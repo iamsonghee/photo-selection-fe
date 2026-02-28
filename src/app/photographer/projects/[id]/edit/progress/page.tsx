@@ -1,22 +1,52 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, Download, Upload } from "lucide-react";
+import { useParams } from "next/navigation";
+import { Check } from "lucide-react";
 import { Button, Card, ProgressBar } from "@/components/ui";
-import { mockProjects, getPhotosByProject } from "@/lib/mock-data";
+import { getProjectById, getPhotosWithSelections } from "@/lib/db";
 import { addDays, format } from "date-fns";
+import type { Project, Photo } from "@/types";
 import { EditProgressActions } from "./EditProgressActions";
 
-export default async function EditProgressPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const project = mockProjects.find((p) => p.id === id);
+export default function EditProgressPage() {
+  const params = useParams();
+  const id = params.id as string;
+  const [project, setProject] = useState<Project | null>(null);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [photoStates, setPhotoStates] = useState<Record<string, { rating?: number; color?: string; comment?: string }>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getProjectById(id)
+      .then((p) => {
+        setProject(p);
+        if (!p?.id) return;
+        return getPhotosWithSelections(p.id);
+      })
+      .then((result) => {
+        if (!result) return;
+        const selected = result.photos.filter((p) => result.selectedIds.has(p.id));
+        selected.sort((a, b) => a.orderIndex - b.orderIndex);
+        setPhotos(selected);
+        setPhotoStates(result.photoStates ?? {});
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <p className="text-zinc-400">로딩 중...</p>
+      </div>
+    );
+  }
   if (!project) return null;
 
-  const photos = getPhotosByProject(id).filter((p) => p.selected);
   const completedCount = Math.floor(photos.length * 0.3);
-  const nextPhoto = photos.find((p) => p.photographerMemo || p.comment);
+  const nextPhoto = photos.find((p) => photoStates[p.id]?.comment);
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -26,11 +56,11 @@ export default async function EditProgressPage({
         <h3 className="mb-3 text-base font-medium text-zinc-200">보정 진행 현황</h3>
         <p className="font-mono text-2xl text-white">
           완료 {completedCount}/{photos.length}장 (
-          {Math.round((completedCount / photos.length) * 100)}%)
+          {photos.length ? Math.round((completedCount / photos.length) * 100) : 0}%)
         </p>
         <ProgressBar
           value={completedCount}
-          max={photos.length}
+          max={photos.length || 1}
           variant="success"
           className="mt-3"
           showLabel
@@ -49,13 +79,13 @@ export default async function EditProgressPage({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm text-zinc-400">
-                별점 {nextPhoto.tag?.star ?? "-"} · {nextPhoto.tag?.color ?? "태그 없음"}
+                별점 {photoStates[nextPhoto.id]?.rating ?? nextPhoto.tag?.star ?? "-"} ·{" "}
+                {photoStates[nextPhoto.id]?.color ?? nextPhoto.tag?.color ?? "태그 없음"}
               </p>
-              {nextPhoto.comment && (
-                <p className="mt-1 text-sm text-zinc-300">고객: {nextPhoto.comment}</p>
-              )}
-              {nextPhoto.photographerMemo && (
-                <p className="mt-1 text-sm text-primary">메모: {nextPhoto.photographerMemo}</p>
+              {(photoStates[nextPhoto.id]?.comment || nextPhoto.comment) && (
+                <p className="mt-1 text-sm text-zinc-300">
+                  고객: {photoStates[nextPhoto.id]?.comment ?? nextPhoto.comment}
+                </p>
               )}
               <div className="mt-4 flex gap-2">
                 <Button variant="primary" size="sm" className="flex items-center gap-1">

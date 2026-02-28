@@ -3,16 +3,29 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
-import { updateProject } from "@/lib/mock-data";
+import { updateProject } from "@/lib/db";
 
 export function ConfirmCancelButton({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleConfirm = () => {
-    updateProject(projectId, { status: "selecting" });
-    setOpen(false);
-    router.refresh();
+  const handleConfirm = async () => {
+    setSubmitting(true);
+    try {
+      await updateProject(projectId, { status: "selecting" });
+      await fetch("/api/photographer/project-logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: projectId, action: "selecting" }),
+      }).catch(() => {});
+      setOpen(false);
+      router.refresh();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -30,8 +43,13 @@ export function ConfirmCancelButton({ projectId }: { projectId: string }) {
               <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>
                 아니오
               </Button>
-              <Button variant="primary" className="flex-1" onClick={handleConfirm}>
-                예, 취소합니다
+              <Button
+                variant="primary"
+                className="flex-1"
+                onClick={handleConfirm}
+                disabled={submitting}
+              >
+                {submitting ? "처리 중..." : "예, 취소합니다"}
               </Button>
             </div>
           </div>

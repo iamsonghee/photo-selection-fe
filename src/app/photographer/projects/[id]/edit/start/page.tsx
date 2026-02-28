@@ -1,15 +1,55 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { Button, Card } from "@/components/ui";
-import { mockProjects } from "@/lib/mock-data";
+import { getProjectById, updateProject } from "@/lib/db";
+import type { Project } from "@/types";
 
-export default async function EditStartPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const project = mockProjects.find((p) => p.id === id);
+export default function EditStartPage() {
+  const params = useParams();
+  const router = useRouter();
+  const id = params.id as string;
+  const [project, setProject] = useState<Project | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    getProjectById(id)
+      .then((p) => {
+        setProject(p);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [id]);
+
+  const handleStartEditing = async () => {
+    if (!project) return;
+    setSubmitting(true);
+    try {
+      await updateProject(id, { status: "editing" });
+      await fetch("/api/photographer/project-logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: id, action: "editing" }),
+      }).catch(() => {});
+      router.push(`/photographer/projects/${id}/edit/progress`);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <p className="text-zinc-400">로딩 중...</p>
+      </div>
+    );
+  }
   if (!project) return null;
 
   return (
@@ -33,11 +73,15 @@ export default async function EditStartPage({
             취소
           </Button>
         </Link>
-        <Link href={`/photographer/projects/${id}/edit/progress`} className="flex-1">
-          <Button variant="danger" fullWidth>
-            보정 시작 확인
-          </Button>
-        </Link>
+        <Button
+          variant="danger"
+          fullWidth
+          className="flex-1"
+          onClick={handleStartEditing}
+          disabled={submitting}
+        >
+          {submitting ? "처리 중..." : "보정 시작 확인"}
+        </Button>
       </div>
     </div>
   );

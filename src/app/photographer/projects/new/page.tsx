@@ -1,13 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { addDays, format, isBefore } from "date-fns";
 import { Button, Card, Input } from "@/components/ui";
-import { MOCK_NEW_PROJECT_ID } from "@/lib/mock-data";
+import { supabase } from "@/lib/supabase";
+import { createProject, getPhotographerIdByAuthId } from "@/lib/db";
+
+/** catch된 값에서 사용자에게 보여줄 메시지 추출 (Supabase 등 비열거 속성 대응) */
+function getErrorMessage(e: unknown): string {
+  if (e instanceof Error && e.message) return e.message;
+  if (e && typeof e === "object") {
+    const o = e as Record<string, unknown>;
+    const parts = [o.message, o.details, o.hint, o.code].filter(Boolean);
+    if (parts.length) return parts.join(" ");
+    const fromKeys = Object.getOwnPropertyNames(e)
+      .map((k) => `${k}: ${(e as Record<string, unknown>)[k]}`)
+      .join(", ");
+    if (fromKeys) return fromKeys;
+  }
+  return String(e) || "프로젝트 생성에 실패했습니다.";
+}
 
 const deadlineOptions = [
   { label: "7일", days: 7 },
@@ -39,6 +55,8 @@ export default function NewProjectPage() {
   const router = useRouter();
   const [deadlineType, setDeadlineType] = useState<"quick" | "custom">("quick");
   const [quickDays, setQuickDays] = useState<number>(14);
+  const [submitting, setSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const today = format(new Date(), "yyyy-MM-dd");
 
   const {
@@ -67,8 +85,43 @@ export default function NewProjectPage() {
     ? `D+${Math.max(0, Math.ceil((resolvedDeadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))}`
     : "";
 
-  const onSubmit = (_data: FormData) => {
-    router.push(`/photographer/projects/${MOCK_NEW_PROJECT_ID}/upload`);
+  const onSubmit = async (data: FormData) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user?.id) throw new Error("로그인이 필요합니다.");
+    const photographerId = await getPhotographerIdByAuthId(user.id);
+    if (!photographerId) throw new Error("사진작가 계정 정보를 찾을 수 없습니다.");
+    setAuthError(null);
+    setSubmitting(true);
+    try {
+      const deadline =
+        deadlineType === "quick"
+          ? addDays(new Date(), quickDays)
+          : data.customDeadline
+            ? new Date(data.customDeadline)
+            : addDays(new Date(), 14);
+      const id = await createProject({
+        name: data.projectName,
+        customer_name: data.customerName,
+        shoot_date: data.shootDate,
+        deadline: format(deadline, "yyyy-MM-dd"),
+        required_count: data.requiredCount,
+        photographer_id: photographerId,
+      });
+      await fetch("/api/photographer/project-logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: id, action: "created" }),
+      }).catch(() => {});
+      router.push(`/photographer/projects/${id}/upload`);
+    } catch (e) {
+      const msg = getErrorMessage(e);
+      console.error("[프로젝트 생성 실패]", msg, e);
+      setAuthError(msg);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -166,8 +219,17 @@ export default function NewProjectPage() {
         />
         <p className="-mt-2 text-xs text-zinc-500">일반적으로 150~300장을 추천합니다</p>
 
-        <Button type="submit" variant="primary" size="lg" fullWidth disabled={!isValid}>
-          프로젝트 생성
+        {authError && (
+          <p className="text-sm text-red-400">{authError}</p>
+        )}
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          fullWidth
+          disabled={!isValid || submitting}
+        >
+          {submitting ? "생성 중..." : "프로젝트 생성"}
         </Button>
       </form>
     </div>

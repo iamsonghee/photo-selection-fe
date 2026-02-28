@@ -5,13 +5,15 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { Button, Card } from "@/components/ui";
-import { getProjectByToken } from "@/lib/mock-data";
+import { useSelectionOptional } from "@/contexts/SelectionContext";
 
 export default function InvitePageClient() {
   const router = useRouter();
   const params = useParams();
   const token = (params?.token as string) ?? "";
-  const project = getProjectByToken(token);
+  const ctx = useSelectionOptional();
+  const project = ctx?.project ?? null;
+  const loading = ctx?.loading ?? true;
 
   useEffect(() => {
     if (!project) return;
@@ -24,6 +26,14 @@ export default function InvitePageClient() {
       return;
     }
   }, [project, token, router]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#0a0b0d] px-4">
+        <p className="text-zinc-400">로딩 중...</p>
+      </div>
+    );
+  }
 
   if (!project) {
     return (

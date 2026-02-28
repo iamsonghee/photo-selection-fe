@@ -5,8 +5,7 @@ import { useParams } from "next/navigation";
 import { useMemo } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { getProjectByToken, getPhotosByProject } from "@/lib/mock-data";
-import { loadConfirmedData } from "@/lib/confirmed-storage";
+import { useSelectionOptional } from "@/contexts/SelectionContext";
 import type { ColorTag } from "@/types";
 
 const COLOR_HEX: Record<ColorTag, string> = {
@@ -25,29 +24,22 @@ function getTestImageUrl(photoId: string, size = "400/300") {
 export default function LockedPage() {
   const params = useParams();
   const token = (params?.token as string) ?? "";
-  const project = getProjectByToken(token);
+  const ctx = useSelectionOptional();
+  const project = ctx?.project ?? null;
 
   const { photos, N, photoStates } = useMemo(() => {
-    if (!project) return { photos: [], N: 0, photoStates: {} as Record<string, { rating?: number; color?: ColorTag }> };
-    const allPhotos = getPhotosByProject(project.id);
-    const stored = loadConfirmedData(token);
-    if (stored?.selectedIds?.length) {
-      const idSet = new Set(stored.selectedIds);
-      const filtered = allPhotos.filter((p) => idSet.has(p.id));
-      filtered.sort((a, b) => a.orderIndex - b.orderIndex);
-      return {
-        photos: filtered,
-        N: filtered.length,
-        photoStates: stored.photoStates ?? {},
-      };
+    if (!project || !ctx?.photos?.length || !ctx?.selectedIds?.size) {
+      return { photos: [] as import("@/types").Photo[], N: 0, photoStates: ctx?.photoStates ?? {} };
     }
-    const fallback = allPhotos.filter((p) => p.selected);
+    const idSet = ctx.selectedIds;
+    const filtered = ctx.photos.filter((p) => idSet.has(p.id));
+    filtered.sort((a, b) => a.orderIndex - b.orderIndex);
     return {
-      photos: fallback,
-      N: fallback.length,
-      photoStates: {} as Record<string, { rating?: number; color?: ColorTag }>,
+      photos: filtered,
+      N: filtered.length,
+      photoStates: ctx.photoStates ?? {},
     };
-  }, [project, token]);
+  }, [project, ctx?.photos, ctx?.selectedIds, ctx?.photoStates]);
 
   if (!project) return null;
 
@@ -119,7 +111,7 @@ export default function LockedPage() {
               className="relative aspect-[4/3] overflow-hidden rounded-xl bg-[#1a1d24] border-2 border-[#2ed573]/35 cursor-default"
             >
               <img
-                src={getTestImageUrl(photo.id)}
+                src={photo.url || getTestImageUrl(photo.id)}
                 alt=""
                 className="h-full w-full object-cover block"
               />

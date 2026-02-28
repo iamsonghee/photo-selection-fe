@@ -31,7 +31,7 @@ export const mockProjects: Project[] = [
     requiredCount: 200,
     photoCount: 150,
     status: "preparing",
-    inviteToken: "inv-mock-new",
+    accessToken: "inv-mock-new",
     customerCancelCount: 0,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -46,7 +46,7 @@ export const mockProjects: Project[] = [
     requiredCount: 10,
     photoCount: 280,
     status: "selecting",
-    inviteToken: "inv-abc-001",
+    accessToken: "inv-abc-001",
     customerCancelCount: 0,
     createdAt: "2026-02-15T10:00:00Z",
     updatedAt: "2026-02-20T14:30:00Z",
@@ -61,7 +61,7 @@ export const mockProjects: Project[] = [
     requiredCount: 150,
     photoCount: 150,
     status: "confirmed",
-    inviteToken: "inv-abc-002",
+    accessToken: "inv-abc-002",
     customerCancelCount: 0,
     confirmedAt: "2026-02-18T16:00:00Z",
     createdAt: "2026-02-05T09:00:00Z",
@@ -77,7 +77,7 @@ export const mockProjects: Project[] = [
     requiredCount: 80,
     photoCount: 120,
     status: "editing",
-    inviteToken: "inv-abc-003",
+    accessToken: "inv-abc-003",
     customerCancelCount: 0,
     confirmedAt: "2026-02-18T16:00:00Z",
     createdAt: "2026-01-25T10:00:00Z",
@@ -93,7 +93,7 @@ export const mockProjects: Project[] = [
     requiredCount: 100,
     photoCount: 60,
     status: "preparing",
-    inviteToken: "inv-abc-004",
+    accessToken: "inv-abc-004",
     customerCancelCount: 0,
     createdAt: "2026-02-16T10:00:00Z",
     updatedAt: "2026-02-16T10:00:00Z",
@@ -108,7 +108,7 @@ export const mockProjects: Project[] = [
     requiredCount: 200,
     photoCount: 250,
     status: "editing",
-    inviteToken: "inv-mno-005",
+    accessToken: "inv-mno-005",
     customerCancelCount: 0,
     confirmedAt: "2026-02-20T14:30:00Z",
     createdAt: "2026-02-05T10:00:00Z",
@@ -124,7 +124,7 @@ export const mockProjects: Project[] = [
     requiredCount: 150,
     photoCount: 180,
     status: "editing",
-    inviteToken: "inv-lock-006",
+    accessToken: "inv-lock-006",
     customerCancelCount: 0,
     confirmedAt: "2026-02-19T12:00:00Z",
     createdAt: "2026-01-28T10:00:00Z",
@@ -176,7 +176,7 @@ export function getPhotosByProject(projectId: string): Photo[] {
 // token 불일치 시 null 반환 (fallback 사용 안 함) → UI에서 "존재하지 않는 초대 링크" 표시
 export function getProjectByToken(token: string | undefined | null): Project | undefined {
   if (token == null || token === "") return undefined;
-  return mockProjects.find((p) => p.inviteToken === token) ?? undefined;
+  return mockProjects.find((p) => p.accessToken === token) ?? undefined;
 }
 
 // ========== 프로젝트 상태 변경 (확정 취소 등) ==========

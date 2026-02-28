@@ -1,21 +1,66 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Camera } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function AuthPage() {
-  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const supabase = createClient();
 
-  const handleGoogleLogin = () => {
-    console.log("Google 로그인 시도");
-    router.push("/photographer/dashboard");
+  useEffect(() => {
+    const err = searchParams.get("error");
+    if (err) setError(decodeURIComponent(err));
+  }, [searchParams]);
+
+  const handleGoogleLogin = async () => {
+    setError(null);
+    setLoading("google");
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+    if (!url || !key || url.includes("placeholder") || key.includes("placeholder")) {
+      setError(
+        "NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY를 프로젝트 루트의 .env.local에 설정한 뒤, 개발 서버(npm run dev)를 재시작해 주세요."
+      );
+      setLoading(null);
+      return;
+    }
+    console.log("[Auth] signInWithOAuth(google) 호출");
+    try {
+      const { data, error: err } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
+        },
+      });
+      if (err) {
+        console.error("[Auth] signInWithOAuth error:", err);
+        setError(err.message);
+        setLoading(null);
+        return;
+      }
+      console.log("[Auth] signInWithOAuth 성공, 리다이렉트:", data?.url);
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        setError("로그인 URL을 받지 못했습니다. Supabase Google Provider 설정을 확인하세요.");
+        setLoading(null);
+      }
+    } catch (e) {
+      console.error("[Auth] signInWithOAuth 예외:", e);
+      setError("로그인 중 오류가 발생했습니다.");
+      setLoading(null);
+    }
   };
 
   const handleKakaoLogin = () => {
-    console.log("카카오 로그인 시도");
-    router.push("/photographer/dashboard");
+    console.log("카카오 로그인 시도 (미구현)");
+    setError("카카오 로그인은 준비 중입니다.");
   };
 
   return (
@@ -31,12 +76,18 @@ export default function AuthPage() {
           사진작가를 위한 셀렉 워크플로우
         </p>
 
+        {error && (
+          <p className="mb-4 rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-400">
+            {error}
+          </p>
+        )}
         <div className="space-y-3">
           <Button
             variant="google"
             size="lg"
             fullWidth
             onClick={handleGoogleLogin}
+            disabled={!!loading}
             className="flex items-center justify-center gap-3"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -57,7 +108,7 @@ export default function AuthPage() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            Google로 계속하기
+            {loading === "google" ? "연결 중…" : "Google로 계속하기"}
           </Button>
           <Button
             variant="kakao"

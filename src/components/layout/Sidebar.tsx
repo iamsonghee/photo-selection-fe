@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Camera, LayoutDashboard, FolderOpen, Users, BarChart3, Settings } from "lucide-react";
 import { Button } from "@/components/ui";
-import { mockPhotographer } from "@/lib/mock-data";
 
 const navItems = [
   { href: "/photographer/dashboard", label: "대시보드", icon: LayoutDashboard },
@@ -52,19 +51,11 @@ export function Sidebar() {
       </nav>
       <div className="border-t border-zinc-800 p-3">
         <div className="flex items-center gap-3 rounded-lg p-2">
-          {mockPhotographer.avatarUrl ? (
-            <img
-              src={mockPhotographer.avatarUrl}
-              alt=""
-              className="h-9 w-9 rounded-full object-cover"
-            />
-          ) : (
-            <div className="h-9 w-9 rounded-full bg-zinc-700" />
-          )}
+          <div className="h-9 w-9 rounded-full bg-zinc-700 flex items-center justify-center text-sm font-medium text-zinc-400">
+            👤
+          </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-zinc-200">
-              {mockPhotographer.name}
-            </p>
+            <p className="truncate text-sm font-medium text-zinc-200">작가</p>
             <Button
               variant="ghost"
               size="sm"

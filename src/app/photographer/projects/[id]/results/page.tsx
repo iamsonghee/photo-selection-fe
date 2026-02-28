@@ -1,10 +1,14 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Download, Edit3 } from "lucide-react";
 import { Button, Card } from "@/components/ui";
-import { mockProjects, getPhotosByProject, getCommentsByProject } from "@/lib/mock-data";
-import type { StarRating, ColorTag } from "@/types";
+import { getProjectById, getPhotosWithSelections } from "@/lib/db";
+import type { Project, Photo, StarRating, ColorTag } from "@/types";
 import { ConfirmCancelButton } from "../ConfirmCancelButton";
 import { ResultsActions } from "./ResultsActions";
 
@@ -17,24 +21,54 @@ const colorLabels: Record<ColorTag, string> = {
   purple: "🟣",
 };
 
-export default async function ResultsPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const project = mockProjects.find((p) => p.id === id);
-  if (!project) return null;
+export default function ResultsPage() {
+  const params = useParams();
+  const id = params.id as string;
+  const [project, setProject] = useState<Project | null>(null);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [photoStates, setPhotoStates] = useState<Record<string, { rating?: number; color?: ColorTag; comment?: string }>>({});
+  const [loading, setLoading] = useState(true);
 
-  const photos = getPhotosByProject(id).filter((p) => p.selected);
-  const comments = getCommentsByProject(id);
+  useEffect(() => {
+    getProjectById(id)
+      .then((p) => {
+        if (!p) return;
+        setProject(p);
+        return getPhotosWithSelections(p.id);
+      })
+      .then((result) => {
+        if (!result) return;
+        const selected = result.photos.filter((p) => result.selectedIds.has(p.id));
+        selected.sort((a, b) => a.orderIndex - b.orderIndex);
+        setPhotos(selected);
+        setPhotoStates(result.photoStates ?? {});
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [id]);
+
   const starCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<StarRating, number>;
   const colorCounts = { red: 0, yellow: 0, green: 0, blue: 0, purple: 0 } as Record<ColorTag, number>;
   photos.forEach((p) => {
-    if (p.tag?.star) starCounts[p.tag.star]++;
-    if (p.tag?.color) colorCounts[p.tag.color]++;
+    const state = photoStates[p.id];
+    const star = (state?.rating ?? p.tag?.star) as StarRating | undefined;
+    const color = state?.color ?? p.tag?.color;
+    if (star && star >= 1 && star <= 5) starCounts[star]++;
+    if (color) colorCounts[color]++;
   });
   const total = photos.length;
+  const commentsWithPhoto = photos
+    .filter((p) => photoStates[p.id]?.comment)
+    .map((p) => ({ photoId: p.id, orderIndex: p.orderIndex, text: photoStates[p.id]!.comment! }));
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <p className="text-zinc-400">로딩 중...</p>
+      </div>
+    );
+  }
+  if (!project) return null;
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
@@ -106,33 +140,17 @@ export default async function ResultsPage({
 
       <Card>
         <h3 className="mb-4 text-lg font-medium text-white">고객 코멘트</h3>
-        <div className="mb-4 flex gap-2">
-          {(["all", "retouch", "feedback", "question"] as const).map((tab) => (
-            <button
-              key={tab}
-              className="rounded-lg bg-zinc-800 px-3 py-1.5 text-sm font-medium text-zinc-300"
-            >
-              {tab === "all"
-                ? "모두"
-                : tab === "retouch"
-                  ? "보정요청"
-                  : tab === "feedback"
-                    ? "피드백"
-                    : "질문"}
-            </button>
-          ))}
-        </div>
         <ul className="space-y-3">
-          {comments.slice(0, 5).map((c) => {
-            const photo = photos.find((p) => p.id === c.photoId);
-            return (
-              <li key={c.id} className="rounded-lg border border-zinc-800 p-3">
-                <p className="font-mono text-xs text-zinc-500">사진 #{photo?.orderIndex}</p>
-                <p className="text-sm text-zinc-300">{c.text}</p>
-              </li>
-            );
-          })}
+          {commentsWithPhoto.slice(0, 10).map((c) => (
+            <li key={c.photoId} className="rounded-lg border border-zinc-800 p-3">
+              <p className="font-mono text-xs text-zinc-500">사진 #{c.orderIndex}</p>
+              <p className="text-sm text-zinc-300">{c.text}</p>
+            </li>
+          ))}
         </ul>
+        {commentsWithPhoto.length === 0 && (
+          <p className="text-sm text-zinc-500">코멘트가 없습니다.</p>
+        )}
       </Card>
 
       <Card>

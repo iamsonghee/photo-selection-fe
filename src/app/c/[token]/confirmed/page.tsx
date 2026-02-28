@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { getProjectByToken, mockPhotographer, updateProject } from "@/lib/mock-data";
-import { loadConfirmedData } from "@/lib/confirmed-storage";
+import { useSelectionOptional } from "@/contexts/SelectionContext";
+import { updateProject } from "@/lib/db";
 import { Button } from "@/components/ui";
 
 const CUSTOMER_CANCEL_MAX = 3;
@@ -15,15 +15,12 @@ export default function ConfirmedPage() {
   const params = useParams();
   const router = useRouter();
   const token = (params?.token as string) ?? "";
-  const project = getProjectByToken(token);
+  const ctx = useSelectionOptional();
+  const project = ctx?.project ?? null;
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
-  const N = useMemo(() => {
-    if (!project) return 0;
-    const data = loadConfirmedData(token);
-    if (data?.selectedIds?.length != null) return data.selectedIds.length;
-    return project.requiredCount;
-  }, [project, token]);
+  const N = project?.requiredCount ?? 0;
 
   if (!project) {
     return (
@@ -38,13 +35,17 @@ export default function ConfirmedPage() {
   const remainingCancels = Math.max(0, CUSTOMER_CANCEL_MAX - cancelCount);
   const canCancel = remainingCancels > 0;
 
-  const handleConfirmCancel = () => {
-    updateProject(project.id, {
-      status: "selecting",
-      customerCancelCount: cancelCount + 1,
-    });
-    setCancelModalOpen(false);
-    router.push(`/c/${token}/gallery`);
+  const handleConfirmCancel = async () => {
+    setCancelling(true);
+    try {
+      await updateProject(project.id, { status: "selecting" });
+      setCancelModalOpen(false);
+      router.push(`/c/${token}/gallery`);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const confirmedDate = project.confirmedAt
@@ -177,7 +178,7 @@ export default function ConfirmedPage() {
               {initial}
             </div>
             <div>
-              <div className="text-base font-bold mb-0.5">{mockPhotographer.name}</div>
+              <div className="text-base font-bold mb-0.5">담당 작가</div>
               <div className="text-xs text-[#8b90a0] leading-relaxed">
                 웨딩 & 포트레이트 전문 · 서울 기반
               </div>
@@ -207,10 +208,14 @@ export default function ConfirmedPage() {
             소중한 순간을 함께할 수 있어 영광입니다. 남겨주신 코멘트 꼼꼼히 반영해서 예쁘게 보정해 드릴게요 😊
           </div>
 
-          {/* 확정 취소 */}
+          {/* 확정 취소: confirmed일 때만 노출, editing이면 보정 진행 안내 */}
           <div className="mt-6 pt-6 border-t border-[#252830]">
-            {canCancel ? (
-              <>
+            {project.status === "editing" ? (
+              <p className="text-center text-sm text-[#8b90a0]">
+                현재 보정이 진행 중입니다
+              </p>
+            ) : project.status === "confirmed" ? (
+              canCancel ? (
                 <Button
                   variant="outline"
                   className="w-full border-[#252830] text-[#8b90a0] hover:border-[#ff4757] hover:text-[#ff4757]"
@@ -218,12 +223,12 @@ export default function ConfirmedPage() {
                 >
                   확정 취소
                 </Button>
-              </>
-            ) : (
-              <p className="text-center text-xs text-[#5a5f70]">
-                재선택 횟수를 모두 사용했습니다
-              </p>
-            )}
+              ) : (
+                <p className="text-center text-xs text-[#5a5f70]">
+                  재선택 횟수를 모두 사용했습니다
+                </p>
+              )
+            ) : null}
           </div>
         </section>
       </div>
@@ -243,8 +248,13 @@ export default function ConfirmedPage() {
               >
                 아니오
               </Button>
-              <Button variant="primary" className="flex-1" onClick={handleConfirmCancel}>
-                예, 다시 선택할게요
+              <Button
+                variant="primary"
+                className="flex-1"
+                onClick={handleConfirmCancel}
+                disabled={cancelling}
+              >
+                {cancelling ? "처리 중..." : "예, 다시 선택할게요"}
               </Button>
             </div>
           </div>

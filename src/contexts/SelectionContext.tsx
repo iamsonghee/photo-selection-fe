@@ -10,16 +10,72 @@ import {
 } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { Button, ProgressBar } from "@/components/ui";
-import { loadConfirmedData, saveConfirmedData } from "@/lib/confirmed-storage";
-import { getProjectByToken, getPhotosByProject } from "@/lib/mock-data";
+/** 고객 플로우: API Route 호출 (Service Role로 selections 처리) */
+async function fetchCustomerPhotos(token: string) {
+  const res = await fetch(`/api/c/photos?token=${encodeURIComponent(token)}`);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error ?? "Failed to load");
+  }
+  return res.json();
+}
+
+async function upsertSelectionApi(
+  token: string,
+  projectId: string,
+  photoId: string,
+  state: { rating?: number | null; color_tag?: string | null; comment?: string | null }
+) {
+  const res = await fetch("/api/c/selections", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      token,
+      project_id: projectId,
+      photo_id: photoId,
+      ...state,
+    }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error ?? "Failed");
+  }
+}
+
+async function deleteSelectionApi(token: string, projectId: string, photoId: string) {
+  const res = await fetch("/api/c/selections", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, project_id: projectId, photo_id: photoId }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error ?? "Failed");
+  }
+}
+
+async function confirmProjectApi(token: string, projectId: string) {
+  const res = await fetch("/api/c/confirm", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, project_id: projectId }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error ?? "Failed");
+  }
+}
 import type { StarRating, ColorTag } from "@/types";
 
 export type PhotoState = {
   rating?: StarRating;
   color?: ColorTag;
+  comment?: string;
 };
 
 type SelectionContextValue = {
+  project: import("@/types").Project | null;
+  photos: import("@/types").Photo[];
   selectedIds: Set<string>;
   photoStates: Record<string, PhotoState>;
   Y: number;
@@ -29,6 +85,7 @@ type SelectionContextValue = {
   updatePhotoState: (photoId: string, patch: Partial<PhotoState>) => void;
   projectId: string | null;
   projectStatus: string | null;
+  loading: boolean;
 };
 
 const SelectionContext = createContext<SelectionContextValue | null>(null);
@@ -48,61 +105,88 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const token = (params?.token as string) ?? "";
-  const project = getProjectByToken(token);
 
+  const [project, setProject] = useState<import("@/types").Project | null>(null);
+  const [photos, setPhotos] = useState<import("@/types").Photo[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [photoStates, setPhotoStates] = useState<Record<string, PhotoState>>({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!project?.id) {
+    if (!token) {
+      setProject(null);
+      setPhotos([]);
       setSelectedIds(new Set());
       setPhotoStates({});
+      setLoading(false);
       return;
     }
-    const photos = getPhotosByProject(project.id);
-    // 확정 취소 후 재진입 시: localStorage에 저장된 선택 복원
-    if (project.status === "selecting") {
-      const stored = loadConfirmedData(token);
-      if (stored?.selectedIds?.length) {
-        setSelectedIds(new Set(stored.selectedIds));
-        setPhotoStates(stored.photoStates ?? {});
-        return;
-      }
-    }
-    setSelectedIds(new Set(photos.filter((p) => p.selected).map((p) => p.id)));
-    setPhotoStates(
-      photos.reduce<Record<string, PhotoState>>(
-        (acc, p) => ({
-          ...acc,
-          [p.id]: { rating: p.tag?.star, color: p.tag?.color },
-        }),
-        {}
-      )
-    );
-  }, [project?.id, project?.status, token]);
+    let cancelled = false;
+    setLoading(true);
+    fetchCustomerPhotos(token)
+      .then((data) => {
+        if (cancelled) return;
+        setProject(data.project ?? null);
+        setPhotos(data.photos ?? []);
+        setSelectedIds(new Set(data.selectedIds ?? []));
+        setPhotoStates(data.photoStates ?? {});
+      })
+      .catch((e) => {
+        if (!cancelled) console.error(e);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
-  const updatePhotoState = useCallback((photoId: string, patch: Partial<PhotoState>) => {
-    setPhotoStates((prev) => ({
-      ...prev,
-      [photoId]: { ...prev[photoId], ...patch },
-    }));
-  }, []);
+  const updatePhotoState = useCallback(
+    (photoId: string, patch: Partial<PhotoState>) => {
+      setPhotoStates((prev) => {
+        const next = { ...prev, [photoId]: { ...prev[photoId], ...patch } };
+        if (project?.id && token) {
+          const state = next[photoId];
+          upsertSelectionApi(token, project.id, photoId, {
+            rating: state?.rating ?? null,
+            color_tag: state?.color ?? null,
+            comment: state?.comment ?? null,
+          }).catch(console.error);
+        }
+        return next;
+      });
+    },
+    [project?.id, token]
+  );
 
-  const toggle = useCallback((photoId: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(photoId)) next.delete(photoId);
-      else next.add(photoId);
-      return next;
-    });
-  }, []);
+  const toggle = useCallback(
+    (photoId: string) => {
+      if (!project?.id || !token) return;
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(photoId)) {
+          next.delete(photoId);
+          deleteSelectionApi(token, project.id, photoId).catch(console.error);
+        } else {
+          next.add(photoId);
+          upsertSelectionApi(token, project.id, photoId, {
+            rating: photoStates[photoId]?.rating ?? null,
+            color_tag: photoStates[photoId]?.color ?? null,
+            comment: photoStates[photoId]?.comment ?? null,
+          }).catch(console.error);
+        }
+        return next;
+      });
+    },
+    [project?.id, token, photoStates]
+  );
 
   const isSelected = useCallback(
     (photoId: string) => selectedIds.has(photoId),
     [selectedIds]
   );
 
-  // Y = 선택된 사진 수 (반드시 selectedIds.size 로만 계산)
   const Y = selectedIds.size;
   const N = project?.requiredCount ?? 0;
   const projectId = project?.id ?? null;
@@ -110,6 +194,8 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<SelectionContextValue>(
     () => ({
+      project,
+      photos,
       selectedIds,
       photoStates,
       Y,
@@ -119,8 +205,22 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       updatePhotoState,
       projectId,
       projectStatus,
+      loading,
     }),
-    [selectedIds, photoStates, Y, N, toggle, isSelected, updatePhotoState, projectId, projectStatus]
+    [
+      project,
+      photos,
+      selectedIds,
+      photoStates,
+      Y,
+      N,
+      toggle,
+      isSelected,
+      updatePhotoState,
+      projectId,
+      projectStatus,
+      loading,
+    ]
   );
 
   const showBar =
@@ -129,11 +229,16 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const canConfirm = Y === N;
 
-  const handleFinalConfirm = useCallback(() => {
-    saveConfirmedData(token, selectedIds, photoStates);
-    setShowConfirmModal(false);
-    router.push(`/c/${token}/confirmed`);
-  }, [token, selectedIds, photoStates, router]);
+  const handleFinalConfirm = useCallback(async () => {
+    if (!projectId || !token) return;
+    try {
+      await confirmProjectApi(token, projectId);
+      setShowConfirmModal(false);
+      router.push(`/c/${token}/confirmed`);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [token, projectId, router]);
 
   return (
     <SelectionContext.Provider value={value}>
