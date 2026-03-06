@@ -1,0 +1,38 @@
+---
+description: Git commit & push 시점 및 커밋 메시지 규칙
+alwaysApply: true
+---
+
+# Git Commit & Push 규칙
+
+## 1. Commit & Push 하는 시점 (아래 두 경우에만)
+
+- **큰 기능 하나가 완료됐을 때**
+- **오늘 작업을 마무리할 때**
+
+큰 작업은 단계별로 나누고, **각 단계 완료 시점에 커밋**한다.
+
+## 2. 실행 방법
+
+```bash
+git add .
+git commit -m "prefix: 작업 내용 간단 요약"
+git push origin main
+```
+
+## 3. 커밋 메시지 prefix
+
+| 용도       | prefix   | 예시                    |
+|-----------|----------|-------------------------|
+| 기능 추가 | `feat:`  | feat: 프로필 이미지 업로드 |
+| 버그 수정 | `fix:`   | fix: 갤러리 로딩 오류     |
+| UI 수정   | `style:` | style: 담당 작가 카드 정리 |
+| 리팩토링  | `refactor:` | refactor: API 응답 타입 정리 |
+
+- 한 줄로 간단히 요약한다.
+- 필요 시 영문 사용 가능: `feat: add profile image upload to settings`
+
+## 4. 주의
+
+- 작은 수정마다 커밋하지 않는다.
+- 기능/단계 단위로 묶어서 커밋한 뒤 push 한다.
