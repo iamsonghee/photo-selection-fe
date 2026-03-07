@@ -24,6 +24,8 @@ export interface Photo {
   projectId: string;
   orderIndex: number;
   url: string; // mock: placeholder or path
+  /** DB original_filename. 없으면 URL에서 추출하거나 number로 fallback */
+  originalFilename?: string | null;
   selected?: boolean;
   tag?: PhotoTag;
   comment?: string;
@@ -34,8 +36,20 @@ export interface Photo {
 // preparing: 작가가 아직 사진 업로드 중 (M < N)
 // selecting: 고객이 사진 셀렉 중
 // confirmed: 고객이 최종확정 완료
-// editing:   작가가 보정 시작 (Lock 상태)
-export type ProjectStatus = "preparing" | "selecting" | "confirmed" | "editing";
+// editing:   작가가 보정 중
+// reviewing_v1: 고객이 v1 검토 중
+// editing_v2:   작가가 v2 재보정 중
+// reviewing_v2: 고객이 v2 검토 중
+// delivered:   최종 완료
+export type ProjectStatus =
+  | "preparing"
+  | "selecting"
+  | "confirmed"
+  | "editing"
+  | "reviewing_v1"
+  | "editing_v2"
+  | "reviewing_v2"
+  | "delivered";
 
 export interface Project {
   id: string;
@@ -49,6 +63,7 @@ export interface Project {
   status: ProjectStatus;
   accessToken: string;
   confirmedAt?: string; // ISO, when customer final-confirmed
+  deliveredAt?: string; // ISO, when status = delivered
   /** 고객이 확정 취소한 횟수 (최대 3회, 고객 측 "확정 취소"용) */
   customerCancelCount?: number;
   createdAt: string;
@@ -80,11 +95,32 @@ export interface ActivityLog {
 }
 
 // ========== 갤러리 필터 ==========
-export type SortOrder = "newest" | "oldest";
+export type SortOrder = "newest" | "oldest" | "filename";
 
 // ========== N 변경 알림 (고객 갤러리) ==========
 export interface NChangeNotice {
   previousN: number;
   newN: number;
   noticedAt: string;
+}
+
+// ========== 보정본 검토 (목업/추후 DB) ==========
+export type ReviewStatus = "approved" | "revision_requested";
+
+export interface PhotoVersion {
+  id: string;
+  photoId: string;
+  version: 1 | 2;
+  r2Url: string;
+  photographerMemo: string | null;
+  createdAt: string;
+}
+
+export interface VersionReview {
+  id: string;
+  photoVersionId: string;
+  photoId: string;
+  status: ReviewStatus;
+  customerComment: string | null;
+  reviewedAt: string | null;
 }

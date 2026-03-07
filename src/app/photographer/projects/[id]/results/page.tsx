@@ -1,25 +1,41 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { Download, Edit3 } from "lucide-react";
+import { Edit3, Clipboard, Download } from "lucide-react";
 import { Button, Card } from "@/components/ui";
 import { getProjectById, getPhotosWithSelections } from "@/lib/db";
-import type { Project, Photo, StarRating, ColorTag } from "@/types";
+import type { Project, Photo, ColorTag } from "@/types";
 import { ConfirmCancelButton } from "../ConfirmCancelButton";
-import { ResultsActions } from "./ResultsActions";
 
-const starLabels: Record<StarRating, string> = { 1: "⭐1", 2: "⭐2", 3: "⭐3", 4: "⭐4", 5: "⭐5" };
-const colorLabels: Record<ColorTag, string> = {
-  red: "🔴",
-  yellow: "🟡",
-  green: "🟢",
-  blue: "🔵",
-  purple: "🟣",
-};
+function sanitizeFilenamePart(s: string) {
+  return s.replace(/[\\/:*?"<>|]/g, "_").trim();
+}
+
+function csvEscape(value: string) {
+  const v = value ?? "";
+  if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+  return v;
+}
+
+function downloadTextFile(filename: string, text: string, mime: string) {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function getDisplayFilename(p: Photo): string {
+  return (p.originalFilename ?? "").trim() || String(p.orderIndex);
+}
 
 export default function ResultsPage() {
   const params = useParams();
@@ -28,6 +44,11 @@ export default function ResultsPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [photoStates, setPhotoStates] = useState<Record<string, { rating?: number; color?: ColorTag; comment?: string }>>({});
   const [loading, setLoading] = useState(true);
+  const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({});
+  const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
+  const [savingMemoIds, setSavingMemoIds] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getProjectById(id)
@@ -39,27 +60,97 @@ export default function ResultsPage() {
       .then((result) => {
         if (!result) return;
         const selected = result.photos.filter((p) => result.selectedIds.has(p.id));
-        selected.sort((a, b) => a.orderIndex - b.orderIndex);
+        selected.sort((a, b) => getDisplayFilename(a).localeCompare(getDisplayFilename(b), undefined, { sensitivity: "base" }));
         setPhotos(selected);
         setPhotoStates(result.photoStates ?? {});
+        setMemoDrafts(
+          selected.reduce<Record<string, string>>((acc, p) => {
+            acc[p.id] = p.photographerMemo ?? "";
+            return acc;
+          }, {})
+        );
       })
-      .catch(console.error)
+      .catch((e) => {
+        console.error(e);
+        setError(e instanceof Error ? e.message : "로드 실패");
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
-  const starCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<StarRating, number>;
-  const colorCounts = { red: 0, yellow: 0, green: 0, blue: 0, purple: 0 } as Record<ColorTag, number>;
-  photos.forEach((p) => {
-    const state = photoStates[p.id];
-    const star = (state?.rating ?? p.tag?.star) as StarRating | undefined;
-    const color = state?.color ?? p.tag?.color;
-    if (star && star >= 1 && star <= 5) starCounts[star]++;
-    if (color) colorCounts[color]++;
-  });
-  const total = photos.length;
-  const commentsWithPhoto = photos
-    .filter((p) => photoStates[p.id]?.comment)
-    .map((p) => ({ photoId: p.id, orderIndex: p.orderIndex, text: photoStates[p.id]!.comment! }));
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const confirmedText = useMemo(() => {
+    if (!project?.confirmedAt) return null;
+    return format(new Date(project.confirmedAt), "yyyy-MM-dd HH:mm", { locale: ko });
+  }, [project?.confirmedAt]);
+
+  const exportBaseName = useMemo(() => {
+    if (!project) return "selections";
+    const p = sanitizeFilenamePart(project.name || "프로젝트");
+    const c = sanitizeFilenamePart(project.customerName || "고객");
+    return `${p}_${c}_selections`;
+  }, [project]);
+
+  const fileNames = useMemo(() => photos.map(getDisplayFilename), [photos]);
+
+  const handleCopyClipboard = async () => {
+    try {
+      const text = fileNames.join("\n");
+      await navigator.clipboard.writeText(text);
+      setToast("클립보드에 복사했습니다");
+    } catch (e) {
+      console.error(e);
+      setToast("복사 실패");
+    }
+  };
+
+  const handleDownloadCsv = () => {
+    const header = ["파일명", "코멘트", "작가메모"].join(",");
+    const rows = photos.map((p) => {
+      const filename = getDisplayFilename(p);
+      const comment = (photoStates[p.id]?.comment ?? "").trim();
+      const memo = (memoDrafts[p.id] ?? p.photographerMemo ?? "").trim();
+      return [csvEscape(filename), csvEscape(comment), csvEscape(memo)].join(",");
+    });
+    downloadTextFile(`${exportBaseName}.csv`, [header, ...rows].join("\n"), "text/csv;charset=utf-8");
+  };
+
+  const handleDownloadTxt = () => {
+    downloadTextFile(`${exportBaseName}.txt`, fileNames.join("\n"), "text/plain;charset=utf-8");
+  };
+
+  const saveMemo = async (photoId: string) => {
+    const memo = memoDrafts[photoId] ?? "";
+    setSavingMemoIds((prev) => new Set(prev).add(photoId));
+    setError(null);
+    try {
+      const res = await fetch(`/api/photographer/photos/${photoId}/memo`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memo }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "메모 저장 실패");
+      const saved = (data.memo as string | null) ?? null;
+      setPhotos((prev) =>
+        prev.map((p) => (p.id === photoId ? { ...p, photographerMemo: saved ?? undefined } : p))
+      );
+      setMemoDrafts((prev) => ({ ...prev, [photoId]: saved ?? "" }));
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : "메모 저장 실패");
+    } finally {
+      setSavingMemoIds((prev) => {
+        const next = new Set(prev);
+        next.delete(photoId);
+        return next;
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -72,101 +163,175 @@ export default function ResultsPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
-      <div className="rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-success">
-        ✅ 고객이 최종확정했습니다! —{" "}
-        {project.confirmedAt &&
-          format(new Date(project.confirmedAt), "yyyy-MM-dd HH:mm", { locale: ko })}
-      </div>
-
-      <div className="flex flex-wrap gap-4">
-        <Link href={`/photographer/projects/${id}/edit/start`}>
-          <Button variant="primary" className="flex items-center gap-2">
-            <Edit3 className="h-4 w-4" />
-            보정 시작
-          </Button>
-        </Link>
-        <ResultsActions />
-        <ConfirmCancelButton projectId={id} />
-      </div>
-
       <Card>
-        <h3 className="mb-4 text-lg font-medium text-white">선택된 사진 ({photos.length}장)</h3>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {photos.slice(0, 16).map((p) => (
-            <div key={p.id} className="aspect-square overflow-hidden rounded-lg bg-zinc-800">
-              <img src={p.url} alt="" className="h-full w-full object-cover" />
-              <p className="p-1 text-center text-xs font-mono text-zinc-400">{p.orderIndex}</p>
-            </div>
-          ))}
-        </div>
-        {photos.length > 16 && (
-          <p className="mt-2 text-sm text-zinc-500">외 {photos.length - 16}장</p>
-        )}
-      </Card>
-
-      <Card>
-        <h3 className="mb-4 text-lg font-medium text-white">태그 분포</h3>
-        <div className="mb-6">
-          <p className="mb-2 text-sm text-zinc-400">별점</p>
-          <div className="space-y-2">
-            {([1, 2, 3, 4, 5] as const).map((s) => (
-              <div key={s} className="flex items-center gap-3">
-                <span className="w-12 text-sm">{starLabels[s]}</span>
-                <div className="h-4 flex-1 overflow-hidden rounded bg-zinc-800">
-                  <div
-                    className="h-full bg-primary"
-                    style={{ width: `${total ? (starCounts[s] / total) * 100 : 0}%` }}
-                  />
-                </div>
-                <span className="w-16 text-right font-mono text-sm text-zinc-400">
-                  {starCounts[s]}장 ({total ? Math.round((starCounts[s] / total) * 100) : 0}%)
-                </span>
-              </div>
-            ))}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-success font-medium">✅ 고객이 최종확정했습니다</p>
+            {confirmedText && (
+              <p className="mt-1 text-sm text-zinc-400">확정일시: {confirmedText}</p>
+            )}
           </div>
-        </div>
-        <div>
-          <p className="mb-2 text-sm text-zinc-400">색상</p>
-          <div className="flex flex-wrap gap-4">
-            {(["red", "yellow", "green", "blue", "purple"] as const).map((c) => (
-              <span key={c} className="text-sm">
-                {colorLabels[c]} {colorCounts[c]}장 (
-                {total ? Math.round((colorCounts[c] / total) * 100) : 0}%)
-              </span>
-            ))}
+          <div className="flex flex-wrap gap-2">
+            {project.status === "editing" && (
+              <Link href={`/photographer/projects/${id}/upload-versions`}>
+                <Button variant="primary" className="flex items-center gap-2">
+                  <span aria-hidden>📤</span>
+                  보정본 업로드
+                </Button>
+              </Link>
+            )}
+            <Link href={`/photographer/projects/${id}/edit/start`}>
+              <Button variant="primary" className="flex items-center gap-2">
+                <span aria-hidden>🎨</span>
+                보정 시작
+              </Button>
+            </Link>
+            <ConfirmCancelButton projectId={id} />
           </div>
         </div>
       </Card>
 
       <Card>
-        <h3 className="mb-4 text-lg font-medium text-white">고객 코멘트</h3>
-        <ul className="space-y-3">
-          {commentsWithPhoto.slice(0, 10).map((c) => (
-            <li key={c.photoId} className="rounded-lg border border-zinc-800 p-3">
-              <p className="font-mono text-xs text-zinc-500">사진 #{c.orderIndex}</p>
-              <p className="text-sm text-zinc-300">{c.text}</p>
-            </li>
-          ))}
-        </ul>
-        {commentsWithPhoto.length === 0 && (
-          <p className="text-sm text-zinc-500">코멘트가 없습니다.</p>
-        )}
-      </Card>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-lg font-medium text-white">선택된 사진 + 코멘트 ({photos.length}장)</h3>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="flex items-center gap-2" onClick={handleCopyClipboard}>
+              <Clipboard className="h-4 w-4" />
+              클립보드 복사
+            </Button>
+            <Button variant="outline" className="flex items-center gap-2" onClick={handleDownloadCsv}>
+              <Download className="h-4 w-4" />
+              CSV 다운로드
+            </Button>
+            <Button variant="outline" className="flex items-center gap-2" onClick={handleDownloadTxt}>
+              <Download className="h-4 w-4" />
+              TXT 다운로드
+            </Button>
+          </div>
+        </div>
 
-      <Card>
-        <h3 className="mb-4 text-lg font-medium text-white">작가 메모</h3>
-        <p className="text-sm text-zinc-500">사진별 메모 입력 (예: Lightroom 밝기+2)</p>
-        <div className="mt-3 flex gap-2">
-          <input
-            type="text"
-            placeholder="메모 입력"
-            className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-zinc-100 placeholder:text-zinc-500"
-          />
-          <Button variant="secondary" size="sm">
-            저장
-          </Button>
+        {error && (
+          <p className="mt-3 rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
+        )}
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[720px] border-separate border-spacing-0">
+            <thead>
+              <tr className="text-left text-xs text-zinc-500">
+                <th className="px-3 py-2">썸네일</th>
+                <th className="px-3 py-2">파일명</th>
+                <th className="px-3 py-2">코멘트</th>
+                <th className="px-3 py-2">작가 메모</th>
+              </tr>
+            </thead>
+            <tbody className="text-sm">
+              {photos.map((p) => {
+                const filename = getDisplayFilename(p);
+                const comment = (photoStates[p.id]?.comment ?? "").trim();
+                const draft = memoDrafts[p.id] ?? p.photographerMemo ?? "";
+                const saving = savingMemoIds.has(p.id);
+                const isEditing = editingMemoId === p.id;
+                return (
+                  <tr key={p.id} className="border-t border-zinc-800/80">
+                    <td className="px-3 py-2">
+                      <div className="h-[60px] w-[60px] overflow-hidden rounded-lg bg-zinc-800">
+                        <img src={p.url} alt="" className="h-full w-full object-cover" />
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <div className="max-w-[220px] truncate text-zinc-200" title={filename}>
+                        {filename}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <div className="max-w-[320px] whitespace-pre-wrap break-words text-zinc-300">
+                        {comment || "-"}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <input
+                        value={draft}
+                        readOnly={!isEditing || saving}
+                        placeholder="메모 입력"
+                        onClick={() => {
+                          if (saving) return;
+                          setEditingMemoId(p.id);
+                        }}
+                        onChange={(e) =>
+                          setMemoDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            (e.currentTarget as HTMLInputElement).blur();
+                          }
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            setMemoDrafts((prev) => ({ ...prev, [p.id]: p.photographerMemo ?? "" }));
+                            setEditingMemoId(null);
+                            (e.currentTarget as HTMLInputElement).blur();
+                          }
+                        }}
+                        onBlur={async () => {
+                          if (editingMemoId !== p.id) return;
+                          setEditingMemoId(null);
+                          await saveMemo(p.id);
+                        }}
+                        className={`w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors ${
+                          isEditing
+                            ? "border-primary bg-zinc-900 text-zinc-100"
+                            : "border-zinc-800 bg-zinc-900/40 text-zinc-300 hover:border-zinc-700 cursor-pointer"
+                        } ${saving ? "opacity-60" : ""}`}
+                      />
+                      <p className="mt-1 text-xs text-zinc-600">
+                        클릭해서 입력 → Enter/blur로 저장
+                      </p>
+                    </td>
+                  </tr>
+                );
+              })}
+              {photos.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-3 py-6 text-center text-zinc-500">
+                    선택된 사진이 없습니다.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </Card>
+
+      <Card className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-sm text-zinc-400">
+          보정을 시작하면 고객의 갤러리가 잠깁니다
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {project.status === "editing" && (
+            <Link href={`/photographer/projects/${id}/upload-versions`}>
+              <Button variant="primary" className="flex items-center gap-2">
+                <span aria-hidden>📤</span>
+                보정본 업로드
+              </Button>
+            </Link>
+          )}
+          <Link href={`/photographer/projects/${id}/edit/start`}>
+            <Button variant="primary" className="flex items-center gap-2">
+              <span aria-hidden>🎨</span>
+              보정 시작
+            </Button>
+          </Link>
+        </div>
+      </Card>
+
+      {toast && (
+        <div
+          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-white shadow-lg ring-1 ring-zinc-700"
+          role="status"
+        >
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

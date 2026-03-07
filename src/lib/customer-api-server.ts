@@ -4,7 +4,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminClient } from "@/lib/supabase-admin";
-import type { Project, Photo } from "@/types";
+import type { Project, Photo, ProjectStatus } from "@/types";
 import type { PhotoState } from "@/contexts/SelectionContext";
 import type { Database } from "@/types/supabase";
 
@@ -22,9 +22,10 @@ function mapProjectRow(row: ProjectsRow): Project {
     deadline: row.deadline,
     requiredCount: row.required_count,
     photoCount: row.photo_count ?? 0,
-    status: row.status,
+    status: row.status as ProjectStatus,
     accessToken: row.access_token,
     confirmedAt: row.confirmed_at ?? undefined,
+    deliveredAt: (row as { delivered_at?: string | null }).delivered_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -41,6 +42,7 @@ function mapPhotoRow(
     projectId: row.project_id,
     orderIndex: row.number,
     url: row.r2_thumb_url,
+    originalFilename: row.original_filename ?? null,
     selected: selectedIds.has(pid),
     tag: photoStates[pid]
       ? { star: photoStates[pid].rating as 1 | 2 | 3 | 4 | 5 | undefined, color: photoStates[pid].color }
@@ -152,4 +154,92 @@ export async function validateTokenAndProject(
   const project = await getProjectByToken(admin, token);
   if (!project || project.id !== projectId) return null;
   return project;
+}
+
+// ---------- 보정본 검토 데이터 (GET /api/c/review) ----------
+
+export interface ReviewPhotoItem {
+  id: string;
+  photoVersionId: string;
+  originalFilename: string;
+  originalUrl: string;
+  versionUrl: string;
+  photographerMemo: string | null;
+  orderIndex: number;
+  /** 이미 제출된 검토가 있으면 */
+  existingReview?: { status: "approved" | "revision_requested"; customerComment: string | null };
+}
+
+export interface ReviewDataResponse {
+  project: Project;
+  globalPhotographerMemo: string | null;
+  photos: ReviewPhotoItem[];
+}
+
+/** access_token으로 프로젝트 + 현재 버전의 photo_versions + version_reviews 조회 */
+export async function getReviewDataByToken(
+  admin: SupabaseClient,
+  token: string
+): Promise<ReviewDataResponse | null> {
+  const project = await getProjectByToken(admin, token);
+  if (!project) return null;
+  if (project.status !== "reviewing_v1" && project.status !== "reviewing_v2") return null;
+
+  const version = project.status === "reviewing_v2" ? 2 : 1;
+
+  const { data: selections } = await admin
+    .from("selections")
+    .select("photo_id")
+    .eq("project_id", project.id);
+  const photoIds = (selections ?? []).map((s: { photo_id: string }) => s.photo_id);
+  if (photoIds.length === 0) return { project, globalPhotographerMemo: null, photos: [] };
+
+  const { data: photosRows, error: photosErr } = await admin
+    .from("photos")
+    .select("id, number, r2_thumb_url, original_filename")
+    .in("id", photoIds)
+    .order("number", { ascending: true });
+  if (photosErr || !photosRows?.length) return { project, globalPhotographerMemo: null, photos: [] };
+
+  const { data: pvRows, error: pvErr } = await admin
+    .from("photo_versions")
+    .select("id, photo_id, r2_url, photographer_memo")
+    .in("photo_id", photoIds)
+    .eq("version", version);
+  if (pvErr) return { project, globalPhotographerMemo: null, photos: [] };
+
+  const pvByPhotoId = new Map((pvRows ?? []).map((r: { photo_id: string; id: string; r2_url: string; photographer_memo: string | null }) => [r.photo_id, r]));
+  const pvIds = (pvRows ?? []).map((r: { id: string }) => r.id);
+
+  const { data: reviewRows } = await admin
+    .from("version_reviews")
+    .select("photo_version_id, status, customer_comment")
+    .in("photo_version_id", pvIds);
+  const reviewByPvId = new Map(
+    (reviewRows ?? []).map((r: { photo_version_id: string; status: string; customer_comment: string | null }) => [
+      r.photo_version_id,
+      { status: r.status as "approved" | "revision_requested", customerComment: r.customer_comment },
+    ])
+  );
+
+  const photos: ReviewPhotoItem[] = [];
+  for (const row of photosRows as Array<{ id: string; number: number; r2_thumb_url: string; original_filename: string | null }>) {
+    const pv = pvByPhotoId.get(row.id);
+    if (!pv) continue;
+    const existing = reviewByPvId.get(pv.id);
+    photos.push({
+      id: row.id,
+      photoVersionId: pv.id,
+      originalFilename: (row.original_filename ?? "").trim() || String(row.number),
+      originalUrl: row.r2_thumb_url,
+      versionUrl: (pv as { r2_url: string }).r2_url,
+      photographerMemo: (pv as { photographer_memo: string | null }).photographer_memo ?? null,
+      orderIndex: row.number,
+      existingReview: existing,
+    });
+  }
+  photos.sort((a, b) => a.orderIndex - b.orderIndex);
+
+  const globalPhotographerMemo = null;
+  return { project, globalPhotographerMemo, photos };
 }

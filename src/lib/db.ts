@@ -1,7 +1,11 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import type { Project, Photo } from "@/types";
+import type { Project, Photo, ProjectStatus } from "@/types";
 import type { PhotoState } from "@/contexts/SelectionContext";
 import type { Database } from "@/types/supabase";
+
+type PhotoVersionRow = Database["public"]["Tables"]["photo_versions"]["Row"];
+type VersionReviewRow = Database["public"]["Tables"]["version_reviews"]["Row"];
 
 /** DB projects row → app Project */
 function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Project {
@@ -14,9 +18,10 @@ function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Pr
     deadline: row.deadline,
     requiredCount: row.required_count,
     photoCount: row.photo_count ?? 0,
-    status: row.status,
+    status: row.status as ProjectStatus,
     accessToken: row.access_token,
     confirmedAt: row.confirmed_at ?? undefined,
+    deliveredAt: row.delivered_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -36,6 +41,8 @@ function mapPhotoRow(
     projectId: row.project_id,
     orderIndex: row.number,
     url: row.r2_thumb_url,
+    originalFilename: row.original_filename ?? null,
+    photographerMemo: row.memo ?? undefined,
     selected,
     tag: state ? { star: state.rating as 1 | 2 | 3 | 4 | 5 | undefined, color: state.color } : undefined,
     comment: undefined,
@@ -187,7 +194,7 @@ export async function createProject(params: {
   return data.id;
 }
 
-/** 프로젝트 수정 (name, customer_name, shoot_date, deadline, required_count) */
+/** 프로젝트 수정 (name, customer_name, shoot_date, deadline, required_count, status 등) */
 export async function updateProject(
   id: string,
   patch: Partial<{
@@ -196,8 +203,9 @@ export async function updateProject(
     shoot_date: string;
     deadline: string;
     required_count: number;
-    status: "preparing" | "selecting" | "confirmed" | "editing";
+    status: ProjectStatus;
     confirmed_at: string | null;
+    delivered_at: string | null;
   }>
 ): Promise<void> {
   const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -208,6 +216,7 @@ export async function updateProject(
   if (patch.required_count != null) payload.required_count = patch.required_count;
   if (patch.status != null) payload.status = patch.status;
   if (patch.confirmed_at !== undefined) payload.confirmed_at = patch.confirmed_at;
+  if (patch.delivered_at !== undefined) payload.delivered_at = patch.delivered_at;
 
   const { error } = await supabase.from("projects").update(payload).eq("id", id);
   if (error) throw error;
@@ -247,6 +256,7 @@ export async function getPhotosWithSelections(
     photoStates[s.photo_id] = {
       rating: (s.rating as 1 | 2 | 3 | 4 | 5) ?? undefined,
       color: (s.color_tag as PhotoState["color"]) ?? undefined,
+      comment: s.comment ?? undefined,
     };
   }
 
@@ -294,4 +304,181 @@ export async function confirmProject(projectId: string): Promise<void> {
     status: "confirmed",
     confirmed_at: new Date().toISOString(),
   });
+}
+
+// ---------- 보정본 검토 (photo_versions, version_reviews) ----------
+
+export interface PhotoVersionRecord {
+  id: string;
+  photoId: string;
+  version: 1 | 2;
+  r2Url: string;
+  photographerMemo: string | null;
+  createdAt: string;
+}
+
+export interface VersionReviewRecord {
+  id: string;
+  photoVersionId: string;
+  photoId: string;
+  status: "approved" | "revision_requested";
+  customerComment: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+function mapPhotoVersionRow(row: PhotoVersionRow): PhotoVersionRecord {
+  return {
+    id: row.id,
+    photoId: row.photo_id,
+    version: row.version as 1 | 2,
+    r2Url: row.r2_url,
+    photographerMemo: row.photographer_memo ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+function mapVersionReviewRow(row: VersionReviewRow): VersionReviewRecord {
+  return {
+    id: row.id,
+    photoVersionId: row.photo_version_id,
+    photoId: row.photo_id,
+    status: row.status,
+    customerComment: row.customer_comment ?? null,
+    reviewedAt: row.reviewed_at ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+/** 프로젝트의 선택된 사진에 대한 photo_versions 조회 (photos JOIN). version 필터 optional */
+export async function getPhotoVersionsByProjectId(
+  projectId: string,
+  version?: 1 | 2
+): Promise<PhotoVersionRecord[]> {
+  const { data: selections } = await supabase
+    .from("selections")
+    .select("photo_id")
+    .eq("project_id", projectId);
+  const photoIds = (selections?.data ?? []).map((s: { photo_id: string }) => s.photo_id);
+  if (photoIds.length === 0) return [];
+
+  let query = supabase
+    .from("photo_versions")
+    .select("*")
+    .in("photo_id", photoIds);
+  if (version != null) query = query.eq("version", version);
+  const { data, error } = await query.order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((row) => mapPhotoVersionRow(row as PhotoVersionRow));
+}
+
+/** 프로젝트 내 선택된 사진의 version_reviews 조회 (photo_versions JOIN 후 photo_id로 photos.project_id 필터) */
+export async function getVersionReviewsByProjectId(
+  projectId: string
+): Promise<VersionReviewRecord[]> {
+  const photoIds = await getSelectedPhotoIds(projectId);
+  if (photoIds.length === 0) return [];
+
+  const { data: pvRows, error: pvError } = await supabase
+    .from("photo_versions")
+    .select("id, photo_id")
+    .in("photo_id", photoIds);
+  if (pvError) throw pvError;
+  const pvIds = (pvRows ?? []).map((r: { id: string }) => r.id);
+  if (pvIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("version_reviews")
+    .select("*")
+    .in("photo_version_id", pvIds);
+  if (error) throw error;
+  return (data ?? []).map((row) => mapVersionReviewRow(row as VersionReviewRow));
+}
+
+async function getSelectedPhotoIds(projectId: string): Promise<string[]> {
+  const { data } = await supabase
+    .from("selections")
+    .select("photo_id")
+    .eq("project_id", projectId);
+  return (data ?? []).map((s: { photo_id: string }) => s.photo_id);
+}
+
+/** photo_versions 일괄 INSERT */
+export async function createPhotoVersions(
+  versions: Array<{
+    photo_id: string;
+    version: 1 | 2;
+    r2_url: string;
+    photographer_memo?: string | null;
+  }>
+): Promise<void> {
+  if (versions.length === 0) return;
+  const rows = versions.map((v) => ({
+    photo_id: v.photo_id,
+    version: v.version,
+    r2_url: v.r2_url,
+    photographer_memo: v.photographer_memo ?? null,
+  }));
+  const { error } = await supabase.from("photo_versions").insert(rows);
+  if (error) throw error;
+}
+
+/** version_reviews UPSERT (photo_version_id 기준) */
+export async function upsertVersionReview(params: {
+  photo_version_id: string;
+  photo_id: string;
+  status: "approved" | "revision_requested";
+  customer_comment?: string | null;
+}): Promise<void> {
+  const { error } = await supabase.from("version_reviews").upsert(
+    {
+      photo_version_id: params.photo_version_id,
+      photo_id: params.photo_id,
+      status: params.status,
+      customer_comment: params.customer_comment ?? null,
+      reviewed_at: new Date().toISOString(),
+    },
+    { onConflict: "photo_version_id" } as { onConflict?: string }
+  );
+  if (error) throw error;
+}
+
+/** 고객 검토 최종 제출: version_reviews 일괄 INSERT 후 project status 업데이트 (admin 클라이언트 사용) */
+export async function submitVersionReviews(
+  admin: SupabaseClient,
+  projectId: string,
+  reviews: Array<{
+    photo_version_id: string;
+    photo_id: string;
+    status: "approved" | "revision_requested";
+    customer_comment?: string | null;
+  }>
+): Promise<{ status: ProjectStatus }> {
+  const now = new Date().toISOString();
+  const rows = reviews.map((r) => ({
+    photo_version_id: r.photo_version_id,
+    photo_id: r.photo_id,
+    status: r.status,
+    customer_comment: r.customer_comment ?? null,
+    reviewed_at: now,
+  }));
+  const { error: insertError } = await admin.from("version_reviews").upsert(rows, {
+    onConflict: "photo_version_id",
+  } as { onConflict?: string });
+  if (insertError) throw new Error(insertError.message);
+
+  const hasRevision = reviews.some((r) => r.status === "revision_requested");
+  const newStatus: ProjectStatus = hasRevision ? "editing_v2" : "delivered";
+  const updatePayload: Record<string, unknown> = {
+    status: newStatus,
+    updated_at: now,
+  };
+  if (newStatus === "delivered") updatePayload.delivered_at = now;
+
+  const { error: updateError } = await admin
+    .from("projects")
+    .update(updatePayload)
+    .eq("id", projectId);
+  if (updateError) throw new Error(updateError.message);
+  return { status: newStatus };
 }

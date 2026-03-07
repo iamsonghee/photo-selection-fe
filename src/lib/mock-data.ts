@@ -130,6 +130,22 @@ export const mockProjects: Project[] = [
     createdAt: "2026-01-28T10:00:00Z",
     updatedAt: "2026-02-21T08:00:00Z",
   },
+  {
+    id: "proj7",
+    name: "웨딩스튜디오",
+    photographerId: "ph1",
+    customerName: "이혜진",
+    shootDate: "2026-02-10",
+    deadline: "2026-03-15",
+    requiredCount: 5,
+    photoCount: 5,
+    status: "reviewing_v1",
+    accessToken: "inv-review-007",
+    customerCancelCount: 0,
+    confirmedAt: "2026-02-20T16:00:00Z",
+    createdAt: "2026-02-15T10:00:00Z",
+    updatedAt: "2026-02-25T10:00:00Z",
+  },
 ];
 
 // ========== 프로젝트별 사진 (갤러리/뷰어/결과용) ==========
@@ -164,9 +180,11 @@ function generatePhotos(projectId: string, count: number, selectedCount: number)
 export function getPhotosByProject(projectId: string): Photo[] {
   const proj = mockProjects.find((p) => p.id === projectId);
   if (!proj) return [];
-  // selecting / preparing: 초기 선택 0장. confirmed / editing: 확정된 N장 선택된 상태로 표시
+  // selecting / preparing: 초기 선택 0장. confirmed, editing, reviewing_*, delivered: 확정된 N장
   const selectedCount =
-    proj.status === "confirmed" || proj.status === "editing"
+    ["confirmed", "editing", "reviewing_v1", "editing_v2", "reviewing_v2", "delivered"].includes(
+      proj.status
+    )
       ? proj.requiredCount
       : 0;
   return generatePhotos(projectId, proj.photoCount, selectedCount);
@@ -231,8 +249,53 @@ export const mockNChangeNotice: NChangeNotice = {
 
 // ========== 대시보드 통계 ==========
 export function getDashboardStats() {
-  const inProgress = mockProjects.filter((p) => p.status === "selecting").length;
-  const completed = mockProjects.filter((p) => p.status === "confirmed" || p.status === "editing").length;
+  const inProgress = mockProjects.filter((p) =>
+    ["selecting", "confirmed", "editing", "reviewing_v1", "editing_v2", "reviewing_v2"].includes(p.status)
+  ).length;
+  const completed = mockProjects.filter((p) => p.status === "delivered").length;
   const waiting = mockProjects.filter((p) => p.status === "preparing").length;
   return { inProgress, completed, waiting };
+}
+
+// ========== 보정본 검토 목업 (5장 기준) ==========
+export interface ReviewPhotoItem {
+  id: string;
+  originalFilename: string;
+  originalUrl: string;
+  versionUrl: string;
+  photographerMemo: string | null;
+  orderIndex: number;
+}
+
+/** 프로젝트의 보정본 검토용 목업 데이터. 선택된 N장(목업 5장) + v1 보정본 URL/메모 */
+export function getReviewMockData(projectId: string): {
+  globalPhotographerMemo: string;
+  photos: ReviewPhotoItem[];
+} {
+  const proj = mockProjects.find((p) => p.id === projectId);
+  const N = proj ? proj.requiredCount : 5;
+  const count = Math.min(N, 5);
+  const photos: ReviewPhotoItem[] = [];
+  const baseUrl = (i: number) =>
+    `data:image/svg+xml,${encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect fill="#1e293b" width="400" height="400"/><text x="50%" y="50%" fill="#94a3b8" font-size="20" text-anchor="middle" dominant-baseline="middle">원본 ${i}</text></svg>`
+    )}`;
+  const versionUrl = (i: number) =>
+    `data:image/svg+xml,${encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect fill="#1a2744" width="400" height="400"/><text x="50%" y="50%" fill="#4f7eff" font-size="20" text-anchor="middle" dominant-baseline="middle">보정 v1 ${i}</text></svg>`
+    )}`;
+  for (let i = 0; i < count; i++) {
+    photos.push({
+      id: `photo-${projectId}-${i + 1}`,
+      originalFilename: `IMG_00${i + 1}.jpg`,
+      originalUrl: baseUrl(i + 1),
+      versionUrl: versionUrl(i + 1),
+      photographerMemo: i % 2 === 0 ? `피부톤 보정, 밝기+1 적용 (${i + 1}번)` : null,
+      orderIndex: i + 1,
+    });
+  }
+  return {
+    globalPhotographerMemo: "전체 밝기+1, 피부톤 보정 적용했습니다. 수정 원하시면 말씀해 주세요.",
+    photos,
+  };
 }

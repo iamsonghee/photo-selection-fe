@@ -4,6 +4,10 @@ import {
   getProjectByToken,
   getPhotosWithSelectionsAdmin,
 } from "@/lib/customer-api-server";
+import {
+  getProjectByToken as getProjectByTokenMock,
+  getPhotosByProject,
+} from "@/lib/mock-data";
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
@@ -12,14 +16,31 @@ export async function GET(req: NextRequest) {
   }
   try {
     const admin = getAdminClient();
-    const project = await getProjectByToken(admin, token);
-    if (!project) {
-      return NextResponse.json({ error: "Invalid token", project: null }, { status: 404 });
+    let project = await getProjectByToken(admin, token);
+    let photos: Awaited<ReturnType<typeof getPhotosWithSelectionsAdmin>>["photos"];
+    let selectedIds: Set<string>;
+    let photoStates: Record<string, { rating?: number; color?: string; comment?: string }>;
+
+    if (project) {
+      const result = await getPhotosWithSelectionsAdmin(admin, project.id);
+      photos = result.photos;
+      selectedIds = result.selectedIds;
+      photoStates = result.photoStates;
+    } else {
+      // 목업: DB에 없으면 mock 데이터 사용 (보정본 검토 등)
+      const mockProject = getProjectByTokenMock(token);
+      if (!mockProject) {
+        return NextResponse.json({ error: "Invalid token", project: null }, { status: 404 });
+      }
+      project = mockProject;
+      const allPhotos = getPhotosByProject(project.id);
+      photos = allPhotos;
+      selectedIds = new Set(
+        allPhotos.filter((p) => p.selected).map((p) => p.id)
+      );
+      photoStates = {};
     }
-    const { photos, selectedIds, photoStates } = await getPhotosWithSelectionsAdmin(
-      admin,
-      project.id
-    );
+
     return NextResponse.json({
       project,
       photos,

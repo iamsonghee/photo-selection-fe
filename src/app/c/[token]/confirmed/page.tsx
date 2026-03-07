@@ -2,14 +2,23 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { updateProject } from "@/lib/db";
 import { Button } from "@/components/ui";
+import { getProfileImageUrl } from "@/lib/photographer";
 
 const CUSTOMER_CANCEL_MAX = 3;
+
+type PhotographerInfo = {
+  name: string | null;
+  profile_image_url: string | null;
+  bio: string | null;
+  instagram_url: string | null;
+  portfolio_url: string | null;
+} | null;
 
 export default function ConfirmedPage() {
   const params = useParams();
@@ -19,13 +28,46 @@ export default function ConfirmedPage() {
   const project = ctx?.project ?? null;
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`/api/c/photographer?token=${encodeURIComponent(token)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) =>
+        data &&
+        setPhotographer({
+          name: data.name ?? null,
+          profile_image_url: data.profile_image_url ?? null,
+          bio: data.bio ?? null,
+          instagram_url: data.instagram_url ?? null,
+          portfolio_url: data.portfolio_url ?? null,
+        })
+      )
+      .catch(() => {});
+  }, [token]);
 
   const N = project?.requiredCount ?? 0;
+
+  useEffect(() => {
+    if (!project || !token) return;
+    if (project.status === "reviewing_v1" || project.status === "reviewing_v2") {
+      router.replace(`/c/${token}`);
+    }
+  }, [project?.status, token, router]);
 
   if (!project) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
         <p className="text-zinc-400">존재하지 않는 초대 링크입니다.</p>
+      </div>
+    );
+  }
+
+  if (project.status === "reviewing_v1" || project.status === "reviewing_v2") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
+        <p className="text-zinc-400">이동 중...</p>
       </div>
     );
   }
@@ -51,7 +93,6 @@ export default function ConfirmedPage() {
   const confirmedDate = project.confirmedAt
     ? format(new Date(project.confirmedAt), "yyyy년 M월 d일 HH:mm", { locale: ko })
     : format(new Date(), "yyyy년 M월 d일 HH:mm", { locale: ko });
-  const initial = project.name?.trim().charAt(0) ?? "?";
 
   return (
     <div className="min-h-screen bg-[#0a0b0d] text-[#e8eaf0]">
@@ -174,38 +215,45 @@ export default function ConfirmedPage() {
             담당 작가
           </h2>
           <div className="flex gap-3.5 items-center">
-            <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#4f7eff] to-[#7c3aed] text-xl font-bold text-white">
-              {initial}
-            </div>
+            <img
+              src={getProfileImageUrl(photographer?.profile_image_url)}
+              alt=""
+              className="h-[52px] w-[52px] shrink-0 rounded-full object-cover"
+            />
             <div>
-              <div className="text-base font-bold mb-0.5">담당 작가</div>
+              <div className="text-base font-bold mb-0.5">{photographer?.name || "담당 작가"}</div>
               <div className="text-xs text-[#8b90a0] leading-relaxed">
-                웨딩 & 포트레이트 전문 · 서울 기반
+                선택하신 사진을 꼼꼼히 보정해 드립니다
               </div>
             </div>
           </div>
-          <div className="mt-3.5 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="rounded-full border border-[#252830] bg-[#1a1d24] px-3.5 py-1.5 text-xs text-[#8b90a0]"
-            >
-              📷 인스타그램
-            </button>
-            <button
-              type="button"
-              className="rounded-full border border-[#252830] bg-[#1a1d24] px-3.5 py-1.5 text-xs text-[#8b90a0]"
-            >
-              🌐 포트폴리오
-            </button>
-            <button
-              type="button"
-              className="rounded-full border border-[#252830] bg-[#1a1d24] px-3.5 py-1.5 text-xs text-[#8b90a0]"
-            >
-              📞 연락하기
-            </button>
-          </div>
+          {(photographer?.instagram_url || photographer?.portfolio_url) && (
+            <div className="mt-3.5 flex flex-wrap gap-2">
+              {photographer.instagram_url && (
+                <a
+                  href={photographer.instagram_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full border border-[#252830] bg-[#1a1d24] px-3.5 py-1.5 text-xs text-[#8b90a0] transition-colors hover:border-[#4f7eff] hover:text-[#4f7eff]"
+                >
+                  📷 인스타그램
+                </a>
+              )}
+              {photographer.portfolio_url && (
+                <a
+                  href={photographer.portfolio_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full border border-[#252830] bg-[#1a1d24] px-3.5 py-1.5 text-xs text-[#8b90a0] transition-colors hover:border-[#4f7eff] hover:text-[#4f7eff]"
+                >
+                  🌐 포트폴리오
+                </a>
+              )}
+            </div>
+          )}
           <div className="mt-4 rounded-xl border-l-4 border-[#4f7eff] bg-[#1a1d24] p-3.5 text-[13px] text-[#8b90a0] leading-relaxed">
-            소중한 순간을 함께할 수 있어 영광입니다. 남겨주신 코멘트 꼼꼼히 반영해서 예쁘게 보정해 드릴게요 😊
+            {photographer?.bio?.trim() ||
+              "소중한 순간을 함께할 수 있어 영광입니다. 남겨주신 코멘트 꼼꼼히 반영해서 예쁘게 보정해 드릴게요 😊"}
           </div>
 
           {/* 확정 취소: confirmed일 때만 노출, editing이면 보정 진행 안내 */}

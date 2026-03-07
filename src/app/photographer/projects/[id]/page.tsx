@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { differenceInDays } from "date-fns";
 import {
@@ -21,12 +21,14 @@ import type { Project, ProjectStatus } from "@/types";
 
 function statusBadgeVariant(s: ProjectStatus): "waiting" | "in_progress" | "completed" {
   if (s === "preparing") return "waiting";
-  if (s === "selecting") return "in_progress";
+  if (["selecting", "confirmed", "editing", "reviewing_v1", "editing_v2", "reviewing_v2"].includes(s))
+    return "in_progress";
   return "completed";
 }
 
 export default function ProjectDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -40,6 +42,7 @@ export default function ProjectDetailPage() {
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -122,7 +125,9 @@ export default function ProjectDetailPage() {
   const M = project?.photoCount ?? 0;
   const daysLeft = project ? differenceInDays(new Date(project.deadline), new Date()) : 0;
   const isConfirmedOrEditing =
-    project?.status === "confirmed" || project?.status === "editing";
+    ["confirmed", "editing", "reviewing_v1", "editing_v2", "reviewing_v2"].includes(
+      project?.status ?? ""
+    );
 
   if (loading) {
     return (
@@ -379,13 +384,66 @@ export default function ProjectDetailPage() {
             </Card>
           )}
 
+          {project.status === "editing_v2" && (
+            <Card className="border-warning/30 bg-warning/5">
+              <CardTitle className="mb-3">🔄 재보정 요청이 접수되었습니다</CardTitle>
+              <p className="text-sm text-zinc-400 mb-3">
+                고객이 재보정을 요청한 사진이 있습니다. v2 보정본을 업로드해 주세요.
+              </p>
+              {/* 목업: 재보정 요청 목록은 추후 version_reviews 연동 */}
+              <div className="mb-3 rounded-lg bg-zinc-800/50 px-3 py-2 text-xs text-zinc-500">
+                재보정 요청 사진 목록 · 고객 코멘트 (DB 연동 후 표시)
+              </div>
+              <Link href={`/photographer/projects/${id}/upload-versions`} className="block">
+                <Button variant="primary" className="w-full flex items-center justify-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  v2 업로드
+                </Button>
+              </Link>
+            </Card>
+          )}
+
+          {(project.status === "reviewing_v1" || project.status === "reviewing_v2") && (
+            <Card>
+              <CardTitle className="mb-3">👀 고객 검토 중</CardTitle>
+              <p className="text-sm text-zinc-400 mb-2">
+                고객이 보정본을 검토하고 있습니다.
+              </p>
+              <div className="mt-2 text-xs text-zinc-500">
+                검토 현황 · 재보정 요청 (DB 연동 후 표시)
+              </div>
+              <ProgressBar
+                value={0}
+                max={N}
+                variant="default"
+                className="mt-3"
+                showLabel
+              />
+            </Card>
+          )}
+
+          {project.status === "delivered" && (
+            <Card className="border-success/30 bg-success/5">
+              <CardTitle className="mb-3">✅ 납품 완료</CardTitle>
+              <p className="text-sm text-zinc-400">
+                이 프로젝트는 최종 납품이 완료되었습니다.
+              </p>
+              <p className="mt-2 text-xs text-zinc-500">
+                완료일시 (DB 연동 후 표시)
+              </p>
+            </Card>
+          )}
+
           {/* 위험 구역 */}
           <Card className="border-danger/50 bg-danger/5">
             <CardTitle className="text-danger">위험 구역</CardTitle>
             <Button
               variant="danger"
               className="mt-3 w-full justify-start"
-              onClick={() => setShowDeleteModal(true)}
+              onClick={() => {
+                setSaveError("");
+                setShowDeleteModal(true);
+              }}
             >
               프로젝트 삭제
             </Button>
@@ -398,14 +456,45 @@ export default function ProjectDetailPage() {
           <Card className="w-full max-w-sm">
             <h3 className="text-lg font-semibold text-white">프로젝트 삭제</h3>
             <p className="mt-2 text-sm text-zinc-400">
-              정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+              정말 삭제하시겠습니까? 모든 사진과 셀렉 데이터가 영구적으로 삭제됩니다.
             </p>
+            {saveError && (
+              <p className="mt-3 text-sm text-danger">{saveError}</p>
+            )}
             <div className="mt-6 flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowDeleteModal(false)}>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+              >
                 취소
               </Button>
-              <Button variant="danger" className="flex-1" disabled>
-                삭제 (준비 중)
+              <Button
+                variant="danger"
+                className="flex-1"
+                disabled={deleting}
+                onClick={async () => {
+                  setDeleting(true);
+                  try {
+                    const res = await fetch(`/api/photographer/projects/${id}`, {
+                      method: "DELETE",
+                    });
+                    if (!res.ok) {
+                      const data = await res.json().catch(() => ({}));
+                      throw new Error(data.error ?? "삭제에 실패했습니다.");
+                    }
+                    setShowDeleteModal(false);
+                    router.push("/photographer/dashboard");
+                  } catch (e) {
+                    console.error(e);
+                    setSaveError(e instanceof Error ? e.message : "삭제에 실패했습니다.");
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+              >
+                {deleting ? "삭제 중…" : "삭제"}
               </Button>
             </div>
           </Card>

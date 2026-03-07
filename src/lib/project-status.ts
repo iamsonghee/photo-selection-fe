@@ -6,6 +6,10 @@ export const PROJECT_STATUSES: ProjectStatus[] = [
   "selecting",
   "confirmed",
   "editing",
+  "reviewing_v1",
+  "editing_v2",
+  "reviewing_v2",
+  "delivered",
 ];
 
 /** 상태 한글명 */
@@ -14,16 +18,27 @@ export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   selecting: "셀렉 중",
   confirmed: "셀렉 완료",
   editing: "보정 중",
+  reviewing_v1: "v1 검토 중",
+  editing_v2: "v2 재보정 중",
+  reviewing_v2: "v2 검토 중",
+  delivered: "납품 완료",
 };
 
 /** 대시보드 그룹: 대기중 = preparing */
 export const GROUP_WAITING: ProjectStatus[] = ["preparing"];
 
-/** 대시보드 그룹: 진행중 = selecting, confirmed */
-export const GROUP_IN_PROGRESS: ProjectStatus[] = ["selecting", "confirmed"];
+/** 대시보드 그룹: 진행중 = selecting, confirmed, editing, reviewing_*, editing_v2 */
+export const GROUP_IN_PROGRESS: ProjectStatus[] = [
+  "selecting",
+  "confirmed",
+  "editing",
+  "reviewing_v1",
+  "editing_v2",
+  "reviewing_v2",
+];
 
-/** 대시보드 그룹: 완료 = editing */
-export const GROUP_COMPLETED: ProjectStatus[] = ["editing"];
+/** 대시보드 그룹: 완료 = delivered */
+export const GROUP_COMPLETED: ProjectStatus[] = ["delivered"];
 
 /**
  * 상태 전환 규칙
@@ -31,6 +46,12 @@ export const GROUP_COMPLETED: ProjectStatus[] = ["editing"];
  * - selecting → confirmed: 고객 최종확정
  * - confirmed → editing: 작가 보정 시작
  * - confirmed → selecting: 고객 확정 취소 (제한 횟수 내)
+ * - editing → reviewing_v1: 작가 보정본 업로드 후 고객에게 전달
+ * - reviewing_v1 → delivered: 고객 전부 확정
+ * - reviewing_v1 → editing_v2: 고객 재보정 요청
+ * - editing_v2 → reviewing_v2: 작가 v2 업로드 후 전달
+ * - reviewing_v2 → delivered: 고객 전부 확정
+ * - reviewing_v2 → editing_v2: 고객 재보정 요청 (1회 남은 경우)
  */
 export function canTransition(
   from: ProjectStatus,
@@ -40,7 +61,11 @@ export function canTransition(
     preparing: ["selecting"],
     selecting: ["confirmed"],
     confirmed: ["editing", "selecting"],
-    editing: [],
+    editing: ["reviewing_v1"],
+    reviewing_v1: ["delivered", "editing_v2"],
+    editing_v2: ["reviewing_v2"],
+    reviewing_v2: ["delivered", "editing_v2"],
+    delivered: [],
   };
   return allowed[from]?.includes(to) ?? false;
 }

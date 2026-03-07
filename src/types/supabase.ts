@@ -6,8 +6,17 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type ProjectStatusDb = "preparing" | "selecting" | "confirmed" | "editing";
+export type ProjectStatusDb =
+  | "preparing"
+  | "selecting"
+  | "confirmed"
+  | "editing"
+  | "reviewing_v1"
+  | "editing_v2"
+  | "reviewing_v2"
+  | "delivered";
 export type ColorTagDb = "red" | "yellow" | "green" | "blue" | "purple";
+export type VersionReviewStatusDb = "approved" | "revision_requested";
 
 export interface Database {
   public: {
@@ -25,6 +34,7 @@ export interface Database {
           photographer_id: string;
           access_token: string;
           confirmed_at: string | null;
+          delivered_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -40,6 +50,7 @@ export interface Database {
           photographer_id: string;
           access_token: string;
           confirmed_at?: string | null;
+          delivered_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -55,6 +66,7 @@ export interface Database {
           photographer_id?: string;
           access_token?: string;
           confirmed_at?: string | null;
+          delivered_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -65,6 +77,8 @@ export interface Database {
           project_id: string;
           number: number;
           r2_thumb_url: string;
+          original_filename: string | null;
+          memo: string | null;
           created_at: string;
         };
         Insert: {
@@ -72,6 +86,8 @@ export interface Database {
           project_id: string;
           number: number;
           r2_thumb_url: string;
+          original_filename?: string | null;
+          memo?: string | null;
           created_at?: string;
         };
         Update: {
@@ -79,6 +95,8 @@ export interface Database {
           project_id?: string;
           number?: number;
           r2_thumb_url?: string;
+          original_filename?: string | null;
+          memo?: string | null;
           created_at?: string;
         };
       };
@@ -131,6 +149,96 @@ export interface Database {
           project_id?: string;
           photographer_id?: string;
           action?: "created" | "uploaded" | "selecting" | "confirmed" | "editing";
+          created_at?: string;
+        };
+      };
+      photographers: {
+        Row: {
+          id: string;
+          auth_id: string;
+          email: string | null;
+          name: string | null;
+          profile_image_url: string | null;
+          bio: string | null;
+          instagram_url: string | null;
+          portfolio_url: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          auth_id: string;
+          email?: string | null;
+          name?: string | null;
+          profile_image_url?: string | null;
+          bio?: string | null;
+          instagram_url?: string | null;
+          portfolio_url?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          auth_id?: string;
+          email?: string | null;
+          name?: string | null;
+          profile_image_url?: string | null;
+          bio?: string | null;
+          instagram_url?: string | null;
+          portfolio_url?: string | null;
+          created_at?: string;
+        };
+      };
+      photo_versions: {
+        Row: {
+          id: string;
+          photo_id: string;
+          version: number;
+          r2_url: string;
+          photographer_memo: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          photo_id: string;
+          version: number;
+          r2_url: string;
+          photographer_memo?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          photo_id?: string;
+          version?: number;
+          r2_url?: string;
+          photographer_memo?: string | null;
+          created_at?: string;
+        };
+      };
+      version_reviews: {
+        Row: {
+          id: string;
+          photo_version_id: string;
+          photo_id: string;
+          status: VersionReviewStatusDb;
+          customer_comment: string | null;
+          reviewed_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          photo_version_id: string;
+          photo_id: string;
+          status: VersionReviewStatusDb;
+          customer_comment?: string | null;
+          reviewed_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          photo_version_id?: string;
+          photo_id?: string;
+          status?: VersionReviewStatusDb;
+          customer_comment?: string | null;
+          reviewed_at?: string | null;
           created_at?: string;
         };
       };
