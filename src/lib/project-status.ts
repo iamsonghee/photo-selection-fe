@@ -73,3 +73,11 @@ export function canTransition(
 export function getStatusLabel(status: ProjectStatus): string {
   return PROJECT_STATUS_LABELS[status] ?? status;
 }
+
+/** preparing일 때 photoCount에 따라 "업로드 전" | "업로드 중" 반환. 그 외는 getStatusLabel과 동일. */
+export function getDisplayStatusLabel(status: ProjectStatus, photoCount?: number): string {
+  if (status === "preparing") {
+    return (photoCount ?? 0) >= 1 ? "업로드 중" : "업로드 전";
+  }
+  return getStatusLabel(status);
+}

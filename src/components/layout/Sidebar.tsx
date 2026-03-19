@@ -1,24 +1,47 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Camera, LayoutDashboard, FolderOpen, Users, BarChart3, Settings } from "lucide-react";
 import { Button } from "@/components/ui";
+import { createClient } from "@/lib/supabase/client";
+import { getProfileImageUrl } from "@/lib/photographer";
 
 const navItems = [
   { href: "/photographer/dashboard", label: "대시보드", icon: LayoutDashboard },
   { href: "/photographer/projects", label: "프로젝트", icon: FolderOpen },
   { href: "#", label: "고객관리", icon: Users },
   { href: "#", label: "통계", icon: BarChart3 },
-  { href: "#", label: "설정", icon: Settings },
+  { href: "/photographer/settings", label: "설정", icon: Settings },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [profile, setProfile] = useState<{
+    name: string | null;
+    email: string | null;
+    profileImageUrl: string | null;
+  } | null>(null);
 
-  const handleLogout = () => {
-    console.log("로그아웃");
+  useEffect(() => {
+    fetch("/api/photographer/profile")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => data && setProfile({
+        name: data.name ?? null,
+        email: data.email ?? null,
+        profileImageUrl: data.profileImageUrl ?? null,
+      }))
+      .catch(() => {});
+  }, []);
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    window.location.href = "/auth";
   };
+
+  const displayName = profile?.name?.trim() || profile?.email || "작가";
 
   return (
     <aside className="fixed left-0 top-0 z-30 flex w-[200px] flex-col border-r border-zinc-800 bg-zinc-900/80">
@@ -51,11 +74,13 @@ export function Sidebar() {
       </nav>
       <div className="border-t border-zinc-800 p-3">
         <div className="flex items-center gap-3 rounded-lg p-2">
-          <div className="h-9 w-9 rounded-full bg-zinc-700 flex items-center justify-center text-sm font-medium text-zinc-400">
-            👤
-          </div>
+          <img
+            src={getProfileImageUrl(profile?.profileImageUrl)}
+            alt=""
+            className="h-9 w-9 shrink-0 rounded-full object-cover"
+          />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-zinc-200">작가</p>
+            <p className="truncate text-sm font-medium text-zinc-200">{displayName}</p>
             <Button
               variant="ghost"
               size="sm"

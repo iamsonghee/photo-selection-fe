@@ -3,9 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
-import { updateProject } from "@/lib/db";
 
-export function ConfirmCancelButton({ projectId }: { projectId: string }) {
+export function ConfirmCancelButton({
+  projectId,
+  onSuccess,
+}: {
+  projectId: string;
+  onSuccess?: () => void;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -13,13 +18,31 @@ export function ConfirmCancelButton({ projectId }: { projectId: string }) {
   const handleConfirm = async () => {
     setSubmitting(true);
     try {
-      await updateProject(projectId, { status: "selecting" });
+      const res = await fetch(`/api/photographer/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "selecting" }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const msg = (data as { error?: string }).error ?? res.statusText;
+        // 이미 selecting이면 UX 관점에서 성공으로 취급 (중복 클릭/화면 지연 대비)
+        if (typeof msg === "string" && msg.includes("현재: selecting")) {
+          setOpen(false);
+          onSuccess?.();
+          router.refresh();
+          return;
+        }
+        console.error("[확정 취소]", msg);
+        return;
+      }
       await fetch("/api/photographer/project-logs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project_id: projectId, action: "selecting" }),
       }).catch(() => {});
       setOpen(false);
+      onSuccess?.();
       router.refresh();
     } catch (e) {
       console.error(e);

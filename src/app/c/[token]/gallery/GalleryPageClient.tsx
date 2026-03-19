@@ -5,11 +5,15 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, RotateCcw, Check } from "lucide-react";
 import { Button, Badge } from "@/components/ui";
-import { useSelection } from "@/contexts/SelectionContext";
+import { useSelection, SelectionConfirmBar } from "@/contexts/SelectionContext";
+import { getProfileImageUrl } from "@/lib/photographer";
+
+type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 import {
   parseFilterFromSearchParams,
   buildFilterQueryString,
   getFilteredPhotos,
+  getPhotoDisplayName,
 } from "@/lib/gallery-filter";
 import type { StarRating, ColorTag, SortOrder } from "@/types";
 
@@ -70,6 +74,15 @@ export default function GalleryPageClient() {
 
   const { project, photos, Y, N, toggle, isSelected, selectedIds, photoStates, loading } =
     useSelection();
+  const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`/api/c/photographer?token=${encodeURIComponent(token)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => data && setPhotographer({ name: data.name ?? null, profile_image_url: data.profile_image_url ?? null }))
+      .catch(() => {});
+  }, [token]);
 
   const filterState = useMemo(
     () => parseFilterFromSearchParams(paramsToRead),
@@ -99,7 +112,11 @@ export default function GalleryPageClient() {
 
   useEffect(() => {
     if (!project) return;
-    if (project.status === "editing" || project.status === "confirmed") {
+    if (project.status === "confirmed") {
+      router.replace(`/c/${token}/confirmed`);
+      return;
+    }
+    if (project.status === "editing") {
       router.replace(`/c/${token}/locked`);
       return;
     }
@@ -144,11 +161,23 @@ export default function GalleryPageClient() {
   return (
     <div className="min-h-screen bg-[#0a0b0d] pb-32">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-800 bg-[#0a0b0d]/95 px-4 py-3 backdrop-blur">
-        <Link href={`/c/${token}`} className="flex items-center gap-2 text-zinc-400 hover:text-white">
-          <ChevronLeft className="h-5 w-5" />
-          <span className="font-medium">{project.name}</span>
-        </Link>
-        <span className="flex items-center gap-1.5 text-sm">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Link href={`/c/${token}`} className="flex shrink-0 items-center gap-2 text-zinc-400 hover:text-white">
+            <ChevronLeft className="h-5 w-5" />
+            <span className="font-medium">{project.name}</span>
+          </Link>
+          {photographer && (
+            <div className="ml-2 flex shrink-0 items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800/80 px-2 py-1">
+              <img
+                src={getProfileImageUrl(photographer.profile_image_url)}
+                alt=""
+                className="h-6 w-6 rounded-full object-cover"
+              />
+              <span className="max-w-[120px] truncate text-xs text-zinc-400">{photographer.name || "작가"}</span>
+            </div>
+          )}
+        </div>
+        <span className="flex shrink-0 items-center gap-1.5 text-sm">
           <Badge variant={Y === N ? "success" : Y < N ? "danger" : "warning"}>
             선택 {Y} / {N}
           </Badge>
@@ -199,6 +228,7 @@ export default function GalleryPageClient() {
             onChange={(e) => updateFilter({ sortOrder: e.target.value as SortOrder })}
             className="shrink-0 rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-200"
           >
+            <option value="filename">파일명순</option>
             <option value="newest">최신순</option>
             <option value="oldest">오래된순</option>
           </select>
@@ -210,7 +240,7 @@ export default function GalleryPageClient() {
                 starFilter: "all",
                 colorFilter: "all",
                 selectedFilter: "all",
-                sortOrder: "newest",
+                sortOrder: "filename",
               })
             }
             className="shrink-0 gap-1 py-1 text-xs"
@@ -236,7 +266,7 @@ export default function GalleryPageClient() {
             >
               <img
                 src={photo.url || getTestImageUrl(photo.id)}
-                alt={`사진 ${photo.orderIndex}`}
+                alt={getPhotoDisplayName(photo)}
                 className="h-full w-full object-cover transition-[filter] duration-200 group-hover:brightness-110"
                 loading="lazy"
                 decoding="async"
@@ -256,13 +286,18 @@ export default function GalleryPageClient() {
                 {selected ? <Check className="h-4 w-4" strokeWidth={3} /> : null}
               </button>
               {!hasTag && (
-                <p className="absolute bottom-1 left-1 rounded bg-black/50 px-1.5 py-0.5 font-mono text-xs text-white">
-                  #{photo.orderIndex}
+                <p
+                  className="absolute bottom-1 left-1 max-w-[85%] truncate rounded bg-black/50 px-1.5 py-0.5 text-xs text-white"
+                  title={getPhotoDisplayName(photo)}
+                >
+                  {getPhotoDisplayName(photo)}
                 </p>
               )}
               {hasTag && (
-                <div className="absolute bottom-1 left-1 flex items-center gap-1.5 rounded bg-black/60 px-2 py-1">
-                  <span className="font-mono text-xs text-white">#{photo.orderIndex}</span>
+                <div className="absolute bottom-1 left-1 flex items-center gap-1.5 rounded bg-black/60 px-2 py-1 max-w-[85%] min-w-0">
+                  <span className="truncate text-xs text-white" title={getPhotoDisplayName(photo)}>
+                    {getPhotoDisplayName(photo)}
+                  </span>
                   {rating != null && rating > 0 && (
                     <span className="text-sm leading-none text-[#f5a623]">
                       {"★".repeat(rating)}
@@ -280,6 +315,7 @@ export default function GalleryPageClient() {
           );
         })}
       </div>
+      <SelectionConfirmBar />
     </div>
   );
 }

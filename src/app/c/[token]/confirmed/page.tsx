@@ -6,7 +6,6 @@ import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
-import { updateProject } from "@/lib/db";
 import { Button } from "@/components/ui";
 import { getProfileImageUrl } from "@/lib/photographer";
 
@@ -26,9 +25,15 @@ export default function ConfirmedPage() {
   const token = (params?.token as string) ?? "";
   const ctx = useSelectionOptional();
   const project = ctx?.project ?? null;
+  const loading = ctx?.loading ?? true;
+  const [mounted, setMounted] = useState(false);
+  const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -47,19 +52,47 @@ export default function ConfirmedPage() {
       .catch(() => {});
   }, [token]);
 
+  if (!mounted) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
+        <p className="text-zinc-400">불러오는 중...</p>
+      </div>
+    );
+  }
+
   const N = project?.requiredCount ?? 0;
 
   useEffect(() => {
     if (!project || !token) return;
+    if (project.status === "selecting") {
+      router.replace(`/c/${token}/gallery`);
+      return;
+    }
     if (project.status === "reviewing_v1" || project.status === "reviewing_v2") {
       router.replace(`/c/${token}`);
     }
   }, [project?.status, token, router]);
 
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
+        <p className="text-zinc-400">불러오는 중...</p>
+      </div>
+    );
+  }
+
   if (!project) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
         <p className="text-zinc-400">존재하지 않는 초대 링크입니다.</p>
+      </div>
+    );
+  }
+
+  if (project.status === "selecting") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
+        <p className="text-zinc-400">이동 중...</p>
       </div>
     );
   }
@@ -74,15 +107,28 @@ export default function ConfirmedPage() {
 
   const M = project.photoCount;
   const cancelCount = project.customerCancelCount ?? 0;
+  const atCancelLimit = cancelCount >= CUSTOMER_CANCEL_MAX;
   const remainingCancels = Math.max(0, CUSTOMER_CANCEL_MAX - cancelCount);
-  const canCancel = remainingCancels > 0;
 
   const handleConfirmCancel = async () => {
+    if (!project?.id || !token) return;
     setCancelling(true);
     try {
-      await updateProject(project.id, { status: "selecting" });
+      const res = await fetch("/api/c/cancel-confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, project_id: project.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        console.error("[확정 취소]", (data as { error?: string }).error ?? res.statusText);
+        setCancelling(false);
+        return;
+      }
       setCancelModalOpen(false);
-      router.push(`/c/${token}/gallery`);
+      if (typeof window !== "undefined") {
+        window.location.replace(`/c/${token}/gallery`);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -92,7 +138,7 @@ export default function ConfirmedPage() {
 
   const confirmedDate = project.confirmedAt
     ? format(new Date(project.confirmedAt), "yyyy년 M월 d일 HH:mm", { locale: ko })
-    : format(new Date(), "yyyy년 M월 d일 HH:mm", { locale: ko });
+    : "—";
 
   return (
     <div className="min-h-screen bg-[#0a0b0d] text-[#e8eaf0]">
@@ -256,44 +302,37 @@ export default function ConfirmedPage() {
               "소중한 순간을 함께할 수 있어 영광입니다. 남겨주신 코멘트 꼼꼼히 반영해서 예쁘게 보정해 드릴게요 😊"}
           </div>
 
-          {/* 확정 취소: confirmed일 때만 노출, editing이면 보정 진행 안내 */}
-          <div className="mt-6 pt-6 border-t border-[#252830]">
-            {project.status === "editing" ? (
-              <p className="text-center text-sm text-[#8b90a0]">
-                현재 보정이 진행 중입니다
+          {project.status === "confirmed" && (
+            <div className="mt-6 pt-6 border-t border-[#252830] space-y-2">
+              <p className="text-center text-xs text-[#8b90a0]">
+                남은 횟수 <span className="font-mono text-[#e8eaf0]">{remainingCancels}</span>
               </p>
-            ) : project.status === "confirmed" ? (
-              canCancel ? (
-                <Button
-                  variant="outline"
-                  className="w-full border-[#252830] text-[#8b90a0] hover:border-[#ff4757] hover:text-[#ff4757]"
-                  onClick={() => setCancelModalOpen(true)}
-                >
-                  확정 취소
-                </Button>
-              ) : (
-                <p className="text-center text-xs text-[#5a5f70]">
-                  재선택 횟수를 모두 사용했습니다
+              {atCancelLimit ? (
+                <p className="text-center text-sm text-[#8b90a0]">
+                  확정 취소는 최대 3회까지 가능합니다
                 </p>
-              )
-            ) : null}
-          </div>
+              ) : null}
+              <Button
+                variant="outline"
+                className="w-full border-[#252830] text-[#8b90a0] hover:border-[#ff4757] hover:text-[#ff4757] disabled:opacity-50"
+                disabled={atCancelLimit}
+                onClick={() => !atCancelLimit && setCancelModalOpen(true)}
+              >
+                확정 취소
+              </Button>
+            </div>
+          )}
         </section>
       </div>
 
-      {/* 확정 취소 확인 모달 */}
-      {cancelModalOpen && (
+      {cancelModalOpen && project.status === "confirmed" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-sm rounded-xl border border-[#252830] bg-[#13151a] p-6 shadow-xl">
             <p className="text-center text-[#e8eaf0]">
-              확정을 취소하고 다시 선택하시겠습니까? (남은 횟수 {remainingCancels}/{CUSTOMER_CANCEL_MAX})
+              확정을 취소하고 다시 선택하시겠습니까? (남은 횟수 {remainingCancels})
             </p>
             <div className="mt-6 flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setCancelModalOpen(false)}
-              >
+              <Button variant="outline" className="flex-1" onClick={() => setCancelModalOpen(false)}>
                 아니오
               </Button>
               <Button

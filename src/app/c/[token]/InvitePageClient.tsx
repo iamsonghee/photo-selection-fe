@@ -37,12 +37,16 @@ export default function InvitePageClient() {
 
   useEffect(() => {
     if (!project) return;
-    if (project.status === "editing") {
+    if (project.status === "editing" || project.status === "editing_v2") {
       router.replace(`/c/${token}/locked`);
       return;
     }
     if (project.status === "confirmed") {
       router.replace(`/c/${token}/confirmed`);
+      return;
+    }
+    if (project.status === "delivered") {
+      router.replace(`/c/${token}/delivered`);
       return;
     }
   }, [project, token, router]);
@@ -63,7 +67,12 @@ export default function InvitePageClient() {
     );
   }
 
-  if (project.status === "editing" || project.status === "confirmed") {
+  if (
+    project.status === "editing" ||
+    project.status === "editing_v2" ||
+    project.status === "confirmed" ||
+    project.status === "delivered"
+  ) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
         <p className="text-zinc-400">이동 중...</p>

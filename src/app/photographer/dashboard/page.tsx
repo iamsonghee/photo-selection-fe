@@ -15,7 +15,8 @@ import {
   Clock,
   Layers,
 } from "lucide-react";
-import { Button, Card, Badge, ProgressBar } from "@/components/ui";
+import { Button, Card, Badge } from "@/components/ui";
+import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import { supabase } from "@/lib/supabase";
 import { getPhotographerIdByAuthId, getProjectsByPhotographerId } from "@/lib/db";
 import type { ProjectLogApiItem } from "@/app/api/photographer/project-logs/route";
@@ -23,7 +24,7 @@ import {
   GROUP_WAITING,
   GROUP_IN_PROGRESS,
   GROUP_COMPLETED,
-  getStatusLabel,
+  getDisplayStatusLabel,
 } from "@/lib/project-status";
 import type { Project, ProjectStatus } from "@/types";
 
@@ -53,6 +54,7 @@ export default function DashboardPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [photographerId, setPhotographerId] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("사용자");
+  const [profileName, setProfileName] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   // Search / filter state
@@ -86,12 +88,14 @@ export default function DashboardPage() {
           setLoading(false);
           return;
         }
-        const [list, logRes] = await Promise.all([
+        const [list, logRes, profileRes] = await Promise.all([
           getProjectsByPhotographerId(pid),
           fetch("/api/photographer/project-logs").then((r) => (r.ok ? r.json() : [])),
+          fetch("/api/photographer/profile").then((r) => (r.ok ? r.json() : null)),
         ]);
         setProjects(list);
         setLogs(Array.isArray(logRes) ? logRes : []);
+        if (profileRes?.name?.trim()) setProfileName(profileRes.name.trim());
       } catch (e) {
         console.error(e);
       } finally {
@@ -165,24 +169,10 @@ export default function DashboardPage() {
     return d > 0 ? `D+${d}` : d === 0 ? "D-Day" : `D${d}`;
   };
 
-  const statusBadge = (status: ProjectStatus) => {
-    if (GROUP_IN_PROGRESS.includes(status))
-      return <Badge variant="in_progress">{getStatusLabel(status)}</Badge>;
-    if (GROUP_WAITING.includes(status))
-      return <Badge variant="waiting">{getStatusLabel(status)}</Badge>;
-    if (GROUP_COMPLETED.includes(status))
-      return <Badge variant="completed">{getStatusLabel(status)}</Badge>;
-    return <Badge>{getStatusLabel(status)}</Badge>;
-  };
-
-  const getSelectedCount = (p: Project) => {
-    if (GROUP_COMPLETED.includes(p.status)) return p.requiredCount;
-    return 0;
-  };
-
-  const selectionProgressY = (p: Project) => {
-    if (GROUP_COMPLETED.includes(p.status)) return p.requiredCount;
-    return getSelectedCount(p);
+  const statusBadgeVariant = (status: ProjectStatus) => {
+    if (GROUP_COMPLETED.includes(status)) return "completed";
+    if (GROUP_WAITING.includes(status)) return "waiting";
+    return "in_progress";
   };
 
   const groupByStatus = (list: Project[]) => {
@@ -227,7 +217,7 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold text-white">
-            안녕하세요, {userName} 님 👋
+            안녕하세요, {profileName ?? userName} 님 👋
           </h1>
           <p className="mt-0.5 text-sm text-zinc-400">오늘도 좋은 하루 되세요</p>
         </div>
@@ -352,10 +342,10 @@ export default function DashboardPage() {
                   <ProjectCard
                     key={p.id}
                     project={p}
-                    statusBadge={statusBadge}
-                    selectionProgressY={selectionProgressY}
                     daysLabel={daysLabel}
                     onCopyInvite={copyInviteLink}
+                    statusBadgeVariant={statusBadgeVariant}
+                    getStatusLabel={(status) => getDisplayStatusLabel(status, p.photoCount)}
                   />
                 ))}
               </div>
@@ -371,10 +361,10 @@ export default function DashboardPage() {
                   <ProjectCard
                     key={p.id}
                     project={p}
-                    statusBadge={statusBadge}
-                    selectionProgressY={selectionProgressY}
                     daysLabel={daysLabel}
                     onCopyInvite={copyInviteLink}
+                    statusBadgeVariant={statusBadgeVariant}
+                    getStatusLabel={(status) => getDisplayStatusLabel(status, p.photoCount)}
                   />
                 ))}
               </div>
@@ -390,10 +380,10 @@ export default function DashboardPage() {
                   <ProjectCard
                     key={p.id}
                     project={p}
-                    statusBadge={statusBadge}
-                    selectionProgressY={selectionProgressY}
                     daysLabel={daysLabel}
                     onCopyInvite={copyInviteLink}
+                    statusBadgeVariant={statusBadgeVariant}
+                    getStatusLabel={(status) => getDisplayStatusLabel(status, p.photoCount)}
                   />
                 ))}
               </div>
@@ -463,18 +453,17 @@ export default function DashboardPage() {
 
 function ProjectCard({
   project: p,
-  statusBadge,
-  selectionProgressY,
   daysLabel,
   onCopyInvite,
+  statusBadgeVariant,
+  getStatusLabel,
 }: {
   project: Project;
-  statusBadge: (s: ProjectStatus) => JSX.Element;
-  selectionProgressY: (p: Project) => number;
   daysLabel: (d: string) => string;
   onCopyInvite: (p: Project) => void;
+  statusBadgeVariant: (s: ProjectStatus) => "completed" | "waiting" | "in_progress";
+  getStatusLabel: (s: ProjectStatus) => string;
 }) {
-  const y = selectionProgressY(p);
   const [hover, setHover] = useState(false);
 
   return (
@@ -490,19 +479,18 @@ function ProjectCard({
               <p className="font-medium text-white">{p.name}</p>
               <p className="text-sm text-zinc-400">{p.customerName}</p>
             </div>
-            {statusBadge(p.status)}
+            <Badge variant={statusBadgeVariant(p.status)} className="shrink-0">
+              {getDisplayStatusLabel(p.status, p.photoCount)}
+            </Badge>
           </div>
-          <div className="mt-3 flex items-center gap-4 text-sm">
-            <span className="font-mono text-zinc-400">
-              {y >= p.requiredCount ? "Y" : "N"} · {y}/{p.requiredCount}
-            </span>
-            <ProgressBar
-              value={y}
-              max={p.requiredCount}
-              variant={GROUP_COMPLETED.includes(p.status) ? "success" : "default"}
-              className="max-w-[200px] flex-1"
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+            <ProjectProgressBar
+              status={p.status}
+              photoCount={p.photoCount}
+              requiredCount={p.requiredCount}
+              className="min-w-0 flex-1 flex-shrink-0"
             />
-            <span className="text-zinc-500">{daysLabel(p.deadline)}</span>
+            <span className="text-zinc-500 shrink-0">{daysLabel(p.deadline)}</span>
           </div>
         </Card>
       </Link>

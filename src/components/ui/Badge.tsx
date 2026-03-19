@@ -14,7 +14,7 @@ const variantClasses: Record<Variant, string> = {
   info: "bg-primary/20 text-primary",
   in_progress: "bg-warning/20 text-warning",
   waiting: "bg-zinc-600 text-zinc-300",
-  completed: "bg-success/20 text-success",
+  completed: "bg-success text-white",
 };
 
 export function Badge({ variant = "default", className = "", ...props }: BadgeProps) {

@@ -464,8 +464,11 @@ export async function submitVersionReviews(
   }));
   const { error: insertError } = await admin.from("version_reviews").upsert(rows, {
     onConflict: "photo_version_id",
-  } as { onConflict?: string });
-  if (insertError) throw new Error(insertError.message);
+  });
+  if (insertError) {
+    console.error("[submitVersionReviews] version_reviews upsert", insertError);
+    throw new Error(`검토 저장 실패: ${insertError.message}`);
+  }
 
   const hasRevision = reviews.some((r) => r.status === "revision_requested");
   const newStatus: ProjectStatus = hasRevision ? "editing_v2" : "delivered";
@@ -475,10 +478,24 @@ export async function submitVersionReviews(
   };
   if (newStatus === "delivered") updatePayload.delivered_at = now;
 
-  const { error: updateError } = await admin
+  let updateError: { message: string } | null = null;
+  const { error: err } = await admin
     .from("projects")
     .update(updatePayload)
     .eq("id", projectId);
-  if (updateError) throw new Error(updateError.message);
+  updateError = err;
+
+  // delivered_at 컬럼이 없을 수 있음(마이그레이션 미적용) → 제외하고 재시도
+  if (updateError && newStatus === "delivered" && /delivered_at|column/i.test(updateError.message)) {
+    const fallbackPayload = { status: newStatus, updated_at: now };
+    const { error: err2 } = await admin.from("projects").update(fallbackPayload).eq("id", projectId);
+    if (!err2) return { status: newStatus };
+    updateError = err2;
+  }
+
+  if (updateError) {
+    console.error("[submitVersionReviews] projects update", updateError);
+    throw new Error(`프로젝트 상태 변경 실패: ${updateError.message}`);
+  }
   return { status: newStatus };
 }

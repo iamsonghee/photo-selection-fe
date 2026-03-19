@@ -4,11 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
-import { useSelection } from "@/contexts/SelectionContext";
+import { useSelection, SelectionConfirmBar } from "@/contexts/SelectionContext";
 import {
   parseFilterFromSearchParams,
   buildFilterQueryString,
   getFilteredPhotos,
+  getPhotoDisplayName,
 } from "@/lib/gallery-filter";
 import type { StarRating, ColorTag } from "@/types";
 import { differenceInDays } from "date-fns";
@@ -69,11 +70,39 @@ export default function ViewerPage() {
     },
     [current, updatePhotoState]
   );
+
+  // 숫자키(1~5): 같은 점수면 해제(0), 다르면 해당 점수로 변경
+  const toggleStarFromKey = useCallback(
+    (s: StarRating) => {
+      if (!current) return;
+      const currentRating = photoStates[current.id]?.rating;
+      if (currentRating === s) {
+        updatePhotoState(current.id, { rating: undefined });
+      } else {
+        updatePhotoState(current.id, { rating: s });
+      }
+    },
+    [current, photoStates, updatePhotoState]
+  );
   const setColor = useCallback(
     (c: ColorTag | undefined) => {
       if (current) updatePhotoState(current.id, { color: c });
     },
     [current, updatePhotoState]
+  );
+
+  // 컬러 태그 단축키(Q/W/E/R/T): 같은 색이면 해제, 다르면 해당 색으로 변경
+  const toggleColorFromKey = useCallback(
+    (c: ColorTag) => {
+      if (!current) return;
+      const currentColor = photoStates[current.id]?.color;
+      if (currentColor === c) {
+        updatePhotoState(current.id, { color: undefined });
+      } else {
+        updatePhotoState(current.id, { color: c });
+      }
+    },
+    [current, photoStates, updatePhotoState]
   );
 
   const N = project?.requiredCount ?? 0;
@@ -90,6 +119,19 @@ export default function ViewerPage() {
     if (currentIndex >= filteredPhotos.length - 1) return;
     router.push(`/c/${token}/viewer/${filteredPhotos[currentIndex + 1].id}${queryString}`);
   }, [currentIndex, filteredPhotos.length, filteredPhotos, router, token, queryString]);
+
+  // 키보드 방향키용: 순환 이동 (첫 장 ← 마지막, 마지막 → 첫 장)
+  const goPrevWrap = useCallback(() => {
+    if (!filteredPhotos.length) return;
+    const nextIndex = (currentIndex - 1 + filteredPhotos.length) % filteredPhotos.length;
+    router.push(`/c/${token}/viewer/${filteredPhotos[nextIndex].id}${queryString}`);
+  }, [currentIndex, filteredPhotos, router, token, queryString]);
+
+  const goNextWrap = useCallback(() => {
+    if (!filteredPhotos.length) return;
+    const nextIndex = (currentIndex + 1) % filteredPhotos.length;
+    router.push(`/c/${token}/viewer/${filteredPhotos[nextIndex].id}${queryString}`);
+  }, [currentIndex, filteredPhotos, router, token, queryString]);
 
   const toggleSelect = useCallback(() => {
     if (!current) return;
@@ -163,68 +205,77 @@ export default function ViewerPage() {
           openCommentModal();
           break;
         case "Digit1":
-          setStar(1);
+          toggleStarFromKey(1);
           setStarPressRing(1);
           setTimeout(() => setStarPressRing(null), 200);
           break;
         case "Digit2":
-          setStar(2);
+          toggleStarFromKey(2);
           setStarPressRing(2);
           setTimeout(() => setStarPressRing(null), 200);
           break;
         case "Digit3":
-          setStar(3);
+          toggleStarFromKey(3);
           setStarPressRing(3);
           setTimeout(() => setStarPressRing(null), 200);
           break;
         case "Digit4":
-          setStar(4);
+          toggleStarFromKey(4);
           setStarPressRing(4);
           setTimeout(() => setStarPressRing(null), 200);
           break;
         case "Digit5":
-          setStar(5);
+          toggleStarFromKey(5);
           setStarPressRing(5);
           setTimeout(() => setStarPressRing(null), 200);
           break;
         case "KeyQ":
-          setColor("red");
+          toggleColorFromKey("red");
           setColorPressRing("red");
           setTimeout(() => setColorPressRing(null), 200);
           break;
         case "KeyW":
-          setColor("yellow");
+          toggleColorFromKey("yellow");
           setColorPressRing("yellow");
           setTimeout(() => setColorPressRing(null), 200);
           break;
         case "KeyE":
-          setColor("green");
+          toggleColorFromKey("green");
           setColorPressRing("green");
           setTimeout(() => setColorPressRing(null), 200);
           break;
         case "KeyR":
-          setColor("blue");
+          toggleColorFromKey("blue");
           setColorPressRing("blue");
           setTimeout(() => setColorPressRing(null), 200);
           break;
         case "KeyT":
-          setColor("purple");
+          toggleColorFromKey("purple");
           setColorPressRing("purple");
           setTimeout(() => setColorPressRing(null), 200);
           break;
         case "ArrowLeft":
           e.preventDefault();
-          goPrev();
+          goPrevWrap();
           break;
         case "ArrowRight":
           e.preventDefault();
-          goNext();
+          goNextWrap();
           break;
         default:
           break;
       }
     },
-    [commentModalOpen, goPrev, goNext, openCommentModal, closeCommentModal, saveCommentAndClose]
+    [
+      commentModalOpen,
+      goPrevWrap,
+      goNextWrap,
+      toggleStarFromKey,
+      toggleColorFromKey,
+      openCommentModal,
+      closeCommentModal,
+      saveCommentAndClose,
+    ]
   );
 
   useEffect(() => {
@@ -265,8 +316,8 @@ export default function ViewerPage() {
           <span className="font-mono text-zinc-300">
             선택 {Y}/{N}
           </span>
-          <span className="font-mono text-zinc-400">
-            #{current.orderIndex} / {filteredPhotos.length}
+          <span className="max-w-[140px] truncate text-zinc-400" title={getPhotoDisplayName(current)}>
+            {getPhotoDisplayName(current)} / {filteredPhotos.length}
           </span>
           <span className="text-zinc-500">기한까지 {daysLeft}일</span>
         </div>
@@ -276,7 +327,7 @@ export default function ViewerPage() {
         {current.url ? (
           <img
             src={current.url}
-            alt={`사진 ${current.orderIndex}`}
+            alt={getPhotoDisplayName(current)}
             className="w-full h-full object-contain"
             style={{ maxHeight: "60vh" }}
           />
@@ -464,7 +515,7 @@ export default function ViewerPage() {
             <div className="mx-auto max-w-lg">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs text-zinc-400">
-                  사진 #{current.orderIndex} · 작가에게 전달됩니다
+                  {getPhotoDisplayName(current)} · 작가에게 전달됩니다
                 </p>
                 <button
                   type="button"
@@ -512,6 +563,7 @@ export default function ViewerPage() {
           </div>
         </>
       )}
+      <SelectionConfirmBar />
     </div>
   );
 }

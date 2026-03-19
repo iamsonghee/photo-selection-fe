@@ -13,6 +13,7 @@ type PhotosRow = Database["public"]["Tables"]["photos"]["Row"];
 type SelectionsRow = Database["public"]["Tables"]["selections"]["Row"];
 
 function mapProjectRow(row: ProjectsRow): Project {
+  const r = row as ProjectsRow & { customer_cancel_count?: number | null };
   return {
     id: row.id,
     name: row.name,
@@ -26,6 +27,7 @@ function mapProjectRow(row: ProjectsRow): Project {
     accessToken: row.access_token,
     confirmedAt: row.confirmed_at ?? undefined,
     deliveredAt: (row as { delivered_at?: string | null }).delivered_at ?? undefined,
+    customerCancelCount: r.customer_cancel_count ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -139,6 +141,18 @@ export async function confirmProjectAdmin(admin: SupabaseClient, projectId: stri
     .update({
       status: "confirmed",
       confirmed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", projectId);
+  if (error) throw new Error(error.message);
+}
+
+/** 확정 취소: status → selecting (고객이 확정 취소 시, admin 전용) */
+export async function cancelConfirmAdmin(admin: SupabaseClient, projectId: string): Promise<void> {
+  const { error } = await admin
+    .from("projects")
+    .update({
+      status: "selecting",
       updated_at: new Date().toISOString(),
     })
     .eq("id", projectId);

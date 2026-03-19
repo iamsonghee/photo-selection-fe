@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { Button, Card } from "@/components/ui";
-import { getProjectById, updateProject } from "@/lib/db";
+import { getProjectById } from "@/lib/db";
+import { getStatusLabel } from "@/lib/project-status";
 import type { Project } from "@/types";
 
 export default function EditStartPage() {
@@ -26,10 +27,18 @@ export default function EditStartPage() {
   }, [id]);
 
   const handleStartEditing = async () => {
-    if (!project) return;
+    if (!project || project.status !== "confirmed") return;
     setSubmitting(true);
     try {
-      await updateProject(id, { status: "editing" });
+      const res = await fetch(`/api/photographer/projects/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "editing" }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "상태 변경 실패");
+      }
       await fetch("/api/photographer/project-logs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -52,8 +61,15 @@ export default function EditStartPage() {
   }
   if (!project) return null;
 
+  const canStartEditing = project.status === "confirmed";
+
   return (
     <div className="mx-auto max-w-[440px] space-y-8">
+      {!canStartEditing && (
+        <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-amber-400 text-sm">
+          보정을 시작하려면 프로젝트가 &quot;셀렉 완료&quot; 상태여야 합니다. (현재: {getStatusLabel(project.status)})
+        </div>
+      )}
       <div className="flex items-center gap-2 rounded-lg border border-danger/50 bg-danger/10 px-4 py-3 text-danger">
         <AlertTriangle className="h-5 w-5 shrink-0" />
         <span className="font-semibold">🚨 보정 시작 전 반드시 확인하세요</span>
@@ -78,7 +94,7 @@ export default function EditStartPage() {
           fullWidth
           className="flex-1"
           onClick={handleStartEditing}
-          disabled={submitting}
+          disabled={submitting || !canStartEditing}
         >
           {submitting ? "처리 중..." : "보정 시작 확인"}
         </Button>

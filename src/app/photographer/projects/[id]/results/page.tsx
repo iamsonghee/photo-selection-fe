@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { Edit3, Clipboard, Download } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
+import { Clipboard, Download } from "lucide-react";
 import { Button, Card } from "@/components/ui";
 import { getProjectById, getPhotosWithSelections } from "@/lib/db";
 import type { Project, Photo, ColorTag } from "@/types";
@@ -39,16 +40,16 @@ function getDisplayFilename(p: Photo): string {
 
 export default function ResultsPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [photoStates, setPhotoStates] = useState<Record<string, { rating?: number; color?: ColorTag; comment?: string }>>({});
   const [loading, setLoading] = useState(true);
-  const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({});
-  const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
-  const [savingMemoIds, setSavingMemoIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showEditStartModal, setShowEditStartModal] = useState(false);
+  const [editStartSubmitting, setEditStartSubmitting] = useState(false);
 
   useEffect(() => {
     getProjectById(id)
@@ -63,12 +64,6 @@ export default function ResultsPage() {
         selected.sort((a, b) => getDisplayFilename(a).localeCompare(getDisplayFilename(b), undefined, { sensitivity: "base" }));
         setPhotos(selected);
         setPhotoStates(result.photoStates ?? {});
-        setMemoDrafts(
-          selected.reduce<Record<string, string>>((acc, p) => {
-            acc[p.id] = p.photographerMemo ?? "";
-            return acc;
-          }, {})
-        );
       })
       .catch((e) => {
         console.error(e);
@@ -109,12 +104,11 @@ export default function ResultsPage() {
   };
 
   const handleDownloadCsv = () => {
-    const header = ["파일명", "코멘트", "작가메모"].join(",");
+    const header = ["파일명", "코멘트"].join(",");
     const rows = photos.map((p) => {
       const filename = getDisplayFilename(p);
       const comment = (photoStates[p.id]?.comment ?? "").trim();
-      const memo = (memoDrafts[p.id] ?? p.photographerMemo ?? "").trim();
-      return [csvEscape(filename), csvEscape(comment), csvEscape(memo)].join(",");
+      return [csvEscape(filename), csvEscape(comment)].join(",");
     });
     downloadTextFile(`${exportBaseName}.csv`, [header, ...rows].join("\n"), "text/csv;charset=utf-8");
   };
@@ -123,32 +117,24 @@ export default function ResultsPage() {
     downloadTextFile(`${exportBaseName}.txt`, fileNames.join("\n"), "text/plain;charset=utf-8");
   };
 
-  const saveMemo = async (photoId: string) => {
-    const memo = memoDrafts[photoId] ?? "";
-    setSavingMemoIds((prev) => new Set(prev).add(photoId));
+  const handleEditStartConfirm = async () => {
+    setEditStartSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(`/api/photographer/photos/${photoId}/memo`, {
+      const res = await fetch(`/api/photographer/projects/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ memo }),
+        body: JSON.stringify({ status: "editing" }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "메모 저장 실패");
-      const saved = (data.memo as string | null) ?? null;
-      setPhotos((prev) =>
-        prev.map((p) => (p.id === photoId ? { ...p, photographerMemo: saved ?? undefined } : p))
-      );
-      setMemoDrafts((prev) => ({ ...prev, [photoId]: saved ?? "" }));
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? "상태 변경 실패");
+      setProject((prev) => (prev ? { ...prev, status: "editing" } : null));
+      setShowEditStartModal(false);
     } catch (e) {
       console.error(e);
-      setError(e instanceof Error ? e.message : "메모 저장 실패");
+      setError(e instanceof Error ? e.message : "상태 변경 실패");
     } finally {
-      setSavingMemoIds((prev) => {
-        const next = new Set(prev);
-        next.delete(photoId);
-        return next;
-      });
+      setEditStartSubmitting(false);
     }
   };
 
@@ -180,13 +166,25 @@ export default function ResultsPage() {
                 </Button>
               </Link>
             )}
-            <Link href={`/photographer/projects/${id}/edit/start`}>
-              <Button variant="primary" className="flex items-center gap-2">
+            {project.status === "confirmed" && (
+              <Button
+                variant="primary"
+                className="flex items-center gap-2"
+                onClick={() => setShowEditStartModal(true)}
+              >
                 <span aria-hidden>🎨</span>
                 보정 시작
               </Button>
-            </Link>
-            <ConfirmCancelButton projectId={id} />
+            )}
+            {project.status === "confirmed" && (
+              <ConfirmCancelButton
+                projectId={id}
+                onSuccess={() => {
+                  setProject((prev) => (prev ? { ...prev, status: "selecting" } : prev));
+                  router.push(`/photographer/projects/${id}`);
+                }}
+              />
+            )}
           </div>
         </div>
       </Card>
@@ -221,16 +219,12 @@ export default function ResultsPage() {
                 <th className="px-3 py-2">썸네일</th>
                 <th className="px-3 py-2">파일명</th>
                 <th className="px-3 py-2">코멘트</th>
-                <th className="px-3 py-2">작가 메모</th>
               </tr>
             </thead>
             <tbody className="text-sm">
               {photos.map((p) => {
                 const filename = getDisplayFilename(p);
                 const comment = (photoStates[p.id]?.comment ?? "").trim();
-                const draft = memoDrafts[p.id] ?? p.photographerMemo ?? "";
-                const saving = savingMemoIds.has(p.id);
-                const isEditing = editingMemoId === p.id;
                 return (
                   <tr key={p.id} className="border-t border-zinc-800/80">
                     <td className="px-3 py-2">
@@ -248,51 +242,12 @@ export default function ResultsPage() {
                         {comment || "-"}
                       </div>
                     </td>
-                    <td className="px-3 py-2 align-top">
-                      <input
-                        value={draft}
-                        readOnly={!isEditing || saving}
-                        placeholder="메모 입력"
-                        onClick={() => {
-                          if (saving) return;
-                          setEditingMemoId(p.id);
-                        }}
-                        onChange={(e) =>
-                          setMemoDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            (e.currentTarget as HTMLInputElement).blur();
-                          }
-                          if (e.key === "Escape") {
-                            e.preventDefault();
-                            setMemoDrafts((prev) => ({ ...prev, [p.id]: p.photographerMemo ?? "" }));
-                            setEditingMemoId(null);
-                            (e.currentTarget as HTMLInputElement).blur();
-                          }
-                        }}
-                        onBlur={async () => {
-                          if (editingMemoId !== p.id) return;
-                          setEditingMemoId(null);
-                          await saveMemo(p.id);
-                        }}
-                        className={`w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors ${
-                          isEditing
-                            ? "border-primary bg-zinc-900 text-zinc-100"
-                            : "border-zinc-800 bg-zinc-900/40 text-zinc-300 hover:border-zinc-700 cursor-pointer"
-                        } ${saving ? "opacity-60" : ""}`}
-                      />
-                      <p className="mt-1 text-xs text-zinc-600">
-                        클릭해서 입력 → Enter/blur로 저장
-                      </p>
-                    </td>
                   </tr>
                 );
               })}
               {photos.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-zinc-500">
+                  <td colSpan={3} className="px-3 py-6 text-center text-zinc-500">
                     선택된 사진이 없습니다.
                   </td>
                 </tr>
@@ -315,14 +270,52 @@ export default function ResultsPage() {
               </Button>
             </Link>
           )}
-          <Link href={`/photographer/projects/${id}/edit/start`}>
-            <Button variant="primary" className="flex items-center gap-2">
+          {project.status === "confirmed" && (
+            <Button
+              variant="primary"
+              className="flex items-center gap-2"
+              onClick={() => setShowEditStartModal(true)}
+            >
               <span aria-hidden>🎨</span>
               보정 시작
             </Button>
-          </Link>
+          )}
         </div>
       </Card>
+
+      {showEditStartModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-[440px] space-y-6 rounded-xl border border-zinc-700 bg-zinc-900 p-6 shadow-xl">
+            <div className="flex items-center gap-2 rounded-lg border border-danger/50 bg-danger/10 px-4 py-3 text-danger">
+              <AlertTriangle className="h-5 w-5 shrink-0" />
+              <span className="font-semibold">🚨 보정 시작 전 반드시 확인하세요</span>
+            </div>
+            <ol className="list-decimal space-y-3 pl-5 text-sm text-zinc-300">
+              <li>보정 시작 후 고객은 &quot;최종확정&quot;을 취소할 수 없습니다</li>
+              <li>선택된 사진이 고정됩니다 (추가/삭제 불가)</li>
+              <li>고객은 읽기 전용 모드로 전환됩니다</li>
+            </ol>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowEditStartModal(false)}
+                disabled={editStartSubmitting}
+              >
+                취소
+              </Button>
+              <Button
+                variant="danger"
+                className="flex-1"
+                onClick={handleEditStartConfirm}
+                disabled={editStartSubmitting}
+              >
+                {editStartSubmitting ? "처리 중..." : "보정 시작 확인"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div

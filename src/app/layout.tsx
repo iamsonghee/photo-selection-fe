@@ -17,8 +17,23 @@ export default function RootLayout({
         className="min-h-screen bg-[#0a0b0d] text-zinc-200 antialiased"
         suppressHydrationWarning
       >
-        {/* 확장 프로그램(엔딕, WXT 등)이 body 직하위에 노드를 주입하면 Next 뷰포트/메타 경계와
-            hydration mismatch가 발생할 수 있음. 개발 시 시크릿 창 또는 확장 비활성화로 확인 권장. */}
+        {/* 확장(엔딕/WXT 등)이 DOM을 주입하면 hydration mismatch 발생. 직후 + rAF + 다음 태스크에 정리. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+function clean(){
+  try {
+    var el = document.getElementById('__endic_crx__');
+    if (el) el.remove();
+    document.querySelectorAll('[data-wxt-integrated]').forEach(function(e){ e.removeAttribute('data-wxt-integrated'); });
+  } catch (_) {}
+}
+clean();
+if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(clean);
+setTimeout(clean, 0);
+`,
+          }}
+        />
         <div suppressHydrationWarning className="contents">
           {children}
         </div>

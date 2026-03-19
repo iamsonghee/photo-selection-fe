@@ -4,6 +4,34 @@
 import type { Photo } from "@/types";
 import type { StarRating, ColorTag, SortOrder } from "@/types";
 
+/** r2_thumb_url 등에서 파일명 추출. 예: "https://.../photos/abc/uuid.jpg" → "uuid.jpg" */
+export function getPhotoFileName(url: string | null | undefined): string {
+  if (!url?.trim()) return "";
+  try {
+    const path = url.split("?")[0];
+    const segment = path.split("/").filter(Boolean).pop() ?? "";
+    return decodeURIComponent(segment);
+  } catch {
+    return url;
+  }
+}
+
+/** 표시용 파일명: original_filename 우선, 없으면 URL에서 추출, 없으면 #orderIndex */
+export function getPhotoDisplayName(photo: Photo): string {
+  const name = photo.originalFilename?.trim();
+  if (name) return name;
+  const fromUrl = getPhotoFileName(photo.url);
+  if (fromUrl) return fromUrl;
+  return `#${photo.orderIndex}`;
+}
+
+/** 정렬 키: original_filename 우선, 없으면 URL에서 추출 (파일명순 정렬용) */
+function getPhotoSortKey(photo: Photo): string {
+  const name = photo.originalFilename?.trim();
+  if (name) return name;
+  return getPhotoFileName(photo.url);
+}
+
 export const FILTER_PARAM = {
   rating: "rating",
   color_tag: "color_tag",
@@ -45,7 +73,8 @@ export function parseFilterFromSearchParams(
     color === "all" || (color != null && VALID_COLORS.includes(color as ColorTag | "none"))
       ? (color as ColorTag | "none" | "all")
       : "all";
-  const sortOrder: SortOrder = sort === "oldest" ? "oldest" : "newest";
+  const sortOrder: SortOrder =
+    sort === "oldest" ? "oldest" : sort === "newest" ? "newest" : "filename";
   const selectedFilter: "all" | "selected" =
     selected === "selected" ? "selected" : "all";
 
@@ -57,7 +86,7 @@ export function buildFilterQueryString(state: GalleryFilterState): string {
   const params = new URLSearchParams();
   if (state.starFilter !== "all") params.set(FILTER_PARAM.rating, String(state.starFilter));
   if (state.colorFilter !== "all") params.set(FILTER_PARAM.color_tag, state.colorFilter);
-  if (state.sortOrder !== "newest") params.set(FILTER_PARAM.sort, state.sortOrder);
+  if (state.sortOrder !== "filename") params.set(FILTER_PARAM.sort, state.sortOrder);
   if (state.selectedFilter !== "all") params.set(FILTER_PARAM.selected, state.selectedFilter);
   const qs = params.toString();
   return qs ? `?${qs}` : "";
@@ -88,7 +117,11 @@ export function getFilteredPhotos(
   if (state.colorFilter === "none") {
     list = list.filter((p) => !photoStates[p.id]?.color);
   }
-  if (state.sortOrder === "oldest") {
+  if (state.sortOrder === "filename") {
+    list = list.sort((a, b) =>
+      getPhotoSortKey(a).localeCompare(getPhotoSortKey(b), undefined, { sensitivity: "base" })
+    );
+  } else if (state.sortOrder === "oldest") {
     list = list.sort((a, b) => a.orderIndex - b.orderIndex);
   } else {
     list = list.sort((a, b) => b.orderIndex - a.orderIndex);

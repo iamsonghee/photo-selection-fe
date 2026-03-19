@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { differenceInDays } from "date-fns";
 import {
   MessageCircle,
   Mail,
@@ -15,7 +14,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { Button, Card, CardTitle, Badge, Input, ProgressBar } from "@/components/ui";
-import { getProjectById, getPhotosWithSelections } from "@/lib/db";
+import { getProjectById } from "@/lib/db";
 import { getStatusLabel } from "@/lib/project-status";
 import type { Project, ProjectStatus } from "@/types";
 
@@ -31,7 +30,6 @@ export default function ProjectDetailPage() {
   const router = useRouter();
   const id = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
-  const [selectedCount, setSelectedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [editName, setEditName] = useState("");
@@ -43,6 +41,12 @@ export default function ProjectDetailPage() {
   const [saving, setSaving] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showPhotoManage, setShowPhotoManage] = useState(false);
+  const [photoList, setPhotoList] = useState<{ id: string; r2_thumb_url: string; original_filename: string }[]>([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -55,10 +59,6 @@ export default function ProjectDetailPage() {
           setEditShootDate(p.shootDate);
           setEditDeadline(p.deadline);
           setEditRequiredCount(p.requiredCount);
-          if (p.id && p.status === "selecting") {
-            const r = await getPhotosWithSelections(p.id);
-            setSelectedCount(r.selectedIds.size);
-          }
         }
       } catch (e) {
         console.error(e);
@@ -117,13 +117,65 @@ export default function ProjectDetailPage() {
     navigator.clipboard.writeText(inviteUrl);
   };
 
-  const Y =
-    project?.status === "selecting"
-      ? selectedCount
-      : (project?.requiredCount ?? 0);
+  const loadPhotoList = async () => {
+    if (!id) return;
+    setLoadingPhotos(true);
+    try {
+      const res = await fetch(`/api/photographer/projects/${id}/photos`);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data.photos)) setPhotoList(data.photos);
+      else setPhotoList([]);
+    } catch {
+      setPhotoList([]);
+    } finally {
+      setLoadingPhotos(false);
+    }
+  };
+
+  const handleTogglePhotoManage = () => {
+    if (!showPhotoManage) loadPhotoList();
+    setShowPhotoManage((prev) => !prev);
+  };
+
+  const handleDeletePhoto = async (photoId: string) => {
+    setDeletingPhotoId(photoId);
+    try {
+      const res = await fetch(`/api/photographer/photos/${photoId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "삭제 실패");
+      }
+      setPhotoList((prev) => prev.filter((p) => p.id !== photoId));
+      setProject((prev) => prev ? { ...prev, photoCount: Math.max(0, prev.photoCount - 1) } : null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDeletingPhotoId(null);
+    }
+  };
+
+  const handleDeleteAllPhotos = async () => {
+    if (!id || !project) return;
+    setDeletingAll(true);
+    try {
+      const res = await fetch(`/api/photographer/projects/${id}/photos`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "삭제 실패");
+      }
+      setPhotoList([]);
+      setProject((prev) => prev ? { ...prev, photoCount: 0 } : null);
+      setShowDeleteAllModal(false);
+      setShowPhotoManage(false);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   const N = project?.requiredCount ?? 0;
   const M = project?.photoCount ?? 0;
-  const daysLeft = project ? differenceInDays(new Date(project.deadline), new Date()) : 0;
   const isConfirmedOrEditing =
     ["confirmed", "editing", "reviewing_v1", "editing_v2", "reviewing_v2"].includes(
       project?.status ?? ""
@@ -160,12 +212,6 @@ export default function ProjectDetailPage() {
           </Badge>
         </div>
         <div className="flex gap-2">
-          <Link href={`/photographer/projects/${id}/upload`}>
-            <Button variant="outline" className="flex items-center gap-2">
-              <Upload className="h-4 w-4" />
-              업로드
-            </Button>
-          </Link>
           {isConfirmedOrEditing && (
             <Link href={`/photographer/projects/${id}/results`}>
               <Button variant="primary" className="flex items-center gap-2">
@@ -269,8 +315,72 @@ export default function ProjectDetailPage() {
                   <span className="text-zinc-200">{M}</span>
                 </div>
                 <div className="mt-4">
-                  <p className="mb-1 text-xs text-zinc-500">업로드 현황</p>
+                  <div className="mb-1 flex items-center justify-between">
+                    <p className="text-xs text-zinc-500">업로드 현황</p>
+                    {project.status === "preparing" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-zinc-400"
+                        onClick={handleTogglePhotoManage}
+                      >
+                        {showPhotoManage ? "사진 관리 접기" : "사진 관리"}
+                      </Button>
+                    )}
+                  </div>
                   <ProgressBar value={M} max={N} variant={M >= N ? "success" : "default"} showLabel />
+                  {project.status === "preparing" && showPhotoManage && (
+                    <div className="mt-4 rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
+                      {loadingPhotos ? (
+                        <p className="py-4 text-center text-sm text-zinc-500">로딩 중...</p>
+                      ) : photoList.length === 0 ? (
+                        <p className="py-4 text-center text-sm text-zinc-500">업로드된 사진이 없습니다.</p>
+                      ) : (
+                        <>
+                          <ul className="space-y-2 max-h-60 overflow-y-auto">
+                            {photoList.map((p) => (
+                              <li
+                                key={p.id}
+                                className="flex items-center gap-3 rounded-lg border border-zinc-700 bg-zinc-900/50 p-2"
+                              >
+                                <img
+                                  src={p.r2_thumb_url}
+                                  alt=""
+                                  className="h-[60px] w-[60px] shrink-0 rounded object-cover"
+                                />
+                                <span className="min-w-0 flex-1 truncate text-sm text-zinc-300">
+                                  {p.original_filename || "(파일명 없음)"}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="shrink-0 text-danger hover:text-danger"
+                                  disabled={deletingPhotoId !== null}
+                                  onClick={() => handleDeletePhoto(p.id)}
+                                >
+                                  {deletingPhotoId === p.id ? "삭제 중…" : "삭제"}
+                                </Button>
+                              </li>
+                            ))}
+                          </ul>
+                          <div className="mt-3 flex gap-2">
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              className="flex-1"
+                              disabled={deletingAll}
+                              onClick={() => setShowDeleteAllModal(true)}
+                            >
+                              전체 삭제
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => setShowPhotoManage(false)}>
+                              목록 닫기
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -317,53 +427,42 @@ export default function ProjectDetailPage() {
         <div className="w-full space-y-6 lg:w-[320px] lg:shrink-0">
           {project.status === "preparing" && (
             <Card>
-              <p className="font-medium text-zinc-200">📸 사진을 업로드해주세요</p>
+              <p className="font-medium text-zinc-200">
+                {M === 0 ? "📸 사진을 업로드해주세요" : "📸 업로드 현황"}
+              </p>
               <div className="mt-3">
                 <ProgressBar value={M} max={N} variant="default" showLabel />
               </div>
               <Link href={`/photographer/projects/${id}/upload`} className="mt-4 block">
                 <Button variant="primary" className="w-full flex items-center justify-center gap-2">
                   <Upload className="h-4 w-4" />
-                  지금 업로드하기
+                  {M === 0 ? "사진 업로드" : "업로드 관리"}
                 </Button>
               </Link>
             </Card>
           )}
 
-          {project.status === "selecting" && (
-            <Card>
-              <CardTitle className="mb-3">셀렉 진행 현황</CardTitle>
-              <div className="text-2xl font-mono text-white">
-                {Y} / {N}
-              </div>
-              <p className="text-sm text-zinc-400 mt-1">
-                기한까지 {daysLeft > 0 ? `${daysLeft}일` : "마감"}
-              </p>
-              <ProgressBar
-                value={Y}
-                max={N}
-                variant={Y >= N ? "success" : "default"}
-                className="mt-3"
-                showLabel
-              />
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" className="flex items-center gap-2">
-                  <MessageCircle className="h-4 w-4" />
-                  카카오톡
-                </Button>
-                <Button variant="outline" size="sm" className="flex items-center gap-2">
-                  <Mail className="h-4 w-4" />
-                  이메일
+          {project.status !== "preparing" && (
+            <Card
+              className="cursor-pointer transition-colors hover:border-zinc-700"
+              onClick={() => router.push(`/photographer/projects/${id}/upload`)}
+            >
+              <p className="font-medium text-zinc-200">📷 업로드된 사진</p>
+              <p className="mt-1 text-sm text-zinc-400">업로드 {M}장 / 필요 {N}장</p>
+              <div className="mt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-center"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push(`/photographer/projects/${id}/upload`);
+                  }}
+                >
+                  사진 보기 →
                 </Button>
               </div>
-              {isConfirmedOrEditing && (
-                <Link href={`/photographer/projects/${id}/results`} className="mt-4 block">
-                  <Button variant="primary" className="w-full flex items-center justify-center gap-2">
-                    <Search className="h-4 w-4" />
-                    결과 검토하기
-                  </Button>
-                </Link>
-              )}
             </Card>
           )}
 
@@ -384,6 +483,21 @@ export default function ProjectDetailPage() {
             </Card>
           )}
 
+          {project.status === "editing" && (
+            <Card>
+              <CardTitle className="mb-3">🎨 v1 보정본 업로드</CardTitle>
+              <p className="text-sm text-zinc-400 mb-3">
+                고객 선택본 기준으로 v1 보정본을 업로드하고 전달하세요.
+              </p>
+              <Link href={`/photographer/projects/${id}/upload-versions`} className="block">
+                <Button variant="primary" className="w-full flex items-center justify-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  보정본 업로드
+                </Button>
+              </Link>
+            </Card>
+          )}
+
           {project.status === "editing_v2" && (
             <Card className="border-warning/30 bg-warning/5">
               <CardTitle className="mb-3">🔄 재보정 요청이 접수되었습니다</CardTitle>
@@ -394,10 +508,10 @@ export default function ProjectDetailPage() {
               <div className="mb-3 rounded-lg bg-zinc-800/50 px-3 py-2 text-xs text-zinc-500">
                 재보정 요청 사진 목록 · 고객 코멘트 (DB 연동 후 표시)
               </div>
-              <Link href={`/photographer/projects/${id}/upload-versions`} className="block">
+              <Link href={`/photographer/projects/${id}/upload-versions/v2`} className="block">
                 <Button variant="primary" className="w-full flex items-center justify-center gap-2">
                   <Upload className="h-4 w-4" />
-                  v2 업로드
+                  v2 재보정 업로드
                 </Button>
               </Link>
             </Card>
@@ -409,6 +523,18 @@ export default function ProjectDetailPage() {
               <p className="text-sm text-zinc-400 mb-2">
                 고객이 보정본을 검토하고 있습니다.
               </p>
+              <Link
+                href={
+                  project.status === "reviewing_v2"
+                    ? `/photographer/projects/${id}/upload-versions/v2`
+                    : `/photographer/projects/${id}/upload-versions`
+                }
+                className="mt-3 block"
+              >
+                <Button variant="outline" className="w-full">
+                  보정본 확인
+                </Button>
+              </Link>
               <div className="mt-2 text-xs text-zinc-500">
                 검토 현황 · 재보정 요청 (DB 연동 후 표시)
               </div>
@@ -495,6 +621,35 @@ export default function ProjectDetailPage() {
                 }}
               >
                 {deleting ? "삭제 중…" : "삭제"}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {showDeleteAllModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <Card className="w-full max-w-sm">
+            <h3 className="text-lg font-semibold text-white">사진 전체 삭제</h3>
+            <p className="mt-2 text-sm text-zinc-400">
+              업로드된 사진 {photoList.length}장을 모두 삭제하시겠습니까?
+            </p>
+            <div className="mt-6 flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowDeleteAllModal(false)}
+                disabled={deletingAll}
+              >
+                취소
+              </Button>
+              <Button
+                variant="danger"
+                className="flex-1"
+                disabled={deletingAll}
+                onClick={handleDeleteAllPhotos}
+              >
+                {deletingAll ? "삭제 중…" : "전체 삭제"}
               </Button>
             </div>
           </Card>
