@@ -101,7 +101,7 @@ export async function DELETE(
       .map((p: { r2_thumb_url: string }) => urlToR2Key(p.r2_thumb_url))
       .filter(Boolean);
     if (keys.length > 0) {
-      const backendUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+      const backendUrl = process.env.BACKEND_URL ?? process.env.API_URL ?? "http://127.0.0.1:8001";
       const res = await fetch(`${backendUrl}/api/storage/delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

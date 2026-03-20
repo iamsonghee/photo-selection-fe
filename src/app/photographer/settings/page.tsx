@@ -9,7 +9,7 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Pencil, Loader2 } from "lucide-react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8001";
 const ACCEPT_IMAGE = "image/jpeg,image/png,image/webp";
 
 function getInitial(name: string | null, email: string | null): string {

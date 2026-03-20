@@ -61,7 +61,7 @@ export async function DELETE(
 
     const key = urlToR2Key((photo as { r2_thumb_url: string }).r2_thumb_url);
     if (key) {
-      const backendUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+      const backendUrl = process.env.BACKEND_URL ?? process.env.API_URL ?? "http://127.0.0.1:8001";
       const res = await fetch(`${backendUrl}/api/storage/delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -1,7 +1,7 @@
 const BACKEND_URL =
   process.env.BACKEND_URL ??
   process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:8000";
+  "http://127.0.0.1:8001";
 
 export async function POST(req: Request) {
   const auth = req.headers.get("Authorization") ?? "";
@@ -13,10 +13,8 @@ export async function POST(req: Request) {
       Authorization: auth,
       "Content-Type": contentType,
     },
-    // @ts-ignore
-    body: req.body,
-    duplex: "half",
-  });
+    body: req.body as unknown as BodyInit,
+  } as RequestInit);
 
   const text = await res.text();
   return new Response(text, {
