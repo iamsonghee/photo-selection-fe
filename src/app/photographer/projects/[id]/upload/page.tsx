@@ -10,8 +10,7 @@ import { getProjectById, getPhotosByProjectId } from "@/lib/db";
 import type { Project, Photo } from "@/types";
 
 const ACCEPT_TYPES = "image/jpeg,image/png,image/webp";
-// MODULE_VERSION: 2026-03-20-v3
-console.log("[upload-module] loaded v3 - proxy endpoint active");
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 type TabId = "local" | "gdrive";
 
@@ -246,9 +245,7 @@ export default function UploadPage() {
     });
     xhr.addEventListener("abort", () => resetProgressState());
 
-    const uploadEndpoint = "/api/photographer/upload/photos";
-    console.log("[upload] XHR endpoint:", uploadEndpoint);
-    xhr.open("POST", uploadEndpoint);
+    xhr.open("POST", `${BACKEND_URL}/api/upload/photos`);
     xhr.setRequestHeader("Authorization", `Bearer ${token}`);
     xhr.send(form);
   };
