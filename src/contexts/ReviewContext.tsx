@@ -5,9 +5,11 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ReviewStatus } from "@/types";
+import type { ReviewPhotoItem } from "@/lib/customer-api-server";
 
 export type ReviewStateItem = {
   status: ReviewStatus;
@@ -15,6 +17,10 @@ export type ReviewStateItem = {
 };
 
 type ReviewContextValue = {
+  /** 네비게이션 간 유지되는 리뷰 사진 목록 */
+  reviewPhotos: ReviewPhotoItem[];
+  loadReviewPhotos: (token: string, projectId: string, status: string) => void;
+  reviewPhotosLoading: boolean;
   /** photoId → { status, comment } (임시 저장, 갤러리에서 최종 제출 시 사용) */
   reviewState: Record<string, ReviewStateItem>;
   setReview: (photoId: string, status: ReviewStatus, comment?: string | null) => void;
@@ -37,6 +43,24 @@ export function useReviewOptional() {
 }
 
 export function ReviewProvider({ children }: { children: React.ReactNode }) {
+  const [reviewPhotos, setReviewPhotos] = useState<ReviewPhotoItem[]>([]);
+  const [reviewPhotosLoading, setReviewPhotosLoading] = useState(false);
+  const loadedKeyRef = useRef<string | null>(null);
+
+  const loadReviewPhotos = useCallback((token: string, projectId: string, status: string) => {
+    const key = `${projectId}:${status}`;
+    if (loadedKeyRef.current === key) return;
+    if (!token || !projectId) return;
+    if (status !== "reviewing_v1" && status !== "reviewing_v2") return;
+    loadedKeyRef.current = key;
+    setReviewPhotosLoading(true);
+    fetch(`/api/c/review?token=${encodeURIComponent(token)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setReviewPhotos(data?.photos ?? []))
+      .catch(() => setReviewPhotos([]))
+      .finally(() => setReviewPhotosLoading(false));
+  }, []);
+
   const [reviewState, setReviewState] = useState<Record<string, ReviewStateItem>>({});
 
   const setReview = useCallback((photoId: string, status: ReviewStatus, comment?: string | null) => {
@@ -67,13 +91,16 @@ export function ReviewProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<ReviewContextValue>(
     () => ({
+      reviewPhotos,
+      loadReviewPhotos,
+      reviewPhotosLoading,
       reviewState,
       setReview,
       getReview,
       clearReview,
       resetAll,
     }),
-    [reviewState, setReview, getReview, clearReview, resetAll]
+    [reviewPhotos, loadReviewPhotos, reviewPhotosLoading, reviewState, setReview, getReview, clearReview, resetAll]
   );
 
   return (

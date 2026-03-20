@@ -5,9 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
-import { getReviewMockData } from "@/lib/mock-data";
 import FullScreenCompareModal from "@/components/FullScreenCompareModal";
-import type { ReviewPhotoItem } from "@/lib/customer-api-server";
 
 export default function ReviewViewerPage() {
   const params = useParams();
@@ -15,33 +13,14 @@ export default function ReviewViewerPage() {
   const token = (params?.token as string) ?? "";
   const photoId = params?.photoId as string;
   const { project, loading: selectionLoading } = useSelection();
-  const { setReview, getReview } = useReview();
-  const [apiPhotos, setApiPhotos] = useState<ReviewPhotoItem[]>([]);
+  const { reviewPhotos, loadReviewPhotos, reviewPhotosLoading, setReview, getReview } = useReview();
 
   useEffect(() => {
-    if (!token || !project?.id) return;
-    if (project.status !== "reviewing_v1" && project.status !== "reviewing_v2") return;
-    fetch(`/api/c/review?token=${encodeURIComponent(token)}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setApiPhotos(data?.photos ?? []))
-      .catch(() => setApiPhotos([]));
-  }, [token, project?.id, project?.status]);
+    if (!project?.id || !project?.status) return;
+    loadReviewPhotos(token, project.id, project.status);
+  }, [token, project?.id, project?.status, loadReviewPhotos]);
 
-  const photos = useMemo(() => {
-    if (apiPhotos.length > 0) return apiPhotos;
-    if (!project?.id) return [];
-    const mock = getReviewMockData(project.id);
-    return mock.photos.map((p) => ({
-      id: p.id,
-      photoVersionId: "",
-      originalFilename: p.originalFilename,
-      originalUrl: p.originalUrl,
-      versionUrl: p.versionUrl,
-      photographerMemo: p.photographerMemo,
-      orderIndex: p.orderIndex,
-      existingReview: undefined,
-    }));
-  }, [apiPhotos, project?.id]);
+  const photos = reviewPhotos;
   const currentIndex = useMemo(
     () => photos.findIndex((p) => p.id === photoId),
     [photos, photoId]
@@ -139,6 +118,13 @@ export default function ReviewViewerPage() {
   }
 
   if (!current) {
+    if (reviewPhotosLoading || photos.length === 0) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
+          <p className="text-[#5a5f7a]">불러오는 중...</p>
+        </div>
+      );
+    }
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
         <div className="text-center">
