@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  generateBuildId: async () => "build-20260320-v2",
 };
 
 export default nextConfig;
