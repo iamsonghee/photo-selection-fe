@@ -1,7 +1,7 @@
 const BACKEND_URL =
   process.env.BACKEND_URL ??
   process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:8001";
+  "http://localhost:8000";
 
 export async function POST(req: Request) {
   const auth = req.headers.get("Authorization") ?? "";

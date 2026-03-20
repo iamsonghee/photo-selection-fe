@@ -47,7 +47,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const backendUrl = process.env.BACKEND_URL ?? process.env.API_URL ?? "http://127.0.0.1:8001";
+    const backendUrl = process.env.BACKEND_URL ?? process.env.API_URL ?? "http://localhost:8000";
     const supabase = await createClient();
     const {
       data: { session },

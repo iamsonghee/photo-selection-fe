@@ -4,7 +4,7 @@ const BACKEND_URL =
   process.env.API_URL ??
   process.env.BACKEND_URL ??
   process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:8001";
+  "http://localhost:8000";
 
 /**
  * 보정본 업로드를 백엔드로 프록시 (같은 origin 요청으로 CORS 회피)
