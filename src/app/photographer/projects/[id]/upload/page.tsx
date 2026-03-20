@@ -10,7 +10,6 @@ import { getProjectById, getPhotosByProjectId } from "@/lib/db";
 import type { Project, Photo } from "@/types";
 
 const ACCEPT_TYPES = "image/jpeg,image/png,image/webp";
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 type TabId = "local" | "gdrive";
 
