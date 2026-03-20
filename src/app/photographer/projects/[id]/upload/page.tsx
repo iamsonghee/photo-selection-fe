@@ -245,7 +245,7 @@ export default function UploadPage() {
     });
     xhr.addEventListener("abort", () => resetProgressState());
 
-    xhr.open("POST", `${API_BASE}/api/upload/photos`);
+    xhr.open("POST", `/api/photographer/upload/photos`);
     xhr.setRequestHeader("Authorization", `Bearer ${token}`);
     xhr.send(form);
   };
