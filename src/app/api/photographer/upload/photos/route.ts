@@ -5,16 +5,17 @@ const BACKEND_URL =
 
 export async function POST(req: Request) {
   const auth = req.headers.get("Authorization") ?? "";
-  const contentType = req.headers.get("Content-Type") ?? "";
+
+  // Parse FormData from the incoming request and forward it.
+  // Do NOT set Content-Type manually — fetch sets it automatically
+  // with the correct multipart boundary.
+  const formData = await req.formData();
 
   const res = await fetch(`${BACKEND_URL}/api/upload/photos`, {
     method: "POST",
-    headers: {
-      Authorization: auth,
-      "Content-Type": contentType,
-    },
-    body: req.body as unknown as BodyInit,
-  } as RequestInit);
+    headers: { Authorization: auth },
+    body: formData,
+  });
 
   const text = await res.text();
   return new Response(text, {
