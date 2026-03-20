@@ -6,16 +6,21 @@ const BACKEND_URL =
 export async function POST(req: Request) {
   const auth = req.headers.get("Authorization") ?? "";
 
-  // Parse FormData from the incoming request and forward it.
-  // Do NOT set Content-Type manually — fetch sets it automatically
-  // with the correct multipart boundary.
+  console.log("[proxy/upload] BACKEND_URL:", BACKEND_URL);
+  console.log("[proxy/upload] BACKEND_URL env:", process.env.BACKEND_URL);
+
   const formData = await req.formData();
 
-  const res = await fetch(`${BACKEND_URL}/api/upload/photos`, {
+  const targetUrl = `${BACKEND_URL}/api/upload/photos`;
+  console.log("[proxy/upload] forwarding to:", targetUrl);
+
+  const res = await fetch(targetUrl, {
     method: "POST",
     headers: { Authorization: auth },
     body: formData,
   });
+
+  console.log("[proxy/upload] backend response status:", res.status);
 
   const text = await res.text();
   return new Response(text, {

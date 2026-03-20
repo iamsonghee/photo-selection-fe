@@ -245,6 +245,7 @@ export default function UploadPage() {
     xhr.addEventListener("abort", () => resetProgressState());
 
     const uploadEndpoint = "/api/photographer/upload/photos";
+    console.log("[upload] XHR endpoint:", uploadEndpoint);
     xhr.open("POST", uploadEndpoint);
     xhr.setRequestHeader("Authorization", `Bearer ${token}`);
     xhr.send(form);
