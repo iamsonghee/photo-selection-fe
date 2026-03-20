@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import InvitePageWrapper from "./InvitePageWrapper";
 import { getProjectByToken } from "@/lib/customer-api-server";
+import { getAdminClient } from "@/lib/supabase-admin";
 
 export default async function InvitePage({
   params,
@@ -10,7 +11,8 @@ export default async function InvitePage({
   const { token } = await params;
   if (!token) return <InvitePageWrapper />;
 
-  const project = await getProjectByToken(token);
+  const admin = getAdminClient();
+  const project = await getProjectByToken(admin, token);
   const status = project?.status;
 
   if (status === "delivered") {
