@@ -359,7 +359,7 @@ export async function getPhotoVersionsByProjectId(
     .from("selections")
     .select("photo_id")
     .eq("project_id", projectId);
-  const photoIds = (selections?.data ?? []).map((s: { photo_id: string }) => s.photo_id);
+  const photoIds = (selections ?? []).map((s: { photo_id: string }) => s.photo_id);
   if (photoIds.length === 0) return [];
 
   let query = supabase
