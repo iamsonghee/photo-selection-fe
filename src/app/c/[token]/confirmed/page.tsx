@@ -52,16 +52,6 @@ export default function ConfirmedPage() {
       .catch(() => {});
   }, [token]);
 
-  if (!mounted) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
-        <p className="text-zinc-400">불러오는 중...</p>
-      </div>
-    );
-  }
-
-  const N = project?.requiredCount ?? 0;
-
   useEffect(() => {
     if (!project || !token) return;
     if (project.status === "selecting") {
@@ -72,6 +62,16 @@ export default function ConfirmedPage() {
       router.replace(`/c/${token}`);
     }
   }, [project?.status, token, router]);
+
+  if (!mounted) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
+        <p className="text-zinc-400">불러오는 중...</p>
+      </div>
+    );
+  }
+
+  const N = project?.requiredCount ?? 0;
 
   if (loading) {
     return (
