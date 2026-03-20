@@ -10,6 +10,8 @@ import { getProjectById, getPhotosByProjectId } from "@/lib/db";
 import type { Project, Photo } from "@/types";
 
 const ACCEPT_TYPES = "image/jpeg,image/png,image/webp";
+// MODULE_VERSION: 2026-03-20-v3
+console.log("[upload-module] loaded v3 - proxy endpoint active");
 
 type TabId = "local" | "gdrive";
 
