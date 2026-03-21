@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
+import type { ReviewPhotoItem } from "@/lib/customer-api-server";
 
 const REVISION_LIMIT = 2;
 
