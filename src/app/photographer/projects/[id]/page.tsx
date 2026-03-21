@@ -227,6 +227,11 @@ export default function ProjectDetailPage() {
       setSaveError("셀렉 갯수는 1 이상이어야 합니다.");
       return;
     }
+    // 업로드 완료 후(selecting)에만 M >= N 검증
+    if (project.status !== "preparing" && canEditN && project.photoCount < newN) {
+      setSaveError(`업로드된 사진 수(${project.photoCount}장) 이하로 설정해주세요.`);
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch(`/api/photographer/projects/${id}`, {
