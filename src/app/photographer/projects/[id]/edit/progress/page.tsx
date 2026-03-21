@@ -49,7 +49,7 @@ export default function EditProgressPage() {
   const nextPhoto = photos.find((p) => photoStates[p.id]?.comment);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
+    <div className="mx-auto max-w-2xl space-y-8 p-6">
       <h1 className="text-2xl font-semibold text-white">보정 진행도</h1>
 
       <Card>

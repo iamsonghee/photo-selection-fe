@@ -64,7 +64,7 @@ export default function EditStartPage() {
   const canStartEditing = project.status === "confirmed";
 
   return (
-    <div className="mx-auto max-w-[440px] space-y-8">
+    <div className="mx-auto max-w-[440px] space-y-8 p-6">
       {!canStartEditing && (
         <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-amber-400 text-sm">
           보정을 시작하려면 프로젝트가 &quot;셀렉 완료&quot; 상태여야 합니다. (현재: {getStatusLabel(project.status)})

@@ -1,32 +1,401 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { format, differenceInDays } from "date-fns";
-import { PlusCircle } from "lucide-react";
-import { Button, Card, Badge } from "@/components/ui";
-import { ProjectProgressBar } from "@/components/ProjectProgressBar";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Search, ChevronDown, Image as ImageIcon, Check, Calendar,
+  ChevronRight, SlidersHorizontal, PackageCheck, Loader2,
+} from "lucide-react";
+import { format, differenceInDays, startOfMonth, subMonths } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { getPhotographerIdByAuthId, getProjectsByPhotographerId } from "@/lib/db";
-import { getDisplayStatusLabel } from "@/lib/project-status";
+import { PROJECT_STATUSES, PROJECT_STATUS_LABELS } from "@/lib/project-status";
+import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import type { Project, ProjectStatus } from "@/types";
 
+// ── 상수 ──────────────────────────────────────────────────────
+const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+const C = {
+  ink: "#0d1e28", surface: "#0f2030", surface2: "#152a3a", surface3: "#1a3347",
+  steel: "#669bbc", steelLt: "#8db8d4",
+  border: "rgba(102,155,188,0.12)", borderMd: "rgba(102,155,188,0.22)",
+  text: "#e8eef2", muted: "#7a9ab0", dim: "#3a5a6e",
+  green: "#2ed573", greenDim: "#0f2a1e",
+  orange: "#f5a623", orangeDim: "#2a1a08",
+  red: "#ff4757", redDim: "#2a0f12",
+};
+
+const ACTIVE_STATUSES: ProjectStatus[] = ["selecting","confirmed","editing","reviewing_v1","editing_v2","reviewing_v2"];
+
+const DATE_FILTER_OPTIONS = [
+  { value: "all",        label: "전체" },
+  { value: "this_month", label: "이번 달" },
+  { value: "last_month", label: "지난 달" },
+  { value: "3months",    label: "3개월" },
+];
+
+const STATUS_FILTER_OPTIONS = [
+  { value: "all", label: "전체 상태" },
+  ...PROJECT_STATUSES.map((s) => ({ value: s, label: PROJECT_STATUS_LABELS[s] })),
+];
+
+const SORT_OPTIONS = [
+  { value: "latest",     label: "최신순" },
+  { value: "deadline",   label: "마감 임박순" },
+  { value: "name",       label: "이름순" },
+  { value: "shoot_date", label: "촬영일순" },
+];
+
+// ── 헬퍼 ──────────────────────────────────────────────────────
+function getCardBorderColor(status: ProjectStatus): string {
+  switch (status) {
+    case "preparing":    return C.dim;
+    case "selecting":    return C.steel;
+    case "confirmed":    return C.green;
+    case "editing":
+    case "editing_v2":   return C.orange;
+    case "reviewing_v1":
+    case "reviewing_v2": return C.steelLt;
+    case "delivered":    return "rgba(46,213,115,0.4)";
+  }
+}
+
+function getBadgeStyle(status: ProjectStatus): React.CSSProperties {
+  switch (status) {
+    case "preparing":
+      return { background: C.surface3, color: C.steelLt, border: `1px solid rgba(102,155,188,0.2)` };
+    case "selecting":
+      return { background: "rgba(102,155,188,0.15)", color: C.steel, border: "1px solid rgba(102,155,188,0.3)" };
+    case "confirmed":
+      return { background: "rgba(46,213,115,0.12)", color: C.green, border: "1px solid rgba(46,213,115,0.25)" };
+    case "editing":
+    case "editing_v2":
+      return { background: "rgba(245,166,35,0.12)", color: C.orange, border: "1px solid rgba(245,166,35,0.3)" };
+    case "reviewing_v1":
+    case "reviewing_v2":
+      return { background: "rgba(141,184,212,0.12)", color: C.steelLt, border: "1px solid rgba(141,184,212,0.25)" };
+    case "delivered":
+      return { background: C.greenDim, color: C.green, border: "1px solid rgba(46,213,115,0.3)" };
+  }
+}
+
+function getBadgeLabel(status: ProjectStatus, photoCount: number): string {
+  if (status === "preparing") return photoCount >= 1 ? "업로드 중" : "업로드 전";
+  return PROJECT_STATUS_LABELS[status];
+}
+
+function getDDayInfo(deadline: string): { label: string; variant: "ok" | "warn" | "over" } {
+  const d = differenceInDays(new Date(deadline), new Date());
+  if (d < 0)  return { label: "D-Day 초과", variant: "over" };
+  if (d === 0) return { label: "D-Day", variant: "ok" };
+  if (d <= 3)  return { label: `D+${d} · 임박`, variant: "warn" };
+  return { label: `D+${d}`, variant: "ok" };
+}
+
+const DDAY_STYLES: Record<"ok"|"warn"|"over", React.CSSProperties> = {
+  ok:   { color: C.muted,   background: C.surface3 },
+  warn: { color: C.orange,  background: C.orangeDim },
+  over: { color: C.red,     background: C.redDim },
+};
+
+function highlight(text: string, query: string): React.ReactNode {
+  if (!query.trim()) return text;
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = text.split(new RegExp(`(${escaped})`, "gi"));
+  return parts.map((part, i) =>
+    part.toLowerCase() === query.toLowerCase()
+      ? <mark key={i} style={{ background: "rgba(102,155,188,0.2)", color: C.steel, borderRadius: 3, padding: "0 2px", fontStyle: "normal" }}>{part}</mark>
+      : part
+  );
+}
+
+function getMetaChips(p: Project): { icon: React.ReactNode; text: string }[] {
+  switch (p.status) {
+    case "preparing":
+      return [{ icon: <ImageIcon size={11} />, text: `${p.photoCount}장 업로드됨` }];
+    case "selecting":
+      return [
+        { icon: <ImageIcon size={11} />, text: `${p.photoCount}장` },
+        { icon: <Check size={11} />, text: `${p.requiredCount}장 셀렉 목표` },
+      ];
+    case "confirmed":
+      return [
+        { icon: <Check size={11} />, text: `${p.requiredCount}장 셀렉 완료` },
+        { icon: <ImageIcon size={11} />, text: "보정 시작 필요" },
+      ];
+    case "editing":
+    case "editing_v2":
+      return [{ icon: <ImageIcon size={11} />, text: `${p.requiredCount}장 선택됨` }];
+    case "reviewing_v1":
+    case "reviewing_v2":
+      return [{ icon: <Check size={11} />, text: `${p.requiredCount}장 · 검토 중` }];
+    case "delivered":
+      return [
+        { icon: <PackageCheck size={11} />, text: `${p.requiredCount}장 납품` },
+        ...(p.deliveredAt ? [{ icon: <Calendar size={11} />, text: format(new Date(p.deliveredAt), "yyyy-MM-dd") }] : []),
+      ];
+  }
+}
+
+// ── Dropdown 컴포넌트 ─────────────────────────────────────────
+interface DropdownProps {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+  icon?: React.ReactNode;
+}
+
+function Dropdown({ label, value, options, onChange, icon }: DropdownProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const active = value !== "all";
+  const selectedLabel = options.find((o) => o.value === value)?.label ?? label;
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: "relative", flexShrink: 0 }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          display: "flex", alignItems: "center", gap: 6,
+          padding: "8px 14px",
+          background: active ? "rgba(102,155,188,0.06)" : C.surface,
+          border: `1px solid ${active ? C.steel : C.border}`,
+          borderRadius: 9, color: active ? C.steel : C.muted,
+          fontSize: 12, cursor: "pointer", whiteSpace: "nowrap",
+          fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+          transition: "all 0.15s",
+        }}
+      >
+        {icon}
+        {active ? selectedLabel : label}
+        <ChevronDown size={11} color={C.dim} />
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 6px)", left: 0,
+          background: C.surface2, border: `1px solid ${C.borderMd}`,
+          borderRadius: 10, padding: "4px 0", minWidth: 140,
+          zIndex: 100, boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+        }}>
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              style={{
+                display: "block", width: "100%", textAlign: "left",
+                padding: "8px 14px", background: "transparent", border: "none",
+                color: opt.value === value ? C.steel : C.muted,
+                fontSize: 12, cursor: "pointer",
+                fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                fontWeight: opt.value === value ? 500 : 400,
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── 프로젝트 카드 ─────────────────────────────────────────────
+function ProjectCard({ project, searchQuery, onClick }: {
+  project: Project;
+  searchQuery: string;
+  onClick: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const shoot = new Date(project.shootDate);
+  const month = MONTHS[shoot.getMonth()];
+  const day = String(shoot.getDate()).padStart(2, "0");
+  const dday = getDDayInfo(project.deadline);
+  const meta = getMetaChips(project);
+  const badgeStyle = getBadgeStyle(project.status);
+
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? C.surface2 : C.surface,
+        border: `1px solid ${hovered ? C.borderMd : C.border}`,
+        borderRadius: 11, padding: "16px 18px", marginBottom: 7,
+        cursor: "pointer",
+        transform: hovered ? "translateX(2px)" : "translateX(0)",
+        transition: "all 0.18s",
+        display: "grid", gridTemplateColumns: "auto 1fr auto",
+        gap: 16, alignItems: "center",
+        position: "relative", overflow: "hidden",
+      }}
+    >
+      {/* 좌측 컬러 보더 */}
+      <div style={{
+        position: "absolute", left: 0, top: 0, bottom: 0, width: 3,
+        borderRadius: "11px 0 0 11px",
+        background: getCardBorderColor(project.status),
+      }} />
+
+      {/* 날짜 */}
+      <div style={{
+        display: "flex", flexDirection: "column", alignItems: "center",
+        minWidth: 44, paddingLeft: 4,
+      }}>
+        <span style={{ fontSize: 10, color: C.dim, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+          {month}
+        </span>
+        <span style={{
+          fontFamily: "'Playfair Display', serif",
+          fontSize: 22, fontWeight: 700, color: C.muted, lineHeight: 1,
+        }}>
+          {day}
+        </span>
+      </div>
+
+      {/* 중앙: 메인 정보 */}
+      <div style={{ minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
+            {highlight(project.name, searchQuery)}
+          </span>
+          <span style={{ fontSize: 12, color: C.muted }}>
+            {highlight(project.customerName, searchQuery)}
+          </span>
+          <span style={{
+            ...badgeStyle,
+            padding: "3px 9px", borderRadius: 20, fontSize: 10, fontWeight: 500, whiteSpace: "nowrap",
+          }}>
+            {getBadgeLabel(project.status, project.photoCount)}
+          </span>
+        </div>
+
+        {/* ProjectProgressBar */}
+        <div style={{ marginBottom: 8 }}>
+          <ProjectProgressBar status={project.status} />
+        </div>
+
+        {/* 메타 칩 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {meta.map((m, i) => (
+            <span key={i} style={{ fontSize: 11, color: C.muted, display: "flex", alignItems: "center", gap: 3 }}>
+              {m.icon}{m.text}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* 우측: D-Day + 화살표 */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
+        <span style={{
+          ...DDAY_STYLES[dday.variant],
+          fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, whiteSpace: "nowrap",
+        }}>
+          {dday.label}
+        </span>
+        <ChevronRight
+          size={14}
+          color={hovered ? C.steel : C.dim}
+          style={{ transform: hovered ? "translateX(2px)" : "translateX(0)", transition: "all 0.15s" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── 섹션 헤더 ─────────────────────────────────────────────────
+function SectionLabel({ label, count }: { label: string; count: number }) {
+  return (
+    <div style={{
+      fontSize: 10, fontWeight: 600, letterSpacing: 1,
+      textTransform: "uppercase", color: C.dim,
+      marginBottom: 8, marginTop: 20,
+      display: "flex", alignItems: "center", gap: 8,
+    }}>
+      {label}
+      <span style={{
+        background: C.surface2, border: `1px solid ${C.border}`,
+        borderRadius: 10, padding: "1px 6px",
+        fontSize: 9, color: C.muted, fontWeight: 400, letterSpacing: 0,
+      }}>
+        {count}
+      </span>
+    </div>
+  );
+}
+
+// ── 빈 상태 ───────────────────────────────────────────────────
+function EmptyState({ hasProjects, onReset }: { hasProjects: boolean; onReset: () => void }) {
+  const router = useRouter();
+  return (
+    <div style={{ textAlign: "center", padding: "56px 20px", color: C.dim }}>
+      <div style={{ fontSize: 36, marginBottom: 12, opacity: 0.5 }}>
+        {hasProjects ? <Search size={36} color={C.dim} /> : <ImageIcon size={36} color={C.dim} />}
+      </div>
+      <div style={{ fontSize: 14, color: C.muted, marginBottom: 6 }}>
+        {hasProjects ? "검색 결과가 없습니다" : "아직 프로젝트가 없습니다"}
+      </div>
+      <div style={{ fontSize: 12, color: C.dim, marginBottom: 20 }}>
+        {hasProjects ? "검색어나 필터를 변경해보세요" : "새 프로젝트를 만들어보세요"}
+      </div>
+      {hasProjects ? (
+        <button
+          onClick={onReset}
+          style={{
+            padding: "8px 18px", background: "transparent",
+            border: `1px solid ${C.borderMd}`, borderRadius: 8,
+            color: C.muted, fontSize: 12, cursor: "pointer",
+            fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+          }}
+        >
+          필터 초기화
+        </button>
+      ) : (
+        <button
+          onClick={() => router.push("/photographer/projects/new")}
+          style={{
+            padding: "8px 18px", background: C.steel,
+            border: "none", borderRadius: 8, color: "white",
+            fontSize: 12, cursor: "pointer",
+            fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+          }}
+        >
+          새 프로젝트 만들기
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ══════════════ 메인 페이지 ══════════════════════════════════
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const [projects, setProjects]   = useState<Project[]>([]);
+  const [loading, setLoading]     = useState(true);
+
+  // 필터 상태
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFilter,  setDateFilter]  = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy,      setSortBy]      = useState("latest");
+  const [activeTab,   setActiveTab]   = useState<"all"|"waiting"|"active"|"completed">("all");
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user?.id) {
-        setLoading(false);
-        return;
-      }
+      if (!user?.id) { setLoading(false); return; }
       try {
         const photographerId = await getPhotographerIdByAuthId(user.id);
-        if (!photographerId) {
-          setLoading(false);
-          return;
-        }
+        if (!photographerId) { setLoading(false); return; }
         const list = await getProjectsByPhotographerId(photographerId);
         setProjects(list);
       } catch (e) {
@@ -37,73 +406,267 @@ export default function ProjectsPage() {
     });
   }, []);
 
-  const statusBadgeVariant = (status: ProjectStatus) => {
-    if (status === "delivered") return "completed";
-    if (status === "preparing") return "waiting";
-    return "in_progress";
-  };
+  const resetFilters = useCallback(() => {
+    setSearchQuery("");
+    setDateFilter("all");
+    setStatusFilter("all");
+    setSortBy("latest");
+    setActiveTab("all");
+  }, []);
 
-  const daysLabel = (deadline: string) => {
-    const d = differenceInDays(new Date(deadline), new Date());
-    return d > 0 ? `D+${d}` : d === 0 ? "D-Day" : `D${d}`;
-  };
+  // ── 탭별 counts (검색/필터 무관, 전체 기준) ──
+  const tabCounts = useMemo(() => ({
+    all:       projects.length,
+    waiting:   projects.filter((p) => p.status === "preparing").length,
+    active:    projects.filter((p) => ACTIVE_STATUSES.includes(p.status)).length,
+    completed: projects.filter((p) => p.status === "delivered").length,
+  }), [projects]);
+
+  // ── 필터링 + 정렬 ──
+  const filtered = useMemo(() => {
+    let result = [...projects];
+
+    // 검색
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (p) => p.name.toLowerCase().includes(q) || p.customerName.toLowerCase().includes(q)
+      );
+    }
+
+    // 촬영일 필터
+    const now = new Date();
+    if (dateFilter === "this_month") {
+      const start = startOfMonth(now);
+      result = result.filter((p) => new Date(p.shootDate) >= start);
+    } else if (dateFilter === "last_month") {
+      const start = startOfMonth(subMonths(now, 1));
+      const end   = startOfMonth(now);
+      result = result.filter((p) => { const d = new Date(p.shootDate); return d >= start && d < end; });
+    } else if (dateFilter === "3months") {
+      const start = subMonths(now, 3);
+      result = result.filter((p) => new Date(p.shootDate) >= start);
+    }
+
+    // 상태 필터
+    if (statusFilter !== "all") {
+      result = result.filter((p) => p.status === statusFilter);
+    }
+
+    // 탭 필터
+    if (activeTab === "waiting")   result = result.filter((p) => p.status === "preparing");
+    if (activeTab === "active")    result = result.filter((p) => ACTIVE_STATUSES.includes(p.status));
+    if (activeTab === "completed") result = result.filter((p) => p.status === "delivered");
+
+    // 정렬
+    if (sortBy === "latest")     result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    if (sortBy === "deadline")   result.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+    if (sortBy === "name")       result.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    if (sortBy === "shoot_date") result.sort((a, b) => new Date(b.shootDate).getTime() - new Date(a.shootDate).getTime());
+
+    return result;
+  }, [projects, searchQuery, dateFilter, statusFilter, activeTab, sortBy]);
+
+  // 섹션 분리 (탭이 "all"일 때)
+  const waiting   = filtered.filter((p) => p.status === "preparing");
+  const active    = filtered.filter((p) => ACTIVE_STATUSES.includes(p.status));
+  const completed = filtered.filter((p) => p.status === "delivered");
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-zinc-400">로딩 중...</p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "50vh", gap: 8 }}>
+        <Loader2 size={20} color={C.muted} style={{ animation: "spin 1s linear infinite" }} />
+        <span style={{ fontSize: 13, color: C.muted }}>로딩 중...</span>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
+  const TABS = [
+    { key: "all",       label: "전체",   count: tabCounts.all },
+    { key: "waiting",   label: "대기 중", count: tabCounts.waiting },
+    { key: "active",    label: "진행 중", count: tabCounts.active },
+    { key: "completed", label: "완료",    count: tabCounts.completed },
+  ] as const;
+
+  const hasActiveFilter = searchQuery.trim() || dateFilter !== "all" || statusFilter !== "all" || activeTab !== "all";
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold text-white">프로젝트</h1>
-        <Link href="/photographer/projects/new">
-          <Button variant="primary" className="flex items-center gap-2">
-            <PlusCircle className="h-5 w-5" />
-            새 프로젝트
-          </Button>
-        </Link>
+    <div style={{ fontFamily: "'DM Sans','Noto Sans KR',sans-serif" }}>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+        .search-input:focus { outline:none; border-color:${C.borderMd} !important; }
+        .search-input::placeholder { color:${C.dim}; }
+      `}</style>
+
+      {/* ── Topbar ── */}
+      <div style={{
+        height: 52, borderBottom: `1px solid ${C.border}`,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "0 24px",
+        background: "rgba(13,30,40,0.85)", backdropFilter: "blur(12px)",
+        position: "sticky", top: 0, zIndex: 50,
+      }}>
+        <span style={{ fontSize: 15, fontWeight: 500, color: C.text }}>프로젝트</span>
+        <button
+          onClick={() => router.push("/photographer/projects/new")}
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "7px 16px", background: C.steel, color: "white",
+            border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500,
+            cursor: "pointer", fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+          }}
+        >
+          ＋ 새 프로젝트
+        </button>
       </div>
 
-      <div className="space-y-6">
-        {projects.map((p) => (
-          <Link key={p.id} href={`/photographer/projects/${p.id}`}>
-            <Card className="transition-colors hover:border-zinc-700">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="font-medium text-white">{p.name}</p>
-                  <p className="text-sm text-zinc-400">
-                    {p.customerName} · 기한 {format(new Date(p.deadline), "yyyy-MM-dd")}
-                  </p>
-                </div>
-                <Badge variant={statusBadgeVariant(p.status)} className="shrink-0">
-                  {getDisplayStatusLabel(p.status, p.photoCount)}
-                </Badge>
+      {/* ── 콘텐츠 ── */}
+      <div style={{ padding: "20px 24px" }}>
+
+        {/* 검색 + 필터 바 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+          {/* 검색창 */}
+          <div style={{ flex: 1, position: "relative" }}>
+            <Search
+              size={13} color={C.dim}
+              style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}
+            />
+            <input
+              className="search-input"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="프로젝트명, 고객명으로 검색"
+              style={{
+                width: "100%", padding: "9px 12px 9px 34px",
+                background: C.surface, border: `1px solid ${C.border}`,
+                borderRadius: 9, color: C.text, fontSize: 13,
+                fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                transition: "border-color 0.15s", boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          {/* 촬영일 필터 */}
+          <Dropdown
+            label="촬영일"
+            value={dateFilter}
+            options={DATE_FILTER_OPTIONS}
+            onChange={setDateFilter}
+            icon={<Calendar size={12} color={C.dim} />}
+          />
+
+          {/* 상태 필터 */}
+          <Dropdown
+            label="상태"
+            value={statusFilter}
+            options={STATUS_FILTER_OPTIONS}
+            onChange={setStatusFilter}
+            icon={<SlidersHorizontal size={12} color={C.dim} />}
+          />
+
+          {/* 정렬 */}
+          <Dropdown
+            label="정렬"
+            value={sortBy === "latest" ? "all" : sortBy}
+            options={SORT_OPTIONS.map((o) => ({ ...o, value: o.value === "latest" ? "all" : o.value }))}
+            onChange={(v) => setSortBy(v === "all" ? "latest" : v)}
+            icon={<ChevronDown size={12} color={C.dim} />}
+          />
+        </div>
+
+        {/* 상태 탭 */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 4,
+          marginBottom: 18, borderBottom: `1px solid ${C.border}`, paddingBottom: 0,
+        }}>
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                padding: "8px 14px", fontSize: 12, fontWeight: 500,
+                color: activeTab === tab.key ? C.steel : C.muted,
+                background: "transparent", border: "none",
+                borderBottom: `2px solid ${activeTab === tab.key ? C.steel : "transparent"}`,
+                marginBottom: -1, cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 5,
+                fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                transition: "all 0.15s",
+              }}
+            >
+              {tab.label}
+              <span style={{
+                padding: "1px 6px", borderRadius: 10, fontSize: 10, fontWeight: 600,
+                background: activeTab === tab.key ? "rgba(102,155,188,0.15)" : C.surface2,
+                color: activeTab === tab.key ? C.steel : C.muted,
+              }}>
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* 결과 요약 */}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          marginBottom: 12,
+        }}>
+          <span style={{ fontSize: 12, color: C.dim }}>
+            전체 {filtered.length}개 프로젝트
+          </span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            style={{
+              padding: "5px 10px", background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 7, color: C.muted, fontSize: 11,
+              fontFamily: "'DM Sans','Noto Sans KR',sans-serif", cursor: "pointer",
+            }}
+          >
+            {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+
+        {/* ── 프로젝트 목록 ── */}
+        {filtered.length === 0 ? (
+          <EmptyState hasProjects={projects.length > 0} onReset={resetFilters} />
+        ) : activeTab === "all" ? (
+          // 섹션 그룹핑
+          <>
+            {waiting.length > 0 && (
+              <div>
+                <SectionLabel label="대기 중" count={waiting.length} />
+                {waiting.map((p) => (
+                  <ProjectCard key={p.id} project={p} searchQuery={searchQuery} onClick={() => router.push(`/photographer/projects/${p.id}`)} />
+                ))}
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
-                <ProjectProgressBar
-                  status={p.status}
-                  photoCount={p.photoCount}
-                  requiredCount={p.requiredCount}
-                  className="min-w-0 flex-1 flex-shrink-0"
-                />
-                <span className="text-zinc-500 shrink-0">{daysLabel(p.deadline)}</span>
+            )}
+            {active.length > 0 && (
+              <div>
+                <SectionLabel label="진행 중" count={active.length} />
+                {active.map((p) => (
+                  <ProjectCard key={p.id} project={p} searchQuery={searchQuery} onClick={() => router.push(`/photographer/projects/${p.id}`)} />
+                ))}
               </div>
-            </Card>
-          </Link>
-        ))}
+            )}
+            {completed.length > 0 && (
+              <div>
+                <SectionLabel label="완료" count={completed.length} />
+                {completed.map((p) => (
+                  <ProjectCard key={p.id} project={p} searchQuery={searchQuery} onClick={() => router.push(`/photographer/projects/${p.id}`)} />
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          // 탭 필터링 — 플랫 리스트
+          filtered.map((p) => (
+            <ProjectCard key={p.id} project={p} searchQuery={searchQuery} onClick={() => router.push(`/photographer/projects/${p.id}`)} />
+          ))
+        )}
       </div>
-      {projects.length === 0 && (
-        <Card className="p-8 text-center">
-          <p className="text-zinc-400">아직 프로젝트가 없습니다.</p>
-          <Link href="/photographer/projects/new" className="mt-4 inline-block">
-            <Button variant="primary">새 프로젝트 만들기</Button>
-          </Link>
-        </Card>
-      )}
     </div>
   );
 }

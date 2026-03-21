@@ -1,95 +1,321 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { differenceInDays, formatDistanceToNow } from "date-fns";
-import { ko } from "date-fns/locale";
 import {
-  PlusCircle,
-  Loader2,
-  Search,
-  X,
-  Link2,
-  BarChart3,
+  Plus,
+  Bell,
+  FolderOpen,
   CheckCircle2,
-  Clock,
-  Layers,
+  RefreshCw,
+  Eye,
+  Image as ImageIcon,
+  Check,
 } from "lucide-react";
-import { Button, Card, Badge } from "@/components/ui";
-import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import { getProjectsByPhotographerId } from "@/lib/db";
-import type { ProjectLogApiItem } from "@/app/api/photographer/project-logs/route";
-import {
-  GROUP_WAITING,
-  GROUP_IN_PROGRESS,
-  GROUP_COMPLETED,
-  getDisplayStatusLabel,
-} from "@/lib/project-status";
 import type { Project, ProjectStatus } from "@/types";
+import type { ProjectLogItem } from "@/lib/db";
+import { useProfile } from "@/contexts/ProfileContext";
+import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 
-const ACTION_LABELS: Record<ProjectLogApiItem["action"], string> = {
-  created: "프로젝트 생성",
-  uploaded: "사진 업로드",
-  selecting: "셀렉 진행",
-  confirmed: "셀렉 완료",
-  editing: "보정 시작",
+// ── colour tokens ──────────────────────────────────────────
+const C = {
+  ink:       "#0d1e28",
+  surface:   "#0f2030",
+  surface2:  "#152a3a",
+  surface3:  "#1a3347",
+  steel:     "#669bbc",
+  steelLt:   "#8db8d4",
+  border:    "rgba(102,155,188,0.12)",
+  borderMd:  "rgba(102,155,188,0.22)",
+  text:      "#e8eef2",
+  muted:     "#7a9ab0",
+  dim:       "#3a5a6e",
+  green:     "#2ed573",
+  greenDim:  "#0f2a1e",
+  orange:    "#f5a623",
+  orangeDim: "#2a1a08",
+  red:       "#ff4757",
+  redDim:    "#2a0f12",
 };
 
-const ACTION_ICONS: Record<ProjectLogApiItem["action"], string> = {
-  created: "📁",
-  uploaded: "📤",
-  selecting: "🖼️",
-  confirmed: "✅",
-  editing: "🎨",
+// ── status config ──────────────────────────────────────────
+type BadgeKey = "preparing" | "selecting" | "editing" | "delivered" | "revision";
+
+const STATUS_BADGE: Record<ProjectStatus, { label: string; key: BadgeKey }> = {
+  preparing:    { label: "업로드 전", key: "preparing" },
+  selecting:    { label: "셀렉 중",   key: "selecting" },
+  confirmed:    { label: "확정됨",    key: "selecting" },
+  editing:      { label: "보정 중",   key: "editing"   },
+  reviewing_v1: { label: "검토 중",   key: "editing"   },
+  editing_v2:   { label: "재보정 중", key: "revision"  },
+  reviewing_v2: { label: "재검토 중", key: "editing"   },
+  delivered:    { label: "납품 완료", key: "delivered" },
 };
 
-type FilterTab = "all" | "inProgress" | "waiting" | "completed";
-type SortOption = "newest" | "deadline" | "customer";
+const BADGE_STYLE: Record<BadgeKey, React.CSSProperties> = {
+  preparing: { background: C.surface3,                    color: C.muted,   border: `1px solid ${C.border}` },
+  selecting: { background: "rgba(102,155,188,0.15)",      color: C.steel,   border: "1px solid rgba(102,155,188,0.3)" },
+  editing:   { background: "rgba(245,166,35,0.12)",       color: C.orange,  border: "1px solid rgba(245,166,35,0.3)"  },
+  revision:  { background: "rgba(255,71,87,0.12)",        color: C.red,     border: "1px solid rgba(255,71,87,0.3)"   },
+  delivered: { background: C.greenDim,                    color: C.green,   border: "1px solid rgba(46,213,115,0.3)"  },
+};
 
+const STATUS_LEFT: Record<ProjectStatus, string> = {
+  preparing:    C.dim,
+  selecting:    C.steel,
+  confirmed:    C.green,
+  editing:      C.orange,
+  reviewing_v1: C.steelLt,
+  editing_v2:   C.red,
+  reviewing_v2: C.steelLt,
+  delivered:    C.dim,
+};
+
+const ACTIVE_STATUSES: ProjectStatus[] = [
+  "selecting", "confirmed", "editing", "reviewing_v1", "editing_v2", "reviewing_v2",
+];
+
+// ── helpers ────────────────────────────────────────────────
+function dday(deadline: string): { text: string; warn: boolean } {
+  const diff = Math.ceil(
+    (new Date(deadline).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86_400_000
+  );
+  if (diff > 3)   return { text: `D-${diff}`,        warn: false };
+  if (diff > 0)   return { text: `D-${diff} · 임박`, warn: true  };
+  if (diff === 0) return { text: "D-day",             warn: true  };
+  return            { text: `D+${Math.abs(diff)}`,   warn: true  };
+}
+
+function timeAgo(iso: string): string {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60)     return "방금 전";
+  if (diff < 3600)   return `${Math.floor(diff / 60)}분 전`;
+  if (diff < 86400)  return `${Math.floor(diff / 3600)}시간 전`;
+  if (diff < 172800) return "어제";
+  return `${Math.floor(diff / 86400)}일 전`;
+}
+
+const LOG_DOT: Record<string, string> = {
+  created:   C.steel,
+  uploaded:  C.orange,
+  selecting: C.green,
+  confirmed: C.green,
+  editing:   C.orange,
+  delivered: C.green,
+  revision:  C.red,
+};
+
+const LOG_LABEL: Record<string, string> = {
+  created:   "프로젝트 생성",
+  uploaded:  "사진 업로드",
+  selecting: "셀렉 완료",
+  confirmed: "확정 완료",
+  editing:   "보정 시작",
+  delivered: "납품 완료",
+  revision:  "재보정 요청",
+};
+
+// ── StatusBadge ────────────────────────────────────────────
+function StatusBadge({ status }: { status: ProjectStatus }) {
+  const { label, key } = STATUS_BADGE[status];
+  return (
+    <span style={{
+      ...BADGE_STYLE[key],
+      fontSize: 10,
+      fontWeight: 500,
+      padding: "2px 8px",
+      borderRadius: 20,
+      flexShrink: 0,
+    }}>
+      {label}
+    </span>
+  );
+}
+
+// ── ProjectCard ────────────────────────────────────────────
+function ProjectCard({ project }: { project: Project }) {
+  const router = useRouter();
+  const [hovered, setHovered] = useState(false);
+  const accentColor = STATUS_LEFT[project.status];
+  const { text: ddayText, warn } = dday(project.deadline);
+  const ddayStyle: React.CSSProperties = warn
+    ? { color: C.orange, background: C.orangeDim }
+    : { color: C.muted,  background: C.surface3  };
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => router.push(`/photographer/projects/${project.id}`)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          router.push(`/photographer/projects/${project.id}`);
+        }
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? C.surface2 : C.surface,
+        borderTop:    `1px solid ${hovered ? C.borderMd : C.border}`,
+        borderRight:  `1px solid ${hovered ? C.borderMd : C.border}`,
+        borderBottom: `1px solid ${hovered ? C.borderMd : C.border}`,
+        borderLeft:   `3px solid ${accentColor}`,
+        borderRadius: 10,
+        padding: "14px 16px",
+        marginBottom: 6,
+        cursor: "pointer",
+        transition: "all 0.18s",
+        transform: hovered ? "translateX(2px)" : "none",
+        display: "grid",
+        gridTemplateColumns: "1fr auto",
+        gap: 12,
+        alignItems: "center",
+      }}
+    >
+      <div>
+        {/* 카드 상단: 프로젝트명 + 고객명 + 배지 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{project.name}</span>
+          <span style={{ fontSize: 12, color: C.muted }}>{project.customerName || "—"}</span>
+          <StatusBadge status={project.status} />
+        </div>
+
+        {/* 진행 바 */}
+        <ProjectProgressBar status={project.status} />
+
+        {/* 하단 메타 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
+              <ImageIcon size={10} />
+              {project.photoCount}장
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
+              <Check size={10} />
+              {project.requiredCount}장
+            </span>
+          </div>
+          <span style={{
+            ...ddayStyle,
+            fontSize: 10,
+            fontWeight: 500,
+            padding: "2px 7px",
+            borderRadius: 5,
+            flexShrink: 0,
+          }}>
+            {ddayText}
+          </span>
+        </div>
+      </div>
+
+      {/* 화살표 */}
+      <span style={{ fontSize: 12, color: hovered ? C.steel : C.dim, transition: "color 0.15s" }}>→</span>
+    </div>
+  );
+}
+
+// ── ActionCard ─────────────────────────────────────────────
+function ActionCard({
+  count,
+  label,
+  sub,
+  icon,
+  topColor,
+  numColor,
+  bgTint,
+}: {
+  count: number;
+  label: string;
+  sub: string;
+  icon: React.ReactNode;
+  topColor: string;
+  numColor: string;
+  bgTint: string;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <Link href="/photographer/projects" style={{ textDecoration: "none" }}>
+      <div
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          background: hovered ? C.surface2 : bgTint,
+          borderTop:    `2px solid ${topColor}`,
+          borderRight:  `1px solid ${hovered ? C.borderMd : C.border}`,
+          borderBottom: `1px solid ${hovered ? C.borderMd : C.border}`,
+          borderLeft:   `1px solid ${hovered ? C.borderMd : C.border}`,
+          borderRadius: 10,
+          padding: "14px",
+          cursor: "pointer",
+          transition: "all 0.18s",
+          transform: hovered ? "translateY(-2px)" : "none",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <span style={{ fontSize: 11, color: C.muted }}>{label}</span>
+          <span>{icon}</span>
+        </div>
+        <div style={{
+          fontFamily: "'Playfair Display', serif",
+          fontSize: 30,
+          lineHeight: 1,
+          marginBottom: 3,
+          color: numColor,
+        }}>
+          {count}
+        </div>
+        <div style={{ fontSize: 10, color: C.dim }}>{sub}</div>
+      </div>
+    </Link>
+  );
+}
+
+// ── SectionHeader ──────────────────────────────────────────
+function SectionHeader({ title, count }: { title: string; count: number }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+      <span style={{
+        fontSize: 11, fontWeight: 600, letterSpacing: 1,
+        textTransform: "uppercase", color: C.dim,
+      }}>
+        {title}
+      </span>
+      <span style={{
+        background: C.surface2, border: `1px solid ${C.border}`,
+        borderRadius: 10, padding: "1px 7px", fontSize: 10, color: C.muted,
+      }}>
+        {count}
+      </span>
+    </div>
+  );
+}
+
+// ── Main Page ──────────────────────────────────────────────
 export default function DashboardPage() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [logs, setLogs] = useState<ProjectLogApiItem[]>([]);
+  const router = useRouter();
+  const { profile, loading: profileLoading } = useProfile();
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [photographerId, setPhotographerId] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string>("사용자");
-  const [profileName, setProfileName] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [logs, setLogs] = useState<ProjectLogItem[]>([]);
 
-  // Search / filter state
-  const [search, setSearch] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [filterTab, setFilterTab] = useState<FilterTab>("all");
-  const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const userName =
+    profile?.name?.trim() ||
+    profile?.email?.split("@")[0] ||
+    "사용자";
 
   useEffect(() => {
+    if (profileLoading) return;
+    const pid = profile?.id;
+    if (!pid) { setLoading(false); return; }
+
     async function load() {
       try {
-        // 서버사이드 API로 인증 확인 (쿠키를 서버에서 직접 읽음 → OAuth 리다이렉트 직후도 안정적)
-        // profile API: 행 없으면 자동 생성, 401이면 미로그인
-        const profileRes = await fetch("/api/photographer/profile").then((r) =>
-          r.ok ? r.json() : null
-        );
-        const pid: string | null = profileRes?.id ?? null;
-
-        if (!pid) {
-          setLoading(false);
-          return;
-        }
-
-        setUserId(profileRes.authId ?? pid);
-        setPhotographerId(pid);
-        const displayName =
-          profileRes.name?.trim() ||
-          profileRes.email?.split("@")[0] ||
-          "사용자";
-        setUserName(displayName);
-        if (profileRes.name?.trim()) setProfileName(profileRes.name.trim());
-
         const [list, logRes] = await Promise.all([
-          getProjectsByPhotographerId(pid),
-          fetch("/api/photographer/project-logs").then((r) => (r.ok ? r.json() : [])),
+          getProjectsByPhotographerId(pid as string),
+          fetch("/api/photographer/project-logs").then((r) => r.ok ? r.json() : []),
         ]);
         setProjects(list);
         setLogs(Array.isArray(logRes) ? logRes : []);
@@ -100,417 +326,348 @@ export default function DashboardPage() {
       }
     }
     load();
-  }, []);
+  }, [profile, profileLoading]);
 
-  useEffect(() => {
-    if (toast) {
-      const t = setTimeout(() => setToast(null), 2500);
-      return () => clearTimeout(t);
-    }
-  }, [toast]);
-
-  const waiting = useMemo(() => projects.filter((p) => GROUP_WAITING.includes(p.status)), [projects]);
-  const inProgress = useMemo(() => projects.filter((p) => GROUP_IN_PROGRESS.includes(p.status)), [projects]);
-  const completed = useMemo(() => projects.filter((p) => GROUP_COMPLETED.includes(p.status)), [projects]);
-
-  const filteredAndSorted = useMemo(() => {
-    let list = projects;
-
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) || p.customerName.toLowerCase().includes(q)
-      );
-    }
-    if (startDate) {
-      list = list.filter((p) => p.shootDate >= startDate);
-    }
-    if (endDate) {
-      list = list.filter((p) => p.shootDate <= endDate);
-    }
-    if (filterTab === "inProgress") list = list.filter((p) => GROUP_IN_PROGRESS.includes(p.status));
-    else if (filterTab === "waiting") list = list.filter((p) => GROUP_WAITING.includes(p.status));
-    else if (filterTab === "completed") list = list.filter((p) => GROUP_COMPLETED.includes(p.status));
-
-    if (sortBy === "newest") {
-      list = [...list].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-    } else if (sortBy === "deadline") {
-      list = [...list].sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
-    } else {
-      list = [...list].sort((a, b) => a.customerName.localeCompare(b.customerName));
-    }
-    return list;
-  }, [projects, search, startDate, endDate, filterTab, sortBy]);
-
-  const resetFilters = () => {
-    setSearch("");
-    setStartDate("");
-    setEndDate("");
-    setFilterTab("all");
-    setSortBy("newest");
-  };
-
-  const copyInviteLink = (p: Project) => {
-    const url =
-      typeof window !== "undefined"
-        ? `${window.location.origin}/c/${p.accessToken}`
-        : "";
-    if (url && navigator.clipboard) {
-      navigator.clipboard.writeText(url).then(() => setToast("초대 링크가 복사되었습니다."));
-    }
-  };
-
-  const daysLabel = (deadline: string) => {
-    const d = differenceInDays(new Date(deadline), new Date());
-    return d > 0 ? `D+${d}` : d === 0 ? "D-Day" : `D${d}`;
-  };
-
-  const statusBadgeVariant = (status: ProjectStatus) => {
-    if (GROUP_COMPLETED.includes(status)) return "completed";
-    if (GROUP_WAITING.includes(status)) return "waiting";
-    return "in_progress";
-  };
-
-  const groupByStatus = (list: Project[]) => {
-    const inP: Project[] = [];
-    const wait: Project[] = [];
-    const done: Project[] = [];
-    list.forEach((p) => {
-      if (GROUP_IN_PROGRESS.includes(p.status)) inP.push(p);
-      else if (GROUP_WAITING.includes(p.status)) wait.push(p);
-      else if (GROUP_COMPLETED.includes(p.status)) done.push(p);
-    });
-    return { inProgress: inP, waiting: wait, completed: done };
-  };
-
-  const grouped = useMemo(() => groupByStatus(filteredAndSorted), [filteredAndSorted]);
-
-  if (loading) {
+  if (profileLoading || loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 0" }}>
+        <p style={{ color: C.muted, fontSize: 13 }}>불러오는 중…</p>
       </div>
     );
   }
 
-  if (!userId || !photographerId) {
+  if (!profile?.id) {
     return (
-      <div className="space-y-8">
-        <h1 className="text-2xl font-semibold text-white">작가 대시보드</h1>
-        <Card className="p-8 text-center">
-          <p className="text-zinc-400">로그인하면 프로젝트 목록을 볼 수 있습니다.</p>
-          <Link href="/auth" className="mt-4 inline-block">
-            <Button variant="primary">로그인</Button>
-          </Link>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* 1. 헤더 */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-white">
-            안녕하세요, {profileName ?? userName} 님 👋
-          </h1>
-          <p className="mt-0.5 text-sm text-zinc-400">오늘도 좋은 하루 되세요</p>
-        </div>
-        <Link href="/photographer/projects/new">
-          <Button variant="primary" className="flex items-center gap-2">
-            <PlusCircle className="h-4 w-4" />
-            새 프로젝트
-          </Button>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "80px 0" }}>
+        <p style={{ color: C.muted, fontSize: 13 }}>로그인하면 프로젝트를 볼 수 있습니다</p>
+        <Link href="/auth" style={{
+          backgroundColor: C.steel, color: "#fff",
+          padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none",
+        }}>
+          로그인
         </Link>
       </div>
+    );
+  }
 
-      {/* 2. 요약 카드 4개 */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Card className="flex items-center gap-3 p-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/20 text-primary">
-            <BarChart3 className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-xs text-zinc-400">진행 중</p>
-            <p className="text-lg font-bold text-white">{inProgress.length}</p>
-          </div>
-        </Card>
-        <Card className="flex items-center gap-3 p-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-success/20 text-success">
-            <CheckCircle2 className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-xs text-zinc-400">완료됨</p>
-            <p className="text-lg font-bold text-white">{completed.length}</p>
-          </div>
-        </Card>
-        <Card className="flex items-center gap-3 p-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-600/50 text-zinc-300">
-            <Clock className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-xs text-zinc-400">대기 중</p>
-            <p className="text-lg font-bold text-white">{waiting.length}</p>
-          </div>
-        </Card>
-        <Card className="flex items-center gap-3 p-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400">
-            <Layers className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-xs text-zinc-400">전체</p>
-            <p className="text-lg font-bold text-white">{projects.length}</p>
-          </div>
-        </Card>
-      </div>
-
-      {/* 3. 검색/필터 2줄 */}
-      <Card className="p-4 space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-            <input
-              type="text"
-              placeholder="프로젝트명 / 고객명"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-900 py-2 pl-9 pr-3 text-sm text-white placeholder-zinc-500 focus:border-primary focus:outline-none"
-            />
-          </div>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white"
-          />
-          <span className="text-zinc-500">~</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white"
-          />
-          <Button variant="ghost" size="sm" onClick={resetFilters} className="text-zinc-400">
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex gap-1 rounded-lg border border-zinc-700 bg-zinc-900/50 p-1">
-            {(["all", "inProgress", "waiting", "completed"] as const).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setFilterTab(tab)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  filterTab === tab ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                {tab === "all" && "전체"}
-                {tab === "inProgress" && "진행중"}
-                {tab === "waiting" && "대기중"}
-                {tab === "completed" && "완료"}
-              </button>
-            ))}
-          </div>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white"
-          >
-            <option value="newest">최신순</option>
-            <option value="deadline">마감임박순</option>
-            <option value="customer">고객명순</option>
-          </select>
-        </div>
-      </Card>
-
-      {/* 4. 2컬럼: 프로젝트 목록 | 활동 로그 */}
-      <div className="flex flex-col gap-6 lg:flex-row">
-        <div className="min-w-0 flex-1 space-y-4">
-          {grouped.inProgress.length > 0 && (
-            <section>
-              <h2 className="mb-2 text-sm font-medium text-zinc-400">
-                진행 중 · {grouped.inProgress.length}
-              </h2>
-              <div className="space-y-3">
-                {grouped.inProgress.map((p) => (
-                  <ProjectCard
-                    key={p.id}
-                    project={p}
-                    daysLabel={daysLabel}
-                    onCopyInvite={copyInviteLink}
-                    statusBadgeVariant={statusBadgeVariant}
-                    getStatusLabel={(status) => getDisplayStatusLabel(status, p.photoCount)}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-          {grouped.waiting.length > 0 && (
-            <section>
-              <h2 className="mb-2 text-sm font-medium text-zinc-400">
-                대기 중 · {grouped.waiting.length}
-              </h2>
-              <div className="space-y-3">
-                {grouped.waiting.map((p) => (
-                  <ProjectCard
-                    key={p.id}
-                    project={p}
-                    daysLabel={daysLabel}
-                    onCopyInvite={copyInviteLink}
-                    statusBadgeVariant={statusBadgeVariant}
-                    getStatusLabel={(status) => getDisplayStatusLabel(status, p.photoCount)}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-          {grouped.completed.length > 0 && (
-            <section>
-              <h2 className="mb-2 text-sm font-medium text-zinc-400">
-                완료됨 · {grouped.completed.length}
-              </h2>
-              <div className="space-y-3">
-                {grouped.completed.map((p) => (
-                  <ProjectCard
-                    key={p.id}
-                    project={p}
-                    daysLabel={daysLabel}
-                    onCopyInvite={copyInviteLink}
-                    statusBadgeVariant={statusBadgeVariant}
-                    getStatusLabel={(status) => getDisplayStatusLabel(status, p.photoCount)}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-          {filteredAndSorted.length === 0 && (
-            <Card className="p-8 text-center">
-              <p className="text-zinc-400">조건에 맞는 프로젝트가 없습니다.</p>
-              <Button variant="ghost" size="sm" className="mt-2" onClick={resetFilters}>
-                필터 초기화
-              </Button>
-            </Card>
-          )}
-        </div>
-
-        {/* 활동 로그 패널 */}
-        <aside className="w-full shrink-0 lg:w-[280px]">
-          <Card className="p-4">
-            <h3 className="mb-3 text-sm font-medium text-zinc-300">활동 로그</h3>
-            {logs.length === 0 ? (
-              <p className="py-6 text-center text-sm text-zinc-500">최근 활동이 없습니다</p>
-            ) : (
-              <ul className="space-y-3">
-                {logs.map((log) => (
-                  <li key={log.id} className="flex gap-2 text-sm">
-                    <span className="mt-0.5 shrink-0 text-base leading-none">
-                      {ACTION_ICONS[log.action]}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-zinc-300">
-                        {log.projectName}
-                        {log.customerName ? ` - ${log.customerName} ` : " "}
-                        {ACTION_LABELS[log.action]}
-                      </p>
-                      <p className="text-xs text-zinc-500">
-                        {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true, locale: ko })}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </aside>
-      </div>
-
-      {projects.length === 0 && !search && !startDate && !endDate && (
-        <Card className="p-8 text-center">
-          <p className="text-zinc-400">아직 프로젝트가 없습니다.</p>
-          <Link href="/photographer/projects/new" className="mt-4 inline-block">
-            <Button variant="primary">새 프로젝트 만들기</Button>
-          </Link>
-        </Card>
-      )}
-
-      {toast && (
-        <div
-          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-white shadow-lg ring-1 ring-zinc-700"
-          role="status"
-        >
-          {toast}
-        </div>
-      )}
-    </div>
+  // ── derived data: 최근 업데이트 순 6개 제한 ──
+  const sortedAll = [...projects].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
-}
+  const displayProjects      = sortedAll.slice(0, 6);
+  const showViewAllBtn       = projects.length > 6;
+  const totalDeliveredCount  = projects.filter((p) => p.status === "delivered").length;
 
-function ProjectCard({
-  project: p,
-  daysLabel,
-  onCopyInvite,
-  statusBadgeVariant,
-  getStatusLabel,
-}: {
-  project: Project;
-  daysLabel: (d: string) => string;
-  onCopyInvite: (p: Project) => void;
-  statusBadgeVariant: (s: ProjectStatus) => "completed" | "waiting" | "in_progress";
-  getStatusLabel: (s: ProjectStatus) => string;
-}) {
-  const [hover, setHover] = useState(false);
+  const preparingProjects = displayProjects.filter((p) => p.status === "preparing");
+  const activeProjects    = displayProjects.filter((p) => ACTIVE_STATUSES.includes(p.status));
+  const recentDelivered   = displayProjects.filter((p) => p.status === "delivered").slice(0, 1);
+
+  const confirmedCount = projects.filter((p) => p.status === "confirmed").length;
+  const revisionCount  = projects.filter((p) => p.status === "editing_v2").length;
+  const reviewingCount = projects.filter((p) =>
+    p.status === "reviewing_v1" || p.status === "reviewing_v2"
+  ).length;
+  const hasAction = confirmedCount + revisionCount + reviewingCount > 0;
+
+  const thisMonth = new Date().getMonth();
+  const thisYear  = new Date().getFullYear();
+  const thisMonthCount = projects.filter((p) => {
+    const d = new Date(p.shootDate);
+    return d.getFullYear() === thisYear && d.getMonth() === thisMonth;
+  }).length;
 
   return (
-    <div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      className="relative"
-    >
-      <Link href={`/photographer/projects/${p.id}`}>
-        <Card className="transition-colors hover:border-zinc-700">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="font-medium text-white">{p.name}</p>
-              <p className="text-sm text-zinc-400">{p.customerName}</p>
-            </div>
-            <Badge variant={statusBadgeVariant(p.status)} className="shrink-0">
-              {getDisplayStatusLabel(p.status, p.photoCount)}
-            </Badge>
-          </div>
-          <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
-            <ProjectProgressBar
-              status={p.status}
-              photoCount={p.photoCount}
-              requiredCount={p.requiredCount}
-              className="min-w-0 flex-1 flex-shrink-0"
-            />
-            <span className="text-zinc-500 shrink-0">{daysLabel(p.deadline)}</span>
-          </div>
-        </Card>
-      </Link>
-      {hover && (
-        <div className="absolute right-2 top-2 flex gap-1">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="text-xs"
-            onClick={(e) => {
-              e.preventDefault();
-              onCopyInvite(p);
+    <div style={{ minHeight: "100vh", backgroundColor: C.ink, fontFamily: "'DM Sans', sans-serif" }}>
+
+      {/* ── Topbar ── */}
+      <div style={{
+        height: 52,
+        borderBottom: `1px solid ${C.border}`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "0 24px",
+        background: "rgba(13,30,40,0.85)",
+        backdropFilter: "blur(12px)",
+        position: "sticky",
+        top: 0,
+        zIndex: 50,
+      }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <p style={{ fontSize: 15, fontWeight: 500, color: C.text }}>
+            안녕하세요,{" "}
+            <em style={{ fontStyle: "normal", color: C.steel }}>{userName}</em>
+            {" "}님 👋
+          </p>
+          <p style={{ fontSize: 11, color: C.dim }}>오늘도 좋은 하루 되세요</p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            type="button"
+            aria-label="알림"
+            style={{
+              width: 32, height: 32, borderRadius: 8,
+              border: `1px solid ${C.border}`, background: "transparent",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", color: C.muted,
             }}
           >
-            🔗 초대링크 복사
-          </Button>
-          <Link href={`/photographer/projects/${p.id}`}>
-            <Button variant="ghost" size="sm" className="text-xs">
-              📊 상세
-            </Button>
-          </Link>
+            <Bell size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/photographer/projects/new")}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "7px 16px", background: C.steel,
+              color: "white", border: "none", borderRadius: 8,
+              fontSize: 12, fontWeight: 500, cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            <Plus size={12} />
+            새 프로젝트
+          </button>
         </div>
-      )}
+      </div>
+
+      {/* ── Body: 2-column grid ── */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 260px",
+        minHeight: "calc(100vh - 52px)",
+      }}>
+
+        {/* ── Left column ── */}
+        <div style={{
+          padding: "22px 22px 22px 24px",
+          overflowY: "auto",
+          borderRight: `1px solid ${C.border}`,
+        }}>
+
+          {/* 1. 액션 필요 섹션 */}
+          {hasAction && (
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                <div style={{
+                  width: 6, height: 6, borderRadius: "50%",
+                  backgroundColor: C.orange,
+                  animation: "pulse 2s infinite",
+                  flexShrink: 0,
+                }} />
+                <span style={{
+                  fontSize: 11, fontWeight: 600, letterSpacing: 1,
+                  textTransform: "uppercase", color: C.dim,
+                }}>
+                  지금 확인이 필요해요
+                </span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                {confirmedCount > 0 && (
+                  <ActionCard
+                    count={confirmedCount}
+                    label="고객 확정 완료"
+                    sub="보정 시작 대기 중"
+                    icon={<CheckCircle2 size={16} color={C.green} />}
+                    topColor={C.green}
+                    numColor={C.green}
+                    bgTint="rgba(46,213,115,0.04)"
+                  />
+                )}
+                {revisionCount > 0 && (
+                  <ActionCard
+                    count={revisionCount}
+                    label="재보정 요청"
+                    sub="코멘트 확인 필요"
+                    icon={<RefreshCw size={16} color={C.red} />}
+                    topColor={C.red}
+                    numColor={C.red}
+                    bgTint="rgba(255,71,87,0.04)"
+                  />
+                )}
+                {reviewingCount > 0 && (
+                  <ActionCard
+                    count={reviewingCount}
+                    label="고객 검토 중"
+                    sub="보정본 검토 대기"
+                    icon={<Eye size={16} color={C.steelLt} />}
+                    topColor={C.steel}
+                    numColor={C.steelLt}
+                    bgTint="rgba(102,155,188,0.04)"
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 2. 대기 중 */}
+          {preparingProjects.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <SectionHeader title="대기 중" count={preparingProjects.length} />
+              {preparingProjects.map((p) => <ProjectCard key={p.id} project={p} />)}
+            </div>
+          )}
+
+          {/* 3. 진행 중 */}
+          {activeProjects.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <SectionHeader title="진행 중" count={activeProjects.length} />
+              {activeProjects.map((p) => <ProjectCard key={p.id} project={p} />)}
+            </div>
+          )}
+
+          {/* 4. 최근 완료 */}
+          {recentDelivered.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <SectionHeader title="최근 완료" count={totalDeliveredCount} />
+              {recentDelivered.map((p) => <ProjectCard key={p.id} project={p} />)}
+            </div>
+          )}
+
+          {/* 전체 보기 버튼: 6개 초과 시 */}
+          {showViewAllBtn && (
+            <Link
+              href="/photographer/projects"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: "100%", padding: 9,
+                border: `1px dashed ${C.border}`, borderRadius: 9,
+                background: "transparent", color: C.dim,
+                fontSize: 12, textDecoration: "none", marginBottom: 20,
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.borderColor = C.steel;
+                (e.currentTarget as HTMLAnchorElement).style.color = C.steel;
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.borderColor = C.border;
+                (e.currentTarget as HTMLAnchorElement).style.color = C.dim;
+              }}
+            >
+              전체 프로젝트 보기 →
+            </Link>
+          )}
+
+          {/* 프로젝트 없을 때 */}
+          {projects.length === 0 && (
+            <div style={{ textAlign: "center", padding: "60px 0" }}>
+              <FolderOpen size={36} color={C.dim} style={{ margin: "0 auto 14px" }} />
+              <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>아직 프로젝트가 없습니다</p>
+              <button
+                type="button"
+                onClick={() => router.push("/photographer/projects/new")}
+                style={{
+                  backgroundColor: C.steel, color: "#fff", border: "none",
+                  borderRadius: 8, padding: "9px 20px", fontSize: 13, fontWeight: 600,
+                  cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6,
+                }}
+              >
+                <Plus size={14} />
+                첫 프로젝트 만들기
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ── Right column ── */}
+        <div style={{ padding: 20, overflowY: "auto", background: "rgba(0,0,0,0.12)" }}>
+
+          {/* 통계 */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8,
+            marginBottom: 16, paddingBottom: 16,
+            borderBottom: `1px solid ${C.border}`,
+          }}>
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 8, padding: "10px 12px", textAlign: "center",
+            }}>
+              <div style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: 22, lineHeight: 1, marginBottom: 3, color: C.steel,
+              }}>
+                {projects.length}
+              </div>
+              <div style={{ fontSize: 10, color: C.dim }}>전체 프로젝트</div>
+            </div>
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 8, padding: "10px 12px", textAlign: "center",
+            }}>
+              <div style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: 22, lineHeight: 1, marginBottom: 3, color: C.orange,
+              }}>
+                {thisMonthCount}
+              </div>
+              <div style={{ fontSize: 10, color: C.dim }}>이번 달 촬영</div>
+            </div>
+          </div>
+
+          {/* 최근 활동 */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <span style={{
+              fontSize: 11, fontWeight: 600, letterSpacing: 1,
+              textTransform: "uppercase", color: C.dim,
+            }}>
+              최근 활동
+            </span>
+          </div>
+
+          {logs.length === 0 ? (
+            <p style={{ fontSize: 12, color: C.dim, textAlign: "center", padding: "20px 0" }}>
+              아직 활동이 없습니다
+            </p>
+          ) : (
+            <div style={{ position: "relative" }}>
+              {/* 타임라인 세로선 */}
+              <div style={{
+                position: "absolute", left: 10, top: 8, bottom: 8,
+                width: 1, backgroundColor: C.border,
+              }} />
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                {logs.slice(0, 10).map((log) => {
+                  const dotColor = LOG_DOT[log.action] ?? C.steel;
+                  const label = LOG_LABEL[log.action] ?? log.action;
+                  return (
+                    <div key={log.id} style={{ display: "flex", gap: 12, padding: "6px 0" }}>
+                      <div style={{
+                        display: "flex", flexDirection: "column",
+                        alignItems: "center", flexShrink: 0,
+                        paddingTop: 3, width: 20,
+                      }}>
+                        <div style={{
+                          width: 8, height: 8, borderRadius: "50%",
+                          backgroundColor: dotColor,
+                          border: `1.5px solid ${C.ink}`,
+                          position: "relative", zIndex: 1, flexShrink: 0,
+                        }} />
+                      </div>
+                      <div style={{ flex: 1, paddingBottom: 10 }}>
+                        <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+                          <strong style={{ color: C.text, fontWeight: 500 }}>{log.projectName}</strong>
+                          {" · "}{label}
+                        </div>
+                        <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>
+                          {timeAgo(log.createdAt)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(245,166,35,0.4); }
+          50%       { opacity: 0.7; box-shadow: 0 0 0 4px rgba(245,166,35,0); }
+        }
+      `}</style>
     </div>
   );
 }
