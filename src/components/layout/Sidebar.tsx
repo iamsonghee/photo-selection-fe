@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Camera, LayoutDashboard, FolderOpen, Users, BarChart3, Settings } from "lucide-react";
 import { Button } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { getProfileImageUrl } from "@/lib/photographer";
+import { useProfile } from "@/contexts/ProfileContext";
 
 const navItems = [
   { href: "/photographer/dashboard", label: "대시보드", icon: LayoutDashboard },
@@ -18,22 +18,7 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [profile, setProfile] = useState<{
-    name: string | null;
-    email: string | null;
-    profileImageUrl: string | null;
-  } | null>(null);
-
-  useEffect(() => {
-    fetch("/api/photographer/profile")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => data && setProfile({
-        name: data.name ?? null,
-        email: data.email ?? null,
-        profileImageUrl: data.profileImageUrl ?? null,
-      }))
-      .catch(() => {});
-  }, []);
+  const { profile } = useProfile();
 
   const handleLogout = async () => {
     const supabase = createClient();

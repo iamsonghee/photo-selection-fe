@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Pencil, Loader2 } from "lucide-react";
+import { useProfile } from "@/contexts/ProfileContext";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const ACCEPT_IMAGE = "image/jpeg,image/png,image/webp";
@@ -19,6 +20,7 @@ function getInitial(name: string | null, email: string | null): string {
 }
 
 export default function SettingsPage() {
+  const { profile: ctxProfile, updateProfile: updateCtxProfile } = useProfile();
   const [profile, setProfile] = useState<PhotographerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
@@ -64,13 +66,14 @@ export default function SettingsPage() {
         }),
       });
       if (!res.ok) throw new Error("저장에 실패했습니다.");
-      setProfile({
-        ...profile,
+      const patch = {
         name: editName.trim() || null,
         bio: editBio.trim() || null,
         instagramUrl: editInstagramUrl.trim() || null,
         portfolioUrl: editPortfolioUrl.trim() || null,
-      });
+      };
+      setProfile({ ...profile, ...patch });
+      updateCtxProfile(patch);
       setEditMode(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "저장 실패");
@@ -108,6 +111,7 @@ export default function SettingsPage() {
       });
       if (!patchRes.ok) throw new Error("프로필 저장 실패");
       setProfile({ ...profile, profileImageUrl: url });
+      updateCtxProfile({ profileImageUrl: url });
     } catch (err) {
       setError(err instanceof Error ? err.message : "이미지 업로드 실패");
     } finally {
