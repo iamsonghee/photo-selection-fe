@@ -21,10 +21,11 @@ export interface PhotographerProfile {
   bio: string | null;
   instagramUrl: string | null;
   portfolioUrl: string | null;
+  contactPhone: string | null;
   createdAt: string;
 }
 
-const SELECT_COLS = "id, auth_id, email, name, profile_image_url, bio, instagram_url, portfolio_url, created_at";
+const SELECT_COLS = "id, auth_id, email, name, profile_image_url, bio, instagram_url, portfolio_url, contact_phone, created_at";
 
 /** GET: 현재 로그인 작가 프로필. admin 클라이언트 우선, 없으면 server anon 클라이언트로 폴백. */
 export async function GET() {
@@ -102,6 +103,7 @@ export async function GET() {
       bio: (row.bio as string | null) ?? null,
       instagramUrl: (row.instagram_url as string | null) ?? null,
       portfolioUrl: (row.portfolio_url as string | null) ?? null,
+      contactPhone: (row.contact_phone as string | null) ?? null,
       createdAt: row.created_at as string,
     };
 
@@ -137,6 +139,8 @@ export async function PATCH(req: NextRequest) {
     else if (body.portfolio_url === null) payload.portfolio_url = null;
     if (typeof body.profile_image_url === "string") payload.profile_image_url = body.profile_image_url;
     else if (body.profile_image_url === null) payload.profile_image_url = null;
+    if (typeof body.contact_phone === "string") payload.contact_phone = body.contact_phone;
+    else if (body.contact_phone === null) payload.contact_phone = null;
 
     if (Object.keys(payload).length === 0) {
       return NextResponse.json({ ok: true });
