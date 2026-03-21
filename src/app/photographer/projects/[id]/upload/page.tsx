@@ -714,7 +714,7 @@ export default function UploadPage() {
                   const photo = visiblePhotos[startIdx];
                   if (!photo) return null;
                   const filename = photo.originalFilename ?? `${startIdx + 1}`;
-                  const fileSize = (photo as unknown as Record<string, unknown>).fileSize as number | null ?? null;
+                  const fileSize = photo.fileSize ?? null;
                   const fileSizeText = fileSize != null
                     ? fileSize >= 1024 * 1024
                       ? `${(fileSize / (1024 * 1024)).toFixed(1)} MB`
