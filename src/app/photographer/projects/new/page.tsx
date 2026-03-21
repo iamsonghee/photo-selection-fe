@@ -140,6 +140,7 @@ export default function NewProjectPage() {
           label="촬영 날짜"
           type="date"
           error={errors.shootDate?.message}
+          onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
           {...register("shootDate")}
         />
 
@@ -191,6 +192,7 @@ export default function NewProjectPage() {
                 type="date"
                 min={today}
                 error={errors.customDeadline?.message}
+                onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
                 {...register("customDeadline")}
               />
             </div>
@@ -215,6 +217,12 @@ export default function NewProjectPage() {
           min={1}
           placeholder="예: 200"
           error={errors.requiredCount?.message}
+          onInput={(e) => {
+            const el = e.currentTarget as HTMLInputElement;
+            if (el.value.startsWith("0") && el.value.length > 1) {
+              el.value = String(parseInt(el.value, 10));
+            }
+          }}
           {...register("requiredCount", { valueAsNumber: true })}
         />
         <p className="-mt-2 text-xs text-zinc-500">일반적으로 150~300장을 추천합니다</p>
