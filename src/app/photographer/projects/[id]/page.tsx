@@ -22,6 +22,7 @@ import {
   Calendar,
   Clock,
   Check,
+  CheckCircle2,
 } from "lucide-react";
 import { getProjectById } from "@/lib/db";
 import { getStatusLabel } from "@/lib/project-status";
@@ -186,6 +187,7 @@ export default function ProjectDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [showEditGuideModal, setShowEditGuideModal] = useState(false);
 
   // edit state
   const [editMode, setEditMode] = useState(false);
@@ -678,7 +680,13 @@ export default function ProjectDetailPage() {
                 icon={<PenLine size={16} />}
                 label="보정본 업로드"
                 desc={canEditVersions ? "보정본 업로드/관리" : "셀렉 완료 후 가능"}
-                onClick={() => router.push(editVersionsPath)}
+                onClick={() => {
+                  if (project.status === "confirmed") {
+                    setShowEditGuideModal(true);
+                  } else {
+                    router.push(editVersionsPath);
+                  }
+                }}
                 disabled={!canEditVersions}
               />
               <QuickAction
@@ -708,6 +716,62 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Edit guide modal ── */}
+      {showEditGuideModal && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 50,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.7)", padding: 16,
+        }}>
+          <div style={{
+            background: C.surface, border: `1px solid ${C.borderMd}`,
+            borderRadius: 14, padding: 24, width: "100%", maxWidth: 400,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <CheckCircle2 size={20} color={C.green} style={{ flexShrink: 0 }} />
+              <h3 style={{ fontSize: 15, fontWeight: 600, color: C.text }}>
+                보정을 시작하지 않았습니다
+              </h3>
+            </div>
+            <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.7, marginBottom: 20 }}>
+              보정본을 업로드하려면 먼저 셀렉 결과를 확인하고
+              <strong style={{ color: C.text }}> [보정 시작하기]</strong>를 눌러주세요.
+              <br />
+              보정 시작 후 보정본 업로드가 가능합니다.
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => setShowEditGuideModal(false)}
+                style={{
+                  flex: 1, padding: "10px 0", background: "transparent",
+                  border: `1px solid ${C.border}`, borderRadius: 8,
+                  color: C.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                닫기
+              </button>
+              <button
+                onClick={() => {
+                  setShowEditGuideModal(false);
+                  router.push(`/photographer/projects/${id}/results`);
+                }}
+                style={{
+                  flex: 1, padding: "10px 0",
+                  background: "rgba(102,155,188,0.15)",
+                  border: "1px solid rgba(102,155,188,0.3)", borderRadius: 8,
+                  color: C.steel, fontSize: 13, fontWeight: 500,
+                  cursor: "pointer", fontFamily: "inherit",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                }}
+              >
+                셀렉 결과 확인하기
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Delete modal ── */}
       {showDeleteModal && (
