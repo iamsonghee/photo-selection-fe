@@ -23,7 +23,9 @@ export interface PhotographerProfile {
   createdAt: string;
 }
 
-/** GET: 현재 로그인 작가 프로필 (photographers 테이블, service role). 행 없으면 자동 생성. */
+const SELECT_COLS = "id, auth_id, email, name, profile_image_url, bio, instagram_url, portfolio_url, created_at";
+
+/** GET: 현재 로그인 작가 프로필. admin 클라이언트 우선, 없으면 server anon 클라이언트로 폴백. */
 export async function GET() {
   try {
     const auth = await getPhotographerAuth();
@@ -32,20 +34,31 @@ export async function GET() {
     }
     const { authId, email } = auth;
 
-    const admin = getAdminClient();
-    let { data, error } = await admin
+    // admin 클라이언트 시도 (SUPABASE_SERVICE_ROLE_KEY 필요)
+    // 없으면 server anon 클라이언트로 폴백 (photographers 테이블 RLS SELECT 정책 필요)
+    let queryClient: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof getAdminClient>;
+    let hasAdmin = false;
+    try {
+      queryClient = getAdminClient();
+      hasAdmin = true;
+    } catch {
+      queryClient = await createClient();
+    }
+
+    let { data, error } = await queryClient
       .from("photographers")
-      .select("id, auth_id, email, name, profile_image_url, bio, instagram_url, portfolio_url, created_at")
+      .select(SELECT_COLS)
       .eq("auth_id", authId)
       .limit(1)
       .single();
 
-    // 최초 로그인 등으로 행이 없으면 자동 생성
-    if (error?.code === "PGRST116") {
+    // 행 없으면 admin으로 자동 생성 (admin 사용 가능할 때만)
+    if (error?.code === "PGRST116" && hasAdmin) {
+      const admin = queryClient as ReturnType<typeof getAdminClient>;
       const inserted = await admin
         .from("photographers")
         .insert({ auth_id: authId, email: email ?? null })
-        .select("id, auth_id, email, name, profile_image_url, bio, instagram_url, portfolio_url, created_at")
+        .select(SELECT_COLS)
         .single();
       data = inserted.data;
       error = inserted.error;

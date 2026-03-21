@@ -25,18 +25,23 @@ export async function GET(request: Request) {
 
   const user = sessionData?.user;
   if (user?.id) {
-    const admin = getAdminClient();
-    const { data: existing } = await admin
-      .from("photographers")
-      .select("id")
-      .eq("auth_id", user.id)
-      .limit(1)
-      .single();
-    if (!existing) {
-      await admin.from("photographers").insert({
-        auth_id: user.id,
-        email: user.email ?? null,
-      });
+    try {
+      const admin = getAdminClient();
+      const { data: existing } = await admin
+        .from("photographers")
+        .select("id")
+        .eq("auth_id", user.id)
+        .limit(1)
+        .single();
+      if (!existing) {
+        await admin.from("photographers").insert({
+          auth_id: user.id,
+          email: user.email ?? null,
+        });
+      }
+    } catch (e) {
+      // photographer 행 생성 실패 시에도 로그인 리다이렉트는 계속 진행
+      console.error("[Auth Callback] photographer upsert failed:", e);
     }
   }
 
