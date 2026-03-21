@@ -188,6 +188,7 @@ export default function UploadPage() {
   const [showInviteModal,     setShowInviteModal]     = useState(false);
   const [inviteSubmitting,    setInviteSubmitting]    = useState(false);
   const [lightboxIndex,       setLightboxIndex]       = useState<number | null>(null);
+  const [pendingFiles,        setPendingFiles]        = useState<File[]>([]);
 
   // ── 가상 스크롤 ──────────────────────────────────────────────────────────
   const visiblePhotos = useMemo(
@@ -315,8 +316,8 @@ export default function UploadPage() {
       (f) => ["image/jpeg","image/png","image/webp"].includes(f.type)
     );
     setError(null);
-    if (list.length) startUpload(list);
-  }, [startUpload]);
+    if (list.length) setPendingFiles(list);
+  }, []);
 
   const onDragOver  = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(true); }, []);
   const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(false); }, []);
@@ -327,7 +328,7 @@ export default function UploadPage() {
     const list = Array.from(chosen).filter((f) => ["image/jpeg","image/png","image/webp"].includes(f.type));
     setError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    if (list.length) startUpload(list);
+    if (list.length) setPendingFiles(list);
   };
 
   const handleDeletePhoto = async (photoId: string) => {
@@ -836,6 +837,55 @@ export default function UploadPage() {
       )}
 
       {toast && <Toast message={toast} />}
+
+      {/* ── 업로드 확인 모달 ── */}
+      {pendingFiles.length > 0 && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9998,
+        }}>
+          <div style={{
+            background: C.surface, border: `1px solid ${C.borderMd}`,
+            borderRadius: 14, padding: "28px 28px 24px",
+            maxWidth: 380, width: "100%", margin: "0 16px",
+          }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8 }}>
+              사진 업로드
+            </div>
+            <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.7, marginBottom: 24 }}>
+              총{" "}
+              <span style={{ color: C.steel, fontWeight: 600 }}>
+                {pendingFiles.length}장
+              </span>
+              을 업로드하겠습니까?
+            </p>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setPendingFiles([])}
+                style={{
+                  padding: "8px 16px", background: "transparent",
+                  border: `1px solid ${C.border}`, borderRadius: 8,
+                  color: C.muted, fontSize: 13, cursor: "pointer",
+                  fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={() => { const f = pendingFiles; setPendingFiles([]); startUpload(f); }}
+                style={{
+                  padding: "8px 20px", background: C.steel, border: "none",
+                  borderRadius: 8, color: "white", fontSize: 13, fontWeight: 600,
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                  fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                }}
+              >
+                <Upload size={13} /> 업로드
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
