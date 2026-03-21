@@ -59,7 +59,22 @@ export default function UploadPage() {
   const [deleteAllSubmitting, setDeleteAllSubmitting] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") {
+        setLightboxIndex((i) => (i === null ? 0 : (i + 1) % photos.length));
+      } else if (e.key === "ArrowLeft") {
+        setLightboxIndex((i) => (i === null ? 0 : (i - 1 + photos.length) % photos.length));
+      } else if (e.key === "Escape") {
+        setLightboxIndex(null);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [lightboxIndex, photos.length]);
 
   const loadProject = useCallback(async () => {
     try {
@@ -377,11 +392,11 @@ export default function UploadPage() {
                 <div
                   role="button"
                   tabIndex={0}
-                  onClick={() => setLightboxUrl(p.url)}
+                  onClick={() => setLightboxIndex(index)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      setLightboxUrl(p.url);
+                      setLightboxIndex(index);
                     }
                   }}
                   className="block w-full cursor-pointer text-left"
@@ -641,26 +656,50 @@ export default function UploadPage() {
         </div>
       )}
 
-      {/* 라이트박스 (썸네일 클릭 시 원본 미리보기) */}
-      {lightboxUrl && (
+      {/* 라이트박스 */}
+      {lightboxIndex !== null && photos[lightboxIndex] && (
         <div
           className="fixed inset-0 z-50 flex cursor-default items-center justify-center bg-black/90 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="이미지 미리보기"
         >
+          {/* 닫기 배경 */}
           <button
             type="button"
             className="absolute inset-0"
-            onClick={() => setLightboxUrl(null)}
+            onClick={() => setLightboxIndex(null)}
             aria-label="닫기"
           />
+          {/* 이전 버튼 */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => ((i ?? 0) - 1 + photos.length) % photos.length); }}
+            className="absolute left-4 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white hover:bg-black/80"
+            aria-label="이전"
+          >
+            &#8592;
+          </button>
+          {/* 이미지 */}
           <img
-            src={lightboxUrl}
+            src={photos[lightboxIndex].url}
             alt="미리보기"
             className="relative z-10 max-h-full max-w-full object-contain"
             onClick={(e) => e.stopPropagation()}
           />
+          {/* 다음 버튼 */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => ((i ?? 0) + 1) % photos.length); }}
+            className="absolute right-4 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white hover:bg-black/80"
+            aria-label="다음"
+          >
+            &#8594;
+          </button>
+          {/* 장 번호 */}
+          <div className="absolute bottom-6 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/60 px-4 py-1.5 text-sm text-white">
+            {lightboxIndex + 1} / {photos.length}
+          </div>
         </div>
       )}
 
