@@ -5,10 +5,11 @@ import { getAdminClient } from "@/lib/supabase-admin";
 async function getPhotographerAuth(): Promise<{ authId: string; email: string | null } | null> {
   const supabase = await createClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user?.id) return null;
-  return { authId: session.user.id, email: session.user.email ?? null };
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+  if (error || !user?.id) return null;
+  return { authId: user.id, email: user.email ?? null };
 }
 
 export interface PhotographerProfile {
