@@ -18,8 +18,8 @@ const INITIAL_VISIBLE = 40;
 const LOAD_MORE       = 40;
 
 const VIEW_CONFIG = {
-  filename: { cols: 8, rowH: 90  },  // 소형 + 파일명
-  gallery:  { cols: 5, rowH: 140 },  // 대형, 파일명 없음
+  filename: { cols: 1, rowH: 32  },  // 파일명 텍스트 리스트
+  gallery:  { cols: 5, rowH: 140 },  // 이미지 그리드
 } as const;
 type ViewMode = keyof typeof VIEW_CONFIG;
 
@@ -99,33 +99,31 @@ function ConfirmModal({
 
 // ── 지연 로딩 썸네일 ────────────────────────────────────────────────────────
 function LazyThumb({
-  photo, index, isReadOnly, deleting, onDelete, onClick, showFilename = true,
+  photo, index, isReadOnly, deleting, onDelete, onClick,
 }: {
   photo: Photo; index: number; isReadOnly: boolean;
-  deleting: boolean; onDelete: () => void; onClick: () => void; showFilename?: boolean;
+  deleting: boolean; onDelete: () => void; onClick: () => void;
 }) {
   const [loaded, setLoaded] = useState(false);
-  const filename = photo.originalFilename ?? `${index + 1}`;
   return (
     <div
       className="up-thumb"
-      style={{ cursor: "pointer", display: "flex", flexDirection: "column", gap: 4 }}
+      style={{ cursor: "pointer", display: "flex", flexDirection: "column" }}
       onClick={onClick}
     >
       {/* 이미지 영역 */}
       <div style={{
-        aspectRatio: "3/2", background: C.surface2, borderRadius: 5,
+        aspectRatio: "3/2", background: C.surface2, borderRadius: 6,
         position: "relative", overflow: "hidden",
         border: `1px solid ${C.border}`, transition: "border-color 0.15s",
       }}>
-        {/* placeholder */}
         <div style={{
           position: "absolute", inset: 0, background: C.surface2,
           transition: "opacity 0.25s", opacity: loaded ? 0 : 1,
           display: "flex", alignItems: "center", justifyContent: "center",
           pointerEvents: "none",
         }}>
-          <ImageIcon size={10} color={C.dim} style={{ opacity: 0.3 }} />
+          <ImageIcon size={14} color={C.dim} style={{ opacity: 0.3 }} />
         </div>
         <img
           src={photo.url}
@@ -143,8 +141,8 @@ function LazyThumb({
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
             disabled={deleting}
             style={{
-              position: "absolute", top: 3, right: 3,
-              width: 16, height: 16, borderRadius: "50%",
+              position: "absolute", top: 4, right: 4,
+              width: 18, height: 18, borderRadius: "50%",
               background: "rgba(255,71,87,0.85)", border: "none",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 9, color: "white", opacity: 0, cursor: "pointer",
@@ -152,21 +150,11 @@ function LazyThumb({
             }}
           >
             {deleting
-              ? <Loader2 size={8} style={{ animation: "spin 1s linear infinite" }} />
+              ? <Loader2 size={9} style={{ animation: "spin 1s linear infinite" }} />
               : "✕"}
           </button>
         )}
       </div>
-      {/* 파일명 */}
-      {showFilename && (
-        <div style={{
-          fontSize: 9, color: C.muted, lineHeight: 1.3, textAlign: "center",
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          padding: "0 2px",
-        }}>
-          {filename}
-        </div>
-      )}
     </div>
   );
 }
@@ -201,7 +189,7 @@ export default function UploadPage() {
   const [inviteSubmitting,    setInviteSubmitting]    = useState(false);
   const [lightboxIndex,       setLightboxIndex]       = useState<number | null>(null);
   const [pendingFiles,        setPendingFiles]        = useState<File[]>([]);
-  const [viewMode,            setViewMode]            = useState<ViewMode>("gallery");
+  const [viewMode,            setViewMode]            = useState<ViewMode>("filename");
 
   // ── 가상 스크롤 ──────────────────────────────────────────────────────────
   const { cols, rowH } = VIEW_CONFIG[viewMode];
@@ -443,6 +431,8 @@ export default function UploadPage() {
         .thumb-scroll::-webkit-scrollbar { width: 4px; }
         .thumb-scroll::-webkit-scrollbar-track { background: transparent; }
         .thumb-scroll::-webkit-scrollbar-thumb { background: ${C.dim}; border-radius: 2px; }
+        .fn-row:hover { background: rgba(102,155,188,0.05); }
+        .fn-row:hover span:last-child { opacity: 1 !important; }
       `}</style>
 
       {/* ── Topbar ── */}
@@ -709,6 +699,62 @@ export default function UploadPage() {
             <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                 const startIdx = virtualRow.index * cols;
+
+                // ── 파일명 리스트 모드 ──
+                if (viewMode === "filename") {
+                  const photo = visiblePhotos[startIdx];
+                  if (!photo) return null;
+                  const filename = photo.originalFilename ?? `${startIdx + 1}`;
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      data-index={virtualRow.index}
+                      ref={rowVirtualizer.measureElement}
+                      className="fn-row"
+                      onClick={() => setLightboxIndex(startIdx)}
+                      style={{
+                        position: "absolute", top: virtualRow.start,
+                        left: 0, right: 0,
+                        display: "flex", alignItems: "center", gap: 10,
+                        padding: "0 4px",
+                        height: 31,
+                        borderBottom: `1px solid ${C.border}`,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <span style={{
+                        fontSize: 11, color: C.dim, minWidth: 36,
+                        textAlign: "right", flexShrink: 0,
+                      }}>
+                        {startIdx + 1}
+                      </span>
+                      <span style={{
+                        fontSize: 12, color: C.text, flex: 1,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
+                        {filename}
+                      </span>
+                      {!isReadOnly && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeletePhoto(photo.id); }}
+                          disabled={deletingId === photo.id}
+                          style={{
+                            background: "transparent", border: "none", padding: "2px 4px",
+                            color: C.dim, cursor: "pointer", flexShrink: 0,
+                            display: "flex", alignItems: "center",
+                            fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                          }}
+                        >
+                          {deletingId === photo.id
+                            ? <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} />
+                            : <span style={{ fontSize: 13 }}>✕</span>}
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+
+                // ── 갤러리 모드 ──
                 return (
                   <div
                     key={virtualRow.key}
@@ -736,7 +782,6 @@ export default function UploadPage() {
                           deleting={deletingId === photo.id}
                           onDelete={() => handleDeletePhoto(photo.id)}
                           onClick={() => setLightboxIndex(startIdx + c)}
-                          showFilename={viewMode === "filename"}
                         />
                       );
                     })}
