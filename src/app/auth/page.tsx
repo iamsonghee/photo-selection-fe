@@ -128,6 +128,28 @@ export default function AuthPage() {
         />
       ))}
 
+      {/* ══════════════ CENTERED WRAPPER ══════════════ */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "48px 32px",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+      <div
+        style={{
+          display: "flex",
+          width: "100%",
+          maxWidth: 960,
+          gap: 48,
+          alignItems: "center",
+        }}
+      >
+
       {/* ══════════════ LEFT PANEL ══════════════ */}
       <div
         style={{
@@ -135,9 +157,7 @@ export default function AuthPage() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
-          padding: "60px 64px",
-          position: "relative",
-          zIndex: 1,
+          minWidth: 0,
         }}
       >
         {/* Logo */}
@@ -274,15 +294,11 @@ export default function AuthPage() {
       {/* ══════════════ RIGHT PANEL ══════════════ */}
       <div
         style={{
-          width: 420,
+          width: 360,
           flexShrink: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          padding: "48px 40px",
-          position: "relative",
-          zIndex: 1,
-          background: "radial-gradient(ellipse at 60% 40%, rgba(102,155,188,0.06) 0%, transparent 70%)",
         }}
       >
         <div
@@ -421,6 +437,8 @@ export default function AuthPage() {
           </p>
         </div>
       </div>
+      </div> {/* centered wrapper */}
+      </div> {/* outer centering div */}
     </div>
   );
 }
