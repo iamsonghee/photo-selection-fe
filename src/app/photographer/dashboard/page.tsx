@@ -210,7 +210,9 @@ function ProjectCard({ project }: { project: Project }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         background: hovered ? C.surface2 : C.surface,
-        border: `1px solid ${hovered ? C.borderMd : C.border}`,
+        borderTop: `1px solid ${hovered ? C.borderMd : C.border}`,
+        borderRight: `1px solid ${hovered ? C.borderMd : C.border}`,
+        borderBottom: `1px solid ${hovered ? C.borderMd : C.border}`,
         borderLeft: `3px solid ${accentColor}`,
         borderRadius: 10,
         padding: "14px 16px",
