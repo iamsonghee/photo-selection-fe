@@ -35,6 +35,7 @@ export async function GET(request: Request) {
         .single();
       if (!existing) {
         await admin.from("photographers").insert({
+          id: crypto.randomUUID(),
           auth_id: user.id,
           email: user.email ?? null,
         });

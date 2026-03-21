@@ -68,7 +68,7 @@ export async function GET() {
       const admin = queryClient as ReturnType<typeof getAdminClient>;
       const { error: upsertError } = await admin
         .from("photographers")
-        .upsert({ auth_id: authId, email: email ?? null }, { onConflict: "auth_id", ignoreDuplicates: true });
+        .upsert({ id: crypto.randomUUID(), auth_id: authId, email: email ?? null }, { onConflict: "auth_id", ignoreDuplicates: true });
       console.log(tag, "STEP4 upsert result:", { upsertError: upsertError ? { code: upsertError.code, msg: upsertError.message } : null });
 
       const { data: refetchData, error: refetchError } = await admin
