@@ -13,11 +13,15 @@ import type { Project, Photo } from "@/types";
 
 const ACCEPT_TYPES = "image/jpeg,image/png,image/webp";
 const BACKEND_URL  = process.env.NEXT_PUBLIC_API_URL ?? "";
-const COLS         = 8;
 const THUMB_GAP    = 6;
-const THUMB_ROW_H  = 90;  // estimated: ~62px thumb + 18px filename + 10px gap+padding
 const INITIAL_VISIBLE = 40;
 const LOAD_MORE       = 40;
+
+const VIEW_CONFIG = {
+  filename: { cols: 8, rowH: 90  },  // 소형 + 파일명
+  gallery:  { cols: 5, rowH: 140 },  // 대형, 파일명 없음
+} as const;
+type ViewMode = keyof typeof VIEW_CONFIG;
 
 const C = {
   ink: "#0d1e28", surface: "#0f2030", surface2: "#152a3a", surface3: "#1a3347",
@@ -95,10 +99,10 @@ function ConfirmModal({
 
 // ── 지연 로딩 썸네일 ────────────────────────────────────────────────────────
 function LazyThumb({
-  photo, index, isReadOnly, deleting, onDelete, onClick,
+  photo, index, isReadOnly, deleting, onDelete, onClick, showFilename = true,
 }: {
   photo: Photo; index: number; isReadOnly: boolean;
-  deleting: boolean; onDelete: () => void; onClick: () => void;
+  deleting: boolean; onDelete: () => void; onClick: () => void; showFilename?: boolean;
 }) {
   const [loaded, setLoaded] = useState(false);
   const filename = photo.originalFilename ?? `${index + 1}`;
@@ -154,13 +158,15 @@ function LazyThumb({
         )}
       </div>
       {/* 파일명 */}
-      <div style={{
-        fontSize: 9, color: C.muted, lineHeight: 1.3, textAlign: "center",
-        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        padding: "0 2px",
-      }}>
-        {filename}
-      </div>
+      {showFilename && (
+        <div style={{
+          fontSize: 9, color: C.muted, lineHeight: 1.3, textAlign: "center",
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          padding: "0 2px",
+        }}>
+          {filename}
+        </div>
+      )}
     </div>
   );
 }
@@ -195,18 +201,21 @@ export default function UploadPage() {
   const [inviteSubmitting,    setInviteSubmitting]    = useState(false);
   const [lightboxIndex,       setLightboxIndex]       = useState<number | null>(null);
   const [pendingFiles,        setPendingFiles]        = useState<File[]>([]);
+  const [viewMode,            setViewMode]            = useState<ViewMode>("gallery");
 
   // ── 가상 스크롤 ──────────────────────────────────────────────────────────
+  const { cols, rowH } = VIEW_CONFIG[viewMode];
+
   const visiblePhotos = useMemo(
     () => photos.slice(0, visibleCount),
     [photos, visibleCount],
   );
-  const rowCount = Math.ceil(visiblePhotos.length / COLS);
+  const rowCount = Math.ceil(visiblePhotos.length / cols);
 
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => thumbScrollRef.current,
-    estimateSize: () => THUMB_ROW_H,
+    estimateSize: () => rowH,
     overscan: 3,
   });
 
@@ -630,18 +639,45 @@ export default function UploadPage() {
                 )}
               </span>
             </span>
-            {!isReadOnly && photos.length > 0 && (
-              <button
-                onClick={() => setShowDeleteAllModal(true)}
-                style={{
-                  background: "transparent", border: "none", fontSize: 11,
-                  color: C.red, cursor: "pointer",
-                  fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
-                }}
-              >
-                전체 삭제
-              </button>
-            )}
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* 보기 옵션 토글 */}
+              <div style={{
+                display: "flex", gap: 1,
+                background: C.surface2, border: `1px solid ${C.border}`,
+                borderRadius: 7, padding: 2, overflow: "hidden",
+              }}>
+                {([ ["gallery", "갤러리보기"], ["filename", "파일명보기"] ] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setViewMode(key)}
+                    style={{
+                      padding: "3px 10px", borderRadius: 5, border: "none",
+                      background: viewMode === key ? C.steel : "transparent",
+                      color: viewMode === key ? "white" : C.dim,
+                      fontSize: 11, cursor: "pointer", fontWeight: viewMode === key ? 500 : 400,
+                      transition: "background 0.15s, color 0.15s",
+                      fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {!isReadOnly && photos.length > 0 && (
+                <button
+                  onClick={() => setShowDeleteAllModal(true)}
+                  style={{
+                    background: "transparent", border: "none", fontSize: 11,
+                    color: C.red, cursor: "pointer",
+                    fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                  }}
+                >
+                  전체 삭제
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -672,7 +708,7 @@ export default function UploadPage() {
           >
             <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const startIdx = virtualRow.index * COLS;
+                const startIdx = virtualRow.index * cols;
                 return (
                   <div
                     key={virtualRow.key}
@@ -683,12 +719,12 @@ export default function UploadPage() {
                       top: virtualRow.start,
                       left: 0, right: 0,
                       display: "grid",
-                      gridTemplateColumns: `repeat(${COLS}, 1fr)`,
+                      gridTemplateColumns: `repeat(${cols}, 1fr)`,
                       gap: THUMB_GAP,
                       paddingBottom: THUMB_GAP,
                     }}
                   >
-                    {Array.from({ length: COLS }, (_, c) => {
+                    {Array.from({ length: cols }, (_, c) => {
                       const photo = visiblePhotos[startIdx + c];
                       if (!photo) return <div key={c} style={{ aspectRatio: "3/2" }} />;
                       return (
@@ -700,6 +736,7 @@ export default function UploadPage() {
                           deleting={deletingId === photo.id}
                           onDelete={() => handleDeletePhoto(photo.id)}
                           onClick={() => setLightboxIndex(startIdx + c)}
+                          showFilename={viewMode === "filename"}
                         />
                       );
                     })}
