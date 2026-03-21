@@ -13,9 +13,9 @@ import type { Project, Photo } from "@/types";
 
 const ACCEPT_TYPES = "image/jpeg,image/png,image/webp";
 const BACKEND_URL  = process.env.NEXT_PUBLIC_API_URL ?? "";
-const COLS         = 5;
-const THUMB_GAP    = 8;
-const THUMB_ROW_H  = 140; // estimated: ~130px thumb + 10px gap+padding
+const COLS         = 8;
+const THUMB_GAP    = 6;
+const THUMB_ROW_H  = 90;  // estimated: ~62px thumb + 18px filename + 10px gap+padding
 const INITIAL_VISIBLE = 40;
 const LOAD_MORE       = 40;
 
@@ -101,60 +101,66 @@ function LazyThumb({
   deleting: boolean; onDelete: () => void; onClick: () => void;
 }) {
   const [loaded, setLoaded] = useState(false);
+  const filename = photo.originalFilename ?? `${index + 1}`;
   return (
     <div
       className="up-thumb"
-      style={{
-        aspectRatio: "3/2", background: C.surface2, borderRadius: 7,
-        position: "relative", overflow: "hidden", cursor: "pointer",
-        border: `1px solid ${C.border}`, transition: "border-color 0.15s",
-      }}
+      style={{ cursor: "pointer", display: "flex", flexDirection: "column", gap: 4 }}
       onClick={onClick}
     >
-      {/* placeholder */}
+      {/* 이미지 영역 */}
       <div style={{
-        position: "absolute", inset: 0, background: C.surface2,
-        transition: "opacity 0.25s", opacity: loaded ? 0 : 1,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        pointerEvents: "none",
+        aspectRatio: "3/2", background: C.surface2, borderRadius: 5,
+        position: "relative", overflow: "hidden",
+        border: `1px solid ${C.border}`, transition: "border-color 0.15s",
       }}>
-        <ImageIcon size={14} color={C.dim} style={{ opacity: 0.3 }} />
-      </div>
-      <img
-        src={photo.url}
-        alt=""
-        loading="lazy"
-        onLoad={(e) => { setLoaded(true); (e.currentTarget as HTMLImageElement).style.opacity = "1"; }}
-        style={{
-          width: "100%", height: "100%", objectFit: "cover", display: "block",
-          opacity: 0, transition: "opacity 0.25s",
-        }}
-      />
-      {!isReadOnly && (
-        <button
-          className="up-thumb-del"
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          disabled={deleting}
+        {/* placeholder */}
+        <div style={{
+          position: "absolute", inset: 0, background: C.surface2,
+          transition: "opacity 0.25s", opacity: loaded ? 0 : 1,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          pointerEvents: "none",
+        }}>
+          <ImageIcon size={10} color={C.dim} style={{ opacity: 0.3 }} />
+        </div>
+        <img
+          src={photo.url}
+          alt=""
+          loading="lazy"
+          onLoad={(e) => { setLoaded(true); (e.currentTarget as HTMLImageElement).style.opacity = "1"; }}
           style={{
-            position: "absolute", top: 4, right: 4,
-            width: 20, height: 20, borderRadius: "50%",
-            background: "rgba(255,71,87,0.85)", border: "none",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 10, color: "white", opacity: 0, cursor: "pointer",
-            transition: "opacity 0.15s",
+            width: "100%", height: "100%", objectFit: "cover", display: "block",
+            opacity: 0, transition: "opacity 0.25s",
           }}
-        >
-          {deleting
-            ? <Loader2 size={10} style={{ animation: "spin 1s linear infinite" }} />
-            : "✕"}
-        </button>
-      )}
-      <span style={{
-        position: "absolute", bottom: 3, left: 4,
-        fontSize: 9, color: "rgba(255,255,255,0.55)",
+        />
+        {!isReadOnly && (
+          <button
+            className="up-thumb-del"
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            disabled={deleting}
+            style={{
+              position: "absolute", top: 3, right: 3,
+              width: 16, height: 16, borderRadius: "50%",
+              background: "rgba(255,71,87,0.85)", border: "none",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 9, color: "white", opacity: 0, cursor: "pointer",
+              transition: "opacity 0.15s",
+            }}
+          >
+            {deleting
+              ? <Loader2 size={8} style={{ animation: "spin 1s linear infinite" }} />
+              : "✕"}
+          </button>
+        )}
+      </div>
+      {/* 파일명 */}
+      <div style={{
+        fontSize: 9, color: C.muted, lineHeight: 1.3, textAlign: "center",
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        padding: "0 2px",
       }}>
-        {index + 1}
-      </span>
+        {filename}
+      </div>
     </div>
   );
 }
