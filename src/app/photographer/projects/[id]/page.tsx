@@ -259,12 +259,14 @@ export default function ProjectDetailPage() {
                     type="date"
                     value={editShootDate}
                     onChange={(e) => setEditShootDate(e.target.value)}
+                    onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
                   />
                   <Input
                     label="셀렉 기한"
                     type="date"
                     value={editDeadline}
                     onChange={(e) => setEditDeadline(e.target.value)}
+                    onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
                   />
                   <Input
                     label="셀렉 갯수 (N)"
@@ -272,6 +274,12 @@ export default function ProjectDetailPage() {
                     min={1}
                     value={editRequiredCount}
                     onChange={(e) => setEditRequiredCount(Number(e.target.value))}
+                    onInput={(e) => {
+                      const el = e.currentTarget as HTMLInputElement;
+                      if (el.value.startsWith("0") && el.value.length > 1) {
+                        el.value = String(parseInt(el.value, 10));
+                      }
+                    }}
                   />
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-zinc-300">
