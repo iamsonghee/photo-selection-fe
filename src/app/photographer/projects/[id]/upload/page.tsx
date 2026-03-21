@@ -13,9 +13,9 @@ import type { Project, Photo } from "@/types";
 
 const ACCEPT_TYPES = "image/jpeg,image/png,image/webp";
 const BACKEND_URL  = process.env.NEXT_PUBLIC_API_URL ?? "";
-const COLS         = 4;
-const THUMB_GAP    = 6;
-const THUMB_ROW_H  = 70;  // estimated: ~62px thumb + 8px gap+padding
+const COLS         = 5;
+const THUMB_GAP    = 8;
+const THUMB_ROW_H  = 140; // estimated: ~130px thumb + 10px gap+padding
 const INITIAL_VISIBLE = 40;
 const LOAD_MORE       = 40;
 
@@ -456,22 +456,15 @@ export default function UploadPage() {
         </div>
       </div>
 
-      {/* ── 2컬럼 페이지 본문 ── */}
-      <div style={{
-        display: "grid", gridTemplateColumns: "1fr 420px",
-        flex: 1, minHeight: 0, overflow: "hidden",
-      }}>
+      {/* ── 단일 컬럼 본문 ── */}
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-        {/* ══ 좌측 컬럼 ══ */}
-        <div style={{
-          padding: "20px 20px 80px 24px",
-          borderRight: `1px solid ${C.border}`,
-          overflowY: "auto",
-        }}>
+        {/* ── 상단 고정 섹션 (프로젝트 정보 + 통계 + 드롭존) ── */}
+        <div style={{ flexShrink: 0, padding: "16px 24px 0" }}>
 
           {isReadOnly && (
             <div style={{
-              marginBottom: 14, padding: "10px 14px", borderRadius: 10,
+              marginBottom: 12, padding: "9px 14px", borderRadius: 8,
               background: "rgba(102,155,188,0.06)", border: `1px solid ${C.borderMd}`,
               fontSize: 12, color: C.muted,
             }}>
@@ -479,26 +472,43 @@ export default function UploadPage() {
             </div>
           )}
 
-          {/* 업로드 현황 — 3분할 통계 */}
+          {/* 프로젝트 정보 — 컴팩트 가로 바 */}
+          <div style={{
+            display: "flex", gap: 0, alignItems: "center", flexWrap: "wrap",
+            background: C.surface, border: `1px solid ${C.border}`,
+            borderRadius: 8, marginBottom: 12, overflow: "hidden",
+          }}>
+            {infoRows.map(({ key, val, color }, i) => (
+              <div key={key} style={{
+                display: "flex", gap: 6, alignItems: "center",
+                padding: "8px 16px",
+                borderRight: i < infoRows.length - 1 ? `1px solid ${C.border}` : "none",
+              }}>
+                <span style={{ fontSize: 11, color: C.dim, whiteSpace: "nowrap" }}>{key}</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: color || C.text, whiteSpace: "nowrap" }}>{val}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* 통계 3분할 */}
           <div style={{
             display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
-            gap: 1, background: C.border, borderRadius: 12,
-            marginBottom: 14, overflow: "hidden",
+            gap: 1, background: C.border, borderRadius: 10,
+            marginBottom: 12, overflow: "hidden",
             animation: "fadeUp 0.3s ease 0.05s both",
           }}>
             {[
-              { num: M,                                    label: "업로드됨",  color: C.steel  },
-              { num: photoCountExpected ?? "-",            label: "예정 수",   color: C.orange },
-              { num: remaining !== null ? remaining : "-", label: "남은 수",   color: C.muted  },
+              { num: M,                                    label: "업로드됨", color: C.steel  },
+              { num: photoCountExpected ?? "-",            label: "예정 수",  color: C.orange },
+              { num: remaining !== null ? remaining : "-", label: "남은 수",  color: C.muted  },
             ].map((s, i) => (
               <div key={i} style={{
-                background: C.surface, padding: "14px 16px", textAlign: "center",
-                borderRadius: i === 0 ? "12px 0 0 12px" : i === 2 ? "0 12px 12px 0" : 0,
+                background: C.surface, padding: "12px 16px", textAlign: "center",
+                borderRadius: i === 0 ? "10px 0 0 10px" : i === 2 ? "0 10px 10px 0" : 0,
               }}>
                 <div style={{
                   fontFamily: "'Playfair Display', serif",
-                  fontSize: 28, fontWeight: 700, lineHeight: 1, marginBottom: 4,
-                  color: s.color,
+                  fontSize: 26, fontWeight: 700, lineHeight: 1, marginBottom: 3, color: s.color,
                 }}>{s.num}</div>
                 <div style={{ fontSize: 10, color: C.dim }}>{s.label}</div>
               </div>
@@ -515,20 +525,20 @@ export default function UploadPage() {
               onDragLeave={onDragLeave}
               style={{
                 border: `2px dashed ${dragOver ? C.steel : C.borderMd}`,
-                borderRadius: 12, padding: "20px",
-                textAlign: "center", cursor: isUploading ? "default" : "pointer",
+                borderRadius: 10, padding: "18px 20px",
+                cursor: isUploading ? "default" : "pointer",
                 background: dragOver ? "rgba(102,155,188,0.05)" : "rgba(102,155,188,0.02)",
-                marginBottom: 14, transition: "all 0.2s",
+                marginBottom: 12, transition: "all 0.2s",
                 opacity: isUploading ? 0.5 : 1,
-                animation: "fadeUp 0.3s ease 0.15s both",
+                animation: "fadeUp 0.3s ease 0.1s both",
               }}
             >
               <input
                 ref={fileInputRef} type="file" accept={ACCEPT_TYPES} multiple
                 style={{ display: "none" }} onChange={handleFileChange}
               />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-                <FolderOpen size={22} color={C.dim} />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+                <FolderOpen size={20} color={C.dim} />
                 <div style={{ textAlign: "left" }}>
                   <div style={{ fontSize: 13, fontWeight: 500, color: C.text, lineHeight: 1.4 }}>
                     사진을 드래그하거나 클릭해서 선택
@@ -558,10 +568,10 @@ export default function UploadPage() {
           {isUploading && files.length > 0 && (
             <div style={{
               background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10,
-              padding: "14px 16px", marginBottom: 12,
+              padding: "12px 16px", marginBottom: 12,
               animation: "fadeUp 0.25s ease both",
             }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <Loader2 size={13} color={C.steel} style={{ animation: "spin 1s linear infinite" }} />
                   <span style={{ fontSize: 12, fontWeight: 500, color: C.text }}>
@@ -583,155 +593,121 @@ export default function UploadPage() {
           )}
 
           {uploadPhase === "done" && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: C.green, marginTop: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: C.green, marginBottom: 10 }}>
               <CheckCircle2 size={15} /> 업로드 완료!
             </div>
           )}
 
           {error && (
             <div style={{
-              padding: "10px 14px", borderRadius: 8, marginTop: 8,
+              padding: "9px 14px", borderRadius: 8, marginBottom: 10,
               background: "rgba(255,71,87,0.1)", border: "1px solid rgba(255,71,87,0.2)",
               fontSize: 12, color: C.red,
             }}>
               {error}
             </div>
           )}
+
+          {/* 사진 섹션 헤더 */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "4px 0 10px",
+            borderTop: `1px solid ${C.border}`,
+            marginTop: 4,
+          }}>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: C.dim }}>
+              업로드된 사진{" "}
+              <span style={{ color: C.steel, fontWeight: 400, letterSpacing: 0, textTransform: "none" }}>
+                {photos.length}장
+                {visibleCount < photos.length && (
+                  <span style={{ color: C.dim }}> / {visibleCount}장 표시</span>
+                )}
+              </span>
+            </span>
+            {!isReadOnly && photos.length > 0 && (
+              <button
+                onClick={() => setShowDeleteAllModal(true)}
+                style={{
+                  background: "transparent", border: "none", fontSize: 11,
+                  color: C.red, cursor: "pointer",
+                  fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                }}
+              >
+                전체 삭제
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* ══ 우측 컬럼 — flex column, overflow hidden ══ */}
-        <div style={{
-          display: "flex", flexDirection: "column",
-          background: "rgba(0,0,0,0.08)",
-          overflow: "hidden",
-        }}>
-
-          {/* 프로젝트 정보 카드 — 고정 */}
-          <div style={{ padding: "20px 20px 0", flexShrink: 0 }}>
+        {/* ── 사진 그리드 — 가상 스크롤, flex 1 ── */}
+        {photos.length === 0 ? (
+          <div style={{
+            flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "0 24px 24px",
+          }}>
             <div style={{
-              background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 12, overflow: "hidden", marginBottom: 12,
+              textAlign: "center", padding: "40px 20px", color: C.dim,
+              background: C.surface, border: `1px dashed ${C.border}`,
+              borderRadius: 10, width: "100%",
             }}>
-              {infoRows.map(({ key, val, color }, i) => (
-                <div key={key} style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "7px 14px",
-                  borderBottom: i < infoRows.length - 1 ? `1px solid ${C.border}` : "none",
-                }}>
-                  <span style={{ fontSize: 11, color: C.dim }}>{key}</span>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: color || C.text }}>{val}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* 사진 섹션 헤더 */}
-            <div style={{
-              fontSize: 11, fontWeight: 600, letterSpacing: 1,
-              textTransform: "uppercase", color: C.dim,
-              paddingBottom: 10,
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-            }}>
-              <span>
-                업로드된 사진{" "}
-                <span style={{ color: C.steel, fontWeight: 400, letterSpacing: 0, textTransform: "none" }}>
-                  {photos.length}장
-                  {visibleCount < photos.length && (
-                    <span style={{ color: C.dim }}> / {visibleCount}장 표시</span>
-                  )}
-                </span>
-              </span>
-              {!isReadOnly && photos.length > 0 && (
-                <button
-                  onClick={() => setShowDeleteAllModal(true)}
-                  style={{
-                    background: "transparent", border: "none", fontSize: 11,
-                    color: C.red, cursor: "pointer", fontWeight: 400,
-                    letterSpacing: 0, textTransform: "none",
-                    fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
-                  }}
-                >
-                  전체 삭제
-                </button>
-              )}
+              <ImageIcon size={32} color={C.dim} style={{ marginBottom: 10, opacity: 0.3 }} />
+              <div style={{ fontSize: 13 }}>아직 업로드된 사진이 없습니다</div>
             </div>
           </div>
-
-          {/* 가상 스크롤 썸네일 그리드 — flex 1 */}
-          {photos.length === 0 ? (
-            <div style={{
-              flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-              margin: "0 20px 20px",
-            }}>
-              <div style={{
-                textAlign: "center", padding: "32px 20px", color: C.dim,
-                background: C.surface, border: `1px dashed ${C.border}`,
-                borderRadius: 10, width: "100%",
-              }}>
-                <ImageIcon size={28} color={C.dim} style={{ marginBottom: 8, opacity: 0.4 }} />
-                <div style={{ fontSize: 12 }}>아직 업로드된 사진이 없습니다</div>
-              </div>
+        ) : (
+          <div
+            ref={thumbScrollRef}
+            className="thumb-scroll"
+            onScroll={handleThumbScroll}
+            style={{
+              flex: 1, minHeight: 0, overflowY: "auto",
+              padding: `0 24px ${isReadOnly ? 16 : 80}px`,
+            }}
+          >
+            <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const startIdx = virtualRow.index * COLS;
+                return (
+                  <div
+                    key={virtualRow.key}
+                    data-index={virtualRow.index}
+                    ref={rowVirtualizer.measureElement}
+                    style={{
+                      position: "absolute",
+                      top: virtualRow.start,
+                      left: 0, right: 0,
+                      display: "grid",
+                      gridTemplateColumns: `repeat(${COLS}, 1fr)`,
+                      gap: THUMB_GAP,
+                      paddingBottom: THUMB_GAP,
+                    }}
+                  >
+                    {Array.from({ length: COLS }, (_, c) => {
+                      const photo = visiblePhotos[startIdx + c];
+                      if (!photo) return <div key={c} style={{ aspectRatio: "3/2" }} />;
+                      return (
+                        <LazyThumb
+                          key={photo.id}
+                          photo={photo}
+                          index={startIdx + c}
+                          isReadOnly={isReadOnly}
+                          deleting={deletingId === photo.id}
+                          onDelete={() => handleDeletePhoto(photo.id)}
+                          onClick={() => setLightboxIndex(startIdx + c)}
+                        />
+                      );
+                    })}
+                  </div>
+                );
+              })}
             </div>
-          ) : (
-            <div
-              ref={thumbScrollRef}
-              className="thumb-scroll"
-              onScroll={handleThumbScroll}
-              style={{
-                flex: 1, minHeight: 0, overflowY: "auto",
-                padding: "0 20px",
-                paddingBottom: isReadOnly ? 20 : 80,
-              }}
-            >
-              {/* 가상화 컨테이너 */}
-              <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
-                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                  const startIdx = virtualRow.index * COLS;
-                  return (
-                    <div
-                      key={virtualRow.key}
-                      data-index={virtualRow.index}
-                      ref={rowVirtualizer.measureElement}
-                      style={{
-                        position: "absolute",
-                        top: virtualRow.start,
-                        left: 0, right: 0,
-                        display: "grid",
-                        gridTemplateColumns: `repeat(${COLS}, 1fr)`,
-                        gap: THUMB_GAP,
-                        paddingBottom: THUMB_GAP,
-                      }}
-                    >
-                      {Array.from({ length: COLS }, (_, c) => {
-                        const photo = visiblePhotos[startIdx + c];
-                        if (!photo) return <div key={c} style={{ aspectRatio: "3/2" }} />;
-                        return (
-                          <LazyThumb
-                            key={photo.id}
-                            photo={photo}
-                            index={startIdx + c}
-                            isReadOnly={isReadOnly}
-                            deleting={deletingId === photo.id}
-                            onDelete={() => handleDeletePhoto(photo.id)}
-                            onClick={() => setLightboxIndex(startIdx + c)}
-                          />
-                        );
-                      })}
-                    </div>
-                  );
-                })}
+            {visibleCount < photos.length && (
+              <div style={{ textAlign: "center", padding: "12px 0", fontSize: 11, color: C.dim }}>
+                스크롤해서 더 보기 ({photos.length - visibleCount}장 남음)
               </div>
-              {/* 로드 더 인디케이터 */}
-              {visibleCount < photos.length && (
-                <div style={{
-                  textAlign: "center", padding: "12px 0",
-                  fontSize: 11, color: C.dim,
-                }}>
-                  스크롤해서 더 보기 ({photos.length - visibleCount}장 남음)
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── 하단 고정 액션바 ── */}
