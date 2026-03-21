@@ -13,6 +13,8 @@ import {
   Clipboard,
   Download,
   ChevronRight,
+  ChevronLeft,
+  X,
   Image,
   AlertCircle,
   AlertTriangle,
@@ -83,6 +85,7 @@ export default function ResultsPage() {
   const [showEditStartModal, setShowEditStartModal] = useState(false);
   const [editStartSubmitting, setEditStartSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("gallery");
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   useEffect(() => {
     getProjectById(id)
@@ -385,6 +388,7 @@ export default function ResultsPage() {
                 url={p.url}
                 filename={getDisplayFilename(p)}
                 comment={(photoStates[p.id]?.comment ?? "").trim()}
+                onOpen={() => setLightboxIndex(i)}
               />
             ))}
           </div>
@@ -411,6 +415,7 @@ export default function ResultsPage() {
                 url={p.url}
                 filename={getDisplayFilename(p)}
                 comment={(photoStates[p.id]?.comment ?? "").trim()}
+                onOpen={() => setLightboxIndex(i)}
               />
             ))}
           </div>
@@ -533,6 +538,18 @@ export default function ResultsPage() {
         </div>
       )}
 
+      {/* ── Lightbox ── */}
+      {lightboxIndex !== null && (
+        <Lightbox
+          photos={photos}
+          photoStates={photoStates}
+          index={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onPrev={() => setLightboxIndex((i) => (i! > 0 ? i! - 1 : photos.length - 1))}
+          onNext={() => setLightboxIndex((i) => (i! < photos.length - 1 ? i! + 1 : 0))}
+        />
+      )}
+
       {/* ── Toast ── */}
       {toast && (
         <div style={{
@@ -600,14 +617,15 @@ function ViewBtn({
 }
 
 function GalleryItem({
-  num, url, filename, comment,
-}: { num: number; url: string; filename: string; comment: string }) {
+  num, url, filename, comment, onOpen,
+}: { num: number; url: string; filename: string; comment: string; onOpen: () => void }) {
   const [h, setH] = useState(false);
   const [imgErr, setImgErr] = useState(false);
   return (
     <div
       onMouseEnter={() => setH(true)}
       onMouseLeave={() => setH(false)}
+      onClick={onOpen}
       style={{
         background: C.surface,
         border: `1px solid ${h ? C.borderMd : C.border}`,
@@ -673,14 +691,15 @@ function GalleryItem({
 }
 
 function ListItem({
-  num, url, filename, comment,
-}: { num: number; url: string; filename: string; comment: string }) {
+  num, url, filename, comment, onOpen,
+}: { num: number; url: string; filename: string; comment: string; onOpen: () => void }) {
   const [h, setH] = useState(false);
   const [imgErr, setImgErr] = useState(false);
   return (
     <div
       onMouseEnter={() => setH(true)}
       onMouseLeave={() => setH(false)}
+      onClick={onOpen}
       style={{
         display: "grid", gridTemplateColumns: "48px 60px 1fr 2fr",
         gap: 12, alignItems: "center",
@@ -724,6 +743,143 @@ function ListItem({
           </>
         ) : "—"}
       </div>
+    </div>
+  );
+}
+
+// ---------- Lightbox ----------
+function Lightbox({
+  photos, photoStates, index, onClose, onPrev, onNext,
+}: {
+  photos: Photo[];
+  photoStates: Record<string, { rating?: number; color?: ColorTag; comment?: string }>;
+  index: number;
+  onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const photo = photos[index];
+  const filename = getDisplayFilename(photo);
+  const comment = (photoStates[photo.id]?.comment ?? "").trim();
+  const total = photos.length;
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") onPrev();
+      if (e.key === "ArrowRight") onNext();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose, onPrev, onNext]);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 500,
+        background: "rgba(0,0,0,0.92)",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+      }}
+    >
+      {/* Close */}
+      <button
+        onClick={onClose}
+        style={{
+          position: "absolute", top: 16, right: 16,
+          width: 36, height: 36, borderRadius: "50%",
+          background: "rgba(255,255,255,0.1)", border: "none",
+          color: "white", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        <X size={18} />
+      </button>
+
+      {/* Counter */}
+      <div style={{
+        position: "absolute", top: 20, left: "50%", transform: "translateX(-50%)",
+        fontSize: 12, color: "rgba(255,255,255,0.5)",
+      }}>
+        {index + 1} / {total}
+      </div>
+
+      {/* Prev */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onPrev(); }}
+        style={{
+          position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
+          width: 44, height: 44, borderRadius: "50%",
+          background: "rgba(255,255,255,0.1)", border: "none",
+          color: "white", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "background 0.15s",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+      >
+        <ChevronLeft size={22} />
+      </button>
+
+      {/* Image */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          display: "flex", flexDirection: "column", alignItems: "center",
+          maxWidth: "90vw", width: "100%",
+        }}
+      >
+        <img
+          key={photo.id}
+          src={photo.url}
+          alt={filename}
+          style={{
+            maxHeight: "75vh", maxWidth: "90vw",
+            objectFit: "contain", borderRadius: 6,
+            display: "block",
+          }}
+        />
+
+        {/* Info bar */}
+        <div style={{
+          marginTop: 14,
+          background: "rgba(15,32,48,0.9)", border: "1px solid rgba(102,155,188,0.15)",
+          borderRadius: 10, padding: "12px 18px",
+          width: "100%", maxWidth: 560,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 500, color: C.text, marginBottom: comment ? 8 : 0 }}>
+            {filename}
+          </div>
+          {comment && (
+            <div style={{
+              display: "flex", alignItems: "flex-start", gap: 6,
+              padding: "8px 10px", borderRadius: 7,
+              background: "rgba(245,166,35,0.08)", border: "1px solid rgba(245,166,35,0.2)",
+            }}>
+              <MessageSquare size={13} color={C.orange} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span style={{ fontSize: 13, color: C.orange, lineHeight: 1.5 }}>{comment}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Next */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onNext(); }}
+        style={{
+          position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
+          width: 44, height: 44, borderRadius: "50%",
+          background: "rgba(255,255,255,0.1)", border: "none",
+          color: "white", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "background 0.15s",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+      >
+        <ChevronRight size={22} />
+      </button>
     </div>
   );
 }
