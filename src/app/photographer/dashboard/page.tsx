@@ -12,12 +12,12 @@ import {
   Eye,
   Image as ImageIcon,
   Check,
-  ChevronRight,
 } from "lucide-react";
 import { getProjectsByPhotographerId } from "@/lib/db";
 import type { Project, ProjectStatus } from "@/types";
 import type { ProjectLogItem } from "@/lib/db";
 import { useProfile } from "@/contexts/ProfileContext";
+import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 
 // ── colour tokens ──────────────────────────────────────────
 const C = {
@@ -117,34 +117,6 @@ const LOG_LABEL: Record<string, string> = {
   revision:  "재보정 요청",
 };
 
-// ── ProjectProgressBar ─────────────────────────────────────
-function ProjectProgressBar({ value, max }: { value: number; max: number }) {
-  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
-  const barColor = pct >= 100 ? C.green : C.steel;
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-      <div style={{
-        flex: 1,
-        height: 3,
-        borderRadius: 2,
-        backgroundColor: C.surface3,
-        overflow: "hidden",
-      }}>
-        <div style={{
-          width: `${pct}%`,
-          height: "100%",
-          borderRadius: 2,
-          backgroundColor: barColor,
-          transition: "width 0.4s ease",
-        }} />
-      </div>
-      <span style={{ fontSize: 10, color: C.muted, whiteSpace: "nowrap", flexShrink: 0 }}>
-        {value} / {max}
-      </span>
-    </div>
-  );
-}
-
 // ── StatusBadge ────────────────────────────────────────────
 function StatusBadge({ status }: { status: ProjectStatus }) {
   const { label, key } = STATUS_BADGE[status];
@@ -212,7 +184,7 @@ function ProjectCard({ project }: { project: Project }) {
         </div>
 
         {/* 진행 바 */}
-        <ProjectProgressBar value={project.photoCount} max={project.requiredCount} />
+        <ProjectProgressBar status={project.status} />
 
         {/* 하단 메타 */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -378,13 +350,17 @@ export default function DashboardPage() {
     );
   }
 
-  // ── derived data ──
-  const preparingProjects = projects.filter((p) => p.status === "preparing");
-  const activeProjects    = projects.filter((p) => ACTIVE_STATUSES.includes(p.status));
-  const deliveredProjects = projects
-    .filter((p) => p.status === "delivered")
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  const recentDelivered = deliveredProjects.slice(0, 1);
+  // ── derived data: 최근 업데이트 순 6개 제한 ──
+  const sortedAll = [...projects].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+  const displayProjects      = sortedAll.slice(0, 6);
+  const showViewAllBtn       = projects.length > 6;
+  const totalDeliveredCount  = projects.filter((p) => p.status === "delivered").length;
+
+  const preparingProjects = displayProjects.filter((p) => p.status === "preparing");
+  const activeProjects    = displayProjects.filter((p) => ACTIVE_STATUSES.includes(p.status));
+  const recentDelivered   = displayProjects.filter((p) => p.status === "delivered").slice(0, 1);
 
   const confirmedCount = projects.filter((p) => p.status === "confirmed").length;
   const revisionCount  = projects.filter((p) => p.status === "editing_v2").length;
@@ -543,30 +519,34 @@ export default function DashboardPage() {
           {/* 4. 최근 완료 */}
           {recentDelivered.length > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <SectionHeader title="최근 완료" count={deliveredProjects.length} />
+              <SectionHeader title="최근 완료" count={totalDeliveredCount} />
               {recentDelivered.map((p) => <ProjectCard key={p.id} project={p} />)}
-              <Link
-                href="/photographer/projects"
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  width: "100%", padding: 9,
-                  border: `1px dashed ${C.border}`, borderRadius: 9,
-                  background: "transparent", color: C.dim,
-                  fontSize: 12, textDecoration: "none", marginTop: 4,
-                  transition: "all 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLAnchorElement).style.borderColor = C.steel;
-                  (e.currentTarget as HTMLAnchorElement).style.color = C.steel;
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLAnchorElement).style.borderColor = C.border;
-                  (e.currentTarget as HTMLAnchorElement).style.color = C.dim;
-                }}
-              >
-                전체 프로젝트 보기 →
-              </Link>
             </div>
+          )}
+
+          {/* 전체 보기 버튼: 6개 초과 시 */}
+          {showViewAllBtn && (
+            <Link
+              href="/photographer/projects"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: "100%", padding: 9,
+                border: `1px dashed ${C.border}`, borderRadius: 9,
+                background: "transparent", color: C.dim,
+                fontSize: 12, textDecoration: "none", marginBottom: 20,
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.borderColor = C.steel;
+                (e.currentTarget as HTMLAnchorElement).style.color = C.steel;
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.borderColor = C.border;
+                (e.currentTarget as HTMLAnchorElement).style.color = C.dim;
+              }}
+            >
+              전체 프로젝트 보기 →
+            </Link>
           )}
 
           {/* 프로젝트 없을 때 */}
