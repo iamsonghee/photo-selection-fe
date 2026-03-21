@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 
-async function getPhotographerAuthId(): Promise<string | null> {
+async function getPhotographerAuth(): Promise<{ authId: string; email: string | null } | null> {
   const supabase = await createClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  return session?.user?.id ?? null;
+  if (!session?.user?.id) return null;
+  return { authId: session.user.id, email: session.user.email ?? null };
 }
 
 export interface PhotographerProfile {
@@ -22,26 +23,35 @@ export interface PhotographerProfile {
   createdAt: string;
 }
 
-/** GET: 현재 로그인 작가 프로필 (photographers 테이블, service role) */
+/** GET: 현재 로그인 작가 프로필 (photographers 테이블, service role). 행 없으면 자동 생성. */
 export async function GET() {
   try {
-    const authId = await getPhotographerAuthId();
-    if (!authId) {
+    const auth = await getPhotographerAuth();
+    if (!auth) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const { authId, email } = auth;
 
     const admin = getAdminClient();
-    const { data, error } = await admin
+    let { data, error } = await admin
       .from("photographers")
       .select("id, auth_id, email, name, profile_image_url, bio, instagram_url, portfolio_url, created_at")
       .eq("auth_id", authId)
       .limit(1)
       .single();
 
+    // 최초 로그인 등으로 행이 없으면 자동 생성
+    if (error?.code === "PGRST116") {
+      const inserted = await admin
+        .from("photographers")
+        .insert({ auth_id: authId, email: email ?? null })
+        .select("id, auth_id, email, name, profile_image_url, bio, instagram_url, portfolio_url, created_at")
+        .single();
+      data = inserted.data;
+      error = inserted.error;
+    }
+
     if (error || !data) {
-      if (error?.code === "PGRST116") {
-        return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-      }
       return NextResponse.json({ error: error?.message ?? "Not found" }, { status: 500 });
     }
 
@@ -71,7 +81,8 @@ export async function GET() {
 /** PATCH: name, bio, instagram_url, portfolio_url 수정 */
 export async function PATCH(req: NextRequest) {
   try {
-    const authId = await getPhotographerAuthId();
+    const auth = await getPhotographerAuth();
+    const authId = auth?.authId ?? null;
     if (!authId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

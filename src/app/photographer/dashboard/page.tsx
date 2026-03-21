@@ -18,7 +18,7 @@ import {
 import { Button, Card, Badge } from "@/components/ui";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import { supabase } from "@/lib/supabase";
-import { getPhotographerIdByAuthId, getProjectsByPhotographerId } from "@/lib/db";
+import { getProjectsByPhotographerId } from "@/lib/db";
 import type { ProjectLogApiItem } from "@/app/api/photographer/project-logs/route";
 import {
   GROUP_WAITING,
@@ -82,20 +82,23 @@ export default function DashboardPage() {
         return;
       }
       try {
-        const pid = await getPhotographerIdByAuthId(user.id);
+        // 서버사이드 admin 클라이언트 사용 → RLS 우회, 최초 로그인 시 자동 생성
+        const profileRes = await fetch("/api/photographer/profile").then((r) =>
+          r.ok ? r.json() : null
+        );
+        const pid: string | null = profileRes?.id ?? null;
         setPhotographerId(pid);
         if (!pid) {
           setLoading(false);
           return;
         }
-        const [list, logRes, profileRes] = await Promise.all([
+        if (profileRes?.name?.trim()) setProfileName(profileRes.name.trim());
+        const [list, logRes] = await Promise.all([
           getProjectsByPhotographerId(pid),
           fetch("/api/photographer/project-logs").then((r) => (r.ok ? r.json() : [])),
-          fetch("/api/photographer/profile").then((r) => (r.ok ? r.json() : null)),
         ]);
         setProjects(list);
         setLogs(Array.isArray(logRes) ? logRes : []);
-        if (profileRes?.name?.trim()) setProfileName(profileRes.name.trim());
       } catch (e) {
         console.error(e);
       } finally {
