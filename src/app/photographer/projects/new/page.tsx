@@ -125,7 +125,7 @@ export default function NewProjectPage() {
   };
 
   return (
-    <div className="mx-auto max-w-[440px] space-y-8">
+    <div className="mx-auto max-w-[440px] space-y-8 p-6">
       <h1 className="text-2xl font-semibold text-white">새 프로젝트</h1>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

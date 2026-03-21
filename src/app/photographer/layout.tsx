@@ -8,9 +8,9 @@ export default function PhotographerLayout({
 }) {
   return (
     <ProfileProvider>
-      <div className="flex min-h-screen bg-[#0a0b0d]">
+      <div className="flex min-h-screen bg-[#0d1e28]">
         <Sidebar />
-        <main className="ml-[200px] flex-1 p-6">{children}</main>
+        <main className="ml-[220px] flex-1">{children}</main>
       </div>
     </ProfileProvider>
   );

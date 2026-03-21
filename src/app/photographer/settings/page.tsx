@@ -143,7 +143,7 @@ export default function SettingsPage() {
   const initial = getInitial(profile.name, profile.email);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6 p-6">
       <h1 className="text-2xl font-semibold text-white">설정</h1>
 
       <div className="flex flex-col gap-6 lg:flex-row">
