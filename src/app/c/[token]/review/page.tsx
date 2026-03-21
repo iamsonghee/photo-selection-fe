@@ -6,8 +6,6 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
-import { getReviewMockData } from "@/lib/mock-data";
-import type { ReviewPhotoItem } from "@/lib/customer-api-server";
 
 const REVISION_LIMIT = 2;
 
@@ -16,50 +14,15 @@ export default function ReviewGalleryPage() {
   const router = useRouter();
   const token = (params?.token as string) ?? "";
   const { project, loading: selectionLoading } = useSelection();
-  const { reviewState, getReview, resetAll, setReview } = useReview();
-  const [apiReviewData, setApiReviewData] = useState<{
-    project: { id: string; status: string };
-    photos: ReviewPhotoItem[];
-    globalPhotographerMemo: string | null;
-  } | null>(null);
-  const [reviewDataLoading, setReviewDataLoading] = useState(true);
+  const { reviewPhotos, loadReviewPhotos, reviewPhotosLoading, reviewState, getReview, resetAll, setReview } = useReview();
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token || !project?.id) {
-      setReviewDataLoading(false);
-      return;
-    }
-    if (project.status !== "reviewing_v1" && project.status !== "reviewing_v2") {
-      setReviewDataLoading(false);
-      return;
-    }
-    setReviewDataLoading(true);
-    fetch(`/api/c/review?token=${encodeURIComponent(token)}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.project) setApiReviewData(data);
-        else setApiReviewData(null);
-      })
-      .catch(() => setApiReviewData(null))
-      .finally(() => setReviewDataLoading(false));
-  }, [token, project?.id, project?.status]);
+    if (!project?.id || !project?.status) return;
+    loadReviewPhotos(token, project.id, project.status);
+  }, [token, project?.id, project?.status, loadReviewPhotos]);
 
-  const photos = useMemo(() => {
-    if (apiReviewData?.photos?.length) return apiReviewData.photos;
-    if (!project?.id) return [];
-    const mock = getReviewMockData(project.id);
-    return mock.photos.map((p) => ({
-      id: p.id,
-      photoVersionId: "" as string,
-      originalFilename: p.originalFilename,
-      originalUrl: p.originalUrl,
-      versionUrl: p.versionUrl,
-      photographerMemo: p.photographerMemo,
-      orderIndex: p.orderIndex,
-      existingReview: undefined,
-    }));
-  }, [apiReviewData, project?.id]);
+  const photos = reviewPhotos;
 
   const total = photos.length;
 
@@ -145,11 +108,11 @@ export default function ReviewGalleryPage() {
 
   const [showSubmitModal, setShowSubmitModal] = useState(false);
 
-  if (selectionLoading || reviewDataLoading || !project) {
+  if (selectionLoading || reviewPhotosLoading || !project) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
         <p className="text-[#5a5f7a]">
-          {selectionLoading ? "로딩 중…" : "존재하지 않는 초대 링크입니다."}
+          {selectionLoading || reviewPhotosLoading ? "로딩 중…" : "존재하지 않는 초대 링크입니다."}
         </p>
       </div>
     );
