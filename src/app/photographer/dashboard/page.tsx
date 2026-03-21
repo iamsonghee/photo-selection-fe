@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { Button, Card, Badge } from "@/components/ui";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
-import { supabase } from "@/lib/supabase";
 import { getProjectsByPhotographerId } from "@/lib/db";
 import type { ProjectLogApiItem } from "@/app/api/photographer/project-logs/route";
 import {
@@ -66,33 +65,28 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUserId(user?.id ?? null);
-      const name =
-        (user?.user_metadata?.full_name as string) ??
-        (user?.user_metadata?.name as string) ??
-        user?.email?.split("@")[0] ??
-        "사용자";
-      setUserName(name);
-
-      if (!user?.id) {
-        setLoading(false);
-        return;
-      }
       try {
-        // 서버사이드 admin 클라이언트 사용 → RLS 우회, 최초 로그인 시 자동 생성
+        // 서버사이드 API로 인증 확인 (쿠키를 서버에서 직접 읽음 → OAuth 리다이렉트 직후도 안정적)
+        // profile API: 행 없으면 자동 생성, 401이면 미로그인
         const profileRes = await fetch("/api/photographer/profile").then((r) =>
           r.ok ? r.json() : null
         );
         const pid: string | null = profileRes?.id ?? null;
-        setPhotographerId(pid);
+
         if (!pid) {
           setLoading(false);
           return;
         }
-        if (profileRes?.name?.trim()) setProfileName(profileRes.name.trim());
+
+        setUserId(profileRes.authId ?? pid);
+        setPhotographerId(pid);
+        const displayName =
+          profileRes.name?.trim() ||
+          profileRes.email?.split("@")[0] ||
+          "사용자";
+        setUserName(displayName);
+        if (profileRes.name?.trim()) setProfileName(profileRes.name.trim());
+
         const [list, logRes] = await Promise.all([
           getProjectsByPhotographerId(pid),
           fetch("/api/photographer/project-logs").then((r) => (r.ok ? r.json() : [])),
