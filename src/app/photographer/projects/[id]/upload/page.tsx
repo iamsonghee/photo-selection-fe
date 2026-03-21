@@ -3,24 +3,28 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  ChevronLeft, Upload, Loader2, X, FolderOpen, ImageIcon, CheckCircle2,
+  ChevronLeft, Upload, Loader2, FolderOpen, ImageIcon, CheckCircle2,
 } from "lucide-react";
-import { differenceInCalendarDays, format } from "date-fns";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { differenceInCalendarDays } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
 import { getProjectById, getPhotosByProjectId } from "@/lib/db";
 import type { Project, Photo } from "@/types";
 
 const ACCEPT_TYPES = "image/jpeg,image/png,image/webp";
 const BACKEND_URL  = process.env.NEXT_PUBLIC_API_URL ?? "";
+const COLS         = 4;
+const THUMB_GAP    = 6;
+const THUMB_ROW_H  = 70;  // estimated: ~62px thumb + 8px gap+padding
+const INITIAL_VISIBLE = 40;
+const LOAD_MORE       = 40;
 
 const C = {
   ink: "#0d1e28", surface: "#0f2030", surface2: "#152a3a", surface3: "#1a3347",
   steel: "#669bbc", steelLt: "#8db8d4",
   border: "rgba(102,155,188,0.12)", borderMd: "rgba(102,155,188,0.22)",
   text: "#e8eef2", muted: "#7a9ab0", dim: "#3a5a6e",
-  green: "#2ed573", greenDim: "#0f2a1e",
-  orange: "#f5a623", orangeDim: "#2a1a08",
-  red: "#ff4757", redDim: "#2a0f12",
+  green: "#2ed573", orange: "#f5a623", red: "#ff4757",
 };
 
 function logUploadTokenDebug(scope: string, token: string | null | undefined) {
@@ -89,41 +93,115 @@ function ConfirmModal({
   );
 }
 
+// ── 지연 로딩 썸네일 ────────────────────────────────────────────────────────
+function LazyThumb({
+  photo, index, isReadOnly, deleting, onDelete, onClick,
+}: {
+  photo: Photo; index: number; isReadOnly: boolean;
+  deleting: boolean; onDelete: () => void; onClick: () => void;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div
+      className="up-thumb"
+      style={{
+        aspectRatio: "3/2", background: C.surface2, borderRadius: 7,
+        position: "relative", overflow: "hidden", cursor: "pointer",
+        border: `1px solid ${C.border}`, transition: "border-color 0.15s",
+      }}
+      onClick={onClick}
+    >
+      {/* placeholder */}
+      <div style={{
+        position: "absolute", inset: 0, background: C.surface2,
+        transition: "opacity 0.25s", opacity: loaded ? 0 : 1,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        pointerEvents: "none",
+      }}>
+        <ImageIcon size={14} color={C.dim} style={{ opacity: 0.3 }} />
+      </div>
+      <img
+        src={photo.url}
+        alt=""
+        loading="lazy"
+        onLoad={(e) => { setLoaded(true); (e.currentTarget as HTMLImageElement).style.opacity = "1"; }}
+        style={{
+          width: "100%", height: "100%", objectFit: "cover", display: "block",
+          opacity: 0, transition: "opacity 0.25s",
+        }}
+      />
+      {!isReadOnly && (
+        <button
+          className="up-thumb-del"
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          disabled={deleting}
+          style={{
+            position: "absolute", top: 4, right: 4,
+            width: 20, height: 20, borderRadius: "50%",
+            background: "rgba(255,71,87,0.85)", border: "none",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 10, color: "white", opacity: 0, cursor: "pointer",
+            transition: "opacity 0.15s",
+          }}
+        >
+          {deleting
+            ? <Loader2 size={10} style={{ animation: "spin 1s linear infinite" }} />
+            : "✕"}
+        </button>
+      )}
+      <span style={{
+        position: "absolute", bottom: 3, left: 4,
+        fontSize: 9, color: "rgba(255,255,255,0.55)",
+      }}>
+        {index + 1}
+      </span>
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════
 export default function UploadPage() {
   const params = useParams();
   const router = useRouter();
   const id     = params.id as string;
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef  = useRef<HTMLInputElement>(null);
+  const thumbScrollRef = useRef<HTMLDivElement>(null);
 
   // ── 데이터 상태 ──
   const [project,  setProject]  = useState<Project | null>(null);
   const [photos,   setPhotos]   = useState<Photo[]>([]);
   const [loading,  setLoading]  = useState(true);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
 
   // ── 업로드 상태 ──
   const [files,          setFiles]          = useState<File[]>([]);
   const [dragOver,       setDragOver]       = useState(false);
   const [uploadPhase,    setUploadPhase]    = useState<"idle"|"sending"|"processing"|"done">("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadedBytes,  setUploadedBytes]  = useState(0);
-  const [totalBytes,     setTotalBytes]     = useState(0);
   const [error,          setError]          = useState<string | null>(null);
   const [toast,          setToast]          = useState<string | null>(null);
 
   // ── UI 상태 ──
-  const [deletingId,           setDeletingId]           = useState<string | null>(null);
-  const [showDeleteAllModal,   setShowDeleteAllModal]   = useState(false);
-  const [deleteAllSubmitting,  setDeleteAllSubmitting]  = useState(false);
-  const [showInviteModal,      setShowInviteModal]      = useState(false);
-  const [inviteSubmitting,     setInviteSubmitting]     = useState(false);
-  const [lightboxIndex,        setLightboxIndex]        = useState<number | null>(null);
+  const [deletingId,          setDeletingId]          = useState<string | null>(null);
+  const [showDeleteAllModal,  setShowDeleteAllModal]  = useState(false);
+  const [deleteAllSubmitting, setDeleteAllSubmitting] = useState(false);
+  const [showInviteModal,     setShowInviteModal]     = useState(false);
+  const [inviteSubmitting,    setInviteSubmitting]    = useState(false);
+  const [lightboxIndex,       setLightboxIndex]       = useState<number | null>(null);
 
-  // 로컬 파일 미리보기 URL
-  const filePreviews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
-  useEffect(() => {
-    return () => filePreviews.forEach((url) => URL.revokeObjectURL(url));
-  }, [filePreviews]);
+  // ── 가상 스크롤 ──────────────────────────────────────────────────────────
+  const visiblePhotos = useMemo(
+    () => photos.slice(0, visibleCount),
+    [photos, visibleCount],
+  );
+  const rowCount = Math.ceil(visiblePhotos.length / COLS);
+
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => thumbScrollRef.current,
+    estimateSize: () => THUMB_ROW_H,
+    overscan: 3,
+  });
 
   // ── 라이트박스 키보드 ──
   useEffect(() => {
@@ -163,30 +241,23 @@ export default function UploadPage() {
     if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); }
   }, [toast]);
 
-  // ── 드래그&드롭 ──
-  const onDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault(); setDragOver(false);
-    const list = Array.from(e.dataTransfer.files).filter(
-      (f) => ["image/jpeg","image/png","image/webp"].includes(f.type)
-    );
-    setFiles(list); setError(null);
-  }, []);
-  const onDragOver  = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(true); }, []);
-  const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(false); }, []);
+  // ── 무한 스크롤 ──────────────────────────────────────────────────────────
+  const handleThumbScroll = useCallback(() => {
+    const el = thumbScrollRef.current;
+    if (!el) return;
+    if (
+      el.scrollHeight - el.scrollTop - el.clientHeight < 200 &&
+      visibleCount < photos.length
+    ) {
+      setVisibleCount((prev) => Math.min(prev + LOAD_MORE, photos.length));
+    }
+  }, [visibleCount, photos.length]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const chosen = e.target.files;
-    if (!chosen?.length) return;
-    setFiles(Array.from(chosen).filter((f) => ["image/jpeg","image/png","image/webp"].includes(f.type)));
-    setError(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  // ── 업로드 ──
-  const startUpload = async () => {
-    if (!files.length) return;
+  // ── 업로드 (파일 리스트를 직접 받아 즉시 시작) ────────────────────────
+  const startUpload = useCallback(async (uploadFiles: File[]) => {
+    if (!uploadFiles.length) return;
+    setFiles(uploadFiles);
     setError(null); setUploadPhase("sending"); setUploadProgress(0);
-    setUploadedBytes(0); setTotalBytes(files.reduce((s, f) => s + f.size, 0));
 
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
@@ -198,14 +269,13 @@ export default function UploadPage() {
 
     const form = new FormData();
     form.append("project_id", id);
-    files.forEach((f) => form.append("files", f));
+    uploadFiles.forEach((f) => form.append("files", f));
 
     const xhr = new XMLHttpRequest();
-    const resetProgressState = () => { setUploadPhase("idle"); setUploadProgress(0); setUploadedBytes(0); setTotalBytes(0); };
+    const resetState = () => { setUploadPhase("idle"); setUploadProgress(0); setFiles([]); };
 
     xhr.upload.addEventListener("progress", (e) => {
       if (e.lengthComputable) {
-        setUploadedBytes(e.loaded); setTotalBytes(e.total);
         setUploadProgress(e.total > 0 ? Math.min(99, Math.round((e.loaded / e.total) * 100)) : 0);
         if (e.loaded >= e.total && e.total > 0) setUploadPhase("processing");
       }
@@ -213,20 +283,51 @@ export default function UploadPage() {
     xhr.addEventListener("load", () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         setUploadPhase("done");
-        fetch("/api/photographer/project-logs", { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ project_id: id, action: "uploaded" }) }).catch(() => {});
-        setTimeout(() => { setFiles([]); resetProgressState(); setToast("업로드 완료!"); loadProject(); loadPhotos(); router.refresh(); }, 800);
+        fetch("/api/photographer/project-logs", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ project_id: id, action: "uploaded" }),
+        }).catch(() => {});
+        setTimeout(() => {
+          resetState();
+          setToast("업로드 완료!");
+          loadProject(); loadPhotos(); router.refresh();
+        }, 800);
       } else {
         let msg = "업로드에 실패했습니다.";
-        try { const b = JSON.parse(xhr.responseText); if (b.detail) msg = typeof b.detail === "string" ? b.detail : b.detail[0]?.msg ?? msg; } catch {}
-        setError(msg); resetProgressState();
+        try {
+          const b = JSON.parse(xhr.responseText);
+          if (b.detail) msg = typeof b.detail === "string" ? b.detail : b.detail[0]?.msg ?? msg;
+        } catch {}
+        setError(msg); resetState();
       }
     });
-    xhr.addEventListener("error", () => { setError("네트워크 오류가 발생했습니다."); resetProgressState(); });
-    xhr.addEventListener("abort", resetProgressState);
+    xhr.addEventListener("error", () => { setError("네트워크 오류가 발생했습니다."); resetState(); });
+    xhr.addEventListener("abort", resetState);
     xhr.open("POST", `${BACKEND_URL}/api/upload/photos`);
     xhr.setRequestHeader("Authorization", `Bearer ${token}`);
     xhr.send(form);
+  }, [id, loadProject, loadPhotos, router]);
+
+  // ── 드래그&드롭 ──
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); setDragOver(false);
+    const list = Array.from(e.dataTransfer.files).filter(
+      (f) => ["image/jpeg","image/png","image/webp"].includes(f.type)
+    );
+    setError(null);
+    if (list.length) startUpload(list);
+  }, [startUpload]);
+
+  const onDragOver  = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(true); }, []);
+  const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(false); }, []);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const chosen = e.target.files;
+    if (!chosen?.length) return;
+    const list = Array.from(chosen).filter((f) => ["image/jpeg","image/png","image/webp"].includes(f.type));
+    setError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (list.length) startUpload(list);
   };
 
   const handleDeletePhoto = async (photoId: string) => {
@@ -296,8 +397,8 @@ export default function UploadPage() {
   const isReadOnly   = project.status !== "preparing";
   const isUploading  = uploadPhase === "sending" || uploadPhase === "processing";
 
-  const deadlineDays = differenceInCalendarDays(new Date(project.deadline), new Date());
-  const deadlineText = `${project.deadline} (D+${deadlineDays})`;
+  const deadlineDays   = differenceInCalendarDays(new Date(project.deadline), new Date());
+  const deadlineText   = `${project.deadline} (D+${deadlineDays})`;
   const deadlineUrgent = deadlineDays >= 0 && deadlineDays <= 3;
 
   const progressPct = photoCountExpected && photoCountExpected > 0
@@ -305,26 +406,32 @@ export default function UploadPage() {
     : N > 0 ? Math.min(100, Math.round((M / N) * 100)) : 0;
 
   const infoRows = [
-    { key: "프로젝트",  val: project.name,              color: "" },
-    { key: "고객",      val: project.customerName,      color: "" },
-    { key: "촬영일",    val: project.shootDate,          color: "" },
-    { key: "셀렉 기한", val: deadlineText,               color: deadlineUrgent ? C.orange : "" },
-    { key: "셀렉 갯수", val: `${N}장`,                   color: C.steel },
+    { key: "프로젝트",  val: project.name,          color: "" },
+    { key: "고객",      val: project.customerName,  color: "" },
+    { key: "촬영일",    val: project.shootDate,      color: "" },
+    { key: "셀렉 기한", val: deadlineText,           color: deadlineUrgent ? C.orange : "" },
+    { key: "셀렉 갯수", val: `${N}장`,               color: C.steel },
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", fontFamily: "'DM Sans','Noto Sans KR',sans-serif" }}>
+    <div style={{
+      display: "flex", flexDirection: "column", height: "100vh",
+      fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+    }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from{opacity:0;transform:translateY(5px);} to{opacity:1;transform:translateY(0);} }
         .up-dropzone:hover { border-color: ${C.steel} !important; background: rgba(102,155,188,0.05) !important; }
         .up-thumb:hover .up-thumb-del { opacity: 1 !important; }
         .up-thumb:hover { border-color: ${C.borderMd} !important; }
+        .thumb-scroll::-webkit-scrollbar { width: 4px; }
+        .thumb-scroll::-webkit-scrollbar-track { background: transparent; }
+        .thumb-scroll::-webkit-scrollbar-thumb { background: ${C.dim}; border-radius: 2px; }
       `}</style>
 
       {/* ── Topbar ── */}
       <div style={{
-        height: 52, borderBottom: `1px solid ${C.border}`,
+        height: 52, flexShrink: 0, borderBottom: `1px solid ${C.border}`,
         display: "flex", alignItems: "center", gap: 12, padding: "0 24px",
         background: "rgba(13,30,40,0.85)", backdropFilter: "blur(12px)",
         position: "sticky", top: 0, zIndex: 50,
@@ -350,12 +457,16 @@ export default function UploadPage() {
 
       {/* ── 2컬럼 페이지 본문 ── */}
       <div style={{
-        display: "grid", gridTemplateColumns: "1fr 340px",
-        flex: 1, minHeight: "calc(100vh - 52px - 64px)",
+        display: "grid", gridTemplateColumns: "1fr 420px",
+        flex: 1, minHeight: 0, overflow: "hidden",
       }}>
 
         {/* ══ 좌측 컬럼 ══ */}
-        <div style={{ padding: "22px 20px 100px 24px", borderRight: `1px solid ${C.border}`, overflowY: "auto" }}>
+        <div style={{
+          padding: "20px 20px 80px 24px",
+          borderRight: `1px solid ${C.border}`,
+          overflowY: "auto",
+        }}>
 
           {isReadOnly && (
             <div style={{
@@ -375,9 +486,9 @@ export default function UploadPage() {
             animation: "fadeUp 0.3s ease 0.05s both",
           }}>
             {[
-              { num: M,                                label: "업로드됨",  color: C.steel   },
-              { num: photoCountExpected ?? "-",        label: "예정 수",   color: C.orange  },
-              { num: remaining !== null ? remaining : "-", label: "남은 수", color: C.muted },
+              { num: M,                                    label: "업로드됨",  color: C.steel  },
+              { num: photoCountExpected ?? "-",            label: "예정 수",   color: C.orange },
+              { num: remaining !== null ? remaining : "-", label: "남은 수",   color: C.muted  },
             ].map((s, i) => (
               <div key={i} style={{
                 background: C.surface, padding: "14px 16px", textAlign: "center",
@@ -403,139 +514,70 @@ export default function UploadPage() {
               onDragLeave={onDragLeave}
               style={{
                 border: `2px dashed ${dragOver ? C.steel : C.borderMd}`,
-                borderRadius: 12, padding: "28px 20px", textAlign: "center",
-                cursor: isUploading ? "default" : "pointer",
+                borderRadius: 12, padding: "20px",
+                textAlign: "center", cursor: isUploading ? "default" : "pointer",
                 background: dragOver ? "rgba(102,155,188,0.05)" : "rgba(102,155,188,0.02)",
                 marginBottom: 14, transition: "all 0.2s",
                 opacity: isUploading ? 0.5 : 1,
                 animation: "fadeUp 0.3s ease 0.15s both",
               }}
             >
-              <input ref={fileInputRef} type="file" accept={ACCEPT_TYPES} multiple style={{ display: "none" }} onChange={handleFileChange} />
-              <FolderOpen size={28} color={C.dim} style={{ marginBottom: 8 }} />
-              <div style={{ fontSize: 14, fontWeight: 500, color: C.text, marginBottom: 4 }}>
-                사진을 드래그하거나 클릭해서 선택하세요
-              </div>
-              <div style={{ fontSize: 12, color: C.muted, marginBottom: 14 }}>
-                여러 장을 한번에 올릴 수 있어요
-              </div>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); if (!isUploading) fileInputRef.current?.click(); }}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  padding: "8px 18px", background: C.steel, color: "white",
-                  border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500,
-                  cursor: "pointer", fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
-                }}
-              >
-                <Upload size={13} /> 파일 선택
-              </button>
-              <div style={{ marginTop: 10, fontSize: 11, color: C.dim }}>
-                JPEG · PNG · WebP · 최대 20MB/장
+              <input
+                ref={fileInputRef} type="file" accept={ACCEPT_TYPES} multiple
+                style={{ display: "none" }} onChange={handleFileChange}
+              />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                <FolderOpen size={22} color={C.dim} />
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: C.text, lineHeight: 1.4 }}>
+                    사진을 드래그하거나 클릭해서 선택
+                  </div>
+                  <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
+                    JPEG · PNG · WebP · 최대 20MB/장
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); if (!isUploading) fileInputRef.current?.click(); }}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    padding: "7px 14px", background: C.steel, color: "white",
+                    border: "none", borderRadius: 7, fontSize: 12, fontWeight: 500,
+                    cursor: "pointer", flexShrink: 0,
+                    fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                  }}
+                >
+                  <Upload size={12} /> 파일 선택
+                </button>
               </div>
             </div>
           )}
 
-          {/* 선택된 파일 목록 (업로드 전) */}
-          {files.length > 0 && uploadPhase === "idle" && (
+          {/* 업로드 진행 표시 */}
+          {isUploading && files.length > 0 && (
             <div style={{
               background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10,
-              marginBottom: 14, overflow: "hidden",
+              padding: "14px 16px", marginBottom: 12,
+              animation: "fadeUp 0.25s ease both",
             }}>
-              <div style={{
-                padding: "10px 14px", borderBottom: `1px solid ${C.border}`,
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-              }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: C.text }}>
-                  선택된 파일 {files.length}장
-                </span>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => { setFiles([]); setError(null); }} style={{
-                    padding: "4px 10px", background: "transparent", border: `1px solid ${C.border}`,
-                    borderRadius: 6, color: C.muted, fontSize: 11, cursor: "pointer",
-                    fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
-                  }}>취소</button>
-                  <button onClick={startUpload} style={{
-                    padding: "4px 12px", background: C.steel, border: "none",
-                    borderRadius: 6, color: "white", fontSize: 11, fontWeight: 500,
-                    cursor: "pointer", fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
-                    display: "flex", alignItems: "center", gap: 5,
-                  }}>
-                    <Upload size={11} /> 업로드 시작
-                  </button>
-                </div>
-              </div>
-              <ul style={{ maxHeight: 200, overflowY: "auto", padding: "4px 0" }}>
-                {files.map((file, i) => (
-                  <li key={`${file.name}-${i}`} style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    padding: "6px 14px", borderBottom: i < files.length - 1 ? `1px solid ${C.border}` : "none",
-                  }}>
-                    {filePreviews[i] && (
-                      <img src={filePreviews[i]} alt="" style={{ width: 32, height: 24, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
-                    )}
-                    <span style={{ flex: 1, fontSize: 12, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {file.name}
-                    </span>
-                    <button
-                      onClick={() => setFiles((prev) => prev.filter((_, fi) => fi !== i))}
-                      style={{ background: "transparent", border: "none", color: C.dim, cursor: "pointer", padding: 2 }}
-                    >
-                      <X size={12} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* 업로드 중 목록 */}
-          {isUploading && files.length > 0 && (
-            <div>
-              <div style={{
-                fontSize: 11, fontWeight: 600, letterSpacing: 1,
-                textTransform: "uppercase", color: C.dim,
-                marginBottom: 10, marginTop: 4,
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-              }}>
-                <span>업로드 중</span>
-                <span style={{ fontSize: 11, color: C.steel, fontWeight: 400, letterSpacing: 0, textTransform: "none" }}>
-                  {uploadPhase === "processing" ? "처리 중..." : `전체 ${files.length}장`}
-                </span>
-              </div>
-              {files.map((file, i) => (
-                <div key={i} style={{
-                  background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10,
-                  padding: "12px 16px", marginBottom: 8,
-                  display: "flex", alignItems: "center", gap: 12,
-                }}>
-                  <div style={{
-                    width: 40, height: 30, borderRadius: 5, background: C.surface2,
-                    flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    {filePreviews[i]
-                      ? <img src={filePreviews[i]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      : <ImageIcon size={14} color={C.dim} />}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, fontWeight: 500, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                        {file.name}
-                      </span>
-                      <span style={{ fontSize: 10, color: C.dim, flexShrink: 0, marginLeft: 8 }}>
-                        {i + 1} / {files.length}
-                      </span>
-                    </div>
-                    <div style={{ height: 3, background: C.surface3, borderRadius: 2, overflow: "hidden" }}>
-                      <div style={{ height: "100%", background: C.steel, borderRadius: 2, width: uploadPhase === "processing" ? "100%" : `${uploadProgress}%`, transition: "width 0.3s" }} />
-                    </div>
-                  </div>
-                  <span style={{ fontSize: 11, color: C.muted, flexShrink: 0 }}>
-                    {uploadPhase === "processing" ? "처리 중" : `${uploadProgress}%`}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Loader2 size={13} color={C.steel} style={{ animation: "spin 1s linear infinite" }} />
+                  <span style={{ fontSize: 12, fontWeight: 500, color: C.text }}>
+                    {uploadPhase === "processing" ? "처리 중..." : `전체 ${files.length}장 업로드 중`}
                   </span>
                 </div>
-              ))}
+                <span style={{ fontSize: 11, color: C.muted }}>
+                  {uploadPhase === "processing" ? "거의 완료" : `${uploadProgress}%`}
+                </span>
+              </div>
+              <div style={{ height: 4, background: C.surface3, borderRadius: 2, overflow: "hidden" }}>
+                <div style={{
+                  height: "100%", background: C.steel, borderRadius: 2,
+                  width: uploadPhase === "processing" ? "100%" : `${uploadProgress}%`,
+                  transition: "width 0.3s",
+                }} />
+              </div>
             </div>
           )}
 
@@ -556,101 +598,136 @@ export default function UploadPage() {
           )}
         </div>
 
-        {/* ══ 우측 컬럼 ══ */}
-        <div style={{ padding: "22px 20px 100px", overflowY: "auto", background: "rgba(0,0,0,0.1)" }}>
+        {/* ══ 우측 컬럼 — flex column, overflow hidden ══ */}
+        <div style={{
+          display: "flex", flexDirection: "column",
+          background: "rgba(0,0,0,0.08)",
+          overflow: "hidden",
+        }}>
 
-          {/* 프로젝트 정보 카드 */}
-          <div style={{
-            background: C.surface, border: `1px solid ${C.border}`,
-            borderRadius: 12, padding: 16, marginBottom: 12,
-          }}>
-            {infoRows.map(({ key, val, color }) => (
-              <div key={key} style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "7px 0", borderBottom: `1px solid ${C.border}`,
-              }}>
-                <span style={{ fontSize: 11, color: C.dim }}>{key}</span>
-                <span style={{ fontSize: 12, fontWeight: 500, color: color || C.text }}>{val}</span>
-              </div>
-            ))}
-            {/* 마지막 row border 없애기 위한 override */}
-            <style>{`.pinfo-row:last-child{border-bottom:none!important;}`}</style>
-          </div>
-
-          {/* 업로드된 사진 섹션 */}
-          <div style={{
-            fontSize: 11, fontWeight: 600, letterSpacing: 1,
-            textTransform: "uppercase", color: C.dim,
-            marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between",
-          }}>
-            <span>
-              업로드된 사진{" "}
-              <span style={{ color: C.steel, fontWeight: 400, letterSpacing: 0, textTransform: "none", fontSize: 11 }}>
-                {photos.length}장
-              </span>
-            </span>
-            {!isReadOnly && photos.length > 0 && (
-              <button
-                onClick={() => setShowDeleteAllModal(true)}
-                style={{
-                  background: "transparent", border: "none", fontSize: 11,
-                  color: C.red, cursor: "pointer", fontWeight: 400,
-                  letterSpacing: 0, textTransform: "none",
-                  fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
-                }}
-              >
-                전체 삭제
-              </button>
-            )}
-          </div>
-
-          {photos.length === 0 ? (
+          {/* 프로젝트 정보 카드 — 고정 */}
+          <div style={{ padding: "20px 20px 0", flexShrink: 0 }}>
             <div style={{
-              textAlign: "center", padding: "32px 20px", color: C.dim,
-              background: C.surface, border: `1px dashed ${C.border}`, borderRadius: 10,
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 12, overflow: "hidden", marginBottom: 12,
             }}>
-              <ImageIcon size={28} color={C.dim} style={{ marginBottom: 8, opacity: 0.4 }} />
-              <div style={{ fontSize: 12 }}>아직 업로드된 사진이 없습니다</div>
-            </div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
-              {photos.map((p, index) => (
-                <div
-                  key={p.id}
-                  className="up-thumb"
-                  style={{
-                    aspectRatio: "3/2", background: C.surface2, borderRadius: 7,
-                    position: "relative", overflow: "hidden", cursor: "pointer",
-                    border: `1px solid ${C.border}`, transition: "border-color 0.15s",
-                  }}
-                  onClick={() => setLightboxIndex(index)}
-                >
-                  <img src={p.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                  {!isReadOnly && (
-                    <button
-                      className="up-thumb-del"
-                      onClick={(e) => { e.stopPropagation(); handleDeletePhoto(p.id); }}
-                      disabled={deletingId === p.id}
-                      style={{
-                        position: "absolute", top: 4, right: 4,
-                        width: 20, height: 20, borderRadius: "50%",
-                        background: "rgba(255,71,87,0.85)", border: "none",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 10, color: "white", opacity: 0, cursor: "pointer",
-                        transition: "opacity 0.15s",
-                      }}
-                    >
-                      {deletingId === p.id ? <Loader2 size={10} style={{ animation: "spin 1s linear infinite" }} /> : "✕"}
-                    </button>
-                  )}
-                  <span style={{
-                    position: "absolute", bottom: 3, left: 4,
-                    fontSize: 9, color: "rgba(255,255,255,0.6)",
-                  }}>
-                    {index + 1}
-                  </span>
+              {infoRows.map(({ key, val, color }, i) => (
+                <div key={key} style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "7px 14px",
+                  borderBottom: i < infoRows.length - 1 ? `1px solid ${C.border}` : "none",
+                }}>
+                  <span style={{ fontSize: 11, color: C.dim }}>{key}</span>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: color || C.text }}>{val}</span>
                 </div>
               ))}
+            </div>
+
+            {/* 사진 섹션 헤더 */}
+            <div style={{
+              fontSize: 11, fontWeight: 600, letterSpacing: 1,
+              textTransform: "uppercase", color: C.dim,
+              paddingBottom: 10,
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <span>
+                업로드된 사진{" "}
+                <span style={{ color: C.steel, fontWeight: 400, letterSpacing: 0, textTransform: "none" }}>
+                  {photos.length}장
+                  {visibleCount < photos.length && (
+                    <span style={{ color: C.dim }}> / {visibleCount}장 표시</span>
+                  )}
+                </span>
+              </span>
+              {!isReadOnly && photos.length > 0 && (
+                <button
+                  onClick={() => setShowDeleteAllModal(true)}
+                  style={{
+                    background: "transparent", border: "none", fontSize: 11,
+                    color: C.red, cursor: "pointer", fontWeight: 400,
+                    letterSpacing: 0, textTransform: "none",
+                    fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                  }}
+                >
+                  전체 삭제
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 가상 스크롤 썸네일 그리드 — flex 1 */}
+          {photos.length === 0 ? (
+            <div style={{
+              flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+              margin: "0 20px 20px",
+            }}>
+              <div style={{
+                textAlign: "center", padding: "32px 20px", color: C.dim,
+                background: C.surface, border: `1px dashed ${C.border}`,
+                borderRadius: 10, width: "100%",
+              }}>
+                <ImageIcon size={28} color={C.dim} style={{ marginBottom: 8, opacity: 0.4 }} />
+                <div style={{ fontSize: 12 }}>아직 업로드된 사진이 없습니다</div>
+              </div>
+            </div>
+          ) : (
+            <div
+              ref={thumbScrollRef}
+              className="thumb-scroll"
+              onScroll={handleThumbScroll}
+              style={{
+                flex: 1, minHeight: 0, overflowY: "auto",
+                padding: "0 20px",
+                paddingBottom: isReadOnly ? 20 : 80,
+              }}
+            >
+              {/* 가상화 컨테이너 */}
+              <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const startIdx = virtualRow.index * COLS;
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      data-index={virtualRow.index}
+                      ref={rowVirtualizer.measureElement}
+                      style={{
+                        position: "absolute",
+                        top: virtualRow.start,
+                        left: 0, right: 0,
+                        display: "grid",
+                        gridTemplateColumns: `repeat(${COLS}, 1fr)`,
+                        gap: THUMB_GAP,
+                        paddingBottom: THUMB_GAP,
+                      }}
+                    >
+                      {Array.from({ length: COLS }, (_, c) => {
+                        const photo = visiblePhotos[startIdx + c];
+                        if (!photo) return <div key={c} style={{ aspectRatio: "3/2" }} />;
+                        return (
+                          <LazyThumb
+                            key={photo.id}
+                            photo={photo}
+                            index={startIdx + c}
+                            isReadOnly={isReadOnly}
+                            deleting={deletingId === photo.id}
+                            onDelete={() => handleDeletePhoto(photo.id)}
+                            onClick={() => setLightboxIndex(startIdx + c)}
+                          />
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* 로드 더 인디케이터 */}
+              {visibleCount < photos.length && (
+                <div style={{
+                  textAlign: "center", padding: "12px 0",
+                  fontSize: 11, color: C.dim,
+                }}>
+                  스크롤해서 더 보기 ({photos.length - visibleCount}장 남음)
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -667,7 +744,6 @@ export default function UploadPage() {
           zIndex: 100,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            {/* 진행 현황 */}
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               <span style={{ fontSize: 12, color: C.muted }}>
                 {M} / {photoCountExpected ?? N}장 업로드
@@ -676,7 +752,6 @@ export default function UploadPage() {
                 <div style={{ height: "100%", background: C.steel, borderRadius: 2, width: `${progressPct}%`, transition: "width 0.3s" }} />
               </div>
             </div>
-            {/* 조건 메시지 */}
             {isReady ? (
               <div style={{ fontSize: 11, color: C.green, display: "flex", alignItems: "center", gap: 4 }}>
                 <CheckCircle2 size={12} /> 고객 초대 가능
@@ -695,7 +770,8 @@ export default function UploadPage() {
               display: "flex", alignItems: "center", gap: 6,
               padding: "9px 20px",
               background: isReady ? C.steel : C.surface3,
-              border: "none", borderRadius: 8, color: isReady ? "white" : C.dim,
+              border: "none", borderRadius: 8,
+              color: isReady ? "white" : C.dim,
               fontSize: 13, fontWeight: 600,
               cursor: isReady ? "pointer" : "not-allowed",
               fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
@@ -711,19 +787,26 @@ export default function UploadPage() {
       {lightboxIndex !== null && photos[lightboxIndex] && (
         <div
           onClick={() => setLightboxIndex(null)}
-          style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.9)", padding: 16, cursor: "default" }}
+          style={{
+            position: "fixed", inset: 0, zIndex: 200,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(0,0,0,0.92)", padding: 16, cursor: "default",
+          }}
           role="dialog" aria-modal aria-label="이미지 미리보기"
         >
-          <button onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => ((i ?? 0) - 1 + photos.length) % photos.length); }}
-            style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", padding: 12, color: "white", cursor: "pointer", zIndex: 20, fontSize: 18 }}>
-            ←
-          </button>
-          <img src={photos[lightboxIndex].url} alt="미리보기" onClick={(e) => e.stopPropagation()}
-            style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain", position: "relative", zIndex: 10 }} />
-          <button onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => ((i ?? 0) + 1) % photos.length); }}
-            style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", padding: 12, color: "white", cursor: "pointer", zIndex: 20, fontSize: 18 }}>
-            →
-          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => ((i ?? 0) - 1 + photos.length) % photos.length); }}
+            style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", padding: 12, color: "white", cursor: "pointer", zIndex: 20, fontSize: 18 }}
+          >←</button>
+          <img
+            src={photos[lightboxIndex].url} alt="미리보기"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain", position: "relative", zIndex: 10 }}
+          />
+          <button
+            onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => ((i ?? 0) + 1) % photos.length); }}
+            style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", padding: 12, color: "white", cursor: "pointer", zIndex: 20, fontSize: 18 }}
+          >→</button>
           <div style={{ position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "rgba(0,0,0,0.6)", padding: "6px 16px", borderRadius: 20, fontSize: 13, color: "white", zIndex: 20 }}>
             {lightboxIndex + 1} / {photos.length}
           </div>
@@ -752,7 +835,6 @@ export default function UploadPage() {
         />
       )}
 
-      {/* ── Toast ── */}
       {toast && <Toast message={toast} />}
     </div>
   );
