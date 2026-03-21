@@ -171,6 +171,9 @@ export async function createProject(params: {
   deadline: string;
   required_count: number;
   photographer_id: string;
+  shoot_type?: string | null;
+  customer_phone?: string | null;
+  photo_count_expected?: number | null;
 }): Promise<string> {
   const accessToken = crypto.randomUUID();
   const { data, error } = await supabase
@@ -185,6 +188,9 @@ export async function createProject(params: {
       status: "preparing",
       photographer_id: params.photographer_id,
       access_token: accessToken,
+      ...(params.shoot_type           ? { shoot_type: params.shoot_type } : {}),
+      ...(params.customer_phone       ? { customer_phone: params.customer_phone } : {}),
+      ...(params.photo_count_expected ? { photo_count_expected: params.photo_count_expected } : {}),
     })
     .select("id")
     .single();
