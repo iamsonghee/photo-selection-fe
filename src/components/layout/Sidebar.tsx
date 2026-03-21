@@ -21,11 +21,11 @@ const C = {
 };
 
 const navItems = [
-  { href: "/photographer/dashboard", label: "대시보드", icon: LayoutDashboard },
-  { href: "/photographer/projects",  label: "프로젝트",  icon: FolderOpen   },
-  { href: "#",                        label: "고객관리",  icon: Users        },
-  { href: "#",                        label: "통계",      icon: BarChart3    },
-  { href: "/photographer/settings",  label: "설정",      icon: Settings     },
+  { href: "/photographer/dashboard", label: "대시보드", icon: LayoutDashboard, comingSoon: false },
+  { href: "/photographer/projects",  label: "프로젝트",  icon: FolderOpen,    comingSoon: false },
+  { href: "#",                        label: "고객관리",  icon: Users,         comingSoon: true  },
+  { href: "#",                        label: "통계",      icon: BarChart3,     comingSoon: true  },
+  { href: "/photographer/settings",  label: "설정",      icon: Settings,      comingSoon: false },
 ];
 
 function getInitial(name?: string | null, email?: string | null): string {
@@ -90,8 +90,9 @@ export function Sidebar() {
 
       {/* ── 네비게이션 ── */}
       <nav style={{ padding: 10, flex: 1 }}>
-        {navItems.map(({ href, label, icon: Icon }) => {
+        {navItems.map(({ href, label, icon: Icon, comingSoon }) => {
           const isActive =
+            !comingSoon &&
             href !== "#" && (
               pathname === href ||
               (href === "/photographer/projects"
@@ -99,32 +100,24 @@ export function Sidebar() {
                 : pathname.startsWith(href))
             );
 
-          return (
-            <Link
-              key={label}
-              href={href}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 9,
-                padding: "9px 12px",
-                borderRadius: 8,
-                fontSize: 13,
-                color: isActive ? C.text : C.muted,
-                backgroundColor: isActive ? "rgba(102,155,188,0.12)" : "transparent",
-                marginBottom: 2,
-                textDecoration: "none",
-                position: "relative",
-                transition: "color 0.15s, background-color 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "rgba(102,155,188,0.06)";
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "transparent";
-              }}
-            >
-              {/* 활성 상태 좌측 보더 */}
+          const itemStyle: React.CSSProperties = {
+            display: "flex",
+            alignItems: "center",
+            gap: 9,
+            padding: "9px 12px",
+            borderRadius: 8,
+            fontSize: 13,
+            color: comingSoon ? C.dim : isActive ? C.text : C.muted,
+            backgroundColor: isActive ? "rgba(102,155,188,0.12)" : "transparent",
+            marginBottom: 2,
+            textDecoration: "none",
+            position: "relative",
+            transition: "color 0.15s, background-color 0.15s",
+            cursor: comingSoon ? "default" : "pointer",
+          };
+
+          const inner = (
+            <>
               {isActive && (
                 <div style={{
                   position: "absolute",
@@ -135,7 +128,44 @@ export function Sidebar() {
                 }} />
               )}
               <Icon size={16} style={{ flexShrink: 0 }} />
-              {label}
+              <span style={{ flex: 1 }}>{label}</span>
+              {comingSoon && (
+                <span style={{
+                  fontSize: 9, fontWeight: 500,
+                  padding: "2px 6px", borderRadius: 10,
+                  background: "rgba(58,90,110,0.4)",
+                  border: "1px solid rgba(58,90,110,0.6)",
+                  color: C.dim,
+                  letterSpacing: "0.02em",
+                  flexShrink: 0,
+                }}>
+                  준비중
+                </span>
+              )}
+            </>
+          );
+
+          if (comingSoon) {
+            return (
+              <div key={label} style={itemStyle}>
+                {inner}
+              </div>
+            );
+          }
+
+          return (
+            <Link
+              key={label}
+              href={href}
+              style={itemStyle}
+              onMouseEnter={(e) => {
+                if (!isActive) (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "rgba(102,155,188,0.06)";
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "transparent";
+              }}
+            >
+              {inner}
             </Link>
           );
         })}
