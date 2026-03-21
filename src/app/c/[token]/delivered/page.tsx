@@ -12,6 +12,7 @@ export default function DeliveredPage() {
   const token = (params?.token as string) ?? "";
   const ctx = useSelectionOptional();
   const project = ctx?.project ?? null;
+  const loading = ctx?.loading ?? true;
   const [mounted, setMounted] = useState(false);
   const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
 
@@ -33,7 +34,7 @@ export default function DeliveredPage() {
     }
   }, [project?.status, token, router]);
 
-  if (!mounted) {
+  if (!mounted || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
         <p className="text-zinc-400">불러오는 중...</p>
