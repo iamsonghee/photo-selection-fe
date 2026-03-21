@@ -27,53 +27,71 @@ const SELECT_COLS = "id, auth_id, email, name, profile_image_url, bio, instagram
 
 /** GET: 현재 로그인 작가 프로필. admin 클라이언트 우선, 없으면 server anon 클라이언트로 폴백. */
 export async function GET() {
+  const tag = `[GET /api/photographer/profile ${Date.now()}]`;
   try {
+    // STEP 1: 세션 확인
     const auth = await getPhotographerAuth();
+    console.log(tag, "STEP1 auth:", auth ? `authId=${auth.authId}` : "null (no session)");
     if (!auth) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const { authId, email } = auth;
 
-    // admin 클라이언트 시도 (SUPABASE_SERVICE_ROLE_KEY 필요)
-    // 없으면 server anon 클라이언트로 폴백 (photographers 테이블 RLS SELECT 정책 필요)
+    // STEP 2: admin 클라이언트
     let queryClient: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof getAdminClient>;
     let hasAdmin = false;
     try {
       queryClient = getAdminClient();
       hasAdmin = true;
-    } catch {
+      console.log(tag, "STEP2 admin client OK");
+    } catch (adminErr) {
+      console.log(tag, "STEP2 admin client FAILED, fallback to anon:", adminErr instanceof Error ? adminErr.message : adminErr);
       queryClient = await createClient();
     }
 
-    let { data, error } = await queryClient
+    // STEP 3: 기존 행 조회
+    const { data, error: selectError } = await queryClient
       .from("photographers")
       .select(SELECT_COLS)
       .eq("auth_id", authId)
       .limit(1)
       .single();
+    console.log(tag, "STEP3 select result:", { data: data ? "row found" : null, errorCode: selectError?.code, errorMsg: selectError?.message });
 
-    // 행 없으면 admin으로 자동 생성 (admin 사용 가능할 때만)
-    // upsert + ignoreDuplicates: 동시 요청 시 unique constraint 에러 방지
-    if (error?.code === "PGRST116" && hasAdmin) {
+    let finalData = data;
+    let finalError = selectError;
+
+    // STEP 4: 행 없으면 upsert
+    if (selectError?.code === "PGRST116" && hasAdmin) {
+      console.log(tag, "STEP4 no row found, upserting...");
       const admin = queryClient as ReturnType<typeof getAdminClient>;
-      await admin
+      const { error: upsertError } = await admin
         .from("photographers")
         .upsert({ auth_id: authId, email: email ?? null }, { onConflict: "auth_id", ignoreDuplicates: true });
-      const refetched = await admin
+      console.log(tag, "STEP4 upsert result:", { upsertError: upsertError ? { code: upsertError.code, msg: upsertError.message } : null });
+
+      const { data: refetchData, error: refetchError } = await admin
         .from("photographers")
         .select(SELECT_COLS)
         .eq("auth_id", authId)
         .limit(1)
         .single();
-      data = refetched.data;
-      error = refetched.error;
+      console.log(tag, "STEP4 refetch result:", { data: refetchData ? "row found" : null, errorCode: refetchError?.code, errorMsg: refetchError?.message });
+      finalData = refetchData;
+      finalError = refetchError;
+    } else if (selectError?.code === "PGRST116" && !hasAdmin) {
+      console.log(tag, "STEP4 no row but no admin client — cannot auto-create");
     }
 
-    if (error || !data) {
-      return NextResponse.json({ error: error?.message ?? "Not found" }, { status: 500 });
+    if (finalError || !finalData) {
+      console.error(tag, "FINAL ERROR:", { errorCode: finalError?.code, errorMsg: finalError?.message, hasData: !!finalData });
+      return NextResponse.json(
+        { error: finalError?.message ?? "Not found", code: finalError?.code },
+        { status: 500 }
+      );
     }
 
-    const row = data as Record<string, unknown>;
+    const row = finalData as Record<string, unknown>;
     const profile: PhotographerProfile = {
       id: row.id as string,
       authId: row.auth_id as string,
@@ -86,9 +104,10 @@ export async function GET() {
       createdAt: row.created_at as string,
     };
 
+    console.log(tag, "SUCCESS profile id:", profile.id);
     return NextResponse.json(profile);
   } catch (e) {
-    console.error("[GET photographer/profile]", e);
+    console.error(tag, "EXCEPTION:", e);
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Failed" },
       { status: 500 }
