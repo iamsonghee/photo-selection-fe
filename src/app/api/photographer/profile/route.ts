@@ -53,15 +53,20 @@ export async function GET() {
       .single();
 
     // 행 없으면 admin으로 자동 생성 (admin 사용 가능할 때만)
+    // upsert + ignoreDuplicates: 동시 요청 시 unique constraint 에러 방지
     if (error?.code === "PGRST116" && hasAdmin) {
       const admin = queryClient as ReturnType<typeof getAdminClient>;
-      const inserted = await admin
+      await admin
         .from("photographers")
-        .insert({ auth_id: authId, email: email ?? null })
+        .upsert({ auth_id: authId, email: email ?? null }, { onConflict: "auth_id", ignoreDuplicates: true });
+      const refetched = await admin
+        .from("photographers")
         .select(SELECT_COLS)
+        .eq("auth_id", authId)
+        .limit(1)
         .single();
-      data = inserted.data;
-      error = inserted.error;
+      data = refetched.data;
+      error = refetched.error;
     }
 
     if (error || !data) {
