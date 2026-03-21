@@ -3,8 +3,18 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Bell, FolderOpen, CheckCircle2, RefreshCw, Eye, ArrowRight } from "lucide-react";
-import { getProjectsByPhotographerId, getProjectLogsRecent } from "@/lib/db";
+import {
+  Plus,
+  Bell,
+  FolderOpen,
+  CheckCircle2,
+  RefreshCw,
+  Eye,
+  Image as ImageIcon,
+  Check,
+  ChevronRight,
+} from "lucide-react";
+import { getProjectsByPhotographerId } from "@/lib/db";
 import type { Project, ProjectStatus } from "@/types";
 import type { ProjectLogItem } from "@/lib/db";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -45,11 +55,11 @@ const STATUS_BADGE: Record<ProjectStatus, { label: string; key: BadgeKey }> = {
 };
 
 const BADGE_STYLE: Record<BadgeKey, React.CSSProperties> = {
-  preparing: { background: C.surface3, color: C.muted,   border: `1px solid ${C.border}` },
-  selecting: { background: "rgba(102,155,188,0.15)", color: C.steel,  border: "1px solid rgba(102,155,188,0.3)" },
-  editing:   { background: "rgba(245,166,35,0.12)",  color: C.orange, border: "1px solid rgba(245,166,35,0.3)"  },
-  revision:  { background: "rgba(255,71,87,0.12)",   color: C.red,    border: "1px solid rgba(255,71,87,0.3)"   },
-  delivered: { background: C.greenDim,               color: C.green,  border: "1px solid rgba(46,213,115,0.3)"  },
+  preparing: { background: C.surface3,                    color: C.muted,   border: `1px solid ${C.border}` },
+  selecting: { background: "rgba(102,155,188,0.15)",      color: C.steel,   border: "1px solid rgba(102,155,188,0.3)" },
+  editing:   { background: "rgba(245,166,35,0.12)",       color: C.orange,  border: "1px solid rgba(245,166,35,0.3)"  },
+  revision:  { background: "rgba(255,71,87,0.12)",        color: C.red,     border: "1px solid rgba(255,71,87,0.3)"   },
+  delivered: { background: C.greenDim,                    color: C.green,   border: "1px solid rgba(46,213,115,0.3)"  },
 };
 
 const STATUS_LEFT: Record<ProjectStatus, string> = {
@@ -67,32 +77,15 @@ const ACTIVE_STATUSES: ProjectStatus[] = [
   "selecting", "confirmed", "editing", "reviewing_v1", "editing_v2", "reviewing_v2",
 ];
 
-// ── mini steps ─────────────────────────────────────────────
-type StepState = "done" | "current" | "pending" | "all-done";
-const STEP_LABELS = ["업로드", "셀렉", "보정·검토", "완료"];
-
-function getMiniSteps(status: ProjectStatus): StepState[] {
-  switch (status) {
-    case "preparing":    return ["current",  "pending",  "pending",  "pending"];
-    case "selecting":    return ["done",     "current",  "pending",  "pending"];
-    case "confirmed":
-    case "editing":
-    case "reviewing_v1":
-    case "editing_v2":
-    case "reviewing_v2": return ["done",     "done",     "current",  "pending"];
-    case "delivered":    return ["all-done", "all-done", "all-done", "all-done"];
-  }
-}
-
 // ── helpers ────────────────────────────────────────────────
 function dday(deadline: string): { text: string; warn: boolean } {
   const diff = Math.ceil(
     (new Date(deadline).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86_400_000
   );
-  if (diff > 3)  return { text: `D-${diff}`,           warn: false };
-  if (diff > 0)  return { text: `D-${diff} · 임박`,    warn: true  };
-  if (diff === 0) return { text: "D-day",               warn: true  };
-  return           { text: `D+${Math.abs(diff)}`,      warn: true  };
+  if (diff > 3)   return { text: `D-${diff}`,        warn: false };
+  if (diff > 0)   return { text: `D-${diff} · 임박`, warn: true  };
+  if (diff === 0) return { text: "D-day",             warn: true  };
+  return            { text: `D+${Math.abs(diff)}`,   warn: true  };
 }
 
 function timeAgo(iso: string): string {
@@ -124,51 +117,35 @@ const LOG_LABEL: Record<string, string> = {
   revision:  "재보정 요청",
 };
 
-// ── MiniSteps ──────────────────────────────────────────────
-function MiniSteps({ status }: { status: ProjectStatus }) {
-  const steps = getMiniSteps(status);
+// ── ProjectProgressBar ─────────────────────────────────────
+function ProjectProgressBar({ value, max }: { value: number; max: number }) {
+  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+  const barColor = pct >= 100 ? C.green : C.steel;
   return (
-    <div style={{ display: "flex", gap: 0, marginBottom: 8, width: "100%" }}>
-      {steps.map((state, i) => {
-        const dotColor =
-          state === "all-done" ? C.green :
-          state === "current"  ? C.steel :
-          state === "done"     ? C.muted : C.dim;
-        const fillColor =
-          state === "all-done" ? C.green :
-          state === "done"     ? C.muted :
-          state === "current"  ? C.steel : "transparent";
-        return (
-          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-            <span style={{
-              fontSize: 9,
-              color:
-                state === "current"  ? C.text :
-                state === "done" || state === "all-done" ? C.muted : C.dim,
-              fontWeight: state === "current" ? 500 : 400,
-              whiteSpace: "nowrap",
-            }}>
-              {STEP_LABELS[i]}
-            </span>
-            <div style={{
-              width: state === "current" ? 7 : 5,
-              height: state === "current" ? 7 : 5,
-              borderRadius: "50%",
-              backgroundColor: dotColor,
-              boxShadow: state === "current" ? `0 0 0 2px rgba(102,155,188,0.2)` : "none",
-              flexShrink: 0,
-            }} />
-            <div style={{ width: "100%", height: 2, borderRadius: 1, backgroundColor: C.surface3, overflow: "hidden" }}>
-              <div style={{ height: "100%", borderRadius: 1, backgroundColor: fillColor, width: state === "pending" ? "0%" : "100%" }} />
-            </div>
-          </div>
-        );
-      })}
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+      <div style={{
+        flex: 1,
+        height: 3,
+        borderRadius: 2,
+        backgroundColor: C.surface3,
+        overflow: "hidden",
+      }}>
+        <div style={{
+          width: `${pct}%`,
+          height: "100%",
+          borderRadius: 2,
+          backgroundColor: barColor,
+          transition: "width 0.4s ease",
+        }} />
+      </div>
+      <span style={{ fontSize: 10, color: C.muted, whiteSpace: "nowrap", flexShrink: 0 }}>
+        {value} / {max}
+      </span>
     </div>
   );
 }
 
-// ── Badge ──────────────────────────────────────────────────
+// ── StatusBadge ────────────────────────────────────────────
 function StatusBadge({ status }: { status: ProjectStatus }) {
   const { label, key } = STATUS_BADGE[status];
   return (
@@ -193,7 +170,7 @@ function ProjectCard({ project }: { project: Project }) {
   const { text: ddayText, warn } = dday(project.deadline);
   const ddayStyle: React.CSSProperties = warn
     ? { color: C.orange, background: C.orangeDim }
-    : { color: C.muted,  background: C.surface3 };
+    : { color: C.muted,  background: C.surface3  };
 
   return (
     <div
@@ -210,10 +187,10 @@ function ProjectCard({ project }: { project: Project }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         background: hovered ? C.surface2 : C.surface,
-        borderTop: `1px solid ${hovered ? C.borderMd : C.border}`,
-        borderRight: `1px solid ${hovered ? C.borderMd : C.border}`,
+        borderTop:    `1px solid ${hovered ? C.borderMd : C.border}`,
+        borderRight:  `1px solid ${hovered ? C.borderMd : C.border}`,
         borderBottom: `1px solid ${hovered ? C.borderMd : C.border}`,
-        borderLeft: `3px solid ${accentColor}`,
+        borderLeft:   `3px solid ${accentColor}`,
         borderRadius: 10,
         padding: "14px 16px",
         marginBottom: 6,
@@ -227,26 +204,27 @@ function ProjectCard({ project }: { project: Project }) {
       }}
     >
       <div>
-        {/* card-top */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        {/* 카드 상단: 프로젝트명 + 고객명 + 배지 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{project.name}</span>
           <span style={{ fontSize: 12, color: C.muted }}>{project.customerName || "—"}</span>
           <StatusBadge status={project.status} />
         </div>
 
-        {/* mini-steps */}
-        <MiniSteps status={project.status} />
+        {/* 진행 바 */}
+        <ProjectProgressBar value={project.photoCount} max={project.requiredCount} />
 
-        {/* card-bottom */}
+        {/* 하단 메타 */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
-            <span style={{ fontSize: 10, color: C.muted }}>🖼 {project.photoCount}장</span>
-            {project.status === "selecting" && (
-              <span style={{ fontSize: 10, color: C.muted }}>✓ 셀렉 중</span>
-            )}
-            {project.status === "delivered" && project.requiredCount > 0 && (
-              <span style={{ fontSize: 10, color: C.muted }}>✓ {project.requiredCount}장 납품</span>
-            )}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
+              <ImageIcon size={10} />
+              {project.photoCount}장
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
+              <Check size={10} />
+              {project.requiredCount}장
+            </span>
           </div>
           <span style={{
             ...ddayStyle,
@@ -254,21 +232,21 @@ function ProjectCard({ project }: { project: Project }) {
             fontWeight: 500,
             padding: "2px 7px",
             borderRadius: 5,
+            flexShrink: 0,
           }}>
             {ddayText}
           </span>
         </div>
       </div>
 
-      {/* arrow */}
-      <span style={{ fontSize: 12, color: hovered ? C.steel : C.dim, transition: "all 0.15s" }}>→</span>
+      {/* 화살표 */}
+      <span style={{ fontSize: 12, color: hovered ? C.steel : C.dim, transition: "color 0.15s" }}>→</span>
     </div>
   );
 }
 
 // ── ActionCard ─────────────────────────────────────────────
 function ActionCard({
-  type,
   count,
   label,
   sub,
@@ -277,7 +255,6 @@ function ActionCard({
   numColor,
   bgTint,
 }: {
-  type: string;
   count: number;
   label: string;
   sub: string;
@@ -294,20 +271,20 @@ function ActionCard({
         onMouseLeave={() => setHovered(false)}
         style={{
           background: hovered ? C.surface2 : bgTint,
-          border: `1px solid ${hovered ? C.borderMd : C.border}`,
-          borderTop: `2px solid ${topColor}`,
+          borderTop:    `2px solid ${topColor}`,
+          borderRight:  `1px solid ${hovered ? C.borderMd : C.border}`,
+          borderBottom: `1px solid ${hovered ? C.borderMd : C.border}`,
+          borderLeft:   `1px solid ${hovered ? C.borderMd : C.border}`,
           borderRadius: 10,
           padding: "14px",
           cursor: "pointer",
           transition: "all 0.18s",
           transform: hovered ? "translateY(-2px)" : "none",
-          position: "relative",
-          overflow: "hidden",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <span style={{ fontSize: 11, color: C.muted }}>{label}</span>
-          <span style={{ fontSize: 16 }}>{icon}</span>
+          <span>{icon}</span>
         </div>
         <div style={{
           fontFamily: "'Playfair Display', serif",
@@ -324,10 +301,30 @@ function ActionCard({
   );
 }
 
+// ── SectionHeader ──────────────────────────────────────────
+function SectionHeader({ title, count }: { title: string; count: number }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+      <span style={{
+        fontSize: 11, fontWeight: 600, letterSpacing: 1,
+        textTransform: "uppercase", color: C.dim,
+      }}>
+        {title}
+      </span>
+      <span style={{
+        background: C.surface2, border: `1px solid ${C.border}`,
+        borderRadius: 10, padding: "1px 7px", fontSize: 10, color: C.muted,
+      }}>
+        {count}
+      </span>
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────
 export default function DashboardPage() {
   const router = useRouter();
-  const { profile } = useProfile();
+  const { profile, loading: profileLoading } = useProfile();
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const [logs, setLogs] = useState<ProjectLogItem[]>([]);
@@ -338,14 +335,14 @@ export default function DashboardPage() {
     "사용자";
 
   useEffect(() => {
-    if (!profile) return;
-    const pid = profile.id;
+    if (profileLoading) return;
+    const pid = profile?.id;
     if (!pid) { setLoading(false); return; }
 
     async function load() {
       try {
         const [list, logRes] = await Promise.all([
-          getProjectsByPhotographerId(pid),
+          getProjectsByPhotographerId(pid as string),
           fetch("/api/photographer/project-logs").then((r) => r.ok ? r.json() : []),
         ]);
         setProjects(list);
@@ -357,10 +354,9 @@ export default function DashboardPage() {
       }
     }
     load();
-  }, [profile]);
+  }, [profile, profileLoading]);
 
-  // wait for profile to load first
-  if (!profile || loading) {
+  if (profileLoading || loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 0" }}>
         <p style={{ color: C.muted, fontSize: 13 }}>불러오는 중…</p>
@@ -368,11 +364,14 @@ export default function DashboardPage() {
     );
   }
 
-  if (!profile.id) {
+  if (!profile?.id) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "80px 0" }}>
         <p style={{ color: C.muted, fontSize: 13 }}>로그인하면 프로젝트를 볼 수 있습니다</p>
-        <Link href="/auth" style={{ backgroundColor: C.steel, color: "#fff", padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+        <Link href="/auth" style={{
+          backgroundColor: C.steel, color: "#fff",
+          padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none",
+        }}>
           로그인
         </Link>
       </div>
@@ -387,10 +386,12 @@ export default function DashboardPage() {
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   const recentDelivered = deliveredProjects.slice(0, 1);
 
-  const confirmedCount  = projects.filter((p) => p.status === "confirmed").length;
-  const revisionCount   = projects.filter((p) => p.status === "editing_v2").length;
-  const reviewingCount  = projects.filter((p) => p.status === "reviewing_v1" || p.status === "reviewing_v2").length;
-  const hasAction       = confirmedCount + revisionCount + reviewingCount > 0;
+  const confirmedCount = projects.filter((p) => p.status === "confirmed").length;
+  const revisionCount  = projects.filter((p) => p.status === "editing_v2").length;
+  const reviewingCount = projects.filter((p) =>
+    p.status === "reviewing_v1" || p.status === "reviewing_v2"
+  ).length;
+  const hasAction = confirmedCount + revisionCount + reviewingCount > 0;
 
   const thisMonth = new Date().getMonth();
   const thisYear  = new Date().getFullYear();
@@ -432,7 +433,7 @@ export default function DashboardPage() {
               width: 32, height: 32, borderRadius: 8,
               border: `1px solid ${C.border}`, background: "transparent",
               display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", color: C.muted, position: "relative",
+              cursor: "pointer", color: C.muted,
             }}
           >
             <Bell size={14} />
@@ -454,36 +455,40 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Body ── */}
+      {/* ── Body: 2-column grid ── */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "1fr 260px",
         minHeight: "calc(100vh - 52px)",
       }}>
 
-        {/* ── Left ── */}
+        {/* ── Left column ── */}
         <div style={{
           padding: "22px 22px 22px 24px",
           overflowY: "auto",
           borderRight: `1px solid ${C.border}`,
         }}>
 
-          {/* 1. 액션 필요 */}
+          {/* 1. 액션 필요 섹션 */}
           {hasAction && (
             <div style={{ marginBottom: 24 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: C.dim }}>
-                  <div style={{
-                    width: 6, height: 6, borderRadius: "50%", backgroundColor: C.orange,
-                    animation: "pulse 2s infinite",
-                  }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                <div style={{
+                  width: 6, height: 6, borderRadius: "50%",
+                  backgroundColor: C.orange,
+                  animation: "pulse 2s infinite",
+                  flexShrink: 0,
+                }} />
+                <span style={{
+                  fontSize: 11, fontWeight: 600, letterSpacing: 1,
+                  textTransform: "uppercase", color: C.dim,
+                }}>
                   지금 확인이 필요해요
-                </div>
+                </span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                 {confirmedCount > 0 && (
                   <ActionCard
-                    type="confirmed"
                     count={confirmedCount}
                     label="고객 확정 완료"
                     sub="보정 시작 대기 중"
@@ -495,7 +500,6 @@ export default function DashboardPage() {
                 )}
                 {revisionCount > 0 && (
                   <ActionCard
-                    type="revision"
                     count={revisionCount}
                     label="재보정 요청"
                     sub="코멘트 확인 필요"
@@ -507,7 +511,6 @@ export default function DashboardPage() {
                 )}
                 {reviewingCount > 0 && (
                   <ActionCard
-                    type="reviewing"
                     count={reviewingCount}
                     label="고객 검토 중"
                     sub="보정본 검토 대기"
@@ -524,17 +527,7 @@ export default function DashboardPage() {
           {/* 2. 대기 중 */}
           {preparingProjects.length > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: C.dim }}>
-                  대기 중
-                  <span style={{
-                    background: C.surface2, border: `1px solid ${C.border}`,
-                    borderRadius: 10, padding: "1px 7px", fontSize: 10, color: C.muted, fontWeight: 400,
-                  }}>
-                    {preparingProjects.length}
-                  </span>
-                </div>
-              </div>
+              <SectionHeader title="대기 중" count={preparingProjects.length} />
               {preparingProjects.map((p) => <ProjectCard key={p.id} project={p} />)}
             </div>
           )}
@@ -542,17 +535,7 @@ export default function DashboardPage() {
           {/* 3. 진행 중 */}
           {activeProjects.length > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: C.dim }}>
-                  진행 중
-                  <span style={{
-                    background: C.surface2, border: `1px solid ${C.border}`,
-                    borderRadius: 10, padding: "1px 7px", fontSize: 10, color: C.muted, fontWeight: 400,
-                  }}>
-                    {activeProjects.length}
-                  </span>
-                </div>
-              </div>
+              <SectionHeader title="진행 중" count={activeProjects.length} />
               {activeProjects.map((p) => <ProjectCard key={p.id} project={p} />)}
             </div>
           )}
@@ -560,17 +543,7 @@ export default function DashboardPage() {
           {/* 4. 최근 완료 */}
           {recentDelivered.length > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: C.dim }}>
-                  최근 완료
-                  <span style={{
-                    background: C.surface2, border: `1px solid ${C.border}`,
-                    borderRadius: 10, padding: "1px 7px", fontSize: 10, color: C.muted, fontWeight: 400,
-                  }}>
-                    {deliveredProjects.length}
-                  </span>
-                </div>
-              </div>
+              <SectionHeader title="최근 완료" count={deliveredProjects.length} />
               {recentDelivered.map((p) => <ProjectCard key={p.id} project={p} />)}
               <Link
                 href="/photographer/projects"
@@ -617,22 +590,35 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* ── Right ── */}
+        {/* ── Right column ── */}
         <div style={{ padding: 20, overflowY: "auto", background: "rgba(0,0,0,0.12)" }}>
 
           {/* 통계 */}
           <div style={{
             display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8,
-            marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.border}`,
+            marginBottom: 16, paddingBottom: 16,
+            borderBottom: `1px solid ${C.border}`,
           }}>
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
-              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, lineHeight: 1, marginBottom: 3, color: C.steel }}>
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 8, padding: "10px 12px", textAlign: "center",
+            }}>
+              <div style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: 22, lineHeight: 1, marginBottom: 3, color: C.steel,
+              }}>
                 {projects.length}
               </div>
               <div style={{ fontSize: 10, color: C.dim }}>전체 프로젝트</div>
             </div>
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
-              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, lineHeight: 1, marginBottom: 3, color: C.orange }}>
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 8, padding: "10px 12px", textAlign: "center",
+            }}>
+              <div style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: 22, lineHeight: 1, marginBottom: 3, color: C.orange,
+              }}>
                 {thisMonthCount}
               </div>
               <div style={{ fontSize: 10, color: C.dim }}>이번 달 촬영</div>
@@ -641,11 +627,18 @@ export default function DashboardPage() {
 
           {/* 최근 활동 */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: C.dim }}>최근 활동</span>
+            <span style={{
+              fontSize: 11, fontWeight: 600, letterSpacing: 1,
+              textTransform: "uppercase", color: C.dim,
+            }}>
+              최근 활동
+            </span>
           </div>
 
           {logs.length === 0 ? (
-            <p style={{ fontSize: 12, color: C.dim, textAlign: "center", padding: "20px 0" }}>아직 활동이 없습니다</p>
+            <p style={{ fontSize: 12, color: C.dim, textAlign: "center", padding: "20px 0" }}>
+              아직 활동이 없습니다
+            </p>
           ) : (
             <div style={{ position: "relative" }}>
               {/* 타임라인 세로선 */}
@@ -658,15 +651,17 @@ export default function DashboardPage() {
                   const dotColor = LOG_DOT[log.action] ?? C.steel;
                   const label = LOG_LABEL[log.action] ?? log.action;
                   return (
-                    <div key={log.id} style={{ display: "flex", gap: 12, padding: "6px 0", cursor: "pointer" }}>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, paddingTop: 3, width: 20 }}>
+                    <div key={log.id} style={{ display: "flex", gap: 12, padding: "6px 0" }}>
+                      <div style={{
+                        display: "flex", flexDirection: "column",
+                        alignItems: "center", flexShrink: 0,
+                        paddingTop: 3, width: 20,
+                      }}>
                         <div style={{
                           width: 8, height: 8, borderRadius: "50%",
                           backgroundColor: dotColor,
                           border: `1.5px solid ${C.ink}`,
-                          flexShrink: 0,
-                          position: "relative",
-                          zIndex: 1,
+                          position: "relative", zIndex: 1, flexShrink: 0,
                         }} />
                       </div>
                       <div style={{ flex: 1, paddingBottom: 10 }}>
@@ -674,7 +669,9 @@ export default function DashboardPage() {
                           <strong style={{ color: C.text, fontWeight: 500 }}>{log.projectName}</strong>
                           {" · "}{label}
                         </div>
-                        <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{timeAgo(log.createdAt)}</div>
+                        <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>
+                          {timeAgo(log.createdAt)}
+                        </div>
                       </div>
                     </div>
                   );
@@ -689,10 +686,6 @@ export default function DashboardPage() {
         @keyframes pulse {
           0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(245,166,35,0.4); }
           50%       { opacity: 0.7; box-shadow: 0 0 0 4px rgba(245,166,35,0); }
-        }
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(5px); }
-          to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>
