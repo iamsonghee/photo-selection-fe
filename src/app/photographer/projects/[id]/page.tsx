@@ -187,11 +187,28 @@ export default function ProjectDetailPage() {
   const [deleteError, setDeleteError] = useState("");
   const [copied, setCopied] = useState(false);
 
+  // edit state
+  const [editMode, setEditMode] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editCustomerName, setEditCustomerName] = useState("");
+  const [editShootDate, setEditShootDate] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
+  const [editRequiredCount, setEditRequiredCount] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
   useEffect(() => {
     async function load() {
       try {
         const p = await getProjectById(id);
         setProject(p);
+        if (p) {
+          setEditName(p.name);
+          setEditCustomerName(p.customerName);
+          setEditShootDate(p.shootDate);
+          setEditDeadline(p.deadline);
+          setEditRequiredCount(p.requiredCount);
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -200,6 +217,39 @@ export default function ProjectDetailPage() {
     }
     load();
   }, [id]);
+
+  const handleSaveEdit = async () => {
+    if (!project) return;
+    setSaveError("");
+    const canEditN = ["preparing", "selecting"].includes(project.status);
+    const newN = canEditN ? editRequiredCount : project.requiredCount;
+    if (canEditN && newN < 1) {
+      setSaveError("셀렉 갯수는 1 이상이어야 합니다.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/photographer/projects/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editName,
+          customer_name: editCustomerName,
+          shoot_date: editShootDate,
+          deadline: editDeadline,
+          required_count: newN,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? "저장 실패");
+      setProject({ ...project, name: editName, customerName: editCustomerName, shootDate: editShootDate, deadline: editDeadline, requiredCount: newN });
+      setEditMode(false);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "저장 실패");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const inviteUrl =
     typeof window !== "undefined"
@@ -392,30 +442,112 @@ export default function ProjectDetailPage() {
                 <FolderOpen size={14} />
                 프로젝트 정보
               </div>
-              <EditBtn onClick={() => router.push(`/photographer/projects/${id}/edit/start`)} />
+              {!editMode && <EditBtn onClick={() => setEditMode(true)} />}
             </div>
-            <div style={{ padding: "10px 18px" }}>
-              {([
-                { key: "프로젝트명", val: project.name,                                                  valStyle: {} },
-                { key: "고객명",     val: project.customerName || "—",                                   valStyle: {} },
-                { key: "촬영일",     val: format(new Date(project.shootDate), "yyyy-MM-dd"),              valStyle: {} },
-                { key: "셀렉 기한",  val: `${format(new Date(project.deadline), "yyyy-MM-dd")} (${deadlineText})`, valStyle: { color: deadlineColor } },
-                { key: "셀렉 갯수",  val: `${N}장`,                                                      valStyle: { color: C.steel } },
-                { key: "업로드 수",  val: `${M}장`,                                                      valStyle: {} },
-              ] as { key: string; val: string; valStyle: React.CSSProperties }[]).map((row, i, arr) => (
-                <div
-                  key={row.key}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "9px 0",
-                    borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : "none",
-                  }}
-                >
-                  <span style={{ fontSize: 11, color: C.dim }}>{row.key}</span>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: C.text, ...row.valStyle }}>{row.val}</span>
+
+            {editMode ? (
+              <div style={{ padding: "16px 18px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                  {[
+                    { label: "프로젝트명", value: editName, onChange: setEditName, type: "text" },
+                    { label: "고객명",     value: editCustomerName, onChange: setEditCustomerName, type: "text" },
+                    { label: "촬영일",     value: editShootDate, onChange: setEditShootDate, type: "date" },
+                    { label: "셀렉 기한",  value: editDeadline, onChange: setEditDeadline, type: "date" },
+                  ].map((f) => (
+                    <label key={f.label} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <span style={{ fontSize: 11, color: C.dim }}>{f.label}</span>
+                      <input
+                        type={f.type}
+                        value={f.value}
+                        onChange={(e) => f.onChange(e.target.value)}
+                        style={{
+                          padding: "8px 10px", borderRadius: 8,
+                          background: C.surface2, border: `1px solid ${C.borderMd}`,
+                          color: C.text, fontSize: 13, fontFamily: "inherit",
+                          outline: "none", width: "100%",
+                        }}
+                      />
+                    </label>
+                  ))}
                 </div>
-              ))}
-            </div>
+                {/* 셀렉 갯수 — 보정 시작 전(preparing/selecting)만 편집 가능 */}
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 }}>
+                  <span style={{ fontSize: 11, color: C.dim }}>
+                    셀렉 갯수 (N)
+                    {!["preparing", "selecting"].includes(project.status) && (
+                      <span style={{ marginLeft: 6, color: C.orange, fontSize: 10 }}>보정 시작 후 변경 불가</span>
+                    )}
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={editRequiredCount}
+                    disabled={!["preparing", "selecting"].includes(project.status)}
+                    onChange={(e) => setEditRequiredCount(Number(e.target.value))}
+                    style={{
+                      padding: "8px 10px", borderRadius: 8,
+                      background: ["preparing", "selecting"].includes(project.status) ? C.surface2 : C.surface3,
+                      border: `1px solid ${C.borderMd}`,
+                      color: ["preparing", "selecting"].includes(project.status) ? C.text : C.dim,
+                      fontSize: 13, fontFamily: "inherit",
+                      outline: "none", width: "50%",
+                      cursor: ["preparing", "selecting"].includes(project.status) ? "text" : "not-allowed",
+                    }}
+                  />
+                </label>
+                {saveError && (
+                  <p style={{ fontSize: 12, color: C.red, marginBottom: 10 }}>{saveError}</p>
+                )}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={() => { setEditMode(false); setSaveError(""); }}
+                    style={{
+                      flex: 1, padding: "9px 0", background: "transparent",
+                      border: `1px solid ${C.border}`, borderRadius: 8,
+                      color: C.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                    }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={saving}
+                    style={{
+                      flex: 1, padding: "9px 0",
+                      background: "rgba(102,155,188,0.15)",
+                      border: `1px solid rgba(102,155,188,0.3)`, borderRadius: 8,
+                      color: C.steel, fontSize: 13, fontWeight: 500,
+                      cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit",
+                    }}
+                  >
+                    {saving ? "저장 중…" : "저장"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: "10px 18px" }}>
+                {([
+                  { key: "프로젝트명", val: project.name,                                                          valStyle: {} },
+                  { key: "고객명",     val: project.customerName || "—",                                           valStyle: {} },
+                  { key: "촬영일",     val: format(new Date(project.shootDate), "yyyy-MM-dd"),                    valStyle: {} },
+                  { key: "셀렉 기한",  val: `${format(new Date(project.deadline), "yyyy-MM-dd")} (${deadlineText})`, valStyle: { color: deadlineColor } },
+                  { key: "셀렉 갯수",  val: `${N}장`,                                                              valStyle: { color: C.steel } },
+                  { key: "업로드 수",  val: `${M}장`,                                                              valStyle: {} },
+                ] as { key: string; val: string; valStyle: React.CSSProperties }[]).map((row, i, arr) => (
+                  <div
+                    key={row.key}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "9px 0",
+                      borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : "none",
+                    }}
+                  >
+                    <span style={{ fontSize: 11, color: C.dim }}>{row.key}</span>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: C.text, ...row.valStyle }}>{row.val}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Invite card */}
