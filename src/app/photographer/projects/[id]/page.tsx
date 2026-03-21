@@ -1,65 +1,197 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
+import { useState, useEffect, ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { format } from "date-fns";
+import { differenceInDays, format } from "date-fns";
 import {
-  MessageCircle,
-  Mail,
-  QrCode,
-  Copy,
-  Upload,
-  Search,
+  ArrowLeft,
+  FolderOpen,
   Pencil,
+  Link2,
+  Copy,
+  MessageCircle,
+  Zap,
+  Upload,
+  ListChecks,
+  Eye,
+  PenLine,
+  ChevronRight,
+  AlertTriangle,
+  Trash2,
+  User,
+  Calendar,
+  Clock,
+  Check,
 } from "lucide-react";
-import { Button, Card, CardTitle, Badge, Input, ProgressBar } from "@/components/ui";
 import { getProjectById } from "@/lib/db";
 import { getStatusLabel } from "@/lib/project-status";
 import type { Project, ProjectStatus } from "@/types";
 
-function statusBadgeVariant(s: ProjectStatus): "waiting" | "in_progress" | "completed" {
-  if (s === "preparing") return "waiting";
-  if (["selecting", "confirmed", "editing", "reviewing_v1", "editing_v2", "reviewing_v2"].includes(s))
-    return "in_progress";
-  return "completed";
+// ---------- color tokens ----------
+const C = {
+  surface:   "#0f2030",
+  surface2:  "#152a3a",
+  surface3:  "#1a3347",
+  steel:     "#669bbc",
+  border:    "rgba(102,155,188,0.12)",
+  borderMd:  "rgba(102,155,188,0.22)",
+  text:      "#e8eef2",
+  muted:     "#7a9ab0",
+  dim:       "#3a5a6e",
+  green:     "#2ed573",
+  greenDim:  "#0f2a1e",
+  orange:    "#f5a623",
+  red:       "#ff4757",
+  redDim:    "#2a0f12",
+  kakao:     "#FEE500",
+};
+
+// ---------- workflow helpers ----------
+type WfState = "done" | "current" | "pending";
+
+function getWorkflowStates(status: ProjectStatus): WfState[] {
+  switch (status) {
+    case "preparing":    return ["current", "pending", "pending", "pending", "pending"];
+    case "selecting":    return ["done",    "current", "pending", "pending", "pending"];
+    case "confirmed":
+    case "editing":
+    case "editing_v2":   return ["done",    "done",    "current", "pending", "pending"];
+    case "reviewing_v1":
+    case "reviewing_v2": return ["done",    "done",    "done",    "current", "pending"];
+    case "delivered":    return ["done",    "done",    "done",    "done",    "done"];
+    default:             return ["pending", "pending", "pending", "pending", "pending"];
+  }
 }
 
+const WF_STEPS = [
+  {
+    name: "업로드",
+    desc: (s: WfState, m: number) =>
+      s === "done" ? `${m}장 완료` : s === "current" ? "진행 중" : "사진 업로드",
+  },
+  {
+    name: "셀렉",
+    desc: (s: WfState) =>
+      s === "done" ? "셀렉 완료" : s === "current" ? "고객 셀렉 진행 중" : "업로드 완료 후",
+  },
+  {
+    name: "보정",
+    desc: (s: WfState) =>
+      s === "done" ? "보정 완료" : s === "current" ? "보정 진행 중" : "셀렉 완료 후",
+  },
+  {
+    name: "검토",
+    desc: (s: WfState) =>
+      s === "done" ? "검토 완료" : s === "current" ? "고객 검토 중" : "보정본 전달 후",
+  },
+  {
+    name: "납품",
+    desc: (s: WfState) =>
+      s === "done" ? "납품 완료" : s === "current" ? "납품 완료" : "최종 확정 후",
+  },
+];
+
+function statusBadgeStyle(status: ProjectStatus) {
+  if (status === "preparing")
+    return { background: "rgba(245,166,35,0.15)", color: C.orange, border: "1px solid rgba(245,166,35,0.3)" };
+  if (status === "delivered")
+    return { background: "rgba(46,213,115,0.15)", color: C.green, border: "1px solid rgba(46,213,115,0.3)" };
+  return { background: "rgba(102,155,188,0.15)", color: C.steel, border: "1px solid rgba(102,155,188,0.3)" };
+}
+
+// ---------- sub-components ----------
+function WfDot({ state, num }: { state: WfState; num: number }) {
+  const base: React.CSSProperties = {
+    width: 22, height: 22, borderRadius: "50%",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: 10, flexShrink: 0, fontWeight: 600,
+  };
+  if (state === "done")
+    return (
+      <div style={{ ...base, background: C.greenDim, color: C.green, border: "1px solid rgba(46,213,115,0.3)" }}>
+        <Check size={11} />
+      </div>
+    );
+  if (state === "current")
+    return (
+      <div style={{ ...base, background: "rgba(102,155,188,0.15)", color: C.steel, border: "1px solid rgba(102,155,188,0.3)" }}>
+        ●
+      </div>
+    );
+  return (
+    <div style={{ ...base, background: C.surface3, color: C.dim, border: `1px solid ${C.border}` }}>
+      {num}
+    </div>
+  );
+}
+
+function QuickAction({
+  icon, label, desc, onClick, disabled, badge,
+}: {
+  icon: ReactNode;
+  label: string;
+  desc: string;
+  onClick: () => void;
+  disabled: boolean;
+  badge?: { text: string; color: "green" | "orange" };
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={disabled ? undefined : onClick}
+      onMouseEnter={() => { if (!disabled) setHovered(true); }}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        width: "100%", padding: "11px 14px",
+        background: hovered ? C.surface3 : C.surface2,
+        border: `1px solid ${hovered ? C.borderMd : C.border}`,
+        borderRadius: 9, display: "flex", alignItems: "center", gap: 10,
+        cursor: disabled ? "not-allowed" : "pointer",
+        fontFamily: "inherit", marginBottom: 7, textAlign: "left",
+        opacity: disabled ? 0.35 : 1,
+        transform: hovered ? "translateX(2px)" : "none",
+        transition: "all 0.15s",
+      }}
+    >
+      <div style={{ fontSize: 16, flexShrink: 0, color: C.muted }}>{icon}</div>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: 12, fontWeight: 500, color: C.text, marginBottom: 2 }}>{label}</div>
+        <div style={{ fontSize: 10, color: C.muted }}>{desc}</div>
+      </div>
+      {badge ? (
+        <span style={{
+          marginLeft: "auto", padding: "2px 7px", borderRadius: 10,
+          fontSize: 10, fontWeight: 500,
+          background: badge.color === "green" ? C.greenDim : "rgba(245,166,35,0.15)",
+          color: badge.color === "green" ? C.green : C.orange,
+        }}>
+          {badge.text}
+        </span>
+      ) : (
+        <ChevronRight size={12} style={{ marginLeft: "auto", color: C.dim, flexShrink: 0 }} />
+      )}
+    </button>
+  );
+}
+
+// ---------- main page ----------
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
-  const [editMode, setEditMode] = useState(false);
-  const [editName, setEditName] = useState("");
-  const [editCustomerName, setEditCustomerName] = useState("");
-  const [editShootDate, setEditShootDate] = useState("");
-  const [editDeadline, setEditDeadline] = useState("");
-  const [editRequiredCount, setEditRequiredCount] = useState(0);
-  const [saveError, setSaveError] = useState("");
-  const [saving, setSaving] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [showPhotoManage, setShowPhotoManage] = useState(false);
-  const [photoList, setPhotoList] = useState<{ id: string; r2_thumb_url: string; original_filename: string }[]>([]);
-  const [loadingPhotos, setLoadingPhotos] = useState(false);
-  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
-  const [deletingAll, setDeletingAll] = useState(false);
-  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     async function load() {
       try {
         const p = await getProjectById(id);
         setProject(p);
-        if (p) {
-          setEditName(p.name);
-          setEditCustomerName(p.customerName);
-          setEditShootDate(p.shootDate);
-          setEditDeadline(p.deadline);
-          setEditRequiredCount(p.requiredCount);
-        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -69,45 +201,6 @@ export default function ProjectDetailPage() {
     load();
   }, [id]);
 
-  const handleSaveEdit = async () => {
-    if (!project) return;
-    setSaveError("");
-    const newN = editRequiredCount;
-    if (newN !== project.requiredCount && project.photoCount < newN) {
-      setSaveError(`업로드 수(M=${project.photoCount}) 이상으로 N을 설정해주세요.`);
-      return;
-    }
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/photographer/projects/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: editName,
-          customer_name: editCustomerName,
-          shoot_date: editShootDate,
-          deadline: editDeadline,
-          required_count: editRequiredCount,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "저장 실패");
-      setProject({
-        ...project,
-        name: editName,
-        customerName: editCustomerName,
-        shootDate: editShootDate,
-        deadline: editDeadline,
-        requiredCount: editRequiredCount,
-      });
-      setEditMode(false);
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "저장 실패");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const inviteUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/c/${project?.accessToken ?? ""}`
@@ -115,554 +208,461 @@ export default function ProjectDetailPage() {
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(inviteUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  const loadPhotoList = async () => {
-    if (!id) return;
-    setLoadingPhotos(true);
+  const handleDelete = async () => {
+    setDeleteError("");
+    setDeleting(true);
     try {
-      const res = await fetch(`/api/photographer/projects/${id}/photos`);
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && Array.isArray(data.photos)) setPhotoList(data.photos);
-      else setPhotoList([]);
-    } catch {
-      setPhotoList([]);
-    } finally {
-      setLoadingPhotos(false);
-    }
-  };
-
-  const handleTogglePhotoManage = () => {
-    if (!showPhotoManage) loadPhotoList();
-    setShowPhotoManage((prev) => !prev);
-  };
-
-  const handleDeletePhoto = async (photoId: string) => {
-    setDeletingPhotoId(photoId);
-    try {
-      const res = await fetch(`/api/photographer/photos/${photoId}`, { method: "DELETE" });
+      const res = await fetch(`/api/photographer/projects/${id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error((data as { error?: string }).error ?? "삭제 실패");
+        throw new Error((data as { error?: string }).error ?? "삭제에 실패했습니다.");
       }
-      setPhotoList((prev) => prev.filter((p) => p.id !== photoId));
-      setProject((prev) => prev ? { ...prev, photoCount: Math.max(0, prev.photoCount - 1) } : null);
+      setShowDeleteModal(false);
+      router.push("/photographer/dashboard");
     } catch (e) {
-      console.error(e);
+      setDeleteError(e instanceof Error ? e.message : "삭제에 실패했습니다.");
     } finally {
-      setDeletingPhotoId(null);
+      setDeleting(false);
     }
   };
-
-  const handleDeleteAllPhotos = async () => {
-    if (!id || !project) return;
-    setDeletingAll(true);
-    try {
-      const res = await fetch(`/api/photographer/projects/${id}/photos`, { method: "DELETE" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as { error?: string }).error ?? "삭제 실패");
-      }
-      setPhotoList([]);
-      setProject((prev) => prev ? { ...prev, photoCount: 0 } : null);
-      setShowDeleteAllModal(false);
-      setShowPhotoManage(false);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setDeletingAll(false);
-    }
-  };
-
-  const N = project?.requiredCount ?? 0;
-  const M = project?.photoCount ?? 0;
-  const isConfirmedOrEditing =
-    ["confirmed", "editing", "reviewing_v1", "editing_v2", "reviewing_v2"].includes(
-      project?.status ?? ""
-    );
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-zinc-400">로딩 중...</p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "48px 0" }}>
+        <span style={{ color: C.muted }}>로딩 중...</span>
       </div>
     );
   }
 
   if (!project) {
     return (
-      <div className="space-y-8">
-        <p className="text-zinc-400">프로젝트를 찾을 수 없습니다.</p>
-        <Link href="/photographer/dashboard">
-          <Button variant="outline">대시보드로</Button>
-        </Link>
+      <div style={{ padding: 24 }}>
+        <span style={{ color: C.muted }}>프로젝트를 찾을 수 없습니다.</span>
       </div>
     );
   }
 
+  const N = project.requiredCount;
+  const M = project.photoCount;
+  const wfStates = getWorkflowStates(project.status);
+  const daysLeft = differenceInDays(new Date(project.deadline), new Date());
+  const isInviteActive = project.status !== "preparing";
+
+  const canViewSelections = project.status !== "preparing";
+  const canEditVersions = ["confirmed", "editing", "editing_v2", "reviewing_v1", "reviewing_v2", "delivered"].includes(project.status);
+  const canReview = ["reviewing_v1", "reviewing_v2", "delivered"].includes(project.status);
+
+  const editVersionsPath =
+    project.status === "editing_v2" || project.status === "reviewing_v2"
+      ? `/photographer/projects/${id}/upload-versions/v2`
+      : `/photographer/projects/${id}/upload-versions`;
+
+  const deadlineColor = daysLeft < 0 ? C.red : daysLeft <= 7 ? C.orange : C.muted;
+  const deadlineText =
+    daysLeft > 0 ? `D+${daysLeft}` : daysLeft === 0 ? "D-Day" : `+${Math.abs(daysLeft)}일 초과`;
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
-      {/* Header */}
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold text-white">{project.name}</h1>
-          <span className="text-zinc-400">{project.customerName || "(고객명 없음)"}</span>
-          <Badge variant={statusBadgeVariant(project.status)}>
+    <div style={{ display: "flex", flexDirection: "column" }}>
+
+      {/* ── Topbar ── */}
+      <div style={{
+        height: 52, borderBottom: `1px solid ${C.border}`,
+        display: "flex", alignItems: "center",
+        padding: "0 24px",
+        background: "rgba(13,30,40,0.85)", backdropFilter: "blur(12px)",
+        position: "sticky", top: 0, zIndex: 50,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            onClick={() => router.push("/photographer/projects")}
+            style={{
+              display: "flex", alignItems: "center", gap: 5,
+              padding: "5px 10px", borderRadius: 7,
+              border: `1px solid ${C.border}`, background: "transparent",
+              color: C.muted, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            <ArrowLeft size={13} />
+            프로젝트
+          </button>
+          <span style={{
+            padding: "3px 9px", borderRadius: 20, fontSize: 11, fontWeight: 500,
+            whiteSpace: "nowrap", ...statusBadgeStyle(project.status),
+          }}>
             {getStatusLabel(project.status)}
-          </Badge>
-        </div>
-        <div className="flex gap-2">
-          {isConfirmedOrEditing && (
-            <Link href={`/photographer/projects/${id}/results`}>
-              <Button variant="primary" className="flex items-center gap-2">
-                결과 검토
-              </Button>
-            </Link>
-          )}
-        </div>
-      </header>
-
-      <div className="flex flex-col gap-6 lg:flex-row">
-        {/* Left column */}
-        <div className="min-w-0 flex-1 space-y-6">
-          {/* 프로젝트 정보 카드 */}
-          <Card>
-            <div className="flex items-start justify-between gap-4">
-              <CardTitle className="mb-4">프로젝트 정보</CardTitle>
-              {!editMode && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex items-center gap-1"
-                  onClick={() => setEditMode(true)}
-                >
-                  <Pencil className="h-4 w-4" />
-                  수정
-                </Button>
-              )}
-            </div>
-            {editMode ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Input
-                    label="프로젝트명"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                  />
-                  <Input
-                    label="고객명"
-                    value={editCustomerName}
-                    onChange={(e) => setEditCustomerName(e.target.value)}
-                  />
-                  <Input
-                    label="촬영일"
-                    type="date"
-                    value={editShootDate}
-                    onChange={(e) => setEditShootDate(e.target.value)}
-                    onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
-                  />
-                  <Input
-                    label="셀렉 기한"
-                    type="date"
-                    value={editDeadline}
-                    onChange={(e) => setEditDeadline(e.target.value)}
-                    onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
-                  />
-                  <Input
-                    label="셀렉 갯수 (N)"
-                    type="number"
-                    min={1}
-                    value={editRequiredCount}
-                    onChange={(e) => setEditRequiredCount(Number(e.target.value))}
-                    onInput={(e) => {
-                      const el = e.currentTarget as HTMLInputElement;
-                      if (el.value.startsWith("0") && el.value.length > 1) {
-                        el.value = String(parseInt(el.value, 10));
-                      }
-                    }}
-                  />
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-zinc-300">
-                      업로드 수 (M)
-                    </label>
-                    <p className="h-11 px-4 flex items-center rounded-lg bg-zinc-800 text-zinc-400">
-                      {M}장
-                    </p>
-                  </div>
-                </div>
-                {saveError && (
-                  <p className="text-sm text-danger">{saveError}</p>
-                )}
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setEditMode(false)}>
-                    취소
-                  </Button>
-                  <Button variant="primary" onClick={handleSaveEdit} disabled={saving}>
-                    {saving ? "저장 중..." : "저장"}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                  <span className="text-zinc-500">프로젝트명</span>
-                  <span className="text-zinc-200">{project.name}</span>
-                  <span className="text-zinc-500">고객명</span>
-                  <span className="text-zinc-200">{project.customerName || "—"}</span>
-                  <span className="text-zinc-500">촬영일</span>
-                  <span className="text-zinc-200">
-                    {format(new Date(project.shootDate), "yyyy-MM-dd")}
-                  </span>
-                  <span className="text-zinc-500">셀렉 기한</span>
-                  <span className="text-zinc-200">
-                    {format(new Date(project.deadline), "yyyy-MM-dd")}
-                  </span>
-                  <span className="text-zinc-500">셀렉 갯수 (N)</span>
-                  <span className="text-zinc-200">{N}</span>
-                  <span className="text-zinc-500">업로드 수 (M)</span>
-                  <span className="text-zinc-200">{M}</span>
-                </div>
-                <div className="mt-4">
-                  <div className="mb-1 flex items-center justify-between">
-                    <p className="text-xs text-zinc-500">업로드 현황</p>
-                    {project.status === "preparing" && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs text-zinc-400"
-                        onClick={handleTogglePhotoManage}
-                      >
-                        {showPhotoManage ? "사진 관리 접기" : "사진 관리"}
-                      </Button>
-                    )}
-                  </div>
-                  <ProgressBar value={M} max={N} variant={M >= N ? "success" : "default"} showLabel />
-                  {project.status === "preparing" && showPhotoManage && (
-                    <div className="mt-4 rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
-                      {loadingPhotos ? (
-                        <p className="py-4 text-center text-sm text-zinc-500">로딩 중...</p>
-                      ) : photoList.length === 0 ? (
-                        <p className="py-4 text-center text-sm text-zinc-500">업로드된 사진이 없습니다.</p>
-                      ) : (
-                        <>
-                          <ul className="space-y-2 max-h-60 overflow-y-auto">
-                            {photoList.map((p) => (
-                              <li
-                                key={p.id}
-                                className="flex items-center gap-3 rounded-lg border border-zinc-700 bg-zinc-900/50 p-2"
-                              >
-                                <img
-                                  src={p.r2_thumb_url}
-                                  alt=""
-                                  className="h-[60px] w-[60px] shrink-0 rounded object-cover"
-                                />
-                                <span className="min-w-0 flex-1 truncate text-sm text-zinc-300">
-                                  {p.original_filename || "(파일명 없음)"}
-                                </span>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="shrink-0 text-danger hover:text-danger"
-                                  disabled={deletingPhotoId !== null}
-                                  onClick={() => handleDeletePhoto(p.id)}
-                                >
-                                  {deletingPhotoId === p.id ? "삭제 중…" : "삭제"}
-                                </Button>
-                              </li>
-                            ))}
-                          </ul>
-                          <div className="mt-3 flex gap-2">
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              className="flex-1"
-                              disabled={deletingAll}
-                              onClick={() => setShowDeleteAllModal(true)}
-                            >
-                              전체 삭제
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => setShowPhotoManage(false)}>
-                              목록 닫기
-                            </Button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </Card>
-
-          {/* 고객 초대 카드 */}
-          <Card>
-            <CardTitle className="mb-3">고객 초대</CardTitle>
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <span className="text-zinc-300">{project.customerName || "(미입력)"}</span>
-              <Badge variant={statusBadgeVariant(project.status)}>
-                {getStatusLabel(project.status)}
-              </Badge>
-            </div>
-            <div className="flex gap-2 mb-3">
-              <input
-                readOnly
-                value={inviteUrl}
-                className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 font-mono text-xs text-zinc-300"
-              />
-              <Button variant="secondary" size="sm" onClick={handleCopyLink} className="flex items-center gap-1">
-                <Copy className="h-4 w-4" />
-                링크 복사
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" className="flex items-center gap-2">
-                <MessageCircle className="h-4 w-4" />
-                카카오톡
-              </Button>
-              <Button variant="outline" size="sm" className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                이메일
-              </Button>
-              <Button variant="outline" size="sm" className="flex items-center gap-2">
-                <QrCode className="h-4 w-4" />
-                QR코드
-              </Button>
-            </div>
-          </Card>
-        </div>
-
-        {/* Right column — 320px */}
-        <div className="w-full space-y-6 lg:w-[320px] lg:shrink-0">
-          {project.status === "preparing" && (
-            <Card>
-              <p className="font-medium text-zinc-200">
-                {M === 0 ? "📸 사진을 업로드해주세요" : "📸 업로드 현황"}
-              </p>
-              <div className="mt-3">
-                <ProgressBar value={M} max={N} variant="default" showLabel />
-              </div>
-              <Link href={`/photographer/projects/${id}/upload`} className="mt-4 block">
-                <Button variant="primary" className="w-full flex items-center justify-center gap-2">
-                  <Upload className="h-4 w-4" />
-                  {M === 0 ? "사진 업로드" : "업로드 관리"}
-                </Button>
-              </Link>
-            </Card>
-          )}
-
-          {project.status !== "preparing" && (
-            <Card
-              className="cursor-pointer transition-colors hover:border-zinc-700"
-              onClick={() => router.push(`/photographer/projects/${id}/upload`)}
-            >
-              <p className="font-medium text-zinc-200">📷 업로드된 사진</p>
-              <p className="mt-1 text-sm text-zinc-400">업로드 {M}장 / 필요 {N}장</p>
-              <div className="mt-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-center"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    router.push(`/photographer/projects/${id}/upload`);
-                  }}
-                >
-                  사진 보기 →
-                </Button>
-              </div>
-            </Card>
-          )}
-
-          {(project.status === "confirmed" || project.status === "editing") && (
-            <Card>
-              <CardTitle className="mb-3">결과</CardTitle>
-              {project.confirmedAt && (
-                <p className="text-sm text-zinc-400">
-                  확정일: {format(new Date(project.confirmedAt), "yyyy-MM-dd HH:mm")}
-                </p>
-              )}
-              <Link href={`/photographer/projects/${id}/results`} className="mt-4 block">
-                <Button variant="primary" className="w-full flex items-center justify-center gap-2">
-                  <Search className="h-4 w-4" />
-                  결과 검토하기
-                </Button>
-              </Link>
-            </Card>
-          )}
-
-          {project.status === "editing" && (
-            <Card>
-              <CardTitle className="mb-3">🎨 v1 보정본 업로드</CardTitle>
-              <p className="text-sm text-zinc-400 mb-3">
-                고객 선택본 기준으로 v1 보정본을 업로드하고 전달하세요.
-              </p>
-              <Link href={`/photographer/projects/${id}/upload-versions`} className="block">
-                <Button variant="primary" className="w-full flex items-center justify-center gap-2">
-                  <Upload className="h-4 w-4" />
-                  보정본 업로드
-                </Button>
-              </Link>
-            </Card>
-          )}
-
-          {project.status === "editing_v2" && (
-            <Card className="border-warning/30 bg-warning/5">
-              <CardTitle className="mb-3">🔄 재보정 요청이 접수되었습니다</CardTitle>
-              <p className="text-sm text-zinc-400 mb-3">
-                고객이 재보정을 요청한 사진이 있습니다. v2 보정본을 업로드해 주세요.
-              </p>
-              {/* 목업: 재보정 요청 목록은 추후 version_reviews 연동 */}
-              <div className="mb-3 rounded-lg bg-zinc-800/50 px-3 py-2 text-xs text-zinc-500">
-                재보정 요청 사진 목록 · 고객 코멘트 (DB 연동 후 표시)
-              </div>
-              <Link href={`/photographer/projects/${id}/upload-versions/v2`} className="block">
-                <Button variant="primary" className="w-full flex items-center justify-center gap-2">
-                  <Upload className="h-4 w-4" />
-                  v2 재보정 업로드
-                </Button>
-              </Link>
-            </Card>
-          )}
-
-          {(project.status === "reviewing_v1" || project.status === "reviewing_v2") && (
-            <Card>
-              <CardTitle className="mb-3">👀 고객 검토 중</CardTitle>
-              <p className="text-sm text-zinc-400 mb-2">
-                고객이 보정본을 검토하고 있습니다.
-              </p>
-              <Link
-                href={
-                  project.status === "reviewing_v2"
-                    ? `/photographer/projects/${id}/upload-versions/v2`
-                    : `/photographer/projects/${id}/upload-versions`
-                }
-                className="mt-3 block"
-              >
-                <Button variant="outline" className="w-full">
-                  보정본 확인
-                </Button>
-              </Link>
-              <div className="mt-2 text-xs text-zinc-500">
-                검토 현황 · 재보정 요청 (DB 연동 후 표시)
-              </div>
-              <ProgressBar
-                value={0}
-                max={N}
-                variant="default"
-                className="mt-3"
-                showLabel
-              />
-            </Card>
-          )}
-
-          {project.status === "delivered" && (
-            <Card className="border-success/30 bg-success/5">
-              <CardTitle className="mb-3">✅ 납품 완료</CardTitle>
-              <p className="text-sm text-zinc-400">
-                이 프로젝트는 최종 납품이 완료되었습니다.
-              </p>
-              <p className="mt-2 text-xs text-zinc-500">
-                완료일시 (DB 연동 후 표시)
-              </p>
-            </Card>
-          )}
-
-          {/* 위험 구역 */}
-          <Card className="border-danger/50 bg-danger/5">
-            <CardTitle className="text-danger">위험 구역</CardTitle>
-            <Button
-              variant="danger"
-              className="mt-3 w-full justify-start"
-              onClick={() => {
-                setSaveError("");
-                setShowDeleteModal(true);
-              }}
-            >
-              프로젝트 삭제
-            </Button>
-          </Card>
+          </span>
         </div>
       </div>
 
+      {/* ── Hero ── */}
+      <div style={{ padding: "20px 24px 0", marginBottom: 16 }}>
+        <h1 style={{
+          fontFamily: "'Playfair Display', serif",
+          fontSize: 26, fontWeight: 700,
+          color: C.text, marginBottom: 6, lineHeight: 1.2,
+        }}>
+          {project.name}
+        </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 12, color: C.muted, flexWrap: "wrap" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <User size={12} />
+            {project.customerName || "(고객명 없음)"}
+          </span>
+          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <Calendar size={12} />
+            {format(new Date(project.shootDate), "yyyy-MM-dd")} 촬영
+          </span>
+          <span style={{ display: "flex", alignItems: "center", gap: 4, color: deadlineColor }}>
+            <Clock size={12} />
+            {format(new Date(project.deadline), "yyyy-MM-dd")} 기한 · {deadlineText}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Workflow step bar ── */}
+      <div style={{ padding: "0 24px", marginBottom: 20 }}>
+        <div style={{
+          display: "flex", alignItems: "stretch",
+          background: C.surface, border: `1px solid ${C.border}`,
+          borderRadius: 12, overflow: "hidden",
+        }}>
+          {WF_STEPS.map((step, i) => {
+            const state = wfStates[i];
+            return (
+              <div
+                key={step.name}
+                style={{
+                  flex: 1, padding: "12px 14px",
+                  display: "flex", alignItems: "center", gap: 8,
+                  borderRight: i < WF_STEPS.length - 1 ? `1px solid ${C.border}` : "none",
+                  position: "relative",
+                  background:
+                    state === "done" ? "rgba(46,213,115,0.03)"
+                    : state === "current" ? "rgba(102,155,188,0.06)"
+                    : "transparent",
+                }}
+              >
+                {(state === "done" || state === "current") && (
+                  <div style={{
+                    position: "absolute", bottom: 0, left: 0, right: 0, height: 2,
+                    background: state === "done" ? "rgba(46,213,115,0.5)" : C.steel,
+                  }} />
+                )}
+                <WfDot state={state} num={i + 1} />
+                <div>
+                  <div style={{
+                    fontSize: 12, fontWeight: 500,
+                    color: state === "done" ? C.muted : state === "current" ? C.text : C.dim,
+                  }}>
+                    {step.name}
+                  </div>
+                  <div style={{ fontSize: 10, color: C.dim, marginTop: 1 }}>
+                    {step.desc(state, M)}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Content grid ── */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "1fr 280px",
+        gap: 14, padding: "0 24px 40px", alignItems: "start",
+      }}>
+
+        {/* ── Left ── */}
+        <div>
+
+          {/* Project info card */}
+          <div style={{
+            background: C.surface, border: `1px solid ${C.border}`,
+            borderRadius: 12, overflow: "hidden", marginBottom: 12,
+          }}>
+            <div style={{
+              padding: "14px 18px", borderBottom: `1px solid ${C.border}`,
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: C.muted }}>
+                <FolderOpen size={14} />
+                프로젝트 정보
+              </div>
+              <EditBtn onClick={() => router.push(`/photographer/projects/${id}/edit/start`)} />
+            </div>
+            <div style={{ padding: "10px 18px" }}>
+              {([
+                { key: "프로젝트명", val: project.name,                                                  valStyle: {} },
+                { key: "고객명",     val: project.customerName || "—",                                   valStyle: {} },
+                { key: "촬영일",     val: format(new Date(project.shootDate), "yyyy-MM-dd"),              valStyle: {} },
+                { key: "셀렉 기한",  val: `${format(new Date(project.deadline), "yyyy-MM-dd")} (${deadlineText})`, valStyle: { color: deadlineColor } },
+                { key: "셀렉 갯수",  val: `${N}장`,                                                      valStyle: { color: C.steel } },
+                { key: "업로드 수",  val: `${M}장`,                                                      valStyle: {} },
+              ] as { key: string; val: string; valStyle: React.CSSProperties }[]).map((row, i, arr) => (
+                <div
+                  key={row.key}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "9px 0",
+                    borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : "none",
+                  }}
+                >
+                  <span style={{ fontSize: 11, color: C.dim }}>{row.key}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: C.text, ...row.valStyle }}>{row.val}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Invite card */}
+          <div style={{
+            background: C.surface, border: `1px solid ${C.border}`,
+            borderRadius: 12, overflow: "hidden",
+          }}>
+            <div style={{
+              padding: "14px 18px", borderBottom: `1px solid ${C.border}`,
+              display: "flex", alignItems: "center", gap: 6,
+              fontSize: 12, fontWeight: 600, color: C.muted,
+            }}>
+              <Link2 size={14} />
+              고객 초대
+            </div>
+            <div style={{ padding: "16px 18px" }}>
+
+              {/* Invite status */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "10px 12px", borderRadius: 9, marginBottom: 14,
+                background: isInviteActive ? "rgba(46,213,115,0.06)" : C.surface2,
+                border: isInviteActive ? "1px solid rgba(46,213,115,0.15)" : `1px solid ${C.border}`,
+              }}>
+                <div style={{
+                  width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+                  background: isInviteActive ? C.green : C.dim,
+                }} />
+                <span style={{ fontSize: 12, color: isInviteActive ? C.green : C.muted }}>
+                  {isInviteActive
+                    ? `초대 활성화됨 · ${getStatusLabel(project.status)}`
+                    : "초대 전 · 사진 업로드 필요"}
+                </span>
+              </div>
+
+              <div style={{ fontSize: 11, color: C.dim, marginBottom: 6 }}>초대 링크</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
+                <div style={{
+                  flex: 1, display: "flex", alignItems: "center",
+                  padding: "9px 12px",
+                  background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8,
+                  minWidth: 0,
+                }}>
+                  <span style={{
+                    fontSize: 11, color: C.muted,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {inviteUrl}
+                  </span>
+                </div>
+                <button
+                  onClick={handleCopyLink}
+                  style={{
+                    padding: "8px 12px",
+                    background: copied ? "rgba(46,213,115,0.12)" : C.surface3,
+                    border: `1px solid ${copied ? "rgba(46,213,115,0.3)" : C.border}`,
+                    borderRadius: 8, color: copied ? C.green : C.muted,
+                    fontSize: 11, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+                    whiteSpace: "nowrap", flexShrink: 0,
+                    display: "flex", alignItems: "center", gap: 4,
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <Copy size={11} />
+                  {copied ? "복사됨" : "복사"}
+                </button>
+                <button
+                  onClick={handleCopyLink}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    padding: "8px 12px",
+                    background: C.kakao, border: "none", borderRadius: 8,
+                    color: "#191919", fontSize: 11, fontWeight: 600,
+                    cursor: "pointer", fontFamily: "inherit",
+                    whiteSpace: "nowrap", flexShrink: 0,
+                  }}
+                >
+                  <MessageCircle size={11} />
+                  카카오톡
+                </button>
+              </div>
+
+              <div style={{ paddingTop: 12, borderTop: `1px solid ${C.border}`, fontSize: 11, color: C.dim }}>
+                접속 이력 없음
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Right ── */}
+        <div>
+
+          {/* Quick actions card */}
+          <div style={{
+            background: C.surface, border: `1px solid ${C.border}`,
+            borderRadius: 12, overflow: "hidden", marginBottom: 12,
+          }}>
+            <div style={{
+              padding: "14px 18px", borderBottom: `1px solid ${C.border}`,
+              display: "flex", alignItems: "center", gap: 6,
+              fontSize: 12, fontWeight: 600, color: C.muted,
+            }}>
+              <Zap size={14} />
+              빠른 액션
+            </div>
+            <div style={{ padding: 12 }}>
+              <QuickAction
+                icon={<Upload size={16} />}
+                label="사진 업로드"
+                desc={`${M}장 업로드됨`}
+                onClick={() => router.push(`/photographer/projects/${id}/upload`)}
+                disabled={false}
+              />
+              <QuickAction
+                icon={<ListChecks size={16} />}
+                label="셀렉 결과"
+                desc={canViewSelections ? `${N}장 중 셀렉 진행` : "업로드 완료 후 가능"}
+                onClick={() => router.push(`/photographer/projects/${id}/results`)}
+                disabled={!canViewSelections}
+                badge={project.status === "selecting" ? { text: "진행 중", color: "green" } : undefined}
+              />
+              <QuickAction
+                icon={<PenLine size={16} />}
+                label="보정본 업로드"
+                desc={canEditVersions ? "보정본 업로드/관리" : "셀렉 완료 후 가능"}
+                onClick={() => router.push(editVersionsPath)}
+                disabled={!canEditVersions}
+              />
+              <QuickAction
+                icon={<Eye size={16} />}
+                label="보정본 검토"
+                desc={canReview ? "고객 검토 현황" : "보정 완료 후 가능"}
+                onClick={() => router.push(editVersionsPath)}
+                disabled={!canReview}
+              />
+            </div>
+          </div>
+
+          {/* Danger zone */}
+          <div style={{
+            background: "rgba(255,71,87,0.03)", border: "1px solid rgba(255,71,87,0.12)",
+            borderRadius: 12, overflow: "hidden",
+          }}>
+            <div style={{ padding: "11px 16px", borderBottom: "1px solid rgba(255,71,87,0.1)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 600, color: C.red }}>
+                <AlertTriangle size={12} />
+                위험 구역
+              </div>
+            </div>
+            <div style={{ padding: "12px 16px" }}>
+              <DangerBtn onClick={() => { setDeleteError(""); setShowDeleteModal(true); }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Delete modal ── */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <Card className="w-full max-w-sm">
-            <h3 className="text-lg font-semibold text-white">프로젝트 삭제</h3>
-            <p className="mt-2 text-sm text-zinc-400">
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 50,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.7)", padding: 16,
+        }}>
+          <div style={{
+            background: C.surface, border: `1px solid ${C.borderMd}`,
+            borderRadius: 14, padding: 24, width: "100%", maxWidth: 360,
+          }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: C.text, marginBottom: 8 }}>
+              프로젝트 삭제
+            </h3>
+            <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.6 }}>
               정말 삭제하시겠습니까? 모든 사진과 셀렉 데이터가 영구적으로 삭제됩니다.
             </p>
-            {saveError && (
-              <p className="mt-3 text-sm text-danger">{saveError}</p>
+            {deleteError && (
+              <p style={{ marginTop: 12, fontSize: 13, color: C.red }}>{deleteError}</p>
             )}
-            <div className="mt-6 flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1"
+            <div style={{ marginTop: 24, display: "flex", gap: 8 }}>
+              <button
                 onClick={() => setShowDeleteModal(false)}
                 disabled={deleting}
+                style={{
+                  flex: 1, padding: "10px 0", background: "transparent",
+                  border: `1px solid ${C.border}`, borderRadius: 8,
+                  color: C.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                }}
               >
                 취소
-              </Button>
-              <Button
-                variant="danger"
-                className="flex-1"
+              </button>
+              <button
+                onClick={handleDelete}
                 disabled={deleting}
-                onClick={async () => {
-                  setDeleting(true);
-                  try {
-                    const res = await fetch(`/api/photographer/projects/${id}`, {
-                      method: "DELETE",
-                    });
-                    if (!res.ok) {
-                      const data = await res.json().catch(() => ({}));
-                      throw new Error(data.error ?? "삭제에 실패했습니다.");
-                    }
-                    setShowDeleteModal(false);
-                    router.push("/photographer/dashboard");
-                  } catch (e) {
-                    console.error(e);
-                    setSaveError(e instanceof Error ? e.message : "삭제에 실패했습니다.");
-                  } finally {
-                    setDeleting(false);
-                  }
+                style={{
+                  flex: 1, padding: "10px 0", background: C.redDim,
+                  border: "1px solid rgba(255,71,87,0.3)", borderRadius: 8,
+                  color: C.red, fontSize: 13, fontWeight: 500,
+                  cursor: deleting ? "not-allowed" : "pointer", fontFamily: "inherit",
                 }}
               >
                 {deleting ? "삭제 중…" : "삭제"}
-              </Button>
+              </button>
             </div>
-          </Card>
-        </div>
-      )}
-
-      {showDeleteAllModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <Card className="w-full max-w-sm">
-            <h3 className="text-lg font-semibold text-white">사진 전체 삭제</h3>
-            <p className="mt-2 text-sm text-zinc-400">
-              업로드된 사진 {photoList.length}장을 모두 삭제하시겠습니까?
-            </p>
-            <div className="mt-6 flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setShowDeleteAllModal(false)}
-                disabled={deletingAll}
-              >
-                취소
-              </Button>
-              <Button
-                variant="danger"
-                className="flex-1"
-                disabled={deletingAll}
-                onClick={handleDeleteAllPhotos}
-              >
-                {deletingAll ? "삭제 중…" : "전체 삭제"}
-              </Button>
-            </div>
-          </Card>
+          </div>
         </div>
       )}
     </div>
+  );
+}
+
+// ── micro components with hover ──
+function EditBtn({ onClick }: { onClick: () => void }) {
+  const [h, setH] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setH(true)}
+      onMouseLeave={() => setH(false)}
+      style={{
+        padding: "4px 10px", background: "transparent",
+        border: `1px solid ${h ? C.steel : C.border}`, borderRadius: 6,
+        color: h ? C.steel : C.muted, fontSize: 11, cursor: "pointer",
+        fontFamily: "inherit", display: "flex", alignItems: "center", gap: 4,
+        transition: "all 0.15s",
+      }}
+    >
+      <Pencil size={11} />
+      수정
+    </button>
+  );
+}
+
+function DangerBtn({ onClick }: { onClick: () => void }) {
+  const [h, setH] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setH(true)}
+      onMouseLeave={() => setH(false)}
+      style={{
+        width: "100%", padding: "9px 14px", background: h ? C.redDim : "transparent",
+        border: "1px solid rgba(255,71,87,0.3)", borderRadius: 8,
+        color: C.red, fontSize: 12, fontWeight: 500, cursor: "pointer",
+        fontFamily: "inherit", display: "flex", alignItems: "center",
+        justifyContent: "center", gap: 6, transition: "all 0.15s",
+      }}
+    >
+      <Trash2 size={14} />
+      프로젝트 삭제
+    </button>
   );
 }
