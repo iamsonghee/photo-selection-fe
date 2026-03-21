@@ -18,8 +18,8 @@ const INITIAL_VISIBLE = 40;
 const LOAD_MORE       = 40;
 
 const VIEW_CONFIG = {
-  filename: { cols: 1, rowH: 32  },  // 파일명 텍스트 리스트
-  gallery:  { cols: 5, rowH: 140 },  // 이미지 그리드
+  filename: { cols: 1, rowH: 32  },  // 파일명+사이즈 텍스트 리스트
+  gallery:  { cols: 8, rowH: 110 },  // 8열 이미지 그리드 + 파일명
 } as const;
 type ViewMode = keyof typeof VIEW_CONFIG;
 
@@ -105,15 +105,16 @@ function LazyThumb({
   deleting: boolean; onDelete: () => void; onClick: () => void;
 }) {
   const [loaded, setLoaded] = useState(false);
+  const filename = photo.originalFilename ?? `${index + 1}`;
   return (
     <div
       className="up-thumb"
-      style={{ cursor: "pointer", display: "flex", flexDirection: "column" }}
+      style={{ cursor: "pointer", display: "flex", flexDirection: "column", gap: 3 }}
       onClick={onClick}
     >
       {/* 이미지 영역 */}
       <div style={{
-        aspectRatio: "3/2", background: C.surface2, borderRadius: 6,
+        aspectRatio: "3/2", background: C.surface2, borderRadius: 5,
         position: "relative", overflow: "hidden",
         border: `1px solid ${C.border}`, transition: "border-color 0.15s",
       }}>
@@ -123,7 +124,7 @@ function LazyThumb({
           display: "flex", alignItems: "center", justifyContent: "center",
           pointerEvents: "none",
         }}>
-          <ImageIcon size={14} color={C.dim} style={{ opacity: 0.3 }} />
+          <ImageIcon size={10} color={C.dim} style={{ opacity: 0.3 }} />
         </div>
         <img
           src={photo.url}
@@ -141,8 +142,8 @@ function LazyThumb({
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
             disabled={deleting}
             style={{
-              position: "absolute", top: 4, right: 4,
-              width: 18, height: 18, borderRadius: "50%",
+              position: "absolute", top: 3, right: 3,
+              width: 16, height: 16, borderRadius: "50%",
               background: "rgba(255,71,87,0.85)", border: "none",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 9, color: "white", opacity: 0, cursor: "pointer",
@@ -150,10 +151,18 @@ function LazyThumb({
             }}
           >
             {deleting
-              ? <Loader2 size={9} style={{ animation: "spin 1s linear infinite" }} />
+              ? <Loader2 size={8} style={{ animation: "spin 1s linear infinite" }} />
               : "✕"}
           </button>
         )}
+      </div>
+      {/* 파일명 */}
+      <div style={{
+        fontSize: 9, color: C.muted, lineHeight: 1.3, textAlign: "center",
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        padding: "0 2px",
+      }}>
+        {filename}
       </div>
     </div>
   );
@@ -705,6 +714,12 @@ export default function UploadPage() {
                   const photo = visiblePhotos[startIdx];
                   if (!photo) return null;
                   const filename = photo.originalFilename ?? `${startIdx + 1}`;
+                  const fileSize = (photo as unknown as Record<string, unknown>).fileSize as number | null ?? null;
+                  const fileSizeText = fileSize != null
+                    ? fileSize >= 1024 * 1024
+                      ? `${(fileSize / (1024 * 1024)).toFixed(1)} MB`
+                      : `${Math.round(fileSize / 1024)} KB`
+                    : "-";
                   return (
                     <div
                       key={virtualRow.key}
@@ -733,6 +748,12 @@ export default function UploadPage() {
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}>
                         {filename}
+                      </span>
+                      <span style={{
+                        fontSize: 11, color: C.dim, flexShrink: 0,
+                        minWidth: 64, textAlign: "right",
+                      }}>
+                        {fileSizeText}
                       </span>
                       {!isReadOnly && (
                         <button
