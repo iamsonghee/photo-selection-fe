@@ -617,7 +617,7 @@ function GalleryItem({
       }}
     >
       <div style={{
-        aspectRatio: "2/3", background: C.surface2,
+        aspectRatio: "3/2", background: C.surface2,
         display: "flex", alignItems: "center", justifyContent: "center",
         position: "relative", overflow: "hidden",
       }}>
