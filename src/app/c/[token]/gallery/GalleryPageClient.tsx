@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, RotateCcw, Check } from "lucide-react";
-import { Button, Badge } from "@/components/ui";
+import { RotateCcw } from "lucide-react";
 import { useSelection, SelectionConfirmBar } from "@/contexts/SelectionContext";
 import { getProfileImageUrl } from "@/lib/photographer";
 
@@ -55,7 +54,6 @@ export default function GalleryPageClient() {
   const searchParams = useSearchParams();
   const token = (params?.token as string) ?? "";
 
-  // 뒤로가기 시 useSearchParams가 갱신되지 않는 경우를 위해 URL 직접 동기화
   const [urlSearch, setUrlSearch] = useState<string | null>(() =>
     typeof window !== "undefined" ? window.location.search : null
   );
@@ -135,106 +133,142 @@ export default function GalleryPageClient() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#0a0b0d] px-4">
-        <p className="text-zinc-400">갤러리 불러오는 중...</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#09090d]">
+        <p className="text-sm text-[#5a5f78]">갤러리 불러오는 중...</p>
       </div>
     );
   }
   if (!project) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#0a0b0d] px-4">
-        <p className="text-zinc-400">존재하지 않는 초대 링크입니다.</p>
-        <Link href="/"><Button variant="outline">홈으로</Button></Link>
+      <div className="flex min-h-screen items-center justify-center bg-[#09090d]">
+        <p className="text-sm text-[#5a5f78]">존재하지 않는 초대 링크입니다.</p>
       </div>
     );
   }
   if (project.status === "editing") return null;
   if (loadFailed || photos.length === 0) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#0a0b0d] px-4">
-        <p className="text-zinc-400">사진을 불러올 수 없습니다.</p>
-        <Link href={`/c/${token}`}><Button variant="outline">초대 페이지로 돌아가기</Button></Link>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#09090d] px-4">
+        <p className="text-sm text-[#5a5f78]">사진을 불러올 수 없습니다.</p>
+        <Link
+          href={`/c/${token}`}
+          className="rounded-xl border border-[#252b3d] px-4 py-2 text-[13px] text-[#8b90a8] hover:border-[#4f7eff] hover:text-[#4f7eff]"
+        >
+          초대 페이지로 돌아가기
+        </Link>
       </div>
     );
   }
 
+  const selectionStatus = Y === N ? "done" : Y < N ? "under" : "over";
+
   return (
-    <div className="min-h-screen bg-[#0a0b0d] pb-32">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-800 bg-[#0a0b0d]/95 px-4 py-3 backdrop-blur">
+    <div className="min-h-screen bg-[#09090d] pb-32">
+      {/* Header */}
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-[#1e2236] bg-[#111318]/95 px-4 py-3 backdrop-blur">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <Link href={`/c/${token}`} className="flex shrink-0 items-center gap-2 text-zinc-400 hover:text-white">
-            <ChevronLeft className="h-5 w-5" />
-            <span className="font-medium">{project.name}</span>
+          <Link
+            href={`/c/${token}`}
+            className="flex shrink-0 items-center gap-1 text-[#8b90a8] hover:text-[#e8eaf0] active:opacity-70"
+          >
+            <span className="text-[18px]">‹</span>
+            <span className="max-w-[130px] truncate text-[13px] font-medium">{project.name}</span>
           </Link>
           {photographer && (
-            <div className="ml-2 flex shrink-0 items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800/80 px-2 py-1">
+            <div className="ml-1 flex shrink-0 items-center gap-1.5 rounded-full border border-[#1e2236] bg-[#1a1d24] px-2 py-0.5">
               <img
                 src={getProfileImageUrl(photographer.profile_image_url)}
                 alt=""
-                className="h-6 w-6 rounded-full object-cover"
+                className="h-5 w-5 rounded-full object-cover"
               />
-              <span className="max-w-[120px] truncate text-xs text-zinc-400">{photographer.name || "작가"}</span>
+              <span className="max-w-[80px] truncate text-[11px] text-[#8b90a8]">
+                {photographer.name || "작가"}
+              </span>
             </div>
           )}
         </div>
-        <span className="flex shrink-0 items-center gap-1.5 text-sm">
-          <Badge variant={Y === N ? "success" : Y < N ? "danger" : "warning"}>
-            선택 {Y} / {N}
-          </Badge>
-          <span className="text-zinc-500">· 전체 {photos.length}장</span>
+        <span
+          className={`shrink-0 rounded-full px-2.5 py-1 font-mono text-[11px] font-semibold ${
+            selectionStatus === "done"
+              ? "bg-[#2ed573]/10 text-[#2ed573]"
+              : selectionStatus === "over"
+                ? "bg-[#f5a623]/10 text-[#f5a623]"
+                : "bg-[#ff4757]/10 text-[#ff4757]"
+          }`}
+        >
+          {Y} / {N}
         </span>
       </header>
-      <div className="border-b border-zinc-800 bg-zinc-900/50 px-4 py-2">
-        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
-          <span className="shrink-0 text-xs font-medium text-zinc-500">별점</span>
+
+      {/* Filter bar */}
+      <div className="border-b border-[#1e2236] bg-[#111318]/95 px-4 py-2">
+        <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto">
+          <span className="shrink-0 text-[11px] text-[#5a5f78]">별점</span>
           {STAR_OPTIONS.map((opt) => (
             <button
               key={String(opt.value)}
+              type="button"
               onClick={() => updateFilter({ starFilter: opt.value })}
-              className={`shrink-0 rounded px-2 py-1 text-xs ${starFilter === opt.value ? "bg-primary/30 text-primary" : "text-zinc-400 hover:bg-zinc-800"}`}
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] transition-colors ${
+                starFilter === opt.value
+                  ? "bg-[#4f7eff]/20 text-[#4f7eff]"
+                  : "text-[#8b90a8] hover:bg-[#1e2236]"
+              }`}
             >
               {opt.label}
             </button>
           ))}
-          <span className="mx-1 shrink-0 w-px h-4 bg-zinc-700" />
-          <span className="shrink-0 text-xs font-medium text-zinc-500">색상</span>
+          <span className="mx-1 h-3 w-px shrink-0 bg-[#1e2236]" />
+          <span className="shrink-0 text-[11px] text-[#5a5f78]">색상</span>
           {COLOR_OPTIONS.map((opt) => (
             <button
               key={opt.value}
+              type="button"
               onClick={() => updateFilter({ colorFilter: opt.value })}
-              className={`shrink-0 rounded px-2 py-1 text-xs ${colorFilter === opt.value ? "bg-primary/30 text-primary" : "text-zinc-400 hover:bg-zinc-800"}`}
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] transition-colors ${
+                colorFilter === opt.value
+                  ? "bg-[#4f7eff]/20 text-[#4f7eff]"
+                  : "text-[#8b90a8] hover:bg-[#1e2236]"
+              }`}
             >
               {opt.label}
             </button>
           ))}
-          <span className="mx-1 shrink-0 w-px h-4 bg-zinc-700" />
+          <span className="mx-1 h-3 w-px shrink-0 bg-[#1e2236]" />
           <button
             type="button"
             onClick={() => updateFilter({ selectedFilter: "all" })}
-            className={`shrink-0 rounded px-2 py-1 text-xs ${selectedFilter === "all" ? "bg-primary/30 text-primary" : "text-zinc-400 hover:bg-zinc-800"}`}
+            className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] transition-colors ${
+              selectedFilter === "all"
+                ? "bg-[#4f7eff]/20 text-[#4f7eff]"
+                : "text-[#8b90a8] hover:bg-[#1e2236]"
+            }`}
           >
             전체
           </button>
           <button
             type="button"
             onClick={() => updateFilter({ selectedFilter: "selected" })}
-            className={`shrink-0 rounded px-2 py-1 text-xs ${selectedFilter === "selected" ? "bg-primary/30 text-primary" : "text-zinc-400 hover:bg-zinc-800"}`}
+            className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] transition-colors ${
+              selectedFilter === "selected"
+                ? "bg-[#4f7eff]/20 text-[#4f7eff]"
+                : "text-[#8b90a8] hover:bg-[#1e2236]"
+            }`}
           >
             선택됨
           </button>
-          <span className="mx-1 shrink-0 w-px h-4 bg-zinc-700" />
+          <span className="mx-1 h-3 w-px shrink-0 bg-[#1e2236]" />
           <select
             value={sortOrder}
             onChange={(e) => updateFilter({ sortOrder: e.target.value as SortOrder })}
-            className="shrink-0 rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-200"
+            className="shrink-0 rounded-lg border border-[#1e2236] bg-[#1a1d24] px-2 py-1 text-[11px] text-[#e8eaf0] focus:outline-none"
           >
             <option value="filename">파일명순</option>
             <option value="newest">최신순</option>
             <option value="oldest">오래된순</option>
           </select>
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
+            type="button"
             onClick={() =>
               updateFilter({
                 starFilter: "all",
@@ -243,13 +277,15 @@ export default function GalleryPageClient() {
                 sortOrder: "filename",
               })
             }
-            className="shrink-0 gap-1 py-1 text-xs"
+            className="shrink-0 flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] text-[#5a5f78] hover:bg-[#1e2236] hover:text-[#8b90a8]"
           >
             <RotateCcw className="h-3 w-3" /> 초기화
-          </Button>
+          </button>
         </div>
       </div>
-      <div className="grid grid-cols-4 gap-2 px-4 py-4">
+
+      {/* Photo grid */}
+      <div className="grid grid-cols-2 gap-2 px-4 py-4 sm:grid-cols-3">
         {filteredPhotos.map((photo) => {
           const selected = isSelected(photo.id);
           const state = photoStates[photo.id];
@@ -260,52 +296,46 @@ export default function GalleryPageClient() {
             <Link
               key={photo.id}
               href={`/c/${token}/viewer/${photo.id}${viewerQueryString}`}
-              className={`group relative aspect-[4/3] block cursor-pointer overflow-hidden rounded-xl bg-zinc-800 transition-[box-shadow,border-color] ${
-                selected ? "ring-2 ring-green-500 ring-offset-2 ring-offset-[#0a0b0d]" : ""
+              className={`group relative block aspect-[4/3] cursor-pointer overflow-hidden rounded-xl bg-[#1a1d24] transition-all ${
+                selected ? "ring-2 ring-[#2ed573] ring-offset-2 ring-offset-[#09090d]" : ""
               }`}
             >
               <img
                 src={photo.url || getTestImageUrl(photo.id)}
                 alt={getPhotoDisplayName(photo)}
-                className="h-full w-full object-cover transition-[filter] duration-200 group-hover:brightness-110"
+                className="h-full w-full object-cover transition-[filter] duration-200 group-hover:brightness-105"
                 loading="lazy"
                 decoding="async"
                 draggable={false}
               />
-              {/* 우상단 체크: 선택 시 항상 표시, 미선택 시 hover 시에만. 클릭 시 선택/해제만 (뷰어 이동 방지) */}
+              {/* Select toggle button */}
               <button
                 type="button"
                 onClick={(e) => handleCheckClick(e, photo.id)}
-                className={`absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full border-2 transition-opacity ${
+                className={`absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 transition-opacity ${
                   selected
-                    ? "border-white bg-green-500 text-white opacity-100"
-                    : "border-white/80 bg-black/50 text-white opacity-0 group-hover:opacity-100 hover:bg-black/70"
+                    ? "border-white bg-[#2ed573] text-white opacity-100"
+                    : "border-white/80 bg-black/50 text-white opacity-0 group-hover:opacity-100"
                 }`}
                 aria-label={selected ? "선택 해제" : "선택"}
               >
-                {selected ? <Check className="h-4 w-4" strokeWidth={3} /> : null}
+                {selected && <span className="text-[10px]">✓</span>}
               </button>
+              {/* Tags / filename */}
               {!hasTag && (
-                <p
-                  className="absolute bottom-1 left-1 max-w-[85%] truncate rounded bg-black/50 px-1.5 py-0.5 text-xs text-white"
-                  title={getPhotoDisplayName(photo)}
-                >
+                <p className="absolute bottom-1 left-1 max-w-[85%] truncate rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
                   {getPhotoDisplayName(photo)}
                 </p>
               )}
               {hasTag && (
-                <div className="absolute bottom-1 left-1 flex items-center gap-1.5 rounded bg-black/60 px-2 py-1 max-w-[85%] min-w-0">
-                  <span className="truncate text-xs text-white" title={getPhotoDisplayName(photo)}>
-                    {getPhotoDisplayName(photo)}
-                  </span>
+                <div className="absolute bottom-1 left-1 flex max-w-[85%] min-w-0 items-center gap-1 rounded bg-black/60 px-1.5 py-0.5">
+                  <span className="truncate text-[10px] text-white">{getPhotoDisplayName(photo)}</span>
                   {rating != null && rating > 0 && (
-                    <span className="text-sm leading-none text-[#f5a623]">
-                      {"★".repeat(rating)}
-                    </span>
+                    <span className="text-[10px] leading-none text-[#f5a623]">{"★".repeat(rating)}</span>
                   )}
                   {colorTag && (
                     <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full border border-white/30"
+                      className="h-2 w-2 shrink-0 rounded-full border border-white/30"
                       style={{ backgroundColor: COLOR_HEX[colorTag] }}
                     />
                   )}
@@ -315,6 +345,7 @@ export default function GalleryPageClient() {
           );
         })}
       </div>
+
       <SelectionConfirmBar />
     </div>
   );

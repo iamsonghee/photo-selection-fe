@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
 import FullScreenCompareModal from "@/components/FullScreenCompareModal";
@@ -35,9 +36,7 @@ export default function ReviewViewerPage() {
   const review = current ? getReview(current.id) : null;
   const [revisionComment, setRevisionComment] = useState(review?.comment ?? "");
   const [savedFlash, setSavedFlash] = useState(false);
-  const [showRevisionArea, setShowRevisionArea] = useState(
-    review?.status === "revision_requested"
-  );
+  const [showRevisionArea, setShowRevisionArea] = useState(review?.status === "revision_requested");
   const [fullOpen, setFullOpen] = useState(false);
   const [fullInitial, setFullInitial] = useState<"original" | "version">("original");
 
@@ -59,13 +58,8 @@ export default function ReviewViewerPage() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        goPrev();
-      } else if (e.key === "ArrowRight") {
-        e.preventDefault();
-        goNext();
-      }
+      if (e.key === "ArrowLeft") { e.preventDefault(); goPrev(); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); goNext(); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -94,22 +88,21 @@ export default function ReviewViewerPage() {
 
   if (selectionLoading || !project) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
-        <p className="text-[#5a5f7a]">
+      <div className="flex min-h-screen items-center justify-center bg-[#09090d]">
+        <p className="text-sm text-[#5a5f78]">
           {selectionLoading ? "로딩 중…" : "존재하지 않는 초대 링크입니다."}
         </p>
       </div>
     );
   }
 
-  const canShowReview =
-    project.status === "reviewing_v1" || project.status === "reviewing_v2";
+  const canShowReview = project.status === "reviewing_v1" || project.status === "reviewing_v2";
   if (!canShowReview) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
+      <div className="flex min-h-screen items-center justify-center bg-[#09090d]">
         <Link
           href={`/c/${token}/confirmed`}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-[#2e3348] px-3 py-1.5 text-[12px] font-semibold text-[#8b8fa8]"
+          className="rounded-xl border border-[#252b3d] px-4 py-2 text-[13px] text-[#8b90a8] hover:border-[#4f7eff] hover:text-[#4f7eff]"
         >
           확정 페이지로
         </Link>
@@ -120,18 +113,18 @@ export default function ReviewViewerPage() {
   if (!current) {
     if (reviewPhotosLoading || photos.length === 0) {
       return (
-        <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
-          <p className="text-[#5a5f7a]">불러오는 중...</p>
+        <div className="flex min-h-screen items-center justify-center bg-[#09090d]">
+          <p className="text-sm text-[#5a5f78]">불러오는 중...</p>
         </div>
       );
     }
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0b0d]">
+      <div className="flex min-h-screen items-center justify-center bg-[#09090d]">
         <div className="text-center">
-          <p className="text-[#5a5f7a]">사진을 찾을 수 없습니다.</p>
+          <p className="mb-4 text-sm text-[#5a5f78]">사진을 찾을 수 없습니다.</p>
           <Link
             href={`/c/${token}/review`}
-            className="mt-4 inline-block rounded-lg border border-[#2e3348] px-3 py-1.5 text-[12px] font-semibold text-[#8b8fa8]"
+            className="rounded-xl border border-[#252b3d] px-4 py-2 text-[13px] text-[#8b90a8]"
           >
             갤러리로
           </Link>
@@ -141,126 +134,128 @@ export default function ReviewViewerPage() {
   }
 
   const revisionRemaining = project.status === "reviewing_v2" ? 1 : 2;
-  const badgeLabel =
-    review?.status === "approved"
-      ? "확정"
-      : review?.status === "revision_requested"
-        ? "재보정"
-        : "미검토";
+  const versionLabel = `보정본 ${project.status === "reviewing_v2" ? "v2" : "v1"}`;
+  const status = review?.status ?? "pending";
 
   return (
-    <div className="min-h-screen bg-[#0a0b0d] text-[#e8eaf0]">
-      <div className="mx-auto max-w-[860px] px-5 py-7">
-        {/* viewer-header (와이어프레임) */}
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-[#09090d] text-[#e8eaf0]">
+      {/* Header */}
+      <header className="sticky top-0 z-20 border-b border-[#1e2236] bg-[#111318]/95 px-4 py-3 backdrop-blur">
+        <div className="mx-auto flex max-w-[520px] items-center justify-between">
+          <div className="flex items-center gap-2">
             <Link
               href={`/c/${token}/review`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#2e3348] px-3 py-1.5 text-[12px] font-semibold text-[#8b8fa8]"
+              className="flex items-center gap-1 text-[#8b90a8] hover:text-[#e8eaf0] active:opacity-70"
             >
-              ← 목록
+              <ChevronLeft className="h-4 w-4" />
+              <span className="text-[13px]">목록</span>
             </Link>
+            <div className="h-4 w-px bg-[#1e2236]" />
             <div>
-              <div className="text-[15px] font-bold text-[#e8eaf0]">
-                {current.originalFilename}
-              </div>
-              <div className="text-[11px] text-[#5a5f7a]">
-                {currentIndex + 1} / {photos.length}장 ·{" "}
+              <div className="text-[13px] font-semibold">{current.originalFilename}</div>
+              <div className="flex items-center gap-1.5 text-[11px] text-[#5a5f78]">
+                <span>{currentIndex + 1} / {photos.length}</span>
                 <span
-                  className={`inline-block rounded-[20px] px-2 py-0.5 text-[10px] font-semibold ${
-                    review?.status === "approved"
-                      ? "bg-[#0f2a1e] text-[#2ed573] border border-[#2ed573]"
-                      : review?.status === "revision_requested"
-                        ? "bg-[#2a1408] text-[#f5a623] border border-[#f5a623]"
-                        : "bg-[#1a1d28] text-[#5a5f7a] border border-[#2e3348]"
+                  className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    status === "approved"
+                      ? "border border-[#2ed573] bg-[#0f2a1e] text-[#2ed573]"
+                      : status === "revision_requested"
+                        ? "border border-[#f5a623] bg-[#2a1408] text-[#f5a623]"
+                        : "border border-[#1e2236] bg-[#1a1d24] text-[#5a5f78]"
                   }`}
                 >
-                  {badgeLabel}
+                  {status === "approved" ? "확정" : status === "revision_requested" ? "재보정" : "미검토"}
                 </span>
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={goPrev}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#2e3348] px-3 py-1.5 text-[12px] font-semibold text-[#8b8fa8] bg-transparent"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-[#1e2236] text-[#8b90a8] hover:border-[#252b3d] hover:text-[#e8eaf0]"
             >
-              ← 이전
+              <ChevronLeft className="h-4 w-4" />
             </button>
             <button
               type="button"
               onClick={goNext}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#2e3348] px-3 py-1.5 text-[12px] font-semibold text-[#8b8fa8] bg-transparent"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-[#1e2236] text-[#8b90a8] hover:border-[#252b3d] hover:text-[#e8eaf0]"
             >
-              다음 →
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
         </div>
+      </header>
 
-        {/* compare-grid (와이어프레임: 2열, gap 3px, border-radius 12px) */}
-        <div className="grid grid-cols-2 gap-[3px] rounded-xl overflow-hidden border border-[#1e2028] mb-2.5">
-          <div className="relative aspect-[4/3] bg-[#1a1d28] flex items-center justify-center">
-            <img
-              src={current.originalUrl}
-              alt="원본"
-              className="w-full h-full object-contain cursor-zoom-in"
-              onClick={() => {
-                setFullInitial("original");
-                setFullOpen(true);
-              }}
-            />
-            <span className="absolute top-2.5 left-2.5 rounded-md bg-black/55 px-2.5 py-1 text-[11px] font-bold text-[#aaa]">
+      <div className="mx-auto max-w-[520px] px-4 py-4">
+        {/* Compare grid — stacked on mobile, 2-col on sm+ */}
+        <div className="mb-2 grid grid-cols-1 gap-1 overflow-hidden rounded-xl border border-[#1e2236] sm:grid-cols-2">
+          <div className="relative bg-[#1a1d24]">
+            <div className="aspect-[4/3]">
+              <img
+                src={current.originalUrl}
+                alt="원본"
+                className="h-full w-full cursor-zoom-in object-contain"
+                onClick={() => { setFullInitial("original"); setFullOpen(true); }}
+              />
+            </div>
+            <span className="absolute left-2.5 top-2.5 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-bold text-[#aaa]">
               원본
             </span>
           </div>
-          <div className="relative aspect-[4/3] bg-[#1a2030] flex items-center justify-center">
-            <img
-              src={current.versionUrl}
-              alt="보정본"
-              className="w-full h-full object-contain cursor-zoom-in"
-              onClick={() => {
-                setFullInitial("version");
-                setFullOpen(true);
-              }}
-            />
-            <span className="absolute top-2.5 left-2.5 rounded-md bg-[#4f7eff]/85 px-2.5 py-1 text-[11px] font-bold text-white">
-              보정본 {project.status === "reviewing_v2" ? "v2" : "v1"}
+          <div className="relative bg-[#1a2030]">
+            <div className="aspect-[4/3]">
+              <img
+                src={current.versionUrl}
+                alt={versionLabel}
+                className="h-full w-full cursor-zoom-in object-contain"
+                onClick={() => { setFullInitial("version"); setFullOpen(true); }}
+              />
+            </div>
+            <span className="absolute left-2.5 top-2.5 rounded-md bg-[#4f7eff]/85 px-2 py-0.5 text-[11px] font-bold text-white">
+              {versionLabel}
             </span>
           </div>
         </div>
-        <p className="text-center text-[11px] text-[#3a3f55] mb-4">
-          💡 추후 슬라이더로 좌우 드래그 비교 가능
+        <p className="mb-4 text-center text-[11px] text-[#3a3f55]">
+          💡 사진을 클릭하면 풀스크린으로 볼 수 있습니다
         </p>
 
-        {/* memo-box (와이어프레임) */}
-        <div className="rounded-lg border border-[#1a1d28] bg-[#0e0f14] px-3.5 py-2.5 text-[12px] text-[#8b8fa8] mb-3.5">
-          📝 작가 메모:{" "}
-          {current.photographerMemo ?? "없음"}
-        </div>
-
-        {/* feedback-card (와이어프레임) */}
-        <div className="rounded-[10px] border border-[#1e2028] bg-[#0e0f14] p-4 mb-3.5">
-          <div className="text-[13px] font-bold mb-1.5">이 사진에 대한 의견</div>
-          <div className="text-[11px] text-[#3a3f55] mb-3 py-2 px-2.5 rounded-md bg-[#111318] border-l-[3px] border-l-[#4f7eff]">
-            💡 선택 내용은 임시 저장됩니다. 모든 사진 검토 후 갤러리에서 한번에
-            작가에게 전달돼요.
+        {/* Photographer memo */}
+        {current.photographerMemo && (
+          <div className="mb-3 rounded-xl border border-[#1e2236] bg-[#111318] px-3.5 py-2.5 text-[12px] text-[#8b90a8]">
+            📝 작가 메모: {current.photographerMemo}
           </div>
-          <div className="text-[11px] text-[#f5a623] flex items-center gap-1.5 mb-3">
+        )}
+
+        {/* Feedback card */}
+        <div className="rounded-xl border border-[#1e2236] bg-[#111318] p-4">
+          <div className="mb-2 text-[13px] font-semibold">이 사진에 대한 의견</div>
+
+          {/* Info hint */}
+          <div className="mb-3 rounded-xl border-l-[3px] border-l-[#4f7eff] bg-[#1a1d24] px-3 py-2 text-[11px] leading-relaxed text-[#5a5f78]">
+            💡 선택 내용은 임시 저장됩니다. 모든 사진 검토 후 갤러리에서 한번에 전달돼요.
+          </div>
+
+          {/* Revision limit warning */}
+          <div className="mb-3 flex items-center gap-1.5 text-[11px] text-[#f5a623]">
             ⚠️ 재보정은 최대 2회까지 가능합니다 (남은 횟수: {revisionRemaining}회)
           </div>
-          <div className="flex gap-2 items-center mb-3">
+
+          {/* Action buttons */}
+          <div className="mb-3 flex items-center gap-2">
             <button
               type="button"
               onClick={handleApprove}
-              className="inline-flex items-center gap-1.5 rounded-lg py-2 px-4 text-[13px] font-semibold bg-[#0f2a1e] border border-[#2ed573] text-[#2ed573]"
+              className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-[#2ed573] bg-[#0f2a1e] px-4 py-2 text-[13px] font-semibold text-[#2ed573] transition-opacity hover:opacity-80"
             >
               ✅ 확정
             </button>
             <button
               type="button"
               onClick={handleRevisionClick}
-              className="inline-flex items-center gap-1.5 rounded-lg py-2 px-4 text-[13px] font-semibold bg-[#2a1a08] border border-[#f5a623] text-[#f5a623]"
+              className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-[#f5a623] bg-[#2a1a08] px-4 py-2 text-[13px] font-semibold text-[#f5a623] transition-opacity hover:opacity-80"
             >
               🔄 재보정 요청
             </button>
@@ -269,50 +264,46 @@ export default function ReviewViewerPage() {
             )}
           </div>
 
-          {/* revision-area: 재보정 요청 클릭 시 또는 이미 재보정 상태일 때 표시 */}
-          <div
-            className={showRevisionArea ? "block" : "hidden"}
-          >
-            <textarea
-              value={revisionComment}
-              onChange={(e) => setRevisionComment(e.target.value)}
-              placeholder={`어떤 부분을 수정하면 좋을지 입력해주세요\n예) 배경을 좀 더 밝게 해주세요, 피부톤을 더 자연스럽게...`}
-              className="w-full rounded-lg border border-[#2e3348] bg-[#111318] px-3 py-2.5 text-[13px] text-[#e8eaf0] placeholder-[#5a5f7a] focus:border-[#f5a623] focus:outline-none resize-none h-20 font-[inherit]"
-              rows={3}
-            />
-            <div className="flex items-center justify-between mt-2">
-              <span className="text-[11px] text-[#3a3f55]">
-                입력 후 임시 저장 버튼을 눌러주세요
-              </span>
-              <button
-                type="button"
-                onClick={handleRevisionSave}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#2e3348] px-3 py-1.5 text-[12px] font-semibold text-[#8b8fa8] bg-transparent"
-              >
-                임시 저장
-              </button>
+          {/* Revision comment area */}
+          {showRevisionArea && (
+            <div>
+              <textarea
+                value={revisionComment}
+                onChange={(e) => setRevisionComment(e.target.value)}
+                placeholder={`어떤 부분을 수정하면 좋을지 입력해주세요\n예) 배경을 좀 더 밝게 해주세요`}
+                className="h-20 w-full resize-none rounded-xl border border-[#252b3d] bg-[#1a1d24] px-3 py-2.5 text-[13px] text-[#e8eaf0] outline-none transition-colors placeholder:text-[#5a5f78] focus:border-[#f5a623]"
+                rows={3}
+              />
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-[11px] text-[#3a3f55]">입력 후 임시 저장 버튼을 눌러주세요</span>
+                <button
+                  type="button"
+                  onClick={handleRevisionSave}
+                  className="rounded-xl border border-[#252b3d] px-3 py-1.5 text-[12px] text-[#8b90a8] hover:border-[#f5a623] hover:text-[#f5a623]"
+                >
+                  임시 저장
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* viewer-nav (와이어프레임) */}
-        <div className="flex items-center justify-between pt-4 border-t border-[#1e2028]">
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={goPrev}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#2e3348] px-3 py-1.5 text-[12px] font-semibold text-[#8b8fa8] bg-transparent"
-            >
-              ← 이전 사진
-            </button>
-            <button
-              type="button"
-              onClick={goNext}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#2e3348] px-3 py-1.5 text-[12px] font-semibold text-[#8b8fa8] bg-transparent"
-            >
-              다음 사진 →
-            </button>
-          </div>
+        {/* Bottom nav */}
+        <div className="mt-4 flex items-center justify-between border-t border-[#1e2236] pt-4">
+          <button
+            type="button"
+            onClick={goPrev}
+            className="flex items-center gap-1.5 rounded-xl border border-[#1e2236] px-3 py-2 text-[12px] text-[#8b90a8] hover:border-[#252b3d] hover:text-[#e8eaf0]"
+          >
+            ← 이전 사진
+          </button>
+          <button
+            type="button"
+            onClick={goNext}
+            className="flex items-center gap-1.5 rounded-xl border border-[#1e2236] px-3 py-2 text-[12px] text-[#8b90a8] hover:border-[#252b3d] hover:text-[#e8eaf0]"
+          >
+            다음 사진 →
+          </button>
         </div>
       </div>
 
@@ -321,7 +312,7 @@ export default function ReviewViewerPage() {
         initialSide={fullInitial}
         originalUrl={current.originalUrl}
         versionUrl={current.versionUrl}
-        versionLabel={`보정본 ${project.status === "reviewing_v2" ? "v2" : "v1"}`}
+        versionLabel={versionLabel}
         onClose={() => setFullOpen(false)}
       />
     </div>
