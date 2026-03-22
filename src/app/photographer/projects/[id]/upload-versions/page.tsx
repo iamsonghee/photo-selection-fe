@@ -16,6 +16,9 @@ import {
   Pencil,
   FileText,
   Send,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getPhotosWithSelections, getProjectById } from "@/lib/db";
@@ -71,6 +74,8 @@ export default function UploadVersionsPage() {
   const [error,           setError]           = useState<string | null>(null);
   const [compareOpen,     setCompareOpen]     = useState(false);
   const [compareInitIdx,  setCompareInitIdx]  = useState(0);
+  const [lightboxItems,   setLightboxItems]   = useState<Array<{ url: string; label: string; sublabel?: string | null }>>([]);
+  const [lightboxIndex,   setLightboxIndex]   = useState<number | null>(null);
 
   // ── load project + selected photos ──
   useEffect(() => {
@@ -162,6 +167,11 @@ export default function UploadVersionsPage() {
       })
       .filter(Boolean) as Array<{ original: { url: string; filename: string }; retouched: { url: string; filename: string } }>;
   }, [targets, localPreviewMap, uploadedV1Info]);
+
+  const openLightbox = useCallback((items: Array<{ url: string; label: string; sublabel?: string | null }>, index: number) => {
+    setLightboxItems(items);
+    setLightboxIndex(index);
+  }, []);
 
   const openCompareByTarget = useCallback((targetId: string) => {
     const matched = targets.find((t) => t.id === targetId);
@@ -255,6 +265,11 @@ export default function UploadVersionsPage() {
       }))
     : [];
 
+  const lightboxTargetItems = useMemo(
+    () => targets.map((t) => ({ url: t.photo.url, label: t.filename })),
+    [targets]
+  );
+
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "48px 0" }}>
@@ -333,7 +348,14 @@ export default function UploadVersionsPage() {
               </span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
-              {targets.map((t, i) => <SelectedThumb key={t.id} target={t} num={i + 1} />)}
+              {targets.map((t, i) => (
+                <SelectedThumb
+                  key={t.id}
+                  target={t}
+                  num={i + 1}
+                  onClick={() => t.photo.url && openLightbox(lightboxTargetItems, i)}
+                />
+              ))}
               {targets.length === 0 && (
                 <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "20px 0", fontSize: 13, color: C.dim }}>
                   선택된 사진이 없습니다.
@@ -457,6 +479,7 @@ export default function UploadVersionsPage() {
                       isReadOnly
                       onChangeOne={handleChangeOne}
                       onCompare={openCompareByTarget}
+                      onOpenLightbox={openLightbox}
                     />
                   ))
                 : displayMapping.map((m) => (
@@ -470,6 +493,7 @@ export default function UploadVersionsPage() {
                       isReadOnly={false}
                       onChangeOne={handleChangeOne}
                       onCompare={openCompareByTarget}
+                      onOpenLightbox={openLightbox}
                     />
                   ))}
             </>
@@ -647,6 +671,16 @@ export default function UploadVersionsPage() {
       <input ref={perItemInputRef} type="file" accept="image/jpeg,image/png,image/webp"
         style={{ display: "none" }} onChange={(e) => handlePerItemSelect(e.target.files)} />
 
+      {lightboxIndex !== null && lightboxItems.length > 0 && (
+        <Lightbox
+          items={lightboxItems}
+          index={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onPrev={() => setLightboxIndex((i) => i !== null ? (i - 1 + lightboxItems.length) % lightboxItems.length : null)}
+          onNext={() => setLightboxIndex((i) => i !== null ? (i + 1) % lightboxItems.length : null)}
+        />
+      )}
+
       <CompareViewerModal
         isOpen={compareOpen}
         onClose={() => setCompareOpen(false)}
@@ -659,13 +693,17 @@ export default function UploadVersionsPage() {
 
 // ---------- sub-components ----------
 
-function SelectedThumb({ target, num }: { target: V1Target; num: number }) {
+function SelectedThumb({ target, num, onClick }: { target: V1Target; num: number; onClick?: () => void }) {
   const [err, setErr] = useState(false);
   return (
-    <div style={{
-      background: C.surface, border: `1px solid ${C.border}`,
-      borderRadius: 8, overflow: "hidden",
-    }}>
+    <div
+      onClick={onClick}
+      style={{
+        background: C.surface, border: `1px solid ${C.border}`,
+        borderRadius: 8, overflow: "hidden",
+        cursor: onClick ? "zoom-in" : "default",
+      }}
+    >
       <div style={{ aspectRatio: "3/2", background: C.surface2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
         {target.photo.url && !err ? (
           <img src={target.photo.url} alt="" onError={() => setErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -688,7 +726,7 @@ function SelectedThumb({ target, num }: { target: V1Target; num: number }) {
 }
 
 function MappingCard({
-  target, file, type, orderIndex, previewUrl, isReadOnly, onChangeOne, onCompare,
+  target, file, type, orderIndex, previewUrl, isReadOnly, onChangeOne, onCompare, onOpenLightbox,
 }: {
   target: V1Target;
   file: File | null;
@@ -698,6 +736,7 @@ function MappingCard({
   isReadOnly: boolean;
   onChangeOne: (id: string) => void;
   onCompare: (id: string) => void;
+  onOpenLightbox: (items: Array<{ url: string; label: string; sublabel?: string | null }>, index: number) => void;
 }) {
   const [origErr, setOrigErr]     = useState(false);
   const [retouchErr, setRetouchErr] = useState(false);
@@ -711,7 +750,10 @@ function MappingCard({
 
         {/* Original */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <div style={{ width: 52, height: 38, background: C.surface3, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+          <div
+            onClick={() => target.photo.url && onOpenLightbox([{ url: target.photo.url, label: target.filename, sublabel: "원본 선택 사진" }], 0)}
+            style={{ width: 52, height: 38, background: C.surface3, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${C.border}`, overflow: "hidden", cursor: target.photo.url ? "zoom-in" : "default" }}
+          >
             {target.photo.url && !origErr ? (
               <img src={target.photo.url} alt="" onError={() => setOrigErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : <Image size={16} color={C.dim} />}
@@ -732,11 +774,11 @@ function MappingCard({
             <div style={{ fontSize: 11, color: C.dim, fontStyle: "italic" }}>보정본 없음</div>
           </div>
         ) : (
-          <div
-            style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, cursor: previewUrl ? "zoom-in" : "default" }}
-            onClick={() => previewUrl && onCompare(target.id)}
-          >
-            <div style={{ width: 52, height: 38, background: "#1a2535", borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <div
+              onClick={() => previewUrl && onOpenLightbox([{ url: previewUrl, label: target.filename, sublabel: "v1 보정본" }], 0)}
+              style={{ width: 52, height: 38, background: "#1a2535", borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${C.border}`, overflow: "hidden", cursor: previewUrl ? "zoom-in" : "default" }}
+            >
               {previewUrl && !retouchErr ? (
                 <img src={previewUrl} alt="" onError={() => setRetouchErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : <Image size={16} color={C.dim} />}
@@ -797,6 +839,134 @@ function MappingCard({
           파일명 불일치 · 업로드 순서({(orderIndex ?? 0) + 1}번째)로 자동 매핑됐습니다. 다른 사진이면 [변경]을 눌러주세요.
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------- Lightbox ----------
+
+function Lightbox({
+  items, index, onClose, onPrev, onNext,
+}: {
+  items: Array<{ url: string; label: string; sublabel?: string | null }>;
+  index: number;
+  onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const item = items[index];
+  const multi = items.length > 1;
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft" && multi) onPrev();
+      if (e.key === "ArrowRight" && multi) onNext();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose, onPrev, onNext, multi]);
+
+  if (!item) return null;
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 500,
+        background: "rgba(0,0,0,0.9)",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      }}
+    >
+      {/* Close */}
+      <button
+        onClick={onClose}
+        style={{
+          position: "absolute", top: 16, right: 16,
+          background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "50%",
+          width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: "pointer", color: C.text,
+        }}
+      >
+        <X size={18} />
+      </button>
+
+      {/* Counter */}
+      {multi && (
+        <div style={{
+          position: "absolute", top: 20, left: "50%", transform: "translateX(-50%)",
+          fontSize: 12, color: C.muted,
+        }}>
+          {index + 1} / {items.length}
+        </div>
+      )}
+
+      {/* Prev */}
+      {multi && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onPrev(); }}
+          style={{
+            position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
+            background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "50%",
+            width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", color: C.text,
+          }}
+        >
+          <ChevronLeft size={20} />
+        </button>
+      )}
+
+      {/* Image */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: "calc(100vw - 120px)", maxHeight: "calc(100vh - 120px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        <img
+          src={item.url}
+          alt={item.label}
+          style={{ maxWidth: "100%", maxHeight: "calc(100vh - 120px)", objectFit: "contain", borderRadius: 6 }}
+        />
+      </div>
+
+      {/* Next */}
+      {multi && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNext(); }}
+          style={{
+            position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
+            background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "50%",
+            width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", color: C.text,
+          }}
+        >
+          <ChevronRight size={20} />
+        </button>
+      )}
+
+      {/* Info bar */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: "absolute", bottom: 0, left: 0, right: 0,
+          padding: "14px 24px",
+          background: "linear-gradient(transparent, rgba(0,0,0,0.7))",
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+        }}
+      >
+        <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{item.label}</div>
+        {item.sublabel && (
+          <div style={{
+            fontSize: 11, color: C.muted,
+            background: "rgba(102,155,188,0.12)", border: "1px solid rgba(102,155,188,0.25)",
+            borderRadius: 6, padding: "3px 10px",
+          }}>
+            {item.sublabel}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
