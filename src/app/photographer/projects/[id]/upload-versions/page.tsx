@@ -1,15 +1,49 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, CSSProperties } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import { Loader2, Upload } from "lucide-react";
-import { Button, Card } from "@/components/ui";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Upload,
+  FolderOpen,
+  Image,
+  ArrowRight,
+  Check,
+  ArrowUpDown,
+  AlertCircle,
+  RefreshCw,
+  Pencil,
+  FileText,
+  Send,
+  X,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getPhotosWithSelections, getProjectById } from "@/lib/db";
 import { buildVersionMapping, remapSingleFile, type MappingResult } from "@/lib/version-mapping";
 import type { Photo, Project } from "@/types";
 import CompareViewerModal from "@/components/CompareViewerModal";
+
+// ---------- color tokens ----------
+const C = {
+  surface:   "#0f2030",
+  surface2:  "#152a3a",
+  surface3:  "#1a3347",
+  steel:     "#669bbc",
+  border:    "rgba(102,155,188,0.12)",
+  borderMd:  "rgba(102,155,188,0.22)",
+  text:      "#e8eef2",
+  muted:     "#7a9ab0",
+  dim:       "#3a5a6e",
+  green:     "#2ed573",
+  greenDim:  "#0f2a1e",
+  orange:    "#f5a623",
+  orangeDim: "#2a1a08",
+  red:       "#ff4757",
+  redDim:    "#2a0f12",
+};
 
 function getDisplayFilename(p: Photo): string {
   return (p.originalFilename ?? "").trim() || String(p.orderIndex);
@@ -17,29 +51,33 @@ function getDisplayFilename(p: Photo): string {
 
 type V1Target = { id: string; photo: Photo; filename: string };
 
+// ---------- main page ----------
 export default function UploadVersionsPage() {
-  const params = useParams();
-  const router = useRouter();
-  const id = params.id as string;
+  const params  = useParams();
+  const router  = useRouter();
+  const id      = params.id as string;
 
-  const multiInputRef = useRef<HTMLInputElement | null>(null);
+  const multiInputRef   = useRef<HTMLInputElement | null>(null);
   const perItemInputRef = useRef<HTMLInputElement | null>(null);
 
   const [perItemTargetId, setPerItemTargetId] = useState<string | null>(null);
-  const [project, setProject] = useState<Project | null>(null);
-  const [photos, setPhotos] = useState<Photo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [mapping, setMapping] = useState<MappingResult<V1Target>[]>([]);
-  const [uploadedV1Info, setUploadedV1Info] = useState<Map<string, string>>(new Map());
-  const [dragOver, setDragOver] = useState(false);
-  const [globalMemo, setGlobalMemo] = useState("");
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [compareOpen, setCompareOpen] = useState(false);
-  const [compareInitialIndex, setCompareInitialIndex] = useState(0);
+  const [project,         setProject]         = useState<Project | null>(null);
+  const [photos,          setPhotos]          = useState<Photo[]>([]);
+  const [loading,         setLoading]         = useState(true);
+  const [uploadedFiles,   setUploadedFiles]   = useState<File[]>([]);
+  const [mapping,         setMapping]         = useState<MappingResult<V1Target>[]>([]);
+  const [uploadedV1Info,  setUploadedV1Info]  = useState<Map<string, string>>(new Map());
+  const [dragOver,        setDragOver]        = useState(false);
+  const [globalMemo,      setGlobalMemo]      = useState("");
+  const [showConfirm,     setShowConfirm]     = useState(false);
+  const [submitting,      setSubmitting]      = useState(false);
+  const [error,           setError]           = useState<string | null>(null);
+  const [compareOpen,     setCompareOpen]     = useState(false);
+  const [compareInitIdx,  setCompareInitIdx]  = useState(0);
+  const [lightboxItems,   setLightboxItems]   = useState<Array<{ url: string; label: string; sublabel?: string | null }>>([]);
+  const [lightboxIndex,   setLightboxIndex]   = useState<number | null>(null);
 
+  // ── load project + selected photos ──
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -57,44 +95,35 @@ export default function UploadVersionsPage() {
           setPhotos(selected);
         });
       })
-      .catch((e) => {
-        if (!cancelled) {
-          console.error(e);
-          setError(e instanceof Error ? e.message : "로드 실패");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .catch((e) => { if (!cancelled) { console.error(e); setError(e instanceof Error ? e.message : "로드 실패"); } })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [id]);
 
+  // ── route guard ──
   useEffect(() => {
     if (!project || !id) return;
     if (project.status === "editing" || project.status === "reviewing_v1") return;
     if (project.status === "editing_v2" || project.status === "reviewing_v2") {
-      router.replace(`/photographer/projects/${id}/upload-versions/v2`);
-      return;
+      router.replace(`/photographer/projects/${id}/upload-versions/v2`); return;
     }
     router.replace(`/photographer/projects/${id}`);
   }, [project, id, router]);
 
   const isReadOnly = project?.status === "reviewing_v1";
 
-  const targets = useMemo<V1Target[]>(() => {
-    return photos.map((photo) => ({ id: photo.id, photo, filename: getDisplayFilename(photo) }));
-  }, [photos]);
+  const targets = useMemo<V1Target[]>(
+    () => photos.map((photo) => ({ id: photo.id, photo, filename: getDisplayFilename(photo) })),
+    [photos]
+  );
 
+  // ── rebuild mapping when files change ──
   useEffect(() => {
-    if (uploadedFiles.length === 0) {
-      setMapping([]);
-      return;
-    }
+    if (uploadedFiles.length === 0) { setMapping([]); return; }
     setMapping(buildVersionMapping(uploadedFiles, targets));
   }, [uploadedFiles, targets]);
 
+  // ── load server-side v1 info when read-only ──
   useEffect(() => {
     if (!id || !isReadOnly) return;
     let cancelled = false;
@@ -109,12 +138,8 @@ export default function UploadVersionsPage() {
         });
         setUploadedV1Info(info);
       })
-      .catch(() => {
-        if (!cancelled) setUploadedV1Info(new Map());
-      });
-    return () => {
-      cancelled = true;
-    };
+      .catch(() => { if (!cancelled) setUploadedV1Info(new Map()); });
+    return () => { cancelled = true; };
   }, [id, isReadOnly]);
 
   const mappedCount = useMemo(() => {
@@ -124,69 +149,51 @@ export default function UploadVersionsPage() {
 
   const localPreviewMap = useMemo(() => {
     const m = new Map<string, string>();
-    mapping.forEach((item) => {
-      if (item.file) m.set(item.target.id, URL.createObjectURL(item.file));
-    });
+    mapping.forEach((item) => { if (item.file) m.set(item.target.id, URL.createObjectURL(item.file)); });
     return m;
   }, [mapping]);
 
-  useEffect(() => {
-    return () => {
-      localPreviewMap.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, [localPreviewMap]);
+  useEffect(() => () => { localPreviewMap.forEach((url) => URL.revokeObjectURL(url)); }, [localPreviewMap]);
 
   const comparePhotos = useMemo(() => {
     return targets
       .map((t) => {
-        const localUrl = localPreviewMap.get(t.id);
-        const serverUrl = uploadedV1Info.get(t.id);
-        const retouchedUrl = localUrl ?? serverUrl ?? "";
+        const retouchedUrl = localPreviewMap.get(t.id) ?? uploadedV1Info.get(t.id) ?? "";
         if (!retouchedUrl) return null;
         return {
           original: { url: t.photo.url, filename: t.filename },
           retouched: { url: retouchedUrl, filename: t.filename },
         };
       })
-      .filter(Boolean) as Array<{
-      original: { url: string; filename: string };
-      retouched: { url: string; filename: string };
-    }>;
+      .filter(Boolean) as Array<{ original: { url: string; filename: string }; retouched: { url: string; filename: string } }>;
   }, [targets, localPreviewMap, uploadedV1Info]);
 
-  const openCompareByTarget = useCallback(
-    (targetId: string) => {
-      const idx = comparePhotos.findIndex((p) => {
-        const matched = targets.find((t) => t.id === targetId);
-        return matched ? p.original.filename === matched.filename : false;
-      });
-      if (idx < 0) return;
-      setCompareInitialIndex(idx);
-      setCompareOpen(true);
-    },
-    [comparePhotos, targets]
-  );
+  const openLightbox = useCallback((items: Array<{ url: string; label: string; sublabel?: string | null }>, index: number) => {
+    setLightboxItems(items);
+    setLightboxIndex(index);
+  }, []);
+
+  const openCompareByTarget = useCallback((targetId: string) => {
+    const matched = targets.find((t) => t.id === targetId);
+    const idx = comparePhotos.findIndex((p) => matched ? p.original.filename === matched.filename : false);
+    if (idx < 0) return;
+    setCompareInitIdx(idx);
+    setCompareOpen(true);
+  }, [comparePhotos, targets]);
 
   const stats = useMemo(() => {
-    let exact = 0;
-    let order = 0;
-    mapping.forEach((m) => {
-      if (m.type === "exact") exact += 1;
-      else if (m.type === "order") order += 1;
-    });
+    let exact = 0, order = 0;
+    mapping.forEach((m) => { if (m.type === "exact") exact++; else if (m.type === "order") order++; });
     return { exact, order };
   }, [mapping]);
 
   const canDeliver = useMemo(() => {
-    if (isReadOnly) return false;
-    if (project?.status !== "editing") return false;
-    if (targets.length === 0) return false;
+    if (isReadOnly || project?.status !== "editing" || targets.length === 0) return false;
     return mapping.length === targets.length && mapping.every((m) => m.file != null);
   }, [isReadOnly, project?.status, targets.length, mapping]);
 
   const handleDropFiles = useCallback((files: File[]) => {
-    const filtered = files.filter((f) => ["image/jpeg", "image/png", "image/webp"].includes(f.type));
-    setUploadedFiles(filtered);
+    setUploadedFiles(files.filter((f) => ["image/jpeg", "image/png", "image/webp"].includes(f.type)));
   }, []);
 
   const handleChangeOne = useCallback((targetId: string) => {
@@ -194,33 +201,23 @@ export default function UploadVersionsPage() {
     setTimeout(() => perItemInputRef.current?.click(), 0);
   }, []);
 
-  const handlePerItemSelect = useCallback(
-    (fileList: FileList | null) => {
-      if (!fileList?.length || !perItemTargetId) return;
-      const file = Array.from(fileList).find((f) => ["image/jpeg", "image/png", "image/webp"].includes(f.type));
-      if (!file) return;
-      setMapping((prev) => remapSingleFile(prev, perItemTargetId, file));
-      setPerItemTargetId(null);
-    },
-    [perItemTargetId]
-  );
+  const handlePerItemSelect = useCallback((fileList: FileList | null) => {
+    if (!fileList?.length || !perItemTargetId) return;
+    const file = Array.from(fileList).find((f) => ["image/jpeg", "image/png", "image/webp"].includes(f.type));
+    if (!file) return;
+    setMapping((prev) => remapSingleFile(prev, perItemTargetId, file));
+    setPerItemTargetId(null);
+  }, [perItemTargetId]);
 
   const handleDeliver = useCallback(async () => {
     if (!project || !canDeliver) return;
-
-    setSubmitting(true);
-    setError(null);
+    setSubmitting(true); setError(null);
     try {
       const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
       const token = session?.access_token;
-      if (userError || !user) throw new Error("로그인 인증을 확인할 수 없습니다. 다시 로그인 후 시도해주세요.");
+      if (userError || !user) throw new Error("로그인 인증을 확인할 수 없습니다.");
       if (!token) throw new Error("로그인이 필요합니다.");
 
       const ordered = mapping.filter((m) => m.file != null) as Array<MappingResult<V1Target> & { file: File }>;
@@ -232,292 +229,744 @@ export default function UploadVersionsPage() {
       form.append("global_memo", globalMemo);
 
       const uploadRes = await fetch("/api/photographer/upload-versions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
+        method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form,
       });
       const uploadData = await uploadRes.json().catch(() => ({}));
       if (!uploadRes.ok) {
-        const msg =
-          uploadData.error ??
-          (typeof uploadData.detail === "string"
-            ? uploadData.detail
-            : Array.isArray(uploadData.detail)
-              ? uploadData.detail[0]?.msg ?? uploadData.detail[0]?.message
-              : null);
+        const msg = uploadData.error ?? (typeof uploadData.detail === "string"
+          ? uploadData.detail : Array.isArray(uploadData.detail)
+            ? uploadData.detail[0]?.msg ?? uploadData.detail[0]?.message : null);
         throw new Error(msg ?? "업로드 실패");
       }
 
       const patchRes = await fetch(`/api/photographer/projects/${id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "reviewing_v1" }),
       });
       const patchData = await patchRes.json().catch(() => ({}));
       if (!patchRes.ok) throw new Error(patchData.error ?? "상태 변경 실패");
-
       router.push(`/photographer/projects/${id}`);
     } catch (e) {
-      console.error(e);
       setError(e instanceof Error ? e.message : "전달 실패");
     } finally {
-      setSubmitting(false);
-      setShowConfirmModal(false);
+      setSubmitting(false); setShowConfirm(false);
     }
   }, [project, canDeliver, mapping, id, globalMemo, router]);
 
+  // ── derived display ──
+  const displayMapping = mapping.length > 0 ? mapping : buildVersionMapping([], targets);
+  const emptyCount = mapping.length > 0 ? mapping.filter((m) => m.file == null).length : 0;
+
+  const readOnlyItems = isReadOnly
+    ? targets.map((t) => ({
+        target: t,
+        type: (uploadedV1Info.has(t.id) ? "exact" : "none") as "exact" | "none",
+        serverUrl: uploadedV1Info.get(t.id),
+      }))
+    : [];
+
+  const lightboxTargetItems = useMemo(
+    () => targets.map((t) => ({ url: t.photo.url, label: t.filename })),
+    [targets]
+  );
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-zinc-400">로딩 중...</p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "48px 0" }}>
+        <span style={{ color: C.muted }}>로딩 중...</span>
       </div>
     );
   }
-
   if (!project) return null;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 pb-28 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-white">v1 보정본 업로드</h1>
-        <Link href={`/photographer/projects/${id}`}>
-          <Button variant="ghost" size="sm">프로젝트로</Button>
-        </Link>
-      </div>
+    <div style={{ display: "flex", flexDirection: "column" }}>
 
-      {isReadOnly && (
-        <Card className="border-[#4f7eff]/30 bg-[#4f7eff]/5">
-          <p className="text-sm text-zinc-200">고객이 v1 보정본을 검토 중입니다</p>
-          <p className="mt-1 text-xs text-zinc-400">현재는 보기 전용 모드입니다.</p>
-        </Card>
-      )}
-
-      <Card>
-        <div className="flex items-center justify-between gap-3">
+      {/* ── Topbar ── */}
+      <div style={{
+        height: 52, borderBottom: `1px solid ${C.border}`,
+        display: "flex", alignItems: "center", padding: "0 24px",
+        background: "rgba(13,30,40,0.85)", backdropFilter: "blur(12px)",
+        position: "sticky", top: 0, zIndex: 50,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            onClick={() => router.push(`/photographer/projects/${id}`)}
+            style={{
+              display: "flex", alignItems: "center", gap: 5,
+              padding: "5px 10px", borderRadius: 7,
+              border: `1px solid ${C.border}`, background: "transparent",
+              color: C.muted, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            <ArrowLeft size={13} />
+            프로젝트 상세로
+          </button>
           <div>
-            <h2 className="text-sm font-semibold text-zinc-200">고객 선택 사진 목록</h2>
-            <p className="mt-1 text-xs text-zinc-500">총 {targets.length}장</p>
+            <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>v1 보정본 업로드</div>
+            <div style={{ fontSize: 11, color: C.dim }}>
+              {project.name} · {project.customerName} · {targets.length}장 선택됨
+            </div>
           </div>
         </div>
-        <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {targets.map((t) => (
-            <li key={t.id} className="group rounded-lg border border-zinc-800 bg-zinc-900/30 p-2">
-              <div className="relative flex items-center gap-3">
-              <div className="h-16 w-16 overflow-hidden rounded bg-zinc-800">
-                <img src={t.photo.url} alt="" className="h-full w-full object-cover" />
-              </div>
-              <div className="min-w-0 flex-1 truncate text-sm text-zinc-200" title={t.filename}>
-                {t.filename}
-              </div>
-              {(localPreviewMap.get(t.id) || uploadedV1Info.get(t.id)) && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                  onClick={() => openCompareByTarget(t.id)}
-                >
-                  보정본과 비교
-                </Button>
+      </div>
+
+      {/* ── Reviewing banner ── */}
+      {isReadOnly && (
+        <div style={{
+          margin: "16px 24px 0",
+          background: "rgba(102,155,188,0.06)", border: "1px solid rgba(102,155,188,0.2)",
+          borderRadius: 12, padding: "14px 20px",
+          display: "flex", alignItems: "center", gap: 12,
+        }}>
+          <CheckCircle2 size={18} color={C.steel} />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.steel }}>고객이 v1 보정본을 검토 중입니다</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>현재는 보기 전용 모드입니다.</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 2-column grid ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", minHeight: "calc(100vh - 52px)" }}>
+
+        {/* ── Left col ── */}
+        <div style={{ padding: "20px 20px 100px 24px", borderRight: `1px solid ${C.border}` }}>
+
+          {/* Selected photos */}
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: C.dim }}>
+                고객 선택 사진
+              </span>
+              <span style={{
+                background: C.surface2, border: `1px solid ${C.border}`,
+                borderRadius: 10, padding: "1px 7px",
+                fontSize: 10, color: C.muted,
+              }}>
+                {targets.length}장
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
+              {targets.map((t, i) => (
+                <SelectedThumb
+                  key={t.id}
+                  target={t}
+                  num={i + 1}
+                  onClick={() => t.photo.url && openLightbox(lightboxTargetItems, i)}
+                />
+              ))}
+              {targets.length === 0 && (
+                <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "20px 0", fontSize: 13, color: C.dim }}>
+                  선택된 사진이 없습니다.
+                </div>
               )}
+            </div>
+          </div>
+
+          {/* Dropzone */}
+          {!isReadOnly && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: C.dim, marginBottom: 10 }}>
+                보정본 업로드
               </div>
-            </li>
-          ))}
-          {targets.length === 0 && <li className="text-sm text-zinc-500">선택된 사진이 없습니다.</li>}
-        </ul>
-      </Card>
-
-      <Card>
-        <h2 className="text-sm font-semibold text-zinc-200">보정본 업로드 + 매핑</h2>
-        <p className="mt-1 text-xs text-zinc-500">선택된 {targets.length}장에 맞춰 업로드해주세요.</p>
-
-        {!isReadOnly && (
-          <div
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragOver(false);
-              handleDropFiles(Array.from(e.dataTransfer.files));
-            }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={(e) => {
-              e.preventDefault();
-              setDragOver(false);
-            }}
-            className={`mt-4 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors ${
-              dragOver ? "border-primary bg-primary/10" : "border-zinc-700 bg-zinc-800/30"
-            }`}
-          >
-            {uploadedFiles.length === 0 ? (
-              <>
-                <p className="text-sm text-zinc-300">드래그&드롭 또는 클릭하여 여러 파일을 선택하세요</p>
-                <p className="mt-1 text-xs text-zinc-500">JPEG/PNG/WebP</p>
-                <div className="mt-3">
-                  <Button variant="outline" onClick={() => multiInputRef.current?.click()} disabled={targets.length === 0}>
-                    파일 선택
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-zinc-200">{uploadedFiles.length}장 업로드됨</p>
-                <div className="mt-3">
-                  <Button variant="outline" onClick={() => multiInputRef.current?.click()}>
-                    다시 선택
-                  </Button>
-                </div>
-              </>
-            )}
-            <input
-              ref={multiInputRef}
-              type="file"
-              multiple
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(e) => handleDropFiles(Array.from(e.target.files ?? []))}
-            />
-            <input
-              ref={perItemInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(e) => handlePerItemSelect(e.target.files)}
-            />
-          </div>
-        )}
-
-        {mapping.length > 0 && (
-          <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/30 px-4 py-3 text-sm text-zinc-300">
-            매핑 통계: <span className="text-success">파일명 일치 {stats.exact}</span> ·{" "}
-            <span className="text-warning">순서 매핑 {stats.order}</span>
-          </div>
-        )}
-
-        <div className="mt-4 space-y-2">
-          {(mapping.length > 0 ? mapping : buildVersionMapping([], targets)).map((m) => {
-            const uploadedOnServer = isReadOnly && uploadedV1Info.has(m.target.id);
-            return (
-            <div key={m.target.id} className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3">
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto_1fr] md:items-center">
-                <button
-                  type="button"
-                  className="min-w-0 text-left"
-                  onClick={() => (localPreviewMap.get(m.target.id) || uploadedV1Info.get(m.target.id)) && openCompareByTarget(m.target.id)}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-zinc-800">
-                      <img src={m.target.photo.url} alt="" className="h-full w-full object-cover" />
+              <div
+                onDrop={(e) => { e.preventDefault(); setDragOver(false); handleDropFiles(Array.from(e.dataTransfer.files)); }}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
+                onClick={() => uploadedFiles.length === 0 && multiInputRef.current?.click()}
+                style={{
+                  border: `2px dashed ${uploadedFiles.length > 0 ? "rgba(46,213,115,0.4)" : dragOver ? C.steel : C.borderMd}`,
+                  borderRadius: 12, padding: "22px 20px", textAlign: "center",
+                  cursor: uploadedFiles.length === 0 ? "pointer" : "default",
+                  background: uploadedFiles.length > 0 ? "rgba(46,213,115,0.02)" : dragOver ? "rgba(102,155,188,0.05)" : "rgba(102,155,188,0.02)",
+                  transition: "all 0.2s",
+                }}
+              >
+                {uploadedFiles.length === 0 ? (
+                  <>
+                    <div style={{ marginBottom: 8, display: "flex", justifyContent: "center" }}>
+                      <FolderOpen size={24} color={C.dim} />
                     </div>
-                    <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-zinc-200" title={m.target.filename}>{m.target.filename}</div>
-                  <div className="mt-1 text-xs text-zinc-500">원본 선택 사진</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: C.text, marginBottom: 4 }}>
+                      드래그&드롭 또는 파일을 선택하세요
                     </div>
-                  </div>
-                </button>
-                <div className="hidden md:flex items-center justify-center text-zinc-500">→</div>
-                <div className="min-w-0">
-                  <div className="truncate text-sm text-zinc-200" title={m.file?.name ?? ""}>
-                    {m.file?.name ?? (uploadedOnServer ? "업로드 완료" : "업로드 필요")}
-                  </div>
-                  {(m.file || uploadedOnServer) && (
-                    <div className="mt-1 flex items-center gap-2">
-                      <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-zinc-800">
-                        <img
-                          src={m.file ? localPreviewMap.get(m.target.id) : uploadedV1Info.get(m.target.id)}
-                          alt=""
-                          className="h-full w-full cursor-zoom-in object-cover"
-                          onClick={() => openCompareByTarget(m.target.id)}
-                        />
-                      </div>
-                      {m.file && (
-                        <span className="text-xs text-zinc-500">
-                          {(m.file.size / 1024 / 1024).toFixed(2)} MB
-                        </span>
+                    <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>JPEG / PNG / WebP</div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); multiInputRef.current?.click(); }}
+                      disabled={targets.length === 0}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 5,
+                        padding: "7px 16px", background: C.steel, color: "white",
+                        border: "none", borderRadius: 7, fontSize: 12, fontWeight: 500,
+                        cursor: targets.length === 0 ? "not-allowed" : "pointer", fontFamily: "inherit",
+                      }}
+                    >
+                      <Upload size={13} />
+                      파일 선택
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ marginBottom: 8, display: "flex", justifyContent: "center" }}>
+                      <CheckCircle2 size={24} color={C.green} />
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: C.text, marginBottom: 4 }}>
+                      {uploadedFiles.length}장 업로드됨
+                    </div>
+                    <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>
+                      파일명 자동 매핑 완료 · 아래에서 확인해주세요
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); multiInputRef.current?.click(); }}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 5,
+                        padding: "7px 16px", background: C.surface3, color: C.muted,
+                        border: `1px solid ${C.border}`, borderRadius: 7, fontSize: 12, fontWeight: 500,
+                        cursor: "pointer", fontFamily: "inherit",
+                      }}
+                    >
+                      <RefreshCw size={13} />
+                      다시 선택
+                    </button>
+                  </>
+                )}
+                <div style={{ marginTop: 10, fontSize: 10, color: C.dim }}>
+                  파일명 일치 시 자동 매핑 · 불일치 시 순서대로 매핑
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Mapping section */}
+          {(displayMapping.length > 0 || isReadOnly) && (
+            <>
+              {/* Divider */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 0" }}>
+                <div style={{ flex: 1, height: 1, background: C.border }} />
+                <div style={{ fontSize: 11, color: C.dim, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 8 }}>
+                  매핑 결과
+                  {mapping.length > 0 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      {stats.exact > 0 && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11 }}>
+                          <div style={{ width: 6, height: 6, borderRadius: "50%", background: C.green }} />
+                          <span style={{ color: C.green }}>파일명 일치 {stats.exact}장</span>
+                        </div>
+                      )}
+                      {stats.order > 0 && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11 }}>
+                          <div style={{ width: 6, height: 6, borderRadius: "50%", background: C.orange }} />
+                          <span style={{ color: C.orange }}>순서 매핑 {stats.order}장</span>
+                        </div>
                       )}
                     </div>
                   )}
-                  <div className="mt-1 flex items-center gap-2">
-                    {uploadedOnServer && (
-                      <span className="rounded bg-success/15 px-2 py-0.5 text-xs font-semibold text-success">✓ 서버 업로드 확인</span>
-                    )}
-                    {m.type === "exact" && !uploadedOnServer && <span className="rounded bg-success/15 px-2 py-0.5 text-xs font-semibold text-success">✓ 파일명 일치</span>}
-                    {m.type === "order" && !uploadedOnServer && <span className="rounded bg-warning/15 px-2 py-0.5 text-xs font-semibold text-warning">↕ 순서 매핑</span>}
-                    {!isReadOnly && (
-                      <Button variant="outline" size="sm" onClick={() => handleChangeOne(m.target.id)}>
-                        변경
-                      </Button>
-                    )}
-                  </div>
                 </div>
+                <div style={{ flex: 1, height: 1, background: C.border }} />
               </div>
+
+              {/* Cards */}
+              {isReadOnly
+                ? readOnlyItems.map((item) => (
+                    <MappingCard
+                      key={item.target.id}
+                      target={item.target}
+                      file={null}
+                      type={item.type}
+                      orderIndex={undefined}
+                      previewUrl={item.serverUrl}
+                      isReadOnly
+                      onChangeOne={handleChangeOne}
+                      onCompare={openCompareByTarget}
+                      onOpenLightbox={openLightbox}
+                    />
+                  ))
+                : displayMapping.map((m) => (
+                    <MappingCard
+                      key={m.target.id}
+                      target={m.target}
+                      file={m.file}
+                      type={m.type}
+                      orderIndex={m.orderIndex}
+                      previewUrl={localPreviewMap.get(m.target.id)}
+                      isReadOnly={false}
+                      onChangeOne={handleChangeOne}
+                      onCompare={openCompareByTarget}
+                      onOpenLightbox={openLightbox}
+                    />
+                  ))}
+            </>
+          )}
+
+          {error && (
+            <div style={{
+              marginTop: 12, padding: "10px 14px",
+              background: "rgba(255,71,87,0.1)", border: "1px solid rgba(255,71,87,0.2)",
+              borderRadius: 8, fontSize: 13, color: C.red,
+            }}>
+              {error}
             </div>
-          );
-          })}
+          )}
         </div>
-      </Card>
 
-      <Card>
-        <label className="mb-2 block text-sm font-medium text-zinc-300">작가 메모 (선택)</label>
-        <textarea
-          value={globalMemo}
-          onChange={(e) => setGlobalMemo(e.target.value)}
-          placeholder="고객에게 전달됩니다"
-          className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-primary"
-          rows={3}
-          disabled={isReadOnly}
-        />
-      </Card>
+        {/* ── Right col ── */}
+        <div style={{ padding: "20px 20px 100px", background: "rgba(0,0,0,0.1)" }}>
 
-      {error && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
-
-      {!isReadOnly && (
-        <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/90 backdrop-blur">
-          <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-zinc-200">
-                업로드 현황 <span className="font-mono text-zinc-400">{mappedCount}</span> /{" "}
-                <span className="font-mono text-zinc-400">{targets.length}</span>
+          {/* Project info */}
+          <div style={{
+            background: C.surface, border: `1px solid ${C.border}`,
+            borderRadius: 12, padding: "14px 16px", marginBottom: 12,
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 10, letterSpacing: "0.5px", textTransform: "uppercase" }}>
+              프로젝트 정보
+            </div>
+            {([
+              { key: "프로젝트",   val: project.name,              style: {} },
+              { key: "고객",       val: project.customerName || "—", style: {} },
+              { key: "선택 사진",  val: `${targets.length}장`,      style: { color: C.steel } },
+              { key: "업로드 현황",val: `${mappedCount} / ${targets.length}장`,
+                style: { color: mappedCount < targets.length ? C.orange : C.green } as CSSProperties },
+            ] as { key: string; val: string; style: CSSProperties }[]).map((row, i, arr) => (
+              <div key={row.key} style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "6px 0", borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : "none",
+              }}>
+                <span style={{ fontSize: 11, color: C.dim }}>{row.key}</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: C.text, ...row.style }}>{row.val}</span>
               </div>
-              <div className="mt-2 h-2 rounded-full bg-zinc-800 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-primary"
-                  style={{
-                    width: targets.length > 0 ? `${Math.min(100, Math.round((mappedCount / targets.length) * 100))}%` : "0%",
-                  }}
-                />
+            ))}
+          </div>
+
+          {/* Memo */}
+          <div style={{
+            background: C.surface, border: `1px solid ${C.border}`,
+            borderRadius: 12, padding: "14px 16px",
+          }}>
+            <div style={{
+              fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 10,
+              letterSpacing: "0.5px", textTransform: "uppercase",
+              display: "flex", alignItems: "center", gap: 5,
+            }}>
+              <FileText size={12} />
+              전체 작가 메모
+            </div>
+            <textarea
+              value={globalMemo}
+              onChange={(e) => setGlobalMemo(e.target.value)}
+              placeholder="고객에게 전달할 메모 (선택사항)"
+              disabled={isReadOnly}
+              style={{
+                width: "100%", padding: "10px 12px",
+                background: C.surface2, border: `1px solid ${C.border}`,
+                borderRadius: 8, color: C.text,
+                fontSize: 12, fontFamily: "inherit",
+                resize: "none", height: 72, lineHeight: 1.5, outline: "none",
+              }}
+            />
+            <div style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>
+              고객 검토 화면에 표시됩니다
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Bottom action bar ── */}
+      {!isReadOnly && (
+        <div style={{
+          position: "fixed", bottom: 0, left: 220, right: 0,
+          background: "rgba(0,48,73,0.95)",
+          borderTop: "1px solid rgba(102,155,188,0.15)",
+          backdropFilter: "blur(12px)",
+          padding: "12px 24px",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          zIndex: 100,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>v1 보정본 업로드 현황</div>
+              <div style={{ fontSize: 11, color: emptyCount > 0 ? C.orange : C.muted }}>
+                {emptyCount > 0 ? `미업로드 ${emptyCount}장 · 매핑 확인 후 전달해주세요` : "매핑 확인 후 전달해주세요"}
               </div>
             </div>
-            <Button variant="primary" disabled={!canDeliver || submitting} onClick={() => setShowConfirmModal(true)}>
-              고객에게 전달
-            </Button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 100, height: 3, background: "rgba(255,255,255,0.1)", borderRadius: 2, overflow: "hidden" }}>
+                <div style={{
+                  height: "100%", borderRadius: 2, background: C.steel, transition: "width 0.3s",
+                  width: targets.length > 0 ? `${Math.min(100, Math.round((mappedCount / targets.length) * 100))}%` : "0%",
+                }} />
+              </div>
+              <span style={{ fontSize: 11, color: C.muted }}>{mappedCount} / {targets.length}장 업로드</span>
+            </div>
+          </div>
+          <button
+            disabled={!canDeliver || submitting}
+            onClick={() => setShowConfirm(true)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "9px 22px",
+              background: canDeliver ? C.steel : C.surface3,
+              border: "none", borderRadius: 9,
+              color: canDeliver ? "white" : C.dim,
+              fontSize: 13, fontWeight: 600,
+              cursor: canDeliver ? "pointer" : "not-allowed",
+              fontFamily: "inherit",
+            }}
+          >
+            고객에게 전달
+            <Send size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* ── Confirm modal ── */}
+      {showConfirm && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.7)", padding: 16,
+        }}>
+          <div style={{
+            background: C.surface, border: `1px solid ${C.borderMd}`,
+            borderRadius: 14, padding: 24, width: "100%", maxWidth: 380,
+          }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: C.text, marginBottom: 8 }}>고객에게 전달</h3>
+            <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.6, marginBottom: 24 }}>
+              v1 보정본 {mappedCount}장을 고객에게 전달하시겠습니까?
+              <br />전달 후 고객이 v1 검토를 진행합니다.
+            </p>
+            {error && <p style={{ marginBottom: 12, fontSize: 13, color: C.red }}>{error}</p>}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => setShowConfirm(false)} disabled={submitting}
+                style={{
+                  flex: 1, padding: "10px 0", background: "transparent",
+                  border: `1px solid ${C.border}`, borderRadius: 8,
+                  color: C.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={handleDeliver} disabled={submitting || !canDeliver}
+                style={{
+                  flex: 1, padding: "10px 0",
+                  background: "rgba(102,155,188,0.15)",
+                  border: "1px solid rgba(102,155,188,0.3)", borderRadius: 8,
+                  color: C.steel, fontSize: 13, fontWeight: 500,
+                  cursor: submitting ? "not-allowed" : "pointer", fontFamily: "inherit",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                }}
+              >
+                {submitting ? "처리 중..." : "전달하기"}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <Card className="w-full max-w-sm">
-            <h3 className="text-lg font-semibold text-white">고객에게 전달</h3>
-            <p className="mt-2 text-sm text-zinc-400">
-              보정본 {mappedCount}장을 고객에게 전달하시겠습니까?
-              <br />전달 후 고객이 v1 검토를 진행합니다.
-            </p>
-            <div className="mt-6 flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowConfirmModal(false)} disabled={submitting}>취소</Button>
-              <Button variant="primary" className="flex-1" disabled={submitting || !canDeliver} onClick={handleDeliver}>
-                {submitting ? <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />처리 중...</span> : "전달"}
-              </Button>
-            </div>
-          </Card>
-        </div>
+      {/* ── Hidden file inputs ── */}
+      <input ref={multiInputRef} type="file" multiple accept="image/jpeg,image/png,image/webp"
+        style={{ display: "none" }} onChange={(e) => handleDropFiles(Array.from(e.target.files ?? []))} />
+      <input ref={perItemInputRef} type="file" accept="image/jpeg,image/png,image/webp"
+        style={{ display: "none" }} onChange={(e) => handlePerItemSelect(e.target.files)} />
+
+      {lightboxIndex !== null && lightboxItems.length > 0 && (
+        <Lightbox
+          items={lightboxItems}
+          index={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onPrev={() => setLightboxIndex((i) => i !== null ? (i - 1 + lightboxItems.length) % lightboxItems.length : null)}
+          onNext={() => setLightboxIndex((i) => i !== null ? (i + 1) % lightboxItems.length : null)}
+        />
       )}
+
       <CompareViewerModal
         isOpen={compareOpen}
         onClose={() => setCompareOpen(false)}
         photos={comparePhotos}
-        initialIndex={compareInitialIndex}
+        initialIndex={compareInitIdx}
       />
+    </div>
+  );
+}
+
+// ---------- sub-components ----------
+
+function SelectedThumb({ target, num, onClick }: { target: V1Target; num: number; onClick?: () => void }) {
+  const [err, setErr] = useState(false);
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: C.surface, border: `1px solid ${C.border}`,
+        borderRadius: 8, overflow: "hidden",
+        cursor: onClick ? "zoom-in" : "default",
+      }}
+    >
+      <div style={{ aspectRatio: "3/2", background: C.surface2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+        {target.photo.url && !err ? (
+          <img src={target.photo.url} alt="" onError={() => setErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          <Image size={16} color={C.dim} />
+        )}
+        <div style={{
+          position: "absolute", bottom: 3, left: 4,
+          fontSize: 9, color: "rgba(255,255,255,0.6)",
+          background: "rgba(0,0,0,0.4)", padding: "1px 4px", borderRadius: 3,
+        }}>
+          {num}
+        </div>
+      </div>
+      <div style={{ padding: "4px 6px", fontSize: 9, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {target.filename}
+      </div>
+    </div>
+  );
+}
+
+function MappingCard({
+  target, file, type, orderIndex, previewUrl, isReadOnly, onChangeOne, onCompare, onOpenLightbox,
+}: {
+  target: V1Target;
+  file: File | null;
+  type: "exact" | "order" | "none";
+  orderIndex?: number;
+  previewUrl?: string;
+  isReadOnly: boolean;
+  onChangeOne: (id: string) => void;
+  onCompare: (id: string) => void;
+  onOpenLightbox: (items: Array<{ url: string; label: string; sublabel?: string | null }>, index: number) => void;
+}) {
+  const [origErr, setOrigErr]     = useState(false);
+  const [retouchErr, setRetouchErr] = useState(false);
+  const state = isReadOnly ? (previewUrl ? "matched" : "empty") : type === "exact" ? "matched" : type === "order" ? "ordered" : "empty";
+  const borderColor = state === "matched" ? "rgba(46,213,115,0.2)" : state === "ordered" ? "rgba(245,166,35,0.2)" : "rgba(255,71,87,0.2)";
+  const fileSizeStr = file ? `${(file.size / 1024 / 1024).toFixed(1)}MB` : "";
+
+  return (
+    <div style={{ background: C.surface2, border: `1px solid ${borderColor}`, borderRadius: 10, overflow: "hidden", marginBottom: 7 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 32px 1fr auto", alignItems: "center", padding: "10px 14px" }}>
+
+        {/* Original */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <div
+            onClick={() => target.photo.url && onOpenLightbox([{ url: target.photo.url, label: target.filename, sublabel: "원본 선택 사진" }], 0)}
+            style={{ width: 52, height: 38, background: C.surface3, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${C.border}`, overflow: "hidden", cursor: target.photo.url ? "zoom-in" : "default" }}
+          >
+            {target.photo.url && !origErr ? (
+              <img src={target.photo.url} alt="" onError={() => setOrigErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : <Image size={16} color={C.dim} />}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2, color: C.text }}>{target.filename}</div>
+            <div style={{ fontSize: 10, color: C.muted }}>원본 선택 사진</div>
+          </div>
+        </div>
+
+        {/* Arrow */}
+        <div style={{ display: "flex", justifyContent: "center", color: C.dim }}><ArrowRight size={13} /></div>
+
+        {/* Retouched */}
+        {state === "empty" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <div style={{ width: 52, height: 38, background: "transparent", borderRadius: 5, border: `2px dashed ${C.border}`, flexShrink: 0 }} />
+            <div style={{ fontSize: 11, color: C.dim, fontStyle: "italic" }}>보정본 없음</div>
+          </div>
+        ) : (
+          <div
+            style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, cursor: previewUrl ? "zoom-in" : "default" }}
+            onClick={() => previewUrl && onCompare(target.id)}
+          >
+            <div style={{ width: 52, height: 38, background: "#1a2535", borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+              {previewUrl && !retouchErr ? (
+                <img src={previewUrl} alt="" onError={() => setRetouchErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : <Image size={16} color={C.dim} />}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2, color: C.text }}>
+                {file?.name ?? (isReadOnly ? "업로드 완료" : "")}
+              </div>
+              {fileSizeStr && <div style={{ fontSize: 10, color: C.muted }}>{fileSizeStr}</div>}
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, paddingLeft: 8 }}>
+          {state === "matched" && (
+            <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 500, whiteSpace: "nowrap", color: C.green, background: C.greenDim, border: "1px solid rgba(46,213,115,0.3)", display: "flex", alignItems: "center", gap: 3 }}>
+              <Check size={9} />파일명 일치
+            </span>
+          )}
+          {state === "ordered" && (
+            <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 500, whiteSpace: "nowrap", color: C.orange, background: C.orangeDim, border: "1px solid rgba(245,166,35,0.3)", display: "flex", alignItems: "center", gap: 3 }}>
+              <ArrowUpDown size={9} />순서 매핑
+            </span>
+          )}
+          {state === "empty" && (
+            <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 500, whiteSpace: "nowrap", color: C.red, background: C.redDim, border: "1px solid rgba(255,71,87,0.3)", display: "flex", alignItems: "center", gap: 3 }}>
+              <AlertCircle size={9} />미업로드
+            </span>
+          )}
+          {!isReadOnly && (
+            <button
+              onClick={() => onChangeOne(target.id)}
+              style={{
+                padding: "3px 8px", borderRadius: 5,
+                border: `1px solid ${state === "empty" ? "rgba(102,155,188,0.3)" : C.border}`,
+                background: "transparent",
+                color: state === "empty" ? C.steel : C.dim,
+                fontSize: 10, cursor: "pointer", fontFamily: "inherit",
+                display: "flex", alignItems: "center", gap: 3,
+                transition: "all 0.15s",
+              }}
+            >
+              {state === "empty" ? "선택" : <><Pencil size={9} />변경</>}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Ordered warning */}
+      {state === "ordered" && !isReadOnly && (
+        <div style={{
+          padding: "5px 14px",
+          borderTop: "1px solid rgba(245,166,35,0.12)",
+          background: "rgba(245,166,35,0.04)",
+          fontSize: 10, color: C.orange,
+        }}>
+          파일명 불일치 · 업로드 순서({(orderIndex ?? 0) + 1}번째)로 자동 매핑됐습니다. 다른 사진이면 [변경]을 눌러주세요.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Lightbox ----------
+
+function Lightbox({
+  items, index, onClose, onPrev, onNext,
+}: {
+  items: Array<{ url: string; label: string; sublabel?: string | null }>;
+  index: number;
+  onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const item = items[index];
+  const multi = items.length > 1;
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft" && multi) onPrev();
+      if (e.key === "ArrowRight" && multi) onNext();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose, onPrev, onNext, multi]);
+
+  if (!item) return null;
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 500,
+        background: "rgba(0,0,0,0.9)",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      }}
+    >
+      {/* Close */}
+      <button
+        onClick={onClose}
+        style={{
+          position: "absolute", top: 16, right: 16,
+          background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "50%",
+          width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: "pointer", color: C.text,
+        }}
+      >
+        <X size={18} />
+      </button>
+
+      {/* Counter */}
+      {multi && (
+        <div style={{
+          position: "absolute", top: 20, left: "50%", transform: "translateX(-50%)",
+          fontSize: 12, color: C.muted,
+        }}>
+          {index + 1} / {items.length}
+        </div>
+      )}
+
+      {/* Prev */}
+      {multi && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onPrev(); }}
+          style={{
+            position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
+            background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "50%",
+            width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", color: C.text,
+          }}
+        >
+          <ChevronLeft size={20} />
+        </button>
+      )}
+
+      {/* Image */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: "calc(100vw - 120px)", maxHeight: "calc(100vh - 120px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        <img
+          src={item.url}
+          alt={item.label}
+          style={{ maxWidth: "100%", maxHeight: "calc(100vh - 120px)", objectFit: "contain", borderRadius: 6 }}
+        />
+      </div>
+
+      {/* Next */}
+      {multi && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNext(); }}
+          style={{
+            position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
+            background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "50%",
+            width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", color: C.text,
+          }}
+        >
+          <ChevronRight size={20} />
+        </button>
+      )}
+
+      {/* Info bar */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: "absolute", bottom: 0, left: 0, right: 0,
+          padding: "14px 24px",
+          background: "linear-gradient(transparent, rgba(0,0,0,0.7))",
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+        }}
+      >
+        <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{item.label}</div>
+        {item.sublabel && (
+          <div style={{
+            fontSize: 11, color: C.muted,
+            background: "rgba(102,155,188,0.12)", border: "1px solid rgba(102,155,188,0.25)",
+            borderRadius: 6, padding: "3px 10px",
+          }}>
+            {item.sublabel}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

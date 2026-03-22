@@ -26,6 +26,8 @@ export interface Photo {
   url: string; // mock: placeholder or path
   /** DB original_filename. 없으면 URL에서 추출하거나 number로 fallback */
   originalFilename?: string | null;
+  /** DB file_size (bytes). 업로드 시 저장 */
+  fileSize?: number | null;
   selected?: boolean;
   tag?: PhotoTag;
   comment?: string;

@@ -1,17 +1,45 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useState, ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { AlertTriangle } from "lucide-react";
-import { Clipboard, Download } from "lucide-react";
-import { Button, Card } from "@/components/ui";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  LayoutGrid,
+  List,
+  MessageSquare,
+  Clipboard,
+  Download,
+  ChevronRight,
+  ChevronLeft,
+  X,
+  Image,
+  AlertCircle,
+  AlertTriangle,
+} from "lucide-react";
 import { getProjectById, getPhotosWithSelections } from "@/lib/db";
 import type { Project, Photo, ColorTag } from "@/types";
-import { ConfirmCancelButton } from "../ConfirmCancelButton";
 
+// ---------- color tokens ----------
+const C = {
+  surface:   "#0f2030",
+  surface2:  "#152a3a",
+  surface3:  "#1a3347",
+  steel:     "#669bbc",
+  border:    "rgba(102,155,188,0.12)",
+  borderMd:  "rgba(102,155,188,0.22)",
+  text:      "#e8eef2",
+  muted:     "#7a9ab0",
+  dim:       "#3a5a6e",
+  green:     "#2ed573",
+  greenDim:  "#0f2a1e",
+  orange:    "#f5a623",
+  red:       "#ff4757",
+};
+
+// ---------- utils (preserved) ----------
 function sanitizeFilenamePart(s: string) {
   return s.replace(/[\\/:*?"<>|]/g, "_").trim();
 }
@@ -38,18 +66,26 @@ function getDisplayFilename(p: Photo): string {
   return (p.originalFilename ?? "").trim() || String(p.orderIndex);
 }
 
+type ViewMode = "gallery" | "list";
+
+// ---------- main page ----------
 export default function ResultsPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+
   const [project, setProject] = useState<Project | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [photoStates, setPhotoStates] = useState<Record<string, { rating?: number; color?: ColorTag; comment?: string }>>({});
+  const [photoStates, setPhotoStates] = useState<
+    Record<string, { rating?: number; color?: ColorTag; comment?: string }>
+  >({});
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showEditStartModal, setShowEditStartModal] = useState(false);
   const [editStartSubmitting, setEditStartSubmitting] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("gallery");
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   useEffect(() => {
     getProjectById(id)
@@ -61,7 +97,9 @@ export default function ResultsPage() {
       .then((result) => {
         if (!result) return;
         const selected = result.photos.filter((p) => result.selectedIds.has(p.id));
-        selected.sort((a, b) => getDisplayFilename(a).localeCompare(getDisplayFilename(b), undefined, { sensitivity: "base" }));
+        selected.sort((a, b) =>
+          getDisplayFilename(a).localeCompare(getDisplayFilename(b), undefined, { sensitivity: "base" })
+        );
         setPhotos(selected);
         setPhotoStates(result.photoStates ?? {});
       })
@@ -92,13 +130,16 @@ export default function ResultsPage() {
 
   const fileNames = useMemo(() => photos.map(getDisplayFilename), [photos]);
 
+  const commentCount = useMemo(
+    () => photos.filter((p) => (photoStates[p.id]?.comment ?? "").trim()).length,
+    [photos, photoStates]
+  );
+
   const handleCopyClipboard = async () => {
     try {
-      const text = fileNames.join("\n");
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(fileNames.join("\n"));
       setToast("클립보드에 복사했습니다");
-    } catch (e) {
-      console.error(e);
+    } catch {
       setToast("복사 실패");
     }
   };
@@ -131,200 +172,714 @@ export default function ResultsPage() {
       setProject((prev) => (prev ? { ...prev, status: "editing" } : null));
       setShowEditStartModal(false);
     } catch (e) {
-      console.error(e);
       setError(e instanceof Error ? e.message : "상태 변경 실패");
     } finally {
       setEditStartSubmitting(false);
     }
   };
 
+  const isConfirmedOrBeyond =
+    project &&
+    ["confirmed", "editing", "reviewing_v1", "editing_v2", "reviewing_v2", "delivered"].includes(
+      project.status
+    );
+  const isSelecting = project?.status === "selecting";
+  const showActionBar = project && ["confirmed", "editing"].includes(project.status);
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-zinc-400">로딩 중...</p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "48px 0" }}>
+        <span style={{ color: C.muted }}>로딩 중...</span>
       </div>
     );
   }
   if (!project) return null;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 p-6">
-      <Card>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-success font-medium">✅ 고객이 최종확정했습니다</p>
-            {confirmedText && (
-              <p className="mt-1 text-sm text-zinc-400">확정일시: {confirmedText}</p>
-            )}
+    <div style={{ display: "flex", flexDirection: "column", paddingBottom: showActionBar ? 70 : 0 }}>
+
+      {/* ── Topbar ── */}
+      <div style={{
+        height: 52, borderBottom: `1px solid ${C.border}`,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "0 24px",
+        background: "rgba(13,30,40,0.85)", backdropFilter: "blur(12px)",
+        position: "sticky", top: 0, zIndex: 50,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            onClick={() => router.push(`/photographer/projects/${id}`)}
+            style={{
+              display: "flex", alignItems: "center", gap: 5,
+              padding: "5px 10px", borderRadius: 7,
+              border: `1px solid ${C.border}`, background: "transparent",
+              color: C.muted, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            <ArrowLeft size={13} />
+            프로젝트 상세로
+          </button>
+          <span style={{ fontSize: 14, fontWeight: 500, color: C.text }}>셀렉 결과</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <ExportBtn icon={<Clipboard size={13} />} label="클립보드 복사" onClick={handleCopyClipboard} />
+          <ExportBtn icon={<Download size={13} />} label="CSV" onClick={handleDownloadCsv} />
+          <ExportBtn icon={<Download size={13} />} label="TXT" onClick={handleDownloadTxt} />
+        </div>
+      </div>
+
+      {/* ── Confirmed banner ── */}
+      {isConfirmedOrBeyond && (
+        <div style={{
+          margin: "16px 24px 0",
+          background: "rgba(46,213,115,0.06)",
+          border: "1px solid rgba(46,213,115,0.2)",
+          borderRadius: 12, padding: "14px 20px",
+          display: "flex", alignItems: "center", gap: 14,
+        }}>
+          <div style={{
+            width: 36, height: 36,
+            background: C.greenDim, border: "1px solid rgba(46,213,115,0.3)",
+            borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
+          }}>
+            <CheckCircle2 size={18} color={C.green} />
           </div>
-          <div className="flex flex-wrap gap-2">
-            {project.status === "editing" && (
-              <Link href={`/photographer/projects/${id}/upload-versions`}>
-                <Button variant="primary" className="flex items-center gap-2">
-                  <span aria-hidden>📤</span>
-                  보정본 업로드
-                </Button>
-              </Link>
-            )}
-            {project.status === "confirmed" && (
-              <Button
-                variant="primary"
-                className="flex items-center gap-2"
-                onClick={() => setShowEditStartModal(true)}
-              >
-                <span aria-hidden>🎨</span>
-                보정 시작
-              </Button>
-            )}
-            {project.status === "confirmed" && (
-              <ConfirmCancelButton
-                projectId={id}
-                onSuccess={() => {
-                  setProject((prev) => (prev ? { ...prev, status: "selecting" } : prev));
-                  router.push(`/photographer/projects/${id}`);
-                }}
-              />
-            )}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: C.green, marginBottom: 3 }}>
+              고객이 최종 확정했습니다
+            </div>
+            <div style={{ fontSize: 12, color: C.muted }}>
+              확정일시: {confirmedText ?? "—"} · 총 {photos.length}장 선택됨
+            </div>
+          </div>
+          {project.status === "confirmed" && (
+            <button
+              onClick={() => setShowEditStartModal(true)}
+              style={{
+                display: "flex", alignItems: "center", gap: 5,
+                padding: "8px 16px", background: C.steel,
+                border: "none", borderRadius: 8, color: "white",
+                fontSize: 12, fontWeight: 500, cursor: "pointer",
+                fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0,
+              }}
+            >
+              보정 시작하기
+              <ChevronRight size={13} />
+            </button>
+          )}
+          {project.status === "editing" && (
+            <button
+              onClick={() => router.push(`/photographer/projects/${id}/upload-versions`)}
+              style={{
+                display: "flex", alignItems: "center", gap: 5,
+                padding: "8px 16px",
+                background: "rgba(102,155,188,0.15)",
+                border: "1px solid rgba(102,155,188,0.3)",
+                borderRadius: 8, color: C.steel,
+                fontSize: 12, fontWeight: 500, cursor: "pointer",
+                fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0,
+              }}
+            >
+              보정본 업로드
+              <ChevronRight size={13} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Selecting banner ── */}
+      {isSelecting && (
+        <div style={{
+          margin: "16px 24px 0",
+          background: "rgba(102,155,188,0.06)",
+          border: "1px solid rgba(102,155,188,0.2)",
+          borderRadius: 12, padding: "14px 20px",
+          display: "flex", alignItems: "center", gap: 14,
+        }}>
+          <div style={{
+            width: 36, height: 36,
+            background: "rgba(102,155,188,0.1)", border: "1px solid rgba(102,155,188,0.3)",
+            borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
+          }}>
+            <MessageSquare size={18} color={C.steel} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: C.steel, marginBottom: 3 }}>
+              고객이 셀렉 진행 중입니다
+            </div>
+            <div style={{ fontSize: 12, color: C.muted }}>
+              현재까지 {photos.length}장 선택됨
+            </div>
           </div>
         </div>
-      </Card>
+      )}
 
-      <Card>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-lg font-medium text-white">선택된 사진 + 코멘트 ({photos.length}장)</h3>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="flex items-center gap-2" onClick={handleCopyClipboard}>
-              <Clipboard className="h-4 w-4" />
-              클립보드 복사
-            </Button>
-            <Button variant="outline" className="flex items-center gap-2" onClick={handleDownloadCsv}>
-              <Download className="h-4 w-4" />
-              CSV 다운로드
-            </Button>
-            <Button variant="outline" className="flex items-center gap-2" onClick={handleDownloadTxt}>
-              <Download className="h-4 w-4" />
-              TXT 다운로드
-            </Button>
-          </div>
+      {/* ── Toolbar ── */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "16px 24px 12px",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>선택된 사진</span>
+          <span style={{
+            padding: "3px 9px", borderRadius: 20,
+            background: "rgba(102,155,188,0.12)", border: "1px solid rgba(102,155,188,0.2)",
+            fontSize: 12, color: C.steel, fontWeight: 500,
+          }}>
+            {photos.length}장
+          </span>
+          {commentCount > 0 && (
+            <span style={{
+              fontSize: 11, color: C.orange,
+              display: "flex", alignItems: "center", gap: 4,
+            }}>
+              <MessageSquare size={11} />
+              코멘트 {commentCount}건
+            </span>
+          )}
         </div>
+        <div style={{
+          display: "flex",
+          background: C.surface, border: `1px solid ${C.border}`,
+          borderRadius: 8, overflow: "hidden",
+        }}>
+          <ViewBtn
+            icon={<LayoutGrid size={13} />}
+            label="갤러리"
+            active={viewMode === "gallery"}
+            onClick={() => setViewMode("gallery")}
+          />
+          <ViewBtn
+            icon={<List size={13} />}
+            label="목록"
+            active={viewMode === "list"}
+            onClick={() => setViewMode("list")}
+          />
+        </div>
+      </div>
 
-        {error && (
-          <p className="mt-3 rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
+      {error && (
+        <div style={{
+          margin: "0 24px 12px", padding: "10px 14px",
+          background: "rgba(255,71,87,0.1)", border: "1px solid rgba(255,71,87,0.2)",
+          borderRadius: 8, fontSize: 13, color: C.red,
+        }}>
+          {error}
+        </div>
+      )}
+
+      {/* ── Content ── */}
+      <div style={{ padding: "0 24px 40px" }}>
+        {photos.length === 0 && (
+          <div style={{ padding: "48px 0", textAlign: "center", fontSize: 14, color: C.dim }}>
+            선택된 사진이 없습니다.
+          </div>
         )}
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[720px] border-separate border-spacing-0">
-            <thead>
-              <tr className="text-left text-xs text-zinc-500">
-                <th className="px-3 py-2">썸네일</th>
-                <th className="px-3 py-2">파일명</th>
-                <th className="px-3 py-2">코멘트</th>
-              </tr>
-            </thead>
-            <tbody className="text-sm">
-              {photos.map((p) => {
-                const filename = getDisplayFilename(p);
-                const comment = (photoStates[p.id]?.comment ?? "").trim();
-                return (
-                  <tr key={p.id} className="border-t border-zinc-800/80">
-                    <td className="px-3 py-2">
-                      <div className="h-[60px] w-[60px] overflow-hidden rounded-lg bg-zinc-800">
-                        <img src={p.url} alt="" className="h-full w-full object-cover" />
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 align-top">
-                      <div className="max-w-[220px] truncate text-zinc-200" title={filename}>
-                        {filename}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 align-top">
-                      <div className="max-w-[320px] whitespace-pre-wrap break-words text-zinc-300">
-                        {comment || "-"}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {photos.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-3 py-6 text-center text-zinc-500">
-                    선택된 사진이 없습니다.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+        {/* Gallery view */}
+        {viewMode === "gallery" && photos.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10 }}>
+            {photos.map((p, i) => (
+              <GalleryItem
+                key={p.id}
+                num={i + 1}
+                url={p.url}
+                filename={getDisplayFilename(p)}
+                comment={(photoStates[p.id]?.comment ?? "").trim()}
+                onOpen={() => setLightboxIndex(i)}
+              />
+            ))}
+          </div>
+        )}
 
-      <Card className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-sm text-zinc-400">
-          보정을 시작하면 고객의 갤러리가 잠깁니다
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {project.status === "editing" && (
-            <Link href={`/photographer/projects/${id}/upload-versions`}>
-              <Button variant="primary" className="flex items-center gap-2">
-                <span aria-hidden>📤</span>
-                보정본 업로드
-              </Button>
-            </Link>
-          )}
-          {project.status === "confirmed" && (
-            <Button
-              variant="primary"
-              className="flex items-center gap-2"
-              onClick={() => setShowEditStartModal(true)}
-            >
-              <span aria-hidden>🎨</span>
-              보정 시작
-            </Button>
-          )}
-        </div>
-      </Card>
-
-      {showEditStartModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-[440px] space-y-6 rounded-xl border border-zinc-700 bg-zinc-900 p-6 shadow-xl">
-            <div className="flex items-center gap-2 rounded-lg border border-danger/50 bg-danger/10 px-4 py-3 text-danger">
-              <AlertTriangle className="h-5 w-5 shrink-0" />
-              <span className="font-semibold">🚨 보정 시작 전 반드시 확인하세요</span>
+        {/* List view */}
+        {viewMode === "list" && photos.length > 0 && (
+          <div>
+            <div style={{
+              display: "grid", gridTemplateColumns: "48px 60px 1fr 2fr",
+              gap: 12, padding: "8px 14px",
+              fontSize: 10, color: C.dim, fontWeight: 600, letterSpacing: "0.5px",
+              borderBottom: `1px solid ${C.border}`, marginBottom: 4,
+            }}>
+              <div>썸네일</div>
+              <div>번호</div>
+              <div>파일명</div>
+              <div>코멘트</div>
             </div>
-            <ol className="list-decimal space-y-3 pl-5 text-sm text-zinc-300">
+            {photos.map((p, i) => (
+              <ListItem
+                key={p.id}
+                num={i + 1}
+                url={p.url}
+                filename={getDisplayFilename(p)}
+                comment={(photoStates[p.id]?.comment ?? "").trim()}
+                onOpen={() => setLightboxIndex(i)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Bottom action bar ── */}
+      {showActionBar && (
+        <div style={{
+          position: "fixed", bottom: 0, left: 220, right: 0,
+          background: "rgba(0,48,73,0.95)",
+          borderTop: "1px solid rgba(102,155,188,0.15)",
+          backdropFilter: "blur(12px)",
+          padding: "12px 24px",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          zIndex: 100,
+        }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>
+              {project.status === "confirmed" ? "보정 준비 완료" : "보정 중"}
+            </div>
+            <div style={{ fontSize: 11, color: C.muted }}>
+              {project.status === "confirmed"
+                ? `${photos.length}장 확정${commentCount > 0 ? ` · 코멘트 ${commentCount}건 확인 후 보정을 시작해주세요` : " · 보정을 시작해주세요"}`
+                : `${photos.length}장 보정 진행 중`}
+            </div>
+          </div>
+          <div>
+            {project.status === "confirmed" && (
+              <button
+                onClick={() => setShowEditStartModal(true)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "9px 20px", background: C.steel,
+                  border: "none", borderRadius: 8, color: "white",
+                  fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                보정 시작하기
+                <ChevronRight size={14} />
+              </button>
+            )}
+            {project.status === "editing" && (
+              <button
+                onClick={() => router.push(`/photographer/projects/${id}/upload-versions`)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "9px 20px", background: C.steel,
+                  border: "none", borderRadius: 8, color: "white",
+                  fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                보정본 업로드
+                <ChevronRight size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit start modal ── */}
+      {showEditStartModal && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.7)", padding: 16,
+        }}>
+          <div style={{
+            background: C.surface, border: `1px solid ${C.borderMd}`,
+            borderRadius: 14, padding: 24, width: "100%", maxWidth: 440,
+          }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              borderRadius: 8, border: "1px solid rgba(255,71,87,0.5)",
+              background: "rgba(255,71,87,0.1)", padding: "10px 14px",
+              marginBottom: 20, color: C.red,
+            }}>
+              <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: 14, fontWeight: 600 }}>보정 시작 전 반드시 확인하세요</span>
+            </div>
+            <ol style={{
+              paddingLeft: 20, margin: "0 0 24px",
+              display: "flex", flexDirection: "column", gap: 12,
+              fontSize: 13, color: C.muted,
+            }}>
               <li>보정 시작 후 고객은 &quot;최종확정&quot;을 취소할 수 없습니다</li>
               <li>선택된 사진이 고정됩니다 (추가/삭제 불가)</li>
               <li>고객은 읽기 전용 모드로 전환됩니다</li>
             </ol>
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
+            {error && (
+              <p style={{ marginBottom: 12, fontSize: 13, color: C.red }}>{error}</p>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
                 onClick={() => setShowEditStartModal(false)}
                 disabled={editStartSubmitting}
+                style={{
+                  flex: 1, padding: "10px 0", background: "transparent",
+                  border: `1px solid ${C.border}`, borderRadius: 8,
+                  color: C.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                }}
               >
                 취소
-              </Button>
-              <Button
-                variant="danger"
-                className="flex-1"
+              </button>
+              <button
                 onClick={handleEditStartConfirm}
                 disabled={editStartSubmitting}
+                style={{
+                  flex: 1, padding: "10px 0",
+                  background: "rgba(255,71,87,0.15)",
+                  border: "1px solid rgba(255,71,87,0.3)", borderRadius: 8,
+                  color: C.red, fontSize: 13, fontWeight: 500,
+                  cursor: editStartSubmitting ? "not-allowed" : "pointer", fontFamily: "inherit",
+                }}
               >
                 {editStartSubmitting ? "처리 중..." : "보정 시작 확인"}
-              </Button>
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* ── Lightbox ── */}
+      {lightboxIndex !== null && (
+        <Lightbox
+          photos={photos}
+          photoStates={photoStates}
+          index={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onPrev={() => setLightboxIndex((i) => (i! > 0 ? i! - 1 : photos.length - 1))}
+          onNext={() => setLightboxIndex((i) => (i! < photos.length - 1 ? i! + 1 : 0))}
+        />
+      )}
+
+      {/* ── Toast ── */}
       {toast && (
-        <div
-          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-white shadow-lg ring-1 ring-zinc-700"
-          role="status"
-        >
+        <div style={{
+          position: "fixed",
+          bottom: showActionBar ? 80 : 24,
+          left: "50%", transform: "translateX(-50%)",
+          zIndex: 300,
+          background: C.surface3, borderRadius: 8,
+          padding: "8px 16px", fontSize: 13, fontWeight: 500, color: C.text,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+          border: `1px solid ${C.border}`,
+          whiteSpace: "nowrap",
+        }}>
           {toast}
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------- sub-components ----------
+
+function ExportBtn({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) {
+  const [h, setH] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setH(true)}
+      onMouseLeave={() => setH(false)}
+      style={{
+        display: "flex", alignItems: "center", gap: 5,
+        padding: "6px 12px", borderRadius: 8,
+        border: `1px solid ${h ? C.borderMd : C.border}`,
+        background: "transparent",
+        color: h ? C.text : C.muted,
+        fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+        transition: "all 0.15s",
+      }}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function ViewBtn({
+  icon, label, active, onClick,
+}: { icon: ReactNode; label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: "6px 12px", border: "none",
+        background: active ? C.surface2 : "transparent",
+        color: active ? C.text : C.muted,
+        fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+        display: "flex", alignItems: "center", gap: 4,
+        transition: "all 0.15s",
+      }}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function GalleryItem({
+  num, url, filename, comment, onOpen,
+}: { num: number; url: string; filename: string; comment: string; onOpen: () => void }) {
+  const [h, setH] = useState(false);
+  const [imgErr, setImgErr] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setH(true)}
+      onMouseLeave={() => setH(false)}
+      onClick={onOpen}
+      style={{
+        background: C.surface,
+        border: `1px solid ${h ? C.borderMd : C.border}`,
+        borderRadius: 10, overflow: "hidden", cursor: "pointer",
+        transform: h ? "translateY(-2px)" : "none",
+        transition: "all 0.18s",
+      }}
+    >
+      <div style={{
+        aspectRatio: "3/2", background: C.surface2,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        position: "relative", overflow: "hidden",
+      }}>
+        {url && !imgErr ? (
+          <img
+            src={url} alt=""
+            onError={() => setImgErr(true)}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        ) : (
+          <Image size={24} color={C.dim} />
+        )}
+        <div style={{
+          position: "absolute", top: 6, left: 6,
+          background: "rgba(0,0,0,0.55)", color: "white",
+          fontSize: 9, fontWeight: 600, padding: "2px 6px", borderRadius: 4,
+        }}>
+          {num}
+        </div>
+        {comment && (
+          <div style={{
+            position: "absolute", top: 6, right: 6,
+            width: 18, height: 18,
+            background: C.orange, borderRadius: "50%",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <AlertCircle size={10} color="white" />
+          </div>
+        )}
+      </div>
+      <div style={{ padding: "8px 10px" }}>
+        <div style={{
+          fontSize: 10, color: C.muted,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          marginBottom: 4,
+        }}>
+          {filename}
+        </div>
+        <div style={{
+          fontSize: 10, color: comment ? C.orange : C.dim,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          display: "flex", alignItems: "center", gap: 3,
+        }}>
+          {comment ? (
+            <><MessageSquare size={9} />{comment}</>
+          ) : (
+            "코멘트 없음"
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ListItem({
+  num, url, filename, comment, onOpen,
+}: { num: number; url: string; filename: string; comment: string; onOpen: () => void }) {
+  const [h, setH] = useState(false);
+  const [imgErr, setImgErr] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setH(true)}
+      onMouseLeave={() => setH(false)}
+      onClick={onOpen}
+      style={{
+        display: "grid", gridTemplateColumns: "48px 60px 1fr 2fr",
+        gap: 12, alignItems: "center",
+        padding: "10px 14px",
+        background: h ? C.surface2 : C.surface,
+        border: `1px solid ${h ? C.borderMd : C.border}`,
+        borderRadius: 9, marginBottom: 5,
+        cursor: "pointer", transition: "all 0.15s",
+      }}
+    >
+      <div style={{
+        width: 48, height: 36, background: C.surface2, borderRadius: 5,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        border: `1px solid ${C.border}`, overflow: "hidden", flexShrink: 0,
+      }}>
+        {url && !imgErr ? (
+          <img src={url} alt="" onError={() => setImgErr(true)}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          <Image size={16} color={C.dim} />
+        )}
+      </div>
+      <div style={{ fontSize: 11, color: C.dim }}>{num}</div>
+      <div style={{
+        fontSize: 12, fontWeight: 500, color: C.text,
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+      }}>
+        {filename}
+      </div>
+      <div style={{
+        fontSize: 12, color: comment ? C.orange : C.dim,
+        display: "flex", alignItems: "center", gap: 5,
+        overflow: "hidden",
+      }}>
+        {comment ? (
+          <>
+            <MessageSquare size={12} style={{ flexShrink: 0 }} />
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {comment}
+            </span>
+          </>
+        ) : "—"}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Lightbox ----------
+function Lightbox({
+  photos, photoStates, index, onClose, onPrev, onNext,
+}: {
+  photos: Photo[];
+  photoStates: Record<string, { rating?: number; color?: ColorTag; comment?: string }>;
+  index: number;
+  onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const photo = photos[index];
+  const filename = getDisplayFilename(photo);
+  const comment = (photoStates[photo.id]?.comment ?? "").trim();
+  const total = photos.length;
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") onPrev();
+      if (e.key === "ArrowRight") onNext();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose, onPrev, onNext]);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 500,
+        background: "rgba(0,0,0,0.92)",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+      }}
+    >
+      {/* Close */}
+      <button
+        onClick={onClose}
+        style={{
+          position: "absolute", top: 16, right: 16,
+          width: 36, height: 36, borderRadius: "50%",
+          background: "rgba(255,255,255,0.1)", border: "none",
+          color: "white", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        <X size={18} />
+      </button>
+
+      {/* Counter */}
+      <div style={{
+        position: "absolute", top: 20, left: "50%", transform: "translateX(-50%)",
+        fontSize: 12, color: "rgba(255,255,255,0.5)",
+      }}>
+        {index + 1} / {total}
+      </div>
+
+      {/* Prev */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onPrev(); }}
+        style={{
+          position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
+          width: 44, height: 44, borderRadius: "50%",
+          background: "rgba(255,255,255,0.1)", border: "none",
+          color: "white", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "background 0.15s",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+      >
+        <ChevronLeft size={22} />
+      </button>
+
+      {/* Image */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          display: "flex", flexDirection: "column", alignItems: "center",
+          maxWidth: "90vw", width: "100%",
+        }}
+      >
+        <img
+          key={photo.id}
+          src={photo.url}
+          alt={filename}
+          style={{
+            maxHeight: "75vh", maxWidth: "90vw",
+            objectFit: "contain", borderRadius: 6,
+            display: "block",
+          }}
+        />
+
+        {/* Info bar */}
+        <div style={{
+          marginTop: 14,
+          background: "rgba(15,32,48,0.9)", border: "1px solid rgba(102,155,188,0.15)",
+          borderRadius: 10, padding: "12px 18px",
+          width: "100%", maxWidth: 560,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 500, color: C.text, marginBottom: comment ? 8 : 0 }}>
+            {filename}
+          </div>
+          {comment && (
+            <div style={{
+              display: "flex", alignItems: "flex-start", gap: 6,
+              padding: "8px 10px", borderRadius: 7,
+              background: "rgba(245,166,35,0.08)", border: "1px solid rgba(245,166,35,0.2)",
+            }}>
+              <MessageSquare size={13} color={C.orange} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span style={{ fontSize: 13, color: C.orange, lineHeight: 1.5 }}>{comment}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Next */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onNext(); }}
+        style={{
+          position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
+          width: 44, height: 44, borderRadius: "50%",
+          background: "rgba(255,255,255,0.1)", border: "none",
+          color: "white", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "background 0.15s",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+      >
+        <ChevronRight size={22} />
+      </button>
     </div>
   );
 }
