@@ -71,7 +71,6 @@ export default function ViewerPage() {
     [current, updatePhotoState]
   );
 
-  // 숫자키(1~5): 같은 점수면 해제(0), 다르면 해당 점수로 변경
   const toggleStarFromKey = useCallback(
     (s: StarRating) => {
       if (!current) return;
@@ -84,6 +83,7 @@ export default function ViewerPage() {
     },
     [current, photoStates, updatePhotoState]
   );
+
   const setColor = useCallback(
     (c: ColorTag | undefined) => {
       if (current) updatePhotoState(current.id, { color: c });
@@ -91,7 +91,6 @@ export default function ViewerPage() {
     [current, updatePhotoState]
   );
 
-  // 컬러 태그 단축키(Q/W/E/R/T): 같은 색이면 해제, 다르면 해당 색으로 변경
   const toggleColorFromKey = useCallback(
     (c: ColorTag) => {
       if (!current) return;
@@ -120,7 +119,6 @@ export default function ViewerPage() {
     router.push(`/c/${token}/viewer/${filteredPhotos[currentIndex + 1].id}${queryString}`);
   }, [currentIndex, filteredPhotos.length, filteredPhotos, router, token, queryString]);
 
-  // 키보드 방향키용: 순환 이동 (첫 장 ← 마지막, 마지막 → 첫 장)
   const goPrevWrap = useCallback(() => {
     if (!filteredPhotos.length) return;
     const nextIndex = (currentIndex - 1 + filteredPhotos.length) % filteredPhotos.length;
@@ -168,113 +166,46 @@ export default function ViewerPage() {
     }
   }, [project?.status, project, token, router]);
 
-  // 모달 열릴 때 draftComment를 현재 코멘트로 동기화
   useEffect(() => {
     if (commentModalOpen && current) {
       setDraftComment(photoStates[current.id]?.comment ?? "");
     }
   }, [commentModalOpen, current?.id, photoStates]);
 
-  // e.code 사용 → 한글(ㅂㅈㄷㄱㅅ) / 영문(qwert) 모두 동작
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (commentModalOpen) {
         if (tag === "TEXTAREA" || tag === "INPUT") {
-          if (e.key === "Escape") {
-            e.preventDefault();
-            closeCommentModal();
-          }
-          if (e.key === "Enter" && e.ctrlKey) {
-            e.preventDefault();
-            saveCommentAndClose();
-          }
+          if (e.key === "Escape") { e.preventDefault(); closeCommentModal(); }
+          if (e.key === "Enter" && e.ctrlKey) { e.preventDefault(); saveCommentAndClose(); }
           return;
         }
-        if (e.key === "Escape") {
-          e.preventDefault();
-          closeCommentModal();
-        }
+        if (e.key === "Escape") { e.preventDefault(); closeCommentModal(); }
         return;
       }
       if (tag === "TEXTAREA" || tag === "INPUT") return;
 
       switch (e.code) {
-        case "KeyC":
-          e.preventDefault();
-          openCommentModal();
-          break;
-        case "Digit1":
-          toggleStarFromKey(1);
-          setStarPressRing(1);
-          setTimeout(() => setStarPressRing(null), 200);
-          break;
-        case "Digit2":
-          toggleStarFromKey(2);
-          setStarPressRing(2);
-          setTimeout(() => setStarPressRing(null), 200);
-          break;
-        case "Digit3":
-          toggleStarFromKey(3);
-          setStarPressRing(3);
-          setTimeout(() => setStarPressRing(null), 200);
-          break;
-        case "Digit4":
-          toggleStarFromKey(4);
-          setStarPressRing(4);
-          setTimeout(() => setStarPressRing(null), 200);
-          break;
-        case "Digit5":
-          toggleStarFromKey(5);
-          setStarPressRing(5);
-          setTimeout(() => setStarPressRing(null), 200);
-          break;
-        case "KeyQ":
-          toggleColorFromKey("red");
-          setColorPressRing("red");
-          setTimeout(() => setColorPressRing(null), 200);
-          break;
-        case "KeyW":
-          toggleColorFromKey("yellow");
-          setColorPressRing("yellow");
-          setTimeout(() => setColorPressRing(null), 200);
-          break;
-        case "KeyE":
-          toggleColorFromKey("green");
-          setColorPressRing("green");
-          setTimeout(() => setColorPressRing(null), 200);
-          break;
-        case "KeyR":
-          toggleColorFromKey("blue");
-          setColorPressRing("blue");
-          setTimeout(() => setColorPressRing(null), 200);
-          break;
-        case "KeyT":
-          toggleColorFromKey("purple");
-          setColorPressRing("purple");
-          setTimeout(() => setColorPressRing(null), 200);
-          break;
-        case "ArrowLeft":
-          e.preventDefault();
-          goPrevWrap();
-          break;
-        case "ArrowRight":
-          e.preventDefault();
-          goNextWrap();
-          break;
-        default:
-          break;
+        case "KeyC": e.preventDefault(); openCommentModal(); break;
+        case "Digit1": toggleStarFromKey(1); setStarPressRing(1); setTimeout(() => setStarPressRing(null), 200); break;
+        case "Digit2": toggleStarFromKey(2); setStarPressRing(2); setTimeout(() => setStarPressRing(null), 200); break;
+        case "Digit3": toggleStarFromKey(3); setStarPressRing(3); setTimeout(() => setStarPressRing(null), 200); break;
+        case "Digit4": toggleStarFromKey(4); setStarPressRing(4); setTimeout(() => setStarPressRing(null), 200); break;
+        case "Digit5": toggleStarFromKey(5); setStarPressRing(5); setTimeout(() => setStarPressRing(null), 200); break;
+        case "KeyQ": toggleColorFromKey("red"); setColorPressRing("red"); setTimeout(() => setColorPressRing(null), 200); break;
+        case "KeyW": toggleColorFromKey("yellow"); setColorPressRing("yellow"); setTimeout(() => setColorPressRing(null), 200); break;
+        case "KeyE": toggleColorFromKey("green"); setColorPressRing("green"); setTimeout(() => setColorPressRing(null), 200); break;
+        case "KeyR": toggleColorFromKey("blue"); setColorPressRing("blue"); setTimeout(() => setColorPressRing(null), 200); break;
+        case "KeyT": toggleColorFromKey("purple"); setColorPressRing("purple"); setTimeout(() => setColorPressRing(null), 200); break;
+        case "ArrowLeft": e.preventDefault(); goPrevWrap(); break;
+        case "ArrowRight": e.preventDefault(); goNextWrap(); break;
+        default: break;
       }
     },
     [
-      commentModalOpen,
-      goPrevWrap,
-      goNextWrap,
-      toggleStarFromKey,
-      toggleColorFromKey,
-      openCommentModal,
-      closeCommentModal,
-      saveCommentAndClose,
+      commentModalOpen, goPrevWrap, goNextWrap, toggleStarFromKey, toggleColorFromKey,
+      openCommentModal, closeCommentModal, saveCommentAndClose,
     ]
   );
 
@@ -283,14 +214,8 @@ export default function ViewerPage() {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "TEXTAREA" || tag === "INPUT") return;
       if (commentModalOpen) return;
-
-      if (e.code === "Space") {
-        e.preventDefault();
-        e.stopPropagation();
-        toggleSelect();
-      }
+      if (e.code === "Space") { e.preventDefault(); e.stopPropagation(); toggleSelect(); }
     };
-
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     window.addEventListener("keyup", handleKeyUp, { capture: true });
     return () => {
@@ -302,75 +227,77 @@ export default function ViewerPage() {
   if (!project || !current) return null;
   if (project.status === "confirmed" || project.status === "editing") return null;
 
-  // 별점 UI: 채워진 별 = hover 중이면 hoverRating, 아니면 star state (키보드/클릭 반영)
   const displayRating = hoverRating || star || 0;
+  const isCurrentSelected = selectedIds.has(current.id);
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#0a0b0d] pb-28">
-      <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-        <Link href={`/c/${token}/gallery`} className="flex items-center gap-2 text-zinc-400 hover:text-white">
-          <ChevronLeft className="h-5 w-5" />
-          <span className="font-medium">{project.name}</span>
+    <div className="flex min-h-screen flex-col bg-[#09090d]">
+      {/* Header */}
+      <header className="flex items-center justify-between border-b border-[#1e2236] bg-[#111318]/95 px-4 py-3 backdrop-blur">
+        <Link
+          href={`/c/${token}/gallery${queryString}`}
+          className="flex items-center gap-1 text-[#8b90a8] hover:text-[#e8eaf0] active:opacity-70"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          <span className="text-[13px] font-medium">{project.name}</span>
         </Link>
-        <div className="flex items-center gap-4 text-sm">
-          <span className="font-mono text-zinc-300">
-            선택 {Y}/{N}
+        <div className="flex items-center gap-3 text-[12px]">
+          <span className="font-mono text-[#e8eaf0]">{Y}/{N}</span>
+          <span className="text-[#5a5f78]">
+            {currentIndex + 1}/{filteredPhotos.length}
           </span>
-          <span className="max-w-[140px] truncate text-zinc-400" title={getPhotoDisplayName(current)}>
-            {getPhotoDisplayName(current)} / {filteredPhotos.length}
-          </span>
-          <span className="text-zinc-500">기한까지 {daysLeft}일</span>
+          <span className="text-[#5a5f78]">기한 {daysLeft}일</span>
         </div>
       </header>
 
-      <div className="relative flex-1 flex items-center justify-center min-h-0">
+      {/* Image area */}
+      <div className="relative flex flex-1 items-center justify-center bg-black">
         {current.url ? (
           <img
             src={current.url}
             alt={getPhotoDisplayName(current)}
-            className="w-full h-full object-contain"
+            className="h-full w-full object-contain"
             style={{ maxHeight: "60vh" }}
           />
         ) : (
-          <div
-            className="w-full max-w-2xl aspect-video bg-zinc-800 rounded-lg flex items-center justify-center text-zinc-500"
-            style={{ maxHeight: "60vh" }}
-          >
+          <div className="flex aspect-video w-full max-w-2xl items-center justify-center rounded-lg bg-[#1a1d24] text-[#5a5f78]" style={{ maxHeight: "60vh" }}>
             사진 없음
           </div>
         )}
+        {/* Prev/Next */}
         <button
           type="button"
           onClick={goPrev}
           disabled={currentIndex === 0}
-          className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full p-2.5 text-white/60 hover:text-white hover:bg-black/40 disabled:opacity-30 disabled:pointer-events-none transition-all duration-200"
+          className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white/60 transition-all hover:bg-black/60 hover:text-white disabled:pointer-events-none disabled:opacity-20"
         >
-          <ChevronLeft className="h-8 w-8" />
+          <ChevronLeft className="h-6 w-6" />
         </button>
         <button
           type="button"
           onClick={goNext}
           disabled={currentIndex === filteredPhotos.length - 1}
-          className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-2.5 text-white/60 hover:text-white hover:bg-black/40 disabled:opacity-30 disabled:pointer-events-none transition-all duration-200"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white/60 transition-all hover:bg-black/60 hover:text-white disabled:pointer-events-none disabled:opacity-20"
         >
-          <ChevronRight className="h-8 w-8" />
+          <ChevronRight className="h-6 w-6" />
         </button>
       </div>
 
-      <div className="border-t border-zinc-800/80 bg-[#111318] p-5">
-        <div className="mx-auto max-w-3xl space-y-4">
-          {/* 선택/해제 버튼 */}
+      {/* Controls panel */}
+      <div className="border-t border-[#1e2236] bg-[#111318] p-4 pb-28">
+        <div className="mx-auto max-w-lg space-y-4">
+          {/* Select toggle */}
           <div className="flex justify-center">
             <button
               type="button"
               onClick={toggleSelect}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                selectedIds.has(current.id)
-                  ? "bg-primary text-white border border-primary hover:bg-primary/90"
-                  : "bg-zinc-800/80 text-zinc-300 border border-zinc-700 hover:bg-zinc-700/80"
+              className={`flex min-h-[44px] items-center gap-2 rounded-xl px-6 py-2.5 text-[13px] font-medium transition-all ${
+                isCurrentSelected
+                  ? "border border-[#2ed573] bg-[#2ed573]/15 text-[#2ed573]"
+                  : "border border-[#252b3d] bg-[#1a1d24] text-[#8b90a8] hover:border-[#4f7eff] hover:text-[#4f7eff]"
               }`}
             >
-              {selectedIds.has(current.id) ? (
+              {isCurrentSelected ? (
                 <>
                   <Check className="h-4 w-4" strokeWidth={2.5} />
                   선택됨
@@ -381,10 +308,10 @@ export default function ViewerPage() {
             </button>
           </div>
 
-          {/* 한 줄: 별점 + 색상 태그 (이미지 바로 아래 중앙 정렬) */}
-          <div className="flex flex-wrap items-center justify-center gap-8">
-            {/* 별점 */}
-            <div className="flex items-center gap-2">
+          {/* Star + Color tags */}
+          <div className="flex flex-wrap items-center justify-center gap-6">
+            {/* Stars */}
+            <div className="flex items-center gap-1.5">
               {([1, 2, 3, 4, 5] as const).map((s) => {
                 const filled = s <= displayRating;
                 return (
@@ -394,136 +321,125 @@ export default function ViewerPage() {
                     onClick={() => setStar(s)}
                     onMouseEnter={() => setHoverRating(s)}
                     onMouseLeave={() => setHoverRating(0)}
-                    className={`text-4xl transition-all duration-150 rounded-lg p-1 ${
+                    className={`min-h-[44px] min-w-[36px] rounded-lg p-1 text-[28px] transition-all ${
                       starPressRing === s ? "scale-125" : "hover:scale-110"
                     } ${
                       filled
-                        ? "text-[#f5a623] bg-[#f5a623]/20"
-                        : "text-zinc-500 bg-transparent border border-zinc-600 hover:border-zinc-500"
+                        ? "bg-[#f5a623]/20 text-[#f5a623]"
+                        : "border border-[#252b3d] bg-transparent text-[#3a3f55] hover:border-[#3a3f55]"
                     }`}
                   >
                     ★
                   </button>
                 );
               })}
-              {star != null && star > 0 && (
-                <span className="ml-1 text-sm text-zinc-400 tabular-nums">{star}점</span>
-              )}
-              <span className="ml-1 text-xs text-zinc-600">[1–5]</span>
             </div>
 
-            {/* 구분선 */}
-            <div className="h-8 w-px bg-zinc-700/80 hidden sm:block" />
+            <div className="h-6 w-px bg-[#1e2236] hidden sm:block" />
 
-            {/* 색상 태그 */}
+            {/* Color dots */}
             <div className="flex flex-wrap items-center justify-center gap-2">
               {COLOR_OPTIONS.map((opt) => {
-                const isSelected = color === opt.key;
-                const showRing = isSelected || colorPressRing === opt.key;
+                const isActive = color === opt.key;
+                const showRing = isActive || colorPressRing === opt.key;
                 return (
                   <button
                     key={opt.key}
                     type="button"
-                    onClick={() => setColor(isSelected ? undefined : opt.key)}
-                    className="flex flex-col items-center gap-1"
+                    onClick={() => setColor(isActive ? undefined : opt.key)}
+                    className="flex min-h-[44px] flex-col items-center gap-1"
                   >
                     <span
-                      className={`rounded-full transition-all duration-200 flex items-center justify-center ${
+                      className={`flex items-center justify-center rounded-full transition-all duration-200 ${
                         showRing ? "ring-2 ring-white ring-offset-2 ring-offset-[#111318]" : ""
-                      } ${colorPressRing === opt.key ? "ring-4" : ""}`}
+                      }`}
                       style={{
-                        width: isSelected ? 44 : 36,
-                        height: isSelected ? 44 : 36,
+                        width: isActive ? 40 : 32,
+                        height: isActive ? 40 : 32,
                         backgroundColor: opt.color,
-                        opacity: isSelected ? 1 : 0.6,
-                        transform: isSelected ? "scale(1.15)" : "scale(1)",
+                        opacity: isActive ? 1 : 0.55,
+                        transform: isActive ? "scale(1.1)" : "scale(1)",
                       }}
                     >
-                      {isSelected && <Check className="h-5 w-5 text-white" strokeWidth={3} />}
+                      {isActive && <Check className="h-4 w-4 text-white" strokeWidth={3} />}
                     </span>
-                    <span className={`text-xs ${isSelected ? "text-zinc-300" : "text-zinc-500"}`}>
+                    <span className={`text-[10px] ${isActive ? "text-[#e8eaf0]" : "text-[#5a5f78]"}`}>
                       {opt.label}
                     </span>
                   </button>
                 );
               })}
-              <span className="text-xs text-zinc-600 ml-0.5">[Q W E R T]</span>
             </div>
           </div>
 
-          {/* 코멘트 버튼 + 미리보기 */}
+          {/* Comment */}
           <div className="flex flex-col items-center gap-2">
             <button
               type="button"
               onClick={openCommentModal}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+              className={`flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-medium transition-all ${
                 comment
-                  ? "bg-primary/15 text-primary border border-primary/30 hover:bg-primary/20"
-                  : "bg-zinc-800/80 text-zinc-300 border border-zinc-700/80 hover:bg-zinc-700/80 hover:border-zinc-600"
+                  ? "border border-[#4f7eff]/30 bg-[#4f7eff]/10 text-[#4f7eff]"
+                  : "border border-[#252b3d] bg-[#1a1d24] text-[#8b90a8] hover:border-[#4f7eff] hover:text-[#4f7eff]"
               }`}
             >
               <span>💬</span>
               {comment ? `코멘트 (${comment.length}자)` : "코멘트"}
             </button>
-            {comment ? (
-              <p
-                className="text-center text-xs text-zinc-400 max-w-md line-clamp-2"
-                title={comment}
-              >
-                {comment}
-              </p>
-            ) : null}
+            {comment && (
+              <p className="line-clamp-2 max-w-md text-center text-[11px] text-[#8b90a8]">{comment}</p>
+            )}
           </div>
 
-          {/* 하단: 단축키 펼치기만 (기본 숨김) */}
-          <div className="flex justify-end pt-1">
+          {/* Shortcuts */}
+          <div className="flex justify-end">
             <button
               type="button"
               onClick={() => setShortcutsOpen((o) => !o)}
-              className="text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
+              className="text-[11px] text-[#5a5f78] transition-colors hover:text-[#8b90a8]"
             >
-              {shortcutsOpen ? "단축키 접기 ▲" : "단축키 안내 펼치기 ▼"}
+              {shortcutsOpen ? "단축키 접기 ▲" : "단축키 펼치기 ▼"}
             </button>
           </div>
           {shortcutsOpen && (
-            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500 pt-1 border-t border-zinc-800/80 mt-2">
+            <ul className="flex flex-wrap gap-x-4 gap-y-1 border-t border-[#1e2236] pt-2 text-[11px] text-[#5a5f78]">
               <li>1~5: 별점</li>
               <li>Q,W,E,R,T: 색상</li>
               <li>C: 코멘트</li>
-              <li>[Space] 선택 / 해제</li>
+              <li>Space: 선택/해제</li>
               <li>← →: 이전/다음</li>
             </ul>
           )}
         </div>
       </div>
 
-      {/* 코멘트 Bottom Sheet */}
+      {/* Comment bottom sheet */}
       {commentModalOpen && (
         <>
           <div
-            className="fixed inset-0 bg-black/60 z-50 transition-opacity"
+            className="fixed inset-0 z-50 bg-black/60 transition-opacity"
             onClick={closeCommentModal}
             aria-hidden
           />
           <div
-            className={`fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border-t border-zinc-700 bg-[#1a1d24] p-5 pb-[env(safe-area-inset-bottom)] transition-transform duration-200 ease-out ${
+            className={`fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border-t border-[#252b3d] bg-[#111318] p-5 pb-[env(safe-area-inset-bottom)] transition-transform duration-200 ease-out ${
               commentSheetVisible ? "translate-y-0" : "translate-y-full"
             }`}
             role="dialog"
             aria-label="코멘트 입력"
           >
             <div className="mx-auto max-w-lg">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs text-zinc-400">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-[11px] text-[#8b90a8]">
                   {getPhotoDisplayName(current)} · 작가에게 전달됩니다
                 </p>
                 <button
                   type="button"
                   onClick={closeCommentModal}
-                  className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors"
+                  className="rounded-full p-1.5 text-[#8b90a8] hover:bg-[#1e2236] hover:text-[#e8eaf0]"
                   aria-label="닫기"
                 >
-                  <span className="text-lg leading-none">×</span>
+                  <span className="text-[18px] leading-none">×</span>
                 </button>
               </div>
               <div className="relative">
@@ -534,27 +450,21 @@ export default function ViewerPage() {
                   placeholder="보정 요청이나 피드백을 자유롭게 남겨주세요..."
                   autoFocus
                   onKeyDown={(e) => {
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      closeCommentModal();
-                    }
-                    if (e.key === "Enter" && e.ctrlKey) {
-                      e.preventDefault();
-                      saveCommentAndClose();
-                    }
+                    if (e.key === "Escape") { e.preventDefault(); closeCommentModal(); }
+                    if (e.key === "Enter" && e.ctrlKey) { e.preventDefault(); saveCommentAndClose(); }
                   }}
-                  className="w-full bg-[#0a0b0d] border border-zinc-700 focus:border-primary rounded-xl p-4 pb-8 pr-14 text-sm text-white resize-none outline-none min-h-[120px] transition-colors"
+                  className="min-h-[120px] w-full resize-none rounded-xl border border-[#252b3d] bg-[#09090d] p-4 pb-8 pr-14 text-[13px] text-[#e8eaf0] outline-none transition-colors placeholder:text-[#5a5f78] focus:border-[#4f7eff]"
                 />
-                <span className="absolute bottom-2 right-3 text-xs text-zinc-500 tabular-nums pointer-events-none">
+                <span className="pointer-events-none absolute bottom-2 right-3 text-[11px] tabular-nums text-[#5a5f78]">
                   {draftComment.length}/{COMMENT_MAX_LENGTH}
                 </span>
               </div>
-              <div className="flex gap-2 justify-end mt-3">
+              <div className="mt-3 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={saveCommentAndClose}
                   disabled={!draftComment.trim()}
-                  className="px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+                  className="rounded-xl bg-[#4f7eff] px-4 py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   저장
                 </button>
@@ -563,6 +473,7 @@ export default function ViewerPage() {
           </div>
         </>
       )}
+
       <SelectionConfirmBar />
     </div>
   );
