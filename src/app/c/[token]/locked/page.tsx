@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { Aperture, Lock } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import type { ColorTag } from "@/types";
 
@@ -21,6 +22,29 @@ const COLOR_HEX: Record<ColorTag, string> = {
 function getTestImageUrl(photoId: string, size = "400/300") {
   const seed = photoId.replace(/\D/g, "") || "1";
   return `https://picsum.photos/seed/${seed}/${size}`;
+}
+
+const playfair: React.CSSProperties = { fontFamily: "'Playfair Display', Georgia, serif" };
+const headerBg: React.CSSProperties = { background: "rgba(13,30,40,0.9)", backdropFilter: "blur(12px)" };
+
+function PageHeader({ right }: { right?: React.ReactNode }) {
+  return (
+    <header className="sticky top-0 z-50 flex h-12 items-center justify-between border-b border-[#1e2236] px-4" style={headerBg}>
+      <div className="flex items-center gap-2">
+        <Aperture className="h-4 w-4 text-[#4f7eff]" />
+        <span className="text-[15px] font-bold text-[#e8eaf0]" style={playfair}>A컷</span>
+      </div>
+      {right && <div className="text-[12px] text-[#8b90a8]">{right}</div>}
+    </header>
+  );
+}
+
+function PageFooter() {
+  return (
+    <footer className="py-5 text-center text-[11px] text-[#3a3f55]">
+      © 2026 A컷 · Acut
+    </footer>
+  );
 }
 
 export default function LockedPage() {
@@ -70,13 +94,10 @@ export default function LockedPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         console.error("[확정 취소]", (data as { error?: string }).error ?? res.statusText);
-        setCancelling(false);
-        return;
+        setCancelling(false); return;
       }
       setCancelModalOpen(false);
-      if (typeof window !== "undefined") {
-        window.location.replace(`/c/${token}/gallery`);
-      }
+      if (typeof window !== "undefined") window.location.replace(`/c/${token}/gallery`);
     } catch (e) {
       console.error(e);
     } finally {
@@ -85,27 +106,13 @@ export default function LockedPage() {
   };
 
   if (!mounted || loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#09090d]">
-        <p className="text-sm text-[#5a5f78]">불러오는 중...</p>
-      </div>
-    );
+    return <div className="flex min-h-screen items-center justify-center bg-[#09090d]"><p className="text-sm text-[#5a5f78]">불러오는 중...</p></div>;
   }
-
   if (!project) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#09090d]">
-        <p className="text-sm text-[#5a5f78]">존재하지 않는 초대 링크입니다.</p>
-      </div>
-    );
+    return <div className="flex min-h-screen items-center justify-center bg-[#09090d]"><p className="text-sm text-[#5a5f78]">존재하지 않는 초대 링크입니다.</p></div>;
   }
-
   if (project.status === "selecting") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#09090d]">
-        <p className="text-sm text-[#5a5f78]">이동 중...</p>
-      </div>
-    );
+    return <div className="flex min-h-screen items-center justify-center bg-[#09090d]"><p className="text-sm text-[#5a5f78]">이동 중...</p></div>;
   }
 
   const M = project.photoCount;
@@ -118,93 +125,48 @@ export default function LockedPage() {
 
   return (
     <div className="min-h-screen bg-[#09090d] text-[#e8eaf0]">
-      {/* Sticky lock banner */}
-      <div
-        className={`sticky top-0 z-50 flex items-center gap-2 border-b px-4 py-2.5 text-[12px] backdrop-blur ${
-          isEditing
-            ? "border-[#ff4757]/20 bg-[#ff4757]/8 text-[#ff4757]"
-            : "border-[#1e2236] bg-[#111318]/95 text-[#8b90a8]"
-        }`}
-      >
-        🔒{" "}
+      <PageHeader right={project.name} />
+
+      {/* Lock banner */}
+      <div className={`flex items-center gap-2 border-b px-4 py-2.5 text-[12px] ${isEditing ? "border-[#ff4757]/20 bg-[#ff4757]/8 text-[#ff4757]" : "border-[#1e2236] bg-[#111318]/95 text-[#8b90a8]"}`}>
+        <Lock className="h-3.5 w-3.5 shrink-0" />
         {isEditing
           ? "보정 작업이 시작되어 선택을 변경할 수 없습니다."
           : isConfirmed
-            ? "확정된 선택입니다. 다시 선택하려면 아래 확정 취소를 이용하세요."
+            ? "확정 완료 · 읽기 전용"
             : "현재 상태에서는 확정 취소를 사용할 수 없습니다."}
       </div>
 
-      {/* Header */}
-      <header className="sticky top-[41px] z-40 flex items-center gap-3 border-b border-[#1e2236] bg-[#111318]/95 px-4 py-3 backdrop-blur">
-        <Link
-          href={`/c/${token}/confirmed`}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#8b90a8] hover:bg-[#1e2236] active:opacity-70"
-          aria-label="뒤로 가기"
-        >
-          ‹
-        </Link>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[14px] font-semibold">{project.name}</div>
-          <div className="text-[11px] text-[#5a5f78]">선택한 사진 · 읽기 전용</div>
-        </div>
-        <span className="rounded-full bg-[#2ed573]/10 px-2.5 py-1 font-mono text-[11px] font-semibold text-[#2ed573]">
-          {N} / {M}
-        </span>
-      </header>
-
-      {/* Filter bar (disabled) */}
-      <div className="flex items-center gap-2 overflow-x-auto border-b border-[#1e2236] bg-[#111318]/95 px-4 py-2 opacity-40 pointer-events-none">
-        <span className="shrink-0 rounded-full border border-[#2ed573] bg-[#2ed573]/10 px-2.5 py-1 text-[11px] text-[#2ed573]">
-          선택됨 {N}
-        </span>
-        {["⭐5", "⭐4", "🔴", "🟡", "🟢"].map((label) => (
-          <span key={label} className="shrink-0 rounded-full border border-[#1e2236] bg-[#1a1d24] px-2.5 py-1 text-[11px] text-[#8b90a8]">
-            {label}
-          </span>
-        ))}
-        <span className="ml-auto shrink-0 text-[11px] text-[#5a5f78]">🔒 읽기 전용</span>
+      {/* Sub header: progress */}
+      <div className="flex items-center justify-between border-b border-[#1e2236] bg-[#111318]/80 px-4 py-2.5">
+        <div className="text-[12px] text-[#8b90a8]">선택한 사진 · 읽기 전용</div>
+        <span className="font-mono text-[12px] font-semibold text-[#2ed573]">{N} / {M}</span>
       </div>
 
       {/* Photo grid */}
-      <div className="grid grid-cols-2 gap-2 px-4 py-4 pb-32 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 p-4 pb-32 sm:grid-cols-3 md:grid-cols-4">
         {photos.map((photo) => {
           const state = photoStates[photo.id] ?? photo.tag;
           const rating = state?.rating ?? photo.tag?.star;
           const colorTag = state?.color ?? photo.tag?.color;
           const hasTag = (rating != null && rating > 0) || colorTag != null;
           return (
-            <div
-              key={photo.id}
-              className="relative aspect-[4/3] cursor-default overflow-hidden rounded-xl border-2 border-[#2ed573]/30 bg-[#1a1d24]"
-            >
-              <img
-                src={photo.url || getTestImageUrl(photo.id)}
-                alt=""
-                className="block h-full w-full object-cover"
-              />
-              {/* Read-only overlay */}
+            <div key={photo.id} className="relative aspect-[4/3] cursor-default overflow-hidden rounded-xl border-2 border-[#2ed573]/30 bg-[#1a1d24]">
+              <img src={photo.url || getTestImageUrl(photo.id)} alt="" className="block h-full w-full object-cover" />
               <div className="absolute inset-0 cursor-not-allowed" aria-hidden />
-              {/* Check badge */}
               <div className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#2ed573] text-[10px] text-white">
                 ✓
               </div>
-              {/* Tags */}
               {hasTag && (
                 <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1">
                   {rating != null && rating > 0 && (
-                    <span className="rounded bg-black/65 px-1.5 py-0.5 text-[10px] text-[#f5a623]">
-                      {"★".repeat(rating)}
-                    </span>
+                    <span className="rounded bg-black/65 px-1.5 py-0.5 text-[10px] text-[#f5a623]">{"★".repeat(rating)}</span>
                   )}
                   {colorTag && (
-                    <span
-                      className="h-2.5 w-2.5 rounded-full border border-white/40"
-                      style={{ backgroundColor: COLOR_HEX[colorTag] }}
-                    />
+                    <span className="h-2.5 w-2.5 rounded-full border border-white/40" style={{ backgroundColor: COLOR_HEX[colorTag] }} />
                   )}
                 </div>
               )}
-              {/* Index */}
               <div className="absolute bottom-1.5 right-1.5 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[9px] text-[#8b90a8]">
                 #{photo.orderIndex}
               </div>
@@ -222,40 +184,30 @@ export default function LockedPage() {
               <div className="text-[11px] text-[#5a5f78]">{confirmedDate} 확정</div>
             </div>
             {project.status === "confirmed" && (
-              <div className="text-right">
-                <div className="text-[10px] text-[#5a5f78]">남은 취소 횟수 {remainingCancels}회</div>
-              </div>
+              <div className="text-right text-[11px] text-[#5a5f78]">남은 취소 {remainingCancels}회</div>
             )}
           </div>
-          {/* Progress bar */}
           <div className="mb-3 h-1 overflow-hidden rounded-full bg-[#1e2236]">
-            <div
-              className="h-full rounded-full bg-[#2ed573]"
-              style={{ width: M ? `${(N / M) * 100}%` : "100%" }}
-            />
+            <div className="h-full rounded-full bg-[#2ed573]" style={{ width: M ? `${(N / M) * 100}%` : "100%" }} />
           </div>
           {project.status === "confirmed" && (
             <>
-              {atCancelLimit && (
-                <p className="mb-2 text-center text-[11px] text-[#5a5f78]">
-                  확정 취소는 최대 3회까지 가능합니다
-                </p>
-              )}
+              {atCancelLimit && <p className="mb-2 text-center text-[11px] text-[#5a5f78]">확정 취소는 최대 3회까지 가능합니다</p>}
               <button
                 type="button"
                 disabled={!canCancel}
                 onClick={() => canCancel && setCancelModalOpen(true)}
-                className="w-full rounded-xl border border-[#252b3d] py-3 text-[13px] text-[#8b90a8] transition-colors hover:border-[#ff4757] hover:text-[#ff4757] disabled:pointer-events-none disabled:opacity-40"
+                className="flex h-11 w-full items-center justify-center rounded-xl border border-[#252b3d] text-[13px] text-[#8b90a8] transition-colors hover:border-[#ff4757] hover:text-[#ff4757] disabled:pointer-events-none disabled:opacity-40"
               >
                 확정 취소
               </button>
             </>
           )}
-          {isEditing && (
-            <div className="text-center text-[12px] text-[#5a5f78]">보정 진행 중</div>
-          )}
+          {isEditing && <div className="text-center text-[12px] text-[#5a5f78]">보정 진행 중</div>}
         </div>
       </div>
+
+      <PageFooter />
 
       {/* Cancel modal */}
       {cancelModalOpen && (
@@ -267,19 +219,10 @@ export default function LockedPage() {
               남은 횟수 <span className="font-medium text-[#e8eaf0]">{remainingCancels}회</span>
             </p>
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setCancelModalOpen(false)}
-                className="flex-1 rounded-xl border border-[#252b3d] py-3 text-[13px] text-[#8b90a8]"
-              >
+              <button type="button" onClick={() => setCancelModalOpen(false)} className="flex h-11 flex-1 items-center justify-center rounded-xl border border-[#252b3d] text-[13px] text-[#8b90a8]">
                 취소
               </button>
-              <button
-                type="button"
-                onClick={handleConfirmCancel}
-                disabled={cancelling}
-                className="flex-1 rounded-xl bg-[#4f7eff] py-3 text-[13px] font-semibold text-white disabled:opacity-60"
-              >
+              <button type="button" onClick={handleConfirmCancel} disabled={cancelling} className="flex h-11 flex-1 items-center justify-center rounded-xl bg-[#4f7eff] text-[13px] font-semibold text-white disabled:opacity-60">
                 {cancelling ? "처리 중..." : "예, 다시 선택할게요"}
               </button>
             </div>

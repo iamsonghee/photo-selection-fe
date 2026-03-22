@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { Aperture, CheckCircle2, Lock, Image as ImageIcon, Clock, Package } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { getProfileImageUrl } from "@/lib/photographer";
 
@@ -17,6 +18,29 @@ type PhotographerInfo = {
   instagram_url: string | null;
   portfolio_url: string | null;
 } | null;
+
+const playfair: React.CSSProperties = { fontFamily: "'Playfair Display', Georgia, serif" };
+const headerBg: React.CSSProperties = { background: "rgba(13,30,40,0.9)", backdropFilter: "blur(12px)" };
+
+function PageHeader({ right }: { right?: React.ReactNode }) {
+  return (
+    <header className="sticky top-0 z-50 flex h-12 items-center justify-between border-b border-[#1e2236] px-4" style={headerBg}>
+      <div className="flex items-center gap-2">
+        <Aperture className="h-4 w-4 text-[#4f7eff]" />
+        <span className="text-[15px] font-bold text-[#e8eaf0]" style={playfair}>A컷</span>
+      </div>
+      {right && <div className="text-[12px] text-[#8b90a8]">{right}</div>}
+    </header>
+  );
+}
+
+function PageFooter() {
+  return (
+    <footer className="py-5 text-center text-[11px] text-[#3a3f55]">
+      © 2026 A컷 · Acut
+    </footer>
+  );
+}
 
 export default function ConfirmedPage() {
   const params = useParams();
@@ -97,29 +121,31 @@ export default function ConfirmedPage() {
   };
 
   const steps = [
-    { icon: "✅", label: "사진 셀렉 완료", desc: `${N}장의 사진을 최종 확정했습니다`, badge: "완료", badgeColor: "#2ed573", badgeBg: "#0f2a1e", done: true },
-    { icon: "✏️", label: "보정 작업", desc: "작가님이 선택하신 사진을 보정합니다. 예상 기간 5~7일", badge: "진행 중", badgeColor: "#4f7eff", badgeBg: "#0d1535", done: false },
-    { icon: "📦", label: "결과물 납품", desc: "보정 완료된 사진을 고해상도로 전달드립니다", badge: "대기 중", badgeColor: "#5a5f78", badgeBg: "#1a1d24", done: false },
-    { icon: "🎉", label: "완료", desc: "모든 작업이 마무리됩니다", badge: "대기 중", badgeColor: "#5a5f78", badgeBg: "#1a1d24", done: false },
+    { icon: <CheckCircle2 className="h-4 w-4" />, label: "사진 셀렉 완료", desc: `${N}장의 사진을 최종 확정했습니다`, badge: "완료", badgeColor: "#2ed573", badgeBg: "#0f2a1e", done: true },
+    { icon: <ImageIcon className="h-4 w-4" />, label: "보정 작업", desc: "작가님이 선택하신 사진을 보정합니다. 예상 기간 5~7일", badge: "진행 중", badgeColor: "#4f7eff", badgeBg: "#0d1535", done: false },
+    { icon: <Package className="h-4 w-4" />, label: "결과물 납품", desc: "보정 완료된 사진을 고해상도로 전달드립니다", badge: "대기 중", badgeColor: "#5a5f78", badgeBg: "#1a1d24", done: false },
+    { icon: <CheckCircle2 className="h-4 w-4" />, label: "완료", desc: "모든 작업이 마무리됩니다", badge: "대기 중", badgeColor: "#5a5f78", badgeBg: "#1a1d24", done: false },
   ];
 
   return (
     <div className="min-h-screen bg-[#09090d] text-[#e8eaf0]">
-      <div className="mx-auto max-w-[520px] px-4 pt-10 pb-16">
+      <PageHeader right={project.name} />
 
-        {/* Header */}
-        <header className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-[68px] w-[68px] items-center justify-center rounded-full border-2 border-[#2ed573] bg-[#0f2a1e] text-[30px]">
-            ✅
+      <div className="mx-auto max-w-[520px] px-4 pt-8 pb-16">
+        {/* Hero */}
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2 border-[#2ed573] bg-[#0f2a1e]">
+            <CheckCircle2 className="h-8 w-8 text-[#2ed573]" />
           </div>
-          <h1 className="mb-1 text-[21px] font-bold">셀렉이 완료되었습니다!</h1>
-          <p className="text-[12px] text-[#8b90a8]">{confirmedDate}</p>
-        </header>
+          <h1 className="mb-1 text-[22px] font-bold text-[#e8eaf0]" style={playfair}>확정이 완료됐습니다!</h1>
+          <p className="mb-1 text-[13px] text-[#8b90a8]">작가가 보정을 시작합니다</p>
+          <p className="text-[12px] text-[#5a5f78]">{confirmedDate}</p>
+        </div>
 
         {/* Summary */}
         <section className="mb-3 rounded-2xl border border-[#1e2236] bg-[#111318] p-5">
           <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-[#5a5f78]">선택 요약</h2>
-          <div className="flex items-center justify-center gap-2 mb-3">
+          <div className="mb-3 flex items-center justify-center gap-2">
             <span className="font-mono text-[40px] font-bold text-[#2ed573]">{N}</span>
             <span className="font-mono text-[28px] text-[#3a3f55]">/</span>
             <span className="font-mono text-[28px] font-bold text-[#5a5f78]">{M}</span>
@@ -131,9 +157,10 @@ export default function ConfirmedPage() {
           </div>
           <Link
             href={`/c/${token}/locked`}
-            className="block w-full rounded-xl border border-[#252b3d] bg-[#1a1d24] py-3 text-center text-[13px] text-[#8b90a8] transition-colors hover:border-[#4f7eff] hover:text-[#4f7eff] active:opacity-80"
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#252b3d] bg-[#1a1d24] text-[13px] text-[#8b90a8] transition-colors hover:border-[#4f7eff] hover:text-[#4f7eff]"
           >
-            🔒 선택한 사진 보기 (읽기 전용)
+            <Lock className="h-3.5 w-3.5" />
+            선택한 사진 보기 (읽기 전용)
           </Link>
         </section>
 
@@ -144,7 +171,7 @@ export default function ConfirmedPage() {
             {steps.map((step, i) => (
               <div key={step.label} className="flex gap-3">
                 <div className="flex flex-col items-center">
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 text-[14px] ${step.done ? "border-[#2ed573] bg-[#0f2a1e]" : "border-[#252b3d] bg-[#1a1d24]"}`}>
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 ${step.done ? "border-[#2ed573] bg-[#0f2a1e] text-[#2ed573]" : "border-[#252b3d] bg-[#1a1d24] text-[#5a5f78]"}`}>
                     {step.icon}
                   </div>
                   {i < steps.length - 1 && <div className="my-1 w-0.5 flex-1 min-h-[16px] bg-[#1e2236]" />}
@@ -152,8 +179,7 @@ export default function ConfirmedPage() {
                 <div className="pb-5 pt-1 flex-1 last:pb-1">
                   <div className="text-[13px] font-semibold mb-0.5">{step.label}</div>
                   <div className="text-[11px] text-[#8b90a8] leading-relaxed">{step.desc}</div>
-                  <span className="mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px]"
-                    style={{ color: step.badgeColor, background: step.badgeBg }}>
+                  <span className="mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px]" style={{ color: step.badgeColor, background: step.badgeBg }}>
                     {step.badge}
                   </span>
                 </div>
@@ -166,36 +192,28 @@ export default function ConfirmedPage() {
         <section className="rounded-2xl border border-[#1e2236] bg-[#111318] p-5">
           <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-[#5a5f78]">담당 작가</h2>
           <div className="flex items-center gap-3 mb-3">
-            <img
-              src={getProfileImageUrl(photographer?.profile_image_url)}
-              alt=""
-              className="h-12 w-12 shrink-0 rounded-full object-cover"
-            />
+            <img src={getProfileImageUrl(photographer?.profile_image_url)} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover" />
             <div>
               <div className="text-[15px] font-bold">{photographer?.name || "담당 작가"}</div>
               <div className="text-[11px] text-[#8b90a8]">선택하신 사진을 꼼꼼히 보정해 드립니다</div>
             </div>
           </div>
-
           {(photographer?.instagram_url || photographer?.portfolio_url) && (
             <div className="mb-3 flex flex-wrap gap-2">
               {photographer?.instagram_url && (
-                <a href={photographer.instagram_url} target="_blank" rel="noopener noreferrer"
-                  className="rounded-full border border-[#252b3d] bg-[#1a1d24] px-3 py-1.5 text-[11px] text-[#8b90a8] hover:border-[#4f7eff] hover:text-[#4f7eff]">
-                  📷 인스타그램
+                <a href={photographer.instagram_url} target="_blank" rel="noopener noreferrer" className="rounded-full border border-[#252b3d] bg-[#1a1d24] px-3 py-1.5 text-[11px] text-[#8b90a8] hover:border-[#4f7eff] hover:text-[#4f7eff]">
+                  인스타그램
                 </a>
               )}
               {photographer?.portfolio_url && (
-                <a href={photographer.portfolio_url} target="_blank" rel="noopener noreferrer"
-                  className="rounded-full border border-[#252b3d] bg-[#1a1d24] px-3 py-1.5 text-[11px] text-[#8b90a8] hover:border-[#4f7eff] hover:text-[#4f7eff]">
-                  🌐 포트폴리오
+                <a href={photographer.portfolio_url} target="_blank" rel="noopener noreferrer" className="rounded-full border border-[#252b3d] bg-[#1a1d24] px-3 py-1.5 text-[11px] text-[#8b90a8] hover:border-[#4f7eff] hover:text-[#4f7eff]">
+                  포트폴리오
                 </a>
               )}
             </div>
           )}
-
           <div className="rounded-xl border-l-[3px] border-l-[#4f7eff] bg-[#1a1d24] p-3.5 text-[12px] text-[#8b90a8] leading-relaxed">
-            {photographer?.bio?.trim() || "소중한 순간을 함께할 수 있어 영광입니다. 남겨주신 코멘트 꼼꼼히 반영해서 예쁘게 보정해 드릴게요 😊"}
+            {photographer?.bio?.trim() || "소중한 순간을 함께할 수 있어 영광입니다. 남겨주신 코멘트 꼼꼼히 반영해서 예쁘게 보정해 드릴게요"}
           </div>
 
           {project.status === "confirmed" && (
@@ -210,7 +228,7 @@ export default function ConfirmedPage() {
                 type="button"
                 disabled={atCancelLimit}
                 onClick={() => !atCancelLimit && setCancelModalOpen(true)}
-                className="w-full rounded-xl border border-[#252b3d] py-3 text-[13px] text-[#8b90a8] transition-colors hover:border-[#ff4757] hover:text-[#ff4757] disabled:opacity-40 disabled:pointer-events-none"
+                className="flex h-11 w-full items-center justify-center rounded-xl border border-[#252b3d] text-[13px] text-[#8b90a8] transition-colors hover:border-[#ff4757] hover:text-[#ff4757] disabled:opacity-40 disabled:pointer-events-none"
               >
                 확정 취소
               </button>
@@ -218,6 +236,8 @@ export default function ConfirmedPage() {
           )}
         </section>
       </div>
+
+      <PageFooter />
 
       {/* Cancel modal */}
       {cancelModalOpen && project.status === "confirmed" && (
@@ -229,19 +249,10 @@ export default function ConfirmedPage() {
               남은 횟수 <span className="font-medium text-[#e8eaf0]">{remainingCancels}회</span>
             </p>
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setCancelModalOpen(false)}
-                className="flex-1 rounded-xl border border-[#252b3d] py-3 text-[13px] text-[#8b90a8]"
-              >
+              <button type="button" onClick={() => setCancelModalOpen(false)} className="flex h-11 flex-1 items-center justify-center rounded-xl border border-[#252b3d] text-[13px] text-[#8b90a8]">
                 취소
               </button>
-              <button
-                type="button"
-                onClick={handleConfirmCancel}
-                disabled={cancelling}
-                className="flex-1 rounded-xl bg-[#4f7eff] py-3 text-[13px] font-semibold text-white disabled:opacity-60"
-              >
+              <button type="button" onClick={handleConfirmCancel} disabled={cancelling} className="flex h-11 flex-1 items-center justify-center rounded-xl bg-[#4f7eff] text-[13px] font-semibold text-white disabled:opacity-60">
                 {cancelling ? "처리 중..." : "예, 다시 선택할게요"}
               </button>
             </div>
