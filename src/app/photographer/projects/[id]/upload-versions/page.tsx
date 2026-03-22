@@ -774,11 +774,11 @@ function MappingCard({
             <div style={{ fontSize: 11, color: C.dim, fontStyle: "italic" }}>보정본 없음</div>
           </div>
         ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <div
-              onClick={() => previewUrl && onOpenLightbox([{ url: previewUrl, label: target.filename, sublabel: "v1 보정본" }], 0)}
-              style={{ width: 52, height: 38, background: "#1a2535", borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${C.border}`, overflow: "hidden", cursor: previewUrl ? "zoom-in" : "default" }}
-            >
+          <div
+            style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, cursor: previewUrl ? "zoom-in" : "default" }}
+            onClick={() => previewUrl && onCompare(target.id)}
+          >
+            <div style={{ width: 52, height: 38, background: "#1a2535", borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${C.border}`, overflow: "hidden" }}>
               {previewUrl && !retouchErr ? (
                 <img src={previewUrl} alt="" onError={() => setRetouchErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : <Image size={16} color={C.dim} />}
