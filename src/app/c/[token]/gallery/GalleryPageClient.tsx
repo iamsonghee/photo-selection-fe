@@ -411,27 +411,38 @@ export default function GalleryPageClient() {
                   {photo.orderIndex}
                 </div>
 
-                {/* Star rating (bottom-left) */}
-                {rating != null && rating > 0 && (
-                  <div className="absolute bottom-[4px] left-[4px] z-[2] flex gap-[1px]">
-                    {Array.from({ length: rating }, (_, i) => (
+                {/* Bottom info panel: 2 rows */}
+                <div
+                  className="absolute bottom-0 left-0 right-0 z-[2] flex flex-col"
+                  style={{ background: "rgba(0,0,0,0.52)", padding: "2px 5px 3px" }}
+                >
+                  {/* Row 1: filename */}
+                  <span
+                    className="block truncate"
+                    style={{ fontSize: 9, color: "rgba(255,255,255,0.75)", lineHeight: "14px" }}
+                  >
+                    {getPhotoDisplayName(photo)}
+                  </span>
+                  {/* Row 2: stars (left) + color dot (right) */}
+                  <div className="flex items-center justify-between" style={{ minHeight: 12 }}>
+                    <div className="flex items-center gap-[1px]">
+                      {rating != null && rating > 0
+                        ? Array.from({ length: rating }, (_, i) => (
+                            <span key={i} style={{ fontSize: 9, color: "#f5a623", lineHeight: 1 }}>★</span>
+                          ))
+                        : <span style={{ fontSize: 9, color: "transparent", lineHeight: 1 }}>★</span>
+                      }
+                    </div>
+                    {colorHex ? (
                       <span
-                        key={i}
-                        style={{ fontSize: 9, color: "#f5a623", textShadow: "0 1px 2px rgba(0,0,0,0.8)" }}
-                      >
-                        ★
-                      </span>
-                    ))}
+                        className="rounded-full"
+                        style={{ width: 8, height: 8, background: colorHex, border: "1px solid rgba(255,255,255,0.55)", flexShrink: 0, display: "block" }}
+                      />
+                    ) : (
+                      <span style={{ width: 8, height: 8, display: "block" }} />
+                    )}
                   </div>
-                )}
-
-                {/* Color dot (bottom-right) */}
-                {colorHex && (
-                  <div
-                    className="absolute bottom-[4px] right-[4px] z-[2] rounded-full"
-                    style={{ width: 10, height: 10, background: colorHex, border: "1.5px solid rgba(255,255,255,0.6)" }}
-                  />
-                )}
+                </div>
               </Link>
             );
           })}
