@@ -1,80 +1,58 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Aperture, RotateCcw } from "lucide-react";
-import { useSelection, SelectionConfirmBar } from "@/contexts/SelectionContext";
+import { useParams, useRouter } from "next/navigation";
+import { RotateCcw, Check, ArrowUpDown } from "lucide-react";
+import { useSelection } from "@/contexts/SelectionContext";
 import { getProfileImageUrl } from "@/lib/photographer";
 import {
-  parseFilterFromSearchParams,
   buildFilterQueryString,
   getFilteredPhotos,
   getPhotoDisplayName,
 } from "@/lib/gallery-filter";
+import type { GalleryFilterState } from "@/lib/gallery-filter";
 import type { StarRating, ColorTag, SortOrder } from "@/types";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 
-const STAR_OPTIONS: { value: StarRating | "all"; label: string }[] = [
-  { value: "all", label: "모두" },
-  { value: 5, label: "★5" },
-  { value: 4, label: "★4" },
-  { value: 3, label: "★3" },
-  { value: 2, label: "★2" },
-  { value: 1, label: "★1" },
+const COLOR_OPTIONS: { key: ColorTag; hex: string }[] = [
+  { key: "red",    hex: "#ff4757" },
+  { key: "yellow", hex: "#ffd32a" },
+  { key: "green",  hex: "#2ed573" },
+  { key: "blue",   hex: "#1e90ff" },
+  { key: "purple", hex: "#5352ed" },
 ];
 
-const COLOR_OPTIONS: { value: ColorTag | "none" | "all"; label: string }[] = [
-  { value: "all", label: "전체" },
-  { value: "red", label: "빨강" },
-  { value: "yellow", label: "노랑" },
-  { value: "green", label: "초록" },
-  { value: "blue", label: "파랑" },
-  { value: "purple", label: "보라" },
-  { value: "none", label: "미선택" },
+const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
+  { value: "filename", label: "파일명순" },
+  { value: "oldest",   label: "번호순"  },
+  { value: "newest",   label: "최신순"  },
 ];
-
-const COLOR_HEX: Record<ColorTag, string> = {
-  red: "#ff4757",
-  yellow: "#f5a623",
-  green: "#2ed573",
-  blue: "#4f7eff",
-  purple: "#9c27b0",
-};
-
-function getTestImageUrl(photoId: string, size = "400/400") {
-  const seed = photoId.replace(/\D/g, "") || "1";
-  return `https://picsum.photos/seed/${seed}/${size}`;
-}
 
 const playfair: React.CSSProperties = { fontFamily: "'Playfair Display', Georgia, serif" };
-const headerBg: React.CSSProperties = { background: "rgba(13,30,40,0.9)", backdropFilter: "blur(12px)" };
 
 export default function GalleryPageClient() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const token = (params?.token as string) ?? "";
 
-  const [urlSearch, setUrlSearch] = useState<string | null>(() =>
-    typeof window !== "undefined" ? window.location.search : null
-  );
-  useEffect(() => {
-    const syncFromUrl = () => setUrlSearch(typeof window !== "undefined" ? window.location.search : "");
-    window.addEventListener("popstate", syncFromUrl);
-    return () => window.removeEventListener("popstate", syncFromUrl);
-  }, []);
-
-  const paramsToRead = useMemo(() => {
-    if (urlSearch !== null) {
-      return new URLSearchParams(urlSearch.startsWith("?") ? urlSearch : `?${urlSearch}`);
-    }
-    return searchParams;
-  }, [urlSearch, searchParams]);
-
-  const { project, photos, Y, N, toggle, isSelected, selectedIds, photoStates, loading } = useSelection();
+  const { project, photos, Y, N, toggle, selectedIds, photoStates, loading } = useSelection();
   const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
+
+  // Local filter state
+  const [tabFilter,    setTabFilter]    = useState<"all" | "selected">("all");
+  const [starFilter,   setStarFilter]   = useState<number>(0);
+  const [colorFilter,  setColorFilter]  = useState<ColorTag | null>(null);
+  const [sortOrder,    setSortOrder]    = useState<SortOrder>("filename");
+  const [hoverStar,    setHoverStar]    = useState(0);
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const sortRef = useRef<HTMLDivElement>(null);
+
+  // Confirm modal
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirming,       setConfirming]       = useState(false);
+  const [confirmError,     setConfirmError]     = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -84,179 +62,473 @@ export default function GalleryPageClient() {
       .catch(() => {});
   }, [token]);
 
-  const filterState = useMemo(() => parseFilterFromSearchParams(paramsToRead), [paramsToRead]);
-  const { starFilter, colorFilter, selectedFilter, sortOrder } = filterState;
+  useEffect(() => {
+    if (!project) return;
+    if (project.status === "confirmed") { router.replace(`/c/${token}/confirmed`); return; }
+    if (project.status === "editing")   { router.replace(`/c/${token}/locked`);    return; }
+  }, [project, token, router]);
+
+  // Close sort dropdown on outside click
+  useEffect(() => {
+    if (!showSortMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
+        setShowSortMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showSortMenu]);
+
+  // Derive GalleryFilterState for filtering + viewer links
+  const filterState = useMemo<GalleryFilterState>(() => ({
+    selectedFilter: tabFilter,
+    starFilter: starFilter === 0 ? "all" : (starFilter as StarRating),
+    colorFilter: colorFilter ?? "all",
+    sortOrder,
+  }), [tabFilter, starFilter, colorFilter, sortOrder]);
 
   const filteredPhotos = useMemo(
     () => getFilteredPhotos(photos, selectedIds, photoStates, filterState),
     [photos, selectedIds, photoStates, filterState]
   );
 
-  const viewerQueryString = useMemo(() => buildFilterQueryString(filterState), [filterState]);
-
-  const updateFilter = useCallback(
-    (patch: Partial<typeof filterState>) => {
-      const next: typeof filterState = { ...filterState, ...patch };
-      const qs = buildFilterQueryString(next);
-      router.replace(`/c/${token}/gallery${qs}`, { scroll: false });
-      setUrlSearch(qs.startsWith("?") ? qs.slice(1) : qs ? qs : "");
-    },
-    [filterState, router, token]
+  const viewerQueryString = useMemo(
+    () => buildFilterQueryString(filterState),
+    [filterState]
   );
 
-  useEffect(() => {
-    if (!project) return;
-    if (project.status === "confirmed") { router.replace(`/c/${token}/confirmed`); return; }
-    if (project.status === "editing") { router.replace(`/c/${token}/locked`); return; }
-  }, [project, token, router]);
+  const handleCheckClick = useCallback((e: React.MouseEvent, photoId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggle(photoId);
+  }, [toggle]);
 
-  const loadFailed = !loading && project != null && photos.length === 0;
+  const handleConfirm = useCallback(async () => {
+    if (!project?.id || !token) return;
+    setConfirming(true);
+    setConfirmError(null);
+    try {
+      const res = await fetch("/api/c/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, project_id: project.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setConfirmError((data as { error?: string }).error ?? `오류 (${res.status})`);
+        setConfirming(false);
+        return;
+      }
+      setShowConfirmModal(false);
+      router.push(`/c/${token}/confirmed`);
+      window.location.href = `/c/${token}/confirmed`;
+    } catch (e) {
+      console.error(e);
+      setConfirming(false);
+    }
+  }, [project?.id, token, router]);
 
-  const handleCheckClick = useCallback(
-    (e: React.MouseEvent, photoId: string) => {
-      e.preventDefault();
-      e.stopPropagation();
-      toggle(photoId);
-    },
-    [toggle]
-  );
+  // ── Loading / error states ──────────────────────────────────────────────
 
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center bg-[#09090d]"><p className="text-sm text-[#5a5f78]">갤러리 불러오는 중...</p></div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center" style={{ background: "#0d1e28" }}>
+        <p className="text-sm" style={{ color: "#3a5a6e" }}>갤러리 불러오는 중...</p>
+      </div>
+    );
   }
   if (!project) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#09090d] px-4">
-        <p className="text-sm text-[#5a5f78]">존재하지 않는 초대 링크입니다.</p>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4" style={{ background: "#0d1e28" }}>
+        <p className="text-sm" style={{ color: "#3a5a6e" }}>존재하지 않는 초대 링크입니다.</p>
       </div>
     );
   }
   if (project.status === "editing") return null;
-  if (loadFailed || photos.length === 0) {
+  if (!loading && photos.length === 0) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#09090d] px-4">
-        <p className="text-sm text-[#5a5f78]">사진을 불러올 수 없습니다.</p>
-        <Link href={`/c/${token}`} className="rounded-xl border border-[#252b3d] px-4 py-2 text-[13px] text-[#8b90a8] hover:border-[#4f7eff] hover:text-[#4f7eff]">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4" style={{ background: "#0d1e28" }}>
+        <p className="text-sm" style={{ color: "#3a5a6e" }}>사진을 불러올 수 없습니다.</p>
+        <Link href={`/c/${token}`}
+          className="rounded-xl px-4 py-2 text-[13px] transition-colors hover:opacity-80"
+          style={{ border: "1px solid rgba(102,155,188,0.2)", color: "#669bbc" }}>
           초대 페이지로 돌아가기
         </Link>
       </div>
     );
   }
 
-  const selectionStatus = Y === N ? "done" : Y < N ? "under" : "over";
+  const canConfirm = Y === N;
   const progressPct = N > 0 ? Math.min((Y / N) * 100, 100) : 0;
+  const currentSortLabel = SORT_OPTIONS.find((o) => o.value === sortOrder)?.label ?? "파일명순";
 
   return (
-    <div className="min-h-screen bg-[#09090d] pb-40">
-      {/* Header */}
-      <header className="sticky top-0 z-20 border-b border-[#1e2236] px-4" style={headerBg}>
-        <div className="flex h-12 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Aperture className="h-4 w-4 text-[#4f7eff]" />
-            <span className="text-[15px] font-bold text-[#e8eaf0]" style={playfair}>A컷</span>
+    <div style={{ background: "#0d1e28", minHeight: "100vh", paddingBottom: 80 }}>
+
+      {/* ── Header ── */}
+      <header
+        className="sticky top-0 z-[100] flex h-12 items-center justify-between px-4"
+        style={{ background: "rgba(13,30,40,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(102,155,188,0.12)" }}
+      >
+        {/* Logo */}
+        <div className="flex items-center gap-[7px]">
+          <div
+            className="flex h-6 w-6 items-center justify-center rounded-[5px]"
+            style={{ background: "#152a3a", border: "1px solid rgba(102,155,188,0.22)" }}
+          >
+            <span style={{ ...playfair, fontSize: 11, color: "#669bbc" }}>A</span>
           </div>
-          <div className="flex items-center gap-2">
-            {photographer && (
-              <div className="flex items-center gap-1.5 rounded-full border border-[#1e2236] bg-[#1a1d24] px-2 py-0.5">
-                <img src={getProfileImageUrl(photographer.profile_image_url)} alt="" className="h-4 w-4 rounded-full object-cover" />
-                <span className="max-w-[70px] truncate text-[11px] text-[#8b90a8]">{photographer.name || "작가"}</span>
-              </div>
-            )}
-            <span className={`rounded-full px-2.5 py-1 font-mono text-[11px] font-semibold ${
-              selectionStatus === "done" ? "bg-[#2ed573]/10 text-[#2ed573]" :
-              selectionStatus === "over" ? "bg-[#f5a623]/10 text-[#f5a623]" :
-              "bg-[#ff4757]/10 text-[#ff4757]"
-            }`}>
-              {Y} / {N}
-            </span>
-          </div>
+          <span style={{ ...playfair, fontSize: 14, color: "#e8eef2" }}>A컷</span>
         </div>
-        {/* Progress bar */}
-        <div className="h-0.5 bg-[#1e2236]">
-          <div className="h-full bg-[#4f7eff] transition-all duration-300" style={{ width: `${progressPct}%` }} />
+
+        {/* Right: photographer + count */}
+        <div className="flex items-center gap-2.5">
+          {photographer && (
+            <span className="text-[12px]" style={{ color: "#7a9ab0" }}>
+              {photographer.name || "작가"}
+            </span>
+          )}
+          <span
+            className="rounded-full px-[9px] py-[3px] text-[12px] font-semibold"
+            style={{ background: "rgba(102,155,188,0.12)", border: "1px solid rgba(102,155,188,0.2)", color: "#669bbc" }}
+          >
+            {Y} / {N}
+          </span>
         </div>
       </header>
 
-      {/* Filter bar */}
-      <div className="border-b border-[#1e2236] bg-[#111318]/95 px-4 py-2">
-        <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto">
-          {/* Selected filter */}
+      {/* ── Filter bar ── */}
+      <div
+        className="sticky top-12 z-[90]"
+        style={{ background: "rgba(13,30,40,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(102,155,188,0.12)" }}
+      >
+        <div
+          className="flex items-center gap-1.5 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {/* Tabs: 전체 / 선택됨 */}
           {(["all", "selected"] as const).map((v) => (
-            <button key={v} type="button" onClick={() => updateFilter({ selectedFilter: v })}
-              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] transition-colors ${selectedFilter === v ? "bg-[#4f7eff]/20 text-[#4f7eff]" : "text-[#8b90a8] hover:bg-[#1e2236]"}`}>
+            <button
+              key={v}
+              type="button"
+              onClick={() => setTabFilter(v)}
+              className="shrink-0 rounded-full text-[12px] font-medium transition-all"
+              style={{
+                padding: "5px 12px",
+                border: tabFilter === v ? "1px solid rgba(102,155,188,0.3)" : "1px solid rgba(102,155,188,0.12)",
+                background: tabFilter === v ? "rgba(102,155,188,0.12)" : "transparent",
+                color: tabFilter === v ? "#669bbc" : "#7a9ab0",
+                whiteSpace: "nowrap",
+                cursor: "pointer",
+              }}
+            >
               {v === "all" ? "전체" : "선택됨"}
             </button>
           ))}
-          <span className="mx-1 h-3 w-px shrink-0 bg-[#1e2236]" />
-          {/* Star filter */}
-          {STAR_OPTIONS.map((opt) => (
-            <button key={String(opt.value)} type="button" onClick={() => updateFilter({ starFilter: opt.value })}
-              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] transition-colors ${starFilter === opt.value ? "bg-[#4f7eff]/20 text-[#4f7eff]" : "text-[#8b90a8] hover:bg-[#1e2236]"}`}>
-              {opt.label}
-            </button>
-          ))}
-          <span className="mx-1 h-3 w-px shrink-0 bg-[#1e2236]" />
-          {/* Color filter */}
-          {COLOR_OPTIONS.map((opt) => (
-            <button key={opt.value} type="button" onClick={() => updateFilter({ colorFilter: opt.value })}
-              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] transition-colors ${colorFilter === opt.value ? "bg-[#4f7eff]/20 text-[#4f7eff]" : "text-[#8b90a8] hover:bg-[#1e2236]"}`}>
-              {opt.label}
-            </button>
-          ))}
-          <span className="mx-1 h-3 w-px shrink-0 bg-[#1e2236]" />
-          <select value={sortOrder} onChange={(e) => updateFilter({ sortOrder: e.target.value as SortOrder })}
-            className="shrink-0 rounded-lg border border-[#1e2236] bg-[#1a1d24] px-2 py-1 text-[11px] text-[#e8eaf0] focus:outline-none">
-            <option value="filename">파일명순</option>
-            <option value="newest">최신순</option>
-            <option value="oldest">오래된순</option>
-          </select>
-          <button type="button" onClick={() => updateFilter({ starFilter: "all", colorFilter: "all", selectedFilter: "all", sortOrder: "filename" })}
-            className="shrink-0 flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] text-[#5a5f78] hover:bg-[#1e2236] hover:text-[#8b90a8]">
-            <RotateCcw className="h-3 w-3" /> 초기화
+
+          <span className="mx-0.5 h-4 w-px shrink-0" style={{ background: "rgba(102,155,188,0.12)" }} />
+
+          {/* Interactive star filter */}
+          {([1, 2, 3, 4, 5] as const).map((s) => {
+            const filled = s <= (hoverStar || starFilter);
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setStarFilter((prev) => (prev === s ? 0 : s))}
+                onMouseEnter={() => setHoverStar(s)}
+                onMouseLeave={() => setHoverStar(0)}
+                className="shrink-0 transition-transform hover:scale-[1.2]"
+                style={{
+                  fontSize: 18,
+                  lineHeight: 1,
+                  padding: "4px 2px",
+                  color: filled ? "#f5a623" : "#3a5a6e",
+                  userSelect: "none",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "color 0.1s, transform 0.1s",
+                }}
+              >
+                {filled ? "★" : "☆"}
+              </button>
+            );
+          })}
+
+          <span className="mx-0.5 h-4 w-px shrink-0" style={{ background: "rgba(102,155,188,0.12)" }} />
+
+          {/* Color dot filters */}
+          {COLOR_OPTIONS.map((opt) => {
+            const isActive = colorFilter === opt.key;
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setColorFilter((prev) => (prev === opt.key ? null : opt.key))}
+                className="shrink-0 flex items-center justify-center transition-all"
+                title={opt.key}
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 20,
+                  padding: "5px 6px",
+                  border: isActive ? "1px solid rgba(102,155,188,0.3)" : "1px solid rgba(102,155,188,0.12)",
+                  background: isActive ? "#152a3a" : "transparent",
+                  cursor: "pointer",
+                }}
+              >
+                <span
+                  className="block rounded-full"
+                  style={{ width: 14, height: 14, background: opt.hex, flexShrink: 0 }}
+                />
+              </button>
+            );
+          })}
+
+          {/* Reset: star + color only */}
+          <button
+            type="button"
+            onClick={() => { setStarFilter(0); setColorFilter(null); }}
+            className="shrink-0 flex items-center justify-center transition-all hover:opacity-70"
+            title="초기화"
+            style={{
+              padding: "4px 6px",
+              borderRadius: 6,
+              border: "1px solid rgba(102,155,188,0.12)",
+              color: "#3a5a6e",
+              background: "none",
+              cursor: "pointer",
+            }}
+          >
+            <RotateCcw style={{ width: 13, height: 13 }} />
           </button>
+
+          {/* Sort button – margin-left auto → right-aligned */}
+          <div className="relative shrink-0" style={{ marginLeft: "auto" }} ref={sortRef}>
+            <button
+              type="button"
+              onClick={() => setShowSortMenu((v) => !v)}
+              className="flex items-center gap-1.5 transition-all"
+              style={{
+                padding: "4px 8px",
+                borderRadius: 6,
+                border: "1px solid rgba(102,155,188,0.12)",
+                color: "#7a9ab0",
+                fontSize: 11,
+                background: "none",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <ArrowUpDown style={{ width: 11, height: 11 }} />
+              {currentSortLabel}
+            </button>
+            {showSortMenu && (
+              <div
+                className="absolute right-0 top-full mt-1 z-[200] overflow-hidden rounded-lg shadow-xl"
+                style={{ background: "#0f2030", border: "1px solid rgba(102,155,188,0.2)", minWidth: 100 }}
+              >
+                {SORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => { setSortOrder(opt.value); setShowSortMenu(false); }}
+                    className="block w-full px-3 py-2 text-left text-[12px] transition-colors hover:bg-[rgba(102,155,188,0.08)]"
+                    style={{ color: sortOrder === opt.value ? "#669bbc" : "#7a9ab0", background: "none", cursor: "pointer" }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Photo grid */}
-      <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 md:grid-cols-4">
-        {filteredPhotos.map((photo) => {
-          const selected = isSelected(photo.id);
-          const state = photoStates[photo.id];
-          const rating = state?.rating;
-          const colorTag = state?.color;
-          const hasTag = (rating != null && rating > 0) || colorTag != null;
-          return (
-            <Link key={photo.id} href={`/c/${token}/viewer/${photo.id}${viewerQueryString}`}
-              className={`group relative block aspect-[4/3] cursor-pointer overflow-hidden rounded-xl bg-[#1a1d24] transition-all ${selected ? "ring-2 ring-[#2ed573] ring-offset-1 ring-offset-[#09090d]" : ""}`}>
-              <img
-                src={photo.url || getTestImageUrl(photo.id)}
-                alt={getPhotoDisplayName(photo)}
-                className="h-full w-full object-cover transition-[filter] duration-200 group-hover:brightness-105"
-                loading="lazy" decoding="async" draggable={false}
-              />
-              {/* Select button */}
-              <button type="button" onClick={(e) => handleCheckClick(e, photo.id)}
-                className={`absolute left-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 transition-opacity ${
-                  selected ? "border-white bg-[#2ed573] text-white opacity-100" : "border-white/80 bg-black/50 text-white opacity-0 group-hover:opacity-100"
-                }`} aria-label={selected ? "선택 해제" : "선택"}>
-                {selected && <span className="text-[10px]">✓</span>}
-              </button>
-              {/* Tags */}
-              <div className="absolute bottom-1 left-1 flex max-w-[90%] min-w-0 items-center gap-1 rounded bg-black/55 px-1.5 py-0.5">
-                <span className="truncate text-[10px] text-white">{getPhotoDisplayName(photo)}</span>
-                {hasTag && rating != null && rating > 0 && (
-                  <span className="text-[10px] leading-none text-[#f5a623]">{"★".repeat(rating)}</span>
+      {/* ── Gallery grid ── */}
+      <div style={{ padding: "10px 10px 20px" }}>
+        <div className="grid grid-cols-3 gap-[6px] sm:grid-cols-4 lg:grid-cols-6">
+          {filteredPhotos.map((photo) => {
+            const selected = selectedIds.has(photo.id);
+            const state = photoStates[photo.id];
+            const rating = state?.rating;
+            const colorTag = state?.color;
+            const colorHex = colorTag ? COLOR_OPTIONS.find((c) => c.key === colorTag)?.hex : null;
+
+            return (
+              <Link
+                key={photo.id}
+                href={`/c/${token}/viewer/${photo.id}${viewerQueryString}`}
+                className="group relative block overflow-hidden rounded-[8px] transition-transform hover:scale-[1.02]"
+                style={{
+                  aspectRatio: "1 / 1",
+                  background: "#152a3a",
+                  border: selected ? "2px solid #669bbc" : "1px solid rgba(102,155,188,0.12)",
+                }}
+              >
+                {/* Selected tint overlay */}
+                {selected && (
+                  <div
+                    className="pointer-events-none absolute inset-0 z-[1]"
+                    style={{ background: "rgba(102,155,188,0.12)" }}
+                  />
                 )}
-                {hasTag && colorTag && (
-                  <span className="h-2 w-2 shrink-0 rounded-full border border-white/30" style={{ backgroundColor: COLOR_HEX[colorTag] }} />
+
+                {/* Image */}
+                <img
+                  src={photo.url || `https://picsum.photos/seed/${photo.id.replace(/\D/g, "") || "1"}/400/400`}
+                  alt={getPhotoDisplayName(photo)}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                  draggable={false}
+                />
+
+                {/* Check badge (top-left) */}
+                <button
+                  type="button"
+                  onClick={(e) => handleCheckClick(e, photo.id)}
+                  aria-label={selected ? "선택 해제" : "선택"}
+                  className={`absolute left-[5px] top-[5px] z-[2] flex items-center justify-center rounded-full transition-opacity ${
+                    selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  }`}
+                  style={{
+                    width: 20,
+                    height: 20,
+                    background: selected ? "#669bbc" : "rgba(0,0,0,0.45)",
+                    border: selected ? "2px solid white" : "1.5px solid rgba(255,255,255,0.55)",
+                  }}
+                >
+                  {selected && <Check style={{ width: 10, height: 10, color: "white", strokeWidth: 3 }} />}
+                </button>
+
+                {/* Number badge (top-right) */}
+                <div
+                  className="absolute right-[5px] top-[4px] z-[2] rounded px-[4px] py-[1px]"
+                  style={{ background: "rgba(0,0,0,0.3)", fontSize: 9, color: "rgba(255,255,255,0.5)" }}
+                >
+                  {photo.orderIndex}
+                </div>
+
+                {/* Star rating (bottom-left) */}
+                {rating != null && rating > 0 && (
+                  <div className="absolute bottom-[4px] left-[4px] z-[2] flex gap-[1px]">
+                    {Array.from({ length: rating }, (_, i) => (
+                      <span
+                        key={i}
+                        style={{ fontSize: 9, color: "#f5a623", textShadow: "0 1px 2px rgba(0,0,0,0.8)" }}
+                      >
+                        ★
+                      </span>
+                    ))}
+                  </div>
                 )}
-              </div>
-            </Link>
-          );
-        })}
+
+                {/* Color dot (bottom-right) */}
+                {colorHex && (
+                  <div
+                    className="absolute bottom-[4px] right-[4px] z-[2] rounded-full"
+                    style={{ width: 10, height: 10, background: colorHex, border: "1.5px solid rgba(255,255,255,0.6)" }}
+                  />
+                )}
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
-      <SelectionConfirmBar />
+      {/* ── Bottom bar ── */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-[100] flex items-center justify-between gap-3 px-4 py-2.5 backdrop-blur"
+        style={{ background: "rgba(0,48,73,0.97)", borderTop: "1px solid rgba(102,155,188,0.15)" }}
+      >
+        {/* Left: text + progress */}
+        <div className="flex flex-1 flex-col gap-[3px]">
+          <div className="flex items-center justify-between">
+            <span className="text-[12px]" style={{ color: "#7a9ab0" }}>선택 {Y} / {N}</span>
+            {Y < N  && <span className="text-[12px] font-medium" style={{ color: "#f5a623" }}>{N - Y}개 더 선택 필요</span>}
+            {Y === N && <span className="text-[12px] font-medium" style={{ color: "#2ed573" }}>선택 완료!</span>}
+            {Y > N  && <span className="text-[12px] font-medium" style={{ color: "#f5a623" }}>{Y - N}개 초과 선택</span>}
+          </div>
+          <div
+            className="h-[3px] overflow-hidden rounded-full"
+            style={{ background: "rgba(255,255,255,0.1)" }}
+          >
+            <div
+              className="h-full rounded-full transition-all duration-300"
+              style={{ width: `${progressPct}%`, background: "#669bbc" }}
+            />
+          </div>
+        </div>
+
+        {/* Right: confirm button */}
+        <button
+          type="button"
+          onClick={() => canConfirm && setShowConfirmModal(true)}
+          disabled={!canConfirm}
+          className="shrink-0 rounded-[10px] text-[13px] font-semibold transition-all"
+          style={{
+            height: 44,
+            padding: "0 20px",
+            background: canConfirm ? "#669bbc" : "#1a3347",
+            color: canConfirm ? "white" : "#3a5a6e",
+            border: "none",
+            cursor: canConfirm ? "pointer" : "not-allowed",
+          }}
+        >
+          최종확정
+        </button>
+      </div>
+
+      {/* ── Confirm modal ── */}
+      {showConfirmModal && (
+        <div
+          className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 p-4 sm:items-center"
+          onClick={() => !confirming && setShowConfirmModal(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-6 shadow-xl"
+            style={{ background: "#0f2030", border: "1px solid rgba(102,155,188,0.2)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              className="mb-2 text-[16px] font-bold"
+              style={{ ...playfair, color: "#e8eef2" }}
+            >
+              선택 확정
+            </h3>
+            <p className="mb-6 text-[13px] leading-relaxed" style={{ color: "#7a9ab0" }}>
+              <span style={{ color: "#669bbc", fontWeight: 600 }}>{Y}장</span>을 최종 선택으로 확정하시겠습니까?
+              <br />확정 후에는 수정이 제한됩니다.
+            </p>
+            {confirmError && (
+              <p className="mb-3 text-[12px]" style={{ color: "#ff4757" }} role="alert">
+                {confirmError}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => !confirming && setShowConfirmModal(false)}
+                className="flex h-11 flex-1 items-center justify-center rounded-xl text-[13px]"
+                style={{ border: "1px solid rgba(102,155,188,0.2)", color: "#7a9ab0", background: "none" }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={confirming}
+                className="flex h-11 flex-1 items-center justify-center rounded-xl text-[13px] font-semibold disabled:opacity-60"
+                style={{ background: "#669bbc", color: "white", border: "none" }}
+              >
+                {confirming ? "처리 중..." : "확정"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
