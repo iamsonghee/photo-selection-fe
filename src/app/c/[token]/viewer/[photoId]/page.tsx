@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ChevronLeft, ChevronRight, Check, X } from "lucide-react";
-import { useSelection, SelectionConfirmBar } from "@/contexts/SelectionContext";
+import { useSelection } from "@/contexts/SelectionContext";
 import {
   parseFilterFromSearchParams,
   buildFilterQueryString,
@@ -239,26 +239,23 @@ export default function ViewerPage() {
             </div>
           </div>
 
-          {/* Comment button */}
-          <div className="flex justify-center">
+          {/* Comment + Select row */}
+          <div className="flex items-center gap-2">
             <button type="button" onClick={openCommentModal}
-              className={`flex h-10 items-center gap-2 rounded-xl px-4 text-[13px] font-medium transition-all ${
+              className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-xl text-[13px] font-medium transition-all ${
                 comment ? "border border-[#4f7eff]/30 bg-[#4f7eff]/10 text-[#4f7eff]" : "border border-[#252b3d] bg-[#1a1d24] text-[#8b90a8] hover:border-[#4f7eff] hover:text-[#4f7eff]"
               }`}>
               {comment ? `코멘트 (${comment.length}자)` : "코멘트 남기기"}
             </button>
+            <button type="button" onClick={toggleSelect}
+              className={`flex h-11 items-center gap-1.5 rounded-xl px-4 text-[13px] font-semibold transition-all ${
+                isCurrentSelected ? "bg-[#2ed573] text-white" : "bg-[#4f7eff] text-white"
+              }`}>
+              {isCurrentSelected ? <><Check className="h-4 w-4" /> 선택됨</> : "+ 선택"}
+            </button>
           </div>
         </div>
       </div>
-
-      {/* FAB: Select button */}
-      <button type="button" onClick={toggleSelect}
-        className={`fixed bottom-6 right-4 z-40 flex h-12 items-center gap-2 rounded-full px-5 text-[13px] font-semibold shadow-lg transition-all ${
-          isCurrentSelected ? "bg-[#2ed573] text-white" : "bg-[#4f7eff] text-white"
-        }`}
-        style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom) + 120px)" }}>
-        {isCurrentSelected ? <><Check className="h-4 w-4" /> 선택됨</> : "+ 선택"}
-      </button>
 
       {/* Comment bottom sheet */}
       {commentModalOpen && (
@@ -294,7 +291,6 @@ export default function ViewerPage() {
         </>
       )}
 
-      <SelectionConfirmBar />
     </div>
   );
 }
