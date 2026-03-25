@@ -247,13 +247,10 @@ export default function ViewerPage() {
     </div>
   );
 
-  const SelectButton = ({ fullWidth }: { fullWidth?: boolean }) => (
+  const SelectButton = () => (
     <button type="button" onClick={toggleSelect}
       style={{
-        width: fullWidth ? "100%" : undefined,
-        maxWidth: fullWidth ? undefined : 280,
-        margin: fullWidth ? undefined : "0 auto",
-        height: 44,
+        width: "100%", height: 44,
         display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
         borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer",
         fontFamily: "'DM Sans', sans-serif", transition: "all 0.15s",
@@ -453,7 +450,7 @@ export default function ViewerPage() {
           padding: "12px 16px", flexShrink: 0, display: "flex", flexDirection: "column", gap: 10,
         }}>
           {/* Select button */}
-          <SelectButton fullWidth />
+          <SelectButton />
 
           {/* Stars + Colors */}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
