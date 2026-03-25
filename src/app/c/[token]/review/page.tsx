@@ -334,14 +334,13 @@ export default function ReviewGalleryPage() {
       {showSubmitModal && (
         <div style={{
           position: "fixed", inset: 0, zIndex: 200,
-          display: "flex", alignItems: "flex-end", justifyContent: "center",
+          display: "flex", alignItems: "center", justifyContent: "center",
           background: "rgba(0,0,0,0.65)", padding: 16,
         }}>
           <div style={{
             width: "100%", maxWidth: 360,
             background: SURFACE, border: `1px solid ${BORDER_MD}`,
             borderRadius: 16, padding: 24, boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
-            marginBottom: 8,
           }}>
             <h3 style={{ fontSize: 16, fontWeight: 700, color: TEXT, marginBottom: 8, ...playfair }}>최종 제출</h3>
             <p style={{ fontSize: 13, lineHeight: 1.6, color: MUTED, marginBottom: 20 }}>
