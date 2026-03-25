@@ -1,86 +1,82 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { Aperture, Lock } from "lucide-react";
+import { Check, AlertTriangle, LayoutGrid, List } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import type { ColorTag } from "@/types";
 
 const CUSTOMER_CANCEL_MAX = 3;
 
+/* ── design tokens ──────────────────────────── */
+const INK      = "#0d1e28";
+const SURFACE  = "#0f2030";
+const SURFACE2 = "#152a3a";
+const SURFACE3 = "#1a3347";
+const STEEL    = "#669bbc";
+const GREEN    = "#2ed573";
+const GREEN_DIM = "#0f2a1e";
+const ORANGE   = "#f5a623";
+const ORANGE_DIM = "#2a1a08";
+const RED      = "#ff4757";
+const RED_DIM  = "#2a0f12";
+const DIM      = "#3a5a6e";
+const MUTED    = "#7a9ab0";
+const TEXT     = "#e8eef2";
+const BORDER   = "rgba(102,155,188,0.12)";
+const BORDER_MD = "rgba(102,155,188,0.22)";
+
 const COLOR_HEX: Record<ColorTag, string> = {
-  red: "#ff4757",
-  yellow: "#f5a623",
-  green: "#2ed573",
-  blue: "#4f7eff",
-  purple: "#9c27b0",
+  red:    "#ff4757",
+  yellow: "#ffd32a",
+  green:  "#2ed573",
+  blue:   "#1e90ff",
+  purple: "#5352ed",
 };
 
-function getTestImageUrl(photoId: string, size = "400/300") {
-  const seed = photoId.replace(/\D/g, "") || "1";
-  return `https://picsum.photos/seed/${seed}/${size}`;
-}
-
 const playfair: React.CSSProperties = { fontFamily: "'Playfair Display', Georgia, serif" };
-const headerBg: React.CSSProperties = { background: "rgba(13,30,40,0.9)", backdropFilter: "blur(12px)" };
 
-function PageHeader({ right }: { right?: React.ReactNode }) {
-  return (
-    <header className="sticky top-0 z-50 flex h-12 items-center justify-between border-b border-[#1e2236] px-4" style={headerBg}>
-      <div className="flex items-center gap-2">
-        <Aperture className="h-4 w-4 text-[#4f7eff]" />
-        <span className="text-[15px] font-bold text-[#e8eaf0]" style={playfair}>A컷</span>
-      </div>
-      {right && <div className="text-[12px] text-[#8b90a8]">{right}</div>}
-    </header>
-  );
-}
-
-function PageFooter() {
-  return (
-    <footer className="py-5 text-center text-[11px] text-[#3a3f55]">
-      © 2026 A컷 · Acut
-    </footer>
-  );
+function getTestImageUrl(photoId: string) {
+  const seed = photoId.replace(/\D/g, "") || "1";
+  return `https://picsum.photos/seed/${seed}/400/300`;
 }
 
 export default function LockedPage() {
   const params = useParams();
   const router = useRouter();
-  const token = (params?.token as string) ?? "";
-  const ctx = useSelectionOptional();
+  const token  = (params?.token as string) ?? "";
+  const ctx    = useSelectionOptional();
   const project = ctx?.project ?? null;
   const loading = ctx?.loading ?? true;
-  const [mounted, setMounted] = useState(false);
+
+  const [mounted,         setMounted]         = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
+  const [cancelling,      setCancelling]      = useState(false);
+  const [viewMode,        setViewMode]        = useState<"grid" | "list">("grid");
 
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (!project || !token) return;
-    if (project.status === "selecting") {
-      router.replace(`/c/${token}/gallery`);
-    }
+    if (project.status === "selecting") router.replace(`/c/${token}/gallery`);
   }, [project?.status, token, router]);
 
   const { photos, N, photoStates } = useMemo(() => {
     if (!project || !ctx?.photos?.length || !ctx?.selectedIds?.size) {
       return { photos: [] as import("@/types").Photo[], N: 0, photoStates: ctx?.photoStates ?? {} };
     }
-    const idSet = ctx.selectedIds;
+    const idSet   = ctx.selectedIds;
     const filtered = ctx.photos.filter((p) => idSet.has(p.id));
     filtered.sort((a, b) => a.orderIndex - b.orderIndex);
     return { photos: filtered, N: filtered.length, photoStates: ctx.photoStates ?? {} };
   }, [project, ctx?.photos, ctx?.selectedIds, ctx?.photoStates]);
 
-  const cancelCount = project?.customerCancelCount ?? 0;
+  const cancelCount      = project?.customerCancelCount ?? 0;
   const remainingCancels = Math.max(0, CUSTOMER_CANCEL_MAX - cancelCount);
-  const atCancelLimit = cancelCount >= CUSTOMER_CANCEL_MAX;
-  const canCancel = project?.status === "confirmed" && !atCancelLimit;
+  const atCancelLimit    = cancelCount >= CUSTOMER_CANCEL_MAX;
+  const canCancel        = project?.status === "confirmed" && !atCancelLimit;
 
   const handleConfirmCancel = async () => {
     if (!project?.id || !token) return;
@@ -105,125 +101,405 @@ export default function LockedPage() {
     }
   };
 
+  /* ── loading / guard ────────────────────────── */
   if (!mounted || loading) {
-    return <div className="flex min-h-screen items-center justify-center bg-[#09090d]"><p className="text-sm text-[#5a5f78]">불러오는 중...</p></div>;
+    return (
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: INK }}>
+        <p style={{ fontSize: 13, color: MUTED }}>불러오는 중...</p>
+      </div>
+    );
   }
   if (!project) {
-    return <div className="flex min-h-screen items-center justify-center bg-[#09090d]"><p className="text-sm text-[#5a5f78]">존재하지 않는 초대 링크입니다.</p></div>;
+    return (
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: INK }}>
+        <p style={{ fontSize: 13, color: MUTED }}>존재하지 않는 초대 링크입니다.</p>
+      </div>
+    );
   }
   if (project.status === "selecting") {
-    return <div className="flex min-h-screen items-center justify-center bg-[#09090d]"><p className="text-sm text-[#5a5f78]">이동 중...</p></div>;
+    return (
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: INK }}>
+        <p style={{ fontSize: 13, color: MUTED }}>이동 중...</p>
+      </div>
+    );
   }
 
   const M = project.photoCount;
   const confirmedDate = project.confirmedAt
     ? format(new Date(project.confirmedAt), "yyyy년 M월 d일 HH:mm", { locale: ko })
     : "—";
+  const confirmedDateShort = project.confirmedAt
+    ? format(new Date(project.confirmedAt), "yyyy-MM-dd HH:mm")
+    : "—";
 
-  const isEditing = project.status === "editing" || project.status === "editing_v2";
+  const isEditing  = project.status === "editing" || project.status === "editing_v2";
   const isConfirmed = project.status === "confirmed";
 
   return (
-    <div className="min-h-screen bg-[#09090d] text-[#e8eaf0]">
-      <PageHeader right={project.name} />
+    <div style={{ background: INK, minHeight: "100vh", display: "flex", flexDirection: "column", color: TEXT }}>
 
-      {/* Lock banner */}
-      <div className={`flex items-center gap-2 border-b px-4 py-2.5 text-[12px] ${isEditing ? "border-[#ff4757]/20 bg-[#ff4757]/8 text-[#ff4757]" : "border-[#1e2236] bg-[#111318]/95 text-[#8b90a8]"}`}>
-        <Lock className="h-3.5 w-3.5 shrink-0" />
-        {isEditing
-          ? "보정 작업이 시작되어 선택을 변경할 수 없습니다."
-          : isConfirmed
-            ? "확정 완료 · 읽기 전용"
-            : "현재 상태에서는 확정 취소를 사용할 수 없습니다."}
-      </div>
+      {/* ── Header ────────────────────────────── */}
+      <header style={{
+        height: 48, flexShrink: 0,
+        background: "rgba(13,30,40,0.95)", backdropFilter: "blur(12px)",
+        borderBottom: `1px solid ${BORDER}`,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "0 20px", position: "sticky", top: 0, zIndex: 50,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          <div style={{
+            width: 24, height: 24, background: SURFACE2, border: `1px solid ${BORDER_MD}`,
+            borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center",
+            ...playfair, fontSize: 11, color: STEEL,
+          }}>A</div>
+          <span style={{ ...playfair, fontSize: 14, color: TEXT }}>
+            A컷 <em style={{ color: STEEL, fontStyle: "italic" }}>Acut</em>
+          </span>
+        </div>
+        <span style={{ fontSize: 12, color: MUTED }}>{project.name}</span>
+      </header>
 
-      {/* Sub header: progress */}
-      <div className="flex items-center justify-between border-b border-[#1e2236] bg-[#111318]/80 px-4 py-2.5">
-        <div className="text-[12px] text-[#8b90a8]">선택한 사진 · 읽기 전용</div>
-        <span className="font-mono text-[12px] font-semibold text-[#2ed573]">{N} / {M}</span>
-      </div>
+      {/* ── Confirm banner ────────────────────── */}
+      <div style={{
+        background: "rgba(46,213,115,0.06)",
+        borderBottom: "1px solid rgba(46,213,115,0.15)",
+        padding: "14px 20px",
+        display: "flex", alignItems: "center", gap: 16, flexShrink: 0,
+      }}>
+        {/* Icon */}
+        <div style={{
+          width: 40, height: 40, flexShrink: 0,
+          background: GREEN_DIM, border: "1px solid rgba(46,213,115,0.3)",
+          borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <Check style={{ width: 18, height: 18, color: GREEN }} />
+        </div>
 
-      {/* Photo grid */}
-      <div className="grid grid-cols-2 gap-2 p-4 pb-32 sm:grid-cols-3 md:grid-cols-4">
-        {photos.map((photo) => {
-          const state = photoStates[photo.id] ?? photo.tag;
-          const rating = state?.rating ?? photo.tag?.star;
-          const colorTag = state?.color ?? photo.tag?.color;
-          const hasTag = (rating != null && rating > 0) || colorTag != null;
-          return (
-            <div key={photo.id} className="relative aspect-[4/3] cursor-default overflow-hidden rounded-xl border-2 border-[#2ed573]/30 bg-[#1a1d24]">
-              <img src={photo.url || getTestImageUrl(photo.id)} alt="" className="block h-full w-full object-cover" />
-              <div className="absolute inset-0 cursor-not-allowed" aria-hidden />
-              <div className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#2ed573] text-[10px] text-white">
-                ✓
-              </div>
-              {hasTag && (
-                <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1">
-                  {rating != null && rating > 0 && (
-                    <span className="rounded bg-black/65 px-1.5 py-0.5 text-[10px] text-[#f5a623]">{"★".repeat(rating)}</span>
-                  )}
-                  {colorTag && (
-                    <span className="h-2.5 w-2.5 rounded-full border border-white/40" style={{ backgroundColor: COLOR_HEX[colorTag] }} />
-                  )}
-                </div>
-              )}
-              <div className="absolute bottom-1.5 right-1.5 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[9px] text-[#8b90a8]">
-                #{photo.orderIndex}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Fixed bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-[#1e2236] bg-[#09090d]/95 px-4 py-4 backdrop-blur">
-        <div className="mx-auto max-w-[520px]">
-          <div className="mb-2 flex items-center justify-between">
-            <div>
-              <div className="font-mono text-[13px] font-semibold text-[#2ed573]">{N}장 확정 완료</div>
-              <div className="text-[11px] text-[#5a5f78]">{confirmedDate} 확정</div>
-            </div>
-            {project.status === "confirmed" && (
-              <div className="text-right text-[11px] text-[#5a5f78]">남은 취소 {remainingCancels}회</div>
-            )}
+        {/* Info */}
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+            <span style={{ fontSize: 15, fontWeight: 600, color: GREEN }}>{N}장 확정 완료</span>
+            <span style={{
+              fontSize: 10, fontWeight: 500, padding: "2px 8px", borderRadius: 10,
+              background: "rgba(46,213,115,0.1)", border: "1px solid rgba(46,213,115,0.2)", color: GREEN,
+            }}>읽기 전용</span>
           </div>
-          <div className="mb-3 h-1 overflow-hidden rounded-full bg-[#1e2236]">
-            <div className="h-full rounded-full bg-[#2ed573]" style={{ width: M ? `${(N / M) * 100}%` : "100%" }} />
+          <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5 }}>
+            {isEditing
+              ? "보정 작업이 진행 중입니다 · 완료 시 알림을 보내드립니다"
+              : "작가가 보정을 진행 중입니다 · 보정 완료 시 알림을 보내드립니다"}
           </div>
-          {project.status === "confirmed" && (
-            <>
-              {atCancelLimit && <p className="mb-2 text-center text-[11px] text-[#5a5f78]">확정 취소는 최대 3회까지 가능합니다</p>}
-              <button
-                type="button"
-                disabled={!canCancel}
-                onClick={() => canCancel && setCancelModalOpen(true)}
-                className="flex h-11 w-full items-center justify-center rounded-xl border border-[#252b3d] text-[13px] text-[#8b90a8] transition-colors hover:border-[#ff4757] hover:text-[#ff4757] disabled:pointer-events-none disabled:opacity-40"
-              >
-                확정 취소
-              </button>
-            </>
+        </div>
+
+        {/* Meta */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 11, color: DIM, flexShrink: 0, textAlign: "right" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-end" }}>
+            <span style={{ fontSize: 10, color: DIM }}>확정 일시</span>
+            <span style={{ fontSize: 12, color: MUTED, fontWeight: 500 }}>{confirmedDateShort}</span>
+          </div>
+          {isConfirmed && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-end" }}>
+              <span style={{ fontSize: 10, color: DIM }}>취소 가능</span>
+              <span style={{ fontSize: 12, fontWeight: 500, color: atCancelLimit ? MUTED : ORANGE }}>
+                {atCancelLimit ? "불가" : `${remainingCancels}회 남음`}
+              </span>
+            </div>
           )}
-          {isEditing && <div className="text-center text-[12px] text-[#5a5f78]">보정 진행 중</div>}
         </div>
       </div>
 
-      <PageFooter />
+      {/* ── Toolbar ───────────────────────────── */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "12px 20px 8px", flexShrink: 0,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: MUTED }}>선택한 사진</span>
+          <span style={{
+            padding: "2px 8px", borderRadius: 20,
+            background: "rgba(102,155,188,0.1)", border: "1px solid rgba(102,155,188,0.2)",
+            fontSize: 11, color: STEEL, fontWeight: 500,
+          }}>{N}장</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{
+            display: "flex", background: SURFACE,
+            border: `1px solid ${BORDER}`, borderRadius: 7, overflow: "hidden",
+          }}>
+            <button type="button" onClick={() => setViewMode("grid")}
+              style={{
+                padding: "5px 10px", border: "none", cursor: "pointer",
+                background: viewMode === "grid" ? SURFACE2 : "transparent",
+                color: viewMode === "grid" ? TEXT : MUTED,
+                display: "flex", alignItems: "center", gap: 4, fontSize: 11,
+                fontFamily: "inherit",
+              }}>
+              <LayoutGrid style={{ width: 12, height: 12 }} /> 갤러리
+            </button>
+            <button type="button" onClick={() => setViewMode("list")}
+              style={{
+                padding: "5px 10px", border: "none", cursor: "pointer",
+                background: viewMode === "list" ? SURFACE2 : "transparent",
+                color: viewMode === "list" ? TEXT : MUTED,
+                display: "flex", alignItems: "center", gap: 4, fontSize: 11,
+                fontFamily: "inherit",
+              }}>
+              <List style={{ width: 12, height: 12 }} /> 목록
+            </button>
+          </div>
+        </div>
+      </div>
 
-      {/* Cancel modal */}
+      {/* ── Gallery / List ────────────────────── */}
+      <div style={{ flex: 1, padding: "0 16px 100px", overflowY: "auto" }}>
+        {viewMode === "grid" ? (
+          /* Grid view */
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6" style={{ gap: 6 }}>
+            {photos.map((photo, idx) => {
+              const state    = photoStates[photo.id] ?? photo.tag;
+              const rating   = state?.rating ?? photo.tag?.star;
+              const colorTag = state?.color ?? photo.tag?.color;
+              const colorHex = colorTag ? COLOR_HEX[colorTag] : null;
+              const comment  = (photoStates[photo.id] as { comment?: string } | undefined)?.comment ?? photo.comment;
+              const filename = photo.originalFilename ?? `photo_${photo.orderIndex}`;
+              return (
+                <div key={photo.id} style={{
+                  background: SURFACE2,
+                  border: "2px solid rgba(102,155,188,0.4)",
+                  borderRadius: 8, overflow: "hidden", cursor: "default",
+                }}>
+                  {/* Image — 1:1 */}
+                  <div style={{ aspectRatio: "1/1", position: "relative" }}>
+                    <img
+                      src={photo.url || getTestImageUrl(photo.id)}
+                      alt=""
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                    {/* Check badge — top left */}
+                    <div style={{
+                      position: "absolute", top: 5, left: 5,
+                      width: 18, height: 18,
+                      background: STEEL, borderRadius: "50%",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      border: "1.5px solid rgba(255,255,255,0.3)",
+                    }}>
+                      <Check style={{ width: 9, height: 9, color: "white", strokeWidth: 3 }} />
+                    </div>
+                    {/* Number — top right */}
+                    <span style={{
+                      position: "absolute", top: 4, right: 5,
+                      fontSize: 9, color: "rgba(255,255,255,0.5)",
+                      background: "rgba(0,0,0,0.35)", padding: "1px 4px", borderRadius: 3,
+                    }}>{idx + 1}</span>
+                    {/* Stars — bottom left */}
+                    {rating != null && rating > 0 && (
+                      <div style={{ position: "absolute", bottom: 4, left: 4, display: "flex", gap: 1 }}>
+                        {Array.from({ length: rating }).map((_, i) => (
+                          <span key={i} style={{ fontSize: 9, color: ORANGE, textShadow: "0 1px 2px rgba(0,0,0,0.8)" }}>★</span>
+                        ))}
+                      </div>
+                    )}
+                    {/* Color dot — bottom right */}
+                    {colorHex && (
+                      <span style={{
+                        position: "absolute", bottom: 4, right: 4,
+                        width: 9, height: 9, borderRadius: "50%",
+                        background: colorHex, border: "1.5px solid rgba(255,255,255,0.5)",
+                        display: "inline-block",
+                      }} />
+                    )}
+                  </div>
+                  {/* Text strip — filename + comment */}
+                  <div style={{ padding: "4px 6px 5px", borderTop: `1px solid ${BORDER}`, background: "rgba(0,0,0,0.25)" }}>
+                    <p style={{
+                      fontSize: 9, color: MUTED, margin: 0,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>{filename}</p>
+                    {comment && (
+                      <p className="line-clamp-2" style={{
+                        fontSize: 9, color: DIM, margin: "2px 0 0", lineHeight: 1.4,
+                      }}>{comment}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* List view */
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {photos.map((photo, idx) => {
+              const state    = photoStates[photo.id] ?? photo.tag;
+              const rating   = state?.rating ?? photo.tag?.star;
+              const colorTag = state?.color ?? photo.tag?.color;
+              const colorHex = colorTag ? COLOR_HEX[colorTag] : null;
+              const comment  = (photoStates[photo.id] as { comment?: string } | undefined)?.comment ?? photo.comment;
+              return (
+                <div key={photo.id} style={{
+                  display: "flex", alignItems: "flex-start", gap: 10,
+                  padding: "8px 10px",
+                  background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 8,
+                }}>
+                  {/* Thumb */}
+                  <div style={{ width: 44, height: 44, borderRadius: 5, overflow: "hidden", flexShrink: 0, background: SURFACE2 }}>
+                    <img src={photo.url || getTestImageUrl(photo.id)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </div>
+                  {/* Number + filename + comment */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, color: DIM, marginBottom: 2 }}>#{idx + 1}</div>
+                    <div style={{ fontSize: 12, color: TEXT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: comment ? 3 : 0 }}>
+                      {photo.originalFilename ?? `photo_${photo.orderIndex}`}
+                    </div>
+                    {comment && (
+                      <div className="line-clamp-2" style={{ fontSize: 11, color: DIM, lineHeight: 1.4 }}>
+                        {comment}
+                      </div>
+                    )}
+                  </div>
+                  {/* Stars */}
+                  {rating != null && rating > 0 && (
+                    <div style={{ display: "flex", gap: 1, flexShrink: 0 }}>
+                      {Array.from({ length: rating }).map((_, i) => (
+                        <span key={i} style={{ fontSize: 11, color: ORANGE }}>★</span>
+                      ))}
+                    </div>
+                  )}
+                  {/* Color dot */}
+                  {colorHex && (
+                    <span style={{
+                      width: 10, height: 10, borderRadius: "50%", flexShrink: 0,
+                      background: colorHex, border: "1.5px solid rgba(255,255,255,0.4)", display: "inline-block",
+                    }} />
+                  )}
+                  {/* Check */}
+                  <div style={{
+                    width: 20, height: 20, background: STEEL, borderRadius: "50%", flexShrink: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <Check style={{ width: 10, height: 10, color: "white", strokeWidth: 3 }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Fixed bottom bar ──────────────────── */}
+      <div style={{
+        position: "fixed", bottom: 0, left: 0, right: 0,
+        background: "rgba(0,48,73,0.97)", borderTop: "1px solid rgba(102,155,188,0.15)",
+        backdropFilter: "blur(12px)",
+        padding: "10px 20px", zIndex: 100,
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+      }}>
+        {/* Left */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          {/* Confirmed info */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{
+              width: 28, height: 28, background: GREEN_DIM,
+              border: "1px solid rgba(46,213,115,0.3)", borderRadius: "50%", flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Check style={{ width: 13, height: 13, color: GREEN }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: GREEN }}>{N}장 확정 완료</div>
+              <div style={{ fontSize: 11, color: MUTED, marginTop: 1 }}>{confirmedDate} 확정</div>
+            </div>
+          </div>
+          {/* Divider */}
+          <span style={{ width: 1, height: 28, background: BORDER, display: "inline-block", flexShrink: 0 }} />
+          {/* Cancel count */}
+          {isConfirmed && (
+            <div style={{ fontSize: 12, color: MUTED }}>
+              취소 가능 <strong style={{ color: atCancelLimit ? MUTED : ORANGE }}>
+                {atCancelLimit ? "불가" : `${remainingCancels}회`}
+              </strong> 남음
+            </div>
+          )}
+          {isEditing && (
+            <div style={{ fontSize: 12, color: MUTED }}>보정 진행 중</div>
+          )}
+        </div>
+
+        {/* Right: cancel button */}
+        {isConfirmed && (
+          <button
+            type="button"
+            disabled={!canCancel}
+            onClick={() => canCancel && setCancelModalOpen(true)}
+            style={{
+              padding: "8px 16px", background: "transparent",
+              border: `1px solid ${canCancel ? "rgba(255,71,87,0.25)" : BORDER}`,
+              borderRadius: 8,
+              color: canCancel ? RED : DIM,
+              fontSize: 12, fontWeight: 500, cursor: canCancel ? "pointer" : "not-allowed",
+              display: "flex", alignItems: "center", gap: 5,
+              transition: "all 0.15s", opacity: canCancel ? 1 : 0.5,
+              fontFamily: "inherit",
+            }}>
+            확정 취소
+          </button>
+        )}
+      </div>
+
+      {/* ── Cancel modal ──────────────────────── */}
       {cancelModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center">
-          <div className="w-full max-w-sm rounded-2xl border border-[#252b3d] bg-[#111318] p-6 shadow-xl">
-            <h3 className="mb-2 text-[16px] font-bold text-[#e8eaf0]">확정 취소</h3>
-            <p className="mb-6 text-[13px] leading-relaxed text-[#8b90a8]">
-              확정을 취소하고 다시 선택하시겠습니까?<br />
-              남은 횟수 <span className="font-medium text-[#e8eaf0]">{remainingCancels}회</span>
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(4px)", display: "flex",
+            alignItems: "center", justifyContent: "center",
+            zIndex: 200, padding: 16,
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setCancelModalOpen(false); }}>
+          <div style={{
+            background: SURFACE, border: `1px solid ${BORDER_MD}`,
+            borderRadius: 16, padding: 28, maxWidth: 380, width: "90%", textAlign: "center",
+          }}>
+            {/* Icon */}
+            <div style={{
+              width: 48, height: 48, background: RED_DIM,
+              border: "1px solid rgba(255,71,87,0.3)", borderRadius: "50%",
+              margin: "0 auto 16px",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <AlertTriangle style={{ width: 20, height: 20, color: RED }} />
+            </div>
+            <h3 style={{ ...playfair, fontSize: 18, color: TEXT, marginBottom: 8 }}>확정을 취소하시겠습니까?</h3>
+            <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.6, marginBottom: 20 }}>
+              취소 후 다시 사진을 선택하고 확정할 수 있습니다.
             </p>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setCancelModalOpen(false)} className="flex h-11 flex-1 items-center justify-center rounded-xl border border-[#252b3d] text-[13px] text-[#8b90a8]">
-                취소
+            {/* Warning */}
+            <div style={{
+              padding: "10px 14px", background: ORANGE_DIM,
+              border: "1px solid rgba(245,166,35,0.2)", borderRadius: 8,
+              fontSize: 12, color: ORANGE, marginBottom: 20, lineHeight: 1.5, textAlign: "left",
+            }}>
+              취소 가능 횟수가 차감됩니다.<br />
+              현재 {remainingCancels}회 남음 · 0회가 되면 취소 불가합니다.
+            </div>
+            {/* Buttons */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <button type="button" onClick={() => setCancelModalOpen(false)}
+                style={{
+                  height: 42, borderRadius: 9, fontSize: 13, fontWeight: 500,
+                  background: "transparent", border: `1px solid ${BORDER}`, color: MUTED,
+                  cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
+                }}>
+                유지하기
               </button>
-              <button type="button" onClick={handleConfirmCancel} disabled={cancelling} className="flex h-11 flex-1 items-center justify-center rounded-xl bg-[#4f7eff] text-[13px] font-semibold text-white disabled:opacity-60">
-                {cancelling ? "처리 중..." : "예, 다시 선택할게요"}
+              <button type="button" onClick={handleConfirmCancel} disabled={cancelling}
+                style={{
+                  height: 42, borderRadius: 9, fontSize: 13, fontWeight: 500,
+                  background: RED_DIM, border: "1px solid rgba(255,71,87,0.3)", color: RED,
+                  cursor: cancelling ? "not-allowed" : "pointer",
+                  opacity: cancelling ? 0.6 : 1,
+                  transition: "all 0.15s", fontFamily: "inherit",
+                }}>
+                {cancelling ? "처리 중..." : "취소하기"}
               </button>
             </div>
           </div>
