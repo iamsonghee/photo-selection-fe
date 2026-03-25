@@ -467,10 +467,10 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* 고객 연락처 */}
+            {/* 연락처 */}
             <div style={{ marginBottom: 14 }}>
               <div style={labelStyle}>
-                <Phone size={11} color={C.dim} /> 고객 연락처
+                <Phone size={11} color={C.dim} /> 연락처
               </div>
               <input
                 className="form-input"
