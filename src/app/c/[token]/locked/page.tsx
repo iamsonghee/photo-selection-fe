@@ -260,51 +260,67 @@ export default function LockedPage() {
               const rating   = state?.rating ?? photo.tag?.star;
               const colorTag = state?.color ?? photo.tag?.color;
               const colorHex = colorTag ? COLOR_HEX[colorTag] : null;
+              const comment  = (photoStates[photo.id] as { comment?: string } | undefined)?.comment ?? photo.comment;
+              const filename = photo.originalFilename ?? `photo_${photo.orderIndex}`;
               return (
                 <div key={photo.id} style={{
-                  aspectRatio: "1/1", background: SURFACE2,
+                  background: SURFACE2,
                   border: "2px solid rgba(102,155,188,0.4)",
-                  borderRadius: 8, position: "relative", overflow: "hidden",
-                  cursor: "default",
+                  borderRadius: 8, overflow: "hidden", cursor: "default",
                 }}>
-                  <img
-                    src={photo.url || getTestImageUrl(photo.id)}
-                    alt=""
-                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                  />
-                  {/* Check badge — top left */}
-                  <div style={{
-                    position: "absolute", top: 5, left: 5,
-                    width: 18, height: 18,
-                    background: STEEL, borderRadius: "50%",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    border: "1.5px solid rgba(255,255,255,0.3)",
-                  }}>
-                    <Check style={{ width: 9, height: 9, color: "white", strokeWidth: 3 }} />
-                  </div>
-                  {/* Number — top right */}
-                  <span style={{
-                    position: "absolute", top: 4, right: 5,
-                    fontSize: 9, color: "rgba(255,255,255,0.5)",
-                    background: "rgba(0,0,0,0.35)", padding: "1px 4px", borderRadius: 3,
-                  }}>{idx + 1}</span>
-                  {/* Stars — bottom left */}
-                  {rating != null && rating > 0 && (
-                    <div style={{ position: "absolute", bottom: 4, left: 4, display: "flex", gap: 1 }}>
-                      {Array.from({ length: rating }).map((_, i) => (
-                        <span key={i} style={{ fontSize: 9, color: ORANGE, textShadow: "0 1px 2px rgba(0,0,0,0.8)" }}>★</span>
-                      ))}
+                  {/* Image — 1:1 */}
+                  <div style={{ aspectRatio: "1/1", position: "relative" }}>
+                    <img
+                      src={photo.url || getTestImageUrl(photo.id)}
+                      alt=""
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                    {/* Check badge — top left */}
+                    <div style={{
+                      position: "absolute", top: 5, left: 5,
+                      width: 18, height: 18,
+                      background: STEEL, borderRadius: "50%",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      border: "1.5px solid rgba(255,255,255,0.3)",
+                    }}>
+                      <Check style={{ width: 9, height: 9, color: "white", strokeWidth: 3 }} />
                     </div>
-                  )}
-                  {/* Color dot — bottom right */}
-                  {colorHex && (
+                    {/* Number — top right */}
                     <span style={{
-                      position: "absolute", bottom: 4, right: 4,
-                      width: 9, height: 9, borderRadius: "50%",
-                      background: colorHex, border: "1.5px solid rgba(255,255,255,0.5)",
-                      display: "inline-block",
-                    }} />
-                  )}
+                      position: "absolute", top: 4, right: 5,
+                      fontSize: 9, color: "rgba(255,255,255,0.5)",
+                      background: "rgba(0,0,0,0.35)", padding: "1px 4px", borderRadius: 3,
+                    }}>{idx + 1}</span>
+                    {/* Stars — bottom left */}
+                    {rating != null && rating > 0 && (
+                      <div style={{ position: "absolute", bottom: 4, left: 4, display: "flex", gap: 1 }}>
+                        {Array.from({ length: rating }).map((_, i) => (
+                          <span key={i} style={{ fontSize: 9, color: ORANGE, textShadow: "0 1px 2px rgba(0,0,0,0.8)" }}>★</span>
+                        ))}
+                      </div>
+                    )}
+                    {/* Color dot — bottom right */}
+                    {colorHex && (
+                      <span style={{
+                        position: "absolute", bottom: 4, right: 4,
+                        width: 9, height: 9, borderRadius: "50%",
+                        background: colorHex, border: "1.5px solid rgba(255,255,255,0.5)",
+                        display: "inline-block",
+                      }} />
+                    )}
+                  </div>
+                  {/* Text strip — filename + comment */}
+                  <div style={{ padding: "4px 6px 5px", borderTop: `1px solid ${BORDER}`, background: "rgba(0,0,0,0.25)" }}>
+                    <p style={{
+                      fontSize: 9, color: MUTED, margin: 0,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>{filename}</p>
+                    {comment && (
+                      <p className="line-clamp-2" style={{
+                        fontSize: 9, color: DIM, margin: "2px 0 0", lineHeight: 1.4,
+                      }}>{comment}</p>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -317,9 +333,10 @@ export default function LockedPage() {
               const rating   = state?.rating ?? photo.tag?.star;
               const colorTag = state?.color ?? photo.tag?.color;
               const colorHex = colorTag ? COLOR_HEX[colorTag] : null;
+              const comment  = (photoStates[photo.id] as { comment?: string } | undefined)?.comment ?? photo.comment;
               return (
                 <div key={photo.id} style={{
-                  display: "flex", alignItems: "center", gap: 10,
+                  display: "flex", alignItems: "flex-start", gap: 10,
                   padding: "8px 10px",
                   background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 8,
                 }}>
@@ -327,12 +344,17 @@ export default function LockedPage() {
                   <div style={{ width: 44, height: 44, borderRadius: 5, overflow: "hidden", flexShrink: 0, background: SURFACE2 }}>
                     <img src={photo.url || getTestImageUrl(photo.id)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   </div>
-                  {/* Number + filename */}
+                  {/* Number + filename + comment */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 11, color: DIM, marginBottom: 2 }}>#{idx + 1}</div>
-                    <div style={{ fontSize: 12, color: TEXT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: 12, color: TEXT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: comment ? 3 : 0 }}>
                       {photo.originalFilename ?? `photo_${photo.orderIndex}`}
                     </div>
+                    {comment && (
+                      <div className="line-clamp-2" style={{ fontSize: 11, color: DIM, lineHeight: 1.4 }}>
+                        {comment}
+                      </div>
+                    )}
                   </div>
                   {/* Stars */}
                   {rating != null && rating > 0 && (
