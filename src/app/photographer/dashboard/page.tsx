@@ -12,6 +12,8 @@ import {
   Eye,
   Image as ImageIcon,
   Check,
+  CheckCircle,
+  Upload,
 } from "lucide-react";
 import { getProjectsByPhotographerId } from "@/lib/db";
 import type { Project, ProjectStatus } from "@/types";
@@ -39,6 +41,23 @@ const C = {
   red:       "#ff4757",
   redDim:    "#2a0f12",
 };
+
+// ── preparing 상태 3단계 분기 헬퍼 ──────────────────────────
+function getPreparingBadge(photoCount: number, requiredCount: number): { label: string; color: string } {
+  if (photoCount === 0) {
+    return { label: "업로드 전", color: C.dim };
+  } else if (photoCount < requiredCount) {
+    return { label: "업로드 중", color: C.steel };
+  } else {
+    return { label: "초대 활성화 필요", color: C.orange };
+  }
+}
+
+function getPreparingBorderColor(photoCount: number, requiredCount: number): string {
+  if (photoCount === 0) return C.dim;
+  if (photoCount < requiredCount) return C.steel;
+  return C.orange;
+}
 
 // ── status config ──────────────────────────────────────────
 type BadgeKey = "preparing" | "selecting" | "editing" | "delivered" | "revision";
@@ -118,7 +137,42 @@ const LOG_LABEL: Record<string, string> = {
 };
 
 // ── StatusBadge ────────────────────────────────────────────
-function StatusBadge({ status }: { status: ProjectStatus }) {
+function StatusBadge({ status, photoCount, requiredCount }: {
+  status: ProjectStatus;
+  photoCount?: number;
+  requiredCount?: number;
+}) {
+  if (status === "preparing") {
+    const pc = photoCount ?? 0;
+    const rc = requiredCount ?? Infinity;
+    const badge = getPreparingBadge(pc, rc);
+    let bgColor: string;
+    let borderColor: string;
+    if (pc === 0) {
+      bgColor = C.surface3;
+      borderColor = `1px solid rgba(58,90,110,0.3)`;
+    } else if (pc < rc) {
+      bgColor = "rgba(102,155,188,0.12)";
+      borderColor = `1px solid rgba(102,155,188,0.25)`;
+    } else {
+      bgColor = "rgba(245,166,35,0.12)";
+      borderColor = `1px solid rgba(245,166,35,0.3)`;
+    }
+    return (
+      <span style={{
+        background: bgColor,
+        color: badge.color,
+        border: borderColor,
+        fontSize: 10,
+        fontWeight: 500,
+        padding: "2px 8px",
+        borderRadius: 20,
+        flexShrink: 0,
+      }}>
+        {badge.label}
+      </span>
+    );
+  }
   const { label, key } = STATUS_BADGE[status];
   return (
     <span style={{
@@ -138,11 +192,42 @@ function StatusBadge({ status }: { status: ProjectStatus }) {
 function ProjectCard({ project }: { project: Project }) {
   const router = useRouter();
   const [hovered, setHovered] = useState(false);
-  const accentColor = STATUS_LEFT[project.status];
+  const photoCount = project.photoCount ?? 0;
+  const requiredCount = project.requiredCount ?? 0;
+  const accentColor = project.status === "preparing"
+    ? getPreparingBorderColor(photoCount, requiredCount)
+    : STATUS_LEFT[project.status];
   const { text: ddayText, warn } = dday(project.deadline);
   const ddayStyle: React.CSSProperties = warn
     ? { color: C.orange, background: C.orangeDim }
     : { color: C.muted,  background: C.surface3  };
+
+  // preparing 상태 하단 메타 텍스트
+  const preparingMeta = (() => {
+    if (project.status !== "preparing") return null;
+    if (photoCount === 0) {
+      return (
+        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
+          <ImageIcon size={10} />
+          사진 업로드를 시작해주세요
+        </span>
+      );
+    } else if (photoCount < requiredCount) {
+      return (
+        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
+          <ImageIcon size={10} />
+          {photoCount} / {requiredCount}장 업로드됨
+        </span>
+      );
+    } else {
+      return (
+        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.orange }}>
+          <CheckCircle size={10} />
+          {photoCount}장 준비 완료 · 고객 초대 활성화 필요
+        </span>
+      );
+    }
+  })();
 
   return (
     <div
@@ -180,23 +265,27 @@ function ProjectCard({ project }: { project: Project }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{project.name}</span>
           <span style={{ fontSize: 12, color: C.muted }}>{project.customerName || "—"}</span>
-          <StatusBadge status={project.status} />
+          <StatusBadge status={project.status} photoCount={photoCount} requiredCount={requiredCount} />
         </div>
 
         {/* 진행 바 */}
-        <ProjectProgressBar status={project.status} />
+        <ProjectProgressBar status={project.status} photoCount={photoCount} requiredCount={requiredCount} />
 
         {/* 하단 메타 */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
-              <ImageIcon size={10} />
-              {project.photoCount}장
-            </span>
-            <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
-              <Check size={10} />
-              {project.requiredCount}장
-            </span>
+            {preparingMeta ?? (
+              <>
+                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
+                  <ImageIcon size={10} />
+                  {project.photoCount}장
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
+                  <Check size={10} />
+                  {project.requiredCount}장
+                </span>
+              </>
+            )}
           </div>
           <span style={{
             ...ddayStyle,
@@ -226,6 +315,7 @@ function ActionCard({
   topColor,
   numColor,
   bgTint,
+  href,
 }: {
   count: number;
   label: string;
@@ -234,10 +324,11 @@ function ActionCard({
   topColor: string;
   numColor: string;
   bgTint: string;
+  href?: string;
 }) {
   const [hovered, setHovered] = useState(false);
   return (
-    <Link href="/photographer/projects" style={{ textDecoration: "none" }}>
+    <Link href={href ?? "/photographer/projects"} style={{ textDecoration: "none" }}>
       <div
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
@@ -367,7 +458,16 @@ export default function DashboardPage() {
   const reviewingCount = projects.filter((p) =>
     p.status === "reviewing_v1" || p.status === "reviewing_v2"
   ).length;
-  const hasAction = confirmedCount + revisionCount + reviewingCount > 0;
+  // preparing 상태 중 photo_count >= required_count인 프로젝트 (초대 활성화 필요)
+  const inviteReadyProjects = projects.filter(
+    (p) => p.status === "preparing" && (p.photoCount ?? 0) >= (p.requiredCount ?? Infinity)
+  );
+  const inviteReadyCount = inviteReadyProjects.length;
+  // 초대 활성화 필요 카드 클릭 시 이동할 href
+  const inviteReadyHref = inviteReadyProjects.length === 1
+    ? `/photographer/projects/${inviteReadyProjects[0].id}/upload`
+    : "/photographer/projects";
+  const hasAction = confirmedCount + revisionCount + reviewingCount + inviteReadyCount > 0;
 
   const thisMonth = new Date().getMonth();
   const thisYear  = new Date().getFullYear();
@@ -494,6 +594,18 @@ export default function DashboardPage() {
                     topColor={C.steel}
                     numColor={C.steelLt}
                     bgTint="rgba(102,155,188,0.04)"
+                  />
+                )}
+                {inviteReadyCount > 0 && (
+                  <ActionCard
+                    count={inviteReadyCount}
+                    label="초대 활성화 필요"
+                    sub="사진 준비 완료 · 고객 초대 활성화"
+                    icon={<Upload size={16} color={C.orange} />}
+                    topColor={C.orange}
+                    numColor={C.orange}
+                    bgTint="rgba(245,166,35,0.04)"
+                    href={inviteReadyHref}
                   />
                 )}
               </div>

@@ -26,26 +26,43 @@ type Props = {
   className?: string;
 };
 
-export function ProjectProgressBar({ status, className = "" }: Props) {
+export function ProjectProgressBar({ status, photoCount, requiredCount, className = "" }: Props) {
   const steps = getSteps(status);
+  // preparing 상태에서 업로드 진행률 (0~100%)
+  const uploadPct = status === "preparing" && requiredCount && requiredCount > 0
+    ? Math.min(100, Math.round(((photoCount ?? 0) / requiredCount) * 100))
+    : null;
 
   return (
     <div className={className} style={{ display: "flex", gap: 0, marginBottom: 8, width: "100%" }}>
       {steps.map((state, i) => {
+        // ── preparing 업로드 진행률 반영: step 0(업로드)이 current일 때 ──
+        const isUploadStep = i === 0 && state === "current" && uploadPct !== null;
+        // preparing 완료 시 dot 색상 변경 (photo_count >= required_count → orange 힌트)
+        const isUploadDone = i === 0 && state === "current" && uploadPct !== null && uploadPct >= 100;
+
         // ── dot ──
         const dotSize   = state === "current" ? 7 : 5;
         const dotColor  =
-          state === "all-done" ? "rgba(46,213,115,0.8)" :
-          state === "current"  ? "#669bbc" :
-          state === "done"     ? "#4a7a8e" : "#3a5a6e";
+          state === "all-done"  ? "rgba(46,213,115,0.8)" :
+          isUploadDone          ? "#f5a623" :
+          state === "current"   ? "#669bbc" :
+          state === "done"      ? "#4a7a8e" : "#3a5a6e";
         const dotShadow =
-          state === "current" ? "0 0 0 2px rgba(102,155,188,0.15)" : "none";
+          isUploadDone          ? "0 0 0 2px rgba(245,166,35,0.2)" :
+          state === "current"   ? "0 0 0 2px rgba(102,155,188,0.15)" : "none";
 
         // ── bar fill ──
         const fillColor =
           state === "all-done" ? "rgba(46,213,115,0.6)" :
+          isUploadDone         ? "#f5a623" :
           state === "done"     ? "#3a5a6e" :
           state === "current"  ? "#669bbc" : "transparent";
+
+        // 업로드 진행 중일 때 bar width
+        const barWidth = isUploadStep
+          ? `${uploadPct}%`
+          : state === "pending" ? "0%" : "100%";
 
         // ── label ──
         const labelColor  =
@@ -96,7 +113,8 @@ export function ProjectProgressBar({ status, className = "" }: Props) {
                 height: "100%",
                 borderRadius: 1,
                 backgroundColor: fillColor,
-                width: state === "pending" ? "0%" : "100%",
+                width: barWidth,
+                transition: "width 0.3s ease",
               }} />
             </div>
           </div>

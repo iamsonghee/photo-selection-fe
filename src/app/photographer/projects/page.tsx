@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search, ChevronDown, Image as ImageIcon, Check, Calendar,
-  ChevronRight, SlidersHorizontal, PackageCheck, Loader2,
+  ChevronRight, SlidersHorizontal, PackageCheck, Loader2, CheckCircle,
 } from "lucide-react";
 import { format, differenceInDays, startOfMonth, subMonths } from "date-fns";
 import { supabase } from "@/lib/supabase";
@@ -48,9 +48,28 @@ const SORT_OPTIONS = [
 ];
 
 // ── 헬퍼 ──────────────────────────────────────────────────────
-function getCardBorderColor(status: ProjectStatus): string {
+// ── preparing 상태 3단계 분기 헬퍼 ──────────────────────────
+function getPreparingBadge(photoCount: number, requiredCount: number): { label: string; color: string } {
+  if (photoCount === 0) {
+    return { label: "업로드 전", color: C.dim };
+  } else if (photoCount < requiredCount) {
+    return { label: "업로드 중", color: C.steel };
+  } else {
+    return { label: "초대 활성화 필요", color: C.orange };
+  }
+}
+
+function getPreparingBorderColor(photoCount: number, requiredCount: number): string {
+  if (photoCount === 0) return C.dim;
+  if (photoCount < requiredCount) return C.steel;
+  return C.orange;
+}
+
+function getCardBorderColor(status: ProjectStatus, photoCount?: number, requiredCount?: number): string {
+  if (status === "preparing") {
+    return getPreparingBorderColor(photoCount ?? 0, requiredCount ?? Infinity);
+  }
   switch (status) {
-    case "preparing":    return C.dim;
     case "selecting":    return C.steel;
     case "confirmed":    return C.green;
     case "editing":
@@ -61,10 +80,19 @@ function getCardBorderColor(status: ProjectStatus): string {
   }
 }
 
-function getBadgeStyle(status: ProjectStatus): React.CSSProperties {
+function getBadgeStyle(status: ProjectStatus, photoCount?: number, requiredCount?: number): React.CSSProperties {
+  if (status === "preparing") {
+    const pc = photoCount ?? 0;
+    const rc = requiredCount ?? Infinity;
+    if (pc === 0) {
+      return { background: C.surface3, color: C.dim, border: `1px solid rgba(58,90,110,0.3)` };
+    } else if (pc < rc) {
+      return { background: "rgba(102,155,188,0.12)", color: C.steel, border: `1px solid rgba(102,155,188,0.25)` };
+    } else {
+      return { background: "rgba(245,166,35,0.12)", color: C.orange, border: `1px solid rgba(245,166,35,0.3)` };
+    }
+  }
   switch (status) {
-    case "preparing":
-      return { background: C.surface3, color: C.steelLt, border: `1px solid rgba(102,155,188,0.2)` };
     case "selecting":
       return { background: "rgba(102,155,188,0.15)", color: C.steel, border: "1px solid rgba(102,155,188,0.3)" };
     case "confirmed":
@@ -80,8 +108,10 @@ function getBadgeStyle(status: ProjectStatus): React.CSSProperties {
   }
 }
 
-function getBadgeLabel(status: ProjectStatus, photoCount: number): string {
-  if (status === "preparing") return photoCount >= 1 ? "업로드 중" : "업로드 전";
+function getBadgeLabel(status: ProjectStatus, photoCount: number, requiredCount: number): string {
+  if (status === "preparing") {
+    return getPreparingBadge(photoCount, requiredCount).label;
+  }
   return PROJECT_STATUS_LABELS[status];
 }
 
@@ -112,8 +142,17 @@ function highlight(text: string, query: string): React.ReactNode {
 
 function getMetaChips(p: Project): { icon: React.ReactNode; text: string }[] {
   switch (p.status) {
-    case "preparing":
-      return [{ icon: <ImageIcon size={11} />, text: `${p.photoCount}장 업로드됨` }];
+    case "preparing": {
+      const pc = p.photoCount ?? 0;
+      const rc = p.requiredCount ?? 0;
+      if (pc === 0) {
+        return [{ icon: <ImageIcon size={11} />, text: "사진 업로드를 시작해주세요" }];
+      } else if (pc < rc) {
+        return [{ icon: <ImageIcon size={11} />, text: `${pc} / ${rc}장 업로드됨` }];
+      } else {
+        return [{ icon: <CheckCircle size={11} />, text: `${pc}장 준비 완료 · 고객 초대 활성화 필요` }];
+      }
+    }
     case "selecting":
       return [
         { icon: <ImageIcon size={11} />, text: `${p.photoCount}장` },
@@ -221,7 +260,9 @@ function ProjectCard({ project, searchQuery, onClick }: {
   const day = String(shoot.getDate()).padStart(2, "0");
   const dday = getDDayInfo(project.deadline);
   const meta = getMetaChips(project);
-  const badgeStyle = getBadgeStyle(project.status);
+  const photoCount = project.photoCount ?? 0;
+  const requiredCount = project.requiredCount ?? 0;
+  const badgeStyle = getBadgeStyle(project.status, photoCount, requiredCount);
 
   return (
     <div
@@ -244,7 +285,7 @@ function ProjectCard({ project, searchQuery, onClick }: {
       <div style={{
         position: "absolute", left: 0, top: 0, bottom: 0, width: 3,
         borderRadius: "11px 0 0 11px",
-        background: getCardBorderColor(project.status),
+        background: getCardBorderColor(project.status, photoCount, requiredCount),
       }} />
 
       {/* 날짜 */}
@@ -276,13 +317,13 @@ function ProjectCard({ project, searchQuery, onClick }: {
             ...badgeStyle,
             padding: "3px 9px", borderRadius: 20, fontSize: 10, fontWeight: 500, whiteSpace: "nowrap",
           }}>
-            {getBadgeLabel(project.status, project.photoCount)}
+            {getBadgeLabel(project.status, photoCount, requiredCount)}
           </span>
         </div>
 
         {/* ProjectProgressBar */}
         <div style={{ marginBottom: 8 }}>
-          <ProjectProgressBar status={project.status} />
+          <ProjectProgressBar status={project.status} photoCount={photoCount} requiredCount={requiredCount} />
         </div>
 
         {/* 메타 칩 */}

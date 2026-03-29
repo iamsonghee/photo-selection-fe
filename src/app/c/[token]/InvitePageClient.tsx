@@ -164,7 +164,7 @@ export default function InvitePageClient() {
   /* ── selecting / preparing ── */
   const M = project.photoCount;
   const N = project.requiredCount;
-  const ready = M >= N;
+  const ready = project.status === "selecting";
   const deadlineStr = format(new Date(project.deadline), "yyyy.MM.dd", { locale: ko });
 
   return (

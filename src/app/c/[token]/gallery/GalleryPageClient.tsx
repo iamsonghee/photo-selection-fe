@@ -64,6 +64,7 @@ export default function GalleryPageClient() {
 
   useEffect(() => {
     if (!project) return;
+    if (project.status === "preparing") { router.replace(`/c/${token}`);           return; }
     if (project.status === "confirmed") { router.replace(`/c/${token}/confirmed`); return; }
     if (project.status === "editing")   { router.replace(`/c/${token}/locked`);    return; }
   }, [project, token, router]);
