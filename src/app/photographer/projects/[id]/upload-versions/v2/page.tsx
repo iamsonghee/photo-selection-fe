@@ -28,6 +28,7 @@ import { getPhotosWithSelections, getProjectById, getVersionReviewsByProjectId }
 import { buildVersionMapping, remapSingleFile, type MappingResult } from "@/lib/version-mapping";
 import type { Photo, Project } from "@/types";
 import CompareViewerModal from "@/components/CompareViewerModal";
+import { BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
 
 // ---------- color tokens ----------
 const C = {
@@ -79,8 +80,9 @@ export default function UploadVersionsV2Page() {
   const [reviews,         setReviews]         = useState<
     Array<{ photoId: string; status: "approved" | "revision_requested"; customerComment: string | null }>
   >([]);
-  const [serverV1Map,     setServerV1Map]     = useState<Map<string, string>>(new Map());
-  const [serverV2Map,     setServerV2Map]     = useState<Map<string, string>>(new Map());
+  const [serverV1Map,         setServerV1Map]         = useState<Map<string, string>>(new Map());
+  const [serverV2Map,         setServerV2Map]         = useState<Map<string, string>>(new Map());
+  const [existingVersionCount, setExistingVersionCount] = useState<number>(0);
   const [loading,         setLoading]         = useState(true);
   const [reviewLoading,   setReviewLoading]   = useState(false);
   const [uploadedFiles,   setUploadedFiles]   = useState<File[]>([]);
@@ -157,6 +159,11 @@ export default function UploadVersionsV2Page() {
         });
         setServerV1Map(v1);
         setServerV2Map(v2);
+        // distinct version 수
+        const distinctVersions = new Set(
+          list.map((it: { version?: number }) => it.version).filter(Boolean)
+        );
+        setExistingVersionCount(distinctVersions.size);
       })
       .catch(() => { if (!cancelled) { setServerV1Map(new Map()); setServerV2Map(new Map()); } });
     return () => { cancelled = true; };
@@ -384,7 +391,17 @@ export default function UploadVersionsV2Page() {
             프로젝트 상세로
           </button>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>v2 재보정 업로드</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: C.text, display: "flex", alignItems: "center", gap: 8 }}>
+              v2 재보정 업로드
+              <span style={{
+                background: existingVersionCount >= BETA_MAX_REVISION_COUNT ? "rgba(255,71,87,0.15)" : C.surface3,
+                border: `1px solid ${existingVersionCount >= BETA_MAX_REVISION_COUNT ? "rgba(255,71,87,0.3)" : C.border}`,
+                color: existingVersionCount >= BETA_MAX_REVISION_COUNT ? C.red : C.muted,
+                borderRadius: 10, padding: "1px 8px", fontSize: 10, fontWeight: 500,
+              }}>
+                보정 횟수 {existingVersionCount} / {BETA_MAX_REVISION_COUNT}
+              </span>
+            </div>
             <div style={{ fontSize: 11, color: C.dim }}>
               {project.name} · {project.customerName} · 재보정 {revisionTargets.length}장
             </div>
@@ -454,6 +471,21 @@ export default function UploadVersionsV2Page() {
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: C.dim, marginBottom: 10 }}>
                 v2 재보정본 업로드
               </div>
+              {existingVersionCount >= BETA_MAX_REVISION_COUNT ? (
+                <div style={{
+                  padding: "18px 20px", borderRadius: 12, textAlign: "center",
+                  background: "rgba(255,71,87,0.06)", border: "2px dashed rgba(255,71,87,0.25)",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                }}>
+                  <AlertCircle size={20} color={C.red} />
+                  <div style={{ fontSize: 13, color: C.red, fontWeight: 500 }}>
+                    베타 기간 최대 보정 횟수({BETA_MAX_REVISION_COUNT}회)에 도달했습니다.
+                  </div>
+                  <div style={{ fontSize: 11, color: C.muted }}>
+                    현재 {existingVersionCount} / {BETA_MAX_REVISION_COUNT}회 사용 중
+                  </div>
+                </div>
+              ) : (
               <div
                 onDrop={(e) => { e.preventDefault(); setDragOver(false); handleDropFiles(Array.from(e.dataTransfer.files)); }}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -522,6 +554,7 @@ export default function UploadVersionsV2Page() {
                   파일명 일치 시 자동 매핑 · 불일치 시 순서대로 매핑
                 </div>
               </div>
+              )} {/* end ternary */}
             </div>
           )}
 

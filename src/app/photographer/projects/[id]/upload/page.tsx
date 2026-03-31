@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  ChevronLeft, Upload, Loader2, FolderOpen, ImageIcon, CheckCircle2,
+  ChevronLeft, Upload, Loader2, FolderOpen, ImageIcon, CheckCircle2, AlertCircle,
 } from "lucide-react";
+import { BETA_MAX_PHOTOS_PER_PROJECT, parseBetaLimitError } from "@/lib/beta-limits";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { differenceInCalendarDays } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
@@ -309,7 +310,12 @@ export default function UploadPage() {
         let msg = "업로드에 실패했습니다.";
         try {
           const b = JSON.parse(xhr.responseText);
-          if (b.detail) msg = typeof b.detail === "string" ? b.detail : b.detail[0]?.msg ?? msg;
+          const betaErr = parseBetaLimitError(b);
+          if (betaErr) {
+            msg = betaErr.message;
+          } else if (b.detail) {
+            msg = typeof b.detail === "string" ? b.detail : b.detail[0]?.msg ?? msg;
+          }
         } catch {}
         setError(msg); resetState();
       }
@@ -409,6 +415,8 @@ export default function UploadPage() {
   const isReady      = M >= N;
   const isReadOnly   = project.status !== "preparing";
   const isUploading  = uploadPhase === "sending" || uploadPhase === "processing";
+  const isAtPhotoLimit = M >= BETA_MAX_PHOTOS_PER_PROJECT;
+  const isPhotoLimitNear = !isAtPhotoLimit && M >= Math.floor(BETA_MAX_PHOTOS_PER_PROJECT * 0.9);
 
   const deadlineDays   = differenceInCalendarDays(new Date(project.deadline), new Date());
   const deadlineText   = `${project.deadline} (D+${deadlineDays})`;
@@ -531,51 +539,76 @@ export default function UploadPage() {
 
           {/* 드롭존 */}
           {!isReadOnly && (
-            <div
-              className="up-dropzone"
-              onClick={() => !isUploading && fileInputRef.current?.click()}
-              onDrop={isUploading ? undefined : onDrop}
-              onDragOver={isUploading ? undefined : onDragOver}
-              onDragLeave={onDragLeave}
-              style={{
-                border: `2px dashed ${dragOver ? C.steel : C.borderMd}`,
-                borderRadius: 10, padding: "18px 20px",
-                cursor: isUploading ? "default" : "pointer",
-                background: dragOver ? "rgba(102,155,188,0.05)" : "rgba(102,155,188,0.02)",
-                marginBottom: 12, transition: "all 0.2s",
-                opacity: isUploading ? 0.5 : 1,
-                animation: "fadeUp 0.3s ease 0.1s both",
-              }}
-            >
-              <input
-                ref={fileInputRef} type="file" accept={ACCEPT_TYPES} multiple
-                style={{ display: "none" }} onChange={handleFileChange}
-              />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
-                <FolderOpen size={20} color={C.dim} />
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: C.text, lineHeight: 1.4 }}>
-                    사진을 드래그하거나 클릭해서 선택
-                  </div>
-                  <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
-                    JPEG · PNG · WebP · 최대 20MB/장
-                  </div>
+            <>
+              {isAtPhotoLimit ? (
+                <div style={{
+                  padding: "14px 18px", borderRadius: 10, marginBottom: 12,
+                  background: "rgba(255,71,87,0.06)", border: "1px solid rgba(255,71,87,0.2)",
+                  display: "flex", alignItems: "center", gap: 10,
+                  fontSize: 12, color: C.red,
+                }}>
+                  <AlertCircle size={15} />
+                  베타 기간 최대 업로드 수({BETA_MAX_PHOTOS_PER_PROJECT}장)에 도달했습니다.
+                  <span style={{ marginLeft: "auto", color: C.muted, fontWeight: 500 }}>
+                    {M} / {BETA_MAX_PHOTOS_PER_PROJECT}
+                  </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); if (!isUploading) fileInputRef.current?.click(); }}
+              ) : (
+                <div
+                  className="up-dropzone"
+                  onClick={() => !isUploading && fileInputRef.current?.click()}
+                  onDrop={isUploading ? undefined : onDrop}
+                  onDragOver={isUploading ? undefined : onDragOver}
+                  onDragLeave={onDragLeave}
                   style={{
-                    display: "inline-flex", alignItems: "center", gap: 5,
-                    padding: "7px 14px", background: C.steel, color: "white",
-                    border: "none", borderRadius: 7, fontSize: 12, fontWeight: 500,
-                    cursor: "pointer", flexShrink: 0,
-                    fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                    border: `2px dashed ${dragOver ? C.steel : C.borderMd}`,
+                    borderRadius: 10, padding: "18px 20px",
+                    cursor: isUploading ? "default" : "pointer",
+                    background: dragOver ? "rgba(102,155,188,0.05)" : "rgba(102,155,188,0.02)",
+                    marginBottom: 12, transition: "all 0.2s",
+                    opacity: isUploading ? 0.5 : 1,
+                    animation: "fadeUp 0.3s ease 0.1s both",
                   }}
                 >
-                  <Upload size={12} /> 파일 선택
-                </button>
-              </div>
-            </div>
+                  <input
+                    ref={fileInputRef} type="file" accept={ACCEPT_TYPES} multiple
+                    style={{ display: "none" }} onChange={handleFileChange}
+                  />
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+                    <FolderOpen size={20} color={C.dim} />
+                    <div style={{ textAlign: "left" }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: C.text, lineHeight: 1.4 }}>
+                        사진을 드래그하거나 클릭해서 선택
+                      </div>
+                      <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
+                        JPEG · PNG · WebP · 최대 20MB/장
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); if (!isUploading) fileInputRef.current?.click(); }}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 5,
+                        padding: "7px 14px", background: C.steel, color: "white",
+                        border: "none", borderRadius: 7, fontSize: 12, fontWeight: 500,
+                        cursor: "pointer", flexShrink: 0,
+                        fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                      }}
+                    >
+                      <Upload size={12} /> 파일 선택
+                    </button>
+                  </div>
+                  {/* 베타 업로드 카운터 */}
+                  <div style={{
+                    marginTop: 10, textAlign: "right",
+                    fontSize: 11,
+                    color: isPhotoLimitNear ? C.orange : C.dim,
+                  }}>
+                    {M} / {BETA_MAX_PHOTOS_PER_PROJECT}장 (베타 한도)
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* 업로드 진행 표시 */}

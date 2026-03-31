@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getPhotosWithSelections, getProjectById } from "@/lib/db";
+import { BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
 import { buildVersionMapping, remapSingleFile, type MappingResult } from "@/lib/version-mapping";
 import type { Photo, Project } from "@/types";
 import CompareViewerModal from "@/components/CompareViewerModal";
@@ -64,9 +65,10 @@ export default function UploadVersionsPage() {
   const [project,         setProject]         = useState<Project | null>(null);
   const [photos,          setPhotos]          = useState<Photo[]>([]);
   const [loading,         setLoading]         = useState(true);
-  const [uploadedFiles,   setUploadedFiles]   = useState<File[]>([]);
-  const [mapping,         setMapping]         = useState<MappingResult<V1Target>[]>([]);
-  const [uploadedV1Info,  setUploadedV1Info]  = useState<Map<string, string>>(new Map());
+  const [uploadedFiles,       setUploadedFiles]       = useState<File[]>([]);
+  const [mapping,             setMapping]             = useState<MappingResult<V1Target>[]>([]);
+  const [uploadedV1Info,      setUploadedV1Info]      = useState<Map<string, string>>(new Map());
+  const [existingVersionCount, setExistingVersionCount] = useState<number>(0);
   const [dragOver,        setDragOver]        = useState(false);
   const [globalMemo,      setGlobalMemo]      = useState("");
   const [showConfirm,     setShowConfirm]     = useState(false);
@@ -123,24 +125,32 @@ export default function UploadVersionsPage() {
     setMapping(buildVersionMapping(uploadedFiles, targets));
   }, [uploadedFiles, targets]);
 
-  // ── load server-side v1 info when read-only ──
+  // ── load server-side version info (항상) ──
   useEffect(() => {
-    if (!id || !isReadOnly) return;
+    if (!id) return;
     let cancelled = false;
     fetch(`/api/photographer/projects/${id}/versions`)
       .then((res) => res.json().catch(() => ({})))
       .then((data) => {
         if (cancelled) return;
         const list = Array.isArray(data?.versions) ? data.versions : [];
+        // distinct version 수 계산
+        const distinctVersions = new Set(
+          list.map((v: { version?: number }) => v.version).filter(Boolean)
+        );
+        setExistingVersionCount(distinctVersions.size);
+        // v1 URL 매핑
         const info = new Map<string, string>();
         list.forEach((v: { version?: number; photo_id?: string; r2_url?: string }) => {
           if (v.version === 1 && v.photo_id && v.r2_url) info.set(v.photo_id, v.r2_url);
         });
         setUploadedV1Info(info);
       })
-      .catch(() => { if (!cancelled) setUploadedV1Info(new Map()); });
+      .catch(() => {
+        if (!cancelled) { setUploadedV1Info(new Map()); setExistingVersionCount(0); }
+      });
     return () => { cancelled = true; };
-  }, [id, isReadOnly]);
+  }, [id]);
 
   const mappedCount = useMemo(() => {
     if (isReadOnly) return uploadedV1Info.size;
@@ -303,7 +313,17 @@ export default function UploadVersionsPage() {
             프로젝트 상세로
           </button>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>v1 보정본 업로드</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: C.text, display: "flex", alignItems: "center", gap: 8 }}>
+              v1 보정본 업로드
+              <span style={{
+                background: existingVersionCount >= BETA_MAX_REVISION_COUNT ? "rgba(255,71,87,0.15)" : C.surface3,
+                border: `1px solid ${existingVersionCount >= BETA_MAX_REVISION_COUNT ? "rgba(255,71,87,0.3)" : C.border}`,
+                color: existingVersionCount >= BETA_MAX_REVISION_COUNT ? C.red : C.muted,
+                borderRadius: 10, padding: "1px 8px", fontSize: 10, fontWeight: 500,
+              }}>
+                보정 횟수 {existingVersionCount} / {BETA_MAX_REVISION_COUNT}
+              </span>
+            </div>
             <div style={{ fontSize: 11, color: C.dim }}>
               {project.name} · {project.customerName} · {targets.length}장 선택됨
             </div>
@@ -370,6 +390,21 @@ export default function UploadVersionsPage() {
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: C.dim, marginBottom: 10 }}>
                 보정본 업로드
               </div>
+              {existingVersionCount >= BETA_MAX_REVISION_COUNT ? (
+                <div style={{
+                  padding: "18px 20px", borderRadius: 12, textAlign: "center",
+                  background: "rgba(255,71,87,0.06)", border: "2px dashed rgba(255,71,87,0.25)",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                }}>
+                  <AlertCircle size={20} color={C.red} />
+                  <div style={{ fontSize: 13, color: C.red, fontWeight: 500 }}>
+                    베타 기간 최대 보정 횟수({BETA_MAX_REVISION_COUNT}회)에 도달했습니다.
+                  </div>
+                  <div style={{ fontSize: 11, color: C.muted }}>
+                    현재 {existingVersionCount} / {BETA_MAX_REVISION_COUNT}회 사용 중
+                  </div>
+                </div>
+              ) : (
               <div
                 onDrop={(e) => { e.preventDefault(); setDragOver(false); handleDropFiles(Array.from(e.dataTransfer.files)); }}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -435,6 +470,7 @@ export default function UploadVersionsPage() {
                   파일명 일치 시 자동 매핑 · 불일치 시 순서대로 매핑
                 </div>
               </div>
+              )} {/* end ternary */}
             </div>
           )}
 
