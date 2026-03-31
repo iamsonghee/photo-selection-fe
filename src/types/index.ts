@@ -64,6 +64,7 @@ export interface Project {
   photoCount: number; // M
   status: ProjectStatus;
   accessToken: string;
+  accessPin?: string | null;
   confirmedAt?: string; // ISO, when customer final-confirmed
   deliveredAt?: string; // ISO, when status = delivered
   /** 고객이 확정 취소한 횟수 (최대 3회, 고객 측 "확정 취소"용) */

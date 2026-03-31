@@ -25,6 +25,7 @@ function mapProjectRow(row: ProjectsRow): Project {
     photoCount: row.photo_count ?? 0,
     status: row.status as ProjectStatus,
     accessToken: row.access_token,
+    accessPin: (row as any).access_pin ?? null,
     confirmedAt: row.confirmed_at ?? undefined,
     deliveredAt: (row as { delivered_at?: string | null }).delivered_at ?? undefined,
     customerCancelCount: r.customer_cancel_count ?? 0,

@@ -12,7 +12,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Heart, Baby, GraduationCap, Briefcase, Camera,
-  Calendar, Phone, Users, Image as ImageIcon, ChevronLeft, Loader2,
+  Calendar, Phone, Users, Image as ImageIcon, ChevronLeft, Loader2, Lock, RefreshCw,
 } from "lucide-react";
 import { addDays, format, differenceInCalendarDays } from "date-fns";
 import { supabase } from "@/lib/supabase";
@@ -75,6 +75,7 @@ export default function NewProjectPage() {
     format(addDays(new Date(), 7), "yyyy-MM-dd")
   );
 
+  const [accessPin,          setAccessPin]          = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState<string | null>(null);
 
@@ -136,6 +137,7 @@ export default function NewProjectPage() {
         shoot_type: shootType || null,
         customer_phone: customerPhone.trim() || null,
         photo_count_expected: photoCountExpected ? Number(photoCountExpected) : null,
+        access_pin: accessPin || null,
       });
 
       await fetch("/api/photographer/project-logs", {
@@ -485,6 +487,62 @@ export default function NewProjectPage() {
                     )}
                   </div>
                 )}
+              </div>
+
+              {/* 고객 비밀번호 (PIN) */}
+              <div style={{ marginTop: 18 }}>
+                <div style={labelStyle}>
+                  <Lock size={11} color={C.dim} />
+                  고객 비밀번호
+                  <span style={{ fontSize: 10, fontWeight: 400, color: C.dim }}>선택사항</span>
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    className="np-input"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={4}
+                    pattern="[0-9]*"
+                    style={{ ...inputBase, width: 120, letterSpacing: 6, fontSize: 16, fontWeight: 600 }}
+                    value={accessPin}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                      setAccessPin(v);
+                    }}
+                    placeholder="0000"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setAccessPin(Math.floor(1000 + Math.random() * 9000).toString())}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 5,
+                      padding: "9px 12px",
+                      background: C.surface2, border: `1px solid ${C.border}`,
+                      borderRadius: 8, color: C.muted, fontSize: 12,
+                      cursor: "pointer", fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                    }}
+                  >
+                    <RefreshCw size={12} />
+                    랜덤 생성
+                  </button>
+                  {accessPin && (
+                    <button
+                      type="button"
+                      onClick={() => setAccessPin("")}
+                      style={{
+                        padding: "9px 12px",
+                        background: "transparent", border: `1px solid ${C.border}`,
+                        borderRadius: 8, color: C.muted, fontSize: 12,
+                        cursor: "pointer", fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                      }}
+                    >
+                      삭제
+                    </button>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
+                  설정 시 고객이 링크 접속 시 비밀번호를 입력해야 합니다
+                </div>
               </div>
             </div>
           </div>

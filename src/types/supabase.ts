@@ -37,6 +37,7 @@ export interface Database {
           delivered_at: string | null;
           created_at: string;
           updated_at: string;
+          access_pin: string | null;
         };
         Insert: {
           id?: string;
@@ -53,6 +54,7 @@ export interface Database {
           delivered_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          access_pin?: string | null;
         };
         Update: {
           id?: string;
@@ -69,6 +71,27 @@ export interface Database {
           delivered_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          access_pin?: string | null;
+        };
+      };
+      pin_attempts: {
+        Row: {
+          id: string;
+          project_token: string;
+          attempted_at: string;
+          ip_address: string | null;
+        };
+        Insert: {
+          id?: string;
+          project_token: string;
+          attempted_at?: string;
+          ip_address?: string | null;
+        };
+        Update: {
+          id?: string;
+          project_token?: string;
+          attempted_at?: string;
+          ip_address?: string | null;
         };
       };
       photos: {
