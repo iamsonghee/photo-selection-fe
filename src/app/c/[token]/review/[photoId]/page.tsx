@@ -7,22 +7,23 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Check, RefreshCw, Maximize2 } fro
 import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
 import FullScreenCompareModal from "@/components/FullScreenCompareModal";
+import { PHOTOGRAPHER_THEME as T, PS_DISPLAY } from "@/lib/photographer-theme";
 
 /* ── design tokens ──────────────────────────── */
-const SURFACE   = "#0f2030";
-const SURFACE2  = "#152a3a";
-const SURFACE3  = "#1a3347";
-const STEEL     = "#669bbc";
-const GREEN     = "#2ed573";
-const GREEN_DIM = "#0f2a1e";
-const ORANGE    = "#f5a623";
-const DIM       = "#3a5a6e";
-const MUTED     = "#7a9ab0";
-const TEXT      = "#e8eef2";
-const BORDER    = "rgba(102,155,188,0.12)";
-const BORDER_MD = "rgba(102,155,188,0.22)";
+const SURFACE = T.surface;
+const SURFACE2 = T.surface2;
+const SURFACE3 = T.surface3;
+const STEEL = T.steel;
+const GREEN = T.green;
+const GREEN_DIM = T.greenDim;
+const ORANGE = T.orange;
+const DIM = T.dim;
+const MUTED = T.muted;
+const TEXT = T.text;
+const BORDER = T.border;
+const BORDER_MD = T.borderMd;
 
-const playfair: React.CSSProperties = { fontFamily: "'Playfair Display', Georgia, serif" };
+const playfair: React.CSSProperties = { fontFamily: PS_DISPLAY };
 const panelLabel: React.CSSProperties = {
   fontSize: 10, fontWeight: 600, letterSpacing: 1,
   textTransform: "uppercase", color: DIM, marginBottom: 10,
@@ -158,7 +159,7 @@ export default function ReviewViewerPage() {
               ...playfair, fontSize: 10, color: STEEL,
             }}>A</div>
             <span style={{ ...playfair, fontSize: 13, color: TEXT }}>
-              A컷 <em style={{ color: STEEL, fontStyle: "italic" }}>Acut</em>
+              PhotoSelect
             </span>
           </div>
           <span style={{ width: 1, height: 16, background: BORDER, display: "inline-block" }} />
@@ -281,7 +282,7 @@ export default function ReviewViewerPage() {
               position: "absolute", top: 10, left: 10, zIndex: 2,
               padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600,
               backdropFilter: "blur(8px)",
-              background: "rgba(102,155,188,0.2)", color: STEEL, border: "1px solid rgba(102,155,188,0.3)",
+              background: "rgba(79,126,255,0.2)", color: STEEL, border: "1px solid rgba(79,126,255,0.3)",
             }}>{versionLabel}</span>
             <div
               onClick={() => { setFullInitial("version"); setFullOpen(true); }}

@@ -13,6 +13,7 @@ import {
 } from "@/lib/gallery-filter";
 import type { GalleryFilterState } from "@/lib/gallery-filter";
 import type { StarRating, ColorTag, SortOrder } from "@/types";
+import { PS_DISPLAY } from "@/lib/photographer-theme";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 
@@ -30,7 +31,7 @@ const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
   { value: "newest",   label: "최신순"  },
 ];
 
-const playfair: React.CSSProperties = { fontFamily: "'Playfair Display', Georgia, serif" };
+const playfair: React.CSSProperties = { fontFamily: PS_DISPLAY };
 
 export default function GalleryPageClient() {
   const params = useParams();
@@ -134,14 +135,14 @@ export default function GalleryPageClient() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: "#0d1e28" }}>
+      <div className="flex min-h-screen items-center justify-center" style={{ background: "#050505" }}>
         <p className="text-sm" style={{ color: "#3a5a6e" }}>갤러리 불러오는 중...</p>
       </div>
     );
   }
   if (!project) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4" style={{ background: "#0d1e28" }}>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4" style={{ background: "#050505" }}>
         <p className="text-sm" style={{ color: "#3a5a6e" }}>존재하지 않는 초대 링크입니다.</p>
       </div>
     );
@@ -149,11 +150,11 @@ export default function GalleryPageClient() {
   if (project.status === "editing") return null;
   if (!loading && photos.length === 0) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4" style={{ background: "#0d1e28" }}>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4" style={{ background: "#050505" }}>
         <p className="text-sm" style={{ color: "#3a5a6e" }}>사진을 불러올 수 없습니다.</p>
         <Link href={`/c/${token}`}
           className="rounded-xl px-4 py-2 text-[13px] transition-colors hover:opacity-80"
-          style={{ border: "1px solid rgba(102,155,188,0.2)", color: "#669bbc" }}>
+          style={{ border: "1px solid rgba(79,126,255,0.2)", color: "#4f7eff" }}>
           초대 페이지로 돌아가기
         </Link>
       </div>
@@ -165,34 +166,34 @@ export default function GalleryPageClient() {
   const currentSortLabel = SORT_OPTIONS.find((o) => o.value === sortOrder)?.label ?? "파일명순";
 
   return (
-    <div style={{ background: "#0d1e28", minHeight: "100vh", paddingBottom: 80 }}>
+    <div style={{ background: "#050505", minHeight: "100vh", paddingBottom: 80 }}>
 
       {/* ── Header ── */}
       <header
         className="sticky top-0 z-[100] flex h-12 items-center justify-between px-4"
-        style={{ background: "rgba(13,30,40,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(102,155,188,0.12)" }}
+        style={{ background: "rgba(10,10,11,0.92)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(79,126,255,0.12)" }}
       >
         {/* Logo */}
         <div className="flex items-center gap-[7px]">
           <div
             className="flex h-6 w-6 items-center justify-center rounded-[5px]"
-            style={{ background: "#152a3a", border: "1px solid rgba(102,155,188,0.22)" }}
+            style={{ background: "rgba(39,39,42,0.75)", border: "1px solid rgba(79,126,255,0.22)" }}
           >
-            <span style={{ ...playfair, fontSize: 11, color: "#669bbc" }}>A</span>
+            <span style={{ ...playfair, fontSize: 11, color: "#4f7eff" }}>P</span>
           </div>
-          <span style={{ ...playfair, fontSize: 14, color: "#e8eef2" }}>A컷</span>
+          <span style={{ ...playfair, fontSize: 14, color: "#fafafa" }}>PhotoSelect</span>
         </div>
 
         {/* Right: photographer + count */}
         <div className="flex items-center gap-2.5">
           {photographer && (
-            <span className="text-[12px]" style={{ color: "#7a9ab0" }}>
+            <span className="text-[12px]" style={{ color: "#a1a1aa" }}>
               {photographer.name || "작가"}
             </span>
           )}
           <span
             className="rounded-full px-[9px] py-[3px] text-[12px] font-semibold"
-            style={{ background: "rgba(102,155,188,0.12)", border: "1px solid rgba(102,155,188,0.2)", color: "#669bbc" }}
+            style={{ background: "rgba(79,126,255,0.12)", border: "1px solid rgba(79,126,255,0.2)", color: "#4f7eff" }}
           >
             {Y} / {N}
           </span>
@@ -202,7 +203,7 @@ export default function GalleryPageClient() {
       {/* ── Filter bar ── */}
       <div
         className="sticky top-12 z-[90]"
-        style={{ background: "rgba(13,30,40,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(102,155,188,0.12)" }}
+        style={{ background: "rgba(10,10,11,0.92)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(79,126,255,0.12)" }}
       >
         <div
           className="flex items-center gap-1.5 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -216,9 +217,9 @@ export default function GalleryPageClient() {
               className="shrink-0 rounded-full text-[12px] font-medium transition-all"
               style={{
                 padding: "5px 12px",
-                border: tabFilter === v ? "1px solid rgba(102,155,188,0.3)" : "1px solid rgba(102,155,188,0.12)",
-                background: tabFilter === v ? "rgba(102,155,188,0.12)" : "transparent",
-                color: tabFilter === v ? "#669bbc" : "#7a9ab0",
+                border: tabFilter === v ? "1px solid rgba(79,126,255,0.3)" : "1px solid rgba(79,126,255,0.12)",
+                background: tabFilter === v ? "rgba(79,126,255,0.12)" : "transparent",
+                color: tabFilter === v ? "#4f7eff" : "#a1a1aa",
                 whiteSpace: "nowrap",
                 cursor: "pointer",
               }}
@@ -227,7 +228,7 @@ export default function GalleryPageClient() {
             </button>
           ))}
 
-          <span className="mx-0.5 h-4 w-px shrink-0" style={{ background: "rgba(102,155,188,0.12)" }} />
+          <span className="mx-0.5 h-4 w-px shrink-0" style={{ background: "rgba(79,126,255,0.12)" }} />
 
           {/* Interactive star filter */}
           {([1, 2, 3, 4, 5] as const).map((s) => {
@@ -257,7 +258,7 @@ export default function GalleryPageClient() {
             );
           })}
 
-          <span className="mx-0.5 h-4 w-px shrink-0" style={{ background: "rgba(102,155,188,0.12)" }} />
+          <span className="mx-0.5 h-4 w-px shrink-0" style={{ background: "rgba(79,126,255,0.12)" }} />
 
           {/* Color dot filters */}
           {COLOR_OPTIONS.map((opt) => {
@@ -274,8 +275,8 @@ export default function GalleryPageClient() {
                   height: 28,
                   borderRadius: 20,
                   padding: "5px 6px",
-                  border: isActive ? "1px solid rgba(102,155,188,0.3)" : "1px solid rgba(102,155,188,0.12)",
-                  background: isActive ? "#152a3a" : "transparent",
+                  border: isActive ? "1px solid rgba(79,126,255,0.3)" : "1px solid rgba(79,126,255,0.12)",
+                  background: isActive ? "rgba(39,39,42,0.75)" : "transparent",
                   cursor: "pointer",
                 }}
               >
@@ -296,7 +297,7 @@ export default function GalleryPageClient() {
             style={{
               padding: "4px 6px",
               borderRadius: 6,
-              border: "1px solid rgba(102,155,188,0.12)",
+              border: "1px solid rgba(79,126,255,0.12)",
               color: "#3a5a6e",
               background: "none",
               cursor: "pointer",
@@ -314,8 +315,8 @@ export default function GalleryPageClient() {
               style={{
                 padding: "4px 8px",
                 borderRadius: 6,
-                border: "1px solid rgba(102,155,188,0.12)",
-                color: "#7a9ab0",
+                border: "1px solid rgba(79,126,255,0.12)",
+                color: "#a1a1aa",
                 fontSize: 11,
                 background: "none",
                 cursor: "pointer",
@@ -328,15 +329,15 @@ export default function GalleryPageClient() {
             {showSortMenu && (
               <div
                 className="absolute right-0 top-full mt-1 z-[200] overflow-hidden rounded-lg shadow-xl"
-                style={{ background: "#0f2030", border: "1px solid rgba(102,155,188,0.2)", minWidth: 100 }}
+                style={{ background: "rgba(24,24,27,0.85)", border: "1px solid rgba(79,126,255,0.2)", minWidth: 100 }}
               >
                 {SORT_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
                     onClick={() => { setSortOrder(opt.value); setShowSortMenu(false); }}
-                    className="block w-full px-3 py-2 text-left text-[12px] transition-colors hover:bg-[rgba(102,155,188,0.08)]"
-                    style={{ color: sortOrder === opt.value ? "#669bbc" : "#7a9ab0", background: "none", cursor: "pointer" }}
+                    className="block w-full px-3 py-2 text-left text-[12px] transition-colors hover:bg-[rgba(79,126,255,0.08)]"
+                    style={{ color: sortOrder === opt.value ? "#4f7eff" : "#a1a1aa", background: "none", cursor: "pointer" }}
                   >
                     {opt.label}
                   </button>
@@ -364,15 +365,15 @@ export default function GalleryPageClient() {
                 className="group relative block overflow-hidden rounded-[8px] transition-transform hover:scale-[1.02]"
                 style={{
                   aspectRatio: "1 / 1",
-                  background: "#152a3a",
-                  border: selected ? "2px solid #669bbc" : "1px solid rgba(102,155,188,0.12)",
+                  background: "rgba(39,39,42,0.75)",
+                  border: selected ? "2px solid #4f7eff" : "1px solid rgba(79,126,255,0.12)",
                 }}
               >
                 {/* Selected tint overlay */}
                 {selected && (
                   <div
                     className="pointer-events-none absolute inset-0 z-[1]"
-                    style={{ background: "rgba(102,155,188,0.12)" }}
+                    style={{ background: "rgba(79,126,255,0.12)" }}
                   />
                 )}
 
@@ -397,7 +398,7 @@ export default function GalleryPageClient() {
                   style={{
                     width: 20,
                     height: 20,
-                    background: selected ? "#669bbc" : "rgba(0,0,0,0.45)",
+                    background: selected ? "#4f7eff" : "rgba(0,0,0,0.45)",
                     border: selected ? "2px solid white" : "1.5px solid rgba(255,255,255,0.55)",
                   }}
                 >
@@ -453,12 +454,12 @@ export default function GalleryPageClient() {
       {/* ── Bottom bar ── */}
       <div
         className="fixed bottom-0 left-0 right-0 z-[100] flex items-center justify-between gap-3 px-4 py-2.5 backdrop-blur"
-        style={{ background: "rgba(0,48,73,0.97)", borderTop: "1px solid rgba(102,155,188,0.15)" }}
+        style={{ background: "rgba(9,9,11,0.97)", borderTop: "1px solid rgba(79,126,255,0.15)" }}
       >
         {/* Left: text + progress */}
         <div className="flex flex-1 flex-col gap-[3px]">
           <div className="flex items-center justify-between">
-            <span className="text-[12px]" style={{ color: "#7a9ab0" }}>선택 {Y} / {N}</span>
+            <span className="text-[12px]" style={{ color: "#a1a1aa" }}>선택 {Y} / {N}</span>
             {Y < N  && <span className="text-[12px] font-medium" style={{ color: "#f5a623" }}>{N - Y}개 더 선택 필요</span>}
             {Y === N && <span className="text-[12px] font-medium" style={{ color: "#2ed573" }}>선택 완료!</span>}
             {Y > N  && <span className="text-[12px] font-medium" style={{ color: "#f5a623" }}>{Y - N}개 초과 선택</span>}
@@ -469,7 +470,7 @@ export default function GalleryPageClient() {
           >
             <div
               className="h-full rounded-full transition-all duration-300"
-              style={{ width: `${progressPct}%`, background: "#669bbc" }}
+              style={{ width: `${progressPct}%`, background: "#4f7eff" }}
             />
           </div>
         </div>
@@ -483,7 +484,7 @@ export default function GalleryPageClient() {
           style={{
             height: 44,
             padding: "0 20px",
-            background: canConfirm ? "#669bbc" : "#1a3347",
+            background: canConfirm ? "#4f7eff" : "rgba(63,63,70,0.55)",
             color: canConfirm ? "white" : "#3a5a6e",
             border: "none",
             cursor: canConfirm ? "pointer" : "not-allowed",
@@ -501,17 +502,17 @@ export default function GalleryPageClient() {
         >
           <div
             className="w-full max-w-sm rounded-2xl p-6 shadow-xl"
-            style={{ background: "#0f2030", border: "1px solid rgba(102,155,188,0.2)" }}
+            style={{ background: "rgba(24,24,27,0.85)", border: "1px solid rgba(79,126,255,0.2)" }}
             onClick={(e) => e.stopPropagation()}
           >
             <h3
               className="mb-2 text-[16px] font-bold"
-              style={{ ...playfair, color: "#e8eef2" }}
+              style={{ ...playfair, color: "#fafafa" }}
             >
               선택 확정
             </h3>
-            <p className="mb-6 text-[13px] leading-relaxed" style={{ color: "#7a9ab0" }}>
-              <span style={{ color: "#669bbc", fontWeight: 600 }}>{Y}장</span>을 최종 선택으로 확정하시겠습니까?
+            <p className="mb-6 text-[13px] leading-relaxed" style={{ color: "#a1a1aa" }}>
+              <span style={{ color: "#4f7eff", fontWeight: 600 }}>{Y}장</span>을 최종 선택으로 확정하시겠습니까?
               <br />확정 후에는 수정이 제한됩니다.
             </p>
             {confirmError && (
@@ -524,7 +525,7 @@ export default function GalleryPageClient() {
                 type="button"
                 onClick={() => !confirming && setShowConfirmModal(false)}
                 className="flex h-11 flex-1 items-center justify-center rounded-xl text-[13px]"
-                style={{ border: "1px solid rgba(102,155,188,0.2)", color: "#7a9ab0", background: "none" }}
+                style={{ border: "1px solid rgba(79,126,255,0.2)", color: "#a1a1aa", background: "none" }}
               >
                 취소
               </button>
@@ -533,7 +534,7 @@ export default function GalleryPageClient() {
                 onClick={handleConfirm}
                 disabled={confirming}
                 className="flex h-11 flex-1 items-center justify-center rounded-xl text-[13px] font-semibold disabled:opacity-60"
-                style={{ background: "#669bbc", color: "white", border: "none" }}
+                style={{ background: "#4f7eff", color: "white", border: "none" }}
               >
                 {confirming ? "처리 중..." : "확정"}
               </button>

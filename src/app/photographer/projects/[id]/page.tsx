@@ -30,25 +30,7 @@ import {
 import { getProjectById } from "@/lib/db";
 import { getStatusLabel } from "@/lib/project-status";
 import type { Project, ProjectStatus } from "@/types";
-
-// ---------- color tokens ----------
-const C = {
-  surface:   "#0f2030",
-  surface2:  "#152a3a",
-  surface3:  "#1a3347",
-  steel:     "#669bbc",
-  border:    "rgba(102,155,188,0.12)",
-  borderMd:  "rgba(102,155,188,0.22)",
-  text:      "#e8eef2",
-  muted:     "#7a9ab0",
-  dim:       "#3a5a6e",
-  green:     "#2ed573",
-  greenDim:  "#0f2a1e",
-  orange:    "#f5a623",
-  red:       "#ff4757",
-  redDim:    "#2a0f12",
-  kakao:     "#FEE500",
-};
+import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT } from "@/lib/photographer-theme";
 
 // ---------- workflow helpers ----------
 type WfState = "done" | "current" | "pending";
@@ -100,7 +82,7 @@ function statusBadgeStyle(status: ProjectStatus) {
     return { background: "rgba(245,166,35,0.15)", color: C.orange, border: "1px solid rgba(245,166,35,0.3)" };
   if (status === "delivered")
     return { background: "rgba(46,213,115,0.15)", color: C.green, border: "1px solid rgba(46,213,115,0.3)" };
-  return { background: "rgba(102,155,188,0.15)", color: C.steel, border: "1px solid rgba(102,155,188,0.3)" };
+  return { background: "rgba(79,126,255,0.15)", color: C.steel, border: "1px solid rgba(79,126,255,0.3)" };
 }
 
 // ---------- sub-components ----------
@@ -118,7 +100,7 @@ function WfDot({ state, num }: { state: WfState; num: number }) {
     );
   if (state === "current")
     return (
-      <div style={{ ...base, background: "rgba(102,155,188,0.15)", color: C.steel, border: "1px solid rgba(102,155,188,0.3)" }}>
+      <div style={{ ...base, background: "rgba(79,126,255,0.15)", color: C.steel, border: "1px solid rgba(79,126,255,0.3)" }}>
         ●
       </div>
     );
@@ -402,7 +384,7 @@ export default function ProjectDetailPage() {
       {/* ── Hero ── */}
       <div style={{ padding: "20px 24px 0", marginBottom: 16 }}>
         <h1 style={{
-          fontFamily: "'Playfair Display', serif",
+          fontFamily: PS_DISPLAY,
           fontSize: 26, fontWeight: 700,
           color: C.text, marginBottom: 6, lineHeight: 1.2,
         }}>
@@ -443,7 +425,7 @@ export default function ProjectDetailPage() {
                   position: "relative",
                   background:
                     state === "done" ? "rgba(46,213,115,0.03)"
-                    : state === "current" ? "rgba(102,155,188,0.06)"
+                    : state === "current" ? "rgba(79,126,255,0.06)"
                     : "transparent",
                 }}
               >
@@ -565,8 +547,8 @@ export default function ProjectDetailPage() {
                     disabled={saving}
                     style={{
                       flex: 1, padding: "9px 0",
-                      background: "rgba(102,155,188,0.15)",
-                      border: `1px solid rgba(102,155,188,0.3)`, borderRadius: 8,
+                      background: "rgba(79,126,255,0.15)",
+                      border: `1px solid rgba(79,126,255,0.3)`, borderRadius: 8,
                       color: C.steel, fontSize: 13, fontWeight: 500,
                       cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit",
                     }}
@@ -895,8 +877,8 @@ export default function ProjectDetailPage() {
                 disabled={pinSaving || (!!pinInput && pinInput.length !== 4)}
                 style={{
                   flex: 1, padding: "10px 0",
-                  background: "rgba(102,155,188,0.15)",
-                  border: "1px solid rgba(102,155,188,0.3)", borderRadius: 8,
+                  background: "rgba(79,126,255,0.15)",
+                  border: "1px solid rgba(79,126,255,0.3)", borderRadius: 8,
                   color: C.steel, fontSize: 13, fontWeight: 500,
                   cursor: pinSaving ? "not-allowed" : "pointer", fontFamily: "inherit",
                   opacity: (pinSaving || (!!pinInput && pinInput.length !== 4)) ? 0.5 : 1,
@@ -950,8 +932,8 @@ export default function ProjectDetailPage() {
                 }}
                 style={{
                   flex: 1, padding: "10px 0",
-                  background: "rgba(102,155,188,0.15)",
-                  border: "1px solid rgba(102,155,188,0.3)", borderRadius: 8,
+                  background: "rgba(79,126,255,0.15)",
+                  border: "1px solid rgba(79,126,255,0.3)", borderRadius: 8,
                   color: C.steel, fontSize: 13, fontWeight: 500,
                   cursor: "pointer", fontFamily: "inherit",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 5,

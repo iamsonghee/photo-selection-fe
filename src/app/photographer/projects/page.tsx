@@ -12,19 +12,10 @@ import { getPhotographerIdByAuthId, getProjectsByPhotographerId } from "@/lib/db
 import { PROJECT_STATUSES, PROJECT_STATUS_LABELS } from "@/lib/project-status";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import type { Project, ProjectStatus } from "@/types";
+import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT } from "@/lib/photographer-theme";
 
 // ── 상수 ──────────────────────────────────────────────────────
 const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-
-const C = {
-  ink: "#0d1e28", surface: "#0f2030", surface2: "#152a3a", surface3: "#1a3347",
-  steel: "#669bbc", steelLt: "#8db8d4",
-  border: "rgba(102,155,188,0.12)", borderMd: "rgba(102,155,188,0.22)",
-  text: "#e8eef2", muted: "#7a9ab0", dim: "#3a5a6e",
-  green: "#2ed573", greenDim: "#0f2a1e",
-  orange: "#f5a623", orangeDim: "#2a1a08",
-  red: "#ff4757", redDim: "#2a0f12",
-};
 
 const ACTIVE_STATUSES: ProjectStatus[] = ["selecting","confirmed","editing","reviewing_v1","editing_v2","reviewing_v2"];
 
@@ -87,14 +78,14 @@ function getBadgeStyle(status: ProjectStatus, photoCount?: number, requiredCount
     if (pc === 0) {
       return { background: C.surface3, color: C.dim, border: `1px solid rgba(58,90,110,0.3)` };
     } else if (pc < rc) {
-      return { background: "rgba(102,155,188,0.12)", color: C.steel, border: `1px solid rgba(102,155,188,0.25)` };
+      return { background: "rgba(79,126,255,0.12)", color: C.steel, border: `1px solid rgba(79,126,255,0.25)` };
     } else {
       return { background: "rgba(245,166,35,0.12)", color: C.orange, border: `1px solid rgba(245,166,35,0.3)` };
     }
   }
   switch (status) {
     case "selecting":
-      return { background: "rgba(102,155,188,0.15)", color: C.steel, border: "1px solid rgba(102,155,188,0.3)" };
+      return { background: "rgba(79,126,255,0.15)", color: C.steel, border: "1px solid rgba(79,126,255,0.3)" };
     case "confirmed":
       return { background: "rgba(46,213,115,0.12)", color: C.green, border: "1px solid rgba(46,213,115,0.25)" };
     case "editing":
@@ -135,7 +126,7 @@ function highlight(text: string, query: string): React.ReactNode {
   const parts = text.split(new RegExp(`(${escaped})`, "gi"));
   return parts.map((part, i) =>
     part.toLowerCase() === query.toLowerCase()
-      ? <mark key={i} style={{ background: "rgba(102,155,188,0.2)", color: C.steel, borderRadius: 3, padding: "0 2px", fontStyle: "normal" }}>{part}</mark>
+      ? <mark key={i} style={{ background: "rgba(79,126,255,0.2)", color: C.steel, borderRadius: 3, padding: "0 2px", fontStyle: "normal" }}>{part}</mark>
       : part
   );
 }
@@ -207,11 +198,11 @@ function Dropdown({ label, value, options, onChange, icon }: DropdownProps) {
         style={{
           display: "flex", alignItems: "center", gap: 6,
           padding: "8px 14px",
-          background: active ? "rgba(102,155,188,0.06)" : C.surface,
+          background: active ? "rgba(79,126,255,0.06)" : C.surface,
           border: `1px solid ${active ? C.steel : C.border}`,
           borderRadius: 9, color: active ? C.steel : C.muted,
           fontSize: 12, cursor: "pointer", whiteSpace: "nowrap",
-          fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+          fontFamily: PS_FONT,
           transition: "all 0.15s",
         }}
       >
@@ -235,7 +226,7 @@ function Dropdown({ label, value, options, onChange, icon }: DropdownProps) {
                 padding: "8px 14px", background: "transparent", border: "none",
                 color: opt.value === value ? C.steel : C.muted,
                 fontSize: 12, cursor: "pointer",
-                fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                fontFamily: PS_FONT,
                 fontWeight: opt.value === value ? 500 : 400,
               }}
             >
@@ -297,7 +288,7 @@ function ProjectCard({ project, searchQuery, onClick }: {
           {month}
         </span>
         <span style={{
-          fontFamily: "'Playfair Display', serif",
+          fontFamily: PS_DISPLAY,
           fontSize: 22, fontWeight: 700, color: C.muted, lineHeight: 1,
         }}>
           {day}
@@ -396,7 +387,7 @@ function EmptyState({ hasProjects, onReset }: { hasProjects: boolean; onReset: (
             padding: "8px 18px", background: "transparent",
             border: `1px solid ${C.borderMd}`, borderRadius: 8,
             color: C.muted, fontSize: 12, cursor: "pointer",
-            fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+            fontFamily: PS_FONT,
           }}
         >
           필터 초기화
@@ -408,7 +399,7 @@ function EmptyState({ hasProjects, onReset }: { hasProjects: boolean; onReset: (
             padding: "8px 18px", background: C.steel,
             border: "none", borderRadius: 8, color: "white",
             fontSize: 12, cursor: "pointer",
-            fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+            fontFamily: PS_FONT,
           }}
         >
           새 프로젝트 만들기
@@ -533,7 +524,7 @@ export default function ProjectsPage() {
   const hasActiveFilter = searchQuery.trim() || dateFilter !== "all" || statusFilter !== "all" || activeTab !== "all";
 
   return (
-    <div style={{ fontFamily: "'DM Sans','Noto Sans KR',sans-serif" }}>
+    <div style={{ fontFamily: PS_FONT }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
@@ -546,7 +537,7 @@ export default function ProjectsPage() {
         height: 52, borderBottom: `1px solid ${C.border}`,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 24px",
-        background: "rgba(13,30,40,0.85)", backdropFilter: "blur(12px)",
+        background: C.topbarBg, backdropFilter: "blur(12px)",
         position: "sticky", top: 0, zIndex: 50,
       }}>
         <span style={{ fontSize: 15, fontWeight: 500, color: C.text }}>프로젝트</span>
@@ -556,7 +547,7 @@ export default function ProjectsPage() {
             display: "flex", alignItems: "center", gap: 6,
             padding: "7px 16px", background: C.steel, color: "white",
             border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500,
-            cursor: "pointer", fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+            cursor: "pointer", fontFamily: PS_FONT,
           }}
         >
           ＋ 새 프로젝트
@@ -583,7 +574,7 @@ export default function ProjectsPage() {
                 width: "100%", padding: "9px 12px 9px 34px",
                 background: C.surface, border: `1px solid ${C.border}`,
                 borderRadius: 9, color: C.text, fontSize: 13,
-                fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                fontFamily: PS_FONT,
                 transition: "border-color 0.15s", boxSizing: "border-box",
               }}
             />
@@ -633,14 +624,14 @@ export default function ProjectsPage() {
                 borderBottom: `2px solid ${activeTab === tab.key ? C.steel : "transparent"}`,
                 marginBottom: -1, cursor: "pointer",
                 display: "flex", alignItems: "center", gap: 5,
-                fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                fontFamily: PS_FONT,
                 transition: "all 0.15s",
               }}
             >
               {tab.label}
               <span style={{
                 padding: "1px 6px", borderRadius: 10, fontSize: 10, fontWeight: 600,
-                background: activeTab === tab.key ? "rgba(102,155,188,0.15)" : C.surface2,
+                background: activeTab === tab.key ? "rgba(79,126,255,0.15)" : C.surface2,
                 color: activeTab === tab.key ? C.steel : C.muted,
               }}>
                 {tab.count}
@@ -663,7 +654,7 @@ export default function ProjectsPage() {
             style={{
               padding: "5px 10px", background: C.surface, border: `1px solid ${C.border}`,
               borderRadius: 7, color: C.muted, fontSize: 11,
-              fontFamily: "'DM Sans','Noto Sans KR',sans-serif", cursor: "pointer",
+              fontFamily: PS_FONT, cursor: "pointer",
             }}
           >
             {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}

@@ -7,26 +7,27 @@ import { ko } from "date-fns/locale";
 import { Check, AlertTriangle, LayoutGrid, List } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import type { ColorTag } from "@/types";
+import { PHOTOGRAPHER_THEME as T, PS_DISPLAY } from "@/lib/photographer-theme";
 
 const CUSTOMER_CANCEL_MAX = 3;
 
 /* ── design tokens ──────────────────────────── */
-const INK      = "#0d1e28";
-const SURFACE  = "#0f2030";
-const SURFACE2 = "#152a3a";
-const SURFACE3 = "#1a3347";
-const STEEL    = "#669bbc";
-const GREEN    = "#2ed573";
-const GREEN_DIM = "#0f2a1e";
-const ORANGE   = "#f5a623";
-const ORANGE_DIM = "#2a1a08";
-const RED      = "#ff4757";
-const RED_DIM  = "#2a0f12";
-const DIM      = "#3a5a6e";
-const MUTED    = "#7a9ab0";
-const TEXT     = "#e8eef2";
-const BORDER   = "rgba(102,155,188,0.12)";
-const BORDER_MD = "rgba(102,155,188,0.22)";
+const INK = T.ink;
+const SURFACE = T.surface;
+const SURFACE2 = T.surface2;
+const SURFACE3 = T.surface3;
+const STEEL = T.steel;
+const GREEN = T.green;
+const GREEN_DIM = T.greenDim;
+const ORANGE = T.orange;
+const ORANGE_DIM = T.orangeDim;
+const RED = T.red;
+const RED_DIM = T.redDim;
+const DIM = T.dim;
+const MUTED = T.muted;
+const TEXT = T.text;
+const BORDER = T.border;
+const BORDER_MD = T.borderMd;
 
 const COLOR_HEX: Record<ColorTag, string> = {
   red:    "#ff4757",
@@ -36,7 +37,7 @@ const COLOR_HEX: Record<ColorTag, string> = {
   purple: "#5352ed",
 };
 
-const playfair: React.CSSProperties = { fontFamily: "'Playfair Display', Georgia, serif" };
+const playfair: React.CSSProperties = { fontFamily: PS_DISPLAY };
 
 function getTestImageUrl(photoId: string) {
   const seed = photoId.replace(/\D/g, "") || "1";
@@ -153,7 +154,7 @@ export default function LockedPage() {
             ...playfair, fontSize: 11, color: STEEL,
           }}>A</div>
           <span style={{ ...playfair, fontSize: 14, color: TEXT }}>
-            A컷 <em style={{ color: STEEL, fontStyle: "italic" }}>Acut</em>
+            PhotoSelect
           </span>
         </div>
         <span style={{ fontSize: 12, color: MUTED }}>{project.name}</span>
@@ -217,7 +218,7 @@ export default function LockedPage() {
           <span style={{ fontSize: 13, fontWeight: 500, color: MUTED }}>선택한 사진</span>
           <span style={{
             padding: "2px 8px", borderRadius: 20,
-            background: "rgba(102,155,188,0.1)", border: "1px solid rgba(102,155,188,0.2)",
+            background: "rgba(79,126,255,0.1)", border: "1px solid rgba(79,126,255,0.2)",
             fontSize: 11, color: STEEL, fontWeight: 500,
           }}>{N}장</span>
         </div>
@@ -265,7 +266,7 @@ export default function LockedPage() {
               return (
                 <div key={photo.id} style={{
                   background: SURFACE2,
-                  border: "2px solid rgba(102,155,188,0.4)",
+                  border: "2px solid rgba(79,126,255,0.4)",
                   borderRadius: 8, overflow: "hidden", cursor: "default",
                 }}>
                   {/* Image — 1:1 */}
@@ -388,7 +389,7 @@ export default function LockedPage() {
       {/* ── Fixed bottom bar ──────────────────── */}
       <div style={{
         position: "fixed", bottom: 0, left: 0, right: 0,
-        background: "rgba(0,48,73,0.97)", borderTop: "1px solid rgba(102,155,188,0.15)",
+        background: T.modalScrim, borderTop: "1px solid rgba(79,126,255,0.15)",
         backdropFilter: "blur(12px)",
         padding: "10px 20px", zIndex: 100,
         display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,

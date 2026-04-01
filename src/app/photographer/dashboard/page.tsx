@@ -22,27 +22,7 @@ import type { Project, ProjectStatus } from "@/types";
 import type { ProjectLogItem } from "@/lib/db";
 import { useProfile } from "@/contexts/ProfileContext";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
-
-// ── colour tokens ──────────────────────────────────────────
-const C = {
-  ink:       "#0d1e28",
-  surface:   "#0f2030",
-  surface2:  "#152a3a",
-  surface3:  "#1a3347",
-  steel:     "#669bbc",
-  steelLt:   "#8db8d4",
-  border:    "rgba(102,155,188,0.12)",
-  borderMd:  "rgba(102,155,188,0.22)",
-  text:      "#e8eef2",
-  muted:     "#7a9ab0",
-  dim:       "#3a5a6e",
-  green:     "#2ed573",
-  greenDim:  "#0f2a1e",
-  orange:    "#f5a623",
-  orangeDim: "#2a1a08",
-  red:       "#ff4757",
-  redDim:    "#2a0f12",
-};
+import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT } from "@/lib/photographer-theme";
 
 // ── preparing 상태 3단계 분기 헬퍼 ──────────────────────────
 function getPreparingBadge(photoCount: number, requiredCount: number): { label: string; color: string } {
@@ -77,7 +57,7 @@ const STATUS_BADGE: Record<ProjectStatus, { label: string; key: BadgeKey }> = {
 
 const BADGE_STYLE: Record<BadgeKey, React.CSSProperties> = {
   preparing: { background: C.surface3,                    color: C.muted,   border: `1px solid ${C.border}` },
-  selecting: { background: "rgba(102,155,188,0.15)",      color: C.steel,   border: "1px solid rgba(102,155,188,0.3)" },
+  selecting: { background: "rgba(79,126,255,0.15)",      color: C.steel,   border: "1px solid rgba(79,126,255,0.3)" },
   editing:   { background: "rgba(245,166,35,0.12)",       color: C.orange,  border: "1px solid rgba(245,166,35,0.3)"  },
   revision:  { background: "rgba(255,71,87,0.12)",        color: C.red,     border: "1px solid rgba(255,71,87,0.3)"   },
   delivered: { background: C.greenDim,                    color: C.green,   border: "1px solid rgba(46,213,115,0.3)"  },
@@ -152,10 +132,10 @@ function StatusBadge({ status, photoCount, requiredCount }: {
     let borderColor: string;
     if (pc === 0) {
       bgColor = C.surface3;
-      borderColor = `1px solid rgba(58,90,110,0.3)`;
+      borderColor = `1px solid rgba(113,113,122,0.35)`;
     } else if (pc < rc) {
-      bgColor = "rgba(102,155,188,0.12)";
-      borderColor = `1px solid rgba(102,155,188,0.25)`;
+      bgColor = "rgba(79,126,255,0.12)";
+      borderColor = `1px solid rgba(79,126,255,0.25)`;
     } else {
       bgColor = "rgba(245,166,35,0.12)";
       borderColor = `1px solid rgba(245,166,35,0.3)`;
@@ -352,7 +332,7 @@ function ActionCard({
           <span>{icon}</span>
         </div>
         <div style={{
-          fontFamily: "'Playfair Display', serif",
+          fontFamily: PS_DISPLAY,
           fontSize: 30,
           lineHeight: 1,
           marginBottom: 3,
@@ -479,7 +459,7 @@ export default function DashboardPage() {
   }).length;
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: C.ink, fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ minHeight: "100vh", backgroundColor: "transparent", fontFamily: PS_FONT }}>
 
       {/* ── Topbar ── */}
       <div style={{
@@ -489,7 +469,7 @@ export default function DashboardPage() {
         alignItems: "center",
         justifyContent: "space-between",
         padding: "0 24px",
-        background: "rgba(13,30,40,0.85)",
+        background: C.topbarBg,
         backdropFilter: "blur(12px)",
         position: "sticky",
         top: 0,
@@ -524,7 +504,7 @@ export default function DashboardPage() {
               padding: "7px 16px", background: C.steel,
               color: "white", border: "none", borderRadius: 8,
               fontSize: 12, fontWeight: 500, cursor: "pointer",
-              fontFamily: "'DM Sans', sans-serif",
+              fontFamily: PS_FONT,
             }}
           >
             <Plus size={12} />
@@ -595,7 +575,7 @@ export default function DashboardPage() {
                     icon={<Eye size={16} color={C.steelLt} />}
                     topColor={C.steel}
                     numColor={C.steelLt}
-                    bgTint="rgba(102,155,188,0.04)"
+                    bgTint="rgba(79,126,255,0.06)"
                   />
                 )}
                 {inviteReadyCount > 0 && (
@@ -733,7 +713,7 @@ export default function DashboardPage() {
               borderRadius: 8, padding: "10px 12px", textAlign: "center",
             }}>
               <div style={{
-                fontFamily: "'Playfair Display', serif",
+                fontFamily: PS_DISPLAY,
                 fontSize: 22, lineHeight: 1, marginBottom: 3, color: C.steel,
               }}>
                 {projects.length}
@@ -745,7 +725,7 @@ export default function DashboardPage() {
               borderRadius: 8, padding: "10px 12px", textAlign: "center",
             }}>
               <div style={{
-                fontFamily: "'Playfair Display', serif",
+                fontFamily: PS_DISPLAY,
                 fontSize: 22, lineHeight: 1, marginBottom: 3, color: C.orange,
               }}>
                 {thisMonthCount}

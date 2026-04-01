@@ -1,4 +1,5 @@
 import CustomerLayoutClient from "./CustomerLayoutClient";
+import "./customer-shell.css";
 
 export default function CustomerTokenLayout({
   children,

@@ -3,21 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Lock } from "lucide-react";
-
-const C = {
-  ink: "#0d1e28",
-  surface: "#0f2030",
-  surface2: "#152a3a",
-  surface3: "#1a3347",
-  steel: "#669bbc",
-  border: "rgba(102,155,188,0.12)",
-  borderMd: "rgba(102,155,188,0.22)",
-  text: "#e8eef2",
-  muted: "#7a9ab0",
-  dim: "#3a5a6e",
-  red: "#ff4757",
-  orange: "#f5a623",
-};
+import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT } from "@/lib/photographer-theme";
 
 export default function PinPage() {
   const params = useParams();
@@ -112,17 +98,17 @@ export default function PinPage() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: C.ink,
+      background: "transparent",
       backgroundImage: `
-        linear-gradient(rgba(102,155,188,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(102,155,188,0.03) 1px, transparent 1px)
+        linear-gradient(rgba(79,126,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(79,126,255,0.04) 1px, transparent 1px)
       `,
       backgroundSize: "40px 40px",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       padding: 24,
-      fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+      fontFamily: PS_FONT,
     }}>
       <div style={{
         width: "100%",
@@ -136,7 +122,7 @@ export default function PinPage() {
         {/* Icon */}
         <div style={{
           width: 52, height: 52, borderRadius: "50%",
-          background: "rgba(102,155,188,0.1)",
+          background: "rgba(79,126,255,0.1)",
           border: `1px solid ${C.borderMd}`,
           display: "flex", alignItems: "center", justifyContent: "center",
           margin: "0 auto 20px",
@@ -146,7 +132,7 @@ export default function PinPage() {
 
         {/* Title */}
         <h1 style={{
-          fontFamily: "'Playfair Display', serif",
+          fontFamily: PS_DISPLAY,
           fontSize: 20, fontWeight: 700, color: C.text,
           marginBottom: 8,
         }}>

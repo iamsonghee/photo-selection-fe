@@ -7,23 +7,24 @@ import { Check, RefreshCw } from "lucide-react";
 import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
 import type { ReviewPhotoItem } from "@/lib/customer-api-server";
+import { PHOTOGRAPHER_THEME as T, PS_DISPLAY } from "@/lib/photographer-theme";
 
 const REVISION_LIMIT = 2;
 
-/* ── design tokens ────────────────────────────── */
-const INK      = "#0d1e28";
-const SURFACE  = "#0f2030";
-const SURFACE2 = "#152a3a";
-const STEEL    = "#669bbc";
-const GREEN    = "#2ed573";
-const RED      = "#ff4757";
-const DIM      = "#3a5a6e";
-const TEXT     = "#c8d8e4";
-const MUTED    = "#5a8099";
-const BORDER   = "rgba(102,155,188,0.12)";
-const BORDER_MD = "rgba(102,155,188,0.25)";
+/* ── design tokens (작가/랜딩과 동일 팔레트) ────────────────────────────── */
+const INK = T.ink;
+const SURFACE = T.surface;
+const SURFACE2 = T.surface2;
+const STEEL = T.steel;
+const GREEN = T.green;
+const RED = T.red;
+const DIM = T.dim;
+const TEXT = T.text;
+const MUTED = T.muted;
+const BORDER = T.border;
+const BORDER_MD = T.borderMd;
 
-const playfair: React.CSSProperties = { fontFamily: "'Playfair Display', Georgia, serif" };
+const playfair: React.CSSProperties = { fontFamily: PS_DISPLAY };
 
 export default function ReviewGalleryPage() {
   const params = useParams();
@@ -147,7 +148,7 @@ export default function ReviewGalleryPage() {
             ...playfair, fontSize: 11, color: STEEL,
           }}>A</div>
           <span style={{ ...playfair, fontSize: 14, color: TEXT }}>
-            A컷 <em style={{ color: STEEL, fontStyle: "italic" }}>Acut</em>
+            PhotoSelect
           </span>
         </div>
         <span style={{ fontSize: 12, color: MUTED }}>{project.name}</span>
