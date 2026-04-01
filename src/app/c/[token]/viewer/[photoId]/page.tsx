@@ -11,6 +11,7 @@ import {
   getFilteredPhotos,
   getPhotoDisplayName,
 } from "@/lib/gallery-filter";
+import { viewerImageUrl } from "@/lib/viewer-image-url";
 import type { StarRating, ColorTag } from "@/types";
 
 const COLOR_OPTIONS: { key: ColorTag; color: string }[] = [
@@ -162,6 +163,7 @@ export default function ViewerPage() {
   const displayRating    = hoverStar || star || 0;
   const isCurrentSelected = selectedIds.has(current.id);
   const filename          = getPhotoDisplayName(current);
+  const viewerSrc         = viewerImageUrl(current);
 
   // ── Shared UI blocks ─────────────────────────────────────────────────────
 
@@ -227,20 +229,20 @@ export default function ViewerPage() {
         placeholder="이 사진에 대한 메모를 남겨주세요"
         style={{
           width: "100%", padding: "10px 12px",
-          background: "#152a3a", border: "1px solid rgba(102,155,188,0.12)",
-          borderRadius: 8, color: "#e8eef2", fontSize: 12,
-          fontFamily: "'DM Sans', sans-serif",
+          background: "rgba(39,39,42,0.75)", border: "1px solid rgba(79,126,255,0.12)",
+          borderRadius: 8, color: "#fafafa", fontSize: 12,
+          fontFamily: "'Pretendard', system-ui, sans-serif",
           resize: "none", height: 72, lineHeight: 1.5, outline: "none",
         }}
       />
       <button type="button" onClick={saveComment}
-        className="transition-colors hover:border-[#669bbc] hover:text-[#669bbc]"
+        className="transition-colors hover:border-[#4f7eff] hover:text-[#4f7eff]"
         style={{
           marginTop: 6, width: "100%", padding: "7px",
-          borderRadius: 7, background: "#1a3347",
-          border: "1px solid rgba(102,155,188,0.12)",
-          color: "#7a9ab0", fontSize: 12, cursor: "pointer",
-          fontFamily: "'DM Sans', sans-serif",
+          borderRadius: 7, background: "rgba(63,63,70,0.55)",
+          border: "1px solid rgba(79,126,255,0.12)",
+          color: "#a1a1aa", fontSize: 12, cursor: "pointer",
+          fontFamily: "'Pretendard', system-ui, sans-serif",
         }}>
         저장
       </button>
@@ -253,10 +255,10 @@ export default function ViewerPage() {
         width: "100%", height: 44,
         display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
         borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer",
-        fontFamily: "'DM Sans', sans-serif", transition: "all 0.15s",
+        fontFamily: "'Pretendard', system-ui, sans-serif", transition: "all 0.15s",
         ...(isCurrentSelected
-          ? { background: "rgba(102,155,188,0.15)", border: "1.5px solid #669bbc", color: "#669bbc" }
-          : { background: "#152a3a", border: "1.5px dashed rgba(102,155,188,0.4)", color: "#7a9ab0" }
+          ? { background: "rgba(79,126,255,0.15)", border: "1.5px solid #4f7eff", color: "#4f7eff" }
+          : { background: "rgba(39,39,42,0.75)", border: "1.5px dashed rgba(79,126,255,0.4)", color: "#a1a1aa" }
         ),
       }}>
       {isCurrentSelected ? <><Check style={{ width: 15, height: 15 }} /> 확정됨</> : "+ 확정하기"}
@@ -306,8 +308,8 @@ export default function ViewerPage() {
 
           {/* Image area */}
           <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", background: "#0a0a0a", overflow: "hidden" }}>
-            {current.url
-              ? <img src={current.url} alt={filename} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
+            {viewerSrc
+              ? <img src={viewerSrc} alt={filename} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
               : <div style={{ color: "#3a5a6e" }}>사진 없음</div>
             }
 
@@ -352,18 +354,18 @@ export default function ViewerPage() {
 
         {/* Right: control panel */}
         <div style={{
-          background: "#0f2030", borderLeft: "1px solid rgba(102,155,188,0.12)",
+          background: "rgba(24,24,27,0.85)", borderLeft: "1px solid rgba(79,126,255,0.12)",
           display: "flex", flexDirection: "column",
           height: "100vh", position: "sticky", top: 0, overflowY: "auto",
         }}>
-          <div style={{ padding: 16, borderBottom: "1px solid rgba(102,155,188,0.12)" }}>{StarBlock}</div>
-          <div style={{ padding: 16, borderBottom: "1px solid rgba(102,155,188,0.12)" }}>{ColorBlock}</div>
+          <div style={{ padding: 16, borderBottom: "1px solid rgba(79,126,255,0.12)" }}>{StarBlock}</div>
+          <div style={{ padding: 16, borderBottom: "1px solid rgba(79,126,255,0.12)" }}>{ColorBlock}</div>
           <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column" }}>{CommentBlock}</div>
 
           {/* Prev / Next nav */}
           <div style={{
             padding: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8,
-            borderTop: "1px solid rgba(102,155,188,0.12)",
+            borderTop: "1px solid rgba(79,126,255,0.12)",
           }}>
             {[
               { label: "이전", icon: <ChevronLeft style={{ width: 14, height: 14 }} />, onClick: goPrev, disabled: currentIndex === 0, dir: "prev" },
@@ -371,11 +373,11 @@ export default function ViewerPage() {
             ].map(({ label, icon, onClick, disabled, dir }) => (
               <button key={dir} type="button" onClick={onClick} disabled={disabled}
                 style={{
-                  height: 38, borderRadius: 8, border: "1px solid rgba(102,155,188,0.12)",
-                  background: "transparent", color: "#7a9ab0", fontSize: 12,
+                  height: 38, borderRadius: 8, border: "1px solid rgba(79,126,255,0.12)",
+                  background: "transparent", color: "#a1a1aa", fontSize: 12,
                   cursor: disabled ? "not-allowed" : "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
-                  opacity: disabled ? 0.4 : 1, fontFamily: "'DM Sans', sans-serif",
+                  opacity: disabled ? 0.4 : 1, fontFamily: "'Pretendard', system-ui, sans-serif",
                 }}>
                 {dir === "prev" && icon}{label}{dir === "next" && icon}
               </button>
@@ -417,8 +419,8 @@ export default function ViewerPage() {
 
         {/* Image */}
         <div style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0 }}>
-          {current.url
-            ? <img src={current.url} alt={filename} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+          {viewerSrc
+            ? <img src={viewerSrc} alt={filename} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
             : <div style={{ color: "#3a5a6e" }}>사진 없음</div>
           }
           <button type="button" onClick={goPrevWrap}
@@ -446,7 +448,7 @@ export default function ViewerPage() {
         {/* Bottom overlay */}
         <div style={{
           background: "rgba(13,30,40,0.97)", backdropFilter: "blur(12px)",
-          borderTop: "1px solid rgba(102,155,188,0.12)",
+          borderTop: "1px solid rgba(79,126,255,0.12)",
           padding: "12px 16px", flexShrink: 0, display: "flex", flexDirection: "column", gap: 10,
         }}>
           {/* Select button */}
@@ -472,7 +474,7 @@ export default function ViewerPage() {
                 );
               })}
             </div>
-            <span style={{ width: 1, height: 20, background: "rgba(102,155,188,0.15)", flexShrink: 0 }} />
+            <span style={{ width: 1, height: 20, background: "rgba(79,126,255,0.15)", flexShrink: 0 }} />
             <div style={{ display: "flex", gap: 6 }}>
               {COLOR_OPTIONS.map((opt) => {
                 const isActive = color === opt.key;
@@ -499,17 +501,17 @@ export default function ViewerPage() {
               placeholder="코멘트..."
               style={{
                 flex: 1, padding: "8px 10px",
-                background: "#152a3a", border: "1px solid rgba(102,155,188,0.12)",
-                borderRadius: 7, color: "#e8eef2", fontSize: 12,
-                fontFamily: "'DM Sans', sans-serif", resize: "none", height: 44, lineHeight: 1.5, outline: "none",
+                background: "rgba(39,39,42,0.75)", border: "1px solid rgba(79,126,255,0.12)",
+                borderRadius: 7, color: "#fafafa", fontSize: 12,
+                fontFamily: "'Pretendard', system-ui, sans-serif", resize: "none", height: 44, lineHeight: 1.5, outline: "none",
               }}
             />
             <button type="button" onClick={saveComment}
               style={{
                 height: 44, padding: "0 14px", borderRadius: 7,
-                background: "#1a3347", border: "1px solid rgba(102,155,188,0.12)",
-                color: "#7a9ab0", fontSize: 12, cursor: "pointer", flexShrink: 0,
-                fontFamily: "'DM Sans', sans-serif",
+                background: "rgba(63,63,70,0.55)", border: "1px solid rgba(79,126,255,0.12)",
+                color: "#a1a1aa", fontSize: 12, cursor: "pointer", flexShrink: 0,
+                fontFamily: "'Pretendard', system-ui, sans-serif",
               }}>
               저장
             </button>

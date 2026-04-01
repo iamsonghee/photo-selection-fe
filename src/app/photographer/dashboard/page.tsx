@@ -14,7 +14,9 @@ import {
   Check,
   CheckCircle,
   Upload,
+  AlertCircle,
 } from "lucide-react";
+import { BETA_MAX_PROJECTS_TOTAL } from "@/lib/beta-limits";
 import { getProjectsByPhotographerId } from "@/lib/db";
 import type { Project, ProjectStatus } from "@/types";
 import type { ProjectLogItem } from "@/lib/db";
@@ -684,6 +686,41 @@ export default function DashboardPage() {
 
         {/* ── Right column ── */}
         <div style={{ padding: 20, overflowY: "auto", background: "rgba(0,0,0,0.12)" }}>
+
+          {/* 베타 사용량 카드 */}
+          {(() => {
+            const count = projects.length;
+            const pct = Math.min(100, Math.round((count / BETA_MAX_PROJECTS_TOTAL) * 100));
+            const barColor = count >= BETA_MAX_PROJECTS_TOTAL ? C.red : count >= 8 ? C.orange : C.steel;
+            const textColor = count >= BETA_MAX_PROJECTS_TOTAL ? C.red : count >= 8 ? C.orange : C.muted;
+            return (
+              <div style={{
+                background: C.surface, border: `1px solid ${C.border}`,
+                borderRadius: 10, padding: "12px 14px", marginBottom: 16,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: C.dim, letterSpacing: "0.5px", textTransform: "uppercase" }}>
+                    베타 사용량
+                  </span>
+                  {count >= BETA_MAX_PROJECTS_TOTAL && (
+                    <AlertCircle size={13} color={C.red} />
+                  )}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, color: C.muted }}>프로젝트</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: textColor }}>
+                    {count} / {BETA_MAX_PROJECTS_TOTAL}
+                  </span>
+                </div>
+                <div style={{ height: 4, background: C.surface3, borderRadius: 2, overflow: "hidden" }}>
+                  <div style={{
+                    height: "100%", borderRadius: 2, background: barColor,
+                    width: `${pct}%`, transition: "width 0.3s",
+                  }} />
+                </div>
+              </div>
+            );
+          })()}
 
           {/* 통계 */}
           <div style={{

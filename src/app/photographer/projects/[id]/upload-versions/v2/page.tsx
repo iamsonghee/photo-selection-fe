@@ -28,25 +28,9 @@ import { getPhotosWithSelections, getProjectById, getVersionReviewsByProjectId }
 import { buildVersionMapping, remapSingleFile, type MappingResult } from "@/lib/version-mapping";
 import type { Photo, Project } from "@/types";
 import CompareViewerModal from "@/components/CompareViewerModal";
-
-// ---------- color tokens ----------
-const C = {
-  surface:   "#0f2030",
-  surface2:  "#152a3a",
-  surface3:  "#1a3347",
-  steel:     "#669bbc",
-  border:    "rgba(102,155,188,0.12)",
-  borderMd:  "rgba(102,155,188,0.22)",
-  text:      "#e8eef2",
-  muted:     "#7a9ab0",
-  dim:       "#3a5a6e",
-  green:     "#2ed573",
-  greenDim:  "#0f2a1e",
-  orange:    "#f5a623",
-  orangeDim: "#2a1a08",
-  red:       "#ff4757",
-  redDim:    "#2a0f12",
-};
+import { BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
+import { PHOTOGRAPHER_THEME as C } from "@/lib/photographer-theme";
+import { viewerImageUrl } from "@/lib/viewer-image-url";
 
 function getDisplayFilename(p: Photo): string {
   return (p.originalFilename ?? "").trim() || String(p.orderIndex);
@@ -79,8 +63,9 @@ export default function UploadVersionsV2Page() {
   const [reviews,         setReviews]         = useState<
     Array<{ photoId: string; status: "approved" | "revision_requested"; customerComment: string | null }>
   >([]);
-  const [serverV1Map,     setServerV1Map]     = useState<Map<string, string>>(new Map());
-  const [serverV2Map,     setServerV2Map]     = useState<Map<string, string>>(new Map());
+  const [serverV1Map,         setServerV1Map]         = useState<Map<string, string>>(new Map());
+  const [serverV2Map,         setServerV2Map]         = useState<Map<string, string>>(new Map());
+  const [existingVersionCount, setExistingVersionCount] = useState<number>(0);
   const [loading,         setLoading]         = useState(true);
   const [reviewLoading,   setReviewLoading]   = useState(false);
   const [uploadedFiles,   setUploadedFiles]   = useState<File[]>([]);
@@ -157,6 +142,11 @@ export default function UploadVersionsV2Page() {
         });
         setServerV1Map(v1);
         setServerV2Map(v2);
+        // distinct version 수
+        const distinctVersions = new Set(
+          list.map((it: { version?: number }) => it.version).filter(Boolean)
+        );
+        setExistingVersionCount(distinctVersions.size);
       })
       .catch(() => { if (!cancelled) { setServerV1Map(new Map()); setServerV2Map(new Map()); } });
     return () => { cancelled = true; };
@@ -213,7 +203,7 @@ export default function UploadVersionsV2Page() {
         const v2 = localV2PreviewMap.get(t.id) ?? serverV2Map.get(t.id);
         if (!v1 && !v2) return null;
         return {
-          original: { url: t.photo.url, filename: t.filename },
+          original: { url: viewerImageUrl(t.photo), filename: t.filename },
           v1: v1 ? { url: v1, filename: t.filename } : undefined,
           v2: v2 ? { url: v2, filename: t.filename } : undefined,
         };
@@ -347,7 +337,7 @@ export default function UploadVersionsV2Page() {
     : [];
 
   const lightboxRevisionItems = useMemo(
-    () => revisionTargets.map((t) => ({ url: t.photo.url, label: t.filename, sublabel: t.comment })),
+    () => revisionTargets.map((t) => ({ url: viewerImageUrl(t.photo), label: t.filename, sublabel: t.comment })),
     [revisionTargets]
   );
 
@@ -384,7 +374,17 @@ export default function UploadVersionsV2Page() {
             프로젝트 상세로
           </button>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>v2 재보정 업로드</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: C.text, display: "flex", alignItems: "center", gap: 8 }}>
+              v2 재보정 업로드
+              <span style={{
+                background: existingVersionCount >= BETA_MAX_REVISION_COUNT ? "rgba(255,71,87,0.15)" : C.surface3,
+                border: `1px solid ${existingVersionCount >= BETA_MAX_REVISION_COUNT ? "rgba(255,71,87,0.3)" : C.border}`,
+                color: existingVersionCount >= BETA_MAX_REVISION_COUNT ? C.red : C.muted,
+                borderRadius: 10, padding: "1px 8px", fontSize: 10, fontWeight: 500,
+              }}>
+                보정 횟수 {existingVersionCount} / {BETA_MAX_REVISION_COUNT}
+              </span>
+            </div>
             <div style={{ fontSize: 11, color: C.dim }}>
               {project.name} · {project.customerName} · 재보정 {revisionTargets.length}장
             </div>
@@ -396,7 +396,7 @@ export default function UploadVersionsV2Page() {
       {isReadOnly && (
         <div style={{
           margin: "16px 24px 0",
-          background: "rgba(102,155,188,0.06)", border: "1px solid rgba(102,155,188,0.2)",
+          background: "rgba(79,126,255,0.06)", border: "1px solid rgba(79,126,255,0.2)",
           borderRadius: 12, padding: "14px 20px",
           display: "flex", alignItems: "center", gap: 12,
         }}>
@@ -454,6 +454,21 @@ export default function UploadVersionsV2Page() {
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: C.dim, marginBottom: 10 }}>
                 v2 재보정본 업로드
               </div>
+              {existingVersionCount >= BETA_MAX_REVISION_COUNT ? (
+                <div style={{
+                  padding: "18px 20px", borderRadius: 12, textAlign: "center",
+                  background: "rgba(255,71,87,0.06)", border: "2px dashed rgba(255,71,87,0.25)",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                }}>
+                  <AlertCircle size={20} color={C.red} />
+                  <div style={{ fontSize: 13, color: C.red, fontWeight: 500 }}>
+                    베타 기간 최대 보정 횟수({BETA_MAX_REVISION_COUNT}회)에 도달했습니다.
+                  </div>
+                  <div style={{ fontSize: 11, color: C.muted }}>
+                    현재 {existingVersionCount} / {BETA_MAX_REVISION_COUNT}회 사용 중
+                  </div>
+                </div>
+              ) : (
               <div
                 onDrop={(e) => { e.preventDefault(); setDragOver(false); handleDropFiles(Array.from(e.dataTransfer.files)); }}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -463,7 +478,7 @@ export default function UploadVersionsV2Page() {
                   border: `2px dashed ${uploadedFiles.length > 0 ? "rgba(46,213,115,0.4)" : dragOver ? C.steel : C.borderMd}`,
                   borderRadius: 12, padding: "22px 20px", textAlign: "center",
                   cursor: uploadedFiles.length === 0 ? "pointer" : "default",
-                  background: uploadedFiles.length > 0 ? "rgba(46,213,115,0.02)" : dragOver ? "rgba(102,155,188,0.05)" : "rgba(102,155,188,0.02)",
+                  background: uploadedFiles.length > 0 ? "rgba(46,213,115,0.02)" : dragOver ? "rgba(79,126,255,0.05)" : "rgba(79,126,255,0.02)",
                   transition: "all 0.2s",
                 }}
               >
@@ -522,6 +537,7 @@ export default function UploadVersionsV2Page() {
                   파일명 일치 시 자동 매핑 · 불일치 시 순서대로 매핑
                 </div>
               </div>
+              )} {/* end ternary */}
             </div>
           )}
 
@@ -751,7 +767,7 @@ export default function UploadVersionsV2Page() {
         <div style={{
           position: "fixed", bottom: 0, left: 220, right: 0,
           background: "rgba(0,48,73,0.95)",
-          borderTop: "1px solid rgba(102,155,188,0.15)",
+          borderTop: "1px solid rgba(79,126,255,0.15)",
           backdropFilter: "blur(12px)",
           padding: "12px 24px",
           display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -826,8 +842,8 @@ export default function UploadVersionsV2Page() {
                 onClick={handleDeliver} disabled={submitting || !canDeliver}
                 style={{
                   flex: 1, padding: "10px 0",
-                  background: "rgba(102,155,188,0.15)",
-                  border: "1px solid rgba(102,155,188,0.3)", borderRadius: 8,
+                  background: "rgba(79,126,255,0.15)",
+                  border: "1px solid rgba(79,126,255,0.3)", borderRadius: 8,
                   color: C.steel, fontSize: 13, fontWeight: 500,
                   cursor: submitting ? "not-allowed" : "pointer", fontFamily: "inherit",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
@@ -936,7 +952,7 @@ function MappingCardV2({
           <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
             {/* original */}
             <div
-              onClick={() => target.photo.url && onOpenLightbox([{ url: target.photo.url, label: target.filename, sublabel: "원본 선택 사진" }], 0)}
+              onClick={() => target.photo.url && onOpenLightbox([{ url: viewerImageUrl(target.photo), label: target.filename, sublabel: "원본 선택 사진" }], 0)}
               style={{ width: 36, height: 28, background: C.surface3, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${C.border}`, overflow: "hidden", cursor: target.photo.url ? "zoom-in" : "default" }}
             >
               {target.photo.url && !origErr ? (
@@ -947,7 +963,7 @@ function MappingCardV2({
             {v1Url && (
               <div
                 onClick={() => onOpenLightbox([{ url: v1Url, label: target.filename, sublabel: "v1 보정본" }], 0)}
-                style={{ width: 36, height: 28, background: C.surface3, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid rgba(102,155,188,0.3)`, overflow: "hidden", cursor: "zoom-in" }}
+                style={{ width: 36, height: 28, background: C.surface3, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid rgba(79,126,255,0.3)`, overflow: "hidden", cursor: "zoom-in" }}
               >
                 {!v1Err ? (
                   <img src={v1Url} alt="" onError={() => setV1Err(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -1015,7 +1031,7 @@ function MappingCardV2({
               onClick={() => onChangeOne(target.id)}
               style={{
                 padding: "3px 8px", borderRadius: 5,
-                border: `1px solid ${state === "empty" ? "rgba(102,155,188,0.3)" : C.border}`,
+                border: `1px solid ${state === "empty" ? "rgba(79,126,255,0.3)" : C.border}`,
                 background: "transparent",
                 color: state === "empty" ? C.steel : C.dim,
                 fontSize: 10, cursor: "pointer", fontFamily: "inherit",

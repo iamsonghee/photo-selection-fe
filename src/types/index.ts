@@ -23,7 +23,9 @@ export interface Photo {
   id: string;
   projectId: string;
   orderIndex: number;
-  url: string; // mock: placeholder or path
+  url: string; // r2_thumb — 그리드·썸네일
+  /** r2_preview (또는 동일 해상도). 없으면 뷰어에서 url 사용 */
+  previewUrl?: string | null;
   /** DB original_filename. 없으면 URL에서 추출하거나 number로 fallback */
   originalFilename?: string | null;
   /** DB file_size (bytes). 업로드 시 저장 */
@@ -64,6 +66,7 @@ export interface Project {
   photoCount: number; // M
   status: ProjectStatus;
   accessToken: string;
+  accessPin?: string | null;
   confirmedAt?: string; // ISO, when customer final-confirmed
   deliveredAt?: string; // ISO, when status = delivered
   /** 고객이 확정 취소한 횟수 (최대 3회, 고객 측 "확정 취소"용) */

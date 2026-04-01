@@ -14,6 +14,7 @@ import {
   Upload,
   ListChecks,
   Eye,
+  EyeOff,
   PenLine,
   ChevronRight,
   AlertTriangle,
@@ -23,6 +24,8 @@ import {
   Clock,
   Check,
   CheckCircle2,
+  Lock,
+  RefreshCw,
 } from "lucide-react";
 import { getProjectById } from "@/lib/db";
 import { getStatusLabel } from "@/lib/project-status";
@@ -189,6 +192,13 @@ export default function ProjectDetailPage() {
   const [copied, setCopied] = useState(false);
   const [showEditGuideModal, setShowEditGuideModal] = useState(false);
 
+  // PIN state
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinVisible, setPinVisible] = useState(false);
+  const [pinSaving, setPinSaving] = useState(false);
+  const [pinError, setPinError] = useState("");
+
   // edit state
   const [editMode, setEditMode] = useState(false);
   const [editName, setEditName] = useState("");
@@ -264,9 +274,43 @@ export default function ProjectDetailPage() {
       : `/c/${project?.accessToken ?? ""}`;
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(inviteUrl);
+    const pin = project?.accessPin;
+    const text = pin ? `링크: ${inviteUrl}\n비밀번호: ${pin}` : inviteUrl;
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleKakaoShare = () => {
+    const pin = project?.accessPin;
+    const text = pin
+      ? `링크: ${inviteUrl}\n비밀번호: ${pin}`
+      : inviteUrl;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSavePin = async (newPin: string | null) => {
+    if (!project) return;
+    setPinError("");
+    setPinSaving(true);
+    try {
+      const res = await fetch(`/api/photographer/projects/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access_pin: newPin }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? "저장 실패");
+      setProject({ ...project, accessPin: newPin });
+      setShowPinModal(false);
+      setPinInput("");
+    } catch (e) {
+      setPinError(e instanceof Error ? e.message : "저장 실패");
+    } finally {
+      setPinSaving(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -622,7 +666,7 @@ export default function ProjectDetailPage() {
                   {copied ? "복사됨" : "복사"}
                 </button>
                 <button
-                  onClick={handleCopyLink}
+                  onClick={handleKakaoShare}
                   style={{
                     display: "flex", alignItems: "center", gap: 5,
                     padding: "8px 12px",
@@ -637,8 +681,51 @@ export default function ProjectDetailPage() {
                 </button>
               </div>
 
-              <div style={{ paddingTop: 12, borderTop: `1px solid ${C.border}`, fontSize: 11, color: C.dim }}>
-                접속 이력 없음
+              {/* PIN section */}
+              <div style={{ paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.dim }}>
+                    <Lock size={11} />
+                    비밀번호
+                  </div>
+                  {project.accessPin ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 13, color: C.text, letterSpacing: 2 }}>
+                        {pinVisible ? project.accessPin : "●●●●"}
+                      </span>
+                      <button
+                        onClick={() => setPinVisible(!pinVisible)}
+                        style={{ background: "transparent", border: "none", cursor: "pointer", color: C.muted, padding: 2 }}
+                      >
+                        {pinVisible ? <EyeOff size={13} /> : <Eye size={13} />}
+                      </button>
+                      <button
+                        onClick={() => { setPinInput(project.accessPin ?? ""); setShowPinModal(true); setPinError(""); }}
+                        style={{
+                          padding: "3px 9px", background: "transparent",
+                          border: `1px solid ${C.border}`, borderRadius: 6,
+                          color: C.muted, fontSize: 11, cursor: "pointer", fontFamily: "inherit",
+                        }}
+                      >
+                        변경
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 12, color: C.dim }}>비밀번호 없음</span>
+                      <button
+                        onClick={() => { setPinInput(""); setShowPinModal(true); setPinError(""); }}
+                        style={{
+                          padding: "3px 9px", background: "transparent",
+                          border: `1px solid ${C.border}`, borderRadius: 6,
+                          color: C.muted, fontSize: 11, cursor: "pointer", fontFamily: "inherit",
+                        }}
+                      >
+                        설정
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -716,6 +803,111 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* ── PIN modal ── */}
+      {showPinModal && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 50,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.7)", padding: 16,
+        }}>
+          <div style={{
+            background: C.surface, border: `1px solid ${C.borderMd}`,
+            borderRadius: 14, padding: 24, width: "100%", maxWidth: 360,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+              <Lock size={18} color={C.steel} />
+              <h3 style={{ fontSize: 15, fontWeight: 600, color: C.text }}>
+                고객 비밀번호 {project?.accessPin ? "변경" : "설정"}
+              </h3>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={pinInput}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                    setPinInput(v);
+                  }}
+                  placeholder="4자리 숫자"
+                  style={{
+                    flex: 1, padding: "10px 12px",
+                    background: C.surface2, border: `1px solid ${C.borderMd}`,
+                    borderRadius: 8, color: C.text, fontSize: 18,
+                    fontFamily: "inherit", outline: "none",
+                    letterSpacing: 8, fontWeight: 700,
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setPinInput(Math.floor(1000 + Math.random() * 9000).toString())}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    padding: "9px 12px",
+                    background: C.surface2, border: `1px solid ${C.border}`,
+                    borderRadius: 8, color: C.muted, fontSize: 12,
+                    cursor: "pointer", fontFamily: "inherit",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <RefreshCw size={12} />
+                  랜덤
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 6 }}>
+                4자리 숫자를 입력하거나 랜덤 생성 버튼을 누르세요
+              </div>
+            </div>
+            {pinError && (
+              <p style={{ fontSize: 12, color: C.red, marginBottom: 12 }}>{pinError}</p>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              {project?.accessPin && (
+                <button
+                  onClick={() => handleSavePin(null)}
+                  disabled={pinSaving}
+                  style={{
+                    padding: "10px 14px", background: "transparent",
+                    border: "1px solid rgba(255,71,87,0.3)", borderRadius: 8,
+                    color: C.red, fontSize: 12, cursor: pinSaving ? "not-allowed" : "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  PIN 삭제
+                </button>
+              )}
+              <button
+                onClick={() => { setShowPinModal(false); setPinInput(""); setPinError(""); }}
+                disabled={pinSaving}
+                style={{
+                  flex: 1, padding: "10px 0", background: "transparent",
+                  border: `1px solid ${C.border}`, borderRadius: 8,
+                  color: C.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={() => handleSavePin(pinInput || null)}
+                disabled={pinSaving || (!!pinInput && pinInput.length !== 4)}
+                style={{
+                  flex: 1, padding: "10px 0",
+                  background: "rgba(102,155,188,0.15)",
+                  border: "1px solid rgba(102,155,188,0.3)", borderRadius: 8,
+                  color: C.steel, fontSize: 13, fontWeight: 500,
+                  cursor: pinSaving ? "not-allowed" : "pointer", fontFamily: "inherit",
+                  opacity: (pinSaving || (!!pinInput && pinInput.length !== 4)) ? 0.5 : 1,
+                }}
+              >
+                {pinSaving ? "저장 중…" : "저장"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Edit guide modal ── */}
       {showEditGuideModal && (

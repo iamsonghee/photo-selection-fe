@@ -8,15 +8,17 @@
  * ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS photo_count_expected int4;
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Heart, Baby, GraduationCap, Briefcase, Camera,
-  Calendar, Phone, Users, Image as ImageIcon, ChevronLeft, Loader2,
+  Calendar, Phone, Users, Image as ImageIcon, ChevronLeft, Loader2, Lock, RefreshCw,
+  AlertCircle, AlertTriangle,
 } from "lucide-react";
 import { addDays, format, differenceInCalendarDays } from "date-fns";
 import { supabase } from "@/lib/supabase";
-import { createProject, getPhotographerIdByAuthId } from "@/lib/db";
+import { createProject, getPhotographerIdByAuthId, getProjectsByPhotographerId } from "@/lib/db";
+import { BETA_MAX_PROJECTS_TOTAL } from "@/lib/beta-limits";
 
 // ── 컬러 토큰 ──────────────────────────────────────────────
 const C = {
@@ -24,7 +26,7 @@ const C = {
   steel: "#669bbc", steelLt: "#8db8d4",
   border: "rgba(102,155,188,0.12)", borderMd: "rgba(102,155,188,0.22)",
   text: "#e8eef2", muted: "#7a9ab0", dim: "#3a5a6e",
-  red: "#ff4757",
+  red: "#ff4757", orange: "#f5a623",
 };
 
 // ── 촬영 유형 ──────────────────────────────────────────────
@@ -75,8 +77,28 @@ export default function NewProjectPage() {
     format(addDays(new Date(), 7), "yyyy-MM-dd")
   );
 
+  const [accessPin,          setAccessPin]          = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState<string | null>(null);
+  const [projectCount,       setProjectCount]       = useState<number | null>(null);
+
+  // ── 마운트 시 프로젝트 수 조회 ──
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.id || cancelled) return;
+        const photographerId = await getPhotographerIdByAuthId(user.id);
+        if (!photographerId || cancelled) return;
+        const projects = await getProjectsByPhotographerId(photographerId);
+        if (!cancelled) setProjectCount(projects.length);
+      } catch {
+        if (!cancelled) setProjectCount(0);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // ── 기한 계산 ──
   const handleQuickDays = (days: number) => {
@@ -136,6 +158,7 @@ export default function NewProjectPage() {
         shoot_type: shootType || null,
         customer_phone: customerPhone.trim() || null,
         photo_count_expected: photoCountExpected ? Number(photoCountExpected) : null,
+        access_pin: accessPin || null,
       });
 
       await fetch("/api/photographer/project-logs", {
@@ -220,6 +243,52 @@ export default function NewProjectPage() {
               촬영 정보를 입력하면 고객 초대 링크가 자동으로 생성됩니다
             </div>
           </div>
+
+          {/* 베타 한도 초과 */}
+          {projectCount !== null && projectCount >= BETA_MAX_PROJECTS_TOTAL && (
+            <div style={{
+              padding: "20px 24px", borderRadius: 12, marginBottom: 20,
+              background: "rgba(255,71,87,0.06)", border: "1px solid rgba(255,71,87,0.2)",
+              display: "flex", flexDirection: "column", gap: 12,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <AlertCircle size={18} color={C.red} />
+                <div style={{ fontSize: 14, fontWeight: 600, color: C.red }}>베타 기간 프로젝트 한도 도달</div>
+              </div>
+              <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.6 }}>
+                베타 기간 중 최대 {BETA_MAX_PROJECTS_TOTAL}개의 프로젝트를 생성할 수 있습니다.
+                <br />현재 <strong style={{ color: C.text }}>{projectCount} / {BETA_MAX_PROJECTS_TOTAL}개</strong> 사용 중입니다.
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push("/photographer/projects")}
+                style={{
+                  alignSelf: "flex-start", padding: "8px 18px",
+                  background: C.surface2, border: `1px solid ${C.border}`,
+                  borderRadius: 8, color: C.muted, fontSize: 13,
+                  cursor: "pointer", fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                }}
+              >
+                프로젝트 목록 보기
+              </button>
+            </div>
+          )}
+
+          {/* 베타 한도 임박 경고 (9개) */}
+          {projectCount !== null && projectCount === BETA_MAX_PROJECTS_TOTAL - 1 && (
+            <div style={{
+              padding: "10px 16px", borderRadius: 8, marginBottom: 16,
+              background: "rgba(245,166,35,0.06)", border: "1px solid rgba(245,166,35,0.2)",
+              display: "flex", alignItems: "center", gap: 8,
+              fontSize: 12, color: C.orange,
+            }}>
+              <AlertTriangle size={14} />
+              잔여 1개 · 베타 기간 중 최대 {BETA_MAX_PROJECTS_TOTAL}개의 프로젝트를 생성할 수 있습니다.
+            </div>
+          )}
+
+          {/* ── 섹션 1~3: 한도 미초과 시만 표시 ── */}
+          {(projectCount === null || projectCount < BETA_MAX_PROJECTS_TOTAL) && <>
 
           {/* ── 섹션 1: 기본 정보 ── */}
           <div className="np-card" style={cardStyle}>
@@ -486,17 +555,75 @@ export default function NewProjectPage() {
                   </div>
                 )}
               </div>
+
+              {/* 고객 비밀번호 (PIN) */}
+              <div style={{ marginTop: 18 }}>
+                <div style={labelStyle}>
+                  <Lock size={11} color={C.dim} />
+                  고객 비밀번호
+                  <span style={{ fontSize: 10, fontWeight: 400, color: C.dim }}>선택사항</span>
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    className="np-input"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={4}
+                    pattern="[0-9]*"
+                    style={{ ...inputBase, width: 120, letterSpacing: 6, fontSize: 16, fontWeight: 600 }}
+                    value={accessPin}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                      setAccessPin(v);
+                    }}
+                    placeholder="0000"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setAccessPin(Math.floor(1000 + Math.random() * 9000).toString())}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 5,
+                      padding: "9px 12px",
+                      background: C.surface2, border: `1px solid ${C.border}`,
+                      borderRadius: 8, color: C.muted, fontSize: 12,
+                      cursor: "pointer", fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                    }}
+                  >
+                    <RefreshCw size={12} />
+                    랜덤 생성
+                  </button>
+                  {accessPin && (
+                    <button
+                      type="button"
+                      onClick={() => setAccessPin("")}
+                      style={{
+                        padding: "9px 12px",
+                        background: "transparent", border: `1px solid ${C.border}`,
+                        borderRadius: 8, color: C.muted, fontSize: 12,
+                        cursor: "pointer", fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                      }}
+                    >
+                      삭제
+                    </button>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
+                  설정 시 고객이 링크 접속 시 비밀번호를 입력해야 합니다
+                </div>
+              </div>
             </div>
           </div>
 
           {error && (
             <p style={{ fontSize: 13, color: C.red, marginTop: 8 }}>{error}</p>
           )}
+
+          </> /* end 한도 미초과 섹션 */}
         </div>
       </div>
 
-      {/* ── 하단 고정 액션 바 ── */}
-      <div style={{
+      {/* ── 하단 고정 액션 바 (한도 미초과 시만) ── */}
+      {(projectCount === null || projectCount < BETA_MAX_PROJECTS_TOTAL) && <div style={{
         position: "fixed", bottom: 0, left: 220, right: 0,
         background: "rgba(0,48,73,0.95)", backdropFilter: "blur(12px)",
         borderTop: "1px solid rgba(102,155,188,0.15)",
@@ -555,6 +682,7 @@ export default function NewProjectPage() {
           </button>
         </div>
       </div>
+      } {/* end 액션바 조건부 */}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>

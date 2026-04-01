@@ -25,6 +25,7 @@ function mapProjectRow(row: ProjectsRow): Project {
     photoCount: row.photo_count ?? 0,
     status: row.status as ProjectStatus,
     accessToken: row.access_token,
+    accessPin: (row as any).access_pin ?? null,
     confirmedAt: row.confirmed_at ?? undefined,
     deliveredAt: (row as { delivered_at?: string | null }).delivered_at ?? undefined,
     customerCancelCount: r.customer_cancel_count ?? 0,
@@ -44,6 +45,7 @@ function mapPhotoRow(
     projectId: row.project_id,
     orderIndex: row.number,
     url: row.r2_thumb_url,
+    previewUrl: row.r2_preview_url ?? row.r2_thumb_url,
     originalFilename: row.original_filename ?? null,
     selected: selectedIds.has(pid),
     tag: photoStates[pid]
@@ -210,7 +212,7 @@ export async function getReviewDataByToken(
 
   const { data: photosRows, error: photosErr } = await admin
     .from("photos")
-    .select("id, number, r2_thumb_url, original_filename")
+    .select("id, number, r2_thumb_url, r2_preview_url, original_filename")
     .in("id", photoIds)
     .order("number", { ascending: true });
   if (photosErr || !photosRows?.length) return { project, globalPhotographerMemo: null, photos: [] };
@@ -237,7 +239,13 @@ export async function getReviewDataByToken(
   );
 
   const photos: ReviewPhotoItem[] = [];
-  for (const row of photosRows as Array<{ id: string; number: number; r2_thumb_url: string; original_filename: string | null }>) {
+  for (const row of photosRows as Array<{
+    id: string;
+    number: number;
+    r2_thumb_url: string;
+    r2_preview_url: string | null;
+    original_filename: string | null;
+  }>) {
     const pv = pvByPhotoId.get(row.id);
     if (!pv) continue;
     const existing = reviewByPvId.get(pv.id);
@@ -245,7 +253,7 @@ export async function getReviewDataByToken(
       id: row.id,
       photoVersionId: pv.id,
       originalFilename: (row.original_filename ?? "").trim() || String(row.number),
-      originalUrl: row.r2_thumb_url,
+      originalUrl: row.r2_preview_url ?? row.r2_thumb_url,
       versionUrl: (pv as { r2_url: string }).r2_url,
       photographerMemo: (pv as { photographer_memo: string | null }).photographer_memo ?? null,
       orderIndex: row.number,

@@ -126,6 +126,11 @@ export async function PATCH(
       }
       payload.required_count = body.required_count;
     }
+    if ('access_pin' in body) {
+      if (body.access_pin === null || (typeof body.access_pin === 'string' && /^\d{4}$/.test(body.access_pin))) {
+        payload.access_pin = body.access_pin;
+      }
+    }
     if (typeof body.status === "string" && body.status) {
       const currentStatus = (project as { status: string }).status as ProjectStatus;
       if (!canTransition(currentStatus, body.status as ProjectStatus)) {

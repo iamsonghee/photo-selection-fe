@@ -20,6 +20,7 @@ function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Pr
     photoCount: row.photo_count ?? 0,
     status: row.status as ProjectStatus,
     accessToken: row.access_token,
+    accessPin: (row as any).access_pin ?? null,
     confirmedAt: row.confirmed_at ?? undefined,
     deliveredAt: row.delivered_at ?? undefined,
     createdAt: row.created_at,
@@ -41,6 +42,7 @@ function mapPhotoRow(
     projectId: row.project_id,
     orderIndex: row.number,
     url: row.r2_thumb_url,
+    previewUrl: row.r2_preview_url ?? row.r2_thumb_url,
     originalFilename: row.original_filename ?? null,
     fileSize: (row as unknown as Record<string, unknown>).file_size as number | null ?? null,
     photographerMemo: row.memo ?? undefined,
@@ -175,6 +177,7 @@ export async function createProject(params: {
   shoot_type?: string | null;
   customer_phone?: string | null;
   photo_count_expected?: number | null;
+  access_pin?: string | null;
 }): Promise<string> {
   const accessToken = crypto.randomUUID();
   const { data, error } = await supabase
@@ -192,6 +195,7 @@ export async function createProject(params: {
       ...(params.shoot_type           ? { shoot_type: params.shoot_type } : {}),
       ...(params.customer_phone       ? { customer_phone: params.customer_phone } : {}),
       ...(params.photo_count_expected ? { photo_count_expected: params.photo_count_expected } : {}),
+      ...(params.access_pin           ? { access_pin: params.access_pin } : {}),
     })
     .select("id")
     .single();

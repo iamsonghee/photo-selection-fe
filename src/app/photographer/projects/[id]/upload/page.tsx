@@ -3,33 +3,30 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  ChevronLeft, Upload, Loader2, FolderOpen, ImageIcon, CheckCircle2,
+  ChevronLeft, Upload, Loader2, FolderOpen, ImageIcon, CheckCircle2, AlertCircle,
 } from "lucide-react";
+import { BETA_MAX_PHOTOS_PER_PROJECT, parseBetaLimitError } from "@/lib/beta-limits";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { differenceInCalendarDays } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
 import { getProjectById, getPhotosByProjectId } from "@/lib/db";
 import type { Project, Photo } from "@/types";
+import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT } from "@/lib/photographer-theme";
+import { viewerImageUrl } from "@/lib/viewer-image-url";
 
 const ACCEPT_TYPES = "image/jpeg,image/png,image/webp";
 const BACKEND_URL  = process.env.NEXT_PUBLIC_API_URL ?? "";
 const THUMB_GAP    = 6;
 const INITIAL_VISIBLE = 40;
 const LOAD_MORE       = 40;
+const BATCH_SIZE  = 5;
+const BATCH_DELAY = 500; // ms
 
 const VIEW_CONFIG = {
   filename: { cols: 1, rowH: 32  },  // 파일명+사이즈 텍스트 리스트
   gallery:  { cols: 8, rowH: 110 },  // 8열 이미지 그리드 + 파일명
 } as const;
 type ViewMode = keyof typeof VIEW_CONFIG;
-
-const C = {
-  ink: "#0d1e28", surface: "#0f2030", surface2: "#152a3a", surface3: "#1a3347",
-  steel: "#669bbc", steelLt: "#8db8d4",
-  border: "rgba(102,155,188,0.12)", borderMd: "rgba(102,155,188,0.22)",
-  text: "#e8eef2", muted: "#7a9ab0", dim: "#3a5a6e",
-  green: "#2ed573", orange: "#f5a623", red: "#ff4757",
-};
 
 function logUploadTokenDebug(scope: string, token: string | null | undefined) {
   const tokenStr = token ?? "";
@@ -76,7 +73,7 @@ function ConfirmModal({
           <button onClick={onCancel} disabled={loading} style={{
             padding: "8px 16px", background: "transparent", border: `1px solid ${C.border}`,
             borderRadius: 8, color: C.muted, fontSize: 13, cursor: "pointer",
-            fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+            fontFamily: PS_FONT,
           }}>취소</button>
           <button onClick={onConfirm} disabled={loading} style={{
             padding: "8px 18px",
@@ -86,7 +83,7 @@ function ConfirmModal({
             fontSize: 13, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer",
             opacity: loading ? 0.7 : 1,
             display: "flex", alignItems: "center", gap: 6,
-            fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+            fontFamily: PS_FONT,
           }}>
             {loading && <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />}
             {confirmLabel}
@@ -173,8 +170,9 @@ export default function UploadPage() {
   const params = useParams();
   const router = useRouter();
   const id     = params.id as string;
-  const fileInputRef  = useRef<HTMLInputElement>(null);
-  const thumbScrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef       = useRef<HTMLInputElement>(null);
+  const thumbScrollRef     = useRef<HTMLDivElement>(null);
+  const stopRequestedRef   = useRef(false);
 
   // ── 데이터 상태 ──
   const [project,  setProject]  = useState<Project | null>(null);
@@ -187,6 +185,10 @@ export default function UploadPage() {
   const [dragOver,       setDragOver]       = useState(false);
   const [uploadPhase,    setUploadPhase]    = useState<"idle"|"sending"|"processing"|"done">("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [processedCount, setProcessedCount] = useState(0);
+  const [batchProgress,  setBatchProgress]  = useState<{ current: number; total: number }>({ current: 0, total: 0 });
+  const [stopRequested,  setStopRequested]  = useState(false);
+  const [uploadSummary,  setUploadSummary]  = useState<{ total: number; succeeded: number; failedFiles: File[] } | null>(null);
   const [error,          setError]          = useState<string | null>(null);
   const [toast,          setToast]          = useState<string | null>(null);
 
@@ -266,60 +268,111 @@ export default function UploadPage() {
     }
   }, [visibleCount, photos.length]);
 
-  // ── 업로드 (파일 리스트를 직접 받아 즉시 시작) ────────────────────────
+  // ── 업로드 (5장씩 배치 순차 처리) ────────────────────────────────────
   const startUpload = useCallback(async (uploadFiles: File[]) => {
     if (!uploadFiles.length) return;
     setFiles(uploadFiles);
-    setError(null); setUploadPhase("sending"); setUploadProgress(0);
+    setError(null);
+    setUploadPhase("sending");
+    setUploadProgress(0);
+    setProcessedCount(0);
+    setUploadSummary(null);
+    setStopRequested(false);
+    stopRequestedRef.current = false;
 
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     const token = session?.access_token;
-    if (userError || !user) { setError("로그인 인증을 확인할 수 없습니다."); setUploadPhase("idle"); return; }
     logUploadTokenDebug("v1-upload/photos", token);
+    if (userError || !user) { setError("로그인 인증을 확인할 수 없습니다."); setUploadPhase("idle"); return; }
     if (!token) { setError("로그인이 필요합니다."); setUploadPhase("idle"); return; }
 
-    const form = new FormData();
-    form.append("project_id", id);
-    uploadFiles.forEach((f) => form.append("files", f));
+    // 배치 분할
+    const batches: File[][] = [];
+    for (let i = 0; i < uploadFiles.length; i += BATCH_SIZE) {
+      batches.push(uploadFiles.slice(i, i + BATCH_SIZE));
+    }
+    setBatchProgress({ current: 0, total: batches.length });
 
-    const xhr = new XMLHttpRequest();
-    const resetState = () => { setUploadPhase("idle"); setUploadProgress(0); setFiles([]); };
+    let totalUploaded = 0;
+    const allFailed: File[] = [];
+    let wasStopped = false;
 
-    xhr.upload.addEventListener("progress", (e) => {
-      if (e.lengthComputable) {
-        setUploadProgress(e.total > 0 ? Math.min(99, Math.round((e.loaded / e.total) * 100)) : 0);
-        if (e.loaded >= e.total && e.total > 0) setUploadPhase("processing");
+    for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+      if (stopRequestedRef.current) { wasStopped = true; break; }
+
+      const batch = batches[batchIdx];
+      setBatchProgress({ current: batchIdx + 1, total: batches.length });
+      setUploadProgress(Math.round((batchIdx / batches.length) * 100));
+      setProcessedCount(Math.min((batchIdx + 1) * BATCH_SIZE, uploadFiles.length));
+
+      try {
+        const form = new FormData();
+        form.append("project_id", id);
+        batch.forEach((f) => form.append("files", f));
+
+        const res = await fetch(`${BACKEND_URL}/api/upload/photos`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: form,
+        });
+
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          totalUploaded += data.uploaded ?? batch.length;
+        } else {
+          try {
+            const b = await res.json();
+            const betaErr = parseBetaLimitError(b);
+            if (betaErr) {
+              setError(betaErr.message);
+              setUploadPhase("idle"); setUploadProgress(0); setFiles([]);
+              return;
+            }
+          } catch {}
+          allFailed.push(...batch);
+        }
+      } catch (e) {
+        // 네트워크 오류(서버 연결 불가)면 즉시 중단
+        if (e instanceof TypeError) {
+          setError("서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요.");
+          setUploadPhase("idle"); setUploadProgress(0); setFiles([]);
+          return;
+        }
+        allFailed.push(...batch);
       }
-    });
-    xhr.addEventListener("load", () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        setUploadPhase("done");
-        fetch("/api/photographer/project-logs", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ project_id: id, action: "uploaded" }),
-        }).catch(() => {});
-        setTimeout(() => {
-          resetState();
-          setToast("업로드 완료!");
-          loadProject(); loadPhotos(); router.refresh();
-        }, 800);
-      } else {
-        let msg = "업로드에 실패했습니다.";
-        try {
-          const b = JSON.parse(xhr.responseText);
-          if (b.detail) msg = typeof b.detail === "string" ? b.detail : b.detail[0]?.msg ?? msg;
-        } catch {}
-        setError(msg); resetState();
+
+      setUploadProgress(Math.round(((batchIdx + 1) / batches.length) * 100));
+
+      if (batchIdx < batches.length - 1 && !stopRequestedRef.current) {
+        await new Promise<void>((r) => setTimeout(r, BATCH_DELAY));
       }
-    });
-    xhr.addEventListener("error", () => { setError("네트워크 오류가 발생했습니다."); resetState(); });
-    xhr.addEventListener("abort", resetState);
-    xhr.open("POST", `${BACKEND_URL}/api/upload/photos`);
-    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-    xhr.send(form);
+    }
+
+    if (wasStopped) {
+      setUploadPhase("idle"); setUploadProgress(0); setFiles([]);
+      setToast("업로드가 중지됐습니다. 언제든 이어서 업로드할 수 있어요.");
+      loadProject(); loadPhotos(); router.refresh();
+    } else {
+      setUploadSummary({ total: uploadFiles.length, succeeded: totalUploaded, failedFiles: allFailed });
+      setUploadPhase("done");
+      fetch("/api/photographer/project-logs", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: id, action: "uploaded" }),
+      }).catch(() => {});
+      setTimeout(() => {
+        setUploadPhase("idle"); setUploadProgress(0); setFiles([]);
+        if (allFailed.length === 0) setToast("업로드 완료!");
+        loadProject(); loadPhotos(); router.refresh();
+      }, 800);
+    }
   }, [id, loadProject, loadPhotos, router]);
+
+  const handleStopUpload = useCallback(() => {
+    stopRequestedRef.current = true;
+    setStopRequested(true);
+  }, []);
 
   // ── 드래그&드롭 ──
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -409,6 +462,8 @@ export default function UploadPage() {
   const isReady      = M >= N;
   const isReadOnly   = project.status !== "preparing";
   const isUploading  = uploadPhase === "sending" || uploadPhase === "processing";
+  const isAtPhotoLimit = M >= BETA_MAX_PHOTOS_PER_PROJECT;
+  const isPhotoLimitNear = !isAtPhotoLimit && M >= Math.floor(BETA_MAX_PHOTOS_PER_PROJECT * 0.9);
 
   const deadlineDays   = differenceInCalendarDays(new Date(project.deadline), new Date());
   const deadlineText   = `${project.deadline} (D+${deadlineDays})`;
@@ -429,18 +484,18 @@ export default function UploadPage() {
   return (
     <div style={{
       display: "flex", flexDirection: "column", height: "100vh",
-      fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+      fontFamily: PS_FONT,
     }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from{opacity:0;transform:translateY(5px);} to{opacity:1;transform:translateY(0);} }
-        .up-dropzone:hover { border-color: ${C.steel} !important; background: rgba(102,155,188,0.05) !important; }
+        .up-dropzone:hover { border-color: ${C.steel} !important; background: rgba(79,126,255,0.05) !important; }
         .up-thumb:hover .up-thumb-del { opacity: 1 !important; }
         .up-thumb:hover { border-color: ${C.borderMd} !important; }
         .thumb-scroll::-webkit-scrollbar { width: 4px; }
         .thumb-scroll::-webkit-scrollbar-track { background: transparent; }
         .thumb-scroll::-webkit-scrollbar-thumb { background: ${C.dim}; border-radius: 2px; }
-        .fn-row:hover { background: rgba(102,155,188,0.05); }
+        .fn-row:hover { background: rgba(79,126,255,0.05); }
         .fn-row:hover span:last-child { opacity: 1 !important; }
       `}</style>
 
@@ -457,7 +512,7 @@ export default function UploadPage() {
             display: "flex", alignItems: "center", gap: 5, padding: "5px 10px",
             borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent",
             color: C.muted, fontSize: 12, cursor: "pointer",
-            fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+            fontFamily: PS_FONT,
           }}
         >
           <ChevronLeft size={13} /> 프로젝트 상세로
@@ -479,7 +534,7 @@ export default function UploadPage() {
           {isReadOnly && (
             <div style={{
               marginBottom: 12, padding: "9px 14px", borderRadius: 8,
-              background: "rgba(102,155,188,0.06)", border: `1px solid ${C.borderMd}`,
+              background: "rgba(79,126,255,0.06)", border: `1px solid ${C.borderMd}`,
               fontSize: 12, color: C.muted,
             }}>
               📌 고객 셀렉이 시작되어 사진 수정이 불가합니다.
@@ -521,7 +576,7 @@ export default function UploadPage() {
                 borderRadius: i === 0 ? "10px 0 0 10px" : i === 2 ? "0 10px 10px 0" : 0,
               }}>
                 <div style={{
-                  fontFamily: "'Playfair Display', serif",
+                  fontFamily: PS_DISPLAY,
                   fontSize: 26, fontWeight: 700, lineHeight: 1, marginBottom: 3, color: s.color,
                 }}>{s.num}</div>
                 <div style={{ fontSize: 10, color: C.dim }}>{s.label}</div>
@@ -531,51 +586,76 @@ export default function UploadPage() {
 
           {/* 드롭존 */}
           {!isReadOnly && (
-            <div
-              className="up-dropzone"
-              onClick={() => !isUploading && fileInputRef.current?.click()}
-              onDrop={isUploading ? undefined : onDrop}
-              onDragOver={isUploading ? undefined : onDragOver}
-              onDragLeave={onDragLeave}
-              style={{
-                border: `2px dashed ${dragOver ? C.steel : C.borderMd}`,
-                borderRadius: 10, padding: "18px 20px",
-                cursor: isUploading ? "default" : "pointer",
-                background: dragOver ? "rgba(102,155,188,0.05)" : "rgba(102,155,188,0.02)",
-                marginBottom: 12, transition: "all 0.2s",
-                opacity: isUploading ? 0.5 : 1,
-                animation: "fadeUp 0.3s ease 0.1s both",
-              }}
-            >
-              <input
-                ref={fileInputRef} type="file" accept={ACCEPT_TYPES} multiple
-                style={{ display: "none" }} onChange={handleFileChange}
-              />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
-                <FolderOpen size={20} color={C.dim} />
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: C.text, lineHeight: 1.4 }}>
-                    사진을 드래그하거나 클릭해서 선택
-                  </div>
-                  <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
-                    JPEG · PNG · WebP · 최대 20MB/장
-                  </div>
+            <>
+              {isAtPhotoLimit ? (
+                <div style={{
+                  padding: "14px 18px", borderRadius: 10, marginBottom: 12,
+                  background: "rgba(255,71,87,0.06)", border: "1px solid rgba(255,71,87,0.2)",
+                  display: "flex", alignItems: "center", gap: 10,
+                  fontSize: 12, color: C.red,
+                }}>
+                  <AlertCircle size={15} />
+                  베타 기간 최대 업로드 수({BETA_MAX_PHOTOS_PER_PROJECT}장)에 도달했습니다.
+                  <span style={{ marginLeft: "auto", color: C.muted, fontWeight: 500 }}>
+                    {M} / {BETA_MAX_PHOTOS_PER_PROJECT}
+                  </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); if (!isUploading) fileInputRef.current?.click(); }}
+              ) : (
+                <div
+                  className="up-dropzone"
+                  onClick={() => !isUploading && fileInputRef.current?.click()}
+                  onDrop={isUploading ? undefined : onDrop}
+                  onDragOver={isUploading ? undefined : onDragOver}
+                  onDragLeave={onDragLeave}
                   style={{
-                    display: "inline-flex", alignItems: "center", gap: 5,
-                    padding: "7px 14px", background: C.steel, color: "white",
-                    border: "none", borderRadius: 7, fontSize: 12, fontWeight: 500,
-                    cursor: "pointer", flexShrink: 0,
-                    fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                    border: `2px dashed ${dragOver ? C.steel : C.borderMd}`,
+                    borderRadius: 10, padding: "18px 20px",
+                    cursor: isUploading ? "default" : "pointer",
+                    background: dragOver ? "rgba(79,126,255,0.05)" : "rgba(79,126,255,0.02)",
+                    marginBottom: 12, transition: "all 0.2s",
+                    opacity: isUploading ? 0.5 : 1,
+                    animation: "fadeUp 0.3s ease 0.1s both",
                   }}
                 >
-                  <Upload size={12} /> 파일 선택
-                </button>
-              </div>
-            </div>
+                  <input
+                    ref={fileInputRef} type="file" accept={ACCEPT_TYPES} multiple
+                    style={{ display: "none" }} onChange={handleFileChange}
+                  />
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+                    <FolderOpen size={20} color={C.dim} />
+                    <div style={{ textAlign: "left" }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: C.text, lineHeight: 1.4 }}>
+                        사진을 드래그하거나 클릭해서 선택
+                      </div>
+                      <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
+                        JPEG · PNG · WebP · 최대 20MB/장
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); if (!isUploading) fileInputRef.current?.click(); }}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 5,
+                        padding: "7px 14px", background: C.steel, color: "white",
+                        border: "none", borderRadius: 7, fontSize: 12, fontWeight: 500,
+                        cursor: "pointer", flexShrink: 0,
+                        fontFamily: PS_FONT,
+                      }}
+                    >
+                      <Upload size={12} /> 파일 선택
+                    </button>
+                  </div>
+                  {/* 베타 업로드 카운터 */}
+                  <div style={{
+                    marginTop: 10, textAlign: "right",
+                    fontSize: 11,
+                    color: isPhotoLimitNear ? C.orange : C.dim,
+                  }}>
+                    {M} / {BETA_MAX_PHOTOS_PER_PROJECT}장 (베타 한도)
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* 업로드 진행 표시 */}
@@ -589,17 +669,38 @@ export default function UploadPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <Loader2 size={13} color={C.steel} style={{ animation: "spin 1s linear infinite" }} />
                   <span style={{ fontSize: 12, fontWeight: 500, color: C.text }}>
-                    {uploadPhase === "processing" ? "처리 중..." : `전체 ${files.length}장 업로드 중`}
+                    업로드 중 {processedCount} / {files.length}장
                   </span>
+                  {batchProgress.total > 0 && (
+                    <span style={{ fontSize: 11, color: C.dim }}>
+                      (배치 {batchProgress.current}/{batchProgress.total})
+                    </span>
+                  )}
                 </div>
-                <span style={{ fontSize: 11, color: C.muted }}>
-                  {uploadPhase === "processing" ? "거의 완료" : `${uploadProgress}%`}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 11, color: C.muted }}>{uploadProgress}%</span>
+                  {uploadPhase === "sending" && (
+                    stopRequested ? (
+                      <span style={{ fontSize: 11, color: C.orange }}>중지 요청됨...</span>
+                    ) : (
+                      <button
+                        onClick={handleStopUpload}
+                        style={{
+                          padding: "3px 10px", fontSize: 11, cursor: "pointer",
+                          background: "transparent", border: `1px solid ${C.borderMd}`,
+                          borderRadius: 5, color: C.muted, fontFamily: PS_FONT,
+                        }}
+                      >
+                        업로드 중지
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
               <div style={{ height: 4, background: C.surface3, borderRadius: 2, overflow: "hidden" }}>
                 <div style={{
                   height: "100%", background: C.steel, borderRadius: 2,
-                  width: uploadPhase === "processing" ? "100%" : `${uploadProgress}%`,
+                  width: `${uploadProgress}%`,
                   transition: "width 0.3s",
                 }} />
               </div>
@@ -619,6 +720,44 @@ export default function UploadPage() {
               fontSize: 12, color: C.red,
             }}>
               {error}
+            </div>
+          )}
+
+          {/* 업로드 실패 파일 요약 */}
+          {uploadSummary && uploadSummary.failedFiles.length > 0 && uploadPhase === "idle" && (
+            <div style={{
+              padding: "12px 14px", borderRadius: 8, marginBottom: 10,
+              background: "rgba(255,165,0,0.08)", border: "1px solid rgba(255,165,0,0.25)",
+              fontSize: 12,
+            }}>
+              <div style={{ fontWeight: 600, color: C.orange, marginBottom: 6 }}>
+                {uploadSummary.total}장 중 {uploadSummary.succeeded}장 성공,{" "}
+                {uploadSummary.failedFiles.length}장 실패
+              </div>
+              <div style={{
+                maxHeight: 72, overflowY: "auto", marginBottom: 10,
+                borderRadius: 4, background: "rgba(0,0,0,0.1)", padding: "6px 8px",
+              }}>
+                {uploadSummary.failedFiles.map((f, i) => (
+                  <div key={i} style={{ fontSize: 11, color: C.muted, lineHeight: 1.8 }}>
+                    {f.name}
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => {
+                  const f = uploadSummary.failedFiles;
+                  setUploadSummary(null);
+                  startUpload(f);
+                }}
+                style={{
+                  padding: "5px 12px", fontSize: 11, cursor: "pointer",
+                  background: "rgba(255,165,0,0.15)", border: "1px solid rgba(255,165,0,0.3)",
+                  borderRadius: 5, color: C.orange, fontFamily: PS_FONT,
+                }}
+              >
+                실패 파일 재시도
+              </button>
             </div>
           )}
 
@@ -656,7 +795,7 @@ export default function UploadPage() {
                       color: viewMode === key ? "white" : C.dim,
                       fontSize: 11, cursor: "pointer", fontWeight: viewMode === key ? 500 : 400,
                       transition: "background 0.15s, color 0.15s",
-                      fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                      fontFamily: PS_FONT,
                     }}
                   >
                     {label}
@@ -670,7 +809,7 @@ export default function UploadPage() {
                   style={{
                     background: "transparent", border: "none", fontSize: 11,
                     color: C.red, cursor: "pointer",
-                    fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                    fontFamily: PS_FONT,
                   }}
                 >
                   전체 삭제
@@ -763,7 +902,7 @@ export default function UploadPage() {
                             background: "transparent", border: "none", padding: "2px 4px",
                             color: C.dim, cursor: "pointer", flexShrink: 0,
                             display: "flex", alignItems: "center",
-                            fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                            fontFamily: PS_FONT,
                           }}
                         >
                           {deletingId === photo.id
@@ -824,7 +963,7 @@ export default function UploadPage() {
         <div style={{
           position: "fixed", bottom: 0, left: 220, right: 0,
           background: "rgba(0,48,73,0.95)", backdropFilter: "blur(12px)",
-          borderTop: "1px solid rgba(102,155,188,0.15)",
+          borderTop: "1px solid rgba(79,126,255,0.15)",
           padding: "12px 24px",
           display: "flex", alignItems: "center", justifyContent: "space-between",
           zIndex: 100,
@@ -860,7 +999,7 @@ export default function UploadPage() {
               color: isReady ? "white" : C.dim,
               fontSize: 13, fontWeight: 600,
               cursor: isReady ? "pointer" : "not-allowed",
-              fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+              fontFamily: PS_FONT,
               opacity: isReady ? 1 : 0.35,
             }}
           >
@@ -885,7 +1024,7 @@ export default function UploadPage() {
             style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", padding: 12, color: "white", cursor: "pointer", zIndex: 20, fontSize: 18 }}
           >←</button>
           <img
-            src={photos[lightboxIndex].url} alt="미리보기"
+            src={viewerImageUrl(photos[lightboxIndex])} alt="미리보기"
             onClick={(e) => e.stopPropagation()}
             style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain", position: "relative", zIndex: 10 }}
           />
@@ -951,7 +1090,7 @@ export default function UploadPage() {
                   padding: "8px 16px", background: "transparent",
                   border: `1px solid ${C.border}`, borderRadius: 8,
                   color: C.muted, fontSize: 13, cursor: "pointer",
-                  fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                  fontFamily: PS_FONT,
                 }}
               >
                 취소
@@ -962,7 +1101,7 @@ export default function UploadPage() {
                   padding: "8px 20px", background: C.steel, border: "none",
                   borderRadius: 8, color: "white", fontSize: 13, fontWeight: 600,
                   cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                  fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                  fontFamily: PS_FONT,
                 }}
               >
                 <Upload size={13} /> 업로드

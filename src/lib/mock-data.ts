@@ -153,11 +153,13 @@ function generatePhotos(projectId: string, count: number, selectedCount: number)
   const photos: Photo[] = [];
   for (let i = 0; i < count; i++) {
     const selected = i < selectedCount;
+    const u = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600"><rect fill="#1f2937" width="600" height="600"/><text x="50%" y="50%" fill="#9ca3af" font-size="24" text-anchor="middle" dominant-baseline="middle">${i + 1}</text></svg>`)}`;
     photos.push({
       id: `photo-${projectId}-${i + 1}`,
       projectId,
       orderIndex: i + 1,
-      url: `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600"><rect fill="#1f2937" width="600" height="600"/><text x="50%" y="50%" fill="#9ca3af" font-size="24" text-anchor="middle" dominant-baseline="middle">${i + 1}</text></svg>`)}`,
+      url: u,
+      previewUrl: u,
       selected,
       tag: selected
         ? {

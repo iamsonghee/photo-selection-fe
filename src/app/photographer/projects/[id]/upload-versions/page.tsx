@@ -22,28 +22,12 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getPhotosWithSelections, getProjectById } from "@/lib/db";
+import { BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
 import { buildVersionMapping, remapSingleFile, type MappingResult } from "@/lib/version-mapping";
 import type { Photo, Project } from "@/types";
 import CompareViewerModal from "@/components/CompareViewerModal";
-
-// ---------- color tokens ----------
-const C = {
-  surface:   "#0f2030",
-  surface2:  "#152a3a",
-  surface3:  "#1a3347",
-  steel:     "#669bbc",
-  border:    "rgba(102,155,188,0.12)",
-  borderMd:  "rgba(102,155,188,0.22)",
-  text:      "#e8eef2",
-  muted:     "#7a9ab0",
-  dim:       "#3a5a6e",
-  green:     "#2ed573",
-  greenDim:  "#0f2a1e",
-  orange:    "#f5a623",
-  orangeDim: "#2a1a08",
-  red:       "#ff4757",
-  redDim:    "#2a0f12",
-};
+import { PHOTOGRAPHER_THEME as C } from "@/lib/photographer-theme";
+import { viewerImageUrl } from "@/lib/viewer-image-url";
 
 function getDisplayFilename(p: Photo): string {
   return (p.originalFilename ?? "").trim() || String(p.orderIndex);
@@ -64,9 +48,10 @@ export default function UploadVersionsPage() {
   const [project,         setProject]         = useState<Project | null>(null);
   const [photos,          setPhotos]          = useState<Photo[]>([]);
   const [loading,         setLoading]         = useState(true);
-  const [uploadedFiles,   setUploadedFiles]   = useState<File[]>([]);
-  const [mapping,         setMapping]         = useState<MappingResult<V1Target>[]>([]);
-  const [uploadedV1Info,  setUploadedV1Info]  = useState<Map<string, string>>(new Map());
+  const [uploadedFiles,       setUploadedFiles]       = useState<File[]>([]);
+  const [mapping,             setMapping]             = useState<MappingResult<V1Target>[]>([]);
+  const [uploadedV1Info,      setUploadedV1Info]      = useState<Map<string, string>>(new Map());
+  const [existingVersionCount, setExistingVersionCount] = useState<number>(0);
   const [dragOver,        setDragOver]        = useState(false);
   const [globalMemo,      setGlobalMemo]      = useState("");
   const [showConfirm,     setShowConfirm]     = useState(false);
@@ -123,24 +108,32 @@ export default function UploadVersionsPage() {
     setMapping(buildVersionMapping(uploadedFiles, targets));
   }, [uploadedFiles, targets]);
 
-  // ── load server-side v1 info when read-only ──
+  // ── load server-side version info (항상) ──
   useEffect(() => {
-    if (!id || !isReadOnly) return;
+    if (!id) return;
     let cancelled = false;
     fetch(`/api/photographer/projects/${id}/versions`)
       .then((res) => res.json().catch(() => ({})))
       .then((data) => {
         if (cancelled) return;
         const list = Array.isArray(data?.versions) ? data.versions : [];
+        // distinct version 수 계산
+        const distinctVersions = new Set(
+          list.map((v: { version?: number }) => v.version).filter(Boolean)
+        );
+        setExistingVersionCount(distinctVersions.size);
+        // v1 URL 매핑
         const info = new Map<string, string>();
         list.forEach((v: { version?: number; photo_id?: string; r2_url?: string }) => {
           if (v.version === 1 && v.photo_id && v.r2_url) info.set(v.photo_id, v.r2_url);
         });
         setUploadedV1Info(info);
       })
-      .catch(() => { if (!cancelled) setUploadedV1Info(new Map()); });
+      .catch(() => {
+        if (!cancelled) { setUploadedV1Info(new Map()); setExistingVersionCount(0); }
+      });
     return () => { cancelled = true; };
-  }, [id, isReadOnly]);
+  }, [id]);
 
   const mappedCount = useMemo(() => {
     if (isReadOnly) return uploadedV1Info.size;
@@ -161,7 +154,7 @@ export default function UploadVersionsPage() {
         const retouchedUrl = localPreviewMap.get(t.id) ?? uploadedV1Info.get(t.id) ?? "";
         if (!retouchedUrl) return null;
         return {
-          original: { url: t.photo.url, filename: t.filename },
+          original: { url: viewerImageUrl(t.photo), filename: t.filename },
           retouched: { url: retouchedUrl, filename: t.filename },
         };
       })
@@ -266,7 +259,7 @@ export default function UploadVersionsPage() {
     : [];
 
   const lightboxTargetItems = useMemo(
-    () => targets.map((t) => ({ url: t.photo.url, label: t.filename })),
+    () => targets.map((t) => ({ url: viewerImageUrl(t.photo), label: t.filename })),
     [targets]
   );
 
@@ -303,7 +296,17 @@ export default function UploadVersionsPage() {
             프로젝트 상세로
           </button>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>v1 보정본 업로드</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: C.text, display: "flex", alignItems: "center", gap: 8 }}>
+              v1 보정본 업로드
+              <span style={{
+                background: existingVersionCount >= BETA_MAX_REVISION_COUNT ? "rgba(255,71,87,0.15)" : C.surface3,
+                border: `1px solid ${existingVersionCount >= BETA_MAX_REVISION_COUNT ? "rgba(255,71,87,0.3)" : C.border}`,
+                color: existingVersionCount >= BETA_MAX_REVISION_COUNT ? C.red : C.muted,
+                borderRadius: 10, padding: "1px 8px", fontSize: 10, fontWeight: 500,
+              }}>
+                보정 횟수 {existingVersionCount} / {BETA_MAX_REVISION_COUNT}
+              </span>
+            </div>
             <div style={{ fontSize: 11, color: C.dim }}>
               {project.name} · {project.customerName} · {targets.length}장 선택됨
             </div>
@@ -315,7 +318,7 @@ export default function UploadVersionsPage() {
       {isReadOnly && (
         <div style={{
           margin: "16px 24px 0",
-          background: "rgba(102,155,188,0.06)", border: "1px solid rgba(102,155,188,0.2)",
+          background: "rgba(79,126,255,0.06)", border: "1px solid rgba(79,126,255,0.2)",
           borderRadius: 12, padding: "14px 20px",
           display: "flex", alignItems: "center", gap: 12,
         }}>
@@ -370,6 +373,21 @@ export default function UploadVersionsPage() {
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: C.dim, marginBottom: 10 }}>
                 보정본 업로드
               </div>
+              {existingVersionCount >= BETA_MAX_REVISION_COUNT ? (
+                <div style={{
+                  padding: "18px 20px", borderRadius: 12, textAlign: "center",
+                  background: "rgba(255,71,87,0.06)", border: "2px dashed rgba(255,71,87,0.25)",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                }}>
+                  <AlertCircle size={20} color={C.red} />
+                  <div style={{ fontSize: 13, color: C.red, fontWeight: 500 }}>
+                    베타 기간 최대 보정 횟수({BETA_MAX_REVISION_COUNT}회)에 도달했습니다.
+                  </div>
+                  <div style={{ fontSize: 11, color: C.muted }}>
+                    현재 {existingVersionCount} / {BETA_MAX_REVISION_COUNT}회 사용 중
+                  </div>
+                </div>
+              ) : (
               <div
                 onDrop={(e) => { e.preventDefault(); setDragOver(false); handleDropFiles(Array.from(e.dataTransfer.files)); }}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -379,7 +397,7 @@ export default function UploadVersionsPage() {
                   border: `2px dashed ${uploadedFiles.length > 0 ? "rgba(46,213,115,0.4)" : dragOver ? C.steel : C.borderMd}`,
                   borderRadius: 12, padding: "22px 20px", textAlign: "center",
                   cursor: uploadedFiles.length === 0 ? "pointer" : "default",
-                  background: uploadedFiles.length > 0 ? "rgba(46,213,115,0.02)" : dragOver ? "rgba(102,155,188,0.05)" : "rgba(102,155,188,0.02)",
+                  background: uploadedFiles.length > 0 ? "rgba(46,213,115,0.02)" : dragOver ? "rgba(79,126,255,0.05)" : "rgba(79,126,255,0.02)",
                   transition: "all 0.2s",
                 }}
               >
@@ -435,6 +453,7 @@ export default function UploadVersionsPage() {
                   파일명 일치 시 자동 매핑 · 불일치 시 순서대로 매핑
                 </div>
               </div>
+              )} {/* end ternary */}
             </div>
           )}
 
@@ -576,7 +595,7 @@ export default function UploadVersionsPage() {
         <div style={{
           position: "fixed", bottom: 0, left: 220, right: 0,
           background: "rgba(0,48,73,0.95)",
-          borderTop: "1px solid rgba(102,155,188,0.15)",
+          borderTop: "1px solid rgba(79,126,255,0.15)",
           backdropFilter: "blur(12px)",
           padding: "12px 24px",
           display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -651,8 +670,8 @@ export default function UploadVersionsPage() {
                 onClick={handleDeliver} disabled={submitting || !canDeliver}
                 style={{
                   flex: 1, padding: "10px 0",
-                  background: "rgba(102,155,188,0.15)",
-                  border: "1px solid rgba(102,155,188,0.3)", borderRadius: 8,
+                  background: "rgba(79,126,255,0.15)",
+                  border: "1px solid rgba(79,126,255,0.3)", borderRadius: 8,
                   color: C.steel, fontSize: 13, fontWeight: 500,
                   cursor: submitting ? "not-allowed" : "pointer", fontFamily: "inherit",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
@@ -751,7 +770,7 @@ function MappingCard({
         {/* Original */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
           <div
-            onClick={() => target.photo.url && onOpenLightbox([{ url: target.photo.url, label: target.filename, sublabel: "원본 선택 사진" }], 0)}
+            onClick={() => target.photo.url && onOpenLightbox([{ url: viewerImageUrl(target.photo), label: target.filename, sublabel: "원본 선택 사진" }], 0)}
             style={{ width: 52, height: 38, background: C.surface3, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${C.border}`, overflow: "hidden", cursor: target.photo.url ? "zoom-in" : "default" }}
           >
             {target.photo.url && !origErr ? (
@@ -814,7 +833,7 @@ function MappingCard({
               onClick={() => onChangeOne(target.id)}
               style={{
                 padding: "3px 8px", borderRadius: 5,
-                border: `1px solid ${state === "empty" ? "rgba(102,155,188,0.3)" : C.border}`,
+                border: `1px solid ${state === "empty" ? "rgba(79,126,255,0.3)" : C.border}`,
                 background: "transparent",
                 color: state === "empty" ? C.steel : C.dim,
                 fontSize: 10, cursor: "pointer", fontFamily: "inherit",
@@ -960,7 +979,7 @@ function Lightbox({
         {item.sublabel && (
           <div style={{
             fontSize: 11, color: C.muted,
-            background: "rgba(102,155,188,0.12)", border: "1px solid rgba(102,155,188,0.25)",
+            background: "rgba(79,126,255,0.12)", border: "1px solid rgba(79,126,255,0.25)",
             borderRadius: 6, padding: "3px 10px",
           }}>
             {item.sublabel}
