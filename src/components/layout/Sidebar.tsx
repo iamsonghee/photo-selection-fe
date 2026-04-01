@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FolderOpen, Users, BarChart3, Settings, Camera } from "lucide-react";
+import { LayoutDashboard, FolderOpen, Users, BarChart3, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getProfileImageUrl } from "@/lib/photographer";
 import { useProfile } from "@/contexts/ProfileContext";
-import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT } from "@/lib/photographer-theme";
+import { PHOTOGRAPHER_THEME as C, PS_FONT } from "@/lib/photographer-theme";
+import { BrandLogoBar } from "@/components/BrandLogo";
 
 const navItems = [
   { href: "/photographer/dashboard", label: "대시보드", icon: LayoutDashboard, comingSoon: false },
@@ -50,32 +51,19 @@ export function Sidebar() {
     }}>
 
       {/* ── 로고 영역 ── */}
-      <div style={{
-        padding: "20px",
-        borderBottom: `1px solid ${C.border}`,
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-      }}>
-        <div style={{
-          width: 36, height: 36,
-          background: "rgba(79,126,255,0.12)",
-          border: `1.5px solid ${C.borderMd}`,
-          borderRadius: 10,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          flexShrink: 0,
-        }}>
-          <Camera size={18} color={C.steel} />
-        </div>
-        <div>
-          <div style={{ fontFamily: PS_DISPLAY, fontSize: 17, fontWeight: 600, color: C.text, lineHeight: 1.2, letterSpacing: "-0.02em" }}>
-            PhotoSelect
-          </div>
-          <div style={{ fontSize: 9, color: C.dim, letterSpacing: 1, textTransform: "uppercase", marginTop: 2 }}>
-            photographer
-          </div>
-        </div>
-      </div>
+      <Link
+        href="/photographer/dashboard"
+        style={{
+          padding: "18px 20px",
+          borderBottom: `1px solid ${C.border}`,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          textDecoration: "none",
+        }}
+      >
+        <BrandLogoBar size="md" />
+      </Link>
 
       {/* ── 네비게이션 ── */}
       <nav style={{ padding: 10, flex: 1 }}>

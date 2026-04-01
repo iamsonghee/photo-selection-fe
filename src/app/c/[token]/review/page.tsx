@@ -8,6 +8,7 @@ import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
 import type { ReviewPhotoItem } from "@/lib/customer-api-server";
 import { PHOTOGRAPHER_THEME as T, PS_DISPLAY } from "@/lib/photographer-theme";
+import { BrandLogoBar } from "@/components/BrandLogo";
 
 const REVISION_LIMIT = 2;
 
@@ -140,17 +141,7 @@ export default function ReviewGalleryPage() {
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 20px", position: "sticky", top: 0, zIndex: 50,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {/* logo mark */}
-          <div style={{
-            width: 24, height: 24, background: SURFACE2, border: `1px solid ${BORDER_MD}`,
-            borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center",
-            ...playfair, fontSize: 11, color: STEEL,
-          }}>A</div>
-          <span style={{ ...playfair, fontSize: 14, color: TEXT }}>
-            PhotoSelect
-          </span>
-        </div>
+        <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
         <span style={{ fontSize: 12, color: MUTED }}>{project.name}</span>
       </header>
 

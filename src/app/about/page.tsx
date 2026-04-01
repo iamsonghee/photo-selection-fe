@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { BrandLogoBar, BrandLogoFull } from "@/components/BrandLogo";
 import { useEffect, useRef, useState } from "react";
 
 const ease = "cubic-bezier(0.16, 1, 0.3, 1)";
@@ -116,8 +117,8 @@ export default function AboutPage() {
           className="relative z-[60] mx-auto flex w-full max-w-6xl items-center justify-between gap-4 rounded-full border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-xl md:px-6"
           style={{ transition: `all 0.5s ${ease}` }}
         >
-          <Link href="/about" className="font-display text-lg font-semibold tracking-tight text-white">
-            PhotoSelect
+          <Link href="/about" className="inline-flex items-center">
+            <BrandLogoBar size="md" priority />
           </Link>
           <div className="hidden items-center gap-8 text-sm text-zinc-300 md:flex">
             <a href="#features" className="hover:text-white" style={{ transition: `color 0.5s ${ease}` }}>
@@ -410,8 +411,8 @@ export default function AboutPage() {
       <footer className="relative z-10 border-t border-white/10 py-12">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 md:flex-row md:items-center md:justify-between md:px-8">
           <div>
-            <p className="font-display text-lg font-semibold text-white">PhotoSelect</p>
-            <p className="about-break mt-1 text-sm text-zinc-500">사진작가와 고객을 잇는 셀렉·보정 워크플로우</p>
+            <BrandLogoFull maxWidth={220} className="opacity-95" />
+            <p className="about-break mt-3 text-sm text-zinc-500">사진작가와 고객을 잇는 셀렉·보정 워크플로우</p>
           </div>
           <div className="flex flex-wrap gap-6 text-sm text-zinc-400">
             <Link href="/auth" className="hover:text-zinc-200" style={{ transition: `color 0.5s ${ease}` }}>
@@ -421,7 +422,7 @@ export default function AboutPage() {
               기능
             </a>
           </div>
-          <p className="text-xs text-zinc-600">© {new Date().getFullYear()} PhotoSelect</p>
+          <p className="text-xs text-zinc-600">© {new Date().getFullYear()} A CUT</p>
         </div>
       </footer>
     </div>

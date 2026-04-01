@@ -48,7 +48,7 @@ function mapPhotoRow(
     photographerMemo: row.memo ?? undefined,
     selected,
     tag: state ? { star: state.rating as 1 | 2 | 3 | 4 | 5 | undefined, color: state.color } : undefined,
-    comment: undefined,
+    comment: state?.comment ?? undefined,
   };
 }
 

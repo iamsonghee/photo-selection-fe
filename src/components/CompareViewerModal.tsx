@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 type CompareItem = {
@@ -18,9 +19,14 @@ type Props = {
 };
 
 export default function CompareViewerModal({ isOpen, onClose, photos, initialIndex }: Props) {
+  const [mounted, setMounted] = useState(false);
   const [index, setIndex] = useState(initialIndex);
   const [tab, setTab] = useState<"original" | "v1" | "v2">("original");
   const total = photos.length;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -67,6 +73,7 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
   }, [isOpen]);
 
   if (!isOpen || !current) return null;
+  if (!mounted) return null;
 
   const v1 = current.v1 ?? current.retouched;
   const hasV1 = Boolean(v1?.url);
@@ -76,10 +83,14 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
     tab === "original" ? current.original : tab === "v1" ? (v1 ?? current.original) : (current.v2 ?? current.original);
   const activeLabel = tab === "original" ? "원본" : tab === "v1" ? "보정본 v1" : "보정본 v2";
 
-  return (
-    <div className="fixed inset-0 z-[80] bg-black/95" onClick={onClose}>
-      <div className="absolute inset-0 flex flex-col px-4 py-4" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-center justify-between gap-3">
+  /** document.body에 붙여 작가 레이아웃(main z-10)·사이드바(z-30)·하단 고정바(z-100) 스택 위에 표시 */
+  return createPortal(
+    <div className="fixed inset-0 z-[1000] bg-black/95" onClick={onClose}>
+      <div
+        className="absolute inset-0 flex min-h-0 flex-col overflow-hidden px-4 py-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 shrink-0 flex items-center justify-between gap-3">
           <div className="text-sm text-zinc-200">
             <span className="font-semibold">{current.original.filename}</span>
             <span className="ml-2 text-zinc-500">
@@ -96,7 +107,7 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
           </button>
         </div>
 
-        <div className="mb-2 flex flex-wrap items-center gap-2">
+        <div className="mb-2 shrink-0 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setTab("original")}
@@ -124,37 +135,58 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
           )}
         </div>
 
-        <div className={`relative min-h-0 flex-1 ${singleView ? "" : "grid grid-cols-1 gap-3 md:grid-cols-2"}`}>
-          {singleView ? (
-            <div className="flex min-h-0 flex-col rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
-              <div className="mb-2 text-xs font-semibold text-zinc-300">{activeLabel}</div>
-              <div className="min-h-0 flex-1 overflow-hidden rounded bg-zinc-900">
-                <img src={activeImage.url} alt="" className="h-full w-full cursor-zoom-in object-contain" />
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="flex min-h-0 flex-col rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
-                <div className="mb-2 text-xs font-semibold text-zinc-300">원본</div>
-                <div className="min-h-0 flex-1 overflow-hidden rounded bg-zinc-900">
-                  <img src={current.original.url} alt="" className="h-full w-full cursor-zoom-in object-contain" />
+        <div className="relative min-h-0 flex-1">
+          <div
+            className={`grid h-full min-h-0 w-full overflow-hidden ${
+              singleView ? "grid-cols-1" : "grid-cols-1 gap-3 md:grid-cols-2"
+            }`}
+          >
+            {singleView ? (
+              <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
+                <div className="mb-2 shrink-0 text-xs font-semibold text-zinc-300">{activeLabel}</div>
+                <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded bg-zinc-900">
+                  <img
+                    src={activeImage.url}
+                    alt=""
+                    className="max-h-full max-w-full cursor-zoom-in object-contain"
+                    draggable={false}
+                  />
                 </div>
               </div>
-              <div className="flex min-h-0 flex-col rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
-                <div className="mb-2 text-xs font-semibold text-zinc-300">보정본 v1</div>
-                <div className="min-h-0 flex-1 overflow-hidden rounded bg-zinc-900">
-                  <img src={(v1 ?? current.original).url} alt="" className="h-full w-full cursor-zoom-in object-contain" />
+            ) : (
+              <>
+                <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
+                  <div className="mb-2 shrink-0 text-xs font-semibold text-zinc-300">원본</div>
+                  <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded bg-zinc-900">
+                    <img
+                      src={current.original.url}
+                      alt=""
+                      className="max-h-full max-w-full cursor-zoom-in object-contain"
+                      draggable={false}
+                    />
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
+                <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
+                  <div className="mb-2 shrink-0 text-xs font-semibold text-zinc-300">보정본 v1</div>
+                  <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded bg-zinc-900">
+                    <img
+                      src={(v1 ?? current.original).url}
+                      alt=""
+                      className="max-h-full max-w-full cursor-zoom-in object-contain"
+                      draggable={false}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
 
           <button
             type="button"
             aria-label="이전"
             disabled={index <= 0}
             onClick={() => setIndex((prev) => Math.max(0, prev - 1))}
-            className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full border border-zinc-700 bg-zinc-900/80 p-2 text-zinc-100 disabled:opacity-40"
+            className="absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-zinc-700 bg-zinc-900/90 p-2 text-zinc-100 shadow-lg disabled:opacity-40"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
@@ -163,12 +195,13 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
             aria-label="다음"
             disabled={index >= total - 1}
             onClick={() => setIndex((prev) => Math.min(total - 1, prev + 1))}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full border border-zinc-700 bg-zinc-900/80 p-2 text-zinc-100 disabled:opacity-40"
+            className="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-zinc-700 bg-zinc-900/90 p-2 text-zinc-100 shadow-lg disabled:opacity-40"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

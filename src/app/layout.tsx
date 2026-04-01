@@ -1,9 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { BRAND_LOGO_PNG } from "@/lib/brand-assets";
 
 export const metadata: Metadata = {
   title: "PhotoSelect — 사진작가를 위한 셀렉 워크플로우",
   description: "사진작가와 고객이 함께하는 사진 셀렉·보정 워크플로우",
+  icons: {
+    icon: BRAND_LOGO_PNG,
+    apple: BRAND_LOGO_PNG,
+  },
 };
 
 export const viewport: Viewport = {

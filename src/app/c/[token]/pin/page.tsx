@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Lock } from "lucide-react";
 import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT } from "@/lib/photographer-theme";
+import { BrandLogoBar } from "@/components/BrandLogo";
 
 export default function PinPage() {
   const params = useParams();
@@ -119,6 +120,9 @@ export default function PinPage() {
         padding: 32,
         textAlign: "center",
       }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+          <BrandLogoBar size="lg" priority href={token ? `/c/${token}` : undefined} />
+        </div>
         {/* Icon */}
         <div style={{
           width: 52, height: 52, borderRadius: "50%",

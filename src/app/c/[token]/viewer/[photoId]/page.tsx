@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ChevronLeft, ChevronRight, Check } from "lucide-react";
@@ -26,10 +26,108 @@ const COMMENT_MAX_LENGTH = 150;
 
 const S = {
   panelLabel: {
-    fontSize: 10, fontWeight: 600, letterSpacing: 1,
-    textTransform: "uppercase" as const, color: "#3a5a6e", marginBottom: 10,
+    fontSize: 11, fontWeight: 500, color: "rgba(161,161,170,0.9)", marginBottom: 8,
   } as React.CSSProperties,
 };
+
+/** object-fit: contain 영역 기준 좌표 (실제 그려진 사진의 왼쪽 위) */
+function getObjectFitContainOffset(
+  containerW: number,
+  containerH: number,
+  naturalW: number,
+  naturalH: number
+) {
+  if (containerW <= 0 || containerH <= 0 || naturalW <= 0 || naturalH <= 0) {
+    return { left: 0, top: 0 };
+  }
+  const scale = Math.min(containerW / naturalW, containerH / naturalH);
+  const drawnW = naturalW * scale;
+  const drawnH = naturalH * scale;
+  return {
+    left: (containerW - drawnW) / 2,
+    top: (containerH - drawnH) / 2,
+  };
+}
+
+/** 프리뷰: 전체 영역에 fit + 실제 사진 좌상단에 체크 배지 */
+function ViewerPhotoWithBadge({
+  src,
+  alt,
+  showBadge,
+}: {
+  src: string;
+  alt: string;
+  showBadge: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [badgeOffset, setBadgeOffset] = useState({ left: 5, top: 5 });
+
+  const measureBadge = useCallback(() => {
+    const el = containerRef.current;
+    const img = imgRef.current;
+    if (!el) return;
+    const { width: cw, height: ch } = el.getBoundingClientRect();
+    const nw = img?.naturalWidth ?? 0;
+    const nh = img?.naturalHeight ?? 0;
+    if (nw <= 0 || nh <= 0) {
+      setBadgeOffset({ left: 5, top: 5 });
+      return;
+    }
+    const { left, top } = getObjectFitContainOffset(cw, ch, nw, nh);
+    setBadgeOffset({ left: left + 5, top: top + 5 });
+  }, []);
+
+  useEffect(() => {
+    measureBadge();
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => measureBadge());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [measureBadge, src]);
+
+  useEffect(() => {
+    const onResize = () => measureBadge();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [measureBadge]);
+
+  return (
+    <div ref={containerRef} style={{ width: "100%", height: "100%", position: "relative" }}>
+      <img
+        ref={imgRef}
+        src={src}
+        alt={alt}
+        onLoad={measureBadge}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+          objectPosition: "center",
+          display: "block",
+        }}
+      />
+      {showBadge && (
+        <div
+          className="pointer-events-none absolute z-[3] flex items-center justify-center rounded-full"
+          style={{
+            left: badgeOffset.left,
+            top: badgeOffset.top,
+            width: 20,
+            height: 20,
+            background: "#4f7eff",
+            border: "2px solid white",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+          }}
+          aria-hidden
+        >
+          <Check style={{ width: 10, height: 10, color: "white" }} strokeWidth={3} />
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ViewerPage() {
   const params = useParams();
@@ -229,18 +327,18 @@ export default function ViewerPage() {
         placeholder="이 사진에 대한 메모를 남겨주세요"
         style={{
           width: "100%", padding: "10px 12px",
-          background: "rgba(39,39,42,0.75)", border: "1px solid rgba(79,126,255,0.12)",
+          background: "rgba(39,39,42,0.6)", border: "1px solid rgba(255,255,255,0.08)",
           borderRadius: 8, color: "#fafafa", fontSize: 12,
           fontFamily: "'Pretendard', system-ui, sans-serif",
           resize: "none", height: 72, lineHeight: 1.5, outline: "none",
         }}
       />
       <button type="button" onClick={saveComment}
-        className="transition-colors hover:border-[#4f7eff] hover:text-[#4f7eff]"
+        className="transition-colors hover:text-[#4f7eff]"
         style={{
-          marginTop: 6, width: "100%", padding: "7px",
-          borderRadius: 7, background: "rgba(63,63,70,0.55)",
-          border: "1px solid rgba(79,126,255,0.12)",
+          marginTop: 8, width: "100%", padding: "8px",
+          borderRadius: 8, background: "rgba(255,255,255,0.06)",
+          border: "none",
           color: "#a1a1aa", fontSize: 12, cursor: "pointer",
           fontFamily: "'Pretendard', system-ui, sans-serif",
         }}>
@@ -252,65 +350,106 @@ export default function ViewerPage() {
   const SelectButton = () => (
     <button type="button" onClick={toggleSelect}
       style={{
-        width: "100%", height: 44,
+        width: "100%", minHeight: 44,
         display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
         borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer",
         fontFamily: "'Pretendard', system-ui, sans-serif", transition: "all 0.15s",
+        padding: "10px 12px",
         ...(isCurrentSelected
-          ? { background: "rgba(79,126,255,0.15)", border: "1.5px solid #4f7eff", color: "#4f7eff" }
-          : { background: "rgba(39,39,42,0.75)", border: "1.5px dashed rgba(79,126,255,0.4)", color: "#a1a1aa" }
+          ? { background: "rgba(79,126,255,0.12)", border: "none", color: "#7aa3ff" }
+          : { background: "rgba(255,255,255,0.06)", border: "none", color: "#a1a1aa" }
         ),
       }}>
-      {isCurrentSelected ? <><Check style={{ width: 15, height: 15 }} /> 확정됨</> : "+ 확정하기"}
+      {isCurrentSelected ? (
+        <>
+          <Check style={{ width: 15, height: 15, flexShrink: 0 }} />
+          <span>선택됨 ({Y}/{N})</span>
+        </>
+      ) : (
+        <span>선택하기 ({Y}/{N})</span>
+      )}
     </button>
   );
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ background: "#0a0a0a", minHeight: "100vh" }}
+    <div
+      style={{ background: "#0a0a0a", minHeight: "100vh", overflow: "hidden" }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}>
 
       {/* ════ DESKTOP (md+): 2-column grid ════ */}
-      <div className="hidden md:grid" style={{ gridTemplateColumns: "1fr 280px", minHeight: "100vh" }}>
+      <div
+        className="hidden md:grid"
+        style={{ gridTemplateColumns: "1fr 280px", height: "100vh", maxHeight: "100vh", overflow: "hidden" }}
+      >
 
         {/* Left: image */}
-        <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
+            height: "100%",
+            overflow: "hidden",
+          }}
+        >
 
           {/* Topbar */}
           <div style={{
-            height: 48, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)",
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "0 16px", borderBottom: "1px solid rgba(255,255,255,0.08)",
+            background: "rgba(0,0,0,0.72)", backdropFilter: "blur(10px)",
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
             position: "sticky", top: 0, zIndex: 10, flexShrink: 0,
+            paddingTop: 40,
           }}>
-            <Link href={`/c/${token}/gallery${queryString}`}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "6px 10px", borderRadius: 7,
-                border: "1px solid rgba(255,255,255,0.12)",
-                color: "rgba(255,255,255,0.7)", fontSize: 12, textDecoration: "none",
-              }}>
-              <ArrowLeft style={{ width: 14, height: 14 }} />
-              갤러리
-            </Link>
-            <span style={{
-              fontSize: 11, color: "rgba(255,255,255,0.4)",
-              maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            <div style={{
+              height: 44, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+              padding: "0 16px",
             }}>
-              {filename}
-            </span>
-            <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", flexShrink: 0 }}>
-              {currentIndex + 1} / {filteredPhotos.length}
-            </span>
+              <Link href={`/c/${token}/gallery${queryString}`}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "6px 10px", borderRadius: 8,
+                  color: "rgba(255,255,255,0.75)", fontSize: 12, textDecoration: "none",
+                  flexShrink: 0,
+                }}>
+                <ArrowLeft style={{ width: 14, height: 14 }} />
+                갤러리
+              </Link>
+              <span style={{
+                fontSize: 11, color: "rgba(255,255,255,0.4)",
+                flex: 1, minWidth: 0, textAlign: "center",
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}>
+                {filename}
+              </span>
+              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", flexShrink: 0 }}>
+                {currentIndex + 1} / {filteredPhotos.length}
+              </span>
+            </div>
           </div>
 
           {/* Image area */}
-          <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", background: "#0a0a0a", overflow: "hidden" }}>
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              minWidth: 0,
+              position: "relative",
+              background: "#0a0a0a",
+              overflow: "hidden",
+            }}
+          >
             {viewerSrc
-              ? <img src={viewerSrc} alt={filename} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
-              : <div style={{ color: "#3a5a6e" }}>사진 없음</div>
+              ? (
+                <ViewerPhotoWithBadge
+                  src={viewerSrc}
+                  alt={filename}
+                  showBadge={isCurrentSelected}
+                />
+              )
+              : <div style={{ color: "#3a5a6e", padding: 16 }}>사진 없음</div>
             }
 
             {/* Prev arrow */}
@@ -318,8 +457,8 @@ export default function ViewerPage() {
               style={{
                 position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
                 width: 40, height: 40, borderRadius: "50%",
-                background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
-                color: "rgba(255,255,255,0.6)", cursor: currentIndex === 0 ? "not-allowed" : "pointer",
+                background: "rgba(0,0,0,0.35)", border: "none",
+                color: "rgba(255,255,255,0.85)", cursor: currentIndex === 0 ? "not-allowed" : "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 opacity: currentIndex === 0 ? 0.2 : 1, transition: "all 0.15s",
               }}>
@@ -331,41 +470,50 @@ export default function ViewerPage() {
               style={{
                 position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
                 width: 40, height: 40, borderRadius: "50%",
-                background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
-                color: "rgba(255,255,255,0.6)", cursor: currentIndex === filteredPhotos.length - 1 ? "not-allowed" : "pointer",
+                background: "rgba(0,0,0,0.35)", border: "none",
+                color: "rgba(255,255,255,0.85)", cursor: currentIndex === filteredPhotos.length - 1 ? "not-allowed" : "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 opacity: currentIndex === filteredPhotos.length - 1 ? 0.2 : 1, transition: "all 0.15s",
               }}>
               <ChevronRight style={{ width: 20, height: 20 }} />
             </button>
+          </div>
 
-            {/* Bottom gradient + select button */}
-            <div style={{
-              position: "absolute", bottom: 0, left: 0, right: 0, padding: 16,
-              background: "linear-gradient(transparent, rgba(0,0,0,0.7))",
-              display: "flex", justifyContent: "center",
-            }}>
-              <div style={{ width: "100%", maxWidth: 280 }}>
-                <SelectButton />
-              </div>
-            </div>
+          {/* 선택 (이미지 하단 별도 영역) */}
+          <div
+            style={{
+              flexShrink: 0,
+              padding: "12px 16px 16px",
+              background: "rgba(9,9,11,0.98)",
+            }}
+          >
+            <SelectButton />
           </div>
         </div>
 
         {/* Right: control panel */}
         <div style={{
-          background: "rgba(24,24,27,0.85)", borderLeft: "1px solid rgba(79,126,255,0.12)",
-          display: "flex", flexDirection: "column",
-          height: "100vh", position: "sticky", top: 0, overflowY: "auto",
+          background: "#141416",
+          borderLeft: "1px solid rgba(255,255,255,0.06)",
+          display: "flex",
+          flexDirection: "column",
+          height: "100vh",
+          position: "sticky",
+          top: 0,
+          overflowY: "auto",
         }}>
-          <div style={{ padding: 16, borderBottom: "1px solid rgba(79,126,255,0.12)" }}>{StarBlock}</div>
-          <div style={{ padding: 16, borderBottom: "1px solid rgba(79,126,255,0.12)" }}>{ColorBlock}</div>
-          <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column" }}>{CommentBlock}</div>
+          <div style={{ padding: "18px 16px 0", display: "flex", flexDirection: "column", gap: 22, flex: 1, minHeight: 0 }}>
+            {StarBlock}
+            {ColorBlock}
+            {CommentBlock}
+          </div>
 
           {/* Prev / Next nav */}
           <div style={{
-            padding: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8,
-            borderTop: "1px solid rgba(79,126,255,0.12)",
+            padding: "12px 16px 16px",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 8,
           }}>
             {[
               { label: "이전", icon: <ChevronLeft style={{ width: 14, height: 14 }} />, onClick: goPrev, disabled: currentIndex === 0, dir: "prev" },
@@ -373,8 +521,8 @@ export default function ViewerPage() {
             ].map(({ label, icon, onClick, disabled, dir }) => (
               <button key={dir} type="button" onClick={onClick} disabled={disabled}
                 style={{
-                  height: 38, borderRadius: 8, border: "1px solid rgba(79,126,255,0.12)",
-                  background: "transparent", color: "#a1a1aa", fontSize: 12,
+                  height: 38, borderRadius: 8, border: "none",
+                  background: "rgba(255,255,255,0.06)", color: "#a1a1aa", fontSize: 12,
                   cursor: disabled ? "not-allowed" : "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
                   opacity: disabled ? 0.4 : 1, fontFamily: "'Pretendard', system-ui, sans-serif",
@@ -391,44 +539,56 @@ export default function ViewerPage() {
 
         {/* Topbar */}
         <div style={{
-          height: 48, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "0 16px", borderBottom: "1px solid rgba(255,255,255,0.08)",
+          background: "rgba(0,0,0,0.72)", backdropFilter: "blur(10px)",
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
           flexShrink: 0, zIndex: 20,
+          paddingTop: 40,
         }}>
-          <Link href={`/c/${token}/gallery${queryString}`}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "6px 10px", borderRadius: 7,
-              border: "1px solid rgba(255,255,255,0.12)",
-              color: "rgba(255,255,255,0.7)", fontSize: 12, textDecoration: "none",
-            }}>
-            <ArrowLeft style={{ width: 14, height: 14 }} />
-            갤러리
-          </Link>
-          <span style={{
-            fontSize: 11, color: "rgba(255,255,255,0.4)",
-            maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          <div style={{
+            height: 44, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6,
+            padding: "0 12px",
           }}>
-            {filename}
-          </span>
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", flexShrink: 0 }}>
-            {currentIndex + 1} / {filteredPhotos.length}
-          </span>
+            <Link href={`/c/${token}/gallery${queryString}`}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 8px", borderRadius: 8,
+                color: "rgba(255,255,255,0.75)", fontSize: 12, textDecoration: "none",
+                flexShrink: 0,
+              }}>
+              <ArrowLeft style={{ width: 14, height: 14 }} />
+              갤러리
+            </Link>
+            <span style={{
+              fontSize: 11, color: "rgba(255,255,255,0.4)",
+              flex: 1, minWidth: 0, textAlign: "center",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              {filename}
+            </span>
+            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", flexShrink: 0 }}>
+              {currentIndex + 1} / {filteredPhotos.length}
+            </span>
+          </div>
         </div>
 
         {/* Image */}
-        <div style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0 }}>
+        <div style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 0, minWidth: 0 }}>
           {viewerSrc
-            ? <img src={viewerSrc} alt={filename} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
-            : <div style={{ color: "#3a5a6e" }}>사진 없음</div>
+            ? (
+              <ViewerPhotoWithBadge
+                src={viewerSrc}
+                alt={filename}
+                showBadge={isCurrentSelected}
+              />
+            )
+            : <div style={{ color: "#3a5a6e", padding: 16 }}>사진 없음</div>
           }
           <button type="button" onClick={goPrevWrap}
             style={{
               position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)",
               width: 36, height: 36, borderRadius: "50%",
-              background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
-              color: "rgba(255,255,255,0.6)", cursor: "pointer",
+              background: "rgba(0,0,0,0.35)", border: "none",
+              color: "rgba(255,255,255,0.85)", cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
             <ChevronLeft style={{ width: 18, height: 18 }} />
@@ -437,8 +597,8 @@ export default function ViewerPage() {
             style={{
               position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
               width: 36, height: 36, borderRadius: "50%",
-              background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
-              color: "rgba(255,255,255,0.6)", cursor: "pointer",
+              background: "rgba(0,0,0,0.35)", border: "none",
+              color: "rgba(255,255,255,0.85)", cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
             <ChevronRight style={{ width: 18, height: 18 }} />
@@ -447,15 +607,14 @@ export default function ViewerPage() {
 
         {/* Bottom overlay */}
         <div style={{
-          background: "rgba(13,30,40,0.97)", backdropFilter: "blur(12px)",
-          borderTop: "1px solid rgba(79,126,255,0.12)",
-          padding: "12px 16px", flexShrink: 0, display: "flex", flexDirection: "column", gap: 10,
+          background: "rgba(10,10,11,0.96)", backdropFilter: "blur(12px)",
+          padding: "12px 16px", flexShrink: 0, display: "flex", flexDirection: "column", gap: 12,
         }}>
           {/* Select button */}
           <SelectButton />
 
           {/* Stars + Colors */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ display: "flex", gap: 2 }}>
               {([1, 2, 3, 4, 5] as const).map((s) => {
                 const filled = s <= (hoverStar || star || 0);
@@ -474,7 +633,6 @@ export default function ViewerPage() {
                 );
               })}
             </div>
-            <span style={{ width: 1, height: 20, background: "rgba(79,126,255,0.15)", flexShrink: 0 }} />
             <div style={{ display: "flex", gap: 6 }}>
               {COLOR_OPTIONS.map((opt) => {
                 const isActive = color === opt.key;
@@ -501,15 +659,15 @@ export default function ViewerPage() {
               placeholder="코멘트..."
               style={{
                 flex: 1, padding: "8px 10px",
-                background: "rgba(39,39,42,0.75)", border: "1px solid rgba(79,126,255,0.12)",
-                borderRadius: 7, color: "#fafafa", fontSize: 12,
+                background: "rgba(39,39,42,0.6)", border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 8, color: "#fafafa", fontSize: 12,
                 fontFamily: "'Pretendard', system-ui, sans-serif", resize: "none", height: 44, lineHeight: 1.5, outline: "none",
               }}
             />
             <button type="button" onClick={saveComment}
               style={{
-                height: 44, padding: "0 14px", borderRadius: 7,
-                background: "rgba(63,63,70,0.55)", border: "1px solid rgba(79,126,255,0.12)",
+                height: 44, padding: "0 14px", borderRadius: 8,
+                background: "rgba(255,255,255,0.06)", border: "none",
                 color: "#a1a1aa", fontSize: 12, cursor: "pointer", flexShrink: 0,
                 fontFamily: "'Pretendard', system-ui, sans-serif",
               }}>

@@ -8,6 +8,7 @@ import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
 import FullScreenCompareModal from "@/components/FullScreenCompareModal";
 import { PHOTOGRAPHER_THEME as T, PS_DISPLAY } from "@/lib/photographer-theme";
+import { BrandLogoBar } from "@/components/BrandLogo";
 
 /* ── design tokens ──────────────────────────── */
 const SURFACE = T.surface;
@@ -152,16 +153,7 @@ export default function ReviewViewerPage() {
       }}>
         {/* Left: logo + divider + back */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{
-              width: 22, height: 22, background: SURFACE2, border: `1px solid ${BORDER_MD}`,
-              borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center",
-              ...playfair, fontSize: 10, color: STEEL,
-            }}>A</div>
-            <span style={{ ...playfair, fontSize: 13, color: TEXT }}>
-              PhotoSelect
-            </span>
-          </div>
+          <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
           <span style={{ width: 1, height: 16, background: BORDER, display: "inline-block" }} />
           <Link href={`/c/${token}/review`}
             style={{

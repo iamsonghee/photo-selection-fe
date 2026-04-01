@@ -2,9 +2,10 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Aperture, PackageCheck } from "lucide-react";
+import { PackageCheck } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { PS_DISPLAY } from "@/lib/photographer-theme";
+import { BrandLogoBar } from "@/components/BrandLogo";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 
@@ -16,13 +17,10 @@ const gridBg: React.CSSProperties = {
   backgroundSize: "48px 48px",
 };
 
-function PageHeader({ right }: { right?: React.ReactNode }) {
+function PageHeader({ right, inviteHref }: { right?: React.ReactNode; inviteHref?: string }) {
   return (
     <header className="sticky top-0 z-50 flex h-12 items-center justify-between border-b border-white/10 px-4" style={headerBg}>
-      <div className="flex items-center gap-2">
-        <Aperture className="h-4 w-4 text-[#4f7eff]" />
-        <span className="text-[15px] font-bold tracking-tight text-zinc-100" style={playfair}>PhotoSelect</span>
-      </div>
+      <BrandLogoBar size="sm" href={inviteHref} />
       {right && <div className="text-[12px] text-zinc-400">{right}</div>}
     </header>
   );
@@ -31,7 +29,7 @@ function PageHeader({ right }: { right?: React.ReactNode }) {
 function PageFooter() {
   return (
     <footer className="py-5 text-center text-[11px] text-zinc-500">
-      © 2026 PhotoSelect
+      © 2026 A CUT
     </footer>
   );
 }
@@ -72,7 +70,7 @@ export default function DeliveredPage() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100" style={gridBg}>
-      <PageHeader right={project.name} />
+      <PageHeader right={project.name} inviteHref={token ? `/c/${token}` : undefined} />
 
       <div className="flex min-h-[calc(100vh-48px)] flex-col items-center justify-center px-4 py-8">
         <div className="w-full max-w-[440px] rounded-2xl border border-white/10 bg-[#111318]/95 p-6 text-center md:p-8" style={{ backdropFilter: "blur(8px)" }}>

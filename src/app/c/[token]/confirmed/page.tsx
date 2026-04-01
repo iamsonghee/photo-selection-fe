@@ -5,10 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { Aperture, CheckCircle2, Lock, Image as ImageIcon, Clock, Package } from "lucide-react";
+import { CheckCircle2, Lock, Image as ImageIcon, Clock, Package } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { getProfileImageUrl } from "@/lib/photographer";
 import { PS_DISPLAY } from "@/lib/photographer-theme";
+import { BrandLogoBar } from "@/components/BrandLogo";
 
 const CUSTOMER_CANCEL_MAX = 3;
 
@@ -23,13 +24,10 @@ type PhotographerInfo = {
 const playfair: React.CSSProperties = { fontFamily: PS_DISPLAY };
 const headerBg: React.CSSProperties = { background: "rgba(10,10,11,0.92)", backdropFilter: "blur(12px)" };
 
-function PageHeader({ right }: { right?: React.ReactNode }) {
+function PageHeader({ right, inviteHref }: { right?: React.ReactNode; inviteHref?: string }) {
   return (
     <header className="sticky top-0 z-50 flex h-12 items-center justify-between border-b border-white/10 px-4" style={headerBg}>
-      <div className="flex items-center gap-2">
-        <Aperture className="h-4 w-4 text-[#4f7eff]" />
-        <span className="text-[15px] font-bold tracking-tight text-zinc-100" style={playfair}>PhotoSelect</span>
-      </div>
+      <BrandLogoBar size="sm" href={inviteHref} />
       {right && <div className="text-[12px] text-zinc-400">{right}</div>}
     </header>
   );
@@ -38,7 +36,7 @@ function PageHeader({ right }: { right?: React.ReactNode }) {
 function PageFooter() {
   return (
     <footer className="py-5 text-center text-[11px] text-zinc-500">
-      © 2026 PhotoSelect
+      © 2026 A CUT
     </footer>
   );
 }
@@ -130,7 +128,7 @@ export default function ConfirmedPage() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100">
-      <PageHeader right={project.name} />
+      <PageHeader right={project.name} inviteHref={token ? `/c/${token}` : undefined} />
 
       <div className="mx-auto max-w-[520px] px-4 pt-8 pb-16">
         {/* Hero */}

@@ -14,6 +14,7 @@ import {
 import type { GalleryFilterState } from "@/lib/gallery-filter";
 import type { StarRating, ColorTag, SortOrder } from "@/types";
 import { PS_DISPLAY } from "@/lib/photographer-theme";
+import { BrandLogoBar } from "@/components/BrandLogo";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 
@@ -154,7 +155,7 @@ export default function GalleryPageClient() {
         <p className="text-sm" style={{ color: "#3a5a6e" }}>사진을 불러올 수 없습니다.</p>
         <Link href={`/c/${token}`}
           className="rounded-xl px-4 py-2 text-[13px] transition-colors hover:opacity-80"
-          style={{ border: "1px solid rgba(79,126,255,0.2)", color: "#4f7eff" }}>
+          style={{ border: "none", background: "rgba(255,255,255,0.06)", color: "#7aa3ff" }}>
           초대 페이지로 돌아가기
         </Link>
       </div>
@@ -171,18 +172,10 @@ export default function GalleryPageClient() {
       {/* ── Header ── */}
       <header
         className="sticky top-0 z-[100] flex h-12 items-center justify-between px-4"
-        style={{ background: "rgba(10,10,11,0.92)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(79,126,255,0.12)" }}
+        style={{ background: "rgba(10,10,11,0.92)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
       >
         {/* Logo */}
-        <div className="flex items-center gap-[7px]">
-          <div
-            className="flex h-6 w-6 items-center justify-center rounded-[5px]"
-            style={{ background: "rgba(39,39,42,0.75)", border: "1px solid rgba(79,126,255,0.22)" }}
-          >
-            <span style={{ ...playfair, fontSize: 11, color: "#4f7eff" }}>P</span>
-          </div>
-          <span style={{ ...playfair, fontSize: 14, color: "#fafafa" }}>PhotoSelect</span>
-        </div>
+        <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
 
         {/* Right: photographer + count */}
         <div className="flex items-center gap-2.5">
@@ -193,7 +186,7 @@ export default function GalleryPageClient() {
           )}
           <span
             className="rounded-full px-[9px] py-[3px] text-[12px] font-semibold"
-            style={{ background: "rgba(79,126,255,0.12)", border: "1px solid rgba(79,126,255,0.2)", color: "#4f7eff" }}
+            style={{ background: "rgba(79,126,255,0.14)", border: "none", color: "#7aa3ff" }}
           >
             {Y} / {N}
           </span>
@@ -202,11 +195,13 @@ export default function GalleryPageClient() {
 
       {/* ── Filter bar ── */}
       <div
-        className="sticky top-12 z-[90]"
-        style={{ background: "rgba(10,10,11,0.92)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(79,126,255,0.12)" }}
+        className={`sticky top-12 ${showSortMenu ? "z-[110]" : "z-[90]"}`}
+        style={{ background: "rgba(10,10,11,0.92)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
       >
         <div
-          className="flex items-center gap-1.5 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className={`flex items-center gap-1.5 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+            showSortMenu ? "overflow-visible" : "overflow-x-auto"
+          }`}
         >
           {/* Tabs: 전체 / 선택됨 */}
           {(["all", "selected"] as const).map((v) => (
@@ -217,9 +212,9 @@ export default function GalleryPageClient() {
               className="shrink-0 rounded-full text-[12px] font-medium transition-all"
               style={{
                 padding: "5px 12px",
-                border: tabFilter === v ? "1px solid rgba(79,126,255,0.3)" : "1px solid rgba(79,126,255,0.12)",
-                background: tabFilter === v ? "rgba(79,126,255,0.12)" : "transparent",
-                color: tabFilter === v ? "#4f7eff" : "#a1a1aa",
+                border: "none",
+                background: tabFilter === v ? "rgba(79,126,255,0.15)" : "rgba(255,255,255,0.05)",
+                color: tabFilter === v ? "#7aa3ff" : "#a1a1aa",
                 whiteSpace: "nowrap",
                 cursor: "pointer",
               }}
@@ -228,7 +223,7 @@ export default function GalleryPageClient() {
             </button>
           ))}
 
-          <span className="mx-0.5 h-4 w-px shrink-0" style={{ background: "rgba(79,126,255,0.12)" }} />
+          <span className="w-2 shrink-0" aria-hidden />
 
           {/* Interactive star filter */}
           {([1, 2, 3, 4, 5] as const).map((s) => {
@@ -258,7 +253,7 @@ export default function GalleryPageClient() {
             );
           })}
 
-          <span className="mx-0.5 h-4 w-px shrink-0" style={{ background: "rgba(79,126,255,0.12)" }} />
+          <span className="w-2 shrink-0" aria-hidden />
 
           {/* Color dot filters */}
           {COLOR_OPTIONS.map((opt) => {
@@ -275,8 +270,8 @@ export default function GalleryPageClient() {
                   height: 28,
                   borderRadius: 20,
                   padding: "5px 6px",
-                  border: isActive ? "1px solid rgba(79,126,255,0.3)" : "1px solid rgba(79,126,255,0.12)",
-                  background: isActive ? "rgba(39,39,42,0.75)" : "transparent",
+                  border: isActive ? "1px solid rgba(255,255,255,0.2)" : "1px solid transparent",
+                  background: isActive ? "rgba(255,255,255,0.06)" : "transparent",
                   cursor: "pointer",
                 }}
               >
@@ -297,9 +292,9 @@ export default function GalleryPageClient() {
             style={{
               padding: "4px 6px",
               borderRadius: 6,
-              border: "1px solid rgba(79,126,255,0.12)",
-              color: "#3a5a6e",
-              background: "none",
+              border: "none",
+              color: "#71717a",
+              background: "rgba(255,255,255,0.06)",
               cursor: "pointer",
             }}
           >
@@ -315,10 +310,10 @@ export default function GalleryPageClient() {
               style={{
                 padding: "4px 8px",
                 borderRadius: 6,
-                border: "1px solid rgba(79,126,255,0.12)",
+                border: "none",
                 color: "#a1a1aa",
                 fontSize: 11,
-                background: "none",
+                background: "rgba(255,255,255,0.05)",
                 cursor: "pointer",
                 whiteSpace: "nowrap",
               }}
@@ -329,7 +324,7 @@ export default function GalleryPageClient() {
             {showSortMenu && (
               <div
                 className="absolute right-0 top-full mt-1 z-[200] overflow-hidden rounded-lg shadow-xl"
-                style={{ background: "rgba(24,24,27,0.85)", border: "1px solid rgba(79,126,255,0.2)", minWidth: 100 }}
+                style={{ background: "rgba(24,24,27,0.96)", border: "1px solid rgba(255,255,255,0.08)", minWidth: 100 }}
               >
                 {SORT_OPTIONS.map((opt) => (
                   <button
@@ -350,7 +345,7 @@ export default function GalleryPageClient() {
 
       {/* ── Gallery grid ── */}
       <div style={{ padding: "10px 10px 20px" }}>
-        <div className="grid grid-cols-3 gap-[6px] sm:grid-cols-4 lg:grid-cols-6">
+        <div className="grid grid-cols-3 gap-[6px] sm:grid-cols-4 lg:grid-cols-8">
           {filteredPhotos.map((photo) => {
             const selected = selectedIds.has(photo.id);
             const state = photoStates[photo.id];
@@ -366,7 +361,7 @@ export default function GalleryPageClient() {
                 style={{
                   aspectRatio: "1 / 1",
                   background: "rgba(39,39,42,0.75)",
-                  border: selected ? "2px solid #4f7eff" : "1px solid rgba(79,126,255,0.12)",
+                  border: selected ? "2px solid #4f7eff" : "1px solid rgba(255,255,255,0.08)",
                 }}
               >
                 {/* Selected tint overlay */}
@@ -454,7 +449,7 @@ export default function GalleryPageClient() {
       {/* ── Bottom bar ── */}
       <div
         className="fixed bottom-0 left-0 right-0 z-[100] flex items-center justify-between gap-3 px-4 py-2.5 backdrop-blur"
-        style={{ background: "rgba(9,9,11,0.97)", borderTop: "1px solid rgba(79,126,255,0.15)" }}
+        style={{ background: "rgba(9,9,11,0.98)", borderTop: "1px solid rgba(255,255,255,0.06)" }}
       >
         {/* Left: text + progress */}
         <div className="flex flex-1 flex-col gap-[3px]">
@@ -502,7 +497,7 @@ export default function GalleryPageClient() {
         >
           <div
             className="w-full max-w-sm rounded-2xl p-6 shadow-xl"
-            style={{ background: "rgba(24,24,27,0.85)", border: "1px solid rgba(79,126,255,0.2)" }}
+            style={{ background: "rgba(20,20,22,0.96)", border: "1px solid rgba(255,255,255,0.08)" }}
             onClick={(e) => e.stopPropagation()}
           >
             <h3
@@ -525,7 +520,7 @@ export default function GalleryPageClient() {
                 type="button"
                 onClick={() => !confirming && setShowConfirmModal(false)}
                 className="flex h-11 flex-1 items-center justify-center rounded-xl text-[13px]"
-                style={{ border: "1px solid rgba(79,126,255,0.2)", color: "#a1a1aa", background: "none" }}
+                style={{ border: "none", color: "#a1a1aa", background: "rgba(255,255,255,0.06)" }}
               >
                 취소
               </button>

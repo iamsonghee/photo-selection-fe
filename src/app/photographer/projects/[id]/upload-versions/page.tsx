@@ -23,7 +23,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { getPhotosWithSelections, getProjectById } from "@/lib/db";
 import { BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
-import { buildVersionMapping, remapSingleFile, type MappingResult } from "@/lib/version-mapping";
+import { buildVersionMapping, clearSingleFile, remapSingleFile, type MappingResult } from "@/lib/version-mapping";
 import type { Photo, Project } from "@/types";
 import CompareViewerModal from "@/components/CompareViewerModal";
 import { PHOTOGRAPHER_THEME as C } from "@/lib/photographer-theme";
@@ -102,11 +102,24 @@ export default function UploadVersionsPage() {
     [photos]
   );
 
-  // ── rebuild mapping when files change ──
+  const uploadedFilesRef = useRef<File[]>([]);
   useEffect(() => {
-    if (uploadedFiles.length === 0) { setMapping([]); return; }
-    setMapping(buildVersionMapping(uploadedFiles, targets));
-  }, [uploadedFiles, targets]);
+    uploadedFilesRef.current = uploadedFiles;
+  }, [uploadedFiles]);
+
+  /** 타깃 목록이 바뀔 때만 매핑 구조를 맞추고, 같은 사진 집합이면 행 단위 편집(취소·개별 변경)은 유지 */
+  useEffect(() => {
+    if (targets.length === 0) return;
+    setMapping((prev) => {
+      const sameStructure =
+        prev.length === targets.length &&
+        prev.every((m, i) => m.target.id === targets[i]?.id);
+      if (sameStructure) return prev;
+      const files = uploadedFilesRef.current;
+      if (files.length === 0) return buildVersionMapping([], targets);
+      return buildVersionMapping(files, targets);
+    });
+  }, [targets]);
 
   // ── load server-side version info (항상) ──
   useEffect(() => {
@@ -174,6 +187,8 @@ export default function UploadVersionsPage() {
     setCompareOpen(true);
   }, [comparePhotos, targets]);
 
+  const localMappedFileCount = useMemo(() => mapping.filter((m) => m.file != null).length, [mapping]);
+
   const stats = useMemo(() => {
     let exact = 0, order = 0;
     mapping.forEach((m) => { if (m.type === "exact") exact++; else if (m.type === "order") order++; });
@@ -186,7 +201,22 @@ export default function UploadVersionsPage() {
   }, [isReadOnly, project?.status, targets.length, mapping]);
 
   const handleDropFiles = useCallback((files: File[]) => {
-    setUploadedFiles(files.filter((f) => ["image/jpeg", "image/png", "image/webp"].includes(f.type)));
+    const filtered = files.filter((f) => ["image/jpeg", "image/png", "image/webp"].includes(f.type));
+    if (targets.length === 0) return;
+    setUploadedFiles(filtered);
+    setMapping(buildVersionMapping(filtered, targets));
+  }, [targets]);
+
+  const handleClearFile = useCallback((targetId: string) => {
+    let fileToRemove: File | null = null;
+    setMapping((prev) => {
+      const row = prev.find((r) => r.target.id === targetId);
+      fileToRemove = row?.file ?? null;
+      return clearSingleFile(prev, targetId);
+    });
+    if (fileToRemove) {
+      setUploadedFiles((ufs) => ufs.filter((f) => f !== fileToRemove));
+    }
   }, []);
 
   const handleChangeOne = useCallback((targetId: string) => {
@@ -392,16 +422,16 @@ export default function UploadVersionsPage() {
                 onDrop={(e) => { e.preventDefault(); setDragOver(false); handleDropFiles(Array.from(e.dataTransfer.files)); }}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
-                onClick={() => uploadedFiles.length === 0 && multiInputRef.current?.click()}
+                onClick={() => localMappedFileCount === 0 && multiInputRef.current?.click()}
                 style={{
-                  border: `2px dashed ${uploadedFiles.length > 0 ? "rgba(46,213,115,0.4)" : dragOver ? C.steel : C.borderMd}`,
+                  border: `2px dashed ${localMappedFileCount > 0 ? "rgba(46,213,115,0.4)" : dragOver ? C.steel : C.borderMd}`,
                   borderRadius: 12, padding: "22px 20px", textAlign: "center",
-                  cursor: uploadedFiles.length === 0 ? "pointer" : "default",
-                  background: uploadedFiles.length > 0 ? "rgba(46,213,115,0.02)" : dragOver ? "rgba(79,126,255,0.05)" : "rgba(79,126,255,0.02)",
+                  cursor: localMappedFileCount === 0 ? "pointer" : "default",
+                  background: localMappedFileCount > 0 ? "rgba(46,213,115,0.02)" : dragOver ? "rgba(79,126,255,0.05)" : "rgba(79,126,255,0.02)",
                   transition: "all 0.2s",
                 }}
               >
-                {uploadedFiles.length === 0 ? (
+                {localMappedFileCount === 0 ? (
                   <>
                     <div style={{ marginBottom: 8, display: "flex", justifyContent: "center" }}>
                       <FolderOpen size={24} color={C.dim} />
@@ -430,7 +460,7 @@ export default function UploadVersionsPage() {
                       <CheckCircle2 size={24} color={C.green} />
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 500, color: C.text, marginBottom: 4 }}>
-                      {uploadedFiles.length}장 업로드됨
+                      {localMappedFileCount}장 업로드됨
                     </div>
                     <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>
                       파일명 자동 매핑 완료 · 아래에서 확인해주세요
@@ -497,6 +527,7 @@ export default function UploadVersionsPage() {
                       previewUrl={item.serverUrl}
                       isReadOnly
                       onChangeOne={handleChangeOne}
+                      onClearFile={() => {}}
                       onCompare={openCompareByTarget}
                       onOpenLightbox={openLightbox}
                     />
@@ -511,6 +542,7 @@ export default function UploadVersionsPage() {
                       previewUrl={localPreviewMap.get(m.target.id)}
                       isReadOnly={false}
                       onChangeOne={handleChangeOne}
+                      onClearFile={handleClearFile}
                       onCompare={openCompareByTarget}
                       onOpenLightbox={openLightbox}
                     />
@@ -723,7 +755,7 @@ function SelectedThumb({ target, num, onClick }: { target: V1Target; num: number
         cursor: onClick ? "zoom-in" : "default",
       }}
     >
-      <div style={{ aspectRatio: "3/2", background: C.surface2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+      <div style={{ aspectRatio: "1/1", background: C.surface2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
         {target.photo.url && !err ? (
           <img src={target.photo.url} alt="" onError={() => setErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
@@ -737,15 +769,33 @@ function SelectedThumb({ target, num, onClick }: { target: V1Target; num: number
           {num}
         </div>
       </div>
-      <div style={{ padding: "4px 6px", fontSize: 9, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {target.filename}
+      <div style={{ padding: "4px 6px" }}>
+        <div style={{ fontSize: 9, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {target.filename}
+        </div>
+        {target.photo.comment?.trim() ? (
+          <div
+            style={{
+              marginTop: 3,
+              fontSize: 9,
+              color: C.dim,
+              lineHeight: 1.25,
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            {target.photo.comment}
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
 function MappingCard({
-  target, file, type, orderIndex, previewUrl, isReadOnly, onChangeOne, onCompare, onOpenLightbox,
+  target, file, type, orderIndex, previewUrl, isReadOnly, onChangeOne, onClearFile, onCompare, onOpenLightbox,
 }: {
   target: V1Target;
   file: File | null;
@@ -754,6 +804,7 @@ function MappingCard({
   previewUrl?: string;
   isReadOnly: boolean;
   onChangeOne: (id: string) => void;
+  onClearFile: (id: string) => void;
   onCompare: (id: string) => void;
   onOpenLightbox: (items: Array<{ url: string; label: string; sublabel?: string | null }>, index: number) => void;
 }) {
@@ -771,7 +822,7 @@ function MappingCard({
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
           <div
             onClick={() => target.photo.url && onOpenLightbox([{ url: viewerImageUrl(target.photo), label: target.filename, sublabel: "원본 선택 사진" }], 0)}
-            style={{ width: 52, height: 38, background: C.surface3, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${C.border}`, overflow: "hidden", cursor: target.photo.url ? "zoom-in" : "default" }}
+            style={{ width: 52, height: 52, background: C.surface3, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${C.border}`, overflow: "hidden", cursor: target.photo.url ? "zoom-in" : "default" }}
           >
             {target.photo.url && !origErr ? (
               <img src={target.photo.url} alt="" onError={() => setOrigErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -779,7 +830,9 @@ function MappingCard({
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 11, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2, color: C.text }}>{target.filename}</div>
-            <div style={{ fontSize: 10, color: C.muted }}>원본 선택 사진</div>
+            {target.photo.comment?.trim() ? (
+              <div style={{ fontSize: 10, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", lineHeight: 1.3 }}>{target.photo.comment}</div>
+            ) : null}
           </div>
         </div>
 
@@ -789,7 +842,7 @@ function MappingCard({
         {/* Retouched */}
         {state === "empty" ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <div style={{ width: 52, height: 38, background: "transparent", borderRadius: 5, border: `2px dashed ${C.border}`, flexShrink: 0 }} />
+            <div style={{ width: 52, height: 52, background: "transparent", borderRadius: 5, border: `2px dashed ${C.border}`, flexShrink: 0 }} />
             <div style={{ fontSize: 11, color: C.dim, fontStyle: "italic" }}>보정본 없음</div>
           </div>
         ) : (
@@ -797,7 +850,7 @@ function MappingCard({
             style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, cursor: previewUrl ? "zoom-in" : "default" }}
             onClick={() => previewUrl && onCompare(target.id)}
           >
-            <div style={{ width: 52, height: 38, background: "#1a2535", borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+            <div style={{ width: 52, height: 52, background: "#1a2535", borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${C.border}`, overflow: "hidden" }}>
               {previewUrl && !retouchErr ? (
                 <img src={previewUrl} alt="" onError={() => setRetouchErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : <Image size={16} color={C.dim} />}
@@ -812,7 +865,7 @@ function MappingCard({
         )}
 
         {/* Actions */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, paddingLeft: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, paddingLeft: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           {state === "matched" && (
             <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 500, whiteSpace: "nowrap", color: C.green, background: C.greenDim, border: "1px solid rgba(46,213,115,0.3)", display: "flex", alignItems: "center", gap: 3 }}>
               <Check size={9} />파일명 일치
@@ -828,8 +881,26 @@ function MappingCard({
               <AlertCircle size={9} />미업로드
             </span>
           )}
+          {!isReadOnly && file != null && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onClearFile(target.id); }}
+              style={{
+                padding: "3px 8px", borderRadius: 5,
+                border: `1px solid rgba(255,71,87,0.35)`,
+                background: "transparent",
+                color: C.red,
+                fontSize: 10, cursor: "pointer", fontFamily: "inherit",
+                display: "flex", alignItems: "center", gap: 3,
+                transition: "all 0.15s",
+              }}
+            >
+              <X size={9} />취소
+            </button>
+          )}
           {!isReadOnly && (
             <button
+              type="button"
               onClick={() => onChangeOne(target.id)}
               style={{
                 padding: "3px 8px", borderRadius: 5,

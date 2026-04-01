@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { BrandLogoBar } from "@/components/BrandLogo";
 
 const ease = "cubic-bezier(0.16, 1, 0.3, 1)";
 
@@ -115,8 +116,8 @@ export default function AuthPage() {
 
       <div className="relative z-10 mx-auto flex min-h-[100dvh] max-w-6xl flex-col justify-center px-4 py-10 md:px-8 md:py-16 lg:py-20">
         <header className="mb-10 flex items-center justify-between md:mb-12" style={fadeIn(0)}>
-          <Link href="/auth" className="font-display text-lg font-semibold tracking-tight text-white">
-            PhotoSelect
+          <Link href="/auth" className="inline-flex items-center">
+            <BrandLogoBar size="md" priority />
           </Link>
           <Link
             href="/about"
@@ -185,7 +186,7 @@ export default function AuthPage() {
                 <div className="px-6 py-9 sm:px-8 sm:py-10">
                   <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#7ea3ff]">시작하기</p>
                   <h2 className="auth-break mt-2 font-display text-2xl font-semibold leading-snug text-white">
-                    PhotoSelect에
+                    A CUT에
                     <br />
                     오신 걸 환영합니다
                   </h2>
