@@ -332,7 +332,13 @@ export default function UploadPage() {
           } catch {}
           allFailed.push(...batch);
         }
-      } catch {
+      } catch (e) {
+        // 네트워크 오류(서버 연결 불가)면 즉시 중단
+        if (e instanceof TypeError) {
+          setError("서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요.");
+          setUploadPhase("idle"); setUploadProgress(0); setFiles([]);
+          return;
+        }
         allFailed.push(...batch);
       }
 
