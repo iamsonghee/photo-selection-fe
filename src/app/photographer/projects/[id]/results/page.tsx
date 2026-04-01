@@ -21,23 +21,8 @@ import {
 } from "lucide-react";
 import { getProjectById, getPhotosWithSelections } from "@/lib/db";
 import type { Project, Photo, ColorTag } from "@/types";
-
-// ---------- color tokens ----------
-const C = {
-  surface:   "#0f2030",
-  surface2:  "#152a3a",
-  surface3:  "#1a3347",
-  steel:     "#669bbc",
-  border:    "rgba(102,155,188,0.12)",
-  borderMd:  "rgba(102,155,188,0.22)",
-  text:      "#e8eef2",
-  muted:     "#7a9ab0",
-  dim:       "#3a5a6e",
-  green:     "#2ed573",
-  greenDim:  "#0f2a1e",
-  orange:    "#f5a623",
-  red:       "#ff4757",
-};
+import { PHOTOGRAPHER_THEME as C } from "@/lib/photographer-theme";
+import { viewerImageUrl } from "@/lib/viewer-image-url";
 
 // ---------- utils (preserved) ----------
 function sanitizeFilenamePart(s: string) {
@@ -274,8 +259,8 @@ export default function ResultsPage() {
               style={{
                 display: "flex", alignItems: "center", gap: 5,
                 padding: "8px 16px",
-                background: "rgba(102,155,188,0.15)",
-                border: "1px solid rgba(102,155,188,0.3)",
+                background: "rgba(79,126,255,0.15)",
+                border: "1px solid rgba(79,126,255,0.3)",
                 borderRadius: 8, color: C.steel,
                 fontSize: 12, fontWeight: 500, cursor: "pointer",
                 fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0,
@@ -292,14 +277,14 @@ export default function ResultsPage() {
       {isSelecting && (
         <div style={{
           margin: "16px 24px 0",
-          background: "rgba(102,155,188,0.06)",
-          border: "1px solid rgba(102,155,188,0.2)",
+          background: "rgba(79,126,255,0.06)",
+          border: "1px solid rgba(79,126,255,0.2)",
           borderRadius: 12, padding: "14px 20px",
           display: "flex", alignItems: "center", gap: 14,
         }}>
           <div style={{
             width: 36, height: 36,
-            background: "rgba(102,155,188,0.1)", border: "1px solid rgba(102,155,188,0.3)",
+            background: "rgba(79,126,255,0.1)", border: "1px solid rgba(79,126,255,0.3)",
             borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
             flexShrink: 0,
           }}>
@@ -325,7 +310,7 @@ export default function ResultsPage() {
           <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>선택된 사진</span>
           <span style={{
             padding: "3px 9px", borderRadius: 20,
-            background: "rgba(102,155,188,0.12)", border: "1px solid rgba(102,155,188,0.2)",
+            background: "rgba(79,126,255,0.12)", border: "1px solid rgba(79,126,255,0.2)",
             fontSize: 12, color: C.steel, fontWeight: 500,
           }}>
             {photos.length}장
@@ -427,7 +412,7 @@ export default function ResultsPage() {
         <div style={{
           position: "fixed", bottom: 0, left: 220, right: 0,
           background: "rgba(0,48,73,0.95)",
-          borderTop: "1px solid rgba(102,155,188,0.15)",
+          borderTop: "1px solid rgba(79,126,255,0.15)",
           backdropFilter: "blur(12px)",
           padding: "12px 24px",
           display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -832,7 +817,7 @@ function Lightbox({
       >
         <img
           key={photo.id}
-          src={photo.url}
+          src={viewerImageUrl(photo)}
           alt={filename}
           style={{
             maxHeight: "75vh", maxWidth: "90vw",
@@ -844,7 +829,7 @@ function Lightbox({
         {/* Info bar */}
         <div style={{
           marginTop: 14,
-          background: "rgba(15,32,48,0.9)", border: "1px solid rgba(102,155,188,0.15)",
+          background: C.modalScrim, border: "1px solid rgba(79,126,255,0.15)",
           borderRadius: 10, padding: "12px 18px",
           width: "100%", maxWidth: 560,
         }}>

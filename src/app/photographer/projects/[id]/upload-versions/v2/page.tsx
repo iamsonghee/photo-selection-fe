@@ -29,25 +29,8 @@ import { buildVersionMapping, remapSingleFile, type MappingResult } from "@/lib/
 import type { Photo, Project } from "@/types";
 import CompareViewerModal from "@/components/CompareViewerModal";
 import { BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
-
-// ---------- color tokens ----------
-const C = {
-  surface:   "#0f2030",
-  surface2:  "#152a3a",
-  surface3:  "#1a3347",
-  steel:     "#669bbc",
-  border:    "rgba(102,155,188,0.12)",
-  borderMd:  "rgba(102,155,188,0.22)",
-  text:      "#e8eef2",
-  muted:     "#7a9ab0",
-  dim:       "#3a5a6e",
-  green:     "#2ed573",
-  greenDim:  "#0f2a1e",
-  orange:    "#f5a623",
-  orangeDim: "#2a1a08",
-  red:       "#ff4757",
-  redDim:    "#2a0f12",
-};
+import { PHOTOGRAPHER_THEME as C } from "@/lib/photographer-theme";
+import { viewerImageUrl } from "@/lib/viewer-image-url";
 
 function getDisplayFilename(p: Photo): string {
   return (p.originalFilename ?? "").trim() || String(p.orderIndex);
@@ -220,7 +203,7 @@ export default function UploadVersionsV2Page() {
         const v2 = localV2PreviewMap.get(t.id) ?? serverV2Map.get(t.id);
         if (!v1 && !v2) return null;
         return {
-          original: { url: t.photo.url, filename: t.filename },
+          original: { url: viewerImageUrl(t.photo), filename: t.filename },
           v1: v1 ? { url: v1, filename: t.filename } : undefined,
           v2: v2 ? { url: v2, filename: t.filename } : undefined,
         };
@@ -354,7 +337,7 @@ export default function UploadVersionsV2Page() {
     : [];
 
   const lightboxRevisionItems = useMemo(
-    () => revisionTargets.map((t) => ({ url: t.photo.url, label: t.filename, sublabel: t.comment })),
+    () => revisionTargets.map((t) => ({ url: viewerImageUrl(t.photo), label: t.filename, sublabel: t.comment })),
     [revisionTargets]
   );
 
@@ -413,7 +396,7 @@ export default function UploadVersionsV2Page() {
       {isReadOnly && (
         <div style={{
           margin: "16px 24px 0",
-          background: "rgba(102,155,188,0.06)", border: "1px solid rgba(102,155,188,0.2)",
+          background: "rgba(79,126,255,0.06)", border: "1px solid rgba(79,126,255,0.2)",
           borderRadius: 12, padding: "14px 20px",
           display: "flex", alignItems: "center", gap: 12,
         }}>
@@ -495,7 +478,7 @@ export default function UploadVersionsV2Page() {
                   border: `2px dashed ${uploadedFiles.length > 0 ? "rgba(46,213,115,0.4)" : dragOver ? C.steel : C.borderMd}`,
                   borderRadius: 12, padding: "22px 20px", textAlign: "center",
                   cursor: uploadedFiles.length === 0 ? "pointer" : "default",
-                  background: uploadedFiles.length > 0 ? "rgba(46,213,115,0.02)" : dragOver ? "rgba(102,155,188,0.05)" : "rgba(102,155,188,0.02)",
+                  background: uploadedFiles.length > 0 ? "rgba(46,213,115,0.02)" : dragOver ? "rgba(79,126,255,0.05)" : "rgba(79,126,255,0.02)",
                   transition: "all 0.2s",
                 }}
               >
@@ -784,7 +767,7 @@ export default function UploadVersionsV2Page() {
         <div style={{
           position: "fixed", bottom: 0, left: 220, right: 0,
           background: "rgba(0,48,73,0.95)",
-          borderTop: "1px solid rgba(102,155,188,0.15)",
+          borderTop: "1px solid rgba(79,126,255,0.15)",
           backdropFilter: "blur(12px)",
           padding: "12px 24px",
           display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -859,8 +842,8 @@ export default function UploadVersionsV2Page() {
                 onClick={handleDeliver} disabled={submitting || !canDeliver}
                 style={{
                   flex: 1, padding: "10px 0",
-                  background: "rgba(102,155,188,0.15)",
-                  border: "1px solid rgba(102,155,188,0.3)", borderRadius: 8,
+                  background: "rgba(79,126,255,0.15)",
+                  border: "1px solid rgba(79,126,255,0.3)", borderRadius: 8,
                   color: C.steel, fontSize: 13, fontWeight: 500,
                   cursor: submitting ? "not-allowed" : "pointer", fontFamily: "inherit",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
@@ -969,7 +952,7 @@ function MappingCardV2({
           <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
             {/* original */}
             <div
-              onClick={() => target.photo.url && onOpenLightbox([{ url: target.photo.url, label: target.filename, sublabel: "원본 선택 사진" }], 0)}
+              onClick={() => target.photo.url && onOpenLightbox([{ url: viewerImageUrl(target.photo), label: target.filename, sublabel: "원본 선택 사진" }], 0)}
               style={{ width: 36, height: 28, background: C.surface3, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${C.border}`, overflow: "hidden", cursor: target.photo.url ? "zoom-in" : "default" }}
             >
               {target.photo.url && !origErr ? (
@@ -980,7 +963,7 @@ function MappingCardV2({
             {v1Url && (
               <div
                 onClick={() => onOpenLightbox([{ url: v1Url, label: target.filename, sublabel: "v1 보정본" }], 0)}
-                style={{ width: 36, height: 28, background: C.surface3, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid rgba(102,155,188,0.3)`, overflow: "hidden", cursor: "zoom-in" }}
+                style={{ width: 36, height: 28, background: C.surface3, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid rgba(79,126,255,0.3)`, overflow: "hidden", cursor: "zoom-in" }}
               >
                 {!v1Err ? (
                   <img src={v1Url} alt="" onError={() => setV1Err(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -1048,7 +1031,7 @@ function MappingCardV2({
               onClick={() => onChangeOne(target.id)}
               style={{
                 padding: "3px 8px", borderRadius: 5,
-                border: `1px solid ${state === "empty" ? "rgba(102,155,188,0.3)" : C.border}`,
+                border: `1px solid ${state === "empty" ? "rgba(79,126,255,0.3)" : C.border}`,
                 background: "transparent",
                 color: state === "empty" ? C.steel : C.dim,
                 fontSize: 10, cursor: "pointer", fontFamily: "inherit",

@@ -42,6 +42,7 @@ function mapPhotoRow(
     projectId: row.project_id,
     orderIndex: row.number,
     url: row.r2_thumb_url,
+    previewUrl: row.r2_preview_url ?? row.r2_thumb_url,
     originalFilename: row.original_filename ?? null,
     fileSize: (row as unknown as Record<string, unknown>).file_size as number | null ?? null,
     photographerMemo: row.memo ?? undefined,

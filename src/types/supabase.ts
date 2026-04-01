@@ -100,6 +100,7 @@ export interface Database {
           project_id: string;
           number: number;
           r2_thumb_url: string;
+          r2_preview_url: string | null;
           original_filename: string | null;
           memo: string | null;
           created_at: string;
@@ -109,6 +110,7 @@ export interface Database {
           project_id: string;
           number: number;
           r2_thumb_url: string;
+          r2_preview_url?: string | null;
           original_filename?: string | null;
           memo?: string | null;
           created_at?: string;
@@ -118,6 +120,7 @@ export interface Database {
           project_id?: string;
           number?: number;
           r2_thumb_url?: string;
+          r2_preview_url?: string | null;
           original_filename?: string | null;
           memo?: string | null;
           created_at?: string;

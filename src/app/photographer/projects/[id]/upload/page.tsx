@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getProjectById, getPhotosByProjectId } from "@/lib/db";
 import type { Project, Photo } from "@/types";
 import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT } from "@/lib/photographer-theme";
+import { viewerImageUrl } from "@/lib/viewer-image-url";
 
 const ACCEPT_TYPES = "image/jpeg,image/png,image/webp";
 const BACKEND_URL  = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -1023,7 +1024,7 @@ export default function UploadPage() {
             style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", padding: 12, color: "white", cursor: "pointer", zIndex: 20, fontSize: 18 }}
           >←</button>
           <img
-            src={photos[lightboxIndex].url} alt="미리보기"
+            src={viewerImageUrl(photos[lightboxIndex])} alt="미리보기"
             onClick={(e) => e.stopPropagation()}
             style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain", position: "relative", zIndex: 10 }}
           />
