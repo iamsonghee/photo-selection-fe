@@ -22,7 +22,7 @@ import type { Project, ProjectStatus } from "@/types";
 import type { ProjectLogItem } from "@/lib/db";
 import { useProfile } from "@/contexts/ProfileContext";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
-import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT } from "@/lib/photographer-theme";
+import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT, photographerDock } from "@/lib/photographer-theme";
 
 // ── preparing 상태 3단계 분기 헬퍼 ──────────────────────────
 function getPreparingBadge(photoCount: number, requiredCount: number): { label: string; color: string } {
@@ -211,6 +211,8 @@ function ProjectCard({ project }: { project: Project }) {
     }
   })();
 
+  const cardEdge = hovered ? C.borderMd : C.hairline;
+
   return (
     <div
       role="button"
@@ -226,10 +228,10 @@ function ProjectCard({ project }: { project: Project }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         background: hovered ? C.surface2 : C.surface,
-        borderTop:    `1px solid ${hovered ? C.borderMd : C.border}`,
-        borderRight:  `1px solid ${hovered ? C.borderMd : C.border}`,
-        borderBottom: `1px solid ${hovered ? C.borderMd : C.border}`,
-        borderLeft:   `3px solid ${accentColor}`,
+        borderTop: `1px solid ${cardEdge}`,
+        borderRight: `1px solid ${cardEdge}`,
+        borderBottom: `1px solid ${cardEdge}`,
+        borderLeft: `3px solid ${accentColor}`,
         borderRadius: 10,
         padding: "14px 16px",
         marginBottom: 6,
@@ -309,6 +311,7 @@ function ActionCard({
   href?: string;
 }) {
   const [hovered, setHovered] = useState(false);
+  const cardEdge = hovered ? C.borderMd : C.hairline;
   return (
     <Link href={href ?? "/photographer/projects"} style={{ textDecoration: "none" }}>
       <div
@@ -316,10 +319,10 @@ function ActionCard({
         onMouseLeave={() => setHovered(false)}
         style={{
           background: hovered ? C.surface2 : bgTint,
-          borderTop:    `2px solid ${topColor}`,
-          borderRight:  `1px solid ${hovered ? C.borderMd : C.border}`,
-          borderBottom: `1px solid ${hovered ? C.borderMd : C.border}`,
-          borderLeft:   `1px solid ${hovered ? C.borderMd : C.border}`,
+          borderTop: `2px solid ${topColor}`,
+          borderRight: `1px solid ${cardEdge}`,
+          borderBottom: `1px solid ${cardEdge}`,
+          borderLeft: `1px solid ${cardEdge}`,
           borderRadius: 10,
           padding: "14px",
           cursor: "pointer",
@@ -464,7 +467,7 @@ export default function DashboardPage() {
       {/* ── Topbar ── */}
       <div style={{
         height: 52,
-        borderBottom: `1px solid ${C.border}`,
+        ...photographerDock.bottomEdge,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -524,7 +527,6 @@ export default function DashboardPage() {
         <div style={{
           padding: "22px 22px 22px 24px",
           overflowY: "auto",
-          borderRight: `1px solid ${C.border}`,
         }}>
 
           {/* 1. 액션 필요 섹션 */}
@@ -665,7 +667,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Right column ── */}
-        <div style={{ padding: 20, overflowY: "auto", background: "rgba(0,0,0,0.12)" }}>
+        <div style={{ padding: 20, overflowY: "auto", background: "rgba(0,0,0,0.16)" }}>
 
           {/* 베타 사용량 카드 */}
           {(() => {
@@ -705,8 +707,7 @@ export default function DashboardPage() {
           {/* 통계 */}
           <div style={{
             display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8,
-            marginBottom: 16, paddingBottom: 16,
-            borderBottom: `1px solid ${C.border}`,
+            marginBottom: 16,
           }}>
             <div style={{
               background: C.surface, border: `1px solid ${C.border}`,

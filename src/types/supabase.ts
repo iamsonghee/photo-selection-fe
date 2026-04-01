@@ -103,6 +103,7 @@ export interface Database {
           r2_preview_url: string | null;
           original_filename: string | null;
           memo: string | null;
+          file_size: number | null;
           created_at: string;
         };
         Insert: {
@@ -113,6 +114,7 @@ export interface Database {
           r2_preview_url?: string | null;
           original_filename?: string | null;
           memo?: string | null;
+          file_size?: number | null;
           created_at?: string;
         };
         Update: {
@@ -123,6 +125,7 @@ export interface Database {
           r2_preview_url?: string | null;
           original_filename?: string | null;
           memo?: string | null;
+          file_size?: number | null;
           created_at?: string;
         };
       };
@@ -220,6 +223,7 @@ export interface Database {
           version: number;
           r2_url: string;
           photographer_memo: string | null;
+          file_size: number | null;
           created_at: string;
         };
         Insert: {
@@ -228,6 +232,7 @@ export interface Database {
           version: number;
           r2_url: string;
           photographer_memo?: string | null;
+          file_size?: number | null;
           created_at?: string;
         };
         Update: {
@@ -236,6 +241,7 @@ export interface Database {
           version?: number;
           r2_url?: string;
           photographer_memo?: string | null;
+          file_size?: number | null;
           created_at?: string;
         };
       };

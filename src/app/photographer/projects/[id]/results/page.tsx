@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { getProjectById, getPhotosWithSelections } from "@/lib/db";
 import type { Project, Photo, ColorTag } from "@/types";
-import { PHOTOGRAPHER_THEME as C } from "@/lib/photographer-theme";
+import { PHOTOGRAPHER_THEME as C, photographerDock } from "@/lib/photographer-theme";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 
 // ---------- utils (preserved) ----------
@@ -185,7 +185,7 @@ export default function ResultsPage() {
 
       {/* ── Topbar ── */}
       <div style={{
-        height: 52, borderBottom: `1px solid ${C.border}`,
+        height: 52, ...photographerDock.bottomEdge,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 24px",
         background: "rgba(13,30,40,0.85)", backdropFilter: "blur(12px)",

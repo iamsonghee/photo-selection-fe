@@ -12,7 +12,7 @@ import { getPhotographerIdByAuthId, getProjectsByPhotographerId } from "@/lib/db
 import { PROJECT_STATUSES, PROJECT_STATUS_LABELS } from "@/lib/project-status";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import type { Project, ProjectStatus } from "@/types";
-import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT } from "@/lib/photographer-theme";
+import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT, photographerDock } from "@/lib/photographer-theme";
 
 // ── 상수 ──────────────────────────────────────────────────────
 const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
@@ -534,7 +534,7 @@ export default function ProjectsPage() {
 
       {/* ── Topbar ── */}
       <div style={{
-        height: 52, borderBottom: `1px solid ${C.border}`,
+        height: 52, ...photographerDock.bottomEdge,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 24px",
         background: C.topbarBg, backdropFilter: "blur(12px)",
@@ -611,7 +611,7 @@ export default function ProjectsPage() {
         {/* 상태 탭 */}
         <div style={{
           display: "flex", alignItems: "center", gap: 4,
-          marginBottom: 18, borderBottom: `1px solid ${C.border}`, paddingBottom: 0,
+          marginBottom: 18, paddingBottom: 4,
         }}>
           {TABS.map((tab) => (
             <button

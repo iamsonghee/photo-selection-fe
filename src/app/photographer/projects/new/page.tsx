@@ -19,7 +19,7 @@ import { addDays, format, differenceInCalendarDays } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { createProject, getPhotographerIdByAuthId, getProjectsByPhotographerId } from "@/lib/db";
 import { BETA_MAX_PROJECTS_TOTAL } from "@/lib/beta-limits";
-import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT } from "@/lib/photographer-theme";
+import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT, photographerDock } from "@/lib/photographer-theme";
 
 // ── 촬영 유형 ──────────────────────────────────────────────
 const SHOOT_TYPES = [
@@ -173,7 +173,7 @@ export default function NewProjectPage() {
     borderRadius: 12, overflow: "hidden", marginBottom: 12,
   };
   const cardHeaderStyle: React.CSSProperties = {
-    padding: "14px 20px", borderBottom: `1px solid ${C.border}`,
+    padding: "14px 20px", borderBottom: `1px solid ${C.hairline}`,
     display: "flex", alignItems: "center", gap: 8,
   };
   const labelStyle: React.CSSProperties = {
@@ -196,7 +196,7 @@ export default function NewProjectPage() {
 
       {/* ── Topbar ── */}
       <div style={{
-        height: 52, borderBottom: `1px solid ${C.border}`,
+        height: 52, ...photographerDock.bottomEdge,
         display: "flex", alignItems: "center", gap: 12, padding: "0 28px",
         background: "rgba(13,30,40,0.85)", backdropFilter: "blur(12px)",
         position: "sticky", top: 0, zIndex: 50,

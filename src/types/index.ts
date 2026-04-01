@@ -28,7 +28,7 @@ export interface Photo {
   previewUrl?: string | null;
   /** DB original_filename. 없으면 URL에서 추출하거나 number로 fallback */
   originalFilename?: string | null;
-  /** DB file_size (bytes). 업로드 시 저장 */
+  /** DB file_size (bytes). R2에 올라간 썸네일+미리보기 JPEG 합계 */
   fileSize?: number | null;
   selected?: boolean;
   tag?: PhotoTag;

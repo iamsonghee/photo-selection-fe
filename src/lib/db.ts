@@ -421,6 +421,7 @@ export async function createPhotoVersions(
     version: 1 | 2;
     r2_url: string;
     photographer_memo?: string | null;
+    file_size?: number | null;
   }>
 ): Promise<void> {
   if (versions.length === 0) return;
@@ -429,6 +430,7 @@ export async function createPhotoVersions(
     version: v.version,
     r2_url: v.r2_url,
     photographer_memo: v.photographer_memo ?? null,
+    file_size: v.file_size ?? null,
   }));
   const { error } = await supabase.from("photo_versions").insert(rows);
   if (error) throw error;

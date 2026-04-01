@@ -30,7 +30,7 @@ import {
 import { getProjectById } from "@/lib/db";
 import { getStatusLabel } from "@/lib/project-status";
 import type { Project, ProjectStatus } from "@/types";
-import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT } from "@/lib/photographer-theme";
+import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT, photographerDock } from "@/lib/photographer-theme";
 
 // ---------- workflow helpers ----------
 type WfState = "done" | "current" | "pending";
@@ -353,7 +353,7 @@ export default function ProjectDetailPage() {
 
       {/* ── Topbar ── */}
       <div style={{
-        height: 52, borderBottom: `1px solid ${C.border}`,
+        height: 52, ...photographerDock.bottomEdge,
         display: "flex", alignItems: "center",
         padding: "0 24px",
         background: "rgba(13,30,40,0.85)", backdropFilter: "blur(12px)",
@@ -410,6 +410,7 @@ export default function ProjectDetailPage() {
       <div style={{ padding: "0 24px", marginBottom: 20 }}>
         <div style={{
           display: "flex", alignItems: "stretch",
+          gap: 0,
           background: C.surface, border: `1px solid ${C.border}`,
           borderRadius: 12, overflow: "hidden",
         }}>
@@ -421,7 +422,7 @@ export default function ProjectDetailPage() {
                 style={{
                   flex: 1, padding: "12px 14px",
                   display: "flex", alignItems: "center", gap: 8,
-                  borderRight: i < WF_STEPS.length - 1 ? `1px solid ${C.border}` : "none",
+                  borderLeft: i > 0 ? `1px solid ${C.hairline}` : "none",
                   position: "relative",
                   background:
                     state === "done" ? "rgba(46,213,115,0.03)"

@@ -26,8 +26,12 @@ import { BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
 import { buildVersionMapping, clearSingleFile, remapSingleFile, type MappingResult } from "@/lib/version-mapping";
 import type { Photo, Project } from "@/types";
 import CompareViewerModal from "@/components/CompareViewerModal";
-import { PHOTOGRAPHER_THEME as C } from "@/lib/photographer-theme";
+import { PHOTOGRAPHER_THEME as C, photographerDock } from "@/lib/photographer-theme";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
+import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
+
+/** GET /versions 에서 온 보정본 메타 (R2 저장 바이트 포함) */
+type VersionRowMeta = { url: string; fileSize: number | null };
 
 function getDisplayFilename(p: Photo): string {
   return (p.originalFilename ?? "").trim() || String(p.orderIndex);
@@ -50,7 +54,7 @@ export default function UploadVersionsPage() {
   const [loading,         setLoading]         = useState(true);
   const [uploadedFiles,       setUploadedFiles]       = useState<File[]>([]);
   const [mapping,             setMapping]             = useState<MappingResult<V1Target>[]>([]);
-  const [uploadedV1Info,      setUploadedV1Info]      = useState<Map<string, string>>(new Map());
+  const [uploadedV1Info,      setUploadedV1Info]      = useState<Map<string, VersionRowMeta>>(new Map());
   const [existingVersionCount, setExistingVersionCount] = useState<number>(0);
   const [dragOver,        setDragOver]        = useState(false);
   const [globalMemo,      setGlobalMemo]      = useState("");
@@ -135,10 +139,11 @@ export default function UploadVersionsPage() {
           list.map((v: { version?: number }) => v.version).filter(Boolean)
         );
         setExistingVersionCount(distinctVersions.size);
-        // v1 URL 매핑
-        const info = new Map<string, string>();
-        list.forEach((v: { version?: number; photo_id?: string; r2_url?: string }) => {
-          if (v.version === 1 && v.photo_id && v.r2_url) info.set(v.photo_id, v.r2_url);
+        const info = new Map<string, VersionRowMeta>();
+        list.forEach((v: { version?: number; photo_id?: string; r2_url?: string; file_size?: number | null }) => {
+          if (v.version === 1 && v.photo_id && v.r2_url) {
+            info.set(v.photo_id, { url: v.r2_url, fileSize: v.file_size ?? null });
+          }
         });
         setUploadedV1Info(info);
       })
@@ -164,7 +169,7 @@ export default function UploadVersionsPage() {
   const comparePhotos = useMemo(() => {
     return targets
       .map((t) => {
-        const retouchedUrl = localPreviewMap.get(t.id) ?? uploadedV1Info.get(t.id) ?? "";
+        const retouchedUrl = localPreviewMap.get(t.id) ?? uploadedV1Info.get(t.id)?.url ?? "";
         if (!retouchedUrl) return null;
         return {
           original: { url: viewerImageUrl(t.photo), filename: t.filename },
@@ -281,11 +286,15 @@ export default function UploadVersionsPage() {
   const emptyCount = mapping.length > 0 ? mapping.filter((m) => m.file == null).length : 0;
 
   const readOnlyItems = isReadOnly
-    ? targets.map((t) => ({
-        target: t,
-        type: (uploadedV1Info.has(t.id) ? "exact" : "none") as "exact" | "none",
-        serverUrl: uploadedV1Info.get(t.id),
-      }))
+    ? targets.map((t) => {
+        const meta = uploadedV1Info.get(t.id);
+        return {
+          target: t,
+          type: (meta ? "exact" : "none") as "exact" | "none",
+          serverUrl: meta?.url,
+          storedFileSizeBytes: meta?.fileSize ?? null,
+        };
+      })
     : [];
 
   const lightboxTargetItems = useMemo(
@@ -307,7 +316,7 @@ export default function UploadVersionsPage() {
 
       {/* ── Topbar ── */}
       <div style={{
-        height: 52, borderBottom: `1px solid ${C.border}`,
+        height: 52, ...photographerDock.bottomEdge,
         display: "flex", alignItems: "center", padding: "0 24px",
         background: "rgba(13,30,40,0.85)", backdropFilter: "blur(12px)",
         position: "sticky", top: 0, zIndex: 50,
@@ -364,7 +373,7 @@ export default function UploadVersionsPage() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", minHeight: "calc(100vh - 52px)" }}>
 
         {/* ── Left col ── */}
-        <div style={{ padding: "20px 20px 100px 24px", borderRight: `1px solid ${C.border}` }}>
+        <div style={{ padding: "20px 24px 100px 24px" }}>
 
           {/* Selected photos */}
           <div style={{ marginBottom: 18 }}>
@@ -490,13 +499,11 @@ export default function UploadVersionsPage() {
           {/* Mapping section */}
           {(displayMapping.length > 0 || isReadOnly) && (
             <>
-              {/* Divider */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 0" }}>
-                <div style={{ flex: 1, height: 1, background: C.border }} />
-                <div style={{ fontSize: 11, color: C.dim, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 8 }}>
-                  매핑 결과
+              <div style={{ margin: "20px 0 14px" }}>
+                <div style={{ fontSize: 11, color: C.dim, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>매핑 결과</span>
                   {mapping.length > 0 && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                       {stats.exact > 0 && (
                         <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11 }}>
                           <div style={{ width: 6, height: 6, borderRadius: "50%", background: C.green }} />
@@ -512,7 +519,6 @@ export default function UploadVersionsPage() {
                     </div>
                   )}
                 </div>
-                <div style={{ flex: 1, height: 1, background: C.border }} />
               </div>
 
               {/* Cards */}
@@ -525,6 +531,7 @@ export default function UploadVersionsPage() {
                       type={item.type}
                       orderIndex={undefined}
                       previewUrl={item.serverUrl}
+                      storedFileSizeBytes={item.storedFileSizeBytes}
                       isReadOnly
                       onChangeOne={handleChangeOne}
                       onClearFile={() => {}}
@@ -539,7 +546,8 @@ export default function UploadVersionsPage() {
                       file={m.file}
                       type={m.type}
                       orderIndex={m.orderIndex}
-                      previewUrl={localPreviewMap.get(m.target.id)}
+                      previewUrl={localPreviewMap.get(m.target.id) ?? uploadedV1Info.get(m.target.id)?.url}
+                      storedFileSizeBytes={uploadedV1Info.get(m.target.id)?.fileSize ?? null}
                       isReadOnly={false}
                       onChangeOne={handleChangeOne}
                       onClearFile={handleClearFile}
@@ -562,7 +570,7 @@ export default function UploadVersionsPage() {
         </div>
 
         {/* ── Right col ── */}
-        <div style={{ padding: "20px 20px 100px", background: "rgba(0,0,0,0.1)" }}>
+        <div style={{ padding: "20px 20px 100px", background: "rgba(0,0,0,0.14)" }}>
 
           {/* Project info */}
           <div style={{
@@ -572,21 +580,23 @@ export default function UploadVersionsPage() {
             <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 10, letterSpacing: "0.5px", textTransform: "uppercase" }}>
               프로젝트 정보
             </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {([
               { key: "프로젝트",   val: project.name,              style: {} },
               { key: "고객",       val: project.customerName || "—", style: {} },
               { key: "선택 사진",  val: `${targets.length}장`,      style: { color: C.steel } },
               { key: "업로드 현황",val: `${mappedCount} / ${targets.length}장`,
                 style: { color: mappedCount < targets.length ? C.orange : C.green } as CSSProperties },
-            ] as { key: string; val: string; style: CSSProperties }[]).map((row, i, arr) => (
+            ] as { key: string; val: string; style: CSSProperties }[]).map((row) => (
               <div key={row.key} style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "6px 0", borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : "none",
+                padding: "5px 0",
               }}>
                 <span style={{ fontSize: 11, color: C.dim }}>{row.key}</span>
                 <span style={{ fontSize: 12, fontWeight: 500, color: C.text, ...row.style }}>{row.val}</span>
               </div>
             ))}
+            </div>
           </div>
 
           {/* Memo */}
@@ -627,7 +637,7 @@ export default function UploadVersionsPage() {
         <div style={{
           position: "fixed", bottom: 0, left: 220, right: 0,
           background: "rgba(0,48,73,0.95)",
-          borderTop: "1px solid rgba(79,126,255,0.15)",
+          ...photographerDock.topEdge,
           backdropFilter: "blur(12px)",
           padding: "12px 24px",
           display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -795,13 +805,15 @@ function SelectedThumb({ target, num, onClick }: { target: V1Target; num: number
 }
 
 function MappingCard({
-  target, file, type, orderIndex, previewUrl, isReadOnly, onChangeOne, onClearFile, onCompare, onOpenLightbox,
+  target, file, type, orderIndex, previewUrl, storedFileSizeBytes, isReadOnly, onChangeOne, onClearFile, onCompare, onOpenLightbox,
 }: {
   target: V1Target;
   file: File | null;
   type: "exact" | "order" | "none";
   orderIndex?: number;
   previewUrl?: string;
+  /** DB·R2에 저장된 보정본 바이트 (없으면 용량 미표시) */
+  storedFileSizeBytes?: number | null;
   isReadOnly: boolean;
   onChangeOne: (id: string) => void;
   onClearFile: (id: string) => void;
@@ -812,7 +824,10 @@ function MappingCard({
   const [retouchErr, setRetouchErr] = useState(false);
   const state = isReadOnly ? (previewUrl ? "matched" : "empty") : type === "exact" ? "matched" : type === "order" ? "ordered" : "empty";
   const borderColor = state === "matched" ? "rgba(46,213,115,0.2)" : state === "ordered" ? "rgba(245,166,35,0.2)" : "rgba(255,71,87,0.2)";
-  const fileSizeStr = file ? `${(file.size / 1024 / 1024).toFixed(1)}MB` : "";
+  const fileSizeStr =
+    storedFileSizeBytes != null && storedFileSizeBytes >= 0
+      ? formatStoredFileSizeBytes(storedFileSizeBytes)
+      : "";
 
   return (
     <div style={{ background: C.surface2, border: `1px solid ${borderColor}`, borderRadius: 10, overflow: "hidden", marginBottom: 7 }}>

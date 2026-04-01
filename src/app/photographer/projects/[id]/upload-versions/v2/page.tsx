@@ -29,8 +29,11 @@ import { buildVersionMapping, clearSingleFile, remapSingleFile, type MappingResu
 import type { Photo, Project } from "@/types";
 import CompareViewerModal from "@/components/CompareViewerModal";
 import { BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
-import { PHOTOGRAPHER_THEME as C } from "@/lib/photographer-theme";
+import { PHOTOGRAPHER_THEME as C, photographerDock } from "@/lib/photographer-theme";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
+import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
+
+type VersionRowMeta = { url: string; fileSize: number | null };
 
 function getDisplayFilename(p: Photo): string {
   return (p.originalFilename ?? "").trim() || String(p.orderIndex);
@@ -63,8 +66,8 @@ export default function UploadVersionsV2Page() {
   const [reviews,         setReviews]         = useState<
     Array<{ photoId: string; status: "approved" | "revision_requested"; customerComment: string | null }>
   >([]);
-  const [serverV1Map,         setServerV1Map]         = useState<Map<string, string>>(new Map());
-  const [serverV2Map,         setServerV2Map]         = useState<Map<string, string>>(new Map());
+  const [serverV1Map,         setServerV1Map]         = useState<Map<string, VersionRowMeta>>(new Map());
+  const [serverV2Map,         setServerV2Map]         = useState<Map<string, VersionRowMeta>>(new Map());
   const [existingVersionCount, setExistingVersionCount] = useState<number>(0);
   const [loading,         setLoading]         = useState(true);
   const [reviewLoading,   setReviewLoading]   = useState(false);
@@ -133,12 +136,13 @@ export default function UploadVersionsV2Page() {
       .then((data) => {
         if (cancelled) return;
         const list = Array.isArray(data?.versions) ? data.versions : [];
-        const v1 = new Map<string, string>();
-        const v2 = new Map<string, string>();
-        list.forEach((it: { version?: number; photo_id?: string; r2_url?: string }) => {
+        const v1 = new Map<string, VersionRowMeta>();
+        const v2 = new Map<string, VersionRowMeta>();
+        list.forEach((it: { version?: number; photo_id?: string; r2_url?: string; file_size?: number | null }) => {
           if (!it.photo_id || !it.r2_url) return;
-          if (it.version === 1) v1.set(it.photo_id, it.r2_url);
-          if (it.version === 2) v2.set(it.photo_id, it.r2_url);
+          const meta: VersionRowMeta = { url: it.r2_url, fileSize: it.file_size ?? null };
+          if (it.version === 1) v1.set(it.photo_id, meta);
+          if (it.version === 2) v2.set(it.photo_id, meta);
         });
         setServerV1Map(v1);
         setServerV2Map(v2);
@@ -211,8 +215,8 @@ export default function UploadVersionsV2Page() {
   const comparePhotos = useMemo(() => {
     return revisionTargets
       .map((t) => {
-        const v1 = serverV1Map.get(t.id);
-        const v2 = localV2PreviewMap.get(t.id) ?? serverV2Map.get(t.id);
+        const v1 = serverV1Map.get(t.id)?.url;
+        const v2 = localV2PreviewMap.get(t.id) ?? serverV2Map.get(t.id)?.url;
         if (!v1 && !v2) return null;
         return {
           original: { url: viewerImageUrl(t.photo), filename: t.filename },
@@ -357,12 +361,17 @@ export default function UploadVersionsV2Page() {
   const emptyCount = mapping.length > 0 ? mapping.filter((m) => m.file == null).length : 0;
 
   const readOnlyItems = isReadOnly
-    ? revisionTargets.map((t) => ({
-        target: t,
-        type: (serverV2Map.has(t.id) ? "exact" : "none") as "exact" | "none",
-        serverUrl: serverV2Map.get(t.id),
-        v1Url: serverV1Map.get(t.id),
-      }))
+    ? revisionTargets.map((t) => {
+        const v1m = serverV1Map.get(t.id);
+        const v2m = serverV2Map.get(t.id);
+        return {
+          target: t,
+          type: (v2m ? "exact" : "none") as "exact" | "none",
+          serverUrl: v2m?.url,
+          storedFileSizeBytes: v2m?.fileSize ?? null,
+          v1Url: v1m?.url,
+        };
+      })
     : [];
 
   const lightboxRevisionItems = useMemo(
@@ -384,7 +393,7 @@ export default function UploadVersionsV2Page() {
 
       {/* ── Topbar ── */}
       <div style={{
-        height: 52, borderBottom: `1px solid ${C.border}`,
+        height: 52, ...photographerDock.bottomEdge,
         display: "flex", alignItems: "center", padding: "0 24px",
         background: "rgba(13,30,40,0.85)", backdropFilter: "blur(12px)",
         position: "sticky", top: 0, zIndex: 50,
@@ -441,7 +450,7 @@ export default function UploadVersionsV2Page() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", minHeight: "calc(100vh - 52px)" }}>
 
         {/* ── Left col ── */}
-        <div style={{ padding: "20px 20px 100px 24px", borderRight: `1px solid ${C.border}` }}>
+        <div style={{ padding: "20px 24px 100px 24px" }}>
 
           {/* Revision target photos */}
           <div style={{ marginBottom: 18 }}>
@@ -573,13 +582,11 @@ export default function UploadVersionsV2Page() {
           {/* Mapping section */}
           {(displayMapping.length > 0 || isReadOnly) && (
             <>
-              {/* Divider */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 0" }}>
-                <div style={{ flex: 1, height: 1, background: C.border }} />
-                <div style={{ fontSize: 11, color: C.dim, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 8 }}>
-                  매핑 결과
+              <div style={{ margin: "20px 0 14px" }}>
+                <div style={{ fontSize: 11, color: C.dim, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>매핑 결과</span>
                   {mapping.length > 0 && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                       {stats.exact > 0 && (
                         <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11 }}>
                           <div style={{ width: 6, height: 6, borderRadius: "50%", background: C.green }} />
@@ -595,7 +602,6 @@ export default function UploadVersionsV2Page() {
                     </div>
                   )}
                 </div>
-                <div style={{ flex: 1, height: 1, background: C.border }} />
               </div>
 
               {/* Cards */}
@@ -608,6 +614,7 @@ export default function UploadVersionsV2Page() {
                       type={item.type}
                       orderIndex={undefined}
                       previewUrl={item.serverUrl}
+                      storedFileSizeBytes={item.storedFileSizeBytes}
                       v1Url={item.v1Url}
                       isReadOnly
                       onChangeOne={handleChangeOne}
@@ -623,8 +630,9 @@ export default function UploadVersionsV2Page() {
                       file={m.file}
                       type={m.type}
                       orderIndex={m.orderIndex}
-                      previewUrl={localV2PreviewMap.get(m.target.id)}
-                      v1Url={serverV1Map.get(m.target.id)}
+                      previewUrl={localV2PreviewMap.get(m.target.id) ?? serverV2Map.get(m.target.id)?.url}
+                      storedFileSizeBytes={serverV2Map.get(m.target.id)?.fileSize ?? null}
+                      v1Url={serverV1Map.get(m.target.id)?.url}
                       isReadOnly={false}
                       onChangeOne={handleChangeOne}
                       onClearFile={handleClearFile}
@@ -647,7 +655,7 @@ export default function UploadVersionsV2Page() {
         </div>
 
         {/* ── Right col ── */}
-        <div style={{ padding: "20px 20px 100px", background: "rgba(0,0,0,0.1)" }}>
+        <div style={{ padding: "20px 20px 100px", background: "rgba(0,0,0,0.14)" }}>
 
           {/* Project info */}
           <div style={{
@@ -657,6 +665,7 @@ export default function UploadVersionsV2Page() {
             <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 10, letterSpacing: "0.5px", textTransform: "uppercase" }}>
               프로젝트 정보
             </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {([
               { key: "프로젝트",   val: project.name,                style: {} },
               { key: "고객",       val: project.customerName || "—",  style: {} },
@@ -664,15 +673,16 @@ export default function UploadVersionsV2Page() {
               { key: "재보정 요청", val: `${revisionTargets.length}장`, style: { color: C.orange } },
               { key: "업로드 현황", val: `${mappedCount} / ${revisionTargets.length}장`,
                 style: { color: mappedCount < revisionTargets.length ? C.orange : C.green } as CSSProperties },
-            ] as { key: string; val: string; style: CSSProperties }[]).map((row, i, arr) => (
+            ] as { key: string; val: string; style: CSSProperties }[]).map((row) => (
               <div key={row.key} style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "6px 0", borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : "none",
+                padding: "5px 0",
               }}>
                 <span style={{ fontSize: 11, color: C.dim }}>{row.key}</span>
                 <span style={{ fontSize: 12, fontWeight: 500, color: C.text, ...row.style }}>{row.val}</span>
               </div>
             ))}
+            </div>
           </div>
 
           {/* Review results */}
@@ -733,10 +743,8 @@ export default function UploadVersionsV2Page() {
               )}
             </div>
 
-            <div style={{ height: 1, background: C.border, marginBottom: 10 }} />
-
             {/* Revision */}
-            <div>
+            <div style={{ marginTop: 12 }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: C.orange, marginBottom: 5, display: "flex", alignItems: "center", gap: 4 }}>
                 <AlertCircle size={9} />재보정 요청 ({revisionTargets.length}장)
               </div>
@@ -798,7 +806,7 @@ export default function UploadVersionsV2Page() {
         <div style={{
           position: "fixed", bottom: 0, left: 220, right: 0,
           background: "rgba(0,48,73,0.95)",
-          borderTop: "1px solid rgba(79,126,255,0.15)",
+          ...photographerDock.topEdge,
           backdropFilter: "blur(12px)",
           padding: "12px 24px",
           display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -966,13 +974,14 @@ function SelectedThumbV2({ target, num, onClick }: { target: V2Target; num: numb
 }
 
 function MappingCardV2({
-  target, file, type, orderIndex, previewUrl, v1Url, isReadOnly, onChangeOne, onClearFile, onCompare, onOpenLightbox,
+  target, file, type, orderIndex, previewUrl, storedFileSizeBytes, v1Url, isReadOnly, onChangeOne, onClearFile, onCompare, onOpenLightbox,
 }: {
   target: V2Target;
   file: File | null;
   type: "exact" | "order" | "none";
   orderIndex?: number;
   previewUrl?: string;
+  storedFileSizeBytes?: number | null;
   v1Url?: string;
   isReadOnly: boolean;
   onChangeOne: (id: string) => void;
@@ -985,7 +994,10 @@ function MappingCardV2({
   const [retouchErr, setRetouchErr] = useState(false);
   const state = isReadOnly ? (previewUrl ? "matched" : "empty") : type === "exact" ? "matched" : type === "order" ? "ordered" : "empty";
   const borderColor = state === "matched" ? "rgba(46,213,115,0.2)" : state === "ordered" ? "rgba(245,166,35,0.2)" : "rgba(255,71,87,0.2)";
-  const fileSizeStr = file ? `${(file.size / 1024 / 1024).toFixed(1)}MB` : "";
+  const fileSizeStr =
+    storedFileSizeBytes != null && storedFileSizeBytes >= 0
+      ? formatStoredFileSizeBytes(storedFileSizeBytes)
+      : "";
 
   return (
     <div style={{ background: C.surface2, border: `1px solid ${borderColor}`, borderRadius: 10, overflow: "hidden", marginBottom: 7 }}>

@@ -43,7 +43,7 @@ export function Sidebar() {
       left: 0, top: 0, bottom: 0,
       width: 220,
       backgroundColor: C.navyDim,
-      borderRight: `1px solid ${C.border}`,
+      borderRight: `1px solid ${C.hairline}`,
       display: "flex",
       flexDirection: "column",
       zIndex: 30,
@@ -54,8 +54,7 @@ export function Sidebar() {
       <Link
         href="/photographer/dashboard"
         style={{
-          padding: "18px 20px",
-          borderBottom: `1px solid ${C.border}`,
+          padding: "18px 20px 20px",
           display: "flex",
           alignItems: "center",
           gap: 10,
@@ -149,7 +148,7 @@ export function Sidebar() {
       </nav>
 
       {/* ── 하단 유저 영역 ── */}
-      <div style={{ padding: 14, borderTop: `1px solid ${C.border}` }}>
+      <div style={{ padding: "18px 14px 14px", marginTop: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
           {/* 아바타 */}
           {hasImage ? (
