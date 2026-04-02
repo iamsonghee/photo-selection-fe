@@ -2,23 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FolderOpen, Users, BarChart3, Settings, Camera } from "lucide-react";
+import { LayoutDashboard, FolderOpen, Users, BarChart3, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getProfileImageUrl } from "@/lib/photographer";
 import { useProfile } from "@/contexts/ProfileContext";
-
-// ── colour tokens (wireframe 기준) ──────────────────────────
-const C = {
-  navyDim:   "#001f30",
-  steel:     "#669bbc",
-  border:    "rgba(102,155,188,0.12)",
-  borderMd:  "rgba(102,155,188,0.22)",
-  text:      "#e8eef2",
-  muted:     "#7a9ab0",
-  dim:       "#3a5a6e",
-  green:     "#2ed573",
-  greenDim:  "#0f2a1e",
-};
+import { PHOTOGRAPHER_THEME as C, PS_FONT } from "@/lib/photographer-theme";
+import { BrandLogoBar } from "@/components/BrandLogo";
 
 const navItems = [
   { href: "/photographer/dashboard", label: "대시보드", icon: LayoutDashboard, comingSoon: false },
@@ -54,39 +43,26 @@ export function Sidebar() {
       left: 0, top: 0, bottom: 0,
       width: 220,
       backgroundColor: C.navyDim,
-      borderRight: `1px solid ${C.border}`,
+      borderRight: `1px solid ${C.hairline}`,
       display: "flex",
       flexDirection: "column",
       zIndex: 30,
+      fontFamily: PS_FONT,
     }}>
 
       {/* ── 로고 영역 ── */}
-      <div style={{
-        padding: "20px",
-        borderBottom: `1px solid ${C.border}`,
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-      }}>
-        <div style={{
-          width: 36, height: 36,
-          background: "rgba(102,155,188,0.1)",
-          border: `1.5px solid ${C.borderMd}`,
-          borderRadius: 8,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          flexShrink: 0,
-        }}>
-          <Camera size={18} color={C.steel} />
-        </div>
-        <div>
-          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 17, color: C.text, lineHeight: 1.2 }}>
-            A컷
-          </div>
-          <div style={{ fontSize: 9, color: C.dim, letterSpacing: 1, textTransform: "uppercase", marginTop: 2 }}>
-            Acut
-          </div>
-        </div>
-      </div>
+      <Link
+        href="/photographer/dashboard"
+        style={{
+          padding: "18px 20px 20px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          textDecoration: "none",
+        }}
+      >
+        <BrandLogoBar size="md" />
+      </Link>
 
       {/* ── 네비게이션 ── */}
       <nav style={{ padding: 10, flex: 1 }}>
@@ -105,14 +81,14 @@ export function Sidebar() {
             alignItems: "center",
             gap: 9,
             padding: "9px 12px",
-            borderRadius: 8,
+            borderRadius: 10,
             fontSize: 13,
             color: comingSoon ? C.dim : isActive ? C.text : C.muted,
-            backgroundColor: isActive ? "rgba(102,155,188,0.12)" : "transparent",
+            backgroundColor: isActive ? "rgba(79,126,255,0.12)" : "transparent",
             marginBottom: 2,
             textDecoration: "none",
             position: "relative",
-            transition: "color 0.15s, background-color 0.15s",
+            transition: "color 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
             cursor: comingSoon ? "default" : "pointer",
           };
 
@@ -133,8 +109,8 @@ export function Sidebar() {
                 <span style={{
                   fontSize: 9, fontWeight: 500,
                   padding: "2px 6px", borderRadius: 10,
-                  background: "rgba(58,90,110,0.4)",
-                  border: "1px solid rgba(58,90,110,0.6)",
+                  background: "rgba(113,113,122,0.35)",
+                  border: "1px solid rgba(255,255,255,0.08)",
                   color: C.dim,
                   letterSpacing: "0.02em",
                   flexShrink: 0,
@@ -159,7 +135,7 @@ export function Sidebar() {
               href={href}
               style={itemStyle}
               onMouseEnter={(e) => {
-                if (!isActive) (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "rgba(102,155,188,0.06)";
+                if (!isActive) (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "rgba(79,126,255,0.06)";
               }}
               onMouseLeave={(e) => {
                 if (!isActive) (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "transparent";
@@ -172,7 +148,7 @@ export function Sidebar() {
       </nav>
 
       {/* ── 하단 유저 영역 ── */}
-      <div style={{ padding: 14, borderTop: `1px solid ${C.border}` }}>
+      <div style={{ padding: "18px 14px 14px", marginTop: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
           {/* 아바타 */}
           {hasImage ? (
@@ -185,7 +161,7 @@ export function Sidebar() {
           ) : (
             <div style={{
               width: 30, height: 30, borderRadius: "50%",
-              background: "linear-gradient(135deg, #669bbc, #003049)",
+              background: "linear-gradient(135deg, #4f7eff, #3b4f6b)",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 12, fontWeight: 600, color: "white", flexShrink: 0,
             }}>
@@ -216,9 +192,9 @@ export function Sidebar() {
           style={{
             width: "100%", marginTop: 8, padding: "6px 0",
             background: "transparent", border: `1px solid ${C.border}`,
-            borderRadius: 6, fontSize: 11, color: C.muted,
-            cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-            transition: "border-color 0.15s, color 0.15s",
+            borderRadius: 8, fontSize: 11, color: C.muted,
+            cursor: "pointer", fontFamily: PS_FONT,
+            transition: "border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
           onMouseEnter={(e) => {
             (e.currentTarget as HTMLButtonElement).style.borderColor = C.steel;

@@ -22,6 +22,7 @@ type VersionRow = {
   photo_id: string;
   version: 1 | 2;
   r2_url: string;
+  file_size: number | null;
   created_at: string;
   photos: { original_filename: string | null } | null;
   version_reviews:
@@ -77,7 +78,7 @@ export async function GET(
     const { data, error } = await admin
       .from("photo_versions")
       .select(
-        "id, photo_id, version, r2_url, created_at, photos!inner(original_filename), version_reviews(status, customer_comment, reviewed_at)"
+        "id, photo_id, version, r2_url, file_size, created_at, photos!inner(original_filename), version_reviews(status, customer_comment, reviewed_at)"
       )
       .in("photo_id", Array.from(allowed))
       .order("created_at", { ascending: false });
@@ -91,6 +92,7 @@ export async function GET(
         photo_id: r.photo_id,
         version: r.version,
         r2_url: r.r2_url,
+        file_size: r.file_size ?? null,
         created_at: r.created_at,
         original_filename: r.photos?.original_filename ?? "",
         review_status: review?.status ?? null,

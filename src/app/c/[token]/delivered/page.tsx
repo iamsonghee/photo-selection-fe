@@ -2,35 +2,34 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Aperture, PackageCheck } from "lucide-react";
+import { PackageCheck } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
+import { PS_DISPLAY } from "@/lib/photographer-theme";
+import { BrandLogoBar } from "@/components/BrandLogo";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 
-const playfair: React.CSSProperties = { fontFamily: "'Playfair Display', Georgia, serif" };
-const headerBg: React.CSSProperties = { background: "rgba(13,30,40,0.9)", backdropFilter: "blur(12px)" };
+const playfair: React.CSSProperties = { fontFamily: PS_DISPLAY };
+const headerBg: React.CSSProperties = { background: "rgba(10,10,11,0.92)", backdropFilter: "blur(12px)" };
 const gridBg: React.CSSProperties = {
   backgroundImage:
-    "linear-gradient(rgba(102,155,188,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(102,155,188,0.04) 1px, transparent 1px)",
+    "linear-gradient(rgba(79,126,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(79,126,255,0.05) 1px, transparent 1px)",
   backgroundSize: "48px 48px",
 };
 
-function PageHeader({ right }: { right?: React.ReactNode }) {
+function PageHeader({ right, inviteHref }: { right?: React.ReactNode; inviteHref?: string }) {
   return (
-    <header className="sticky top-0 z-50 flex h-12 items-center justify-between border-b border-[#1e2236] px-4" style={headerBg}>
-      <div className="flex items-center gap-2">
-        <Aperture className="h-4 w-4 text-[#4f7eff]" />
-        <span className="text-[15px] font-bold text-[#e8eaf0]" style={playfair}>A컷</span>
-      </div>
-      {right && <div className="text-[12px] text-[#8b90a8]">{right}</div>}
+    <header className="sticky top-0 z-50 flex h-12 items-center justify-between border-b border-white/10 px-4" style={headerBg}>
+      <BrandLogoBar size="sm" href={inviteHref} />
+      {right && <div className="text-[12px] text-zinc-400">{right}</div>}
     </header>
   );
 }
 
 function PageFooter() {
   return (
-    <footer className="py-5 text-center text-[11px] text-[#3a3f55]">
-      © 2026 A컷 · Acut
+    <footer className="py-5 text-center text-[11px] text-zinc-500">
+      © 2026 A CUT
     </footer>
   );
 }
@@ -60,28 +59,28 @@ export default function DeliveredPage() {
   }, [project?.status, token, router]);
 
   if (!mounted || loading) {
-    return <div className="flex min-h-screen items-center justify-center bg-[#09090d]"><p className="text-sm text-[#5a5f78]">불러오는 중...</p></div>;
+    return <div className="flex min-h-screen items-center justify-center bg-[#050505]"><p className="text-sm text-[#5a5f78]">불러오는 중...</p></div>;
   }
   if (!project) {
-    return <div className="flex min-h-screen items-center justify-center bg-[#09090d]"><p className="text-sm text-[#5a5f78]">존재하지 않는 초대 링크입니다.</p></div>;
+    return <div className="flex min-h-screen items-center justify-center bg-[#050505]"><p className="text-sm text-[#5a5f78]">존재하지 않는 초대 링크입니다.</p></div>;
   }
   if (project.status !== "delivered") {
-    return <div className="flex min-h-screen items-center justify-center bg-[#09090d]"><p className="text-sm text-[#5a5f78]">이동 중...</p></div>;
+    return <div className="flex min-h-screen items-center justify-center bg-[#050505]"><p className="text-sm text-[#5a5f78]">이동 중...</p></div>;
   }
 
   return (
-    <div className="min-h-screen bg-[#09090d] text-[#e8eaf0]" style={gridBg}>
-      <PageHeader right={project.name} />
+    <div className="min-h-screen bg-[#050505] text-zinc-100" style={gridBg}>
+      <PageHeader right={project.name} inviteHref={token ? `/c/${token}` : undefined} />
 
       <div className="flex min-h-[calc(100vh-48px)] flex-col items-center justify-center px-4 py-8">
-        <div className="w-full max-w-[440px] rounded-2xl border border-[#1e2236] bg-[#111318]/95 p-6 text-center md:p-8" style={{ backdropFilter: "blur(8px)" }}>
+        <div className="w-full max-w-[440px] rounded-2xl border border-white/10 bg-[#111318]/95 p-6 text-center md:p-8" style={{ backdropFilter: "blur(8px)" }}>
           <div className="mb-6 flex justify-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-[#2ed573] bg-[#0f2a1e]">
               <PackageCheck className="h-8 w-8 text-[#2ed573]" />
             </div>
           </div>
 
-          <h1 className="mb-2 text-[22px] font-bold text-[#e8eaf0]" style={playfair}>
+          <h1 className="mb-2 text-[22px] font-bold text-zinc-100" style={playfair}>
             납품이 완료됐습니다!
           </h1>
           <p className="mb-6 text-[13px] leading-relaxed text-[#8b90a8]">
@@ -89,12 +88,12 @@ export default function DeliveredPage() {
             문의사항은 작가에게 연락해 주세요.
           </p>
 
-          <div className="rounded-xl border border-[#1e2236] bg-[#1a1d24] p-4 text-left">
+          <div className="rounded-xl border border-white/10 bg-[#1a1d24] p-4 text-left">
             {photographer?.profile_image_url && (
               <div className="mb-3 flex items-center gap-3">
                 <img src={photographer.profile_image_url} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
                 <div>
-                  <div className="text-[13px] font-semibold text-[#e8eaf0]">{photographer?.name ?? "담당 작가"}</div>
+                  <div className="text-[13px] font-semibold text-zinc-100">{photographer?.name ?? "담당 작가"}</div>
                   <div className="text-[11px] text-[#5a5f78]">{project.name}</div>
                 </div>
               </div>

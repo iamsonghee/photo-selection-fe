@@ -46,18 +46,18 @@ export function ProjectProgressBar({ status, photoCount, requiredCount, classNam
         const dotColor  =
           state === "all-done"  ? "rgba(46,213,115,0.8)" :
           isUploadDone          ? "#f5a623" :
-          state === "current"   ? "#669bbc" :
-          state === "done"      ? "#4a7a8e" : "#3a5a6e";
+          state === "current"   ? "#4f7eff" :
+          state === "done"      ? "#52525b" : "#71717a";
         const dotShadow =
           isUploadDone          ? "0 0 0 2px rgba(245,166,35,0.2)" :
-          state === "current"   ? "0 0 0 2px rgba(102,155,188,0.15)" : "none";
+          state === "current"   ? "0 0 0 2px rgba(79,126,255,0.22)" : "none";
 
         // ── bar fill ──
         const fillColor =
           state === "all-done" ? "rgba(46,213,115,0.6)" :
           isUploadDone         ? "#f5a623" :
-          state === "done"     ? "#3a5a6e" :
-          state === "current"  ? "#669bbc" : "transparent";
+          state === "done"     ? "#52525b" :
+          state === "current"  ? "#4f7eff" : "transparent";
 
         // 업로드 진행 중일 때 bar width
         const barWidth = isUploadStep
@@ -66,8 +66,8 @@ export function ProjectProgressBar({ status, photoCount, requiredCount, classNam
 
         // ── label ──
         const labelColor  =
-          state === "current"                       ? "#e8eef2" :
-          state === "done" || state === "all-done"  ? "#7a9ab0" : "#3a5a6e";
+          state === "current"                       ? "#fafafa" :
+          state === "done" || state === "all-done"  ? "#a1a1aa" : "#71717a";
         const labelWeight = state === "current" ? 500 : 400;
 
         return (
@@ -106,7 +106,7 @@ export function ProjectProgressBar({ status, photoCount, requiredCount, classNam
               width: "100%",
               height: 2,
               borderRadius: 1,
-              backgroundColor: "#1a3347",
+              backgroundColor: "#27272a",
               overflow: "hidden",
             }}>
               <div style={{

@@ -22,27 +22,7 @@ import type { Project, ProjectStatus } from "@/types";
 import type { ProjectLogItem } from "@/lib/db";
 import { useProfile } from "@/contexts/ProfileContext";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
-
-// ── colour tokens ──────────────────────────────────────────
-const C = {
-  ink:       "#0d1e28",
-  surface:   "#0f2030",
-  surface2:  "#152a3a",
-  surface3:  "#1a3347",
-  steel:     "#669bbc",
-  steelLt:   "#8db8d4",
-  border:    "rgba(102,155,188,0.12)",
-  borderMd:  "rgba(102,155,188,0.22)",
-  text:      "#e8eef2",
-  muted:     "#7a9ab0",
-  dim:       "#3a5a6e",
-  green:     "#2ed573",
-  greenDim:  "#0f2a1e",
-  orange:    "#f5a623",
-  orangeDim: "#2a1a08",
-  red:       "#ff4757",
-  redDim:    "#2a0f12",
-};
+import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT, photographerDock } from "@/lib/photographer-theme";
 
 // ── preparing 상태 3단계 분기 헬퍼 ──────────────────────────
 function getPreparingBadge(photoCount: number, requiredCount: number): { label: string; color: string } {
@@ -77,7 +57,7 @@ const STATUS_BADGE: Record<ProjectStatus, { label: string; key: BadgeKey }> = {
 
 const BADGE_STYLE: Record<BadgeKey, React.CSSProperties> = {
   preparing: { background: C.surface3,                    color: C.muted,   border: `1px solid ${C.border}` },
-  selecting: { background: "rgba(102,155,188,0.15)",      color: C.steel,   border: "1px solid rgba(102,155,188,0.3)" },
+  selecting: { background: "rgba(79,126,255,0.15)",      color: C.steel,   border: "1px solid rgba(79,126,255,0.3)" },
   editing:   { background: "rgba(245,166,35,0.12)",       color: C.orange,  border: "1px solid rgba(245,166,35,0.3)"  },
   revision:  { background: "rgba(255,71,87,0.12)",        color: C.red,     border: "1px solid rgba(255,71,87,0.3)"   },
   delivered: { background: C.greenDim,                    color: C.green,   border: "1px solid rgba(46,213,115,0.3)"  },
@@ -152,10 +132,10 @@ function StatusBadge({ status, photoCount, requiredCount }: {
     let borderColor: string;
     if (pc === 0) {
       bgColor = C.surface3;
-      borderColor = `1px solid rgba(58,90,110,0.3)`;
+      borderColor = `1px solid rgba(113,113,122,0.35)`;
     } else if (pc < rc) {
-      bgColor = "rgba(102,155,188,0.12)";
-      borderColor = `1px solid rgba(102,155,188,0.25)`;
+      bgColor = "rgba(79,126,255,0.12)";
+      borderColor = `1px solid rgba(79,126,255,0.25)`;
     } else {
       bgColor = "rgba(245,166,35,0.12)";
       borderColor = `1px solid rgba(245,166,35,0.3)`;
@@ -231,6 +211,8 @@ function ProjectCard({ project }: { project: Project }) {
     }
   })();
 
+  const cardEdge = hovered ? C.borderMd : C.hairline;
+
   return (
     <div
       role="button"
@@ -246,10 +228,10 @@ function ProjectCard({ project }: { project: Project }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         background: hovered ? C.surface2 : C.surface,
-        borderTop:    `1px solid ${hovered ? C.borderMd : C.border}`,
-        borderRight:  `1px solid ${hovered ? C.borderMd : C.border}`,
-        borderBottom: `1px solid ${hovered ? C.borderMd : C.border}`,
-        borderLeft:   `3px solid ${accentColor}`,
+        borderTop: `1px solid ${cardEdge}`,
+        borderRight: `1px solid ${cardEdge}`,
+        borderBottom: `1px solid ${cardEdge}`,
+        borderLeft: `3px solid ${accentColor}`,
         borderRadius: 10,
         padding: "14px 16px",
         marginBottom: 6,
@@ -329,6 +311,7 @@ function ActionCard({
   href?: string;
 }) {
   const [hovered, setHovered] = useState(false);
+  const cardEdge = hovered ? C.borderMd : C.hairline;
   return (
     <Link href={href ?? "/photographer/projects"} style={{ textDecoration: "none" }}>
       <div
@@ -336,10 +319,10 @@ function ActionCard({
         onMouseLeave={() => setHovered(false)}
         style={{
           background: hovered ? C.surface2 : bgTint,
-          borderTop:    `2px solid ${topColor}`,
-          borderRight:  `1px solid ${hovered ? C.borderMd : C.border}`,
-          borderBottom: `1px solid ${hovered ? C.borderMd : C.border}`,
-          borderLeft:   `1px solid ${hovered ? C.borderMd : C.border}`,
+          borderTop: `2px solid ${topColor}`,
+          borderRight: `1px solid ${cardEdge}`,
+          borderBottom: `1px solid ${cardEdge}`,
+          borderLeft: `1px solid ${cardEdge}`,
           borderRadius: 10,
           padding: "14px",
           cursor: "pointer",
@@ -352,7 +335,7 @@ function ActionCard({
           <span>{icon}</span>
         </div>
         <div style={{
-          fontFamily: "'Playfair Display', serif",
+          fontFamily: PS_DISPLAY,
           fontSize: 30,
           lineHeight: 1,
           marginBottom: 3,
@@ -479,17 +462,17 @@ export default function DashboardPage() {
   }).length;
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: C.ink, fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ minHeight: "100vh", backgroundColor: "transparent", fontFamily: PS_FONT }}>
 
       {/* ── Topbar ── */}
       <div style={{
         height: 52,
-        borderBottom: `1px solid ${C.border}`,
+        ...photographerDock.bottomEdge,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         padding: "0 24px",
-        background: "rgba(13,30,40,0.85)",
+        background: C.topbarBg,
         backdropFilter: "blur(12px)",
         position: "sticky",
         top: 0,
@@ -524,7 +507,7 @@ export default function DashboardPage() {
               padding: "7px 16px", background: C.steel,
               color: "white", border: "none", borderRadius: 8,
               fontSize: 12, fontWeight: 500, cursor: "pointer",
-              fontFamily: "'DM Sans', sans-serif",
+              fontFamily: PS_FONT,
             }}
           >
             <Plus size={12} />
@@ -544,7 +527,6 @@ export default function DashboardPage() {
         <div style={{
           padding: "22px 22px 22px 24px",
           overflowY: "auto",
-          borderRight: `1px solid ${C.border}`,
         }}>
 
           {/* 1. 액션 필요 섹션 */}
@@ -595,7 +577,7 @@ export default function DashboardPage() {
                     icon={<Eye size={16} color={C.steelLt} />}
                     topColor={C.steel}
                     numColor={C.steelLt}
-                    bgTint="rgba(102,155,188,0.04)"
+                    bgTint="rgba(79,126,255,0.06)"
                   />
                 )}
                 {inviteReadyCount > 0 && (
@@ -685,7 +667,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Right column ── */}
-        <div style={{ padding: 20, overflowY: "auto", background: "rgba(0,0,0,0.12)" }}>
+        <div style={{ padding: 20, overflowY: "auto", background: "rgba(0,0,0,0.16)" }}>
 
           {/* 베타 사용량 카드 */}
           {(() => {
@@ -725,15 +707,14 @@ export default function DashboardPage() {
           {/* 통계 */}
           <div style={{
             display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8,
-            marginBottom: 16, paddingBottom: 16,
-            borderBottom: `1px solid ${C.border}`,
+            marginBottom: 16,
           }}>
             <div style={{
               background: C.surface, border: `1px solid ${C.border}`,
               borderRadius: 8, padding: "10px 12px", textAlign: "center",
             }}>
               <div style={{
-                fontFamily: "'Playfair Display', serif",
+                fontFamily: PS_DISPLAY,
                 fontSize: 22, lineHeight: 1, marginBottom: 3, color: C.steel,
               }}>
                 {projects.length}
@@ -745,7 +726,7 @@ export default function DashboardPage() {
               borderRadius: 8, padding: "10px 12px", textAlign: "center",
             }}>
               <div style={{
-                fontFamily: "'Playfair Display', serif",
+                fontFamily: PS_DISPLAY,
                 fontSize: 22, lineHeight: 1, marginBottom: 3, color: C.orange,
               }}>
                 {thisMonthCount}

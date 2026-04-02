@@ -45,3 +45,15 @@ export function remapSingleFile<T extends MappingTarget>(
 ): MappingResult<T>[] {
   return prev.map((m) => (m.target.id === targetId ? { ...m, file, type: "order" as const } : m));
 }
+
+/** 해당 타깃에 매핑된 로컬 파일만 제거 (일괄 업로드 배열과 별도로 행 단위 취소할 때 사용) */
+export function clearSingleFile<T extends MappingTarget>(
+  prev: MappingResult<T>[],
+  targetId: string
+): MappingResult<T>[] {
+  return prev.map((m) =>
+    m.target.id === targetId
+      ? { ...m, file: null, type: "none" as const, orderIndex: undefined }
+      : m
+  );
+}

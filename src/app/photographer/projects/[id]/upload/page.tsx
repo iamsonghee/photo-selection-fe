@@ -22,8 +22,9 @@ import { differenceInCalendarDays } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
 import { getProjectById, getPhotosByProjectId } from "@/lib/db";
 import type { Project, Photo } from "@/types";
-import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT } from "@/lib/photographer-theme";
+import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT, photographerDock } from "@/lib/photographer-theme";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
+import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
 
 /** 모바일 스펙: 넓은 이미지 선택 + HEIC; 필터는 handleFileChange에서 image/ 유지 */
 const ACCEPT_TYPES = "image/*,image/heic,image/heif";
@@ -581,7 +582,7 @@ export default function UploadPage() {
 
       {/* ── Topbar ── */}
       <div style={{
-        height: 52, flexShrink: 0, borderBottom: `1px solid ${C.border}`,
+        height: 52, flexShrink: 0, ...photographerDock.bottomEdge,
         display: "flex", alignItems: "center", gap: 12, padding: "0 24px",
         background: "rgba(13,30,40,0.85)", backdropFilter: "blur(12px)",
         position: "sticky", top: 0, zIndex: 50,
@@ -675,8 +676,8 @@ export default function UploadPage() {
           {/* 통계 3분할 */}
           <div className="up-o-stats" style={{
             display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
-            gap: 1, background: C.border, borderRadius: 10,
-            marginBottom: 12, overflow: "hidden",
+            gap: 8,
+            marginBottom: 12,
             animation: "fadeUp 0.3s ease 0.05s both",
           }}>
             {[
@@ -686,7 +687,7 @@ export default function UploadPage() {
             ].map((s, i) => (
               <div key={i} style={{
                 background: C.surface, padding: "12px 16px", textAlign: "center",
-                borderRadius: i === 0 ? "10px 0 0 10px" : i === 2 ? "0 10px 10px 0" : 0,
+                borderRadius: 10, border: `1px solid ${C.hairline}`,
               }}>
                 <div className="up-stats-num" style={{
                   fontFamily: PS_DISPLAY,
@@ -911,8 +912,7 @@ export default function UploadPage() {
           <div className="up-section-header up-o-header" style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
             padding: "4px 0 10px",
-            borderTop: `1px solid ${C.border}`,
-            marginTop: 4,
+            marginTop: 16,
           }}>
             <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: C.dim }}>
               업로드된 사진{" "}
@@ -1022,11 +1022,10 @@ export default function UploadPage() {
                   if (!photo) return null;
                   const filename = photo.originalFilename ?? `${startIdx + 1}`;
                   const fileSize = photo.fileSize ?? null;
-                  const fileSizeText = fileSize != null
-                    ? fileSize >= 1024 * 1024
-                      ? `${(fileSize / (1024 * 1024)).toFixed(1)} MB`
-                      : `${Math.round(fileSize / 1024)} KB`
-                    : "-";
+                  const fileSizeText =
+                    fileSize != null && fileSize >= 0
+                      ? formatStoredFileSizeBytes(fileSize)
+                      : "-";
                   return (
                     <div
                       key={virtualRow.key}
@@ -1040,7 +1039,7 @@ export default function UploadPage() {
                         display: "flex", alignItems: "center", gap: 10,
                         padding: "0 4px",
                         height: 31,
-                        borderBottom: `1px solid ${C.border}`,
+                        borderBottom: `1px solid ${C.hairline}`,
                         cursor: "pointer",
                       }}
                     >
@@ -1131,7 +1130,7 @@ export default function UploadPage() {
         <div className="up-action-bar" style={{
           position: "fixed", bottom: 0, left: 220, right: 0,
           background: "rgba(0,48,73,0.95)", backdropFilter: "blur(12px)",
-          borderTop: "1px solid rgba(79,126,255,0.15)",
+          ...photographerDock.topEdge,
           padding: "12px 24px",
           display: "flex", alignItems: "center", justifyContent: "space-between",
           zIndex: 100,

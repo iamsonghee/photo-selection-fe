@@ -5,9 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { Aperture, CheckCircle2, Lock, Image as ImageIcon, Clock, Package } from "lucide-react";
+import { CheckCircle2, Lock, Image as ImageIcon, Clock, Package } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { getProfileImageUrl } from "@/lib/photographer";
+import { PS_DISPLAY } from "@/lib/photographer-theme";
+import { BrandLogoBar } from "@/components/BrandLogo";
 
 const CUSTOMER_CANCEL_MAX = 3;
 
@@ -19,25 +21,22 @@ type PhotographerInfo = {
   portfolio_url: string | null;
 } | null;
 
-const playfair: React.CSSProperties = { fontFamily: "'Playfair Display', Georgia, serif" };
-const headerBg: React.CSSProperties = { background: "rgba(13,30,40,0.9)", backdropFilter: "blur(12px)" };
+const playfair: React.CSSProperties = { fontFamily: PS_DISPLAY };
+const headerBg: React.CSSProperties = { background: "rgba(10,10,11,0.92)", backdropFilter: "blur(12px)" };
 
-function PageHeader({ right }: { right?: React.ReactNode }) {
+function PageHeader({ right, inviteHref }: { right?: React.ReactNode; inviteHref?: string }) {
   return (
-    <header className="sticky top-0 z-50 flex h-12 items-center justify-between border-b border-[#1e2236] px-4" style={headerBg}>
-      <div className="flex items-center gap-2">
-        <Aperture className="h-4 w-4 text-[#4f7eff]" />
-        <span className="text-[15px] font-bold text-[#e8eaf0]" style={playfair}>A컷</span>
-      </div>
-      {right && <div className="text-[12px] text-[#8b90a8]">{right}</div>}
+    <header className="sticky top-0 z-50 flex h-12 items-center justify-between border-b border-white/10 px-4" style={headerBg}>
+      <BrandLogoBar size="sm" href={inviteHref} />
+      {right && <div className="text-[12px] text-zinc-400">{right}</div>}
     </header>
   );
 }
 
 function PageFooter() {
   return (
-    <footer className="py-5 text-center text-[11px] text-[#3a3f55]">
-      © 2026 A컷 · Acut
+    <footer className="py-5 text-center text-[11px] text-zinc-500">
+      © 2026 A CUT
     </footer>
   );
 }
@@ -79,13 +78,13 @@ export default function ConfirmedPage() {
   }, [project?.status, token, router]);
 
   if (!mounted || loading) {
-    return <div className="flex min-h-screen items-center justify-center bg-[#09090d]"><p className="text-sm text-[#5a5f78]">불러오는 중...</p></div>;
+    return <div className="flex min-h-screen items-center justify-center bg-[#050505]"><p className="text-sm text-[#5a5f78]">불러오는 중...</p></div>;
   }
   if (!project) {
-    return <div className="flex min-h-screen items-center justify-center bg-[#09090d]"><p className="text-sm text-[#5a5f78]">존재하지 않는 초대 링크입니다.</p></div>;
+    return <div className="flex min-h-screen items-center justify-center bg-[#050505]"><p className="text-sm text-[#5a5f78]">존재하지 않는 초대 링크입니다.</p></div>;
   }
   if (project.status === "selecting" || project.status === "reviewing_v1" || project.status === "reviewing_v2") {
-    return <div className="flex min-h-screen items-center justify-center bg-[#09090d]"><p className="text-sm text-[#5a5f78]">이동 중...</p></div>;
+    return <div className="flex min-h-screen items-center justify-center bg-[#050505]"><p className="text-sm text-[#5a5f78]">이동 중...</p></div>;
   }
 
   const N = project.requiredCount ?? 0;
@@ -128,8 +127,8 @@ export default function ConfirmedPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#09090d] text-[#e8eaf0]">
-      <PageHeader right={project.name} />
+    <div className="min-h-screen bg-[#050505] text-zinc-100">
+      <PageHeader right={project.name} inviteHref={token ? `/c/${token}` : undefined} />
 
       <div className="mx-auto max-w-[520px] px-4 pt-8 pb-16">
         {/* Hero */}
@@ -137,13 +136,13 @@ export default function ConfirmedPage() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2 border-[#2ed573] bg-[#0f2a1e]">
             <CheckCircle2 className="h-8 w-8 text-[#2ed573]" />
           </div>
-          <h1 className="mb-1 text-[22px] font-bold text-[#e8eaf0]" style={playfair}>확정이 완료됐습니다!</h1>
+          <h1 className="mb-1 text-[22px] font-bold text-zinc-100" style={playfair}>확정이 완료됐습니다!</h1>
           <p className="mb-1 text-[13px] text-[#8b90a8]">작가가 보정을 시작합니다</p>
           <p className="text-[12px] text-[#5a5f78]">{confirmedDate}</p>
         </div>
 
         {/* Summary */}
-        <section className="mb-3 rounded-2xl border border-[#1e2236] bg-[#111318] p-5">
+        <section className="mb-3 rounded-2xl border border-white/10 bg-[#111318] p-5">
           <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-[#5a5f78]">선택 요약</h2>
           <div className="mb-3 flex items-center justify-center gap-2">
             <span className="font-mono text-[40px] font-bold text-[#2ed573]">{N}</span>
@@ -165,7 +164,7 @@ export default function ConfirmedPage() {
         </section>
 
         {/* Timeline */}
-        <section className="mb-3 rounded-2xl border border-[#1e2236] bg-[#111318] p-5">
+        <section className="mb-3 rounded-2xl border border-white/10 bg-[#111318] p-5">
           <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-[#5a5f78]">다음 진행 과정</h2>
           <div>
             {steps.map((step, i) => (
@@ -174,7 +173,7 @@ export default function ConfirmedPage() {
                   <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 ${step.done ? "border-[#2ed573] bg-[#0f2a1e] text-[#2ed573]" : "border-[#252b3d] bg-[#1a1d24] text-[#5a5f78]"}`}>
                     {step.icon}
                   </div>
-                  {i < steps.length - 1 && <div className="my-1 w-0.5 flex-1 min-h-[16px] bg-[#1e2236]" />}
+                  {i < steps.length - 1 && <div className="my-1 w-0.5 flex-1 min-h-[16px] bg-white/10" />}
                 </div>
                 <div className="pb-5 pt-1 flex-1 last:pb-1">
                   <div className="text-[13px] font-semibold mb-0.5">{step.label}</div>
@@ -189,7 +188,7 @@ export default function ConfirmedPage() {
         </section>
 
         {/* Photographer */}
-        <section className="rounded-2xl border border-[#1e2236] bg-[#111318] p-5">
+        <section className="rounded-2xl border border-white/10 bg-[#111318] p-5">
           <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-[#5a5f78]">담당 작가</h2>
           <div className="flex items-center gap-3 mb-3">
             <img src={getProfileImageUrl(photographer?.profile_image_url)} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover" />
@@ -217,9 +216,9 @@ export default function ConfirmedPage() {
           </div>
 
           {project.status === "confirmed" && (
-            <div className="mt-5 border-t border-[#1e2236] pt-5 space-y-2">
+            <div className="mt-5 border-t border-white/10 pt-5 space-y-2">
               <p className="text-center text-[11px] text-[#8b90a8]">
-                확정 취소 남은 횟수 <span className="font-mono text-[#e8eaf0]">{remainingCancels}회</span>
+                확정 취소 남은 횟수 <span className="font-mono text-zinc-100">{remainingCancels}회</span>
               </p>
               {atCancelLimit && (
                 <p className="text-center text-[11px] text-[#5a5f78]">확정 취소는 최대 3회까지 가능합니다</p>
@@ -243,10 +242,10 @@ export default function ConfirmedPage() {
       {cancelModalOpen && project.status === "confirmed" && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center">
           <div className="w-full max-w-sm rounded-2xl border border-[#252b3d] bg-[#111318] p-6 shadow-xl">
-            <h3 className="mb-2 text-[16px] font-bold text-[#e8eaf0]">확정 취소</h3>
+            <h3 className="mb-2 text-[16px] font-bold text-zinc-100">확정 취소</h3>
             <p className="mb-6 text-[13px] leading-relaxed text-[#8b90a8]">
               확정을 취소하고 다시 선택하시겠습니까?<br />
-              남은 횟수 <span className="font-medium text-[#e8eaf0]">{remainingCancels}회</span>
+              남은 횟수 <span className="font-medium text-zinc-100">{remainingCancels}회</span>
             </p>
             <div className="flex gap-2">
               <button type="button" onClick={() => setCancelModalOpen(false)} className="flex h-11 flex-1 items-center justify-center rounded-xl border border-[#252b3d] text-[13px] text-[#8b90a8]">

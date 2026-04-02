@@ -1,0 +1,54 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap");
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css");
+
+.customer-app-shell {
+  font-family: "Pretendard", system-ui, sans-serif;
+}
+
+.customer-app-shell .font-display-ps {
+  font-family: "Space Grotesk", "Pretendard", sans-serif;
+}
+
+/* ── Entry Animations ── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(1.5rem);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
+}
+
+.fade-in-section {
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Step card hover ── */
+.step-card {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.step-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(79, 126, 255, 0.25) !important;
+  background: rgba(79, 126, 255, 0.05) !important;
+}
+
+/* ── Spring Button ── */
+.ps-btn-spring {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ps-btn-spring:hover:not(:disabled) {
+  transform: scale(1.02);
+}
+.ps-btn-spring:active:not(:disabled) {
+  transform: scale(0.98);
+}

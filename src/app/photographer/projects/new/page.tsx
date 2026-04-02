@@ -19,15 +19,7 @@ import { addDays, format, differenceInCalendarDays } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { createProject, getPhotographerIdByAuthId, getProjectsByPhotographerId } from "@/lib/db";
 import { BETA_MAX_PROJECTS_TOTAL } from "@/lib/beta-limits";
-
-// ── 컬러 토큰 ──────────────────────────────────────────────
-const C = {
-  ink: "#0d1e28", surface: "#0f2030", surface2: "#152a3a", surface3: "#1a3347",
-  steel: "#669bbc", steelLt: "#8db8d4",
-  border: "rgba(102,155,188,0.12)", borderMd: "rgba(102,155,188,0.22)",
-  text: "#e8eef2", muted: "#7a9ab0", dim: "#3a5a6e",
-  red: "#ff4757", orange: "#f5a623",
-};
+import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT, photographerDock } from "@/lib/photographer-theme";
 
 // ── 촬영 유형 ──────────────────────────────────────────────
 const SHOOT_TYPES = [
@@ -56,7 +48,7 @@ const inputBase: React.CSSProperties = {
   width: "100%", padding: "10px 12px",
   background: C.surface2, border: `1px solid ${C.border}`,
   borderRadius: 8, color: C.text, fontSize: 13,
-  fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+  fontFamily: PS_FONT,
   boxSizing: "border-box", outline: "none",
   transition: "border-color 0.15s",
 };
@@ -181,7 +173,7 @@ export default function NewProjectPage() {
     borderRadius: 12, overflow: "hidden", marginBottom: 12,
   };
   const cardHeaderStyle: React.CSSProperties = {
-    padding: "14px 20px", borderBottom: `1px solid ${C.border}`,
+    padding: "14px 20px", borderBottom: `1px solid ${C.hairline}`,
     display: "flex", alignItems: "center", gap: 8,
   };
   const labelStyle: React.CSSProperties = {
@@ -190,7 +182,7 @@ export default function NewProjectPage() {
   };
 
   return (
-    <div style={{ fontFamily: "'DM Sans','Noto Sans KR',sans-serif" }}>
+    <div style={{ fontFamily: PS_FONT }}>
       <style>{`
         .np-input:focus { border-color: ${C.steel} !important; }
         .np-input::placeholder { color: ${C.dim}; }
@@ -204,7 +196,7 @@ export default function NewProjectPage() {
 
       {/* ── Topbar ── */}
       <div style={{
-        height: 52, borderBottom: `1px solid ${C.border}`,
+        height: 52, ...photographerDock.bottomEdge,
         display: "flex", alignItems: "center", gap: 12, padding: "0 28px",
         background: "rgba(13,30,40,0.85)", backdropFilter: "blur(12px)",
         position: "sticky", top: 0, zIndex: 50,
@@ -216,7 +208,7 @@ export default function NewProjectPage() {
             padding: "5px 10px", borderRadius: 7,
             border: `1px solid ${C.border}`, background: "transparent",
             color: C.muted, fontSize: 12, cursor: "pointer",
-            fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+            fontFamily: PS_FONT,
           }}
         >
           <ChevronLeft size={13} /> 프로젝트
@@ -234,7 +226,7 @@ export default function NewProjectPage() {
           {/* 폼 헤더 */}
           <div style={{ marginBottom: 24 }}>
             <div style={{
-              fontFamily: "'Playfair Display', serif",
+              fontFamily: PS_DISPLAY,
               fontSize: 24, fontWeight: 700, color: C.text, marginBottom: 6,
             }}>
               새 프로젝트 만들기
@@ -266,7 +258,7 @@ export default function NewProjectPage() {
                   alignSelf: "flex-start", padding: "8px 18px",
                   background: C.surface2, border: `1px solid ${C.border}`,
                   borderRadius: 8, color: C.muted, fontSize: 13,
-                  cursor: "pointer", fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                  cursor: "pointer", fontFamily: PS_FONT,
                 }}
               >
                 프로젝트 목록 보기
@@ -315,11 +307,11 @@ export default function NewProjectPage() {
                         style={{
                           display: "flex", alignItems: "center", gap: 5,
                           padding: "5px 12px", borderRadius: 20,
-                          background: active ? "rgba(102,155,188,0.08)" : C.surface2,
+                          background: active ? "rgba(79,126,255,0.08)" : C.surface2,
                           border: `1px solid ${active ? C.steel : C.border}`,
                           color: active ? C.steel : C.muted,
                           fontSize: 12, cursor: "pointer",
-                          fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                          fontFamily: PS_FONT,
                           transition: "all 0.15s",
                         }}
                       >
@@ -340,7 +332,7 @@ export default function NewProjectPage() {
                   </div>
                   <input
                     className="np-input"
-                    style={{ ...inputBase, borderColor: name ? "rgba(102,155,188,0.2)" : C.border }}
+                    style={{ ...inputBase, borderColor: name ? "rgba(79,126,255,0.2)" : C.border }}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="예: 비티에스 웨딩"
@@ -355,7 +347,7 @@ export default function NewProjectPage() {
                   <input
                     className="np-input"
                     type="date"
-                    style={{ ...inputBase, borderColor: shootDate ? "rgba(102,155,188,0.2)" : C.border }}
+                    style={{ ...inputBase, borderColor: shootDate ? "rgba(79,126,255,0.2)" : C.border }}
                     value={shootDate}
                     onChange={(e) => {
                       setShootDate(e.target.value);
@@ -387,7 +379,7 @@ export default function NewProjectPage() {
                   </div>
                   <input
                     className="np-input"
-                    style={{ ...inputBase, borderColor: customerName ? "rgba(102,155,188,0.2)" : C.border }}
+                    style={{ ...inputBase, borderColor: customerName ? "rgba(79,126,255,0.2)" : C.border }}
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="고객 이름"
@@ -437,7 +429,7 @@ export default function NewProjectPage() {
                       style={{
                         ...inputBase,
                         paddingRight: 36,
-                        borderColor: requiredCount ? "rgba(102,155,188,0.2)" : C.border,
+                        borderColor: requiredCount ? "rgba(79,126,255,0.2)" : C.border,
                       }}
                       value={requiredCount}
                       onChange={(e) => setRequiredCount(e.target.value)}
@@ -493,12 +485,12 @@ export default function NewProjectPage() {
                         onClick={() => handleQuickDays(days)}
                         style={{
                           padding: "5px 12px",
-                          background: active ? "rgba(102,155,188,0.12)" : C.surface2,
+                          background: active ? "rgba(79,126,255,0.12)" : C.surface2,
                           border: `1px solid ${active ? C.steel : C.border}`,
                           borderRadius: 20, fontSize: 11,
                           color: active ? C.steel : C.muted,
                           cursor: "pointer",
-                          fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                          fontFamily: PS_FONT,
                           transition: "all 0.15s",
                         }}
                       >
@@ -511,12 +503,12 @@ export default function NewProjectPage() {
                     onClick={() => setQuickDays(null)}
                     style={{
                       padding: "5px 12px",
-                      background: quickDays === null ? "rgba(102,155,188,0.12)" : C.surface2,
+                      background: quickDays === null ? "rgba(79,126,255,0.12)" : C.surface2,
                       border: `1px solid ${quickDays === null ? C.steel : C.border}`,
                       borderRadius: 20, fontSize: 11,
                       color: quickDays === null ? C.steel : C.muted,
                       cursor: "pointer",
-                      fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                      fontFamily: PS_FONT,
                       transition: "all 0.15s",
                     }}
                   >
@@ -530,7 +522,7 @@ export default function NewProjectPage() {
                   type="date"
                   style={{
                     ...inputBase,
-                    borderColor: deadline ? "rgba(102,155,188,0.2)" : C.border,
+                    borderColor: deadline ? "rgba(79,126,255,0.2)" : C.border,
                   }}
                   value={deadline}
                   onChange={(e) => handleDeadlineInput(e.target.value)}
@@ -542,8 +534,8 @@ export default function NewProjectPage() {
                   <div style={{
                     display: "flex", alignItems: "center", gap: 8,
                     padding: "8px 12px", marginTop: 8,
-                    background: "rgba(102,155,188,0.05)",
-                    border: "1px solid rgba(102,155,188,0.15)",
+                    background: "rgba(79,126,255,0.05)",
+                    border: "1px solid rgba(79,126,255,0.15)",
                     borderRadius: 7, fontSize: 12, color: C.muted,
                   }}>
                     <Calendar size={12} color={C.dim} />
@@ -586,7 +578,7 @@ export default function NewProjectPage() {
                       padding: "9px 12px",
                       background: C.surface2, border: `1px solid ${C.border}`,
                       borderRadius: 8, color: C.muted, fontSize: 12,
-                      cursor: "pointer", fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                      cursor: "pointer", fontFamily: PS_FONT,
                     }}
                   >
                     <RefreshCw size={12} />
@@ -600,7 +592,7 @@ export default function NewProjectPage() {
                         padding: "9px 12px",
                         background: "transparent", border: `1px solid ${C.border}`,
                         borderRadius: 8, color: C.muted, fontSize: 12,
-                        cursor: "pointer", fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+                        cursor: "pointer", fontFamily: PS_FONT,
                       }}
                     >
                       삭제
@@ -626,7 +618,7 @@ export default function NewProjectPage() {
       {(projectCount === null || projectCount < BETA_MAX_PROJECTS_TOTAL) && <div style={{
         position: "fixed", bottom: 0, left: 220, right: 0,
         background: "rgba(0,48,73,0.95)", backdropFilter: "blur(12px)",
-        borderTop: "1px solid rgba(102,155,188,0.15)",
+        borderTop: "1px solid rgba(79,126,255,0.15)",
         padding: "14px 28px",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         zIndex: 100,
@@ -656,7 +648,7 @@ export default function NewProjectPage() {
               padding: "9px 18px", background: "transparent",
               border: `1px solid ${C.border}`, borderRadius: 8,
               color: C.muted, fontSize: 13, fontWeight: 500,
-              cursor: "pointer", fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+              cursor: "pointer", fontFamily: PS_FONT,
             }}
           >
             취소
@@ -672,7 +664,7 @@ export default function NewProjectPage() {
               cursor: isValid && !submitting ? "pointer" : "not-allowed",
               opacity: submitting ? 0.7 : 1,
               display: "flex", alignItems: "center", gap: 6,
-              fontFamily: "'DM Sans','Noto Sans KR',sans-serif",
+              fontFamily: PS_FONT,
               transition: "background 0.15s",
             }}
           >

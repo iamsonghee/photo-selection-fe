@@ -11,27 +11,10 @@ import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useProfile } from "@/contexts/ProfileContext";
+import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT } from "@/lib/photographer-theme";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const ACCEPT_IMAGE = "image/jpeg,image/png,image/webp";
-
-const C = {
-  ink: "#0d1e28",
-  surface: "#0f2030",
-  surface2: "#152a3a",
-  surface3: "#1a3347",
-  steel: "#669bbc",
-  steelLt: "#8db8d4",
-  border: "rgba(102,155,188,0.12)",
-  borderMd: "rgba(102,155,188,0.22)",
-  text: "#e8eef2",
-  muted: "#7a9ab0",
-  dim: "#3a5a6e",
-  green: "#2ed573",
-  greenDim: "#0f2a1e",
-  red: "#ff4757",
-  redDim: "#2a0f12",
-};
 
 function getInitial(name: string | null, email: string | null): string {
   if (name?.trim()) return name.trim().charAt(0).toUpperCase();
@@ -275,7 +258,7 @@ export default function SettingsPage() {
     width: "100%", padding: "10px 12px",
     background: C.surface2, border: `1px solid ${C.border}`,
     borderRadius: 8, color: C.text, fontSize: 13,
-    fontFamily: "'DM Sans', 'Noto Sans KR', sans-serif",
+    fontFamily: PS_FONT,
     outline: "none", boxSizing: "border-box",
   };
   const labelStyle: React.CSSProperties = {
@@ -285,16 +268,16 @@ export default function SettingsPage() {
   return (
     <div style={{
       padding: 28, maxWidth: 860,
-      fontFamily: "'DM Sans', 'Noto Sans KR', sans-serif",
+      fontFamily: PS_FONT,
     }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
         .settings-hero { animation: fadeUp 0.3s ease both; }
         .settings-grid { animation: fadeUp 0.3s ease both; animation-delay: 0.08s; }
-        .form-input:focus { border-color: rgba(102,155,188,0.4) !important; }
-        .btn-save:hover:not(:disabled) { background: #7aadcc !important; }
-        .btn-cancel:hover { background: rgba(102,155,188,0.06) !important; }
+        .form-input:focus { border-color: rgba(79,126,255,0.4) !important; }
+        .btn-save:hover:not(:disabled) { background: #6490ff !important; }
+        .btn-cancel:hover { background: rgba(79,126,255,0.06) !important; }
         .btn-danger:hover { background: rgba(255,71,87,0.12) !important; }
         .avatar-wrap:hover .avatar-overlay { opacity: 1 !important; }
         .avatar-wrap:hover .avatar-img { border-color: ${C.steel} !important; }
@@ -311,7 +294,7 @@ export default function SettingsPage() {
         <div aria-hidden style={{
           position: "absolute", top: -60, right: -60,
           width: 220, height: 220, borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(102,155,188,0.05), transparent 70%)",
+          background: "radial-gradient(circle, rgba(79,126,255,0.05), transparent 70%)",
           pointerEvents: "none",
         }} />
 
@@ -364,7 +347,7 @@ export default function SettingsPage() {
         {/* Hero info */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
-            fontFamily: "'Playfair Display', serif",
+            fontFamily: PS_DISPLAY,
             fontSize: 20, fontWeight: 700, color: C.text, marginBottom: 4,
           }}>
             {profile.name || "이름 없음"}
@@ -467,10 +450,10 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* 고객 연락처 */}
+            {/* 연락처 */}
             <div style={{ marginBottom: 14 }}>
               <div style={labelStyle}>
-                <Phone size={11} color={C.dim} /> 고객 연락처
+                <Phone size={11} color={C.dim} /> 연락처
               </div>
               <input
                 className="form-input"
@@ -514,7 +497,7 @@ export default function SettingsPage() {
                   style={{
                     flex: 1, padding: "10px 12px", background: "transparent",
                     border: "none", color: C.text, fontSize: 13,
-                    fontFamily: "'DM Sans', 'Noto Sans KR', sans-serif", outline: "none",
+                    fontFamily: PS_FONT, outline: "none",
                   }}
                   value={editInstagram}
                   onChange={(e) => setEditInstagram(e.target.value)}
@@ -599,7 +582,7 @@ export default function SettingsPage() {
               <span style={{
                 fontSize: 9, fontWeight: 600, letterSpacing: "0.08em",
                 textTransform: "uppercase", padding: "3px 8px",
-                background: "rgba(102,155,188,0.08)", border: `1px solid ${C.border}`,
+                background: "rgba(79,126,255,0.08)", border: `1px solid ${C.border}`,
                 borderRadius: 20, color: C.dim,
               }}>
                 준비 중

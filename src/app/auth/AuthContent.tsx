@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui";
-import { Camera } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { BrandLogoBar } from "@/components/BrandLogo";
 
 export function AuthContent() {
   const searchParams = useSearchParams();
@@ -62,10 +62,7 @@ export function AuthContent() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#0a0b0d] px-4">
       <div className="w-full max-w-[440px] text-center">
         <div className="mb-8 flex justify-center">
-          <div className="flex items-center gap-2">
-            <Camera className="h-10 w-10 text-[#4f7eff]" />
-            <span className="logo-text text-2xl text-white">PhotoSelect</span>
-          </div>
+          <BrandLogoBar size="lg" priority />
         </div>
         <p className="mb-10 text-zinc-400">사진작가를 위한 셀렉 워크플로우</p>
 
