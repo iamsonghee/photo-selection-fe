@@ -97,8 +97,7 @@ async function postPhotosWithRetry(
 const INITIAL_VISIBLE = 40;
 const LOAD_MORE       = 40;
 const BATCH_SIZE  = 5;
-/** 휴대폰만 배치 사이 딜레이 (연속 요청 부담 완화). PC는 0으로 불필요한 대기 제거 */
-const BATCH_DELAY_PHONE_MS = 500;
+/** iPhone은 1장=1배치라 예전(5장/배치)보다 요청 수가 많음 → 배치 간 딜레이 없음(불필요한 대기만 수십 초~수분 추가됨) */
 
 const VIEW_CONFIG = {
   filename: { cols: 1, rowH: 32  },  // 파일명+사이즈 텍스트 리스트
@@ -416,11 +415,9 @@ export default function UploadPage() {
       );
 
       try {
-        // 휴대폰만: 긴 연속 업로드에서 토큰 만료 완화 (PC는 매 배치 getSession 생략 → 속도 유지)
-        if (isPhoneLikeClient()) {
-          if (batchIdx > 0 && batchIdx % 5 === 0) {
-            await supabase.auth.refreshSession();
-          }
+        // 휴대폰·긴 세션: N배치마다만 세션 갱신 (매 배치 getSession 생략 → iPhone 1장씩일 때 체감 속도 회복)
+        if (isPhoneLikeClient() && batchIdx > 0 && batchIdx % 20 === 0) {
+          await supabase.auth.refreshSession();
           const { data: { session: fresh } } = await supabase.auth.getSession();
           if (fresh?.access_token) currentToken = fresh.access_token;
         }
@@ -471,14 +468,6 @@ export default function UploadPage() {
       }
 
       setUploadProgress(Math.round(((batchIdx + 1) / batches.length) * 100));
-
-      if (
-        batchIdx < batches.length - 1 &&
-        !stopRequestedRef.current &&
-        isPhoneLikeClient()
-      ) {
-        await new Promise<void>((r) => setTimeout(r, BATCH_DELAY_PHONE_MS));
-      }
     }
 
     if (wasStopped) {
