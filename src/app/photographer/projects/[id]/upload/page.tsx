@@ -414,12 +414,14 @@ export default function UploadPage() {
       );
 
       try {
-        // 긴 연속 업로드(특히 휴대폰·1장씩)에서 액세스 토큰 만료 완화
-        if (isPhoneLikeClient() && batchIdx > 0 && batchIdx % 5 === 0) {
-          await supabase.auth.refreshSession();
+        // 휴대폰만: 긴 연속 업로드에서 토큰 만료 완화 (PC는 매 배치 getSession 생략 → 속도 유지)
+        if (isPhoneLikeClient()) {
+          if (batchIdx > 0 && batchIdx % 5 === 0) {
+            await supabase.auth.refreshSession();
+          }
+          const { data: { session: fresh } } = await supabase.auth.getSession();
+          if (fresh?.access_token) currentToken = fresh.access_token;
         }
-        const { data: { session: fresh } } = await supabase.auth.getSession();
-        if (fresh?.access_token) currentToken = fresh.access_token;
 
         const uploadUrl = uploadPhotosUrl();
         const buildForm = () => {
