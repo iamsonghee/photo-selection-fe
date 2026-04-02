@@ -3,7 +3,18 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  ChevronLeft, Upload, Loader2, FolderOpen, ImageIcon, CheckCircle2, AlertCircle,
+  ChevronLeft,
+  ChevronDown,
+  ChevronUp,
+  Upload,
+  Loader2,
+  FolderOpen,
+  ImageIcon,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  AlertTriangle,
+  Pin,
 } from "lucide-react";
 import { BETA_MAX_PHOTOS_PER_PROJECT, parseBetaLimitError } from "@/lib/beta-limits";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -14,9 +25,9 @@ import type { Project, Photo } from "@/types";
 import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT } from "@/lib/photographer-theme";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 
-const ACCEPT_TYPES = "image/jpeg,image/png,image/webp";
+/** 모바일 스펙: 넓은 이미지 선택 + HEIC; 필터는 handleFileChange에서 image/ 유지 */
+const ACCEPT_TYPES = "image/*,image/heic,image/heif";
 const BACKEND_URL  = process.env.NEXT_PUBLIC_API_URL ?? "";
-const THUMB_GAP    = 6;
 const INITIAL_VISIBLE = 40;
 const LOAD_MORE       = 40;
 const BATCH_SIZE  = 5;
@@ -96,10 +107,10 @@ function ConfirmModal({
 
 // ── 지연 로딩 썸네일 ────────────────────────────────────────────────────────
 function LazyThumb({
-  photo, index, isReadOnly, deleting, onDelete, onClick,
+  photo, index, isReadOnly, deleting, onDelete, onClick, isEditMode = false,
 }: {
   photo: Photo; index: number; isReadOnly: boolean;
-  deleting: boolean; onDelete: () => void; onClick: () => void;
+  deleting: boolean; onDelete: () => void; onClick: () => void; isEditMode?: boolean;
 }) {
   const [loaded, setLoaded] = useState(false);
   const filename = photo.originalFilename ?? `${index + 1}`;
@@ -135,12 +146,12 @@ function LazyThumb({
         />
         {!isReadOnly && (
           <button
-            className="up-thumb-del"
+            className={isEditMode ? "up-thumb-del up-thumb-del-active" : "up-thumb-del"}
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
             disabled={deleting}
             style={{
               position: "absolute", top: 3, right: 3,
-              width: 16, height: 16, borderRadius: "50%",
+              width: 20, height: 20, borderRadius: "50%",
               background: "rgba(255,71,87,0.85)", border: "none",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 9, color: "white", opacity: 0, cursor: "pointer",
@@ -149,7 +160,7 @@ function LazyThumb({
           >
             {deleting
               ? <Loader2 size={8} style={{ animation: "spin 1s linear infinite" }} />
-              : "✕"}
+              : <X size={12} strokeWidth={2.5} />}
           </button>
         )}
       </div>
@@ -192,6 +203,11 @@ export default function UploadPage() {
   const [error,          setError]          = useState<string | null>(null);
   const [toast,          setToast]          = useState<string | null>(null);
 
+  // ── 모바일 상태 ──
+  const [isMobile,       setIsMobile]       = useState(false);
+  const [isEditMode,     setIsEditMode]     = useState(false);
+  const [isInfoExpanded, setIsInfoExpanded] = useState(false);
+
   // ── UI 상태 ──
   const [deletingId,          setDeletingId]          = useState<string | null>(null);
   const [showDeleteAllModal,  setShowDeleteAllModal]  = useState(false);
@@ -203,18 +219,20 @@ export default function UploadPage() {
   const [viewMode,            setViewMode]            = useState<ViewMode>("filename");
 
   // ── 가상 스크롤 ──────────────────────────────────────────────────────────
-  const { cols, rowH } = VIEW_CONFIG[viewMode];
+  const { cols: baseCols, rowH: baseRowH } = VIEW_CONFIG[viewMode];
+  const effectiveCols = viewMode === "gallery" && isMobile ? 3 : baseCols;
+  const effectiveRowH = viewMode === "gallery" && isMobile ? 130 : baseRowH;
 
   const visiblePhotos = useMemo(
     () => photos.slice(0, visibleCount),
     [photos, visibleCount],
   );
-  const rowCount = Math.ceil(visiblePhotos.length / cols);
+  const rowCount = Math.ceil(visiblePhotos.length / effectiveCols);
 
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => thumbScrollRef.current,
-    estimateSize: () => rowH,
+    estimateSize: () => effectiveRowH,
     overscan: 3,
   });
 
@@ -251,6 +269,18 @@ export default function UploadPage() {
   useEffect(() => {
     loadProject().then((p) => { if (p) loadPhotos(); });
   }, [id, loadProject, loadPhotos]);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 768px)");
+    setIsMobile(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
+
+  useEffect(() => {
+    if (isMobile) setViewMode("gallery");
+  }, [isMobile]);
 
   useEffect(() => {
     if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); }
@@ -378,7 +408,7 @@ export default function UploadPage() {
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setDragOver(false);
     const list = Array.from(e.dataTransfer.files).filter(
-      (f) => ["image/jpeg","image/png","image/webp"].includes(f.type)
+      (f) => f.type.startsWith("image/") || f.type === ""
     );
     setError(null);
     if (list.length) setPendingFiles(list);
@@ -390,7 +420,7 @@ export default function UploadPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const chosen = e.target.files;
     if (!chosen?.length) return;
-    const list = Array.from(chosen).filter((f) => ["image/jpeg","image/png","image/webp"].includes(f.type));
+    const list = Array.from(chosen).filter((f) => f.type.startsWith("image/") || f.type === "");
     setError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (list.length) setPendingFiles(list);
@@ -489,6 +519,29 @@ export default function UploadPage() {
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from{opacity:0;transform:translateY(5px);} to{opacity:1;transform:translateY(0);} }
+        .up-section-stack { display: flex; flex-direction: column; }
+        @media (min-width: 769px) {
+          .up-o-readonly { order: 10; }
+          .up-o-info { order: 20; }
+          .up-o-stats { order: 30; }
+          .up-o-upload { order: 40; }
+          .up-o-progress { order: 50; }
+          .up-o-done { order: 60; }
+          .up-o-error { order: 70; }
+          .up-o-summary { order: 80; }
+          .up-o-header { order: 90; }
+        }
+        @media (max-width: 768px) {
+          .up-o-readonly { order: 10; }
+          .up-o-stats { order: 20; }
+          .up-o-upload { order: 30; }
+          .up-o-progress { order: 40; }
+          .up-o-done { order: 50; }
+          .up-o-error { order: 60; }
+          .up-o-summary { order: 70; }
+          .up-o-info { order: 80; }
+          .up-o-header { order: 90; }
+        }
         .up-dropzone:hover { border-color: ${C.steel} !important; background: rgba(79,126,255,0.05) !important; }
         .up-thumb:hover .up-thumb-del { opacity: 1 !important; }
         .up-thumb:hover { border-color: ${C.borderMd} !important; }
@@ -497,6 +550,33 @@ export default function UploadPage() {
         .thumb-scroll::-webkit-scrollbar-thumb { background: ${C.dim}; border-radius: 2px; }
         .fn-row:hover { background: rgba(79,126,255,0.05); }
         .fn-row:hover span:last-child { opacity: 1 !important; }
+        .up-thumb-del-active { opacity: 1 !important; }
+        .up-gallery-row { gap: 6px; padding-bottom: 6px; }
+        @media (max-width: 768px) {
+          .up-stats-num { font-size: 22px !important; }
+          .up-stats-label { font-size: 11px !important; }
+          .up-gallery-row { gap: 4px; padding-bottom: 4px; }
+          .up-mobile-file-list { max-height: 120px; overflow-y: auto; margin-top: 10px; padding: 8px 10px; border-radius: 6px; background: rgba(0,0,0,0.2); }
+          .up-mobile-file-list > div { font-size: 11px; color: ${C.muted}; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .up-desktop-only { display: none !important; }
+          .up-mobile-only { display: flex !important; }
+          .up-action-bar {
+            left: 0 !important;
+            padding: 12px 16px !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 12px !important;
+          }
+          .up-action-bar > div:first-child { width: 100%; }
+          .up-invite-btn { width: 100% !important; height: 48px !important; justify-content: center !important; flex: none !important; min-height: 48px !important; }
+          .up-info-rows { display: none !important; }
+          .up-info-rows.expanded { display: flex !important; flex-wrap: wrap !important; }
+          .up-info-toggle { display: flex !important; min-height: 44px; }
+          .up-mobile-edit-ctrl { display: flex !important; min-height: 44px; padding: 8px 14px !important; }
+          .up-section-header { padding: 4px 0 8px; border-top: none !important; margin-top: 8px !important; }
+          .up-m-touch { min-height: 44px; }
+          .up-view-toggle button { min-height: 44px; padding-left: 12px !important; padding-right: 12px !important; }
+        }
       `}</style>
 
       {/* ── Topbar ── */}
@@ -507,6 +587,8 @@ export default function UploadPage() {
         position: "sticky", top: 0, zIndex: 50,
       }}>
         <button
+          type="button"
+          className="up-m-touch"
           onClick={() => router.push(`/photographer/projects/${id}`)}
           style={{
             display: "flex", alignItems: "center", gap: 5, padding: "5px 10px",
@@ -528,39 +610,70 @@ export default function UploadPage() {
       {/* ── 단일 컬럼 본문 ── */}
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-        {/* ── 상단 고정 섹션 (프로젝트 정보 + 통계 + 드롭존) ── */}
-        <div style={{ flexShrink: 0, padding: "16px 24px 0" }}>
+        {/* ── 상단 고정 섹션 (순서: 데스크탑=기존 / 모바일=통계→업로드→진행→정보→헤더) ── */}
+        <div className="up-section-stack" style={{ flexShrink: 0, padding: "16px 24px 0" }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPT_TYPES}
+            multiple
+            style={{ display: "none" }}
+            onChange={handleFileChange}
+          />
 
           {isReadOnly && (
-            <div style={{
+            <div className="up-o-readonly" style={{
               marginBottom: 12, padding: "9px 14px", borderRadius: 8,
               background: "rgba(79,126,255,0.06)", border: `1px solid ${C.borderMd}`,
               fontSize: 12, color: C.muted,
+              display: "flex", alignItems: "center", gap: 8,
             }}>
-              📌 고객 셀렉이 시작되어 사진 수정이 불가합니다.
+              <Pin size={14} color={C.steel} style={{ flexShrink: 0 }} />
+              고객 셀렉이 시작되어 사진 수정이 불가합니다.
             </div>
           )}
 
-          {/* 프로젝트 정보 — 컴팩트 가로 바 */}
-          <div style={{
-            display: "flex", gap: 0, alignItems: "center", flexWrap: "wrap",
-            background: C.surface, border: `1px solid ${C.border}`,
-            borderRadius: 8, marginBottom: 12, overflow: "hidden",
-          }}>
-            {infoRows.map(({ key, val, color }, i) => (
-              <div key={key} style={{
-                display: "flex", gap: 6, alignItems: "center",
-                padding: "8px 16px",
-                borderRight: i < infoRows.length - 1 ? `1px solid ${C.border}` : "none",
-              }}>
-                <span style={{ fontSize: 11, color: C.dim, whiteSpace: "nowrap" }}>{key}</span>
-                <span style={{ fontSize: 12, fontWeight: 500, color: color || C.text, whiteSpace: "nowrap" }}>{val}</span>
-              </div>
-            ))}
+          <div className="up-o-info">
+            <button
+              type="button"
+              className="up-info-toggle"
+              onClick={() => setIsInfoExpanded((v) => !v)}
+              style={{
+                display: "none", width: "100%", alignItems: "center",
+                justifyContent: "space-between",
+                padding: "8px 12px", marginBottom: 6,
+                background: C.surface, border: `1px solid ${C.border}`,
+                borderRadius: 8, cursor: "pointer",
+                color: C.muted, fontSize: 12,
+                fontFamily: PS_FONT,
+              }}
+            >
+              <span>프로젝트 정보</span>
+              {isInfoExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            <div
+              className={`up-info-rows${isInfoExpanded ? " expanded" : ""}`}
+              style={{
+                display: "flex", gap: 0, alignItems: "center", flexWrap: "wrap",
+                background: C.surface, border: `1px solid ${C.border}`,
+                borderRadius: 8, marginBottom: 12, overflow: "hidden",
+              }}
+            >
+              {infoRows.map(({ key, val, color }, i) => (
+                <div key={key} style={{
+                  display: "flex", gap: 6, alignItems: "center",
+                  padding: "8px 16px",
+                  borderRight: i < infoRows.length - 1 ? `1px solid ${C.border}` : "none",
+                }}>
+                  <span style={{ fontSize: 11, color: C.dim, whiteSpace: "nowrap" }}>{key}</span>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: color || C.text, whiteSpace: "nowrap" }}>{val}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* 통계 3분할 */}
-          <div style={{
+          <div className="up-o-stats" style={{
             display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
             gap: 1, background: C.border, borderRadius: 10,
             marginBottom: 12, overflow: "hidden",
@@ -575,18 +688,18 @@ export default function UploadPage() {
                 background: C.surface, padding: "12px 16px", textAlign: "center",
                 borderRadius: i === 0 ? "10px 0 0 10px" : i === 2 ? "0 10px 10px 0" : 0,
               }}>
-                <div style={{
+                <div className="up-stats-num" style={{
                   fontFamily: PS_DISPLAY,
                   fontSize: 26, fontWeight: 700, lineHeight: 1, marginBottom: 3, color: s.color,
                 }}>{s.num}</div>
-                <div style={{ fontSize: 10, color: C.dim }}>{s.label}</div>
+                <div className="up-stats-label" style={{ fontSize: 10, color: C.dim }}>{s.label}</div>
               </div>
             ))}
           </div>
 
-          {/* 드롭존 */}
+          {/* 드롭존 / 모바일 큰 버튼 */}
           {!isReadOnly && (
-            <>
+            <div className="up-o-upload">
               {isAtPhotoLimit ? (
                 <div style={{
                   padding: "14px 18px", borderRadius: 10, marginBottom: 12,
@@ -601,66 +714,90 @@ export default function UploadPage() {
                   </span>
                 </div>
               ) : (
-                <div
-                  className="up-dropzone"
-                  onClick={() => !isUploading && fileInputRef.current?.click()}
-                  onDrop={isUploading ? undefined : onDrop}
-                  onDragOver={isUploading ? undefined : onDragOver}
-                  onDragLeave={onDragLeave}
-                  style={{
-                    border: `2px dashed ${dragOver ? C.steel : C.borderMd}`,
-                    borderRadius: 10, padding: "18px 20px",
-                    cursor: isUploading ? "default" : "pointer",
-                    background: dragOver ? "rgba(79,126,255,0.05)" : "rgba(79,126,255,0.02)",
-                    marginBottom: 12, transition: "all 0.2s",
-                    opacity: isUploading ? 0.5 : 1,
-                    animation: "fadeUp 0.3s ease 0.1s both",
-                  }}
-                >
-                  <input
-                    ref={fileInputRef} type="file" accept={ACCEPT_TYPES} multiple
-                    style={{ display: "none" }} onChange={handleFileChange}
-                  />
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
-                    <FolderOpen size={20} color={C.dim} />
-                    <div style={{ textAlign: "left" }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: C.text, lineHeight: 1.4 }}>
-                        사진을 드래그하거나 클릭해서 선택
+                <>
+                  <div
+                    className="up-dropzone up-desktop-only"
+                    onClick={() => !isUploading && fileInputRef.current?.click()}
+                    onDrop={isUploading ? undefined : onDrop}
+                    onDragOver={isUploading ? undefined : onDragOver}
+                    onDragLeave={onDragLeave}
+                    style={{
+                      border: `2px dashed ${dragOver ? C.steel : C.borderMd}`,
+                      borderRadius: 10, padding: "18px 20px",
+                      cursor: isUploading ? "default" : "pointer",
+                      background: dragOver ? "rgba(79,126,255,0.05)" : "rgba(79,126,255,0.02)",
+                      marginBottom: 12, transition: "all 0.2s",
+                      opacity: isUploading ? 0.5 : 1,
+                      animation: "fadeUp 0.3s ease 0.1s both",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+                      <FolderOpen size={20} color={C.dim} />
+                      <div style={{ textAlign: "left" }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: C.text, lineHeight: 1.4 }}>
+                          사진을 드래그하거나 클릭해서 선택
+                        </div>
+                        <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
+                          JPEG · PNG · WebP · HEIC · 최대 20MB/장
+                        </div>
                       </div>
-                      <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
-                        JPEG · PNG · WebP · 최대 20MB/장
-                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); if (!isUploading) fileInputRef.current?.click(); }}
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: 5,
+                          padding: "7px 14px", background: C.steel, color: "white",
+                          border: "none", borderRadius: 7, fontSize: 12, fontWeight: 500,
+                          cursor: "pointer", flexShrink: 0,
+                          fontFamily: PS_FONT,
+                        }}
+                      >
+                        <Upload size={12} /> 파일 선택
+                      </button>
                     </div>
+                    <div style={{
+                      marginTop: 10, textAlign: "right",
+                      fontSize: 11,
+                      color: isPhotoLimitNear ? C.orange : C.dim,
+                    }}>
+                      {M} / {BETA_MAX_PHOTOS_PER_PROJECT}장 (베타 한도)
+                    </div>
+                  </div>
+
+                  <div className="up-mobile-only" style={{
+                    display: "none", flexDirection: "column", gap: 6, marginBottom: 12,
+                  }}>
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); if (!isUploading) fileInputRef.current?.click(); }}
+                      className="up-m-touch"
+                      onClick={() => !isUploading && fileInputRef.current?.click()}
+                      disabled={isUploading}
                       style={{
-                        display: "inline-flex", alignItems: "center", gap: 5,
-                        padding: "7px 14px", background: C.steel, color: "white",
-                        border: "none", borderRadius: 7, fontSize: 12, fontWeight: 500,
-                        cursor: "pointer", flexShrink: 0,
+                        height: 56, width: "100%", display: "flex", alignItems: "center",
+                        justifyContent: "center", gap: 10,
+                        background: isUploading ? C.surface3 : C.steel,
+                        border: "none", borderRadius: 10,
+                        color: isUploading ? C.dim : "white",
+                        fontSize: 15, fontWeight: 600,
+                        cursor: isUploading ? "default" : "pointer",
                         fontFamily: PS_FONT,
                       }}
                     >
-                      <Upload size={12} /> 파일 선택
+                      <Upload size={18} />
+                      사진 선택하기
                     </button>
+                    <div style={{ fontSize: 11, color: C.dim, textAlign: "center" }}>
+                      카메라롤에서 여러 장 선택 가능
+                    </div>
                   </div>
-                  {/* 베타 업로드 카운터 */}
-                  <div style={{
-                    marginTop: 10, textAlign: "right",
-                    fontSize: 11,
-                    color: isPhotoLimitNear ? C.orange : C.dim,
-                  }}>
-                    {M} / {BETA_MAX_PHOTOS_PER_PROJECT}장 (베타 한도)
-                  </div>
-                </div>
+                </>
               )}
-            </>
+            </div>
           )}
 
           {/* 업로드 진행 표시 */}
           {isUploading && files.length > 0 && (
-            <div style={{
+            <div className="up-o-progress" style={{
               background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10,
               padding: "12px 16px", marginBottom: 12,
               animation: "fadeUp 0.25s ease both",
@@ -684,9 +821,11 @@ export default function UploadPage() {
                       <span style={{ fontSize: 11, color: C.orange }}>중지 요청됨...</span>
                     ) : (
                       <button
+                        type="button"
+                        className="up-m-touch"
                         onClick={handleStopUpload}
                         style={{
-                          padding: "3px 10px", fontSize: 11, cursor: "pointer",
+                          padding: "6px 12px", fontSize: 11, cursor: "pointer",
                           background: "transparent", border: `1px solid ${C.borderMd}`,
                           borderRadius: 5, color: C.muted, fontFamily: PS_FONT,
                         }}
@@ -704,17 +843,24 @@ export default function UploadPage() {
                   transition: "width 0.3s",
                 }} />
               </div>
+              {isMobile && (
+                <div className="up-mobile-file-list">
+                  {files.map((f, i) => (
+                    <div key={`${f.name}-${i}`} title={f.name}>{f.name}</div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           {uploadPhase === "done" && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: C.green, marginBottom: 10 }}>
+            <div className="up-o-done" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: C.green, marginBottom: 10 }}>
               <CheckCircle2 size={15} /> 업로드 완료!
             </div>
           )}
 
           {error && (
-            <div style={{
+            <div className="up-o-error" style={{
               padding: "9px 14px", borderRadius: 8, marginBottom: 10,
               background: "rgba(255,71,87,0.1)", border: "1px solid rgba(255,71,87,0.2)",
               fontSize: 12, color: C.red,
@@ -725,7 +871,7 @@ export default function UploadPage() {
 
           {/* 업로드 실패 파일 요약 */}
           {uploadSummary && uploadSummary.failedFiles.length > 0 && uploadPhase === "idle" && (
-            <div style={{
+            <div className="up-o-summary" style={{
               padding: "12px 14px", borderRadius: 8, marginBottom: 10,
               background: "rgba(255,165,0,0.08)", border: "1px solid rgba(255,165,0,0.25)",
               fontSize: 12,
@@ -762,7 +908,7 @@ export default function UploadPage() {
           )}
 
           {/* 사진 섹션 헤더 */}
-          <div style={{
+          <div className="up-section-header up-o-header" style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
             padding: "4px 0 10px",
             borderTop: `1px solid ${C.border}`,
@@ -779,8 +925,27 @@ export default function UploadPage() {
             </span>
 
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* 모바일 편집 모드 버튼 */}
+              {!isReadOnly && photos.length > 0 && (
+                <button
+                  className="up-mobile-edit-ctrl"
+                  onClick={() => setIsEditMode((v) => !v)}
+                  style={{
+                    display: "none",
+                    padding: "4px 12px", borderRadius: 6, minHeight: 30,
+                    border: `1px solid ${isEditMode ? C.steel : C.border}`,
+                    background: isEditMode ? "rgba(79,126,255,0.12)" : "transparent",
+                    color: isEditMode ? C.steel : C.muted,
+                    fontSize: 12, cursor: "pointer",
+                    fontFamily: PS_FONT,
+                  }}
+                >
+                  {isEditMode ? "완료" : "편집"}
+                </button>
+              )}
+
               {/* 보기 옵션 토글 */}
-              <div style={{
+              <div className="up-view-toggle" style={{
                 display: "flex", gap: 1,
                 background: C.surface2, border: `1px solid ${C.border}`,
                 borderRadius: 7, padding: 2, overflow: "hidden",
@@ -803,13 +968,16 @@ export default function UploadPage() {
                 ))}
               </div>
 
+              {/* 데스크탑 전체 삭제 / 모바일은 편집 모드에서만 */}
               {!isReadOnly && photos.length > 0 && (
                 <button
+                  className={isEditMode ? undefined : "up-desktop-only"}
                   onClick={() => setShowDeleteAllModal(true)}
                   style={{
                     background: "transparent", border: "none", fontSize: 11,
                     color: C.red, cursor: "pointer",
                     fontFamily: PS_FONT,
+                    minHeight: 30,
                   }}
                 >
                   전체 삭제
@@ -846,7 +1014,7 @@ export default function UploadPage() {
           >
             <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const startIdx = virtualRow.index * cols;
+                const startIdx = virtualRow.index * effectiveCols;
 
                 // ── 파일명 리스트 모드 ──
                 if (viewMode === "filename") {
@@ -907,7 +1075,7 @@ export default function UploadPage() {
                         >
                           {deletingId === photo.id
                             ? <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} />
-                            : <span style={{ fontSize: 13 }}>✕</span>}
+                            : <X size={14} />}
                         </button>
                       )}
                     </div>
@@ -917,6 +1085,7 @@ export default function UploadPage() {
                 // ── 갤러리 모드 ──
                 return (
                   <div
+                    className="up-gallery-row"
                     key={virtualRow.key}
                     data-index={virtualRow.index}
                     ref={rowVirtualizer.measureElement}
@@ -925,12 +1094,10 @@ export default function UploadPage() {
                       top: virtualRow.start,
                       left: 0, right: 0,
                       display: "grid",
-                      gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                      gap: THUMB_GAP,
-                      paddingBottom: THUMB_GAP,
+                      gridTemplateColumns: `repeat(${effectiveCols}, 1fr)`,
                     }}
                   >
-                    {Array.from({ length: cols }, (_, c) => {
+                    {Array.from({ length: effectiveCols }, (_, c) => {
                       const photo = visiblePhotos[startIdx + c];
                       if (!photo) return <div key={c} style={{ aspectRatio: "3/2" }} />;
                       return (
@@ -941,7 +1108,8 @@ export default function UploadPage() {
                           isReadOnly={isReadOnly}
                           deleting={deletingId === photo.id}
                           onDelete={() => handleDeletePhoto(photo.id)}
-                          onClick={() => setLightboxIndex(startIdx + c)}
+                          onClick={() => !isEditMode && setLightboxIndex(startIdx + c)}
+                          isEditMode={isEditMode}
                         />
                       );
                     })}
@@ -960,7 +1128,7 @@ export default function UploadPage() {
 
       {/* ── 하단 고정 액션바 ── */}
       {!isReadOnly && (
-        <div style={{
+        <div className="up-action-bar" style={{
           position: "fixed", bottom: 0, left: 220, right: 0,
           background: "rgba(0,48,73,0.95)", backdropFilter: "blur(12px)",
           borderTop: "1px solid rgba(79,126,255,0.15)",
@@ -983,12 +1151,13 @@ export default function UploadPage() {
               </div>
             ) : (
               <div style={{ fontSize: 11, color: C.orange, display: "flex", alignItems: "center", gap: 4 }}>
-                ⚠ {N}장 이상 업로드 시 고객 초대 가능
+                <AlertTriangle size={12} /> {N}장 이상 업로드 시 고객 초대 가능
               </div>
             )}
           </div>
 
           <button
+            className="up-invite-btn"
             onClick={() => isReady && setShowInviteModal(true)}
             disabled={!isReady}
             style={{
