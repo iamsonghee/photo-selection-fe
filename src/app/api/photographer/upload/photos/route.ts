@@ -3,6 +3,9 @@ const BACKEND_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   "http://localhost:8000";
 
+/** 대용량 원본 업로드(여러 장) 시 서버리스 타임아웃 완화 — 플랜별 상한은 호스팅 정책 따름 */
+export const maxDuration = 300;
+
 export async function POST(req: Request) {
   const auth = req.headers.get("Authorization") ?? "";
 

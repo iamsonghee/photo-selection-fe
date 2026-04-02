@@ -28,7 +28,8 @@ import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
 
 /** 모바일 스펙: 넓은 이미지 선택 + HEIC; 필터는 handleFileChange에서 image/ 유지 */
 const ACCEPT_TYPES = "image/*,image/heic,image/heif";
-const BACKEND_URL  = process.env.NEXT_PUBLIC_API_URL ?? "";
+/** 브라우저→백엔드 직접 호출은 모바일 Safari에서 대용량 멀티파트 시 실패할 수 있어 동일 출처 프록시 사용 */
+const UPLOAD_PHOTOS_PATH = "/api/photographer/upload/photos";
 const INITIAL_VISIBLE = 40;
 const LOAD_MORE       = 40;
 const BATCH_SIZE  = 5;
@@ -325,10 +326,15 @@ export default function UploadPage() {
     if (userError || !user) { setError("로그인 인증을 확인할 수 없습니다."); setUploadPhase("idle"); return; }
     if (!token) { setError("로그인이 필요합니다."); setUploadPhase("idle"); return; }
 
-    // 배치 분할
+    // iOS Safari: 여러 장을 한 요청에 넣으면 연결 실패(TypeError)가 나는 경우가 있어 1장씩 전송
+    const effectiveBatchSize =
+      typeof navigator !== "undefined" &&
+      /iPhone|iPad|iPod/i.test(navigator.userAgent)
+        ? 1
+        : BATCH_SIZE;
     const batches: File[][] = [];
-    for (let i = 0; i < uploadFiles.length; i += BATCH_SIZE) {
-      batches.push(uploadFiles.slice(i, i + BATCH_SIZE));
+    for (let i = 0; i < uploadFiles.length; i += effectiveBatchSize) {
+      batches.push(uploadFiles.slice(i, i + effectiveBatchSize));
     }
     setBatchProgress({ current: 0, total: batches.length });
 
@@ -342,14 +348,16 @@ export default function UploadPage() {
       const batch = batches[batchIdx];
       setBatchProgress({ current: batchIdx + 1, total: batches.length });
       setUploadProgress(Math.round((batchIdx / batches.length) * 100));
-      setProcessedCount(Math.min((batchIdx + 1) * BATCH_SIZE, uploadFiles.length));
+      setProcessedCount(
+        Math.min((batchIdx + 1) * effectiveBatchSize, uploadFiles.length)
+      );
 
       try {
         const form = new FormData();
         form.append("project_id", id);
         batch.forEach((f) => form.append("files", f));
 
-        const res = await fetch(`${BACKEND_URL}/api/upload/photos`, {
+        const res = await fetch(UPLOAD_PHOTOS_PATH, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
           body: form,
