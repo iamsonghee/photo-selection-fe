@@ -28,8 +28,50 @@ import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
 
 /** 모바일 스펙: 넓은 이미지 선택 + HEIC; 필터는 handleFileChange에서 image/ 유지 */
 const ACCEPT_TYPES = "image/*,image/heic,image/heif";
-/** 브라우저→백엔드 직접 호출은 모바일 Safari에서 대용량 멀티파트 시 실패할 수 있어 동일 출처 프록시 사용 */
+/** 로컬·API URL 미설정 시에만 동일 출처 프록시(Next → 백엔드) */
 const UPLOAD_PHOTOS_PATH = "/api/photographer/upload/photos";
+
+/** NEXT_PUBLIC_API_URL 이 있으면 브라우저→백엔드 직접 POST (Vercel 프록시 서버리스 타임아웃·본문 제한 회피). 없으면 프록시. */
+function uploadPhotosUrl(): string {
+  const base = (process.env.NEXT_PUBLIC_API_URL ?? "").trim().replace(/\/$/, "");
+  if (base) return `${base}/api/upload/photos`;
+  return UPLOAD_PHOTOS_PATH;
+}
+
+const UPLOAD_MAX_ATTEMPTS = 3;
+
+async function postPhotosWithRetry(
+  url: string,
+  buildForm: () => FormData,
+  token: string,
+): Promise<Response> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= UPLOAD_MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: buildForm(),
+      });
+      if (res.status === 502 || res.status === 503 || res.status === 504) {
+        lastErr = new Error(`HTTP ${res.status}`);
+        if (attempt < UPLOAD_MAX_ATTEMPTS) {
+          await new Promise<void>((r) => setTimeout(r, 800 * attempt));
+          continue;
+        }
+      }
+      return res;
+    } catch (e) {
+      lastErr = e;
+      if (attempt < UPLOAD_MAX_ATTEMPTS) {
+        await new Promise<void>((r) => setTimeout(r, 800 * attempt));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr;
+}
 const INITIAL_VISIBLE = 40;
 const LOAD_MORE       = 40;
 const BATCH_SIZE  = 5;
@@ -353,15 +395,15 @@ export default function UploadPage() {
       );
 
       try {
-        const form = new FormData();
-        form.append("project_id", id);
-        batch.forEach((f) => form.append("files", f));
+        const uploadUrl = uploadPhotosUrl();
+        const buildForm = () => {
+          const form = new FormData();
+          form.append("project_id", id);
+          batch.forEach((f) => form.append("files", f));
+          return form;
+        };
 
-        const res = await fetch(UPLOAD_PHOTOS_PATH, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: form,
-        });
+        const res = await postPhotosWithRetry(uploadUrl, buildForm, token);
 
         if (res.ok) {
           const data = await res.json().catch(() => ({}));
