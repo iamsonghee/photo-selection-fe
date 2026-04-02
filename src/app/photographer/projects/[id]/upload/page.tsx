@@ -40,6 +40,25 @@ function uploadPhotosUrl(): string {
 
 const UPLOAD_MAX_ATTEMPTS = 3;
 
+/** PC와 달리 휴대폰 브라우저는 멀티파트·연결이 불안정한 경우가 많아 1장씩 전송 */
+function isPhoneLikeClient(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  if (/iPhone|iPod/i.test(ua)) return true;
+  if (/Android/i.test(ua) && /Mobile/i.test(ua)) return true;
+  return false;
+}
+
+function shouldRetryUploadStatus(status: number): boolean {
+  return (
+    status === 408 ||
+    status === 429 ||
+    status === 502 ||
+    status === 503 ||
+    status === 504
+  );
+}
+
 async function postPhotosWithRetry(
   url: string,
   buildForm: () => FormData,
@@ -52,8 +71,10 @@ async function postPhotosWithRetry(
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: buildForm(),
+        cache: "no-store",
+        mode: "cors",
       });
-      if (res.status === 502 || res.status === 503 || res.status === 504) {
+      if (shouldRetryUploadStatus(res.status)) {
         lastErr = new Error(`HTTP ${res.status}`);
         if (attempt < UPLOAD_MAX_ATTEMPTS) {
           await new Promise<void>((r) => setTimeout(r, 800 * attempt));
@@ -368,12 +389,10 @@ export default function UploadPage() {
     if (userError || !user) { setError("로그인 인증을 확인할 수 없습니다."); setUploadPhase("idle"); return; }
     if (!token) { setError("로그인이 필요합니다."); setUploadPhase("idle"); return; }
 
-    // iOS Safari: 여러 장을 한 요청에 넣으면 연결 실패(TypeError)가 나는 경우가 있어 1장씩 전송
-    const effectiveBatchSize =
-      typeof navigator !== "undefined" &&
-      /iPhone|iPad|iPod/i.test(navigator.userAgent)
-        ? 1
-        : BATCH_SIZE;
+    let currentToken = token;
+
+    // 휴대폰: 한 요청에 여러 장이 불안정 → 1장씩. PC는 5장 배치 유지.
+    const effectiveBatchSize = isPhoneLikeClient() ? 1 : BATCH_SIZE;
     const batches: File[][] = [];
     for (let i = 0; i < uploadFiles.length; i += effectiveBatchSize) {
       batches.push(uploadFiles.slice(i, i + effectiveBatchSize));
@@ -395,6 +414,13 @@ export default function UploadPage() {
       );
 
       try {
+        // 긴 연속 업로드(특히 휴대폰·1장씩)에서 액세스 토큰 만료 완화
+        if (isPhoneLikeClient() && batchIdx > 0 && batchIdx % 5 === 0) {
+          await supabase.auth.refreshSession();
+        }
+        const { data: { session: fresh } } = await supabase.auth.getSession();
+        if (fresh?.access_token) currentToken = fresh.access_token;
+
         const uploadUrl = uploadPhotosUrl();
         const buildForm = () => {
           const form = new FormData();
@@ -403,7 +429,15 @@ export default function UploadPage() {
           return form;
         };
 
-        const res = await postPhotosWithRetry(uploadUrl, buildForm, token);
+        let res = await postPhotosWithRetry(uploadUrl, buildForm, currentToken);
+        if (res.status === 401) {
+          await supabase.auth.refreshSession();
+          const { data: { session: after401 } } = await supabase.auth.getSession();
+          if (after401?.access_token) {
+            currentToken = after401.access_token;
+            res = await postPhotosWithRetry(uploadUrl, buildForm, currentToken);
+          }
+        }
 
         if (res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -421,9 +455,11 @@ export default function UploadPage() {
           allFailed.push(...batch);
         }
       } catch (e) {
-        // 네트워크 오류(서버 연결 불가)면 즉시 중단
+        // fetch 실패·CORS·연결 끊김 등은 TypeError로 올 수 있음 (휴대폰·백그라운드에서 빈번)
         if (e instanceof TypeError) {
-          setError("서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요.");
+          setError(
+            "업로드 연결이 끊어졌습니다. Wi‑Fi로 바꾸거나 화면을 켜 둔 채로 다시 시도해 주세요. 많은 장수는 나눠 올리면 더 안정적입니다.",
+          );
           setUploadPhase("idle"); setUploadProgress(0); setFiles([]);
           return;
         }
