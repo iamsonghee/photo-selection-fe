@@ -1,8 +1,10 @@
 import type { Viewport } from "next";
+import { PhotographerMobileChrome } from "@/components/layout/PhotographerMobileChrome";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ProfileProvider } from "@/contexts/ProfileContext";
 import "./photographer.css";
 
+/** Next.js App Router: generates the same as meta viewport width=device-width, initial-scale=1, maximum-scale=1 */
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -29,7 +31,8 @@ export default function PhotographerLayout({
         <div className="relative z-10 hidden md:block">
           <Sidebar />
         </div>
-        <main className="relative z-10 ml-0 md:ml-[220px] flex-1">{children}</main>
+        <PhotographerMobileChrome />
+        <main className="relative z-10 ml-0 min-w-0 flex-1 md:ml-[220px]">{children}</main>
       </div>
     </ProfileProvider>
   );

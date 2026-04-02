@@ -64,13 +64,40 @@ export default function EditStartPage() {
   const canStartEditing = project.status === "confirmed";
 
   return (
-    <div className="mx-auto max-w-[440px] space-y-8 p-6">
+    <div className="ph-edit-start-root mx-auto max-w-[440px] space-y-8 p-6">
+      <style>{`
+        @media (max-width: 768px) {
+          .ph-edit-start-root {
+            overflow-x: hidden;
+            max-width: 100% !important;
+            min-width: 0;
+            box-sizing: border-box;
+            padding: 16px 12px 28px !important;
+          }
+          .ph-edit-start-warning {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 8px !important;
+          }
+          .ph-edit-start-actions {
+            flex-direction: column !important;
+            gap: 10px !important;
+          }
+          .ph-edit-start-actions > * {
+            width: 100% !important;
+          }
+          .ph-edit-start-root button {
+            min-height: 48px;
+            box-sizing: border-box;
+          }
+        }
+      `}</style>
       {!canStartEditing && (
         <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-amber-400 text-sm">
           보정을 시작하려면 프로젝트가 &quot;셀렉 완료&quot; 상태여야 합니다. (현재: {getStatusLabel(project.status)})
         </div>
       )}
-      <div className="flex items-center gap-2 rounded-lg border border-danger/50 bg-danger/10 px-4 py-3 text-danger">
+      <div className="ph-edit-start-warning flex items-center gap-2 rounded-lg border border-danger/50 bg-danger/10 px-4 py-3 text-danger">
         <AlertTriangle className="h-5 w-5 shrink-0" />
         <span className="font-semibold">🚨 보정 시작 전 반드시 확인하세요</span>
       </div>
@@ -83,7 +110,7 @@ export default function EditStartPage() {
         </ol>
       </Card>
 
-      <div className="flex gap-3">
+      <div className="ph-edit-start-actions flex gap-3">
         <Link href={`/photographer/projects/${id}/results`} className="flex-1">
           <Button variant="outline" fullWidth>
             취소

@@ -462,10 +462,28 @@ export default function DashboardPage() {
   }).length;
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "transparent", fontFamily: PS_FONT }}>
+    <div className="ph-dashboard-root" style={{ minHeight: "100vh", backgroundColor: "transparent", fontFamily: PS_FONT }}>
+
+      <style>{`
+        @media (max-width: 768px) {
+          .ph-dashboard-root { overflow-x: hidden; max-width: 100%; box-sizing: border-box; }
+          .ph-dashboard-body { grid-template-columns: 1fr !important; min-height: auto !important; }
+          .ph-dashboard-left { padding: 16px 12px 24px !important; }
+          .ph-dashboard-right { padding: 16px 12px 24px !important; }
+          .ph-dashboard-activity { display: none !important; }
+          .ph-dashboard-topbar {
+            height: auto !important; min-height: 52px;
+            flex-wrap: wrap; gap: 10px !important; padding: 10px 12px !important;
+            align-items: flex-start !important;
+          }
+          .ph-dashboard-topbar > div:last-child { width: 100%; justify-content: flex-end; }
+          .ph-dashboard-action-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
+          .ph-dashboard-root button { min-height: 44px; box-sizing: border-box; }
+        }
+      `}</style>
 
       {/* ── Topbar ── */}
-      <div style={{
+      <div className="ph-dashboard-topbar" style={{
         height: 52,
         ...photographerDock.bottomEdge,
         display: "flex",
@@ -482,7 +500,7 @@ export default function DashboardPage() {
           <p style={{ fontSize: 15, fontWeight: 500, color: C.text }}>
             안녕하세요,{" "}
             <em style={{ fontStyle: "normal", color: C.steel }}>{userName}</em>
-            {" "}님 👋
+            님
           </p>
           <p style={{ fontSize: 11, color: C.dim }}>오늘도 좋은 하루 되세요</p>
         </div>
@@ -517,14 +535,14 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Body: 2-column grid ── */}
-      <div style={{
+      <div className="ph-dashboard-body" style={{
         display: "grid",
         gridTemplateColumns: "1fr 260px",
         minHeight: "calc(100vh - 52px)",
       }}>
 
         {/* ── Left column ── */}
-        <div style={{
+        <div className="ph-dashboard-left" style={{
           padding: "22px 22px 22px 24px",
           overflowY: "auto",
         }}>
@@ -546,7 +564,7 @@ export default function DashboardPage() {
                   지금 확인이 필요해요
                 </span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+              <div className="ph-dashboard-action-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                 {confirmedCount > 0 && (
                   <ActionCard
                     count={confirmedCount}
@@ -667,7 +685,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Right column ── */}
-        <div style={{ padding: 20, overflowY: "auto", background: "rgba(0,0,0,0.16)" }}>
+        <div className="ph-dashboard-right" style={{ padding: 20, overflowY: "auto", background: "rgba(0,0,0,0.16)" }}>
 
           {/* 베타 사용량 카드 */}
           {(() => {
@@ -735,60 +753,61 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 최근 활동 */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-            <span style={{
-              fontSize: 11, fontWeight: 600, letterSpacing: 1,
-              textTransform: "uppercase", color: C.dim,
-            }}>
-              최근 활동
-            </span>
-          </div>
-
-          {logs.length === 0 ? (
-            <p style={{ fontSize: 12, color: C.dim, textAlign: "center", padding: "20px 0" }}>
-              아직 활동이 없습니다
-            </p>
-          ) : (
-            <div style={{ position: "relative" }}>
-              {/* 타임라인 세로선 */}
-              <div style={{
-                position: "absolute", left: 10, top: 8, bottom: 8,
-                width: 1, backgroundColor: C.border,
-              }} />
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                {logs.slice(0, 10).map((log) => {
-                  const dotColor = LOG_DOT[log.action] ?? C.steel;
-                  const label = LOG_LABEL[log.action] ?? log.action;
-                  return (
-                    <div key={log.id} style={{ display: "flex", gap: 12, padding: "6px 0" }}>
-                      <div style={{
-                        display: "flex", flexDirection: "column",
-                        alignItems: "center", flexShrink: 0,
-                        paddingTop: 3, width: 20,
-                      }}>
-                        <div style={{
-                          width: 8, height: 8, borderRadius: "50%",
-                          backgroundColor: dotColor,
-                          border: `1.5px solid ${C.ink}`,
-                          position: "relative", zIndex: 1, flexShrink: 0,
-                        }} />
-                      </div>
-                      <div style={{ flex: 1, paddingBottom: 10 }}>
-                        <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
-                          <strong style={{ color: C.text, fontWeight: 500 }}>{log.projectName}</strong>
-                          {" · "}{label}
-                        </div>
-                        <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>
-                          {timeAgo(log.createdAt)}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+          {/* 최근 활동 — 데스크톱만 (모바일은 숨김) */}
+          <div className="ph-dashboard-activity">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <span style={{
+                fontSize: 11, fontWeight: 600, letterSpacing: 1,
+                textTransform: "uppercase", color: C.dim,
+              }}>
+                최근 활동
+              </span>
             </div>
-          )}
+
+            {logs.length === 0 ? (
+              <p style={{ fontSize: 12, color: C.dim, textAlign: "center", padding: "20px 0" }}>
+                아직 활동이 없습니다
+              </p>
+            ) : (
+              <div style={{ position: "relative" }}>
+                <div style={{
+                  position: "absolute", left: 10, top: 8, bottom: 8,
+                  width: 1, backgroundColor: C.border,
+                }} />
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {logs.slice(0, 10).map((log) => {
+                    const dotColor = LOG_DOT[log.action] ?? C.steel;
+                    const label = LOG_LABEL[log.action] ?? log.action;
+                    return (
+                      <div key={log.id} style={{ display: "flex", gap: 12, padding: "6px 0" }}>
+                        <div style={{
+                          display: "flex", flexDirection: "column",
+                          alignItems: "center", flexShrink: 0,
+                          paddingTop: 3, width: 20,
+                        }}>
+                          <div style={{
+                            width: 8, height: 8, borderRadius: "50%",
+                            backgroundColor: dotColor,
+                            border: `1.5px solid ${C.ink}`,
+                            position: "relative", zIndex: 1, flexShrink: 0,
+                          }} />
+                        </div>
+                        <div style={{ flex: 1, paddingBottom: 10 }}>
+                          <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+                            <strong style={{ color: C.text, fontWeight: 500 }}>{log.projectName}</strong>
+                            {" · "}{label}
+                          </div>
+                          <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>
+                            {timeAgo(log.createdAt)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

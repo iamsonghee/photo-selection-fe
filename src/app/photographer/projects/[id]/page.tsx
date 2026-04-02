@@ -124,6 +124,7 @@ function QuickAction({
   const [hovered, setHovered] = useState(false);
   return (
     <button
+      type="button"
       onClick={disabled ? undefined : onClick}
       onMouseEnter={() => { if (!disabled) setHovered(true); }}
       onMouseLeave={() => setHovered(false)}
@@ -349,10 +350,98 @@ export default function ProjectDetailPage() {
     daysLeft > 0 ? `D+${daysLeft}` : daysLeft === 0 ? "D-Day" : `+${Math.abs(daysLeft)}일 초과`;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
+    <div
+      className="ph-project-detail-page"
+      style={{ display: "flex", flexDirection: "column", minWidth: 0, width: "100%", boxSizing: "border-box" }}
+    >
+      <style>{`
+        @media (max-width: 768px) {
+          .ph-project-detail-page {
+            overflow-x: hidden;
+            max-width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+          }
+          .ph-pd-topbar {
+            padding: 10px 12px !important;
+            flex-wrap: wrap;
+            gap: 8px !important;
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+          }
+          .ph-pd-hero {
+            padding: 16px 12px 0 !important;
+            min-width: 0;
+            max-width: 100%;
+            box-sizing: border-box;
+          }
+          .ph-pd-hero h1 {
+            word-break: break-word;
+            overflow-wrap: anywhere;
+          }
+          .ph-pd-wf-wrap {
+            padding: 0 12px !important;
+            margin-bottom: 16px !important;
+            max-width: 100%;
+            min-width: 0;
+            overflow: hidden;
+            box-sizing: border-box;
+          }
+          .ph-pd-wf-inner {
+            scrollbar-width: none;
+            max-width: 100%;
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+          }
+          .ph-pd-wf-inner::-webkit-scrollbar { display: none; }
+          .ph-pd-wf-step {
+            flex: 1 0 min(140px, 85vw) !important;
+            min-width: 0 !important;
+            box-sizing: border-box;
+          }
+          .ph-pd-grid {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+            padding: 0 12px 32px !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            box-sizing: border-box;
+          }
+          .ph-pd-grid > .ph-pd-col {
+            min-width: 0 !important;
+            max-width: 100%;
+          }
+          .ph-pd-info-row {
+            align-items: flex-start !important;
+            gap: 10px !important;
+          }
+          .ph-pd-info-row > span:first-child {
+            flex-shrink: 0;
+          }
+          .ph-pd-info-row > span:last-child {
+            min-width: 0;
+            text-align: right;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+          }
+          .ph-pd-invite-row {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 8px !important;
+          }
+          .ph-pd-invite-row > div:first-of-type { min-width: 0 !important; }
+          .ph-project-detail-page button { min-height: 44px; box-sizing: border-box; }
+          .ph-pd-edit-grid { grid-template-columns: 1fr !important; }
+          .ph-pd-modal-actions { flex-direction: column !important; align-items: stretch !important; gap: 10px !important; }
+          .ph-pd-modal-actions button { width: 100% !important; justify-content: center !important; }
+        }
+      `}</style>
 
       {/* ── Topbar ── */}
-      <div style={{
+      <div className="ph-pd-topbar" style={{
         height: 52, ...photographerDock.bottomEdge,
         display: "flex", alignItems: "center",
         padding: "0 24px",
@@ -361,6 +450,7 @@ export default function ProjectDetailPage() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
+            type="button"
             onClick={() => router.push("/photographer/projects")}
             style={{
               display: "flex", alignItems: "center", gap: 5,
@@ -382,7 +472,7 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* ── Hero ── */}
-      <div style={{ padding: "20px 24px 0", marginBottom: 16 }}>
+      <div className="ph-pd-hero" style={{ padding: "20px 24px 0", marginBottom: 16 }}>
         <h1 style={{
           fontFamily: PS_DISPLAY,
           fontSize: 26, fontWeight: 700,
@@ -407,18 +497,22 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* ── Workflow step bar ── */}
-      <div style={{ padding: "0 24px", marginBottom: 20 }}>
-        <div style={{
+      <div className="ph-pd-wf-wrap" style={{ padding: "0 24px", marginBottom: 20 }}>
+        <div className="ph-pd-wf-inner" style={{
           display: "flex", alignItems: "stretch",
           gap: 0,
           background: C.surface, border: `1px solid ${C.border}`,
-          borderRadius: 12, overflow: "hidden",
+          borderRadius: 12,
+          overflowX: "auto",
+          overflowY: "hidden",
+          WebkitOverflowScrolling: "touch",
         }}>
           {WF_STEPS.map((step, i) => {
             const state = wfStates[i];
             return (
               <div
                 key={step.name}
+                className="ph-pd-wf-step"
                 style={{
                   flex: 1, padding: "12px 14px",
                   display: "flex", alignItems: "center", gap: 8,
@@ -455,13 +549,15 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* ── Content grid ── */}
-      <div style={{
+      <div className="ph-pd-grid" style={{
         display: "grid", gridTemplateColumns: "1fr 280px",
         gap: 14, padding: "0 24px 40px", alignItems: "start",
+        minWidth: 0,
+        boxSizing: "border-box",
       }}>
 
         {/* ── Left ── */}
-        <div>
+        <div className="ph-pd-col" style={{ minWidth: 0 }}>
 
           {/* Project info card */}
           <div style={{
@@ -481,7 +577,7 @@ export default function ProjectDetailPage() {
 
             {editMode ? (
               <div style={{ padding: "16px 18px" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                <div className="ph-pd-edit-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                   {[
                     { label: "프로젝트명", value: editName, onChange: setEditName, type: "text" },
                     { label: "고객명",     value: editCustomerName, onChange: setEditCustomerName, type: "text" },
@@ -532,8 +628,9 @@ export default function ProjectDetailPage() {
                 {saveError && (
                   <p style={{ fontSize: 12, color: C.red, marginBottom: 10 }}>{saveError}</p>
                 )}
-                <div style={{ display: "flex", gap: 8 }}>
+                <div className="ph-pd-modal-actions" style={{ display: "flex", gap: 8 }}>
                   <button
+                    type="button"
                     onClick={() => { setEditMode(false); setSaveError(""); }}
                     style={{
                       flex: 1, padding: "9px 0", background: "transparent",
@@ -544,6 +641,7 @@ export default function ProjectDetailPage() {
                     취소
                   </button>
                   <button
+                    type="button"
                     onClick={handleSaveEdit}
                     disabled={saving}
                     style={{
@@ -570,6 +668,7 @@ export default function ProjectDetailPage() {
                 ] as { key: string; val: string; valStyle: React.CSSProperties }[]).map((row, i, arr) => (
                   <div
                     key={row.key}
+                    className="ph-pd-info-row"
                     style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between",
                       padding: "9px 0",
@@ -618,7 +717,7 @@ export default function ProjectDetailPage() {
               </div>
 
               <div style={{ fontSize: 11, color: C.dim, marginBottom: 6 }}>초대 링크</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
+              <div className="ph-pd-invite-row" style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
                 <div style={{
                   flex: 1, display: "flex", alignItems: "center",
                   padding: "9px 12px",
@@ -633,6 +732,7 @@ export default function ProjectDetailPage() {
                   </span>
                 </div>
                 <button
+                  type="button"
                   onClick={handleCopyLink}
                   style={{
                     padding: "8px 12px",
@@ -649,6 +749,7 @@ export default function ProjectDetailPage() {
                   {copied ? "복사됨" : "복사"}
                 </button>
                 <button
+                  type="button"
                   onClick={handleKakaoShare}
                   style={{
                     display: "flex", alignItems: "center", gap: 5,
@@ -677,12 +778,14 @@ export default function ProjectDetailPage() {
                         {pinVisible ? project.accessPin : "●●●●"}
                       </span>
                       <button
+                        type="button"
                         onClick={() => setPinVisible(!pinVisible)}
                         style={{ background: "transparent", border: "none", cursor: "pointer", color: C.muted, padding: 2 }}
                       >
                         {pinVisible ? <EyeOff size={13} /> : <Eye size={13} />}
                       </button>
                       <button
+                        type="button"
                         onClick={() => { setPinInput(project.accessPin ?? ""); setShowPinModal(true); setPinError(""); }}
                         style={{
                           padding: "3px 9px", background: "transparent",
@@ -697,6 +800,7 @@ export default function ProjectDetailPage() {
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <span style={{ fontSize: 12, color: C.dim }}>비밀번호 없음</span>
                       <button
+                        type="button"
                         onClick={() => { setPinInput(""); setShowPinModal(true); setPinError(""); }}
                         style={{
                           padding: "3px 9px", background: "transparent",
@@ -715,7 +819,7 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* ── Right ── */}
-        <div>
+        <div className="ph-pd-col" style={{ minWidth: 0 }}>
 
           {/* Quick actions card */}
           <div style={{
@@ -847,9 +951,10 @@ export default function ProjectDetailPage() {
             {pinError && (
               <p style={{ fontSize: 12, color: C.red, marginBottom: 12 }}>{pinError}</p>
             )}
-            <div style={{ display: "flex", gap: 8 }}>
+            <div className="ph-pd-modal-actions" style={{ display: "flex", gap: 8 }}>
               {project?.accessPin && (
                 <button
+                  type="button"
                   onClick={() => handleSavePin(null)}
                   disabled={pinSaving}
                   style={{
@@ -863,6 +968,7 @@ export default function ProjectDetailPage() {
                 </button>
               )}
               <button
+                type="button"
                 onClick={() => { setShowPinModal(false); setPinInput(""); setPinError(""); }}
                 disabled={pinSaving}
                 style={{
@@ -874,6 +980,7 @@ export default function ProjectDetailPage() {
                 취소
               </button>
               <button
+                type="button"
                 onClick={() => handleSavePin(pinInput || null)}
                 disabled={pinSaving || (!!pinInput && pinInput.length !== 4)}
                 style={{
@@ -915,8 +1022,9 @@ export default function ProjectDetailPage() {
               <br />
               보정 시작 후 보정본 업로드가 가능합니다.
             </p>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div className="ph-pd-modal-actions" style={{ display: "flex", gap: 8 }}>
               <button
+                type="button"
                 onClick={() => setShowEditGuideModal(false)}
                 style={{
                   flex: 1, padding: "10px 0", background: "transparent",
@@ -927,6 +1035,7 @@ export default function ProjectDetailPage() {
                 닫기
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setShowEditGuideModal(false);
                   router.push(`/photographer/projects/${id}/results`);
@@ -968,8 +1077,9 @@ export default function ProjectDetailPage() {
             {deleteError && (
               <p style={{ marginTop: 12, fontSize: 13, color: C.red }}>{deleteError}</p>
             )}
-            <div style={{ marginTop: 24, display: "flex", gap: 8 }}>
+            <div className="ph-pd-modal-actions" style={{ marginTop: 24, display: "flex", gap: 8 }}>
               <button
+                type="button"
                 onClick={() => setShowDeleteModal(false)}
                 disabled={deleting}
                 style={{
@@ -981,6 +1091,7 @@ export default function ProjectDetailPage() {
                 취소
               </button>
               <button
+                type="button"
                 onClick={handleDelete}
                 disabled={deleting}
                 style={{
@@ -1005,6 +1116,7 @@ function EditBtn({ onClick }: { onClick: () => void }) {
   const [h, setH] = useState(false);
   return (
     <button
+      type="button"
       onClick={onClick}
       onMouseEnter={() => setH(true)}
       onMouseLeave={() => setH(false)}
@@ -1026,6 +1138,7 @@ function DangerBtn({ onClick }: { onClick: () => void }) {
   const [h, setH] = useState(false);
   return (
     <button
+      type="button"
       onClick={onClick}
       onMouseEnter={() => setH(true)}
       onMouseLeave={() => setH(false)}

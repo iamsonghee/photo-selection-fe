@@ -194,6 +194,7 @@ function Dropdown({ label, value, options, onChange, icon }: DropdownProps) {
   return (
     <div ref={ref} style={{ position: "relative", flexShrink: 0 }}>
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
         style={{
           display: "flex", alignItems: "center", gap: 6,
@@ -219,6 +220,7 @@ function Dropdown({ label, value, options, onChange, icon }: DropdownProps) {
         }}>
           {options.map((opt) => (
             <button
+              type="button"
               key={opt.value}
               onClick={() => { onChange(opt.value); setOpen(false); }}
               style={{
@@ -257,6 +259,7 @@ function ProjectCard({ project, searchQuery, onClick }: {
 
   return (
     <div
+      className="ph-project-card"
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -382,6 +385,7 @@ function EmptyState({ hasProjects, onReset }: { hasProjects: boolean; onReset: (
       </div>
       {hasProjects ? (
         <button
+          type="button"
           onClick={onReset}
           style={{
             padding: "8px 18px", background: "transparent",
@@ -394,6 +398,7 @@ function EmptyState({ hasProjects, onReset }: { hasProjects: boolean; onReset: (
         </button>
       ) : (
         <button
+          type="button"
           onClick={() => router.push("/photographer/projects/new")}
           style={{
             padding: "8px 18px", background: C.steel,
@@ -524,16 +529,47 @@ export default function ProjectsPage() {
   const hasActiveFilter = searchQuery.trim() || dateFilter !== "all" || statusFilter !== "all" || activeTab !== "all";
 
   return (
-    <div style={{ fontFamily: PS_FONT }}>
+    <div className="ph-projects-root" style={{ fontFamily: PS_FONT }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
         .search-input:focus { outline:none; border-color:${C.borderMd} !important; }
         .search-input::placeholder { color:${C.dim}; }
+        @media (max-width: 768px) {
+          .ph-projects-root { overflow-x: hidden; max-width: 100%; box-sizing: border-box; }
+          .ph-projects-filter-row {
+            flex-direction: column !important; align-items: stretch !important;
+            gap: 10px !important; margin-bottom: 16px !important;
+          }
+          .ph-projects-filter-row > div:first-child { min-width: 0 !important; }
+          .ph-projects-tabs {
+            overflow-x: auto !important; flex-wrap: nowrap !important;
+            -webkit-overflow-scrolling: touch;
+            gap: 2px !important; padding-bottom: 6px !important;
+            margin-bottom: 14px !important;
+            scrollbar-width: none;
+          }
+          .ph-projects-tabs::-webkit-scrollbar { display: none; }
+          .ph-projects-tabs button { flex-shrink: 0; min-height: 44px; padding: 8px 12px !important; }
+          .ph-projects-root button, .ph-projects-root select { min-height: 44px; box-sizing: border-box; }
+          .ph-projects-result-row { flex-wrap: wrap !important; gap: 8px !important; }
+          .ph-project-card {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+            padding: 14px 12px !important;
+          }
+          .ph-project-card > div:nth-child(2) { min-width: 0 !important; }
+          .ph-project-card > div:last-child {
+            flex-direction: row !important; justify-content: space-between !important;
+            align-items: center !important; width: 100%;
+          }
+          .ph-projects-content { padding: 16px 12px 24px !important; }
+          .ph-projects-topbar { padding: 10px 12px !important; flex-wrap: wrap; gap: 8px !important; }
+        }
       `}</style>
 
       {/* ── Topbar ── */}
-      <div style={{
+      <div className="ph-projects-topbar" style={{
         height: 52, ...photographerDock.bottomEdge,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 24px",
@@ -542,6 +578,7 @@ export default function ProjectsPage() {
       }}>
         <span style={{ fontSize: 15, fontWeight: 500, color: C.text }}>프로젝트</span>
         <button
+          type="button"
           onClick={() => router.push("/photographer/projects/new")}
           style={{
             display: "flex", alignItems: "center", gap: 6,
@@ -555,10 +592,10 @@ export default function ProjectsPage() {
       </div>
 
       {/* ── 콘텐츠 ── */}
-      <div style={{ padding: "20px 24px" }}>
+      <div className="ph-projects-content" style={{ padding: "20px 24px" }}>
 
         {/* 검색 + 필터 바 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+        <div className="ph-projects-filter-row" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
           {/* 검색창 */}
           <div style={{ flex: 1, position: "relative" }}>
             <Search
@@ -609,12 +646,13 @@ export default function ProjectsPage() {
         </div>
 
         {/* 상태 탭 */}
-        <div style={{
+        <div className="ph-projects-tabs" style={{
           display: "flex", alignItems: "center", gap: 4,
           marginBottom: 18, paddingBottom: 4,
         }}>
           {TABS.map((tab) => (
             <button
+              type="button"
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               style={{
@@ -641,7 +679,7 @@ export default function ProjectsPage() {
         </div>
 
         {/* 결과 요약 */}
-        <div style={{
+        <div className="ph-projects-result-row" style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
           marginBottom: 12,
         }}>

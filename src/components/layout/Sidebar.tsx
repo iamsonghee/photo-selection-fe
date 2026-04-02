@@ -2,20 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FolderOpen, Users, BarChart3, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getProfileImageUrl } from "@/lib/photographer";
+import { PHOTOGRAPHER_NAV_ITEMS } from "@/lib/photographer-nav";
 import { useProfile } from "@/contexts/ProfileContext";
 import { PHOTOGRAPHER_THEME as C, PS_FONT } from "@/lib/photographer-theme";
 import { BrandLogoBar } from "@/components/BrandLogo";
-
-const navItems = [
-  { href: "/photographer/dashboard", label: "대시보드", icon: LayoutDashboard, comingSoon: false },
-  { href: "/photographer/projects",  label: "프로젝트",  icon: FolderOpen,    comingSoon: false },
-  { href: "#",                        label: "고객관리",  icon: Users,         comingSoon: true  },
-  { href: "#",                        label: "통계",      icon: BarChart3,     comingSoon: true  },
-  { href: "/photographer/settings",  label: "설정",      icon: Settings,      comingSoon: false },
-];
 
 function getInitial(name?: string | null, email?: string | null): string {
   if (name?.trim())  return name.trim().charAt(0).toUpperCase();
@@ -66,7 +58,7 @@ export function Sidebar() {
 
       {/* ── 네비게이션 ── */}
       <nav style={{ padding: 10, flex: 1 }}>
-        {navItems.map(({ href, label, icon: Icon, comingSoon }) => {
+        {PHOTOGRAPHER_NAV_ITEMS.map(({ href, label, icon: Icon, comingSoon }) => {
           const isActive =
             !comingSoon &&
             href !== "#" && (

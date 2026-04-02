@@ -139,12 +139,109 @@ export default function ReviewViewerPage() {
 
   return (
     <div
-      style={{ background: "#0a0a0a", height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column", color: TEXT }}
+      className="c-review-photo-page"
+      style={{
+        background: "#0a0a0a",
+        height: "100vh",
+        minHeight: "100dvh",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        color: TEXT,
+        minWidth: 0,
+        boxSizing: "border-box",
+      }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
+      <style>{`
+        @media (max-width: 768px) {
+          .c-review-photo-page {
+            padding-top: env(safe-area-inset-top, 0px);
+            height: 100dvh;
+            max-height: 100dvh;
+          }
+          .c-review-topbar {
+            height: auto !important;
+            min-height: 48px;
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+            row-gap: 6px !important;
+            padding: 8px 10px !important;
+            padding-left: max(10px, env(safe-area-inset-left, 0px)) !important;
+            padding-right: max(10px, env(safe-area-inset-right, 0px)) !important;
+            align-items: center !important;
+          }
+          .c-review-topbar-left {
+            min-width: 0 !important;
+          }
+          .c-review-topbar-nav button {
+            min-width: 44px !important;
+            min-height: 44px !important;
+            width: 44px !important;
+            height: 44px !important;
+          }
+          .c-review-main {
+            display: flex !important;
+            flex-direction: column !important;
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
+            grid-template-columns: 1fr !important;
+          }
+          .c-review-compare {
+            display: grid !important;
+            grid-template-columns: 1fr !important;
+            grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) !important;
+            flex: 1 1 52% !important;
+            min-height: 0 !important;
+            max-height: 52vh !important;
+          }
+          .c-review-compare-hint {
+            display: none !important;
+          }
+          .c-review-fs-btn {
+            width: 40px !important;
+            height: 40px !important;
+            min-width: 40px !important;
+            min-height: 40px !important;
+          }
+          .c-review-panel {
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            border-left: none !important;
+            border-top: 1px solid ${BORDER} !important;
+            overflow-x: hidden !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch;
+          }
+          .c-review-panel .c-review-actions {
+            grid-template-columns: 1fr !important;
+            gap: 10px !important;
+          }
+          .c-review-panel .c-review-actions button {
+            min-height: 48px !important;
+            width: 100% !important;
+          }
+          .c-review-panel-nav {
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+            padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+          }
+          .c-review-panel-nav button {
+            min-height: 44px !important;
+            flex: 1 1 calc(50% - 4px);
+          }
+          .c-review-panel-nav a {
+            flex: 1 1 100%;
+            text-align: center;
+            padding: 10px 0;
+          }
+        }
+      `}</style>
       {/* ══ Topbar ══════════════════════════════ */}
-      <div style={{
+      <div className="c-review-topbar" style={{
         height: 48, flexShrink: 0,
         background: "rgba(13,30,40,0.95)", backdropFilter: "blur(12px)",
         borderBottom: `1px solid ${BORDER}`,
@@ -152,7 +249,7 @@ export default function ReviewViewerPage() {
         padding: "0 16px", zIndex: 50,
       }}>
         {/* Left: logo + divider + back */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="c-review-topbar-left" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
           <span style={{ width: 1, height: 16, background: BORDER, display: "inline-block" }} />
           <Link href={`/c/${token}/review`}
@@ -168,7 +265,7 @@ export default function ReviewViewerPage() {
         </div>
 
         {/* Center: counter + status badge */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="c-review-topbar-center" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 12, color: MUTED }}>{currentIndex + 1} / {photos.length}</span>
           {isApproved ? (
             <span style={{
@@ -198,7 +295,7 @@ export default function ReviewViewerPage() {
         </div>
 
         {/* Right: prev / next */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div className="c-review-topbar-nav" style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
           <button type="button" onClick={goPrev}
             style={{
               width: 32, height: 32, borderRadius: 8,
@@ -221,14 +318,21 @@ export default function ReviewViewerPage() {
       </div>
 
       {/* ══ Main body ═══════════════════════════ */}
-      <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 300px", overflow: "hidden" }}>
+      <div
+        className="c-review-main"
+        style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 300px", overflow: "hidden", minHeight: 0, minWidth: 0 }}
+      >
 
         {/* Left: compare area */}
-        <div style={{
-          display: "grid", gridTemplateColumns: "1fr 1fr",
-          gap: 1, background: BORDER,
-          overflow: "hidden", position: "relative",
-        }}>
+        <div
+          className="c-review-compare"
+          style={{
+            display: "grid", gridTemplateColumns: "1fr 1fr",
+            gap: 1, background: BORDER,
+            overflow: "hidden", position: "relative",
+            minHeight: 0,
+          }}
+        >
 
           {/* Original */}
           <div style={{ background: "#0a0a0a", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
@@ -251,6 +355,7 @@ export default function ReviewViewerPage() {
               }
             </div>
             <button type="button" onClick={() => { setFullInitial("original"); setFullOpen(true); }}
+              className="c-review-fs-btn"
               style={{
                 position: "absolute", bottom: 10, right: 10, zIndex: 2,
                 width: 28, height: 28, borderRadius: 6,
@@ -260,12 +365,15 @@ export default function ReviewViewerPage() {
               }}>
               <Maximize2 style={{ width: 13, height: 13 }} />
             </button>
-            <span style={{
-              position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)",
-              fontSize: 10, color: "rgba(255,255,255,0.3)",
-              background: "rgba(0,0,0,0.4)", padding: "3px 10px", borderRadius: 20,
-              whiteSpace: "nowrap", pointerEvents: "none", zIndex: 1,
-            }}>클릭하면 풀스크린</span>
+            <span
+              className="c-review-compare-hint"
+              style={{
+                position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)",
+                fontSize: 10, color: "rgba(255,255,255,0.3)",
+                background: "rgba(0,0,0,0.4)", padding: "3px 10px", borderRadius: 20,
+                whiteSpace: "nowrap", pointerEvents: "none", zIndex: 1,
+              }}
+            >클릭하면 풀스크린</span>
           </div>
 
           {/* Retouched */}
@@ -289,6 +397,7 @@ export default function ReviewViewerPage() {
               }
             </div>
             <button type="button" onClick={() => { setFullInitial("version"); setFullOpen(true); }}
+              className="c-review-fs-btn"
               style={{
                 position: "absolute", bottom: 10, right: 10, zIndex: 2,
                 width: 28, height: 28, borderRadius: 6,
@@ -298,20 +407,28 @@ export default function ReviewViewerPage() {
               }}>
               <Maximize2 style={{ width: 13, height: 13 }} />
             </button>
-            <span style={{
-              position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)",
-              fontSize: 10, color: "rgba(255,255,255,0.3)",
-              background: "rgba(0,0,0,0.4)", padding: "3px 10px", borderRadius: 20,
-              whiteSpace: "nowrap", pointerEvents: "none", zIndex: 1,
-            }}>클릭하면 풀스크린</span>
+            <span
+              className="c-review-compare-hint"
+              style={{
+                position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)",
+                fontSize: 10, color: "rgba(255,255,255,0.3)",
+                background: "rgba(0,0,0,0.4)", padding: "3px 10px", borderRadius: 20,
+                whiteSpace: "nowrap", pointerEvents: "none", zIndex: 1,
+              }}
+            >클릭하면 풀스크린</span>
           </div>
         </div>
 
         {/* Right: action panel */}
-        <div style={{
-          background: SURFACE, borderLeft: `1px solid ${BORDER}`,
-          display: "flex", flexDirection: "column", overflowY: "auto",
-        }}>
+        <div
+          className="c-review-panel"
+          style={{
+            background: SURFACE, borderLeft: `1px solid ${BORDER}`,
+            display: "flex", flexDirection: "column", overflowY: "auto",
+            minHeight: 0,
+            minWidth: 0,
+          }}
+        >
 
           {/* File info */}
           <div style={{ padding: 16, borderBottom: `1px solid ${BORDER}` }}>
@@ -352,7 +469,7 @@ export default function ReviewViewerPage() {
             <div style={panelLabel}>검토 의견</div>
 
             {/* Action buttons */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+            <div className="c-review-actions" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
               <button type="button" onClick={handleApprove}
                 style={{
                   height: 42, borderRadius: 9, fontSize: 13, fontWeight: 500,
@@ -418,11 +535,15 @@ export default function ReviewViewerPage() {
           </div>
 
           {/* Panel nav */}
-          <div style={{
-            padding: "14px 16px",
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            borderTop: `1px solid ${BORDER}`,
-          }}>
+          <div
+            className="c-review-panel-nav"
+            style={{
+              padding: "14px 16px",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              borderTop: `1px solid ${BORDER}`,
+              flexShrink: 0,
+            }}
+          >
             <button type="button" onClick={goPrev}
               style={{
                 display: "flex", alignItems: "center", gap: 5,

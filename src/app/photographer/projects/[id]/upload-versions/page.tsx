@@ -30,6 +30,12 @@ import { PHOTOGRAPHER_THEME as C, photographerDock } from "@/lib/photographer-th
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
 
+/** 모바일/아이폰: 넓은 선택 + HEIC; 필터는 원본 업로드와 동일 (image/ 또는 빈 MIME) */
+const ACCEPT_IMAGE_TYPES = "image/*,image/heic,image/heif";
+function isAcceptedImageFile(f: File): boolean {
+  return f.type.startsWith("image/") || f.type === "";
+}
+
 /** GET /versions 에서 온 보정본 메타 (R2 저장 바이트 포함) */
 type VersionRowMeta = { url: string; fileSize: number | null };
 
@@ -206,7 +212,7 @@ export default function UploadVersionsPage() {
   }, [isReadOnly, project?.status, targets.length, mapping]);
 
   const handleDropFiles = useCallback((files: File[]) => {
-    const filtered = files.filter((f) => ["image/jpeg", "image/png", "image/webp"].includes(f.type));
+    const filtered = files.filter(isAcceptedImageFile);
     if (targets.length === 0) return;
     setUploadedFiles(filtered);
     setMapping(buildVersionMapping(filtered, targets));
@@ -231,7 +237,7 @@ export default function UploadVersionsPage() {
 
   const handlePerItemSelect = useCallback((fileList: FileList | null) => {
     if (!fileList?.length || !perItemTargetId) return;
-    const file = Array.from(fileList).find((f) => ["image/jpeg", "image/png", "image/webp"].includes(f.type));
+    const file = Array.from(fileList).find(isAcceptedImageFile);
     if (!file) return;
     setMapping((prev) => remapSingleFile(prev, perItemTargetId, file));
     setPerItemTargetId(null);
@@ -311,11 +317,102 @@ export default function UploadVersionsPage() {
   }
   if (!project) return null;
 
+  const contentBottomPad = isReadOnly ? 32 : 140;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
+    <div className={`ph-uv-root${isReadOnly ? " ph-uv-readonly" : ""}`} style={{ display: "flex", flexDirection: "column" }}>
+      <style>{`
+        @media (max-width: 768px) {
+          .ph-uv-root { overflow-x: hidden; max-width: 100%; box-sizing: border-box; }
+          .ph-uv-topbar {
+            height: auto !important;
+            min-height: 52px;
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+            padding: 10px 12px !important;
+            align-items: flex-start !important;
+          }
+          .ph-uv-banner { margin: 12px 12px 0 !important; padding: 12px 14px !important; }
+          .ph-uv-grid {
+            grid-template-columns: 1fr !important;
+            min-height: auto !important;
+          }
+          .ph-uv-root:not(.ph-uv-readonly) .ph-uv-left {
+            padding: 16px 12px calc(140px + env(safe-area-inset-bottom, 0px)) !important;
+          }
+          .ph-uv-root.ph-uv-readonly .ph-uv-left {
+            padding: 16px 12px 120px !important;
+          }
+          .ph-uv-root:not(.ph-uv-readonly) .ph-uv-right {
+            padding: 12px 12px calc(140px + env(safe-area-inset-bottom, 0px)) !important;
+          }
+          .ph-uv-root.ph-uv-readonly .ph-uv-right {
+            padding: 12px 12px 28px !important;
+          }
+          .ph-uv-thumb-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            gap: 4px !important;
+          }
+          .ph-uv-action-bar {
+            left: 0 !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 12px !important;
+            padding: 12px 12px !important;
+            padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+          }
+          .ph-uv-action-bar > div:first-child { width: 100%; }
+          .ph-uv-action-bar button {
+            width: 100% !important;
+            min-height: 48px !important;
+            justify-content: center !important;
+            box-sizing: border-box !important;
+          }
+          .ph-uv-modal-actions {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+          }
+          .ph-uv-modal-actions button {
+            width: 100% !important;
+            min-height: 44px !important;
+            justify-content: center !important;
+          }
+          .ph-uv-root .ph-uv-topbar button,
+          .ph-uv-root .ph-uv-dropzone button {
+            min-height: 44px;
+            box-sizing: border-box;
+          }
+          .ph-uv-mapping-row {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+            padding: 12px !important;
+          }
+          .ph-uv-mapping-arrow {
+            display: flex !important;
+            justify-content: center !important;
+            padding: 2px 0 !important;
+          }
+          .ph-uv-mapping-arrow svg { transform: rotate(90deg); }
+          .ph-uv-mapping-actions {
+            flex-wrap: wrap !important;
+            justify-content: flex-start !important;
+            padding-left: 0 !important;
+            width: 100% !important;
+          }
+          .ph-uv-mapping-actions button {
+            min-height: 44px !important;
+            padding: 8px 12px !important;
+            font-size: 11px !important;
+            box-sizing: border-box !important;
+          }
+        }
+      `}</style>
 
       {/* ── Topbar ── */}
-      <div style={{
+      <div className="ph-uv-topbar" style={{
         height: 52, ...photographerDock.bottomEdge,
         display: "flex", alignItems: "center", padding: "0 24px",
         background: "rgba(13,30,40,0.85)", backdropFilter: "blur(12px)",
@@ -323,6 +420,7 @@ export default function UploadVersionsPage() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
+            type="button"
             onClick={() => router.push(`/photographer/projects/${id}`)}
             style={{
               display: "flex", alignItems: "center", gap: 5,
@@ -355,7 +453,7 @@ export default function UploadVersionsPage() {
 
       {/* ── Reviewing banner ── */}
       {isReadOnly && (
-        <div style={{
+        <div className="ph-uv-banner" style={{
           margin: "16px 24px 0",
           background: "rgba(79,126,255,0.06)", border: "1px solid rgba(79,126,255,0.2)",
           borderRadius: 12, padding: "14px 20px",
@@ -370,10 +468,10 @@ export default function UploadVersionsPage() {
       )}
 
       {/* ── 2-column grid ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", minHeight: "calc(100vh - 52px)" }}>
+      <div className="ph-uv-grid" style={{ display: "grid", gridTemplateColumns: "1fr 320px", alignItems: "start", minHeight: "calc(100vh - 52px)" }}>
 
         {/* ── Left col ── */}
-        <div style={{ padding: "20px 24px 100px 24px" }}>
+        <div className="ph-uv-left" style={{ padding: `20px 24px ${contentBottomPad}px` }}>
 
           {/* Selected photos */}
           <div style={{ marginBottom: 18 }}>
@@ -389,7 +487,7 @@ export default function UploadVersionsPage() {
                 {targets.length}장
               </span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
+            <div className="ph-uv-thumb-grid" style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
               {targets.map((t, i) => (
                 <SelectedThumb
                   key={t.id}
@@ -428,6 +526,7 @@ export default function UploadVersionsPage() {
                 </div>
               ) : (
               <div
+                className="ph-uv-dropzone"
                 onDrop={(e) => { e.preventDefault(); setDragOver(false); handleDropFiles(Array.from(e.dataTransfer.files)); }}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
@@ -450,6 +549,7 @@ export default function UploadVersionsPage() {
                     </div>
                     <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>JPEG / PNG / WebP</div>
                     <button
+                      type="button"
                       onClick={(e) => { e.stopPropagation(); multiInputRef.current?.click(); }}
                       disabled={targets.length === 0}
                       style={{
@@ -475,6 +575,7 @@ export default function UploadVersionsPage() {
                       파일명 자동 매핑 완료 · 아래에서 확인해주세요
                     </div>
                     <button
+                      type="button"
                       onClick={(e) => { e.stopPropagation(); multiInputRef.current?.click(); }}
                       style={{
                         display: "inline-flex", alignItems: "center", gap: 5,
@@ -570,7 +671,7 @@ export default function UploadVersionsPage() {
         </div>
 
         {/* ── Right col ── */}
-        <div style={{ padding: "20px 20px 100px", background: "rgba(0,0,0,0.14)" }}>
+        <div className="ph-uv-right" style={{ padding: `12px 20px ${contentBottomPad}px`, background: "rgba(0,0,0,0.14)", minWidth: 0 }}>
 
           {/* Project info */}
           <div style={{
@@ -634,7 +735,7 @@ export default function UploadVersionsPage() {
 
       {/* ── Bottom action bar ── */}
       {!isReadOnly && (
-        <div style={{
+        <div className="ph-uv-action-bar" style={{
           position: "fixed", bottom: 0, left: 220, right: 0,
           background: "rgba(0,48,73,0.95)",
           ...photographerDock.topEdge,
@@ -661,6 +762,7 @@ export default function UploadVersionsPage() {
             </div>
           </div>
           <button
+            type="button"
             disabled={!canDeliver || submitting}
             onClick={() => setShowConfirm(true)}
             style={{
@@ -697,8 +799,9 @@ export default function UploadVersionsPage() {
               <br />전달 후 고객이 v1 검토를 진행합니다.
             </p>
             {error && <p style={{ marginBottom: 12, fontSize: 13, color: C.red }}>{error}</p>}
-            <div style={{ display: "flex", gap: 8 }}>
+            <div className="ph-uv-modal-actions" style={{ display: "flex", gap: 8 }}>
               <button
+                type="button"
                 onClick={() => setShowConfirm(false)} disabled={submitting}
                 style={{
                   flex: 1, padding: "10px 0", background: "transparent",
@@ -709,6 +812,7 @@ export default function UploadVersionsPage() {
                 취소
               </button>
               <button
+                type="button"
                 onClick={handleDeliver} disabled={submitting || !canDeliver}
                 style={{
                   flex: 1, padding: "10px 0",
@@ -727,9 +831,9 @@ export default function UploadVersionsPage() {
       )}
 
       {/* ── Hidden file inputs ── */}
-      <input ref={multiInputRef} type="file" multiple accept="image/jpeg,image/png,image/webp"
+      <input ref={multiInputRef} type="file" multiple accept={ACCEPT_IMAGE_TYPES}
         style={{ display: "none" }} onChange={(e) => handleDropFiles(Array.from(e.target.files ?? []))} />
-      <input ref={perItemInputRef} type="file" accept="image/jpeg,image/png,image/webp"
+      <input ref={perItemInputRef} type="file" accept={ACCEPT_IMAGE_TYPES}
         style={{ display: "none" }} onChange={(e) => handlePerItemSelect(e.target.files)} />
 
       {lightboxIndex !== null && lightboxItems.length > 0 && (
@@ -831,7 +935,7 @@ function MappingCard({
 
   return (
     <div style={{ background: C.surface2, border: `1px solid ${borderColor}`, borderRadius: 10, overflow: "hidden", marginBottom: 7 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 32px 1fr auto", alignItems: "center", padding: "10px 14px" }}>
+      <div className="ph-uv-mapping-row" style={{ display: "grid", gridTemplateColumns: "1fr 32px 1fr auto", alignItems: "center", padding: "10px 14px" }}>
 
         {/* Original */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
@@ -852,7 +956,7 @@ function MappingCard({
         </div>
 
         {/* Arrow */}
-        <div style={{ display: "flex", justifyContent: "center", color: C.dim }}><ArrowRight size={13} /></div>
+        <div className="ph-uv-mapping-arrow" style={{ display: "flex", justifyContent: "center", color: C.dim }}><ArrowRight size={13} /></div>
 
         {/* Retouched */}
         {state === "empty" ? (
@@ -880,7 +984,7 @@ function MappingCard({
         )}
 
         {/* Actions */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, paddingLeft: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div className="ph-uv-mapping-actions" style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, paddingLeft: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           {state === "matched" && (
             <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 500, whiteSpace: "nowrap", color: C.green, background: C.greenDim, border: "1px solid rgba(46,213,115,0.3)", display: "flex", alignItems: "center", gap: 3 }}>
               <Check size={9} />파일명 일치
@@ -985,6 +1089,7 @@ function Lightbox({
     >
       {/* Close */}
       <button
+        type="button"
         onClick={onClose}
         style={{
           position: "absolute", top: 16, right: 16,
@@ -1009,6 +1114,7 @@ function Lightbox({
       {/* Prev */}
       {multi && (
         <button
+          type="button"
           onClick={(e) => { e.stopPropagation(); onPrev(); }}
           style={{
             position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
@@ -1039,6 +1145,7 @@ function Lightbox({
       {/* Next */}
       {multi && (
         <button
+          type="button"
           onClick={(e) => { e.stopPropagation(); onNext(); }}
           style={{
             position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",

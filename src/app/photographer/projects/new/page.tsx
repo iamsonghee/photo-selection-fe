@@ -182,7 +182,7 @@ export default function NewProjectPage() {
   };
 
   return (
-    <div style={{ fontFamily: PS_FONT }}>
+    <div className="ph-new-project-root" style={{ fontFamily: PS_FONT }}>
       <style>{`
         .np-input:focus { border-color: ${C.steel} !important; }
         .np-input::placeholder { color: ${C.dim}; }
@@ -192,16 +192,38 @@ export default function NewProjectPage() {
         .np-card:nth-child(1){animation-delay:0.05s;}
         .np-card:nth-child(2){animation-delay:0.10s;}
         .np-card:nth-child(3){animation-delay:0.15s;}
+        @media (max-width: 768px) {
+          .ph-new-project-root { overflow-x: hidden; max-width: 100%; box-sizing: border-box; }
+          .ph-np-content { padding: 20px 12px 120px !important; }
+          .ph-np-topbar { padding: 10px 12px !important; flex-wrap: wrap; gap: 8px !important; }
+          .ph-np-grid-2 { grid-template-columns: 1fr !important; }
+          .ph-np-pin-row { flex-wrap: wrap !important; }
+          .ph-np-pin-row .np-input { width: 100% !important; max-width: none !important; }
+          .ph-new-project-root .ph-np-action-bar {
+            left: 0 !important;
+            padding: 12px 12px !important;
+            padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+          }
+          .ph-np-action-summary { font-size: 11px !important; max-width: 100%; }
+          .ph-np-action-buttons { width: 100%; flex-direction: column !important; gap: 8px !important; }
+          .ph-np-action-buttons button { width: 100% !important; min-height: 44px !important; justify-content: center !important; }
+          .ph-np-action-buttons button:last-child { min-height: 48px !important; }
+          .ph-new-project-root button { min-height: 44px; box-sizing: border-box; }
+        }
       `}</style>
 
       {/* ── Topbar ── */}
-      <div style={{
+      <div className="ph-np-topbar" style={{
         height: 52, ...photographerDock.bottomEdge,
         display: "flex", alignItems: "center", gap: 12, padding: "0 28px",
         background: "rgba(13,30,40,0.85)", backdropFilter: "blur(12px)",
         position: "sticky", top: 0, zIndex: 50,
       }}>
         <button
+          type="button"
           onClick={() => router.push("/photographer/projects")}
           style={{
             display: "flex", alignItems: "center", gap: 5,
@@ -217,7 +239,7 @@ export default function NewProjectPage() {
       </div>
 
       {/* ── 콘텐츠 ── */}
-      <div style={{
+      <div className="ph-np-content" style={{
         flex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center",
         padding: "32px 24px 80px",
       }}>
@@ -324,7 +346,7 @@ export default function NewProjectPage() {
               </div>
 
               {/* 2컬럼: 프로젝트명 / 촬영날짜 */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div className="ph-np-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <div>
                   <div style={labelStyle}>
                     프로젝트명
@@ -370,7 +392,7 @@ export default function NewProjectPage() {
               <span style={{ fontSize: 12, fontWeight: 600, color: C.muted, letterSpacing: "0.5px" }}>고객 정보</span>
             </div>
             <div style={{ padding: 20 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div className="ph-np-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <div>
                   <div style={labelStyle}>
                     <Users size={11} color={C.dim} />
@@ -415,7 +437,7 @@ export default function NewProjectPage() {
             <div style={{ padding: 20 }}>
 
               {/* 2컬럼: 셀렉 갯수 / 업로드 예정 수 */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 18 }}>
+              <div className="ph-np-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 18 }}>
                 <div>
                   <div style={labelStyle}>
                     셀렉 갯수 (N)
@@ -555,7 +577,7 @@ export default function NewProjectPage() {
                   고객 비밀번호
                   <span style={{ fontSize: 10, fontWeight: 400, color: C.dim }}>선택사항</span>
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div className="ph-np-pin-row" style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input
                     className="np-input"
                     type="text"
@@ -615,16 +637,17 @@ export default function NewProjectPage() {
       </div>
 
       {/* ── 하단 고정 액션 바 (한도 미초과 시만) ── */}
-      {(projectCount === null || projectCount < BETA_MAX_PROJECTS_TOTAL) && <div style={{
+      {(projectCount === null || projectCount < BETA_MAX_PROJECTS_TOTAL) && <div className="ph-np-action-bar" style={{
         position: "fixed", bottom: 0, left: 220, right: 0,
         background: "rgba(0,48,73,0.95)", backdropFilter: "blur(12px)",
+        ...photographerDock.topEdge,
         borderTop: "1px solid rgba(79,126,255,0.15)",
         padding: "14px 28px",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         zIndex: 100,
       }}>
         {/* 좌측: 미리보기 요약 */}
-        <div style={{ fontSize: 12, color: C.muted }}>
+        <div className="ph-np-action-summary" style={{ fontSize: 12, color: C.muted }}>
           {[
             name.trim() && <strong key="name" style={{ color: C.text }}>{name.trim()}</strong>,
             customerName.trim() && customerName.trim(),
@@ -640,7 +663,7 @@ export default function NewProjectPage() {
         </div>
 
         {/* 우측: 버튼 */}
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="ph-np-action-buttons" style={{ display: "flex", gap: 8 }}>
           <button
             type="button"
             onClick={() => router.push("/photographer/projects")}

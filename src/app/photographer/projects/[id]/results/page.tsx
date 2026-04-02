@@ -180,11 +180,133 @@ export default function ResultsPage() {
   }
   if (!project) return null;
 
+  /** 하단 고정 액션 바·모바일 FAB 위로 스크롤 여유 */
+  const contentBottomPad = showActionBar ? 140 : 40;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", paddingBottom: showActionBar ? 70 : 0 }}>
+    <div
+      className={`ph-results-root${showActionBar ? " ph-results-has-action" : ""}`}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        minWidth: 0,
+        width: "100%",
+        boxSizing: "border-box",
+        paddingBottom: 0,
+      }}
+    >
+      <style>{`
+        @media (max-width: 768px) {
+          .ph-results-root {
+            overflow-x: hidden;
+            max-width: 100%;
+          }
+          .ph-results-topbar {
+            height: auto !important;
+            min-height: 52px;
+            flex-wrap: wrap !important;
+            gap: 10px !important;
+            padding: 10px 12px !important;
+            align-items: flex-start !important;
+          }
+          .ph-results-topbar-export {
+            width: 100%;
+            flex-wrap: wrap !important;
+            gap: 6px !important;
+          }
+          .ph-results-topbar-export button {
+            min-height: 40px;
+            flex: 1 1 calc(50% - 4px);
+            justify-content: center;
+            box-sizing: border-box;
+          }
+          .ph-results-banner {
+            margin: 12px 12px 0 !important;
+            padding: 12px 14px !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 12px !important;
+          }
+          .ph-results-banner button {
+            width: 100% !important;
+            justify-content: center !important;
+            min-height: 44px !important;
+          }
+          .ph-results-toolbar {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 12px !important;
+            padding: 12px 12px !important;
+          }
+          .ph-results-toolbar > div:first-child {
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+          }
+          .ph-results-root.ph-results-has-action .ph-results-content {
+            padding: 0 12px calc(140px + env(safe-area-inset-bottom, 0px)) !important;
+          }
+          .ph-results-root:not(.ph-results-has-action) .ph-results-content {
+            padding: 0 12px 28px !important;
+          }
+          .ph-results-gallery {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            gap: 8px !important;
+          }
+          .ph-results-list-head {
+            display: none !important;
+          }
+          .ph-results-list-row {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            align-items: flex-start !important;
+            gap: 8px 10px !important;
+            padding: 12px !important;
+          }
+          .ph-results-list-row > div:nth-child(1) { flex: 0 0 48px; }
+          .ph-results-list-row > div:nth-child(2) { flex: 0 0 auto; }
+          .ph-results-list-row > div:nth-child(3) {
+            flex: 1 1 120px;
+            min-width: 0;
+            white-space: normal !important;
+            word-break: break-word;
+          }
+          .ph-results-list-row > div:nth-child(4) {
+            flex: 1 1 100%;
+            min-width: 0;
+          }
+          .ph-results-list-row > div:nth-child(4) span {
+            white-space: normal !important;
+          }
+          .ph-results-action-bar {
+            left: 0 !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 12px !important;
+            padding: 12px 12px !important;
+            padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+          }
+          .ph-results-action-bar button {
+            width: 100% !important;
+            min-height: 48px !important;
+            justify-content: center !important;
+            box-sizing: border-box !important;
+          }
+          .ph-results-modal-actions {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+          }
+          .ph-results-modal-actions button {
+            width: 100% !important;
+            min-height: 44px !important;
+            justify-content: center !important;
+          }
+          .ph-results-root button { min-height: 44px; box-sizing: border-box; }
+        }
+      `}</style>
 
       {/* ── Topbar ── */}
-      <div style={{
+      <div className="ph-results-topbar" style={{
         height: 52, ...photographerDock.bottomEdge,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 24px",
@@ -193,6 +315,7 @@ export default function ResultsPage() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
+            type="button"
             onClick={() => router.push(`/photographer/projects/${id}`)}
             style={{
               display: "flex", alignItems: "center", gap: 5,
@@ -206,7 +329,7 @@ export default function ResultsPage() {
           </button>
           <span style={{ fontSize: 14, fontWeight: 500, color: C.text }}>셀렉 결과</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="ph-results-topbar-export" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <ExportBtn icon={<Clipboard size={13} />} label="클립보드 복사" onClick={handleCopyClipboard} />
           <ExportBtn icon={<Download size={13} />} label="CSV" onClick={handleDownloadCsv} />
           <ExportBtn icon={<Download size={13} />} label="TXT" onClick={handleDownloadTxt} />
@@ -215,7 +338,7 @@ export default function ResultsPage() {
 
       {/* ── Confirmed banner ── */}
       {isConfirmedOrBeyond && (
-        <div style={{
+        <div className="ph-results-banner" style={{
           margin: "16px 24px 0",
           background: "rgba(46,213,115,0.06)",
           border: "1px solid rgba(46,213,115,0.2)",
@@ -230,7 +353,7 @@ export default function ResultsPage() {
           }}>
             <CheckCircle2 size={18} color={C.green} />
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: C.green, marginBottom: 3 }}>
               고객이 최종 확정했습니다
             </div>
@@ -240,6 +363,7 @@ export default function ResultsPage() {
           </div>
           {project.status === "confirmed" && (
             <button
+              type="button"
               onClick={() => setShowEditStartModal(true)}
               style={{
                 display: "flex", alignItems: "center", gap: 5,
@@ -255,6 +379,7 @@ export default function ResultsPage() {
           )}
           {project.status === "editing" && (
             <button
+              type="button"
               onClick={() => router.push(`/photographer/projects/${id}/upload-versions`)}
               style={{
                 display: "flex", alignItems: "center", gap: 5,
@@ -275,7 +400,7 @@ export default function ResultsPage() {
 
       {/* ── Selecting banner ── */}
       {isSelecting && (
-        <div style={{
+        <div className="ph-results-banner" style={{
           margin: "16px 24px 0",
           background: "rgba(79,126,255,0.06)",
           border: "1px solid rgba(79,126,255,0.2)",
@@ -290,7 +415,7 @@ export default function ResultsPage() {
           }}>
             <MessageSquare size={18} color={C.steel} />
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: C.steel, marginBottom: 3 }}>
               고객이 셀렉 진행 중입니다
             </div>
@@ -302,7 +427,7 @@ export default function ResultsPage() {
       )}
 
       {/* ── Toolbar ── */}
-      <div style={{
+      <div className="ph-results-toolbar" style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "16px 24px 12px",
       }}>
@@ -356,7 +481,7 @@ export default function ResultsPage() {
       )}
 
       {/* ── Content ── */}
-      <div style={{ padding: "0 24px 40px" }}>
+      <div className="ph-results-content" style={{ padding: `0 24px ${contentBottomPad}px` }}>
         {photos.length === 0 && (
           <div style={{ padding: "48px 0", textAlign: "center", fontSize: 14, color: C.dim }}>
             선택된 사진이 없습니다.
@@ -365,7 +490,7 @@ export default function ResultsPage() {
 
         {/* Gallery view */}
         {viewMode === "gallery" && photos.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10 }}>
+          <div className="ph-results-gallery" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
             {photos.map((p, i) => (
               <GalleryItem
                 key={p.id}
@@ -382,7 +507,7 @@ export default function ResultsPage() {
         {/* List view */}
         {viewMode === "list" && photos.length > 0 && (
           <div>
-            <div style={{
+            <div className="ph-results-list-head" style={{
               display: "grid", gridTemplateColumns: "48px 60px 1fr 2fr",
               gap: 12, padding: "8px 14px",
               fontSize: 10, color: C.dim, fontWeight: 600, letterSpacing: "0.5px",
@@ -409,7 +534,7 @@ export default function ResultsPage() {
 
       {/* ── Bottom action bar ── */}
       {showActionBar && (
-        <div style={{
+        <div className="ph-results-action-bar" style={{
           position: "fixed", bottom: 0, left: 220, right: 0,
           background: "rgba(0,48,73,0.95)",
           borderTop: "1px solid rgba(79,126,255,0.15)",
@@ -431,6 +556,7 @@ export default function ResultsPage() {
           <div>
             {project.status === "confirmed" && (
               <button
+                type="button"
                 onClick={() => setShowEditStartModal(true)}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
@@ -445,6 +571,7 @@ export default function ResultsPage() {
             )}
             {project.status === "editing" && (
               <button
+                type="button"
                 onClick={() => router.push(`/photographer/projects/${id}/upload-versions`)}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
@@ -493,8 +620,9 @@ export default function ResultsPage() {
             {error && (
               <p style={{ marginBottom: 12, fontSize: 13, color: C.red }}>{error}</p>
             )}
-            <div style={{ display: "flex", gap: 8 }}>
+            <div className="ph-results-modal-actions" style={{ display: "flex", gap: 8 }}>
               <button
+                type="button"
                 onClick={() => setShowEditStartModal(false)}
                 disabled={editStartSubmitting}
                 style={{
@@ -506,6 +634,7 @@ export default function ResultsPage() {
                 취소
               </button>
               <button
+                type="button"
                 onClick={handleEditStartConfirm}
                 disabled={editStartSubmitting}
                 style={{
@@ -539,7 +668,7 @@ export default function ResultsPage() {
       {toast && (
         <div style={{
           position: "fixed",
-          bottom: showActionBar ? 80 : 24,
+          bottom: showActionBar ? 120 : 24,
           left: "50%", transform: "translateX(-50%)",
           zIndex: 300,
           background: C.surface3, borderRadius: 8,
@@ -561,6 +690,7 @@ function ExportBtn({ icon, label, onClick }: { icon: ReactNode; label: string; o
   const [h, setH] = useState(false);
   return (
     <button
+      type="button"
       onClick={onClick}
       onMouseEnter={() => setH(true)}
       onMouseLeave={() => setH(false)}
@@ -585,6 +715,7 @@ function ViewBtn({
 }: { icon: ReactNode; label: string; active: boolean; onClick: () => void }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       style={{
         padding: "6px 12px", border: "none",
@@ -620,7 +751,7 @@ function GalleryItem({
       }}
     >
       <div style={{
-        aspectRatio: "3/2", background: C.surface2,
+        aspectRatio: "1/1", background: C.surface2,
         display: "flex", alignItems: "center", justifyContent: "center",
         position: "relative", overflow: "hidden",
       }}>
@@ -682,6 +813,7 @@ function ListItem({
   const [imgErr, setImgErr] = useState(false);
   return (
     <div
+      className="ph-results-list-row"
       onMouseEnter={() => setH(true)}
       onMouseLeave={() => setH(false)}
       onClick={onOpen}
@@ -770,6 +902,7 @@ function Lightbox({
     >
       {/* Close */}
       <button
+        type="button"
         onClick={onClose}
         style={{
           position: "absolute", top: 16, right: 16,
@@ -792,6 +925,7 @@ function Lightbox({
 
       {/* Prev */}
       <button
+        type="button"
         onClick={(e) => { e.stopPropagation(); onPrev(); }}
         style={{
           position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
@@ -851,6 +985,7 @@ function Lightbox({
 
       {/* Next */}
       <button
+        type="button"
         onClick={(e) => { e.stopPropagation(); onNext(); }}
         style={{
           position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",

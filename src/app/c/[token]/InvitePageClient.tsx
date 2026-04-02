@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
@@ -327,9 +327,8 @@ export default function InvitePageClient() {
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">진행 방법</p>
           <div className="flex items-center gap-1">
             {STEPS.map((step, i) => (
-              <>
+              <Fragment key={step.title}>
                 <div
-                  key={step.title}
                   className="step-card flex flex-1 items-center gap-2 rounded-xl px-2.5 py-2"
                   style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}
                 >
@@ -342,10 +341,10 @@ export default function InvitePageClient() {
                   </span>
                 </div>
                 {i < 2 && (
-                  <Icon key={`a${i}`} icon="solar:alt-arrow-right-bold" width={10}
+                  <Icon icon="solar:alt-arrow-right-bold" width={10}
                     style={{ color: "#2d3148", flexShrink: 0 }} />
                 )}
-              </>
+              </Fragment>
             ))}
           </div>
         </div>

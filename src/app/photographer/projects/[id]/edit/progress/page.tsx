@@ -49,7 +49,47 @@ export default function EditProgressPage() {
   const nextPhoto = photos.find((p) => photoStates[p.id]?.comment);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8 p-6">
+    <div className="ph-edit-progress-root mx-auto max-w-2xl space-y-8 p-6">
+      <style>{`
+        @media (max-width: 768px) {
+          .ph-edit-progress-root {
+            overflow-x: hidden;
+            max-width: 100% !important;
+            min-width: 0;
+            box-sizing: border-box;
+            padding: 16px 12px 28px !important;
+          }
+          .ph-edit-progress-root h1 {
+            font-size: 1.25rem;
+            line-height: 1.3;
+            word-break: break-word;
+          }
+          .ph-edit-progress-next {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 14px !important;
+          }
+          .ph-edit-progress-next > div:first-child {
+            width: 100% !important;
+            max-width: 200px;
+            margin: 0 auto;
+          }
+          .ph-edit-progress-actions {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 8px !important;
+          }
+          .ph-edit-progress-actions button {
+            width: 100%;
+            min-height: 44px;
+            justify-content: center;
+          }
+          .ph-edit-progress-root button {
+            min-height: 44px;
+            box-sizing: border-box;
+          }
+        }
+      `}</style>
       <h1 className="text-2xl font-semibold text-white">보정 진행도</h1>
 
       <Card>
@@ -73,7 +113,7 @@ export default function EditProgressPage() {
       {nextPhoto && (
         <Card>
           <h3 className="mb-4 text-base font-medium text-zinc-200">다음 보정 사진</h3>
-          <div className="flex gap-4">
+          <div className="ph-edit-progress-next flex gap-4">
             <div className="aspect-square w-32 shrink-0 overflow-hidden rounded-lg bg-zinc-800">
               <img src={nextPhoto.url} alt="" className="h-full w-full object-cover" />
             </div>
@@ -87,7 +127,7 @@ export default function EditProgressPage() {
                   고객: {photoStates[nextPhoto.id]?.comment ?? nextPhoto.comment}
                 </p>
               )}
-              <div className="mt-4 flex gap-2">
+              <div className="ph-edit-progress-actions mt-4 flex gap-2">
                 <Button variant="primary" size="sm" className="flex items-center gap-1">
                   <Check className="h-4 w-4" />
                   ✅ 보정 완료

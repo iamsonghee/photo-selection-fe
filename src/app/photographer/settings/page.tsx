@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Camera, Bell, AlertTriangle, Phone, Globe, User, FileText, Loader2,
+  Camera, Bell, AlertTriangle, Phone, Globe, User, FileText, Loader2, Check,
 } from "lucide-react";
 import type { PhotographerProfile } from "@/app/api/photographer/profile/route";
 import { getProfileImageUrl } from "@/lib/photographer";
@@ -61,8 +61,9 @@ function DeleteModal({ onConfirm, onCancel, loading }: { onConfirm: () => void; 
         <p style={{ fontSize: 13, color: C.red, fontWeight: 500, marginBottom: 24 }}>
           이 작업은 되돌릴 수 없습니다.
         </p>
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+        <div className="ph-settings-delete-actions" style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button
+            type="button"
             onClick={onCancel}
             disabled={loading}
             style={{
@@ -74,6 +75,7 @@ function DeleteModal({ onConfirm, onCancel, loading }: { onConfirm: () => void; 
             취소
           </button>
           <button
+            type="button"
             onClick={onConfirm}
             disabled={loading}
             style={{
@@ -266,7 +268,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div style={{
+    <div className="ph-settings-root" style={{
       padding: 28, maxWidth: 860,
       fontFamily: PS_FONT,
     }}>
@@ -281,6 +283,91 @@ export default function SettingsPage() {
         .btn-danger:hover { background: rgba(255,71,87,0.12) !important; }
         .avatar-wrap:hover .avatar-overlay { opacity: 1 !important; }
         .avatar-wrap:hover .avatar-img { border-color: ${C.steel} !important; }
+        @media (max-width: 768px) {
+          .ph-settings-root {
+            overflow-x: hidden;
+            max-width: 100%;
+            box-sizing: border-box;
+            padding: 16px 12px 96px !important;
+          }
+          .settings-hero {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            padding: 18px 16px !important;
+            gap: 16px !important;
+          }
+          .settings-hero-cta {
+            align-items: stretch !important;
+            width: 100% !important;
+          }
+          .settings-hero-cta label {
+            width: 100% !important;
+            justify-content: center !important;
+            min-height: 44px !important;
+            box-sizing: border-box !important;
+          }
+          .settings-grid {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+          }
+          .ph-settings-instagram-row {
+            flex-direction: column !important;
+            align-items: stretch !important;
+          }
+          .ph-settings-instagram-prefix {
+            border-right: none !important;
+            border-bottom: 1px solid ${C.border} !important;
+          }
+          .ph-settings-actions {
+            flex-direction: column-reverse !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+          }
+          .ph-settings-actions button {
+            width: 100% !important;
+            min-height: 44px !important;
+            justify-content: center !important;
+            box-sizing: border-box !important;
+          }
+          .ph-settings-actions .btn-save {
+            min-height: 48px !important;
+          }
+          .ph-settings-notify-row {
+            min-height: 44px !important;
+            padding: 8px 0 !important;
+          }
+          .ph-settings-danger-row {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 12px !important;
+          }
+          .ph-settings-danger-row button {
+            width: 100% !important;
+            min-height: 44px !important;
+          }
+          .ph-settings-delete-actions {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+          }
+          .ph-settings-delete-actions button {
+            width: 100% !important;
+            min-height: 44px !important;
+            justify-content: center !important;
+          }
+          .ph-settings-root button {
+            min-height: 44px;
+            box-sizing: border-box;
+          }
+          .ph-settings-fake-toggle {
+            min-height: 44px !important;
+            height: auto !important;
+            width: auto !important;
+            min-width: 52px !important;
+            padding: 10px 12px !important;
+            align-self: center !important;
+          }
+        }
       `}</style>
 
       {/* ── 프로필 히어로 ── */}
@@ -359,7 +446,7 @@ export default function SettingsPage() {
               padding: "3px 9px", borderRadius: 20, fontSize: 10,
               background: C.greenDim, border: "1px solid rgba(46,213,115,0.25)", color: C.green,
             }}>
-              ✓ Google 연결됨
+              <Check size={10} strokeWidth={2.5} aria-hidden /> Google 연결됨
             </span>
             {joinDate && (
               <span style={{
@@ -374,7 +461,7 @@ export default function SettingsPage() {
         </div>
 
         {/* 이미지 변경 버튼 */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
+        <div className="settings-hero-cta" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
           <label
             className="btn-cancel"
             style={{
@@ -481,12 +568,12 @@ export default function SettingsPage() {
             {/* 인스타그램 */}
             <div style={{ marginBottom: 14 }}>
               <div style={labelStyle}>인스타그램</div>
-              <div style={{
+              <div className="ph-settings-instagram-row" style={{
                 display: "flex", alignItems: "center",
                 background: C.surface2, border: `1px solid ${C.border}`,
                 borderRadius: 8, overflow: "hidden",
               }}>
-                <span style={{
+                <span className="ph-settings-instagram-prefix" style={{
                   padding: "10px 10px", fontSize: 12, color: C.dim,
                   borderRight: `1px solid ${C.border}`, whiteSpace: "nowrap",
                   background: C.surface3,
@@ -525,12 +612,13 @@ export default function SettingsPage() {
             )}
 
             {/* 저장 액션 */}
-            <div style={{
+            <div className="ph-settings-actions" style={{
               display: "flex", alignItems: "center", justifyContent: "flex-end",
               gap: 8, paddingTop: 14,
               borderTop: `1px solid ${C.border}`, marginTop: 18,
             }}>
               <button
+                type="button"
                 className="btn-cancel"
                 onClick={handleCancel}
                 style={{
@@ -543,6 +631,7 @@ export default function SettingsPage() {
                 취소
               </button>
               <button
+                type="button"
                 className="btn-save"
                 onClick={handleSave}
                 disabled={saving}
@@ -596,6 +685,7 @@ export default function SettingsPage() {
               ].map((item, i) => (
                 <div
                   key={i}
+                  className="ph-settings-notify-row"
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
                     padding: "11px 0",
@@ -607,6 +697,8 @@ export default function SettingsPage() {
                     <div style={{ fontSize: 11, color: C.muted }}>{item.desc}</div>
                   </div>
                   <button
+                    type="button"
+                    className="ph-settings-fake-toggle"
                     onClick={() => setToast("준비 중인 기능입니다.")}
                     style={{
                       width: 34, height: 19, background: C.surface3,
@@ -639,12 +731,13 @@ export default function SettingsPage() {
               <span style={{ fontSize: 12, fontWeight: 600, color: C.red }}>위험 구역</span>
             </div>
             <div style={{ padding: "14px 18px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div className="ph-settings-danger-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                 <div>
                   <div style={{ fontSize: 13, color: C.text, fontWeight: 500, marginBottom: 2 }}>계정 탈퇴</div>
                   <div style={{ fontSize: 11, color: C.muted }}>모든 데이터가 영구 삭제됩니다</div>
                 </div>
                 <button
+                  type="button"
                   className="btn-danger"
                   onClick={() => setShowDeleteModal(true)}
                   style={{
