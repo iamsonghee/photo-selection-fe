@@ -64,6 +64,7 @@ async function postPhotosWithRetry(
   buildForm: () => FormData,
   token: string,
 ): Promise<Response> {
+  const crossOrigin = /^https?:\/\//i.test(url);
   let lastErr: unknown;
   for (let attempt = 1; attempt <= UPLOAD_MAX_ATTEMPTS; attempt++) {
     try {
@@ -72,7 +73,7 @@ async function postPhotosWithRetry(
         headers: { Authorization: `Bearer ${token}` },
         body: buildForm(),
         cache: "no-store",
-        mode: "cors",
+        mode: crossOrigin ? "cors" : "same-origin",
       });
       if (shouldRetryUploadStatus(res.status)) {
         lastErr = new Error(`HTTP ${res.status}`);
@@ -96,7 +97,8 @@ async function postPhotosWithRetry(
 const INITIAL_VISIBLE = 40;
 const LOAD_MORE       = 40;
 const BATCH_SIZE  = 5;
-const BATCH_DELAY = 500; // ms
+/** 휴대폰만 배치 사이 딜레이 (연속 요청 부담 완화). PC는 0으로 불필요한 대기 제거 */
+const BATCH_DELAY_PHONE_MS = 500;
 
 const VIEW_CONFIG = {
   filename: { cols: 1, rowH: 32  },  // 파일명+사이즈 텍스트 리스트
@@ -470,8 +472,12 @@ export default function UploadPage() {
 
       setUploadProgress(Math.round(((batchIdx + 1) / batches.length) * 100));
 
-      if (batchIdx < batches.length - 1 && !stopRequestedRef.current) {
-        await new Promise<void>((r) => setTimeout(r, BATCH_DELAY));
+      if (
+        batchIdx < batches.length - 1 &&
+        !stopRequestedRef.current &&
+        isPhoneLikeClient()
+      ) {
+        await new Promise<void>((r) => setTimeout(r, BATCH_DELAY_PHONE_MS));
       }
     }
 
