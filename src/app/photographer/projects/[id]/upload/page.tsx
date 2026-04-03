@@ -437,6 +437,18 @@ export default function UploadPage() {
     if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); }
   }, [toast]);
 
+  /** 업로드 중 탭 닫기/새로고침 시 브라우저 기본 확인(모바일 포함) — 진행 중 전송 손실 방지 */
+  useEffect(() => {
+    const uploading = uploadPhase === "sending" || uploadPhase === "processing";
+    if (!uploading) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [uploadPhase]);
+
   // ── 무한 스크롤 ──────────────────────────────────────────────────────────
   const handleThumbScroll = useCallback(() => {
     const el = thumbScrollRef.current;
