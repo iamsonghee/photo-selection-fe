@@ -196,6 +196,12 @@ export default function ResultsPage() {
       }}
     >
       <style>{`
+        /* PC: 갤러리 6열 — upload VIEW_CONFIG.gallery.cols 와 동일 (모바일은 아래 미디어쿼리에서 3열) */
+        .ph-results-gallery {
+          display: grid;
+          grid-template-columns: repeat(6, minmax(0, 1fr));
+          gap: 10px;
+        }
         @media (max-width: 768px) {
           .ph-results-root {
             overflow-x: hidden;
@@ -490,7 +496,7 @@ export default function ResultsPage() {
 
         {/* Gallery view */}
         {viewMode === "gallery" && photos.length > 0 && (
-          <div className="ph-results-gallery" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+          <div className="ph-results-gallery">
             {photos.map((p, i) => (
               <GalleryItem
                 key={p.id}

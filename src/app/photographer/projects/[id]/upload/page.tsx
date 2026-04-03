@@ -148,7 +148,7 @@ const PC_CONCURRENCY = 3; // PC: 동시에 처리할 배치 수 (3배치 병렬 
 
 const VIEW_CONFIG = {
   filename: { cols: 1, rowH: 32  },  // 파일명+사이즈 텍스트 리스트
-  gallery:  { cols: 8, rowH: 110 },  // 8열 이미지 그리드 + 파일명
+  gallery:  { cols: 6, rowH: 110 },  // PC: 6열(모바일은 effectiveCols로 3열)
 } as const;
 type ViewMode = keyof typeof VIEW_CONFIG;
 

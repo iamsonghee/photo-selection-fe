@@ -166,6 +166,7 @@ export default function ViewerPage() {
   const [starPressRing, setStarPressRing] = useState<number | null>(null);
   const [colorPressRing, setColorPressRing] = useState<ColorTag | null>(null);
   const [draftComment,  setDraftComment]  = useState("");
+  const [commentSaveFeedback, setCommentSaveFeedback] = useState<"idle" | "saved">("idle");
 
   const N = project?.requiredCount ?? 0;
   const queryString = searchParams.toString() ? `?${searchParams.toString()}` : "";
@@ -175,6 +176,20 @@ export default function ViewerPage() {
     if (current?.id) setDraftComment(photoStates[current.id]?.comment ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id]);
+
+  useEffect(() => {
+    setCommentSaveFeedback("idle");
+  }, [current?.id]);
+
+  const savedCommentForCurrent = current ? (photoStates[current.id]?.comment ?? "") : "";
+  const hasUnsavedComment =
+    Boolean(current) && draftComment.trim() !== savedCommentForCurrent.trim();
+
+  useEffect(() => {
+    if (commentSaveFeedback === "saved" && hasUnsavedComment) {
+      setCommentSaveFeedback("idle");
+    }
+  }, [draftComment, commentSaveFeedback, hasUnsavedComment]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -196,8 +211,11 @@ export default function ViewerPage() {
   }, [current, photoStates, updatePhotoState]);
 
   const saveComment = useCallback(() => {
-    if (current) updatePhotoState(current.id, { comment: draftComment.trim() });
-  }, [current, draftComment, updatePhotoState]);
+    if (!current || !hasUnsavedComment) return;
+    updatePhotoState(current.id, { comment: draftComment.trim() });
+    setCommentSaveFeedback("saved");
+    window.setTimeout(() => setCommentSaveFeedback("idle"), 2500);
+  }, [current, draftComment, hasUnsavedComment, updatePhotoState]);
 
   const toggleSelect = useCallback(() => { if (current) toggle(current.id); }, [current, toggle]);
 
@@ -353,17 +371,72 @@ export default function ViewerPage() {
           resize: "none", height: 72, lineHeight: 1.5, outline: "none",
         }}
       />
-      <button type="button" onClick={saveComment}
-        className="transition-colors hover:text-[#4f7eff]"
+      <button
+        type="button"
+        onClick={saveComment}
+        disabled={!hasUnsavedComment}
+        aria-label={commentSaveFeedback === "saved" ? "코멘트 저장됨" : "코멘트 저장"}
         style={{
-          marginTop: 8, width: "100%", padding: "8px",
-          borderRadius: 8, background: "rgba(255,255,255,0.06)",
-          border: "none",
-          color: "#a1a1aa", fontSize: 12, cursor: "pointer",
+          marginTop: 8,
+          width: "100%",
+          padding: "9px 10px",
+          borderRadius: 8,
+          fontSize: 12,
+          fontWeight: 600,
           fontFamily: "'Pretendard', system-ui, sans-serif",
-        }}>
-        저장
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          transition: "background 0.2s, color 0.2s, border-color 0.2s, transform 0.08s, opacity 0.2s",
+          ...(commentSaveFeedback === "saved"
+            ? {
+                background: "rgba(46,213,115,0.15)",
+                border: "1px solid rgba(46,213,115,0.35)",
+                color: "#2ed573",
+                cursor: "default",
+              }
+            : hasUnsavedComment
+              ? {
+                  background: "rgba(79,126,255,0.14)",
+                  border: "1px solid rgba(79,126,255,0.45)",
+                  color: "#7aa3ff",
+                  cursor: "pointer",
+                }
+              : {
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  color: "#52525b",
+                  cursor: "not-allowed",
+                  opacity: 0.85,
+                }),
+        }}
+        onMouseDown={(e) => {
+          if (hasUnsavedComment && commentSaveFeedback !== "saved") {
+            (e.currentTarget as HTMLButtonElement).style.transform = "scale(0.98)";
+          }
+        }}
+        onMouseUp={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.transform = "";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.transform = "";
+        }}
+      >
+        {commentSaveFeedback === "saved" ? (
+          <>
+            <Check style={{ width: 14, height: 14, flexShrink: 0 }} strokeWidth={3} />
+            저장됨
+          </>
+        ) : (
+          "저장"
+        )}
       </button>
+      {hasUnsavedComment && commentSaveFeedback !== "saved" && (
+        <div style={{ marginTop: 6, fontSize: 10, color: "rgba(161,161,170,0.95)" }}>
+          저장하지 않은 변경이 있어요
+        </div>
+      )}
     </div>
   );
 
@@ -685,14 +758,56 @@ export default function ViewerPage() {
                 fontFamily: "'Pretendard', system-ui, sans-serif", resize: "none", height: 44, lineHeight: 1.5, outline: "none",
               }}
             />
-            <button type="button" onClick={saveComment}
+            <button
+              type="button"
+              onClick={saveComment}
+              disabled={!hasUnsavedComment}
+              aria-label={commentSaveFeedback === "saved" ? "코멘트 저장됨" : "코멘트 저장"}
               style={{
-                height: 44, padding: "0 14px", borderRadius: 8,
-                background: "rgba(255,255,255,0.06)", border: "none",
-                color: "#a1a1aa", fontSize: 12, cursor: "pointer", flexShrink: 0,
+                height: 44,
+                minWidth: 88,
+                padding: "0 12px",
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 600,
+                flexShrink: 0,
                 fontFamily: "'Pretendard', system-ui, sans-serif",
-              }}>
-              저장
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5,
+                transition: "background 0.2s, color 0.2s, border-color 0.2s, transform 0.08s, opacity 0.2s",
+                ...(commentSaveFeedback === "saved"
+                  ? {
+                      background: "rgba(46,213,115,0.15)",
+                      border: "1px solid rgba(46,213,115,0.35)",
+                      color: "#2ed573",
+                      cursor: "default",
+                    }
+                  : hasUnsavedComment
+                    ? {
+                        background: "rgba(79,126,255,0.14)",
+                        border: "1px solid rgba(79,126,255,0.45)",
+                        color: "#7aa3ff",
+                        cursor: "pointer",
+                      }
+                    : {
+                        background: "rgba(255,255,255,0.05)",
+                        border: "1px solid rgba(255,255,255,0.06)",
+                        color: "#52525b",
+                        cursor: "not-allowed",
+                        opacity: 0.85,
+                      }),
+              }}
+            >
+              {commentSaveFeedback === "saved" ? (
+                <>
+                  <Check style={{ width: 13, height: 13, flexShrink: 0 }} strokeWidth={3} />
+                  저장됨
+                </>
+              ) : (
+                "저장"
+              )}
             </button>
           </div>
         </div>
