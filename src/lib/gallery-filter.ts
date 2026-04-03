@@ -39,6 +39,19 @@ export const FILTER_PARAM = {
   selected: "selected",
 } as const;
 
+/** 갤러리 스크롤 복원용(필터와 무관). 인앱 브라우저에서 sessionStorage 대신 URL로 전달 */
+export const GALLERY_SCROLL_PARAM = "gs";
+
+/**
+ * 뷰어 링크에 스크롤 Y(px)를 붙임. viewerQueryString은 buildFilterQueryString 결과(?foo=bar 또는 "").
+ */
+export function appendGalleryScrollQuery(viewerQueryString: string, scrollY: number): string {
+  const y = Math.round(scrollY);
+  if (!Number.isFinite(y) || y < 0) return viewerQueryString;
+  const sep = viewerQueryString ? "&" : "?";
+  return `${viewerQueryString || ""}${sep}${GALLERY_SCROLL_PARAM}=${encodeURIComponent(String(y))}`;
+}
+
 export type GalleryFilterState = {
   starFilter: StarRating | "all";
   colorFilter: ColorTag | "none" | "all";

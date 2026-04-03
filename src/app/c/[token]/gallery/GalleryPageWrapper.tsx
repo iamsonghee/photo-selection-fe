@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { Suspense } from "react";
 import { useParams } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 
@@ -23,5 +24,9 @@ const GalleryPageClient = dynamic(
 );
 
 export default function GalleryPageWrapper() {
-  return <GalleryPageClient />;
+  return (
+    <Suspense fallback={<GalleryLoading />}>
+      <GalleryPageClient />
+    </Suspense>
+  );
 }

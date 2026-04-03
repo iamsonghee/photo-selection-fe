@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { RotateCcw, Check, ArrowUpDown } from "lucide-react";
 import { useSelection } from "@/contexts/SelectionContext";
 import { getProfileImageUrl } from "@/lib/photographer";
 import {
+  appendGalleryScrollQuery,
   buildFilterQueryString,
+  GALLERY_SCROLL_PARAM,
   getFilteredPhotos,
   getPhotoDisplayName,
 } from "@/lib/gallery-filter";
@@ -37,6 +39,7 @@ const playfair: React.CSSProperties = { fontFamily: PS_DISPLAY };
 export default function GalleryPageClient() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const token = (params?.token as string) ?? "";
 
   const { project, photos, Y, N, toggle, selectedIds, photoStates, loading } = useSelection();
@@ -60,7 +63,31 @@ export default function GalleryPageClient() {
   const galleryScrollKey = token ? `ps:c-gallery-scroll:${token}` : "";
 
   useEffect(() => {
-    if (loading || !galleryScrollKey || typeof window === "undefined") return;
+    if (loading || typeof window === "undefined") return;
+
+    // 1) URL gs — 카카오톡 등 인앱에서 sessionStorage가 비는 경우에도 동작
+    const gsFromUrl = searchParams.get(GALLERY_SCROLL_PARAM);
+    if (gsFromUrl != null) {
+      const y = Number(gsFromUrl);
+      if (Number.isFinite(y) && y >= 0) {
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: y, behavior: "auto" });
+        });
+      }
+      try {
+        if (galleryScrollKey) sessionStorage.removeItem(galleryScrollKey);
+      } catch {
+        /* */
+      }
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete(GALLERY_SCROLL_PARAM);
+      const q = next.toString();
+      router.replace(`/c/${token}/gallery${q ? `?${q}` : ""}`, { scroll: false });
+      return;
+    }
+
+    // 2) 일반 브라우저: sessionStorage
+    if (!galleryScrollKey) return;
     const raw = sessionStorage.getItem(galleryScrollKey);
     if (raw == null) return;
     sessionStorage.removeItem(galleryScrollKey);
@@ -69,7 +96,7 @@ export default function GalleryPageClient() {
     requestAnimationFrame(() => {
       window.scrollTo({ top: y, behavior: "auto" });
     });
-  }, [loading, galleryScrollKey]);
+  }, [loading, galleryScrollKey, searchParams, token, router]);
 
   useEffect(() => {
     if (!token) return;
@@ -371,7 +398,14 @@ export default function GalleryPageClient() {
               <Link
                 key={photo.id}
                 href={`/c/${token}/viewer/${photo.id}${viewerQueryString}`}
-                onClick={() => {
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                  e.preventDefault();
+                  const path = `/c/${token}/viewer/${photo.id}${appendGalleryScrollQuery(
+                    viewerQueryString,
+                    window.scrollY,
+                  )}`;
+                  router.push(path);
                   try {
                     if (galleryScrollKey) sessionStorage.setItem(galleryScrollKey, String(window.scrollY));
                   } catch {
