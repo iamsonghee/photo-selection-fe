@@ -13,6 +13,7 @@ import {
 } from "@/lib/gallery-filter";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import type { StarRating, ColorTag } from "@/types";
+import { MobileViewerPinchPhoto } from "@/components/MobileViewerPinchPhoto";
 
 const COLOR_OPTIONS: { key: ColorTag; color: string }[] = [
   { key: "red",    color: "#ff4757" },
@@ -207,12 +208,15 @@ export default function ViewerPage() {
     router.push(`/c/${token}/viewer/${filteredPhotos[(currentIndex + 1) % filteredPhotos.length].id}${queryString}`);
   }, [currentIndex, filteredPhotos, router, token, queryString]);
 
-  // ── Touch swipe ──────────────────────────────────────────────────────────
-
-  let touchStartX = 0;
-  const handleTouchStart = (e: React.TouchEvent) => { touchStartX = e.touches[0].clientX; };
+  // ── Touch swipe (모바일: 이미지 핀치 확대 중에는 다음/이전 스와이프 비활성화) ──
+  const touchStartXRef = useRef(0);
+  const mobileImageZoomedRef = useRef(false);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) touchStartXRef.current = e.touches[0].clientX;
+  };
   const handleTouchEnd = (e: React.TouchEvent) => {
-    const diff = touchStartX - e.changedTouches[0].clientX;
+    if (mobileImageZoomedRef.current) return;
+    const diff = touchStartXRef.current - e.changedTouches[0].clientX;
     if (Math.abs(diff) > 50) { diff > 0 ? goNextWrap() : goPrevWrap(); }
   };
 
@@ -576,10 +580,11 @@ export default function ViewerPage() {
         <div style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 0, minWidth: 0 }}>
           {viewerSrc
             ? (
-              <ViewerPhotoWithBadge
+              <MobileViewerPinchPhoto
                 src={viewerSrc}
                 alt={filename}
                 showBadge={isCurrentSelected}
+                onZoomStateChange={(z) => { mobileImageZoomedRef.current = z; }}
               />
             )
             : <div style={{ color: "#3a5a6e", padding: 16 }}>사진 없음</div>
