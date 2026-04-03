@@ -94,6 +94,44 @@ async function postPhotosWithRetry(
   }
   throw lastErr;
 }
+
+/**
+ * 브라우저→Railway 직접 POST는 CORS 미설정 시 TypeError(Failed to fetch)로 실패함.
+ * 그때 동일 출처 Next 프록시로 한 번 더 시도.
+ */
+async function postPhotosUpload(
+  buildForm: () => FormData,
+  token: string,
+): Promise<Response> {
+  const primary = uploadPhotosUrl();
+  try {
+    return await postPhotosWithRetry(primary, buildForm, token);
+  } catch (e) {
+    if (e instanceof TypeError && primary !== UPLOAD_PHOTOS_PATH) {
+      try {
+        return await postPhotosWithRetry(UPLOAD_PHOTOS_PATH, buildForm, token);
+      } catch {
+        /* 원인 파악용으로 최초 오류 유지 */
+      }
+    }
+    throw e;
+  }
+}
+
+function isUploadNetworkFailure(e: unknown): boolean {
+  if (e instanceof TypeError) return true;
+  if (typeof DOMException !== "undefined" && e instanceof DOMException) {
+    return e.name === "NetworkError";
+  }
+  return false;
+}
+
+function uploadConnectionErrorMessage(): string {
+  if (isPhoneLikeClient()) {
+    return "업로드 연결이 끊어졌습니다. Wi‑Fi로 바꾸거나 화면을 켜 둔 채로 다시 시도해 주세요. 많은 장수는 나눠 올리면 더 안정적입니다.";
+  }
+  return "업로드에 실패했습니다. 인터넷 연결을 확인해 주세요. 계속되면 Railway의 ALLOWED_ORIGINS에 이 사이트 URL을 추가했는지 확인해 주세요.";
+}
 const INITIAL_VISIBLE = 40;
 const LOAD_MORE       = 40;
 const BATCH_SIZE  = 5;
@@ -422,7 +460,6 @@ export default function UploadPage() {
           if (fresh?.access_token) currentToken = fresh.access_token;
         }
 
-        const uploadUrl = uploadPhotosUrl();
         const buildForm = () => {
           const form = new FormData();
           form.append("project_id", id);
@@ -430,13 +467,13 @@ export default function UploadPage() {
           return form;
         };
 
-        let res = await postPhotosWithRetry(uploadUrl, buildForm, currentToken);
+        let res = await postPhotosUpload(buildForm, currentToken);
         if (res.status === 401) {
           await supabase.auth.refreshSession();
           const { data: { session: after401 } } = await supabase.auth.getSession();
           if (after401?.access_token) {
             currentToken = after401.access_token;
-            res = await postPhotosWithRetry(uploadUrl, buildForm, currentToken);
+            res = await postPhotosUpload(buildForm, currentToken);
           }
         }
 
@@ -456,11 +493,8 @@ export default function UploadPage() {
           allFailed.push(...batch);
         }
       } catch (e) {
-        // fetch 실패·CORS·연결 끊김 등은 TypeError로 올 수 있음 (휴대폰·백그라운드에서 빈번)
-        if (e instanceof TypeError) {
-          setError(
-            "업로드 연결이 끊어졌습니다. Wi‑Fi로 바꾸거나 화면을 켜 둔 채로 다시 시도해 주세요. 많은 장수는 나눠 올리면 더 안정적입니다.",
-          );
+        if (isUploadNetworkFailure(e)) {
+          setError(uploadConnectionErrorMessage());
           setUploadPhase("idle"); setUploadProgress(0); setFiles([]);
           return;
         }
