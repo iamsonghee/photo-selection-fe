@@ -42,7 +42,7 @@ function uploadPhotosUrl(): string {
 
 const UPLOAD_MAX_ATTEMPTS = 3;
 
-/** PC와 달리 휴대폰 브라우저는 멀티파트·연결이 불안정한 경우가 많아 1장씩 전송 */
+/** 휴대폰 브라우저 여부 — 업로드는 MOBILE_BATCH_SIZE·MOBILE_CONCURRENCY·클라이언트 압축 경로 사용 */
 function isPhoneLikeClient(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent;
@@ -177,6 +177,9 @@ const LOAD_MORE       = 40;
 const BATCH_SIZE = 8;
 /** PC: 동시에 보낼 multipart 요청 수 (HTTP 왕복·서버 병렬 활용) */
 const PC_CONCURRENCY = 5;
+/** 모바일 전용: 2단계(배치 2~3장·동시성 2 권장안) — PC 상수와 독립 */
+const MOBILE_BATCH_SIZE = 3;
+const MOBILE_CONCURRENCY = 2;
 
 const VIEW_CONFIG = {
   filename: { cols: 1, rowH: 32  },  // 파일명+사이즈 텍스트 리스트
@@ -495,7 +498,7 @@ export default function UploadPage() {
     }
   }, [visibleCount, photos.length]);
 
-  // ── 업로드 (PC: 여러 배치 동시 전송 / 모바일: 1장씩 순차) ──────────────
+  // ── 업로드 (PC: BATCH_SIZE·PC_CONCURRENCY / 모바일: MOBILE_*·압축 선처리) ──────────────
   const startUpload = useCallback(async (uploadFiles: File[]) => {
     if (!uploadFiles.length) return;
     setFiles(uploadFiles);
@@ -556,8 +559,8 @@ export default function UploadPage() {
     setUploadPhase("sending");
     setProcessedCount(0);
 
-    // 휴대폰: 한 요청에 여러 장이 불안정 → 1장씩. PC는 BATCH_SIZE 장씩.
-    const effectiveBatchSize = isPhoneLikeClient() ? 1 : BATCH_SIZE;
+    // 휴대폰: MOBILE_BATCH_SIZE 장/요청 · MOBILE_CONCURRENCY 동시 요청. PC는 BATCH_SIZE.
+    const effectiveBatchSize = isPhoneLikeClient() ? MOBILE_BATCH_SIZE : BATCH_SIZE;
     const batches: File[][] = [];
     for (let i = 0; i < filesToUpload.length; i += effectiveBatchSize) {
       batches.push(filesToUpload.slice(i, i + effectiveBatchSize));
@@ -587,7 +590,7 @@ export default function UploadPage() {
     let completedBatches = 0;
     let abortReason: "betaLimit" | "network" | null = null;
     let abortMessage = "";
-    const concurrency = isPhoneLikeClient() ? 1 : PC_CONCURRENCY;
+    const concurrency = isPhoneLikeClient() ? MOBILE_CONCURRENCY : PC_CONCURRENCY;
 
     for (let chunkStart = 0; chunkStart < batches.length; chunkStart += concurrency) {
       if (stopRequestedRef.current) { wasStopped = true; break; }
