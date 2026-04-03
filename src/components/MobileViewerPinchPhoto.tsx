@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 import {
   viewerImageBlockDownloadHandlers,
   viewerImageBlockDownloadStyle,
+  viewerImageDownloadBlocked,
 } from "@/lib/viewer-image-guard";
 
 function getObjectFitContainOffset(
@@ -264,7 +265,7 @@ export function MobileViewerPinchPhoto({ src, alt, showBadge, onZoomStateChange 
       ref={containerRef}
       className="relative h-full w-full overflow-hidden"
       style={{ touchAction: "none" }}
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={viewerImageDownloadBlocked ? (e) => e.preventDefault() : undefined}
     >
       <div
         style={{

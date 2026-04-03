@@ -1,5 +1,15 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## 이 프로젝트 (photo-selection)
+
+**저장소 루트의 [README.md](../README.md)**에 다음이 정리되어 있습니다.
+
+- 작가 사진 업로드(모바일 압축, 실패 재시도, 백엔드 동시 처리·EXIF)
+- 고객 뷰어 이미지 저장 허용/차단 (`NEXT_PUBLIC_BLOCK_VIEWER_IMAGE_DOWNLOAD`)
+- 환경 변수 요약
+
+프론트 전용 예시 키는 **`.env.example`**을 보세요.
+
 ## Getting Started
 
 First, run the development server:

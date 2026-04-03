@@ -15,6 +15,7 @@ import {
   X,
   AlertTriangle,
   Pin,
+  RefreshCw,
 } from "lucide-react";
 import { BETA_MAX_PHOTOS_PER_PROJECT, parseBetaLimitError } from "@/lib/beta-limits";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -25,6 +26,7 @@ import type { Project, Photo } from "@/types";
 import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT, photographerDock } from "@/lib/photographer-theme";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
+import { compressImageFileForMobileIfNeeded } from "@/lib/upload-client-compress";
 
 /** 모바일 스펙: 넓은 이미지 선택 + HEIC; 필터는 handleFileChange에서 image/ 유지 */
 const ACCEPT_TYPES = "image/*,image/heic,image/heif";
@@ -466,7 +468,7 @@ export default function UploadPage() {
     if (!uploadFiles.length) return;
     setFiles(uploadFiles);
     setError(null);
-    setUploadPhase("sending");
+    setUploadPhase(isPhoneLikeClient() ? "processing" : "sending");
     setUploadProgress(0);
     setProcessedCount(0);
     setUploadSummary(null);
@@ -484,17 +486,51 @@ export default function UploadPage() {
 
     let currentToken = token;
 
+    let filesToUpload = uploadFiles;
+    let wasStopped = false;
+
+    // 모바일만: 브라우저에서 해상도·용량 줄여 전송 실패·지연 완화 (PC는 원본 유지)
+    if (isPhoneLikeClient()) {
+      const compressed: File[] = [];
+      for (let i = 0; i < uploadFiles.length; i++) {
+        if (stopRequestedRef.current) {
+          wasStopped = true;
+          break;
+        }
+        compressed.push(await compressImageFileForMobileIfNeeded(uploadFiles[i]));
+        setProcessedCount(i + 1);
+        setUploadProgress(Math.round(((i + 1) / uploadFiles.length) * 100));
+      }
+      if (wasStopped) {
+        setUploadPhase("idle");
+        setUploadProgress(0);
+        setProcessedCount(0);
+        setFiles([]);
+        setToast("업로드가 중지됐습니다. 언제든 이어서 업로드할 수 있어요.");
+        loadProject();
+        loadPhotos();
+        router.refresh();
+        return;
+      }
+      filesToUpload = compressed;
+      setFiles(filesToUpload);
+    }
+
+    setUploadPhase("sending");
+    setUploadProgress(0);
+    setProcessedCount(0);
+
     // 휴대폰: 한 요청에 여러 장이 불안정 → 1장씩. PC는 5장 배치 유지.
     const effectiveBatchSize = isPhoneLikeClient() ? 1 : BATCH_SIZE;
     const batches: File[][] = [];
-    for (let i = 0; i < uploadFiles.length; i += effectiveBatchSize) {
-      batches.push(uploadFiles.slice(i, i + effectiveBatchSize));
+    for (let i = 0; i < filesToUpload.length; i += effectiveBatchSize) {
+      batches.push(filesToUpload.slice(i, i + effectiveBatchSize));
     }
     setBatchProgress({ current: 0, total: batches.length });
 
     let totalUploaded = 0;
     const allFailed: File[] = [];
-    let wasStopped = false;
+    wasStopped = false;
     let completedBatches = 0;
     let abortReason: "betaLimit" | "network" | null = null;
     let abortMessage = "";
@@ -555,7 +591,7 @@ export default function UploadPage() {
         completedBatches++;
         setUploadProgress(Math.round((completedBatches / batches.length) * 100));
         setBatchProgress({ current: completedBatches, total: batches.length });
-        setProcessedCount(Math.min(completedBatches * effectiveBatchSize, uploadFiles.length));
+        setProcessedCount(Math.min(completedBatches * effectiveBatchSize, filesToUpload.length));
       }));
     }
 
@@ -575,7 +611,7 @@ export default function UploadPage() {
       setToast("업로드가 중지됐습니다. 언제든 이어서 업로드할 수 있어요.");
       loadProject(); loadPhotos(); router.refresh();
     } else {
-      setUploadSummary({ total: uploadFiles.length, succeeded: totalUploaded, failedFiles: allFailed });
+      setUploadSummary({ total: filesToUpload.length, succeeded: totalUploaded, failedFiles: allFailed });
       setUploadPhase("done");
       fetch("/api/photographer/project-logs", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -1036,9 +1072,11 @@ export default function UploadPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <Loader2 size={13} color={C.steel} style={{ animation: "spin 1s linear infinite" }} />
                   <span style={{ fontSize: 12, fontWeight: 500, color: C.text }}>
-                    업로드 중 {processedCount} / {files.length}장
+                    {uploadPhase === "processing"
+                      ? `이미지 최적화 중 ${processedCount} / ${files.length}장`
+                      : `업로드 중 ${processedCount} / ${files.length}장`}
                   </span>
-                  {batchProgress.total > 0 && (
+                  {uploadPhase === "sending" && batchProgress.total > 0 && (
                     <span style={{ fontSize: 11, color: C.dim }}>
                       (배치 {batchProgress.current}/{batchProgress.total})
                     </span>
@@ -1046,7 +1084,7 @@ export default function UploadPage() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 11, color: C.muted }}>{uploadProgress}%</span>
-                  {uploadPhase === "sending" && (
+                  {(uploadPhase === "sending" || uploadPhase === "processing") && (
                     stopRequested ? (
                       <span style={{ fontSize: 11, color: C.orange }}>중지 요청됨...</span>
                     ) : (
@@ -1060,7 +1098,7 @@ export default function UploadPage() {
                           borderRadius: 5, color: C.muted, fontFamily: PS_FONT,
                         }}
                       >
-                        업로드 중지
+                        {uploadPhase === "processing" ? "최적화 중지" : "업로드 중지"}
                       </button>
                     )
                   )}
@@ -1102,38 +1140,74 @@ export default function UploadPage() {
           {/* 업로드 실패 파일 요약 */}
           {uploadSummary && uploadSummary.failedFiles.length > 0 && uploadPhase === "idle" && (
             <div className="up-o-summary" style={{
-              padding: "12px 14px", borderRadius: 8, marginBottom: 10,
-              background: "rgba(255,165,0,0.08)", border: "1px solid rgba(255,165,0,0.25)",
+              padding: "14px 16px", borderRadius: 10, marginBottom: 12,
+              background: "rgba(255,165,0,0.08)", border: "1px solid rgba(255,165,0,0.28)",
               fontSize: 12,
             }}>
-              <div style={{ fontWeight: 600, color: C.orange, marginBottom: 6 }}>
-                {uploadSummary.total}장 중 {uploadSummary.succeeded}장 성공,{" "}
-                {uploadSummary.failedFiles.length}장 실패
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                <AlertTriangle size={18} color={C.orange} style={{ flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontWeight: 600, color: C.orange, marginBottom: 4 }}>
+                    {uploadSummary.succeeded > 0
+                      ? `일부만 완료 · 성공 ${uploadSummary.succeeded}장 · 실패 ${uploadSummary.failedFiles.length}장`
+                      : `업로드 실패 ${uploadSummary.failedFiles.length}장`}
+                  </div>
+                  <p style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, margin: 0 }}>
+                    아래 파일만 다시 보냅니다. 네트워크가 불안정하면 Wi‑Fi로 바꾼 뒤 재시도해 주세요.
+                  </p>
+                </div>
               </div>
               <div style={{
-                maxHeight: 72, overflowY: "auto", marginBottom: 10,
-                borderRadius: 4, background: "rgba(0,0,0,0.1)", padding: "6px 8px",
+                maxHeight: 120, overflowY: "auto", marginBottom: 12,
+                borderRadius: 6, background: "rgba(0,0,0,0.12)", padding: "8px 10px",
               }}>
                 {uploadSummary.failedFiles.map((f, i) => (
-                  <div key={i} style={{ fontSize: 11, color: C.muted, lineHeight: 1.8 }}>
-                    {f.name}
+                  <div
+                    key={`${f.name}-${f.size}-${i}`}
+                    style={{
+                      fontSize: 11, color: C.text, lineHeight: 1.6,
+                      display: "flex", justifyContent: "space-between", gap: 8,
+                      borderBottom: i < uploadSummary.failedFiles.length - 1 ? `1px solid ${C.border}` : "none",
+                      paddingBottom: i < uploadSummary.failedFiles.length - 1 ? 6 : 0,
+                      marginBottom: i < uploadSummary.failedFiles.length - 1 ? 6 : 0,
+                    }}
+                  >
+                    <span style={{ wordBreak: "break-all", minWidth: 0 }} title={f.name}>{f.name}</span>
+                    <span style={{ flexShrink: 0, color: C.dim, fontVariantNumeric: "tabular-nums" }}>
+                      {formatStoredFileSizeBytes(f.size)}
+                    </span>
                   </div>
                 ))}
               </div>
-              <button
-                onClick={() => {
-                  const f = uploadSummary.failedFiles;
-                  setUploadSummary(null);
-                  startUpload(f);
-                }}
-                style={{
-                  padding: "5px 12px", fontSize: 11, cursor: "pointer",
-                  background: "rgba(255,165,0,0.15)", border: "1px solid rgba(255,165,0,0.3)",
-                  borderRadius: 5, color: C.orange, fontFamily: PS_FONT,
-                }}
-              >
-                실패 파일 재시도
-              </button>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const list = [...uploadSummary.failedFiles];
+                    startUpload(list);
+                  }}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    background: "rgba(255,165,0,0.2)", border: `1px solid rgba(255,165,0,0.45)`,
+                    borderRadius: 8, color: C.orange, fontFamily: PS_FONT,
+                  }}
+                >
+                  <RefreshCw size={14} />
+                  실패 {uploadSummary.failedFiles.length}장만 다시 업로드
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUploadSummary(null)}
+                  style={{
+                    padding: "8px 12px", fontSize: 11, cursor: "pointer",
+                    background: "transparent", border: `1px solid ${C.borderMd}`,
+                    borderRadius: 8, color: C.muted, fontFamily: PS_FONT,
+                  }}
+                >
+                  닫기
+                </button>
+              </div>
             </div>
           )}
 

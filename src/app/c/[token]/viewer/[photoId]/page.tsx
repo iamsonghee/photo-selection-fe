@@ -15,6 +15,7 @@ import { viewerImageUrl } from "@/lib/viewer-image-url";
 import {
   viewerImageBlockDownloadHandlers,
   viewerImageBlockDownloadStyle,
+  viewerImageDownloadBlocked,
 } from "@/lib/viewer-image-guard";
 import type { StarRating, ColorTag } from "@/types";
 import { MobileViewerPinchPhoto } from "@/components/MobileViewerPinchPhoto";
@@ -102,7 +103,7 @@ function ViewerPhotoWithBadge({
     <div
       ref={containerRef}
       style={{ width: "100%", height: "100%", position: "relative" }}
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={viewerImageDownloadBlocked ? (e) => e.preventDefault() : undefined}
     >
       <img
         ref={imgRef}
@@ -182,8 +183,9 @@ export default function ViewerPage() {
     const raw = photoStates[current.id]?.rating;
     const cur = raw != null ? (Number(raw) as StarRating) : undefined;
     updatePhotoState(current.id, { rating: cur === s ? undefined : s });
-    // 호버 미리보기가 남으면 별을 지워도 hoverStar 때문에 계속 채워진 것처럼 보임
+    // 호버 미리보기가 남으면 별을 지워도 hoverStar 때문에 계속 채워진 것처럼 보임 (터치 합성 이벤트 대비 다음 틱에 한 번 더 초기화)
     setHoverStar(0);
+    window.setTimeout(() => setHoverStar(0), 0);
   }, [current, photoStates, updatePhotoState]);
 
   const setColor = useCallback((c: ColorTag) => {

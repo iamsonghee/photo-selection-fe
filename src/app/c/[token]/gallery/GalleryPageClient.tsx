@@ -269,14 +269,18 @@ export default function GalleryPageClient() {
 
           <span className="w-2 shrink-0" aria-hidden />
 
-          {/* Interactive star filter */}
+          {/* Interactive star filter — 클릭 후 hover가 남으면 필터가 꺼져도 별이 채워진 것처럼 보임 */}
           {([1, 2, 3, 4, 5] as const).map((s) => {
             const filled = s <= (hoverStar || starFilter);
             return (
               <button
                 key={s}
                 type="button"
-                onClick={() => setStarFilter((prev) => (prev === s ? 0 : s))}
+                onClick={() => {
+                  setStarFilter((prev) => (prev === s ? 0 : s));
+                  setHoverStar(0);
+                  window.setTimeout(() => setHoverStar(0), 0);
+                }}
                 onMouseEnter={() => setHoverStar(s)}
                 onMouseLeave={() => setHoverStar(0)}
                 className="shrink-0 transition-transform hover:scale-[1.2]"
@@ -330,7 +334,12 @@ export default function GalleryPageClient() {
           {/* Reset: star + color only */}
           <button
             type="button"
-            onClick={() => { setStarFilter(0); setColorFilter(null); }}
+            onClick={() => {
+              setStarFilter(0);
+              setColorFilter(null);
+              setHoverStar(0);
+              window.setTimeout(() => setHoverStar(0), 0);
+            }}
             className="shrink-0 flex items-center justify-center transition-all hover:opacity-70"
             title="초기화"
             style={{
@@ -505,6 +514,7 @@ export default function GalleryPageClient() {
                                 rating: cur === s ? undefined : s,
                               });
                               setGridStarHover(null);
+                              window.setTimeout(() => setGridStarHover(null), 0);
                             }}
                             onMouseEnter={() =>
                               setGridStarHover({ photoId: photo.id, star: s })
