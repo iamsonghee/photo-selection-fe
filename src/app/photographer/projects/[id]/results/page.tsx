@@ -23,6 +23,7 @@ import { getProjectById, getPhotosWithSelections } from "@/lib/db";
 import type { Project, Photo, ColorTag } from "@/types";
 import { PHOTOGRAPHER_THEME as C, photographerDock } from "@/lib/photographer-theme";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
+import { galleryThumbPriorityProps } from "@/lib/gallery-filter";
 
 // ---------- utils (preserved) ----------
 function sanitizeFilenamePart(s: string) {
@@ -71,6 +72,7 @@ export default function ResultsPage() {
   const [editStartSubmitting, setEditStartSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("gallery");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [galleryThumbFocusIndex, setGalleryThumbFocusIndex] = useState<number | null>(null);
 
   useEffect(() => {
     getProjectById(id)
@@ -100,6 +102,30 @@ export default function ResultsPage() {
     const t = setTimeout(() => setToast(null), 2500);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    if (galleryThumbFocusIndex == null || photos.length === 0) return;
+    const anchor = galleryThumbFocusIndex;
+    const ordered: string[] = [];
+    const push = (i: number) => {
+      const u = photos[i]?.url;
+      if (u) ordered.push(u);
+    };
+    push(anchor);
+    for (let d = 1; d < photos.length; d++) {
+      if (anchor - d >= 0) push(anchor - d);
+      if (anchor + d < photos.length) push(anchor + d);
+    }
+    const seen = new Set<string>();
+    ordered.forEach((url, i) => {
+      if (seen.has(url)) return;
+      seen.add(url);
+      const img = document.createElement("img");
+      img.decoding = "async";
+      img.fetchPriority = i < 24 ? "high" : "low";
+      img.src = url;
+    });
+  }, [galleryThumbFocusIndex, photos]);
 
   const confirmedText = useMemo(() => {
     if (!project?.confirmedAt) return null;
@@ -501,6 +527,8 @@ export default function ResultsPage() {
               <GalleryItem
                 key={p.id}
                 num={i + 1}
+                photoIndex={i}
+                focusIndex={galleryThumbFocusIndex}
                 url={p.url}
                 filename={getDisplayFilename(p)}
                 comment={(photoStates[p.id]?.comment ?? "").trim()}
@@ -528,6 +556,8 @@ export default function ResultsPage() {
               <ListItem
                 key={p.id}
                 num={i + 1}
+                photoIndex={i}
+                focusIndex={galleryThumbFocusIndex}
                 url={p.url}
                 filename={getDisplayFilename(p)}
                 comment={(photoStates[p.id]?.comment ?? "").trim()}
@@ -664,7 +694,12 @@ export default function ResultsPage() {
           photos={photos}
           photoStates={photoStates}
           index={lightboxIndex}
-          onClose={() => setLightboxIndex(null)}
+          onClose={() => {
+            setLightboxIndex((i) => {
+              if (i !== null) setGalleryThumbFocusIndex(i);
+              return null;
+            });
+          }}
           onPrev={() => setLightboxIndex((i) => (i! > 0 ? i! - 1 : photos.length - 1))}
           onNext={() => setLightboxIndex((i) => (i! < photos.length - 1 ? i! + 1 : 0))}
         />
@@ -739,8 +774,16 @@ function ViewBtn({
 }
 
 function GalleryItem({
-  num, url, filename, comment, onOpen,
-}: { num: number; url: string; filename: string; comment: string; onOpen: () => void }) {
+  num, photoIndex, focusIndex, url, filename, comment, onOpen,
+}: {
+  num: number;
+  photoIndex: number;
+  focusIndex: number | null;
+  url: string;
+  filename: string;
+  comment: string;
+  onOpen: () => void;
+}) {
   const [h, setH] = useState(false);
   const [imgErr, setImgErr] = useState(false);
   return (
@@ -763,7 +806,9 @@ function GalleryItem({
       }}>
         {url && !imgErr ? (
           <img
-            src={url} alt=""
+            src={url}
+            alt=""
+            {...galleryThumbPriorityProps(photoIndex, focusIndex)}
             onError={() => setImgErr(true)}
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
@@ -813,8 +858,16 @@ function GalleryItem({
 }
 
 function ListItem({
-  num, url, filename, comment, onOpen,
-}: { num: number; url: string; filename: string; comment: string; onOpen: () => void }) {
+  num, photoIndex, focusIndex, url, filename, comment, onOpen,
+}: {
+  num: number;
+  photoIndex: number;
+  focusIndex: number | null;
+  url: string;
+  filename: string;
+  comment: string;
+  onOpen: () => void;
+}) {
   const [h, setH] = useState(false);
   const [imgErr, setImgErr] = useState(false);
   return (
@@ -839,8 +892,13 @@ function ListItem({
         border: `1px solid ${C.border}`, overflow: "hidden", flexShrink: 0,
       }}>
         {url && !imgErr ? (
-          <img src={url} alt="" onError={() => setImgErr(true)}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <img
+            src={url}
+            alt=""
+            {...galleryThumbPriorityProps(photoIndex, focusIndex)}
+            onError={() => setImgErr(true)}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
         ) : (
           <Image size={16} color={C.dim} />
         )}
