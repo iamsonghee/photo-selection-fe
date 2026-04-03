@@ -84,6 +84,8 @@ async function postPhotosWithRetry(
       }
       return res;
     } catch (e) {
+      // 크로스 오리진 TypeError = CORS 거부 → 재시도해도 동일 결과, 즉시 throw
+      if (e instanceof TypeError && crossOrigin) throw e;
       lastErr = e;
       if (attempt < UPLOAD_MAX_ATTEMPTS) {
         await new Promise<void>((r) => setTimeout(r, 800 * attempt));
@@ -96,18 +98,23 @@ async function postPhotosWithRetry(
 }
 
 /**
- * 브라우저→Railway 직접 POST는 CORS 미설정 시 TypeError(Failed to fetch)로 실패함.
- * 그때 동일 출처 Next 프록시로 한 번 더 시도.
+ * 브라우저→백엔드 직접 POST는 CORS 미설정 시 TypeError로 실패.
+ * 첫 CORS 실패 시 useProxyRef.current = true 로 설정해 이후 배치는 프록시만 사용.
  */
 async function postPhotosUpload(
   buildForm: () => FormData,
   token: string,
+  useProxyRef: { current: boolean },
 ): Promise<Response> {
   const primary = uploadPhotosUrl();
+  if (useProxyRef.current || primary === UPLOAD_PHOTOS_PATH) {
+    return postPhotosWithRetry(UPLOAD_PHOTOS_PATH, buildForm, token);
+  }
   try {
     return await postPhotosWithRetry(primary, buildForm, token);
   } catch (e) {
-    if (e instanceof TypeError && primary !== UPLOAD_PHOTOS_PATH) {
+    if (e instanceof TypeError) {
+      useProxyRef.current = true; // 이후 배치는 프록시 사용
       try {
         return await postPhotosWithRetry(UPLOAD_PHOTOS_PATH, buildForm, token);
       } catch {
@@ -134,8 +141,8 @@ function uploadConnectionErrorMessage(): string {
 }
 const INITIAL_VISIBLE = 40;
 const LOAD_MORE       = 40;
-const BATCH_SIZE  = 5;
-/** iPhone은 1장=1배치라 예전(5장/배치)보다 요청 수가 많음 → 배치 간 딜레이 없음(불필요한 대기만 수십 초~수분 추가됨) */
+const BATCH_SIZE = 5;
+const PC_CONCURRENCY = 3; // PC: 동시에 처리할 배치 수 (3배치 병렬 → 약 3배 속도 향상)
 
 const VIEW_CONFIG = {
   filename: { cols: 1, rowH: 32  },  // 파일명+사이즈 텍스트 리스트
@@ -290,6 +297,7 @@ export default function UploadPage() {
   const fileInputRef       = useRef<HTMLInputElement>(null);
   const thumbScrollRef     = useRef<HTMLDivElement>(null);
   const stopRequestedRef   = useRef(false);
+  const useProxyRef        = useRef(false);
 
   // ── 데이터 상태 ──
   const [project,  setProject]  = useState<Project | null>(null);
@@ -408,7 +416,7 @@ export default function UploadPage() {
     }
   }, [visibleCount, photos.length]);
 
-  // ── 업로드 (5장씩 배치 순차 처리) ────────────────────────────────────
+  // ── 업로드 (PC: 3배치 동시 처리 / 모바일: 1장씩 순차) ──────────────
   const startUpload = useCallback(async (uploadFiles: File[]) => {
     if (!uploadFiles.length) return;
     setFiles(uploadFiles);
@@ -419,6 +427,7 @@ export default function UploadPage() {
     setUploadSummary(null);
     setStopRequested(false);
     stopRequestedRef.current = false;
+    useProxyRef.current = false;
 
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
@@ -441,24 +450,28 @@ export default function UploadPage() {
     let totalUploaded = 0;
     const allFailed: File[] = [];
     let wasStopped = false;
+    let completedBatches = 0;
+    let abortReason: "betaLimit" | "network" | null = null;
+    let abortMessage = "";
+    const concurrency = isPhoneLikeClient() ? 1 : PC_CONCURRENCY;
 
-    for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+    for (let chunkStart = 0; chunkStart < batches.length; chunkStart += concurrency) {
       if (stopRequestedRef.current) { wasStopped = true; break; }
+      if (abortReason) break;
 
-      const batch = batches[batchIdx];
-      setBatchProgress({ current: batchIdx + 1, total: batches.length });
-      setUploadProgress(Math.round((batchIdx / batches.length) * 100));
-      setProcessedCount(
-        Math.min((batchIdx + 1) * effectiveBatchSize, uploadFiles.length)
-      );
+      // 모바일: 20배치마다 세션 갱신
+      if (isPhoneLikeClient() && chunkStart > 0 && chunkStart % 20 === 0) {
+        await supabase.auth.refreshSession();
+        const { data: { session: fresh } } = await supabase.auth.getSession();
+        if (fresh?.access_token) currentToken = fresh.access_token;
+      }
 
-      try {
-        // 휴대폰·긴 세션: N배치마다만 세션 갱신 (매 배치 getSession 생략 → iPhone 1장씩일 때 체감 속도 회복)
-        if (isPhoneLikeClient() && batchIdx > 0 && batchIdx % 20 === 0) {
-          await supabase.auth.refreshSession();
-          const { data: { session: fresh } } = await supabase.auth.getSession();
-          if (fresh?.access_token) currentToken = fresh.access_token;
-        }
+      const chunk = batches.slice(chunkStart, Math.min(chunkStart + concurrency, batches.length));
+      setBatchProgress({ current: chunkStart + 1, total: batches.length });
+      setUploadProgress(Math.round((chunkStart / batches.length) * 100));
+
+      await Promise.all(chunk.map(async (batch) => {
+        if (abortReason) { allFailed.push(...batch); return; }
 
         const buildForm = () => {
           const form = new FormData();
@@ -467,41 +480,49 @@ export default function UploadPage() {
           return form;
         };
 
-        let res = await postPhotosUpload(buildForm, currentToken);
-        if (res.status === 401) {
-          await supabase.auth.refreshSession();
-          const { data: { session: after401 } } = await supabase.auth.getSession();
-          if (after401?.access_token) {
-            currentToken = after401.access_token;
-            res = await postPhotosUpload(buildForm, currentToken);
-          }
-        }
-
-        if (res.ok) {
-          const data = await res.json().catch(() => ({}));
-          totalUploaded += data.uploaded ?? batch.length;
-        } else {
-          try {
-            const b = await res.json();
-            const betaErr = parseBetaLimitError(b);
-            if (betaErr) {
-              setError(betaErr.message);
-              setUploadPhase("idle"); setUploadProgress(0); setFiles([]);
-              return;
+        try {
+          let res = await postPhotosUpload(buildForm, currentToken, useProxyRef);
+          if (res.status === 401) {
+            await supabase.auth.refreshSession();
+            const { data: { session: after401 } } = await supabase.auth.getSession();
+            if (after401?.access_token) {
+              currentToken = after401.access_token;
+              res = await postPhotosUpload(buildForm, currentToken, useProxyRef);
             }
-          } catch {}
+          }
+
+          if (res.ok) {
+            const data = await res.json().catch(() => ({}));
+            totalUploaded += data.uploaded ?? batch.length;
+          } else {
+            try {
+              const b = await res.json();
+              const betaErr = parseBetaLimitError(b);
+              if (betaErr) { abortReason = "betaLimit"; abortMessage = betaErr.message; return; }
+            } catch {}
+            allFailed.push(...batch);
+          }
+        } catch (e) {
+          if (isUploadNetworkFailure(e)) { abortReason = "network"; return; }
           allFailed.push(...batch);
         }
-      } catch (e) {
-        if (isUploadNetworkFailure(e)) {
-          setError(uploadConnectionErrorMessage());
-          setUploadPhase("idle"); setUploadProgress(0); setFiles([]);
-          return;
-        }
-        allFailed.push(...batch);
-      }
 
-      setUploadProgress(Math.round(((batchIdx + 1) / batches.length) * 100));
+        completedBatches++;
+        setUploadProgress(Math.round((completedBatches / batches.length) * 100));
+        setBatchProgress({ current: completedBatches, total: batches.length });
+        setProcessedCount(Math.min(completedBatches * effectiveBatchSize, uploadFiles.length));
+      }));
+    }
+
+    if (abortReason === "betaLimit") {
+      setError(abortMessage);
+      setUploadPhase("idle"); setUploadProgress(0); setFiles([]);
+      return;
+    }
+    if (abortReason === "network") {
+      setError(uploadConnectionErrorMessage());
+      setUploadPhase("idle"); setUploadProgress(0); setFiles([]);
+      return;
     }
 
     if (wasStopped) {
