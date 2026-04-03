@@ -143,8 +143,10 @@ function uploadConnectionErrorMessage(): string {
 }
 const INITIAL_VISIBLE = 40;
 const LOAD_MORE       = 40;
-const BATCH_SIZE = 5;
-const PC_CONCURRENCY = 3; // PC: 동시에 처리할 배치 수 (3배치 병렬 → 약 3배 속도 향상)
+/** PC: 요청당 파일 수(왕복 감소). 너무 크면 프록시·호스팅 본문 한도에 걸릴 수 있음 */
+const BATCH_SIZE = 8;
+/** PC: 동시에 보낼 multipart 요청 수 (HTTP 왕복·서버 병렬 활용) */
+const PC_CONCURRENCY = 5;
 
 const VIEW_CONFIG = {
   filename: { cols: 1, rowH: 32  },  // 파일명+사이즈 텍스트 리스트
@@ -463,7 +465,7 @@ export default function UploadPage() {
     }
   }, [visibleCount, photos.length]);
 
-  // ── 업로드 (PC: 3배치 동시 처리 / 모바일: 1장씩 순차) ──────────────
+  // ── 업로드 (PC: 여러 배치 동시 전송 / 모바일: 1장씩 순차) ──────────────
   const startUpload = useCallback(async (uploadFiles: File[]) => {
     if (!uploadFiles.length) return;
     setFiles(uploadFiles);
@@ -520,7 +522,7 @@ export default function UploadPage() {
     setUploadProgress(0);
     setProcessedCount(0);
 
-    // 휴대폰: 한 요청에 여러 장이 불안정 → 1장씩. PC는 5장 배치 유지.
+    // 휴대폰: 한 요청에 여러 장이 불안정 → 1장씩. PC는 BATCH_SIZE 장씩.
     const effectiveBatchSize = isPhoneLikeClient() ? 1 : BATCH_SIZE;
     const batches: File[][] = [];
     for (let i = 0; i < filesToUpload.length; i += effectiveBatchSize) {
