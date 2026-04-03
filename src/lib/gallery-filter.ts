@@ -94,7 +94,7 @@ export function buildFilterQueryString(state: GalleryFilterState): string {
 
 export type PhotoStateMap = Record<
   string,
-  { rating?: StarRating; color?: ColorTag; comment?: string }
+  { rating?: StarRating; color?: ColorTag[]; comment?: string }
 >;
 
 /** 갤러리/뷰어 공통: 필터·정렬 적용된 사진 목록 */
@@ -112,10 +112,10 @@ export function getFilteredPhotos(
     list = list.filter((p) => photoStates[p.id]?.rating === state.starFilter);
   }
   if (state.colorFilter !== "all" && state.colorFilter !== "none") {
-    list = list.filter((p) => photoStates[p.id]?.color === state.colorFilter);
+    list = list.filter((p) => photoStates[p.id]?.color?.includes(state.colorFilter as ColorTag));
   }
   if (state.colorFilter === "none") {
-    list = list.filter((p) => !photoStates[p.id]?.color);
+    list = list.filter((p) => !photoStates[p.id]?.color?.length);
   }
   if (state.sortOrder === "filename") {
     list = list.sort((a, b) =>

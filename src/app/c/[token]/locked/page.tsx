@@ -251,8 +251,7 @@ export default function LockedPage() {
             {photos.map((photo, idx) => {
               const state    = photoStates[photo.id] ?? photo.tag;
               const rating   = state?.rating ?? photo.tag?.star;
-              const colorTag = state?.color ?? photo.tag?.color;
-              const colorHex = colorTag ? COLOR_HEX[colorTag] : null;
+              const colorTags = state?.color ?? photo.tag?.color ?? [];
               const comment  = (photoStates[photo.id] as { comment?: string } | undefined)?.comment ?? photo.comment;
               const filename = photo.originalFilename ?? `photo_${photo.orderIndex}`;
               return (
@@ -292,14 +291,17 @@ export default function LockedPage() {
                         ))}
                       </div>
                     )}
-                    {/* Color dot — bottom right */}
-                    {colorHex && (
-                      <span style={{
-                        position: "absolute", bottom: 4, right: 4,
-                        width: 9, height: 9, borderRadius: "50%",
-                        background: colorHex, border: "1.5px solid rgba(255,255,255,0.5)",
-                        display: "inline-block",
-                      }} />
+                    {/* Color dots — bottom right */}
+                    {colorTags.length > 0 && (
+                      <div style={{ position: "absolute", bottom: 4, right: 4, display: "flex", gap: 1 }}>
+                        {colorTags.map((tag) => (
+                          <span key={tag} style={{
+                            width: 9, height: 9, borderRadius: "50%",
+                            background: COLOR_HEX[tag], border: "1.5px solid rgba(255,255,255,0.5)",
+                            display: "inline-block",
+                          }} />
+                        ))}
+                      </div>
                     )}
                   </div>
                   {/* Text strip — filename + comment */}
@@ -324,8 +326,7 @@ export default function LockedPage() {
             {photos.map((photo, idx) => {
               const state    = photoStates[photo.id] ?? photo.tag;
               const rating   = state?.rating ?? photo.tag?.star;
-              const colorTag = state?.color ?? photo.tag?.color;
-              const colorHex = colorTag ? COLOR_HEX[colorTag] : null;
+              const colorTags = state?.color ?? photo.tag?.color ?? [];
               const comment  = (photoStates[photo.id] as { comment?: string } | undefined)?.comment ?? photo.comment;
               return (
                 <div key={photo.id} style={{
@@ -357,12 +358,16 @@ export default function LockedPage() {
                       ))}
                     </div>
                   )}
-                  {/* Color dot */}
-                  {colorHex && (
-                    <span style={{
-                      width: 10, height: 10, borderRadius: "50%", flexShrink: 0,
-                      background: colorHex, border: "1.5px solid rgba(255,255,255,0.4)", display: "inline-block",
-                    }} />
+                  {/* Color dots */}
+                  {colorTags.length > 0 && (
+                    <div style={{ display: "flex", gap: 1, flexShrink: 0, alignItems: "center" }}>
+                      {colorTags.map((tag) => (
+                        <span key={tag} style={{
+                          width: 10, height: 10, borderRadius: "50%", flexShrink: 0,
+                          background: COLOR_HEX[tag], border: "1.5px solid rgba(255,255,255,0.4)", display: "inline-block",
+                        }} />
+                      ))}
+                    </div>
                   )}
                   {/* Check */}
                   <div style={{

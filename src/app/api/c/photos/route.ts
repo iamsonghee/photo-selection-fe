@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     let project = await getProjectByToken(admin, token);
     let photos: Awaited<ReturnType<typeof getPhotosWithSelectionsAdmin>>["photos"];
     let selectedIds: Set<string>;
-    let photoStates: Record<string, { rating?: number; color?: string; comment?: string }>;
+    let photoStates: Record<string, { rating?: number; color?: import("@/types").ColorTag[]; comment?: string }>;
 
     if (project) {
       const result = await getPhotosWithSelectionsAdmin(admin, project.id);

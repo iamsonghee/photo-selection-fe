@@ -67,10 +67,11 @@ async function confirmProjectApi(token: string, projectId: string) {
   }
 }
 import type { StarRating, ColorTag } from "@/types";
+import { serializeColorTags } from "@/types";
 
 export type PhotoState = {
   rating?: StarRating;
-  color?: ColorTag;
+  color?: ColorTag[];
   comment?: string;
 };
 
@@ -150,7 +151,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
           const state = next[photoId];
           upsertSelectionApi(token, project.id, photoId, {
             rating: state?.rating ?? null,
-            color_tag: state?.color ?? null,
+            color_tag: serializeColorTags(state?.color),
             comment: state?.comment ?? null,
           }).catch(console.error);
         }
@@ -172,7 +173,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
           next.add(photoId);
           upsertSelectionApi(token, project.id, photoId, {
             rating: photoStates[photoId]?.rating ?? null,
-            color_tag: photoStates[photoId]?.color ?? null,
+            color_tag: serializeColorTags(photoStates[photoId]?.color),
             comment: photoStates[photoId]?.comment ?? null,
           }).catch(console.error);
         }

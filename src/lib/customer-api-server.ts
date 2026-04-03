@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminClient } from "@/lib/supabase-admin";
 import type { Project, Photo, ProjectStatus } from "@/types";
+import { parseColorTags } from "@/types";
 import type { PhotoState } from "@/contexts/SelectionContext";
 import type { Database } from "@/types/supabase";
 
@@ -91,9 +92,10 @@ export async function getPhotosWithSelectionsAdmin(
   const selectedIds = new Set(selections.map((s) => s.photo_id));
   const photoStates: Record<string, PhotoState> = {};
   for (const s of selections) {
+    const parsedColor = parseColorTags(s.color_tag as string | null);
     photoStates[s.photo_id] = {
       rating: (s.rating as 1 | 2 | 3 | 4 | 5) ?? undefined,
-      color: (s.color_tag as PhotoState["color"]) ?? undefined,
+      color: parsedColor.length ? parsedColor : undefined,
       comment: s.comment ?? undefined,
     };
   }

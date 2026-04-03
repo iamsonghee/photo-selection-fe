@@ -350,8 +350,7 @@ export default function GalleryPageClient() {
             const selected = selectedIds.has(photo.id);
             const state = photoStates[photo.id];
             const rating = state?.rating;
-            const colorTag = state?.color;
-            const colorHex = colorTag ? COLOR_OPTIONS.find((c) => c.key === colorTag)?.hex : null;
+            const colorTags = state?.color ?? [];
 
             return (
               <Link
@@ -430,13 +429,21 @@ export default function GalleryPageClient() {
                         : <span style={{ fontSize: 9, color: "transparent", lineHeight: 1 }}>★</span>
                       }
                     </div>
-                    {colorHex ? (
-                      <span
-                        className="rounded-full"
-                        style={{ width: 8, height: 8, background: colorHex, border: "1px solid rgba(255,255,255,0.55)", flexShrink: 0, display: "block" }}
-                      />
+                    {colorTags.length > 0 ? (
+                      <div style={{ display: "flex", gap: 1, alignItems: "center" }}>
+                        {colorTags.map((tag) => {
+                          const hex = COLOR_OPTIONS.find((c) => c.key === tag)?.hex;
+                          return hex ? (
+                            <span
+                              key={tag}
+                              className="rounded-full"
+                              style={{ width: 6, height: 6, background: hex, border: "1px solid rgba(255,255,255,0.5)", flexShrink: 0, display: "block" }}
+                            />
+                          ) : null;
+                        })}
+                      </div>
                     ) : (
-                      <span style={{ width: 8, height: 8, display: "block" }} />
+                      <span style={{ width: 6, height: 6, display: "block" }} />
                     )}
                   </div>
                 </div>

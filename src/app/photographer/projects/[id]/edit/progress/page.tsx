@@ -15,7 +15,7 @@ export default function EditProgressPage() {
   const id = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [photoStates, setPhotoStates] = useState<Record<string, { rating?: number; color?: string; comment?: string }>>({});
+  const [photoStates, setPhotoStates] = useState<Record<string, { rating?: number; color?: import("@/types").ColorTag[]; comment?: string }>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

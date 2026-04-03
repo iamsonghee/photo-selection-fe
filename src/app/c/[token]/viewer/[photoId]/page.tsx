@@ -174,8 +174,9 @@ export default function ViewerPage() {
 
   const setColor = useCallback((c: ColorTag) => {
     if (!current) return;
-    const cur = photoStates[current.id]?.color;
-    updatePhotoState(current.id, { color: cur === c ? undefined : c });
+    const cur = photoStates[current.id]?.color ?? [];
+    const next = cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c];
+    updatePhotoState(current.id, { color: next.length ? next : undefined });
   }, [current, photoStates, updatePhotoState]);
 
   const saveComment = useCallback(() => {
@@ -295,7 +296,7 @@ export default function ViewerPage() {
       <div style={S.panelLabel}>색상 태그</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {COLOR_OPTIONS.map((opt) => {
-          const isActive  = color === opt.key;
+          const isActive  = color?.includes(opt.key) ?? false;
           const showRing  = isActive || colorPressRing === opt.key;
           return (
             <button key={opt.key} type="button"
@@ -635,7 +636,7 @@ export default function ViewerPage() {
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               {COLOR_OPTIONS.map((opt) => {
-                const isActive = color === opt.key;
+                const isActive = color?.includes(opt.key) ?? false;
                 return (
                   <button key={opt.key} type="button" onClick={() => setColor(opt.key)}
                     style={{

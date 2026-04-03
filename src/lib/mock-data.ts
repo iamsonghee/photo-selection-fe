@@ -164,12 +164,12 @@ function generatePhotos(projectId: string, count: number, selectedCount: number)
       tag: selected
         ? {
             star: ((i % 5) + 1) as 1 | 2 | 3 | 4 | 5,
-            color: ["red", "yellow", "green", "blue", "purple"][i % 5] as
+            color: [["red", "yellow", "green", "blue", "purple"][i % 5] as
               | "red"
               | "yellow"
               | "green"
               | "blue"
-              | "purple",
+              | "purple"],
           }
         : undefined,
       comment: selected && i % 4 === 0 ? `이 사진 보정 시 밝기 살려주세요 (${i + 1}번)` : undefined,

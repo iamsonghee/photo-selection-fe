@@ -62,7 +62,7 @@ export default function ResultsPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [photoStates, setPhotoStates] = useState<
-    Record<string, { rating?: number; color?: ColorTag; comment?: string }>
+    Record<string, { rating?: number; color?: ColorTag[]; comment?: string }>
   >({});
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
@@ -869,7 +869,7 @@ function Lightbox({
   photos, photoStates, index, onClose, onPrev, onNext,
 }: {
   photos: Photo[];
-  photoStates: Record<string, { rating?: number; color?: ColorTag; comment?: string }>;
+  photoStates: Record<string, { rating?: number; color?: ColorTag[]; comment?: string }>;
   index: number;
   onClose: () => void;
   onPrev: () => void;
