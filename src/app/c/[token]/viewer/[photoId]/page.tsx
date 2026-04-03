@@ -12,6 +12,10 @@ import {
   getPhotoDisplayName,
 } from "@/lib/gallery-filter";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
+import {
+  viewerImageBlockDownloadHandlers,
+  viewerImageBlockDownloadStyle,
+} from "@/lib/viewer-image-guard";
 import type { StarRating, ColorTag } from "@/types";
 import { MobileViewerPinchPhoto } from "@/components/MobileViewerPinchPhoto";
 
@@ -95,18 +99,24 @@ function ViewerPhotoWithBadge({
   }, [measureBadge]);
 
   return (
-    <div ref={containerRef} style={{ width: "100%", height: "100%", position: "relative" }}>
+    <div
+      ref={containerRef}
+      style={{ width: "100%", height: "100%", position: "relative" }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <img
         ref={imgRef}
         src={src}
         alt={alt}
         onLoad={measureBadge}
+        {...viewerImageBlockDownloadHandlers}
         style={{
           width: "100%",
           height: "100%",
           objectFit: "contain",
           objectPosition: "center",
           display: "block",
+          ...viewerImageBlockDownloadStyle,
         }}
       />
       {showBadge && (

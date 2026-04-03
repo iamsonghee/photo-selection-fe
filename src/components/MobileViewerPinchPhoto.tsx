@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
+import {
+  viewerImageBlockDownloadHandlers,
+  viewerImageBlockDownloadStyle,
+} from "@/lib/viewer-image-guard";
 
 function getObjectFitContainOffset(
   containerW: number,
@@ -30,6 +34,10 @@ function touchDistance(t: TouchList): number {
 
 const MAX_SCALE = 4;
 const SNAP_BELOW = 1.06;
+const DOUBLE_TAP_MS = 320;
+const DOUBLE_TAP_DIST = 48;
+const DOUBLE_TAP_SCALE = 2;
+const TAP_MOVE_SLOP = 14;
 
 type Props = {
   src: string;
@@ -40,7 +48,7 @@ type Props = {
 };
 
 /**
- * 모바일 고객 뷰어: 핀치로 확대/축소, 확대 시 한 손가락으로 이동
+ * 모바일 고객 뷰어: 핀치 확대·팬, 더블 탭 확대/리셋
  */
 export function MobileViewerPinchPhoto({ src, alt, showBadge, onZoomStateChange }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -59,6 +67,15 @@ export function MobileViewerPinchPhoto({ src, alt, showBadge, onZoomStateChange 
     panStartX: 0,
     panStartY: 0,
   });
+
+  const sessionRef = useRef({
+    sawMultiTouch: false,
+    oneFingerMoved: false,
+    startX: 0,
+    startY: 0,
+  });
+
+  const tapRef = useRef({ lastMs: 0, lastX: 0, lastY: 0 });
 
   const notifyZoom = useCallback(
     (zoomed: boolean) => {
@@ -84,6 +101,7 @@ export function MobileViewerPinchPhoto({ src, alt, showBadge, onZoomStateChange 
 
   useEffect(() => {
     setTransform({ scale: 1, tx: 0, ty: 0 });
+    tapRef.current = { lastMs: 0, lastX: 0, lastY: 0 };
     notifyZoom(false);
   }, [src, notifyZoom]);
 
@@ -109,6 +127,14 @@ export function MobileViewerPinchPhoto({ src, alt, showBadge, onZoomStateChange 
 
     const onStart = (e: TouchEvent) => {
       const t = e.touches;
+      if (t.length === 1) {
+        sessionRef.current.startX = t[0].clientX;
+        sessionRef.current.startY = t[0].clientY;
+        sessionRef.current.oneFingerMoved = false;
+      }
+      if (t.length === 2) {
+        sessionRef.current.sawMultiTouch = true;
+      }
       if (t.length === 2) {
         const g = gestureRef.current;
         g.mode = "pinch";
@@ -131,6 +157,15 @@ export function MobileViewerPinchPhoto({ src, alt, showBadge, onZoomStateChange 
     const onMove = (e: TouchEvent) => {
       const t = e.touches;
       const g = gestureRef.current;
+
+      /* 1배일 때만 이동으로 더블 탭 후보 무효화 — 확대 후 팬해도 더블 탭 리셋 가능 */
+      if (t.length === 1 && transformRef.current.scale <= SNAP_BELOW) {
+        const dx = t[0].clientX - sessionRef.current.startX;
+        const dy = t[0].clientY - sessionRef.current.startY;
+        if (Math.hypot(dx, dy) > TAP_MOVE_SLOP) {
+          sessionRef.current.oneFingerMoved = true;
+        }
+      }
 
       if (g.mode === "pinch" && t.length >= 2) {
         e.preventDefault();
@@ -177,7 +212,34 @@ export function MobileViewerPinchPhoto({ src, alt, showBadge, onZoomStateChange 
         return;
       }
       if (e.touches.length === 0) {
+        const skipDoubleTap =
+          sessionRef.current.sawMultiTouch || sessionRef.current.oneFingerMoved;
+
+        if (!skipDoubleTap && e.changedTouches.length === 1) {
+          const ct = e.changedTouches[0];
+          const now = Date.now();
+          const tr = tapRef.current;
+          const distTap = Math.hypot(ct.clientX - tr.lastX, ct.clientY - tr.lastY);
+          if (tr.lastMs > 0 && now - tr.lastMs < DOUBLE_TAP_MS && distTap < DOUBLE_TAP_DIST) {
+            const cur = transformRef.current;
+            if (cur.scale <= SNAP_BELOW) {
+              setT({ scale: Math.min(MAX_SCALE, DOUBLE_TAP_SCALE), tx: 0, ty: 0 });
+            } else {
+              setT({ scale: 1, tx: 0, ty: 0 });
+            }
+            tapRef.current = { lastMs: 0, lastX: 0, lastY: 0 };
+          } else {
+            tapRef.current = { lastMs: now, lastX: ct.clientX, lastY: ct.clientY };
+          }
+        }
+
         finishAllTouches();
+        sessionRef.current = {
+          sawMultiTouch: false,
+          oneFingerMoved: false,
+          startX: 0,
+          startY: 0,
+        };
       }
     };
 
@@ -202,6 +264,7 @@ export function MobileViewerPinchPhoto({ src, alt, showBadge, onZoomStateChange 
       ref={containerRef}
       className="relative h-full w-full overflow-hidden"
       style={{ touchAction: "none" }}
+      onContextMenu={(e) => e.preventDefault()}
     >
       <div
         style={{
@@ -217,7 +280,7 @@ export function MobileViewerPinchPhoto({ src, alt, showBadge, onZoomStateChange 
           src={src}
           alt={alt}
           onLoad={measureBadge}
-          draggable={false}
+          {...viewerImageBlockDownloadHandlers}
           style={{
             width: "100%",
             height: "100%",
@@ -225,7 +288,7 @@ export function MobileViewerPinchPhoto({ src, alt, showBadge, onZoomStateChange 
             objectPosition: "center",
             display: "block",
             pointerEvents: "none",
-            userSelect: "none",
+            ...viewerImageBlockDownloadStyle,
           }}
         />
       </div>
