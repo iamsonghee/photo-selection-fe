@@ -9,7 +9,9 @@ import { getProfileImageUrl } from "@/lib/photographer";
 import {
   appendGalleryScrollQuery,
   buildFilterQueryString,
+  GALLERY_FOCUS_PARAM,
   GALLERY_SCROLL_PARAM,
+  galleryThumbPriorityProps,
   getFilteredPhotos,
   getPhotoDisplayName,
 } from "@/lib/gallery-filter";
@@ -60,6 +62,8 @@ export default function GalleryPageClient() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirming,       setConfirming]       = useState(false);
   const [confirmError,     setConfirmError]     = useState<string | null>(null);
+  /** 뷰어→갤러리 복귀 시(`gf`) 포커스 사진 주변 썸네일 우선 로드 */
+  const [galleryThumbFocusId, setGalleryThumbFocusId] = useState<string | null>(null);
 
   /** 뷰어에서 갤러리로 돌아올 때 스크롤 위치 복원 */
   const galleryScrollKey = token ? `ps:c-gallery-scroll:${token}` : "";
@@ -100,6 +104,18 @@ export default function GalleryPageClient() {
     });
   }, [loading, galleryScrollKey, searchParams, token, router]);
 
+  /** URL `gf` → 포커스 id 저장 후 파라미터 제거 (썸네일 로드 우선순위) */
+  useEffect(() => {
+    if (loading) return;
+    const gf = searchParams.get(GALLERY_FOCUS_PARAM);
+    if (gf == null) return;
+    setGalleryThumbFocusId(gf);
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete(GALLERY_FOCUS_PARAM);
+    const q = next.toString();
+    router.replace(`/c/${token}/gallery${q ? `?${q}` : ""}`, { scroll: false });
+  }, [loading, searchParams, token, router]);
+
   useEffect(() => {
     if (!token) return;
     fetch(`/api/c/photographer?token=${encodeURIComponent(token)}`)
@@ -139,6 +155,37 @@ export default function GalleryPageClient() {
     () => getFilteredPhotos(photos, selectedIds, photoStates, filterState),
     [photos, selectedIds, photoStates, filterState]
   );
+
+  const galleryFocusIndex = useMemo(() => {
+    if (!galleryThumbFocusId) return null;
+    const i = filteredPhotos.findIndex((p) => p.id === galleryThumbFocusId);
+    return i >= 0 ? i : null;
+  }, [filteredPhotos, galleryThumbFocusId]);
+
+  /** 포커스 중심으로 썸 URL 선요청(브라우저 큐 앞쪽) */
+  useEffect(() => {
+    if (galleryFocusIndex == null || filteredPhotos.length === 0) return;
+    const anchor = galleryFocusIndex;
+    const ordered: string[] = [];
+    const push = (i: number) => {
+      const u = filteredPhotos[i]?.url;
+      if (u) ordered.push(u);
+    };
+    push(anchor);
+    for (let d = 1; d < filteredPhotos.length; d++) {
+      if (anchor - d >= 0) push(anchor - d);
+      if (anchor + d < filteredPhotos.length) push(anchor + d);
+    }
+    const seen = new Set<string>();
+    ordered.forEach((url, i) => {
+      if (seen.has(url)) return;
+      seen.add(url);
+      const img = document.createElement("img");
+      img.decoding = "async";
+      img.fetchPriority = i < 24 ? "high" : "low";
+      img.src = url;
+    });
+  }, [galleryFocusIndex, filteredPhotos]);
 
   const viewerQueryString = useMemo(
     () => buildFilterQueryString(filterState),
@@ -399,7 +446,7 @@ export default function GalleryPageClient() {
       {/* ── Gallery grid ── */}
       <div style={{ padding: "10px 10px 20px" }}>
         <div className="grid grid-cols-3 gap-[6px] sm:grid-cols-4 lg:grid-cols-8">
-          {filteredPhotos.map((photo) => {
+          {filteredPhotos.map((photo, gridIndex) => {
             const selected = selectedIds.has(photo.id);
             const state = photoStates[photo.id];
             const rating = state?.rating;
@@ -443,7 +490,7 @@ export default function GalleryPageClient() {
                   src={photo.url || `https://picsum.photos/seed/${photo.id.replace(/\D/g, "") || "1"}/400/400`}
                   alt={getPhotoDisplayName(photo)}
                   className="h-full w-full object-cover"
-                  loading="lazy"
+                  {...galleryThumbPriorityProps(gridIndex, galleryFocusIndex, { whenNoFocus: "lazy" })}
                   decoding="async"
                   draggable={false}
                 />

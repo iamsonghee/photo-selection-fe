@@ -42,6 +42,50 @@ export const FILTER_PARAM = {
 /** 갤러리 스크롤 복원용(필터와 무관). 인앱 브라우저에서 sessionStorage 대신 URL로 전달 */
 export const GALLERY_SCROLL_PARAM = "gs";
 
+/** 뷰어→갤러리 복귀 시 포커스 썸네일 우선 로드용(사진 id) */
+export const GALLERY_FOCUS_PARAM = "gf";
+
+/**
+ * 뷰어에서 갤러리로 돌아갈 때 포커스 사진 id를 쿼리에 붙임.
+ */
+export function buildGalleryHrefWithFocus(
+  token: string,
+  searchParams: Pick<URLSearchParams, "toString">,
+  focusPhotoId: string
+): string {
+  const next = new URLSearchParams(searchParams.toString());
+  next.set(GALLERY_FOCUS_PARAM, focusPhotoId);
+  const q = next.toString();
+  return `/c/${token}/gallery${q ? `?${q}` : ""}`;
+}
+
+export type GalleryThumbPriorityOptions = {
+  /** 포커스 없을 때 기본: omit(작가 결과 등 기존 동작). 고객 갤러리는 "lazy"로 전부 지연 로드 유지 */
+  whenNoFocus?: "omit" | "lazy";
+};
+
+/**
+ * 갤러리 그리드에서 뷰어 복귀 포커스 주변 썸네일을 먼저 로드할 때 사용.
+ */
+export function galleryThumbPriorityProps(
+  photoIndex: number,
+  focusIndex: number | null,
+  options?: GalleryThumbPriorityOptions
+): { loading?: "eager" | "lazy"; fetchPriority?: "high" | "low" | "auto" } {
+  const whenNo = options?.whenNoFocus ?? "omit";
+  if (focusIndex == null || focusIndex < 0) {
+    return whenNo === "lazy" ? { loading: "lazy" } : {};
+  }
+  const dist = Math.abs(photoIndex - focusIndex);
+  if (dist <= 18) {
+    return {
+      loading: "eager",
+      fetchPriority: dist <= 2 ? "high" : "auto",
+    };
+  }
+  return { loading: "lazy", fetchPriority: "low" };
+}
+
 /**
  * 뷰어 링크에 스크롤 Y(px)를 붙임. viewerQueryString은 buildFilterQueryString 결과(?foo=bar 또는 "").
  */

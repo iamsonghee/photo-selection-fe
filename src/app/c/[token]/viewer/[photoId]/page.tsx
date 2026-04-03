@@ -7,7 +7,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { useSelection } from "@/contexts/SelectionContext";
 import {
   parseFilterFromSearchParams,
-  buildFilterQueryString,
+  buildGalleryHrefWithFocus,
   getFilteredPhotos,
   getPhotoDisplayName,
 } from "@/lib/gallery-filter";
@@ -500,7 +500,7 @@ export default function ViewerPage() {
               height: 44, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
               padding: "0 16px",
             }}>
-              <Link href={`/c/${token}/gallery${queryString}`}
+              <Link href={buildGalleryHrefWithFocus(token, searchParams, photoId)}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
                   padding: "6px 10px", borderRadius: 8,
@@ -641,7 +641,7 @@ export default function ViewerPage() {
             height: 44, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6,
             padding: "0 12px",
           }}>
-            <Link href={`/c/${token}/gallery${queryString}`}
+            <Link href={buildGalleryHrefWithFocus(token, searchParams, photoId)}
               style={{
                 display: "flex", alignItems: "center", gap: 6,
                 padding: "6px 8px", borderRadius: 8,

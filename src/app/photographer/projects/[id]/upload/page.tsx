@@ -61,32 +61,61 @@ function shouldRetryUploadStatus(status: number): boolean {
   );
 }
 
-async function postPhotosWithRetry(
+type XhrUploadResult = {
+  ok: boolean;
+  status: number;
+  json: () => Promise<unknown>;
+};
+
+/**
+ * XHR upload.onprogress — multipart **전송** 바이트 기준(서버 처리·응답 전까지 반영).
+ */
+async function xhrPostWithRetry(
   url: string,
   buildForm: () => FormData,
   token: string,
-): Promise<Response> {
+  onUploadProgress: (loaded: number, total: number) => void,
+): Promise<XhrUploadResult> {
   const crossOrigin = /^https?:\/\//i.test(url);
   let lastErr: unknown;
   for (let attempt = 1; attempt <= UPLOAD_MAX_ATTEMPTS; attempt++) {
     try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: buildForm(),
-        cache: "no-store",
-        mode: crossOrigin ? "cors" : "same-origin",
+      const result = await new Promise<XhrUploadResult>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", url);
+        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable && ev.total > 0) {
+            onUploadProgress(ev.loaded, ev.total);
+          } else if (ev.loaded > 0) {
+            onUploadProgress(ev.loaded, 0);
+          }
+        };
+        xhr.onload = () => {
+          resolve({
+            ok: xhr.status >= 200 && xhr.status < 300,
+            status: xhr.status,
+            json: async () => {
+              try {
+                return JSON.parse(xhr.responseText || "{}");
+              } catch {
+                return {};
+              }
+            },
+          });
+        };
+        xhr.onerror = () => reject(new TypeError("NetworkError"));
+        xhr.send(buildForm());
       });
-      if (shouldRetryUploadStatus(res.status)) {
-        lastErr = new Error(`HTTP ${res.status}`);
+      if (shouldRetryUploadStatus(result.status)) {
+        lastErr = new Error(`HTTP ${result.status}`);
         if (attempt < UPLOAD_MAX_ATTEMPTS) {
           await new Promise<void>((r) => setTimeout(r, 800 * attempt));
           continue;
         }
       }
-      return res;
+      return result;
     } catch (e) {
-      // 크로스 오리진 TypeError = CORS 거부 → 재시도해도 동일 결과, 즉시 throw
       if (e instanceof TypeError && crossOrigin) throw e;
       lastErr = e;
       if (attempt < UPLOAD_MAX_ATTEMPTS) {
@@ -103,22 +132,23 @@ async function postPhotosWithRetry(
  * 브라우저→백엔드 직접 POST는 CORS 미설정 시 TypeError로 실패.
  * 첫 CORS 실패 시 useProxyRef.current = true 로 설정해 이후 배치는 프록시만 사용.
  */
-async function postPhotosUpload(
+async function postPhotosUploadWithProgress(
   buildForm: () => FormData,
   token: string,
   useProxyRef: { current: boolean },
-): Promise<Response> {
+  onUploadProgress: (loaded: number, total: number) => void,
+): Promise<XhrUploadResult> {
   const primary = uploadPhotosUrl();
   if (useProxyRef.current || primary === UPLOAD_PHOTOS_PATH) {
-    return postPhotosWithRetry(UPLOAD_PHOTOS_PATH, buildForm, token);
+    return xhrPostWithRetry(UPLOAD_PHOTOS_PATH, buildForm, token, onUploadProgress);
   }
   try {
-    return await postPhotosWithRetry(primary, buildForm, token);
+    return await xhrPostWithRetry(primary, buildForm, token, onUploadProgress);
   } catch (e) {
     if (e instanceof TypeError) {
       useProxyRef.current = true; // 이후 배치는 프록시 사용
       try {
-        return await postPhotosWithRetry(UPLOAD_PHOTOS_PATH, buildForm, token);
+        return await xhrPostWithRetry(UPLOAD_PHOTOS_PATH, buildForm, token, onUploadProgress);
       } catch {
         /* 원인 파악용으로 최초 오류 유지 */
       }
@@ -486,6 +516,11 @@ export default function UploadPage() {
     if (userError || !user) { setError("로그인 인증을 확인할 수 없습니다."); setUploadPhase("idle"); return; }
     if (!token) { setError("로그인이 필요합니다."); setUploadPhase("idle"); return; }
 
+    /** 인증 직후 ~ 첫 배치 응답 전까지 진행률이 0으로만 보이는 현상 완화 */
+    if (!isPhoneLikeClient()) {
+      setUploadProgress(2);
+    }
+
     let currentToken = token;
 
     let filesToUpload = uploadFiles;
@@ -519,7 +554,6 @@ export default function UploadPage() {
     }
 
     setUploadPhase("sending");
-    setUploadProgress(0);
     setProcessedCount(0);
 
     // 휴대폰: 한 요청에 여러 장이 불안정 → 1장씩. PC는 BATCH_SIZE 장씩.
@@ -528,7 +562,24 @@ export default function UploadPage() {
     for (let i = 0; i < filesToUpload.length; i += effectiveBatchSize) {
       batches.push(filesToUpload.slice(i, i + effectiveBatchSize));
     }
-    setBatchProgress({ current: 0, total: batches.length });
+    const totalBatches = batches.length;
+    const batchSizes = batches.map((b) => b.reduce((s, f) => s + f.size, 0));
+    const rawTotalBytes = batchSizes.reduce((a, b) => a + b, 0);
+    const useByteProgress = rawTotalBytes > 0;
+    const totalUploadBytes = Math.max(1, rawTotalBytes);
+    const loadedPerBatch = new Array<number>(batches.length).fill(0);
+    const applyByteProgress = (batchIdx: number, loaded: number) => {
+      const cap = batchSizes[batchIdx] ?? 0;
+      loadedPerBatch[batchIdx] = cap > 0 ? Math.min(cap, loaded) : loaded;
+      let sum = 0;
+      for (let i = 0; i < batches.length; i++) sum += loadedPerBatch[i];
+      const pct = Math.min(99, Math.round((sum / totalUploadBytes) * 100));
+      setUploadProgress(pct);
+    };
+
+    /** 배치가 있으면 곧 전송 시작(0%만 보이지 않도록) */
+    setUploadProgress(totalBatches > 0 ? 3 : 0);
+    setBatchProgress({ current: totalBatches > 0 ? 1 : 0, total: totalBatches });
 
     let totalUploaded = 0;
     const allFailed: File[] = [];
@@ -551,10 +602,20 @@ export default function UploadPage() {
 
       const chunk = batches.slice(chunkStart, Math.min(chunkStart + concurrency, batches.length));
       setBatchProgress({ current: chunkStart + 1, total: batches.length });
-      setUploadProgress(Math.round((chunkStart / batches.length) * 100));
+      /** 첫 응답 전에도 막대가 움직이도록: 진행 중인 웨이브 기준 1~35% 구간 */
+      /** 바이트 진행률이 없을 때(합계 0 등)만 웨이브 힌트 */
+      const waveHint = Math.min(
+        35,
+        Math.round(((chunkStart + 0.5) / Math.max(1, totalBatches)) * 35),
+      );
+      if (!useByteProgress) {
+        setUploadProgress((prev) => Math.max(prev, waveHint));
+      }
 
-      await Promise.all(chunk.map(async (batch) => {
+      await Promise.all(chunk.map(async (batch, chunkOffset) => {
         if (abortReason) { allFailed.push(...batch); return; }
+
+        const globalBatchIndex = chunkStart + chunkOffset;
 
         const buildForm = () => {
           const form = new FormData();
@@ -563,23 +624,42 @@ export default function UploadPage() {
           return form;
         };
 
+        const onPartProgress = (loaded: number, _total: number) => {
+          if (!useByteProgress) return;
+          applyByteProgress(globalBatchIndex, loaded);
+        };
+
         try {
-          let res = await postPhotosUpload(buildForm, currentToken, useProxyRef);
+          let res = await postPhotosUploadWithProgress(
+            buildForm,
+            currentToken,
+            useProxyRef,
+            onPartProgress,
+          );
           if (res.status === 401) {
             await supabase.auth.refreshSession();
             const { data: { session: after401 } } = await supabase.auth.getSession();
             if (after401?.access_token) {
               currentToken = after401.access_token;
-              res = await postPhotosUpload(buildForm, currentToken, useProxyRef);
+              res = await postPhotosUploadWithProgress(
+                buildForm,
+                currentToken,
+                useProxyRef,
+                onPartProgress,
+              );
             }
           }
 
+          if (useByteProgress && batchSizes[globalBatchIndex] > 0) {
+            applyByteProgress(globalBatchIndex, batchSizes[globalBatchIndex]);
+          }
+
           if (res.ok) {
-            const data = await res.json().catch(() => ({}));
+            const data = (await res.json().catch(() => ({}))) as { uploaded?: number };
             totalUploaded += data.uploaded ?? batch.length;
           } else {
             try {
-              const b = await res.json();
+              const b = (await res.json().catch(() => ({}))) as unknown;
               const betaErr = parseBetaLimitError(b);
               if (betaErr) { abortReason = "betaLimit"; abortMessage = betaErr.message; return; }
             } catch {}
@@ -591,7 +671,14 @@ export default function UploadPage() {
         }
 
         completedBatches++;
-        setUploadProgress(Math.round((completedBatches / batches.length) * 100));
+        if (!useByteProgress) {
+          const pctDone = Math.round((completedBatches / batches.length) * 100);
+          setUploadProgress((prev) => Math.max(prev, pctDone));
+        } else {
+          let sum = 0;
+          for (let i = 0; i < batches.length; i++) sum += loadedPerBatch[i];
+          setUploadProgress(Math.min(99, Math.round((sum / totalUploadBytes) * 100)));
+        }
         setBatchProgress({ current: completedBatches, total: batches.length });
         setProcessedCount(Math.min(completedBatches * effectiveBatchSize, filesToUpload.length));
       }));
@@ -613,6 +700,7 @@ export default function UploadPage() {
       setToast("업로드가 중지됐습니다. 언제든 이어서 업로드할 수 있어요.");
       loadProject(); loadPhotos(); router.refresh();
     } else {
+      if (useByteProgress) setUploadProgress(100);
       setUploadSummary({ total: filesToUpload.length, succeeded: totalUploaded, failedFiles: allFailed });
       setUploadPhase("done");
       fetch("/api/photographer/project-logs", {
@@ -1076,7 +1164,9 @@ export default function UploadPage() {
                   <span style={{ fontSize: 12, fontWeight: 500, color: C.text }}>
                     {uploadPhase === "processing"
                       ? `이미지 최적화 중 ${processedCount} / ${files.length}장`
-                      : `업로드 중 ${processedCount} / ${files.length}장`}
+                      : processedCount === 0
+                        ? `서버로 전송 중… (완료 0 / ${files.length}장)`
+                        : `업로드 중 ${processedCount} / ${files.length}장`}
                   </span>
                   {uploadPhase === "sending" && batchProgress.total > 0 && (
                     <span style={{ fontSize: 11, color: C.dim }}>
