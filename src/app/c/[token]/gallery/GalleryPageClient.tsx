@@ -42,7 +42,7 @@ export default function GalleryPageClient() {
   const searchParams = useSearchParams();
   const token = (params?.token as string) ?? "";
 
-  const { project, photos, Y, N, toggle, selectedIds, photoStates, loading } = useSelection();
+  const { project, photos, Y, N, toggle, selectedIds, photoStates, loading, updatePhotoState } = useSelection();
   const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
 
   // Local filter state
@@ -51,6 +51,8 @@ export default function GalleryPageClient() {
   const [colorFilter,  setColorFilter]  = useState<ColorTag | null>(null);
   const [sortOrder,    setSortOrder]    = useState<SortOrder>("filename");
   const [hoverStar,    setHoverStar]    = useState(0);
+  /** 썸네일 하단 별점 호버 (필터 바 hoverStar 와 분리) */
+  const [gridStarHover, setGridStarHover] = useState<{ photoId: string; star: number } | null>(null);
   const [showSortMenu, setShowSortMenu] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
 
@@ -477,13 +479,50 @@ export default function GalleryPageClient() {
                   </span>
                   {/* Row 2: stars (left) + color dot (right) */}
                   <div className="flex items-center justify-between" style={{ minHeight: 12 }}>
-                    <div className="flex items-center gap-[1px]">
-                      {rating != null && rating > 0
-                        ? Array.from({ length: rating }, (_, i) => (
-                            <span key={i} style={{ fontSize: 9, color: "#f5a623", lineHeight: 1 }}>★</span>
-                          ))
-                        : <span style={{ fontSize: 9, color: "transparent", lineHeight: 1 }}>★</span>
+                    <div
+                      className="flex items-center gap-[1px]"
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseLeave={() =>
+                        setGridStarHover((h) => (h?.photoId === photo.id ? null : h))
                       }
+                    >
+                      {([1, 2, 3, 4, 5] as const).map((s) => {
+                        const hoverVal =
+                          gridStarHover?.photoId === photo.id ? gridStarHover.star : 0;
+                        const displayRating = hoverVal || Number(rating) || 0;
+                        const filled = s <= displayRating;
+                        return (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const raw = photoStates[photo.id]?.rating;
+                              const cur =
+                                raw != null ? (Number(raw) as StarRating) : undefined;
+                              updatePhotoState(photo.id, {
+                                rating: cur === s ? undefined : s,
+                              });
+                              setGridStarHover(null);
+                            }}
+                            onMouseEnter={() =>
+                              setGridStarHover({ photoId: photo.id, star: s })
+                            }
+                            style={{
+                              fontSize: 9,
+                              lineHeight: 1,
+                              padding: 0,
+                              border: "none",
+                              background: "none",
+                              cursor: "pointer",
+                              color: filled ? "#f5a623" : "rgba(60, 60, 70, 0.95)",
+                            }}
+                          >
+                            {filled ? "★" : "☆"}
+                          </button>
+                        );
+                      })}
                     </div>
                     {colorTags.length > 0 ? (
                       <div style={{ display: "flex", gap: 1, alignItems: "center" }}>

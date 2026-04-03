@@ -146,7 +146,13 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   const updatePhotoState = useCallback(
     (photoId: string, patch: Partial<PhotoState>) => {
       setPhotoStates((prev) => {
-        const next = { ...prev, [photoId]: { ...prev[photoId], ...patch } };
+        const prevPhoto = prev[photoId] ?? {};
+        const merged: PhotoState = { ...prevPhoto, ...patch };
+        // `rating: undefined`만으로는 스프레드가 이전 값을 덮어쓰지 않는 경우가 있어 명시 제거
+        if ("rating" in patch && patch.rating === undefined) {
+          delete merged.rating;
+        }
+        const next = { ...prev, [photoId]: merged };
         if (project?.id && token) {
           const state = next[photoId];
           upsertSelectionApi(token, project.id, photoId, {

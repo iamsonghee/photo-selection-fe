@@ -179,8 +179,11 @@ export default function ViewerPage() {
 
   const setStar = useCallback((s: StarRating) => {
     if (!current) return;
-    const cur = photoStates[current.id]?.rating;
+    const raw = photoStates[current.id]?.rating;
+    const cur = raw != null ? (Number(raw) as StarRating) : undefined;
     updatePhotoState(current.id, { rating: cur === s ? undefined : s });
+    // 호버 미리보기가 남으면 별을 지워도 hoverStar 때문에 계속 채워진 것처럼 보임
+    setHoverStar(0);
   }, [current, photoStates, updatePhotoState]);
 
   const setColor = useCallback((c: ColorTag) => {
