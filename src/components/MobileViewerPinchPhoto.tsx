@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Check } from "lucide-react";
 import {
   viewerImageBlockDownloadHandlers,
@@ -288,8 +288,13 @@ export function MobileViewerPinchPhoto({ src, alt, showBadge, onZoomStateChange 
             objectFit: "contain",
             objectPosition: "center",
             display: "block",
-            pointerEvents: "none",
+            /* none이면 터치가 img가 아닌 부모로만 가서 iOS 롱프레스(저장/복사)가 안 뜸. 차단 모드일 때만 none */
+            pointerEvents: viewerImageDownloadBlocked ? "none" : "auto",
             ...viewerImageBlockDownloadStyle,
+            /* 갤러리 썸네일과 같이 롱프레스 콜아웃 허용 (차단 모드에서는 guard가 none) */
+            ...(!viewerImageDownloadBlocked
+              ? ({ WebkitTouchCallout: "default" } as CSSProperties)
+              : {}),
           }}
         />
       </div>
