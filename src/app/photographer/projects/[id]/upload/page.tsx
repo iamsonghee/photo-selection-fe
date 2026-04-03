@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ChevronLeft,
@@ -353,6 +353,17 @@ export default function UploadPage() {
     estimateSize: () => effectiveRowH,
     overscan: 3,
   });
+  const rowVirtualizerRef = useRef(rowVirtualizer);
+  rowVirtualizerRef.current = rowVirtualizer;
+  /** 라이트박스 닫은 뒤 갤러리 가상행으로 스크롤 복귀 */
+  const pendingGalleryScrollPhotoIndexRef = useRef<number | null>(null);
+
+  const closeLightbox = useCallback(() => {
+    setLightboxIndex((cur) => {
+      if (cur !== null) pendingGalleryScrollPhotoIndexRef.current = cur;
+      return null;
+    });
+  }, []);
 
   // ── 라이트박스 키보드 ──
   useEffect(() => {
@@ -360,11 +371,33 @@ export default function UploadPage() {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight") setLightboxIndex((i) => (i === null ? 0 : (i + 1) % photos.length));
       else if (e.key === "ArrowLeft") setLightboxIndex((i) => (i === null ? 0 : (i - 1 + photos.length) % photos.length));
-      else if (e.key === "Escape") setLightboxIndex(null);
+      else if (e.key === "Escape") closeLightbox();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [lightboxIndex, photos.length]);
+  }, [lightboxIndex, photos.length, closeLightbox]);
+
+  useLayoutEffect(() => {
+    if (lightboxIndex !== null) return;
+    const photoIdx = pendingGalleryScrollPhotoIndexRef.current;
+    if (photoIdx == null || photos.length === 0) return;
+
+    const cols = effectiveCols;
+    const needVisible = Math.min(photoIdx + cols + 4, photos.length);
+    if (visibleCount < needVisible) {
+      setVisibleCount(needVisible);
+      return;
+    }
+
+    pendingGalleryScrollPhotoIndexRef.current = null;
+    const rowIdx = Math.floor(photoIdx / cols);
+    const v = rowVirtualizerRef.current;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        v.scrollToIndex(rowIdx, { align: "center" });
+      });
+    });
+  }, [lightboxIndex, visibleCount, photos.length, effectiveCols, viewMode, rowCount]);
 
   const loadProject = useCallback(async () => {
     try {
@@ -1368,7 +1401,7 @@ export default function UploadPage() {
       {/* ── 라이트박스 ── */}
       {lightboxIndex !== null && photos[lightboxIndex] && (
         <div
-          onClick={() => setLightboxIndex(null)}
+          onClick={closeLightbox}
           style={{
             position: "fixed", inset: 0, zIndex: 200,
             display: "flex", alignItems: "center", justifyContent: "center",

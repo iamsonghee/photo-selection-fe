@@ -56,6 +56,21 @@ export default function GalleryPageClient() {
   const [confirming,       setConfirming]       = useState(false);
   const [confirmError,     setConfirmError]     = useState<string | null>(null);
 
+  /** 뷰어에서 갤러리로 돌아올 때 스크롤 위치 복원 */
+  const galleryScrollKey = token ? `ps:c-gallery-scroll:${token}` : "";
+
+  useEffect(() => {
+    if (loading || !galleryScrollKey || typeof window === "undefined") return;
+    const raw = sessionStorage.getItem(galleryScrollKey);
+    if (raw == null) return;
+    sessionStorage.removeItem(galleryScrollKey);
+    const y = Number(raw);
+    if (!Number.isFinite(y) || y < 0) return;
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: y, behavior: "auto" });
+    });
+  }, [loading, galleryScrollKey]);
+
   useEffect(() => {
     if (!token) return;
     fetch(`/api/c/photographer?token=${encodeURIComponent(token)}`)
@@ -356,6 +371,13 @@ export default function GalleryPageClient() {
               <Link
                 key={photo.id}
                 href={`/c/${token}/viewer/${photo.id}${viewerQueryString}`}
+                onClick={() => {
+                  try {
+                    if (galleryScrollKey) sessionStorage.setItem(galleryScrollKey, String(window.scrollY));
+                  } catch {
+                    /* private mode 등 */
+                  }
+                }}
                 className="group relative block overflow-hidden rounded-[8px] transition-transform hover:scale-[1.02]"
                 style={{
                   aspectRatio: "1 / 1",
