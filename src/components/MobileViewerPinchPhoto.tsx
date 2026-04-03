@@ -264,7 +264,10 @@ export function MobileViewerPinchPhoto({ src, alt, showBadge, onZoomStateChange 
     <div
       ref={containerRef}
       className="relative h-full w-full overflow-hidden"
-      style={{ touchAction: "none" }}
+      /* none이면 iOS/Android에서 이미지 롱프레스(저장·복사) 시스템 메뉴가 뜨지 않는 경우가 많음 */
+      style={{
+        touchAction: viewerImageDownloadBlocked ? "none" : "manipulation",
+      }}
       onContextMenu={viewerImageDownloadBlocked ? (e) => e.preventDefault() : undefined}
     >
       <div
