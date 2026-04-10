@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { GOOGLE_OAUTH_QUERY_PARAMS } from "@/lib/google-oauth";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -76,6 +77,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         options: {
           redirectTo:
             typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
+          queryParams: GOOGLE_OAUTH_QUERY_PARAMS,
         },
       });
       if (err) {
