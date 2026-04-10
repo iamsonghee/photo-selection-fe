@@ -6,7 +6,6 @@ import Link from "next/link";
 import {
   Plus,
   Bell,
-  FolderOpen,
   CheckCircle2,
   RefreshCw,
   Eye,
@@ -23,6 +22,7 @@ import type { ProjectLogItem } from "@/lib/db";
 import { useProfile } from "@/contexts/ProfileContext";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT, photographerDock } from "@/lib/photographer-theme";
+import EmptyDashboard from "./EmptyDashboard";
 
 // ── preparing 상태 3단계 분기 헬퍼 ──────────────────────────
 function getPreparingBadge(photoCount: number, requiredCount: number): { label: string; color: string } {
@@ -426,6 +426,15 @@ export default function DashboardPage() {
     );
   }
 
+  if (projects.length === 0) {
+    return (
+      <EmptyDashboard
+        userName={userName}
+        onCreateProject={() => router.push("/photographer/projects/new")}
+      />
+    );
+  }
+
   // ── derived data: 최근 업데이트 순 6개 제한 ──
   const sortedAll = [...projects].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
@@ -663,25 +672,6 @@ export default function DashboardPage() {
             </Link>
           )}
 
-          {/* 프로젝트 없을 때 */}
-          {projects.length === 0 && (
-            <div style={{ textAlign: "center", padding: "60px 0" }}>
-              <FolderOpen size={36} color={C.dim} style={{ margin: "0 auto 14px" }} />
-              <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>아직 프로젝트가 없습니다</p>
-              <button
-                type="button"
-                onClick={() => router.push("/photographer/projects/new")}
-                style={{
-                  backgroundColor: C.steel, color: "#fff", border: "none",
-                  borderRadius: 8, padding: "9px 20px", fontSize: 13, fontWeight: 600,
-                  cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6,
-                }}
-              >
-                <Plus size={14} />
-                첫 프로젝트 만들기
-              </button>
-            </div>
-          )}
         </div>
 
         {/* ── Right column ── */}
