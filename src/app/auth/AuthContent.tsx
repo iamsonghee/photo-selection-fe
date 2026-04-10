@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
+import { GOOGLE_OAUTH_QUERY_PARAMS } from "@/lib/google-oauth";
 import { BrandLogoBar } from "@/components/BrandLogo";
 
 export function AuthContent() {
@@ -35,6 +36,7 @@ export function AuthContent() {
         provider: "google",
         options: {
           redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
+          queryParams: GOOGLE_OAUTH_QUERY_PARAMS,
         },
       });
       if (err) {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { GOOGLE_OAUTH_QUERY_PARAMS } from "@/lib/google-oauth";
 import { BrandLogoBar } from "@/components/BrandLogo";
 
 const ease = "cubic-bezier(0.16, 1, 0.3, 1)";
@@ -68,6 +69,7 @@ export default function AuthPage() {
         provider: "google",
         options: {
           redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
+          queryParams: GOOGLE_OAUTH_QUERY_PARAMS,
         },
       });
       if (err) {
