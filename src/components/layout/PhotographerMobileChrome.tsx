@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 import { Menu, Settings, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PHOTOGRAPHER_NAV_ITEMS } from "@/lib/photographer-nav";
-import { PHOTOGRAPHER_THEME as C, PS_FONT } from "@/lib/photographer-theme";
+// New design tokens
+const ACCENT = "#FF4D00";
 
 /**
  * 모바일(~md 미만)에서만 표시. 사이드바가 숨겨질 때 네비·설정·로그아웃 접근 제공.
@@ -18,6 +19,7 @@ export function PhotographerMobileChrome() {
 
   const hasFixedBottomAction =
     pathname === "/photographer/projects/new" ||
+    /\/photographer\/projects\/[^/]+$/.test(pathname) ||
     /\/photographer\/projects\/[^/]+\/upload$/.test(pathname) ||
     /\/photographer\/projects\/[^/]+\/upload-versions/.test(pathname) ||
     /\/photographer\/projects\/[^/]+\/results$/.test(pathname);
@@ -42,11 +44,11 @@ export function PhotographerMobileChrome() {
   };
 
   const fabStyle: React.CSSProperties = {
-    border: `1px solid ${C.border}`,
-    background: "rgba(10,10,11,0.92)",
+    border: "1px solid #222",
+    background: "rgba(5,5,5,0.95)",
     backdropFilter: "blur(10px)",
-    color: C.muted,
-    boxShadow: "0 4px 24px rgba(0,0,0,0.45)",
+    color: "#666",
+    boxShadow: "0 4px 24px rgba(0,0,0,0.6)",
   };
 
   return (
@@ -76,11 +78,11 @@ export function PhotographerMobileChrome() {
           className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full"
           style={{
             ...fabStyle,
-            color: pathname.startsWith("/photographer/settings") ? C.steel : C.muted,
-            borderColor: pathname.startsWith("/photographer/settings") ? "rgba(79,126,255,0.35)" : C.border,
+            color: pathname.startsWith("/photographer/settings") ? ACCENT : "#666",
+            borderColor: pathname.startsWith("/photographer/settings") ? `rgba(255,77,0,0.4)` : "#222",
             background: pathname.startsWith("/photographer/settings")
-              ? "rgba(79,126,255,0.12)"
-              : "rgba(10,10,11,0.92)",
+              ? "rgba(255,77,0,0.1)"
+              : "rgba(5,5,5,0.95)",
           }}
         >
           <Settings size={22} strokeWidth={2} />
@@ -96,28 +98,58 @@ export function PhotographerMobileChrome() {
             onClick={() => setOpen(false)}
           />
           <aside
-            className="fixed bottom-0 left-0 top-0 z-[150] flex w-[min(300px,88vw)] flex-col md:hidden"
+            className="fixed bottom-0 left-0 top-0 z-[150] flex w-[min(280px,88vw)] flex-col md:hidden"
             style={{
-              fontFamily: PS_FONT,
-              backgroundColor: C.navyDim,
-              borderRight: `1px solid ${C.hairline}`,
+              fontFamily: "'Pretendard', sans-serif",
+              backgroundColor: "#050505",
+              borderRight: "1px solid #222",
               paddingTop: "max(12px, env(safe-area-inset-top))",
               paddingBottom: "max(12px, env(safe-area-inset-bottom))",
             }}
           >
-            <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: C.hairline }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>메뉴</span>
+            {/* 헤더 */}
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "14px 16px", borderBottom: "1px solid #1a1a1a",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{
+                  width: 22, height: 22, background: ACCENT,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#000", fontWeight: 900, fontSize: 11,
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}>A</div>
+                <span style={{
+                  fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700,
+                  fontSize: 15, letterSpacing: "-0.03em", textTransform: "uppercase", color: "#fff",
+                }}>
+                  A-Cut<span style={{ color: ACCENT }}>.</span>
+                </span>
+              </div>
               <button
                 type="button"
                 aria-label="닫기"
-                className="flex h-10 w-10 items-center justify-center rounded-lg"
-                style={{ color: C.muted }}
+                style={{
+                  width: 34, height: 34, border: "1px solid #1e1e1e",
+                  background: "transparent", color: "#555", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}
                 onClick={() => setOpen(false)}
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
-            <nav className="flex-1 overflow-y-auto px-2 py-3">
+
+            {/* MENU 라벨 */}
+            <div style={{
+              fontFamily: "'Space Mono', monospace", fontSize: 9,
+              color: "#444", letterSpacing: "0.2em", textTransform: "uppercase",
+              padding: "18px 20px 8px",
+            }}>
+              MENU
+            </div>
+
+            <nav style={{ flex: 1, overflowY: "auto", padding: "0 10px 12px", display: "flex", flexDirection: "column", gap: 2 }}>
               {PHOTOGRAPHER_NAV_ITEMS.map(({ href, label, icon: Icon, comingSoon }) => {
                 const isActive =
                   !comingSoon &&
@@ -127,48 +159,56 @@ export function PhotographerMobileChrome() {
                       ? pathname.startsWith("/photographer/projects")
                       : pathname.startsWith(href)));
 
+                const baseStyle: React.CSSProperties = {
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "11px 14px", fontSize: 13, fontWeight: 700,
+                  color: comingSoon ? "#333" : isActive ? ACCENT : "#777",
+                  backgroundColor: isActive ? "rgba(255,77,0,0.08)" : "transparent",
+                  borderLeft: `2px solid ${isActive ? ACCENT : "transparent"}`,
+                  textDecoration: "none", transition: "all 0.15s",
+                };
+
                 if (comingSoon) {
                   return (
-                    <div
-                      key={label}
-                      className="mb-1 flex items-center gap-2 rounded-xl px-3 py-2.5"
-                      style={{ color: C.dim, fontSize: 13 }}
-                    >
-                      <Icon size={18} />
-                      <span className="flex-1">{label}</span>
-                      <span className="rounded-full px-1.5 py-0.5 text-[9px]" style={{ background: "rgba(113,113,122,0.35)", color: C.dim }}>
-                        준비중
-                      </span>
+                    <div key={label} style={baseStyle}>
+                      <Icon size={16} />
+                      <span style={{ flex: 1 }}>{label}</span>
+                      <span style={{
+                        fontFamily: "'Space Mono', monospace", fontSize: 8, fontWeight: 700,
+                        padding: "2px 6px", background: "rgba(30,30,30,0.8)", border: "1px solid #222",
+                        color: "#333", letterSpacing: "0.1em", textTransform: "uppercase",
+                      }}>준비중</span>
                     </div>
                   );
                 }
 
                 return (
-                  <Link
-                    key={href}
-                    href={href}
-                    className="mb-1 flex items-center gap-2 rounded-xl px-3 py-2.5 no-underline transition-colors"
-                    style={{
-                      fontSize: 13,
-                      color: isActive ? C.text : C.muted,
-                      backgroundColor: isActive ? "rgba(79,126,255,0.12)" : "transparent",
-                    }}
-                  >
-                    <Icon size={18} />
-                    {label}
+                  <Link key={href} href={href} style={baseStyle}>
+                    <Icon size={16} />
+                    <span style={{ flex: 1 }}>{label}</span>
                   </Link>
                 );
               })}
             </nav>
-            <div className="border-t px-3 pt-2" style={{ borderColor: C.hairline }}>
+
+            <div style={{ borderTop: "1px solid #1a1a1a", padding: "12px 16px" }}>
               <button
                 type="button"
-                className="w-full rounded-xl py-2.5 text-[13px]"
                 style={{
-                  border: `1px solid ${C.border}`,
-                  color: C.muted,
-                  background: "transparent",
-                  fontFamily: PS_FONT,
+                  width: "100%", padding: "9px 0",
+                  background: "transparent", border: "1px solid #222",
+                  fontSize: 11, color: "#555", cursor: "pointer",
+                  fontFamily: "'Space Mono', monospace",
+                  letterSpacing: "0.1em", textTransform: "uppercase",
+                  transition: "border-color 0.15s, color 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = ACCENT;
+                  (e.currentTarget as HTMLButtonElement).style.color = ACCENT;
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "#222";
+                  (e.currentTarget as HTMLButtonElement).style.color = "#555";
                 }}
                 onClick={handleLogout}
               >
