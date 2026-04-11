@@ -736,7 +736,7 @@ export default function UploadVersionsPage() {
       {/* ── Bottom action bar ── */}
       {!isReadOnly && (
         <div className="ph-uv-action-bar" style={{
-          position: "fixed", bottom: 0, left: 220, right: 0,
+          position: "fixed", bottom: 0, left: 240, right: 0,
           background: "rgba(0,48,73,0.95)",
           ...photographerDock.topEdge,
           backdropFilter: "blur(12px)",

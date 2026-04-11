@@ -571,7 +571,7 @@ export default function ResultsPage() {
       {/* ── Bottom action bar ── */}
       {showActionBar && (
         <div className="ph-results-action-bar" style={{
-          position: "fixed", bottom: 0, left: 220, right: 0,
+          position: "fixed", bottom: 0, left: 240, right: 0,
           background: "rgba(0,48,73,0.95)",
           borderTop: "1px solid rgba(79,126,255,0.15)",
           backdropFilter: "blur(12px)",

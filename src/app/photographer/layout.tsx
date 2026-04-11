@@ -1,6 +1,5 @@
 import type { Viewport } from "next";
-import { PhotographerMobileChrome } from "@/components/layout/PhotographerMobileChrome";
-import { Sidebar } from "@/components/layout/Sidebar";
+import { PhotographerDesktopShell } from "@/components/layout/PhotographerDesktopShell";
 import { ProfileProvider } from "@/contexts/ProfileContext";
 import "./photographer.css";
 
@@ -28,11 +27,7 @@ export default function PhotographerLayout({
             className="absolute right-[-15%] top-[35%] h-64 w-64 rounded-full bg-violet-500/10 blur-[90px]"
           />
         </div>
-        <div className="relative z-10 hidden md:block">
-          <Sidebar />
-        </div>
-        <PhotographerMobileChrome />
-        <main className="relative z-10 ml-0 min-w-0 flex-1 md:ml-[220px]">{children}</main>
+        <PhotographerDesktopShell>{children}</PhotographerDesktopShell>
       </div>
     </ProfileProvider>
   );

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { differenceInDays } from "date-fns";
 import {
   ArrowLeft,
@@ -170,17 +171,49 @@ const WF_STEPS = [
   { key: "DELIVERY",      label: "납품" },
 ];
 
-// ---------- thumbnail ----------
-function PhotoThumb({ photo, index, onDelete, deletingId, isEditMode }: {
-  photo: Photo; index: number;
+// ---------- thumbnail (스크롤 루트 기준: 보이는 영역 근처에서만 src 로드) ----------
+function PhotoThumb({
+  photo,
+  index,
+  onDelete,
+  deletingId,
+  isEditMode,
+  scrollRootRef,
+}: {
+  photo: Photo;
+  index: number;
   onDelete: (id: string) => void;
   deletingId: string | null;
   isEditMode: boolean;
+  /** DATABANK 스크롤 박스 — 없으면 즉시 로드 */
+  scrollRootRef?: React.RefObject<HTMLElement | null>;
 }) {
   const [loaded, setLoaded] = useState(false);
+  const [shouldLoadSrc, setShouldLoadSrc] = useState(() => !scrollRootRef);
+  const cellRef = useRef<HTMLDivElement>(null);
   const deleting = deletingId === photo.id;
+
+  useEffect(() => {
+    if (shouldLoadSrc) return;
+    const el = cellRef.current;
+    const root = scrollRootRef?.current ?? null;
+    if (!el) return;
+    if (!root) {
+      setShouldLoadSrc(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setShouldLoadSrc(true);
+      },
+      { root, rootMargin: "100px", threshold: 0 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [scrollRootRef, shouldLoadSrc]);
+
   return (
-    <div className="prj-data-cell" style={{ aspectRatio: "3/2", background: "#080808", border: `1px solid ${BORDER}`, overflow: "hidden", position: "relative" }}>
+    <div ref={cellRef} className="prj-data-cell" style={{ aspectRatio: "3/2", background: "#080808", border: `1px solid ${BORDER}`, overflow: "hidden", position: "relative" }}>
       <div className="prj-overlay" />
       <div style={{ position: "absolute", top: 4, left: 4, background: "rgba(0,0,0,0.8)", padding: "2px 5px", border: `1px solid #222`, zIndex: 5 }}>
         <span style={{ fontFamily: MONO, fontSize: 8, color: "#666" }}>
@@ -190,14 +223,17 @@ function PhotoThumb({ photo, index, onDelete, deletingId, isEditMode }: {
       <div style={{ position: "absolute", inset: 0, background: "#111", transition: "opacity 0.25s", opacity: loaded ? 0 : 1, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
         <ImageIcon size={10} color="#333" />
       </div>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={photo.url}
-        alt=""
-        loading="lazy"
-        onLoad={(e) => { setLoaded(true); (e.currentTarget as HTMLImageElement).style.opacity = "1"; }}
-        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: 0, transition: "opacity 0.25s" }}
-      />
+      {shouldLoadSrc && (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={photo.url}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onLoad={(e) => { setLoaded(true); (e.currentTarget as HTMLImageElement).style.opacity = "1"; }}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: 0, transition: "opacity 0.25s" }}
+        />
+      )}
       {isEditMode && (
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(photo.id); }}
@@ -207,6 +243,253 @@ function PhotoThumb({ photo, index, onDelete, deletingId, isEditMode }: {
           {deleting ? <Loader2 size={9} style={{ animation: "spin 1s linear infinite" }} /> : <X size={11} strokeWidth={2.5} color="#fff" />}
         </button>
       )}
+    </div>
+  );
+}
+
+/** 그리드 최소 셀 너비 — `repeat(auto-fill, minmax(...))` 대체 시 가상 행 계산에 사용 */
+const GRID_MIN_CELL = 148;
+const GRID_GAP = 4;
+const GRID_PAD = 16;
+
+function VirtualizedPhotoGrid({
+  scrollRef,
+  photos,
+  onDelete,
+  deletingId,
+  isEditMode,
+}: {
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  photos: Photo[];
+  onDelete: (id: string) => void;
+  deletingId: string | null;
+  isEditMode: boolean;
+}) {
+  const [layout, setLayout] = useState(() => {
+    const cw = GRID_MIN_CELL;
+    return { cols: 4, cellWidth: cw, rowHeight: Math.ceil(cw * (2 / 3)) + GRID_GAP };
+  });
+
+  useLayoutEffect(() => {
+    const root = scrollRef.current;
+    if (!root) return;
+
+    const update = () => {
+      const w = root.clientWidth - GRID_PAD * 2;
+      if (w <= 0) return;
+      const cols = Math.max(1, Math.floor((w + GRID_GAP) / (GRID_MIN_CELL + GRID_GAP)));
+      const cellWidth = (w - GRID_GAP * (cols - 1)) / cols;
+      const rowHeight = Math.ceil(cellWidth * (2 / 3)) + GRID_GAP;
+      setLayout((prev) =>
+        prev.cols !== cols || prev.rowHeight !== rowHeight ? { cols, cellWidth, rowHeight } : prev,
+      );
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(root);
+    return () => ro.disconnect();
+  }, [scrollRef]);
+
+  const rowCount = Math.ceil(photos.length / layout.cols);
+
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => layout.rowHeight,
+    overscan: 2,
+  });
+
+  return (
+    <div style={{ padding: GRID_PAD }}>
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          height: rowVirtualizer.getTotalSize(),
+        }}
+      >
+        {rowVirtualizer.getVirtualItems().map((vRow) => {
+          const start = vRow.index * layout.cols;
+          const slice = photos.slice(start, start + layout.cols);
+          return (
+            <div
+              key={vRow.key}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: vRow.size,
+                transform: `translateY(${vRow.start}px)`,
+                display: "grid",
+                gridTemplateColumns: `repeat(${layout.cols}, 1fr)`,
+                gap: GRID_GAP,
+                boxSizing: "border-box",
+              }}
+            >
+              {slice.map((photo, j) => (
+                <PhotoThumb
+                  key={photo.id}
+                  photo={photo}
+                  index={start + j}
+                  onDelete={onDelete}
+                  deletingId={deletingId}
+                  isEditMode={isEditMode}
+                  scrollRootRef={scrollRef}
+                />
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const LIST_ROW_H = 54;
+const LIST_THUMB_W = 56;
+const LIST_THUMB_H = 38;
+
+function ListRowThumb({
+  url,
+  scrollRootRef,
+}: {
+  url: string;
+  scrollRootRef: React.RefObject<HTMLElement | null>;
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [load, setLoad] = useState(false);
+  useEffect(() => {
+    if (load) return;
+    const el = wrapRef.current;
+    const root = scrollRootRef.current;
+    if (!el) return;
+    if (!root) {
+      setLoad(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setLoad(true);
+      },
+      { root, rootMargin: "100px", threshold: 0 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [scrollRootRef, load]);
+  return (
+    <div ref={wrapRef} style={{ width: "100%", height: "100%", background: "#111" }}>
+      {load && (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img src={url} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+      )}
+    </div>
+  );
+}
+
+function VirtualizedPhotoList({
+  scrollRef,
+  photos,
+  onDelete,
+  deletingId,
+  isEditMode,
+}: {
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  photos: Photo[];
+  onDelete: (id: string) => void;
+  deletingId: string | null;
+  isEditMode: boolean;
+}) {
+  const listVirtualizer = useVirtualizer({
+    count: photos.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => LIST_ROW_H,
+    overscan: 6,
+  });
+
+  return (
+    <div style={{ padding: 16 }}>
+      <div style={{ position: "relative", width: "100%", height: listVirtualizer.getTotalSize() }}>
+        {listVirtualizer.getVirtualItems().map((v) => {
+          const photo = photos[v.index];
+          const i = v.index;
+          const deleting = deletingId === photo.id;
+          return (
+            <div
+              key={photo.id}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: v.size,
+                transform: `translateY(${v.start}px)`,
+                boxSizing: "border-box",
+                paddingBottom: 2,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "8px 10px",
+                  height: LIST_ROW_H - 2,
+                  border: `1px solid ${BORDER}`,
+                  background: SURFACE_2,
+                  transition: "border-color 0.2s",
+                  boxSizing: "border-box",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,77,0,0.3)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = BORDER; }}
+              >
+                <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED, width: 50, flexShrink: 0 }}>
+                  IDX_{String(photo.orderIndex ?? i + 1).padStart(3, "0")}
+                </span>
+                <div
+                  style={{
+                    width: LIST_THUMB_W,
+                    height: LIST_THUMB_H,
+                    flexShrink: 0,
+                    overflow: "hidden",
+                    border: `1px solid ${BORDER}`,
+                  }}
+                >
+                  <ListRowThumb url={photo.url} scrollRootRef={scrollRef} />
+                </div>
+                <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT_NORMAL, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {photo.originalFilename ?? `FRAME_${String(i + 1).padStart(4, "0")}`}
+                </span>
+                {photo.fileSize && (
+                  <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED, flexShrink: 0 }}>
+                    {(photo.fileSize / 1024).toFixed(0)}KB
+                  </span>
+                )}
+                {isEditMode && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(photo.id)}
+                    disabled={deleting}
+                    style={{
+                      background: "rgba(255,71,87,0.15)",
+                      border: "1px solid rgba(255,71,87,0.3)",
+                      color: "#FF4757",
+                      cursor: "pointer",
+                      padding: "3px 8px",
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    {deleting ? <Loader2 size={10} style={{ animation: "spin 1s linear infinite" }} /> : <X size={10} />}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -254,6 +537,7 @@ export default function ProjectDetailPage() {
   const [toast, setToast] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoScrollRef = useRef<HTMLDivElement>(null);
   const stopRequestedRef = useRef(false);
   const useProxyRef = useRef(false);
 
@@ -499,7 +783,18 @@ export default function ProjectDetailPage() {
   const labelStyle: React.CSSProperties = { fontFamily: MONO, fontSize: "0.6rem", letterSpacing: "0.15em", textTransform: "uppercase", color: TEXT_MUTED, display: "block", marginBottom: 6 };
 
   return (
-    <div className="prj-root" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", position: "relative", background: SURFACE_0 }}>
+    <div
+      className="prj-root"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100dvh",
+        maxHeight: "100dvh",
+        overflow: "hidden",
+        position: "relative",
+        background: SURFACE_0,
+      }}
+    >
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes prj-bar-scan { 0% { transform: translateX(-100%); } 100% { transform: translateX(500%); } }
@@ -568,7 +863,7 @@ export default function ProjectDetailPage() {
       </nav>
 
       {/* main */}
-      <main style={{ flex: 1, display: "flex", overflow: "hidden", zIndex: 10, position: "relative" }}>
+      <main style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden", zIndex: 10, position: "relative" }}>
 
         {/* ── Left Panel ── */}
         <aside className="prj-scroll" style={{ width: 360, flexShrink: 0, borderRight: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", overflowY: "auto" }}>
@@ -731,7 +1026,7 @@ export default function ProjectDetailPage() {
         </aside>
 
         {/* ── Right Panel ── */}
-        <section style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
+        <section style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, overflow: "hidden" }}>
           {/* toolbar */}
           <div style={{ height: 52, borderBottom: `1px solid ${BORDER}`, background: SURFACE_1, display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 20, paddingRight: 20, flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -777,8 +1072,8 @@ export default function ProjectDetailPage() {
             </div>
           </div>
 
-          {/* photo grid */}
-          <div className="prj-scroll" style={{ flex: 1, overflowY: "auto", background: "rgba(3,3,3,0.4)" }}>
+          {/* photo grid — 가상 스크롤로 보이는 행만 마운트·이미지 로드 */}
+          <div ref={photoScrollRef} className="prj-scroll" style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "rgba(3,3,3,0.4)" }}>
             {photosLoading ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", gap: 8 }}>
                 <span className="prj-tech-label" style={{ color: TEXT_MUTED }}>LOADING_DATABANK...</span>
@@ -790,30 +1085,21 @@ export default function ProjectDetailPage() {
                 <p style={{ fontFamily: MONO, fontSize: 10, color: "#2a2a2a", textAlign: "center" }}>왼쪽 드롭존에서 사진을 업로드하면 여기에 표시됩니다</p>
               </div>
             ) : viewMode === "grid" ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 3, padding: 16 }}>
-                {filteredPhotos.map((photo, i) => (
-                  <PhotoThumb key={photo.id} photo={photo} index={i} onDelete={handleDeletePhoto} deletingId={deletingId} isEditMode={isPhotoEditMode} />
-                ))}
-              </div>
+              <VirtualizedPhotoGrid
+                scrollRef={photoScrollRef}
+                photos={filteredPhotos}
+                onDelete={handleDeletePhoto}
+                deletingId={deletingId}
+                isEditMode={isPhotoEditMode}
+              />
             ) : (
-              <div style={{ padding: 16 }}>
-                {filteredPhotos.map((photo, i) => (
-                  <div key={photo.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 10px", border: `1px solid ${BORDER}`, marginBottom: 2, background: SURFACE_2, transition: "border-color 0.2s" }} onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,77,0,0.3)"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = BORDER; }}>
-                    <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED, width: 50, flexShrink: 0 }}>IDX_{String(photo.orderIndex ?? i + 1).padStart(3, "0")}</span>
-                    <div style={{ width: 48, height: 32, background: "#111", flexShrink: 0, overflow: "hidden", border: `1px solid ${BORDER}` }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={photo.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} loading="lazy" />
-                    </div>
-                    <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT_NORMAL, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{photo.originalFilename ?? `FRAME_${String(i + 1).padStart(4, "0")}`}</span>
-                    {photo.fileSize && <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED, flexShrink: 0 }}>{(photo.fileSize / 1024).toFixed(0)}KB</span>}
-                    {isPhotoEditMode && (
-                      <button onClick={() => handleDeletePhoto(photo.id)} disabled={deletingId === photo.id} style={{ background: "rgba(255,71,87,0.15)", border: "1px solid rgba(255,71,87,0.3)", color: "#FF4757", cursor: "pointer", padding: "3px 8px", flexShrink: 0, display: "flex", alignItems: "center" }}>
-                        {deletingId === photo.id ? <Loader2 size={10} style={{ animation: "spin 1s linear infinite" }} /> : <X size={10} />}
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <VirtualizedPhotoList
+                scrollRef={photoScrollRef}
+                photos={filteredPhotos}
+                onDelete={handleDeletePhoto}
+                deletingId={deletingId}
+                isEditMode={isPhotoEditMode}
+              />
             )}
           </div>
         </section>
