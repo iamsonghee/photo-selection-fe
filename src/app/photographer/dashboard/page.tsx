@@ -4,79 +4,44 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Plus,
-  Bell,
-  FolderOpen,
-  CheckCircle2,
-  RefreshCw,
-  Eye,
-  Image as ImageIcon,
-  Check,
-  CheckCircle,
-  Upload,
-  AlertCircle,
+  Plus, AlertCircle,
 } from "lucide-react";
 import { BETA_MAX_PROJECTS_TOTAL } from "@/lib/beta-limits";
+import { getProfileImageUrl } from "@/lib/photographer";
 import { getProjectsByPhotographerId } from "@/lib/db";
 import type { Project, ProjectStatus } from "@/types";
 import type { ProjectLogItem } from "@/lib/db";
 import { useProfile } from "@/contexts/ProfileContext";
-import { ProjectProgressBar } from "@/components/ProjectProgressBar";
-import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT, photographerDock } from "@/lib/photographer-theme";
+import EmptyDashboard from "./EmptyDashboard";
+import { StatusPill } from "@/components/ui/StatusPill";
 
-// ── preparing 상태 3단계 분기 헬퍼 ──────────────────────────
-function getPreparingBadge(photoCount: number, requiredCount: number): { label: string; color: string } {
-  if (photoCount === 0) {
-    return { label: "업로드 전", color: C.dim };
-  } else if (photoCount < requiredCount) {
-    return { label: "업로드 중", color: C.steel };
-  } else {
-    return { label: "초대 활성화 필요", color: C.orange };
-  }
-}
+// ── 새 디자인 컬러 팔레트 ───────────────────────────────────
+const ACCENT  = "#FF4D00";
+const GREEN   = "#22C55E";
+const RED     = "#EF4444";
+const YELLOW  = "#EAB308";
 
-function getPreparingBorderColor(photoCount: number, requiredCount: number): string {
-  if (photoCount === 0) return C.dim;
-  if (photoCount < requiredCount) return C.steel;
-  return C.orange;
+function getPreparingAccent(photoCount: number, requiredCount: number): string {
+  if (photoCount === 0)           return "#444";
+  if (photoCount < requiredCount) return ACCENT;
+  return ACCENT;
 }
 
 // ── status config ──────────────────────────────────────────
-type BadgeKey = "preparing" | "selecting" | "editing" | "delivered" | "revision";
-
-const STATUS_BADGE: Record<ProjectStatus, { label: string; key: BadgeKey }> = {
-  preparing:    { label: "업로드 전", key: "preparing" },
-  selecting:    { label: "셀렉 중",   key: "selecting" },
-  confirmed:    { label: "확정됨",    key: "selecting" },
-  editing:      { label: "보정 중",   key: "editing"   },
-  reviewing_v1: { label: "검토 중",   key: "editing"   },
-  editing_v2:   { label: "재보정 중", key: "revision"  },
-  reviewing_v2: { label: "재검토 중", key: "editing"   },
-  delivered:    { label: "납품 완료", key: "delivered" },
-};
-
-const BADGE_STYLE: Record<BadgeKey, React.CSSProperties> = {
-  preparing: { background: C.surface3,                    color: C.muted,   border: `1px solid ${C.border}` },
-  selecting: { background: "rgba(79,126,255,0.15)",      color: C.steel,   border: "1px solid rgba(79,126,255,0.3)" },
-  editing:   { background: "rgba(245,166,35,0.12)",       color: C.orange,  border: "1px solid rgba(245,166,35,0.3)"  },
-  revision:  { background: "rgba(255,71,87,0.12)",        color: C.red,     border: "1px solid rgba(255,71,87,0.3)"   },
-  delivered: { background: C.greenDim,                    color: C.green,   border: "1px solid rgba(46,213,115,0.3)"  },
-};
-
-const STATUS_LEFT: Record<ProjectStatus, string> = {
-  preparing:    C.dim,
-  selecting:    C.steel,
-  confirmed:    C.green,
-  editing:      C.orange,
-  reviewing_v1: C.steelLt,
-  editing_v2:   C.red,
-  reviewing_v2: C.steelLt,
-  delivered:    C.dim,
-};
-
 const ACTIVE_STATUSES: ProjectStatus[] = [
   "selecting", "confirmed", "editing", "reviewing_v1", "editing_v2", "reviewing_v2",
 ];
+
+const NEW_LEFT: Record<ProjectStatus, string> = {
+  preparing:    "#444",
+  selecting:    "#fff",
+  confirmed:    "#C4A574",
+  editing:      "#C4A574",
+  reviewing_v1: "#fff",
+  editing_v2:   "#fff",
+  reviewing_v2: "#fff",
+  delivered:    "#333",
+};
 
 // ── helpers ────────────────────────────────────────────────
 function dday(deadline: string): { text: string; warn: boolean } {
@@ -89,24 +54,27 @@ function dday(deadline: string): { text: string; warn: boolean } {
   return            { text: `D+${Math.abs(diff)}`,   warn: true  };
 }
 
-function timeAgo(iso: string): string {
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (diff < 60)     return "방금 전";
-  if (diff < 3600)   return `${Math.floor(diff / 60)}분 전`;
-  if (diff < 86400)  return `${Math.floor(diff / 3600)}시간 전`;
-  if (diff < 172800) return "어제";
-  return `${Math.floor(diff / 86400)}일 전`;
-}
 
 const LOG_DOT: Record<string, string> = {
-  created:   C.steel,
-  uploaded:  C.orange,
-  selecting: C.green,
-  confirmed: C.green,
-  editing:   C.orange,
-  delivered: C.green,
-  revision:  C.red,
+  created:   "#666",
+  uploaded:  ACCENT,
+  selecting: "#888",
+  confirmed: "#C4A574",
+  editing:   "#C4A574",
+  delivered: "#fff",
+  revision:  "#fff",
 };
+
+function formatLogTime(iso: string): string {
+  const d    = new Date(iso);
+  const now  = new Date();
+  const diff = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
+  if (diff === 0) {
+    return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+  }
+  if (diff === 1) return "어제";
+  return `${diff}일 전`;
+}
 
 const LOG_LABEL: Record<string, string> = {
   created:   "프로젝트 생성",
@@ -118,100 +86,74 @@ const LOG_LABEL: Record<string, string> = {
   revision:  "재보정 요청",
 };
 
-// ── StatusBadge ────────────────────────────────────────────
-function StatusBadge({ status, photoCount, requiredCount }: {
-  status: ProjectStatus;
-  photoCount?: number;
-  requiredCount?: number;
-}) {
-  if (status === "preparing") {
-    const pc = photoCount ?? 0;
-    const rc = requiredCount ?? Infinity;
-    const badge = getPreparingBadge(pc, rc);
-    let bgColor: string;
-    let borderColor: string;
-    if (pc === 0) {
-      bgColor = C.surface3;
-      borderColor = `1px solid rgba(113,113,122,0.35)`;
-    } else if (pc < rc) {
-      bgColor = "rgba(79,126,255,0.12)";
-      borderColor = `1px solid rgba(79,126,255,0.25)`;
-    } else {
-      bgColor = "rgba(245,166,35,0.12)";
-      borderColor = `1px solid rgba(245,166,35,0.3)`;
-    }
-    return (
-      <span style={{
-        background: bgColor,
-        color: badge.color,
-        border: borderColor,
-        fontSize: 10,
-        fontWeight: 500,
-        padding: "2px 8px",
-        borderRadius: 20,
-        flexShrink: 0,
-      }}>
-        {badge.label}
-      </span>
-    );
-  }
-  const { label, key } = STATUS_BADGE[status];
+// ── 5단계 파이프라인 ───────────────────────────────────────
+const PIPELINE_STEPS = ["업로드", "셀렉", "보정", "재보정", "완료"];
+
+type PipelineConfig = {
+  completedSteps: number; // 완전히 끝난 단계 수 (0~5)
+  activeStep:     number; // 현재 진행 중인 단계 인덱스 (0~4, -1=전체완료)
+  activeColor:    string; // 현재 단계 색상
+  stepLabel:      string; // "N/5 단계명" 또는 상태 설명
+};
+
+const STATUS_PIPELINE: Record<ProjectStatus, PipelineConfig> = {
+  preparing:    { completedSteps: 0, activeStep: 0,  activeColor: ACCENT, stepLabel: "1/5 업로드" },
+  selecting:    { completedSteps: 1, activeStep: 1,  activeColor: ACCENT, stepLabel: "2/5 셀렉" },
+  confirmed:    { completedSteps: 2, activeStep: 2,  activeColor: ACCENT, stepLabel: "3/5 보정" },
+  editing:      { completedSteps: 2, activeStep: 2,  activeColor: ACCENT, stepLabel: "3/5 보정" },
+  reviewing_v1: { completedSteps: 3, activeStep: -1, activeColor: ACCENT, stepLabel: "보정 완료" },
+  editing_v2:   { completedSteps: 3, activeStep: 3,  activeColor: ACCENT, stepLabel: "4/5 재보정" },
+  reviewing_v2: { completedSteps: 4, activeStep: -1, activeColor: ACCENT, stepLabel: "재보정 완료" },
+  delivered:    { completedSteps: 5, activeStep: -1, activeColor: GREEN,  stepLabel: "5/5 완료" },
+};
+
+// ── PipelineBar ────────────────────────────────────────────
+function PipelineBar({ status }: { status: ProjectStatus }) {
+  const { completedSteps, activeStep, activeColor } = STATUS_PIPELINE[status];
+  const allDone    = completedSteps === 5;
+  const isPreparing = status === "preparing";
+
   return (
-    <span style={{
-      ...BADGE_STYLE[key],
-      fontSize: 10,
-      fontWeight: 500,
-      padding: "2px 8px",
-      borderRadius: 20,
-      flexShrink: 0,
+    <div style={{
+      width: "100%", height: 4,
+      background: "#0a0a0a", overflow: "hidden",
+      display: "flex", gap: 2,
     }}>
-      {label}
-    </span>
+      {PIPELINE_STEPS.map((_, i) => {
+        const isDone   = i < completedSteps;
+        const isActive = i === activeStep;
+        let bg      = "#1a1a1a";
+        let opacity = 1;
+        if (allDone) {
+          bg = "#333";
+        } else if (isDone) {
+          bg = "#fff";
+        } else if (isActive) {
+          bg = activeColor;
+          if (isPreparing) opacity = 0.4;
+        }
+        return (
+          <div key={i} style={{ flex: 1, height: "100%", background: bg, opacity }} />
+        );
+      })}
+    </div>
   );
 }
 
-// ── ProjectCard ────────────────────────────────────────────
+// ── ProjectCard (새 디자인) ─────────────────────────────────
 function ProjectCard({ project }: { project: Project }) {
   const router = useRouter();
   const [hovered, setHovered] = useState(false);
-  const photoCount = project.photoCount ?? 0;
-  const requiredCount = project.requiredCount ?? 0;
+  const photoCount  = project.photoCount ?? 0;
+  const reqCount    = project.requiredCount ?? 0;
+
   const accentColor = project.status === "preparing"
-    ? getPreparingBorderColor(photoCount, requiredCount)
-    : STATUS_LEFT[project.status];
+    ? getPreparingAccent(photoCount, reqCount)
+    : NEW_LEFT[project.status];
+
   const { text: ddayText, warn } = dday(project.deadline);
-  const ddayStyle: React.CSSProperties = warn
-    ? { color: C.orange, background: C.orangeDim }
-    : { color: C.muted,  background: C.surface3  };
-
-  // preparing 상태 하단 메타 텍스트
-  const preparingMeta = (() => {
-    if (project.status !== "preparing") return null;
-    if (photoCount === 0) {
-      return (
-        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
-          <ImageIcon size={10} />
-          사진 업로드를 시작해주세요
-        </span>
-      );
-    } else if (photoCount < requiredCount) {
-      return (
-        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
-          <ImageIcon size={10} />
-          {photoCount} / {requiredCount}장 업로드됨
-        </span>
-      );
-    } else {
-      return (
-        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.orange }}>
-          <CheckCircle size={10} />
-          {photoCount}장 준비 완료 · 고객 초대 활성화 필요
-        </span>
-      );
-    }
-  })();
-
-  const cardEdge = hovered ? C.borderMd : C.hairline;
+  const pipelineCfg = STATUS_PIPELINE[project.status];
+  const isDelivered = project.status === "delivered";
 
   return (
     <div
@@ -226,146 +168,192 @@ function ProjectCard({ project }: { project: Project }) {
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className="db-project-card"
       style={{
-        background: hovered ? C.surface2 : C.surface,
-        borderTop: `1px solid ${cardEdge}`,
-        borderRight: `1px solid ${cardEdge}`,
-        borderBottom: `1px solid ${cardEdge}`,
-        borderLeft: `3px solid ${accentColor}`,
-        borderRadius: 10,
-        padding: "14px 16px",
-        marginBottom: 6,
+        background: "#111",
+        borderTop: `1.5px solid ${hovered ? "#3a3a3a" : "#222"}`,
+        borderRight: `1.5px solid ${hovered ? "#3a3a3a" : "#222"}`,
+        borderBottom: `1.5px solid ${hovered ? "#3a3a3a" : "#222"}`,
+        borderLeft: `4px solid ${accentColor}`,
+        padding: "18px 20px 16px",
         cursor: "pointer",
-        transition: "all 0.18s",
-        transform: hovered ? "translateX(2px)" : "none",
-        display: "grid",
-        gridTemplateColumns: "1fr auto",
+        transition: "all 0.2s ease",
+        transform: hovered ? "translateX(4px)" : "none",
+        display: "flex",
+        flexDirection: "column" as const,
         gap: 12,
-        alignItems: "center",
+        opacity: isDelivered ? (hovered ? 1 : 0.65) : 1,
+        position: "relative" as const,
       }}
     >
-      <div>
-        {/* 카드 상단: 프로젝트명 + 고객명 + 배지 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{project.name}</span>
-          <span style={{ fontSize: 12, color: C.muted }}>{project.customerName || "—"}</span>
-          <StatusBadge status={project.status} photoCount={photoCount} requiredCount={requiredCount} />
-        </div>
-
-        {/* 진행 바 */}
-        <ProjectProgressBar status={project.status} photoCount={photoCount} requiredCount={requiredCount} />
-
-        {/* 하단 메타 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
-            {preparingMeta ?? (
-              <>
-                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
-                  <ImageIcon size={10} />
-                  {project.photoCount}장
-                </span>
-                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
-                  <Check size={10} />
-                  {project.requiredCount}장
-                </span>
-              </>
-            )}
-          </div>
-          <span style={{
-            ...ddayStyle,
-            fontSize: 10,
-            fontWeight: 500,
-            padding: "2px 7px",
-            borderRadius: 5,
-            flexShrink: 0,
-          }}>
-            {ddayText}
-          </span>
-        </div>
+      {/* 상단: 배지 + 프로젝트명 + 고객명 */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const }}>
+        <StatusPill status={project.status} photoCount={photoCount} requiredCount={reqCount} />
+        <span style={{ fontSize: 14, fontWeight: 700, color: isDelivered ? "#777" : "#fff" }}>
+          {project.name}
+        </span>
+        <span style={{ fontSize: 13, color: "#666" }}>
+          {project.customerName || "—"}
+        </span>
       </div>
 
-      {/* 화살표 */}
-      <span style={{ fontSize: 12, color: hovered ? C.steel : C.dim, transition: "color 0.15s" }}>→</span>
+      {/* 파이프라인 진행 바 */}
+      <div style={{ maxWidth: 480 }}>
+        <div style={{
+          display: "flex", justifyContent: "space-between",
+          fontFamily: "'Space Mono', monospace", fontSize: 10,
+          color: "#666", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.1em",
+        }}>
+          <span>{pipelineCfg.stepLabel}</span>
+          <span style={{ color: isDelivered ? "#444" : "#888" }}>
+            {(() => {
+              if (project.status === "preparing") return photoCount > 0 ? `${photoCount}장` : "";
+              if (["selecting", "confirmed", "editing", "editing_v2"].includes(project.status)) {
+                return reqCount > 0 ? `${photoCount} / ${reqCount}장` : photoCount > 0 ? `${photoCount}장` : "";
+              }
+              if (project.status === "delivered" && project.shootDate) {
+                return new Date(project.shootDate).toLocaleDateString("ko-KR", { year: "2-digit", month: "2-digit", day: "2-digit" });
+              }
+              return "";
+            })()}
+          </span>
+        </div>
+        <PipelineBar status={project.status} />
+      </div>
+
+      {/* 우측 D-day 배지 */}
+      <div style={{
+        position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
+      }}>
+        {isDelivered ? (
+          <span style={{
+            fontFamily: "'Space Mono', monospace", fontSize: 10,
+            color: "#444", border: "1px solid #2a2a2a",
+            padding: "4px 8px", background: "#050505",
+          }}>
+            완료
+          </span>
+        ) : (
+          <span style={{
+            fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700,
+            color: warn ? ACCENT : "#888",
+            border: `1px solid ${warn ? ACCENT : "#333"}`,
+            padding: "4px 8px",
+            background: warn ? "rgba(255,77,0,0.05)" : "#050505",
+          }}>
+            {ddayText.replace(" · 임박", "")}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
 
-// ── ActionCard ─────────────────────────────────────────────
+// ── ActionCard (새 디자인) ─────────────────────────────────
 function ActionCard({
-  count,
-  label,
-  sub,
-  icon,
-  topColor,
-  numColor,
-  bgTint,
-  href,
+  count, label, sub, numColor, href, leftBorderColor,
 }: {
   count: number;
   label: string;
   sub: string;
-  icon: React.ReactNode;
-  topColor: string;
   numColor: string;
-  bgTint: string;
   href?: string;
+  leftBorderColor?: string;
 }) {
   const [hovered, setHovered] = useState(false);
-  const cardEdge = hovered ? C.borderMd : C.hairline;
   return (
     <Link href={href ?? "/photographer/projects"} style={{ textDecoration: "none" }}>
       <div
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         style={{
-          background: hovered ? C.surface2 : bgTint,
-          borderTop: `2px solid ${topColor}`,
-          borderRight: `1px solid ${cardEdge}`,
-          borderBottom: `1px solid ${cardEdge}`,
-          borderLeft: `1px solid ${cardEdge}`,
-          borderRadius: 10,
-          padding: "14px",
+          background: hovered ? "#1a1a1a" : "#111",
+          borderTop: `1.5px solid ${hovered ? "#3a3a3a" : "#222"}`,
+          borderRight: `1.5px solid ${hovered ? "#3a3a3a" : "#222"}`,
+          borderBottom: `1.5px solid ${hovered ? "#3a3a3a" : "#222"}`,
+          borderLeft: leftBorderColor ? `3px solid ${leftBorderColor}` : `1.5px solid ${hovered ? "#3a3a3a" : "#222"}`,
+          padding: "18px 20px",
           cursor: "pointer",
-          transition: "all 0.18s",
-          transform: hovered ? "translateY(-2px)" : "none",
+          transition: "all 0.2s ease",
+          display: "flex",
+          flexDirection: "column" as const,
+          justifyContent: "space-between",
+          minHeight: 110,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <span style={{ fontSize: 11, color: C.muted }}>{label}</span>
-          <span>{icon}</span>
-        </div>
-        <div style={{
-          fontFamily: PS_DISPLAY,
-          fontSize: 30,
-          lineHeight: 1,
-          marginBottom: 3,
-          color: numColor,
+        <span style={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontSize: 32, fontWeight: 700, color: numColor, lineHeight: 1,
         }}>
           {count}
+        </span>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 2 }}>{label}</div>
+          <div style={{
+            fontFamily: "'Space Mono', monospace",
+            fontSize: 9, color: "#555", textTransform: "uppercase", letterSpacing: "0.15em",
+          }}>{sub}</div>
         </div>
-        <div style={{ fontSize: 10, color: C.dim }}>{sub}</div>
       </div>
     </Link>
   );
 }
 
-// ── SectionHeader ──────────────────────────────────────────
-function SectionHeader({ title, count }: { title: string; count: number }) {
+// ── Accordion Section Header ───────────────────────────────
+function AccordionHeader({
+  title, count, dotColor, textColor, badgeBg, badgeColor,
+  open, onToggle, totalNote,
+}: {
+  title: string; count: number;
+  dotColor: string; textColor: string; badgeBg: string; badgeColor: string;
+  open: boolean; onToggle: () => void;
+  totalNote?: string;
+}) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-      <span style={{
-        fontSize: 11, fontWeight: 600, letterSpacing: 1,
-        textTransform: "uppercase", color: C.dim,
-      }}>
-        {title}
-      </span>
-      <span style={{
-        background: C.surface2, border: `1px solid ${C.border}`,
-        borderRadius: 10, padding: "1px 7px", fontSize: 10, color: C.muted,
-      }}>
-        {count}
-      </span>
-    </div>
+    <button
+      type="button"
+      onClick={onToggle}
+      style={{
+        width: "100%", display: "flex", alignItems: "center",
+        justifyContent: "space-between", padding: "14px 16px",
+        background: "#111", border: "1px solid #222",
+        cursor: "pointer", transition: "background 0.2s ease", textAlign: "left" as const,
+      }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.03)"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#111"; }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ width: 6, height: 6, background: dotColor, flexShrink: 0 }} />
+        <span style={{
+          fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 500,
+          color: textColor, letterSpacing: "0.15em", textTransform: "uppercase",
+        }}>
+          {title}
+        </span>
+        <span style={{
+          background: badgeBg, color: badgeColor,
+          padding: "1px 7px", fontSize: 10, fontWeight: 700,
+          fontFamily: "'Space Mono', monospace",
+        }}>
+          {count}
+        </span>
+        {totalNote && (
+          <span style={{
+            fontFamily: "'Space Mono', monospace", fontSize: 9,
+            color: "#444", letterSpacing: "0.05em",
+          }}>
+            {totalNote}
+          </span>
+        )}
+      </div>
+      <svg
+        width="16" height="16" viewBox="0 0 24 24" fill="none"
+        stroke="#555" strokeWidth="2"
+        style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.3s" }}
+      >
+        <path d="M6 9l6 6 6-6" />
+      </svg>
+    </button>
   );
 }
 
@@ -373,15 +361,37 @@ function SectionHeader({ title, count }: { title: string; count: number }) {
 export default function DashboardPage() {
   const router = useRouter();
   const { profile, loading: profileLoading } = useProfile();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]   = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [logs, setLogs] = useState<ProjectLogItem[]>([]);
+  const [logs, setLogs]         = useState<ProjectLogItem[]>([]);
+  const [clockStr, setClockStr] = useState("");
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(["pending", "active"]));
+
+  const toggleSection = (id: string) => setOpenSections((prev) => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
 
   const userName =
     profile?.name?.trim() ||
     profile?.email?.split("@")[0] ||
     "사용자";
 
+  // 시계
+  useEffect(() => {
+    const update = () => {
+      const now = new Date();
+      setClockStr(
+        `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`
+      );
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // 데이터 로딩
   useEffect(() => {
     if (profileLoading) return;
     const pid = profile?.id;
@@ -404,21 +414,38 @@ export default function DashboardPage() {
     load();
   }, [profile, profileLoading]);
 
+  // ── 로딩 중 ──
   if (profileLoading || loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 0" }}>
-        <p style={{ color: C.muted, fontSize: 13 }}>불러오는 중…</p>
+      <div style={{
+        minHeight: "100vh", background: "#000", display: "flex",
+        alignItems: "center", justifyContent: "center",
+      }}>
+        <div style={{
+          fontFamily: "'Space Mono', monospace", fontSize: 11,
+          color: "#555", letterSpacing: "0.15em", textTransform: "uppercase",
+        }}>
+          SYS.LOADING…
+        </div>
       </div>
     );
   }
 
+  // ── 미로그인 ──
   if (!profile?.id) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "80px 0" }}>
-        <p style={{ color: C.muted, fontSize: 13 }}>로그인하면 프로젝트를 볼 수 있습니다</p>
+      <div style={{
+        minHeight: "100vh", background: "#000",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", gap: 16,
+      }}>
+        <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#555" }}>
+          로그인하면 프로젝트를 볼 수 있습니다
+        </p>
         <Link href="/auth" style={{
-          backgroundColor: C.steel, color: "#fff",
-          padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none",
+          background: ACCENT, color: "#000", padding: "10px 24px",
+          fontSize: 13, fontWeight: 700, textDecoration: "none",
+          fontFamily: "'Space Mono', monospace",
         }}>
           로그인
         </Link>
@@ -426,397 +453,470 @@ export default function DashboardPage() {
     );
   }
 
-  // ── derived data: 최근 업데이트 순 6개 제한 ──
+  // ── 빈 대시보드 ──
+  if (projects.length === 0) {
+    return (
+      <EmptyDashboard
+        userName={userName}
+        onCreateProject={() => router.push("/photographer/projects/new")}
+      />
+    );
+  }
+
+  // ── derived data ──
   const sortedAll = [...projects].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
-  const displayProjects      = sortedAll.slice(0, 6);
-  const showViewAllBtn       = projects.length > 6;
-  const totalDeliveredCount  = projects.filter((p) => p.status === "delivered").length;
+  const displayProjects = sortedAll.slice(0, 6);
+  const showViewAllBtn  = projects.length > 6;
 
   const preparingProjects = displayProjects.filter((p) => p.status === "preparing");
   const activeProjects    = displayProjects.filter((p) => ACTIVE_STATUSES.includes(p.status));
   const recentDelivered   = displayProjects.filter((p) => p.status === "delivered").slice(0, 1);
+  const totalDelivered    = projects.filter((p) => p.status === "delivered").length;
 
-  const confirmedCount = projects.filter((p) => p.status === "confirmed").length;
-  const revisionCount  = projects.filter((p) => p.status === "editing_v2").length;
-  const reviewingCount = projects.filter((p) =>
-    p.status === "reviewing_v1" || p.status === "reviewing_v2"
-  ).length;
-  // preparing 상태 중 photo_count >= required_count인 프로젝트 (초대 활성화 필요)
+  const confirmedCount  = projects.filter((p) => p.status === "confirmed").length;
+  const revisionCount   = projects.filter((p) => p.status === "editing_v2").length;
+  const reviewingCount  = projects.filter((p) => p.status === "reviewing_v1" || p.status === "reviewing_v2").length;
   const inviteReadyProjects = projects.filter(
     (p) => p.status === "preparing" && (p.photoCount ?? 0) >= (p.requiredCount ?? Infinity)
   );
   const inviteReadyCount = inviteReadyProjects.length;
-  // 초대 활성화 필요 카드 클릭 시 이동할 href
-  const inviteReadyHref = inviteReadyProjects.length === 1
-    ? `/photographer/projects/${inviteReadyProjects[0].id}/upload`
+  const inviteReadyHref  = inviteReadyProjects.length === 1
+    ? `/photographer/projects/${inviteReadyProjects[0].id}`
     : "/photographer/projects";
   const hasAction = confirmedCount + revisionCount + reviewingCount + inviteReadyCount > 0;
 
-  const thisMonth = new Date().getMonth();
-  const thisYear  = new Date().getFullYear();
-  const thisMonthCount = projects.filter((p) => {
-    const d = new Date(p.shootDate);
-    return d.getFullYear() === thisYear && d.getMonth() === thisMonth;
-  }).length;
+  const betaCount = projects.length;
+  const betaPct   = Math.min(100, Math.round((betaCount / BETA_MAX_PROJECTS_TOTAL) * 100));
 
   return (
-    <div className="ph-dashboard-root" style={{ minHeight: "100vh", backgroundColor: "transparent", fontFamily: PS_FONT }}>
-
+    <div
+      className="db-root"
+      style={{
+        minHeight: "100vh",
+        background: "#000",
+        color: "#fff",
+        fontFamily: "'Pretendard', 'Noto Sans KR', sans-serif",
+        position: "relative",
+      }}
+    >
       <style>{`
+        /* ── 그리드 배경 ── */
+        .db-grid-bg {
+          position: fixed; inset: 0;
+          background-image:
+            linear-gradient(#333 1px, transparent 1px),
+            linear-gradient(90deg, #333 1px, transparent 1px);
+          background-size: 60px 60px;
+          background-position: center top;
+          opacity: 0.2;
+          pointer-events: none; z-index: 0;
+        }
+        /* ── 스캔라인 ── */
+        .db-scanline {
+          width: 100%; height: 100px; position: fixed; bottom: 100%;
+          background: linear-gradient(0deg, rgba(255,77,0,0.02) 0%, rgba(255,77,0,0) 100%);
+          animation: db-scanline 8s linear infinite;
+          pointer-events: none; z-index: 1;
+        }
+        @keyframes db-scanline { 0% { bottom: 100%; } 100% { bottom: -100px; } }
+        /* ── 프로젝트 카드 ── */
+        .db-project-card:focus { outline: 1px solid ${ACCENT}; }
+        /* ── 스크롤바 ── */
+        .db-root ::-webkit-scrollbar { width: 6px; }
+        .db-root ::-webkit-scrollbar-track { background: #000; }
+        .db-root ::-webkit-scrollbar-thumb { background: #222; }
+        .db-root ::-webkit-scrollbar-thumb:hover { background: ${ACCENT}; }
+        /* ── 전체 보기 링크 ── */
+        .db-view-all { transition: all 0.2s; }
+        .db-view-all:hover { border-color: rgba(255,77,0,0.5) !important; background: rgba(255,77,0,0.04) !important; }
+        .db-view-all:hover .db-view-all-text { color: ${ACCENT} !important; }
+        .db-view-all:hover .db-view-all-arrow { color: ${ACCENT} !important; }
+        /* ── 반응형 ── */
+        @media (max-width: 1024px) {
+          .db-body { flex-direction: column !important; }
+          .db-right-aside { width: 100% !important; position: static !important; }
+        }
         @media (max-width: 768px) {
-          .ph-dashboard-root { overflow-x: hidden; max-width: 100%; box-sizing: border-box; }
-          .ph-dashboard-body { grid-template-columns: 1fr !important; min-height: auto !important; }
-          .ph-dashboard-left { padding: 16px 12px 24px !important; }
-          .ph-dashboard-right { padding: 16px 12px 24px !important; }
-          .ph-dashboard-activity { display: none !important; }
-          .ph-dashboard-topbar {
-            height: auto !important; min-height: 52px;
-            flex-wrap: wrap; gap: 10px !important; padding: 10px 12px !important;
-            align-items: flex-start !important;
-          }
-          .ph-dashboard-topbar > div:last-child { width: 100%; justify-content: flex-end; }
-          .ph-dashboard-action-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
-          .ph-dashboard-root button { min-height: 44px; box-sizing: border-box; }
+          .db-root { overflow-x: hidden; }
+          .db-topbar { flex-wrap: wrap; gap: 10px; padding: 10px 14px !important; height: auto !important; }
+          .db-action-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .db-clock { display: none !important; }
+          .db-activity-panel { display: none !important; }
+        }
+        @keyframes db-pulse {
+          0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,77,0,0.4); }
+          50%      { opacity: 0.6; box-shadow: 0 0 0 4px rgba(255,77,0,0); }
         }
       `}</style>
 
-      {/* ── Topbar ── */}
-      <div className="ph-dashboard-topbar" style={{
-        height: 52,
-        ...photographerDock.bottomEdge,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 24px",
-        background: C.topbarBg,
-        backdropFilter: "blur(12px)",
-        position: "sticky",
-        top: 0,
-        zIndex: 50,
-      }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <p style={{ fontSize: 15, fontWeight: 500, color: C.text }}>
-            안녕하세요,{" "}
-            <em style={{ fontStyle: "normal", color: C.steel }}>{userName}</em>
-            님
-          </p>
-          <p style={{ fontSize: 11, color: C.dim }}>오늘도 좋은 하루 되세요</p>
-        </div>
+      {/* ── 장식 배경 ── */}
+      <div className="db-grid-bg" />
+      <div className="db-scanline" />
+
+      {/* ── 상단 헤더 ── */}
+      <header
+        className="db-topbar"
+        style={{
+          position: "sticky", top: 0, zIndex: 50,
+          height: 64, display: "flex", alignItems: "center",
+          justifyContent: "space-between", padding: "0 28px",
+          background: "rgba(0,0,0,0.95)", backdropFilter: "blur(12px)",
+          borderBottom: "1px solid #222",
+        }}
+      >
+        {/* 좌: 유저 */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button
-            type="button"
-            aria-label="알림"
-            style={{
-              width: 32, height: 32, borderRadius: 8,
-              border: `1px solid ${C.border}`, background: "transparent",
+          {profile?.profileImageUrl ? (
+            <img
+              src={getProfileImageUrl(profile.profileImageUrl)}
+              alt=""
+              style={{
+                width: 32, height: 32, objectFit: "cover",
+                border: "1px solid #2a2a2a", flexShrink: 0,
+              }}
+              onError={(e) => { (e.target as HTMLImageElement).src = getProfileImageUrl(null); }}
+            />
+          ) : (
+            <div style={{
+              width: 32, height: 32, background: "#111",
+              border: "1px solid #2a2a2a", flexShrink: 0,
               display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", color: C.muted,
-            }}
-          >
-            <Bell size={14} />
-          </button>
+              fontSize: 13, fontWeight: 700, color: "#777",
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}>
+              {userName.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div>
+            <div style={{ fontSize: 13, color: "#ccc" }}>
+              안녕하세요, <strong style={{ color: "#fff" }}>{userName} 작가님</strong>
+            </div>
+            <div style={{
+              fontFamily: "'Space Mono', monospace", fontSize: 10,
+              color: "#666", textTransform: "uppercase", letterSpacing: "0.15em", marginTop: 1,
+            }}>
+              세션 활성
+            </div>
+          </div>
+        </div>
+
+        {/* 우: 시계 + 새 프로젝트 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div className="db-clock" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+            <span style={{
+              fontFamily: "'Space Mono', monospace", fontSize: 9,
+              color: "#555", letterSpacing: "0.15em", textTransform: "uppercase",
+            }}>SYS_TIME</span>
+            <span style={{
+              fontFamily: "'Space Mono', monospace", fontSize: 12,
+              color: "#fff", letterSpacing: "0.1em",
+            }}>{clockStr}</span>
+          </div>
           <button
             type="button"
             onClick={() => router.push("/photographer/projects/new")}
             style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "7px 16px", background: C.steel,
-              color: "white", border: "none", borderRadius: 8,
-              fontSize: 12, fontWeight: 500, cursor: "pointer",
-              fontFamily: PS_FONT,
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "8px 18px", background: ACCENT,
+              color: "#000", border: "none",
+              fontSize: 13, fontWeight: 700, cursor: "pointer",
+              fontFamily: "'Pretendard', sans-serif",
+              transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+              letterSpacing: "0.02em", textTransform: "uppercase",
+            }}
+            onMouseEnter={(e) => {
+              const el = e.currentTarget as HTMLButtonElement;
+              el.style.transform = "translateY(-1px)";
+              el.style.boxShadow = "0 0 20px rgba(255,77,0,0.4)";
+              el.style.background = "#ff5e1a";
+            }}
+            onMouseLeave={(e) => {
+              const el = e.currentTarget as HTMLButtonElement;
+              el.style.transform = "";
+              el.style.boxShadow = "";
+              el.style.background = ACCENT;
             }}
           >
-            <Plus size={12} />
+            <Plus size={14} />
             새 프로젝트
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* ── Body: 2-column grid ── */}
-      <div className="ph-dashboard-body" style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 260px",
-        minHeight: "calc(100vh - 52px)",
-      }}>
-
-        {/* ── Left column ── */}
-        <div className="ph-dashboard-left" style={{
-          padding: "22px 22px 22px 24px",
-          overflowY: "auto",
-        }}>
+      {/* ── 바디: 메인 + 우측 사이드바 ── */}
+      <div
+        className="db-body"
+        style={{
+          display: "flex", position: "relative", zIndex: 10,
+          padding: "28px 28px 60px",
+          gap: 28, alignItems: "flex-start",
+        }}
+      >
+        {/* ── 메인 좌측 ── */}
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 28 }}>
 
           {/* 1. 액션 필요 섹션 */}
           {hasAction && (
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                <div style={{
-                  width: 6, height: 6, borderRadius: "50%",
-                  backgroundColor: C.orange,
-                  animation: "pulse 2s infinite",
-                  flexShrink: 0,
-                }} />
-                <span style={{
-                  fontSize: 11, fontWeight: 600, letterSpacing: 1,
-                  textTransform: "uppercase", color: C.dim,
-                }}>
-                  지금 확인이 필요해요
-                </span>
+            <section>
+              <div style={{
+                display: "flex", alignItems: "center", gap: 10,
+                fontFamily: "'Space Mono', monospace", fontSize: 10,
+                color: "#fff", letterSpacing: "0.2em", textTransform: "uppercase",
+                marginBottom: 14,
+              }}>
+                <div style={{ width: 8, height: 8, background: "#fff" }} />
+                처리가 필요한 항목
+                <div style={{ flex: 1, height: 1, background: "#222" }} />
               </div>
-              <div className="ph-dashboard-action-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+              <div
+                className="db-action-grid"
+                style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}
+              >
                 {confirmedCount > 0 && (
-                  <ActionCard
-                    count={confirmedCount}
-                    label="고객 확정 완료"
-                    sub="보정 시작 대기 중"
-                    icon={<CheckCircle2 size={16} color={C.green} />}
-                    topColor={C.green}
-                    numColor={C.green}
-                    bgTint="rgba(46,213,115,0.04)"
-                  />
+                  <ActionCard count={confirmedCount} label="고객 확정" sub="CONFIRMED" numColor={ACCENT} leftBorderColor={ACCENT} />
                 )}
                 {revisionCount > 0 && (
-                  <ActionCard
-                    count={revisionCount}
-                    label="재보정 요청"
-                    sub="코멘트 확인 필요"
-                    icon={<RefreshCw size={16} color={C.red} />}
-                    topColor={C.red}
-                    numColor={C.red}
-                    bgTint="rgba(255,71,87,0.04)"
-                  />
+                  <ActionCard count={revisionCount} label="재보정 요청" sub="EDIT_REQ" numColor={ACCENT} leftBorderColor={ACCENT} />
                 )}
                 {reviewingCount > 0 && (
-                  <ActionCard
-                    count={reviewingCount}
-                    label="고객 검토 중"
-                    sub="보정본 검토 대기"
-                    icon={<Eye size={16} color={C.steelLt} />}
-                    topColor={C.steel}
-                    numColor={C.steelLt}
-                    bgTint="rgba(79,126,255,0.06)"
-                  />
+                  <ActionCard count={reviewingCount} label="검토 중" sub="REVIEWING" numColor="#888" leftBorderColor="#666" />
                 )}
                 {inviteReadyCount > 0 && (
                   <ActionCard
-                    count={inviteReadyCount}
-                    label="초대 활성화 필요"
-                    sub="사진 준비 완료 · 고객 초대 활성화"
-                    icon={<Upload size={16} color={C.orange} />}
-                    topColor={C.orange}
-                    numColor={C.orange}
-                    bgTint="rgba(245,166,35,0.04)"
-                    href={inviteReadyHref}
+                    count={inviteReadyCount} label="초대 대기" sub="READY"
+                    numColor="#555" leftBorderColor="#444" href={inviteReadyHref}
                   />
                 )}
               </div>
-            </div>
+            </section>
           )}
 
-          {/* 2. 대기 중 */}
-          {preparingProjects.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <SectionHeader title="대기 중" count={preparingProjects.length} />
-              {preparingProjects.map((p) => <ProjectCard key={p.id} project={p} />)}
-            </div>
-          )}
+          {/* 2. 프로젝트 아코디언 목록 */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-          {/* 3. 진행 중 */}
-          {activeProjects.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <SectionHeader title="진행 중" count={activeProjects.length} />
-              {activeProjects.map((p) => <ProjectCard key={p.id} project={p} />)}
-            </div>
-          )}
+            {/* 대기 중 */}
+            {preparingProjects.length > 0 && (
+              <div>
+                <AccordionHeader
+                  title="대기중" count={preparingProjects.length}
+                  dotColor="#555" textColor="#888" badgeBg="#1a1a1a" badgeColor="#666"
+                  open={openSections.has("pending")}
+                  onToggle={() => toggleSection("pending")}
+                />
+                {openSections.has("pending") && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8 }}>
+                    {preparingProjects.map((p) => <ProjectCard key={p.id} project={p} />)}
+                  </div>
+                )}
+              </div>
+            )}
 
-          {/* 4. 최근 완료 */}
-          {recentDelivered.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <SectionHeader title="최근 완료" count={totalDeliveredCount} />
-              {recentDelivered.map((p) => <ProjectCard key={p.id} project={p} />)}
-            </div>
-          )}
+            {/* 진행 중 */}
+            {activeProjects.length > 0 && (
+              <div>
+                <AccordionHeader
+                  title="진행중" count={activeProjects.length}
+                  dotColor={ACCENT} textColor={ACCENT}
+                  badgeBg="rgba(255,77,0,0.15)" badgeColor={ACCENT}
+                  open={openSections.has("active")}
+                  onToggle={() => toggleSection("active")}
+                />
+                {openSections.has("active") && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8 }}>
+                    {activeProjects.map((p) => <ProjectCard key={p.id} project={p} />)}
+                  </div>
+                )}
+              </div>
+            )}
 
-          {/* 전체 보기 버튼: 6개 초과 시 */}
-          {showViewAllBtn && (
-            <Link
-              href="/photographer/projects"
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                width: "100%", padding: 9,
-                border: `1px dashed ${C.border}`, borderRadius: 9,
-                background: "transparent", color: C.dim,
-                fontSize: 12, textDecoration: "none", marginBottom: 20,
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.borderColor = C.steel;
-                (e.currentTarget as HTMLAnchorElement).style.color = C.steel;
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.borderColor = C.border;
-                (e.currentTarget as HTMLAnchorElement).style.color = C.dim;
-              }}
-            >
-              전체 프로젝트 보기 →
-            </Link>
-          )}
+            {/* 최근 완료 */}
+            {recentDelivered.length > 0 && (
+              <div>
+                <AccordionHeader
+                  title="최근완료" count={recentDelivered.length}
+                  dotColor="#333" textColor="#555" badgeBg="#1a1a1a" badgeColor="#444"
+                  totalNote={totalDelivered > 1 ? `전체 ${totalDelivered}건` : undefined}
+                  open={openSections.has("delivered")}
+                  onToggle={() => toggleSection("delivered")}
+                />
+                {openSections.has("delivered") && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8 }}>
+                    {recentDelivered.map((p) => <ProjectCard key={p.id} project={p} />)}
+                  </div>
+                )}
+              </div>
+            )}
 
-          {/* 프로젝트 없을 때 */}
-          {projects.length === 0 && (
-            <div style={{ textAlign: "center", padding: "60px 0" }}>
-              <FolderOpen size={36} color={C.dim} style={{ margin: "0 auto 14px" }} />
-              <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>아직 프로젝트가 없습니다</p>
-              <button
-                type="button"
-                onClick={() => router.push("/photographer/projects/new")}
+            {/* 전체 보기 */}
+            {showViewAllBtn && (
+              <Link
+                href="/photographer/projects"
+                className="db-view-all"
                 style={{
-                  backgroundColor: C.steel, color: "#fff", border: "none",
-                  borderRadius: 8, padding: "9px 20px", fontSize: 13, fontWeight: 600,
-                  cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  padding: "16px 24px",
+                  background: "#080808", border: "1px solid #1e1e1e",
+                  textDecoration: "none",
                 }}
               >
-                <Plus size={14} />
-                첫 프로젝트 만들기
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* ── Right column ── */}
-        <div className="ph-dashboard-right" style={{ padding: 20, overflowY: "auto", background: "rgba(0,0,0,0.16)" }}>
-
-          {/* 베타 사용량 카드 */}
-          {(() => {
-            const count = projects.length;
-            const pct = Math.min(100, Math.round((count / BETA_MAX_PROJECTS_TOTAL) * 100));
-            const barColor = count >= BETA_MAX_PROJECTS_TOTAL ? C.red : count >= 8 ? C.orange : C.steel;
-            const textColor = count >= BETA_MAX_PROJECTS_TOTAL ? C.red : count >= 8 ? C.orange : C.muted;
-            return (
-              <div style={{
-                background: C.surface, border: `1px solid ${C.border}`,
-                borderRadius: 10, padding: "12px 14px", marginBottom: 16,
-              }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: C.dim, letterSpacing: "0.5px", textTransform: "uppercase" }}>
-                    베타 사용량
-                  </span>
-                  {count >= BETA_MAX_PROJECTS_TOTAL && (
-                    <AlertCircle size={13} color={C.red} />
-                  )}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, color: C.muted }}>프로젝트</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: textColor }}>
-                    {count} / {BETA_MAX_PROJECTS_TOTAL}
-                  </span>
-                </div>
-                <div style={{ height: 4, background: C.surface3, borderRadius: 2, overflow: "hidden" }}>
-                  <div style={{
-                    height: "100%", borderRadius: 2, background: barColor,
-                    width: `${pct}%`, transition: "width 0.3s",
-                  }} />
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* 통계 */}
-          <div style={{
-            display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8,
-            marginBottom: 16,
-          }}>
-            <div style={{
-              background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 8, padding: "10px 12px", textAlign: "center",
-            }}>
-              <div style={{
-                fontFamily: PS_DISPLAY,
-                fontSize: 22, lineHeight: 1, marginBottom: 3, color: C.steel,
-              }}>
-                {projects.length}
-              </div>
-              <div style={{ fontSize: 10, color: C.dim }}>전체 프로젝트</div>
-            </div>
-            <div style={{
-              background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 8, padding: "10px 12px", textAlign: "center",
-            }}>
-              <div style={{
-                fontFamily: PS_DISPLAY,
-                fontSize: 22, lineHeight: 1, marginBottom: 3, color: C.orange,
-              }}>
-                {thisMonthCount}
-              </div>
-              <div style={{ fontSize: 10, color: C.dim }}>이번 달 촬영</div>
-            </div>
-          </div>
-
-          {/* 최근 활동 — 데스크톱만 (모바일은 숨김) */}
-          <div className="ph-dashboard-activity">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <span style={{
-                fontSize: 11, fontWeight: 600, letterSpacing: 1,
-                textTransform: "uppercase", color: C.dim,
-              }}>
-                최근 활동
-              </span>
-            </div>
-
-            {logs.length === 0 ? (
-              <p style={{ fontSize: 12, color: C.dim, textAlign: "center", padding: "20px 0" }}>
-                아직 활동이 없습니다
-              </p>
-            ) : (
-              <div style={{ position: "relative" }}>
-                <div style={{
-                  position: "absolute", left: 10, top: 8, bottom: 8,
-                  width: 1, backgroundColor: C.border,
-                }} />
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  {logs.slice(0, 10).map((log) => {
-                    const dotColor = LOG_DOT[log.action] ?? C.steel;
-                    const label = LOG_LABEL[log.action] ?? log.action;
-                    return (
-                      <div key={log.id} style={{ display: "flex", gap: 12, padding: "6px 0" }}>
-                        <div style={{
-                          display: "flex", flexDirection: "column",
-                          alignItems: "center", flexShrink: 0,
-                          paddingTop: 3, width: 20,
-                        }}>
-                          <div style={{
-                            width: 8, height: 8, borderRadius: "50%",
-                            backgroundColor: dotColor,
-                            border: `1.5px solid ${C.ink}`,
-                            position: "relative", zIndex: 1, flexShrink: 0,
-                          }} />
-                        </div>
-                        <div style={{ flex: 1, paddingBottom: 10 }}>
-                          <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
-                            <strong style={{ color: C.text, fontWeight: 500 }}>{log.projectName}</strong>
-                            {" · "}{label}
-                          </div>
-                          <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>
-                            {timeAgo(log.createdAt)}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+                <span className="db-view-all-text" style={{ fontSize: 13, fontWeight: 700, color: "#666" }}>
+                  전체 프로젝트 보기
+                </span>
+                <svg className="db-view-all-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2">
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </Link>
             )}
           </div>
         </div>
-      </div>
 
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(245,166,35,0.4); }
-          50%       { opacity: 0.7; box-shadow: 0 0 0 4px rgba(245,166,35,0); }
-        }
-      `}</style>
+        {/* ── 우측 사이드바 ── */}
+        <aside
+          className="db-right-aside"
+          style={{
+            width: 320, flexShrink: 0, display: "flex", flexDirection: "column", gap: 20,
+            position: "sticky", top: 92,
+          }}
+        >
+          {/* 사용량 패널 */}
+          <div style={{
+            background: "#111", border: "1.5px solid #333",
+            padding: "20px 22px", display: "flex", flexDirection: "column", gap: 16,
+            boxShadow: "0 8px 24px -8px rgba(0,0,0,0.8)",
+          }}>
+            {/* 헤더 */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              fontFamily: "'Space Mono', monospace", fontSize: 10,
+              color: "#888", letterSpacing: "0.1em", textTransform: "uppercase",
+              borderBottom: "1px solid #222", paddingBottom: 12,
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
+              SYS.INFO :: USAGE
+            </div>
+
+            {/* 활성 프로젝트 바 */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>활성 프로젝트</span>
+                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 14 }}>
+                  <span style={{ color: "#fff", fontWeight: 700 }}>{betaCount}</span>
+                  <span style={{ color: "#444" }}> / {BETA_MAX_PROJECTS_TOTAL}</span>
+                </div>
+              </div>
+              <div style={{ width: "100%", height: 4, background: "#0a0a0a" }}>
+                <div style={{
+                  height: "100%", background: "#fff",
+                  width: `${betaPct}%`, transition: "width 0.4s",
+                }} />
+              </div>
+            </div>
+
+            {/* 한도 알림 */}
+            {betaCount >= BETA_MAX_PROJECTS_TOTAL ? (
+              <div style={{
+                background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)",
+                padding: "10px 12px",
+                display: "flex", alignItems: "flex-start", gap: 8,
+              }}>
+                <AlertCircle size={13} color={RED} style={{ flexShrink: 0, marginTop: 1 }} />
+                <div>
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: RED, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 3 }}>
+                    Limit Reached
+                  </span>
+                  <span style={{ fontSize: 11, color: "#888", lineHeight: 1.5 }}>
+                    베타 프로젝트 한도에 도달했습니다.
+                  </span>
+                </div>
+              </div>
+            ) : betaCount >= BETA_MAX_PROJECTS_TOTAL - 2 ? (
+              <div style={{
+                background: "#1a1a1a", border: "1px solid #2a2a2a",
+                padding: "10px 12px",
+              }}>
+                <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#666", fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>
+                  Limit Notice
+                </span>
+                <span style={{ fontSize: 11, color: "#444", lineHeight: 1.5 }}>
+                  프로젝트 생성 한도에 근접했습니다.
+                </span>
+              </div>
+            ) : null}
+          </div>
+
+          {/* 최근 활동 패널 */}
+          <div
+            className="db-activity-panel"
+            style={{
+              background: "#111", border: "1.5px solid #333",
+              padding: "20px 22px", display: "flex", flexDirection: "column", gap: 16,
+              boxShadow: "0 8px 24px -8px rgba(0,0,0,0.8)",
+            }}
+          >
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              fontFamily: "'Space Mono', monospace", fontSize: 10,
+              color: "#888", letterSpacing: "0.1em", textTransform: "uppercase",
+              borderBottom: "1px solid #222", paddingBottom: 12,
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+              </svg>
+              SYS.LOG :: RECENT
+            </div>
+
+            {logs.length === 0 ? (
+              <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#444", textAlign: "center", padding: "16px 0" }}>
+                아직 활동이 없습니다
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 4 }}>
+                {logs.slice(0, 8).map((log) => {
+                  const dotColor = LOG_DOT[log.action] ?? "#666";
+                  const label    = LOG_LABEL[log.action] ?? log.action;
+                  return (
+                    <div
+                      key={log.id}
+                      style={{
+                        display: "flex", flexDirection: "column", gap: 2,
+                        borderLeft: "1px solid #222", paddingLeft: 16,
+                        position: "relative",
+                      }}
+                    >
+                      <div style={{
+                        position: "absolute", left: -5, top: 4,
+                        width: 9, height: 9, borderRadius: "50%",
+                        background: "#000", border: `1px solid ${dotColor}`,
+                      }} />
+                      <span style={{
+                        fontFamily: "'Space Mono', monospace", fontSize: 9,
+                        color: "#444",
+                      }}>
+                        {formatLogTime(log.createdAt)}
+                      </span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: dotColor }}>
+                        {label}
+                      </span>
+                      {log.projectName && (
+                        <span style={{
+                          fontSize: 11, color: "#555",
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}>
+                          {log.projectName}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }
