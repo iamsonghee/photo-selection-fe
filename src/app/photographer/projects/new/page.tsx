@@ -10,23 +10,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Heart, Baby, GraduationCap, Briefcase, Camera,
-  Loader2, Lock, RefreshCw, AlertCircle, AlertTriangle,
-} from "lucide-react";
+import { Loader2, Lock, RefreshCw, AlertCircle, AlertTriangle } from "lucide-react";
 import { addDays, format, differenceInCalendarDays } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { createProject, getPhotographerIdByAuthId, getProjectsByPhotographerId } from "@/lib/db";
 import { BETA_MAX_PROJECTS_TOTAL } from "@/lib/beta-limits";
-
-// ── 촬영 유형 ──────────────────────────────────────────────
-const SHOOT_TYPES = [
-  { value: "wedding",     label: "웨딩",       icon: Heart          },
-  { value: "family",      label: "가족·베이비",  icon: Baby           },
-  { value: "graduation",  label: "졸업·기념",   icon: GraduationCap  },
-  { value: "profile",     label: "프로필·증명", icon: Briefcase      },
-  { value: "etc",         label: "기타",        icon: Camera         },
-];
+import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 
 // ── 빠른 기한 옵션 ──────────────────────────────────────────
 const QUICK_DAYS = [3, 5, 7, 14, 30];

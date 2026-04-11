@@ -10,6 +10,11 @@ type VersionReviewRow = Database["public"]["Tables"]["version_reviews"]["Row"];
 
 /** DB projects row → app Project */
 function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Project {
+  const ext = row as Database["public"]["Tables"]["projects"]["Row"] & {
+    shoot_type?: string | null;
+    customer_phone?: string | null;
+    photo_count_expected?: number | null;
+  };
   return {
     id: row.id,
     name: row.name,
@@ -19,6 +24,9 @@ function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Pr
     deadline: row.deadline,
     requiredCount: row.required_count,
     photoCount: row.photo_count ?? 0,
+    photoCountExpected: ext.photo_count_expected ?? null,
+    shootType: ext.shoot_type ?? null,
+    customerPhone: ext.customer_phone ?? null,
     status: row.status as ProjectStatus,
     accessToken: row.access_token,
     accessPin: (row as any).access_pin ?? null,

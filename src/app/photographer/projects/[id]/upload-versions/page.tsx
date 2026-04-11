@@ -1,24 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   CheckCircle2,
   Upload,
-  FolderOpen,
   Image,
   ArrowRight,
-  Check,
-  ArrowUpDown,
   AlertCircle,
-  RefreshCw,
-  Pencil,
-  FileText,
   Send,
   X,
   ChevronLeft,
   ChevronRight,
+  MessageSquare,
+  Maximize2,
+  Info,
+  ListChecks,
+  PenLine,
+  Eye,
+  Link2,
+  Lock,
+  EyeOff,
+  RefreshCw,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getPhotosWithSelections, getProjectById } from "@/lib/db";
@@ -29,6 +32,27 @@ import CompareViewerModal from "@/components/CompareViewerModal";
 import { PHOTOGRAPHER_THEME as C, photographerDock } from "@/lib/photographer-theme";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
+import { ProjectPipelineHeader } from "@/components/photographer/ProjectPipelineHeader";
+import { getStatusLabel } from "@/lib/project-status";
+
+/** upload/results 페이지와 동일 오렌지 넥서스 토큰 */
+const ACCENT = "#FF5A1F";
+const ACCENT_DIM = "rgba(255, 90, 31, 0.15)";
+const ACCENT_GLOW = "rgba(255, 90, 31, 0.4)";
+const BORDER = "#1f1f1f";
+const BORDER_MID = "#2a2a2a";
+const SURFACE_0 = "#020202";
+const SURFACE_1 = "#050505";
+const SURFACE_2 = "#0a0a0a";
+const MONO = "'Space Mono', 'JetBrains Mono', monospace";
+const DISPLAY = "'Space Grotesk', 'Pretendard', sans-serif";
+const TEXT_MUTED = "#5c5c5c";
+const TEXT_NORMAL = "#a3a3a3";
+const TEXT_BRIGHT = "#ffffff";
+/** results 페이지 좌측 사이드와 동일 폭 */
+const ASIDE_W = 360;
+/** SELECTED_ORIGINALS 한 줄에 보이는 최대 썸네일 수(마지막 슬롯은 +N MORE) */
+const SELECTED_ORIGINALS_ROW_MAX = 5;
 
 /** 모바일/아이폰: 넓은 선택 + HEIC; 필터는 원본 업로드와 동일 (image/ 또는 빈 MIME) */
 const ACCEPT_IMAGE_TYPES = "image/*,image/heic,image/heif";
@@ -71,6 +95,12 @@ export default function UploadVersionsPage() {
   const [compareInitIdx,  setCompareInitIdx]  = useState(0);
   const [lightboxItems,   setLightboxItems]   = useState<Array<{ url: string; label: string; sublabel?: string | null }>>([]);
   const [lightboxIndex,   setLightboxIndex]   = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinVisible, setPinVisible] = useState(false);
+  const [pinSaving, setPinSaving] = useState(false);
+  const [pinError, setPinError] = useState("");
 
   // ── load project + selected photos ──
   useEffect(() => {
@@ -308,522 +338,1224 @@ export default function UploadVersionsPage() {
     [targets]
   );
 
+  const inviteUrl = useMemo(() => {
+    if (typeof window === "undefined") return `/c/${project?.accessToken ?? ""}`;
+    return `${window.location.origin}/c/${project?.accessToken ?? ""}`;
+  }, [project?.accessToken]);
+
+  const handleCopyLink = useCallback(() => {
+    const pin = project?.accessPin;
+    void navigator.clipboard.writeText(pin ? `링크: ${inviteUrl}\n비밀번호: ${pin}` : inviteUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [project?.accessPin, inviteUrl]);
+
+  const handleSavePin = useCallback(async (newPin: string | null) => {
+    if (!project) return;
+    setPinError("");
+    setPinSaving(true);
+    try {
+      const res = await fetch(`/api/photographer/projects/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access_pin: newPin }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? "저장 실패");
+      setProject({ ...project, accessPin: newPin });
+      setShowPinModal(false);
+      setPinInput("");
+    } catch (e) {
+      setPinError(e instanceof Error ? e.message : "저장 실패");
+    } finally {
+      setPinSaving(false);
+    }
+  }, [project, id]);
+
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "48px 0" }}>
-        <span style={{ color: C.muted }}>로딩 중...</span>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "100dvh",
+          background: SURFACE_0,
+        }}
+      >
+        <span style={{ fontFamily: MONO, fontSize: "0.63rem", letterSpacing: "0.2em", textTransform: "uppercase", color: TEXT_MUTED }}>
+          LOADING_V1_RETOUCH_VIEW…
+        </span>
       </div>
     );
   }
   if (!project) return null;
 
-  const contentBottomPad = isReadOnly ? 32 : 140;
+  const scrollBottomPad = isReadOnly ? 48 : 120;
+
+  const originalsShowMore = targets.length > SELECTED_ORIGINALS_ROW_MAX;
+  const originalsVisible = originalsShowMore ? targets.slice(0, SELECTED_ORIGINALS_ROW_MAX) : targets;
+  const originalsMoreCount = Math.max(0, targets.length - originalsVisible.length);
+  const originalsRowCols = originalsVisible.length + (originalsShowMore ? 1 : 0);
+
+  const N = project.requiredCount || 0;
+  const canViewSelections = project.status !== "preparing";
+  const canEditVersions = ["confirmed", "editing", "editing_v2", "reviewing_v1", "reviewing_v2", "delivered"].includes(project.status);
+  const canReview = ["reviewing_v1", "reviewing_v2", "delivered"].includes(project.status);
+  const editVersionsPath =
+    project.status === "editing_v2" || project.status === "reviewing_v2"
+      ? `/photographer/projects/${id}/upload-versions/v2`
+      : `/photographer/projects/${id}/upload-versions`;
+  const isInviteActive = project.status !== "preparing";
+
+  const pinModalLabelStyle = {
+    fontFamily: MONO,
+    fontSize: "0.6rem" as const,
+    letterSpacing: "0.15em",
+    textTransform: "uppercase" as const,
+    color: TEXT_MUTED,
+    display: "block" as const,
+    marginBottom: 6,
+  };
 
   return (
-    <div className={`ph-uv-root${isReadOnly ? " ph-uv-readonly" : ""}`} style={{ display: "flex", flexDirection: "column" }}>
+    <div
+      className={`ph-uv-root${isReadOnly ? " ph-uv-readonly" : ""}`}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        minWidth: 0,
+        width: "100%",
+        height: "100dvh",
+        maxHeight: "100dvh",
+        overflow: "hidden",
+        boxSizing: "border-box",
+        position: "relative",
+        background: SURFACE_0,
+        color: TEXT_NORMAL,
+      }}
+    >
       <style>{`
+        @keyframes ph-uv-bar-scan { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }
+        @keyframes prj-scanline { 0% { bottom: 100%; } 100% { bottom: -100px; } }
+        .ph-uv-grid-bg { position: fixed; inset: 0; background-image: linear-gradient(rgba(30,30,30,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(30,30,30,0.2) 1px, transparent 1px); background-size: 30px 30px; z-index: 0; pointer-events: none; }
+        .ph-uv-scanlines { position: fixed; inset: 0; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.3)); background-size: 100% 4px; z-index: 1; pointer-events: none; }
+        .ph-uv-ambient { position: fixed; top: -20%; left: -10%; width: 60vw; height: 60vw; background: radial-gradient(circle, ${ACCENT_DIM} 0%, transparent 50%); z-index: 0; pointer-events: none; opacity: 0.15; }
+        .prj-scanline-el { width: 100%; height: 100px; position: fixed; bottom: 100%; background: linear-gradient(0deg, rgba(255,90,31,0.04) 0%, rgba(255,90,31,0) 100%); animation: prj-scanline 8s linear infinite; pointer-events: none; z-index: 2; }
+        .ph-uv-tech-label { font-family: ${MONO}; font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; }
+        .ph-uv-scroll::-webkit-scrollbar { width: 6px; }
+        .ph-uv-scroll::-webkit-scrollbar-track { background: ${SURFACE_0}; border-left: 1px solid ${BORDER}; }
+        .ph-uv-scroll::-webkit-scrollbar-thumb { background: #333; }
+        .ph-uv-scroll::-webkit-scrollbar-thumb:hover { background: ${ACCENT}; }
+        .ph-uv-dashed-dropzone {
+          box-sizing: border-box;
+          padding: 24px 28px 28px;
+          background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' stroke='%23333' stroke-width='2' stroke-dasharray='8%2c 8' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+          background-origin: border-box;
+          background-clip: border-box;
+          transition: background-color 0.2s ease, background-image 0.2s ease;
+        }
+        .ph-uv-dashed-dropzone:hover, .ph-uv-dashed-dropzone.ph-uv-dz-over {
+          background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' stroke='%23FF5A1F' stroke-width='2' stroke-dasharray='8%2c 8' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+          background-color: ${ACCENT_DIM};
+        }
+        .ph-uv-memo {
+          background: #080808; border: 1px solid ${BORDER}; color: ${TEXT_BRIGHT};
+          transition: border-color 0.2s; resize: none; outline: none;
+        }
+        .ph-uv-memo:focus { border-color: ${ACCENT}; box-shadow: inset 0 0 10px rgba(255, 90, 31, 0.1); }
+        .ph-uv-thumb-tile:hover .ph-uv-thumb-hover-ring { border-color: ${ACCENT} !important; }
+        .ph-uv-mapping-card:hover .ph-uv-map-orig-overlay { opacity: 1 !important; }
+        .ph-uv-thumb-more { transition: border-color 0.2s, background-color 0.2s, color 0.2s; }
+        .ph-uv-thumb-more:hover {
+          border-color: ${ACCENT} !important;
+          background-color: ${ACCENT_DIM} !important;
+        }
+        .ph-uv-thumb-more:hover .ph-uv-thumb-more-label { color: ${TEXT_BRIGHT} !important; }
+        .ph-uv-op-node { transition: all 0.2s; cursor: pointer; }
+        .ph-uv-op-node:hover { border-color: rgba(255,90,31,0.4) !important; background: rgba(255,90,31,0.06) !important; }
+        .ph-uv-op-node:hover .ph-uv-op-arrow { color: ${ACCENT} !important; }
+        .ph-uv-prj-modal-overlay { position: fixed; inset: 0; z-index: 220; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); padding: 16px; }
+        .ph-uv-prj-modal-box { background: #080808; border: 1px solid ${BORDER_MID}; width: 100%; position: relative; }
+        .ph-uv-prj-modal-box::before { content: ''; position: absolute; top: -1px; left: -1px; width: 28px; height: 2px; background: ${ACCENT}; }
+        .ph-uv-prj-modal-box::after { content: ''; position: absolute; bottom: -1px; right: -1px; width: 28px; height: 2px; background: ${ACCENT}; }
+        .ph-uv-prj-btn-primary { background: ${ACCENT_DIM}; border: 1px solid rgba(255,90,31,0.5); color: ${ACCENT}; cursor: pointer; font-family: ${MONO}; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
+        .ph-uv-prj-btn-primary:hover { background: ${ACCENT}; color: #000; }
+        .ph-uv-prj-btn-secondary { background: transparent; border: 1px solid ${BORDER_MID}; color: ${TEXT_MUTED}; cursor: pointer; font-family: ${MONO}; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
+        .ph-uv-prj-btn-secondary:hover { border-color: #444; color: ${TEXT_BRIGHT}; }
+        .ph-uv-prj-btn-danger { background: transparent; border: 1px solid rgba(255,51,51,0.3); color: #FF3333; cursor: pointer; font-family: ${MONO}; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
+        .ph-uv-prj-btn-danger:hover { background: rgba(255,51,51,0.1); }
         @media (max-width: 768px) {
           .ph-uv-root { overflow-x: hidden; max-width: 100%; box-sizing: border-box; }
-          .ph-uv-topbar {
-            height: auto !important;
-            min-height: 52px;
-            flex-wrap: wrap !important;
-            gap: 8px !important;
-            padding: 10px 12px !important;
-            align-items: flex-start !important;
-          }
-          .ph-uv-banner { margin: 12px 12px 0 !important; padding: 12px 14px !important; }
-          .ph-uv-grid {
-            grid-template-columns: 1fr !important;
-            min-height: auto !important;
-          }
-          .ph-uv-root:not(.ph-uv-readonly) .ph-uv-left {
-            padding: 16px 12px calc(140px + env(safe-area-inset-bottom, 0px)) !important;
-          }
-          .ph-uv-root.ph-uv-readonly .ph-uv-left {
-            padding: 16px 12px 120px !important;
-          }
-          .ph-uv-root:not(.ph-uv-readonly) .ph-uv-right {
-            padding: 12px 12px calc(140px + env(safe-area-inset-bottom, 0px)) !important;
-          }
-          .ph-uv-root.ph-uv-readonly .ph-uv-right {
-            padding: 12px 12px 28px !important;
-          }
-          .ph-uv-thumb-grid {
-            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-            gap: 4px !important;
-          }
-          .ph-uv-action-bar {
-            left: 0 !important;
-            flex-direction: column !important;
-            align-items: stretch !important;
-            gap: 12px !important;
-            padding: 12px 12px !important;
-            padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
-          }
-          .ph-uv-action-bar > div:first-child { width: 100%; }
-          .ph-uv-action-bar button {
+          .ph-uv-main-split { flex-direction: column !important; }
+          .ph-uv-main-col { min-height: 50vh !important; }
+          .ph-uv-aside {
             width: 100% !important;
-            min-height: 48px !important;
-            justify-content: center !important;
-            box-sizing: border-box !important;
+            max-height: 42vh;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            border-right: none !important;
+            border-bottom: 1px solid ${BORDER};
           }
-          .ph-uv-modal-actions {
-            flex-direction: column !important;
-            align-items: stretch !important;
-            gap: 10px !important;
-          }
-          .ph-uv-modal-actions button {
-            width: 100% !important;
-            min-height: 44px !important;
-            justify-content: center !important;
-          }
-          .ph-uv-root .ph-uv-topbar button,
-          .ph-uv-root .ph-uv-dropzone button {
-            min-height: 44px;
-            box-sizing: border-box;
-          }
-          .ph-uv-mapping-row {
-            display: flex !important;
-            flex-direction: column !important;
-            align-items: stretch !important;
-            gap: 10px !important;
-            padding: 12px !important;
-          }
-          .ph-uv-mapping-arrow {
-            display: flex !important;
-            justify-content: center !important;
-            padding: 2px 0 !important;
-          }
-          .ph-uv-mapping-arrow svg { transform: rotate(90deg); }
-          .ph-uv-mapping-actions {
-            flex-wrap: wrap !important;
-            justify-content: flex-start !important;
-            padding-left: 0 !important;
-            width: 100% !important;
-          }
-          .ph-uv-mapping-actions button {
-            min-height: 44px !important;
-            padding: 8px 12px !important;
-            font-size: 11px !important;
-            box-sizing: border-box !important;
-          }
+          .ph-uv-thumb-row { gap: 6px !important; }
+          .ph-uv-action-bar { flex-direction: column !important; align-items: stretch !important; gap: 12px !important; padding: 12px !important; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important; height: auto !important; }
+          .ph-uv-action-bar > div:last-child { margin-left: 0 !important; flex-direction: column; width: 100%; }
+          .ph-uv-modal-actions { flex-direction: column !important; align-items: stretch !important; gap: 10px !important; }
+          .ph-uv-modal-actions button { width: 100% !important; min-height: 44px !important; }
+          .ph-uv-mapping-row { flex-direction: column !important; align-items: stretch !important; min-height: 0 !important; }
+          .ph-uv-mapping-mid { width: 100% !important; border-left: none !important; border-right: none !important; border-top: 1px solid ${BORDER}; border-bottom: 1px solid ${BORDER}; padding: 8px !important; }
+          .ph-uv-mapping-mid svg { transform: rotate(90deg); }
+          .ph-uv-mapping-left, .ph-uv-mapping-right { width: 100% !important; }
         }
       `}</style>
 
-      {/* ── Topbar ── */}
-      <div className="ph-uv-topbar" style={{
-        height: 52, ...photographerDock.bottomEdge,
-        display: "flex", alignItems: "center", padding: "0 24px",
-        background: "rgba(13,30,40,0.85)", backdropFilter: "blur(12px)",
-        position: "sticky", top: 0, zIndex: 50,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button
-            type="button"
-            onClick={() => router.push(`/photographer/projects/${id}`)}
-            style={{
-              display: "flex", alignItems: "center", gap: 5,
-              padding: "5px 10px", borderRadius: 7,
-              border: `1px solid ${C.border}`, background: "transparent",
-              color: C.muted, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
-            }}
-          >
-            <ArrowLeft size={13} />
-            프로젝트 상세로
-          </button>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: C.text, display: "flex", alignItems: "center", gap: 8 }}>
-              v1 보정본 업로드
-              <span style={{
-                background: existingVersionCount >= BETA_MAX_REVISION_COUNT ? "rgba(255,71,87,0.15)" : C.surface3,
-                border: `1px solid ${existingVersionCount >= BETA_MAX_REVISION_COUNT ? "rgba(255,71,87,0.3)" : C.border}`,
-                color: existingVersionCount >= BETA_MAX_REVISION_COUNT ? C.red : C.muted,
-                borderRadius: 10, padding: "1px 8px", fontSize: 10, fontWeight: 500,
-              }}>
-                보정 횟수 {existingVersionCount} / {BETA_MAX_REVISION_COUNT}
-              </span>
-            </div>
-            <div style={{ fontSize: 11, color: C.dim }}>
-              {project.name} · {project.customerName} · {targets.length}장 선택됨
-            </div>
-          </div>
-        </div>
-      </div>
+      <div className="ph-uv-grid-bg" aria-hidden />
+      <div className="ph-uv-scanlines" aria-hidden />
+      <div className="ph-uv-ambient" aria-hidden />
+      <div className="prj-scanline-el" aria-hidden />
 
-      {/* ── Reviewing banner ── */}
+      <ProjectPipelineHeader projectId={id} project={project} activeStepIndex={2} />
+
       {isReadOnly && (
-        <div className="ph-uv-banner" style={{
-          margin: "16px 24px 0",
-          background: "rgba(79,126,255,0.06)", border: "1px solid rgba(79,126,255,0.2)",
-          borderRadius: 12, padding: "14px 20px",
-          display: "flex", alignItems: "center", gap: 12,
-        }}>
-          <CheckCircle2 size={18} color={C.steel} />
+        <div
+          className="ph-uv-banner"
+          style={{
+            margin: "0 24px",
+            marginTop: 12,
+            background: `${ACCENT_DIM}`,
+            border: `1px solid rgba(255,90,31,0.25)`,
+            padding: "14px 20px",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexShrink: 0,
+            zIndex: 5,
+          }}
+        >
+          <CheckCircle2 size={18} color={ACCENT} />
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.steel }}>고객이 v1 보정본을 검토 중입니다</div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>현재는 보기 전용 모드입니다.</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_BRIGHT }}>고객이 v1 보정본을 검토 중입니다</div>
+            <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>현재는 보기 전용 모드입니다.</div>
           </div>
         </div>
       )}
 
-      {/* ── 2-column grid ── */}
-      <div className="ph-uv-grid" style={{ display: "grid", gridTemplateColumns: "1fr 320px", alignItems: "start", minHeight: "calc(100vh - 52px)" }}>
-
-        {/* ── Left col ── */}
-        <div className="ph-uv-left" style={{ padding: `20px 24px ${contentBottomPad}px` }}>
-
-          {/* Selected photos */}
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: C.dim }}>
-                고객 선택 사진
-              </span>
-              <span style={{
-                background: C.surface2, border: `1px solid ${C.border}`,
-                borderRadius: 10, padding: "1px 7px",
-                fontSize: 10, color: C.muted,
-              }}>
-                {targets.length}장
-              </span>
-            </div>
-            <div className="ph-uv-thumb-grid" style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
-              {targets.map((t, i) => (
-                <SelectedThumb
-                  key={t.id}
-                  target={t}
-                  num={i + 1}
-                  onClick={() => t.photo.url && openLightbox(lightboxTargetItems, i)}
-                />
-              ))}
-              {targets.length === 0 && (
-                <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "20px 0", fontSize: 13, color: C.dim }}>
-                  선택된 사진이 없습니다.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Dropzone */}
-          {!isReadOnly && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: C.dim, marginBottom: 10 }}>
-                보정본 업로드
+      <main
+        className="ph-uv-main-split"
+        style={{
+          flex: 1,
+          display: "flex",
+          minHeight: 0,
+          overflow: "hidden",
+          zIndex: 10,
+          position: "relative",
+        }}
+      >
+        {/* 좌측 사이드 — results 페이지와 동일 구획 */}
+        <aside
+          className="ph-uv-aside"
+          style={{
+            width: ASIDE_W,
+            flexShrink: 0,
+            alignSelf: "stretch",
+            borderRight: `1px solid ${BORDER}`,
+            display: "flex",
+            flexDirection: "column",
+            overflowX: "hidden",
+            overflowY: "auto",
+            minHeight: 0,
+            background: BORDER,
+          }}
+        >
+          {/* /upload 좌측 패널과 동일 위치 — ACTIVE_PROJECT 최상단 */}
+          <section
+            style={{
+              background: SURFACE_1,
+              padding: 20,
+              borderBottom: `1px solid ${BORDER}`,
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ width: 6, height: 6, background: ACCENT }} />
+                <span className="ph-uv-tech-label" style={{ color: "#888" }}>ACTIVE_PROJECT</span>
               </div>
-              {existingVersionCount >= BETA_MAX_REVISION_COUNT ? (
-                <div style={{
-                  padding: "18px 20px", borderRadius: 12, textAlign: "center",
-                  background: "rgba(255,71,87,0.06)", border: "2px dashed rgba(255,71,87,0.25)",
-                  display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-                }}>
-                  <AlertCircle size={20} color={C.red} />
-                  <div style={{ fontSize: 13, color: C.red, fontWeight: 500 }}>
-                    베타 기간 최대 보정 횟수({BETA_MAX_REVISION_COUNT}회)에 도달했습니다.
-                  </div>
-                  <div style={{ fontSize: 11, color: C.muted }}>
-                    현재 {existingVersionCount} / {BETA_MAX_REVISION_COUNT}회 사용 중
-                  </div>
-                </div>
-              ) : (
-              <div
-                className="ph-uv-dropzone"
-                onDrop={(e) => { e.preventDefault(); setDragOver(false); handleDropFiles(Array.from(e.dataTransfer.files)); }}
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
-                onClick={() => localMappedFileCount === 0 && multiInputRef.current?.click()}
-                style={{
-                  border: `2px dashed ${localMappedFileCount > 0 ? "rgba(46,213,115,0.4)" : dragOver ? C.steel : C.borderMd}`,
-                  borderRadius: 12, padding: "22px 20px", textAlign: "center",
-                  cursor: localMappedFileCount === 0 ? "pointer" : "default",
-                  background: localMappedFileCount > 0 ? "rgba(46,213,115,0.02)" : dragOver ? "rgba(79,126,255,0.05)" : "rgba(79,126,255,0.02)",
-                  transition: "all 0.2s",
-                }}
-              >
-                {localMappedFileCount === 0 ? (
+              {project.displayId ? (
+                <span style={{ fontFamily: MONO, fontSize: 10, color: "#444" }}>ID: {project.displayId}</span>
+              ) : null}
+            </div>
+            <h1
+              style={{
+                fontFamily: "'Space Grotesk', 'Pretendard Variable', sans-serif",
+                fontSize: 20,
+                fontWeight: 700,
+                color: TEXT_BRIGHT,
+                lineHeight: 1.3,
+                marginBottom: 14,
+                marginTop: 0,
+                wordBreak: "break-word",
+              }}
+            >
+              {project.name}
+            </h1>
+
+            <div style={{ background: SURFACE_2, border: `1px solid #222`, padding: "10px 12px", marginBottom: 12 }}>
+              <span className="ph-uv-tech-label" style={{ color: "#555", display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                <Link2 size={9} />
+                CLIENT_INVITE_URL
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span
+                  style={{
+                    fontFamily: MONO,
+                    fontSize: 10,
+                    color: isInviteActive ? TEXT_NORMAL : "#555",
+                    flex: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {isInviteActive ? inviteUrl.replace(/^https?:\/\//, "") : "업로드 완료 후 활성화"}
+                </span>
+                {isInviteActive ? (
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 9,
+                      letterSpacing: "0.1em",
+                      padding: "4px 8px",
+                      flexShrink: 0,
+                      background: copied ? "rgba(46,213,115,0.15)" : ACCENT,
+                      border: "none",
+                      color: copied ? "#2ed573" : "#000",
+                      cursor: "pointer",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {copied ? "COPIED" : "COPY"}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "8px 10px",
+                border: `1px solid ${BORDER}`,
+                marginBottom: 12,
+                background: SURFACE_2,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <Lock size={10} color={TEXT_MUTED} />
+                <span className="ph-uv-tech-label" style={{ color: TEXT_MUTED }}>CLIENT_PIN</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {project.accessPin ? (
                   <>
-                    <div style={{ marginBottom: 8, display: "flex", justifyContent: "center" }}>
-                      <FolderOpen size={24} color={C.dim} />
-                    </div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: C.text, marginBottom: 4 }}>
-                      드래그&드롭 또는 파일을 선택하세요
-                    </div>
-                    <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>JPEG / PNG / WebP</div>
+                    <span style={{ fontFamily: MONO, fontSize: 13, color: TEXT_NORMAL, letterSpacing: 4 }}>
+                      {pinVisible ? project.accessPin : "●●●●"}
+                    </span>
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); multiInputRef.current?.click(); }}
-                      disabled={targets.length === 0}
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: 5,
-                        padding: "7px 16px", background: C.steel, color: "white",
-                        border: "none", borderRadius: 7, fontSize: 12, fontWeight: 500,
-                        cursor: targets.length === 0 ? "not-allowed" : "pointer", fontFamily: "inherit",
-                      }}
+                      onClick={() => setPinVisible(!pinVisible)}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 2 }}
                     >
-                      <Upload size={13} />
-                      파일 선택
+                      {pinVisible ? <EyeOff size={12} /> : <Eye size={12} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPinInput(project.accessPin ?? "");
+                        setShowPinModal(true);
+                        setPinError("");
+                      }}
+                      className="ph-uv-prj-btn-secondary"
+                      style={{ padding: "3px 8px" }}
+                    >
+                      EDIT
                     </button>
                   </>
                 ) : (
                   <>
-                    <div style={{ marginBottom: 8, display: "flex", justifyContent: "center" }}>
-                      <CheckCircle2 size={24} color={C.green} />
-                    </div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: C.text, marginBottom: 4 }}>
-                      {localMappedFileCount}장 업로드됨
-                    </div>
-                    <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>
-                      파일명 자동 매핑 완료 · 아래에서 확인해주세요
-                    </div>
+                    <span style={{ fontFamily: MONO, fontSize: 10, color: "#444" }}>NO_PIN_SET</span>
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); multiInputRef.current?.click(); }}
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: 5,
-                        padding: "7px 16px", background: C.surface3, color: C.muted,
-                        border: `1px solid ${C.border}`, borderRadius: 7, fontSize: 12, fontWeight: 500,
-                        cursor: "pointer", fontFamily: "inherit",
+                      onClick={() => {
+                        setPinInput("");
+                        setShowPinModal(true);
+                        setPinError("");
                       }}
+                      className="ph-uv-prj-btn-secondary"
+                      style={{ padding: "3px 8px" }}
                     >
-                      <RefreshCw size={13} />
-                      다시 선택
+                      SET
                     </button>
                   </>
                 )}
-                <div style={{ marginTop: 10, fontSize: 10, color: C.dim }}>
-                  파일명 일치 시 자동 매핑 · 불일치 시 순서대로 매핑
-                </div>
               </div>
-              )} {/* end ternary */}
             </div>
-          )}
 
-          {/* Mapping section */}
-          {(displayMapping.length > 0 || isReadOnly) && (
-            <>
-              <div style={{ margin: "20px 0 14px" }}>
-                <div style={{ fontSize: 11, color: C.dim, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <span style={{ fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>매핑 결과</span>
-                  {mapping.length > 0 && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                      {stats.exact > 0 && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11 }}>
-                          <div style={{ width: 6, height: 6, borderRadius: "50%", background: C.green }} />
-                          <span style={{ color: C.green }}>파일명 일치 {stats.exact}장</span>
-                        </div>
-                      )}
-                      {stats.order > 0 && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11 }}>
-                          <div style={{ width: 6, height: 6, borderRadius: "50%", background: C.orange }} />
-                          <span style={{ color: C.orange }}>순서 매핑 {stats.order}장</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Cards */}
-              {isReadOnly
-                ? readOnlyItems.map((item) => (
-                    <MappingCard
-                      key={item.target.id}
-                      target={item.target}
-                      file={null}
-                      type={item.type}
-                      orderIndex={undefined}
-                      previewUrl={item.serverUrl}
-                      storedFileSizeBytes={item.storedFileSizeBytes}
-                      isReadOnly
-                      onChangeOne={handleChangeOne}
-                      onClearFile={() => {}}
-                      onCompare={openCompareByTarget}
-                      onOpenLightbox={openLightbox}
-                    />
-                  ))
-                : displayMapping.map((m) => (
-                    <MappingCard
-                      key={m.target.id}
-                      target={m.target}
-                      file={m.file}
-                      type={m.type}
-                      orderIndex={m.orderIndex}
-                      previewUrl={localPreviewMap.get(m.target.id) ?? uploadedV1Info.get(m.target.id)?.url}
-                      storedFileSizeBytes={uploadedV1Info.get(m.target.id)?.fileSize ?? null}
-                      isReadOnly={false}
-                      onChangeOne={handleChangeOne}
-                      onClearFile={handleClearFile}
-                      onCompare={openCompareByTarget}
-                      onOpenLightbox={openLightbox}
-                    />
-                  ))}
-            </>
-          )}
-
-          {error && (
-            <div style={{
-              marginTop: 12, padding: "10px 14px",
-              background: "rgba(255,71,87,0.1)", border: "1px solid rgba(255,71,87,0.2)",
-              borderRadius: 8, fontSize: 13, color: C.red,
-            }}>
-              {error}
-            </div>
-          )}
-        </div>
-
-        {/* ── Right col ── */}
-        <div className="ph-uv-right" style={{ padding: `12px 20px ${contentBottomPad}px`, background: "rgba(0,0,0,0.14)", minWidth: 0 }}>
-
-          {/* Project info */}
-          <div style={{
-            background: C.surface, border: `1px solid ${C.border}`,
-            borderRadius: 12, padding: "14px 16px", marginBottom: 12,
-          }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 10, letterSpacing: "0.5px", textTransform: "uppercase" }}>
-              프로젝트 정보
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {([
-              { key: "프로젝트",   val: project.name,              style: {} },
-              { key: "고객",       val: project.customerName || "—", style: {} },
-              { key: "선택 사진",  val: `${targets.length}장`,      style: { color: C.steel } },
-              { key: "업로드 현황",val: `${mappedCount} / ${targets.length}장`,
-                style: { color: mappedCount < targets.length ? C.orange : C.green } as CSSProperties },
-            ] as { key: string; val: string; style: CSSProperties }[]).map((row) => (
-              <div key={row.key} style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "5px 0",
-              }}>
-                <span style={{ fontSize: 11, color: C.dim }}>{row.key}</span>
-                <span style={{ fontSize: 12, fontWeight: 500, color: C.text, ...row.style }}>{row.val}</span>
-              </div>
-            ))}
-            </div>
-          </div>
-
-          {/* Memo */}
-          <div style={{
-            background: C.surface, border: `1px solid ${C.border}`,
-            borderRadius: 12, padding: "14px 16px",
-          }}>
-            <div style={{
-              fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 10,
-              letterSpacing: "0.5px", textTransform: "uppercase",
-              display: "flex", alignItems: "center", gap: 5,
-            }}>
-              <FileText size={12} />
-              전체 작가 메모
-            </div>
-            <textarea
-              value={globalMemo}
-              onChange={(e) => setGlobalMemo(e.target.value)}
-              placeholder="고객에게 전달할 메모 (선택사항)"
-              disabled={isReadOnly}
+            <div
               style={{
-                width: "100%", padding: "10px 12px",
-                background: C.surface2, border: `1px solid ${C.border}`,
-                borderRadius: 8, color: C.text,
-                fontSize: 12, fontFamily: "inherit",
-                resize: "none", height: 72, lineHeight: 1.5, outline: "none",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 10px",
+                marginBottom: 0,
+                background: isInviteActive ? "rgba(46,213,115,0.04)" : "transparent",
+                border: `1px solid ${isInviteActive ? "rgba(46,213,115,0.15)" : "#222"}`,
               }}
-            />
-            <div style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>
-              고객 검토 화면에 표시됩니다
+            >
+              <div
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: isInviteActive ? "#2ed573" : "#444",
+                  flexShrink: 0,
+                }}
+              />
+              <span style={{ fontFamily: MONO, fontSize: 10, color: isInviteActive ? "#2ed573" : "#555" }}>
+                {isInviteActive ? `LINK_ACTIVE · ${getStatusLabel(project.status)}` : "LINK_INACTIVE · 업로드 전"}
+              </span>
             </div>
-          </div>
-        </div>
-      </div>
 
-      {/* ── Bottom action bar ── */}
-      {!isReadOnly && (
-        <div className="ph-uv-action-bar" style={{
-          position: "fixed", bottom: 0, left: 240, right: 0,
-          background: "rgba(0,48,73,0.95)",
-          ...photographerDock.topEdge,
-          backdropFilter: "blur(12px)",
-          padding: "12px 24px",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          zIndex: 100,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>v1 보정본 업로드 현황</div>
-              <div style={{ fontSize: 11, color: emptyCount > 0 ? C.orange : C.muted }}>
-                {emptyCount > 0 ? `미업로드 ${emptyCount}장 · 매핑 확인 후 전달해주세요` : "매핑 확인 후 전달해주세요"}
+            <div
+              style={{
+                marginTop: 12,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
+              <span className="ph-uv-tech-label" style={{ color: "#555", fontSize: "9px" }}>
+                보정 횟수
+              </span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: SURFACE_2,
+                  border: `1px solid ${existingVersionCount >= BETA_MAX_REVISION_COUNT ? "rgba(239,68,68,0.35)" : "#222"}`,
+                  padding: "4px 12px",
+                }}
+              >
+                <span style={{ fontFamily: MONO, fontSize: 12, color: TEXT_BRIGHT }}>
+                  {existingVersionCount}
+                  <span style={{ color: "#444" }}>/</span>
+                  {BETA_MAX_REVISION_COUNT}
+                </span>
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 100, height: 3, background: "rgba(255,255,255,0.1)", borderRadius: 2, overflow: "hidden" }}>
-                <div style={{
-                  height: "100%", borderRadius: 2, background: C.steel, transition: "width 0.3s",
-                  width: targets.length > 0 ? `${Math.min(100, Math.round((mappedCount / targets.length) * 100))}%` : "0%",
-                }} />
+            <div style={{ marginTop: 12, background: SURFACE_2, border: `1px solid #222`, padding: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <span className="ph-uv-tech-label" style={{ color: "#555", fontSize: "9px" }}>
+                  CUSTOMER_SELECTED
+                </span>
+                <span style={{ fontFamily: MONO, fontSize: 12, color: TEXT_BRIGHT }}>{targets.length} ASSETS</span>
               </div>
-              <span style={{ fontSize: 11, color: C.muted }}>{mappedCount} / {targets.length}장 업로드</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 10, borderTop: `1px solid ${BORDER}` }}>
+                <span className="ph-uv-tech-label" style={{ color: "#555", fontSize: "9px" }}>
+                  MAPPED_RETOUCH
+                </span>
+                <span style={{ fontFamily: MONO, fontSize: 12, color: ACCENT }}>
+                  {mappedCount} / {targets.length}
+                </span>
+              </div>
             </div>
-          </div>
-          <button
-            type="button"
-            disabled={!canDeliver || submitting}
-            onClick={() => setShowConfirm(true)}
+          </section>
+
+          <div
             style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "9px 22px",
-              background: canDeliver ? C.steel : C.surface3,
-              border: "none", borderRadius: 9,
-              color: canDeliver ? "white" : C.dim,
-              fontSize: 13, fontWeight: 600,
-              cursor: canDeliver ? "pointer" : "not-allowed",
-              fontFamily: "inherit",
+              padding: "16px 24px",
+              flexShrink: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              background: SURFACE_1,
+              borderBottom: `1px solid ${BORDER}`,
             }}
           >
-            고객에게 전달
-            <Send size={14} />
-          </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <MessageSquare size={14} color="#666" strokeWidth={2} />
+              <span className="ph-uv-tech-label" style={{ color: "#888" }}>
+                PHOTOGRAPHER_MEMO
+              </span>
+            </div>
+            <textarea
+              className="ph-uv-memo"
+              value={globalMemo}
+              onChange={(e) => setGlobalMemo(e.target.value)}
+              placeholder="고객 검토 화면에 표시될 메모 (선택)"
+              disabled={isReadOnly}
+              rows={3}
+              style={{
+                width: "100%",
+                height: 72,
+                minHeight: 72,
+                maxHeight: 72,
+                boxSizing: "border-box",
+                padding: "8px 10px",
+                fontFamily: MONO,
+                fontSize: 11,
+                lineHeight: 1.45,
+                resize: "none",
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              padding: "16px 24px 18px",
+              borderBottom: `1px solid ${BORDER}`,
+              flexShrink: 0,
+              background: SURFACE_1,
+              minHeight: 0,
+            }}
+          >
+            <span className="ph-uv-tech-label" style={{ color: TEXT_MUTED, display: "block", marginBottom: 10 }}>
+              OPERATION_NODES
+            </span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {[
+                {
+                  icon: <Upload size={14} color={TEXT_MUTED} />,
+                  label: "원본업로드",
+                  desc: "원본 사진 업로드·삭제·초대 링크",
+                  enabled: true,
+                  badge: null as string | null,
+                  onClick: () => {
+                    router.push(`/photographer/projects/${id}/upload`);
+                  },
+                },
+                {
+                  icon: <ListChecks size={14} color={TEXT_MUTED} />,
+                  label: "셀렉 결과 보기",
+                  desc: canViewSelections ? `${N}장 중 셀렉 진행` : "업로드 완료 후 가능",
+                  enabled: canViewSelections,
+                  badge: project.status === "selecting" ? "LIVE" : null,
+                  onClick: () => {
+                    if (!canViewSelections) return;
+                    router.push(`/photographer/projects/${id}/results`);
+                  },
+                },
+                {
+                  icon: <PenLine size={14} color={TEXT_MUTED} />,
+                  label: "보정본 업로드",
+                  desc: canEditVersions ? "보정본 업로드/관리" : "셀렉 완료 후 가능",
+                  enabled: canEditVersions,
+                  badge: null,
+                  onClick: () => {
+                    if (!canEditVersions) return;
+                    router.push(editVersionsPath);
+                  },
+                },
+                {
+                  icon: <Eye size={14} color={TEXT_MUTED} />,
+                  label: "보정본 검토",
+                  desc: canReview ? "고객 검토 현황" : "보정 완료 후 가능",
+                  enabled: canReview,
+                  badge: null,
+                  onClick: () => {
+                    if (!canReview) return;
+                    router.push(editVersionsPath);
+                  },
+                },
+              ].map((node) => (
+                <div
+                  key={node.label}
+                  role="button"
+                  tabIndex={0}
+                  className="ph-uv-op-node"
+                  onClick={node.onClick}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      node.onClick();
+                    }
+                  }}
+                  style={{
+                    background: SURFACE_2,
+                    border: `1px solid ${BORDER}`,
+                    padding: "10px 12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    opacity: node.enabled ? 1 : 0.4,
+                  }}
+                >
+                  {node.icon}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="ph-uv-tech-label" style={{ color: TEXT_BRIGHT, marginBottom: 2, fontSize: "0.6rem" }}>
+                      {node.label}
+                    </div>
+                    <div style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED }}>{node.desc}</div>
+                  </div>
+                  {node.badge ? (
+                    <span
+                      style={{
+                        padding: "2px 6px",
+                        background: "rgba(46,213,115,0.1)",
+                        border: "1px solid rgba(46,213,115,0.3)",
+                        fontFamily: MONO,
+                        fontSize: 9,
+                        color: "#2ed573",
+                      }}
+                    >
+                      {node.badge}
+                    </span>
+                  ) : null}
+                  <ChevronRight size={12} className="ph-uv-op-arrow" color={TEXT_MUTED} style={{ flexShrink: 0 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ padding: 24, background: "rgba(245,158,11,0.05)", borderTop: "1px solid rgba(245,158,11,0.2)", flexShrink: 0, marginTop: "auto" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+              <AlertCircle size={16} color="#f59e0b" className="shrink-0" style={{ marginTop: 2, flexShrink: 0 }} />
+              <div>
+                <span className="ph-uv-tech-label" style={{ color: "#f59e0b", fontSize: "10px", display: "block", marginBottom: 4 }}>
+                  보정 횟수 상한 주의
+                </span>
+                <p style={{ fontFamily: MONO, fontSize: 10, color: "#888", lineHeight: 1.45, margin: 0 }}>
+                  {existingVersionCount >= BETA_MAX_REVISION_COUNT
+                    ? `베타 최대 ${BETA_MAX_REVISION_COUNT}회에 도달했습니다. 추가 업로드가 제한됩니다.`
+                    : `현재 ${existingVersionCount + 1}차 보정본 업로드 단계입니다. 최대 ${BETA_MAX_REVISION_COUNT}회까지 보정본 교환이 가능합니다.`}
+                </p>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        {/* 우측 메인: 스크롤 + 하단 액션 바 */}
+        <section
+          className="ph-uv-main-col"
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            position: "relative",
+            minWidth: 0,
+            minHeight: 0,
+            background: "rgba(3,3,3,0.6)",
+          }}
+        >
+          <div
+            className="ph-uv-scroll ph-uv-left"
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: "auto",
+              padding: "32px 32px",
+              paddingBottom: scrollBottomPad,
+            }}
+          >
+            {/* SELECTED_ORIGINALS */}
+            <div style={{ marginBottom: 40 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Image size={14} color="#666" strokeWidth={2} />
+                  <h2 className="ph-uv-tech-label" style={{ color: "#888", margin: 0 }}>
+                    SELECTED_ORIGINALS
+                  </h2>
+                </div>
+                <div style={{ background: ACCENT_DIM, border: `1px solid rgba(255,90,31,0.3)`, padding: "2px 8px" }}>
+                  <span className="ph-uv-tech-label" style={{ color: ACCENT, fontSize: "9px" }}>
+                    {targets.length} ASSETS
+                  </span>
+                </div>
+              </div>
+              <div
+                className="ph-uv-thumb-row"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    originalsRowCols > 0 ? `repeat(${originalsRowCols}, minmax(0, 1fr))` : "1fr",
+                  gap: 12,
+                  width: "100%",
+                }}
+              >
+                {targets.length === 0 ? (
+                  <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "32px 0", fontSize: 13, color: TEXT_MUTED }}>
+                    선택된 사진이 없습니다.
+                  </div>
+                ) : (
+                  <>
+                    {originalsVisible.map((t, i) => (
+                      <SelectedThumb
+                        key={t.id}
+                        target={t}
+                        num={i + 1}
+                        onClick={
+                          viewerImageUrl(t.photo)
+                            ? () => openLightbox(lightboxTargetItems, i)
+                            : undefined
+                        }
+                      />
+                    ))}
+                    {originalsShowMore ? (
+                      <button
+                        type="button"
+                        className="ph-uv-thumb-more"
+                        onClick={() => router.push(`/photographer/projects/${id}/results`)}
+                        aria-label={`셀렉 결과에서 나머지 ${originalsMoreCount}장 보기`}
+                        style={{
+                          aspectRatio: "1 / 1",
+                          minWidth: 0,
+                          width: "100%",
+                          background: "#080808",
+                          border: `1px solid ${BORDER}`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          padding: 0,
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        <span
+                          className="ph-uv-thumb-more-label ph-uv-tech-label"
+                          style={{ color: "#444", fontSize: "9px" }}
+                        >
+                          +{originalsMoreCount} MORE
+                        </span>
+                      </button>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {!isReadOnly && (
+              <div style={{ marginBottom: 40 }}>
+                {existingVersionCount >= BETA_MAX_REVISION_COUNT ? (
+                  <div
+                    style={{
+                      padding: "24px 20px",
+                      textAlign: "center",
+                      background: "rgba(239,68,68,0.06)",
+                      border: "2px dashed rgba(239,68,68,0.35)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 10,
+                    }}
+                  >
+                    <AlertCircle size={22} color="#ef4444" />
+                    <div style={{ fontSize: 13, color: "#f87171", fontWeight: 600 }}>
+                      베타 기간 최대 보정 횟수({BETA_MAX_REVISION_COUNT}회)에 도달했습니다.
+                    </div>
+                    <div style={{ fontFamily: MONO, fontSize: 10, color: TEXT_MUTED }}>
+                      현재 {existingVersionCount} / {BETA_MAX_REVISION_COUNT}회 사용 중
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      className={`ph-uv-dashed-dropzone${dragOver ? " ph-uv-dz-over" : ""}`}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          if (localMappedFileCount === 0) multiInputRef.current?.click();
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragOver(false);
+                        handleDropFiles(Array.from(e.dataTransfer.files));
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOver(true);
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault();
+                        setDragOver(false);
+                      }}
+                      onClick={() => localMappedFileCount === 0 && multiInputRef.current?.click()}
+                      style={{
+                        width: "100%",
+                        minHeight: 168,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 2,
+                        cursor: localMappedFileCount === 0 ? "pointer" : "default",
+                        backgroundColor: localMappedFileCount > 0 ? "rgba(34,197,94,0.04)" : "transparent",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: "50%",
+                          border: `1px solid ${localMappedFileCount > 0 ? "rgba(34,197,94,0.5)" : "#333"}`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: SURFACE_2,
+                          marginBottom: 6,
+                        }}
+                      >
+                        {localMappedFileCount > 0 ? (
+                          <CheckCircle2 size={18} color="#22c55e" />
+                        ) : (
+                          <Upload size={18} color="#666" strokeWidth={1.5} />
+                        )}
+                      </div>
+                      <p style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 14, color: localMappedFileCount > 0 ? TEXT_BRIGHT : TEXT_NORMAL, margin: 0 }}>
+                        {localMappedFileCount > 0 ? `${localMappedFileCount}장 매핑됨 · 아래에서 확인` : "DROP_RETOUCHED_FILES"}
+                      </p>
+                      <p className="ph-uv-tech-label" style={{ color: "#555", fontSize: "9px", marginTop: 4, marginBottom: 0 }}>
+                        JPEG / PNG / WebP 지원
+                      </p>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          multiInputRef.current?.click();
+                        }}
+                        disabled={targets.length === 0}
+                        className="ph-uv-tech-label"
+                        style={{
+                          marginTop: 16,
+                          padding: "8px 16px",
+                          background: targets.length === 0 ? "#111" : ACCENT_DIM,
+                          border: `1px solid ${targets.length === 0 ? BORDER : "rgba(255,90,31,0.4)"}`,
+                          color: targets.length === 0 ? "#555" : ACCENT,
+                          cursor: targets.length === 0 ? "not-allowed" : "pointer",
+                          fontSize: "10px",
+                          letterSpacing: "0.12em",
+                        }}
+                      >
+                        {localMappedFileCount > 0 ? "RESELECT FILES" : "SELECT FILES"}
+                      </button>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, paddingLeft: 8 }}>
+                      <Info size={12} color="#666" strokeWidth={2} />
+                      <p className="ph-uv-tech-label" style={{ color: "#666", fontSize: "9px", margin: 0 }}>
+                        파일명 일치 시 자동 매핑 · 불일치 시 순서대로 매핑
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {(displayMapping.length > 0 || isReadOnly) && (
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-end",
+                    justifyContent: "space-between",
+                    borderBottom: `1px solid ${BORDER}`,
+                    paddingBottom: 12,
+                    marginBottom: 16,
+                    flexWrap: "wrap",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                    <h2 className="ph-uv-tech-label" style={{ color: TEXT_BRIGHT, margin: 0 }}>
+                      MAPPING_RESULT
+                    </h2>
+                    {mapping.length > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          background: SURFACE_2,
+                          border: `1px solid #222`,
+                          padding: "4px 12px",
+                        }}
+                      >
+                        {stats.exact > 0 && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }} />
+                            <span className="ph-uv-tech-label" style={{ color: "#22c55e", fontSize: "9px" }}>
+                              NAME_MATCH: {stats.exact}
+                            </span>
+                          </div>
+                        )}
+                        {stats.exact > 0 && stats.order > 0 ? <div style={{ width: 1, height: 12, background: "#333" }} /> : null}
+                        {stats.order > 0 && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#f59e0b" }} />
+                            <span className="ph-uv-tech-label" style={{ color: "#f59e0b", fontSize: "9px" }}>
+                              SEQ_MATCH: {stats.order}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {isReadOnly
+                    ? readOnlyItems.map((item, idx) => (
+                        <MappingCard
+                          key={item.target.id}
+                          target={item.target}
+                          orgIndex={idx + 1}
+                          file={null}
+                          type={item.type}
+                          orderIndex={undefined}
+                          previewUrl={item.serverUrl}
+                          storedFileSizeBytes={item.storedFileSizeBytes}
+                          isReadOnly
+                          onChangeOne={handleChangeOne}
+                          onClearFile={() => {}}
+                          onCompare={openCompareByTarget}
+                          onOpenLightbox={openLightbox}
+                        />
+                      ))
+                    : displayMapping.map((m, idx) => (
+                        <MappingCard
+                          key={m.target.id}
+                          target={m.target}
+                          orgIndex={idx + 1}
+                          file={m.file}
+                          type={m.type}
+                          orderIndex={m.orderIndex}
+                          previewUrl={localPreviewMap.get(m.target.id) ?? uploadedV1Info.get(m.target.id)?.url}
+                          storedFileSizeBytes={uploadedV1Info.get(m.target.id)?.fileSize ?? null}
+                          isReadOnly={false}
+                          onChangeOne={handleChangeOne}
+                          onClearFile={handleClearFile}
+                          onCompare={openCompareByTarget}
+                          onOpenLightbox={openLightbox}
+                        />
+                      ))}
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div
+                style={{
+                  marginTop: 16,
+                  padding: "12px 16px",
+                  background: "rgba(239,68,68,0.1)",
+                  border: "1px solid rgba(239,68,68,0.25)",
+                  color: "#f87171",
+                  fontFamily: MONO,
+                  fontSize: 11,
+                }}
+              >
+                {error}
+              </div>
+            )}
+          </div>
+
+          {!isReadOnly && (
+            <div
+              className="ph-uv-action-bar"
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 80,
+                background: "rgba(5,5,5,0.95)",
+                backdropFilter: "blur(12px)",
+                ...photographerDock.topEdge,
+                borderTop: `1px solid ${BORDER}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "0 32px",
+                zIndex: 40,
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8, marginRight: 24 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16 }}>
+                  <span className="ph-uv-tech-label" style={{ color: TEXT_BRIGHT }}>
+                    V1 RETOUCH UPLOAD STATUS
+                  </span>
+                  <span style={{ fontFamily: MONO, fontSize: 12, color: ACCENT, flexShrink: 0 }}>
+                    {emptyCount > 0 ? `${emptyCount}장 미매핑` : "전체 매핑 완료"}
+                  </span>
+                </div>
+                <div style={{ height: 6, width: "100%", minWidth: 0, background: "#111", overflow: "hidden" }}>
+                  <div
+                    style={{
+                      height: "100%",
+                      width: targets.length > 0 ? `${Math.min(100, Math.round((mappedCount / targets.length) * 100))}%` : "0%",
+                      background: ACCENT,
+                      position: "relative",
+                      transition: "width 0.3s",
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background: "rgba(255,255,255,0.2)",
+                        width: "25%",
+                        animation: "ph-uv-bar-scan 2s linear infinite",
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, marginLeft: 32 }}>
+                <span className="ph-uv-tech-label" style={{ color: "#555", fontSize: "9px", textAlign: "right", lineHeight: 1.35 }}>
+                  100% 매핑 시
+                  <br />
+                  전달 활성화
+                </span>
+                <button
+                  type="button"
+                  disabled={!canDeliver || submitting}
+                  onClick={() => setShowConfirm(true)}
+                  className="ph-uv-tech-label"
+                  style={{
+                    border: `1px solid ${canDeliver ? "rgba(255,90,31,0.45)" : "#333"}`,
+                    background: canDeliver ? ACCENT_DIM : "#111",
+                    padding: "12px 28px",
+                    color: canDeliver ? ACCENT : "#555",
+                    fontWeight: 700,
+                    fontSize: "11px",
+                    letterSpacing: "0.14em",
+                    cursor: canDeliver ? "pointer" : "not-allowed",
+                  }}
+                >
+                  DELIVER TO CLIENT
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      </main>
+
+      {showPinModal && (
+        <div
+          className="ph-uv-prj-modal-overlay"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowPinModal(false);
+              setPinInput("");
+              setPinError("");
+            }
+          }}
+        >
+          <div className="ph-uv-prj-modal-box" style={{ maxWidth: 380 }}>
+            <div
+              style={{
+                padding: "16px 20px",
+                borderBottom: `1px solid ${BORDER}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 6, height: 6, background: ACCENT }} />
+                <span className="ph-uv-tech-label" style={{ color: ACCENT }}>
+                  SYS.AUTH :: {project.accessPin ? "MODIFY_PIN" : "SET_PIN"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPinModal(false);
+                  setPinInput("");
+                  setPinError("");
+                }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 4 }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div style={{ padding: 24 }}>
+              <span style={pinModalLabelStyle}>ACCESS_CODE (4자리)</span>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={pinInput}
+                  onChange={(e) => setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder="0000"
+                  style={{
+                    flex: 1,
+                    padding: "10px 14px",
+                    background: SURFACE_2,
+                    border: `1px solid ${BORDER_MID}`,
+                    color: TEXT_BRIGHT,
+                    fontSize: 22,
+                    fontFamily: MONO,
+                    outline: "none",
+                    letterSpacing: 12,
+                    fontWeight: 700,
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = ACCENT;
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = BORDER_MID;
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setPinInput(Math.floor(1000 + Math.random() * 9000).toString())}
+                  className="ph-uv-prj-btn-secondary"
+                  style={{ padding: "10px 12px", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}
+                >
+                  <RefreshCw size={11} />
+                  RANDOM
+                </button>
+              </div>
+              <p style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED, marginBottom: 16 }}>
+                4자리 숫자를 입력하거나 랜덤 생성 버튼을 누르세요
+              </p>
+              {pinError ? (
+                <div
+                  style={{
+                    padding: "6px 10px",
+                    background: "rgba(255,51,51,0.08)",
+                    border: "1px solid rgba(255,51,51,0.2)",
+                    marginBottom: 12,
+                  }}
+                >
+                  <span style={{ fontFamily: MONO, fontSize: 10, color: "#FF3333" }}>[ERR] {pinError}</span>
+                </div>
+              ) : null}
+              <div style={{ display: "flex", gap: 8 }}>
+                {project.accessPin ? (
+                  <button
+                    type="button"
+                    onClick={() => handleSavePin(null)}
+                    disabled={pinSaving}
+                    className="ph-uv-prj-btn-danger"
+                    style={{ padding: "10px 14px" }}
+                  >
+                    DEL_PIN
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPinModal(false);
+                    setPinInput("");
+                    setPinError("");
+                  }}
+                  disabled={pinSaving}
+                  className="ph-uv-prj-btn-secondary"
+                  style={{ flex: 1, padding: "10px 0" }}
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSavePin(pinInput || null)}
+                  disabled={pinSaving || (!!pinInput && pinInput.length !== 4)}
+                  className="ph-uv-prj-btn-primary"
+                  style={{
+                    flex: 1,
+                    padding: "10px 0",
+                    opacity: pinSaving || (!!pinInput && pinInput.length !== 4) ? 0.4 : 1,
+                  }}
+                >
+                  {pinSaving ? "SAVING..." : "COMMIT"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* ── Confirm modal ── */}
       {showConfirm && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 200,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          background: "rgba(0,0,0,0.7)", padding: 16,
-        }}>
-          <div style={{
-            background: C.surface, border: `1px solid ${C.borderMd}`,
-            borderRadius: 14, padding: 24, width: "100%", maxWidth: 380,
-          }}>
-            <h3 style={{ fontSize: 16, fontWeight: 600, color: C.text, marginBottom: 8 }}>고객에게 전달</h3>
-            <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.6, marginBottom: 24 }}>
+        <div
+          className="ph-uv-modal-overlay"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 200,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0,0,0,0.85)",
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              background: "#080808",
+              border: `1px solid ${BORDER_MID}`,
+              width: "100%",
+              maxWidth: 400,
+              padding: 28,
+              position: "relative",
+            }}
+          >
+            <div style={{ position: "absolute", top: -1, left: -1, width: 28, height: 2, background: ACCENT }} />
+            <h3 style={{ fontFamily: DISPLAY, fontSize: 17, fontWeight: 700, color: TEXT_BRIGHT, marginBottom: 10 }}>고객에게 전달</h3>
+            <p style={{ fontSize: 13, color: TEXT_NORMAL, lineHeight: 1.65, marginBottom: 24 }}>
               v1 보정본 {mappedCount}장을 고객에게 전달하시겠습니까?
-              <br />전달 후 고객이 v1 검토를 진행합니다.
+              <br />
+              전달 후 고객이 v1 검토를 진행합니다.
             </p>
-            {error && <p style={{ marginBottom: 12, fontSize: 13, color: C.red }}>{error}</p>}
-            <div className="ph-uv-modal-actions" style={{ display: "flex", gap: 8 }}>
+            {error && <p style={{ marginBottom: 12, fontSize: 12, color: "#f87171", fontFamily: MONO }}>{error}</p>}
+            <div className="ph-uv-modal-actions" style={{ display: "flex", gap: 10 }}>
               <button
                 type="button"
-                onClick={() => setShowConfirm(false)} disabled={submitting}
+                onClick={() => setShowConfirm(false)}
+                disabled={submitting}
+                className="ph-uv-tech-label"
                 style={{
-                  flex: 1, padding: "10px 0", background: "transparent",
-                  border: `1px solid ${C.border}`, borderRadius: 8,
-                  color: C.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                  flex: 1,
+                  padding: "12px 0",
+                  background: "transparent",
+                  border: `1px solid ${BORDER_MID}`,
+                  color: TEXT_MUTED,
+                  cursor: "pointer",
+                  fontSize: "10px",
                 }}
               >
-                취소
+                CANCEL
               </button>
               <button
                 type="button"
-                onClick={handleDeliver} disabled={submitting || !canDeliver}
+                onClick={handleDeliver}
+                disabled={submitting || !canDeliver}
+                className="ph-uv-tech-label"
                 style={{
-                  flex: 1, padding: "10px 0",
-                  background: "rgba(79,126,255,0.15)",
-                  border: "1px solid rgba(79,126,255,0.3)", borderRadius: 8,
-                  color: C.steel, fontSize: 13, fontWeight: 500,
-                  cursor: submitting ? "not-allowed" : "pointer", fontFamily: "inherit",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  flex: 1,
+                  padding: "12px 0",
+                  background: ACCENT_DIM,
+                  border: `1px solid rgba(255,90,31,0.45)`,
+                  color: ACCENT,
+                  cursor: submitting ? "not-allowed" : "pointer",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
                 }}
               >
-                {submitting ? "처리 중..." : "전달하기"}
+                {submitting ? "…" : "CONFIRM DELIVER"}
+                {!submitting && <Send size={14} color={ACCENT} />}
               </button>
             </div>
           </div>
@@ -860,63 +1592,123 @@ export default function UploadVersionsPage() {
 
 function SelectedThumb({ target, num, onClick }: { target: V1Target; num: number; onClick?: () => void }) {
   const [err, setErr] = useState(false);
+  const src = viewerImageUrl(target.photo);
+  const hasComment = Boolean(target.photo.comment?.trim());
   return (
     <div
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (!onClick) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className="ph-uv-thumb-tile"
       style={{
-        background: C.surface, border: `1px solid ${C.border}`,
-        borderRadius: 8, overflow: "hidden",
-        cursor: onClick ? "zoom-in" : "default",
+        aspectRatio: "1/1",
+        background: "#080808",
+        border: `1px solid ${BORDER}`,
+        position: "relative",
+        cursor: onClick ? "pointer" : "default",
+        overflow: "hidden",
       }}
     >
-      <div style={{ aspectRatio: "1/1", background: C.surface2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
-        {target.photo.url && !err ? (
-          <img src={target.photo.url} alt="" onError={() => setErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "#111",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: src && !err ? 1 : 0.5,
+        }}
+      >
+        {src && !err ? (
+          <img src={src} alt="" onError={() => setErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
-          <Image size={16} color={C.dim} />
+          <Image size={20} color="#333" strokeWidth={1} />
         )}
-        <div style={{
-          position: "absolute", bottom: 3, left: 4,
-          fontSize: 9, color: "rgba(255,255,255,0.6)",
-          background: "rgba(0,0,0,0.4)", padding: "1px 4px", borderRadius: 3,
-        }}>
-          {num}
-        </div>
       </div>
-      <div style={{ padding: "4px 6px" }}>
-        <div style={{ fontSize: 9, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <div
+        style={{
+          position: "absolute",
+          top: 4,
+          left: 4,
+          padding: "2px 4px",
+          background: "rgba(0,0,0,0.8)",
+          fontFamily: MONO,
+          fontSize: 8,
+          color: "#666",
+          border: "1px solid #222",
+        }}
+      >
+        {String(num).padStart(3, "0")}
+      </div>
+      {hasComment ? (
+        <div
+          style={{
+            position: "absolute",
+            top: 4,
+            right: 4,
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: ACCENT,
+          }}
+        />
+      ) : null}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: 6,
+          background: "linear-gradient(to top, rgba(0,0,0,0.9), transparent)",
+        }}
+      >
+        <div style={{ fontFamily: MONO, fontSize: 8, color: TEXT_BRIGHT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {target.filename}
         </div>
-        {target.photo.comment?.trim() ? (
-          <div
-            style={{
-              marginTop: 3,
-              fontSize: 9,
-              color: C.dim,
-              lineHeight: 1.25,
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            {target.photo.comment}
-          </div>
-        ) : null}
       </div>
+      <div
+        className="ph-uv-thumb-hover-ring"
+        style={{
+          position: "absolute",
+          inset: 0,
+          border: "1px solid transparent",
+          pointerEvents: "none",
+          transition: "border-color 0.2s",
+        }}
+      />
     </div>
   );
 }
 
 function MappingCard({
-  target, file, type, orderIndex, previewUrl, storedFileSizeBytes, isReadOnly, onChangeOne, onClearFile, onCompare, onOpenLightbox,
+  target,
+  orgIndex,
+  file,
+  type,
+  orderIndex,
+  previewUrl,
+  storedFileSizeBytes,
+  isReadOnly,
+  onChangeOne,
+  onClearFile,
+  onCompare,
+  onOpenLightbox,
 }: {
   target: V1Target;
+  orgIndex: number;
   file: File | null;
   type: "exact" | "order" | "none";
   orderIndex?: number;
   previewUrl?: string;
-  /** DB·R2에 저장된 보정본 바이트 (없으면 용량 미표시) */
   storedFileSizeBytes?: number | null;
   isReadOnly: boolean;
   onChangeOne: (id: string) => void;
@@ -924,130 +1716,421 @@ function MappingCard({
   onCompare: (id: string) => void;
   onOpenLightbox: (items: Array<{ url: string; label: string; sublabel?: string | null }>, index: number) => void;
 }) {
-  const [origErr, setOrigErr]     = useState(false);
+  const [origErr, setOrigErr] = useState(false);
   const [retouchErr, setRetouchErr] = useState(false);
   const state = isReadOnly ? (previewUrl ? "matched" : "empty") : type === "exact" ? "matched" : type === "order" ? "ordered" : "empty";
-  const borderColor = state === "matched" ? "rgba(46,213,115,0.2)" : state === "ordered" ? "rgba(245,166,35,0.2)" : "rgba(255,71,87,0.2)";
+  const orgLabel = `ORG_${String(orgIndex).padStart(3, "0")}`;
+  const origSrc = viewerImageUrl(target.photo);
+
   const fileSizeStr =
-    storedFileSizeBytes != null && storedFileSizeBytes >= 0
-      ? formatStoredFileSizeBytes(storedFileSizeBytes)
-      : "";
+    file != null
+      ? file.size > 0
+        ? formatStoredFileSizeBytes(file.size)
+        : ""
+      : storedFileSizeBytes != null && storedFileSizeBytes >= 0
+        ? formatStoredFileSizeBytes(storedFileSizeBytes)
+        : "";
+
+  const borderClass =
+    state === "matched"
+      ? "rgba(34, 197, 94, 0.3)"
+      : state === "ordered"
+        ? "rgba(245, 158, 11, 0.4)"
+        : "rgba(239, 68, 68, 0.3)";
+  const borderBg =
+    state === "matched"
+      ? "rgba(34, 197, 94, 0.02)"
+      : state === "ordered"
+        ? "rgba(245, 158, 11, 0.02)"
+        : "rgba(239, 68, 68, 0.02)";
 
   return (
-    <div style={{ background: C.surface2, border: `1px solid ${borderColor}`, borderRadius: 10, overflow: "hidden", marginBottom: 7 }}>
-      <div className="ph-uv-mapping-row" style={{ display: "grid", gridTemplateColumns: "1fr 32px 1fr auto", alignItems: "center", padding: "10px 14px" }}>
-
-        {/* Original */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <div
-            onClick={() => target.photo.url && onOpenLightbox([{ url: viewerImageUrl(target.photo), label: target.filename, sublabel: "원본 선택 사진" }], 0)}
-            style={{ width: 52, height: 52, background: C.surface3, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${C.border}`, overflow: "hidden", cursor: target.photo.url ? "zoom-in" : "default" }}
+    <div
+      className="ph-uv-mapping-card group"
+      style={{
+        border: `1px solid ${borderClass}`,
+        backgroundColor: borderBg,
+        overflow: "hidden",
+      }}
+    >
+      <div
+        className="ph-uv-mapping-row"
+        style={{
+          display: "flex",
+          alignItems: "stretch",
+          minHeight: 80,
+        }}
+      >
+        {/* 원본 45% */}
+        <div
+          className="ph-uv-mapping-left"
+          style={{
+            width: "45%",
+            padding: 12,
+            display: "flex",
+            gap: 16,
+            alignItems: "center",
+            background: SURFACE_1,
+            minWidth: 0,
+            boxSizing: "border-box",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() =>
+              origSrc &&
+              onOpenLightbox([{ url: origSrc, label: target.filename, sublabel: "원본 선택 사진" }], 0)
+            }
+            style={{
+              width: 56,
+              height: 56,
+              background: "#111",
+              border: `1px solid #222`,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: origSrc ? "pointer" : "default",
+              padding: 0,
+              overflow: "hidden",
+              position: "relative",
+            }}
           >
-            {target.photo.url && !origErr ? (
-              <img src={target.photo.url} alt="" onError={() => setOrigErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            ) : <Image size={16} color={C.dim} />}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2, color: C.text }}>{target.filename}</div>
-            {target.photo.comment?.trim() ? (
-              <div style={{ fontSize: 10, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", lineHeight: 1.3 }}>{target.photo.comment}</div>
+            {origSrc && !origErr ? (
+              <img src={origSrc} alt="" onError={() => setOrigErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              <Image size={16} color="#333" strokeWidth={1} />
+            )}
+            {origSrc ? (
+              <div
+                className="ph-uv-map-orig-overlay"
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: "rgba(0,0,0,0.5)",
+                  opacity: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "opacity 0.2s",
+                  pointerEvents: "none",
+                }}
+              >
+                <Maximize2 size={14} color="white" strokeWidth={2} />
+              </div>
             ) : null}
+          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, minWidth: 0 }}>
+              <span style={{ background: "#1f1f1f", color: "#888", fontFamily: MONO, fontSize: 9, padding: "2px 6px", flexShrink: 0 }}>
+                {orgLabel}
+              </span>
+              <span style={{ fontFamily: MONO, fontSize: 12, color: TEXT_BRIGHT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={target.filename}>
+                {target.filename}
+              </span>
+            </div>
+            {target.photo.comment?.trim() ? (
+              <p
+                style={{
+                  fontFamily: MONO,
+                  fontSize: 9,
+                  color: ACCENT,
+                  margin: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <MessageSquare size={10} strokeWidth={2} style={{ flexShrink: 0 }} />
+                {target.photo.comment}
+              </p>
+            ) : (
+              <p style={{ fontFamily: MONO, fontSize: 9, color: "#555", margin: 0 }}>코멘트 없음</p>
+            )}
           </div>
         </div>
 
-        {/* Arrow */}
-        <div className="ph-uv-mapping-arrow" style={{ display: "flex", justifyContent: "center", color: C.dim }}><ArrowRight size={13} /></div>
+        {/* 화살표 10% */}
+        <div
+          className="ph-uv-mapping-mid"
+          style={{
+            width: "10%",
+            minWidth: 48,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#080808",
+            borderLeft: `1px solid ${BORDER}`,
+            borderRight: `1px solid ${BORDER}`,
+            flexShrink: 0,
+          }}
+        >
+          <ArrowRight size={16} color="#444" strokeWidth={2} />
+        </div>
 
-        {/* Retouched */}
-        {state === "empty" ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <div style={{ width: 52, height: 52, background: "transparent", borderRadius: 5, border: `2px dashed ${C.border}`, flexShrink: 0 }} />
-            <div style={{ fontSize: 11, color: C.dim, fontStyle: "italic" }}>보정본 없음</div>
-          </div>
-        ) : (
-          <div
-            style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, cursor: previewUrl ? "zoom-in" : "default" }}
-            onClick={() => previewUrl && onCompare(target.id)}
-          >
-            <div style={{ width: 52, height: 52, background: "#1a2535", borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${C.border}`, overflow: "hidden" }}>
-              {previewUrl && !retouchErr ? (
-                <img src={previewUrl} alt="" onError={() => setRetouchErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : <Image size={16} color={C.dim} />}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 11, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2, color: C.text }}>
-                {file?.name ?? (isReadOnly ? "업로드 완료" : "")}
-              </div>
-              {fileSizeStr && <div style={{ fontSize: 10, color: C.muted }}>{fileSizeStr}</div>}
-            </div>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="ph-uv-mapping-actions" style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, paddingLeft: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        {/* 보정본 */}
+        <div
+          className="ph-uv-mapping-right"
+          style={{
+            flex: 1,
+            padding: 12,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            background:
+              state === "matched" ? "rgba(34,197,94,0.05)" : state === "ordered" ? "rgba(245,158,11,0.05)" : "rgba(239,68,68,0.05)",
+            position: "relative",
+            minWidth: 0,
+            boxSizing: "border-box",
+          }}
+        >
           {state === "matched" && (
-            <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 500, whiteSpace: "nowrap", color: C.green, background: C.greenDim, border: "1px solid rgba(46,213,115,0.3)", display: "flex", alignItems: "center", gap: 3 }}>
-              <Check size={9} />파일명 일치
-            </span>
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                right: 0,
+                background: "rgba(34,197,94,0.2)",
+                borderBottom: "1px solid rgba(34,197,94,0.3)",
+                borderLeft: "1px solid rgba(34,197,94,0.3)",
+                padding: "2px 8px",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <div style={{ width: 4, height: 4, background: "#22c55e", borderRadius: "50%" }} />
+              <span className="ph-uv-tech-label" style={{ color: "#22c55e", fontSize: "8px" }}>
+                AUTO
+              </span>
+            </div>
           )}
           {state === "ordered" && (
-            <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 500, whiteSpace: "nowrap", color: C.orange, background: C.orangeDim, border: "1px solid rgba(245,166,35,0.3)", display: "flex", alignItems: "center", gap: 3 }}>
-              <ArrowUpDown size={9} />순서 매핑
-            </span>
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                right: 0,
+                background: "#f59e0b",
+                color: "#000",
+                padding: "2px 8px",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <span className="ph-uv-tech-label" style={{ color: "#000", fontWeight: 700, fontSize: "8px" }}>
+                SEQ
+              </span>
+            </div>
           )}
           {state === "empty" && (
-            <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 500, whiteSpace: "nowrap", color: C.red, background: C.redDim, border: "1px solid rgba(255,71,87,0.3)", display: "flex", alignItems: "center", gap: 3 }}>
-              <AlertCircle size={9} />미업로드
-            </span>
-          )}
-          {!isReadOnly && file != null && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onClearFile(target.id); }}
+            <div
               style={{
-                padding: "3px 8px", borderRadius: 5,
-                border: `1px solid rgba(255,71,87,0.35)`,
-                background: "transparent",
-                color: C.red,
-                fontSize: 10, cursor: "pointer", fontFamily: "inherit",
-                display: "flex", alignItems: "center", gap: 3,
-                transition: "all 0.15s",
+                position: "absolute",
+                top: 0,
+                right: 0,
+                background: "#ef4444",
+                color: "#000",
+                padding: "2px 8px",
               }}
             >
-              <X size={9} />취소
-            </button>
+              <span className="ph-uv-tech-label" style={{ color: "#000", fontWeight: 700, fontSize: "8px" }}>
+                MISSING
+              </span>
+            </div>
           )}
-          {!isReadOnly && (
-            <button
-              type="button"
-              onClick={() => onChangeOne(target.id)}
-              style={{
-                padding: "3px 8px", borderRadius: 5,
-                border: `1px solid ${state === "empty" ? "rgba(79,126,255,0.3)" : C.border}`,
-                background: "transparent",
-                color: state === "empty" ? C.steel : C.dim,
-                fontSize: 10, cursor: "pointer", fontFamily: "inherit",
-                display: "flex", alignItems: "center", gap: 3,
-                transition: "all 0.15s",
-              }}
-            >
-              {state === "empty" ? "선택" : <><Pencil size={9} />변경</>}
-            </button>
+
+          {state === "empty" ? (
+            <div style={{ display: "flex", gap: 16, alignItems: "center", width: "100%" }}>
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  border: "1px dashed rgba(239,68,68,0.35)",
+                  flexShrink: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "transparent",
+                }}
+              >
+                <X size={16} color="rgba(239,68,68,0.5)" strokeWidth={1.5} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span className="ph-uv-tech-label" style={{ color: "rgba(239,68,68,0.75)", fontSize: "10px", display: "block", marginBottom: 6 }}>
+                  NO_RETOUCH_FOUND
+                </span>
+                {!isReadOnly && (
+                  <button
+                    type="button"
+                    onClick={() => onChangeOne(target.id)}
+                    className="ph-uv-tech-label"
+                    style={{
+                      background: "#111",
+                      border: `1px solid #333`,
+                      color: TEXT_BRIGHT,
+                      padding: "4px 12px",
+                      cursor: "pointer",
+                      fontSize: "9px",
+                    }}
+                  >
+                    SELECT FILE
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "flex", gap: 16, alignItems: "center", minWidth: 0, flex: 1 }}>
+                <button
+                  type="button"
+                  onClick={() => previewUrl && onCompare(target.id)}
+                  style={{
+                    width: 56,
+                    height: 56,
+                    background: "#111",
+                    border:
+                      state === "matched"
+                        ? "1px solid rgba(34,197,94,0.35)"
+                        : state === "ordered"
+                          ? "1px solid rgba(245,158,11,0.5)"
+                          : `1px solid ${BORDER}`,
+                    flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 0,
+                    overflow: "hidden",
+                    cursor: previewUrl ? "pointer" : "default",
+                    boxShadow: state === "ordered" ? "0 0 10px rgba(245,158,11,0.2)" : "none",
+                  }}
+                >
+                  {previewUrl && !retouchErr ? (
+                    <img src={previewUrl} alt="" onError={() => setRetouchErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    <Image
+                      size={16}
+                      color={state === "matched" ? "rgba(34,197,94,0.5)" : "rgba(245,158,11,0.8)"}
+                      strokeWidth={1.5}
+                    />
+                  )}
+                </button>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontFamily: MONO, fontSize: 12, color: TEXT_BRIGHT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
+                    {file?.name ?? (isReadOnly ? "업로드 완료" : "")}
+                  </div>
+                  {fileSizeStr ? (
+                    <span className="ph-uv-tech-label" style={{ color: "#666", fontSize: "9px" }}>
+                      {fileSizeStr}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0, marginLeft: 16, alignItems: "stretch" }}>
+                {previewUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => onCompare(target.id)}
+                    className="ph-uv-tech-label"
+                    style={{
+                      fontSize: "9px",
+                      padding: "4px 12px",
+                      border:
+                        state === "matched"
+                          ? "1px solid rgba(34,197,94,0.35)"
+                          : "1px solid #333",
+                      background: state === "matched" ? "rgba(34,197,94,0.1)" : "#111",
+                      color: state === "matched" ? "#22c55e" : TEXT_BRIGHT,
+                      cursor: "pointer",
+                    }}
+                  >
+                    COMPARE
+                  </button>
+                ) : null}
+                {!isReadOnly && file != null && state === "matched" && (
+                  <button
+                    type="button"
+                    onClick={() => onClearFile(target.id)}
+                    className="ph-uv-tech-label"
+                    style={{
+                      fontSize: "8px",
+                      color: "#666",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      textAlign: "right",
+                    }}
+                  >
+                    CLEAR
+                  </button>
+                )}
+                {!isReadOnly && state === "matched" && (
+                  <button
+                    type="button"
+                    onClick={() => onChangeOne(target.id)}
+                    className="ph-uv-tech-label"
+                    style={{
+                      fontSize: "8px",
+                      color: "#888",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      textAlign: "right",
+                    }}
+                  >
+                    CHANGE FILE
+                  </button>
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>
 
-      {/* Ordered warning */}
       {state === "ordered" && !isReadOnly && (
-        <div style={{
-          padding: "5px 14px",
-          borderTop: "1px solid rgba(245,166,35,0.12)",
-          background: "rgba(245,166,35,0.04)",
-          fontSize: 10, color: C.orange,
-        }}>
-          파일명 불일치 · 업로드 순서({(orderIndex ?? 0) + 1}번째)로 자동 매핑됐습니다. 다른 사진이면 [변경]을 눌러주세요.
+        <div
+          style={{
+            background: "rgba(245,158,11,0.1)",
+            borderTop: "1px solid rgba(245,158,11,0.2)",
+            padding: "8px 16px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 8,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <AlertCircle size={12} color="#f59e0b" strokeWidth={2} />
+            <span className="ph-uv-tech-label" style={{ color: "#f59e0b", fontSize: "9px" }}>
+              파일명 불일치 · 업로드 순서 {(orderIndex ?? 0) + 1}번째 파일로 자동 매핑됨
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: 12 }}>
+            <button
+              type="button"
+              onClick={() => onChangeOne(target.id)}
+              className="ph-uv-tech-label"
+              style={{ fontSize: "9px", color: TEXT_BRIGHT, background: "transparent", border: "none", cursor: "pointer", textDecoration: "underline" }}
+            >
+              CHANGE FILE
+            </button>
+            <button
+              type="button"
+              onClick={() => onClearFile(target.id)}
+              className="ph-uv-tech-label"
+              style={{ fontSize: "9px", color: "#888", background: "transparent", border: "none", cursor: "pointer" }}
+            >
+              CLEAR
+            </button>
+          </div>
         </div>
       )}
+
     </div>
   );
 }

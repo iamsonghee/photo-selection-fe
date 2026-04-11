@@ -77,7 +77,12 @@ export interface Project {
   shootDate: string; // ISO date
   deadline: string; // ISO date
   requiredCount: number; // N
-  photoCount: number; // M
+  photoCount: number; // M (실제 업로드된 장수)
+  /** 생성 시 입력한 예상 업로드 장수 (DB 컬럼 photo_count_expected) */
+  photoCountExpected?: number | null;
+  /** 촬영 유형: wedding | family | graduation | profile | etc */
+  shootType?: string | null;
+  customerPhone?: string | null;
   status: ProjectStatus;
   accessToken: string;
   accessPin?: string | null;

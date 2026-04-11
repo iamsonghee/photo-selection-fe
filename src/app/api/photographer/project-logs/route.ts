@@ -30,21 +30,43 @@ async function getPhotographerIdFromSession(): Promise<string | null> {
   return data?.id ?? null;
 }
 
-/** GET: 현재 작가의 최근 10건 활동 로그 (project_logs + projects JOIN) */
-export async function GET() {
+/** GET: 현재 작가의 활동 로그. `?project_id=` 로 특정 프로젝트만 (최대 12건), 없으면 전체 최대 10건 */
+export async function GET(req: NextRequest) {
   try {
     const photographerId = await getPhotographerIdFromSession();
     if (!photographerId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const projectIdFilter = req.nextUrl.searchParams.get("project_id")?.trim() || null;
+
     const admin = getAdminClient();
-    const { data, error } = await admin
+
+    if (projectIdFilter) {
+      const { data: owned, error: ownErr } = await admin
+        .from("projects")
+        .select("id")
+        .eq("id", projectIdFilter)
+        .eq("photographer_id", photographerId)
+        .maybeSingle();
+      if (ownErr || !owned) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
+    let q = admin
       .from("project_logs")
       .select("id, project_id, action, created_at, projects(name, customer_name)")
       .eq("photographer_id", photographerId)
-      .order("created_at", { ascending: false })
-      .limit(10);
+      .order("created_at", { ascending: false });
+
+    if (projectIdFilter) {
+      q = q.eq("project_id", projectIdFilter).limit(12);
+    } else {
+      q = q.limit(10);
+    }
+
+    const { data, error } = await q;
 
     if (error) {
       console.error("[GET project-logs]", error);

@@ -5,15 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { differenceInDays } from "date-fns";
 import {
-  ArrowLeft,
-  Pencil,
   Link2,
-  MessageCircle,
   Eye,
   EyeOff,
   ChevronRight,
   Trash2,
-  Check,
   Lock,
   RefreshCw,
   CheckCircle2,
@@ -32,7 +28,7 @@ import { createClient } from "@/lib/supabase/client";
 import { parseBetaLimitError } from "@/lib/beta-limits";
 import { compressImageFileForMobileIfNeeded } from "@/lib/upload-client-compress";
 import type { Project, ProjectStatus, Photo } from "@/types";
-import { PHOTOGRAPHER_THEME as C } from "@/lib/photographer-theme";
+import { ProjectPipelineHeader } from "@/components/photographer/ProjectPipelineHeader";
 
 // ---------- constants ----------
 const ACCENT = "#FF4D00";
@@ -78,11 +74,14 @@ function shouldRetryStatus(status: number) {
 
 type XhrResult = { ok: boolean; status: number; json: () => Promise<unknown> };
 
+type XhrTransferOpts = { onRequestBodySent?: () => void };
+
 async function xhrPostWithRetry(
   url: string,
   buildForm: () => FormData,
   token: string,
   onProgress: (loaded: number, total: number) => void,
+  transferOpts?: XhrTransferOpts,
 ): Promise<XhrResult> {
   const crossOrigin = /^https?:\/\//i.test(url);
   let lastErr: unknown;
@@ -92,9 +91,18 @@ async function xhrPostWithRetry(
         const xhr = new XMLHttpRequest();
         xhr.open("POST", url);
         xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+        let bodySentReported = false;
+        const reportBodySent = () => {
+          if (bodySentReported) return;
+          bodySentReported = true;
+          transferOpts?.onRequestBodySent?.();
+        };
+        xhr.upload.onload = () => { reportBodySent(); };
         xhr.upload.onprogress = (ev) => {
-          if (ev.lengthComputable && ev.total > 0) onProgress(ev.loaded, ev.total);
-          else if (ev.loaded > 0) onProgress(ev.loaded, 0);
+          if (ev.lengthComputable && ev.total > 0) {
+            onProgress(ev.loaded, ev.total);
+            if (ev.loaded >= ev.total) reportBodySent();
+          } else if (ev.loaded > 0) onProgress(ev.loaded, 0);
         };
         xhr.onload = () => resolve({
           ok: xhr.status >= 200 && xhr.status < 300,
@@ -124,17 +132,18 @@ async function postPhotosUpload(
   token: string,
   useProxyRef: { current: boolean },
   onProgress: (loaded: number, total: number) => void,
+  transferOpts?: XhrTransferOpts,
 ): Promise<XhrResult> {
   const primary = uploadPhotosUrl();
   if (useProxyRef.current || primary === UPLOAD_PHOTOS_PATH) {
-    return xhrPostWithRetry(UPLOAD_PHOTOS_PATH, buildForm, token, onProgress);
+    return xhrPostWithRetry(UPLOAD_PHOTOS_PATH, buildForm, token, onProgress, transferOpts);
   }
   try {
-    return await xhrPostWithRetry(primary, buildForm, token, onProgress);
+    return await xhrPostWithRetry(primary, buildForm, token, onProgress, transferOpts);
   } catch (e) {
     if (e instanceof TypeError) {
       useProxyRef.current = true;
-      return xhrPostWithRetry(UPLOAD_PHOTOS_PATH, buildForm, token, onProgress);
+      return xhrPostWithRetry(UPLOAD_PHOTOS_PATH, buildForm, token, onProgress, transferOpts);
     }
     throw e;
   }
@@ -145,31 +154,6 @@ function isNetworkFailure(e: unknown) {
   if (typeof DOMException !== "undefined" && e instanceof DOMException) return e.name === "NetworkError";
   return false;
 }
-
-// ---------- workflow helpers ----------
-type WfState = "done" | "current" | "pending";
-
-function getWorkflowStates(status: ProjectStatus): WfState[] {
-  switch (status) {
-    case "preparing":    return ["current", "pending", "pending", "pending", "pending"];
-    case "selecting":    return ["done",    "current", "pending", "pending", "pending"];
-    case "confirmed":
-    case "editing":
-    case "editing_v2":   return ["done",    "done",    "current", "pending", "pending"];
-    case "reviewing_v1":
-    case "reviewing_v2": return ["done",    "done",    "done",    "current", "pending"];
-    case "delivered":    return ["done",    "done",    "done",    "done",    "done"   ];
-    default:             return ["pending", "pending", "pending", "pending", "pending"];
-  }
-}
-
-const WF_STEPS = [
-  { key: "UPLOAD_PHASE",  label: "업로드" },
-  { key: "CLIENT_SELECT", label: "셀렉" },
-  { key: "RETOUCH_PHASE", label: "보정" },
-  { key: "REVIEW_PHASE",  label: "검토" },
-  { key: "DELIVERY",      label: "납품" },
-];
 
 // ---------- thumbnail (스크롤 루트 기준: 보이는 영역 근처에서만 src 로드) ----------
 function PhotoThumb({
@@ -502,9 +486,6 @@ export default function ProjectDetailPage() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
   const [showEditGuideModal, setShowEditGuideModal] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -513,19 +494,10 @@ export default function ProjectDetailPage() {
   const [pinVisible, setPinVisible] = useState(false);
   const [pinSaving, setPinSaving] = useState(false);
   const [pinError, setPinError] = useState("");
-
-  const [editMode, setEditMode] = useState(false);
-  const [editName, setEditName] = useState("");
-  const [editCustomerName, setEditCustomerName] = useState("");
-  const [editShootDate, setEditShootDate] = useState("");
-  const [editDeadline, setEditDeadline] = useState("");
-  const [editRequiredCount, setEditRequiredCount] = useState(0);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState("");
+  const [inviteActivating, setInviteActivating] = useState(false);
 
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [photosLoading, setPhotosLoading] = useState(true);
-  const [photoFilter, setPhotoFilter] = useState<"all" | "recent">("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isPhotoEditMode, setIsPhotoEditMode] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -533,6 +505,8 @@ export default function ProjectDetailPage() {
   const [dragOver, setDragOver] = useState(false);
   const [uploadPhase, setUploadPhase] = useState<"idle" | "sending" | "processing" | "done">("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
+  /** 네트워크 전송은 끝났고 서버(썸네일·저장) 응답 대기 중 — 99% 정지로 오해하지 않도록 별도 표시 */
+  const [awaitingServerFinalize, setAwaitingServerFinalize] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -574,6 +548,7 @@ export default function ProjectDetailPage() {
   const startUpload = useCallback(async (uploadFiles: File[]) => {
     if (!uploadFiles.length) return;
     setUploadError(null);
+    setAwaitingServerFinalize(false);
     setUploadPhase(isPhoneLikeClient() ? "processing" : "sending");
     setUploadProgress(0);
     stopRequestedRef.current = false;
@@ -614,7 +589,8 @@ export default function ProjectDetailPage() {
       const cap = batchSizes[idx] ?? 0;
       loadedPerBatch[idx] = cap > 0 ? Math.min(cap, loaded) : loaded;
       let sum = 0; for (let i = 0; i < batches.length; i++) sum += loadedPerBatch[i];
-      setUploadProgress(Math.min(99, Math.round((sum / totalBytes) * 100)));
+      // 상한 90%: 전송 완료 후 서버 처리 구간은 awaitingServerFinalize UI로 표시 (99% 장시간 정지 방지)
+      setUploadProgress(Math.min(90, Math.round((sum / totalBytes) * 100)));
     };
 
     const allFailed: File[] = [];
@@ -631,38 +607,73 @@ export default function ProjectDetailPage() {
         if (fresh?.access_token) currentToken = fresh.access_token;
       }
       const chunk = batches.slice(chunkStart, Math.min(chunkStart + concurrency, batches.length));
+      const bodySent: boolean[] = chunk.map(() => false);
+      const reqDone: boolean[] = chunk.map(() => false);
+      const syncAwaitingServer = () => {
+        setAwaitingServerFinalize(chunk.some((_, j) => bodySent[j] && !reqDone[j]));
+      };
       await Promise.all(chunk.map(async (batch, chunkOffset) => {
-        if (abortReason) { allFailed.push(...batch); return; }
-        const globalIdx = chunkStart + chunkOffset;
-        const buildForm = () => { const f = new FormData(); f.append("project_id", id); batch.forEach((file) => f.append("files", file)); return f; };
         try {
-          let res = await postPhotosUpload(buildForm, currentToken, useProxyRef, (loaded) => applyProgress(globalIdx, loaded));
-          if (res.status === 401) {
-            await supabase.auth.refreshSession();
-            const { data: { session: after } } = await supabase.auth.getSession();
-            if (after?.access_token) { currentToken = after.access_token; res = await postPhotosUpload(buildForm, currentToken, useProxyRef, (loaded) => applyProgress(globalIdx, loaded)); }
-          }
-          if (batchSizes[globalIdx] > 0) applyProgress(globalIdx, batchSizes[globalIdx]);
-          if (!res.ok) {
-            try { const b = (await res.json().catch(() => ({}))) as unknown; const betaErr = parseBetaLimitError(b); if (betaErr) { abortReason = "betaLimit"; abortMessage = betaErr.message; return; } } catch {}
+          if (abortReason) { allFailed.push(...batch); return; }
+          const globalIdx = chunkStart + chunkOffset;
+          const buildForm = () => { const f = new FormData(); f.append("project_id", id); batch.forEach((file) => f.append("files", file)); return f; };
+          try {
+            let res = await postPhotosUpload(
+              buildForm,
+              currentToken,
+              useProxyRef,
+              (loaded) => applyProgress(globalIdx, loaded),
+              { onRequestBodySent: () => { bodySent[chunkOffset] = true; syncAwaitingServer(); } },
+            );
+            if (res.status === 401) {
+              await supabase.auth.refreshSession();
+              const { data: { session: after } } = await supabase.auth.getSession();
+              if (after?.access_token) {
+                currentToken = after.access_token;
+                res = await postPhotosUpload(
+                  buildForm,
+                  currentToken,
+                  useProxyRef,
+                  (loaded) => applyProgress(globalIdx, loaded),
+                  { onRequestBodySent: () => { bodySent[chunkOffset] = true; syncAwaitingServer(); } },
+                );
+              }
+            }
+            if (batchSizes[globalIdx] > 0) applyProgress(globalIdx, batchSizes[globalIdx]);
+            if (!res.ok) {
+              try { const b = (await res.json().catch(() => ({}))) as unknown; const betaErr = parseBetaLimitError(b); if (betaErr) { abortReason = "betaLimit"; abortMessage = betaErr.message; return; } } catch {}
+              allFailed.push(...batch);
+            }
+          } catch (e) {
+            if (isNetworkFailure(e)) { abortReason = "network"; return; }
             allFailed.push(...batch);
           }
-        } catch (e) {
-          if (isNetworkFailure(e)) { abortReason = "network"; return; }
-          allFailed.push(...batch);
+          completedBatches++;
+          setUploadProgress(Math.min(90, Math.round((completedBatches / batches.length) * 100)));
+        } finally {
+          reqDone[chunkOffset] = true;
+          syncAwaitingServer();
         }
-        completedBatches++;
-        setUploadProgress(Math.min(99, Math.round((completedBatches / batches.length) * 100)));
       }));
     }
 
-    if (abortReason === "betaLimit") { setUploadError(abortMessage); setUploadPhase("idle"); setUploadProgress(0); return; }
-    if (abortReason === "network") { setUploadError("업로드에 실패했습니다. 인터넷 연결을 확인해 주세요."); setUploadPhase("idle"); setUploadProgress(0); return; }
+    if (stopRequestedRef.current) {
+      setAwaitingServerFinalize(false);
+      setUploadPhase("idle");
+      setUploadProgress(0);
+      await loadPhotos();
+      return;
+    }
 
+    if (abortReason === "betaLimit") { setAwaitingServerFinalize(false); setUploadError(abortMessage); setUploadPhase("idle"); setUploadProgress(0); return; }
+    if (abortReason === "network") { setAwaitingServerFinalize(false); setUploadError("업로드에 실패했습니다. 인터넷 연결을 확인해 주세요."); setUploadPhase("idle"); setUploadProgress(0); return; }
+
+    setAwaitingServerFinalize(false);
     setUploadProgress(100);
     setUploadPhase("done");
     fetch("/api/photographer/project-logs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: id, action: "uploaded" }) }).catch(() => {});
     setTimeout(async () => {
+      setAwaitingServerFinalize(false);
       setUploadPhase("idle"); setUploadProgress(0);
       setToast(allFailed.length === 0 ? "업로드 완료!" : `${allFailed.length}장 실패`);
       await loadProject(); await loadPhotos(); router.refresh();
@@ -686,34 +697,9 @@ export default function ProjectDetailPage() {
   const onDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(true); }, []);
   const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(false); }, []);
 
-  // ── project handlers ──
-  const handleSaveEdit = async () => {
-    if (!project) return;
-    setSaveError("");
-    const canEditN = ["preparing", "selecting"].includes(project.status);
-    const newN = canEditN ? editRequiredCount : project.requiredCount;
-    if (canEditN && newN < 1) { setSaveError("셀렉 갯수는 1 이상이어야 합니다."); return; }
-    if (project.status !== "preparing" && canEditN && project.photoCount < newN) { setSaveError(`업로드된 사진 수(${project.photoCount}장) 이하로 설정해주세요.`); return; }
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/photographer/projects/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: editName, customer_name: editCustomerName, shoot_date: editShootDate, deadline: editDeadline, required_count: newN }) });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error((data as { error?: string }).error ?? "저장 실패");
-      setProject({ ...project, name: editName, customerName: editCustomerName, shootDate: editShootDate, deadline: editDeadline, requiredCount: newN });
-      setEditMode(false);
-    } catch (e) { setSaveError(e instanceof Error ? e.message : "저장 실패"); }
-    finally { setSaving(false); }
-  };
-
   const inviteUrl = typeof window !== "undefined" ? `${window.location.origin}/c/${project?.accessToken ?? ""}` : `/c/${project?.accessToken ?? ""}`;
 
   const handleCopyLink = () => {
-    const pin = project?.accessPin;
-    navigator.clipboard.writeText(pin ? `링크: ${inviteUrl}\n비밀번호: ${pin}` : inviteUrl);
-    setCopied(true); setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleKakaoShare = () => {
     const pin = project?.accessPin;
     navigator.clipboard.writeText(pin ? `링크: ${inviteUrl}\n비밀번호: ${pin}` : inviteUrl);
     setCopied(true); setTimeout(() => setCopied(false), 2000);
@@ -729,16 +715,6 @@ export default function ProjectDetailPage() {
       setProject({ ...project, accessPin: newPin }); setShowPinModal(false); setPinInput("");
     } catch (e) { setPinError(e instanceof Error ? e.message : "저장 실패"); }
     finally { setPinSaving(false); }
-  };
-
-  const handleDeleteProject = async () => {
-    setDeleteError(""); setDeleting(true);
-    try {
-      const res = await fetch(`/api/photographer/projects/${id}`, { method: "DELETE" });
-      if (!res.ok) { const data = await res.json().catch(() => ({})); throw new Error((data as { error?: string }).error ?? "삭제에 실패했습니다."); }
-      router.push("/photographer/dashboard");
-    } catch (e) { setDeleteError(e instanceof Error ? e.message : "삭제에 실패했습니다."); }
-    finally { setDeleting(false); }
   };
 
   const handleDeletePhoto = async (photoId: string) => {
@@ -763,13 +739,43 @@ export default function ProjectDetailPage() {
     } finally { setDeletingId(null); }
   };
 
+  const handleEnableClientAccess = async () => {
+    if (!project) return;
+    const m = project.photoCount;
+    const n = project.requiredCount;
+    if (project.status !== "preparing" || m < n) return;
+    setInviteActivating(true);
+    try {
+      const res = await fetch(`/api/photographer/projects/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "selecting" satisfies ProjectStatus }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setToast((data as { error?: string }).error ?? "초대 링크 활성화에 실패했습니다.");
+        return;
+      }
+      fetch("/api/photographer/project-logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: id, action: "selecting" }),
+      }).catch(() => {});
+      setProject({ ...project, status: "selecting" });
+      setToast("고객 초대 링크가 활성화되었습니다.");
+      router.refresh();
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : "초대 링크 활성화에 실패했습니다.");
+    } finally {
+      setInviteActivating(false);
+    }
+  };
+
   if (loading) return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", background: SURFACE_0 }}><span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, letterSpacing: "0.15em" }}>LOADING_PROJECT...</span></div>;
   if (!project) return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", background: SURFACE_0 }}><span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, letterSpacing: "0.15em" }}>PROJECT_NOT_FOUND</span></div>;
 
   const N = project.requiredCount;
   const M = project.photoCount;
-  const wfStates = getWorkflowStates(project.status);
-  const currentStep = wfStates.filter((s) => s === "done").length + 1;
   const daysLeft = differenceInDays(new Date(project.deadline), new Date());
   const isInviteActive = project.status !== "preparing";
   const canViewSelections = project.status !== "preparing";
@@ -777,8 +783,8 @@ export default function ProjectDetailPage() {
   const canReview = ["reviewing_v1", "reviewing_v2", "delivered"].includes(project.status);
   const editVersionsPath = project.status === "editing_v2" || project.status === "reviewing_v2" ? `/photographer/projects/${id}/upload-versions/v2` : `/photographer/projects/${id}/upload-versions`;
   const progressPct = N > 0 ? Math.min(100, Math.round((M / N) * 100)) : 0;
-  const filteredPhotos = photoFilter === "recent" ? photos.slice(-20) : photos;
   const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
+  const showServerWorking = uploadPhase === "sending" && awaitingServerFinalize;
 
   const labelStyle: React.CSSProperties = { fontFamily: MONO, fontSize: "0.6rem", letterSpacing: "0.15em", textTransform: "uppercase", color: TEXT_MUTED, display: "block", marginBottom: 6 };
 
@@ -798,6 +804,8 @@ export default function ProjectDetailPage() {
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes prj-bar-scan { 0% { transform: translateX(-100%); } 100% { transform: translateX(500%); } }
+        @keyframes prj-bar-indeterminate-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+        @keyframes prj-bar-indet-sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
         @keyframes prj-scanline { 0% { bottom: 100%; } 100% { bottom: -100px; } }
         .prj-grid-bg { position: fixed; inset: 0; background-image: linear-gradient(rgba(30,30,30,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(30,30,30,0.18) 1px, transparent 1px); background-size: 30px 30px; z-index: 0; pointer-events: none; }
         .prj-scanline-el { width: 100%; height: 100px; position: fixed; bottom: 100%; background: linear-gradient(0deg, rgba(255,77,0,0.02) 0%, rgba(255,77,0,0) 100%); animation: prj-scanline 8s linear infinite; pointer-events: none; z-index: 1; }
@@ -813,8 +821,6 @@ export default function ProjectDetailPage() {
         .prj-op-node { transition: all 0.2s; cursor: pointer; }
         .prj-op-node:hover { border-color: rgba(255,77,0,0.4) !important; background: rgba(255,77,0,0.04) !important; }
         .prj-op-node:hover .prj-op-arrow { color: ${ACCENT} !important; }
-        .prj-filter-tab { transition: all 0.15s; cursor: pointer; }
-        .prj-filter-tab:hover { border-color: ${ACCENT} !important; color: ${TEXT_BRIGHT} !important; }
         .prj-modal-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); padding: 16px; }
         .prj-modal-box { background: #080808; border: 1px solid ${BORDER_MID}; width: 100%; position: relative; }
         .prj-modal-box::before { content: ''; position: absolute; top: -1px; left: -1px; width: 28px; height: 2px; background: ${ACCENT}; }
@@ -825,9 +831,6 @@ export default function ProjectDetailPage() {
         .prj-btn-secondary:hover { border-color: #444; color: ${TEXT_BRIGHT}; }
         .prj-btn-danger { background: transparent; border: 1px solid rgba(255,51,51,0.3); color: #FF3333; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
         .prj-btn-danger:hover { background: rgba(255,51,51,0.1); }
-        .prj-input-field { width: 100%; padding: 8px 0; background: transparent; border: none; border-bottom: 1px solid ${BORDER_MID}; color: ${TEXT_BRIGHT}; font-size: 13px; font-family: inherit; outline: none; box-sizing: border-box; transition: border-color 0.2s; }
-        .prj-input-field:focus { border-bottom-color: ${ACCENT}; }
-        .prj-input-field:disabled { color: ${TEXT_MUTED}; cursor: not-allowed; }
         .prj-dropzone { border: 1px dashed #333; transition: all 0.2s; }
         .prj-dropzone-over { border-color: rgba(255,77,0,0.5) !important; background: ${ACCENT_DIM} !important; }
       `}</style>
@@ -837,30 +840,7 @@ export default function ProjectDetailPage() {
 
       <input ref={fileInputRef} type="file" multiple accept={ACCEPT_TYPES} style={{ display: "none" }} onChange={handleFileChange} />
 
-      {/* pipeline nav */}
-      <nav style={{ height: 48, borderBottom: `1px solid ${BORDER}`, background: SURFACE_0, display: "flex", alignItems: "center", paddingLeft: 16, paddingRight: 20, zIndex: 40, flexShrink: 0, position: "relative" }}>
-        <button type="button" onClick={() => router.push("/photographer/projects")} style={{ display: "flex", alignItems: "center", gap: 5, background: "transparent", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: "4px 12px 4px 0", borderRight: `1px solid ${BORDER}`, marginRight: 16, flexShrink: 0 }}>
-          <ArrowLeft size={12} color={TEXT_MUTED} />
-          <span className="prj-tech-label" style={{ color: TEXT_MUTED }}>RETURN_ROOT</span>
-        </button>
-        <span className="prj-tech-label" style={{ color: TEXT_MUTED, paddingRight: 16, borderRight: `1px solid ${BORDER}`, marginRight: 16, flexShrink: 0 }}>PIPELINE_STATUS</span>
-        <div style={{ display: "flex", alignItems: "center", flex: 1, overflow: "hidden" }}>
-          {WF_STEPS.map((step, i) => {
-            const state = wfStates[i];
-            const isActive = state === "current";
-            const isDone = state === "done";
-            return (
-              <div key={step.key} style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: i === 0 ? 0 : 16, paddingRight: 16, borderLeft: i > 0 ? `1px solid ${BORDER}` : "none" }}>
-                <div style={{ width: 22, height: 22, border: isActive ? `1px solid ${ACCENT}` : isDone ? `1px solid #3f3f46` : `1px solid #222`, display: "flex", alignItems: "center", justifyContent: "center", background: isActive ? ACCENT_DIM : isDone ? "#0f0f0f" : "#050505", boxShadow: isActive ? `0 0 8px ${ACCENT_GLOW}` : "none", flexShrink: 0 }}>
-                  {isDone ? <Check size={10} color="#71717a" /> : <span style={{ fontFamily: MONO, fontSize: 9, color: isActive ? ACCENT : "#444" }}>{String(i + 1).padStart(2, "0")}</span>}
-                </div>
-                <span className="prj-tech-label" style={{ color: isActive ? TEXT_BRIGHT : isDone ? "#555" : "#444", fontWeight: isActive ? 700 : 400, whiteSpace: "nowrap", fontSize: "0.6rem" }}>{step.key}</span>
-              </div>
-            );
-          })}
-        </div>
-        <span className="prj-tech-label" style={{ color: TEXT_BRIGHT, flexShrink: 0 }}>STEP <span style={{ color: ACCENT }}>{String(Math.min(currentStep, 5)).padStart(2, "0")}/05</span></span>
-      </nav>
+      <ProjectPipelineHeader projectId={id} project={project} activeStepIndex={0} />
 
       {/* main */}
       <main style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden", zIndex: 10, position: "relative" }}>
@@ -893,6 +873,24 @@ export default function ProjectDetailPage() {
               </div>
             </div>
 
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", border: `1px solid ${BORDER}`, marginBottom: 12, background: SURFACE_2 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}><Lock size={10} color={TEXT_MUTED} /><span className="prj-tech-label" style={{ color: TEXT_MUTED }}>CLIENT_PIN</span></div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {project.accessPin ? (
+                  <>
+                    <span style={{ fontFamily: MONO, fontSize: 13, color: TEXT_NORMAL, letterSpacing: 4 }}>{pinVisible ? project.accessPin : "●●●●"}</span>
+                    <button type="button" onClick={() => setPinVisible(!pinVisible)} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 2 }}>{pinVisible ? <EyeOff size={12} /> : <Eye size={12} />}</button>
+                    <button type="button" onClick={() => { setPinInput(project.accessPin ?? ""); setShowPinModal(true); setPinError(""); }} className="prj-btn-secondary" style={{ padding: "3px 8px" }}>EDIT</button>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontFamily: MONO, fontSize: 10, color: "#444" }}>NO_PIN_SET</span>
+                    <button type="button" onClick={() => { setPinInput(""); setShowPinModal(true); setPinError(""); }} className="prj-btn-secondary" style={{ padding: "3px 8px" }}>SET</button>
+                  </>
+                )}
+              </div>
+            </div>
+
             <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", marginBottom: 12, background: isInviteActive ? "rgba(46,213,115,0.04)" : "transparent", border: `1px solid ${isInviteActive ? "rgba(46,213,115,0.15)" : "#222"}` }}>
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: isInviteActive ? "#2ed573" : "#444", flexShrink: 0 }} />
               <span style={{ fontFamily: MONO, fontSize: 10, color: isInviteActive ? "#2ed573" : "#555" }}>
@@ -900,14 +898,6 @@ export default function ProjectDetailPage() {
               </span>
             </div>
 
-            <div style={{ display: "flex", gap: 6 }}>
-              <button type="button" onClick={() => { setEditName(project.name); setEditCustomerName(project.customerName); setEditShootDate(project.shootDate); setEditDeadline(project.deadline); setEditRequiredCount(project.requiredCount); setSaveError(""); setEditMode(true); }} className="prj-btn-secondary" style={{ flex: 1, padding: "8px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                <Pencil size={10} />EDIT_META
-              </button>
-              <button type="button" onClick={() => { if (canViewSelections) router.push(`/photographer/projects/${id}/results`); }} className="prj-btn-primary" style={{ flex: 1, padding: "8px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, opacity: canViewSelections ? 1 : 0.4, cursor: canViewSelections ? "pointer" : "not-allowed" }}>
-                <ListChecks size={10} />SELECT_MODE
-              </button>
-            </div>
           </section>
 
           {/* UPLINK_CONSOLE */}
@@ -934,10 +924,20 @@ export default function ProjectDetailPage() {
               </div>
               <div style={{ textAlign: "center" }}>
                 <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 13, color: isUploading ? TEXT_NORMAL : "#888", marginBottom: 4 }}>
-                  {isUploading ? (uploadPhase === "processing" ? "COMPRESSING..." : "UPLOADING...") : "INITIALIZE_TRANSFER"}
+                  {isUploading
+                    ? uploadPhase === "processing"
+                      ? "COMPRESSING..."
+                      : showServerWorking
+                        ? "SERVER_PROCESSING..."
+                        : "UPLOADING..."
+                    : "INITIALIZE_TRANSFER"}
                 </p>
                 <p className="prj-tech-label" style={{ color: "#444", fontSize: "0.55rem" }}>
-                  {isUploading ? `${uploadProgress}% COMPLETE` : "DRAG & DROP OR CLICK TO SELECT"}
+                  {isUploading
+                    ? showServerWorking
+                      ? "썸네일·저장 처리 중 · 완료될 때까지 창을 닫지 마세요"
+                      : `${uploadProgress}% COMPLETE`
+                    : "DRAG & DROP OR CLICK TO SELECT"}
                 </p>
               </div>
             </div>
@@ -950,52 +950,63 @@ export default function ProjectDetailPage() {
                   <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT }}>{M} / {N > 0 ? N : "—"} 장</span>
                 </div>
                 <span className="prj-tech-label" style={{ color: isUploading ? ACCENT : TEXT_MUTED }}>
-                  {isUploading ? `${uploadProgress}%` : `${progressPct}%`}
+                  {isUploading ? (showServerWorking ? "···" : `${uploadProgress}%`) : `${progressPct}%`}
                 </span>
               </div>
               <div style={{ height: 3, background: "#111", position: "relative", overflow: "hidden" }}>
-                <div style={{ width: `${isUploading ? uploadProgress : progressPct}%`, background: ACCENT, height: "100%", position: "relative", overflow: "hidden", transition: "width 0.3s" }}>
-                  {(isUploading || progressPct > 0) && (
+                <div
+                  style={
+                    showServerWorking
+                      ? {
+                          width: "100%",
+                          background: ACCENT,
+                          height: "100%",
+                          position: "relative",
+                          overflow: "hidden",
+                          animation: "prj-bar-indeterminate-pulse 1.4s ease-in-out infinite",
+                        }
+                      : {
+                          width: `${isUploading ? uploadProgress : progressPct}%`,
+                          background: ACCENT,
+                          height: "100%",
+                          position: "relative",
+                          overflow: "hidden",
+                          transition: "width 0.3s",
+                        }
+                  }
+                >
+                  {showServerWorking ? (
+                    <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.35)", width: "35%", animation: "prj-bar-indet-sweep 1.1s linear infinite" }} />
+                  ) : (isUploading || progressPct > 0) ? (
                     <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.25)", width: "20%", animation: "prj-bar-scan 2s linear infinite" }} />
-                  )}
+                  ) : null}
                 </div>
               </div>
               {uploadError && <p style={{ fontFamily: MONO, fontSize: 9, color: "#FF3333", marginTop: 8 }}>[ERR] {uploadError}</p>}
             </div>
 
-            {/* PIN */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", border: `1px solid ${BORDER}`, marginBottom: 14, background: SURFACE_2 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}><Lock size={10} color={TEXT_MUTED} /><span className="prj-tech-label" style={{ color: TEXT_MUTED }}>CLIENT_PIN</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {project.accessPin ? (
-                  <>
-                    <span style={{ fontFamily: MONO, fontSize: 13, color: TEXT_NORMAL, letterSpacing: 4 }}>{pinVisible ? project.accessPin : "●●●●"}</span>
-                    <button type="button" onClick={() => setPinVisible(!pinVisible)} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 2 }}>{pinVisible ? <EyeOff size={12} /> : <Eye size={12} />}</button>
-                    <button type="button" onClick={() => { setPinInput(project.accessPin ?? ""); setShowPinModal(true); setPinError(""); }} className="prj-btn-secondary" style={{ padding: "3px 8px" }}>EDIT</button>
-                  </>
-                ) : (
-                  <>
-                    <span style={{ fontFamily: MONO, fontSize: 10, color: "#444" }}>NO_PIN_SET</span>
-                    <button type="button" onClick={() => { setPinInput(""); setShowPinModal(true); setPinError(""); }} className="prj-btn-secondary" style={{ padding: "3px 8px" }}>SET</button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* kakao */}
-            <div style={{ marginBottom: 14 }}>
-              <button type="button" onClick={handleKakaoShare} style={{ width: "100%", padding: "8px 0", background: "#FEE500", border: "none", color: "#191919", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                <MessageCircle size={12} />카카오톡 공유
+            {!isInviteActive && (
+              <button
+                type="button"
+                onClick={handleEnableClientAccess}
+                disabled={inviteActivating || (project.status === "preparing" && M < N)}
+                className="prj-btn-primary"
+                style={{
+                  width: "100%",
+                  padding: "12px 0",
+                  fontSize: 11,
+                  letterSpacing: "0.15em",
+                  opacity: project.status === "preparing" && M < N ? 0.4 : inviteActivating ? 0.75 : 1,
+                  cursor: inviteActivating || (project.status === "preparing" && M < N) ? "default" : "pointer",
+                }}
+              >
+                {inviteActivating ? "활성화 중…" : "고객초대 링크 활성화"}
               </button>
-            </div>
-
-            <button type="button" onClick={() => setShowPinModal(true)} className="prj-btn-primary" style={{ width: "100%", padding: "12px 0", fontSize: 11, letterSpacing: "0.15em", opacity: (!isInviteActive && M < N) ? 0.4 : 1 }}>
-              ENABLE_CLIENT_ACCESS
-            </button>
+            )}
           </section>
 
           {/* OPERATION_NODES */}
-          <section style={{ background: SURFACE_1, padding: 20, borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
+          <section style={{ background: SURFACE_1, padding: 20, borderBottom: `1px solid ${BORDER}`, flexShrink: 0, marginTop: "auto" }}>
             <span className="prj-tech-label" style={{ color: TEXT_MUTED, display: "block", marginBottom: 12 }}>OPERATION_NODES</span>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {[
@@ -1015,14 +1026,6 @@ export default function ProjectDetailPage() {
               ))}
             </div>
           </section>
-
-          {/* DANGER */}
-          <section style={{ background: SURFACE_1, padding: 20, marginTop: "auto" }}>
-            <span className="prj-tech-label" style={{ color: "#FF3333", display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>⚠ SYS.SEC :: DANGER_ZONE</span>
-            <button type="button" onClick={() => { setDeleteError(""); setShowDeleteModal(true); }} className="prj-btn-danger" style={{ width: "100%", padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              <Trash2 size={12} />TERMINATE_PROJECT
-            </button>
-          </section>
         </aside>
 
         {/* ── Right Panel ── */}
@@ -1039,13 +1042,6 @@ export default function ProjectDetailPage() {
               <div style={{ display: "flex", alignItems: "center", gap: 6, background: SURFACE_2, border: `1px solid ${BORDER}`, padding: "4px 10px" }}>
                 <span className="prj-tech-label" style={{ color: TEXT_MUTED, fontSize: "0.55rem" }}>TOTAL:</span>
                 <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT }}>{photos.length.toLocaleString()}</span>
-              </div>
-              <div style={{ display: "flex", gap: 2 }}>
-                {(["all", "recent"] as const).map((tab) => (
-                  <button key={tab} type="button" onClick={() => setPhotoFilter(tab)} className="prj-filter-tab prj-tech-label" style={{ padding: "4px 10px", background: photoFilter === tab ? ACCENT_DIM : "transparent", border: `1px solid ${photoFilter === tab ? "rgba(255,77,0,0.5)" : BORDER}`, color: photoFilter === tab ? ACCENT : TEXT_MUTED, fontSize: "0.58rem" }}>
-                    {tab === "all" ? "ALL" : "RECENT_20"}
-                  </button>
-                ))}
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1078,7 +1074,7 @@ export default function ProjectDetailPage() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", gap: 8 }}>
                 <span className="prj-tech-label" style={{ color: TEXT_MUTED }}>LOADING_DATABANK...</span>
               </div>
-            ) : filteredPhotos.length === 0 ? (
+            ) : photos.length === 0 ? (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 10 }}>
                 <div style={{ width: 48, height: 48, border: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "center" }}><Upload size={18} color={TEXT_MUTED} /></div>
                 <span className="prj-tech-label" style={{ color: "#333" }}>NO_DATA_LOADED</span>
@@ -1087,7 +1083,7 @@ export default function ProjectDetailPage() {
             ) : viewMode === "grid" ? (
               <VirtualizedPhotoGrid
                 scrollRef={photoScrollRef}
-                photos={filteredPhotos}
+                photos={photos}
                 onDelete={handleDeletePhoto}
                 deletingId={deletingId}
                 isEditMode={isPhotoEditMode}
@@ -1095,7 +1091,7 @@ export default function ProjectDetailPage() {
             ) : (
               <VirtualizedPhotoList
                 scrollRef={photoScrollRef}
-                photos={filteredPhotos}
+                photos={photos}
                 onDelete={handleDeletePhoto}
                 deletingId={deletingId}
                 isEditMode={isPhotoEditMode}
@@ -1109,44 +1105,6 @@ export default function ProjectDetailPage() {
       {toast && (
         <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#080808", border: `1px solid ${BORDER_MID}`, padding: "10px 20px", zIndex: 200, fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT, pointerEvents: "none", whiteSpace: "nowrap" }}>
           {toast}
-        </div>
-      )}
-
-      {/* ── EDIT PROJECT MODAL ── */}
-      {editMode && (
-        <div className="prj-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setEditMode(false); setSaveError(""); } }}>
-          <div className="prj-modal-box" style={{ maxWidth: 520 }}>
-            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 6, height: 6, background: ACCENT }} /><span className="prj-tech-label" style={{ color: ACCENT }}>SYS.META :: EDIT_PROJECT</span></div>
-              <button type="button" onClick={() => { setEditMode(false); setSaveError(""); }} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 4 }}><X size={14} /></button>
-            </div>
-            <div style={{ padding: 24 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 24px" }}>
-                {[
-                  { label: "PROJECT_NAME", value: editName, onChange: setEditName, type: "text" },
-                  { label: "CLIENT_NAME", value: editCustomerName, onChange: setEditCustomerName, type: "text" },
-                  { label: "SHOOT_DATE", value: editShootDate, onChange: setEditShootDate, type: "date" },
-                  { label: "DEADLINE", value: editDeadline, onChange: setEditDeadline, type: "date" },
-                ].map((f) => (
-                  <label key={f.label} style={{ display: "flex", flexDirection: "column", marginBottom: 20 }}>
-                    <span style={{ ...labelStyle }}>{f.label}</span>
-                    <input type={f.type} value={f.value} onChange={(e) => f.onChange(e.target.value)} className="prj-input-field" />
-                  </label>
-                ))}
-              </div>
-              <label style={{ display: "flex", flexDirection: "column", marginBottom: 20 }}>
-                <span style={{ ...labelStyle }}>
-                  SELECT_COUNT (N) {!["preparing", "selecting"].includes(project.status) && <span style={{ color: C.orange }}>LOCKED</span>}
-                </span>
-                <input type="number" min={1} value={editRequiredCount} disabled={!["preparing", "selecting"].includes(project.status)} onChange={(e) => setEditRequiredCount(Number(e.target.value))} className="prj-input-field" />
-              </label>
-              {saveError && <div style={{ padding: "8px 12px", background: "rgba(255,51,51,0.08)", border: "1px solid rgba(255,51,51,0.2)", marginBottom: 16 }}><span style={{ fontFamily: MONO, fontSize: 10, color: "#FF3333" }}>[ERR] {saveError}</span></div>}
-              <div style={{ display: "flex", gap: 8 }}>
-                <button type="button" onClick={() => { setEditMode(false); setSaveError(""); }} className="prj-btn-secondary" style={{ flex: 1, padding: "10px 0" }}>CANCEL</button>
-                <button type="button" onClick={handleSaveEdit} disabled={saving} className="prj-btn-primary" style={{ flex: 1, padding: "10px 0", opacity: saving ? 0.5 : 1 }}>{saving ? "SAVING..." : "COMMIT_CHANGES"}</button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
@@ -1190,27 +1148,6 @@ export default function ProjectDetailPage() {
               <div style={{ display: "flex", gap: 8 }}>
                 <button type="button" onClick={() => setShowEditGuideModal(false)} className="prj-btn-secondary" style={{ flex: 1, padding: "10px 0" }}>CLOSE</button>
                 <button type="button" onClick={() => { setShowEditGuideModal(false); router.push(`/photographer/projects/${id}/results`); }} className="prj-btn-primary" style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>VIEW_SELECT_RESULTS<ChevronRight size={12} /></button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── DELETE MODAL ── */}
-      {showDeleteModal && (
-        <div className="prj-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget && !deleting) setShowDeleteModal(false); }}>
-          <div className="prj-modal-box" style={{ maxWidth: 400, borderColor: "rgba(255,51,51,0.25)" }}>
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(255,51,51,0.15)", display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontFamily: MONO, fontSize: 12, color: "#FF3333" }}>[!]</span>
-              <span className="prj-tech-label" style={{ color: "#FF3333" }}>SYS.SEC :: TERMINATE_CONFIRM</span>
-            </div>
-            <div style={{ padding: 24 }}>
-              <p style={{ fontSize: 14, color: TEXT_NORMAL, lineHeight: 1.7, marginBottom: 8 }}>프로젝트를 영구적으로 삭제합니다.</p>
-              <p style={{ fontFamily: MONO, fontSize: 10, color: TEXT_MUTED, lineHeight: 1.8, marginBottom: 20 }}>모든 사진, 셀렉 데이터, 보정본이 삭제됩니다.<br />이 작업은 되돌릴 수 없습니다.</p>
-              {deleteError && <div style={{ padding: "6px 10px", background: "rgba(255,51,51,0.08)", border: "1px solid rgba(255,51,51,0.2)", marginBottom: 16 }}><span style={{ fontFamily: MONO, fontSize: 10, color: "#FF3333" }}>[ERR] {deleteError}</span></div>}
-              <div style={{ display: "flex", gap: 8 }}>
-                <button type="button" onClick={() => setShowDeleteModal(false)} disabled={deleting} className="prj-btn-secondary" style={{ flex: 1, padding: "10px 0" }}>ABORT</button>
-                <button type="button" onClick={handleDeleteProject} disabled={deleting} className="prj-btn-danger" style={{ flex: 1, padding: "10px 0", opacity: deleting ? 0.5 : 1 }}>{deleting ? "TERMINATING..." : "CONFIRM_DELETE"}</button>
               </div>
             </div>
           </div>
