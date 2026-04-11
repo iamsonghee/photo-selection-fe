@@ -24,6 +24,7 @@ function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Pr
     accessPin: (row as any).access_pin ?? null,
     confirmedAt: row.confirmed_at ?? undefined,
     deliveredAt: row.delivered_at ?? undefined,
+    displayId: (row as any).display_id ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

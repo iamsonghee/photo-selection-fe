@@ -85,6 +85,7 @@ export interface Project {
   deliveredAt?: string; // ISO, when status = delivered
   /** 고객이 확정 취소한 횟수 (최대 3회, 고객 측 "확정 취소"용) */
   customerCancelCount?: number;
+  displayId?: string; // "20260410-001" 형식 (작가별 당일 순번)
   createdAt: string;
   updatedAt: string;
 }
