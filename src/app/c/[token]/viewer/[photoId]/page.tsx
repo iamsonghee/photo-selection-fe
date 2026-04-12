@@ -334,15 +334,17 @@ export default function ViewerPage() {
       {/* ════ DESKTOP (md+) ════ */}
       <div className="hidden md:flex flex-col" style={{ height: "100vh" }}>
 
-        {/* Main image area */}
-        <main style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 10, overflow: "hidden", minHeight: 0 }}>
-
-          {/* Top HUD bar */}
-          <div className="fs-hud" style={{
-            position: "absolute", top: 24, left: "50%", transform: "translateX(-50%)",
-            zIndex: 40, padding: "12px 24px", borderRadius: 2,
+        {/* Header HUD bar */}
+        <header style={{
+          flexShrink: 0, zIndex: 40,
+          background: "rgba(5,5,5,0.92)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          borderBottom: "1px solid #1A1A1A",
+        }}>
+          <div style={{
             display: "flex", alignItems: "center", gap: 24,
-            width: "calc(100% - 128px)", maxWidth: 960,
+            padding: "10px 24px", width: "100%",
           }}>
             {/* Back link */}
             <Link href={galleryHref} style={{ display: "flex", alignItems: "center", gap: 6, color: "rgba(255,255,255,0.4)", textDecoration: "none", flexShrink: 0, transition: "color 0.15s" }}
@@ -459,6 +461,10 @@ export default function ViewerPage() {
               </span>
             </button>
           </div>
+        </header>
+
+        {/* Main image area */}
+        <main style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 10, overflow: "hidden", minHeight: 0 }}>
 
           {/* Left nav */}
           <button type="button" onClick={goPrev} disabled={currentIndex === 0}
@@ -487,7 +493,7 @@ export default function ViewerPage() {
                 alt={filename}
                 {...viewerImageBlockDownloadHandlers}
                 style={{
-                  maxHeight: "calc(100vh - 240px)",
+                  maxHeight: "calc(100vh - 220px)",
                   maxWidth: "calc(100vw - 140px)",
                   width: "auto",
                   objectFit: "contain",
