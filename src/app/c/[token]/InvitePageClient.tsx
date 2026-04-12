@@ -93,7 +93,7 @@ export default function InvitePageClient() {
 
   if (!project) {
     return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[#050505] px-4 text-center">
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[#030303] px-4 text-center">
         <Icon icon="solar:link-broken-bold" width={36} style={{ color: "#3a3f55", marginBottom: 12 }} />
         <p className="text-[15px] font-semibold text-zinc-300">존재하지 않는 초대 링크입니다</p>
         <p className="mt-1 text-[13px] text-zinc-600">URL을 다시 확인해주세요</p>
@@ -233,186 +233,310 @@ export default function InvitePageClient() {
   }
 
   /* ──────────────── selecting / preparing ──────────────── */
-  const M        = project.photoCount;
-  const N        = project.requiredCount;
-  const ready    = project.status === "selecting";
-  const deadline = format(new Date(project.deadline), "M월 d일까지", { locale: ko });
+  const M     = project.photoCount;
+  const N     = project.requiredCount;
+  const ready = project.status === "selecting";
+  const deadlineFormatted = format(new Date(project.deadline), "yyyy.MM.dd", { locale: ko });
+  const prjIdShort = project.id.replace(/-/g, "").slice(0, 8).toUpperCase();
+  const photographerName = photographer?.name ?? "담당 작가";
+
+  const MONO = "'JetBrains Mono', 'Courier New', Courier, monospace";
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-[#050505] text-zinc-100">
+    <div style={{ minHeight: "100vh", background: "#030303", color: "#fff", display: "flex", flexDirection: "column", position: "relative", overflowX: "hidden", fontFamily: "'Pretendard Variable','Pretendard',-apple-system,sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
 
-      {/* ── Ambient glow background ── */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
-        <div style={{ position: "absolute", top: "8%",  left: "-15%", width: 300, height: 300, borderRadius: "50%", background: "rgba(79,126,255,0.10)", filter: "blur(100px)" }} />
-        <div style={{ position: "absolute", top: "45%", right: "-10%", width: 220, height: 220, borderRadius: "50%", background: "rgba(139,92,246,0.08)", filter: "blur(80px)" }} />
-        <div style={{ position: "absolute", bottom: "5%", left: "20%", width: 160, height: 160, borderRadius: "50%", background: "rgba(46,213,115,0.05)", filter: "blur(60px)" }} />
-        {/* Subtle grid */}
-        <div style={{
-          position: "absolute", inset: 0,
-          backgroundImage: "linear-gradient(rgba(79,126,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(79,126,255,0.035) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }} />
-      </div>
+        .cp-grid-bg {
+          position: fixed; inset: 0; z-index: 0; pointer-events: none;
+          background-image: linear-gradient(to right, #1a1a1a 1px, transparent 1px), linear-gradient(to bottom, #1a1a1a 1px, transparent 1px);
+          background-size: 40px 40px;
+        }
+        .cp-bracket {
+          position: fixed; width: 32px; height: 32px;
+          border: 2px solid #555; z-index: 50; pointer-events: none;
+        }
+        .cp-bracket-tl { top: 20px; left: 20px; border-right: none; border-bottom: none; }
+        .cp-bracket-tr { top: 20px; right: 20px; border-left: none; border-bottom: none; }
+        .cp-bracket-bl { bottom: 20px; left: 20px; border-right: none; border-top: none; }
+        .cp-bracket-br { bottom: 20px; right: 20px; border-left: none; border-top: none; }
 
-      <PageHeader inviteHref={inviteHref} />
+        .cp-header {
+          display: flex; justify-content: space-between; align-items: center;
+          padding: 32px 64px; position: relative; z-index: 10;
+        }
+        .cp-brand-cluster { display: flex; align-items: center; gap: 12px; }
+        .cp-logo-box {
+          background: #FF4D00; color: #000;
+          font-weight: 800; font-size: 14px;
+          width: 24px; height: 24px;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .cp-brand-name { font-weight: 800; font-size: 20px; letter-spacing: -0.5px; }
+        .cp-brand-name span { color: #FF4D00; }
 
-      <div className="relative z-10 flex flex-1 flex-col justify-between px-5 py-3 mx-auto w-full max-w-[420px]">
+        .cp-sys-info {
+          display: flex; align-items: center; gap: 24px;
+          font-family: ${MONO}; font-size: 11px; letter-spacing: 1px; color: #8C8C8C;
+        }
+        .cp-status-indicator {
+          display: flex; align-items: center; gap: 8px;
+          padding: 6px 12px; border: 1px solid #2A2A2A; background: #030303;
+        }
+        .cp-status-dot {
+          width: 6px; height: 6px; background: #00E676;
+          border-radius: 50%; box-shadow: 0 0 8px #00E676;
+        }
 
-        {/* ══ HERO ══ */}
-        <div className="fade-in-section">
+        .cp-main {
+          flex: 1; display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          padding: 40px 20px; position: relative; z-index: 10;
+        }
+        .cp-portal-cmd {
+          font-family: ${MONO}; font-size: 12px; color: #FF4D00;
+          letter-spacing: 2px; margin-bottom: 24px; text-transform: uppercase;
+          display: flex; align-items: center; gap: 12px;
+        }
+        .cp-portal-cmd::before, .cp-portal-cmd::after {
+          content: ''; width: 24px; height: 1px; background: #FF4D00;
+        }
 
-          {/* Photographer identity bar */}
-          <div className="mb-5 flex items-center gap-3">
-            <div style={{ position: "relative", flexShrink: 0 }}>
-              <img
-                src={getProfileImageUrl(photographer?.profile_image_url ?? null)}
-                alt=""
-                style={{
-                  width: 56, height: 56, borderRadius: "50%", objectFit: "cover",
-                  boxShadow: "0 0 0 2px rgba(79,126,255,0.45), 0 0 20px rgba(79,126,255,0.18)",
-                }}
-              />
-              <div style={{
-                position: "absolute", bottom: 1, right: 1,
-                width: 17, height: 17, borderRadius: "50%",
-                background: "#4f7eff", border: "2.5px solid #050505",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <Icon icon="solar:camera-bold" width={9} style={{ color: "#fff" }} />
-              </div>
-            </div>
-            <div>
-              <p className="text-[11px] text-zinc-600">담당 작가</p>
-              <p className="text-[15px] font-semibold text-zinc-100 leading-tight">
-                {photographer?.name ?? "담당 작가"}
-              </p>
-            </div>
-            {/* Deadline chip — right aligned */}
-            <div className="ml-auto flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#8b90a8" }}>
-              <Icon icon="solar:clock-circle-bold" width={11} style={{ color: "#4f7eff" }} />
-              {deadline}
-            </div>
-          </div>
+        .cp-card {
+          width: 100%; max-width: 640px;
+          background: rgba(10,10,10,0.6);
+          border: 1px solid #2A2A2A;
+          padding: 56px 48px;
+          position: relative;
+          backdrop-filter: blur(4px);
+        }
+        .cp-card-corner-tl {
+          position: absolute; top: -1px; left: -1px;
+          width: 8px; height: 8px;
+          border: 1px solid #555;
+          border-right: none; border-bottom: none;
+          pointer-events: none;
+        }
+        .cp-card-corner-br {
+          position: absolute; bottom: -1px; right: -1px;
+          width: 8px; height: 8px;
+          border: 1px solid #555;
+          border-left: none; border-top: none;
+          pointer-events: none;
+        }
 
-          {/* Invitation chip */}
-          <div
-            className="mb-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium"
-            style={{ background: "rgba(79,126,255,0.12)", border: "1px solid rgba(79,126,255,0.25)", color: "#6b97ff" }}
-          >
-            <Icon icon="solar:letter-bold" width={11} />
-            사진 셀렉 초대장
-          </div>
+        .cp-card-header { margin-bottom: 48px; text-align: center; }
+        .cp-h1 {
+          font-size: 42px; font-weight: 800; line-height: 1.2;
+          letter-spacing: -1px; margin-bottom: 16px; word-break: keep-all;
+        }
+        .cp-subtitle {
+          font-size: 16px; line-height: 1.6; color: #8C8C8C;
+          max-width: 80%; margin: 0 auto; word-break: keep-all;
+        }
 
-          {/* Big headline */}
-          <h1
-            className="mb-2 font-bold leading-[1.15] text-zinc-100"
-            style={{ fontSize: "clamp(28px, 8vw, 34px)", wordBreak: "keep-all" }}
-          >
-            {project.customerName ? (
-              <>{project.customerName}님,<br /></>
-            ) : null}
-            소중한 사진이<br />
-            도착했어요
-          </h1>
+        .cp-data-grid {
+          display: grid; grid-template-columns: 1fr 1fr;
+          gap: 1px; background: #2A2A2A;
+          border: 1px solid #2A2A2A; margin-bottom: 48px;
+        }
+        .cp-data-cell {
+          background: #030303; padding: 20px 24px;
+          display: flex; flex-direction: column; gap: 8px;
+        }
+        .cp-data-label {
+          font-family: ${MONO}; font-size: 10px; color: #555;
+          text-transform: uppercase; letter-spacing: 1px;
+        }
+        .cp-data-value { font-size: 16px; font-weight: 600; color: #fff; }
 
-          <p className="text-[13px] leading-relaxed text-zinc-500" style={{ wordBreak: "keep-all" }}>
-            {M}장의 사진 중 <strong className="font-semibold text-zinc-300">{N}장</strong>을 직접 골라주세요.
-            선택한 사진을 작가가 정성껏 보정해 드려요.
-          </p>
+        .cp-action-area {
+          display: flex; flex-direction: column; align-items: center; gap: 24px;
+        }
+        .cp-btn-primary {
+          display: inline-flex; align-items: center; justify-content: center;
+          width: 100%; background: #FF4D00; color: #000;
+          font-size: 18px; font-weight: 700;
+          padding: 20px 32px; border: none; cursor: pointer;
+          transition: background 0.2s; text-decoration: none;
+          font-family: inherit;
+        }
+        .cp-btn-primary:hover:not(:disabled) { background: #ff6600; }
+        .cp-btn-primary:disabled { opacity: 0.35; cursor: not-allowed; background: #555; }
+        .cp-btn-arrow { margin-left: 12px; font-weight: 800; transition: transform 0.2s; }
+        .cp-btn-primary:hover:not(:disabled) .cp-btn-arrow { transform: translateX(4px); }
+
+        .cp-btn-sub {
+          font-family: ${MONO}; font-size: 12px; color: #8C8C8C;
+          text-decoration: none; display: flex; align-items: center; gap: 8px;
+          transition: color 0.2s; letter-spacing: 0.5px; background: none; border: none; cursor: pointer;
+        }
+        .cp-btn-sub:hover { color: #fff; }
+
+        .cp-photographer-card {
+          margin-top: 48px; padding-top: 32px;
+          border-top: 1px dashed #2A2A2A;
+          display: flex; align-items: center; justify-content: space-between;
+        }
+        .cp-photo-meta { display: flex; align-items: center; gap: 16px; }
+        .cp-avatar-box {
+          width: 48px; height: 48px; border: 1px solid #2A2A2A;
+          display: flex; align-items: center; justify-content: center;
+          background: rgba(255,255,255,0.03); overflow: hidden; flex-shrink: 0;
+        }
+        .cp-author-name { font-size: 15px; font-weight: 700; }
+        .cp-author-role {
+          font-family: ${MONO}; font-size: 10px; color: #555;
+          text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;
+        }
+        .cp-sys-tag {
+          font-family: ${MONO}; font-size: 10px; color: #FF4D00;
+          letter-spacing: 1px; display: flex; align-items: center; gap: 6px;
+        }
+        .cp-sys-tag::before {
+          content: ''; width: 4px; height: 4px; background: #FF4D00;
+          display: inline-block;
+        }
+
+        .cp-footer {
+          padding: 24px 64px;
+          display: flex; justify-content: space-between; align-items: center;
+          border-top: 1px solid #2A2A2A;
+          font-family: ${MONO}; font-size: 10px; color: #555;
+          letter-spacing: 1px; position: relative; z-index: 10; background: #030303;
+        }
+        .cp-footer-secure { color: #8C8C8C; }
+
+        @media (max-width: 768px) {
+          .cp-header { padding: 20px; }
+          .cp-footer { padding: 20px; }
+          .cp-sys-info { display: none; }
+          .cp-card { padding: 40px 24px; }
+          .cp-h1 { font-size: 32px; }
+          .cp-data-grid { grid-template-columns: 1fr; }
+          .cp-bracket { display: none; }
+        }
+      `}</style>
+
+      {/* Grid background */}
+      <div className="cp-grid-bg" />
+
+      {/* Corner brackets */}
+      <div className="cp-bracket cp-bracket-tl" />
+      <div className="cp-bracket cp-bracket-tr" />
+      <div className="cp-bracket cp-bracket-bl" />
+      <div className="cp-bracket cp-bracket-br" />
+
+      {/* Header */}
+      <header className="cp-header">
+        <div className="cp-brand-cluster">
+          <div className="cp-logo-box">A</div>
+          <div className="cp-brand-name">A-CUT<span>.</span></div>
         </div>
-
-        {/* ══ HOW IT WORKS ══ */}
-        <div className="fade-in-section" style={{ animationDelay: "80ms" }}>
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">진행 방법</p>
-          <div className="flex items-center gap-1">
-            {STEPS.map((step, i) => (
-              <Fragment key={step.title}>
-                <div
-                  className="step-card flex flex-1 items-center gap-2 rounded-xl px-2.5 py-2"
-                  style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}
-                >
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-                    style={{ background: "rgba(79,126,255,0.12)" }}>
-                    <Icon icon={step.icon} width={14} style={{ color: "#6b97ff" }} />
-                  </div>
-                  <span className="text-[10px] font-semibold leading-tight text-zinc-300" style={{ wordBreak: "keep-all" }}>
-                    {step.title}
-                  </span>
-                </div>
-                {i < 2 && (
-                  <Icon icon="solar:alt-arrow-right-bold" width={10}
-                    style={{ color: "#2d3148", flexShrink: 0 }} />
-                )}
-              </Fragment>
-            ))}
+        <div className="cp-sys-info">
+          <div className="cp-status-indicator">
+            <div className="cp-status-dot" />
+            SYS.CLIENT_LINK_ACTIVE
           </div>
+          <div>PRJ_ID: {prjIdShort}</div>
         </div>
+      </header>
 
-        {/* ══ CTA CARD (Double Bezel) ══ */}
-        <div className="fade-in-section" style={{ animationDelay: "140ms" }}>
-          {/* Outer shell */}
-          <div style={{
-            background: "rgba(255,255,255,0.03)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: "1.25rem",
-            padding: "0.375rem",
-          }}>
-            {/* Inner core */}
-            <div style={{
-              background: "#0e1016",
-              borderRadius: "calc(1.25rem - 0.375rem)",
-              padding: "1.125rem 1.25rem",
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
-            }}>
-              {/* 2-column info grid */}
-              <div className="mb-3 grid grid-cols-2 gap-x-3 gap-y-2">
-                {[
-                  { icon: "solar:camera-bold",        val: project.name },
-                  { icon: "solar:gallery-bold",        val: `${M}장 중 ${N}장` },
-                  { icon: "solar:user-bold",           val: photographer?.name ?? "담당 작가" },
-                  { icon: "solar:calendar-mark-bold",  val: deadline },
-                ].map((r, i) => (
-                  <div key={i} className="flex items-center gap-2 text-[12px] text-zinc-300">
-                    <Icon icon={r.icon} width={13} style={{ color: "#4f7eff", flexShrink: 0 }} />
-                    <span className="truncate">{r.val}</span>
-                  </div>
-                ))}
-              </div>
+      {/* Main */}
+      <main className="cp-main">
+        <div className="cp-portal-cmd">CMD :: SYS.CLIENT_INVITE</div>
 
-              {/* Status pill */}
-              <div
-                className="mb-3 flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] font-medium"
-                style={ready
-                  ? { background: "rgba(46,213,115,0.07)", border: "1px solid rgba(46,213,115,0.2)", color: "#2ed573" }
-                  : { background: "rgba(245,166,35,0.07)", border: "1px solid rgba(245,166,35,0.2)", color: "#f5a623" }}
-              >
-                <Icon icon={ready ? "solar:check-circle-bold" : "solar:hourglass-bold"} width={13} />
-                {ready ? "사진 준비 완료 — 지금 바로 감상하세요" : "작가가 사진을 업로드하고 있어요…"}
-              </div>
+        <div className="cp-card">
+          <div className="cp-card-corner-tl" />
+          <div className="cp-card-corner-br" />
 
-              {/* CTA Button — gradient */}
-              <Link href={ready ? `/c/${token}/gallery` : "#"}>
-                <button
-                  type="button"
-                  disabled={!ready}
-                  className="ps-btn-spring flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[14px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
-                  style={{ background: ready ? "linear-gradient(135deg, #4f7eff 0%, #6b5fff 100%)" : "#1a1d24" }}
-                >
-                  {ready ? "갤러리 보기" : "준비 중..."}
-                  {ready && (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: "rgba(0,0,0,0.15)" }}>
-                      <Icon icon="solar:arrow-right-bold" width={12} />
-                    </div>
-                  )}
+          {/* Card header */}
+          <div className="cp-card-header">
+            <h1 className="cp-h1">
+              {project.customerName ? (
+                <>{project.customerName}님,<br /></>
+              ) : null}
+              {ready ? "사진이 준비됐어요." : "사진이 곧 준비돼요."}
+            </h1>
+            <p className="cp-subtitle">
+              {ready
+                ? `${photographerName} 작가님이 촬영한 사진을 보내드렸어요. 마음에 드는 사진을 직접 골라주시면 됩니다.`
+                : "작가가 사진을 업로드하고 있어요. 잠시만 기다려주세요."}
+            </p>
+          </div>
+
+          {/* Data grid */}
+          <div className="cp-data-grid">
+            <div className="cp-data-cell">
+              <span className="cp-data-label">FIELD :: PROJECT_NAME</span>
+              <span className="cp-data-value">{project.name}</span>
+            </div>
+            <div className="cp-data-cell">
+              <span className="cp-data-label">FIELD :: PHOTOGRAPHER</span>
+              <span className="cp-data-value">{photographerName}</span>
+            </div>
+            <div className="cp-data-cell">
+              <span className="cp-data-label">SYS :: DEADLINE</span>
+              <span className="cp-data-value">{deadlineFormatted} 까지</span>
+            </div>
+            <div className="cp-data-cell">
+              <span className="cp-data-label">DATA :: SELECTION_QUOTA</span>
+              <span className="cp-data-value" style={{ fontFamily: MONO, fontSize: 18 }}>
+                <span style={{ color: "#FF4D00" }}>{N}</span> / {M} 장
+              </span>
+            </div>
+          </div>
+
+          {/* Action area */}
+          <div className="cp-action-area">
+            {ready ? (
+              <Link href={`/c/${token}/gallery`} style={{ width: "100%" }}>
+                <button type="button" className="cp-btn-primary">
+                  사진 보러 가기 <span className="cp-btn-arrow">→</span>
                 </button>
               </Link>
+            ) : (
+              <button type="button" className="cp-btn-primary" disabled>
+                업로드 중... <span className="cp-btn-arrow">→</span>
+              </button>
+            )}
+            <Link href={`/c/${token}/about`} className="cp-btn-sub">
+              A컷이 처음이세요? 어떻게 사용하나요 →
+            </Link>
+          </div>
+
+          {/* Photographer card */}
+          <div className="cp-photographer-card">
+            <div className="cp-photo-meta">
+              <div className="cp-avatar-box">
+                {photographer?.profile_image_url ? (
+                  <img
+                    src={getProfileImageUrl(photographer.profile_image_url)}
+                    alt={photographerName}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.5">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                  </svg>
+                )}
+              </div>
+              <div>
+                <div className="cp-author-name">{photographerName}</div>
+                <div className="cp-author-role">담당 작가</div>
+              </div>
             </div>
+            <div className="cp-sys-tag">VERIFIED_CREATOR</div>
           </div>
         </div>
+      </main>
 
-        <footer className="pt-2 text-center text-[10px] text-zinc-700">© 2026 A CUT</footer>
-      </div>
+      {/* Footer */}
+      <footer className="cp-footer">
+        <div>V.1.2.0-CORE &nbsp;&nbsp;|&nbsp;&nbsp; <span className="cp-footer-secure">SECURE_CONNECTION</span></div>
+        <div>© 2026 A컷 · Acut</div>
+      </footer>
     </div>
   );
 }
