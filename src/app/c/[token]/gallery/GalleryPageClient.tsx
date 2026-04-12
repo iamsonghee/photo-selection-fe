@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { RotateCcw, Check, ArrowUpDown } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { useSelection } from "@/contexts/SelectionContext";
-import { getProfileImageUrl } from "@/lib/photographer";
 import {
   appendGalleryScrollQuery,
   buildFilterQueryString,
@@ -17,94 +16,72 @@ import {
 } from "@/lib/gallery-filter";
 import type { GalleryFilterState } from "@/lib/gallery-filter";
 import type { StarRating, ColorTag, SortOrder } from "@/types";
-import { PS_DISPLAY } from "@/lib/photographer-theme";
-import { BrandLogoBar } from "@/components/BrandLogo";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
+type TabFilter = "all" | "selected" | "starred";
 
 const COLOR_OPTIONS: { key: ColorTag; hex: string }[] = [
-  { key: "red",    hex: "#ff4757" },
-  { key: "yellow", hex: "#ffd32a" },
-  { key: "green",  hex: "#2ed573" },
-  { key: "blue",   hex: "#1e90ff" },
-  { key: "purple", hex: "#5352ed" },
+  { key: "red",    hex: "#ef4444" },
+  { key: "yellow", hex: "#f59e0b" },
+  { key: "green",  hex: "#22c55e" },
+  { key: "blue",   hex: "#3b82f6" },
+  { key: "purple", hex: "#8b5cf6" },
 ];
 
 const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
-  { value: "filename", label: "파일명순" },
-  { value: "oldest",   label: "번호순"  },
-  { value: "newest",   label: "최신순"  },
+  { value: "filename", label: "Sort: Filename" },
+  { value: "oldest",   label: "Sort: Number"   },
+  { value: "newest",   label: "Sort: Newest"   },
 ];
 
-const playfair: React.CSSProperties = { fontFamily: PS_DISPLAY };
-
 export default function GalleryPageClient() {
-  const params = useParams();
-  const router = useRouter();
+  const params       = useParams();
+  const router       = useRouter();
   const searchParams = useSearchParams();
-  const token = (params?.token as string) ?? "";
+  const token        = (params?.token as string) ?? "";
 
   const { project, photos, Y, N, toggle, selectedIds, photoStates, loading, updatePhotoState } = useSelection();
   const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
 
-  // Local filter state
-  const [tabFilter,    setTabFilter]    = useState<"all" | "selected">("all");
-  const [starFilter,   setStarFilter]   = useState<number>(0);
-  const [colorFilter,  setColorFilter]  = useState<ColorTag | null>(null);
-  const [sortOrder,    setSortOrder]    = useState<SortOrder>("filename");
-  const [hoverStar,    setHoverStar]    = useState(0);
-  /** 썸네일 하단 별점 호버 (필터 바 hoverStar 와 분리) */
+  const [tabFilter,     setTabFilter]     = useState<TabFilter>("all");
+  const [starFilter,    setStarFilter]    = useState<number>(0);
+  const [colorFilter,   setColorFilter]   = useState<ColorTag | null>(null);
+  const [sortOrder,     setSortOrder]     = useState<SortOrder>("filename");
+  const [hoverStar,     setHoverStar]     = useState(0);
   const [gridStarHover, setGridStarHover] = useState<{ photoId: string; star: number } | null>(null);
-  const [showSortMenu, setShowSortMenu] = useState(false);
-  const sortRef = useRef<HTMLDivElement>(null);
-
-  // Confirm modal
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirming,       setConfirming]       = useState(false);
   const [confirmError,     setConfirmError]     = useState<string | null>(null);
-  /** 뷰어→갤러리 복귀 시(`gf`) 포커스 사진 주변 썸네일 우선 로드 */
   const [galleryThumbFocusId, setGalleryThumbFocusId] = useState<string | null>(null);
 
-  /** 뷰어에서 갤러리로 돌아올 때 스크롤 위치 복원 */
   const galleryScrollKey = token ? `ps:c-gallery-scroll:${token}` : "";
 
+  /* ── Scroll restoration ── */
   useEffect(() => {
     if (loading || typeof window === "undefined") return;
-
-    // 1) URL gs — 카카오톡 등 인앱에서 sessionStorage가 비는 경우에도 동작
     const gsFromUrl = searchParams.get(GALLERY_SCROLL_PARAM);
     if (gsFromUrl != null) {
       const y = Number(gsFromUrl);
       if (Number.isFinite(y) && y >= 0) {
-        requestAnimationFrame(() => {
-          window.scrollTo({ top: y, behavior: "auto" });
-        });
+        requestAnimationFrame(() => { window.scrollTo({ top: y, behavior: "auto" }); });
       }
-      try {
-        if (galleryScrollKey) sessionStorage.removeItem(galleryScrollKey);
-      } catch {
-        /* */
-      }
+      try { if (galleryScrollKey) sessionStorage.removeItem(galleryScrollKey); } catch { /* */ }
       const next = new URLSearchParams(searchParams.toString());
       next.delete(GALLERY_SCROLL_PARAM);
       const q = next.toString();
       router.replace(`/c/${token}/gallery${q ? `?${q}` : ""}`, { scroll: false });
       return;
     }
-
-    // 2) 일반 브라우저: sessionStorage
     if (!galleryScrollKey) return;
     const raw = sessionStorage.getItem(galleryScrollKey);
     if (raw == null) return;
     sessionStorage.removeItem(galleryScrollKey);
     const y = Number(raw);
     if (!Number.isFinite(y) || y < 0) return;
-    requestAnimationFrame(() => {
-      window.scrollTo({ top: y, behavior: "auto" });
-    });
+    requestAnimationFrame(() => { window.scrollTo({ top: y, behavior: "auto" }); });
   }, [loading, galleryScrollKey, searchParams, token, router]);
 
-  /** URL `gf` → 포커스 id 저장 후 파라미터 제거 (썸네일 로드 우선순위) */
+  /* ── Focus param (gf=) ── */
   useEffect(() => {
     if (loading) return;
     const gf = searchParams.get(GALLERY_FOCUS_PARAM);
@@ -116,6 +93,7 @@ export default function GalleryPageClient() {
     router.replace(`/c/${token}/gallery${q ? `?${q}` : ""}`, { scroll: false });
   }, [loading, searchParams, token, router]);
 
+  /* ── Photographer info ── */
   useEffect(() => {
     if (!token) return;
     fetch(`/api/c/photographer?token=${encodeURIComponent(token)}`)
@@ -124,6 +102,7 @@ export default function GalleryPageClient() {
       .catch(() => {});
   }, [token]);
 
+  /* ── Status redirects ── */
   useEffect(() => {
     if (!project) return;
     if (project.status === "preparing") { router.replace(`/c/${token}`);           return; }
@@ -131,46 +110,35 @@ export default function GalleryPageClient() {
     if (project.status === "editing")   { router.replace(`/c/${token}/locked`);    return; }
   }, [project, token, router]);
 
-  // Close sort dropdown on outside click
-  useEffect(() => {
-    if (!showSortMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
-        setShowSortMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [showSortMenu]);
-
-  // Derive GalleryFilterState for filtering + viewer links
+  /* ── Filter state ── */
   const filterState = useMemo<GalleryFilterState>(() => ({
-    selectedFilter: tabFilter,
-    starFilter: starFilter === 0 ? "all" : (starFilter as StarRating),
-    colorFilter: colorFilter ?? "all",
+    selectedFilter: tabFilter === "selected" ? "selected" : "all",
+    starFilter:     tabFilter === "starred" ? 1 : starFilter === 0 ? "all" : (starFilter as StarRating),
+    colorFilter:    colorFilter ?? "all",
     sortOrder,
   }), [tabFilter, starFilter, colorFilter, sortOrder]);
 
-  const filteredPhotos = useMemo(
-    () => getFilteredPhotos(photos, selectedIds, photoStates, filterState),
-    [photos, selectedIds, photoStates, filterState]
-  );
+  const filteredPhotos = useMemo(() => {
+    const base = getFilteredPhotos(photos, selectedIds, photoStates, filterState);
+    if (tabFilter === "starred") {
+      return base.filter((p) => (photoStates[p.id]?.rating ?? 0) > 0);
+    }
+    return base;
+  }, [photos, selectedIds, photoStates, filterState, tabFilter]);
 
+  /* ── Thumbnail focus index ── */
   const galleryFocusIndex = useMemo(() => {
     if (!galleryThumbFocusId) return null;
     const i = filteredPhotos.findIndex((p) => p.id === galleryThumbFocusId);
     return i >= 0 ? i : null;
   }, [filteredPhotos, galleryThumbFocusId]);
 
-  /** 포커스 중심으로 썸 URL 선요청(브라우저 큐 앞쪽) */
+  /* ── Priority preload on focus ── */
   useEffect(() => {
     if (galleryFocusIndex == null || filteredPhotos.length === 0) return;
-    const anchor = galleryFocusIndex;
+    const anchor  = galleryFocusIndex;
     const ordered: string[] = [];
-    const push = (i: number) => {
-      const u = filteredPhotos[i]?.url;
-      if (u) ordered.push(u);
-    };
+    const push = (i: number) => { const u = filteredPhotos[i]?.url; if (u) ordered.push(u); };
     push(anchor);
     for (let d = 1; d < filteredPhotos.length; d++) {
       if (anchor - d >= 0) push(anchor - d);
@@ -181,17 +149,15 @@ export default function GalleryPageClient() {
       if (seen.has(url)) return;
       seen.add(url);
       const img = document.createElement("img");
-      img.decoding = "async";
+      img.decoding      = "async";
       img.fetchPriority = i < 24 ? "high" : "low";
       img.src = url;
     });
   }, [galleryFocusIndex, filteredPhotos]);
 
-  const viewerQueryString = useMemo(
-    () => buildFilterQueryString(filterState),
-    [filterState]
-  );
+  const viewerQueryString = useMemo(() => buildFilterQueryString(filterState), [filterState]);
 
+  /* ── Handlers ── */
   const handleCheckClick = useCallback((e: React.MouseEvent, photoId: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -204,9 +170,9 @@ export default function GalleryPageClient() {
     setConfirmError(null);
     try {
       const res = await fetch("/api/c/confirm", {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, project_id: project.id }),
+        body:    JSON.stringify({ token, project_id: project.id }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -223,479 +189,496 @@ export default function GalleryPageClient() {
     }
   }, [project?.id, token, router]);
 
-  // ── Loading / error states ──────────────────────────────────────────────
-
+  /* ── Loading / error states ── */
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: "#050505" }}>
-        <p className="text-sm" style={{ color: "#3a5a6e" }}>갤러리 불러오는 중...</p>
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#000" }}>
+        <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#555", letterSpacing: "0.1em" }}>
+          LOADING_GALLERY...
+        </p>
       </div>
     );
   }
   if (!project) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4" style={{ background: "#050505" }}>
-        <p className="text-sm" style={{ color: "#3a5a6e" }}>존재하지 않는 초대 링크입니다.</p>
+      <div style={{ display: "flex", minHeight: "100vh", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#000" }}>
+        <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#555" }}>INVALID_TOKEN</p>
       </div>
     );
   }
   if (project.status === "editing") return null;
   if (!loading && photos.length === 0) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4" style={{ background: "#050505" }}>
-        <p className="text-sm" style={{ color: "#3a5a6e" }}>사진을 불러올 수 없습니다.</p>
-        <Link href={`/c/${token}`}
-          className="rounded-xl px-4 py-2 text-[13px] transition-colors hover:opacity-80"
-          style={{ border: "none", background: "rgba(255,255,255,0.06)", color: "#7aa3ff" }}>
-          초대 페이지로 돌아가기
+      <div style={{ display: "flex", minHeight: "100vh", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, background: "#000" }}>
+        <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#555" }}>NO_PHOTOS_FOUND</p>
+        <Link href={`/c/${token}`} style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#FF4D00", textDecoration: "none", border: "1px solid #1A1A1A", padding: "8px 16px" }}>
+          ← BACK_TO_INVITE
         </Link>
       </div>
     );
   }
 
-  const canConfirm = Y === N;
-  const progressPct = N > 0 ? Math.min((Y / N) * 100, 100) : 0;
-  const currentSortLabel = SORT_OPTIONS.find((o) => o.value === sortOrder)?.label ?? "파일명순";
+  const canConfirm  = Y === N;
+  const progressPct = N > 0 ? Math.min(Math.round((Y / N) * 100), 100) : 0;
+  const remaining   = N - Y;
 
   return (
-    <div style={{ background: "#050505", minHeight: "100vh", paddingBottom: 80 }}>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;900&family=Space+Mono:wght@400;700&display=swap');
 
-      {/* ── Header ── */}
-      <header
-        className="sticky top-0 z-[100] flex h-12 items-center justify-between px-4"
-        style={{ background: "rgba(10,10,11,0.92)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
-      >
-        {/* Logo */}
-        <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
+        .gl-grid-bg {
+          position: fixed; inset: 0;
+          background-image: linear-gradient(#1A1A1A 1px, transparent 1px),
+                            linear-gradient(90deg, #1A1A1A 1px, transparent 1px);
+          background-size: 40px 40px;
+          pointer-events: none; z-index: 0; opacity: 0.5;
+        }
 
-        {/* Right: photographer + count */}
-        <div className="flex items-center gap-2.5">
-          {photographer && (
-            <span className="text-[12px]" style={{ color: "#a1a1aa" }}>
-              {photographer.name || "작가"}
-            </span>
-          )}
-          <span
-            className="rounded-full px-[9px] py-[3px] text-[12px] font-semibold"
-            style={{ background: "rgba(79,126,255,0.14)", border: "none", color: "#7aa3ff" }}
-          >
-            {Y} / {N}
-          </span>
-        </div>
-      </header>
+        .gl-photo-card {
+          position: relative;
+          aspect-ratio: 1 / 1;
+          background: #111;
+          border: 1px solid #1A1A1A;
+          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+          cursor: pointer; overflow: hidden;
+          display: block; text-decoration: none;
+        }
+        .gl-photo-card img {
+          width: 100%; height: 100%; object-fit: cover;
+          transition: transform 0.6s ease; display: block;
+        }
+        .gl-photo-card::after {
+          content: ''; position: absolute; inset: 0;
+          background: rgba(255, 174, 0, 0.12);
+          transition: opacity 0.3s ease; z-index: 5; pointer-events: none;
+        }
+        .gl-photo-card:hover::after,
+        .gl-photo-card.gl-selected::after { opacity: 0; }
+        .gl-photo-card:hover img { transform: scale(1.05); }
+        .gl-photo-card.gl-selected {
+          border-color: #FF4D00;
+          box-shadow: inset 0 0 0 1px #FF4D00;
+        }
+        .gl-photo-card.gl-selected .gl-check-box {
+          background: #FF4D00 !important; border-color: #FF4D00 !important;
+        }
 
-      {/* ── Filter bar ── */}
-      <div
-        className={`sticky top-12 ${showSortMenu ? "z-[110]" : "z-[90]"}`}
-        style={{ background: "rgba(10,10,11,0.92)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
-      >
-        <div
-          className={`flex items-center gap-1.5 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-            showSortMenu ? "overflow-visible" : "overflow-x-auto"
-          }`}
-        >
-          {/* Tabs: 전체 / 선택됨 */}
-          {(["all", "selected"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setTabFilter(v)}
-              className="shrink-0 rounded-full text-[12px] font-medium transition-all"
-              style={{
-                padding: "5px 12px",
-                border: "none",
-                background: tabFilter === v ? "rgba(79,126,255,0.15)" : "rgba(255,255,255,0.05)",
-                color: tabFilter === v ? "#7aa3ff" : "#a1a1aa",
-                whiteSpace: "nowrap",
-                cursor: "pointer",
-              }}
-            >
-              {v === "all" ? "전체" : "선택됨"}
-            </button>
-          ))}
+        .gl-card-overlay {
+          position: absolute; inset: 0;
+          background: linear-gradient(0deg, rgba(0,0,0,0.82) 0%, transparent 55%);
+          opacity: 0; transition: opacity 0.3s ease; z-index: 15;
+          padding: 10px; display: flex; flex-direction: column; justify-content: flex-end;
+        }
+        .gl-photo-card:hover .gl-card-overlay,
+        .gl-photo-card.gl-selected .gl-card-overlay { opacity: 1; }
 
-          <span className="w-2 shrink-0" aria-hidden />
+        .gl-bracket {
+          position: absolute; width: 12px; height: 12px;
+          border-color: #FF4D00; pointer-events: none; z-index: 10;
+        }
+        .gl-b-tl { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
+        .gl-b-tr { top: -1px; right: -1px; border-top: 2px solid; border-right: 2px solid; }
+        .gl-b-bl { bottom: -1px; left: -1px; border-bottom: 2px solid; border-left: 2px solid; }
+        .gl-b-br { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
 
-          {/* Interactive star filter — 클릭 후 hover가 남으면 필터가 꺼져도 별이 채워진 것처럼 보임 */}
-          {([1, 2, 3, 4, 5] as const).map((s) => {
-            const filled = s <= (hoverStar || starFilter);
-            return (
-              <button
-                key={s}
-                type="button"
-                onClick={() => {
-                  setStarFilter((prev) => (prev === s ? 0 : s));
-                  setHoverStar(0);
-                  window.setTimeout(() => setHoverStar(0), 0);
-                }}
-                onMouseEnter={() => setHoverStar(s)}
-                onMouseLeave={() => setHoverStar(0)}
-                className="shrink-0 transition-transform hover:scale-[1.2]"
-                style={{
-                  fontSize: 18,
-                  lineHeight: 1,
-                  padding: "4px 2px",
-                  color: filled ? "#f5a623" : "#3a5a6e",
-                  userSelect: "none",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  transition: "color 0.1s, transform 0.1s",
-                }}
-              >
-                {filled ? "★" : "☆"}
-              </button>
-            );
-          })}
+        .gl-check-box {
+          position: absolute; top: 10px; left: 10px;
+          width: 22px; height: 22px;
+          border: 1.5px solid rgba(255,255,255,0.4);
+          display: flex; align-items: center; justify-content: center;
+          z-index: 20; transition: all 0.2s ease;
+          background: rgba(0,0,0,0.35);
+        }
+        .gl-index-badge {
+          position: absolute; top: 10px; right: 10px;
+          background: rgba(0,0,0,0.8); color: white;
+          font-family: 'Space Mono', monospace; font-size: 9px;
+          padding: 2px 5px; border: 1px solid #1A1A1A; z-index: 20;
+        }
 
-          <span className="w-2 shrink-0" aria-hidden />
+        .gl-filter-tab {
+          position: relative; padding: 8px 14px;
+          font-size: 12px; font-weight: 700; color: #555;
+          transition: color 0.2s; background: none; border: none;
+          cursor: pointer; white-space: nowrap; font-family: inherit;
+        }
+        .gl-filter-tab.gl-tab-active { color: #FF4D00; }
+        .gl-filter-tab.gl-tab-active::after {
+          content: ''; position: absolute; bottom: -1px; left: 0;
+          width: 100%; height: 2px; background: #FF4D00;
+        }
 
-          {/* Color dot filters */}
-          {COLOR_OPTIONS.map((opt) => {
-            const isActive = colorFilter === opt.key;
-            return (
-              <button
-                key={opt.key}
-                type="button"
-                onClick={() => setColorFilter((prev) => (prev === opt.key ? null : opt.key))}
-                className="shrink-0 flex items-center justify-center transition-all"
-                title={opt.key}
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 20,
-                  padding: "5px 6px",
-                  border: isActive ? "1px solid rgba(255,255,255,0.2)" : "1px solid transparent",
-                  background: isActive ? "rgba(255,255,255,0.06)" : "transparent",
-                  cursor: "pointer",
-                }}
-              >
-                <span
-                  className="block rounded-full"
-                  style={{ width: 14, height: 14, background: opt.hex, flexShrink: 0 }}
-                />
-              </button>
-            );
-          })}
+        .gl-btn-confirm {
+          background: #FF4D00; color: #000; font-weight: 900;
+          font-family: inherit; transition: all 0.3s ease;
+          clip-path: polygon(0 0, 100% 0, 100% 65%, 88% 100%, 0 100%);
+          border: none; cursor: pointer;
+          display: flex; align-items: center; gap: 10px;
+          padding: 0 28px; height: 48px; font-size: 14px;
+        }
+        .gl-btn-confirm:disabled {
+          opacity: 0.4; cursor: not-allowed;
+          background: #555;
+        }
+        .gl-btn-confirm:not(:disabled):hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 20px rgba(255,77,0,0.3);
+        }
 
-          {/* Reset: star + color only */}
-          <button
-            type="button"
-            onClick={() => {
-              setStarFilter(0);
-              setColorFilter(null);
-              setHoverStar(0);
-              window.setTimeout(() => setHoverStar(0), 0);
-            }}
-            className="shrink-0 flex items-center justify-center transition-all hover:opacity-70"
-            title="초기화"
-            style={{
-              padding: "4px 6px",
-              borderRadius: 6,
-              border: "none",
-              color: "#71717a",
-              background: "rgba(255,255,255,0.06)",
-              cursor: "pointer",
-            }}
-          >
-            <RotateCcw style={{ width: 13, height: 13 }} />
-          </button>
+        .gl-modal-bracket {
+          position: absolute; width: 12px; height: 12px;
+          border-color: #FF4D00; pointer-events: none;
+        }
+        .gl-modal-b-tl { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
+        .gl-modal-b-tr { top: -1px; right: -1px; border-top: 2px solid; border-right: 2px solid; }
+        .gl-modal-b-bl { bottom: -1px; left: -1px; border-bottom: 2px solid; border-left: 2px solid; }
+        .gl-modal-b-br { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
 
-          {/* Sort button – margin-left auto → right-aligned */}
-          <div className="relative shrink-0" style={{ marginLeft: "auto" }} ref={sortRef}>
-            <button
-              type="button"
-              onClick={() => setShowSortMenu((v) => !v)}
-              className="flex items-center gap-1.5 transition-all"
-              style={{
-                padding: "4px 8px",
-                borderRadius: 6,
-                border: "none",
-                color: "#a1a1aa",
-                fontSize: 11,
-                background: "rgba(255,255,255,0.05)",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
-            >
-              <ArrowUpDown style={{ width: 11, height: 11 }} />
-              {currentSortLabel}
-            </button>
-            {showSortMenu && (
-              <div
-                className="absolute right-0 top-full mt-1 z-[200] overflow-hidden rounded-lg shadow-xl"
-                style={{ background: "rgba(24,24,27,0.96)", border: "1px solid rgba(255,255,255,0.08)", minWidth: 100 }}
-              >
-                {SORT_OPTIONS.map((opt) => (
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #FF4D00; }
+      `}</style>
+
+      <div style={{ background: "#000", minHeight: "100vh", paddingTop: 140, paddingBottom: 100 }}>
+        <div className="gl-grid-bg" />
+
+        {/* ── Header ── */}
+        <header style={{
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
+          background: "rgba(0,0,0,0.92)", backdropFilter: "blur(20px)",
+          borderBottom: "1px solid #222",
+        }}>
+          {/* Top row */}
+          <div style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <Link href={token ? `/c/${token}` : "#"} style={{ textDecoration: "none" }}>
+                <div style={{ width: 32, height: 32, background: "#FF4D00", display: "flex", alignItems: "center", justifyContent: "center", color: "#000", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 18, flexShrink: 0 }}>A</div>
+              </Link>
+              <div>
+                <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 20, letterSpacing: "-0.5px", textTransform: "uppercase", lineHeight: 1, color: "#fff", margin: 0 }}>
+                  A-CUT GALLERY
+                </h1>
+                <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555", marginTop: 4, letterSpacing: "0.12em" }}>
+                  PROTOCOL_V2.0 // CLIENT_ACCESS
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
+              {photographer?.name && (
+                <>
+                  <div style={{ textAlign: "right" }}>
+                    <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>Photography by</p>
+                    <p style={{ fontWeight: 700, fontSize: 14, color: "#fff", marginTop: 2 }}>{photographer.name}</p>
+                  </div>
+                  <div style={{ width: 1, height: 32, background: "#222", flexShrink: 0 }} />
+                </>
+              )}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#FF4D00", fontWeight: 700 }}>SELECTED</span>
+                  <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 28, lineHeight: 1, color: "#fff" }}>
+                    {Y}{" "}
+                    <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#444", fontWeight: 400 }}>/ {N}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Filter bar */}
+          <div style={{ borderTop: "1px solid #111", background: "rgba(0,0,0,0.5)" }}>
+            <div style={{ maxWidth: 1800, margin: "0 auto", height: 56, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", overflowX: "auto" }}>
+              {/* Left: tabs + star buttons */}
+              <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                {(["all", "selected", "starred"] as const).map((v) => (
                   <button
-                    key={opt.value}
+                    key={v}
                     type="button"
-                    onClick={() => { setSortOrder(opt.value); setShowSortMenu(false); }}
-                    className="block w-full px-3 py-2 text-left text-[12px] transition-colors hover:bg-[rgba(79,126,255,0.08)]"
-                    style={{ color: sortOrder === opt.value ? "#4f7eff" : "#a1a1aa", background: "none", cursor: "pointer" }}
+                    onClick={() => setTabFilter(v)}
+                    className={`gl-filter-tab${tabFilter === v ? " gl-tab-active" : ""}`}
                   >
-                    {opt.label}
+                    {v === "all" ? "전체 사진" : v === "selected" ? "선택됨" : "즐겨찾기"}
                   </button>
                 ))}
+
+                <div style={{ width: 1, height: 16, background: "#222", margin: "0 8px", flexShrink: 0 }} />
+
+                {/* Star filter */}
+                <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  {([1, 2, 3, 4, 5] as const).map((s) => {
+                    const effectiveStar = tabFilter !== "starred" ? starFilter : 0;
+                    const filled = s <= (hoverStar || effectiveStar);
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        disabled={tabFilter === "starred"}
+                        onClick={() => { setStarFilter((prev) => (prev === s ? 0 : s)); setHoverStar(0); window.setTimeout(() => setHoverStar(0), 0); }}
+                        onMouseEnter={() => tabFilter !== "starred" && setHoverStar(s)}
+                        onMouseLeave={() => setHoverStar(0)}
+                        style={{
+                          width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 13, lineHeight: 1, color: filled ? "#FF4D00" : "#444",
+                          background: "none", border: "none", cursor: tabFilter === "starred" ? "default" : "pointer",
+                          transition: "color 0.1s, transform 0.1s",
+                          transform: hoverStar === s ? "scale(1.2)" : "scale(1)",
+                          opacity: tabFilter === "starred" ? 0.35 : 1,
+                        }}
+                      >
+                        {filled ? "★" : "☆"}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            )}
-          </div>
-        </div>
-      </div>
 
-      {/* ── Gallery grid ── */}
-      <div style={{ padding: "10px 10px 20px" }}>
-        <div className="grid grid-cols-3 gap-[6px] sm:grid-cols-4 lg:grid-cols-8">
-          {filteredPhotos.map((photo, gridIndex) => {
-            const selected = selectedIds.has(photo.id);
-            const state = photoStates[photo.id];
-            const rating = state?.rating;
-            const colorTags = state?.color ?? [];
+              {/* Right: colors + reset + sort */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+                <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
+                  {COLOR_OPTIONS.map((opt) => {
+                    const isActive = colorFilter === opt.key;
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        title={opt.key}
+                        onClick={() => setColorFilter((prev) => (prev === opt.key ? null : opt.key))}
+                        style={{
+                          width: 13, height: 13, borderRadius: "50%",
+                          background: opt.hex,
+                          border: isActive ? "2px solid #fff" : "2px solid transparent",
+                          cursor: "pointer", flexShrink: 0, outline: "none", transition: "border-color 0.15s",
+                        }}
+                      />
+                    );
+                  })}
+                </div>
 
-            return (
-              <Link
-                key={photo.id}
-                href={`/c/${token}/viewer/${photo.id}${viewerQueryString}`}
-                onClick={(e) => {
-                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-                  e.preventDefault();
-                  const path = `/c/${token}/viewer/${photo.id}${appendGalleryScrollQuery(
-                    viewerQueryString,
-                    window.scrollY,
-                  )}`;
-                  router.push(path);
-                  try {
-                    if (galleryScrollKey) sessionStorage.setItem(galleryScrollKey, String(window.scrollY));
-                  } catch {
-                    /* private mode 등 */
-                  }
-                }}
-                className="group relative block overflow-hidden rounded-[8px] transition-transform hover:scale-[1.02]"
-                style={{
-                  aspectRatio: "1 / 1",
-                  background: "rgba(39,39,42,0.75)",
-                  border: selected ? "2px solid #4f7eff" : "1px solid rgba(255,255,255,0.08)",
-                }}
-              >
-                {/* Selected tint overlay */}
-                {selected && (
-                  <div
-                    className="pointer-events-none absolute inset-0 z-[1]"
-                    style={{ background: "rgba(79,126,255,0.12)" }}
-                  />
-                )}
-
-                {/* Image */}
-                <img
-                  src={photo.url || `https://picsum.photos/seed/${photo.id.replace(/\D/g, "") || "1"}/400/400`}
-                  alt={getPhotoDisplayName(photo)}
-                  className="h-full w-full object-cover"
-                  {...galleryThumbPriorityProps(gridIndex, galleryFocusIndex, { whenNoFocus: "lazy" })}
-                  decoding="async"
-                  draggable={false}
-                />
-
-                {/* Check badge (top-left) */}
                 <button
                   type="button"
-                  onClick={(e) => handleCheckClick(e, photo.id)}
-                  aria-label={selected ? "선택 해제" : "선택"}
-                  className={`absolute left-[5px] top-[5px] z-[2] flex items-center justify-center rounded-full transition-opacity ${
-                    selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                  }`}
-                  style={{
-                    width: 20,
-                    height: 20,
-                    background: selected ? "#4f7eff" : "rgba(0,0,0,0.45)",
-                    border: selected ? "2px solid white" : "1.5px solid rgba(255,255,255,0.55)",
-                  }}
+                  title="초기화"
+                  onClick={() => { setStarFilter(0); setColorFilter(null); setHoverStar(0); window.setTimeout(() => setHoverStar(0), 0); }}
+                  style={{ background: "none", border: "none", color: "#444", cursor: "pointer", display: "flex", alignItems: "center", padding: "4px 6px" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#888")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "#444")}
                 >
-                  {selected && <Check style={{ width: 10, height: 10, color: "white", strokeWidth: 3 }} />}
+                  <RotateCcw style={{ width: 12, height: 12 }} />
                 </button>
 
-                {/* Number badge (top-right) */}
-                <div
-                  className="absolute right-[5px] top-[4px] z-[2] rounded px-[4px] py-[1px]"
-                  style={{ background: "rgba(0,0,0,0.3)", fontSize: 9, color: "rgba(255,255,255,0.5)" }}
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+                  style={{ background: "transparent", fontFamily: "'Space Mono', monospace", fontSize: 10, textTransform: "uppercase", border: "1px solid #222", padding: "4px 8px", color: "#888", outline: "none", cursor: "pointer" }}
                 >
-                  {photo.orderIndex}
-                </div>
+                  {SORT_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value} style={{ background: "#0a0a0a" }}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        </header>
 
-                {/* Bottom info panel: 2 rows */}
-                <div
-                  className="absolute bottom-0 left-0 right-0 z-[2] flex flex-col"
-                  style={{ background: "rgba(0,0,0,0.52)", padding: "2px 5px 3px" }}
+        {/* ── Gallery Grid ── */}
+        <main style={{ position: "relative", zIndex: 10, maxWidth: 1800, margin: "0 auto", padding: "0 24px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}
+            className="md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8"
+          >
+            {filteredPhotos.map((photo, gridIndex) => {
+              const selected  = selectedIds.has(photo.id);
+              const state     = photoStates[photo.id];
+              const rating    = state?.rating;
+              const colorTags = state?.color ?? [];
+
+              return (
+                <Link
+                  key={photo.id}
+                  href={`/c/${token}/viewer/${photo.id}${viewerQueryString}`}
+                  onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                    e.preventDefault();
+                    const path = `/c/${token}/viewer/${photo.id}${appendGalleryScrollQuery(viewerQueryString, window.scrollY)}`;
+                    router.push(path);
+                    try { if (galleryScrollKey) sessionStorage.setItem(galleryScrollKey, String(window.scrollY)); } catch { /* */ }
+                  }}
+                  className={`gl-photo-card${selected ? " gl-selected" : ""}`}
                 >
-                  {/* Row 1: filename */}
-                  <span
-                    className="block truncate"
-                    style={{ fontSize: 9, color: "rgba(255,255,255,0.75)", lineHeight: "14px" }}
+                  <div className="gl-bracket gl-b-tl" />
+                  <div className="gl-bracket gl-b-tr" />
+                  <div className="gl-bracket gl-b-bl" />
+                  <div className="gl-bracket gl-b-br" />
+
+                  <img
+                    src={photo.url}
+                    alt={getPhotoDisplayName(photo)}
+                    {...galleryThumbPriorityProps(gridIndex, galleryFocusIndex, { whenNoFocus: "lazy" })}
+                    decoding="async"
+                    draggable={false}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={(e) => handleCheckClick(e, photo.id)}
+                    aria-label={selected ? "선택 해제" : "선택"}
+                    className="gl-check-box"
                   >
-                    {getPhotoDisplayName(photo)}
-                  </span>
-                  {/* Row 2: stars (left) + color dot (right) */}
-                  <div className="flex items-center justify-between" style={{ minHeight: 12 }}>
-                    <div
-                      className="flex items-center gap-[1px]"
-                      onClick={(e) => e.stopPropagation()}
-                      onMouseLeave={() =>
-                        setGridStarHover((h) => (h?.photoId === photo.id ? null : h))
-                      }
-                    >
-                      {([1, 2, 3, 4, 5] as const).map((s) => {
-                        const hoverVal =
-                          gridStarHover?.photoId === photo.id ? gridStarHover.star : 0;
-                        const displayRating = hoverVal || Number(rating) || 0;
-                        const filled = s <= displayRating;
-                        return (
-                          <button
-                            key={s}
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              const raw = photoStates[photo.id]?.rating;
-                              const cur =
-                                raw != null ? (Number(raw) as StarRating) : undefined;
-                              updatePhotoState(photo.id, {
-                                rating: cur === s ? undefined : s,
-                              });
-                              setGridStarHover(null);
-                              window.setTimeout(() => setGridStarHover(null), 0);
-                            }}
-                            onMouseEnter={() =>
-                              setGridStarHover({ photoId: photo.id, star: s })
-                            }
-                            style={{
-                              fontSize: 9,
-                              lineHeight: 1,
-                              padding: 0,
-                              border: "none",
-                              background: "none",
-                              cursor: "pointer",
-                              color: filled ? "#f5a623" : "rgba(60, 60, 70, 0.95)",
-                            }}
-                          >
-                            {filled ? "★" : "☆"}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {colorTags.length > 0 ? (
-                      <div style={{ display: "flex", gap: 1, alignItems: "center" }}>
-                        {colorTags.map((tag) => {
-                          const hex = COLOR_OPTIONS.find((c) => c.key === tag)?.hex;
-                          return hex ? (
-                            <span
-                              key={tag}
-                              className="rounded-full"
-                              style={{ width: 6, height: 6, background: hex, border: "1px solid rgba(255,255,255,0.5)", flexShrink: 0, display: "block" }}
-                            />
-                          ) : null;
+                    {selected && (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={4}>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+
+                  <div className="gl-index-badge">
+                    {String(photo.orderIndex).padStart(2, "0")}
+                  </div>
+
+                  <div className="gl-card-overlay">
+                    <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
+                      {getPhotoDisplayName(photo)}
+                    </p>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div
+                        style={{ display: "flex", gap: 1 }}
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseLeave={() => setGridStarHover((h) => (h?.photoId === photo.id ? null : h))}
+                      >
+                        {([1, 2, 3, 4, 5] as const).map((s) => {
+                          const hoverVal      = gridStarHover?.photoId === photo.id ? gridStarHover.star : 0;
+                          const displayRating = hoverVal || Number(rating) || 0;
+                          const filled        = s <= displayRating;
+                          return (
+                            <button
+                              key={s}
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault(); e.stopPropagation();
+                                const cur = photoStates[photo.id]?.rating != null ? Number(photoStates[photo.id]?.rating) as StarRating : undefined;
+                                updatePhotoState(photo.id, { rating: cur === s ? undefined : s });
+                                setGridStarHover(null);
+                                window.setTimeout(() => setGridStarHover(null), 0);
+                              }}
+                              onMouseEnter={() => setGridStarHover({ photoId: photo.id, star: s })}
+                              style={{ fontSize: 9, lineHeight: 1, padding: 0, border: "none", background: "none", cursor: "pointer", color: filled ? "#FF4D00" : "rgba(60,60,70,0.95)" }}
+                            >
+                              {filled ? "★" : "☆"}
+                            </button>
+                          );
                         })}
                       </div>
-                    ) : (
-                      <span style={{ width: 6, height: 6, display: "block" }} />
-                    )}
+                      <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
+                        {colorTags.map((tag) => {
+                          const hex = COLOR_OPTIONS.find((c) => c.key === tag)?.hex;
+                          return hex ? <span key={tag} style={{ width: 6, height: 6, borderRadius: "50%", background: hex, display: "block", flexShrink: 0 }} /> : null;
+                        })}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Bottom bar ── */}
-      <div
-        className="fixed bottom-0 left-0 right-0 z-[100] flex items-center justify-between gap-3 px-4 py-2.5 backdrop-blur"
-        style={{ background: "rgba(9,9,11,0.98)", borderTop: "1px solid rgba(255,255,255,0.06)" }}
-      >
-        {/* Left: text + progress */}
-        <div className="flex flex-1 flex-col gap-[3px]">
-          <div className="flex items-center justify-between">
-            <span className="text-[12px]" style={{ color: "#a1a1aa" }}>선택 {Y} / {N}</span>
-            {Y < N  && <span className="text-[12px] font-medium" style={{ color: "#f5a623" }}>{N - Y}개 더 선택 필요</span>}
-            {Y === N && <span className="text-[12px] font-medium" style={{ color: "#2ed573" }}>선택 완료!</span>}
-            {Y > N  && <span className="text-[12px] font-medium" style={{ color: "#f5a623" }}>{Y - N}개 초과 선택</span>}
+                </Link>
+              );
+            })}
           </div>
-          <div
-            className="h-[3px] overflow-hidden rounded-full"
-            style={{ background: "rgba(255,255,255,0.1)" }}
-          >
-            <div
-              className="h-full rounded-full transition-all duration-300"
-              style={{ width: `${progressPct}%`, background: "#4f7eff" }}
-            />
-          </div>
-        </div>
 
-        {/* Right: confirm button */}
-        <button
-          type="button"
-          onClick={() => canConfirm && setShowConfirmModal(true)}
-          disabled={!canConfirm}
-          className="shrink-0 rounded-[10px] text-[13px] font-semibold transition-all"
-          style={{
-            height: 44,
-            padding: "0 20px",
-            background: canConfirm ? "#4f7eff" : "rgba(63,63,70,0.55)",
-            color: canConfirm ? "white" : "#3a5a6e",
-            border: "none",
-            cursor: canConfirm ? "pointer" : "not-allowed",
-          }}
-        >
-          최종확정
-        </button>
-      </div>
+          {filteredPhotos.length === 0 && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0", gap: 12 }}>
+              <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#333", letterSpacing: "0.1em" }}>NO_RESULTS</p>
+              <p style={{ fontSize: 12, color: "#555" }}>필터 조건에 맞는 사진이 없습니다</p>
+            </div>
+          )}
+        </main>
 
-      {/* ── Confirm modal ── */}
-      {showConfirmModal && (
-        <div
-          className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 p-4 sm:items-center"
-          onClick={() => !confirming && setShowConfirmModal(false)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl p-6 shadow-xl"
-            style={{ background: "rgba(20,20,22,0.96)", border: "1px solid rgba(255,255,255,0.08)" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3
-              className="mb-2 text-[16px] font-bold"
-              style={{ ...playfair, color: "#fafafa" }}
-            >
-              선택 확정
-            </h3>
-            <p className="mb-6 text-[13px] leading-relaxed" style={{ color: "#a1a1aa" }}>
-              <span style={{ color: "#4f7eff", fontWeight: 600 }}>{Y}장</span>을 최종 선택으로 확정하시겠습니까?
-              <br />확정 후에는 수정이 제한됩니다.
-            </p>
-            {confirmError && (
-              <p className="mb-3 text-[12px]" style={{ color: "#ff4757" }} role="alert">
-                {confirmError}
-              </p>
-            )}
-            <div className="flex gap-2">
+        {/* ── Bottom Bar ── */}
+        <footer style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50, background: "#000", borderTop: "1px solid rgba(255,77,0,0.3)", backdropFilter: "blur(12px)" }}>
+          <div style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8, maxWidth: 400 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'Space Mono', monospace", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                <span style={{ color: "#888" }}>Selection Progress</span>
+                <span style={{ color: "#FF4D00" }}>{progressPct}% Complete</span>
+              </div>
+              <div style={{ width: "100%", height: 3, background: "#111" }}>
+                <div style={{ height: "100%", background: "#FF4D00", width: `${progressPct}%`, transition: "width 0.3s" }} />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 24, marginLeft: 32 }}>
+              <div style={{ textAlign: "right" }}>
+                <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555", margin: 0 }}>MINIMUM {N} REQ.</p>
+                <p style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
+                  {remaining > 0
+                    ? `${remaining} photos remaining`
+                    : remaining === 0
+                    ? "Ready to confirm!"
+                    : `${Math.abs(remaining)} over limit`}
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => !confirming && setShowConfirmModal(false)}
-                className="flex h-11 flex-1 items-center justify-center rounded-xl text-[13px]"
-                style={{ border: "none", color: "#a1a1aa", background: "rgba(255,255,255,0.06)" }}
+                className="gl-btn-confirm"
+                disabled={!canConfirm}
+                onClick={() => canConfirm && setShowConfirmModal(true)}
               >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirm}
-                disabled={confirming}
-                className="flex h-11 flex-1 items-center justify-center rounded-xl text-[13px] font-semibold disabled:opacity-60"
-                style={{ background: "#4f7eff", color: "white", border: "none" }}
-              >
-                {confirming ? "처리 중..." : "확정"}
+                <span>최종 셀렉 확정</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        </footer>
+
+        {/* ── Confirm Modal ── */}
+        {showConfirmModal && (
+          <div
+            style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(6px)", padding: 16 }}
+            onClick={() => !confirming && setShowConfirmModal(false)}
+          >
+            <div
+              style={{ width: "100%", maxWidth: 440, background: "#0A0A0A", border: "1px solid #FF4D00", padding: 40, position: "relative" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="gl-modal-bracket gl-modal-b-tl" />
+              <div className="gl-modal-bracket gl-modal-b-tr" />
+              <div className="gl-modal-bracket gl-modal-b-bl" />
+              <div className="gl-modal-bracket gl-modal-b-br" />
+
+              <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 28, textTransform: "uppercase", fontStyle: "italic", marginBottom: 16, color: "#fff" }}>
+                Confirm Selection
+              </h3>
+              <p style={{ color: "#888", fontSize: 13, lineHeight: 1.7, marginBottom: 32 }}>
+                총 <span style={{ color: "#FF4D00", fontWeight: 700 }}>{Y}장</span>의 사진이 선택되었습니다.
+                확정 후에는 수정을 위해 스튜디오에 별도 요청이 필요합니다. 계속하시겠습니까?
+              </p>
+
+              {confirmError && (
+                <p style={{ color: "#ef4444", fontSize: 12, marginBottom: 16 }} role="alert">{confirmError}</p>
+              )}
+
+              <div style={{ display: "flex", gap: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => !confirming && setShowConfirmModal(false)}
+                  style={{ flex: 1, height: 48, border: "1px solid #222", background: "none", color: "#888", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = "#000"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "#888"; }}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirm}
+                  disabled={confirming}
+                  style={{ flex: 1, height: 48, background: "#FF4D00", color: "#000", fontSize: 13, fontWeight: 900, textTransform: "uppercase", border: "none", cursor: confirming ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: confirming ? 0.6 : 1 }}
+                >
+                  {confirming ? "처리 중..." : "확정 및 전송"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
