@@ -321,7 +321,7 @@ export default function ViewerPage() {
         .fs-comment-input {
           background: rgba(255,255,255,0.05);
           border: 1px solid rgba(255,255,255,0.1);
-          outline: none; font-size: 10px; color: #d1d5db;
+          outline: none; font-size: 13px; color: #e5e7eb;
           font-family: 'Pretendard', sans-serif;
         }
         .fs-comment-input::placeholder { color: #555; }
@@ -353,123 +353,53 @@ export default function ViewerPage() {
           borderBottom: "1px solid #1A1A1A",
         }}>
           <div style={{
-            display: "flex", alignItems: "center", gap: 24,
-            padding: "10px 24px", width: "100%",
+            display: "flex", alignItems: "center", gap: 20,
+            padding: "16px 28px", width: "100%", minHeight: 64,
           }}>
             {/* Back link */}
-            <Link href={galleryHref} style={{ display: "flex", alignItems: "center", gap: 6, color: "rgba(255,255,255,0.4)", textDecoration: "none", flexShrink: 0, transition: "color 0.15s" }}
+            <Link href={galleryHref} scroll={false} title="갤러리로"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, color: "rgba(255,255,255,0.55)", textDecoration: "none", flexShrink: 0, transition: "color 0.15s", borderRadius: 8 }}
               onMouseEnter={(e) => (e.currentTarget.style.color = "#FF4D00")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.4)")}>
-              <X style={{ width: 12, height: 12 }} />
+              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.55)")}>
+              <X style={{ width: 18, height: 18 }} strokeWidth={2} />
             </Link>
 
             {/* Divider */}
-            <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
+            <div style={{ width: 1, height: 36, background: "rgba(255,255,255,0.12)", flexShrink: 0 }} />
 
-            {/* Filename + seq */}
-            <div style={{ display: "flex", flexDirection: "column", minWidth: 130, flexShrink: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 6, height: 6, background: "#FF4D00", flexShrink: 0 }} />
-                <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 11, letterSpacing: "-0.04em", textTransform: "uppercase", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>
+            {/* 사진 정보만 */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, flex: 1, justifyContent: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                <span style={{ width: 8, height: 8, background: "#FF4D00", flexShrink: 0 }} />
+                <h2 style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontWeight: 800,
+                  fontSize: 15,
+                  letterSpacing: "-0.02em",
+                  margin: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  color: "#fafafa",
+                  lineHeight: 1.25,
+                }}>
                   {filename}
                 </h2>
               </div>
-              <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 8, color: "#888", textTransform: "uppercase", letterSpacing: "-0.04em", margin: 0 }}>
-                {shotSeq} // {project?.name ?? "PROJECT"}
+              <p style={{
+                fontFamily: "'Space Mono', monospace",
+                fontSize: 11,
+                color: "#9ca3af",
+                letterSpacing: "0.06em",
+                margin: 0,
+                lineHeight: 1.3,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}>
+                SHOT_{shotSeq} · {project?.name ?? "PROJECT"}
               </p>
             </div>
-
-            {/* Divider */}
-            <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
-
-            {/* Star rating */}
-            <div style={{ display: "flex", gap: 2, alignItems: "center", flexShrink: 0 }}>
-              {([1, 2, 3, 4, 5] as const).map((s) => {
-                const filled = s <= displayRating;
-                return (
-                  <span key={s} className="fs-star"
-                    onClick={() => setStar(s)}
-                    onMouseEnter={() => setHoverStar(s)}
-                    onMouseLeave={() => setHoverStar(0)}
-                    style={{
-                      fontSize: 14, lineHeight: 1, userSelect: "none",
-                      color: filled ? "#FF4D00" : "#333",
-                      transform: starPressRing === s ? "scale(1.25)" : undefined,
-                    }}>
-                    {filled ? "★" : "☆"}
-                  </span>
-                );
-              })}
-            </div>
-
-            {/* Color dots */}
-            <div style={{ display: "flex", gap: 5, alignItems: "center", flexShrink: 0 }}>
-              {COLOR_OPTIONS.map((opt) => {
-                const isActive = color?.includes(opt.key) ?? false;
-                const showRing = isActive || colorPressRing === opt.key;
-                return (
-                  <button key={opt.key} type="button"
-                    onClick={() => setColor(opt.key)}
-                    style={{
-                      width: 12, height: 12, borderRadius: "50%", background: opt.color, cursor: "pointer",
-                      border: showRing ? "1.5px solid white" : "1.5px solid transparent",
-                      boxShadow: showRing ? "0 0 0 1.5px rgba(255,255,255,0.25)" : "none",
-                      flexShrink: 0, position: "relative", transition: "transform 0.1s",
-                    }}>
-                    {isActive && (
-                      <Check style={{ position: "absolute", inset: 0, margin: "auto", width: 6, height: 6, color: "white" }} strokeWidth={3} />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Divider */}
-            <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
-
-            {/* Comment input + Post */}
-            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-              <input
-                type="text"
-                className="fs-comment-input"
-                value={draftComment}
-                onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
-                onKeyDown={(e) => { if (e.key === "Enter") saveComment(); }}
-                placeholder="Retouching notes..."
-                style={{ flex: 1, padding: "4px 12px", borderRadius: 2, minWidth: 0 }}
-              />
-              <button type="button" onClick={saveComment} disabled={!hasUnsavedComment}
-                className="fs-btn-clip"
-                style={{
-                  height: 28, padding: "0 12px", fontSize: 9, flexShrink: 0,
-                  ...(commentSaveFeedback === "saved"
-                    ? { background: "#22c55e", color: "black" }
-                    : hasUnsavedComment
-                      ? { background: "#FF4D00", color: "black" }
-                      : { background: "rgba(255,255,255,0.06)", color: "#555", cursor: "not-allowed" }
-                  ),
-                }}>
-                {commentSaveFeedback === "saved" ? (
-                  <Check style={{ width: 10, height: 10 }} strokeWidth={3} />
-                ) : "Post"}
-              </button>
-            </div>
-
-            {/* Final (select) button */}
-            <button type="button" onClick={toggleSelect}
-              className="fs-btn-clip"
-              style={{
-                height: 28, padding: "0 14px", fontSize: 10, flexShrink: 0,
-                ...(isCurrentSelected
-                  ? { background: "rgba(255,77,0,0.15)", color: "#FF4D00", outline: "1px solid rgba(255,77,0,0.4)" }
-                  : { background: "#FF4D00", color: "black" }
-                ),
-              }}>
-              <Check style={{ width: 10, height: 10 }} strokeWidth={4} />
-              <span style={{ fontStyle: "italic" }}>
-                {isCurrentSelected ? `${Y}/${N}` : "Final"}
-              </span>
-            </button>
           </div>
         </header>
 
@@ -503,7 +433,7 @@ export default function ViewerPage() {
                 alt={filename}
                 {...viewerImageBlockDownloadHandlers}
                 style={{
-                  maxHeight: "calc(100vh - 220px)",
+                  maxHeight: "calc(100vh - 336px)",
                   maxWidth: "calc(100vw - 140px)",
                   width: "auto",
                   objectFit: "contain",
@@ -516,6 +446,28 @@ export default function ViewerPage() {
             ) : (
               <div style={{ color: "#3a5a6e", padding: 16 }}>사진 없음</div>
             )}
+            {/* 필름스트립과 동일: 선택 시 좌상단 오렌지 체크 */}
+            {isCurrentSelected && viewerSrc ? (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 8,
+                  left: 8,
+                  width: 22,
+                  height: 22,
+                  background: "#FF4D00",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 12,
+                  pointerEvents: "none",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
+                }}
+                aria-hidden
+              >
+                <Check style={{ width: 12, height: 12, color: "#000" }} strokeWidth={3} />
+              </div>
+            ) : null}
             {/* EXIF decorative */}
             <div style={{
               position: "absolute", bottom: -28, left: 0,
@@ -528,6 +480,146 @@ export default function ViewerPage() {
             </div>
           </div>
         </main>
+
+        {/* 별·라벨·메모·선택 — 메인 이미지와 필름스트립 사이 */}
+        <section
+          className="fs-hud"
+          style={{
+            flexShrink: 0,
+            zIndex: 35,
+            borderTop: "1px solid #1A1A1A",
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            padding: "14px 28px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 20,
+              flexWrap: "wrap",
+              width: "100%",
+              justifyContent: "space-between",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 4, alignItems: "center", flexShrink: 0, padding: "4px 0" }}>
+                {([1, 2, 3, 4, 5] as const).map((s) => {
+                  const filled = s <= displayRating;
+                  return (
+                    <span
+                      key={s}
+                      className="fs-star"
+                      onClick={() => setStar(s)}
+                      onMouseEnter={() => setHoverStar(s)}
+                      onMouseLeave={() => setHoverStar(0)}
+                      style={{
+                        fontSize: 20,
+                        lineHeight: 1,
+                        userSelect: "none",
+                        color: filled ? "#FF4D00" : "#3f3f46",
+                        transform: starPressRing === s ? "scale(1.2)" : undefined,
+                      }}
+                    >
+                      {filled ? "★" : "☆"}
+                    </span>
+                  );
+                })}
+              </div>
+              <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.12)", flexShrink: 0 }} />
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                {COLOR_OPTIONS.map((opt) => {
+                  const isActive = color?.includes(opt.key) ?? false;
+                  const showRing = isActive || colorPressRing === opt.key;
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      title={opt.key}
+                      onClick={() => setColor(opt.key)}
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        background: opt.color,
+                        cursor: "pointer",
+                        border: showRing ? "2px solid white" : "2px solid rgba(0,0,0,0.35)",
+                        boxShadow: showRing ? "0 0 0 2px rgba(255,255,255,0.2)" : "none",
+                        flexShrink: 0,
+                        position: "relative",
+                        transition: "transform 0.1s",
+                      }}
+                    >
+                      {isActive && (
+                        <Check
+                          style={{ position: "absolute", inset: 0, margin: "auto", width: 10, height: 10, color: "white" }}
+                          strokeWidth={3}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ flex: "1 1 240px", display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+              <input
+                type="text"
+                className="fs-comment-input"
+                value={draftComment}
+                onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveComment();
+                }}
+                placeholder="Retouching notes..."
+                style={{ flex: 1, padding: "10px 14px", borderRadius: 6, minWidth: 0, minHeight: 40 }}
+              />
+              <button
+                type="button"
+                onClick={saveComment}
+                disabled={!hasUnsavedComment}
+                className="fs-btn-clip"
+                style={{
+                  height: 40,
+                  padding: "0 16px",
+                  fontSize: 11,
+                  flexShrink: 0,
+                  letterSpacing: "0.04em",
+                  ...(commentSaveFeedback === "saved"
+                    ? { background: "#22c55e", color: "black" }
+                    : hasUnsavedComment
+                      ? { background: "#FF4D00", color: "black" }
+                      : { background: "rgba(255,255,255,0.06)", color: "#555", cursor: "not-allowed" }),
+                }}
+              >
+                {commentSaveFeedback === "saved" ? (
+                  <Check style={{ width: 14, height: 14 }} strokeWidth={3} />
+                ) : (
+                  "Post"
+                )}
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={toggleSelect}
+              className="fs-btn-clip"
+              style={{
+                height: 40,
+                padding: "0 18px",
+                fontSize: 12,
+                flexShrink: 0,
+                letterSpacing: "0.02em",
+                ...(isCurrentSelected
+                  ? { background: "rgba(255,77,0,0.15)", color: "#FF4D00", outline: "1px solid rgba(255,77,0,0.4)" }
+                  : { background: "#FF4D00", color: "black" }),
+              }}
+            >
+              <Check style={{ width: 14, height: 14 }} strokeWidth={3} />
+              <span>{isCurrentSelected ? `선택됨 ${Y}/${N}` : "선택"}</span>
+            </button>
+          </div>
+        </section>
 
         {/* Filmstrip footer */}
         <footer style={{
@@ -597,19 +689,19 @@ export default function ViewerPage() {
 
         {/* Topbar */}
         <div style={{
-          background: "rgba(0,0,0,0.72)", backdropFilter: "blur(10px)",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
+          background: "rgba(0,0,0,0.78)", backdropFilter: "blur(14px)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
           flexShrink: 0, zIndex: 20, paddingTop: 40,
         }}>
-          <div style={{ height: 44, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, padding: "0 12px" }}>
-            <Link href={galleryHref}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", borderRadius: 8, color: "rgba(255,255,255,0.75)", fontSize: 12, textDecoration: "none", flexShrink: 0 }}>
+          <div style={{ minHeight: 52, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 16px" }}>
+            <Link href={galleryHref} scroll={false}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", borderRadius: 10, color: "rgba(255,255,255,0.85)", fontSize: 14, fontWeight: 600, textDecoration: "none", flexShrink: 0 }}>
               ← 갤러리
             </Link>
-            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.92)", flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 4px" }}>
               {filename}
             </span>
-            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", flexShrink: 0 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: "#FF4D00", flexShrink: 0 }}>
               {currentIndex + 1} / {filteredPhotos.length}
             </span>
           </div>
@@ -653,7 +745,7 @@ export default function ViewerPage() {
             }}>
             {isCurrentSelected
               ? <><Check style={{ width: 15, height: 15, flexShrink: 0 }} /><span>선택됨 ({Y}/{N})</span></>
-              : <span>선택하기 ({Y}/{N})</span>
+              : <span>선택 ({Y}/{N})</span>
             }
           </button>
 

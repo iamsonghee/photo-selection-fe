@@ -303,19 +303,18 @@ export function MobileViewerPinchPhoto({ src, alt, showBadge, onZoomStateChange 
       </div>
       {showBadgeVisible && (
         <div
-          className="pointer-events-none absolute z-[3] flex items-center justify-center rounded-full"
+          className="pointer-events-none absolute z-[3] flex items-center justify-center"
           style={{
             left: badgeOffset.left,
             top: badgeOffset.top,
-            width: 20,
-            height: 20,
-            background: "#4f7eff",
-            border: "2px solid white",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+            width: 22,
+            height: 22,
+            background: "#FF4D00",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
           }}
           aria-hidden
         >
-          <Check style={{ width: 10, height: 10, color: "white" }} strokeWidth={3} />
+          <Check style={{ width: 12, height: 12, color: "#000" }} strokeWidth={3} />
         </div>
       )}
     </div>

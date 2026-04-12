@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { RotateCcw } from "lucide-react";
@@ -58,42 +58,62 @@ export default function GalleryPageClient() {
 
   const galleryScrollKey = token ? `ps:c-gallery-scroll:${token}` : "";
 
-  /* ── Scroll restoration ── */
-  useEffect(() => {
+  /* 브라우저 기본 스크롤 복원과 충돌하지 않도록 (갤러리에 있는 동안만 manual) */
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    const prev = history.scrollRestoration;
+    history.scrollRestoration = "manual";
+    return () => {
+      history.scrollRestoration = prev;
+    };
+  }, []);
+
+  /* 스크롤·썸네일 포커스 복원: 페인트 전에 적용 + gs/gf 정리는 router.replace 1회만 */
+  useLayoutEffect(() => {
     if (loading || typeof window === "undefined") return;
-    const gsFromUrl = searchParams.get(GALLERY_SCROLL_PARAM);
-    if (gsFromUrl != null) {
-      const y = Number(gsFromUrl);
+
+    const gsRaw = searchParams.get(GALLERY_SCROLL_PARAM);
+    const gfRaw = searchParams.get(GALLERY_FOCUS_PARAM);
+    const hasGsParam = gsRaw != null;
+    const hasGfParam = gfRaw != null;
+
+    if (hasGsParam) {
+      const y = Number(gsRaw);
       if (Number.isFinite(y) && y >= 0) {
-        requestAnimationFrame(() => { window.scrollTo({ top: y, behavior: "auto" }); });
+        window.scrollTo({ top: y, behavior: "auto" });
       }
-      try { if (galleryScrollKey) sessionStorage.removeItem(galleryScrollKey); } catch { /* */ }
+      try {
+        if (galleryScrollKey) sessionStorage.removeItem(galleryScrollKey);
+      } catch {
+        /* ignore */
+      }
+    } else if (galleryScrollKey) {
+      try {
+        const raw = sessionStorage.getItem(galleryScrollKey);
+        if (raw != null) {
+          sessionStorage.removeItem(galleryScrollKey);
+          const y = Number(raw);
+          if (Number.isFinite(y) && y >= 0) {
+            window.scrollTo({ top: y, behavior: "auto" });
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (hasGfParam) {
+      setGalleryThumbFocusId(gfRaw);
+    }
+
+    if (hasGsParam || hasGfParam) {
       const next = new URLSearchParams(searchParams.toString());
       next.delete(GALLERY_SCROLL_PARAM);
+      next.delete(GALLERY_FOCUS_PARAM);
       const q = next.toString();
       router.replace(`/c/${token}/gallery${q ? `?${q}` : ""}`, { scroll: false });
-      return;
     }
-    if (!galleryScrollKey) return;
-    const raw = sessionStorage.getItem(galleryScrollKey);
-    if (raw == null) return;
-    sessionStorage.removeItem(galleryScrollKey);
-    const y = Number(raw);
-    if (!Number.isFinite(y) || y < 0) return;
-    requestAnimationFrame(() => { window.scrollTo({ top: y, behavior: "auto" }); });
   }, [loading, galleryScrollKey, searchParams, token, router]);
-
-  /* ── Focus param (gf=) ── */
-  useEffect(() => {
-    if (loading) return;
-    const gf = searchParams.get(GALLERY_FOCUS_PARAM);
-    if (gf == null) return;
-    setGalleryThumbFocusId(gf);
-    const next = new URLSearchParams(searchParams.toString());
-    next.delete(GALLERY_FOCUS_PARAM);
-    const q = next.toString();
-    router.replace(`/c/${token}/gallery${q ? `?${q}` : ""}`, { scroll: false });
-  }, [loading, searchParams, token, router]);
 
   /* ── Photographer info ── */
   useEffect(() => {
@@ -269,11 +289,10 @@ export default function GalleryPageClient() {
         .gl-card-overlay {
           position: absolute; inset: 0;
           background: linear-gradient(0deg, rgba(0,0,0,0.82) 0%, transparent 55%);
-          opacity: 0; transition: opacity 0.3s ease; z-index: 15;
+          opacity: 1; z-index: 15; pointer-events: none;
           padding: 10px; display: flex; flex-direction: column; justify-content: flex-end;
         }
-        .gl-photo-card:hover .gl-card-overlay,
-        .gl-photo-card.gl-selected .gl-card-overlay { opacity: 1; }
+        .gl-card-overlay .gl-overlay-interactive { pointer-events: auto; }
 
         .gl-bracket {
           position: absolute; width: 12px; height: 12px;
@@ -292,13 +311,6 @@ export default function GalleryPageClient() {
           z-index: 20; transition: all 0.2s ease;
           background: rgba(0,0,0,0.35);
         }
-        .gl-index-badge {
-          position: absolute; top: 10px; right: 10px;
-          background: rgba(0,0,0,0.8); color: white;
-          font-family: 'Space Mono', monospace; font-size: 9px;
-          padding: 2px 5px; border: 1px solid #1A1A1A; z-index: 20;
-        }
-
         .gl-filter-tab {
           position: relative; padding: 8px 14px;
           font-size: 12px; font-weight: 700; color: #555;
@@ -531,15 +543,11 @@ export default function GalleryPageClient() {
                     )}
                   </button>
 
-                  <div className="gl-index-badge">
-                    {String(photo.orderIndex).padStart(2, "0")}
-                  </div>
-
                   <div className="gl-card-overlay">
                     <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
                       {getPhotoDisplayName(photo)}
                     </p>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div className="gl-overlay-interactive" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <div
                         style={{ display: "flex", gap: 1 }}
                         onClick={(e) => e.stopPropagation()}
