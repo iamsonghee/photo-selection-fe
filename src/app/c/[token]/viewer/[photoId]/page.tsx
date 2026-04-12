@@ -123,7 +123,8 @@ export default function ViewerPage() {
   const N = project?.requiredCount ?? 0;
   const queryString = searchParams.toString() ? `?${searchParams.toString()}` : "";
 
-  const filmstripRef = useRef<HTMLDivElement>(null);
+  const filmstripRef     = useRef<HTMLDivElement>(null);
+  const filmstripSeenRef = useRef(false); // 마운트 후 첫 실행 여부 추적
 
   useEffect(() => {
     const container = filmstripRef.current;
@@ -132,7 +133,11 @@ export default function ViewerPage() {
     const GAP     = 16;
     const step    = THUMB_W + GAP;
     const target  = currentIndex * step - container.clientWidth / 2 + THUMB_W / 2;
-    container.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+    // 컴포넌트가 매 내비게이션마다 리마운트되므로, 마운트 직후엔 즉시 이동(animation 없음)
+    // 동일 인스턴스에서 인덱스가 바뀔 때만 smooth 처리
+    const behavior = filmstripSeenRef.current ? "smooth" : "instant";
+    filmstripSeenRef.current = true;
+    container.scrollTo({ left: Math.max(0, target), behavior });
   }, [currentIndex]);
 
   useEffect(() => {
