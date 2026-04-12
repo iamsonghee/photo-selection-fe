@@ -123,11 +123,16 @@ export default function ViewerPage() {
   const N = project?.requiredCount ?? 0;
   const queryString = searchParams.toString() ? `?${searchParams.toString()}` : "";
 
-  const filmstripRef   = useRef<HTMLDivElement>(null);
-  const activeThumbRef = useRef<HTMLDivElement>(null);
+  const filmstripRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    activeThumbRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    const container = filmstripRef.current;
+    if (!container) return;
+    const THUMB_W = 150;
+    const GAP     = 16;
+    const step    = THUMB_W + GAP;
+    const target  = currentIndex * step - container.clientWidth / 2 + THUMB_W / 2;
+    container.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
   }, [currentIndex]);
 
   useEffect(() => {
@@ -175,22 +180,22 @@ export default function ViewerPage() {
 
   const goPrev = useCallback(() => {
     if (currentIndex <= 0) return;
-    router.push(`/c/${token}/viewer/${filteredPhotos[currentIndex - 1].id}${queryString}`);
+    router.push(`/c/${token}/viewer/${filteredPhotos[currentIndex - 1].id}${queryString}`, { scroll: false });
   }, [currentIndex, filteredPhotos, router, token, queryString]);
 
   const goNext = useCallback(() => {
     if (currentIndex >= filteredPhotos.length - 1) return;
-    router.push(`/c/${token}/viewer/${filteredPhotos[currentIndex + 1].id}${queryString}`);
+    router.push(`/c/${token}/viewer/${filteredPhotos[currentIndex + 1].id}${queryString}`, { scroll: false });
   }, [currentIndex, filteredPhotos, router, token, queryString]);
 
   const goPrevWrap = useCallback(() => {
     if (!filteredPhotos.length) return;
-    router.push(`/c/${token}/viewer/${filteredPhotos[(currentIndex - 1 + filteredPhotos.length) % filteredPhotos.length].id}${queryString}`);
+    router.push(`/c/${token}/viewer/${filteredPhotos[(currentIndex - 1 + filteredPhotos.length) % filteredPhotos.length].id}${queryString}`, { scroll: false });
   }, [currentIndex, filteredPhotos, router, token, queryString]);
 
   const goNextWrap = useCallback(() => {
     if (!filteredPhotos.length) return;
-    router.push(`/c/${token}/viewer/${filteredPhotos[(currentIndex + 1) % filteredPhotos.length].id}${queryString}`);
+    router.push(`/c/${token}/viewer/${filteredPhotos[(currentIndex + 1) % filteredPhotos.length].id}${queryString}`, { scroll: false });
   }, [currentIndex, filteredPhotos, router, token, queryString]);
 
   // ── Touch swipe ───────────────────────────────────────────────────────────
@@ -538,9 +543,9 @@ export default function ViewerPage() {
               return (
                 <div
                   key={photo.id}
-                  ref={isActive ? activeThumbRef : null}
+
                   className={`fs-thumb${isActive ? " active" : ""}`}
-                  onClick={() => router.push(`/c/${token}/viewer/${photo.id}${queryString}`)}
+                  onClick={() => router.push(`/c/${token}/viewer/${photo.id}${queryString}`, { scroll: false })}
                 >
                   <img
                     src={thumbSrc}
