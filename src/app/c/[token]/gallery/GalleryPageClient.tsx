@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { RotateCcw } from "lucide-react";
+import { format } from "date-fns";
+import { ko } from "date-fns/locale";
 import { useSelection } from "@/contexts/SelectionContext";
 import {
   appendGalleryScrollQuery,
@@ -356,11 +358,11 @@ export default function GalleryPageClient() {
                 <div style={{ width: 32, height: 32, background: "#FF4D00", display: "flex", alignItems: "center", justifyContent: "center", color: "#000", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 18, flexShrink: 0 }}>A</div>
               </Link>
               <div>
-                <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 20, letterSpacing: "-0.5px", textTransform: "uppercase", lineHeight: 1, color: "#fff", margin: 0 }}>
-                  A-CUT GALLERY
+                <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 20, letterSpacing: "-0.5px", lineHeight: 1, color: "#fff", margin: 0 }}>
+                  {project.name}
                 </h1>
-                <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555", marginTop: 4, letterSpacing: "0.12em" }}>
-                  PROTOCOL_V2.0 // CLIENT_ACCESS
+                <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555", marginTop: 4, letterSpacing: "0.1em" }}>
+                  DEADLINE // {format(new Date(project.deadline), "yyyy.MM.dd", { locale: ko })}
                 </p>
               </div>
             </div>
@@ -483,9 +485,7 @@ export default function GalleryPageClient() {
 
         {/* ── Gallery Grid ── */}
         <main style={{ position: "relative", zIndex: 10, maxWidth: 1800, margin: "0 auto", padding: "0 24px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}
-            className="md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8"
-          >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 12 }}>
             {filteredPhotos.map((photo, gridIndex) => {
               const selected  = selectedIds.has(photo.id);
               const state     = photoStates[photo.id];
@@ -592,7 +592,7 @@ export default function GalleryPageClient() {
         {/* ── Bottom Bar ── */}
         <footer style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50, background: "#000", borderTop: "1px solid rgba(255,77,0,0.3)", backdropFilter: "blur(12px)" }}>
           <div style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8, maxWidth: 400 }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'Space Mono', monospace", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 <span style={{ color: "#888" }}>Selection Progress</span>
                 <span style={{ color: "#FF4D00" }}>{progressPct}% Complete</span>
@@ -619,7 +619,7 @@ export default function GalleryPageClient() {
                 disabled={!canConfirm}
                 onClick={() => canConfirm && setShowConfirmModal(true)}
               >
-                <span>최종 셀렉 확정</span>
+                <span>보정 의뢰하기</span>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
                   <line x1="5" y1="12" x2="19" y2="12" />
                   <polyline points="12 5 19 12 12 19" />

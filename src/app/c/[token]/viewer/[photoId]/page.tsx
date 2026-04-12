@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X } from "lucide-react";
 import { useSelection } from "@/contexts/SelectionContext";
 import {
   parseFilterFromSearchParams,
@@ -29,12 +29,6 @@ const COLOR_OPTIONS: { key: ColorTag; color: string }[] = [
 ];
 
 const COMMENT_MAX_LENGTH = 150;
-
-const S = {
-  panelLabel: {
-    fontSize: 11, fontWeight: 500, color: "rgba(161,161,170,0.9)", marginBottom: 8,
-  } as React.CSSProperties,
-};
 
 /** object-fit: contain 영역 기준 좌표 (실제 그려진 사진의 왼쪽 위) */
 function getObjectFitContainOffset(
@@ -128,7 +122,7 @@ function ViewerPhotoWithBadge({
             top: badgeOffset.top,
             width: 20,
             height: 20,
-            background: "#4f7eff",
+            background: "#FF4D00",
             border: "2px solid white",
             boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
           }}
@@ -162,16 +156,16 @@ export default function ViewerPage() {
   const star  = current ? photoStates[current.id]?.rating : undefined;
   const color = current ? photoStates[current.id]?.color  : undefined;
 
-  const [hoverStar,     setHoverStar]     = useState(0);
-  const [starPressRing, setStarPressRing] = useState<number | null>(null);
+  const [hoverStar,      setHoverStar]      = useState(0);
+  const [starPressRing,  setStarPressRing]  = useState<number | null>(null);
   const [colorPressRing, setColorPressRing] = useState<ColorTag | null>(null);
-  const [draftComment,  setDraftComment]  = useState("");
+  const [draftComment,   setDraftComment]   = useState("");
   const [commentSaveFeedback, setCommentSaveFeedback] = useState<"idle" | "saved">("idle");
+  const [showShortcuts,  setShowShortcuts]  = useState(false);
 
   const N = project?.requiredCount ?? 0;
   const queryString = searchParams.toString() ? `?${searchParams.toString()}` : "";
 
-  // Sync draft comment when photo changes
   useEffect(() => {
     if (current?.id) setDraftComment(photoStates[current.id]?.comment ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -198,7 +192,6 @@ export default function ViewerPage() {
     const raw = photoStates[current.id]?.rating;
     const cur = raw != null ? (Number(raw) as StarRating) : undefined;
     updatePhotoState(current.id, { rating: cur === s ? undefined : s });
-    // 호버 미리보기가 남으면 별을 지워도 hoverStar 때문에 계속 채워진 것처럼 보임 (터치 합성 이벤트 대비 다음 틱에 한 번 더 초기화)
     setHoverStar(0);
     window.setTimeout(() => setHoverStar(0), 0);
   }, [current, photoStates, updatePhotoState]);
@@ -258,6 +251,8 @@ export default function ViewerPage() {
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const tag = (e.target as HTMLElement).tagName;
     if (tag === "TEXTAREA" || tag === "INPUT") return;
+    if (e.key === "?" || (e.shiftKey && e.key === "/")) { setShowShortcuts(s => !s); return; }
+    if (e.key === "Escape") { setShowShortcuts(false); return; }
     switch (e.code) {
       case "Digit1": setStar(1); setStarPressRing(1); setTimeout(() => setStarPressRing(null), 200); break;
       case "Digit2": setStar(2); setStarPressRing(2); setTimeout(() => setStarPressRing(null), 200); break;
@@ -296,366 +291,326 @@ export default function ViewerPage() {
   if (!project || !current) return null;
   if (project.status === "confirmed" || project.status === "editing") return null;
 
-  const displayRating    = hoverStar || star || 0;
+  const displayRating     = hoverStar || star || 0;
   const isCurrentSelected = selectedIds.has(current.id);
   const filename          = getPhotoDisplayName(current);
   const viewerSrc         = viewerImageUrl(current);
-
-  // ── Shared UI blocks ─────────────────────────────────────────────────────
-
-  const StarBlock = (
-    <div>
-      <div style={S.panelLabel}>별점</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        {([1, 2, 3, 4, 5] as const).map((s) => {
-          const filled = s <= displayRating;
-          return (
-            <button key={s} type="button"
-              onClick={() => setStar(s)}
-              onMouseEnter={() => setHoverStar(s)}
-              onMouseLeave={() => setHoverStar(0)}
-              className={`transition-transform hover:scale-[1.15] ${starPressRing === s ? "scale-125" : ""}`}
-              style={{
-                fontSize: 24, lineHeight: 1, padding: 2,
-                color: filled ? "#f5a623" : "#3a5a6e",
-                background: "none", border: "none", cursor: "pointer", userSelect: "none",
-              }}>
-              {filled ? "★" : "☆"}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-
-  const ColorBlock = (
-    <div>
-      <div style={S.panelLabel}>색상 태그</div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-        {COLOR_OPTIONS.map((opt) => {
-          const isActive  = color?.includes(opt.key) ?? false;
-          const showRing  = isActive || colorPressRing === opt.key;
-          return (
-            <button key={opt.key} type="button"
-              onClick={() => setColor(opt.key)}
-              className="transition-transform hover:scale-[1.1]"
-              style={{
-                width: 28, height: 28, borderRadius: "50%",
-                background: opt.color,
-                border: showRing ? "2px solid white" : "2px solid transparent",
-                boxShadow: showRing ? "0 0 0 2px rgba(255,255,255,0.3)" : "none",
-                cursor: "pointer", position: "relative", flexShrink: 0,
-              }}>
-              {isActive && (
-                <Check style={{ position: "absolute", inset: 0, margin: "auto", width: 12, height: 12, color: "white" }} strokeWidth={3} />
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-
-  const CommentBlock = (
-    <div style={{ flex: 1 }}>
-      <div style={S.panelLabel}>코멘트</div>
-      <textarea
-        value={draftComment}
-        onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
-        placeholder="이 사진에 대한 메모를 남겨주세요"
-        style={{
-          width: "100%", padding: "10px 12px",
-          background: "rgba(39,39,42,0.6)", border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: 8, color: "#fafafa", fontSize: 12,
-          fontFamily: "'Pretendard', system-ui, sans-serif",
-          resize: "none", height: 72, lineHeight: 1.5, outline: "none",
-        }}
-      />
-      <button
-        type="button"
-        onClick={saveComment}
-        disabled={!hasUnsavedComment}
-        aria-label={commentSaveFeedback === "saved" ? "코멘트 저장됨" : "코멘트 저장"}
-        style={{
-          marginTop: 8,
-          width: "100%",
-          padding: "9px 10px",
-          borderRadius: 8,
-          fontSize: 12,
-          fontWeight: 600,
-          fontFamily: "'Pretendard', system-ui, sans-serif",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 6,
-          transition: "background 0.2s, color 0.2s, border-color 0.2s, transform 0.08s, opacity 0.2s",
-          ...(commentSaveFeedback === "saved"
-            ? {
-                background: "rgba(46,213,115,0.15)",
-                border: "1px solid rgba(46,213,115,0.35)",
-                color: "#2ed573",
-                cursor: "default",
-              }
-            : hasUnsavedComment
-              ? {
-                  background: "rgba(79,126,255,0.14)",
-                  border: "1px solid rgba(79,126,255,0.45)",
-                  color: "#7aa3ff",
-                  cursor: "pointer",
-                }
-              : {
-                  background: "rgba(255,255,255,0.05)",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                  color: "#52525b",
-                  cursor: "not-allowed",
-                  opacity: 0.85,
-                }),
-        }}
-        onMouseDown={(e) => {
-          if (hasUnsavedComment && commentSaveFeedback !== "saved") {
-            (e.currentTarget as HTMLButtonElement).style.transform = "scale(0.98)";
-          }
-        }}
-        onMouseUp={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = "";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = "";
-        }}
-      >
-        {commentSaveFeedback === "saved" ? (
-          <>
-            <Check style={{ width: 14, height: 14, flexShrink: 0 }} strokeWidth={3} />
-            저장됨
-          </>
-        ) : (
-          "저장"
-        )}
-      </button>
-      {hasUnsavedComment && commentSaveFeedback !== "saved" && (
-        <div style={{ marginTop: 6, fontSize: 10, color: "rgba(161,161,170,0.95)" }}>
-          저장하지 않은 변경이 있어요
-        </div>
-      )}
-    </div>
-  );
-
-  const SelectButton = () => (
-    <button type="button" onClick={toggleSelect}
-      style={{
-        width: "100%", minHeight: 44,
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
-        borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer",
-        fontFamily: "'Pretendard', system-ui, sans-serif", transition: "all 0.15s",
-        padding: "10px 12px",
-        ...(isCurrentSelected
-          ? { background: "rgba(79,126,255,0.12)", border: "none", color: "#7aa3ff" }
-          : { background: "rgba(255,255,255,0.06)", border: "none", color: "#a1a1aa" }
-        ),
-      }}>
-      {isCurrentSelected ? (
-        <>
-          <Check style={{ width: 15, height: 15, flexShrink: 0 }} />
-          <span>선택됨 ({Y}/{N})</span>
-        </>
-      ) : (
-        <span>선택하기 ({Y}/{N})</span>
-      )}
-    </button>
-  );
-
-  // ── Render ────────────────────────────────────────────────────────────────
+  const galleryHref       = buildGalleryHrefWithFocus(token, searchParams, photoId);
+  const shotSeq           = String(currentIndex + 1).padStart(3, "0");
+  const totalSeq          = String(filteredPhotos.length).padStart(3, "0");
+  const bracketColor      = isCurrentSelected ? "#FF4D00" : "#555555";
+  const bracketShadow     = isCurrentSelected ? "0 0 16px rgba(255,77,0,0.55)" : "none";
+  const bracketBorder     = `2px solid ${bracketColor}`;
 
   return (
     <div
-      style={{ background: "#0a0a0a", minHeight: "100vh", overflow: "hidden" }}
+      style={{ background: "#030303", minHeight: "100vh", overflow: "hidden" }}
       onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}>
+      onTouchEnd={handleTouchEnd}
+    >
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
-      {/* ════ DESKTOP (md+): 2-column grid ════ */}
-      <div
-        className="hidden md:grid"
-        style={{ gridTemplateColumns: "1fr 280px", height: "100vh", maxHeight: "100vh", overflow: "hidden" }}
-      >
+        .vw-hud {
+          background: rgba(5,5,5,0.82);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(255,255,255,0.08);
+        }
+        .vw-mono {
+          font-family: 'Space Mono', 'JetBrains Mono', monospace;
+        }
+        .vw-nav-btn {
+          background: rgba(5,5,5,0.82);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(255,255,255,0.08);
+          color: rgba(255,255,255,0.6);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: background 0.2s, color 0.2s, border-color 0.2s;
+        }
+        .vw-nav-btn:hover:not(:disabled) {
+          background: rgba(255,77,0,0.12);
+          border-color: rgba(255,77,0,0.4);
+          color: #FF4D00;
+        }
+        .vw-nav-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+        .vw-close-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 16px;
+          color: rgba(255,255,255,0.65);
+          font-family: 'Space Mono', monospace;
+          font-size: 10px;
+          letter-spacing: 0.08em;
+          text-decoration: none;
+          transition: color 0.2s, border-color 0.2s;
+        }
+        .vw-close-btn:hover {
+          color: #FF4D00;
+          border-color: rgba(255,77,0,0.35);
+        }
+        .vw-star-btn {
+          background: none; border: none; cursor: pointer;
+          line-height: 1; padding: 2px; user-select: none;
+          transition: transform 0.1s;
+        }
+        .vw-star-btn:hover { transform: scale(1.15); }
+        .vw-color-dot {
+          border-radius: 50%; cursor: pointer;
+          position: relative; flex-shrink: 0;
+          transition: transform 0.1s;
+        }
+        .vw-color-dot:hover { transform: scale(1.1); }
+        .vw-textarea {
+          width: 100%; padding: 8px 10px;
+          background: rgba(16,16,16,0.9);
+          border: 1px solid rgba(255,255,255,0.08);
+          color: #e0e0e0; font-size: 11px;
+          font-family: 'Pretendard', system-ui, sans-serif;
+          resize: none; outline: none;
+          transition: border-color 0.2s;
+          border-radius: 0;
+          line-height: 1.5;
+        }
+        .vw-textarea:focus { border-color: rgba(255,77,0,0.4); }
+        .vw-textarea::placeholder { color: #444; }
+        .vw-select-btn {
+          width: 100%; padding: 10px 14px;
+          font-family: 'Space Mono', monospace;
+          font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+          cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px;
+          transition: all 0.15s;
+          clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+          border: none;
+        }
+      `}</style>
 
-        {/* Left: image */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            minHeight: 0,
-            height: "100%",
-            overflow: "hidden",
-          }}
-        >
+      {/* Grid background */}
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none",
+        backgroundImage: "linear-gradient(to right,#1a1a1a 1px,transparent 1px),linear-gradient(to bottom,#1a1a1a 1px,transparent 1px)",
+        backgroundSize: "40px 40px",
+      }} />
 
-          {/* Topbar */}
-          <div style={{
-            background: "rgba(0,0,0,0.72)", backdropFilter: "blur(10px)",
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
-            position: "sticky", top: 0, zIndex: 10, flexShrink: 0,
-            paddingTop: 40,
+      {/* Corner brackets */}
+      <div style={{ position: "fixed", top: 20, left: 20, width: 32, height: 32, zIndex: 50, pointerEvents: "none", transition: "border-color 0.3s, box-shadow 0.3s", borderTop: bracketBorder, borderLeft: bracketBorder, borderRight: "none", borderBottom: "none", boxShadow: bracketShadow }} />
+      <div style={{ position: "fixed", top: 20, right: 20, width: 32, height: 32, zIndex: 50, pointerEvents: "none", transition: "border-color 0.3s, box-shadow 0.3s", borderTop: bracketBorder, borderRight: bracketBorder, borderLeft: "none", borderBottom: "none", boxShadow: bracketShadow }} />
+      <div style={{ position: "fixed", bottom: 20, left: 20, width: 32, height: 32, zIndex: 50, pointerEvents: "none", transition: "border-color 0.3s, box-shadow 0.3s", borderBottom: bracketBorder, borderLeft: bracketBorder, borderRight: "none", borderTop: "none", boxShadow: bracketShadow }} />
+      <div style={{ position: "fixed", bottom: 20, right: 20, width: 32, height: 32, zIndex: 50, pointerEvents: "none", transition: "border-color 0.3s, box-shadow 0.3s", borderBottom: bracketBorder, borderRight: bracketBorder, borderLeft: "none", borderTop: "none", boxShadow: bracketShadow }} />
+
+      {/* ════ DESKTOP (md+) ════ */}
+      <div className="hidden md:block">
+
+        {/* Full-bleed image */}
+        <div style={{ position: "fixed", inset: 0, zIndex: 1 }}>
+          {viewerSrc
+            ? <ViewerPhotoWithBadge src={viewerSrc} alt={filename} showBadge={false} />
+            : <div style={{ color: "#3a5a6e", padding: 16 }}>사진 없음</div>
+          }
+        </div>
+
+        {/* Top-center: close + counter */}
+        <div style={{
+          position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)",
+          zIndex: 30, display: "flex", alignItems: "center", gap: 8,
+        }}>
+          <Link href={galleryHref} className="vw-hud vw-close-btn">
+            <X style={{ width: 11, height: 11 }} />
+            CLOSE
+          </Link>
+          <div className="vw-hud vw-mono" style={{
+            padding: "8px 14px", fontSize: 10,
+            color: "rgba(255,255,255,0.45)", letterSpacing: "0.08em",
           }}>
-            <div style={{
-              height: 44, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
-              padding: "0 16px",
-            }}>
-              <Link href={buildGalleryHrefWithFocus(token, searchParams, photoId)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "6px 10px", borderRadius: 8,
-                  color: "rgba(255,255,255,0.75)", fontSize: 12, textDecoration: "none",
-                  flexShrink: 0,
-                }}>
-                <ArrowLeft style={{ width: 14, height: 14 }} />
-                갤러리
-              </Link>
-              <span style={{
-                fontSize: 11, color: "rgba(255,255,255,0.4)",
-                flex: 1, minWidth: 0, textAlign: "center",
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-              }}>
-                {filename}
-              </span>
-              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", flexShrink: 0 }}>
-                {currentIndex + 1} / {filteredPhotos.length}
-              </span>
-            </div>
-          </div>
-
-          {/* Image area */}
-          <div
-            style={{
-              flex: 1,
-              minHeight: 0,
-              minWidth: 0,
-              position: "relative",
-              background: "#0a0a0a",
-              overflow: "hidden",
-            }}
-          >
-            {viewerSrc
-              ? (
-                <ViewerPhotoWithBadge
-                  src={viewerSrc}
-                  alt={filename}
-                  showBadge={isCurrentSelected}
-                />
-              )
-              : <div style={{ color: "#3a5a6e", padding: 16 }}>사진 없음</div>
-            }
-
-            {/* Prev arrow */}
-            <button type="button" onClick={goPrev} disabled={currentIndex === 0}
-              style={{
-                position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
-                width: 40, height: 40, borderRadius: "50%",
-                background: "rgba(0,0,0,0.35)", border: "none",
-                color: "rgba(255,255,255,0.85)", cursor: currentIndex === 0 ? "not-allowed" : "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                opacity: currentIndex === 0 ? 0.2 : 1, transition: "all 0.15s",
-              }}>
-              <ChevronLeft style={{ width: 20, height: 20 }} />
-            </button>
-
-            {/* Next arrow */}
-            <button type="button" onClick={goNext} disabled={currentIndex === filteredPhotos.length - 1}
-              style={{
-                position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
-                width: 40, height: 40, borderRadius: "50%",
-                background: "rgba(0,0,0,0.35)", border: "none",
-                color: "rgba(255,255,255,0.85)", cursor: currentIndex === filteredPhotos.length - 1 ? "not-allowed" : "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                opacity: currentIndex === filteredPhotos.length - 1 ? 0.2 : 1, transition: "all 0.15s",
-              }}>
-              <ChevronRight style={{ width: 20, height: 20 }} />
-            </button>
-          </div>
-
-          {/* 선택 (이미지 하단 별도 영역) */}
-          <div
-            style={{
-              flexShrink: 0,
-              padding: "12px 16px 16px",
-              background: "rgba(9,9,11,0.98)",
-            }}
-          >
-            <SelectButton />
+            {shotSeq} / {totalSeq}
           </div>
         </div>
 
-        {/* Right: control panel */}
-        <div style={{
-          background: "#141416",
-          borderLeft: "1px solid rgba(255,255,255,0.06)",
-          display: "flex",
-          flexDirection: "column",
-          height: "100vh",
-          position: "sticky",
-          top: 0,
-          overflowY: "auto",
+        {/* Top-left: ASSET info */}
+        <div className="vw-hud" style={{
+          position: "fixed", top: 20, left: 72, zIndex: 20,
+          padding: "12px 16px", minWidth: 190, maxWidth: 260,
         }}>
-          <div style={{ padding: "18px 16px 0", display: "flex", flexDirection: "column", gap: 22, flex: 1, minHeight: 0 }}>
-            {StarBlock}
-            {ColorBlock}
-            {CommentBlock}
+          <div className="vw-mono" style={{ fontSize: 9, color: "#FF4D00", letterSpacing: "0.1em", marginBottom: 8 }}>
+            ASSET :: INFO
+          </div>
+          <div className="vw-mono" style={{
+            fontSize: 11, color: "#ffffff", marginBottom: 4,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {filename}
+          </div>
+          <div className="vw-mono" style={{ fontSize: 9, color: "#8C8C8C", letterSpacing: "0.06em", marginBottom: 2 }}>
+            SHOT_{shotSeq} — SEQ.{String(currentIndex + 1).padStart(4, "0")}
+          </div>
+          <div className="vw-mono" style={{ fontSize: 9, color: "#444", marginTop: 4 }}>
+            ENCODE :: SECURE_STREAM
+          </div>
+        </div>
+
+        {/* Top-right: rating + colors + select */}
+        <div className="vw-hud" style={{
+          position: "fixed", top: 20, right: 72, zIndex: 20,
+          padding: "14px 16px", minWidth: 220,
+          display: "flex", flexDirection: "column", gap: 14,
+        }}>
+          {/* Rating */}
+          <div>
+            <div className="vw-mono" style={{ fontSize: 9, color: "#FF4D00", letterSpacing: "0.1em", marginBottom: 8 }}>RATING</div>
+            <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
+              {([1, 2, 3, 4, 5] as const).map((s) => {
+                const filled = s <= displayRating;
+                return (
+                  <button key={s} type="button" className="vw-star-btn"
+                    onClick={() => setStar(s)}
+                    onMouseEnter={() => setHoverStar(s)}
+                    onMouseLeave={() => setHoverStar(0)}
+                    style={{
+                      fontSize: 22,
+                      color: filled ? "#FF4D00" : "#333",
+                      transform: starPressRing === s ? "scale(1.25)" : undefined,
+                    }}>
+                    {filled ? "★" : "☆"}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Prev / Next nav */}
-          <div style={{
-            padding: "12px 16px 16px",
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 8,
-          }}>
-            {[
-              { label: "이전", icon: <ChevronLeft style={{ width: 14, height: 14 }} />, onClick: goPrev, disabled: currentIndex === 0, dir: "prev" },
-              { label: "다음", icon: <ChevronRight style={{ width: 14, height: 14 }} />, onClick: goNext, disabled: currentIndex === filteredPhotos.length - 1, dir: "next" },
-            ].map(({ label, icon, onClick, disabled, dir }) => (
-              <button key={dir} type="button" onClick={onClick} disabled={disabled}
-                style={{
-                  height: 38, borderRadius: 8, border: "none",
-                  background: "rgba(255,255,255,0.06)", color: "#a1a1aa", fontSize: 12,
-                  cursor: disabled ? "not-allowed" : "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
-                  opacity: disabled ? 0.4 : 1, fontFamily: "'Pretendard', system-ui, sans-serif",
-                }}>
-                {dir === "prev" && icon}{label}{dir === "next" && icon}
-              </button>
-            ))}
+          {/* Color labels */}
+          <div>
+            <div className="vw-mono" style={{ fontSize: 9, color: "#FF4D00", letterSpacing: "0.1em", marginBottom: 8 }}>COLOR LABEL</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {COLOR_OPTIONS.map((opt) => {
+                const isActive = color?.includes(opt.key) ?? false;
+                const showRing = isActive || colorPressRing === opt.key;
+                return (
+                  <button key={opt.key} type="button" className="vw-color-dot"
+                    onClick={() => setColor(opt.key)}
+                    style={{
+                      width: 26, height: 26, background: opt.color,
+                      border: showRing ? "2px solid white" : "2px solid transparent",
+                      boxShadow: showRing ? "0 0 0 2px rgba(255,255,255,0.25)" : "none",
+                    }}>
+                    {isActive && (
+                      <Check style={{ position: "absolute", inset: 0, margin: "auto", width: 11, height: 11, color: "white" }} strokeWidth={3} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Select button */}
+          <button type="button" onClick={toggleSelect} className="vw-select-btn"
+            style={isCurrentSelected
+              ? { background: "#FF4D00", color: "#fff" }
+              : { background: "rgba(255,255,255,0.05)", color: "#8C8C8C", outline: "1px solid rgba(255,255,255,0.1)" }
+            }>
+            {isCurrentSelected ? (
+              <><Check style={{ width: 12, height: 12, flexShrink: 0 }} strokeWidth={3} />선택됨 ({Y}/{N})</>
+            ) : (
+              `선택하기 (${Y}/${N})`
+            )}
+          </button>
+        </div>
+
+        {/* Left nav */}
+        <button type="button" onClick={goPrev} disabled={currentIndex === 0}
+          className="vw-nav-btn"
+          style={{ position: "fixed", left: 20, top: "50%", transform: "translateY(-50%)", zIndex: 30, width: 44, height: 44 }}>
+          <ChevronLeft style={{ width: 20, height: 20 }} />
+        </button>
+
+        {/* Right nav */}
+        <button type="button" onClick={goNext} disabled={currentIndex === filteredPhotos.length - 1}
+          className="vw-nav-btn"
+          style={{ position: "fixed", right: 20, top: "50%", transform: "translateY(-50%)", zIndex: 30, width: 44, height: 44 }}>
+          <ChevronRight style={{ width: 20, height: 20 }} />
+        </button>
+
+        {/* Bottom-left: LOC_DATA decorative */}
+        <div className="vw-mono" style={{
+          position: "fixed", bottom: 30, left: 72, zIndex: 20,
+          fontSize: 9, color: "#333", letterSpacing: "0.1em", lineHeight: 1.9,
+          pointerEvents: "none",
+        }}>
+          <div>LOC_DATA :: CLIENT.VIEW</div>
+          <div>ENCODE :: SECURE_STREAM</div>
+          <div>© {new Date().getFullYear()} A컷 · Acut</div>
+        </div>
+
+        {/* Bottom-center: shortcut hint */}
+        <div className="vw-mono" style={{
+          position: "fixed", bottom: 30, left: "50%", transform: "translateX(-50%)",
+          zIndex: 20, fontSize: 9, color: "#3a3a3a", letterSpacing: "0.08em",
+          pointerEvents: "none", whiteSpace: "nowrap",
+        }}>
+          PRESS ? FOR SHORTCUTS
+        </div>
+
+        {/* Bottom-right: Retouching notes */}
+        <div className="vw-hud" style={{
+          position: "fixed", bottom: 30, right: 72, zIndex: 20,
+          padding: "14px 16px", minWidth: 240, maxWidth: 280,
+          display: "flex", flexDirection: "column", gap: 10,
+        }}>
+          <div className="vw-mono" style={{ fontSize: 9, color: "#FF4D00", letterSpacing: "0.1em" }}>
+            RETOUCHING NOTES
+          </div>
+          <textarea
+            className="vw-textarea"
+            value={draftComment}
+            onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
+            placeholder="이 사진에 대한 메모를 남겨주세요"
+            style={{ height: 68 }}
+          />
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button type="button" onClick={saveComment} disabled={!hasUnsavedComment}
+              className="vw-mono"
+              style={{
+                flex: 1, padding: "7px 12px", fontSize: 10, fontWeight: 700,
+                letterSpacing: "0.06em", cursor: hasUnsavedComment ? "pointer" : "not-allowed",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                transition: "all 0.15s", borderRadius: 0,
+                ...(commentSaveFeedback === "saved"
+                  ? { background: "rgba(46,213,115,0.12)", border: "1px solid rgba(46,213,115,0.3)", color: "#2ed573" }
+                  : hasUnsavedComment
+                    ? { background: "rgba(255,77,0,0.10)", border: "1px solid rgba(255,77,0,0.35)", color: "#FF4D00" }
+                    : { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "#444" }
+                ),
+              }}>
+              {commentSaveFeedback === "saved" ? (
+                <><Check style={{ width: 11, height: 11 }} strokeWidth={3} />SAVED</>
+              ) : "POST"}
+            </button>
+            {hasUnsavedComment && commentSaveFeedback !== "saved" && (
+              <span className="vw-mono" style={{ fontSize: 9, color: "#555" }}>미저장</span>
+            )}
           </div>
         </div>
       </div>
 
       {/* ════ MOBILE (<md): fullscreen stack ════ */}
-      <div className="md:hidden fixed inset-0 flex flex-col" style={{ background: "#0a0a0a" }}>
+      <div className="md:hidden fixed inset-0 flex flex-col" style={{ background: "#030303" }}>
 
         {/* Topbar */}
         <div style={{
           background: "rgba(0,0,0,0.72)", backdropFilter: "blur(10px)",
           borderBottom: "1px solid rgba(255,255,255,0.06)",
-          flexShrink: 0, zIndex: 20,
-          paddingTop: 40,
+          flexShrink: 0, zIndex: 20, paddingTop: 40,
         }}>
-          <div style={{
-            height: 44, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6,
-            padding: "0 12px",
-          }}>
-            <Link href={buildGalleryHrefWithFocus(token, searchParams, photoId)}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "6px 8px", borderRadius: 8,
-                color: "rgba(255,255,255,0.75)", fontSize: 12, textDecoration: "none",
-                flexShrink: 0,
-              }}>
-              <ArrowLeft style={{ width: 14, height: 14 }} />
-              갤러리
+          <div style={{ height: 44, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, padding: "0 12px" }}>
+            <Link href={galleryHref}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", borderRadius: 8, color: "rgba(255,255,255,0.75)", fontSize: 12, textDecoration: "none", flexShrink: 0 }}>
+              ← 갤러리
             </Link>
-            <span style={{
-              fontSize: 11, color: "rgba(255,255,255,0.4)",
-              flex: 1, minWidth: 0, textAlign: "center",
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            }}>
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {filename}
             </span>
             <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", flexShrink: 0 }}>
@@ -678,34 +633,34 @@ export default function ViewerPage() {
             : <div style={{ color: "#3a5a6e", padding: 16 }}>사진 없음</div>
           }
           <button type="button" onClick={goPrevWrap}
-            style={{
-              position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)",
-              width: 36, height: 36, borderRadius: "50%",
-              background: "rgba(0,0,0,0.35)", border: "none",
-              color: "rgba(255,255,255,0.85)", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
+            style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", width: 36, height: 36, borderRadius: "50%", background: "rgba(0,0,0,0.35)", border: "none", color: "rgba(255,255,255,0.85)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <ChevronLeft style={{ width: 18, height: 18 }} />
           </button>
           <button type="button" onClick={goNextWrap}
-            style={{
-              position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
-              width: 36, height: 36, borderRadius: "50%",
-              background: "rgba(0,0,0,0.35)", border: "none",
-              color: "rgba(255,255,255,0.85)", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
+            style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", width: 36, height: 36, borderRadius: "50%", background: "rgba(0,0,0,0.35)", border: "none", color: "rgba(255,255,255,0.85)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <ChevronRight style={{ width: 18, height: 18 }} />
           </button>
         </div>
 
         {/* Bottom overlay */}
-        <div style={{
-          background: "rgba(10,10,11,0.96)", backdropFilter: "blur(12px)",
-          padding: "12px 16px", flexShrink: 0, display: "flex", flexDirection: "column", gap: 12,
-        }}>
+        <div style={{ background: "rgba(10,10,11,0.96)", backdropFilter: "blur(12px)", padding: "12px 16px", flexShrink: 0, display: "flex", flexDirection: "column", gap: 12 }}>
           {/* Select button */}
-          <SelectButton />
+          <button type="button" onClick={toggleSelect}
+            style={{
+              width: "100%", minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+              borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer",
+              fontFamily: "'Pretendard', system-ui, sans-serif", transition: "all 0.15s", padding: "10px 12px",
+              ...(isCurrentSelected
+                ? { background: "rgba(255,77,0,0.12)", border: "none", color: "#FF4D00" }
+                : { background: "rgba(255,255,255,0.06)", border: "none", color: "#a1a1aa" }
+              ),
+            }}>
+            {isCurrentSelected ? (
+              <><Check style={{ width: 15, height: 15, flexShrink: 0 }} /><span>선택됨 ({Y}/{N})</span></>
+            ) : (
+              <span>선택하기 ({Y}/{N})</span>
+            )}
+          </button>
 
           {/* Stars + Colors */}
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -717,11 +672,7 @@ export default function ViewerPage() {
                     onClick={() => setStar(s)}
                     onMouseEnter={() => setHoverStar(s)}
                     onMouseLeave={() => setHoverStar(0)}
-                    style={{
-                      fontSize: 22, lineHeight: 1, padding: "2px 3px",
-                      color: filled ? "#f5a623" : "#3a5a6e",
-                      background: "none", border: "none", cursor: "pointer",
-                    }}>
+                    style={{ fontSize: 22, lineHeight: 1, padding: "2px 3px", color: filled ? "#FF4D00" : "#3a5a6e", background: "none", border: "none", cursor: "pointer" }}>
                     {filled ? "★" : "☆"}
                   </button>
                 );
@@ -732,12 +683,7 @@ export default function ViewerPage() {
                 const isActive = color?.includes(opt.key) ?? false;
                 return (
                   <button key={opt.key} type="button" onClick={() => setColor(opt.key)}
-                    style={{
-                      width: 26, height: 26, borderRadius: "50%", background: opt.color,
-                      border: isActive ? "2px solid white" : "2px solid transparent",
-                      boxShadow: isActive ? "0 0 0 2px rgba(255,255,255,0.3)" : "none",
-                      cursor: "pointer", position: "relative", flexShrink: 0,
-                    }}>
+                    style={{ width: 26, height: 26, borderRadius: "50%", background: opt.color, border: isActive ? "2px solid white" : "2px solid transparent", boxShadow: isActive ? "0 0 0 2px rgba(255,255,255,0.3)" : "none", cursor: "pointer", position: "relative", flexShrink: 0 }}>
                     {isActive && <Check style={{ position: "absolute", inset: 0, margin: "auto", width: 11, height: 11, color: "white" }} strokeWidth={3} />}
                   </button>
                 );
@@ -764,54 +710,54 @@ export default function ViewerPage() {
               disabled={!hasUnsavedComment}
               aria-label={commentSaveFeedback === "saved" ? "코멘트 저장됨" : "코멘트 저장"}
               style={{
-                height: 44,
-                minWidth: 88,
-                padding: "0 12px",
-                borderRadius: 8,
-                fontSize: 12,
-                fontWeight: 600,
-                flexShrink: 0,
+                height: 44, minWidth: 88, padding: "0 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, flexShrink: 0,
                 fontFamily: "'Pretendard', system-ui, sans-serif",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 5,
-                transition: "background 0.2s, color 0.2s, border-color 0.2s, transform 0.08s, opacity 0.2s",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                transition: "background 0.2s, color 0.2s, border-color 0.2s",
                 ...(commentSaveFeedback === "saved"
-                  ? {
-                      background: "rgba(46,213,115,0.15)",
-                      border: "1px solid rgba(46,213,115,0.35)",
-                      color: "#2ed573",
-                      cursor: "default",
-                    }
+                  ? { background: "rgba(46,213,115,0.15)", border: "1px solid rgba(46,213,115,0.35)", color: "#2ed573", cursor: "default" }
                   : hasUnsavedComment
-                    ? {
-                        background: "rgba(79,126,255,0.14)",
-                        border: "1px solid rgba(79,126,255,0.45)",
-                        color: "#7aa3ff",
-                        cursor: "pointer",
-                      }
-                    : {
-                        background: "rgba(255,255,255,0.05)",
-                        border: "1px solid rgba(255,255,255,0.06)",
-                        color: "#52525b",
-                        cursor: "not-allowed",
-                        opacity: 0.85,
-                      }),
-              }}
-            >
-              {commentSaveFeedback === "saved" ? (
-                <>
-                  <Check style={{ width: 13, height: 13, flexShrink: 0 }} strokeWidth={3} />
-                  저장됨
-                </>
-              ) : (
-                "저장"
-              )}
+                    ? { background: "rgba(255,77,0,0.12)", border: "1px solid rgba(255,77,0,0.4)", color: "#FF4D00", cursor: "pointer" }
+                    : { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.06)", color: "#52525b", cursor: "not-allowed", opacity: 0.85 }
+                ),
+              }}>
+              {commentSaveFeedback === "saved"
+                ? (<><Check style={{ width: 13, height: 13, flexShrink: 0 }} strokeWidth={3} />저장됨</>)
+                : "저장"
+              }
             </button>
           </div>
         </div>
       </div>
+
+      {/* Keyboard shortcuts modal */}
+      {showShortcuts && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setShowShortcuts(false)}
+        >
+          <div className="vw-hud" style={{ padding: "28px 32px", minWidth: 320 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div className="vw-mono" style={{ fontSize: 11, color: "#FF4D00", letterSpacing: "0.1em" }}>KEYBOARD SHORTCUTS</div>
+              <button type="button" onClick={() => setShowShortcuts(false)}
+                style={{ background: "none", border: "none", color: "#8C8C8C", cursor: "pointer", padding: 4 }}>
+                <X style={{ width: 14, height: 14 }} />
+              </button>
+            </div>
+            <div className="vw-mono" style={{
+              fontSize: 10, color: "#8C8C8C",
+              display: "grid", gridTemplateColumns: "auto 1fr", gap: "10px 24px",
+            }}>
+              <span style={{ color: "#FF4D00" }}>← →</span><span>이전 / 다음 사진</span>
+              <span style={{ color: "#FF4D00" }}>SPACE</span><span>선택 / 선택 해제</span>
+              <span style={{ color: "#FF4D00" }}>1 – 5</span><span>별점 설정</span>
+              <span style={{ color: "#FF4D00" }}>Q W E R T</span><span>색상 태그</span>
+              <span style={{ color: "#FF4D00" }}>?</span><span>단축키 보기 / 닫기</span>
+              <span style={{ color: "#FF4D00" }}>ESC</span><span>창 닫기</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
