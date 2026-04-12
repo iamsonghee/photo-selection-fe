@@ -21,44 +21,29 @@ import type { StarRating, ColorTag } from "@/types";
 import { MobileViewerPinchPhoto } from "@/components/MobileViewerPinchPhoto";
 
 const COLOR_OPTIONS: { key: ColorTag; color: string }[] = [
-  { key: "red",    color: "#ff4757" },
-  { key: "yellow", color: "#ffd32a" },
-  { key: "green",  color: "#2ed573" },
-  { key: "blue",   color: "#1e90ff" },
-  { key: "purple", color: "#5352ed" },
+  { key: "red",    color: "#ef4444" },
+  { key: "yellow", color: "#f97316" },
+  { key: "green",  color: "#22c55e" },
+  { key: "blue",   color: "#3b82f6" },
+  { key: "purple", color: "#a855f7" },
 ];
 
 const COMMENT_MAX_LENGTH = 150;
 
-/** object-fit: contain 영역 기준 좌표 (실제 그려진 사진의 왼쪽 위) */
 function getObjectFitContainOffset(
-  containerW: number,
-  containerH: number,
-  naturalW: number,
-  naturalH: number
+  containerW: number, containerH: number,
+  naturalW: number, naturalH: number
 ) {
-  if (containerW <= 0 || containerH <= 0 || naturalW <= 0 || naturalH <= 0) {
+  if (containerW <= 0 || containerH <= 0 || naturalW <= 0 || naturalH <= 0)
     return { left: 0, top: 0 };
-  }
   const scale = Math.min(containerW / naturalW, containerH / naturalH);
-  const drawnW = naturalW * scale;
-  const drawnH = naturalH * scale;
   return {
-    left: (containerW - drawnW) / 2,
-    top: (containerH - drawnH) / 2,
+    left: (containerW - naturalW * scale) / 2,
+    top: (containerH - naturalH * scale) / 2,
   };
 }
 
-/** 프리뷰: 전체 영역에 fit + 실제 사진 좌상단에 체크 배지 */
-function ViewerPhotoWithBadge({
-  src,
-  alt,
-  showBadge,
-}: {
-  src: string;
-  alt: string;
-  showBadge: boolean;
-}) {
+function ViewerPhotoWithBadge({ src, alt, showBadge }: { src: string; alt: string; showBadge: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const [badgeOffset, setBadgeOffset] = useState({ left: 5, top: 5 });
@@ -70,10 +55,7 @@ function ViewerPhotoWithBadge({
     const { width: cw, height: ch } = el.getBoundingClientRect();
     const nw = img?.naturalWidth ?? 0;
     const nh = img?.naturalHeight ?? 0;
-    if (nw <= 0 || nh <= 0) {
-      setBadgeOffset({ left: 5, top: 5 });
-      return;
-    }
+    if (nw <= 0 || nh <= 0) { setBadgeOffset({ left: 5, top: 5 }); return; }
     const { left, top } = getObjectFitContainOffset(cw, ch, nw, nh);
     setBadgeOffset({ left: left + 5, top: top + 5 });
   }, []);
@@ -94,40 +76,15 @@ function ViewerPhotoWithBadge({
   }, [measureBadge]);
 
   return (
-    <div
-      ref={containerRef}
-      style={{ width: "100%", height: "100%", position: "relative" }}
-      onContextMenu={viewerImageDownloadBlocked ? (e) => e.preventDefault() : undefined}
-    >
-      <img
-        ref={imgRef}
-        src={src}
-        alt={alt}
-        onLoad={measureBadge}
+    <div ref={containerRef} style={{ width: "100%", height: "100%", position: "relative" }}
+      onContextMenu={viewerImageDownloadBlocked ? (e) => e.preventDefault() : undefined}>
+      <img ref={imgRef} src={src} alt={alt} onLoad={measureBadge}
         {...viewerImageBlockDownloadHandlers}
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "contain",
-          objectPosition: "center",
-          display: "block",
-          ...viewerImageBlockDownloadStyle,
-        }}
+        style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center", display: "block", ...viewerImageBlockDownloadStyle }}
       />
       {showBadge && (
-        <div
-          className="pointer-events-none absolute z-[3] flex items-center justify-center rounded-full"
-          style={{
-            left: badgeOffset.left,
-            top: badgeOffset.top,
-            width: 20,
-            height: 20,
-            background: "#FF4D00",
-            border: "2px solid white",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-          }}
-          aria-hidden
-        >
+        <div className="pointer-events-none absolute z-[3] flex items-center justify-center rounded-full"
+          style={{ left: badgeOffset.left, top: badgeOffset.top, width: 20, height: 20, background: "#FF4D00", border: "2px solid white", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }} aria-hidden>
           <Check style={{ width: 10, height: 10, color: "white" }} strokeWidth={3} />
         </div>
       )}
@@ -166,23 +123,25 @@ export default function ViewerPage() {
   const N = project?.requiredCount ?? 0;
   const queryString = searchParams.toString() ? `?${searchParams.toString()}` : "";
 
+  const filmstripRef   = useRef<HTMLDivElement>(null);
+  const activeThumbRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    activeThumbRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [currentIndex]);
+
   useEffect(() => {
     if (current?.id) setDraftComment(photoStates[current.id]?.comment ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id]);
 
-  useEffect(() => {
-    setCommentSaveFeedback("idle");
-  }, [current?.id]);
+  useEffect(() => { setCommentSaveFeedback("idle"); }, [current?.id]);
 
   const savedCommentForCurrent = current ? (photoStates[current.id]?.comment ?? "") : "";
-  const hasUnsavedComment =
-    Boolean(current) && draftComment.trim() !== savedCommentForCurrent.trim();
+  const hasUnsavedComment = Boolean(current) && draftComment.trim() !== savedCommentForCurrent.trim();
 
   useEffect(() => {
-    if (commentSaveFeedback === "saved" && hasUnsavedComment) {
-      setCommentSaveFeedback("idle");
-    }
+    if (commentSaveFeedback === "saved" && hasUnsavedComment) setCommentSaveFeedback("idle");
   }, [draftComment, commentSaveFeedback, hasUnsavedComment]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
@@ -234,8 +193,9 @@ export default function ViewerPage() {
     router.push(`/c/${token}/viewer/${filteredPhotos[(currentIndex + 1) % filteredPhotos.length].id}${queryString}`);
   }, [currentIndex, filteredPhotos, router, token, queryString]);
 
-  // ── Touch swipe (모바일: 이미지 핀치 확대 중에는 다음/이전 스와이프 비활성화) ──
-  const touchStartXRef = useRef(0);
+  // ── Touch swipe ───────────────────────────────────────────────────────────
+
+  const touchStartXRef      = useRef(0);
   const mobileImageZoomedRef = useRef(false);
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) touchStartXRef.current = e.touches[0].clientX;
@@ -246,7 +206,7 @@ export default function ViewerPage() {
     if (Math.abs(diff) > 50) { diff > 0 ? goNextWrap() : goPrevWrap(); }
   };
 
-  // ── Keyboard shortcuts ───────────────────────────────────────────────────
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const tag = (e.target as HTMLElement).tagName;
@@ -291,309 +251,329 @@ export default function ViewerPage() {
   if (!project || !current) return null;
   if (project.status === "confirmed" || project.status === "editing") return null;
 
-  const displayRating     = hoverStar || star || 0;
-  const isCurrentSelected = selectedIds.has(current.id);
-  const filename          = getPhotoDisplayName(current);
-  const viewerSrc         = viewerImageUrl(current);
-  const galleryHref       = buildGalleryHrefWithFocus(token, searchParams, photoId);
-  const shotSeq           = String(currentIndex + 1).padStart(3, "0");
-  const totalSeq          = String(filteredPhotos.length).padStart(3, "0");
-  const bracketColor      = isCurrentSelected ? "#FF4D00" : "#555555";
-  const bracketShadow     = isCurrentSelected ? "0 0 16px rgba(255,77,0,0.55)" : "none";
-  const bracketBorder     = `2px solid ${bracketColor}`;
+  const displayRating      = hoverStar || star || 0;
+  const isCurrentSelected  = selectedIds.has(current.id);
+  const filename           = getPhotoDisplayName(current);
+  const viewerSrc          = viewerImageUrl(current);
+  const galleryHref        = buildGalleryHrefWithFocus(token, searchParams, photoId);
+  const shotSeq            = String(currentIndex + 1).padStart(3, "0");
 
   return (
     <div
-      style={{ background: "#030303", minHeight: "100vh", overflow: "hidden" }}
+      style={{ background: "#000", height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column", position: "relative" }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;900&family=Space+Mono:wght@400;700&display=swap');
 
-        .vw-hud {
-          background: rgba(5,5,5,0.82);
+        .fs-grid-bg {
+          position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.15;
+          background-image: linear-gradient(#1A1A1A 1px, transparent 1px), linear-gradient(90deg, #1A1A1A 1px, transparent 1px);
+          background-size: 40px 40px;
+        }
+        .fs-hud {
+          background: rgba(5,5,5,0.75);
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(255,255,255,0.08);
+          border: 1px solid rgba(255,255,255,0.1);
         }
-        .vw-mono {
-          font-family: 'Space Mono', 'JetBrains Mono', monospace;
-        }
-        .vw-nav-btn {
-          background: rgba(5,5,5,0.82);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(255,255,255,0.08);
-          color: rgba(255,255,255,0.6);
+        .fs-nav-btn {
+          background: rgba(0,0,0,0.4);
+          backdrop-filter: blur(4px);
+          border: 1px solid #1A1A1A;
+          color: white;
+          transition: all 0.2s ease;
+          display: flex; align-items: center; justify-content: center;
           cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: background 0.2s, color 0.2s, border-color 0.2s;
         }
-        .vw-nav-btn:hover:not(:disabled) {
-          background: rgba(255,77,0,0.12);
-          border-color: rgba(255,77,0,0.4);
-          color: #FF4D00;
+        .fs-nav-btn:hover { background: #FF4D00; color: black; border-color: #FF4D00; }
+        .fs-nav-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+        .fs-nav-btn:disabled:hover { background: rgba(0,0,0,0.4); color: white; border-color: #1A1A1A; }
+        .fs-bracket { position: absolute; width: 16px; height: 16px; border-color: #FF4D00; pointer-events: none; z-index: 10; }
+        .fs-b-tl { top: -2px; left: -2px; border-top: 2px solid; border-left: 2px solid; }
+        .fs-b-tr { top: -2px; right: -2px; border-top: 2px solid; border-right: 2px solid; }
+        .fs-b-bl { bottom: -2px; left: -2px; border-bottom: 2px solid; border-left: 2px solid; }
+        .fs-b-br { bottom: -2px; right: -2px; border-bottom: 2px solid; border-right: 2px solid; }
+        .fs-thumb {
+          height: 100px; width: 150px; flex-shrink: 0;
+          border: 1px solid #1A1A1A;
+          filter: grayscale(1); opacity: 0.5;
+          transition: all 0.3s ease; cursor: pointer; position: relative; overflow: hidden;
         }
-        .vw-nav-btn:disabled { opacity: 0.2; cursor: not-allowed; }
-        .vw-close-btn {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 8px 16px;
-          color: rgba(255,255,255,0.65);
-          font-family: 'Space Mono', monospace;
-          font-size: 10px;
-          letter-spacing: 0.08em;
-          text-decoration: none;
-          transition: color 0.2s, border-color 0.2s;
+        .fs-thumb.active {
+          filter: grayscale(0); opacity: 1;
+          border-color: #FF4D00; transform: scale(1.05); z-index: 5;
         }
-        .vw-close-btn:hover {
-          color: #FF4D00;
-          border-color: rgba(255,77,0,0.35);
+        .fs-thumb:not(.active):hover { opacity: 0.75; filter: grayscale(0.4); }
+        .fs-hide-scrollbar::-webkit-scrollbar { display: none; }
+        .fs-hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .fs-comment-input {
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.1);
+          outline: none; font-size: 10px; color: #d1d5db;
+          font-family: 'Pretendard', sans-serif;
         }
-        .vw-star-btn {
-          background: none; border: none; cursor: pointer;
-          line-height: 1; padding: 2px; user-select: none;
-          transition: transform 0.1s;
+        .fs-comment-input::placeholder { color: #555; }
+        .fs-comment-input:focus { border-color: rgba(255,77,0,0.4); }
+        .fs-btn-clip {
+          clip-path: polygon(0 0, 100% 0, 100% 70%, 90% 100%, 0 100%);
+          display: flex; align-items: center; justify-content: center; gap: 6px;
+          cursor: pointer; border: none;
+          font-family: 'Space Grotesk', sans-serif;
+          font-weight: 900; letter-spacing: -0.02em; transition: opacity 0.15s;
         }
-        .vw-star-btn:hover { transform: scale(1.15); }
-        .vw-color-dot {
-          border-radius: 50%; cursor: pointer;
-          position: relative; flex-shrink: 0;
-          transition: transform 0.1s;
-        }
-        .vw-color-dot:hover { transform: scale(1.1); }
-        .vw-textarea {
-          width: 100%; padding: 8px 10px;
-          background: rgba(16,16,16,0.9);
-          border: 1px solid rgba(255,255,255,0.08);
-          color: #e0e0e0; font-size: 11px;
-          font-family: 'Pretendard', system-ui, sans-serif;
-          resize: none; outline: none;
-          transition: border-color 0.2s;
-          border-radius: 0;
-          line-height: 1.5;
-        }
-        .vw-textarea:focus { border-color: rgba(255,77,0,0.4); }
-        .vw-textarea::placeholder { color: #444; }
-        .vw-select-btn {
-          width: 100%; padding: 10px 14px;
-          font-family: 'Space Mono', monospace;
-          font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
-          cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px;
-          transition: all 0.15s;
-          clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
-          border: none;
-        }
+        .fs-btn-clip:hover { opacity: 0.85; }
+        .fs-star { cursor: pointer; transition: transform 0.1s; }
+        .fs-star:hover { transform: scale(1.2); }
       `}</style>
 
       {/* Grid background */}
-      <div style={{
-        position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none",
-        backgroundImage: "linear-gradient(to right,#1a1a1a 1px,transparent 1px),linear-gradient(to bottom,#1a1a1a 1px,transparent 1px)",
-        backgroundSize: "40px 40px",
-      }} />
-
-      {/* Corner brackets */}
-      <div style={{ position: "fixed", top: 20, left: 20, width: 32, height: 32, zIndex: 50, pointerEvents: "none", transition: "border-color 0.3s, box-shadow 0.3s", borderTop: bracketBorder, borderLeft: bracketBorder, borderRight: "none", borderBottom: "none", boxShadow: bracketShadow }} />
-      <div style={{ position: "fixed", top: 20, right: 20, width: 32, height: 32, zIndex: 50, pointerEvents: "none", transition: "border-color 0.3s, box-shadow 0.3s", borderTop: bracketBorder, borderRight: bracketBorder, borderLeft: "none", borderBottom: "none", boxShadow: bracketShadow }} />
-      <div style={{ position: "fixed", bottom: 20, left: 20, width: 32, height: 32, zIndex: 50, pointerEvents: "none", transition: "border-color 0.3s, box-shadow 0.3s", borderBottom: bracketBorder, borderLeft: bracketBorder, borderRight: "none", borderTop: "none", boxShadow: bracketShadow }} />
-      <div style={{ position: "fixed", bottom: 20, right: 20, width: 32, height: 32, zIndex: 50, pointerEvents: "none", transition: "border-color 0.3s, box-shadow 0.3s", borderBottom: bracketBorder, borderRight: bracketBorder, borderLeft: "none", borderTop: "none", boxShadow: bracketShadow }} />
+      <div className="fs-grid-bg" />
 
       {/* ════ DESKTOP (md+) ════ */}
-      <div className="hidden md:block">
+      <div className="hidden md:flex flex-col" style={{ height: "100vh" }}>
 
-        {/* Full-bleed image */}
-        <div style={{ position: "fixed", inset: 0, zIndex: 1 }}>
-          {viewerSrc
-            ? <ViewerPhotoWithBadge src={viewerSrc} alt={filename} showBadge={false} />
-            : <div style={{ color: "#3a5a6e", padding: 16 }}>사진 없음</div>
-          }
-        </div>
+        {/* Main image area */}
+        <main style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 10, overflow: "hidden", minHeight: 0 }}>
 
-        {/* Top-center: close + counter */}
-        <div style={{
-          position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)",
-          zIndex: 30, display: "flex", alignItems: "center", gap: 8,
-        }}>
-          <Link href={galleryHref} className="vw-hud vw-close-btn">
-            <X style={{ width: 11, height: 11 }} />
-            CLOSE
-          </Link>
-          <div className="vw-hud vw-mono" style={{
-            padding: "8px 14px", fontSize: 10,
-            color: "rgba(255,255,255,0.45)", letterSpacing: "0.08em",
+          {/* Top HUD bar */}
+          <div className="fs-hud" style={{
+            position: "absolute", top: 24, left: "50%", transform: "translateX(-50%)",
+            zIndex: 40, padding: "12px 24px", borderRadius: 2,
+            display: "flex", alignItems: "center", gap: 24,
+            width: "calc(100% - 128px)", maxWidth: 960,
           }}>
-            {shotSeq} / {totalSeq}
-          </div>
-        </div>
+            {/* Back link */}
+            <Link href={galleryHref} style={{ display: "flex", alignItems: "center", gap: 6, color: "rgba(255,255,255,0.4)", textDecoration: "none", flexShrink: 0, transition: "color 0.15s" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#FF4D00")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.4)")}>
+              <X style={{ width: 12, height: 12 }} />
+            </Link>
 
-        {/* Top-left: ASSET info */}
-        <div className="vw-hud" style={{
-          position: "fixed", top: 20, left: 72, zIndex: 20,
-          padding: "12px 16px", minWidth: 190, maxWidth: 260,
-        }}>
-          <div className="vw-mono" style={{ fontSize: 9, color: "#FF4D00", letterSpacing: "0.1em", marginBottom: 8 }}>
-            ASSET :: INFO
-          </div>
-          <div className="vw-mono" style={{
-            fontSize: 11, color: "#ffffff", marginBottom: 4,
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}>
-            {filename}
-          </div>
-          <div className="vw-mono" style={{ fontSize: 9, color: "#8C8C8C", letterSpacing: "0.06em", marginBottom: 2 }}>
-            SHOT_{shotSeq} — SEQ.{String(currentIndex + 1).padStart(4, "0")}
-          </div>
-          <div className="vw-mono" style={{ fontSize: 9, color: "#444", marginTop: 4 }}>
-            ENCODE :: SECURE_STREAM
-          </div>
-        </div>
+            {/* Divider */}
+            <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
 
-        {/* Top-right: rating + colors + select */}
-        <div className="vw-hud" style={{
-          position: "fixed", top: 20, right: 72, zIndex: 20,
-          padding: "14px 16px", minWidth: 220,
-          display: "flex", flexDirection: "column", gap: 14,
-        }}>
-          {/* Rating */}
-          <div>
-            <div className="vw-mono" style={{ fontSize: 9, color: "#FF4D00", letterSpacing: "0.1em", marginBottom: 8 }}>RATING</div>
-            <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
+            {/* Filename + seq */}
+            <div style={{ display: "flex", flexDirection: "column", minWidth: 130, flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 6, height: 6, background: "#FF4D00", flexShrink: 0 }} />
+                <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 11, letterSpacing: "-0.04em", textTransform: "uppercase", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>
+                  {filename}
+                </h2>
+              </div>
+              <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 8, color: "#888", textTransform: "uppercase", letterSpacing: "-0.04em", margin: 0 }}>
+                {shotSeq} // {project?.name ?? "PROJECT"}
+              </p>
+            </div>
+
+            {/* Divider */}
+            <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
+
+            {/* Star rating */}
+            <div style={{ display: "flex", gap: 2, alignItems: "center", flexShrink: 0 }}>
               {([1, 2, 3, 4, 5] as const).map((s) => {
                 const filled = s <= displayRating;
                 return (
-                  <button key={s} type="button" className="vw-star-btn"
+                  <span key={s} className="fs-star"
                     onClick={() => setStar(s)}
                     onMouseEnter={() => setHoverStar(s)}
                     onMouseLeave={() => setHoverStar(0)}
                     style={{
-                      fontSize: 22,
+                      fontSize: 14, lineHeight: 1, userSelect: "none",
                       color: filled ? "#FF4D00" : "#333",
                       transform: starPressRing === s ? "scale(1.25)" : undefined,
                     }}>
                     {filled ? "★" : "☆"}
-                  </button>
+                  </span>
                 );
               })}
             </div>
-          </div>
 
-          {/* Color labels */}
-          <div>
-            <div className="vw-mono" style={{ fontSize: 9, color: "#FF4D00", letterSpacing: "0.1em", marginBottom: 8 }}>COLOR LABEL</div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {/* Color dots */}
+            <div style={{ display: "flex", gap: 5, alignItems: "center", flexShrink: 0 }}>
               {COLOR_OPTIONS.map((opt) => {
                 const isActive = color?.includes(opt.key) ?? false;
                 const showRing = isActive || colorPressRing === opt.key;
                 return (
-                  <button key={opt.key} type="button" className="vw-color-dot"
+                  <button key={opt.key} type="button"
                     onClick={() => setColor(opt.key)}
                     style={{
-                      width: 26, height: 26, background: opt.color,
-                      border: showRing ? "2px solid white" : "2px solid transparent",
-                      boxShadow: showRing ? "0 0 0 2px rgba(255,255,255,0.25)" : "none",
+                      width: 12, height: 12, borderRadius: "50%", background: opt.color, cursor: "pointer",
+                      border: showRing ? "1.5px solid white" : "1.5px solid transparent",
+                      boxShadow: showRing ? "0 0 0 1.5px rgba(255,255,255,0.25)" : "none",
+                      flexShrink: 0, position: "relative", transition: "transform 0.1s",
                     }}>
                     {isActive && (
-                      <Check style={{ position: "absolute", inset: 0, margin: "auto", width: 11, height: 11, color: "white" }} strokeWidth={3} />
+                      <Check style={{ position: "absolute", inset: 0, margin: "auto", width: 6, height: 6, color: "white" }} strokeWidth={3} />
                     )}
                   </button>
                 );
               })}
             </div>
-          </div>
 
-          {/* Select button */}
-          <button type="button" onClick={toggleSelect} className="vw-select-btn"
-            style={isCurrentSelected
-              ? { background: "#FF4D00", color: "#fff" }
-              : { background: "rgba(255,255,255,0.05)", color: "#8C8C8C", outline: "1px solid rgba(255,255,255,0.1)" }
-            }>
-            {isCurrentSelected ? (
-              <><Check style={{ width: 12, height: 12, flexShrink: 0 }} strokeWidth={3} />선택됨 ({Y}/{N})</>
-            ) : (
-              `선택하기 (${Y}/${N})`
-            )}
-          </button>
-        </div>
+            {/* Divider */}
+            <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
 
-        {/* Left nav */}
-        <button type="button" onClick={goPrev} disabled={currentIndex === 0}
-          className="vw-nav-btn"
-          style={{ position: "fixed", left: 20, top: "50%", transform: "translateY(-50%)", zIndex: 30, width: 44, height: 44 }}>
-          <ChevronLeft style={{ width: 20, height: 20 }} />
-        </button>
+            {/* Comment input + Post */}
+            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+              <input
+                type="text"
+                className="fs-comment-input"
+                value={draftComment}
+                onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
+                onKeyDown={(e) => { if (e.key === "Enter") saveComment(); }}
+                placeholder="Retouching notes..."
+                style={{ flex: 1, padding: "4px 12px", borderRadius: 2, minWidth: 0 }}
+              />
+              <button type="button" onClick={saveComment} disabled={!hasUnsavedComment}
+                className="fs-btn-clip"
+                style={{
+                  height: 28, padding: "0 12px", fontSize: 9, flexShrink: 0,
+                  ...(commentSaveFeedback === "saved"
+                    ? { background: "#22c55e", color: "black" }
+                    : hasUnsavedComment
+                      ? { background: "#FF4D00", color: "black" }
+                      : { background: "rgba(255,255,255,0.06)", color: "#555", cursor: "not-allowed" }
+                  ),
+                }}>
+                {commentSaveFeedback === "saved" ? (
+                  <Check style={{ width: 10, height: 10 }} strokeWidth={3} />
+                ) : "Post"}
+              </button>
+            </div>
 
-        {/* Right nav */}
-        <button type="button" onClick={goNext} disabled={currentIndex === filteredPhotos.length - 1}
-          className="vw-nav-btn"
-          style={{ position: "fixed", right: 20, top: "50%", transform: "translateY(-50%)", zIndex: 30, width: 44, height: 44 }}>
-          <ChevronRight style={{ width: 20, height: 20 }} />
-        </button>
-
-        {/* Bottom-left: LOC_DATA decorative */}
-        <div className="vw-mono" style={{
-          position: "fixed", bottom: 30, left: 72, zIndex: 20,
-          fontSize: 9, color: "#333", letterSpacing: "0.1em", lineHeight: 1.9,
-          pointerEvents: "none",
-        }}>
-          <div>LOC_DATA :: CLIENT.VIEW</div>
-          <div>ENCODE :: SECURE_STREAM</div>
-          <div>© {new Date().getFullYear()} A컷 · Acut</div>
-        </div>
-
-        {/* Bottom-center: shortcut hint */}
-        <div className="vw-mono" style={{
-          position: "fixed", bottom: 30, left: "50%", transform: "translateX(-50%)",
-          zIndex: 20, fontSize: 9, color: "#3a3a3a", letterSpacing: "0.08em",
-          pointerEvents: "none", whiteSpace: "nowrap",
-        }}>
-          PRESS ? FOR SHORTCUTS
-        </div>
-
-        {/* Bottom-right: Retouching notes */}
-        <div className="vw-hud" style={{
-          position: "fixed", bottom: 30, right: 72, zIndex: 20,
-          padding: "14px 16px", minWidth: 240, maxWidth: 280,
-          display: "flex", flexDirection: "column", gap: 10,
-        }}>
-          <div className="vw-mono" style={{ fontSize: 9, color: "#FF4D00", letterSpacing: "0.1em" }}>
-            RETOUCHING NOTES
-          </div>
-          <textarea
-            className="vw-textarea"
-            value={draftComment}
-            onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
-            placeholder="이 사진에 대한 메모를 남겨주세요"
-            style={{ height: 68 }}
-          />
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button type="button" onClick={saveComment} disabled={!hasUnsavedComment}
-              className="vw-mono"
+            {/* Final (select) button */}
+            <button type="button" onClick={toggleSelect}
+              className="fs-btn-clip"
               style={{
-                flex: 1, padding: "7px 12px", fontSize: 10, fontWeight: 700,
-                letterSpacing: "0.06em", cursor: hasUnsavedComment ? "pointer" : "not-allowed",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                transition: "all 0.15s", borderRadius: 0,
-                ...(commentSaveFeedback === "saved"
-                  ? { background: "rgba(46,213,115,0.12)", border: "1px solid rgba(46,213,115,0.3)", color: "#2ed573" }
-                  : hasUnsavedComment
-                    ? { background: "rgba(255,77,0,0.10)", border: "1px solid rgba(255,77,0,0.35)", color: "#FF4D00" }
-                    : { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "#444" }
+                height: 28, padding: "0 14px", fontSize: 10, flexShrink: 0,
+                ...(isCurrentSelected
+                  ? { background: "rgba(255,77,0,0.15)", color: "#FF4D00", outline: "1px solid rgba(255,77,0,0.4)" }
+                  : { background: "#FF4D00", color: "black" }
                 ),
               }}>
-              {commentSaveFeedback === "saved" ? (
-                <><Check style={{ width: 11, height: 11 }} strokeWidth={3} />SAVED</>
-              ) : "POST"}
+              <Check style={{ width: 10, height: 10 }} strokeWidth={4} />
+              <span style={{ fontStyle: "italic" }}>
+                {isCurrentSelected ? `${Y}/${N}` : "Final"}
+              </span>
             </button>
-            {hasUnsavedComment && commentSaveFeedback !== "saved" && (
-              <span className="vw-mono" style={{ fontSize: 9, color: "#555" }}>미저장</span>
-            )}
           </div>
-        </div>
+
+          {/* Left nav */}
+          <button type="button" onClick={goPrev} disabled={currentIndex === 0}
+            className="fs-nav-btn"
+            style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", zIndex: 20, width: 48, height: 48, borderRadius: "50%" }}>
+            <ChevronLeft style={{ width: 24, height: 24 }} />
+          </button>
+
+          {/* Right nav */}
+          <button type="button" onClick={goNext} disabled={currentIndex === filteredPhotos.length - 1}
+            className="fs-nav-btn"
+            style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", zIndex: 20, width: 48, height: 48, borderRadius: "50%" }}>
+            <ChevronRight style={{ width: 24, height: 24 }} />
+          </button>
+
+          {/* Image frame */}
+          <div style={{ position: "relative" }}
+            onContextMenu={viewerImageDownloadBlocked ? (e) => e.preventDefault() : undefined}>
+            <div className="fs-bracket fs-b-tl" />
+            <div className="fs-bracket fs-b-tr" />
+            <div className="fs-bracket fs-b-bl" />
+            <div className="fs-bracket fs-b-br" />
+            {viewerSrc ? (
+              <img
+                src={viewerSrc}
+                alt={filename}
+                {...viewerImageBlockDownloadHandlers}
+                style={{
+                  maxHeight: "calc(100vh - 240px)",
+                  maxWidth: "calc(100vw - 140px)",
+                  width: "auto",
+                  objectFit: "contain",
+                  display: "block",
+                  boxShadow: "0 25px 50px rgba(0,0,0,0.9)",
+                  border: "1px solid rgba(255,255,255,0.05)",
+                  ...viewerImageBlockDownloadStyle,
+                }}
+              />
+            ) : (
+              <div style={{ color: "#3a5a6e", padding: 16 }}>사진 없음</div>
+            )}
+            {/* EXIF decorative */}
+            <div style={{
+              position: "absolute", bottom: -28, left: 0,
+              fontFamily: "'Space Mono', monospace", fontSize: 9,
+              textTransform: "uppercase", letterSpacing: "0.2em",
+              color: "rgba(255,255,255,0.3)", whiteSpace: "nowrap",
+              pointerEvents: "none",
+            }}>
+              SHOT_{shotSeq} // {filename}
+            </div>
+          </div>
+        </main>
+
+        {/* Filmstrip footer */}
+        <footer style={{
+          height: 160, background: "rgba(0,0,0,0.85)", borderTop: "1px solid rgba(255,255,255,0.08)",
+          zIndex: 30, display: "flex", alignItems: "center", padding: "0 32px",
+          position: "relative", flexShrink: 0,
+        }}>
+          <div
+            ref={filmstripRef}
+            className="fs-hide-scrollbar"
+            style={{ display: "flex", gap: 16, overflowX: "auto", width: "100%", padding: "16px 0", alignItems: "center" }}
+          >
+            {filteredPhotos.map((photo, i) => {
+              const isActive  = i === currentIndex;
+              const thumbSrc  = viewerImageUrl(photo);
+              const thumbName = getPhotoDisplayName(photo);
+              const isSelected = selectedIds.has(photo.id);
+              return (
+                <div
+                  key={photo.id}
+                  ref={isActive ? activeThumbRef : null}
+                  className={`fs-thumb${isActive ? " active" : ""}`}
+                  onClick={() => router.push(`/c/${token}/viewer/${photo.id}${queryString}`)}
+                >
+                  <img
+                    src={thumbSrc}
+                    alt={thumbName}
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  />
+                  <span style={{
+                    position: "absolute", bottom: 4, right: 4,
+                    fontFamily: "'Space Mono', monospace", fontSize: 8,
+                    background: "rgba(0,0,0,0.8)", padding: "0 4px", color: "white",
+                  }}>
+                    {String(i + 1).padStart(3, "0")}
+                  </span>
+                  {isSelected && (
+                    <div style={{
+                      position: "absolute", top: 4, left: 4, width: 14, height: 14,
+                      background: "#FF4D00", display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <Check style={{ width: 8, height: 8, color: "black" }} strokeWidth={4} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Decorative lat/lng */}
+          <div style={{
+            position: "absolute", bottom: 8, right: 24,
+            opacity: 0.3, pointerEvents: "none",
+            display: "flex", alignItems: "center", gap: 12,
+          }}>
+            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 7, textAlign: "right", color: "white" }}>
+              <p style={{ margin: 0 }}>37.5665° N</p>
+              <p style={{ margin: 0 }}>126.9780° E</p>
+            </div>
+            <div style={{ width: 16, height: 16, border: "1px solid rgba(255,255,255,0.2)" }} />
+          </div>
+        </footer>
       </div>
 
       {/* ════ MOBILE (<md): fullscreen stack ════ */}
@@ -655,11 +635,10 @@ export default function ViewerPage() {
                 : { background: "rgba(255,255,255,0.06)", border: "none", color: "#a1a1aa" }
               ),
             }}>
-            {isCurrentSelected ? (
-              <><Check style={{ width: 15, height: 15, flexShrink: 0 }} /><span>선택됨 ({Y}/{N})</span></>
-            ) : (
-              <span>선택하기 ({Y}/{N})</span>
-            )}
+            {isCurrentSelected
+              ? <><Check style={{ width: 15, height: 15, flexShrink: 0 }} /><span>선택됨 ({Y}/{N})</span></>
+              : <span>선택하기 ({Y}/{N})</span>
+            }
           </button>
 
           {/* Stars + Colors */}
@@ -697,18 +676,9 @@ export default function ViewerPage() {
               value={draftComment}
               onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
               placeholder="코멘트..."
-              style={{
-                flex: 1, padding: "8px 10px",
-                background: "rgba(39,39,42,0.6)", border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 8, color: "#fafafa", fontSize: 12,
-                fontFamily: "'Pretendard', system-ui, sans-serif", resize: "none", height: 44, lineHeight: 1.5, outline: "none",
-              }}
+              style={{ flex: 1, padding: "8px 10px", background: "rgba(39,39,42,0.6)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, color: "#fafafa", fontSize: 12, fontFamily: "'Pretendard', system-ui, sans-serif", resize: "none", height: 44, lineHeight: 1.5, outline: "none" }}
             />
-            <button
-              type="button"
-              onClick={saveComment}
-              disabled={!hasUnsavedComment}
-              aria-label={commentSaveFeedback === "saved" ? "코멘트 저장됨" : "코멘트 저장"}
+            <button type="button" onClick={saveComment} disabled={!hasUnsavedComment}
               style={{
                 height: 44, minWidth: 88, padding: "0 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, flexShrink: 0,
                 fontFamily: "'Pretendard', system-ui, sans-serif",
@@ -722,7 +692,7 @@ export default function ViewerPage() {
                 ),
               }}>
               {commentSaveFeedback === "saved"
-                ? (<><Check style={{ width: 13, height: 13, flexShrink: 0 }} strokeWidth={3} />저장됨</>)
+                ? <><Check style={{ width: 13, height: 13, flexShrink: 0 }} strokeWidth={3} />저장됨</>
                 : "저장"
               }
             </button>
@@ -736,18 +706,15 @@ export default function ViewerPage() {
           style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center" }}
           onClick={() => setShowShortcuts(false)}
         >
-          <div className="vw-hud" style={{ padding: "28px 32px", minWidth: 320 }} onClick={(e) => e.stopPropagation()}>
+          <div className="fs-hud" style={{ padding: "28px 32px", minWidth: 320, borderRadius: 2 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <div className="vw-mono" style={{ fontSize: 11, color: "#FF4D00", letterSpacing: "0.1em" }}>KEYBOARD SHORTCUTS</div>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#FF4D00", letterSpacing: "0.1em" }}>KEYBOARD SHORTCUTS</div>
               <button type="button" onClick={() => setShowShortcuts(false)}
                 style={{ background: "none", border: "none", color: "#8C8C8C", cursor: "pointer", padding: 4 }}>
                 <X style={{ width: 14, height: 14 }} />
               </button>
             </div>
-            <div className="vw-mono" style={{
-              fontSize: 10, color: "#8C8C8C",
-              display: "grid", gridTemplateColumns: "auto 1fr", gap: "10px 24px",
-            }}>
+            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#8C8C8C", display: "grid", gridTemplateColumns: "auto 1fr", gap: "10px 24px" }}>
               <span style={{ color: "#FF4D00" }}>← →</span><span>이전 / 다음 사진</span>
               <span style={{ color: "#FF4D00" }}>SPACE</span><span>선택 / 선택 해제</span>
               <span style={{ color: "#FF4D00" }}>1 – 5</span><span>별점 설정</span>
