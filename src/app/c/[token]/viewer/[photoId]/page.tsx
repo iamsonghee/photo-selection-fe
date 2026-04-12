@@ -542,7 +542,7 @@ export default function ViewerPage() {
           >
             {filteredPhotos.map((photo, i) => {
               const isActive  = i === currentIndex;
-              const thumbSrc  = viewerImageUrl(photo);
+              const thumbSrc  = photo.url; // r2_thumb_url — 필름스트립은 썸네일로 충분
               const thumbName = getPhotoDisplayName(photo);
               const isSelected = selectedIds.has(photo.id);
               return (
