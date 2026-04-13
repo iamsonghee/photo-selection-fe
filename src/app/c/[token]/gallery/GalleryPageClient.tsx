@@ -583,7 +583,7 @@ export default function GalleryPageClient() {
                     <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
                       {getPhotoDisplayName(photo)}
                     </p>
-                    <div className="gl-overlay-interactive" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div className="gl-overlay-interactive" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 14 }}>
                       <div
                         style={{ display: "flex", gap: 1 }}
                         onClick={(e) => e.stopPropagation()}
