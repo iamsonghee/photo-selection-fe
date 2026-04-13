@@ -591,8 +591,12 @@ export default function GalleryPageClient() {
                       >
                         {([1, 2, 3, 4, 5] as const).map((s) => {
                           const hoverVal      = gridStarHover?.photoId === photo.id ? gridStarHover.star : 0;
-                          const displayRating = hoverVal || Number(rating) || 0;
-                          const filled        = s <= displayRating;
+                          const currentRating = Number(rating) || 0;
+                          const displayRating = hoverVal || currentRating;
+                          const isHovering    = hoverVal > 0;
+                          // hover 없고 rating 없으면 숨김, hover 없고 rating 있으면 채워진 별만 표시
+                          if (!isHovering && s > currentRating) return null;
+                          const filled = s <= displayRating;
                           return (
                             <button
                               key={s}
