@@ -389,6 +389,7 @@ export default function GalleryPageClient() {
           .gl-footer-progress { gap: 4px !important; }
           .gl-footer-progress-label { font-size: 9px !important; }
           .gl-btn-confirm { height: 40px !important; padding: 0 18px !important; font-size: 12px !important; }
+          .gl-filter-sort { display: none !important; }
         }
       `}</style>
 
@@ -517,6 +518,7 @@ export default function GalleryPageClient() {
                 </button>
 
                 <select
+                  className="gl-filter-sort"
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value as SortOrder)}
                   style={{ background: "transparent", fontFamily: "'Space Mono', monospace", fontSize: 10, textTransform: "uppercase", border: "1px solid #222", padding: "4px 8px", color: "#888", outline: "none", cursor: "pointer" }}
