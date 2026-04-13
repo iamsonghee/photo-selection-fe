@@ -731,65 +731,102 @@ export default function ViewerPage() {
           </button>
         </div>
 
-        {/* Bottom action bar — compact single row */}
+        {/* Bottom action bar */}
         <div style={{
           background: "rgba(10,10,11,0.96)", backdropFilter: "blur(12px)",
           borderTop: "1px solid rgba(255,255,255,0.07)",
           padding: "10px 16px calc(10px + env(safe-area-inset-bottom))",
-          flexShrink: 0, display: "flex", alignItems: "center", gap: 10,
+          flexShrink: 0, display: "flex", flexDirection: "column", gap: 8,
         }}>
-          {/* Stars */}
-          <div style={{ display: "flex", gap: 1, flexShrink: 0 }}>
-            {([1, 2, 3, 4, 5] as const).map((s) => {
-              const filled = s <= (hoverStar || star || 0);
-              return (
-                <button key={s} type="button"
-                  onClick={() => setStar(s)}
-                  onMouseEnter={() => setHoverStar(s)}
-                  onMouseLeave={() => setHoverStar(0)}
-                  style={{ fontSize: 20, lineHeight: 1, padding: "4px 2px", color: filled ? "#FF4D00" : "#333", background: "none", border: "none", cursor: "pointer" }}>
-                  {filled ? "★" : "☆"}
-                </button>
-              );
-            })}
+          {/* Row 1: Stars · Colors · Select */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {/* Stars */}
+            <div style={{ display: "flex", gap: 1, flexShrink: 0 }}>
+              {([1, 2, 3, 4, 5] as const).map((s) => {
+                const filled = s <= (hoverStar || star || 0);
+                return (
+                  <button key={s} type="button"
+                    onClick={() => setStar(s)}
+                    onMouseEnter={() => setHoverStar(s)}
+                    onMouseLeave={() => setHoverStar(0)}
+                    style={{ fontSize: 20, lineHeight: 1, padding: "4px 2px", color: filled ? "#FF4D00" : "#333", background: "none", border: "none", cursor: "pointer" }}>
+                    {filled ? "★" : "☆"}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
+
+            {/* Color tags */}
+            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+              {COLOR_OPTIONS.map((opt) => {
+                const isActive = color?.includes(opt.key) ?? false;
+                return (
+                  <button key={opt.key} type="button" onClick={() => setColor(opt.key)}
+                    style={{ width: 22, height: 22, borderRadius: "50%", background: opt.color, border: isActive ? "2px solid white" : "2px solid transparent", boxShadow: isActive ? "0 0 0 2px rgba(255,255,255,0.25)" : "none", cursor: "pointer", position: "relative", flexShrink: 0 }}>
+                    {isActive && <Check style={{ position: "absolute", inset: 0, margin: "auto", width: 10, height: 10, color: "white" }} strokeWidth={3} />}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ flex: 1 }} />
+
+            {/* Select button */}
+            <button type="button" onClick={toggleSelect}
+              style={{
+                height: 36, padding: "0 14px", borderRadius: 8,
+                fontSize: 12, fontWeight: 700, cursor: "pointer", flexShrink: 0,
+                fontFamily: "'Pretendard', system-ui, sans-serif", transition: "all 0.15s",
+                display: "flex", alignItems: "center", gap: 5,
+                ...(isCurrentSelected
+                  ? { background: "rgba(255,77,0,0.15)", border: "1px solid rgba(255,77,0,0.4)", color: "#FF4D00" }
+                  : { background: "#FF4D00", border: "none", color: "#000" }
+                ),
+              }}>
+              {isCurrentSelected
+                ? <><Check style={{ width: 12, height: 12, flexShrink: 0 }} strokeWidth={3} /><span>선택됨 {Y}/{N}</span></>
+                : <span>선택 {Y}/{N}</span>
+              }
+            </button>
           </div>
 
-          {/* Divider */}
-          <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
-
-          {/* Color tags */}
-          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-            {COLOR_OPTIONS.map((opt) => {
-              const isActive = color?.includes(opt.key) ?? false;
-              return (
-                <button key={opt.key} type="button" onClick={() => setColor(opt.key)}
-                  style={{ width: 22, height: 22, borderRadius: "50%", background: opt.color, border: isActive ? "2px solid white" : "2px solid transparent", boxShadow: isActive ? "0 0 0 2px rgba(255,255,255,0.25)" : "none", cursor: "pointer", position: "relative", flexShrink: 0 }}>
-                  {isActive && <Check style={{ position: "absolute", inset: 0, margin: "auto", width: 10, height: 10, color: "white" }} strokeWidth={3} />}
-                </button>
-              );
-            })}
+          {/* Row 2: Comment */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              type="text"
+              value={draftComment}
+              onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
+              onKeyDown={(e) => { if (e.key === "Enter") saveComment(); }}
+              placeholder="코멘트..."
+              style={{
+                flex: 1, height: 36, padding: "0 10px",
+                background: "rgba(39,39,42,0.6)", border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 8, color: "#fafafa", fontSize: 12,
+                fontFamily: "'Pretendard', system-ui, sans-serif", outline: "none",
+              }}
+            />
+            <button type="button" onClick={saveComment} disabled={!hasUnsavedComment}
+              style={{
+                height: 36, minWidth: 56, padding: "0 12px", borderRadius: 8,
+                fontSize: 12, fontWeight: 600, flexShrink: 0,
+                fontFamily: "'Pretendard', system-ui, sans-serif",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+                transition: "background 0.2s, color 0.2s, border-color 0.2s",
+                ...(commentSaveFeedback === "saved"
+                  ? { background: "rgba(46,213,115,0.15)", border: "1px solid rgba(46,213,115,0.35)", color: "#2ed573", cursor: "default" }
+                  : hasUnsavedComment
+                    ? { background: "rgba(255,77,0,0.12)", border: "1px solid rgba(255,77,0,0.4)", color: "#FF4D00", cursor: "pointer" }
+                    : { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.06)", color: "#52525b", cursor: "not-allowed", opacity: 0.85 }
+                ),
+              }}>
+              {commentSaveFeedback === "saved"
+                ? <><Check style={{ width: 12, height: 12, flexShrink: 0 }} strokeWidth={3} />저장됨</>
+                : "저장"
+              }
+            </button>
           </div>
-
-          {/* Spacer */}
-          <div style={{ flex: 1 }} />
-
-          {/* Select button */}
-          <button type="button" onClick={toggleSelect}
-            style={{
-              height: 40, padding: "0 16px", borderRadius: 8,
-              fontSize: 13, fontWeight: 700, cursor: "pointer", flexShrink: 0,
-              fontFamily: "'Pretendard', system-ui, sans-serif", transition: "all 0.15s",
-              display: "flex", alignItems: "center", gap: 6,
-              ...(isCurrentSelected
-                ? { background: "rgba(255,77,0,0.15)", border: "1px solid rgba(255,77,0,0.4)", color: "#FF4D00" }
-                : { background: "#FF4D00", border: "none", color: "#000" }
-              ),
-            }}>
-            {isCurrentSelected
-              ? <><Check style={{ width: 13, height: 13, flexShrink: 0 }} strokeWidth={3} /><span>선택됨 {Y}/{N}</span></>
-              : <span>선택 {Y}/{N}</span>
-            }
-          </button>
         </div>
       </div>
 
