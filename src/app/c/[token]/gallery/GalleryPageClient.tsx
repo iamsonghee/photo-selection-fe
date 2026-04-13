@@ -355,14 +355,26 @@ export default function GalleryPageClient() {
           .gl-header-selected-label { display: none; }
           .gl-header-selected-count { font-size: 20px !important; }
 
-          /* 필터 바 */
-          .gl-header-filter { height: 40px !important; padding: 0 8px !important; }
-          .gl-filter-divider { display: none !important; }
-          .gl-filter-stars { display: none !important; }
-          .gl-filter-right { display: none !important; }
+          /* 필터 바 — 가로 스크롤 단일 행 */
+          .gl-header-filter {
+            height: 44px !important;
+            padding: 0 8px !important;
+            justify-content: flex-start !important;
+            gap: 4px !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            flex-wrap: nowrap !important;
+          }
+          .gl-filter-right {
+            flex-shrink: 0;
+            gap: 8px !important;
+          }
+          .gl-filter-tab { padding: 6px 10px !important; font-size: 11px !important; }
+          .gl-filter-divider { margin: 0 4px !important; }
+          .gl-filter-stars button { width: 20px !important; height: 20px !important; font-size: 12px !important; }
 
           /* 그리드 */
-          .gl-page-wrapper { padding-top: 100px !important; padding-bottom: 72px !important; }
+          .gl-page-wrapper { padding-top: 104px !important; padding-bottom: 72px !important; }
           .gl-grid-main { padding: 0 6px !important; }
           .gl-photo-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 3px !important; }
 
