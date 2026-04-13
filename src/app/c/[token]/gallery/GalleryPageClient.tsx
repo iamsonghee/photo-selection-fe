@@ -277,7 +277,7 @@ export default function GalleryPageClient() {
 
         .gl-card-overlay {
           position: absolute; inset: 0;
-          background: none;
+          background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.3) 40%, transparent 70%);
           opacity: 1; z-index: 15; pointer-events: none;
           padding: 10px; display: flex; flex-direction: column; justify-content: flex-end;
         }
