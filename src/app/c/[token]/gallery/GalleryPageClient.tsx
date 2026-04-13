@@ -20,7 +20,7 @@ import type { GalleryFilterState } from "@/lib/gallery-filter";
 import type { StarRating, ColorTag, SortOrder } from "@/types";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
-type TabFilter = "all" | "selected" | "starred";
+type TabFilter = "all" | "selected";
 
 const COLOR_OPTIONS: { key: ColorTag; hex: string }[] = [
   { key: "red",    hex: "#ef4444" },
@@ -135,18 +135,14 @@ export default function GalleryPageClient() {
   /* ── Filter state ── */
   const filterState = useMemo<GalleryFilterState>(() => ({
     selectedFilter: tabFilter === "selected" ? "selected" : "all",
-    starFilter:     tabFilter === "starred" ? 1 : starFilter === 0 ? "all" : (starFilter as StarRating),
+    starFilter:     starFilter === 0 ? "all" : (starFilter as StarRating),
     colorFilter:    colorFilter ?? "all",
     sortOrder,
   }), [tabFilter, starFilter, colorFilter, sortOrder]);
 
   const filteredPhotos = useMemo(() => {
-    const base = getFilteredPhotos(photos, selectedIds, photoStates, filterState);
-    if (tabFilter === "starred") {
-      return base.filter((p) => (photoStates[p.id]?.rating ?? 0) > 0);
-    }
-    return base;
-  }, [photos, selectedIds, photoStates, filterState, tabFilter]);
+    return getFilteredPhotos(photos, selectedIds, photoStates, filterState);
+  }, [photos, selectedIds, photoStates, filterState]);
 
   /* ── Thumbnail focus index ── */
   const galleryFocusIndex = useMemo(() => {
@@ -448,14 +444,14 @@ export default function GalleryPageClient() {
             <div className="gl-header-filter" style={{ maxWidth: 1800, margin: "0 auto", height: 56, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", overflowX: "auto" }}>
               {/* Left: tabs + star buttons */}
               <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                {(["all", "selected", "starred"] as const).map((v) => (
+                {(["all", "selected"] as const).map((v) => (
                   <button
                     key={v}
                     type="button"
                     onClick={() => setTabFilter(v)}
                     className={`gl-filter-tab${tabFilter === v ? " gl-tab-active" : ""}`}
                   >
-                    {v === "all" ? "전체 사진" : v === "selected" ? "선택됨" : "즐겨찾기"}
+                    {v === "all" ? "전체 사진" : "선택됨"}
                   </button>
                 ))}
 
@@ -464,23 +460,20 @@ export default function GalleryPageClient() {
                 {/* Star filter */}
                 <div className="gl-filter-stars" style={{ display: "flex", alignItems: "center", gap: 1 }}>
                   {([1, 2, 3, 4, 5] as const).map((s) => {
-                    const effectiveStar = tabFilter !== "starred" ? starFilter : 0;
-                    const filled = s <= (hoverStar || effectiveStar);
+                    const filled = s <= (hoverStar || starFilter);
                     return (
                       <button
                         key={s}
                         type="button"
-                        disabled={tabFilter === "starred"}
                         onClick={() => { setStarFilter((prev) => (prev === s ? 0 : s)); setHoverStar(0); window.setTimeout(() => setHoverStar(0), 0); }}
-                        onMouseEnter={() => tabFilter !== "starred" && setHoverStar(s)}
+                        onMouseEnter={() => setHoverStar(s)}
                         onMouseLeave={() => setHoverStar(0)}
                         style={{
                           width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
                           fontSize: 13, lineHeight: 1, color: filled ? "#FF4D00" : "#444",
-                          background: "none", border: "none", cursor: tabFilter === "starred" ? "default" : "pointer",
+                          background: "none", border: "none", cursor: "pointer",
                           transition: "color 0.1s, transform 0.1s",
                           transform: hoverStar === s ? "scale(1.2)" : "scale(1)",
-                          opacity: tabFilter === "starred" ? 0.35 : 1,
                         }}
                       >
                         {filled ? "★" : "☆"}
