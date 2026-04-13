@@ -20,7 +20,7 @@ import type { GalleryFilterState } from "@/lib/gallery-filter";
 import type { StarRating, ColorTag, SortOrder } from "@/types";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
-type TabFilter = "all" | "selected" | "starred";
+type TabFilter = "all" | "selected";
 
 const COLOR_OPTIONS: { key: ColorTag; hex: string }[] = [
   { key: "red",    hex: "#ef4444" },
@@ -135,18 +135,14 @@ export default function GalleryPageClient() {
   /* ── Filter state ── */
   const filterState = useMemo<GalleryFilterState>(() => ({
     selectedFilter: tabFilter === "selected" ? "selected" : "all",
-    starFilter:     tabFilter === "starred" ? 1 : starFilter === 0 ? "all" : (starFilter as StarRating),
+    starFilter:     starFilter === 0 ? "all" : (starFilter as StarRating),
     colorFilter:    colorFilter ?? "all",
     sortOrder,
   }), [tabFilter, starFilter, colorFilter, sortOrder]);
 
   const filteredPhotos = useMemo(() => {
-    const base = getFilteredPhotos(photos, selectedIds, photoStates, filterState);
-    if (tabFilter === "starred") {
-      return base.filter((p) => (photoStates[p.id]?.rating ?? 0) > 0);
-    }
-    return base;
-  }, [photos, selectedIds, photoStates, filterState, tabFilter]);
+    return getFilteredPhotos(photos, selectedIds, photoStates, filterState);
+  }, [photos, selectedIds, photoStates, filterState]);
 
   /* ── Thumbnail focus index ── */
   const galleryFocusIndex = useMemo(() => {
@@ -270,13 +266,6 @@ export default function GalleryPageClient() {
           width: 100%; height: 100%; object-fit: cover;
           transition: transform 0.6s ease; display: block;
         }
-        .gl-photo-card::after {
-          content: ''; position: absolute; inset: 0;
-          background: rgba(255, 174, 0, 0.12);
-          transition: opacity 0.3s ease; z-index: 5; pointer-events: none;
-        }
-        .gl-photo-card:hover::after,
-        .gl-photo-card.gl-selected::after { opacity: 0; }
         .gl-photo-card:hover img { transform: scale(1.05); }
         .gl-photo-card.gl-selected {
           border-color: #FF4D00;
@@ -288,7 +277,7 @@ export default function GalleryPageClient() {
 
         .gl-card-overlay {
           position: absolute; inset: 0;
-          background: linear-gradient(0deg, rgba(0,0,0,0.82) 0%, transparent 55%);
+          background: none;
           opacity: 1; z-index: 15; pointer-events: none;
           padding: 10px; display: flex; flex-direction: column; justify-content: flex-end;
         }
@@ -352,9 +341,58 @@ export default function GalleryPageClient() {
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #FF4D00; }
+
+        @media (max-width: 767px) {
+          /* 헤더 상단 줄 */
+          .gl-header-top { height: 56px !important; padding: 0 14px !important; }
+          .gl-header-project-title { font-size: 15px !important; }
+          .gl-header-deadline { display: none; }
+          .gl-photographer-section { display: none !important; }
+          .gl-header-selected-label { display: none; }
+          .gl-header-selected-count { font-size: 20px !important; }
+
+          /* 필터 바 — 가로 스크롤 단일 행 */
+          .gl-header-filter {
+            height: 44px !important;
+            padding: 0 8px !important;
+            justify-content: flex-start !important;
+            gap: 4px !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            flex-wrap: nowrap !important;
+          }
+          .gl-filter-right {
+            flex-shrink: 0;
+            gap: 8px !important;
+          }
+          .gl-filter-tab { padding: 6px 10px !important; font-size: 11px !important; }
+          .gl-filter-divider { margin: 0 4px !important; }
+          .gl-filter-stars button { width: 20px !important; height: 20px !important; font-size: 12px !important; }
+
+          /* 그리드 */
+          .gl-page-wrapper { padding-top: 104px !important; padding-bottom: 72px !important; }
+          .gl-grid-main { padding: 0 6px !important; }
+          .gl-photo-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 3px !important; }
+
+          /* 카드 오버레이 — 모바일 크기 축소 */
+          .gl-card-overlay { padding: 6px !important; }
+          .gl-card-overlay p { font-size: 7px !important; margin-bottom: 2px !important; }
+          .gl-card-overlay .gl-overlay-interactive button { font-size: 8px !important; }
+          .gl-card-overlay .gl-overlay-interactive span { width: 5px !important; height: 5px !important; }
+
+          /* 체크박스 크기 */
+          .gl-check-box { width: 18px !important; height: 18px !important; top: 6px !important; left: 6px !important; }
+
+          /* 하단 바 */
+          .gl-footer-inner { height: 60px !important; padding: 0 14px !important; gap: 12px !important; }
+          .gl-footer-meta { display: none !important; }
+          .gl-footer-progress { gap: 4px !important; }
+          .gl-footer-progress-label { font-size: 9px !important; }
+          .gl-btn-confirm { height: 40px !important; padding: 0 18px !important; font-size: 12px !important; }
+        }
       `}</style>
 
-      <div style={{ background: "#000", minHeight: "100vh", paddingTop: 140, paddingBottom: 100 }}>
+      <div className="gl-page-wrapper" style={{ background: "#000", minHeight: "100vh", paddingTop: 140, paddingBottom: 100 }}>
         <div className="gl-grid-bg" />
 
         {/* ── Header ── */}
@@ -364,16 +402,16 @@ export default function GalleryPageClient() {
           borderBottom: "1px solid #222",
         }}>
           {/* Top row */}
-          <div style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div className="gl-header-top" style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
               <Link href={token ? `/c/${token}` : "#"} style={{ textDecoration: "none" }}>
                 <div style={{ width: 32, height: 32, background: "#FF4D00", display: "flex", alignItems: "center", justifyContent: "center", color: "#000", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 18, flexShrink: 0 }}>A</div>
               </Link>
               <div>
-                <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 20, letterSpacing: "-0.5px", lineHeight: 1, color: "#fff", margin: 0 }}>
+                <h1 className="gl-header-project-title" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 20, letterSpacing: "-0.5px", lineHeight: 1, color: "#fff", margin: 0 }}>
                   {project.name}
                 </h1>
-                <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555", marginTop: 4, letterSpacing: "0.1em" }}>
+                <p className="gl-header-deadline" style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555", marginTop: 4, letterSpacing: "0.1em" }}>
                   DEADLINE // {format(new Date(project.deadline), "yyyy.MM.dd", { locale: ko })}
                 </p>
               </div>
@@ -382,17 +420,17 @@ export default function GalleryPageClient() {
             <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
               {photographer?.name && (
                 <>
-                  <div style={{ textAlign: "right" }}>
+                  <div className="gl-photographer-section" style={{ textAlign: "right" }}>
                     <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>Photography by</p>
                     <p style={{ fontWeight: 700, fontSize: 14, color: "#fff", marginTop: 2 }}>{photographer.name}</p>
                   </div>
-                  <div style={{ width: 1, height: 32, background: "#222", flexShrink: 0 }} />
+                  <div className="gl-photographer-section" style={{ width: 1, height: 32, background: "#222", flexShrink: 0 }} />
                 </>
               )}
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#FF4D00", fontWeight: 700 }}>SELECTED</span>
-                  <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 28, lineHeight: 1, color: "#fff" }}>
+                  <span className="gl-header-selected-label" style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#FF4D00", fontWeight: 700 }}>SELECTED</span>
+                  <span className="gl-header-selected-count" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 28, lineHeight: 1, color: "#fff" }}>
                     {Y}{" "}
                     <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#444", fontWeight: 400 }}>/ {N}</span>
                   </span>
@@ -403,42 +441,39 @@ export default function GalleryPageClient() {
 
           {/* Filter bar */}
           <div style={{ borderTop: "1px solid #111", background: "rgba(0,0,0,0.5)" }}>
-            <div style={{ maxWidth: 1800, margin: "0 auto", height: 56, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", overflowX: "auto" }}>
+            <div className="gl-header-filter" style={{ maxWidth: 1800, margin: "0 auto", height: 56, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", overflowX: "auto" }}>
               {/* Left: tabs + star buttons */}
               <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                {(["all", "selected", "starred"] as const).map((v) => (
+                {(["all", "selected"] as const).map((v) => (
                   <button
                     key={v}
                     type="button"
                     onClick={() => setTabFilter(v)}
                     className={`gl-filter-tab${tabFilter === v ? " gl-tab-active" : ""}`}
                   >
-                    {v === "all" ? "전체 사진" : v === "selected" ? "선택됨" : "즐겨찾기"}
+                    {v === "all" ? "전체 사진" : "선택됨"}
                   </button>
                 ))}
 
-                <div style={{ width: 1, height: 16, background: "#222", margin: "0 8px", flexShrink: 0 }} />
+                <div className="gl-filter-divider" style={{ width: 1, height: 16, background: "#222", margin: "0 8px", flexShrink: 0 }} />
 
                 {/* Star filter */}
-                <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <div className="gl-filter-stars" style={{ display: "flex", alignItems: "center", gap: 1 }}>
                   {([1, 2, 3, 4, 5] as const).map((s) => {
-                    const effectiveStar = tabFilter !== "starred" ? starFilter : 0;
-                    const filled = s <= (hoverStar || effectiveStar);
+                    const filled = s <= (hoverStar || starFilter);
                     return (
                       <button
                         key={s}
                         type="button"
-                        disabled={tabFilter === "starred"}
                         onClick={() => { setStarFilter((prev) => (prev === s ? 0 : s)); setHoverStar(0); window.setTimeout(() => setHoverStar(0), 0); }}
-                        onMouseEnter={() => tabFilter !== "starred" && setHoverStar(s)}
+                        onMouseEnter={() => setHoverStar(s)}
                         onMouseLeave={() => setHoverStar(0)}
                         style={{
                           width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
                           fontSize: 13, lineHeight: 1, color: filled ? "#FF4D00" : "#444",
-                          background: "none", border: "none", cursor: tabFilter === "starred" ? "default" : "pointer",
+                          background: "none", border: "none", cursor: "pointer",
                           transition: "color 0.1s, transform 0.1s",
                           transform: hoverStar === s ? "scale(1.2)" : "scale(1)",
-                          opacity: tabFilter === "starred" ? 0.35 : 1,
                         }}
                       >
                         {filled ? "★" : "☆"}
@@ -449,7 +484,7 @@ export default function GalleryPageClient() {
               </div>
 
               {/* Right: colors + reset + sort */}
-              <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+              <div className="gl-filter-right" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
                 <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
                   {COLOR_OPTIONS.map((opt) => {
                     const isActive = colorFilter === opt.key;
@@ -496,8 +531,8 @@ export default function GalleryPageClient() {
         </header>
 
         {/* ── Gallery Grid ── */}
-        <main style={{ position: "relative", zIndex: 10, maxWidth: 1800, margin: "0 auto", padding: "0 24px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 12 }}>
+        <main className="gl-grid-main" style={{ position: "relative", zIndex: 10, maxWidth: 1800, margin: "0 auto", padding: "0 24px" }}>
+          <div className="gl-photo-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 12 }}>
             {filteredPhotos.map((photo, gridIndex) => {
               const selected  = selectedIds.has(photo.id);
               const state     = photoStates[photo.id];
@@ -544,6 +579,7 @@ export default function GalleryPageClient() {
                   </button>
 
                   <div className="gl-card-overlay">
+                    <div className="gl-card-overlay-content">
                     <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
                       {getPhotoDisplayName(photo)}
                     </p>
@@ -555,8 +591,12 @@ export default function GalleryPageClient() {
                       >
                         {([1, 2, 3, 4, 5] as const).map((s) => {
                           const hoverVal      = gridStarHover?.photoId === photo.id ? gridStarHover.star : 0;
-                          const displayRating = hoverVal || Number(rating) || 0;
-                          const filled        = s <= displayRating;
+                          const currentRating = Number(rating) || 0;
+                          const displayRating = hoverVal || currentRating;
+                          const isHovering    = hoverVal > 0;
+                          // hover 없고 rating 없으면 숨김, hover 없고 rating 있으면 채워진 별만 표시
+                          if (!isHovering && s > currentRating) return null;
+                          const filled = s <= displayRating;
                           return (
                             <button
                               key={s}
@@ -583,6 +623,7 @@ export default function GalleryPageClient() {
                         })}
                       </div>
                     </div>
+                    </div>{/* gl-card-overlay-content */}
                   </div>
                 </Link>
               );
@@ -599,9 +640,9 @@ export default function GalleryPageClient() {
 
         {/* ── Bottom Bar ── */}
         <footer style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50, background: "#000", borderTop: "1px solid rgba(255,77,0,0.3)", backdropFilter: "blur(12px)" }}>
-          <div style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'Space Mono', monospace", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          <div className="gl-footer-inner" style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="gl-footer-progress" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div className="gl-footer-progress-label" style={{ display: "flex", justifyContent: "space-between", fontFamily: "'Space Mono', monospace", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 <span style={{ color: "#888" }}>Selection Progress</span>
                 <span style={{ color: "#FF4D00" }}>{progressPct}% Complete</span>
               </div>
@@ -611,7 +652,7 @@ export default function GalleryPageClient() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 24, marginLeft: 32 }}>
-              <div style={{ textAlign: "right" }}>
+              <div className="gl-footer-meta" style={{ textAlign: "right" }}>
                 <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555", margin: 0 }}>MINIMUM {N} REQ.</p>
                 <p style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
                   {remaining > 0
