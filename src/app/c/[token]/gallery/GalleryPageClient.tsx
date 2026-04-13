@@ -270,13 +270,6 @@ export default function GalleryPageClient() {
           width: 100%; height: 100%; object-fit: cover;
           transition: transform 0.6s ease; display: block;
         }
-        .gl-photo-card::after {
-          content: ''; position: absolute; inset: 0;
-          background: rgba(255, 174, 0, 0.12);
-          transition: opacity 0.3s ease; z-index: 5; pointer-events: none;
-        }
-        .gl-photo-card:hover::after,
-        .gl-photo-card.gl-selected::after { opacity: 0; }
         .gl-photo-card:hover img { transform: scale(1.05); }
         .gl-photo-card.gl-selected {
           border-color: #FF4D00;
@@ -352,9 +345,43 @@ export default function GalleryPageClient() {
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #FF4D00; }
+
+        @media (max-width: 767px) {
+          /* 헤더 상단 줄 */
+          .gl-header-top { height: 56px !important; padding: 0 14px !important; }
+          .gl-header-project-title { font-size: 15px !important; }
+          .gl-header-deadline { display: none; }
+          .gl-photographer-section { display: none !important; }
+          .gl-header-selected-label { display: none; }
+          .gl-header-selected-count { font-size: 20px !important; }
+
+          /* 필터 바 */
+          .gl-header-filter { height: 40px !important; padding: 0 8px !important; }
+          .gl-filter-divider { display: none !important; }
+          .gl-filter-stars { display: none !important; }
+          .gl-filter-right { display: none !important; }
+
+          /* 그리드 */
+          .gl-page-wrapper { padding-top: 100px !important; padding-bottom: 72px !important; }
+          .gl-grid-main { padding: 0 6px !important; }
+          .gl-photo-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 3px !important; }
+
+          /* 카드 오버레이 — 파일명·별점·색상 숨김, 그라데이션만 유지 */
+          .gl-card-overlay-content { display: none !important; }
+
+          /* 체크박스 크기 */
+          .gl-check-box { width: 18px !important; height: 18px !important; top: 6px !important; left: 6px !important; }
+
+          /* 하단 바 */
+          .gl-footer-inner { height: 60px !important; padding: 0 14px !important; gap: 12px !important; }
+          .gl-footer-meta { display: none !important; }
+          .gl-footer-progress { gap: 4px !important; }
+          .gl-footer-progress-label { font-size: 9px !important; }
+          .gl-btn-confirm { height: 40px !important; padding: 0 18px !important; font-size: 12px !important; }
+        }
       `}</style>
 
-      <div style={{ background: "#000", minHeight: "100vh", paddingTop: 140, paddingBottom: 100 }}>
+      <div className="gl-page-wrapper" style={{ background: "#000", minHeight: "100vh", paddingTop: 140, paddingBottom: 100 }}>
         <div className="gl-grid-bg" />
 
         {/* ── Header ── */}
@@ -364,16 +391,16 @@ export default function GalleryPageClient() {
           borderBottom: "1px solid #222",
         }}>
           {/* Top row */}
-          <div style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div className="gl-header-top" style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
               <Link href={token ? `/c/${token}` : "#"} style={{ textDecoration: "none" }}>
                 <div style={{ width: 32, height: 32, background: "#FF4D00", display: "flex", alignItems: "center", justifyContent: "center", color: "#000", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 18, flexShrink: 0 }}>A</div>
               </Link>
               <div>
-                <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 20, letterSpacing: "-0.5px", lineHeight: 1, color: "#fff", margin: 0 }}>
+                <h1 className="gl-header-project-title" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 20, letterSpacing: "-0.5px", lineHeight: 1, color: "#fff", margin: 0 }}>
                   {project.name}
                 </h1>
-                <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555", marginTop: 4, letterSpacing: "0.1em" }}>
+                <p className="gl-header-deadline" style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555", marginTop: 4, letterSpacing: "0.1em" }}>
                   DEADLINE // {format(new Date(project.deadline), "yyyy.MM.dd", { locale: ko })}
                 </p>
               </div>
@@ -382,17 +409,17 @@ export default function GalleryPageClient() {
             <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
               {photographer?.name && (
                 <>
-                  <div style={{ textAlign: "right" }}>
+                  <div className="gl-photographer-section" style={{ textAlign: "right" }}>
                     <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>Photography by</p>
                     <p style={{ fontWeight: 700, fontSize: 14, color: "#fff", marginTop: 2 }}>{photographer.name}</p>
                   </div>
-                  <div style={{ width: 1, height: 32, background: "#222", flexShrink: 0 }} />
+                  <div className="gl-photographer-section" style={{ width: 1, height: 32, background: "#222", flexShrink: 0 }} />
                 </>
               )}
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#FF4D00", fontWeight: 700 }}>SELECTED</span>
-                  <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 28, lineHeight: 1, color: "#fff" }}>
+                  <span className="gl-header-selected-label" style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#FF4D00", fontWeight: 700 }}>SELECTED</span>
+                  <span className="gl-header-selected-count" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 28, lineHeight: 1, color: "#fff" }}>
                     {Y}{" "}
                     <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#444", fontWeight: 400 }}>/ {N}</span>
                   </span>
@@ -403,7 +430,7 @@ export default function GalleryPageClient() {
 
           {/* Filter bar */}
           <div style={{ borderTop: "1px solid #111", background: "rgba(0,0,0,0.5)" }}>
-            <div style={{ maxWidth: 1800, margin: "0 auto", height: 56, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", overflowX: "auto" }}>
+            <div className="gl-header-filter" style={{ maxWidth: 1800, margin: "0 auto", height: 56, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", overflowX: "auto" }}>
               {/* Left: tabs + star buttons */}
               <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                 {(["all", "selected", "starred"] as const).map((v) => (
@@ -417,10 +444,10 @@ export default function GalleryPageClient() {
                   </button>
                 ))}
 
-                <div style={{ width: 1, height: 16, background: "#222", margin: "0 8px", flexShrink: 0 }} />
+                <div className="gl-filter-divider" style={{ width: 1, height: 16, background: "#222", margin: "0 8px", flexShrink: 0 }} />
 
                 {/* Star filter */}
-                <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <div className="gl-filter-stars" style={{ display: "flex", alignItems: "center", gap: 1 }}>
                   {([1, 2, 3, 4, 5] as const).map((s) => {
                     const effectiveStar = tabFilter !== "starred" ? starFilter : 0;
                     const filled = s <= (hoverStar || effectiveStar);
@@ -449,7 +476,7 @@ export default function GalleryPageClient() {
               </div>
 
               {/* Right: colors + reset + sort */}
-              <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+              <div className="gl-filter-right" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
                 <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
                   {COLOR_OPTIONS.map((opt) => {
                     const isActive = colorFilter === opt.key;
@@ -496,8 +523,8 @@ export default function GalleryPageClient() {
         </header>
 
         {/* ── Gallery Grid ── */}
-        <main style={{ position: "relative", zIndex: 10, maxWidth: 1800, margin: "0 auto", padding: "0 24px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 12 }}>
+        <main className="gl-grid-main" style={{ position: "relative", zIndex: 10, maxWidth: 1800, margin: "0 auto", padding: "0 24px" }}>
+          <div className="gl-photo-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 12 }}>
             {filteredPhotos.map((photo, gridIndex) => {
               const selected  = selectedIds.has(photo.id);
               const state     = photoStates[photo.id];
@@ -544,6 +571,7 @@ export default function GalleryPageClient() {
                   </button>
 
                   <div className="gl-card-overlay">
+                    <div className="gl-card-overlay-content">
                     <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
                       {getPhotoDisplayName(photo)}
                     </p>
@@ -583,6 +611,7 @@ export default function GalleryPageClient() {
                         })}
                       </div>
                     </div>
+                    </div>{/* gl-card-overlay-content */}
                   </div>
                 </Link>
               );
@@ -599,9 +628,9 @@ export default function GalleryPageClient() {
 
         {/* ── Bottom Bar ── */}
         <footer style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50, background: "#000", borderTop: "1px solid rgba(255,77,0,0.3)", backdropFilter: "blur(12px)" }}>
-          <div style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'Space Mono', monospace", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          <div className="gl-footer-inner" style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="gl-footer-progress" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div className="gl-footer-progress-label" style={{ display: "flex", justifyContent: "space-between", fontFamily: "'Space Mono', monospace", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 <span style={{ color: "#888" }}>Selection Progress</span>
                 <span style={{ color: "#FF4D00" }}>{progressPct}% Complete</span>
               </div>
@@ -611,7 +640,7 @@ export default function GalleryPageClient() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 24, marginLeft: 32 }}>
-              <div style={{ textAlign: "right" }}>
+              <div className="gl-footer-meta" style={{ textAlign: "right" }}>
                 <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555", margin: 0 }}>MINIMUM {N} REQ.</p>
                 <p style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
                   {remaining > 0
