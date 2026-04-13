@@ -378,8 +378,11 @@ export default function GalleryPageClient() {
           .gl-grid-main { padding: 0 6px !important; }
           .gl-photo-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 3px !important; }
 
-          /* 카드 오버레이 — 파일명·별점·색상 숨김, 그라데이션만 유지 */
-          .gl-card-overlay-content { display: none !important; }
+          /* 카드 오버레이 — 모바일 크기 축소 */
+          .gl-card-overlay { padding: 6px !important; }
+          .gl-card-overlay p { font-size: 7px !important; margin-bottom: 2px !important; }
+          .gl-card-overlay .gl-overlay-interactive button { font-size: 8px !important; }
+          .gl-card-overlay .gl-overlay-interactive span { width: 5px !important; height: 5px !important; }
 
           /* 체크박스 크기 */
           .gl-check-box { width: 18px !important; height: 18px !important; top: 6px !important; left: 6px !important; }
