@@ -314,8 +314,8 @@ export default function ResultsPage() {
         .prj-grid-bg { position: fixed; inset: 0; background-image: linear-gradient(rgba(30,30,30,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(30,30,30,0.18) 1px, transparent 1px); background-size: 30px 30px; z-index: 0; pointer-events: none; }
         .prj-scanline-el { width: 100%; height: 100px; position: fixed; bottom: 100%; background: linear-gradient(0deg, rgba(255,90,31,0.03) 0%, rgba(255,90,31,0) 100%); animation: prj-scanline 8s linear infinite; pointer-events: none; z-index: 1; }
         .prj-tech-label { font-family: ${MONO}; font-size: 0.63rem; letter-spacing: 0.15em; text-transform: uppercase; }
-        .ph-results-gallery { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
-        @media (min-width: 1400px) { .ph-results-gallery { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+        .ph-results-gallery { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+        @media (min-width: 1400px) { .ph-results-gallery { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 12px; } }
         .ph-results-inner-scroll::-webkit-scrollbar { width: 6px; }
         .ph-results-inner-scroll::-webkit-scrollbar-track { background: ${SURFACE_2}; border-left: 1px solid ${BORDER}; }
         .ph-results-inner-scroll::-webkit-scrollbar-thumb { background: #333; }
@@ -331,7 +331,7 @@ export default function ResultsPage() {
           .ph-results-main-split { flex-direction: column !important; }
           .ph-results-aside { width: 100% !important; max-height: 42vh; border-right: none !important; border-bottom: 1px solid ${BORDER}; }
           .ph-results-inner-scroll { padding: 0 12px 16px !important; }
-          .ph-results-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px !important; }
+          .ph-results-gallery { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; }
           .ph-results-list-head { display: none !important; }
           .ph-results-list-row { display: flex !important; flex-wrap: wrap !important; gap: 8px !important; padding: 12px !important; }
           .ph-results-action-bar { flex-direction: column !important; align-items: stretch !important; gap: 12px !important; padding: 12px !important; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important; }
