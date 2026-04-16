@@ -408,13 +408,20 @@ export default function InvitePageClient() {
         .cp-footer-secure { color: #8C8C8C; }
 
         @media (max-width: 768px) {
-          .cp-header { padding: 20px; }
-          .cp-footer { padding: 20px; }
+          .cp-header { padding: env(safe-area-inset-top, 16px) 20px 16px; }
+          .cp-footer { padding: 16px 20px calc(16px + env(safe-area-inset-bottom)); }
           .cp-sys-info { display: none; }
-          .cp-card { padding: 40px 24px; }
-          .cp-h1 { font-size: 32px; }
-          .cp-data-grid { grid-template-columns: 1fr; }
+          .cp-card { padding: 28px 20px; }
+          .cp-card-header { margin-bottom: 28px; }
+          .cp-h1 { font-size: 28px; margin-bottom: 10px; }
+          .cp-subtitle { font-size: 14px; max-width: 100%; }
+          .cp-data-grid { grid-template-columns: 1fr; margin-bottom: 28px; }
+          .cp-data-cell { padding: 12px 16px; }
+          .cp-data-value { font-size: 14px; }
+          .cp-btn-primary { font-size: 16px; padding: 16px 24px; }
+          .cp-photographer-card { margin-top: 28px; padding-top: 20px; }
           .cp-bracket { display: none; }
+          .cp-main { padding: 20px 16px; overflow-y: auto; }
         }
       `}</style>
 

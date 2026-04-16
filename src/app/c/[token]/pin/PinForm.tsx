@@ -92,7 +92,7 @@ export default function PinForm({ token, from }: { token: string; from: string }
 
   return (
     <div style={{
-      minHeight: "100vh",
+      minHeight: "100dvh",
       background: "transparent",
       backgroundImage: `
         linear-gradient(rgba(79,126,255,0.04) 1px, transparent 1px),
