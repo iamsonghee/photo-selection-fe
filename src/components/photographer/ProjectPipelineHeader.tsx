@@ -64,7 +64,6 @@ export function ProjectPipelineHeader({ projectId, project, activeStepIndex }: P
   return (
     <nav
       style={{
-        height: PIPELINE_HEADER_H,
         minHeight: PIPELINE_HEADER_H,
         borderBottom: `1px solid ${BORDER_MID}`,
         background: "rgba(5, 5, 5, 0.8)",
@@ -73,6 +72,7 @@ export function ProjectPipelineHeader({ projectId, project, activeStepIndex }: P
         display: "flex",
         alignItems: "center",
         padding: `0 ${HEADER_PAD_X}px`,
+        paddingTop: "env(safe-area-inset-top, 0px)",
         zIndex: 100,
         flexShrink: 0,
         position: "sticky",

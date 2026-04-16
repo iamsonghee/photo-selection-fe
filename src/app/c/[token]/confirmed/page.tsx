@@ -26,9 +26,12 @@ const headerBg: React.CSSProperties = { background: "rgba(10,10,11,0.92)", backd
 
 function PageHeader({ right, inviteHref }: { right?: React.ReactNode; inviteHref?: string }) {
   return (
-    <header className="sticky top-0 z-50 flex h-12 items-center justify-between border-b border-white/10 px-4" style={headerBg}>
+    <header
+      className="sticky top-0 z-50 flex items-center justify-between border-b border-white/10 px-4"
+      style={{ ...headerBg, paddingTop: "env(safe-area-inset-top, 0px)", minHeight: 48 }}
+    >
       <BrandLogoBar size="sm" href={inviteHref} />
-      {right && <div className="text-[12px] text-zinc-400">{right}</div>}
+      {right && <div className="text-[12px] text-zinc-400 truncate max-w-[180px]">{right}</div>}
     </header>
   );
 }

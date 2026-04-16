@@ -239,13 +239,14 @@ export default function NewProjectPage() {
         .np-root ::-webkit-scrollbar-thumb { background: #222; }
         /* ── 반응형 ── */
         @media (max-width: 768px) {
-          .np-main { padding: 32px 20px 100px !important; }
+          .np-main { padding: 24px 16px 100px !important; }
           .np-grid-2 { grid-template-columns: 1fr !important; }
           .np-step-label { display: none; }
           .np-action-row { flex-direction: column !important; gap: 10px !important; }
-          .np-btn-primary, .np-btn-back { width: 100% !important; justify-content: center !important; }
+          .np-btn-primary, .np-btn-back { width: 100% !important; min-height: 48px !important; justify-content: center !important; }
           .np-bottom-left, .np-bottom-right { display: none !important; }
           .np-header-right { display: none !important; }
+          .np-header { padding: 0 16px !important; height: max(52px, calc(44px + env(safe-area-inset-top))) !important; padding-top: env(safe-area-inset-top) !important; }
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes np-pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }

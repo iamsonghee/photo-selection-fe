@@ -82,18 +82,25 @@
 }
 
 .sysHeader {
-  height: 56px;
+  min-height: 56px;
   border-bottom: 1px solid var(--nx-border-main);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
+  padding-top: env(safe-area-inset-top, 0px);
   background: rgba(5, 5, 5, 0.8);
   backdrop-filter: blur(8px);
   position: sticky;
   top: 0;
   z-index: 100;
   flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .sysHeader { padding: 0 16px; padding-top: env(safe-area-inset-top, 0px); }
+  .sysStatus { display: none; }
+  .mainWorkspace { padding: 16px; gap: 20px; }
 }
 
 .navReturn {

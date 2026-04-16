@@ -57,7 +57,7 @@ function Clock() {
 function Header({ onAuthOpen }: { onAuthOpen: () => void }) {
   return (
     <>
-      <header className="fixed top-12 left-12 z-50 flex items-center gap-12">
+      <header className="fixed landing-header-left z-50 hidden lg:flex items-center gap-6 lg:gap-12">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 bg-[#FF4D00] flex items-center justify-center text-black font-black text-xs">A</div>
           <span className="landing-display font-bold tracking-tighter text-2xl uppercase">
@@ -70,7 +70,7 @@ function Header({ onAuthOpen }: { onAuthOpen: () => void }) {
           <button type="button" onClick={onAuthOpen} className="hover:text-white transition">Login</button>
         </nav>
       </header>
-      <div className="fixed top-12 right-12 z-50 flex items-center gap-4">
+      <div className="fixed landing-header-right z-50 hidden lg:flex items-center gap-4">
         <span className="landing-mono text-[10px] text-gray-500">SYS_TIME</span>
         <Clock />
       </div>
@@ -103,7 +103,7 @@ function HeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
   const { active, counter, sync } = PHASES[phase];
 
   return (
-    <section className="relative z-10 w-full h-screen flex flex-col lg:flex-row items-center px-12 lg:px-24 overflow-hidden">
+    <section className="relative z-10 w-full min-h-screen flex flex-col lg:flex-row items-center px-6 sm:px-12 lg:px-24 pt-24 lg:pt-0 overflow-hidden">
       {/* ── Left ── */}
       <div className="flex-1 flex flex-col justify-center lg:pr-12 max-w-xl">
         <div className="mb-6 flex items-center gap-3">
@@ -113,7 +113,7 @@ function HeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
           <div className="h-[1px] w-12 bg-[#FF4D00]/30" />
         </div>
 
-        <h1 className="landing-display text-5xl lg:text-7xl font-black leading-[1.1] mb-8 uppercase landing-break">
+        <h1 className="landing-display text-4xl sm:text-5xl lg:text-7xl font-black leading-[1.1] mb-8 uppercase landing-break">
           사진 셀렉, 이제<br />
           <span className="text-[#FF4D00] landing-glitch">링크 하나</span>로<br />
           끝냅니다.
@@ -152,7 +152,7 @@ function HeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
       </div>
 
       {/* ── Right: Mockup ── */}
-      <div className="flex-1 relative w-full h-full flex items-center justify-center">
+      <div className="landing-hero-mockup flex-1 relative w-full h-full flex items-center justify-center">
         <div className="relative w-full max-w-[500px] border border-[#222] bg-[#050505] shadow-2xl p-6">
           {/* Mockup header bar */}
           <div className="flex justify-between items-center mb-6 landing-mono text-[10px] text-gray-500 tracking-widest border-b border-[#222] pb-4">
@@ -223,6 +223,148 @@ function HeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
   );
 }
 
+// ─── Mobile Hero Section ─────────────────────────────────────────────────────
+
+const MOBILE_PHASES = [
+  { active: [false, true, false, false], counter: "SELECTED: 01", sync: "40%" },
+  { active: [true,  true, false, false], counter: "SELECTED: 02", sync: "75%" },
+  { active: [true,  true, true,  false], counter: "SELECTED: 03", sync: "92%" },
+  { active: [false, true, false, false], counter: "SELECTED: 01", sync: "25%" },
+] as const;
+
+function MobileHeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
+  const [phase, setPhase] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setPhase((p) => (p + 1) % 4), 3000);
+    return () => clearInterval(id);
+  }, []);
+  const { active, counter, sync } = MOBILE_PHASES[phase];
+
+  return (
+    <div className="relative z-10">
+      {/* Mobile Header */}
+      <header
+        className="relative z-50 flex justify-between items-center px-6"
+        style={{ paddingTop: "max(24px, env(safe-area-inset-top, 24px))", paddingBottom: "16px" }}
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 bg-[#FF4D00] flex items-center justify-center text-black font-black text-[10px]">A</div>
+          <span className="landing-display font-bold tracking-tighter text-lg uppercase">
+            A-Cut<span className="text-[#FF4D00]">.</span>
+          </span>
+        </div>
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="landing-mono text-[8px] text-gray-500 leading-none">SYS_TIME</span>
+          <Clock />
+        </div>
+      </header>
+
+      {/* Content */}
+      <div className="w-full px-6 pt-2 pb-20" style={{ display: "flex", flexDirection: "column", gap: "48px" }}>
+
+        {/* Hero text + CTA */}
+        <div className="flex flex-col">
+          <div className="mb-4">
+            <span className="landing-mono text-[8px] tracking-[0.2em] text-[#FF4D00] border border-[#FF4D00]/30 px-1.5 py-0.5">
+              ACTIVE_PROTOCOL_V1.0.2
+            </span>
+          </div>
+          <h1 className="landing-display text-4xl font-black leading-tight mb-6 uppercase landing-break">
+            사진 셀렉, 이제<br />
+            <span className="text-[#FF4D00] landing-glitch">링크 하나</span>로<br />
+            끝냅니다.
+          </h1>
+          <div className="space-y-4 mb-8 border-l border-[#222] pl-4">
+            <p className="landing-strikethrough text-sm leading-relaxed text-gray-400 landing-break">
+              구글드라이브 링크 보내고, 고객 답장 기다리고, 파일명 대조하는 번거로운 과정.
+            </p>
+            <p className="text-base leading-relaxed text-gray-300 font-medium landing-break">
+              작가는 업로드만, 고객은 클릭만.<br />
+              <span className="text-white">모든 워크플로우를 자동화하세요.</span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onAuthOpen}
+            className="landing-btn-primary flex items-center justify-center gap-3 text-black font-bold text-base uppercase tracking-tight mb-4"
+            style={{ padding: "16px 24px", width: "100%" }}
+          >
+            무료로 시작하기
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </button>
+          <div className="flex items-center gap-4 text-[9px] landing-mono text-gray-500 justify-center">
+            <span className="flex items-center gap-1">
+              <div className="w-1 h-1 bg-[#FF4D00]" /> BETA FREE
+            </span>
+            <span className="flex items-center gap-1">
+              <div className="w-1 h-1 bg-[#FF4D00]" /> NO CREDIT CARD
+            </span>
+          </div>
+        </div>
+
+        {/* Mockup + Stats */}
+        <div className="relative w-full">
+          {/* Mockup box */}
+          <div className="relative w-full border border-[#222] bg-[#050505] shadow-2xl p-4">
+            <div className="flex justify-between items-center mb-4 landing-mono text-[8px] text-gray-500 tracking-wider border-b border-[#222] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                <span>CLIENT_LIVE_VIEW</span>
+              </div>
+              <span className="text-white">{counter}</span>
+            </div>
+            <div className="relative grid grid-cols-2 gap-2">
+              {PHOTOS.map((p, i) => (
+                <div key={i} className={`landing-photo-card${active[i] ? " is-active" : ""}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.src} alt={`Portrait ${i + 1}`} />
+                  <div className={`absolute bottom-1.5 left-1.5 landing-mono text-[6px] bg-black/50 px-1 ${active[i] ? "text-[#FF4D00]" : "text-gray-400"}`}>
+                    {p.filename}
+                  </div>
+                  <div className="landing-selection-badge">A-CUT</div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between landing-mono text-[7px]">
+                <span className="text-gray-500">SYNC_STATUS</span>
+                <span className="text-[#FF4D00] animate-pulse">REAL_TIME_ACTIVE</span>
+              </div>
+              <div className="w-full h-[1px] bg-[#222]">
+                <div className="h-full bg-[#FF4D00] transition-all duration-700" style={{ width: sync }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Stats panel — full-width below mockup */}
+          <div className="landing-stats-panel mt-4 w-full">
+            <div className="flex justify-between">
+              <span className="text-white">_OPTIMIZATION_REPORT</span>
+              <span>V.1.0</span>
+            </div>
+            <div className="h-[1px] bg-[#222] my-1.5" />
+            <div className="grid grid-cols-2 gap-x-4">
+              <div>TIME_SAVED: <span className="text-[#FF4D00]">94.8%</span></div>
+              <div>ERROR_RATE: <span className="text-[#FF4D00]">0.00%</span></div>
+              <div>PROCESS: <span className="text-[#FF4D00]">AUTO_MATCH</span></div>
+              <div>LATENCY: <span className="text-[#FF4D00]">14MS</span></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile nav */}
+        <nav className="pt-8 border-t border-[#222] flex flex-wrap gap-x-8 gap-y-4 landing-mono text-[10px] tracking-widest text-gray-500 uppercase justify-center">
+          <a href="#services" className="hover:text-white transition">Selection</a>
+          <a href="#testimonials" className="hover:text-white transition">Reviews</a>
+          <button type="button" onClick={onAuthOpen} className="hover:text-white transition">Login</button>
+        </nav>
+      </div>
+    </div>
+  );
+}
+
 // ─── Problem Section ─────────────────────────────────────────────────────────
 
 const PROBLEMS = [
@@ -253,12 +395,12 @@ function ProblemSection({ onAuthOpen }: { onAuthOpen: () => void }) {
   return (
     <section className="relative z-10 w-full" style={{ background: "#000" }}>
       {/* Intro */}
-      <div className="h-screen flex flex-col items-center justify-center text-center px-8 lg:px-24">
+      <div className="h-screen flex flex-col items-center justify-center text-center px-5 sm:px-8 lg:px-24">
         <Reveal>
           <div className="landing-mono text-[10px] tracking-[0.2em] text-[#FF4D00] mb-6 uppercase">
             SURVEY_RESULTS :: PAIN_POINTS
           </div>
-          <h2 className="landing-display text-5xl lg:text-7xl font-black uppercase leading-tight mb-8 landing-break">
+          <h2 className="landing-display text-4xl sm:text-5xl lg:text-7xl font-black uppercase leading-tight mb-8 landing-break">
             혹시 지금 이렇게<br />
             <span className="text-[#FF4D00]">하고 계신가요?</span>
           </h2>
@@ -270,7 +412,7 @@ function ProblemSection({ onAuthOpen }: { onAuthOpen: () => void }) {
       {PROBLEMS.map((p, i) => (
         <div key={i}>
           <div
-            className="relative min-h-[80vh] flex flex-col justify-center items-center px-8 lg:px-24 py-24"
+            className="relative min-h-[80vh] flex flex-col justify-center items-center px-5 sm:px-8 lg:px-24 py-16 sm:py-24"
             style={{ position: "relative" }}
           >
             {/* Watermark */}
@@ -279,7 +421,7 @@ function ProblemSection({ onAuthOpen }: { onAuthOpen: () => void }) {
               <div className="landing-mono text-[10px] tracking-[0.2em] text-[#FF4D00] uppercase mb-12">
                 {p.code}
               </div>
-              <blockquote className="text-2xl lg:text-3xl font-light italic text-gray-300 mb-16 leading-relaxed landing-break whitespace-pre-line">
+              <blockquote className="text-lg sm:text-2xl lg:text-3xl font-light italic text-gray-300 mb-10 sm:mb-16 leading-relaxed landing-break whitespace-pre-line">
                 {p.quote}
               </blockquote>
               <div className="space-y-6 text-xl text-gray-400">
@@ -311,12 +453,12 @@ function ProblemSection({ onAuthOpen }: { onAuthOpen: () => void }) {
       ))}
 
       {/* CTA transition */}
-      <div className="py-48 flex flex-col items-center justify-center text-center bg-[#050505]">
+      <div className="py-24 sm:py-48 flex flex-col items-center justify-center text-center bg-[#050505]">
         <Reveal>
           <p className="landing-mono text-xs text-gray-500 uppercase tracking-[0.3em] mb-4">
             System Upgrade Recommended
           </p>
-          <h3 className="text-5xl font-bold mb-16 landing-break">이 모든 비효율, A-CUT으로 즉시 해결하세요.</h3>
+          <h3 className="text-3xl sm:text-5xl font-bold mb-10 sm:mb-16 landing-break">이 모든 비효율, A-CUT으로 즉시 해결하세요.</h3>
           <button
             type="button"
             onClick={onAuthOpen}
@@ -341,15 +483,15 @@ function ServicesSection() {
       {/* Grid overlay */}
       <div className="landing-services-grid-bg" />
 
-      <div className="relative z-10 w-full max-w-[1280px] mx-auto px-12 flex flex-col h-full">
+      <div className="relative z-10 w-full max-w-[1280px] mx-auto px-6 sm:px-12 flex flex-col h-full">
         {/* Header */}
-        <div className="mb-16 flex justify-between items-end border-b border-[#262626] pb-8">
+        <div className="mb-10 sm:mb-16 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 border-b border-[#262626] pb-6 sm:pb-8">
           <div className="landing-jb text-[10px] text-[#737373] uppercase flex flex-col gap-1">
             <span className="before:content-['>'] before:text-[#FF4D00] before:mr-2">OP_MODE: SOLUTIONS</span>
             <span className="before:content-['>'] before:text-[#FF4D00] before:mr-2">STATUS: HIGH_EFFICIENCY</span>
             <span className="before:content-['>'] before:text-[#FF4D00] before:mr-2">DATA_STREAM: ACTIVE</span>
           </div>
-          <h2 className="landing-display text-4xl lg:text-5xl font-bold uppercase leading-[1.1] text-right">
+          <h2 className="landing-display text-3xl sm:text-4xl lg:text-5xl font-bold uppercase leading-[1.1] sm:text-right">
             A컷이 바꾸는<br /><span className="text-[#FF4D00]">3가지</span>
           </h2>
         </div>
@@ -539,7 +681,7 @@ function TestimonialsSection() {
       {/* Scanline */}
       <div className="landing-scanline" style={{ position: "absolute" }} />
 
-      <div className="relative z-10 w-full max-w-[1440px] mx-auto px-12 lg:px-24 py-32 flex flex-col min-h-screen justify-center">
+      <div className="relative z-10 w-full max-w-[1440px] mx-auto px-6 lg:px-24 py-16 sm:py-32 flex flex-col min-h-screen justify-center">
         {/* Header */}
         <Reveal>
           <div className="flex items-center gap-4 mb-4">
@@ -547,9 +689,9 @@ function TestimonialsSection() {
               USER_TESTIMONIALS
             </span>
             <div className="h-[1px] flex-1 bg-[#222]" />
-            <span className="landing-mono text-[10px] text-gray-600">n=2 · VERIFIED</span>
+            <span className="landing-mono text-[10px] text-gray-600 hidden sm:inline">n=2 · VERIFIED</span>
           </div>
-          <h2 className="landing-display text-4xl lg:text-6xl font-black uppercase leading-tight mb-6 landing-break">
+          <h2 className="landing-display text-3xl sm:text-4xl lg:text-6xl font-black uppercase leading-tight mb-6 landing-break">
             실제로 써보신<br />
             <span className="text-[#FF4D00]">분들의 이야기</span>
           </h2>
@@ -610,12 +752,12 @@ function CTASection({ onAuthOpen }: { onAuthOpen: () => void }) {
   return (
     <section className="relative z-10 w-full overflow-hidden" style={{ background: "#050505", minHeight: "60vh" }}>
       <div className="landing-cta-noise" />
-      <div className="relative z-10 flex flex-col items-center justify-center text-center px-12 py-40 min-h-[60vh]">
+      <div className="relative z-10 flex flex-col items-center justify-center text-center px-6 sm:px-12 py-20 sm:py-40 min-h-[60vh]">
         <Reveal>
           <p className="landing-mono text-xs text-gray-500 uppercase tracking-[0.3em] mb-4">
             SYSTEM.READY :: INIT_WORKFLOW
           </p>
-          <h2 className="landing-display text-4xl lg:text-5xl font-black uppercase leading-tight mb-6 landing-break">
+          <h2 className="landing-display text-3xl sm:text-4xl lg:text-5xl font-black uppercase leading-tight mb-6 landing-break">
             다음 촬영부터<br /><span className="text-[#FF4D00]">바로 써보세요</span>
           </h2>
           <p className="text-gray-400 text-lg leading-relaxed max-w-xl mx-auto mb-12 landing-break">
@@ -663,18 +805,27 @@ export default function LandingPage() {
       <div className="landing-bracket landing-bracket-bl" />
       <div className="landing-bracket landing-bracket-br" />
 
+      {/* Mobile hero (lg 미만에서만 표시) */}
+      <div className="block lg:hidden">
+        <MobileHeroSection onAuthOpen={() => setAuthOpen(true)} />
+      </div>
+
+      {/* Desktop header (lg 이상에서만 표시) */}
       <Header onAuthOpen={() => setAuthOpen(true)} />
 
       <main>
-        <HeroSection onAuthOpen={() => setAuthOpen(true)} />
+        {/* Desktop hero (lg 이상에서만 표시) */}
+        <div className="hidden lg:block">
+          <HeroSection onAuthOpen={() => setAuthOpen(true)} />
+        </div>
         <ProblemSection onAuthOpen={() => setAuthOpen(true)} />
         <ServicesSection />
         <TestimonialsSection />
         <CTASection onAuthOpen={() => setAuthOpen(true)} />
       </main>
 
-      <footer className="relative z-10 border-t border-[#222] py-8 bg-[#000]">
-        <div className="max-w-[1440px] mx-auto px-12 flex items-center justify-between">
+      <footer className="landing-footer relative z-10 border-t border-[#222] py-8 bg-[#000]">
+        <div className="max-w-[1440px] mx-auto px-6 sm:px-12 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 bg-[#FF4D00] flex items-center justify-center text-black font-black text-[10px]">A</div>
             <span className="landing-display font-bold tracking-tighter text-lg uppercase">

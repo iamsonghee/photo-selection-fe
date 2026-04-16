@@ -291,7 +291,7 @@ export default function SettingsPage() {
         .st-toggle-row:hover { background: rgba(255,255,255,0.02); }
 
         @media (max-width: 768px) {
-          .st-topbar { flex-wrap: wrap; gap: 10px; padding: 10px 14px !important; height: auto !important; }
+          .st-topbar { flex-wrap: wrap; gap: 10px; padding: 10px 14px !important; padding-top: max(10px, env(safe-area-inset-top)) !important; height: auto !important; }
           .st-clock { display: none !important; }
           .st-hero { flex-direction: column !important; align-items: flex-start !important; gap: 16px !important; }
           .st-hero-actions { width: 100% !important; align-items: stretch !important; }

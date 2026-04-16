@@ -540,10 +540,11 @@ export default function DashboardPage() {
         }
         @media (max-width: 768px) {
           .db-root { overflow-x: hidden; }
-          .db-topbar { flex-wrap: wrap; gap: 10px; padding: 10px 14px !important; height: auto !important; }
+          .db-topbar { flex-wrap: wrap; gap: 10px; padding: 10px 14px !important; padding-top: max(10px, env(safe-area-inset-top)) !important; height: auto !important; }
           .db-action-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .db-clock { display: none !important; }
           .db-activity-panel { display: none !important; }
+          .db-project-list { padding: 0 10px !important; }
         }
         @keyframes db-pulse {
           0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,77,0,0.4); }
