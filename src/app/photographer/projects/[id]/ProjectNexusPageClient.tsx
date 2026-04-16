@@ -18,10 +18,10 @@ import {
   X,
 } from "lucide-react";
 import { getProjectById } from "@/lib/db";
-import { getStatusLabel } from "@/lib/project-status";
 import type { Project, ProjectStatus } from "@/types";
 import { PHOTOGRAPHER_THEME as C } from "@/lib/photographer-theme";
 import { SHOOT_TYPES } from "@/lib/project-shoot-types";
+import { StatusPill } from "@/components/ui/StatusPill";
 import styles from "./ProjectNexusDashboard.module.css";
 
 const jetbrains = JetBrains_Mono({
@@ -53,16 +53,6 @@ function getWorkflowStates(status: ProjectStatus): WfState[] {
   }
 }
 
-const STATUS_EN: Record<ProjectStatus, string> = {
-  preparing: "PREPARING",
-  selecting: "SELECTING",
-  confirmed: "CONFIRMED",
-  editing: "EDITING",
-  reviewing_v1: "REVIEW_V1",
-  editing_v2: "EDIT_V2",
-  reviewing_v2: "REVIEW_V2",
-  delivered: "DELIVERED",
-};
 
 type LogRow = {
   id: string;
@@ -394,16 +384,10 @@ export function ProjectNexusPageClient() {
             <div className={styles.projectTitleGroup}>
               <div>
                 <h1 className={styles.projectTitle}>{project.name}</h1>
-                <p className={styles.statusLine}>
-                  상태: {getStatusLabel(project.status)}
-                  {project.status === "preparing" && M > 0 ? ` · 업로드 ${M}장` : ""}
-                </p>
-                <div className={`${styles.statusBadgeRow} ${styles.mono}`}>
-                  <span className={styles.miniBadge}>{prjBreadcrumb}</span>
-                  <span className={`${styles.miniBadge} ${styles.miniBadgeActive}`}>{STATUS_EN[project.status]}</span>
+                <div style={{ marginTop: 8 }}>
+                  <StatusPill status={project.status} photoCount={M} requiredCount={N} />
                 </div>
               </div>
-              <div className={`${styles.projectIdBadge} ${styles.mono}`}>ID:{idBadge}</div>
             </div>
           </div>
 
