@@ -10,6 +10,7 @@ import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { getProfileImageUrl } from "@/lib/photographer";
 import { getReviewMockData } from "@/lib/mock-data";
 import { BrandLogoBar } from "@/components/BrandLogo";
+import hud from "./customer-acut-hud.module.css";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 const REVISION_LIMIT = 2;
@@ -50,8 +51,8 @@ function PageHeader({ inviteHref, right }: { inviteHref?: string; right?: React.
 /* ── Loading ── */
 function LoadingScreen() {
   return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[#050505]">
-      <div className="mb-3 h-7 w-7 animate-spin rounded-full border-2 border-[#4f7eff]/20 border-t-[#4f7eff]" />
+    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[#030303]">
+      <div className="mb-3 h-7 w-7 animate-spin rounded-full border-2 border-[#ff4d00]/20 border-t-[#ff4d00]" />
       <p className="text-[13px] text-zinc-600">불러오는 중...</p>
     </div>
   );
@@ -109,22 +110,34 @@ export default function InvitePageClient() {
     const isV2             = project.status === "reviewing_v2";
     const revisionRemaining = Math.max(0, REVISION_LIMIT - (isV2 ? 1 : 0));
     const deadlineStr      = format(new Date(project.deadline), "yyyy.MM.dd", { locale: ko });
+    const reviewPath = `/c/${token}/review`;
 
     return (
-      <div className="flex min-h-[100dvh] flex-col bg-[#050505] text-zinc-100">
-        {/* Ambient glows */}
-        <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
-          <div style={{ position: "absolute", top: "5%",  left: "-10%", width: 260, height: 260, borderRadius: "50%", background: "rgba(79,126,255,0.10)", filter: "blur(90px)" }} />
-          <div style={{ position: "absolute", top: "40%", right: "-8%", width: 200, height: 200, borderRadius: "50%", background: "rgba(139,92,246,0.08)", filter: "blur(70px)" }} />
-        </div>
+      <div className={hud.root}>
+        <div className={`${hud.viewportBracket} ${hud.bracketTl}`} aria-hidden />
+        <div className={`${hud.viewportBracket} ${hud.bracketTr}`} aria-hidden />
+        <div className={`${hud.viewportBracket} ${hud.bracketBl}`} aria-hidden />
+        <div className={`${hud.viewportBracket} ${hud.bracketBr}`} aria-hidden />
 
-        <PageHeader inviteHref={inviteHref} />
+        <header className={hud.topHeader}>
+          <div className={hud.headerSide}>
+            <Link href={inviteHref ?? "#"} className={hud.btnSub} scroll={false}>
+              ← 돌아가기
+            </Link>
+          </div>
+          <div className={hud.brandCluster}>
+            <div className={hud.logoBox}>A</div>
+            <div className={hud.brandName}>
+              A컷 <span>Acut</span>
+            </div>
+          </div>
+          <div className={hud.headerSide} />
+        </header>
 
-        <div className="relative z-10 flex flex-1 flex-col justify-between px-5 py-4 mx-auto w-full max-w-[420px]">
+        <div className={hud.inviteStack}>
+          <div>
+            <div className={hud.portalCmd} style={{ marginBottom: 16 }}>CMD :: SYS.REVIEW_INVITE</div>
 
-          {/* ── Hero ── */}
-          <div className="fade-in-section">
-            {/* Photographer identity */}
             <div className="mb-4 flex items-center gap-3">
               <div style={{ position: "relative", flexShrink: 0 }}>
                 <img
@@ -132,101 +145,87 @@ export default function InvitePageClient() {
                   alt=""
                   style={{
                     width: 52, height: 52, borderRadius: "50%", objectFit: "cover",
-                    boxShadow: "0 0 0 2px rgba(79,126,255,0.4), 0 0 16px rgba(79,126,255,0.2)",
+                    boxShadow: "0 0 0 2px rgba(255,77,0,0.45), 0 0 16px rgba(255,77,0,0.18)",
                   }}
                 />
                 <div style={{
                   position: "absolute", bottom: 0, right: 0,
                   width: 16, height: 16, borderRadius: "50%",
-                  background: "#4f7eff", border: "2px solid #050505",
+                  background: "#ff4d00", border: "2px solid #030303",
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
                   <Icon icon="solar:verified-check-bold" width={9} style={{ color: "#fff" }} />
                 </div>
               </div>
               <div>
-                <p className="text-[11px] text-zinc-600">담당 작가</p>
+                <p className="text-[11px]" style={{ color: "#555" }}>담당 작가</p>
                 <p className="text-[15px] font-semibold text-zinc-100">{photographer?.name ?? "담당 작가"}</p>
               </div>
             </div>
 
-            {/* Chip */}
             <div
               className="mb-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium"
-              style={{ background: "rgba(79,126,255,0.12)", border: "1px solid rgba(79,126,255,0.25)", color: "#6b97ff" }}
+              style={{ background: "rgba(255,77,0,0.12)", border: "1px solid rgba(255,77,0,0.28)", color: "#ff4d00" }}
             >
               <Icon icon="solar:star-bold" width={11} />
               보정본 검토 요청
             </div>
 
-            {/* Big headline */}
             <h1 className="mb-2 font-bold leading-[1.15] text-zinc-100"
               style={{ fontSize: "clamp(26px, 7vw, 32px)", wordBreak: "keep-all" }}>
               보정이 완료됐어요.<br />
               마음에 드시나요?
             </h1>
-            <p className="text-[13px] leading-relaxed text-zinc-500" style={{ wordBreak: "keep-all" }}>
-              사진을 하나씩 확인하고 코멘트를 남겨주세요.
+            <p className="text-[13px] leading-relaxed" style={{ wordBreak: "keep-all", color: "#8c8c8c" }}>
+              사진을 하나쫜 확인하고 코멘트를 남겨주세요.
               재보정 요청도 가능해요.
             </p>
           </div>
 
-          {/* ── Info card ── */}
-          <div className="fade-in-section" style={{ animationDelay: "80ms" }}>
-            <div style={{
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: "1.25rem",
-              padding: "0.375rem",
-            }}>
-              <div style={{
-                background: "#0e1016",
-                borderRadius: "calc(1.25rem - 0.375rem)",
+          <div>
+            <div
+              style={{
+                background: "rgba(10, 10, 10, 0.6)",
+                border: "1px solid #2a2a2a",
+                borderTop: "1px solid #ff4d00",
                 padding: "1.25rem",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
-              }}>
-                <div className="mb-3 grid grid-cols-2 gap-2">
-                  {[
-                    { icon: "solar:camera-bold",        val: project.name },
-                    { icon: "solar:calendar-mark-bold", val: `기한 ${deadlineStr}` },
-                    { icon: "solar:gallery-bold",        val: `${total}장` },
-                    { icon: "solar:refresh-circle-bold", val: `재보정 ${revisionRemaining}회 가능` },
-                  ].map((r, i) => (
-                    <div key={i} className="flex items-center gap-2 text-[12px] text-zinc-300">
-                      <Icon icon={r.icon} width={13} style={{ color: "#4f7eff", flexShrink: 0 }} />
-                      <span className="truncate">{r.val}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Version badge */}
-                <div
-                  className="mb-3 flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] font-medium"
-                  style={isV2
-                    ? { background: "rgba(245,166,35,0.08)", border: "1px solid rgba(245,166,35,0.2)", color: "#f5a623" }
-                    : { background: "rgba(79,126,255,0.08)", border: "1px solid rgba(79,126,255,0.2)", color: "#6b97ff" }}
-                >
-                  <Icon icon={isV2 ? "solar:refresh-circle-bold" : "solar:magic-stick-bold"} width={13} />
-                  {isV2 ? "2차 보정본 검토 중" : "1차 보정본 검토 중"}
-                </div>
-
-                <Link href={`/c/${token}/review`}>
-                  <button
-                    type="button"
-                    className="ps-btn-spring flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[14px] font-semibold text-white"
-                    style={{ background: "linear-gradient(135deg, #4f7eff 0%, #6b5fff 100%)" }}
-                  >
-                    보정본 검토하기
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: "rgba(0,0,0,0.15)" }}>
-                      <Icon icon="solar:arrow-right-bold" width={12} />
-                    </div>
-                  </button>
-                </Link>
+                backdropFilter: "blur(4px)",
+              }}
+            >
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                {[
+                  { icon: "solar:camera-bold", val: project.name },
+                  { icon: "solar:calendar-mark-bold", val: `기한 ${deadlineStr}` },
+                  { icon: "solar:gallery-bold", val: `${total}장` },
+                  { icon: "solar:refresh-circle-bold", val: `재보정 ${revisionRemaining}회 가능` },
+                ].map((r, i) => (
+                  <div key={i} className="flex items-center gap-2 text-[12px]" style={{ color: "#e5e5e5" }}>
+                    <Icon icon={r.icon} width={13} style={{ color: "#ff4d00", flexShrink: 0 }} />
+                    <span className="truncate">{r.val}</span>
+                  </div>
+                ))}
               </div>
+
+              <div
+                className="mb-3 flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] font-medium"
+                style={isV2
+                  ? { background: "rgba(245,166,35,0.08)", border: "1px solid rgba(245,166,35,0.2)", color: "#f5a623" }
+                  : { background: "rgba(255,77,0,0.08)", border: "1px solid rgba(255,77,0,0.22)", color: "#ff4d00" }}
+              >
+                <Icon icon={isV2 ? "solar:refresh-circle-bold" : "solar:magic-stick-bold"} width={13} />
+                {isV2 ? "2차 보정본 검토 중" : "1차 보정본 검토 중"}
+              </div>
+
+              <Link href={reviewPath} className={hud.btnPrimary} scroll={false}>
+                보정본 검토하기
+                <Icon icon="solar:arrow-right-bold" width={14} style={{ color: "#000" }} />
+              </Link>
             </div>
           </div>
 
-          <footer className="pt-3 text-center text-[10px] text-zinc-700">© 2026 A CUT</footer>
+          <footer className={hud.pageFooter} style={{ borderTop: "none", padding: "16px 0 0", background: "transparent" }}>
+            <div>© 2026 A컷 · Acut</div>
+          </footer>
         </div>
       </div>
     );

@@ -1,41 +1,13 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { PackageCheck } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
-import { PS_DISPLAY } from "@/lib/photographer-theme";
-import { BrandLogoBar } from "@/components/BrandLogo";
+import styles from "./delivered.module.css";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
-
-const playfair: React.CSSProperties = { fontFamily: PS_DISPLAY };
-const headerBg: React.CSSProperties = { background: "rgba(10,10,11,0.92)", backdropFilter: "blur(12px)" };
-const gridBg: React.CSSProperties = {
-  backgroundImage:
-    "linear-gradient(rgba(79,126,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(79,126,255,0.05) 1px, transparent 1px)",
-  backgroundSize: "48px 48px",
-};
-
-function PageHeader({ right, inviteHref }: { right?: React.ReactNode; inviteHref?: string }) {
-  return (
-    <header
-      className="sticky top-0 z-50 flex items-center justify-between border-b border-white/10 px-4"
-      style={{ ...headerBg, paddingTop: "env(safe-area-inset-top, 0px)", minHeight: 48 }}
-    >
-      <BrandLogoBar size="sm" href={inviteHref} />
-      {right && <div className="text-[12px] text-zinc-400 truncate max-w-[180px]">{right}</div>}
-    </header>
-  );
-}
-
-function PageFooter() {
-  return (
-    <footer className="py-5 text-center text-[11px] text-zinc-500">
-      © 2026 A CUT
-    </footer>
-  );
-}
 
 export default function DeliveredPage() {
   const params = useParams();
@@ -62,52 +34,112 @@ export default function DeliveredPage() {
   }, [project?.status, token, router]);
 
   if (!mounted || loading) {
-    return <div className="flex min-h-screen items-center justify-center bg-[#050505]"><p className="text-sm text-[#5a5f78]">불러오는 중...</p></div>;
+    return (
+      <div className={styles.root}>
+        <p style={{ margin: "auto", fontFamily: "var(--font-mono)", fontSize: 11, color: "#555", letterSpacing: "0.12em" }}>
+          LOADING_DELIVERED…
+        </p>
+      </div>
+    );
   }
   if (!project) {
-    return <div className="flex min-h-screen items-center justify-center bg-[#050505]"><p className="text-sm text-[#5a5f78]">존재하지 않는 초대 링크입니다.</p></div>;
+    return (
+      <div className={styles.root}>
+        <div style={{ margin: "auto", padding: 24, textAlign: "center" }}>
+          <p className={styles.subtitle}>존재하지 않는 초대 링크입니다.</p>
+          <Link href="/" className={styles.btnSub} style={{ justifyContent: "center", marginTop: 16 }}>
+            ← 홈으로
+          </Link>
+        </div>
+      </div>
+    );
   }
   if (project.status !== "delivered") {
-    return <div className="flex min-h-screen items-center justify-center bg-[#050505]"><p className="text-sm text-[#5a5f78]">이동 중...</p></div>;
+    return (
+      <div className={styles.root}>
+        <p style={{ margin: "auto", fontFamily: "var(--font-mono)", fontSize: 11, color: "#555", letterSpacing: "0.12em" }}>
+          REDIRECTING…
+        </p>
+      </div>
+    );
   }
 
+  const photographerName = photographer?.name?.trim() || "작가";
+  const invitePath = token ? `/c/${token}` : "/";
+  const galleryPath = token ? `/c/${token}/gallery` : "/";
+
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-100" style={gridBg}>
-      <PageHeader right={project.name} inviteHref={token ? `/c/${token}` : undefined} />
+    <div className={styles.root}>
+      <div className={`${styles.viewportBracket} ${styles.bracketTl}`} aria-hidden />
+      <div className={`${styles.viewportBracket} ${styles.bracketTr}`} aria-hidden />
+      <div className={`${styles.viewportBracket} ${styles.bracketBl}`} aria-hidden />
+      <div className={`${styles.viewportBracket} ${styles.bracketBr}`} aria-hidden />
 
-      <div className="flex min-h-[calc(100vh-48px)] flex-col items-center justify-center px-4 py-8">
-        <div className="w-full max-w-[440px] rounded-2xl border border-white/10 bg-[#111318]/95 p-6 text-center md:p-8" style={{ backdropFilter: "blur(8px)" }}>
-          <div className="mb-6 flex justify-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-[#2ed573] bg-[#0f2a1e]">
-              <PackageCheck className="h-8 w-8 text-[#2ed573]" />
-            </div>
-          </div>
-
-          <h1 className="mb-2 text-[22px] font-bold text-zinc-100" style={playfair}>
-            납품이 완료됐습니다!
-          </h1>
-          <p className="mb-6 text-[13px] leading-relaxed text-[#8b90a8]">
-            {photographer?.name ?? "작가"}님이 최종 보정본을 전달했습니다.<br />
-            문의사항은 작가에게 연락해 주세요.
-          </p>
-
-          <div className="rounded-xl border border-white/10 bg-[#1a1d24] p-4 text-left">
-            {photographer?.profile_image_url && (
-              <div className="mb-3 flex items-center gap-3">
-                <img src={photographer.profile_image_url} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
-                <div>
-                  <div className="text-[13px] font-semibold text-zinc-100">{photographer?.name ?? "담당 작가"}</div>
-                  <div className="text-[11px] text-[#5a5f78]">{project.name}</div>
-                </div>
-              </div>
-            )}
-            <div className="rounded-xl bg-[#111318] px-3.5 py-3 text-[12px] leading-relaxed text-[#8b90a8]">
-              소중한 순간을 함께해서 영광이었습니다. 감사합니다
-            </div>
+      <header className={styles.topHeader}>
+        <div className={styles.headerSide}>
+          <Link href={invitePath} className={styles.btnSub} scroll={false}>
+            ← 돌아가기
+          </Link>
+        </div>
+        <div className={styles.brandCluster}>
+          <div className={styles.logoBox}>A</div>
+          <div className={styles.brandName}>
+            A컷 <span>Acut</span>
           </div>
         </div>
-        <PageFooter />
-      </div>
+        <div className={styles.headerSide} />
+      </header>
+
+      <main className={styles.container}>
+        <div className={styles.portalCmd}>LOG :: DELIVERY_COMPLETE</div>
+        <h1 className={styles.title}>
+          납품이 완료됐습니다!
+        </h1>
+        <p className={styles.subtitle}>
+          {photographerName}님이 최종 보정본을 전달했습니다.
+          <br />
+          문의사항은 작가에게 연락해 주세요.
+        </p>
+
+        <section className={styles.card} aria-label="납품 완료 정보">
+          <div className={styles.successBadge} aria-hidden>
+            <PackageCheck style={{ width: 32, height: 32, color: "var(--accent-green)" }} />
+          </div>
+
+          <div className={styles.detailBox}>
+            {photographer?.profile_image_url ? (
+              <div className={styles.profileRow}>
+                <img src={photographer.profile_image_url} alt="" className={styles.avatar} />
+                <div style={{ minWidth: 0 }}>
+                  <p className={styles.name}>{photographerName}</p>
+                  <p className={styles.meta}>{project.name}</p>
+                </div>
+              </div>
+            ) : (
+              <div style={{ marginBottom: 12 }}>
+                <p className={styles.name}>{photographerName}</p>
+                <p className={styles.meta}>{project.name}</p>
+              </div>
+            )}
+
+            <div className={styles.message}>소중한 순간을 함께해서 영광이었습니다. 감사합니다</div>
+
+            <div className={styles.ctaRow}>
+              <Link href={galleryPath} className={styles.btnPrimary} scroll={false}>
+                갤러리로 이동
+              </Link>
+              <Link href={invitePath} className={styles.btnGhost} scroll={false}>
+                프로젝트 홈
+              </Link>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className={styles.pageFooter}>
+        <div>© 2026 A컷 · Acut</div>
+        <div className={styles.footerNote}>{photographerName} 작가님이 A컷을 통해 전달했습니다.</div>
+      </footer>
     </div>
   );
 }

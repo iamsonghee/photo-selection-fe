@@ -7,25 +7,21 @@ import { Check, RefreshCw } from "lucide-react";
 import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
 import type { ReviewPhotoItem } from "@/lib/customer-api-server";
-import { PHOTOGRAPHER_THEME as T, PS_DISPLAY } from "@/lib/photographer-theme";
-import { BrandLogoBar } from "@/components/BrandLogo";
+import hud from "../customer-acut-hud.module.css";
 
-const REVISION_LIMIT = 2;
+/* HUD — /about · /delivered */
+const INK = "#030303";
+const SURFACE = "rgba(10, 10, 10, 0.6)";
+const SURFACE2 = "#151515";
+const ACCENT = "#ff4d00";
+const GREEN = "#00e676";
+const RED = "#ff4757";
+const DIM = "#555555";
+const TEXT = "#ffffff";
+const MUTED = "#8c8c8c";
+const BORDER = "#2a2a2a";
+const BORDER_MD = "#3a3a3a";
 
-/* ── design tokens (작가/랜딩과 동일 팔레트) ────────────────────────────── */
-const INK = T.ink;
-const SURFACE = T.surface;
-const SURFACE2 = T.surface2;
-const STEEL = T.steel;
-const GREEN = T.green;
-const RED = T.red;
-const DIM = T.dim;
-const TEXT = T.text;
-const MUTED = T.muted;
-const BORDER = T.border;
-const BORDER_MD = T.borderMd;
-
-const playfair: React.CSSProperties = { fontFamily: PS_DISPLAY };
 
 export default function ReviewGalleryPage() {
   const params = useParams();
@@ -66,9 +62,6 @@ export default function ReviewGalleryPage() {
   const reviewedCount  = approvedCount + revisionCount;
   const allReviewed    = total > 0 && pendingCount === 0;
 
-  const isV2 = project?.status === "reviewing_v2";
-  const revisionRemaining = Math.max(0, REVISION_LIMIT - (isV2 ? 1 : 0));
-
   const handleSubmit = useCallback(async () => {
     if (!allReviewed || !token) return;
     setSubmitError(null);
@@ -108,7 +101,7 @@ export default function ReviewGalleryPage() {
   /* ── loading / guard states ─────────────────── */
   if (selectionLoading || reviewPhotosLoading || !project) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: INK }}>
+      <div className="flex min-h-screen items-center justify-center" style={{ background: INK, color: TEXT }}>
         <p style={{ fontSize: 13, color: MUTED }}>{selectionLoading || reviewPhotosLoading ? "로딩 중…" : "존재하지 않는 초대 링크입니다."}</p>
       </div>
     );
@@ -117,7 +110,7 @@ export default function ReviewGalleryPage() {
   const canShowReview = project.status === "reviewing_v1" || project.status === "reviewing_v2";
   if (!canShowReview) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: INK }}>
+      <div className="flex min-h-screen items-center justify-center" style={{ background: INK, color: TEXT }}>
         <div className="text-center">
           <p style={{ fontSize: 13, color: MUTED, marginBottom: 16 }}>현재 검토 단계가 아닙니다.</p>
           <Link href={`/c/${token}/confirmed`}
@@ -131,30 +124,43 @@ export default function ReviewGalleryPage() {
 
   const progressPct = total > 0 ? Math.round((reviewedCount / total) * 100) : 0;
 
-  return (
-    <div style={{ background: INK, minHeight: "100vh", paddingBottom: 88, color: TEXT }}>
+  const invitePath = token ? `/c/${token}` : "#";
 
-      {/* ── Header ──────────────────────────── */}
-      <header style={{
-        background: "rgba(13,30,40,0.95)", backdropFilter: "blur(12px)",
-        borderBottom: `1px solid ${BORDER}`, minHeight: 48,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 20px",
-        paddingTop: "env(safe-area-inset-top, 0px)",
-        position: "sticky", top: 0, zIndex: 50,
-      }}>
-        <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
-        <span style={{ fontSize: 12, color: MUTED }}>{project.name}</span>
+  return (
+    <div className={hud.root}>
+      <div className={`${hud.viewportBracket} ${hud.bracketTl}`} aria-hidden />
+      <div className={`${hud.viewportBracket} ${hud.bracketTr}`} aria-hidden />
+      <div className={`${hud.viewportBracket} ${hud.bracketBl}`} aria-hidden />
+      <div className={`${hud.viewportBracket} ${hud.bracketBr}`} aria-hidden />
+
+      <header className={hud.topHeader} style={{ paddingTop: "max(32px, env(safe-area-inset-top))" }}>
+        <div className={hud.headerSide}>
+          <Link href={invitePath} className={hud.btnSub} scroll={false}>
+            ← 돌아가기
+          </Link>
+        </div>
+        <div className={hud.brandCluster}>
+          <div className={hud.logoBox}>A</div>
+          <div className={hud.brandName}>
+            A컷 <span>Acut</span>
+          </div>
+        </div>
+        <div className={`${hud.headerSide} ${hud.headerSideEnd}`}>
+          <span className={hud.headerMeta} title={project.name}>{project.name}</span>
+        </div>
       </header>
 
+      <div className={hud.reviewBody} style={{ paddingBottom: 100, paddingLeft: 20, paddingRight: 20 }}>
+
       {/* ── Subheader ───────────────────────── */}
-      <div style={{ padding: "16px 20px 0" }}>
+      <div style={{ padding: "8px 0 0" }}>
+        <div className={hud.portalCmd} style={{ marginBottom: 12 }}>CMD :: SYS.REVIEW_GALLERY</div>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
-          <h1 style={{ ...playfair, fontSize: 20, color: TEXT, margin: 0 }}>보정본 검토</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: TEXT, margin: 0, letterSpacing: "-0.02em" }}>보정본 검토</h1>
           <button type="button" onClick={handleApproveAll} disabled={photos.length === 0}
             style={{
-              fontSize: 11, color: GREEN, background: "rgba(46,213,115,0.06)",
-              border: `1px solid rgba(46,213,115,0.2)`, borderRadius: 6,
+              fontSize: 11, color: GREEN, background: "rgba(0,230,118,0.08)",
+              border: `1px solid rgba(0,230,118,0.25)`, borderRadius: 6,
               padding: "4px 10px", cursor: photos.length === 0 ? "not-allowed" : "pointer",
               opacity: photos.length === 0 ? 0.4 : 1,
               display: "flex", alignItems: "center", gap: 4,
@@ -171,7 +177,7 @@ export default function ReviewGalleryPage() {
             <span style={{ fontSize: 12, color: MUTED }}>{reviewedCount} / {total}장</span>
           </div>
           <div style={{ height: 4, background: SURFACE2, borderRadius: 2, overflow: "hidden", marginBottom: 8 }}>
-            <div style={{ height: "100%", borderRadius: 2, background: STEEL, width: `${progressPct}%`, transition: "width 0.3s" }} />
+            <div style={{ height: "100%", borderRadius: 2, background: ACCENT, width: `${progressPct}%`, transition: "width 0.3s" }} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}>
@@ -191,7 +197,7 @@ export default function ReviewGalleryPage() {
       </div>
 
       {/* ── Photo grid ──────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4" style={{ gap: 10, padding: "0 20px" }}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4" style={{ gap: 10, padding: 0 }}>
         {photos.map((p) => {
           const review = getReview(p.id);
           const status: "approved" | "revision_requested" | "pending" = review?.status ?? "pending";
@@ -199,13 +205,13 @@ export default function ReviewGalleryPage() {
           const isRevision  = status === "revision_requested";
           const draft = commentDrafts[p.id] ?? "";
 
-          const cardBorder = isApproved ? "rgba(46,213,115,0.3)" : isRevision ? "rgba(255,71,87,0.25)" : BORDER;
-          const cardBg     = isApproved ? "rgba(46,213,115,0.02)" : isRevision ? "rgba(255,71,87,0.02)" : SURFACE;
+          const cardBorder = isApproved ? "rgba(0,230,118,0.35)" : isRevision ? "rgba(255,71,87,0.25)" : BORDER;
+          const cardBg     = isApproved ? "rgba(0,230,118,0.04)" : isRevision ? "rgba(255,71,87,0.02)" : SURFACE;
 
           const statusLabel = isApproved ? "✓ 확정" : isRevision ? "↩ 재보정" : "미검토";
           const statusColor = isApproved ? GREEN : isRevision ? RED : MUTED;
-          const statusBg    = isApproved ? "rgba(46,213,115,0.15)" : isRevision ? "rgba(255,71,87,0.12)" : SURFACE2;
-          const statusBorder = isApproved ? "rgba(46,213,115,0.3)" : isRevision ? "rgba(255,71,87,0.2)" : BORDER;
+          const statusBg    = isApproved ? "rgba(0,230,118,0.14)" : isRevision ? "rgba(255,71,87,0.12)" : SURFACE2;
+          const statusBorder = isApproved ? "rgba(0,230,118,0.35)" : isRevision ? "rgba(255,71,87,0.2)" : BORDER;
 
           const saveComment = () => {
             setReview(p.id, "revision_requested", draft || undefined);
@@ -233,7 +239,7 @@ export default function ReviewGalleryPage() {
                   {p.originalFilename}
                 </p>
                 <Link href={`/c/${token}/review/${p.id}`}
-                  style={{ fontSize: 11, color: STEEL, display: "flex", alignItems: "center", gap: 3, marginBottom: 10, textDecoration: "none" }}>
+                  style={{ fontSize: 11, color: ACCENT, display: "flex", alignItems: "center", gap: 3, marginBottom: 10, textDecoration: "none" }}>
                   원본과 비교 →
                 </Link>
 
@@ -244,8 +250,8 @@ export default function ReviewGalleryPage() {
                       height: 34, borderRadius: 7, fontSize: 11, fontWeight: 500,
                       display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
                       cursor: "pointer", border: "1px solid", transition: "all 0.15s",
-                      background: isApproved ? "rgba(46,213,115,0.12)" : "rgba(46,213,115,0.06)",
-                      borderColor: isApproved ? GREEN : "rgba(46,213,115,0.25)",
+                      background: isApproved ? "rgba(0,230,118,0.12)" : "rgba(46,213,115,0.06)",
+                      borderColor: isApproved ? GREEN : "rgba(0,230,118,0.28)",
                       color: GREEN,
                     }}>
                     <Check style={{ width: 11, height: 11 }} /> 확정
@@ -296,11 +302,12 @@ export default function ReviewGalleryPage() {
           );
         })}
       </div>
+      </div>
 
       {/* ── Fixed bottom submit bar ──────────── */}
       <div style={{
         position: "fixed", bottom: 0, left: 0, right: 0,
-        background: "rgba(0,48,73,0.97)", borderTop: `1px solid ${BORDER}`,
+        background: "rgba(3,3,3,0.97)", borderTop: `1px solid ${BORDER}`,
         backdropFilter: "blur(12px)", padding: "12px 20px", zIndex: 100,
         display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
       }}>
@@ -317,8 +324,8 @@ export default function ReviewGalleryPage() {
             height: 44, padding: "0 24px", border: "none", borderRadius: 10,
             fontSize: 13, fontWeight: 600, cursor: allReviewed ? "pointer" : "not-allowed",
             flexShrink: 0, transition: "all 0.15s",
-            background: allReviewed ? STEEL : SURFACE2,
-            color: allReviewed ? "white" : DIM,
+            background: allReviewed ? ACCENT : SURFACE2,
+            color: allReviewed ? "#000" : DIM,
           }}>
           작가에게 전달
         </button>
@@ -336,7 +343,7 @@ export default function ReviewGalleryPage() {
             background: SURFACE, border: `1px solid ${BORDER_MD}`,
             borderRadius: 16, padding: 24, boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
           }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: TEXT, marginBottom: 8, ...playfair }}>최종 제출</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: TEXT, marginBottom: 8, letterSpacing: "-0.02em" }}>최종 제출</h3>
             <p style={{ fontSize: 13, lineHeight: 1.6, color: MUTED, marginBottom: 20 }}>
               확정 <span style={{ color: GREEN }}>{approvedCount}장</span>,{" "}
               재보정 요청 <span style={{ color: RED }}>{revisionCount}장</span>을 작가에게 전달하시겠습니까?
@@ -354,7 +361,7 @@ export default function ReviewGalleryPage() {
               <button type="button" onClick={async () => { await handleSubmit(); }}
                 style={{
                   flex: 1, height: 44, border: "none", borderRadius: 10,
-                  fontSize: 13, fontWeight: 600, color: "white", background: STEEL, cursor: "pointer",
+                  fontSize: 13, fontWeight: 700, color: "#000", background: ACCENT, cursor: "pointer",
                 }}>
                 전달
               </button>
