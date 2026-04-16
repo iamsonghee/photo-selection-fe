@@ -645,8 +645,8 @@ export default function GalleryPageClient() {
           <div className="gl-footer-inner" style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div className="gl-footer-progress" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
               <div className="gl-footer-progress-label" style={{ display: "flex", justifyContent: "space-between", fontFamily: "'Space Mono', monospace", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                <span style={{ color: "#888" }}>Selection Progress</span>
-                <span style={{ color: "#FF4D00" }}>{progressPct}% Complete</span>
+                <span style={{ color: "#888" }}>사진 선택</span>
+                <span style={{ color: "#FF4D00" }}>{Y} / {N}장</span>
               </div>
               <div style={{ width: "100%", height: 3, background: "#111" }}>
                 <div style={{ height: "100%", background: "#FF4D00", width: `${progressPct}%`, transition: "width 0.3s" }} />
@@ -655,13 +655,12 @@ export default function GalleryPageClient() {
 
             <div style={{ display: "flex", alignItems: "center", gap: 24, marginLeft: 32 }}>
               <div className="gl-footer-meta" style={{ textAlign: "right" }}>
-                <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555", margin: 0 }}>MINIMUM {N} REQ.</p>
-                <p style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: remaining === 0 ? "#FF4D00" : "rgba(255,255,255,0.5)", margin: 0 }}>
                   {remaining > 0
-                    ? `${remaining} photos remaining`
+                    ? `사진을 ${remaining}장 더 골라주세요`
                     : remaining === 0
-                    ? "Ready to confirm!"
-                    : `${Math.abs(remaining)} over limit`}
+                    ? "모두 선택했어요! 의뢰 버튼을 눌러주세요"
+                    : `${Math.abs(remaining)}장 초과됐어요`}
                 </p>
               </div>
               <button
