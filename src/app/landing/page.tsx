@@ -57,7 +57,7 @@ function Clock() {
 function Header({ onAuthOpen }: { onAuthOpen: () => void }) {
   return (
     <>
-      <header className="fixed top-12 left-12 z-50 flex items-center gap-12">
+      <header className="fixed landing-header-left z-50 flex items-center gap-6 lg:gap-12">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 bg-[#FF4D00] flex items-center justify-center text-black font-black text-xs">A</div>
           <span className="landing-display font-bold tracking-tighter text-2xl uppercase">
@@ -70,7 +70,7 @@ function Header({ onAuthOpen }: { onAuthOpen: () => void }) {
           <button type="button" onClick={onAuthOpen} className="hover:text-white transition">Login</button>
         </nav>
       </header>
-      <div className="fixed top-12 right-12 z-50 flex items-center gap-4">
+      <div className="fixed landing-header-right z-50 flex items-center gap-4 hidden sm:flex">
         <span className="landing-mono text-[10px] text-gray-500">SYS_TIME</span>
         <Clock />
       </div>
@@ -103,7 +103,7 @@ function HeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
   const { active, counter, sync } = PHASES[phase];
 
   return (
-    <section className="relative z-10 w-full h-screen flex flex-col lg:flex-row items-center px-12 lg:px-24 overflow-hidden">
+    <section className="relative z-10 w-full min-h-screen flex flex-col lg:flex-row items-center px-6 sm:px-12 lg:px-24 pt-24 lg:pt-0 overflow-hidden">
       {/* ── Left ── */}
       <div className="flex-1 flex flex-col justify-center lg:pr-12 max-w-xl">
         <div className="mb-6 flex items-center gap-3">
@@ -113,7 +113,7 @@ function HeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
           <div className="h-[1px] w-12 bg-[#FF4D00]/30" />
         </div>
 
-        <h1 className="landing-display text-5xl lg:text-7xl font-black leading-[1.1] mb-8 uppercase landing-break">
+        <h1 className="landing-display text-4xl sm:text-5xl lg:text-7xl font-black leading-[1.1] mb-8 uppercase landing-break">
           사진 셀렉, 이제<br />
           <span className="text-[#FF4D00] landing-glitch">링크 하나</span>로<br />
           끝냅니다.
@@ -152,7 +152,7 @@ function HeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
       </div>
 
       {/* ── Right: Mockup ── */}
-      <div className="flex-1 relative w-full h-full flex items-center justify-center">
+      <div className="landing-hero-mockup flex-1 relative w-full h-full flex items-center justify-center">
         <div className="relative w-full max-w-[500px] border border-[#222] bg-[#050505] shadow-2xl p-6">
           {/* Mockup header bar */}
           <div className="flex justify-between items-center mb-6 landing-mono text-[10px] text-gray-500 tracking-widest border-b border-[#222] pb-4">
@@ -253,12 +253,12 @@ function ProblemSection({ onAuthOpen }: { onAuthOpen: () => void }) {
   return (
     <section className="relative z-10 w-full" style={{ background: "#000" }}>
       {/* Intro */}
-      <div className="h-screen flex flex-col items-center justify-center text-center px-8 lg:px-24">
+      <div className="h-screen flex flex-col items-center justify-center text-center px-5 sm:px-8 lg:px-24">
         <Reveal>
           <div className="landing-mono text-[10px] tracking-[0.2em] text-[#FF4D00] mb-6 uppercase">
             SURVEY_RESULTS :: PAIN_POINTS
           </div>
-          <h2 className="landing-display text-5xl lg:text-7xl font-black uppercase leading-tight mb-8 landing-break">
+          <h2 className="landing-display text-4xl sm:text-5xl lg:text-7xl font-black uppercase leading-tight mb-8 landing-break">
             혹시 지금 이렇게<br />
             <span className="text-[#FF4D00]">하고 계신가요?</span>
           </h2>
@@ -270,7 +270,7 @@ function ProblemSection({ onAuthOpen }: { onAuthOpen: () => void }) {
       {PROBLEMS.map((p, i) => (
         <div key={i}>
           <div
-            className="relative min-h-[80vh] flex flex-col justify-center items-center px-8 lg:px-24 py-24"
+            className="relative min-h-[80vh] flex flex-col justify-center items-center px-5 sm:px-8 lg:px-24 py-16 sm:py-24"
             style={{ position: "relative" }}
           >
             {/* Watermark */}
@@ -279,7 +279,7 @@ function ProblemSection({ onAuthOpen }: { onAuthOpen: () => void }) {
               <div className="landing-mono text-[10px] tracking-[0.2em] text-[#FF4D00] uppercase mb-12">
                 {p.code}
               </div>
-              <blockquote className="text-2xl lg:text-3xl font-light italic text-gray-300 mb-16 leading-relaxed landing-break whitespace-pre-line">
+              <blockquote className="text-lg sm:text-2xl lg:text-3xl font-light italic text-gray-300 mb-10 sm:mb-16 leading-relaxed landing-break whitespace-pre-line">
                 {p.quote}
               </blockquote>
               <div className="space-y-6 text-xl text-gray-400">
@@ -311,12 +311,12 @@ function ProblemSection({ onAuthOpen }: { onAuthOpen: () => void }) {
       ))}
 
       {/* CTA transition */}
-      <div className="py-48 flex flex-col items-center justify-center text-center bg-[#050505]">
+      <div className="py-24 sm:py-48 flex flex-col items-center justify-center text-center bg-[#050505]">
         <Reveal>
           <p className="landing-mono text-xs text-gray-500 uppercase tracking-[0.3em] mb-4">
             System Upgrade Recommended
           </p>
-          <h3 className="text-5xl font-bold mb-16 landing-break">이 모든 비효율, A-CUT으로 즉시 해결하세요.</h3>
+          <h3 className="text-3xl sm:text-5xl font-bold mb-10 sm:mb-16 landing-break">이 모든 비효율, A-CUT으로 즉시 해결하세요.</h3>
           <button
             type="button"
             onClick={onAuthOpen}
@@ -341,15 +341,15 @@ function ServicesSection() {
       {/* Grid overlay */}
       <div className="landing-services-grid-bg" />
 
-      <div className="relative z-10 w-full max-w-[1280px] mx-auto px-12 flex flex-col h-full">
+      <div className="relative z-10 w-full max-w-[1280px] mx-auto px-6 sm:px-12 flex flex-col h-full">
         {/* Header */}
-        <div className="mb-16 flex justify-between items-end border-b border-[#262626] pb-8">
+        <div className="mb-10 sm:mb-16 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 border-b border-[#262626] pb-6 sm:pb-8">
           <div className="landing-jb text-[10px] text-[#737373] uppercase flex flex-col gap-1">
             <span className="before:content-['>'] before:text-[#FF4D00] before:mr-2">OP_MODE: SOLUTIONS</span>
             <span className="before:content-['>'] before:text-[#FF4D00] before:mr-2">STATUS: HIGH_EFFICIENCY</span>
             <span className="before:content-['>'] before:text-[#FF4D00] before:mr-2">DATA_STREAM: ACTIVE</span>
           </div>
-          <h2 className="landing-display text-4xl lg:text-5xl font-bold uppercase leading-[1.1] text-right">
+          <h2 className="landing-display text-3xl sm:text-4xl lg:text-5xl font-bold uppercase leading-[1.1] sm:text-right">
             A컷이 바꾸는<br /><span className="text-[#FF4D00]">3가지</span>
           </h2>
         </div>
@@ -539,7 +539,7 @@ function TestimonialsSection() {
       {/* Scanline */}
       <div className="landing-scanline" style={{ position: "absolute" }} />
 
-      <div className="relative z-10 w-full max-w-[1440px] mx-auto px-12 lg:px-24 py-32 flex flex-col min-h-screen justify-center">
+      <div className="relative z-10 w-full max-w-[1440px] mx-auto px-6 lg:px-24 py-16 sm:py-32 flex flex-col min-h-screen justify-center">
         {/* Header */}
         <Reveal>
           <div className="flex items-center gap-4 mb-4">
@@ -547,9 +547,9 @@ function TestimonialsSection() {
               USER_TESTIMONIALS
             </span>
             <div className="h-[1px] flex-1 bg-[#222]" />
-            <span className="landing-mono text-[10px] text-gray-600">n=2 · VERIFIED</span>
+            <span className="landing-mono text-[10px] text-gray-600 hidden sm:inline">n=2 · VERIFIED</span>
           </div>
-          <h2 className="landing-display text-4xl lg:text-6xl font-black uppercase leading-tight mb-6 landing-break">
+          <h2 className="landing-display text-3xl sm:text-4xl lg:text-6xl font-black uppercase leading-tight mb-6 landing-break">
             실제로 써보신<br />
             <span className="text-[#FF4D00]">분들의 이야기</span>
           </h2>
@@ -610,12 +610,12 @@ function CTASection({ onAuthOpen }: { onAuthOpen: () => void }) {
   return (
     <section className="relative z-10 w-full overflow-hidden" style={{ background: "#050505", minHeight: "60vh" }}>
       <div className="landing-cta-noise" />
-      <div className="relative z-10 flex flex-col items-center justify-center text-center px-12 py-40 min-h-[60vh]">
+      <div className="relative z-10 flex flex-col items-center justify-center text-center px-6 sm:px-12 py-20 sm:py-40 min-h-[60vh]">
         <Reveal>
           <p className="landing-mono text-xs text-gray-500 uppercase tracking-[0.3em] mb-4">
             SYSTEM.READY :: INIT_WORKFLOW
           </p>
-          <h2 className="landing-display text-4xl lg:text-5xl font-black uppercase leading-tight mb-6 landing-break">
+          <h2 className="landing-display text-3xl sm:text-4xl lg:text-5xl font-black uppercase leading-tight mb-6 landing-break">
             다음 촬영부터<br /><span className="text-[#FF4D00]">바로 써보세요</span>
           </h2>
           <p className="text-gray-400 text-lg leading-relaxed max-w-xl mx-auto mb-12 landing-break">
@@ -673,8 +673,8 @@ export default function LandingPage() {
         <CTASection onAuthOpen={() => setAuthOpen(true)} />
       </main>
 
-      <footer className="relative z-10 border-t border-[#222] py-8 bg-[#000]">
-        <div className="max-w-[1440px] mx-auto px-12 flex items-center justify-between">
+      <footer className="landing-footer relative z-10 border-t border-[#222] py-8 bg-[#000]">
+        <div className="max-w-[1440px] mx-auto px-6 sm:px-12 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 bg-[#FF4D00] flex items-center justify-center text-black font-black text-[10px]">A</div>
             <span className="landing-display font-bold tracking-tighter text-lg uppercase">
