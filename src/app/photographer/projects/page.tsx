@@ -208,20 +208,20 @@ export default function ProjectsPage() {
           color: #555; font-size: 11px; font-weight: 700;
           text-transform: uppercase; letter-spacing: 0.08em;
           border-bottom: 1px solid #222;
-          font-family: 'Space Mono', monospace;
+          font-family: 'Space Mono', 'Noto Sans KR', sans-serif;
           white-space: nowrap;
         }
         .prj-table td {
           padding: 15px 16px; border-bottom: 1px solid #111;
           font-size: 13px; color: #888; vertical-align: middle;
-          font-family: 'Space Mono', monospace;
+          font-family: 'Space Mono', 'Noto Sans KR', sans-serif;
           white-space: nowrap;
         }
         .prj-table tr { cursor: pointer; transition: background 0.15s; }
         .prj-table tbody tr:hover td { background: #0d0d0d; color: #fff; }
         .prj-filter-btn {
           padding: 7px 14px; font-size: 12px; font-weight: 700;
-          font-family: 'Space Mono', monospace; text-transform: uppercase;
+          font-family: 'Space Mono', 'Noto Sans KR', sans-serif; text-transform: uppercase;
           cursor: pointer; transition: all 0.15s; letter-spacing: 0.05em;
           border: 1px solid #111;
         }
@@ -287,7 +287,7 @@ export default function ProjectsPage() {
               안녕하세요, <strong style={{ color: "#fff" }}>{userName} 작가님</strong>
             </div>
             <div style={{
-              fontFamily: "'Space Mono', monospace", fontSize: 10,
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
               color: "#666", textTransform: "uppercase", letterSpacing: "0.15em", marginTop: 1,
             }}>
               세션 활성
@@ -298,8 +298,8 @@ export default function ProjectsPage() {
         {/* 우: 시계 + 새 프로젝트 */}
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div className="prj-clock" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: "#555", letterSpacing: "0.15em", textTransform: "uppercase" }}>SYS_TIME</span>
-            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#fff", letterSpacing: "0.1em" }}>{clockStr}</span>
+            <span style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9, color: "#555", letterSpacing: "0.15em", textTransform: "uppercase" }}>SYS_TIME</span>
+            <span style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12, color: "#fff", letterSpacing: "0.1em" }}>{clockStr}</span>
           </div>
           <button
             type="button"
@@ -342,7 +342,7 @@ export default function ProjectsPage() {
         }}>
           <div>
             <div style={{
-              fontFamily: "'Space Mono', monospace", fontSize: 10,
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
               color: ACCENT, letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 6,
             }}>
               프로젝트 데이터베이스
@@ -351,13 +351,13 @@ export default function ProjectsPage() {
           </div>
           <div style={{ display: "flex", gap: 32 }}>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: "#444", textTransform: "uppercase" }}>전체</div>
+              <div style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9, color: "#444", textTransform: "uppercase" }}>전체</div>
               <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>
                 {projects.length}
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: "#444", textTransform: "uppercase" }}>진행중</div>
+              <div style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9, color: "#444", textTransform: "uppercase" }}>진행중</div>
               <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 700, color: ACCENT, lineHeight: 1.2 }}>
                 {activeCount}
               </div>
@@ -382,7 +382,7 @@ export default function ProjectsPage() {
               flex: 1, minWidth: 120,
               background: "#000", border: "1px solid #1a1a1a",
               padding: "7px 12px", fontSize: 13, color: ACCENT,
-              fontFamily: "'Space Mono', monospace",
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
               transition: "border-color 0.15s",
             }}
           />
@@ -390,7 +390,7 @@ export default function ProjectsPage() {
           {/* 촬영일 날짜 필터 */}
           <div className="prj-date-group" style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 10, borderLeft: "1px solid #222" }}>
             <span
-              style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#444", cursor: "pointer" }}
+              style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12, color: "#444", cursor: "pointer" }}
               onClick={() => dateFromRef.current?.showPicker?.()}
             >
               촬영일:
@@ -403,7 +403,7 @@ export default function ProjectsPage() {
                 position: "absolute", inset: 0,
                 display: "flex", alignItems: "center",
                 paddingLeft: 8,
-                fontFamily: "'Space Mono', monospace", fontSize: 12,
+                fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12,
                 color: dateFrom ? "#fff" : "#444",
                 pointerEvents: "none",
               }}>
@@ -420,13 +420,13 @@ export default function ProjectsPage() {
                   background: "#000", border: "1px solid #1a1a1a",
                   padding: "5px 8px", fontSize: 12,
                   color: "transparent",
-                  fontFamily: "'Space Mono', monospace",
+                  fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
                   transition: "border-color 0.15s",
                   width: 96, cursor: "pointer",
                 }}
               />
             </div>
-            <span style={{ color: "#444", fontFamily: "'Space Mono', monospace", fontSize: 12 }}>~</span>
+            <span style={{ color: "#444", fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12 }}>~</span>
             <div
               style={{ position: "relative", cursor: "pointer" }}
               onClick={() => dateToRef.current?.showPicker?.()}
@@ -435,7 +435,7 @@ export default function ProjectsPage() {
                 position: "absolute", inset: 0,
                 display: "flex", alignItems: "center",
                 paddingLeft: 8,
-                fontFamily: "'Space Mono', monospace", fontSize: 12,
+                fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12,
                 color: dateTo ? "#fff" : "#444",
                 pointerEvents: "none",
               }}>
@@ -452,7 +452,7 @@ export default function ProjectsPage() {
                   background: "#000", border: "1px solid #1a1a1a",
                   padding: "5px 8px", fontSize: 12,
                   color: "transparent",
-                  fontFamily: "'Space Mono', monospace",
+                  fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
                   transition: "border-color 0.15s",
                   width: 96, cursor: "pointer",
                 }}
@@ -472,7 +472,7 @@ export default function ProjectsPage() {
                 {tab.label}
                 <span style={{
                   marginLeft: 5,
-                  fontFamily: "'Space Mono', monospace", fontSize: 11,
+                  fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11,
                   color: activeTab === tab.key ? "#fff" : "#333",
                 }}>
                   {tab.count}
@@ -488,7 +488,7 @@ export default function ProjectsPage() {
             style={{
               background: "#000", border: "1px solid #1a1a1a",
               padding: "7px 10px", fontSize: 12, color: "#666",
-              fontFamily: "'Space Mono', monospace", cursor: "pointer",
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", cursor: "pointer",
               marginLeft: "auto",
             }}
           >
@@ -504,7 +504,7 @@ export default function ProjectsPage() {
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "center",
             minHeight: 200,
-            fontFamily: "'Space Mono', monospace", fontSize: 11,
+            fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11,
             color: "#555", letterSpacing: "0.15em", textTransform: "uppercase",
           }}>
             SYS.LOADING…
@@ -534,7 +534,7 @@ export default function ProjectsPage() {
                           <button
                             type="button"
                             onClick={resetFilters}
-                            style={{ background: "none", border: "none", color: ACCENT, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 11, textDecoration: "underline" }}
+                            style={{ background: "none", border: "none", color: ACCENT, cursor: "pointer", fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, textDecoration: "underline" }}
                           >
                             필터 초기화
                           </button>
@@ -556,7 +556,7 @@ export default function ProjectsPage() {
                         onClick={() => router.push(`/photographer/projects/${project.id}`)}
                       >
                         {/* 프로젝트 ID */}
-                        <td style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, color: isDelivered ? "#444" : "#888", whiteSpace: "nowrap" }}>
+                        <td style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 13, color: isDelivered ? "#444" : "#888", whiteSpace: "nowrap" }}>
                           {project.displayId ?? `#${project.id.slice(0, 8).toUpperCase()}`}
                         </td>
 
@@ -615,7 +615,7 @@ export default function ProjectsPage() {
           <div style={{
             display: "flex", justifyContent: "space-between", alignItems: "center",
             marginTop: 16,
-            fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#444",
+            fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: "#444",
             textTransform: "uppercase", letterSpacing: "0.05em",
           }}>
             <span>표시중: {String(filtered.length).padStart(2, "0")} / {String(projects.length).padStart(2, "0")}</span>

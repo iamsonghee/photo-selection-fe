@@ -39,7 +39,7 @@ const BORDER_MID = "#2a2a2a";
 const SURFACE_0 = "#020202";
 const SURFACE_1 = "#050505";
 const SURFACE_2 = "#0a0a0a";
-const MONO = "'Space Mono', 'JetBrains Mono', monospace";
+const MONO = "'Space Mono', 'JetBrains Mono', 'Noto Sans KR', sans-serif";
 const TEXT_MUTED = "#5c5c5c";
 const TEXT_NORMAL = "#a3a3a3";
 const TEXT_BRIGHT = "#ffffff";
@@ -809,7 +809,7 @@ export default function ProjectDetailPage() {
         @keyframes prj-scanline { 0% { bottom: 100%; } 100% { bottom: -100px; } }
         .prj-grid-bg { position: fixed; inset: 0; background-image: linear-gradient(rgba(30,30,30,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(30,30,30,0.18) 1px, transparent 1px); background-size: 30px 30px; z-index: 0; pointer-events: none; }
         .prj-scanline-el { width: 100%; height: 100px; position: fixed; bottom: 100%; background: linear-gradient(0deg, rgba(255,77,0,0.02) 0%, rgba(255,77,0,0) 100%); animation: prj-scanline 8s linear infinite; pointer-events: none; z-index: 1; }
-        .prj-tech-label { font-family: 'Space Mono', 'JetBrains Mono', monospace; font-size: 0.63rem; letter-spacing: 0.15em; text-transform: uppercase; }
+        .prj-tech-label { font-family: 'Space Mono', 'JetBrains Mono', 'Noto Sans KR', sans-serif; font-size: 0.63rem; letter-spacing: 0.15em; text-transform: uppercase; }
         .prj-scroll::-webkit-scrollbar { width: 4px; }
         .prj-scroll::-webkit-scrollbar-track { background: ${SURFACE_2}; }
         .prj-scroll::-webkit-scrollbar-thumb { background: #2a2a2a; }
@@ -825,11 +825,11 @@ export default function ProjectDetailPage() {
         .prj-modal-box { background: #080808; border: 1px solid ${BORDER_MID}; width: 100%; position: relative; }
         .prj-modal-box::before { content: ''; position: absolute; top: -1px; left: -1px; width: 28px; height: 2px; background: ${ACCENT}; }
         .prj-modal-box::after { content: ''; position: absolute; bottom: -1px; right: -1px; width: 28px; height: 2px; background: ${ACCENT}; }
-        .prj-btn-primary { background: ${ACCENT_DIM}; border: 1px solid rgba(255,77,0,0.5); color: ${ACCENT}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
+        .prj-btn-primary { background: ${ACCENT_DIM}; border: 1px solid rgba(255,77,0,0.5); color: ${ACCENT}; cursor: pointer; font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
         .prj-btn-primary:hover { background: ${ACCENT}; color: #000; }
-        .prj-btn-secondary { background: transparent; border: 1px solid ${BORDER_MID}; color: ${TEXT_MUTED}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
+        .prj-btn-secondary { background: transparent; border: 1px solid ${BORDER_MID}; color: ${TEXT_MUTED}; cursor: pointer; font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
         .prj-btn-secondary:hover { border-color: #444; color: ${TEXT_BRIGHT}; }
-        .prj-btn-danger { background: transparent; border: 1px solid rgba(255,51,51,0.3); color: #FF3333; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
+        .prj-btn-danger { background: transparent; border: 1px solid rgba(255,51,51,0.3); color: #FF3333; cursor: pointer; font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
         .prj-btn-danger:hover { background: rgba(255,51,51,0.1); }
         .prj-dropzone { border: 1px dashed #333; transition: all 0.2s; }
         .prj-dropzone-over { border-color: rgba(255,77,0,0.5) !important; background: ${ACCENT_DIM} !important; }

@@ -142,7 +142,7 @@ export function PhotographerMobileChrome() {
 
             {/* MENU 라벨 */}
             <div style={{
-              fontFamily: "'Space Mono', monospace", fontSize: 9,
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9,
               color: "#444", letterSpacing: "0.2em", textTransform: "uppercase",
               padding: "18px 20px 8px",
             }}>
@@ -174,7 +174,7 @@ export function PhotographerMobileChrome() {
                       <Icon size={16} />
                       <span style={{ flex: 1 }}>{label}</span>
                       <span style={{
-                        fontFamily: "'Space Mono', monospace", fontSize: 8, fontWeight: 700,
+                        fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 8, fontWeight: 700,
                         padding: "2px 6px", background: "rgba(30,30,30,0.8)", border: "1px solid #222",
                         color: "#333", letterSpacing: "0.1em", textTransform: "uppercase",
                       }}>준비중</span>
@@ -198,7 +198,7 @@ export function PhotographerMobileChrome() {
                   width: "100%", padding: "9px 0",
                   background: "transparent", border: "1px solid #222",
                   fontSize: 11, color: "#555", cursor: "pointer",
-                  fontFamily: "'Space Mono', monospace",
+                  fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
                   letterSpacing: "0.1em", textTransform: "uppercase",
                   transition: "border-color 0.15s, color 0.15s",
                 }}

@@ -107,7 +107,7 @@ export default function EmptyDashboard({
           }}>
             <div style={{
               display: "flex", alignItems: "center", gap: 8,
-              fontFamily: "'Space Mono', monospace", fontSize: 10,
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
               color: "#22c55e", letterSpacing: "0.2em", textTransform: "uppercase",
             }}>
               <div style={{
@@ -149,7 +149,7 @@ export default function EmptyDashboard({
           <div style={{ textAlign: "center", marginBottom: 40, display: "flex", flexDirection: "column", alignItems: "center" }}>
             <div style={{
               display: "flex", alignItems: "center", gap: 12,
-              fontFamily: "'Space Mono', monospace", fontSize: 10,
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
               color: "#FF4D00", letterSpacing: "0.2em", textTransform: "uppercase",
               marginBottom: 24,
             }}>
@@ -206,7 +206,7 @@ export default function EmptyDashboard({
               position: "absolute", top: 0, left: "50%",
               transform: "translate(-50%, -50%)",
               background: "#000", padding: "4px 16px",
-              fontFamily: "'Space Mono', monospace", fontSize: 10,
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
               color: "#FF4D00", letterSpacing: "0.2em",
               border: "1px solid #333",
               display: "flex", alignItems: "center", gap: 8,
@@ -286,11 +286,11 @@ export default function EmptyDashboard({
                     }}>
                       <span style={{
                         position: "absolute", top: 8, left: 8,
-                        fontFamily: "'Space Mono', monospace", fontSize: 8, color: "#555",
+                        fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 8, color: "#555",
                       }}>{step.num}</span>
                       {step.icon}
                     </div>
-                    <div style={{ textAlign: "center", fontFamily: "'Space Mono', monospace", textTransform: "uppercase" }}>
+                    <div style={{ textAlign: "center", fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", textTransform: "uppercase" }}>
                       <div style={{ fontSize: 11, color: "#fff", fontWeight: 700, marginBottom: 4 }}>{step.label}</div>
                       <div style={{ fontSize: 9, color: "#666", letterSpacing: "0.2em" }}>{step.sub}</div>
                     </div>
@@ -302,7 +302,7 @@ export default function EmptyDashboard({
             {/* 하단 대기 텍스트 */}
             <div style={{
               position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)",
-              fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555",
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: "#555",
               letterSpacing: "0.2em", textTransform: "uppercase",
               display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap",
             }}>
@@ -332,7 +332,7 @@ export default function EmptyDashboard({
               새 프로젝트 만들기
             </button>
             <div style={{
-              fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#666",
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#666",
               display: "flex", alignItems: "center", gap: 8,
             }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FF4D00" strokeWidth="2">
@@ -349,7 +349,7 @@ export default function EmptyDashboard({
         <div style={{
           position: "fixed", bottom: 48, left: 48, zIndex: 50,
           display: "flex", flexDirection: "column", alignItems: "flex-start",
-          fontFamily: "'Space Mono', monospace", fontSize: 9, color: "#555",
+          fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9, color: "#555",
           letterSpacing: "0.2em", textTransform: "uppercase", gap: 4,
         }}>
           <span>V.1.0.5-BETA</span>
@@ -366,7 +366,7 @@ export default function EmptyDashboard({
         }}>
           <div style={{
             display: "flex", flexDirection: "column", alignItems: "flex-end",
-            fontFamily: "'Space Mono', monospace", fontSize: 9, color: "#555",
+            fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9, color: "#555",
             letterSpacing: "0.2em", textTransform: "uppercase", gap: 4,
           }}>
             <span>Buffer_status: optimal</span>

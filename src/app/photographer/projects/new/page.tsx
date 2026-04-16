@@ -197,12 +197,12 @@ export default function NewProjectPage() {
         .np-fi:focus { border-color: #FF4D00; }
         .np-fi::placeholder { color: #444; }
         .np-fi::-webkit-calendar-picker-indicator { filter: invert(0.4); cursor: pointer; }
-        .np-fi-mono { font-family: 'Space Mono', monospace !important; }
+        .np-fi-mono { font-family: 'Space Mono', 'Noto Sans KR', sans-serif !important; }
         /* ── 빠른 기한 / 촬영유형 pill ── */
         .np-pill {
           padding: 6px 14px; background: #0A0A0A; border: 1px solid #333;
           color: #666; font-size: 12px; cursor: pointer;
-          transition: all 0.15s; font-family: 'Space Mono', monospace;
+          transition: all 0.15s; font-family: 'Space Mono', 'Noto Sans KR', sans-serif;
         }
         .np-pill:hover { border-color: #555; color: #999; }
         .np-pill.active { border-color: #FF4D00; color: #FF4D00; background: rgba(255,77,0,0.06); }
@@ -228,7 +228,7 @@ export default function NewProjectPage() {
         .np-btn-back {
           border: 1px solid #333; background: #050505; color: #888;
           padding: 16px 32px; font-size: 12px;
-          font-family: 'Space Mono', monospace; letter-spacing: 0.1em;
+          font-family: 'Space Mono', 'Noto Sans KR', sans-serif; letter-spacing: 0.1em;
           text-transform: uppercase; cursor: pointer; transition: all 0.15s;
           display: flex; align-items: center; gap: 8px;
         }
@@ -279,7 +279,7 @@ export default function NewProjectPage() {
               display:"flex", alignItems:"center", gap:6,
               background:"transparent", border:"1px solid #2a2a2a",
               color:"#666", padding:"6px 12px", fontSize:11,
-              cursor:"pointer", fontFamily:"'Space Mono', monospace",
+              cursor:"pointer", fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif",
               letterSpacing:"0.05em", transition:"all 0.15s",
             }}
           >
@@ -312,7 +312,7 @@ export default function NewProjectPage() {
         >
           <div style={{
             display:"flex", alignItems:"center", gap:6,
-            fontFamily:"'Space Mono', monospace", fontSize:10,
+            fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:10,
             color:"#22c55e", letterSpacing:"0.15em", textTransform:"uppercase",
           }}>
             <span style={{
@@ -370,7 +370,7 @@ export default function NewProjectPage() {
                 color: active ? "#FF4D00" : "#444",
                 background:"#000",
                 display:"flex", alignItems:"center", justifyContent:"center",
-                fontFamily:"'Space Mono', monospace", fontSize:13, fontWeight:700,
+                fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:13, fontWeight:700,
                 boxShadow: active ? "0 0 15px rgba(255,77,0,0.2)" : "none",
               }}>
                 {num}
@@ -381,7 +381,7 @@ export default function NewProjectPage() {
               >
                 <div style={{ fontSize:12, fontWeight:700, color:"#fff", marginBottom:2 }}>{label}</div>
                 <div style={{
-                  fontFamily:"'Space Mono', monospace", fontSize:9,
+                  fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:9,
                   color: active ? "#FF4D00" : "#444",
                   letterSpacing:"0.2em", textTransform:"uppercase",
                 }}>{sub}</div>
@@ -394,7 +394,7 @@ export default function NewProjectPage() {
         <div style={{ marginBottom:36 }}>
           <div style={{
             display:"flex", alignItems:"center", gap:8,
-            fontFamily:"'Space Mono', monospace", fontSize:10,
+            fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:10,
             color:"#FF4D00", letterSpacing:"0.2em",
             textTransform:"uppercase", marginBottom:16,
           }}>
@@ -472,7 +472,7 @@ export default function NewProjectPage() {
             <div style={{ marginBottom:32 }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:12 }}>
                 <label style={{ fontSize:14, fontWeight:700, color:"#ccc" }}>촬영 유형</label>
-                <span style={{ fontFamily:"'Space Mono', monospace", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: SHOOT_TYPE</span>
+                <span style={{ fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: SHOOT_TYPE</span>
               </div>
               <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                 {SHOOT_TYPES.map(({ value, label, icon: Icon }) => (
@@ -499,7 +499,7 @@ export default function NewProjectPage() {
                   <label style={{ fontSize:14, fontWeight:700, color:"#ccc" }}>
                     프로젝트명 <span style={{ fontSize:11, color:"#FF4D00", fontWeight:400 }}>필수</span>
                   </label>
-                  <span style={{ fontFamily:"'Space Mono', monospace", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: PROJ_NAME</span>
+                  <span style={{ fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: PROJ_NAME</span>
                 </div>
                 <div className="np-input-wrap" style={{ position:"relative" }}>
                   <input
@@ -520,7 +520,7 @@ export default function NewProjectPage() {
                   <label style={{ fontSize:14, fontWeight:700, color:"#ccc" }}>
                     촬영 일자 <span style={{ fontSize:11, color:"#FF4D00", fontWeight:400 }}>필수</span>
                   </label>
-                  <span style={{ fontFamily:"'Space Mono', monospace", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: SHOOT_DATE</span>
+                  <span style={{ fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: SHOOT_DATE</span>
                 </div>
                 <div className="np-input-wrap" style={{ position:"relative" }}>
                   <input
@@ -547,7 +547,7 @@ export default function NewProjectPage() {
                   <label style={{ fontSize:14, fontWeight:700, color:"#ccc" }}>
                     고객 이름 <span style={{ fontSize:11, color:"#FF4D00", fontWeight:400 }}>필수</span>
                   </label>
-                  <span style={{ fontFamily:"'Space Mono', monospace", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: CLIENT_NAME</span>
+                  <span style={{ fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: CLIENT_NAME</span>
                 </div>
                 <div className="np-input-wrap" style={{ position:"relative" }}>
                   <input
@@ -566,7 +566,7 @@ export default function NewProjectPage() {
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:10 }}>
                   <label style={{ fontSize:14, fontWeight:700, color:"#ccc" }}>연락처</label>
-                  <span style={{ fontFamily:"'Space Mono', monospace", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: CLIENT_PHONE</span>
+                  <span style={{ fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: CLIENT_PHONE</span>
                 </div>
                 <div className="np-input-wrap" style={{ position:"relative" }}>
                   <input
@@ -587,7 +587,7 @@ export default function NewProjectPage() {
                   <label style={{ fontSize:14, fontWeight:700, color:"#ccc" }}>
                     셀렉 갯수 (N) <span style={{ fontSize:11, color:"#FF4D00", fontWeight:400 }}>필수</span>
                   </label>
-                  <span style={{ fontFamily:"'Space Mono', monospace", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: SEL_COUNT</span>
+                  <span style={{ fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: SEL_COUNT</span>
                 </div>
                 <div className="np-input-wrap" style={{ position:"relative" }}>
                   <input
@@ -617,7 +617,7 @@ export default function NewProjectPage() {
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:10 }}>
                   <label style={{ fontSize:14, fontWeight:700, color:"#ccc" }}>예상 업로드 수 (M)</label>
-                  <span style={{ fontFamily:"'Space Mono', monospace", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: EST_COUNT</span>
+                  <span style={{ fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: EST_COUNT</span>
                 </div>
                 <div className="np-input-wrap" style={{ position:"relative" }}>
                   <input
@@ -646,7 +646,7 @@ export default function NewProjectPage() {
                 <label style={{ fontSize:14, fontWeight:700, color:"#ccc" }}>
                   셀렉 기한 <span style={{ fontSize:11, color:"#FF4D00", fontWeight:400 }}>필수</span>
                 </label>
-                <span style={{ fontFamily:"'Space Mono', monospace", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: DEADLINE</span>
+                <span style={{ fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: DEADLINE</span>
               </div>
 
               {/* 빠른 선택 */}
@@ -690,7 +690,7 @@ export default function NewProjectPage() {
                   display:"flex", alignItems:"center", gap:8,
                   padding:"10px 14px", marginTop:10,
                   background:"rgba(255,77,0,0.04)", border:"1px solid rgba(255,77,0,0.15)",
-                  fontSize:12, color:"#888", fontFamily:"'Space Mono', monospace",
+                  fontSize:12, color:"#888", fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif",
                 }}>
                   기한: <strong style={{ color:"#FF4D00" }}>{deadlinePreview.dateStr}</strong>
                   {deadlinePreview.dLabel && (
@@ -707,7 +707,7 @@ export default function NewProjectPage() {
                   <Lock size={13} style={{ display:"inline", marginRight:6, verticalAlign:"middle" }} />
                   고객 비밀번호
                 </label>
-                <span style={{ fontFamily:"'Space Mono', monospace", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: ACCESS_PIN</span>
+                <span style={{ fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: ACCESS_PIN</span>
               </div>
               <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
                 <div className="np-input-wrap" style={{ position:"relative" }}>
@@ -735,7 +735,7 @@ export default function NewProjectPage() {
                     display:"flex", alignItems:"center", gap:6,
                     padding:"14px 16px", background:"#0a0a0a", border:"1px solid #333",
                     color:"#666", fontSize:12, cursor:"pointer",
-                    fontFamily:"'Space Mono', monospace", transition:"all 0.15s",
+                    fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", transition:"all 0.15s",
                   }}
                 >
                   <RefreshCw size={12} /> 랜덤 생성
@@ -747,7 +747,7 @@ export default function NewProjectPage() {
                     style={{
                       padding:"14px 16px", background:"transparent",
                       border:"1px solid #2a2a2a", color:"#555", fontSize:12,
-                      cursor:"pointer", fontFamily:"'Space Mono', monospace",
+                      cursor:"pointer", fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif",
                     }}
                   >
                     삭제
@@ -765,7 +765,7 @@ export default function NewProjectPage() {
               display:"flex", justifyContent:"space-between", alignItems:"center",
             }}>
               <div style={{
-                fontFamily:"'Space Mono', monospace", fontSize:10,
+                fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:10,
                 color: isValid ? "#22c55e" : "#555",
                 display:"flex", alignItems:"center", gap:8,
                 textTransform:"uppercase", letterSpacing:"0.1em",
@@ -777,7 +777,7 @@ export default function NewProjectPage() {
                 VALIDATION: {isValid ? "PASS" : "READY"}
               </div>
               <div style={{
-                fontFamily:"'Space Mono', monospace", fontSize:10, color:"#333",
+                fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:10, color:"#333",
                 letterSpacing:"0.1em", textTransform:"uppercase",
                 display:"flex", alignItems:"center", gap:8,
               }}>
@@ -828,7 +828,7 @@ export default function NewProjectPage() {
         style={{
           position:"fixed", bottom:48, left:48, zIndex:50,
           display:"flex", flexDirection:"column", gap:4,
-          fontFamily:"'Space Mono', monospace", fontSize:9,
+          fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:9,
           color:"#444", letterSpacing:"0.1em", textTransform:"uppercase",
           pointerEvents:"none",
         }}
@@ -850,7 +850,7 @@ export default function NewProjectPage() {
       >
         <div style={{
           display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4,
-          fontFamily:"'Space Mono', monospace", fontSize:9,
+          fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:9,
           color:"#444", letterSpacing:"0.1em", textTransform:"uppercase",
         }}>
           <span>Stream_id: PROJ_INIT</span>

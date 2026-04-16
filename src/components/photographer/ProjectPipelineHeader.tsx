@@ -15,7 +15,7 @@ export const PIPELINE_HEADER_H = 56;
 const HEADER_PAD_X = 24;
 const HEADER_BACK = "#888888";
 const SURFACE_2 = "#0a0a0a";
-const MONO = "'Space Mono', 'JetBrains Mono', monospace";
+const MONO = "'Space Mono', 'JetBrains Mono', 'Noto Sans KR', sans-serif";
 const TEXT_MUTED = "#5c5c5c";
 const TEXT_BRIGHT = "#ffffff";
 

@@ -21,7 +21,7 @@ const BORDER_MID  = "#222";
 const BORDER_HIGH = "#333";
 const TEXT_SEC  = "#888";
 const TEXT_TERT = "#444";
-const FONT_MONO = "'Space Mono', monospace";
+const FONT_MONO = "'Space Mono', 'Noto Sans KR', sans-serif";
 const FONT_SANS = "'Pretendard', -apple-system, sans-serif";
 
 function getInitial(name: string | null, email: string | null): string {

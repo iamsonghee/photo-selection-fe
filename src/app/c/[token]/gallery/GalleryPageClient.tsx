@@ -211,7 +211,7 @@ export default function GalleryPageClient() {
   if (loading) {
     return (
       <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#000" }}>
-        <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#555", letterSpacing: "0.1em" }}>
+        <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#555", letterSpacing: "0.1em" }}>
           LOADING_GALLERY...
         </p>
       </div>
@@ -220,7 +220,7 @@ export default function GalleryPageClient() {
   if (!project) {
     return (
       <div style={{ display: "flex", minHeight: "100vh", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#000" }}>
-        <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#555" }}>INVALID_TOKEN</p>
+        <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#555" }}>INVALID_TOKEN</p>
       </div>
     );
   }
@@ -228,8 +228,8 @@ export default function GalleryPageClient() {
   if (!loading && photos.length === 0) {
     return (
       <div style={{ display: "flex", minHeight: "100vh", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, background: "#000" }}>
-        <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#555" }}>NO_PHOTOS_FOUND</p>
-        <Link href={`/c/${token}`} style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#FF4D00", textDecoration: "none", border: "1px solid #1A1A1A", padding: "8px 16px" }}>
+        <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#555" }}>NO_PHOTOS_FOUND</p>
+        <Link href={`/c/${token}`} style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#FF4D00", textDecoration: "none", border: "1px solid #1A1A1A", padding: "8px 16px" }}>
           ← BACK_TO_INVITE
         </Link>
       </div>
@@ -412,7 +412,7 @@ export default function GalleryPageClient() {
                 <h1 className="gl-header-project-title" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 20, letterSpacing: "-0.5px", lineHeight: 1, color: "#fff", margin: 0 }}>
                   {project.name}
                 </h1>
-                <p className="gl-header-deadline" style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555", marginTop: 4, letterSpacing: "0.1em" }}>
+                <p className="gl-header-deadline" style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: "#555", marginTop: 4, letterSpacing: "0.1em" }}>
                   DEADLINE // {format(new Date(project.deadline), "yyyy.MM.dd", { locale: ko })}
                 </p>
               </div>
@@ -422,7 +422,7 @@ export default function GalleryPageClient() {
               {photographer?.name && (
                 <>
                   <div className="gl-photographer-section" style={{ textAlign: "right" }}>
-                    <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>Photography by</p>
+                    <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>Photography by</p>
                     <p style={{ fontWeight: 700, fontSize: 14, color: "#fff", marginTop: 2 }}>{photographer.name}</p>
                   </div>
                   <div className="gl-photographer-section" style={{ width: 1, height: 32, background: "#222", flexShrink: 0 }} />
@@ -430,10 +430,10 @@ export default function GalleryPageClient() {
               )}
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span className="gl-header-selected-label" style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#FF4D00", fontWeight: 700 }}>SELECTED</span>
+                  <span className="gl-header-selected-label" style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#FF4D00", fontWeight: 700 }}>SELECTED</span>
                   <span className="gl-header-selected-count" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 28, lineHeight: 1, color: "#fff" }}>
                     {Y}{" "}
-                    <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#444", fontWeight: 400 }}>/ {N}</span>
+                    <span style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12, color: "#444", fontWeight: 400 }}>/ {N}</span>
                   </span>
                 </div>
               </div>
@@ -521,7 +521,7 @@ export default function GalleryPageClient() {
                   className="gl-filter-sort"
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-                  style={{ background: "transparent", fontFamily: "'Space Mono', monospace", fontSize: 10, textTransform: "uppercase", border: "1px solid #222", padding: "4px 8px", color: "#888", outline: "none", cursor: "pointer" }}
+                  style={{ background: "transparent", fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, textTransform: "uppercase", border: "1px solid #222", padding: "4px 8px", color: "#888", outline: "none", cursor: "pointer" }}
                 >
                   {SORT_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value} style={{ background: "#0a0a0a" }}>{o.label}</option>
@@ -582,7 +582,7 @@ export default function GalleryPageClient() {
 
                   <div className="gl-card-overlay">
                     <div className="gl-card-overlay-content">
-                    <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
+                    <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9, color: "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
                       {getPhotoDisplayName(photo)}
                     </p>
                     <div className="gl-overlay-interactive" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 14 }}>
@@ -634,7 +634,7 @@ export default function GalleryPageClient() {
 
           {filteredPhotos.length === 0 && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0", gap: 12 }}>
-              <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#333", letterSpacing: "0.1em" }}>NO_RESULTS</p>
+              <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#333", letterSpacing: "0.1em" }}>NO_RESULTS</p>
               <p style={{ fontSize: 12, color: "#555" }}>필터 조건에 맞는 사진이 없습니다</p>
             </div>
           )}
@@ -644,7 +644,7 @@ export default function GalleryPageClient() {
         <footer style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50, background: "#000", borderTop: "1px solid rgba(255,77,0,0.3)", backdropFilter: "blur(12px)" }}>
           <div className="gl-footer-inner" style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div className="gl-footer-progress" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-              <div className="gl-footer-progress-label" style={{ display: "flex", justifyContent: "space-between", fontFamily: "'Space Mono', monospace", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              <div className="gl-footer-progress-label" style={{ display: "flex", justifyContent: "space-between", fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 <span style={{ color: "#888" }}>사진 선택</span>
                 <span style={{ color: "#FF4D00" }}>{Y} / {N}장</span>
               </div>

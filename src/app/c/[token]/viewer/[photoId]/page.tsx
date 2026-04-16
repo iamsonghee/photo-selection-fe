@@ -387,7 +387,7 @@ export default function ViewerPage() {
                 </h2>
               </div>
               <p style={{
-                fontFamily: "'Space Mono', monospace",
+                fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
                 fontSize: 11,
                 color: "#9ca3af",
                 letterSpacing: "0.06em",
@@ -471,7 +471,7 @@ export default function ViewerPage() {
             {/* EXIF decorative */}
             <div style={{
               position: "absolute", bottom: -28, left: 0,
-              fontFamily: "'Space Mono', monospace", fontSize: 9,
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9,
               textTransform: "uppercase", letterSpacing: "0.2em",
               color: "rgba(255,255,255,0.3)", whiteSpace: "nowrap",
               pointerEvents: "none",
@@ -651,7 +651,7 @@ export default function ViewerPage() {
                   />
                   <span style={{
                     position: "absolute", bottom: 4, right: 4,
-                    fontFamily: "'Space Mono', monospace", fontSize: 8,
+                    fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 8,
                     background: "rgba(0,0,0,0.8)", padding: "0 4px", color: "white",
                   }}>
                     {String(i + 1).padStart(3, "0")}
@@ -675,7 +675,7 @@ export default function ViewerPage() {
             opacity: 0.3, pointerEvents: "none",
             display: "flex", alignItems: "center", gap: 12,
           }}>
-            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 7, textAlign: "right", color: "white" }}>
+            <div style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 7, textAlign: "right", color: "white" }}>
               <p style={{ margin: 0 }}>37.5665° N</p>
               <p style={{ margin: 0 }}>126.9780° E</p>
             </div>
@@ -702,7 +702,7 @@ export default function ViewerPage() {
             <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.92)", flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 4px" }}>
               {filename}
             </span>
-            <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: "#FF4D00", flexShrink: 0 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", color: "#FF4D00", flexShrink: 0 }}>
               {currentIndex + 1} / {filteredPhotos.length}
             </span>
           </div>
@@ -838,13 +838,13 @@ export default function ViewerPage() {
         >
           <div className="fs-hud" style={{ padding: "28px 32px", minWidth: 320, borderRadius: 2 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#FF4D00", letterSpacing: "0.1em" }}>KEYBOARD SHORTCUTS</div>
+              <div style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#FF4D00", letterSpacing: "0.1em" }}>KEYBOARD SHORTCUTS</div>
               <button type="button" onClick={() => setShowShortcuts(false)}
                 style={{ background: "none", border: "none", color: "#8C8C8C", cursor: "pointer", padding: 4 }}>
                 <X style={{ width: 14, height: 14 }} />
               </button>
             </div>
-            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#8C8C8C", display: "grid", gridTemplateColumns: "auto 1fr", gap: "10px 24px" }}>
+            <div style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: "#8C8C8C", display: "grid", gridTemplateColumns: "auto 1fr", gap: "10px 24px" }}>
               <span style={{ color: "#FF4D00" }}>← →</span><span>이전 / 다음 사진</span>
               <span style={{ color: "#FF4D00" }}>SPACE</span><span>선택 / 선택 해제</span>
               <span style={{ color: "#FF4D00" }}>1 – 5</span><span>별점 설정</span>

@@ -201,7 +201,7 @@ function ProjectCard({ project }: { project: Project }) {
       <div style={{ maxWidth: 480 }}>
         <div style={{
           display: "flex", justifyContent: "space-between",
-          fontFamily: "'Space Mono', monospace", fontSize: 10,
+          fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
           color: "#666", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.1em",
         }}>
           <span>{pipelineCfg.stepLabel}</span>
@@ -227,7 +227,7 @@ function ProjectCard({ project }: { project: Project }) {
       }}>
         {isDelivered ? (
           <span style={{
-            fontFamily: "'Space Mono', monospace", fontSize: 10,
+            fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
             color: "#444", border: "1px solid #2a2a2a",
             padding: "4px 8px", background: "#050505",
           }}>
@@ -235,7 +235,7 @@ function ProjectCard({ project }: { project: Project }) {
           </span>
         ) : (
           <span style={{
-            fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700,
+            fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, fontWeight: 700,
             color: warn ? ACCENT : "#888",
             border: `1px solid ${warn ? ACCENT : "#333"}`,
             padding: "4px 8px",
@@ -290,7 +290,7 @@ function ActionCard({
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 2 }}>{label}</div>
           <div style={{
-            fontFamily: "'Space Mono', monospace",
+            fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
             fontSize: 9, color: "#555", textTransform: "uppercase", letterSpacing: "0.15em",
           }}>{sub}</div>
         </div>
@@ -325,7 +325,7 @@ function AccordionHeader({
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ width: 6, height: 6, background: dotColor, flexShrink: 0 }} />
         <span style={{
-          fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 500,
+          fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, fontWeight: 500,
           color: textColor, letterSpacing: "0.15em", textTransform: "uppercase",
         }}>
           {title}
@@ -333,13 +333,13 @@ function AccordionHeader({
         <span style={{
           background: badgeBg, color: badgeColor,
           padding: "1px 7px", fontSize: 10, fontWeight: 700,
-          fontFamily: "'Space Mono', monospace",
+          fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
         }}>
           {count}
         </span>
         {totalNote && (
           <span style={{
-            fontFamily: "'Space Mono', monospace", fontSize: 9,
+            fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9,
             color: "#444", letterSpacing: "0.05em",
           }}>
             {totalNote}
@@ -422,7 +422,7 @@ export default function DashboardPage() {
         alignItems: "center", justifyContent: "center",
       }}>
         <div style={{
-          fontFamily: "'Space Mono', monospace", fontSize: 11,
+          fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11,
           color: "#555", letterSpacing: "0.15em", textTransform: "uppercase",
         }}>
           SYS.LOADING…
@@ -439,13 +439,13 @@ export default function DashboardPage() {
         display: "flex", flexDirection: "column", alignItems: "center",
         justifyContent: "center", gap: 16,
       }}>
-        <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#555" }}>
+        <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12, color: "#555" }}>
           로그인하면 프로젝트를 볼 수 있습니다
         </p>
         <Link href="/auth" style={{
           background: ACCENT, color: "#000", padding: "10px 24px",
           fontSize: 13, fontWeight: 700, textDecoration: "none",
-          fontFamily: "'Space Mono', monospace",
+          fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
         }}>
           로그인
         </Link>
@@ -595,7 +595,7 @@ export default function DashboardPage() {
               안녕하세요, <strong style={{ color: "#fff" }}>{userName} 작가님</strong>
             </div>
             <div style={{
-              fontFamily: "'Space Mono', monospace", fontSize: 10,
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
               color: "#666", textTransform: "uppercase", letterSpacing: "0.15em", marginTop: 1,
             }}>
               세션 활성
@@ -607,11 +607,11 @@ export default function DashboardPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div className="db-clock" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
             <span style={{
-              fontFamily: "'Space Mono', monospace", fontSize: 9,
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9,
               color: "#555", letterSpacing: "0.15em", textTransform: "uppercase",
             }}>SYS_TIME</span>
             <span style={{
-              fontFamily: "'Space Mono', monospace", fontSize: 12,
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12,
               color: "#fff", letterSpacing: "0.1em",
             }}>{clockStr}</span>
           </div>
@@ -663,7 +663,7 @@ export default function DashboardPage() {
             <section>
               <div style={{
                 display: "flex", alignItems: "center", gap: 10,
-                fontFamily: "'Space Mono', monospace", fontSize: 10,
+                fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
                 color: "#fff", letterSpacing: "0.2em", textTransform: "uppercase",
                 marginBottom: 14,
               }}>
@@ -790,7 +790,7 @@ export default function DashboardPage() {
             {/* 헤더 */}
             <div style={{
               display: "flex", alignItems: "center", gap: 8,
-              fontFamily: "'Space Mono', monospace", fontSize: 10,
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
               color: "#888", letterSpacing: "0.1em", textTransform: "uppercase",
               borderBottom: "1px solid #222", paddingBottom: 12,
             }}>
@@ -804,7 +804,7 @@ export default function DashboardPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
                 <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>활성 프로젝트</span>
-                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 14 }}>
+                <div style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 14 }}>
                   <span style={{ color: "#fff", fontWeight: 700 }}>{betaCount}</span>
                   <span style={{ color: "#444" }}> / {BETA_MAX_PROJECTS_TOTAL}</span>
                 </div>
@@ -826,7 +826,7 @@ export default function DashboardPage() {
               }}>
                 <AlertCircle size={13} color={RED} style={{ flexShrink: 0, marginTop: 1 }} />
                 <div>
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: RED, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 3 }}>
+                  <span style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: RED, fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 3 }}>
                     Limit Reached
                   </span>
                   <span style={{ fontSize: 11, color: "#888", lineHeight: 1.5 }}>
@@ -839,7 +839,7 @@ export default function DashboardPage() {
                 background: "#1a1a1a", border: "1px solid #2a2a2a",
                 padding: "10px 12px",
               }}>
-                <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#666", fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>
+                <span style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: "#666", fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: 4 }}>
                   Limit Notice
                 </span>
                 <span style={{ fontSize: 11, color: "#444", lineHeight: 1.5 }}>
@@ -860,7 +860,7 @@ export default function DashboardPage() {
           >
             <div style={{
               display: "flex", alignItems: "center", gap: 8,
-              fontFamily: "'Space Mono', monospace", fontSize: 10,
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
               color: "#888", letterSpacing: "0.1em", textTransform: "uppercase",
               borderBottom: "1px solid #222", paddingBottom: 12,
             }}>
@@ -871,7 +871,7 @@ export default function DashboardPage() {
             </div>
 
             {logs.length === 0 ? (
-              <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#444", textAlign: "center", padding: "16px 0" }}>
+              <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#444", textAlign: "center", padding: "16px 0" }}>
                 아직 활동이 없습니다
               </p>
             ) : (
@@ -894,7 +894,7 @@ export default function DashboardPage() {
                         background: "#000", border: `1px solid ${dotColor}`,
                       }} />
                       <span style={{
-                        fontFamily: "'Space Mono', monospace", fontSize: 9,
+                        fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9,
                         color: "#444",
                       }}>
                         {formatLogTime(log.createdAt)}

@@ -92,7 +92,7 @@ export function SystemLoadingScreen() {
           inset: 0,
           background: "#030303",
           color: "#E8E8E8",
-          fontFamily: "'Space Mono', monospace",
+          fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
@@ -144,7 +144,7 @@ export function SystemLoadingScreen() {
               <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#666", marginBottom: 4 }}>
                 LOCAL_TIME
               </div>
-              <span ref={clockRef} style={{ fontFamily: "'Space Mono', monospace", fontSize: 14, opacity: 0.6 }}>
+              <span ref={clockRef} style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 14, opacity: 0.6 }}>
                 00:00:00:000
               </span>
             </div>
