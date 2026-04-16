@@ -468,22 +468,6 @@ export function ProjectNexusPageClient() {
                   </div>
                   <p className={styles.metaFieldHint}>고객이 선택할 사진 수</p>
                 </div>
-                <div>
-                  <div className={styles.metaFieldRow}>
-                    <span className={styles.metaFieldLabelK}>예상 업로드 수 (M)</span>
-                  </div>
-                  <div>
-                    {project.photoCountExpected != null ? (
-                      <>
-                        <span className={`${styles.dataValLarge} ${styles.mono}`}>{project.photoCountExpected}</span>
-                        <span className={styles.metaUnitSuffix}>장</span>
-                      </>
-                    ) : (
-                      <span className={styles.dataVal}>—</span>
-                    )}
-                  </div>
-                  <p className={styles.metaFieldHint}>일반적으로 150~300장 추천 · 선택사항</p>
-                </div>
               </div>
 
               <div
