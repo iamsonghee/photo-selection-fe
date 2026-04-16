@@ -13,7 +13,6 @@ function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Pr
   const ext = row as Database["public"]["Tables"]["projects"]["Row"] & {
     shoot_type?: string | null;
     customer_phone?: string | null;
-    photo_count_expected?: number | null;
   };
   return {
     id: row.id,
@@ -24,7 +23,6 @@ function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Pr
     deadline: row.deadline,
     requiredCount: row.required_count,
     photoCount: row.photo_count ?? 0,
-    photoCountExpected: ext.photo_count_expected ?? null,
     shootType: ext.shoot_type ?? null,
     customerPhone: ext.customer_phone ?? null,
     status: row.status as ProjectStatus,
@@ -186,7 +184,6 @@ export async function createProject(params: {
   photographer_id: string;
   shoot_type?: string | null;
   customer_phone?: string | null;
-  photo_count_expected?: number | null;
   access_pin?: string | null;
 }): Promise<string> {
   const accessToken = crypto.randomUUID();
@@ -204,7 +201,6 @@ export async function createProject(params: {
       access_token: accessToken,
       ...(params.shoot_type           ? { shoot_type: params.shoot_type } : {}),
       ...(params.customer_phone       ? { customer_phone: params.customer_phone } : {}),
-      ...(params.photo_count_expected ? { photo_count_expected: params.photo_count_expected } : {}),
       ...(params.access_pin           ? { access_pin: params.access_pin } : {}),
     })
     .select("id")

@@ -40,7 +40,6 @@ export default function NewProjectPage() {
   const [customerName,       setCustomerName]       = useState("");
   const [customerPhone,      setCustomerPhone]      = useState("");
   const [requiredCount,      setRequiredCount]      = useState("");
-  const [photoCountExpected, setPhotoCountExpected] = useState("");
   const [quickDays,          setQuickDays]          = useState<number | null>(7);
   const [deadline,           setDeadline]           = useState<string>(() =>
     format(addDays(new Date(), 7), "yyyy-MM-dd")
@@ -126,7 +125,6 @@ export default function NewProjectPage() {
         photographer_id: photographerId,
         shoot_type: shootType || null,
         customer_phone: customerPhone.trim() || null,
-        photo_count_expected: photoCountExpected ? Number(photoCountExpected) : null,
         access_pin: accessPin || null,
       });
 
@@ -613,31 +611,6 @@ export default function NewProjectPage() {
                 <div style={{ fontSize:11, color:"#444", marginTop:6 }}>고객이 선택할 사진 수</div>
               </div>
 
-              {/* 업로드 예정 수 M */}
-              <div>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:10 }}>
-                  <label style={{ fontSize:14, fontWeight:700, color:"#ccc" }}>예상 업로드 수 (M)</label>
-                  <span style={{ fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: EST_COUNT</span>
-                </div>
-                <div className="np-input-wrap" style={{ position:"relative" }}>
-                  <input
-                    className="np-fi np-fi-mono"
-                    type="number"
-                    min={1}
-                    value={photoCountExpected}
-                    onChange={(e) => setPhotoCountExpected(e.target.value)}
-                    placeholder="예: 200"
-                    style={{ paddingRight:40, textAlign:"right" }}
-                  />
-                  <span style={{
-                    position:"absolute", right:16, top:"50%", transform:"translateY(-50%)",
-                    fontSize:14, color:"#555", pointerEvents:"none",
-                  }}>장</span>
-                  <div className="np-ib np-ib-tl" /><div className="np-ib np-ib-tr" />
-                  <div className="np-ib np-ib-bl" /><div className="np-ib np-ib-br" />
-                </div>
-                <div style={{ fontSize:11, color:"#444", marginTop:6 }}>일반적으로 150~300장 추천 · 선택사항</div>
-              </div>
             </div>
 
             {/* ── 셀렉 기한 (구분선) ── */}
