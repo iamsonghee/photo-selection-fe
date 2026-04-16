@@ -235,9 +235,9 @@ export default function ProjectsPage() {
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #222; }
         @media (max-width: 768px) {
-          .prj-topbar { padding: 0 14px !important; flex-wrap: wrap; height: auto !important; gap: 10px; padding-top: 12px !important; padding-bottom: 12px !important; }
+          .prj-topbar { padding: 0 14px !important; flex-wrap: wrap; height: auto !important; gap: 10px; padding-top: max(12px, env(safe-area-inset-top)) !important; padding-bottom: 12px !important; }
           .prj-clock { display: none !important; }
-          .prj-filter-bar { flex-wrap: wrap !important; }
+          .prj-filter-bar { flex-wrap: nowrap !important; overflow-x: auto; }
           .prj-date-group { display: none !important; }
           .prj-table th:nth-child(1),
           .prj-table td:nth-child(1),
@@ -245,6 +245,7 @@ export default function ProjectsPage() {
           .prj-table td:nth-child(6),
           .prj-table th:nth-child(7),
           .prj-table td:nth-child(7) { display: none; }
+          .prj-table th, .prj-table td { padding: 10px 10px !important; font-size: 11px !important; }
         }
       `}</style>
 

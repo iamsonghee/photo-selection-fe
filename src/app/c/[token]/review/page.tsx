@@ -137,9 +137,11 @@ export default function ReviewGalleryPage() {
       {/* ── Header ──────────────────────────── */}
       <header style={{
         background: "rgba(13,30,40,0.95)", backdropFilter: "blur(12px)",
-        borderBottom: `1px solid ${BORDER}`, height: 48,
+        borderBottom: `1px solid ${BORDER}`, minHeight: 48,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 20px", position: "sticky", top: 0, zIndex: 50,
+        padding: "0 20px",
+        paddingTop: "env(safe-area-inset-top, 0px)",
+        position: "sticky", top: 0, zIndex: 50,
       }}>
         <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
         <span style={{ fontSize: 12, color: MUTED }}>{project.name}</span>

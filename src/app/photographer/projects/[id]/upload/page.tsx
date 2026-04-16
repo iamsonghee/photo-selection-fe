@@ -833,6 +833,16 @@ export default function ProjectDetailPage() {
         .prj-btn-danger:hover { background: rgba(255,51,51,0.1); }
         .prj-dropzone { border: 1px dashed #333; transition: all 0.2s; }
         .prj-dropzone-over { border-color: rgba(255,77,0,0.5) !important; background: ${ACCENT_DIM} !important; }
+        @media (max-width: 768px) {
+          .prj-aside { display: none !important; }
+          .prj-main-col { width: 100% !important; }
+          .prj-file-table th:nth-child(3),
+          .prj-file-table td:nth-child(3),
+          .prj-file-table th:nth-child(4),
+          .prj-file-table td:nth-child(4) { display: none !important; }
+          .prj-modal-box { max-width: 100% !important; margin: 0 8px !important; }
+          .prj-btn-primary, .prj-btn-secondary, .prj-btn-danger { min-height: 44px !important; padding: 0 16px !important; }
+        }
       `}</style>
 
       <div className="prj-grid-bg" />

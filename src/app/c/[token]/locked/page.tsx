@@ -142,11 +142,13 @@ export default function LockedPage() {
 
       {/* ── Header ────────────────────────────── */}
       <header style={{
-        height: 48, flexShrink: 0,
+        minHeight: 48, flexShrink: 0,
         background: "rgba(13,30,40,0.95)", backdropFilter: "blur(12px)",
         borderBottom: `1px solid ${BORDER}`,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 20px", position: "sticky", top: 0, zIndex: 50,
+        padding: "0 20px",
+        paddingTop: "env(safe-area-inset-top, 0px)",
+        position: "sticky", top: 0, zIndex: 50,
       }}>
         <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
         <span style={{ fontSize: 12, color: MUTED }}>{project.name}</span>
@@ -184,8 +186,8 @@ export default function LockedPage() {
           </div>
         </div>
 
-        {/* Meta */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 11, color: DIM, flexShrink: 0, textAlign: "right" }}>
+        {/* Meta — 모바일에서 숨김 */}
+        <div className="hidden sm:flex" style={{ alignItems: "center", gap: 12, fontSize: 11, color: DIM, flexShrink: 0, textAlign: "right" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-end" }}>
             <span style={{ fontSize: 10, color: DIM }}>확정 일시</span>
             <span style={{ fontSize: 12, color: MUTED, fontWeight: 500 }}>{confirmedDateShort}</span>

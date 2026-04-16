@@ -510,7 +510,7 @@
 
 @media (max-width: 768px) {
   .topHeader {
-    padding: 20px;
+    padding: calc(env(safe-area-inset-top, 0px) + 16px) 20px 16px;
   }
   .headerSide {
     width: auto;
