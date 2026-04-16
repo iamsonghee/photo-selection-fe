@@ -4,18 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
+import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import styles from "./about.module.css";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 
 function LoadingScreen() {
-  return (
-    <div className={styles.root}>
-      <p style={{ margin: "auto", fontFamily: "var(--font-mono)", fontSize: 11, color: "#555", letterSpacing: "0.12em" }}>
-        LOADING_ABOUT…
-      </p>
-    </div>
-  );
+  return <SystemLoadingScreen />;
 }
 
 export default function AboutPageClient() {
