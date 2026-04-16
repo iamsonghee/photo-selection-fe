@@ -404,7 +404,6 @@ export function ProjectNexusPageClient() {
                   <span className={styles.metaFieldLabelK}>
                     프로젝트명 <span className={styles.metaFieldReq}>필수</span>
                   </span>
-                  <span className={`${styles.metaFieldCode} ${styles.mono}`}>FIELD :: PROJ_NAME</span>
                 </div>
                 <div className={styles.dataVal} style={{ fontSize: 18 }}>
                   {project.name}
@@ -414,7 +413,6 @@ export function ProjectNexusPageClient() {
               <div className={styles.metaBlock}>
                 <div className={styles.metaFieldRow}>
                   <span className={styles.metaFieldLabelK}>촬영 유형</span>
-                  <span className={`${styles.metaFieldCode} ${styles.mono}`}>FIELD :: SHOOT_TYPE</span>
                 </div>
                 <div className={styles.metaTypeRow}>
                   {SHOOT_TYPES.map(({ value, label, icon: Icon }) => (
@@ -440,7 +438,6 @@ export function ProjectNexusPageClient() {
                     <span className={styles.metaFieldLabelK}>
                       촬영 일자 <span className={styles.metaFieldReq}>필수</span>
                     </span>
-                    <span className={`${styles.metaFieldCode} ${styles.mono}`}>FIELD :: SHOOT_DATE</span>
                   </div>
                   <div className={styles.metaValueMono}>{shootDisplay}</div>
                 </div>
@@ -449,14 +446,12 @@ export function ProjectNexusPageClient() {
                     <span className={styles.metaFieldLabelK}>
                       고객 이름 <span className={styles.metaFieldReq}>필수</span>
                     </span>
-                    <span className={`${styles.metaFieldCode} ${styles.mono}`}>FIELD :: CLIENT_NAME</span>
                   </div>
                   <div className={styles.dataVal}>{project.customerName || "—"}</div>
                 </div>
                 <div style={{ gridColumn: "1 / -1" }}>
                   <div className={styles.metaFieldRow}>
                     <span className={styles.metaFieldLabelK}>연락처</span>
-                    <span className={`${styles.metaFieldCode} ${styles.mono}`}>FIELD :: CLIENT_PHONE</span>
                   </div>
                   <div className={styles.metaValueMono}>{project.customerPhone?.trim() || "—"}</div>
                   <p className={styles.metaFieldHint}>알림 기능 연동 시 사용됩니다 · 선택사항</p>
@@ -466,7 +461,6 @@ export function ProjectNexusPageClient() {
                     <span className={styles.metaFieldLabelK}>
                       셀렉 갯수 (N) <span className={styles.metaFieldReq}>필수</span>
                     </span>
-                    <span className={`${styles.metaFieldCode} ${styles.mono}`}>FIELD :: SEL_COUNT</span>
                   </div>
                   <div>
                     <span className={`${styles.dataValLarge} ${styles.dataValOrange} ${styles.mono}`}>{N}</span>
@@ -477,7 +471,6 @@ export function ProjectNexusPageClient() {
                 <div>
                   <div className={styles.metaFieldRow}>
                     <span className={styles.metaFieldLabelK}>예상 업로드 수 (M)</span>
-                    <span className={`${styles.metaFieldCode} ${styles.mono}`}>FIELD :: EST_COUNT</span>
                   </div>
                   <div>
                     {project.photoCountExpected != null ? (
@@ -503,14 +496,12 @@ export function ProjectNexusPageClient() {
                       <span className={styles.metaFieldLabelK}>
                         셀렉 기한 <span className={styles.metaFieldReq}>필수</span>
                       </span>
-                      <span className={`${styles.metaFieldCode} ${styles.mono}`}>FIELD :: DEADLINE</span>
                     </div>
                     <div className={styles.metaValueMono}>{deadlineDisplay}</div>
                   </div>
                   <div>
                     <div className={styles.metaFieldRow}>
                       <span className={styles.metaFieldLabelK}>업로드된 사진 수</span>
-                      <span className={`${styles.metaFieldCode} ${styles.mono}`}>FIELD :: UPLOAD_COUNT</span>
                     </div>
                     <div>
                       <span className={`${styles.dataValLarge} ${styles.mono}`}>{M}</span>
@@ -535,7 +526,6 @@ export function ProjectNexusPageClient() {
                 <div className={`${styles.sysInputGroup} ${styles.sysInputGroupWide}`}>
                   <div className={styles.metaFieldRow} style={{ marginBottom: 8 }}>
                     <span className={styles.metaFieldLabelK}>초대 링크</span>
-                    <span className={`${styles.metaFieldCode} ${styles.mono}`}>FIELD :: PORTAL_URL</span>
                   </div>
                   <div className={styles.sysInputWrapper}>
                     <input
@@ -560,7 +550,6 @@ export function ProjectNexusPageClient() {
                 <div className={styles.sysInputGroup}>
                   <div className={styles.metaFieldRow} style={{ marginBottom: 8 }}>
                     <span className={styles.metaFieldLabelK}>고객 비밀번호</span>
-                    <span className={`${styles.metaFieldCode} ${styles.mono}`}>FIELD :: ACCESS_PIN</span>
                   </div>
                   <div className={styles.sysInputWrapper}>
                     <input
@@ -819,7 +808,6 @@ export function ProjectNexusPageClient() {
                         {f.k}
                         {f.req ? <span className={styles.metaFieldReq}>필수</span> : null}
                       </span>
-                      <span className={`${styles.metaFieldCode} ${styles.mono}`}>FIELD :: {f.code}</span>
                     </div>
                     <input type={f.type} value={f.value} onChange={(e) => f.onChange(e.target.value)} className={styles.inputLine} />
                   </label>
@@ -830,7 +818,6 @@ export function ProjectNexusPageClient() {
                   <span className={styles.metaFieldLabelK}>
                     셀렉 갯수 (N) <span className={styles.metaFieldReq}>필수</span>
                   </span>
-                  <span className={`${styles.metaFieldCode} ${styles.mono}`}>FIELD :: SEL_COUNT</span>
                 </div>
                 {!["preparing", "selecting"].includes(project.status) && (
                   <span className={`${styles.mono} ${styles.textXs}`} style={{ color: C.orange, marginBottom: 6 }}>
@@ -889,7 +876,6 @@ export function ProjectNexusPageClient() {
             <div className={styles.modalBody}>
               <div className={styles.metaFieldRow} style={{ marginBottom: 10 }}>
                 <span className={styles.metaFieldLabelK}>고객 비밀번호</span>
-                <span className={`${styles.metaFieldCode} ${styles.mono}`}>FIELD :: ACCESS_PIN</span>
               </div>
               <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                 <input
