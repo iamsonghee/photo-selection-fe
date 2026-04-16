@@ -57,7 +57,7 @@ function Clock() {
 function Header({ onAuthOpen }: { onAuthOpen: () => void }) {
   return (
     <>
-      <header className="fixed landing-header-left z-50 flex items-center gap-6 lg:gap-12">
+      <header className="fixed landing-header-left z-50 hidden lg:flex items-center gap-6 lg:gap-12">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 bg-[#FF4D00] flex items-center justify-center text-black font-black text-xs">A</div>
           <span className="landing-display font-bold tracking-tighter text-2xl uppercase">
@@ -70,7 +70,7 @@ function Header({ onAuthOpen }: { onAuthOpen: () => void }) {
           <button type="button" onClick={onAuthOpen} className="hover:text-white transition">Login</button>
         </nav>
       </header>
-      <div className="fixed landing-header-right z-50 flex items-center gap-4 hidden sm:flex">
+      <div className="fixed landing-header-right z-50 hidden lg:flex items-center gap-4">
         <span className="landing-mono text-[10px] text-gray-500">SYS_TIME</span>
         <Clock />
       </div>
@@ -220,6 +220,148 @@ function HeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
         </div>
       </div>
     </section>
+  );
+}
+
+// ─── Mobile Hero Section ─────────────────────────────────────────────────────
+
+const MOBILE_PHASES = [
+  { active: [false, true, false, false], counter: "SELECTED: 01", sync: "40%" },
+  { active: [true,  true, false, false], counter: "SELECTED: 02", sync: "75%" },
+  { active: [true,  true, true,  false], counter: "SELECTED: 03", sync: "92%" },
+  { active: [false, true, false, false], counter: "SELECTED: 01", sync: "25%" },
+] as const;
+
+function MobileHeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
+  const [phase, setPhase] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setPhase((p) => (p + 1) % 4), 3000);
+    return () => clearInterval(id);
+  }, []);
+  const { active, counter, sync } = MOBILE_PHASES[phase];
+
+  return (
+    <div className="relative z-10">
+      {/* Mobile Header */}
+      <header
+        className="relative z-50 flex justify-between items-center px-6"
+        style={{ paddingTop: "max(24px, env(safe-area-inset-top, 24px))", paddingBottom: "16px" }}
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 bg-[#FF4D00] flex items-center justify-center text-black font-black text-[10px]">A</div>
+          <span className="landing-display font-bold tracking-tighter text-lg uppercase">
+            A-Cut<span className="text-[#FF4D00]">.</span>
+          </span>
+        </div>
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="landing-mono text-[8px] text-gray-500 leading-none">SYS_TIME</span>
+          <Clock />
+        </div>
+      </header>
+
+      {/* Content */}
+      <div className="w-full px-6 pt-2 pb-20" style={{ display: "flex", flexDirection: "column", gap: "48px" }}>
+
+        {/* Hero text + CTA */}
+        <div className="flex flex-col">
+          <div className="mb-4">
+            <span className="landing-mono text-[8px] tracking-[0.2em] text-[#FF4D00] border border-[#FF4D00]/30 px-1.5 py-0.5">
+              ACTIVE_PROTOCOL_V1.0.2
+            </span>
+          </div>
+          <h1 className="landing-display text-4xl font-black leading-tight mb-6 uppercase landing-break">
+            사진 셀렉, 이제<br />
+            <span className="text-[#FF4D00] landing-glitch">링크 하나</span>로<br />
+            끝냅니다.
+          </h1>
+          <div className="space-y-4 mb-8 border-l border-[#222] pl-4">
+            <p className="landing-strikethrough text-sm leading-relaxed text-gray-400 landing-break">
+              구글드라이브 링크 보내고, 고객 답장 기다리고, 파일명 대조하는 번거로운 과정.
+            </p>
+            <p className="text-base leading-relaxed text-gray-300 font-medium landing-break">
+              작가는 업로드만, 고객은 클릭만.<br />
+              <span className="text-white">모든 워크플로우를 자동화하세요.</span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onAuthOpen}
+            className="landing-btn-primary flex items-center justify-center gap-3 text-black font-bold text-base uppercase tracking-tight mb-4"
+            style={{ padding: "16px 24px", width: "100%" }}
+          >
+            무료로 시작하기
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </button>
+          <div className="flex items-center gap-4 text-[9px] landing-mono text-gray-500 justify-center">
+            <span className="flex items-center gap-1">
+              <div className="w-1 h-1 bg-[#FF4D00]" /> BETA FREE
+            </span>
+            <span className="flex items-center gap-1">
+              <div className="w-1 h-1 bg-[#FF4D00]" /> NO CREDIT CARD
+            </span>
+          </div>
+        </div>
+
+        {/* Mockup + Stats */}
+        <div className="relative w-full">
+          {/* Mockup box */}
+          <div className="relative w-full border border-[#222] bg-[#050505] shadow-2xl p-4">
+            <div className="flex justify-between items-center mb-4 landing-mono text-[8px] text-gray-500 tracking-wider border-b border-[#222] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                <span>CLIENT_LIVE_VIEW</span>
+              </div>
+              <span className="text-white">{counter}</span>
+            </div>
+            <div className="relative grid grid-cols-2 gap-2">
+              {PHOTOS.map((p, i) => (
+                <div key={i} className={`landing-photo-card${active[i] ? " is-active" : ""}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.src} alt={`Portrait ${i + 1}`} />
+                  <div className={`absolute bottom-1.5 left-1.5 landing-mono text-[6px] bg-black/50 px-1 ${active[i] ? "text-[#FF4D00]" : "text-gray-400"}`}>
+                    {p.filename}
+                  </div>
+                  <div className="landing-selection-badge">A-CUT</div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between landing-mono text-[7px]">
+                <span className="text-gray-500">SYNC_STATUS</span>
+                <span className="text-[#FF4D00] animate-pulse">REAL_TIME_ACTIVE</span>
+              </div>
+              <div className="w-full h-[1px] bg-[#222]">
+                <div className="h-full bg-[#FF4D00] transition-all duration-700" style={{ width: sync }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Stats panel — full-width below mockup */}
+          <div className="landing-stats-panel mt-4 w-full">
+            <div className="flex justify-between">
+              <span className="text-white">_OPTIMIZATION_REPORT</span>
+              <span>V.1.0</span>
+            </div>
+            <div className="h-[1px] bg-[#222] my-1.5" />
+            <div className="grid grid-cols-2 gap-x-4">
+              <div>TIME_SAVED: <span className="text-[#FF4D00]">94.8%</span></div>
+              <div>ERROR_RATE: <span className="text-[#FF4D00]">0.00%</span></div>
+              <div>PROCESS: <span className="text-[#FF4D00]">AUTO_MATCH</span></div>
+              <div>LATENCY: <span className="text-[#FF4D00]">14MS</span></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile nav */}
+        <nav className="pt-8 border-t border-[#222] flex flex-wrap gap-x-8 gap-y-4 landing-mono text-[10px] tracking-widest text-gray-500 uppercase justify-center">
+          <a href="#services" className="hover:text-white transition">Selection</a>
+          <a href="#testimonials" className="hover:text-white transition">Reviews</a>
+          <button type="button" onClick={onAuthOpen} className="hover:text-white transition">Login</button>
+        </nav>
+      </div>
+    </div>
   );
 }
 
@@ -663,10 +805,19 @@ export default function LandingPage() {
       <div className="landing-bracket landing-bracket-bl" />
       <div className="landing-bracket landing-bracket-br" />
 
+      {/* Mobile hero (lg 미만에서만 표시) */}
+      <div className="block lg:hidden">
+        <MobileHeroSection onAuthOpen={() => setAuthOpen(true)} />
+      </div>
+
+      {/* Desktop header (lg 이상에서만 표시) */}
       <Header onAuthOpen={() => setAuthOpen(true)} />
 
       <main>
-        <HeroSection onAuthOpen={() => setAuthOpen(true)} />
+        {/* Desktop hero (lg 이상에서만 표시) */}
+        <div className="hidden lg:block">
+          <HeroSection onAuthOpen={() => setAuthOpen(true)} />
+        </div>
         <ProblemSection onAuthOpen={() => setAuthOpen(true)} />
         <ServicesSection />
         <TestimonialsSection />
