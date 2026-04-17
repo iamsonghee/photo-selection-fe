@@ -14,6 +14,7 @@ import type { ProjectLogItem } from "@/lib/db";
 import { useProfile } from "@/contexts/ProfileContext";
 import EmptyDashboard from "./EmptyDashboard";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { ProjectPipelineMiniBar, getPipelineStepLabel } from "@/components/photographer/ProjectPipelineMiniBar";
 
 // ── 새 디자인 컬러 팔레트 ───────────────────────────────────
 const ACCENT  = "#FF4D00";
@@ -86,59 +87,6 @@ const LOG_LABEL: Record<string, string> = {
   revision:  "재보정 요청",
 };
 
-// ── 5단계 파이프라인 ───────────────────────────────────────
-const PIPELINE_STEPS = ["업로드", "셀렉", "보정", "재보정", "완료"];
-
-type PipelineConfig = {
-  completedSteps: number; // 완전히 끝난 단계 수 (0~5)
-  activeStep:     number; // 현재 진행 중인 단계 인덱스 (0~4, -1=전체완료)
-  activeColor:    string; // 현재 단계 색상
-  stepLabel:      string; // "N/5 단계명" 또는 상태 설명
-};
-
-const STATUS_PIPELINE: Record<ProjectStatus, PipelineConfig> = {
-  preparing:    { completedSteps: 0, activeStep: 0,  activeColor: ACCENT, stepLabel: "1/5 업로드" },
-  selecting:    { completedSteps: 1, activeStep: 1,  activeColor: ACCENT, stepLabel: "2/5 셀렉" },
-  confirmed:    { completedSteps: 2, activeStep: 2,  activeColor: ACCENT, stepLabel: "3/5 보정" },
-  editing:      { completedSteps: 2, activeStep: 2,  activeColor: ACCENT, stepLabel: "3/5 보정" },
-  reviewing_v1: { completedSteps: 3, activeStep: -1, activeColor: ACCENT, stepLabel: "보정 완료" },
-  editing_v2:   { completedSteps: 3, activeStep: 3,  activeColor: ACCENT, stepLabel: "4/5 재보정" },
-  reviewing_v2: { completedSteps: 4, activeStep: -1, activeColor: ACCENT, stepLabel: "재보정 완료" },
-  delivered:    { completedSteps: 5, activeStep: -1, activeColor: GREEN,  stepLabel: "5/5 완료" },
-};
-
-// ── PipelineBar ────────────────────────────────────────────
-function PipelineBar({ status }: { status: ProjectStatus }) {
-  const { completedSteps, activeStep, activeColor } = STATUS_PIPELINE[status];
-  const allDone    = completedSteps === 5;
-  const isPreparing = status === "preparing";
-
-  return (
-    <div style={{
-      width: "100%", height: 4,
-      background: "#0a0a0a", overflow: "hidden",
-      display: "flex", gap: 2,
-    }}>
-      {PIPELINE_STEPS.map((_, i) => {
-        const isDone   = i < completedSteps;
-        const isActive = i === activeStep;
-        let bg      = "#1a1a1a";
-        let opacity = 1;
-        if (allDone) {
-          bg = "#333";
-        } else if (isDone) {
-          bg = "#fff";
-        } else if (isActive) {
-          bg = activeColor;
-          if (isPreparing) opacity = 0.4;
-        }
-        return (
-          <div key={i} style={{ flex: 1, height: "100%", background: bg, opacity }} />
-        );
-      })}
-    </div>
-  );
-}
 
 // ── ProjectCard (새 디자인) ─────────────────────────────────
 function ProjectCard({ project }: { project: Project }) {
@@ -152,7 +100,7 @@ function ProjectCard({ project }: { project: Project }) {
     : NEW_LEFT[project.status];
 
   const { text: ddayText, warn } = dday(project.deadline);
-  const pipelineCfg = STATUS_PIPELINE[project.status];
+  const stepLabel = getPipelineStepLabel(project.status);
   const isDelivered = project.status === "delivered";
 
   return (
@@ -204,7 +152,7 @@ function ProjectCard({ project }: { project: Project }) {
           fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
           color: "#666", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.1em",
         }}>
-          <span>{pipelineCfg.stepLabel}</span>
+          <span>{stepLabel}</span>
           <span style={{ color: isDelivered ? "#444" : "#888" }}>
             {(() => {
               if (project.status === "preparing") return photoCount > 0 ? `${photoCount}장` : "";
@@ -218,7 +166,7 @@ function ProjectCard({ project }: { project: Project }) {
             })()}
           </span>
         </div>
-        <PipelineBar status={project.status} />
+        <ProjectPipelineMiniBar status={project.status} variant="full" />
       </div>
 
       {/* 우측 D-day 배지 */}

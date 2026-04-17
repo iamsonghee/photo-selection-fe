@@ -131,6 +131,9 @@ export async function PATCH(
         payload.access_pin = body.access_pin;
       }
     }
+    if (typeof body.allow_revision === 'boolean') {
+      payload.allow_revision = body.allow_revision;
+    }
     if (typeof body.status === "string" && body.status) {
       const currentStatus = (project as { status: string }).status as ProjectStatus;
       if (!canTransition(currentStatus, body.status as ProjectStatus)) {

@@ -8,13 +8,9 @@ import {
   CheckCircle2,
   LayoutGrid,
   List,
-  ListChecks,
-  PenLine,
-  Eye,
   MessageSquare,
   Clipboard,
   Download,
-  Upload,
   ChevronRight,
   ChevronLeft,
   X,
@@ -25,6 +21,8 @@ import { getProjectById, getPhotosWithSelections } from "@/lib/db";
 import type { Project, Photo, ColorTag } from "@/types";
 import { PHOTOGRAPHER_THEME as C } from "@/lib/photographer-theme";
 import { ProjectPipelineHeader } from "@/components/photographer/ProjectPipelineHeader";
+import { ProjectActionFlow } from "@/components/photographer/ProjectActionFlow";
+import { buildCompactSteps } from "@/lib/project-flow-steps";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import { galleryThumbPriorityProps } from "@/lib/gallery-filter";
 
@@ -373,103 +371,35 @@ export default function ResultsPage() {
             </div>
           </section>
 
-          <section style={{ flex: 1, background: SURFACE_1, padding: 24, display: "flex", flexDirection: "column", minHeight: 0 }}>
-            {isSelecting && (
-              <div style={{ marginBottom: 16, padding: 12, background: ACCENT_DIM, border: `1px solid rgba(255,90,31,0.25)`, borderRadius: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT, marginBottom: 4 }}>고객이 셀렉 진행 중입니다</div>
-                <div style={{ fontSize: 11, color: TEXT_MUTED }}>현재까지 {photos.length}장 선택됨</div>
-              </div>
-            )}
-            {isConfirmedOrBeyond && (
-              <div style={{ marginBottom: 16, padding: 12, background: "rgba(46,213,115,0.08)", border: "1px solid rgba(46,213,115,0.2)", borderRadius: 8, display: "flex", gap: 10, alignItems: "flex-start" }}>
-                <CheckCircle2 size={16} color="#2ed573" style={{ flexShrink: 0, marginTop: 2 }} />
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#2ed573", marginBottom: 4 }}>고객이 최종 확정했습니다</div>
-                  <div style={{ fontSize: 11, color: TEXT_MUTED }}>확정: {confirmedText ?? "—"} · {photos.length}장</div>
+          {(isSelecting || isConfirmedOrBeyond) && (
+            <section style={{ background: SURFACE_1, padding: "14px 20px", borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
+              {isSelecting && (
+                <div style={{ padding: 12, background: ACCENT_DIM, border: `1px solid rgba(255,90,31,0.25)`, borderRadius: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT, marginBottom: 4 }}>고객이 셀렉 진행 중입니다</div>
+                  <div style={{ fontSize: 11, color: TEXT_MUTED }}>현재까지 {photos.length}장 선택됨</div>
                 </div>
-              </div>
-            )}
-            <div style={{ margin: "0 -24px", padding: "20px 24px", borderBottom: `1px solid ${BORDER}`, flexShrink: 0, background: SURFACE_1 }}>
-              <span className="prj-tech-label" style={{ color: TEXT_MUTED, display: "block", marginBottom: 12 }}>OPERATION_NODES</span>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {[
-                  {
-                    icon: <Upload size={14} color={TEXT_MUTED} />,
-                    label: "원본업로드",
-                    desc: "원본 사진 업로드·삭제·초대 링크",
-                    enabled: true,
-                    badge: null,
-                    onClick: () => {
-                      router.push(`/photographer/projects/${id}/upload`);
-                    },
-                  },
-                  {
-                    icon: <ListChecks size={14} color={TEXT_MUTED} />,
-                    label: "셀렉 결과 보기",
-                    desc: canViewSelections ? `${N}장 중 셀렉 진행` : "업로드 완료 후 가능",
-                    enabled: canViewSelections,
-                    badge: project.status === "selecting" ? "LIVE" : null,
-                    onClick: () => {
-                      if (!canViewSelections) return;
-                      router.push(`/photographer/projects/${id}/results`);
-                    },
-                  },
-                  {
-                    icon: <PenLine size={14} color={TEXT_MUTED} />,
-                    label: "보정본 업로드",
-                    desc: canEditVersions ? "보정본 업로드/관리" : "셀렉 완료 후 가능",
-                    enabled: canEditVersions,
-                    badge: null,
-                    onClick: () => {
-                      if (!canEditVersions) return;
-                      if (project.status === "confirmed") setShowEditGuideModal(true);
-                      else router.push(editVersionsPath);
-                    },
-                  },
-                  {
-                    icon: <Eye size={14} color={TEXT_MUTED} />,
-                    label: "보정본 검토",
-                    desc: canReview ? "고객 검토 현황" : "보정 완료 후 가능",
-                    enabled: canReview,
-                    badge: null,
-                    onClick: () => canReview && router.push(editVersionsPath),
-                  },
-                ].map((node) => (
-                  <div
-                    key={node.label}
-                    role="button"
-                    tabIndex={0}
-                    className="prj-op-node"
-                    onClick={node.onClick}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        node.onClick();
-                      }
-                    }}
-                    style={{
-                      background: SURFACE_2,
-                      border: `1px solid ${BORDER}`,
-                      padding: "12px 14px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      opacity: node.enabled ? 1 : 0.4,
-                    }}
-                  >
-                    {node.icon}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="prj-tech-label" style={{ color: TEXT_BRIGHT, marginBottom: 3 }}>{node.label}</div>
-                      <div style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED }}>{node.desc}</div>
-                    </div>
-                    {node.badge ? (
-                      <span style={{ padding: "2px 6px", background: "rgba(46,213,115,0.1)", border: "1px solid rgba(46,213,115,0.3)", fontFamily: MONO, fontSize: 9, color: "#2ed573" }}>{node.badge}</span>
-                    ) : null}
-                    <ChevronRight size={12} className="prj-op-arrow" color={TEXT_MUTED} style={{ flexShrink: 0 }} />
+              )}
+              {isConfirmedOrBeyond && (
+                <div style={{ padding: 12, background: "rgba(46,213,115,0.08)", border: "1px solid rgba(46,213,115,0.2)", borderRadius: 8, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <CheckCircle2 size={16} color="#2ed573" style={{ flexShrink: 0, marginTop: 2 }} />
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "#2ed573", marginBottom: 4 }}>고객이 최종 확정했습니다</div>
+                    <div style={{ fontSize: 11, color: TEXT_MUTED }}>확정: {confirmedText ?? "—"} · {photos.length}장</div>
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              )}
+            </section>
+          )}
+
+          <div style={{ flex: 1 }} />
+
+          <section style={{ flexShrink: 0 }}>
+            <ProjectActionFlow variant="compact" steps={buildCompactSteps("results", project, {
+              onUpload: () => router.push(`/photographer/projects/${id}/upload`),
+              onResults: () => router.push(`/photographer/projects/${id}/results`),
+              onVersions: () => { if (project.status === "confirmed") setShowEditGuideModal(true); else router.push(editVersionsPath); },
+              onVersionsV2: () => router.push(`/photographer/projects/${id}/upload-versions/v2`),
+            })} />
           </section>
         </aside>
 

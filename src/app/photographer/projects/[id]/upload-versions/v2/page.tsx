@@ -23,8 +23,6 @@ import {
   Lock,
   Eye,
   EyeOff,
-  ListChecks,
-  PenLine,
   Info,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -36,6 +34,8 @@ import { BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
 import { ProjectPipelineHeader } from "@/components/photographer/ProjectPipelineHeader";
+import { ProjectActionFlow } from "@/components/photographer/ProjectActionFlow";
+import { buildCompactSteps } from "@/lib/project-flow-steps";
 import { getStatusLabel } from "@/lib/project-status";
 
 /** Nexus design tokens — 동일한 오렌지 테마 */
@@ -978,81 +978,14 @@ export default function UploadVersionsV2Page() {
             </div>
           </div>
 
-          {/* OPERATION_NODES */}
-          <div
-            style={{
-              padding: "16px 20px 18px",
-              borderBottom: `1px solid ${BORDER}`,
-              flexShrink: 0,
-              background: SURFACE_1,
-              minHeight: 0,
-            }}
-          >
-            <span className="ph-uv-tech-label" style={{ color: TEXT_MUTED, display: "block", marginBottom: 10 }}>
-              OPERATION_NODES
-            </span>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {[
-                {
-                  icon: <Upload size={14} color={TEXT_MUTED} />,
-                  label: "원본업로드",
-                  desc: "원본 사진 업로드·삭제·초대 링크",
-                  enabled: true,
-                  badge: null as string | null,
-                  onClick: () => router.push(`/photographer/projects/${id}/upload`),
-                },
-                {
-                  icon: <ListChecks size={14} color={TEXT_MUTED} />,
-                  label: "셀렉 결과 보기",
-                  desc: canViewSelections ? `${N}장 중 셀렉 진행` : "업로드 완료 후 가능",
-                  enabled: canViewSelections,
-                  badge: project.status === "selecting" ? "LIVE" : null,
-                  onClick: () => { if (!canViewSelections) return; router.push(`/photographer/projects/${id}/results`); },
-                },
-                {
-                  icon: <PenLine size={14} color={TEXT_MUTED} />,
-                  label: "보정본 업로드",
-                  desc: canEditVersions ? "보정본 업로드/관리" : "셀렉 완료 후 가능",
-                  enabled: canEditVersions,
-                  badge: null,
-                  onClick: () => { if (!canEditVersions) return; router.push(editVersionsPath); },
-                },
-              ].map((node) => (
-                <div
-                  key={node.label}
-                  role="button"
-                  tabIndex={0}
-                  className="ph-uv-op-node"
-                  onClick={node.onClick}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); node.onClick(); }
-                  }}
-                  style={{
-                    background: SURFACE_2,
-                    border: `1px solid ${BORDER}`,
-                    padding: "10px 12px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    opacity: node.enabled ? 1 : 0.4,
-                  }}
-                >
-                  {node.icon}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="ph-uv-tech-label" style={{ color: TEXT_BRIGHT, marginBottom: 2, fontSize: "0.6rem" }}>
-                      {node.label}
-                    </div>
-                    <div style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED }}>{node.desc}</div>
-                  </div>
-                  {node.badge ? (
-                    <span style={{ padding: "2px 6px", background: "rgba(46,213,115,0.1)", border: "1px solid rgba(46,213,115,0.3)", fontFamily: MONO, fontSize: 9, color: "#2ed573" }}>
-                      {node.badge}
-                    </span>
-                  ) : null}
-                  <ChevronRight size={12} className="ph-uv-op-arrow" color={TEXT_MUTED} style={{ flexShrink: 0 }} />
-                </div>
-              ))}
-            </div>
+          {/* ACTION_FLOW compact */}
+          <div style={{ flexShrink: 0 }}>
+            <ProjectActionFlow variant="compact" steps={buildCompactSteps("upload-versions-v2", project, {
+              onUpload: () => router.push(`/photographer/projects/${id}/upload`),
+              onResults: () => router.push(`/photographer/projects/${id}/results`),
+              onVersions: () => router.push(`/photographer/projects/${id}/upload-versions`),
+              onVersionsV2: () => router.push(`/photographer/projects/${id}/upload-versions/v2`),
+            })} />
           </div>
 
           {/* Beta warning */}

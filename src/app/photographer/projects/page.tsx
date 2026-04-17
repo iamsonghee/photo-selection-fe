@@ -10,6 +10,7 @@ import { getProfileImageUrl } from "@/lib/photographer";
 import { useProfile } from "@/contexts/ProfileContext";
 import type { Project, ProjectStatus } from "@/types";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { ProjectPipelineMiniBar, getPipelineStepLabel } from "@/components/photographer/ProjectPipelineMiniBar";
 
 // ── 컬러 팔레트 ────────────────────────────────────────────────
 const ACCENT = "#FF4D00";
@@ -20,24 +21,6 @@ const ACTIVE_STATUSES: ProjectStatus[] = [
   "selecting", "confirmed", "editing", "reviewing_v1", "editing_v2", "reviewing_v2",
 ];
 
-const PIPELINE_STEPS = ["업로드", "셀렉", "보정", "재보정", "완료"];
-
-type PipelineConfig = {
-  completedSteps: number;
-  activeStep: number;
-  stepLabel: string;
-};
-
-const STATUS_PIPELINE: Record<ProjectStatus, PipelineConfig> = {
-  preparing:    { completedSteps: 0, activeStep: 0,  stepLabel: "1단계/5단계" },
-  selecting:    { completedSteps: 1, activeStep: 1,  stepLabel: "2단계/5단계" },
-  confirmed:    { completedSteps: 2, activeStep: 2,  stepLabel: "3단계/5단계" },
-  editing:      { completedSteps: 2, activeStep: 2,  stepLabel: "3단계/5단계" },
-  reviewing_v1: { completedSteps: 3, activeStep: -1, stepLabel: "보정완료" },
-  editing_v2:   { completedSteps: 3, activeStep: 3,  stepLabel: "4단계/5단계" },
-  reviewing_v2: { completedSteps: 4, activeStep: -1, stepLabel: "재보정완료" },
-  delivered:    { completedSteps: 5, activeStep: -1, stepLabel: "5단계/5단계" },
-};
 
 // ── D-Day ──────────────────────────────────────────────────────
 function dday(deadline: string): { text: string; warn: boolean } {
@@ -55,32 +38,6 @@ function formatDate(iso: string): string {
   return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// ── Mini PipelineBar ───────────────────────────────────────────
-function MiniPipelineBar({ status }: { status: ProjectStatus }) {
-  const { completedSteps, activeStep } = STATUS_PIPELINE[status];
-  const allDone = completedSteps === 5;
-  const isPreparing = status === "preparing";
-
-  return (
-    <div style={{ display: "flex", gap: 1, width: 100, height: 4 }}>
-      {PIPELINE_STEPS.map((_, i) => {
-        const isDone   = i < completedSteps;
-        const isActive = i === activeStep;
-        let bg = "#1a1a1a";
-        let opacity = 1;
-        if (allDone) {
-          bg = "#333";
-        } else if (isDone) {
-          bg = "#fff";
-        } else if (isActive) {
-          bg = ACCENT;
-          if (isPreparing) opacity = 0.4;
-        }
-        return <div key={i} style={{ flex: 1, height: "100%", background: bg, opacity }} />;
-      })}
-    </div>
-  );
-}
 
 // ══════════════ 메인 페이지 ══════════════════════════════════
 export default function ProjectsPage() {
@@ -546,7 +503,7 @@ export default function ProjectsPage() {
                   filtered.map((project) => {
                     const photoCount    = project.photoCount ?? 0;
                     const requiredCount = project.requiredCount ?? 0;
-                    const pipeline      = STATUS_PIPELINE[project.status];
+                    const stepLabel     = getPipelineStepLabel(project.status);
                     const dd            = dday(project.deadline);
                     const isDelivered   = project.status === "delivered";
 
@@ -579,12 +536,12 @@ export default function ProjectsPage() {
 
                         {/* 파이프라인 */}
                         <td style={{ color: isDelivered ? "#333" : "#555" }}>
-                          {pipeline.stepLabel}
+                          {stepLabel}
                         </td>
 
                         {/* 진행률 바 */}
                         <td>
-                          <MiniPipelineBar status={project.status} />
+                          <ProjectPipelineMiniBar status={project.status} />
                         </td>
 
                         {/* 촬영일 */}

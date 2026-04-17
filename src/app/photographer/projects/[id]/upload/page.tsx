@@ -16,8 +16,6 @@ import {
   LayoutGrid,
   List,
   Upload,
-  ListChecks,
-  PenLine,
   X,
   Loader2,
   ImageIcon,
@@ -29,6 +27,8 @@ import { parseBetaLimitError } from "@/lib/beta-limits";
 import { compressImageFileForMobileIfNeeded } from "@/lib/upload-client-compress";
 import type { Project, ProjectStatus, Photo } from "@/types";
 import { ProjectPipelineHeader } from "@/components/photographer/ProjectPipelineHeader";
+import { ProjectActionFlow } from "@/components/photographer/ProjectActionFlow";
+import { buildCompactSteps } from "@/lib/project-flow-steps";
 
 // ---------- constants ----------
 const ACCENT = "#FF4D00";
@@ -1015,26 +1015,14 @@ export default function ProjectDetailPage() {
             )}
           </section>
 
-          {/* OPERATION_NODES */}
-          <section style={{ background: SURFACE_1, padding: 20, borderBottom: `1px solid ${BORDER}`, flexShrink: 0, marginTop: "auto" }}>
-            <span className="prj-tech-label" style={{ color: TEXT_MUTED, display: "block", marginBottom: 12 }}>OPERATION_NODES</span>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {[
-                { icon: <ListChecks size={14} color={TEXT_MUTED} />, label: "셀렉 결과 보기", desc: canViewSelections ? `${N}장 중 셀렉 진행` : "업로드 완료 후 가능", enabled: canViewSelections, badge: project.status === "selecting" ? "LIVE" : null, onClick: () => canViewSelections && router.push(`/photographer/projects/${id}/results`) },
-                { icon: <PenLine size={14} color={TEXT_MUTED} />, label: "보정본 업로드", desc: canEditVersions ? "보정본 업로드/관리" : "셀렉 완료 후 가능", enabled: canEditVersions, badge: null, onClick: () => { if (!canEditVersions) return; if (project.status === "confirmed") setShowEditGuideModal(true); else router.push(editVersionsPath); } },
-                { icon: <Eye size={14} color={TEXT_MUTED} />, label: "보정본 검토", desc: canReview ? "고객 검토 현황" : "보정 완료 후 가능", enabled: canReview, badge: null, onClick: () => canReview && router.push(editVersionsPath) },
-              ].map((node) => (
-                <div key={node.label} className="prj-op-node" onClick={node.onClick} style={{ background: SURFACE_2, border: `1px solid ${BORDER}`, padding: "12px 14px", display: "flex", alignItems: "center", gap: 10, opacity: node.enabled ? 1 : 0.4 }}>
-                  {node.icon}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="prj-tech-label" style={{ color: TEXT_BRIGHT, marginBottom: 3 }}>{node.label}</div>
-                    <div style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED }}>{node.desc}</div>
-                  </div>
-                  {node.badge && <span style={{ padding: "2px 6px", background: "rgba(46,213,115,0.1)", border: "1px solid rgba(46,213,115,0.3)", fontFamily: MONO, fontSize: 9, color: "#2ed573" }}>{node.badge}</span>}
-                  <ChevronRight size={12} className="prj-op-arrow" color={TEXT_MUTED} style={{ flexShrink: 0 }} />
-                </div>
-              ))}
-            </div>
+          {/* ACTION_FLOW compact */}
+          <section style={{ flexShrink: 0, marginTop: "auto" }}>
+            <ProjectActionFlow variant="compact" steps={buildCompactSteps("upload", project, {
+              onUpload: () => router.push(`/photographer/projects/${id}/upload`),
+              onResults: () => router.push(`/photographer/projects/${id}/results`),
+              onVersions: () => { if (project.status === "confirmed") setShowEditGuideModal(true); else router.push(editVersionsPath); },
+              onVersionsV2: () => router.push(`/photographer/projects/${id}/upload-versions/v2`),
+            })} />
           </section>
         </aside>
 

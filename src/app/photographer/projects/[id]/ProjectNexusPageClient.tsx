@@ -12,9 +12,13 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Flag,
+  ListChecks,
   Lock,
+  PenLine,
   RefreshCw,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import { getProjectById } from "@/lib/db";
@@ -22,6 +26,8 @@ import type { Project, ProjectStatus } from "@/types";
 import { PHOTOGRAPHER_THEME as C } from "@/lib/photographer-theme";
 import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { ProjectActionFlow } from "@/components/photographer/ProjectActionFlow";
+import type { FlowStep } from "@/components/photographer/ProjectActionFlow";
 import styles from "./ProjectNexusDashboard.module.css";
 
 const jetbrains = JetBrains_Mono({
@@ -106,6 +112,7 @@ export function ProjectNexusPageClient() {
   const [editShootDate, setEditShootDate] = useState("");
   const [editDeadline, setEditDeadline] = useState("");
   const [editRequiredCount, setEditRequiredCount] = useState(0);
+  const [editAllowRevision, setEditAllowRevision] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -198,6 +205,7 @@ export function ProjectNexusPageClient() {
           shoot_date: editShootDate,
           deadline: editDeadline,
           required_count: newN,
+          allow_revision: editAllowRevision,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -209,6 +217,7 @@ export function ProjectNexusPageClient() {
         shootDate: editShootDate,
         deadline: editDeadline,
         requiredCount: newN,
+        allowRevision: editAllowRevision,
       });
       setEditMode(false);
       setToast("메타데이터가 저장되었습니다.");
@@ -286,6 +295,7 @@ export function ProjectNexusPageClient() {
     setEditShootDate(project.shootDate);
     setEditDeadline(project.deadline);
     setEditRequiredCount(project.requiredCount);
+    setEditAllowRevision(project.allowRevision);
     setSaveError("");
     setEditMode(true);
   };
@@ -360,6 +370,109 @@ export function ProjectNexusPageClient() {
 
   const flowClass = (f: FlowVisual) =>
     f === "done" ? styles.flowDone : f === "active" ? styles.flowActive : styles.flowLocked;
+
+  // 재보정 관련 상태 (7단계 전용)
+  const inV2Phase = ["editing_v2", "reviewing_v2", "delivered"].includes(project.status);
+  const useSevenSteps = project.allowRevision && inV2Phase;
+
+  const f5r: FlowVisual = // 재보정 업로드 (7단계 index 4)
+    project.status === "editing_v2" ? "active"
+    : ["reviewing_v2", "delivered"].includes(project.status) ? "done"
+    : "locked";
+  const f6r: FlowVisual = // 재보정 검토 (7단계 index 5)
+    project.status === "reviewing_v2" ? "active"
+    : project.status === "delivered" ? "done"
+    : "locked";
+  const f7r: FlowVisual = delivered ? "done" : "locked"; // 납품 완료 (7단계 index 6)
+
+  const actionFlowSteps: FlowStep[] = useSevenSteps
+    ? [
+        {
+          label: "원본 업로드",
+          desc: f1 === "done" ? "완료" : "진행 중",
+          icon: <Upload size={20} color="#FF4D00" />,
+          state: f1,
+          onClick: () => router.push(`/photographer/projects/${id}/upload`),
+        },
+        {
+          label: "셀렉 결과 확인",
+          desc: f2 === "done" ? "완료" : f2 === "active" ? "고객 셀렉 중" : "이전 단계 완료 후 가능",
+          icon: <ListChecks size={20} color="#FF4D00" />,
+          state: f2,
+          onClick: canViewSelections ? () => router.push(`/photographer/projects/${id}/results`) : undefined,
+        },
+        {
+          label: "보정본 업로드",
+          desc: f3 === "done" ? "완료" : f3 === "active" ? "진행 중" : "이전 단계 완료 후 가능",
+          icon: <PenLine size={20} color="#FF4D00" />,
+          state: "done",
+          onClick: canEditVersions ? () => router.push(`/photographer/projects/${id}/upload-versions`) : undefined,
+        },
+        {
+          label: "보정본 검토",
+          desc: "완료",
+          icon: <Eye size={20} color="#FF4D00" />,
+          state: "done",
+        },
+        {
+          label: "재보정 업로드",
+          desc: f5r === "done" ? "완료" : f5r === "active" ? "진행 중" : "이전 단계 완료 후 가능",
+          icon: <PenLine size={20} color="#FF4D00" />,
+          state: f5r,
+          onClick: f5r !== "locked" ? () => router.push(`/photographer/projects/${id}/upload-versions/v2`) : undefined,
+        },
+        {
+          label: "재보정 검토",
+          desc: f6r === "done" ? "완료" : f6r === "active" ? "고객 검토 중" : "이전 단계 완료 후 가능",
+          icon: <Eye size={20} color="#FF4D00" />,
+          state: f6r,
+        },
+        {
+          label: "최종 전달 완료",
+          desc: f7r === "done" ? "완료" : "최종 목표",
+          icon: <Flag size={20} color="#FF4D00" />,
+          state: f7r,
+        },
+      ]
+    : [
+        {
+          label: "원본 업로드",
+          desc: f1 === "done" ? "완료" : "진행 중",
+          icon: <Upload size={20} color="#FF4D00" />,
+          state: f1,
+          onClick: () => router.push(`/photographer/projects/${id}/upload`),
+        },
+        {
+          label: "셀렉 결과 확인",
+          desc: f2 === "done" ? "완료" : f2 === "active" ? "고객 셀렉 중" : "이전 단계 완료 후 가능",
+          icon: <ListChecks size={20} color="#FF4D00" />,
+          state: f2,
+          onClick: canViewSelections ? () => router.push(`/photographer/projects/${id}/results`) : undefined,
+        },
+        {
+          label: "보정본 업로드",
+          desc: f3 === "done" ? "완료" : f3 === "active" ? "진행 중" : "이전 단계 완료 후 가능",
+          icon: <PenLine size={20} color="#FF4D00" />,
+          state: f3,
+          onClick: canEditVersions ? () => {
+            if (project.status === "confirmed") setShowEditGuideModal(true);
+            else router.push(editVersionsPath);
+          } : undefined,
+        },
+        {
+          label: "고객 최종 검토",
+          desc: f4 === "done" ? "완료" : f4 === "active" ? "고객 검토 중" : "이전 단계 완료 후 가능",
+          icon: <Eye size={20} color="#FF4D00" />,
+          state: f4,
+          onClick: canReview ? () => router.push(editVersionsPath) : undefined,
+        },
+        {
+          label: "최종 전달 완료",
+          desc: f5 === "done" ? "완료" : "최종 목표",
+          icon: <Flag size={20} color="#FF4D00" />,
+          state: f5,
+        },
+      ];
 
   return (
     <div className={`${styles.pageRoot} ${jetbrains.variable}`}>
@@ -493,6 +606,42 @@ export function ProjectNexusPageClient() {
                     </div>
                     <p className={styles.metaFieldHint}>현재 DATABANK에 올라간 원본 장수입니다.</p>
                   </div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <div className={styles.metaFieldRow}>
+                      <span className={styles.metaFieldLabelK}>재보정 여부</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "3px 10px",
+                          border: `1px solid ${project.allowRevision ? "rgba(255,77,0,0.4)" : "#333"}`,
+                          background: project.allowRevision ? "rgba(255,77,0,0.08)" : "transparent",
+                          fontFamily: "var(--font-jetbrains-mono, monospace)",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: project.allowRevision ? "#FF4D00" : "#555",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: "50%",
+                            background: project.allowRevision ? "#FF4D00" : "#444",
+                            flexShrink: 0,
+                          }}
+                        />
+                        {project.allowRevision ? "재보정 허용" : "재보정 없음"}
+                      </span>
+                      <span style={{ fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: 10, color: "#444" }}>
+                        {project.allowRevision ? "보정본 검토 후 재보정 요청 가능" : "보정본 검토 후 바로 납품"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -587,88 +736,7 @@ export function ProjectNexusPageClient() {
         <div className={styles.workspaceRight}>
           <div className={styles.actionFlowContainer}>
             <div className={styles.flowSectionTitle}>03. PIPELINE :: ACTION_FLOW</div>
-
-            <button
-              type="button"
-              className={`${styles.flowStep} ${flowClass(f1)}`}
-              onClick={() => router.push(`/photographer/projects/${id}/upload`)}
-            >
-              <div className={styles.flowInfo}>
-                <span className={styles.flowTitle}>원본 업로드</span>
-                <span className={styles.flowMeta}>{uploadDone ? "MNG :: INGEST_COMPLETE" : "SYS :: AWAITING_UPLOAD"}</span>
-              </div>
-              <div className={styles.flowIcon}>
-                {uploadDone ? <Check size={20} strokeWidth={2} /> : <ChevronRight size={20} className={styles.textOrange} />}
-              </div>
-            </button>
-
-            <button
-              type="button"
-              className={`${styles.flowStep} ${flowClass(f2)}`}
-              disabled={!canViewSelections}
-              onClick={() => canViewSelections && router.push(`/photographer/projects/${id}/results`)}
-            >
-              <div className={styles.flowInfo}>
-                <span className={styles.flowTitle}>셀렉 결과 확인</span>
-                <span className={styles.flowMeta}>
-                  {selectingActive ? "SYS :: AWAITING_CLIENT_ACTION" : "MNG :: SELECTION_TRACKER"}
-                </span>
-              </div>
-              {selectingActive ? (
-                <div className={styles.indicatorPulse} aria-hidden />
-              ) : (
-                <div className={styles.flowIcon}>
-                  {!canViewSelections ? <Lock size={16} strokeWidth={2} /> : <ChevronRight size={18} />}
-                </div>
-              )}
-            </button>
-
-            <button
-              type="button"
-              className={`${styles.flowStep} ${flowClass(f3)}`}
-              disabled={!canEditVersions}
-              onClick={() => {
-                if (!canEditVersions) return;
-                if (project.status === "confirmed") setShowEditGuideModal(true);
-                else router.push(editVersionsPath);
-              }}
-            >
-              <div className={styles.flowInfo}>
-                <span className={styles.flowTitle}>보정본 업로드</span>
-                <span className={styles.flowMeta}>MNG :: RETOUCH_DELIVERY</span>
-              </div>
-              <div className={styles.flowIcon}>
-                {preparing || selecting ? <Lock size={16} strokeWidth={2} /> : <ChevronRight size={18} />}
-              </div>
-            </button>
-
-            <button
-              type="button"
-              className={`${styles.flowStep} ${flowClass(f4)}`}
-              disabled={!canReview}
-              onClick={() => canReview && router.push(editVersionsPath)}
-            >
-              <div className={styles.flowInfo}>
-                <span className={styles.flowTitle}>고객 최종 검토</span>
-                <span className={styles.flowMeta}>SYS :: REVIEW_CYCLE</span>
-              </div>
-              <div className={styles.flowIcon}>
-                {!canReview ? <Lock size={16} strokeWidth={2} /> : reviewActive ? <ChevronRight size={18} /> : <Check size={18} />}
-              </div>
-            </button>
-
-            <button
-              type="button"
-              className={`${styles.flowStep} ${flowClass(f5)}`}
-              disabled={!delivered}
-              onClick={() => delivered && router.push(editVersionsPath)}
-            >
-              <div className={styles.flowInfo}>
-                <span className={styles.flowTitle}>최종 전달 완료</span>
-                <span className={styles.flowMeta}>MNG :: ARCHIVE_PRJ</span>
-              </div>
-              <div className={styles.flowIcon}>{delivered ? <Check size={20} strokeWidth={2} /> : <Lock size={16} strokeWidth={2} />}</div>
-            </button>
+            <ProjectActionFlow steps={actionFlowSteps} />
           </div>
 
           <div className={styles.logSection}>
@@ -817,6 +885,40 @@ export function ProjectNexusPageClient() {
                   className={styles.inputLine}
                 />
                 <p className={styles.metaFieldHint}>고객이 선택할 사진 수</p>
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", marginBottom: 20 }}>
+                <div className={styles.metaFieldRow} style={{ marginBottom: 6 }}>
+                  <span className={styles.metaFieldLabelK}>재보정 허용</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditAllowRevision((v) => !v)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "8px 14px", cursor: "pointer", alignSelf: "flex-start",
+                    background: editAllowRevision ? "rgba(255,77,0,0.08)" : "transparent",
+                    border: editAllowRevision ? "1px solid rgba(255,77,0,0.4)" : "1px solid #333",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <div style={{
+                    width: 28, height: 16, borderRadius: 8,
+                    background: editAllowRevision ? "#FF4D00" : "#222",
+                    position: "relative", transition: "background 0.2s", flexShrink: 0,
+                  }}>
+                    <div style={{
+                      position: "absolute", top: 2, left: editAllowRevision ? 14 : 2,
+                      width: 12, height: 12, borderRadius: "50%",
+                      background: "#fff", transition: "left 0.2s",
+                    }} />
+                  </div>
+                  <span style={{
+                    fontFamily: "'Space Mono', 'JetBrains Mono', sans-serif", fontSize: 11,
+                    color: editAllowRevision ? "#FF4D00" : "#555",
+                  }}>
+                    {editAllowRevision ? "ON — 최대 2회 재보정 허용" : "OFF — 재보정 없음"}
+                  </span>
+                </button>
               </label>
               {saveError && <div className={styles.errBox}>[ERR] {saveError}</div>}
               <div className={styles.btnRow}>

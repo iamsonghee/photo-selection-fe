@@ -89,6 +89,8 @@ export interface Project {
   /** 고객이 확정 취소한 횟수 (최대 3회, 고객 측 "확정 취소"용) */
   customerCancelCount?: number;
   displayId?: string; // "20260410-001" 형식 (작가별 당일 순번)
+  /** 재보정 허용 여부. false이면 5단계 파이프라인, true이면 최대 7단계 */
+  allowRevision: boolean;
   createdAt: string;
   updatedAt: string;
 }

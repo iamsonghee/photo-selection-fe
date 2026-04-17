@@ -45,6 +45,7 @@ export default function NewProjectPage() {
     format(addDays(new Date(), 7), "yyyy-MM-dd")
   );
   const [accessPin,          setAccessPin]          = useState("");
+  const [allowRevision,      setAllowRevision]      = useState(true);
   const [submitting,         setSubmitting]         = useState(false);
   const [error,              setError]              = useState<string | null>(null);
   const [projectCount,       setProjectCount]       = useState<number | null>(null);
@@ -126,6 +127,7 @@ export default function NewProjectPage() {
         shoot_type: shootType || null,
         customer_phone: customerPhone.trim() || null,
         access_pin: accessPin || null,
+        allow_revision: allowRevision,
       });
 
       await fetch("/api/photographer/project-logs", {
@@ -729,6 +731,52 @@ export default function NewProjectPage() {
               </div>
               <div style={{ fontSize:11, color:"#444", marginTop:8 }}>
                 설정 시 고객이 링크 접속 시 비밀번호를 입력해야 합니다 · 선택사항
+              </div>
+            </div>
+
+            {/* ── 재보정 허용 ── */}
+            <div style={{ borderTop:"1px solid #1a1a1a", paddingTop:28, marginTop:4 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:14 }}>
+                <label style={{ fontSize:14, fontWeight:700, color:"#ccc" }}>재보정 허용</label>
+                <span style={{ fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: ALLOW_REVISION</span>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:16 }}>
+                <button
+                  type="button"
+                  onClick={() => setAllowRevision(!allowRevision)}
+                  style={{
+                    display:"flex", alignItems:"center", gap:10,
+                    padding:"10px 16px", cursor:"pointer",
+                    background: allowRevision ? "rgba(255,77,0,0.08)" : "#0a0a0a",
+                    border: allowRevision ? "1px solid rgba(255,77,0,0.4)" : "1px solid #333",
+                    transition:"all 0.15s",
+                  }}
+                >
+                  <div style={{
+                    width:32, height:18, borderRadius:9,
+                    background: allowRevision ? "#FF4D00" : "#222",
+                    position:"relative", transition:"background 0.2s", flexShrink:0,
+                  }}>
+                    <div style={{
+                      position:"absolute", top:3, left: allowRevision ? 17 : 3,
+                      width:12, height:12, borderRadius:"50%",
+                      background:"#fff", transition:"left 0.2s",
+                    }} />
+                  </div>
+                  <span style={{
+                    fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:12,
+                    color: allowRevision ? "#FF4D00" : "#555",
+                    letterSpacing:"0.05em",
+                  }}>
+                    {allowRevision ? "ON" : "OFF"}
+                  </span>
+                </button>
+                <span style={{ fontSize:13, color: allowRevision ? "#aaa" : "#444" }}>
+                  {allowRevision ? "최대 2회 재보정이 가능합니다" : "재보정 없이 5단계로 진행됩니다"}
+                </span>
+              </div>
+              <div style={{ fontSize:11, color:"#444", marginTop:8 }}>
+                허용 시 고객이 보정본 검토 후 재보정을 요청할 수 있습니다 · 선택사항
               </div>
             </div>
 

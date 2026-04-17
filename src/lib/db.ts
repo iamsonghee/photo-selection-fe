@@ -13,6 +13,7 @@ function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Pr
   const ext = row as Database["public"]["Tables"]["projects"]["Row"] & {
     shoot_type?: string | null;
     customer_phone?: string | null;
+    allow_revision?: boolean | null;
   };
   return {
     id: row.id,
@@ -31,6 +32,7 @@ function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Pr
     confirmedAt: row.confirmed_at ?? undefined,
     deliveredAt: row.delivered_at ?? undefined,
     displayId: (row as any).display_id ?? undefined,
+    allowRevision: ext.allow_revision ?? true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -185,6 +187,7 @@ export async function createProject(params: {
   shoot_type?: string | null;
   customer_phone?: string | null;
   access_pin?: string | null;
+  allow_revision?: boolean;
 }): Promise<string> {
   const accessToken = crypto.randomUUID();
   const { data, error } = await supabase
@@ -199,6 +202,7 @@ export async function createProject(params: {
       status: "preparing",
       photographer_id: params.photographer_id,
       access_token: accessToken,
+      allow_revision: params.allow_revision ?? true,
       ...(params.shoot_type           ? { shoot_type: params.shoot_type } : {}),
       ...(params.customer_phone       ? { customer_phone: params.customer_phone } : {}),
       ...(params.access_pin           ? { access_pin: params.access_pin } : {}),
