@@ -103,7 +103,8 @@ function HeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
   const { active, counter, sync } = PHASES[phase];
 
   return (
-    <section className="relative z-10 w-full min-h-screen flex flex-col lg:flex-row items-center px-6 sm:px-12 lg:px-24 pt-24 lg:pt-0 overflow-hidden">
+    <section className="relative z-10 w-full min-h-screen overflow-hidden">
+      <div className="max-w-[1400px] mx-auto w-full min-h-screen flex flex-col lg:flex-row items-center px-6 sm:px-12 lg:px-24 pt-24 lg:pt-0">
       {/* ── Left ── */}
       <div className="flex-1 flex flex-col justify-center lg:pr-12 max-w-xl">
         <div className="mb-6 flex items-center gap-3">
@@ -218,6 +219,7 @@ function HeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
         >
           ACUT
         </div>
+      </div>
       </div>
     </section>
   );
