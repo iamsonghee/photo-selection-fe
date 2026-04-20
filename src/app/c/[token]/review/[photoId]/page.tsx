@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Check, RefreshCw, Maximize2 } from "lucide-r
 import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
 import FullScreenCompareModal from "@/components/FullScreenCompareModal";
+import type { ReviewPhotoItem } from "@/lib/customer-api-server";
 
 /* ── design tokens ── */
 const BG_BASE    = "#030303";
@@ -33,12 +34,14 @@ export default function ReviewViewerPage() {
   const photoId = params?.photoId as string;
 
   const { project, loading: selectionLoading } = useSelection();
-  const { reviewPhotos, loadReviewPhotos, reviewPhotosLoading, setReview, getReview } = useReview();
+  const { reviewPhotos, loadReviewPhotos, reviewPhotosLoading, reviewState, setReview, getReview, resetAll } = useReview();
 
   const [viewMode,         setViewMode]         = useState<ViewMode>("side-by-side");
   const [revisionComment,  setRevisionComment]  = useState("");
   const [fullOpen,         setFullOpen]         = useState(false);
   const [fullInitial,      setFullInitial]      = useState<"original" | "version">("original");
+  const [showSubmitModal,  setShowSubmitModal]  = useState(false);
+  const [submitError,      setSubmitError]      = useState<string | null>(null);
 
   useEffect(() => {
     if (!project?.id || !project?.status) return;
@@ -47,6 +50,14 @@ export default function ReviewViewerPage() {
 
   const photos       = reviewPhotos;
   const currentIndex = useMemo(() => photos.findIndex((p) => p.id === photoId), [photos, photoId]);
+
+  const total         = photos.length;
+  const approvedCount = useMemo(() => photos.filter((p) => getReview(p.id)?.status === "approved").length, [photos, reviewState]);
+  const revisionCount = useMemo(() => photos.filter((p) => getReview(p.id)?.status === "revision_requested").length, [photos, reviewState]);
+  const pendingCount  = total - approvedCount - revisionCount;
+  const reviewedCount = approvedCount + revisionCount;
+  const allReviewed   = total > 0 && pendingCount === 0;
+  const progressPct   = total > 0 ? Math.round((reviewedCount / total) * 100) : 0;
   const current      = currentIndex >= 0 ? photos[currentIndex] : null;
   const prevId       = currentIndex > 0 ? photos[currentIndex - 1]?.id : photos[photos.length - 1]?.id;
   const nextId       = currentIndex < photos.length - 1 && currentIndex >= 0 ? photos[currentIndex + 1]?.id : photos[0]?.id;
@@ -94,6 +105,34 @@ export default function ReviewViewerPage() {
     if (!current) return;
     setReview(current.id, "revision_requested", revisionComment || undefined);
   }, [current, revisionComment, setReview]);
+
+  const handleSubmit = useCallback(async () => {
+    if (!allReviewed || !token) return;
+    setSubmitError(null);
+    const hasRealIds = photos.some((p) => (p as ReviewPhotoItem).photoVersionId?.length > 0);
+    let finalStatus: string | null = null;
+    if (hasRealIds) {
+      const reviews = photos
+        .filter((p) => (p as ReviewPhotoItem).photoVersionId)
+        .map((p) => {
+          const rev = getReview(p.id);
+          return { photo_version_id: (p as ReviewPhotoItem).photoVersionId, photo_id: p.id, status: (rev?.status ?? "approved") as "approved" | "revision_requested", customer_comment: rev?.comment ?? null };
+        });
+      const res  = await fetch("/api/c/review/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, reviews }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setSubmitError((data && typeof data.error === "string" && data.error) || `서버 오류 (${res.status})`); return; }
+      finalStatus = typeof data?.status === "string" ? data.status : null;
+    } else {
+      const result = revisionCount > 0 ? "has_revision" : "all_approved";
+      const res  = await fetch("/api/c/review-submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, result }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setSubmitError((data && typeof data.error === "string" && data.error) || `서버 오류 (${res.status})`); return; }
+      finalStatus = typeof data?.status === "string" ? data.status : null;
+    }
+    resetAll();
+    if (finalStatus === "delivered") { window.location.replace(`/c/${token}/delivered`); return; }
+    window.location.replace(`/c/${token}/confirmed`);
+  }, [allReviewed, token, revisionCount, photos, getReview, resetAll]);
 
   /* ── guard states ── */
   if (selectionLoading || !project) {
@@ -257,11 +296,30 @@ export default function ReviewViewerPage() {
         ::-webkit-scrollbar-track { background: ${BG_BASE}; }
         ::-webkit-scrollbar-thumb { background: ${BORDER_HI}; }
 
+        .rv-btn-submit {
+          background: ${ACCENT}; color: #000; font-weight: 900;
+          font-family: ${MONO}; transition: all 0.3s ease;
+          clip-path: polygon(0 0, 100% 0, 100% 65%, 88% 100%, 0 100%);
+          border: none; cursor: pointer;
+          display: flex; align-items: center; gap: 10px;
+          padding: 0 28px; height: 48px; font-size: 14px; white-space: nowrap;
+        }
+        .rv-btn-submit:disabled { opacity: 0.4; cursor: not-allowed; background: #555; }
+        .rv-btn-submit:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(255,77,0,0.3); }
+
+        .rv-modal-bracket { position: absolute; width: 12px; height: 12px; border-color: ${ACCENT}; pointer-events: none; }
+        .rv-modal-b-tl { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
+        .rv-modal-b-tr { top: -1px; right: -1px; border-top: 2px solid; border-right: 2px solid; }
+        .rv-modal-b-bl { bottom: -1px; left: -1px; border-bottom: 2px solid; border-left: 2px solid; }
+        .rv-modal-b-br { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
+
         @media (max-width: 900px) {
           .rv-workspace { grid-template-columns: 1fr !important; grid-template-rows: auto 1fr auto; }
           .rv-panel-left { display: none !important; }
           .rv-panel-right { border-left: none !important; border-top: 1px solid ${BORDER} !important; max-height: 45vh; overflow-y: auto; }
           .rv-toolbar { overflow-x: auto; }
+          .rv-footer-meta { display: none !important; }
+          .rv-btn-submit { height: 40px !important; padding: 0 18px !important; font-size: 12px !important; }
         }
       `}</style>
 
@@ -580,6 +638,34 @@ export default function ReviewViewerPage() {
           </div>
         </div>
 
+        {/* ── Submit bottom bar ── */}
+        <footer style={{ flexShrink: 0, background: "#000", borderTop: `1px solid rgba(255,77,0,0.3)`, backdropFilter: "blur(12px)" }}>
+          <div style={{ height: 72, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                <span style={{ color: MUTED }}>보정본 검토</span>
+                <span style={{ color: ACCENT }}>{reviewedCount} / {total}장</span>
+              </div>
+              <div style={{ width: "100%", height: 3, background: "#111" }}>
+                <div style={{ height: "100%", background: ACCENT, width: `${progressPct}%`, transition: "width 0.3s" }} />
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 20, flexShrink: 0 }}>
+              <div className="rv-footer-meta" style={{ textAlign: "right" }}>
+                <p style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: allReviewed ? ACCENT : "rgba(255,255,255,0.35)", margin: 0, whiteSpace: "nowrap" }}>
+                  {allReviewed ? "검토 완료! 작가에게 전달해주세요" : `${pendingCount}장 미검토 남음`}
+                </p>
+              </div>
+              <button type="button" className="rv-btn-submit" disabled={!allReviewed} onClick={() => allReviewed && setShowSubmitModal(true)}>
+                <span>작가에게 전달</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                  <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </footer>
+
         {/* ── Footer status bar ── */}
         <div style={{
           height: 32, flexShrink: 0,
@@ -599,6 +685,51 @@ export default function ReviewViewerPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Submit Modal ── */}
+      {showSubmitModal && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(6px)", padding: 16 }}
+          onClick={() => setShowSubmitModal(false)}
+        >
+          <div
+            style={{ width: "100%", maxWidth: 440, background: BG_PANEL, border: `1px solid ${ACCENT}`, padding: 40, position: "relative" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="rv-modal-bracket rv-modal-b-tl" />
+            <div className="rv-modal-bracket rv-modal-b-tr" />
+            <div className="rv-modal-bracket rv-modal-b-bl" />
+            <div className="rv-modal-bracket rv-modal-b-br" />
+            <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 28, textTransform: "uppercase", fontStyle: "italic", marginBottom: 16, color: TEXT }}>
+              Submit Review
+            </h3>
+            <p style={{ color: MUTED, fontSize: 13, lineHeight: 1.7, marginBottom: 32 }}>
+              확정 <span style={{ color: GREEN, fontWeight: 700 }}>{approvedCount}장</span>,{" "}
+              재보정 요청 <span style={{ color: ORANGE, fontWeight: 700 }}>{revisionCount}장</span>을
+              작가에게 전달하시겠습니까?
+            </p>
+            {submitError && <p style={{ color: "#ef4444", fontSize: 12, marginBottom: 16 }}>{submitError}</p>}
+            <div style={{ display: "flex", gap: 12 }}>
+              <button
+                type="button"
+                onClick={() => { setShowSubmitModal(false); setSubmitError(null); }}
+                style={{ flex: 1, height: 48, border: `1px solid ${BORDER_HI}`, background: "none", color: MUTED, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: MONO, transition: "all 0.2s" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = TEXT; e.currentTarget.style.color = "#000"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = MUTED; }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={async () => { await handleSubmit(); }}
+                style={{ flex: 1, height: 48, background: ACCENT, color: "#000", fontSize: 13, fontWeight: 900, textTransform: "uppercase", border: "none", cursor: "pointer", fontFamily: MONO }}
+              >
+                전달하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <FullScreenCompareModal
         open={fullOpen}
