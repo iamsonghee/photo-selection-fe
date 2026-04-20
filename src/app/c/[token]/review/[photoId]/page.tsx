@@ -42,6 +42,15 @@ export default function ReviewViewerPage() {
   const [fullInitial,      setFullInitial]      = useState<"original" | "version">("original");
   const [showSubmitModal,  setShowSubmitModal]  = useState(false);
   const [submitError,      setSubmitError]      = useState<string | null>(null);
+  const [photographer,     setPhotographer]     = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`/api/c/photographer?token=${encodeURIComponent(token)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => data?.name && setPhotographer(data.name))
+      .catch(() => {});
+  }, [token]);
 
   useEffect(() => {
     if (!project?.id || !project?.status) return;
@@ -316,8 +325,8 @@ export default function ReviewViewerPage() {
         @media (max-width: 900px) {
           .rv-header-top { height: 56px !important; padding: 0 14px !important; }
           .rv-header-project-title { font-size: 15px !important; }
-          .rv-header-session { display: none !important; }
-          .rv-header-client-label { display: none !important; }
+          .rv-header-photographer { display: none !important; }
+          .rv-header-reviewed-label { display: none !important; }
           .rv-workspace { grid-template-columns: 1fr !important; grid-template-rows: auto 1fr auto; }
           .rv-panel-left { display: none !important; }
           .rv-panel-right { border-left: none !important; border-top: 1px solid ${BORDER} !important; max-height: 45vh; overflow-y: auto; }
@@ -357,25 +366,24 @@ export default function ReviewViewerPage() {
             </div>
 
             {/* Right */}
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <div className="rv-header-session" style={{ border: `1px solid ${BORDER}`, padding: "4px 10px", display: "flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 10, letterSpacing: "0.05em", color: MUTED, textTransform: "uppercase" }}>
-                <div style={{ width: 6, height: 6, borderRadius: "50%", background: GREEN }} />
-                SYS.SESSION_ACTIVE
-              </div>
-              <div style={{ width: 1, height: 24, background: BORDER }} />
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: MONO, fontSize: 12 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                <span className="rv-header-client-label" style={{ fontFamily: MONO, fontSize: 11, color: DIM }}>CLIENT</span>
-                <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: TEXT }}>{customerName}</span>
-              </div>
-              <div style={{
-                padding: "4px 12px", border: `1px solid ${statusBorder}`,
-                background: statusBg, color: statusColor,
-                fontFamily: MONO, fontSize: 10, letterSpacing: "0.05em", textTransform: "uppercase",
-                display: "flex", alignItems: "center", gap: 5,
-              }}>
-                {isApproved ? <Check size={10} /> : isRevision ? <RefreshCw size={10} /> : null}
-                {statusLabel}
+            <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
+              {photographer && (
+                <>
+                  <div className="rv-header-photographer" style={{ textAlign: "right" }}>
+                    <p style={{ fontFamily: MONO, fontSize: 10, color: DIM, textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>Photography by</p>
+                    <p style={{ fontWeight: 700, fontSize: 14, color: TEXT, marginTop: 2, fontFamily: "'Space Grotesk', sans-serif" }}>{photographer}</p>
+                  </div>
+                  <div className="rv-header-photographer" style={{ width: 1, height: 32, background: BORDER, flexShrink: 0 }} />
+                </>
+              )}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className="rv-header-reviewed-label" style={{ fontFamily: MONO, fontSize: 11, color: ACCENT, fontWeight: 700 }}>REVIEWED</span>
+                  <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 28, lineHeight: 1, color: TEXT }}>
+                    {reviewedCount}{" "}
+                    <span style={{ fontFamily: MONO, fontSize: 12, color: DIM, fontWeight: 400 }}>/ {total}</span>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -656,24 +664,6 @@ export default function ReviewViewerPage() {
           </div>
         </footer>
 
-        {/* ── Footer status bar ── */}
-        <div style={{
-          height: 32, flexShrink: 0,
-          borderTop: `1px solid ${BORDER}`,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "0 24px",
-          background: "#000", zIndex: 10,
-          fontFamily: MONO, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em",
-        }}>
-          <div style={{ color: MUTED }}>
-            V.1.2.0-CORE
-            <span style={{ marginLeft: 16 }}>SECURE_CONNECTION</span>
-          </div>
-          <div style={{ display: "flex", gap: 24, color: DIM }}>
-            <span>STREAM_ID: ASSET_{prjIdShort}</span>
-            <span style={{ color: MUTED }}>{currentIndex + 1} / {photos.length} ASSETS</span>
-          </div>
-        </div>
       </div>
 
       {/* ── Submit Modal ── */}
