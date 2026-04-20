@@ -109,7 +109,8 @@ export default function InvitePageClient() {
     const isV2              = project.status === "reviewing_v2";
     const revisionRemaining = Math.max(0, REVISION_LIMIT - (isV2 ? 1 : 0));
     const deadlineStr       = format(new Date(project.deadline), "yyyy.MM.dd", { locale: ko });
-    const reviewPath        = `/c/${token}/review`;
+    const firstPhotoId      = reviewData?.photos?.[0]?.id;
+    const reviewPath        = firstPhotoId ? `/c/${token}/review/${firstPhotoId}` : `/c/${token}/review`;
     const photographerName  = photographer?.name ?? "담당 작가";
     const prjIdShort        = project.id.replace(/-/g, "").slice(0, 8).toUpperCase();
     const MONO              = "'JetBrains Mono', 'Courier New', Courier, monospace";
