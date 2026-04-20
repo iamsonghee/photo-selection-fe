@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Check, RefreshCw, Maximize2 } from "lucide-react";
 import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
@@ -29,13 +29,13 @@ type ViewMode = "side-by-side" | "single-original" | "single-retouched";
 
 export default function ReviewViewerPage() {
   const params  = useParams();
-  const router  = useRouter();
   const token   = (params?.token as string) ?? "";
   const photoId = params?.photoId as string;
 
   const { project, loading: selectionLoading } = useSelection();
   const { reviewPhotos, loadReviewPhotos, reviewPhotosLoading, reviewState, setReview, getReview, resetAll } = useReview();
 
+  const [activePhotoId,    setActivePhotoId]    = useState(photoId);
   const [viewMode,         setViewMode]         = useState<ViewMode>("side-by-side");
   const [revisionComment,  setRevisionComment]  = useState("");
   const [fullOpen,         setFullOpen]         = useState(false);
@@ -43,6 +43,9 @@ export default function ReviewViewerPage() {
   const [showSubmitModal,  setShowSubmitModal]  = useState(false);
   const [submitError,      setSubmitError]      = useState<string | null>(null);
   const [photographer,     setPhotographer]     = useState<string | null>(null);
+
+  // URL 파라미터가 바뀔 때만 동기화 (브라우저 뒤로가기 등)
+  useEffect(() => { setActivePhotoId(photoId); }, [photoId]);
 
   useEffect(() => {
     if (!token) return;
@@ -58,7 +61,7 @@ export default function ReviewViewerPage() {
   }, [token, project?.id, project?.status, loadReviewPhotos]);
 
   const photos       = reviewPhotos;
-  const currentIndex = useMemo(() => photos.findIndex((p) => p.id === photoId), [photos, photoId]);
+  const currentIndex = useMemo(() => photos.findIndex((p) => p.id === activePhotoId), [photos, activePhotoId]);
 
   const total         = photos.length;
   const approvedCount = useMemo(() => photos.filter((p) => getReview(p.id)?.status === "approved").length, [photos, reviewState]);
@@ -81,8 +84,13 @@ export default function ReviewViewerPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id]);
 
-  const goPrev = useCallback(() => { if (prevId) router.push(`/c/${token}/review/${prevId}`); }, [token, prevId, router]);
-  const goNext = useCallback(() => { if (nextId) router.push(`/c/${token}/review/${nextId}`); }, [token, nextId, router]);
+  const navigate = useCallback((id: string) => {
+    setActivePhotoId(id);
+    window.history.replaceState(null, "", `/c/${token}/review/${id}`);
+  }, [token]);
+
+  const goPrev = useCallback(() => { if (prevId) navigate(prevId); }, [prevId, navigate]);
+  const goNext = useCallback(() => { if (nextId) navigate(nextId); }, [nextId, navigate]);
 
   let touchStartX = 0;
   const handleTouchStart = (e: React.TouchEvent) => { touchStartX = e.touches[0].clientX; };
@@ -441,7 +449,7 @@ export default function ReviewViewerPage() {
               {photos.map((p, i) => {
                 const pReview     = getReview(p.id);
                 const pStatus     = pReview?.status ?? "pending";
-                const isActive    = p.id === photoId;
+                const isActive    = p.id === activePhotoId;
                 const pApproved   = pStatus === "approved";
                 const pRevision   = pStatus === "revision_requested";
                 const pillColor   = pApproved ? GREEN : pRevision ? ORANGE : undefined;
@@ -451,7 +459,7 @@ export default function ReviewViewerPage() {
                   <div
                     key={p.id}
                     className={`rv-thumb-card${isActive ? " rv-active" : ""}`}
-                    onClick={() => router.push(`/c/${token}/review/${p.id}`)}
+                    onClick={() => navigate(p.id)}
                   >
                     {p.versionUrl
                       ? <img src={p.versionUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: isActive ? 1 : 0.6 }} />
