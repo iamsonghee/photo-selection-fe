@@ -181,12 +181,12 @@ export default function ReviewViewerPage() {
         </div>
       );
     }
-    return (
-      <div style={{ display: "flex", minHeight: "100vh", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, background: BG_BASE }}>
-        <p style={{ fontFamily: MONO, fontSize: 11, color: DIM }}>ASSET_NOT_FOUND</p>
-        <Link href={`/c/${token}/review`} style={{ fontFamily: MONO, fontSize: 11, color: ACCENT, border: `1px solid ${BORDER_HI}`, padding: "8px 16px", textDecoration: "none" }}>← BACK_TO_GALLERY</Link>
-      </div>
-    );
+    // photos loaded but ID mismatch — navigate to first photo
+    if (photos[0]) {
+      window.history.replaceState(null, "", `/c/${token}/review/${photos[0].id}`);
+      setActivePhotoId(photos[0].id);
+    }
+    return null;
   }
 
   const versionLabel      = `RETOUCHED_${project.status === "reviewing_v2" ? "V2" : "V1"}`;
