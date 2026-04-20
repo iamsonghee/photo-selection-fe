@@ -589,36 +589,38 @@ export default function ReviewViewerPage() {
 
             {/* Action buttons */}
             <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8, borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
-              <button type="button" className="rv-btn rv-btn-revision" onClick={handleRevisionToggle}
-                style={{
-                  width: "100%", height: 44, display: "flex", alignItems: "center", justifyContent: "center",
-                  fontFamily: MONO, fontSize: 12, fontWeight: 700, cursor: "pointer", border: "1px solid",
-                  gap: 8, letterSpacing: "0.03em", transition: "all 0.2s",
-                  background: isRevision ? "rgba(255,170,0,0.08)" : "transparent",
-                  color: isRevision ? ORANGE : TEXT,
-                  borderColor: isRevision ? "rgba(255,170,0,0.35)" : BORDER_HI,
-                }}>
-                <RefreshCw size={14} />
-                {isRevision ? "REVISION_REQUESTED ✓" : "재보정 요청 (REQUEST EDIT)"}
-              </button>
-              <button type="button" className="rv-btn rv-btn-approve" onClick={handleApprove}
-                style={{
-                  width: "100%", height: 44, display: "flex", alignItems: "center", justifyContent: "center",
-                  fontFamily: MONO, fontSize: 12, fontWeight: 700, cursor: "pointer", border: "1px solid",
-                  gap: 8, letterSpacing: "0.03em", transition: "all 0.2s",
-                  background: isApproved ? "rgba(0,255,102,0.15)" : ACCENT,
-                  color: isApproved ? GREEN : "#000",
-                  borderColor: isApproved ? "rgba(0,255,102,0.4)" : ACCENT,
-                }}>
-                <Check size={14} />
-                {isApproved ? "APPROVED ✓" : "현재 보정본 확정 (APPROVE)"}
-              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button" onClick={handleRevisionToggle}
+                  style={{
+                    flex: 1, height: 44, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontFamily: MONO, fontSize: 11, fontWeight: 700, cursor: "pointer", border: "1px solid",
+                    gap: 6, letterSpacing: "0.03em", transition: "all 0.2s",
+                    background: isRevision ? "rgba(255,170,0,0.1)" : "transparent",
+                    color: isRevision ? ORANGE : MUTED,
+                    borderColor: isRevision ? "rgba(255,170,0,0.4)" : BORDER_HI,
+                  }}>
+                  <RefreshCw size={13} />
+                  {isRevision ? "재보정 ✓" : "재보정"}
+                </button>
+                <button type="button" onClick={handleApprove}
+                  style={{
+                    flex: 1, height: 44, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontFamily: MONO, fontSize: 11, fontWeight: 700, cursor: "pointer", border: "1px solid",
+                    gap: 6, letterSpacing: "0.03em", transition: "all 0.2s",
+                    background: isApproved ? "rgba(0,255,102,0.15)" : "rgba(0,255,102,0.08)",
+                    color: GREEN,
+                    borderColor: isApproved ? "rgba(0,255,102,0.5)" : "rgba(0,255,102,0.25)",
+                  }}>
+                  <Check size={13} />
+                  {isApproved ? "APPROVED ✓" : "확정"}
+                </button>
+              </div>
 
               {/* Memo save (shown when revision) */}
               {isRevision && revisionComment && (
                 <button type="button" onClick={handleRevisionSave}
                   style={{
-                    width: "100%", height: 36, display: "flex", alignItems: "center", justifyContent: "center",
+                    width: "100%", height: 32, display: "flex", alignItems: "center", justifyContent: "center",
                     fontFamily: MONO, fontSize: 10, cursor: "pointer",
                     background: "transparent", border: `1px solid rgba(255,170,0,0.2)`,
                     color: ORANGE, letterSpacing: "0.03em", transition: "all 0.15s",
@@ -626,12 +628,6 @@ export default function ReviewViewerPage() {
                   SAVE_MEMO
                 </button>
               )}
-
-              {/* Back to gallery */}
-              <Link href={`/c/${token}/review`}
-                style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 32, fontFamily: MONO, fontSize: 10, color: DIM, textDecoration: "none", border: `1px solid ${BORDER}`, transition: "all 0.15s", gap: 5, letterSpacing: "0.03em" }}>
-                ← BACK_TO_GALLERY
-              </Link>
             </div>
           </div>
         </div>
