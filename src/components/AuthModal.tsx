@@ -467,6 +467,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
             width: 100%;
             max-width: 100%;
             border-bottom: none;
+            border-radius: 20px 20px 0 0;
+            margin-bottom: 0;
             animation: authModalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
           }
           .auth-modal-container.auth-modal-slide-out {
@@ -474,12 +476,27 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
           }
           .auth-modal-bracket-bl,
           .auth-modal-bracket-br { display: none; }
+          .auth-modal-bracket-tl { border-radius: 20px 0 0 0; }
+          .auth-modal-bracket-tr { border-radius: 0 20px 0 0; }
           .auth-modal-inner {
-            padding: 24px 24px 40px;
+            padding: 28px 24px calc(32px + env(safe-area-inset-bottom, 0px));
           }
           @keyframes authModalSlideUp {
             from { transform: translateY(100%); }
             to   { transform: translateY(0); }
+          }
+        }
+
+        /* 모바일 하단 드래그 핸들 힌트 */
+        @media (max-width: 600px) {
+          .auth-modal-container::before {
+            content: '';
+            display: block;
+            width: 36px;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            margin: 0 auto 4px;
           }
         }
       `}</style>

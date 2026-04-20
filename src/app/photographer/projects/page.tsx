@@ -188,21 +188,33 @@ export default function ProjectsPage() {
         .prj-search:focus { outline: none; border-color: rgba(255,77,0,0.4) !important; }
         .prj-search::placeholder { color: #333; }
         .prj-date:focus { outline: none; border-color: rgba(255,77,0,0.4) !important; }
+        .prj-status-select-mobile { display: none; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #222; }
         @media (max-width: 768px) {
           .prj-topbar { padding: 0 14px !important; flex-wrap: wrap; height: auto !important; gap: 10px; padding-top: max(12px, env(safe-area-inset-top)) !important; padding-bottom: 12px !important; }
           .prj-clock { display: none !important; }
-          .prj-filter-bar { flex-wrap: nowrap !important; overflow-x: auto; }
           .prj-date-group { display: none !important; }
+          .prj-tab-group { display: none !important; }
+          .prj-status-select-mobile { display: block !important; flex: 1; min-width: 0; }
+          .prj-sort-select { flex: 1 !important; margin-left: 0 !important; min-width: 0; }
+          .prj-filter-bar { flex-wrap: wrap !important; overflow-x: unset !important; }
+          .prj-search { flex: 1 1 100% !important; width: 100% !important; }
+          .prj-title-section { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; padding-bottom: 14px !important; }
+          .prj-stats-group { display: none !important; }
+          .prj-body { padding: 16px 14px 60px !important; }
           .prj-table th:nth-child(1),
           .prj-table td:nth-child(1),
+          .prj-table th:nth-child(5),
+          .prj-table td:nth-child(5),
           .prj-table th:nth-child(6),
           .prj-table td:nth-child(6),
           .prj-table th:nth-child(7),
           .prj-table td:nth-child(7) { display: none; }
-          .prj-table th, .prj-table td { padding: 10px 10px !important; font-size: 11px !important; }
+          .prj-table th, .prj-table td { padding: 10px 8px !important; font-size: 11px !important; }
+          .prj-table td:nth-child(2) { max-width: 110px !important; }
+          .prj-table td:nth-child(3) { max-width: 70px !important; overflow: hidden; text-overflow: ellipsis; }
         }
       `}</style>
 
@@ -290,10 +302,10 @@ export default function ProjectsPage() {
       </header>
 
       {/* ── 본문 ── */}
-      <div style={{ position: "relative", zIndex: 10, padding: "28px 28px 60px" }}>
+      <div className="prj-body" style={{ position: "relative", zIndex: 10, padding: "28px 28px 60px" }}>
 
         {/* 타이틀 + 통계 */}
-        <div style={{
+        <div className="prj-title-section" style={{
           display: "flex", justifyContent: "space-between", alignItems: "flex-end",
           borderBottom: "1px solid #222", paddingBottom: 20, marginBottom: 24,
         }}>
@@ -306,7 +318,7 @@ export default function ProjectsPage() {
             </div>
             <h1 style={{ fontSize: 22, fontWeight: 900, color: "#fff", margin: 0 }}>프로젝트 목록</h1>
           </div>
-          <div style={{ display: "flex", gap: 32 }}>
+          <div className="prj-stats-group" style={{ display: "flex", gap: 32 }}>
             <div style={{ textAlign: "right" }}>
               <div style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9, color: "#444", textTransform: "uppercase" }}>전체</div>
               <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>
@@ -417,8 +429,8 @@ export default function ProjectsPage() {
             </div>
           </div>
 
-          {/* 탭 필터 버튼 */}
-          <div style={{ display: "flex", gap: 1 }}>
+          {/* 탭 필터 버튼 (데스크탑) */}
+          <div className="prj-tab-group" style={{ display: "flex", gap: 1 }}>
             {TABS.map((tab) => (
               <button
                 key={tab.key}
@@ -438,8 +450,27 @@ export default function ProjectsPage() {
             ))}
           </div>
 
+          {/* 상태 필터 셀렉트 (모바일 전용) */}
+          <select
+            className="prj-status-select-mobile"
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value as typeof activeTab)}
+            style={{
+              background: "#000", border: "1px solid #1a1a1a",
+              padding: "7px 10px", fontSize: 12, color: "#aaa",
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", cursor: "pointer",
+            }}
+          >
+            {TABS.map((tab) => (
+              <option key={tab.key} value={tab.key}>
+                {tab.label} ({tab.count})
+              </option>
+            ))}
+          </select>
+
           {/* 정렬 */}
           <select
+            className="prj-sort-select"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
             style={{

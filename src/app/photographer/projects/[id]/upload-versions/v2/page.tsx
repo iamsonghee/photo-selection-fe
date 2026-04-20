@@ -857,45 +857,6 @@ export default function UploadVersionsV2Page() {
             </div>
           </section>
 
-          {/* PHOTOGRAPHER_MEMO */}
-          <div
-            style={{
-              padding: "16px 20px",
-              flexShrink: 0,
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              background: SURFACE_1,
-              borderBottom: `1px solid ${BORDER}`,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <MessageSquare size={14} color="#666" strokeWidth={2} />
-              <span className="ph-uv-tech-label" style={{ color: "#888" }}>
-                PHOTOGRAPHER_MEMO
-              </span>
-            </div>
-            <textarea
-              className="ph-uv-memo"
-              value={globalMemo}
-              onChange={(e) => setGlobalMemo(e.target.value)}
-              placeholder="고객 검토 화면에 표시될 메모 (선택)"
-              disabled={isReadOnly}
-              rows={3}
-              style={{
-                width: "100%",
-                height: 72,
-                minHeight: 72,
-                maxHeight: 72,
-                boxSizing: "border-box",
-                padding: "8px 10px",
-                fontFamily: MONO,
-                fontSize: 11,
-                lineHeight: 1.45,
-                resize: "none",
-              }}
-            />
-          </div>
 
           {/* Customer review results */}
           <div
@@ -1540,11 +1501,37 @@ export default function UploadVersionsV2Page() {
           >
             <div style={{ position: "absolute", top: -1, left: -1, width: 28, height: 2, background: ACCENT }} />
             <h3 style={{ fontFamily: DISPLAY, fontSize: 17, fontWeight: 700, color: TEXT_BRIGHT, marginBottom: 10 }}>고객에게 전달</h3>
-            <p style={{ fontSize: 13, color: TEXT_NORMAL, lineHeight: 1.65, marginBottom: 24 }}>
+            <p style={{ fontSize: 13, color: TEXT_NORMAL, lineHeight: 1.65, marginBottom: 20 }}>
               v2 재보정본 {mappedCount}장을 고객에게 전달하시겠습니까?
               <br />
               전달 후 고객이 v2 최종 검토를 진행합니다.
             </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <MessageSquare size={13} color="#666" strokeWidth={2} />
+              <span className="ph-uv-tech-label" style={{ color: "#666", fontSize: "0.6rem" }}>
+                PHOTOGRAPHER_MEMO
+              </span>
+            </div>
+            <textarea
+              className="ph-uv-memo"
+              value={globalMemo}
+              onChange={(e) => setGlobalMemo(e.target.value)}
+              placeholder="고객 검토 화면에 표시될 메모 (선택)"
+              rows={3}
+              style={{
+                width: "100%",
+                height: 72,
+                minHeight: 72,
+                maxHeight: 120,
+                boxSizing: "border-box",
+                padding: "8px 10px",
+                fontFamily: MONO,
+                fontSize: 11,
+                lineHeight: 1.45,
+                resize: "vertical",
+                marginBottom: 20,
+              }}
+            />
             {error && <p style={{ marginBottom: 12, fontSize: 12, color: "#f87171", fontFamily: MONO }}>{error}</p>}
             <div className="ph-uv-modal-actions" style={{ display: "flex", gap: 10 }}>
               <button

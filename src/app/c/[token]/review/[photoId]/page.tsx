@@ -3,40 +3,42 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight, Check, RefreshCw, Maximize2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, RefreshCw, Maximize2 } from "lucide-react";
 import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
 import FullScreenCompareModal from "@/components/FullScreenCompareModal";
-import { PHOTOGRAPHER_THEME as T, PS_DISPLAY } from "@/lib/photographer-theme";
-import { BrandLogoBar } from "@/components/BrandLogo";
 
-/* ── design tokens ──────────────────────────── */
-const SURFACE = T.surface;
-const SURFACE2 = T.surface2;
-const SURFACE3 = T.surface3;
-const STEEL = T.steel;
-const GREEN = T.green;
-const GREEN_DIM = T.greenDim;
-const ORANGE = T.orange;
-const DIM = T.dim;
-const MUTED = T.muted;
-const TEXT = T.text;
-const BORDER = T.border;
-const BORDER_MD = T.borderMd;
+/* ── design tokens ── */
+const BG_BASE    = "#030303";
+const BG_PANEL   = "#0a0a0a";
+const BG_INPUT   = "#111111";
+const BORDER     = "#222222";
+const BORDER_HI  = "#333333";
+const TEXT       = "#ffffff";
+const MUTED      = "#888888";
+const DIM        = "#555555";
+const ACCENT     = "#ff4d00";
+const ACCENT_HO  = "#e64500";
+const ACCENT_DIM = "rgba(255,77,0,0.1)";
+const GREEN      = "#00ff66";
+const ORANGE     = "#ffaa00";
+const MONO       = "'JetBrains Mono', 'Space Mono', monospace";
 
-const playfair: React.CSSProperties = { fontFamily: PS_DISPLAY };
-const panelLabel: React.CSSProperties = {
-  fontSize: 10, fontWeight: 600, letterSpacing: 1,
-  textTransform: "uppercase", color: DIM, marginBottom: 10,
-};
+type ViewMode = "side-by-side" | "single-original" | "single-retouched";
 
 export default function ReviewViewerPage() {
   const params  = useParams();
   const router  = useRouter();
   const token   = (params?.token as string) ?? "";
   const photoId = params?.photoId as string;
-  const { project, loading: selectionLoading }                                                 = useSelection();
-  const { reviewPhotos, loadReviewPhotos, reviewPhotosLoading, setReview, getReview }          = useReview();
+
+  const { project, loading: selectionLoading } = useSelection();
+  const { reviewPhotos, loadReviewPhotos, reviewPhotosLoading, setReview, getReview } = useReview();
+
+  const [viewMode,         setViewMode]         = useState<ViewMode>("side-by-side");
+  const [revisionComment,  setRevisionComment]  = useState("");
+  const [fullOpen,         setFullOpen]         = useState(false);
+  const [fullInitial,      setFullInitial]      = useState<"original" | "version">("original");
 
   useEffect(() => {
     if (!project?.id || !project?.status) return;
@@ -46,13 +48,13 @@ export default function ReviewViewerPage() {
   const photos       = reviewPhotos;
   const currentIndex = useMemo(() => photos.findIndex((p) => p.id === photoId), [photos, photoId]);
   const current      = currentIndex >= 0 ? photos[currentIndex] : null;
-  const prevId       = currentIndex > 0 ? photos[currentIndex - 1].id : photos[photos.length - 1]?.id;
-  const nextId       = currentIndex < photos.length - 1 && currentIndex >= 0 ? photos[currentIndex + 1].id : photos[0]?.id;
+  const prevId       = currentIndex > 0 ? photos[currentIndex - 1]?.id : photos[photos.length - 1]?.id;
+  const nextId       = currentIndex < photos.length - 1 && currentIndex >= 0 ? photos[currentIndex + 1]?.id : photos[0]?.id;
 
-  const review = current ? getReview(current.id) : null;
-  const [revisionComment, setRevisionComment] = useState(review?.comment ?? "");
-  const [fullOpen,   setFullOpen]   = useState(false);
-  const [fullInitial, setFullInitial] = useState<"original" | "version">("original");
+  const review     = current ? getReview(current.id) : null;
+  const status     = review?.status ?? "pending";
+  const isApproved = status === "approved";
+  const isRevision = status === "revision_requested";
 
   useEffect(() => {
     if (current) setRevisionComment(review?.comment ?? "");
@@ -62,7 +64,6 @@ export default function ReviewViewerPage() {
   const goPrev = useCallback(() => { if (prevId) router.push(`/c/${token}/review/${prevId}`); }, [token, prevId, router]);
   const goNext = useCallback(() => { if (nextId) router.push(`/c/${token}/review/${nextId}`); }, [token, nextId, router]);
 
-  /* touch swipe */
   let touchStartX = 0;
   const handleTouchStart = (e: React.TouchEvent) => { touchStartX = e.touches[0].clientX; };
   const handleTouchEnd   = (e: React.TouchEvent) => {
@@ -70,7 +71,6 @@ export default function ReviewViewerPage() {
     if (Math.abs(diff) > 50) { diff > 0 ? goNext() : goPrev(); }
   };
 
-  /* keyboard nav */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft")  { e.preventDefault(); goPrev(); }
@@ -95,11 +95,13 @@ export default function ReviewViewerPage() {
     setReview(current.id, "revision_requested", revisionComment || undefined);
   }, [current, revisionComment, setReview]);
 
-  /* ── guard states ───────────────────────────── */
+  /* ── guard states ── */
   if (selectionLoading || !project) {
     return (
-      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#0a0a0a" }}>
-        <p style={{ fontSize: 13, color: MUTED }}>{selectionLoading ? "로딩 중…" : "존재하지 않는 초대 링크입니다."}</p>
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: BG_BASE }}>
+        <p style={{ fontFamily: MONO, fontSize: 11, color: DIM, letterSpacing: "0.1em" }}>
+          {selectionLoading ? "LOADING…" : "INVALID_TOKEN"}
+        </p>
       </div>
     );
   }
@@ -107,8 +109,10 @@ export default function ReviewViewerPage() {
   const canShowReview = project.status === "reviewing_v1" || project.status === "reviewing_v2";
   if (!canShowReview) {
     return (
-      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#0a0a0a" }}>
-        <Link href={`/c/${token}/confirmed`} style={{ fontSize: 13, color: MUTED, border: `1px solid ${BORDER_MD}`, borderRadius: 10, padding: "8px 16px", textDecoration: "none" }}>확정 페이지로</Link>
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: BG_BASE }}>
+        <Link href={`/c/${token}/confirmed`} style={{ fontFamily: MONO, fontSize: 11, color: MUTED, border: `1px solid ${BORDER_HI}`, padding: "8px 16px", textDecoration: "none" }}>
+          BACK_TO_CONFIRMED
+        </Link>
       </div>
     );
   }
@@ -116,456 +120,482 @@ export default function ReviewViewerPage() {
   if (!current) {
     if (reviewPhotosLoading || photos.length === 0) {
       return (
-        <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#0a0a0a" }}>
-          <p style={{ fontSize: 13, color: MUTED }}>불러오는 중...</p>
+        <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: BG_BASE }}>
+          <p style={{ fontFamily: MONO, fontSize: 11, color: DIM, letterSpacing: "0.1em" }}>LOADING_ASSETS…</p>
         </div>
       );
     }
     return (
-      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#0a0a0a" }}>
-        <div style={{ textAlign: "center" }}>
-          <p style={{ fontSize: 13, color: MUTED, marginBottom: 16 }}>사진을 찾을 수 없습니다.</p>
-          <Link href={`/c/${token}/review`} style={{ fontSize: 13, color: MUTED, border: `1px solid ${BORDER_MD}`, borderRadius: 10, padding: "8px 16px", textDecoration: "none" }}>목록으로</Link>
-        </div>
+      <div style={{ display: "flex", minHeight: "100vh", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, background: BG_BASE }}>
+        <p style={{ fontFamily: MONO, fontSize: 11, color: DIM }}>ASSET_NOT_FOUND</p>
+        <Link href={`/c/${token}/review`} style={{ fontFamily: MONO, fontSize: 11, color: ACCENT, border: `1px solid ${BORDER_HI}`, padding: "8px 16px", textDecoration: "none" }}>← BACK_TO_GALLERY</Link>
       </div>
     );
   }
 
+  const versionLabel      = `RETOUCHED_${project.status === "reviewing_v2" ? "V2" : "V1"}`;
   const revisionRemaining = project.status === "reviewing_v2" ? 1 : 2;
-  const versionLabel      = `보정본 ${project.status === "reviewing_v2" ? "v2" : "v1"}`;
-  const status     = review?.status ?? "pending";
-  const isApproved = status === "approved";
-  const isRevision = status === "revision_requested";
+  const prjIdShort        = project.id.replace(/-/g, "").slice(0, 8).toUpperCase();
+  const customerName      = project.customerName || "CLIENT";
+
+  const statusColor  = isApproved ? GREEN : isRevision ? ORANGE : DIM;
+  const statusBg     = isApproved ? "rgba(0,255,102,0.1)" : isRevision ? "rgba(255,170,0,0.1)" : "rgba(255,255,255,0.04)";
+  const statusBorder = isApproved ? "rgba(0,255,102,0.3)" : isRevision ? "rgba(255,170,0,0.3)" : BORDER_HI;
+  const statusLabel  = isApproved ? "APPROVED" : isRevision ? "REVISION" : "PENDING";
+
+  const showOriginal  = viewMode === "side-by-side" || viewMode === "single-original";
+  const showRetouched = viewMode === "side-by-side" || viewMode === "single-retouched";
 
   return (
-    <div
-      className="c-review-photo-page"
-      style={{
-        background: "#0a0a0a",
-        height: "100vh",
-        minHeight: "100dvh",
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        color: TEXT,
-        minWidth: 0,
-        boxSizing: "border-box",
-      }}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
+    <>
       <style>{`
-        @media (max-width: 768px) {
-          .c-review-photo-page {
-            padding-top: env(safe-area-inset-top, 0px);
-            height: 100dvh;
-            max-height: 100dvh;
-          }
-          .c-review-topbar {
-            height: auto !important;
-            min-height: 48px;
-            flex-wrap: wrap !important;
-            gap: 8px !important;
-            row-gap: 6px !important;
-            padding: 8px 10px !important;
-            padding-left: max(10px, env(safe-area-inset-left, 0px)) !important;
-            padding-right: max(10px, env(safe-area-inset-right, 0px)) !important;
-            align-items: center !important;
-          }
-          .c-review-topbar-left {
-            min-width: 0 !important;
-          }
-          .c-review-topbar-nav button {
-            min-width: 44px !important;
-            min-height: 44px !important;
-            width: 44px !important;
-            height: 44px !important;
-          }
-          .c-review-main {
-            display: flex !important;
-            flex-direction: column !important;
-            flex: 1 1 auto !important;
-            min-height: 0 !important;
-            overflow: hidden !important;
-            grid-template-columns: 1fr !important;
-          }
-          .c-review-compare {
-            display: grid !important;
-            grid-template-columns: 1fr !important;
-            grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) !important;
-            flex: 1 1 52% !important;
-            min-height: 0 !important;
-            max-height: 52vh !important;
-          }
-          .c-review-compare-hint {
-            display: none !important;
-          }
-          .c-review-fs-btn {
-            width: 40px !important;
-            height: 40px !important;
-            min-width: 40px !important;
-            min-height: 40px !important;
-          }
-          .c-review-panel {
-            flex: 1 1 auto !important;
-            min-height: 0 !important;
-            max-height: none !important;
-            border-left: none !important;
-            border-top: 1px solid ${BORDER} !important;
-            overflow-x: hidden !important;
-            overflow-y: auto !important;
-            -webkit-overflow-scrolling: touch;
-          }
-          .c-review-panel .c-review-actions {
-            grid-template-columns: 1fr !important;
-            gap: 10px !important;
-          }
-          .c-review-panel .c-review-actions button {
-            min-height: 48px !important;
-            width: 100% !important;
-          }
-          .c-review-panel-nav {
-            flex-wrap: wrap !important;
-            gap: 8px !important;
-            padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px)) !important;
-          }
-          .c-review-panel-nav button {
-            min-height: 44px !important;
-            flex: 1 1 calc(50% - 4px);
-          }
-          .c-review-panel-nav a {
-            flex: 1 1 100%;
-            text-align: center;
-            padding: 10px 0;
-          }
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+        html, body { overflow: hidden; }
+
+        .rv-workspace {
+          display: grid;
+          grid-template-columns: 260px 1fr 320px;
+          flex: 1;
+          overflow: hidden;
+        }
+
+        .rv-thumb-card {
+          aspect-ratio: 1;
+          border: 1px solid ${BORDER};
+          position: relative;
+          background: ${BG_INPUT};
+          cursor: pointer;
+          transition: border-color 0.2s;
+          overflow: hidden;
+        }
+        .rv-thumb-card:hover { border-color: ${BORDER_HI}; }
+        .rv-thumb-card.rv-active { border-color: ${ACCENT}; }
+
+        .rv-btn-icon {
+          background: transparent;
+          border: none;
+          color: ${MUTED};
+          padding: 8px 12px;
+          cursor: pointer;
+          border-right: 1px solid ${BORDER};
+          font-family: ${MONO};
+          font-size: 11px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          transition: all 0.15s;
+          white-space: nowrap;
+        }
+        .rv-btn-icon:last-child { border-right: none; }
+        .rv-btn-icon:hover { color: ${TEXT}; background: rgba(255,255,255,0.05); }
+        .rv-btn-icon.rv-active { color: ${ACCENT}; background: ${ACCENT_DIM}; }
+
+        .rv-tool-group {
+          display: flex;
+          align-items: center;
+          border: 1px solid ${BORDER};
+        }
+
+        .rv-section-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 12px;
+          font-family: ${MONO};
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: ${DIM};
+        }
+        .rv-section-title::before {
+          content: '';
+          width: 3px;
+          height: 10px;
+          background: ${BORDER_HI};
+          flex-shrink: 0;
+        }
+
+        .rv-meta-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+        .rv-meta-item { display: flex; flex-direction: column; gap: 3px; }
+        .rv-meta-label { font-family: ${MONO}; font-size: 9px; color: ${DIM}; text-transform: uppercase; letter-spacing: 0.05em; }
+        .rv-meta-value { font-family: ${MONO}; font-size: 11px; color: ${TEXT}; }
+
+        .rv-btn {
+          width: 100%;
+          height: 44px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: ${MONO};
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          border: 1px solid;
+          transition: all 0.2s;
+          letter-spacing: 0.03em;
+          gap: 8px;
+        }
+        .rv-btn-approve {
+          background: ${ACCENT};
+          color: #000;
+          border-color: ${ACCENT};
+        }
+        .rv-btn-approve:hover { background: ${ACCENT_HO}; border-color: ${ACCENT_HO}; }
+        .rv-btn-revision {
+          background: transparent;
+          color: ${TEXT};
+          border-color: ${BORDER_HI};
+        }
+        .rv-btn-revision:hover { border-color: ${MUTED}; background: rgba(255,255,255,0.02); }
+
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: ${BG_BASE}; }
+        ::-webkit-scrollbar-thumb { background: ${BORDER_HI}; }
+
+        @media (max-width: 900px) {
+          .rv-workspace { grid-template-columns: 1fr !important; grid-template-rows: auto 1fr auto; }
+          .rv-panel-left { display: none !important; }
+          .rv-panel-right { border-left: none !important; border-top: 1px solid ${BORDER} !important; max-height: 45vh; overflow-y: auto; }
+          .rv-toolbar { overflow-x: auto; }
         }
       `}</style>
-      {/* ══ Topbar ══════════════════════════════ */}
-      <div className="c-review-topbar" style={{
-        height: 48, flexShrink: 0,
-        background: "rgba(13,30,40,0.95)", backdropFilter: "blur(12px)",
-        borderBottom: `1px solid ${BORDER}`,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 16px", zIndex: 50,
-      }}>
-        {/* Left: logo + divider + back */}
-        <div className="c-review-topbar-left" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
-          <span style={{ width: 1, height: 16, background: BORDER, display: "inline-block" }} />
-          <Link href={`/c/${token}/review`}
-            style={{
-              display: "flex", alignItems: "center", gap: 4,
-              padding: "4px 10px", borderRadius: 6,
-              border: `1px solid ${BORDER}`, background: "transparent",
-              color: MUTED, fontSize: 12, textDecoration: "none",
-            }}>
-            <ArrowLeft style={{ width: 12, height: 12 }} />
-            검토 목록
-          </Link>
-        </div>
 
-        {/* Center: counter + status badge */}
-        <div className="c-review-topbar-center" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 12, color: MUTED }}>{currentIndex + 1} / {photos.length}</span>
-          {isApproved ? (
-            <span style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              padding: "3px 9px", borderRadius: 20, fontSize: 11, fontWeight: 500,
-              background: GREEN_DIM, color: GREEN, border: "1px solid rgba(46,213,115,0.3)",
-            }}>
-              <Check style={{ width: 10, height: 10 }} /> 확정
-            </span>
-          ) : isRevision ? (
-            <span style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              padding: "3px 9px", borderRadius: 20, fontSize: 11, fontWeight: 500,
-              background: "rgba(245,166,35,0.1)", color: ORANGE, border: "1px solid rgba(245,166,35,0.3)",
-            }}>
-              <RefreshCw style={{ width: 10, height: 10 }} /> 재보정
-            </span>
-          ) : (
-            <span style={{
-              display: "inline-block",
-              padding: "3px 9px", borderRadius: 20, fontSize: 11, fontWeight: 500,
-              background: SURFACE3, color: MUTED, border: `1px solid ${BORDER}`,
-            }}>
-              미검토
-            </span>
-          )}
-        </div>
-
-        {/* Right: prev / next */}
-        <div className="c-review-topbar-nav" style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          <button type="button" onClick={goPrev}
-            style={{
-              width: 32, height: 32, borderRadius: 8,
-              border: `1px solid ${BORDER}`, background: "transparent", color: MUTED,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", transition: "all 0.15s",
-            }}>
-            <ChevronLeft style={{ width: 16, height: 16 }} />
-          </button>
-          <button type="button" onClick={goNext}
-            style={{
-              width: 32, height: 32, borderRadius: 8,
-              border: `1px solid ${BORDER}`, background: "transparent", color: MUTED,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", transition: "all 0.15s",
-            }}>
-            <ChevronRight style={{ width: 16, height: 16 }} />
-          </button>
-        </div>
-      </div>
-
-      {/* ══ Main body ═══════════════════════════ */}
       <div
-        className="c-review-main"
-        style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 300px", overflow: "hidden", minHeight: 0, minWidth: 0 }}
+        style={{
+          background: BG_BASE, height: "100vh", display: "flex", flexDirection: "column",
+          color: TEXT, overflow: "hidden",
+          backgroundImage: `linear-gradient(#161616 1px, transparent 1px), linear-gradient(90deg, #161616 1px, transparent 1px)`,
+          backgroundSize: "40px 40px",
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
-
-        {/* Left: compare area */}
-        <div
-          className="c-review-compare"
-          style={{
-            display: "grid", gridTemplateColumns: "1fr 1fr",
-            gap: 1, background: BORDER,
-            overflow: "hidden", position: "relative",
-            minHeight: 0,
-          }}
-        >
-
-          {/* Original */}
-          <div style={{ background: "#0a0a0a", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
-            <span style={{
-              position: "absolute", top: 10, left: 10, zIndex: 2,
-              padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600,
-              backdropFilter: "blur(8px)",
-              background: "rgba(0,0,0,0.6)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.12)",
-            }}>원본</span>
-            <div
-              onClick={() => { setFullInitial("original"); setFullOpen(true); }}
-              style={{
-                flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: "pointer", background: "linear-gradient(135deg,#0f1a22,#080f14)",
-                overflow: "hidden", transition: "opacity 0.15s",
-              }}>
-              {current.originalUrl
-                ? <img src={current.originalUrl} alt="원본" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
-                : <span style={{ fontSize: 13, color: DIM }}>원본 없음</span>
-              }
-            </div>
-            <button type="button" onClick={() => { setFullInitial("original"); setFullOpen(true); }}
-              className="c-review-fs-btn"
-              style={{
-                position: "absolute", bottom: 10, right: 10, zIndex: 2,
-                width: 28, height: 28, borderRadius: 6,
-                background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.12)",
-                color: "rgba(255,255,255,0.5)", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-              <Maximize2 style={{ width: 13, height: 13 }} />
-            </button>
-            <span
-              className="c-review-compare-hint"
-              style={{
-                position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)",
-                fontSize: 10, color: "rgba(255,255,255,0.3)",
-                background: "rgba(0,0,0,0.4)", padding: "3px 10px", borderRadius: 20,
-                whiteSpace: "nowrap", pointerEvents: "none", zIndex: 1,
-              }}
-            >클릭하면 풀스크린</span>
-          </div>
-
-          {/* Retouched */}
-          <div style={{ background: "#0a0a0a", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
-            <span style={{
-              position: "absolute", top: 10, left: 10, zIndex: 2,
-              padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600,
-              backdropFilter: "blur(8px)",
-              background: "rgba(79,126,255,0.2)", color: STEEL, border: "1px solid rgba(79,126,255,0.3)",
-            }}>{versionLabel}</span>
-            <div
-              onClick={() => { setFullInitial("version"); setFullOpen(true); }}
-              style={{
-                flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: "pointer", background: "linear-gradient(135deg,#0f1a22,#080f14)",
-                overflow: "hidden", transition: "opacity 0.15s",
-              }}>
-              {current.versionUrl
-                ? <img src={current.versionUrl} alt={versionLabel} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
-                : <span style={{ fontSize: 13, color: DIM }}>보정본 없음</span>
-              }
-            </div>
-            <button type="button" onClick={() => { setFullInitial("version"); setFullOpen(true); }}
-              className="c-review-fs-btn"
-              style={{
-                position: "absolute", bottom: 10, right: 10, zIndex: 2,
-                width: 28, height: 28, borderRadius: 6,
-                background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.12)",
-                color: "rgba(255,255,255,0.5)", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-              <Maximize2 style={{ width: 13, height: 13 }} />
-            </button>
-            <span
-              className="c-review-compare-hint"
-              style={{
-                position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)",
-                fontSize: 10, color: "rgba(255,255,255,0.3)",
-                background: "rgba(0,0,0,0.4)", padding: "3px 10px", borderRadius: 20,
-                whiteSpace: "nowrap", pointerEvents: "none", zIndex: 1,
-              }}
-            >클릭하면 풀스크린</span>
-          </div>
-        </div>
-
-        {/* Right: action panel */}
-        <div
-          className="c-review-panel"
-          style={{
-            background: SURFACE, borderLeft: `1px solid ${BORDER}`,
-            display: "flex", flexDirection: "column", overflowY: "auto",
-            minHeight: 0,
-            minWidth: 0,
-          }}
-        >
-
-          {/* File info */}
-          <div style={{ padding: 16, borderBottom: `1px solid ${BORDER}` }}>
-            <div style={panelLabel}>파일 정보</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, wordBreak: "break-all", lineHeight: 1.4, color: TEXT }}>{current.originalFilename}</div>
-              <div style={{ fontSize: 11, color: DIM }}>원본 선택 사진 · {currentIndex + 1}번째</div>
+        {/* ── Header ── */}
+        <header style={{
+          height: 56, flexShrink: 0,
+          borderBottom: `1px solid ${BORDER}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "0 24px",
+          background: "rgba(10,10,10,0.85)", backdropFilter: "blur(10px)",
+          zIndex: 10,
+        }}>
+          {/* Left */}
+          <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+            <Link href={`/c/${token}`} style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: 18, letterSpacing: "-0.02em", color: TEXT }}>
+              <div style={{ background: ACCENT, color: "#000", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800 }}>A</div>
+              A-CUT.
+            </Link>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: 24, borderLeft: `1px solid ${BORDER}`, fontFamily: MONO, fontSize: 12, color: MUTED }}>
+              <span style={{ color: DIM }}>UID ::</span>
+              <span>PRJ-{prjIdShort}</span>
+              <span style={{ color: TEXT, marginLeft: 8 }}>{project.name} — 보정 검토</span>
             </div>
           </div>
 
-          {/* Revision quota */}
-          <div style={{ padding: 16, borderBottom: `1px solid ${BORDER}` }}>
-            <div style={panelLabel}>재보정 횟수</div>
-            <div style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "7px 10px", background: SURFACE2,
-              border: `1px solid ${BORDER}`, borderRadius: 7,
-              fontSize: 11, color: MUTED,
-            }}>
-              <div style={{ display: "flex", gap: 3 }}>
-                {Array.from({ length: 2 }).map((_, i) => {
-                  const used = i < (2 - revisionRemaining);
-                  return (
-                    <span key={i} style={{
-                      width: 8, height: 8, borderRadius: "50%", display: "inline-block",
-                      background: used ? ORANGE : SURFACE3,
-                      border: used ? "none" : `1px solid ${BORDER}`,
-                    }} />
-                  );
-                })}
+          {/* Right */}
+          <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+            <div style={{ border: `1px solid ${BORDER}`, padding: "4px 10px", display: "flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 10, letterSpacing: "0.05em", color: MUTED, textTransform: "uppercase" }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: GREEN }} />
+              SYS.SESSION_ACTIVE
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: MONO, fontSize: 12 }}>
+              <div style={{ width: 24, height: 24, border: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </div>
-              <span>재보정 {revisionRemaining}회 남음 (최대 2회)</span>
+              <span style={{ color: DIM }}>CLIENT ::</span>
+              <span>{customerName}</span>
+            </div>
+            {/* Status badge */}
+            <div style={{
+              padding: "4px 10px", border: `1px solid ${statusBorder}`,
+              background: statusBg, color: statusColor,
+              fontFamily: MONO, fontSize: 10, letterSpacing: "0.05em", textTransform: "uppercase",
+              display: "flex", alignItems: "center", gap: 5,
+            }}>
+              {isApproved ? <Check size={10} /> : isRevision ? <RefreshCw size={10} /> : null}
+              {statusLabel}
+            </div>
+          </div>
+        </header>
+
+        {/* ── Workspace ── */}
+        <div className="rv-workspace">
+
+          {/* Left panel: thumbnail gallery */}
+          <div className="rv-panel-left" style={{ borderRight: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", background: "rgba(3,3,3,0.95)" }}>
+            <div style={{ padding: "10px 14px", borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: MONO, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <span>BATCH_01</span>
+              <span style={{ color: MUTED }}>{photos.length} ITEMS</span>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, alignContent: "start" }}>
+              {photos.map((p, i) => {
+                const pReview     = getReview(p.id);
+                const pStatus     = pReview?.status ?? "pending";
+                const isActive    = p.id === photoId;
+                const pApproved   = pStatus === "approved";
+                const pRevision   = pStatus === "revision_requested";
+                const pillColor   = pApproved ? GREEN : pRevision ? ORANGE : undefined;
+                const pillLabel   = pApproved ? "APPROVED" : pRevision ? "REVISION" : null;
+
+                return (
+                  <div
+                    key={p.id}
+                    className={`rv-thumb-card${isActive ? " rv-active" : ""}`}
+                    onClick={() => router.push(`/c/${token}/review/${p.id}`)}
+                  >
+                    {p.versionUrl
+                      ? <img src={p.versionUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: isActive ? 1 : 0.6 }} />
+                      : <div style={{ width: "100%", height: "100%", background: `radial-gradient(circle at center, #1a1a1a 0%, #0a0a0a 100%)` }} />
+                    }
+                    <div style={{ position: "absolute", inset: 0, padding: 4, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "flex-start" }}>
+                        {pillLabel && (
+                          <span style={{ background: "rgba(0,0,0,0.8)", border: `1px solid ${pillColor}22`, color: pillColor, padding: "1px 4px", fontSize: 8, fontFamily: MONO, borderRadius: 1 }}>
+                            {pillLabel}
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ fontFamily: MONO, fontSize: 8, color: MUTED, background: "rgba(0,0,0,0.75)", padding: "1px 3px", alignSelf: "flex-start" }}>
+                        {p.originalFilename?.split("/").pop()?.slice(0, 14) ?? `IMG_${String(i + 1).padStart(4, "0")}`}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* Review opinion */}
-          <div style={{ padding: 16, flex: 1 }}>
-            <div style={panelLabel}>검토 의견</div>
-
-            {/* Action buttons */}
-            <div className="c-review-actions" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
-              <button type="button" onClick={handleApprove}
-                style={{
-                  height: 42, borderRadius: 9, fontSize: 13, fontWeight: 500,
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                  cursor: "pointer", border: "1px solid", transition: "all 0.15s",
-                  background: isApproved ? GREEN_DIM : "rgba(46,213,115,0.08)",
-                  borderColor: isApproved ? GREEN : "rgba(46,213,115,0.25)",
-                  color: GREEN,
-                }}>
-                <Check style={{ width: 14, height: 14 }} /> 확정
-              </button>
-              <button type="button" onClick={handleRevisionToggle}
-                style={{
-                  height: 42, borderRadius: 9, fontSize: 13, fontWeight: 500,
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                  cursor: "pointer", border: "1px solid", transition: "all 0.15s",
-                  background: isRevision ? "rgba(245,166,35,0.1)" : "rgba(245,166,35,0.06)",
-                  borderColor: isRevision ? ORANGE : "rgba(245,166,35,0.2)",
-                  color: ORANGE,
-                }}>
-                <RefreshCw style={{ width: 13, height: 13 }} /> 재보정
-              </button>
-            </div>
-
-            <p style={{ fontSize: 10, color: DIM, textAlign: "center" }}>선택 내용은 임시 저장됩니다</p>
-
-            {/* Revision comment (shown when revision_requested) */}
-            {isRevision && (
-              <div style={{ marginTop: 10 }}>
-                <textarea
-                  value={revisionComment}
-                  onChange={(e) => setRevisionComment(e.target.value)}
-                  placeholder={"어떤 부분을 수정하면 좋을지 입력해주세요\n예) 배경을 좀 더 밝게 해주세요"}
-                  style={{
-                    width: "100%", padding: "10px 12px", boxSizing: "border-box",
-                    background: SURFACE2, border: "1px solid rgba(245,166,35,0.2)",
-                    borderRadius: 8, color: TEXT, fontSize: 12, fontFamily: "inherit",
-                    resize: "none", height: 80, lineHeight: 1.5, outline: "none",
-                  }}
-                />
-                <button type="button" onClick={handleRevisionSave}
-                  style={{
-                    marginTop: 6, width: "100%", height: 34,
-                    borderRadius: 7, background: "transparent",
-                    border: "1px solid rgba(245,166,35,0.2)",
-                    color: ORANGE, fontSize: 11, cursor: "pointer", transition: "all 0.15s",
-                  }}>
-                  임시 저장
+          {/* Center panel: viewer */}
+          <div style={{ display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
+            {/* Toolbar */}
+            <div className="rv-toolbar" style={{ height: 48, borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "center", gap: 24, background: "rgba(10,10,10,0.9)", flexShrink: 0 }}>
+              {/* Nav prev/next */}
+              <div className="rv-tool-group">
+                <button type="button" className="rv-btn-icon" onClick={goPrev}>
+                  <ChevronLeft size={14} /> PREV
+                </button>
+                <span style={{ padding: "0 12px", fontFamily: MONO, fontSize: 11, color: MUTED, borderRight: `1px solid ${BORDER}` }}>
+                  {currentIndex + 1} / {photos.length}
+                </span>
+                <button type="button" className="rv-btn-icon" onClick={goNext}>
+                  NEXT <ChevronRight size={14} />
                 </button>
               </div>
-            )}
 
-            {/* Photographer memo */}
-            {current.photographerMemo && (
-              <div style={{
-                marginTop: 12, padding: "8px 10px",
-                background: SURFACE2, border: `1px solid ${BORDER}`, borderRadius: 7,
-                fontSize: 11, color: MUTED, lineHeight: 1.5,
-              }}>
-                작가 메모: {current.photographerMemo}
+              {/* View mode */}
+              <div className="rv-tool-group">
+                <button
+                  type="button"
+                  className={`rv-btn-icon${viewMode === "side-by-side" ? " rv-active" : ""}`}
+                  onClick={() => setViewMode("side-by-side")}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+                  SIDE-BY-SIDE
+                </button>
+                <button
+                  type="button"
+                  className={`rv-btn-icon${viewMode === "single-original" ? " rv-active" : ""}`}
+                  onClick={() => setViewMode("single-original")}
+                >
+                  ORIGINAL
+                </button>
+                <button
+                  type="button"
+                  className={`rv-btn-icon${viewMode === "single-retouched" ? " rv-active" : ""}`}
+                  onClick={() => setViewMode("single-retouched")}
+                >
+                  RETOUCHED
+                </button>
               </div>
-            )}
+
+              {/* Fullscreen */}
+              <div className="rv-tool-group">
+                <button type="button" className="rv-btn-icon" onClick={() => { setFullInitial("original"); setFullOpen(true); }}>
+                  <Maximize2 size={13} /> FULLSCREEN
+                </button>
+              </div>
+            </div>
+
+            {/* Image stage */}
+            <div style={{ flex: 1, padding: 24, display: "flex", gap: 16, overflow: "hidden" }}>
+
+              {/* Original */}
+              {showOriginal && (
+                <div
+                  style={{ flex: 1, border: `1px solid ${BORDER}`, background: BG_PANEL, position: "relative", display: "flex", flexDirection: "column", cursor: "pointer", overflow: "hidden", minHeight: 0 }}
+                  onClick={() => { setFullInitial("original"); setFullOpen(true); }}
+                >
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "8px 12px", display: "flex", justifyContent: "space-between", background: "linear-gradient(rgba(0,0,0,0.8),transparent)", zIndex: 2, pointerEvents: "none" }}>
+                    <span style={{ background: BG_BASE, border: `1px solid ${BORDER}`, padding: "4px 8px", fontFamily: MONO, fontSize: 9, color: MUTED, letterSpacing: "0.05em", textTransform: "uppercase" }}>ORIGINAL (RAW)</span>
+                    <span style={{ background: BG_BASE, border: `1px solid ${BORDER}`, padding: "4px 8px", fontFamily: MONO, fontSize: 9, color: DIM, letterSpacing: "0.05em" }}>{current.originalFilename?.split("/").pop() ?? "UNKNOWN"}</span>
+                  </div>
+                  <div style={{ flex: 1, position: "relative", background: "radial-gradient(circle at center,#1a1a1a 0%,#0a0a0a 100%)", overflow: "hidden", minHeight: 0 }}>
+                    {current.originalUrl
+                      ? <img src={current.originalUrl} alt="원본" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />
+                      : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: DIM }}>NO_ORIGINAL</div>
+                    }
+                  </div>
+                  {/* crosshair reticle */}
+                  <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 40, height: 40, border: "1px solid rgba(255,255,255,0.15)", pointerEvents: "none" }}>
+                    <div style={{ position: "absolute", top: "50%", left: -10, right: -10, height: 1, background: "rgba(255,255,255,0.15)" }} />
+                    <div style={{ position: "absolute", left: "50%", top: -10, bottom: -10, width: 1, background: "rgba(255,255,255,0.15)" }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Retouched */}
+              {showRetouched && (
+                <div
+                  style={{ flex: 1, border: `1px solid ${BORDER_HI}`, background: BG_PANEL, position: "relative", display: "flex", flexDirection: "column", cursor: "pointer", overflow: "hidden", minHeight: 0 }}
+                  onClick={() => { setFullInitial("version"); setFullOpen(true); }}
+                >
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "8px 12px", display: "flex", justifyContent: "space-between", background: "linear-gradient(rgba(0,0,0,0.8),transparent)", zIndex: 2, pointerEvents: "none" }}>
+                    <span style={{ background: BG_BASE, border: `1px solid ${ACCENT}`, padding: "4px 8px", fontFamily: MONO, fontSize: 9, color: ACCENT, letterSpacing: "0.05em", textTransform: "uppercase" }}>{versionLabel}</span>
+                    <span style={{ background: BG_BASE, border: `1px solid ${BORDER}`, padding: "4px 8px", fontFamily: MONO, fontSize: 9, color: DIM, letterSpacing: "0.05em" }}>{current.originalFilename?.split("/").pop()?.replace(/\.[^.]+$/, "_EDIT.JPG") ?? "UNKNOWN"}</span>
+                  </div>
+                  <div style={{ flex: 1, position: "relative", background: "radial-gradient(circle at center,#1a1a1a 0%,#0a0a0a 100%)", overflow: "hidden", minHeight: 0 }}>
+                    {current.versionUrl
+                      ? <img src={current.versionUrl} alt="보정본" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />
+                      : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: DIM }}>NO_RETOUCHED</div>
+                    }
+                  </div>
+                  <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 40, height: 40, border: "1px solid rgba(255,255,255,0.15)", pointerEvents: "none" }}>
+                    <div style={{ position: "absolute", top: "50%", left: -10, right: -10, height: 1, background: "rgba(255,255,255,0.15)" }} />
+                    <div style={{ position: "absolute", left: "50%", top: -10, bottom: -10, width: 1, background: "rgba(255,255,255,0.15)" }} />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Panel nav */}
-          <div
-            className="c-review-panel-nav"
-            style={{
-              padding: "14px 16px",
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              borderTop: `1px solid ${BORDER}`,
-              flexShrink: 0,
-            }}
-          >
-            <button type="button" onClick={goPrev}
-              style={{
-                display: "flex", alignItems: "center", gap: 5,
-                padding: "7px 14px", borderRadius: 8,
-                border: `1px solid ${BORDER}`, background: "transparent",
-                color: MUTED, fontSize: 12, cursor: "pointer", transition: "all 0.15s",
-              }}>
-              <ChevronLeft style={{ width: 13, height: 13 }} /> 이전
-            </button>
-            <Link href={`/c/${token}/review`}
-              style={{ fontSize: 11, color: DIM, textDecoration: "none" }}>
-              목록으로
-            </Link>
-            <button type="button" onClick={goNext}
-              style={{
-                display: "flex", alignItems: "center", gap: 5,
-                padding: "7px 14px", borderRadius: 8,
-                border: `1px solid ${BORDER}`, background: "transparent",
-                color: MUTED, fontSize: 12, cursor: "pointer", transition: "all 0.15s",
-              }}>
-              다음 <ChevronRight style={{ width: 13, height: 13 }} />
-            </button>
+          {/* Right panel */}
+          <div className="rv-panel-right" style={{ borderLeft: `1px solid ${BORDER}`, background: "rgba(3,3,3,0.95)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+            {/* File info / meta */}
+            <div style={{ padding: 16, borderBottom: `1px solid ${BORDER}` }}>
+              <div className="rv-section-title">SYS.ASSET :: INFO</div>
+              <div className="rv-meta-grid">
+                <div className="rv-meta-item">
+                  <span className="rv-meta-label">FILENAME</span>
+                  <span className="rv-meta-value" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 10 }}>
+                    {current.originalFilename?.split("/").pop() ?? "—"}
+                  </span>
+                </div>
+                <div className="rv-meta-item">
+                  <span className="rv-meta-label">INDEX</span>
+                  <span className="rv-meta-value">{String(currentIndex + 1).padStart(3, "0")} / {String(photos.length).padStart(3, "0")}</span>
+                </div>
+                <div className="rv-meta-item">
+                  <span className="rv-meta-label">VERSION</span>
+                  <span className="rv-meta-value" style={{ color: ACCENT }}>{project.status === "reviewing_v2" ? "V2" : "V1"}</span>
+                </div>
+                <div className="rv-meta-item">
+                  <span className="rv-meta-label">REVISION LEFT</span>
+                  <span className="rv-meta-value">{revisionRemaining}x</span>
+                </div>
+                <div className="rv-meta-item" style={{ gridColumn: "1 / -1" }}>
+                  <span className="rv-meta-label">PROJECT</span>
+                  <span className="rv-meta-value" style={{ fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{project.name}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Memo input */}
+            <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <div className="rv-section-title">USER.MEMO :: INPUT</div>
+              <textarea
+                value={revisionComment}
+                onChange={(e) => setRevisionComment(e.target.value)}
+                placeholder={"보정 수정 요청사항을 입력해주세요.\n예) 피부 톤을 조금 더 밝게, 배경 인물 제거 등"}
+                style={{
+                  flex: 1, width: "100%", minHeight: 100, maxHeight: 200,
+                  background: BG_INPUT, border: `1px solid ${BORDER}`,
+                  color: TEXT, padding: 14,
+                  fontFamily: "'Inter', -apple-system, sans-serif",
+                  fontSize: 13, resize: "none", outline: "none", lineHeight: 1.55,
+                  boxSizing: "border-box",
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = BORDER_HI; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = BORDER; }}
+              />
+              {/* Photographer memo */}
+              {current.photographerMemo && (
+                <div style={{ marginTop: 10, padding: "8px 10px", background: BG_INPUT, border: `1px solid ${BORDER}`, fontFamily: MONO, fontSize: 10, color: MUTED, lineHeight: 1.5 }}>
+                  <span style={{ color: DIM }}>PHOTOGRAPHER_NOTE :: </span>{current.photographerMemo}
+                </div>
+              )}
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8, borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
+              <button type="button" className="rv-btn rv-btn-revision" onClick={handleRevisionToggle}
+                style={{
+                  width: "100%", height: 44, display: "flex", alignItems: "center", justifyContent: "center",
+                  fontFamily: MONO, fontSize: 12, fontWeight: 700, cursor: "pointer", border: "1px solid",
+                  gap: 8, letterSpacing: "0.03em", transition: "all 0.2s",
+                  background: isRevision ? "rgba(255,170,0,0.08)" : "transparent",
+                  color: isRevision ? ORANGE : TEXT,
+                  borderColor: isRevision ? "rgba(255,170,0,0.35)" : BORDER_HI,
+                }}>
+                <RefreshCw size={14} />
+                {isRevision ? "REVISION_REQUESTED ✓" : "재보정 요청 (REQUEST EDIT)"}
+              </button>
+              <button type="button" className="rv-btn rv-btn-approve" onClick={handleApprove}
+                style={{
+                  width: "100%", height: 44, display: "flex", alignItems: "center", justifyContent: "center",
+                  fontFamily: MONO, fontSize: 12, fontWeight: 700, cursor: "pointer", border: "1px solid",
+                  gap: 8, letterSpacing: "0.03em", transition: "all 0.2s",
+                  background: isApproved ? "rgba(0,255,102,0.15)" : ACCENT,
+                  color: isApproved ? GREEN : "#000",
+                  borderColor: isApproved ? "rgba(0,255,102,0.4)" : ACCENT,
+                }}>
+                <Check size={14} />
+                {isApproved ? "APPROVED ✓" : "현재 보정본 확정 (APPROVE)"}
+              </button>
+
+              {/* Memo save (shown when revision) */}
+              {isRevision && revisionComment && (
+                <button type="button" onClick={handleRevisionSave}
+                  style={{
+                    width: "100%", height: 36, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontFamily: MONO, fontSize: 10, cursor: "pointer",
+                    background: "transparent", border: `1px solid rgba(255,170,0,0.2)`,
+                    color: ORANGE, letterSpacing: "0.03em", transition: "all 0.15s",
+                  }}>
+                  SAVE_MEMO
+                </button>
+              )}
+
+              {/* Back to gallery */}
+              <Link href={`/c/${token}/review`}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 32, fontFamily: MONO, fontSize: 10, color: DIM, textDecoration: "none", border: `1px solid ${BORDER}`, transition: "all 0.15s", gap: 5, letterSpacing: "0.03em" }}>
+                ← BACK_TO_GALLERY
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Footer status bar ── */}
+        <div style={{
+          height: 32, flexShrink: 0,
+          borderTop: `1px solid ${BORDER}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "0 24px",
+          background: "#000", zIndex: 10,
+          fontFamily: MONO, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em",
+        }}>
+          <div style={{ color: MUTED }}>
+            V.1.2.0-CORE
+            <span style={{ marginLeft: 16 }}>SECURE_CONNECTION</span>
+          </div>
+          <div style={{ display: "flex", gap: 24, color: DIM }}>
+            <span>STREAM_ID: ASSET_{prjIdShort}</span>
+            <span style={{ color: MUTED }}>{currentIndex + 1} / {photos.length} ASSETS</span>
           </div>
         </div>
       </div>
@@ -578,6 +608,6 @@ export default function ReviewViewerPage() {
         versionLabel={versionLabel}
         onClose={() => setFullOpen(false)}
       />
-    </div>
+    </>
   );
 }

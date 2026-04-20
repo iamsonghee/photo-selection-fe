@@ -784,7 +784,7 @@ export function ProjectNexusPageClient() {
               }}
             >
               <Trash2 size={12} strokeWidth={2} aria-hidden />
-              TERMINATE_PROJECT
+              프로젝트 삭제
             </button>
           </section>
         </div>

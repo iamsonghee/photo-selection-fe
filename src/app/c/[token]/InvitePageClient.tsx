@@ -10,7 +10,6 @@ import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { getProfileImageUrl } from "@/lib/photographer";
 import { getReviewMockData } from "@/lib/mock-data";
 import { BrandLogoBar } from "@/components/BrandLogo";
-import hud from "./customer-acut-hud.module.css";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 const REVISION_LIMIT = 2;
@@ -106,127 +105,185 @@ export default function InvitePageClient() {
 
   /* ──────────────── reviewing_v1 / v2 ──────────────── */
   if (project.status === "reviewing_v1" || project.status === "reviewing_v2") {
-    const total            = reviewData?.photos.length ?? project.requiredCount ?? 0;
-    const isV2             = project.status === "reviewing_v2";
+    const total             = reviewData?.photos.length ?? project.requiredCount ?? 0;
+    const isV2              = project.status === "reviewing_v2";
     const revisionRemaining = Math.max(0, REVISION_LIMIT - (isV2 ? 1 : 0));
-    const deadlineStr      = format(new Date(project.deadline), "yyyy.MM.dd", { locale: ko });
-    const reviewPath = `/c/${token}/review`;
+    const deadlineStr       = format(new Date(project.deadline), "yyyy.MM.dd", { locale: ko });
+    const reviewPath        = `/c/${token}/review`;
+    const photographerName  = photographer?.name ?? "담당 작가";
+    const prjIdShort        = project.id.replace(/-/g, "").slice(0, 8).toUpperCase();
+    const MONO              = "'JetBrains Mono', 'Courier New', Courier, monospace";
 
     return (
-      <div className={hud.root}>
-        <div className={`${hud.viewportBracket} ${hud.bracketTl}`} aria-hidden />
-        <div className={`${hud.viewportBracket} ${hud.bracketTr}`} aria-hidden />
-        <div className={`${hud.viewportBracket} ${hud.bracketBl}`} aria-hidden />
-        <div className={`${hud.viewportBracket} ${hud.bracketBr}`} aria-hidden />
+      <div style={{ minHeight: "100vh", background: "#030303", color: "#fff", display: "flex", flexDirection: "column", position: "relative", overflowX: "hidden", fontFamily: "'Pretendard Variable','Pretendard',-apple-system,sans-serif" }}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
 
-        <header className={hud.topHeader}>
-          <div className={hud.headerSide}>
-            <Link href={inviteHref ?? "#"} className={hud.btnSub} scroll={false}>
-              ← 돌아가기
-            </Link>
+          .cp-grid-bg {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background-image: linear-gradient(to right, #1a1a1a 1px, transparent 1px), linear-gradient(to bottom, #1a1a1a 1px, transparent 1px);
+            background-size: 40px 40px;
+          }
+          .cp-bracket { position: fixed; width: 32px; height: 32px; border: 2px solid #555; z-index: 50; pointer-events: none; }
+          .cp-bracket-tl { top: 20px; left: 20px; border-right: none; border-bottom: none; }
+          .cp-bracket-tr { top: 20px; right: 20px; border-left: none; border-bottom: none; }
+          .cp-bracket-bl { bottom: 20px; left: 20px; border-right: none; border-top: none; }
+          .cp-bracket-br { bottom: 20px; right: 20px; border-left: none; border-top: none; }
+
+          .cp-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 32px 64px; position: relative; z-index: 10;
+          }
+          .cp-brand-cluster { display: flex; align-items: center; gap: 12px; }
+          .cp-logo-box { background: #FF4D00; color: #000; font-weight: 800; font-size: 14px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+          .cp-brand-name { font-weight: 800; font-size: 20px; letter-spacing: -0.5px; }
+          .cp-brand-name span { color: #FF4D00; }
+          .cp-sys-info { display: flex; align-items: center; gap: 24px; font-family: ${MONO}; font-size: 11px; letter-spacing: 1px; color: #8C8C8C; }
+          .cp-status-indicator { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid #2A2A2A; background: #030303; }
+          .cp-status-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+          .cp-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; position: relative; z-index: 10; }
+          .cp-portal-cmd { font-family: ${MONO}; font-size: 12px; color: #FF4D00; letter-spacing: 2px; margin-bottom: 24px; text-transform: uppercase; display: flex; align-items: center; gap: 12px; }
+          .cp-portal-cmd::before, .cp-portal-cmd::after { content: ''; width: 24px; height: 1px; background: #FF4D00; }
+
+          .cp-card { width: 100%; max-width: 640px; background: rgba(10,10,10,0.6); border: 1px solid #2A2A2A; padding: 56px 48px; position: relative; backdrop-filter: blur(4px); }
+          .cp-card-corner-tl { position: absolute; top: -1px; left: -1px; width: 8px; height: 8px; border: 1px solid #555; border-right: none; border-bottom: none; pointer-events: none; }
+          .cp-card-corner-br { position: absolute; bottom: -1px; right: -1px; width: 8px; height: 8px; border: 1px solid #555; border-left: none; border-top: none; pointer-events: none; }
+          .cp-card-header { margin-bottom: 48px; text-align: center; }
+          .cp-h1 { font-size: 42px; font-weight: 800; line-height: 1.2; letter-spacing: -1px; margin-bottom: 16px; word-break: keep-all; }
+          .cp-subtitle { font-size: 16px; line-height: 1.6; color: #8C8C8C; max-width: 80%; margin: 0 auto; word-break: keep-all; }
+
+          .cp-data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #2A2A2A; border: 1px solid #2A2A2A; margin-bottom: 48px; }
+          .cp-data-cell { background: #030303; padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; }
+          .cp-data-label { font-family: ${MONO}; font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 1px; }
+          .cp-data-value { font-size: 16px; font-weight: 600; color: #fff; }
+
+          .cp-action-area { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+          .cp-btn-primary { display: inline-flex; align-items: center; justify-content: center; width: 100%; background: #FF4D00; color: #000; font-size: 18px; font-weight: 700; padding: 20px 32px; border: none; cursor: pointer; transition: background 0.2s; text-decoration: none; font-family: inherit; }
+          .cp-btn-primary:hover:not(:disabled) { background: #ff6600; }
+          .cp-btn-primary:disabled { opacity: 0.35; cursor: not-allowed; background: #555; }
+          .cp-btn-arrow { margin-left: 12px; font-weight: 800; transition: transform 0.2s; }
+          .cp-btn-primary:hover:not(:disabled) .cp-btn-arrow { transform: translateX(4px); }
+
+          .cp-photographer-card { margin-top: 48px; padding-top: 32px; border-top: 1px dashed #2A2A2A; display: flex; align-items: center; justify-content: space-between; }
+          .cp-photo-meta { display: flex; align-items: center; gap: 16px; }
+          .cp-avatar-box { width: 48px; height: 48px; border: 1px solid #2A2A2A; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); overflow: hidden; flex-shrink: 0; }
+          .cp-author-name { font-size: 15px; font-weight: 700; }
+          .cp-author-role { font-family: ${MONO}; font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+          .cp-sys-tag { font-family: ${MONO}; font-size: 10px; color: #FF4D00; letter-spacing: 1px; display: flex; align-items: center; gap: 6px; }
+          .cp-sys-tag::before { content: ''; width: 4px; height: 4px; background: #FF4D00; display: inline-block; }
+
+          .cp-footer { padding: 24px 64px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #2A2A2A; font-family: ${MONO}; font-size: 10px; color: #555; letter-spacing: 1px; position: relative; z-index: 10; background: #030303; }
+          .cp-footer-secure { color: #8C8C8C; }
+
+          @media (max-width: 768px) {
+            .cp-header { padding: env(safe-area-inset-top, 16px) 20px 16px; }
+            .cp-footer { padding: 16px 20px calc(16px + env(safe-area-inset-bottom)); }
+            .cp-sys-info { display: none; }
+            .cp-card { padding: 28px 20px; }
+            .cp-card-header { margin-bottom: 28px; }
+            .cp-h1 { font-size: 28px; margin-bottom: 10px; }
+            .cp-subtitle { font-size: 14px; max-width: 100%; }
+            .cp-data-grid { grid-template-columns: 1fr; margin-bottom: 28px; }
+            .cp-data-cell { padding: 12px 16px; }
+            .cp-data-value { font-size: 14px; }
+            .cp-btn-primary { font-size: 16px; padding: 16px 24px; }
+            .cp-photographer-card { margin-top: 28px; padding-top: 20px; }
+            .cp-bracket { display: none; }
+            .cp-main { padding: 20px 16px; overflow-y: auto; }
+          }
+        `}</style>
+
+        <div className="cp-grid-bg" />
+        <div className="cp-bracket cp-bracket-tl" /><div className="cp-bracket cp-bracket-tr" />
+        <div className="cp-bracket cp-bracket-bl" /><div className="cp-bracket cp-bracket-br" />
+
+        <header className="cp-header">
+          <div className="cp-brand-cluster">
+            <div className="cp-logo-box">A</div>
+            <div className="cp-brand-name">A-CUT<span>.</span></div>
           </div>
-          <div className={hud.brandCluster}>
-            <div className={hud.logoBox}>A</div>
-            <div className={hud.brandName}>
-              A컷 <span>Acut</span>
+          <div className="cp-sys-info">
+            <div className="cp-status-indicator">
+              <div className="cp-status-dot" style={{ background: "#FF4D00", boxShadow: "0 0 8px #FF4D00" }} />
+              {isV2 ? "SYS.REVIEW_V2_ACTIVE" : "SYS.REVIEW_V1_ACTIVE"}
             </div>
+            <div>PRJ_ID: {prjIdShort}</div>
           </div>
-          <div className={hud.headerSide} />
         </header>
 
-        <div className={hud.inviteStack}>
-          <div>
-            <div className={hud.portalCmd} style={{ marginBottom: 16 }}>CMD :: SYS.REVIEW_INVITE</div>
+        <main className="cp-main">
+          <div className="cp-portal-cmd">CMD :: SYS.REVIEW_INVITE</div>
 
-            <div className="mb-4 flex items-center gap-3">
-              <div style={{ position: "relative", flexShrink: 0 }}>
-                <img
-                  src={getProfileImageUrl(photographer?.profile_image_url ?? null)}
-                  alt=""
-                  style={{
-                    width: 52, height: 52, borderRadius: "50%", objectFit: "cover",
-                    boxShadow: "0 0 0 2px rgba(255,77,0,0.45), 0 0 16px rgba(255,77,0,0.18)",
-                  }}
-                />
-                <div style={{
-                  position: "absolute", bottom: 0, right: 0,
-                  width: 16, height: 16, borderRadius: "50%",
-                  background: "#ff4d00", border: "2px solid #030303",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <Icon icon="solar:verified-check-bold" width={9} style={{ color: "#fff" }} />
-                </div>
+          <div className="cp-card">
+            <div className="cp-card-corner-tl" />
+            <div className="cp-card-corner-br" />
+
+            <div className="cp-card-header">
+              <h1 className="cp-h1">
+                보정이 완료됐어요.<br />
+                마음에 드시나요?
+              </h1>
+              <p className="cp-subtitle">
+                {photographerName} 작가님의 보정본을 확인하고, 마음에 들면 확정, 수정이 필요하면 재보정 요청을 남겨주세요.
+              </p>
+            </div>
+
+            <div className="cp-data-grid">
+              <div className="cp-data-cell">
+                <span className="cp-data-label">FIELD :: PROJECT_NAME</span>
+                <span className="cp-data-value">{project.name}</span>
               </div>
-              <div>
-                <p className="text-[11px]" style={{ color: "#555" }}>담당 작가</p>
-                <p className="text-[15px] font-semibold text-zinc-100">{photographer?.name ?? "담당 작가"}</p>
+              <div className="cp-data-cell">
+                <span className="cp-data-label">FIELD :: PHOTOGRAPHER</span>
+                <span className="cp-data-value">{photographerName}</span>
+              </div>
+              <div className="cp-data-cell">
+                <span className="cp-data-label">SYS :: DEADLINE</span>
+                <span className="cp-data-value">{deadlineStr} 까지</span>
+              </div>
+              <div className="cp-data-cell">
+                <span className="cp-data-label">DATA :: REVISION_QUOTA</span>
+                <span className="cp-data-value" style={{ fontFamily: MONO, fontSize: 18 }}>
+                  <span style={{ color: "#FF4D00" }}>{revisionRemaining}</span>회 가능
+                  <span style={{ fontFamily: MONO, fontSize: 11, color: "#555", marginLeft: 8 }}>
+                    {isV2 ? "2차 검토" : "1차 검토"}
+                  </span>
+                </span>
               </div>
             </div>
 
-            <div
-              className="mb-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium"
-              style={{ background: "rgba(255,77,0,0.12)", border: "1px solid rgba(255,77,0,0.28)", color: "#ff4d00" }}
-            >
-              <Icon icon="solar:star-bold" width={11} />
-              보정본 검토 요청
-            </div>
-
-            <h1 className="mb-2 font-bold leading-[1.15] text-zinc-100"
-              style={{ fontSize: "clamp(26px, 7vw, 32px)", wordBreak: "keep-all" }}>
-              보정이 완료됐어요.<br />
-              마음에 드시나요?
-            </h1>
-            <p className="text-[13px] leading-relaxed" style={{ wordBreak: "keep-all", color: "#8c8c8c" }}>
-              사진을 하나쫜 확인하고 코멘트를 남겨주세요.
-              재보정 요청도 가능해요.
-            </p>
-          </div>
-
-          <div>
-            <div
-              style={{
-                background: "rgba(10, 10, 10, 0.6)",
-                border: "1px solid #2a2a2a",
-                borderTop: "1px solid #ff4d00",
-                padding: "1.25rem",
-                backdropFilter: "blur(4px)",
-              }}
-            >
-              <div className="mb-3 grid grid-cols-2 gap-2">
-                {[
-                  { icon: "solar:camera-bold", val: project.name },
-                  { icon: "solar:calendar-mark-bold", val: `기한 ${deadlineStr}` },
-                  { icon: "solar:gallery-bold", val: `${total}장` },
-                  { icon: "solar:refresh-circle-bold", val: `재보정 ${revisionRemaining}회 가능` },
-                ].map((r, i) => (
-                  <div key={i} className="flex items-center gap-2 text-[12px]" style={{ color: "#e5e5e5" }}>
-                    <Icon icon={r.icon} width={13} style={{ color: "#ff4d00", flexShrink: 0 }} />
-                    <span className="truncate">{r.val}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div
-                className="mb-3 flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] font-medium"
-                style={isV2
-                  ? { background: "rgba(245,166,35,0.08)", border: "1px solid rgba(245,166,35,0.2)", color: "#f5a623" }
-                  : { background: "rgba(255,77,0,0.08)", border: "1px solid rgba(255,77,0,0.22)", color: "#ff4d00" }}
-              >
-                <Icon icon={isV2 ? "solar:refresh-circle-bold" : "solar:magic-stick-bold"} width={13} />
-                {isV2 ? "2차 보정본 검토 중" : "1차 보정본 검토 중"}
-              </div>
-
-              <Link href={reviewPath} className={hud.btnPrimary} scroll={false}>
-                보정본 검토하기
-                <Icon icon="solar:arrow-right-bold" width={14} style={{ color: "#000" }} />
+            <div className="cp-action-area">
+              <Link href={reviewPath} style={{ width: "100%" }}>
+                <button type="button" className="cp-btn-primary">
+                  보정본 검토하기 <span className="cp-btn-arrow">→</span>
+                </button>
               </Link>
             </div>
-          </div>
 
-          <footer className={hud.pageFooter} style={{ borderTop: "none", padding: "16px 0 0", background: "transparent" }}>
-            <div>© 2026 A컷 · Acut</div>
-          </footer>
-        </div>
+            <div className="cp-photographer-card">
+              <div className="cp-photo-meta">
+                <div className="cp-avatar-box">
+                  {photographer?.profile_image_url ? (
+                    <img src={getProfileImageUrl(photographer.profile_image_url)} alt={photographerName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.5"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" /></svg>
+                  )}
+                </div>
+                <div>
+                  <div className="cp-author-name">{photographerName}</div>
+                  <div className="cp-author-role">담당 작가</div>
+                </div>
+              </div>
+              <div className="cp-sys-tag">VERIFIED_CREATOR</div>
+            </div>
+          </div>
+        </main>
+
+        <footer className="cp-footer">
+          <div>V.1.2.0-CORE &nbsp;&nbsp;|&nbsp;&nbsp; <span className="cp-footer-secure">SECURE_CONNECTION</span></div>
+          <div>© 2026 A컷 · Acut</div>
+        </footer>
       </div>
     );
   }

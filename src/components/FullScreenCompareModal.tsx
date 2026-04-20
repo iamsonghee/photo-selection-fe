@@ -118,12 +118,12 @@ export default function FullScreenCompareModal({
         </div>
 
         {/* image */}
-        <div className="flex-1 px-4 pb-4">
+        <div className="flex-1 min-h-0 px-4 pb-4">
           <div className="relative h-full w-full overflow-hidden rounded-xl bg-black/20">
             <img
               src={current.src}
               alt={current.label}
-              className="h-full w-full object-contain select-none"
+              className="absolute inset-0 w-full h-full object-contain select-none"
               draggable={false}
             />
           </div>

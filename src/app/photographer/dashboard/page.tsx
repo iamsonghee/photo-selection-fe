@@ -131,22 +131,53 @@ function ProjectCard({ project }: { project: Project }) {
         flexDirection: "column" as const,
         gap: 12,
         opacity: isDelivered ? (hovered ? 1 : 0.65) : 1,
-        position: "relative" as const,
       }}
     >
-      {/* 상단: 배지 + 프로젝트명 + 고객명 */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const }}>
-        <StatusPill status={project.status} photoCount={photoCount} requiredCount={reqCount} />
-        <span style={{ fontSize: 14, fontWeight: 700, color: isDelivered ? "#777" : "#fff" }}>
+      {/* 상단: 배지 + 프로젝트명 + 고객명 + D-day */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "nowrap" as const, minWidth: 0 }}>
+        <div style={{ flexShrink: 0 }}>
+          <StatusPill status={project.status} photoCount={photoCount} requiredCount={reqCount} />
+        </div>
+        <span style={{
+          fontSize: 14, fontWeight: 700, color: isDelivered ? "#777" : "#fff",
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
+          minWidth: 0,
+        }}>
           {project.name}
         </span>
-        <span style={{ fontSize: 13, color: "#666" }}>
+        <span style={{
+          fontSize: 13, color: "#666", flexShrink: 0,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
+          maxWidth: 80,
+        }}>
           {project.customerName || "—"}
         </span>
+        {/* D-day 배지 — flex flow로 우측 끝에 배치 */}
+        <div style={{ marginLeft: "auto", flexShrink: 0 }}>
+          {isDelivered ? (
+            <span style={{
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
+              color: "#444", border: "1px solid #2a2a2a",
+              padding: "4px 8px", background: "#050505",
+            }}>
+              완료
+            </span>
+          ) : (
+            <span style={{
+              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, fontWeight: 700,
+              color: warn ? ACCENT : "#888",
+              border: `1px solid ${warn ? ACCENT : "#333"}`,
+              padding: "4px 8px",
+              background: warn ? "rgba(255,77,0,0.05)" : "#050505",
+            }}>
+              {ddayText.replace(" · 임박", "")}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* 파이프라인 진행 바 */}
-      <div style={{ maxWidth: 480 }}>
+      <div style={{ width: "100%" }}>
         <div style={{
           display: "flex", justifyContent: "space-between",
           fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
@@ -167,31 +198,6 @@ function ProjectCard({ project }: { project: Project }) {
           </span>
         </div>
         <ProjectPipelineMiniBar status={project.status} variant="full" />
-      </div>
-
-      {/* 우측 D-day 배지 */}
-      <div style={{
-        position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
-      }}>
-        {isDelivered ? (
-          <span style={{
-            fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
-            color: "#444", border: "1px solid #2a2a2a",
-            padding: "4px 8px", background: "#050505",
-          }}>
-            완료
-          </span>
-        ) : (
-          <span style={{
-            fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, fontWeight: 700,
-            color: warn ? ACCENT : "#888",
-            border: `1px solid ${warn ? ACCENT : "#333"}`,
-            padding: "4px 8px",
-            background: warn ? "rgba(255,77,0,0.05)" : "#050505",
-          }}>
-            {ddayText.replace(" · 임박", "")}
-          </span>
-        )}
       </div>
     </div>
   );
@@ -489,10 +495,13 @@ export default function DashboardPage() {
         @media (max-width: 768px) {
           .db-root { overflow-x: hidden; }
           .db-topbar { flex-wrap: wrap; gap: 10px; padding: 10px 14px !important; padding-top: max(10px, env(safe-area-inset-top)) !important; height: auto !important; }
-          .db-action-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .db-body { padding: 16px 14px 60px !important; align-items: stretch !important; }
+          .db-body > * { width: 100% !important; min-width: 0 !important; }
+          .db-action-grid { grid-template-columns: repeat(3, 1fr) !important; }
           .db-clock { display: none !important; }
           .db-activity-panel { display: none !important; }
-          .db-project-list { padding: 0 10px !important; }
+          .db-right-aside { display: none !important; }
+          .db-project-card { transform: none !important; }
         }
         @keyframes db-pulse {
           0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,77,0,0.4); }
@@ -601,6 +610,7 @@ export default function DashboardPage() {
           display: "flex", position: "relative", zIndex: 10,
           padding: "28px 28px 60px",
           gap: 28, alignItems: "flex-start",
+          minWidth: 0,
         }}
       >
         {/* ── 메인 좌측 ── */}
