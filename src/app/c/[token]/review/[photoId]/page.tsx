@@ -589,6 +589,18 @@ export default function ReviewViewerPage() {
 
             {/* Action buttons */}
             <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8, borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
+              {/* Memo save (shown when revision) */}
+              {isRevision && revisionComment && (
+                <button type="button" onClick={handleRevisionSave}
+                  style={{
+                    width: "100%", height: 32, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontFamily: MONO, fontSize: 10, cursor: "pointer",
+                    background: "transparent", border: `1px solid rgba(255,170,0,0.2)`,
+                    color: ORANGE, letterSpacing: "0.03em", transition: "all 0.15s",
+                  }}>
+                  SAVE_MEMO
+                </button>
+              )}
               <div style={{ display: "flex", gap: 8 }}>
                 <button type="button" onClick={handleRevisionToggle}
                   style={{
@@ -616,18 +628,6 @@ export default function ReviewViewerPage() {
                 </button>
               </div>
 
-              {/* Memo save (shown when revision) */}
-              {isRevision && revisionComment && (
-                <button type="button" onClick={handleRevisionSave}
-                  style={{
-                    width: "100%", height: 32, display: "flex", alignItems: "center", justifyContent: "center",
-                    fontFamily: MONO, fontSize: 10, cursor: "pointer",
-                    background: "transparent", border: `1px solid rgba(255,170,0,0.2)`,
-                    color: ORANGE, letterSpacing: "0.03em", transition: "all 0.15s",
-                  }}>
-                  SAVE_MEMO
-                </button>
-              )}
             </div>
           </div>
         </div>
