@@ -642,9 +642,9 @@ export default function GalleryPageClient() {
 
         {/* ── Bottom Bar ── */}
         <footer style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50, background: "#000", borderTop: "1px solid rgba(255,77,0,0.3)", backdropFilter: "blur(12px)" }}>
-          <div className="gl-footer-inner" style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div className="gl-footer-progress" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-              <div className="gl-footer-progress-label" style={{ display: "flex", justifyContent: "space-between", fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          <div className="gl-footer-inner" style={{ maxWidth: 1800, margin: "0 auto", height: 72, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
+            <div className="gl-footer-progress" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+              <div className="gl-footer-progress-label" style={{ display: "flex", justifyContent: "space-between", fontFamily: "'JetBrains Mono', 'Space Mono', monospace", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 <span style={{ color: "#888" }}>사진 선택</span>
                 <span style={{ color: "#FF4D00" }}>{Y} / {N}장</span>
               </div>
@@ -653,9 +653,9 @@ export default function GalleryPageClient() {
               </div>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 24, marginLeft: 32 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 20, flexShrink: 0 }}>
               <div className="gl-footer-meta" style={{ textAlign: "right" }}>
-                <p style={{ fontSize: 12, fontWeight: 700, color: remaining === 0 ? "#FF4D00" : "rgba(255,255,255,0.5)", margin: 0 }}>
+                <p style={{ fontFamily: "'JetBrains Mono', 'Space Mono', monospace", fontSize: 11, fontWeight: 700, color: remaining === 0 ? "#FF4D00" : "rgba(255,255,255,0.35)", margin: 0, whiteSpace: "nowrap" }}>
                   {remaining > 0
                     ? `사진을 ${remaining}장 더 골라주세요`
                     : remaining === 0

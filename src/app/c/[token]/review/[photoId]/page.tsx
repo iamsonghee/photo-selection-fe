@@ -314,6 +314,10 @@ export default function ReviewViewerPage() {
         .rv-modal-b-br { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
 
         @media (max-width: 900px) {
+          .rv-header-top { height: 56px !important; padding: 0 14px !important; }
+          .rv-header-project-title { font-size: 15px !important; }
+          .rv-header-session { display: none !important; }
+          .rv-header-client-label { display: none !important; }
           .rv-workspace { grid-template-columns: 1fr !important; grid-template-rows: auto 1fr auto; }
           .rv-panel-left { display: none !important; }
           .rv-panel-right { border-left: none !important; border-top: 1px solid ${BORDER} !important; max-height: 45vh; overflow-y: auto; }
@@ -334,49 +338,84 @@ export default function ReviewViewerPage() {
         onTouchEnd={handleTouchEnd}
       >
         {/* ── Header ── */}
-        <header style={{
-          height: 56, flexShrink: 0,
-          borderBottom: `1px solid ${BORDER}`,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "0 24px",
-          background: "rgba(10,10,10,0.85)", backdropFilter: "blur(10px)",
-          zIndex: 10,
-        }}>
-          {/* Left */}
-          <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-            <Link href={`/c/${token}`} style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: 18, letterSpacing: "-0.02em", color: TEXT }}>
-              <div style={{ background: ACCENT, color: "#000", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800 }}>A</div>
-              A-CUT.
-            </Link>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, paddingLeft: 24, borderLeft: `1px solid ${BORDER}`, fontFamily: MONO, fontSize: 12, color: MUTED }}>
-              <span style={{ color: DIM }}>UID ::</span>
-              <span>PRJ-{prjIdShort}</span>
-              <span style={{ color: TEXT, marginLeft: 8 }}>{project.name} — 보정 검토</span>
+        <header style={{ flexShrink: 0, borderBottom: `1px solid ${BORDER}`, background: "rgba(10,10,10,0.92)", backdropFilter: "blur(20px)", zIndex: 10 }}>
+          {/* Row 1 */}
+          <div className="rv-header-top" style={{ height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            {/* Left */}
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <Link href={`/c/${token}`} style={{ textDecoration: "none" }}>
+                <div style={{ width: 32, height: 32, background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center", color: "#000", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 18, flexShrink: 0 }}>A</div>
+              </Link>
+              <div>
+                <h1 className="rv-header-project-title" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 20, letterSpacing: "-0.5px", lineHeight: 1, color: TEXT, margin: 0 }}>
+                  {project.name}
+                </h1>
+                <p style={{ fontFamily: MONO, fontSize: 10, color: DIM, marginTop: 4, letterSpacing: "0.1em" }}>
+                  REVIEW // 보정본 검토
+                </p>
+              </div>
+            </div>
+
+            {/* Right */}
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div className="rv-header-session" style={{ border: `1px solid ${BORDER}`, padding: "4px 10px", display: "flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 10, letterSpacing: "0.05em", color: MUTED, textTransform: "uppercase" }}>
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: GREEN }} />
+                SYS.SESSION_ACTIVE
+              </div>
+              <div style={{ width: 1, height: 24, background: BORDER }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: MONO, fontSize: 12 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span className="rv-header-client-label" style={{ fontFamily: MONO, fontSize: 11, color: DIM }}>CLIENT</span>
+                <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: TEXT }}>{customerName}</span>
+              </div>
+              <div style={{
+                padding: "4px 12px", border: `1px solid ${statusBorder}`,
+                background: statusBg, color: statusColor,
+                fontFamily: MONO, fontSize: 10, letterSpacing: "0.05em", textTransform: "uppercase",
+                display: "flex", alignItems: "center", gap: 5,
+              }}>
+                {isApproved ? <Check size={10} /> : isRevision ? <RefreshCw size={10} /> : null}
+                {statusLabel}
+              </div>
             </div>
           </div>
 
-          {/* Right */}
-          <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-            <div style={{ border: `1px solid ${BORDER}`, padding: "4px 10px", display: "flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 10, letterSpacing: "0.05em", color: MUTED, textTransform: "uppercase" }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: GREEN }} />
-              SYS.SESSION_ACTIVE
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: MONO, fontSize: 12 }}>
-              <div style={{ width: 24, height: 24, border: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          {/* Row 2: Toolbar */}
+          <div style={{ borderTop: `1px solid #111`, background: "rgba(0,0,0,0.5)" }}>
+            <div className="rv-toolbar" style={{ height: 56, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "center", gap: 24, overflowX: "auto" }}>
+              {/* Nav prev/next */}
+              <div className="rv-tool-group">
+                <button type="button" className="rv-btn-icon" onClick={goPrev}>
+                  <ChevronLeft size={14} /> PREV
+                </button>
+                <span style={{ padding: "0 12px", fontFamily: MONO, fontSize: 11, color: MUTED, borderRight: `1px solid ${BORDER}` }}>
+                  {currentIndex + 1} / {photos.length}
+                </span>
+                <button type="button" className="rv-btn-icon" onClick={goNext}>
+                  NEXT <ChevronRight size={14} />
+                </button>
               </div>
-              <span style={{ color: DIM }}>CLIENT ::</span>
-              <span>{customerName}</span>
-            </div>
-            {/* Status badge */}
-            <div style={{
-              padding: "4px 10px", border: `1px solid ${statusBorder}`,
-              background: statusBg, color: statusColor,
-              fontFamily: MONO, fontSize: 10, letterSpacing: "0.05em", textTransform: "uppercase",
-              display: "flex", alignItems: "center", gap: 5,
-            }}>
-              {isApproved ? <Check size={10} /> : isRevision ? <RefreshCw size={10} /> : null}
-              {statusLabel}
+
+              {/* View mode */}
+              <div className="rv-tool-group">
+                <button type="button" className={`rv-btn-icon${viewMode === "side-by-side" ? " rv-active" : ""}`} onClick={() => setViewMode("side-by-side")}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+                  SIDE-BY-SIDE
+                </button>
+                <button type="button" className={`rv-btn-icon${viewMode === "single-original" ? " rv-active" : ""}`} onClick={() => setViewMode("single-original")}>
+                  ORIGINAL
+                </button>
+                <button type="button" className={`rv-btn-icon${viewMode === "single-retouched" ? " rv-active" : ""}`} onClick={() => setViewMode("single-retouched")}>
+                  RETOUCHED
+                </button>
+              </div>
+
+              {/* Fullscreen */}
+              <div className="rv-tool-group">
+                <button type="button" className="rv-btn-icon" onClick={() => { setFullInitial("original"); setFullOpen(true); }}>
+                  <Maximize2 size={13} /> FULLSCREEN
+                </button>
+              </div>
             </div>
           </div>
         </header>
@@ -430,55 +469,6 @@ export default function ReviewViewerPage() {
 
           {/* Center panel: viewer */}
           <div style={{ display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
-            {/* Toolbar */}
-            <div className="rv-toolbar" style={{ height: 48, borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "center", gap: 24, background: "rgba(10,10,10,0.9)", flexShrink: 0 }}>
-              {/* Nav prev/next */}
-              <div className="rv-tool-group">
-                <button type="button" className="rv-btn-icon" onClick={goPrev}>
-                  <ChevronLeft size={14} /> PREV
-                </button>
-                <span style={{ padding: "0 12px", fontFamily: MONO, fontSize: 11, color: MUTED, borderRight: `1px solid ${BORDER}` }}>
-                  {currentIndex + 1} / {photos.length}
-                </span>
-                <button type="button" className="rv-btn-icon" onClick={goNext}>
-                  NEXT <ChevronRight size={14} />
-                </button>
-              </div>
-
-              {/* View mode */}
-              <div className="rv-tool-group">
-                <button
-                  type="button"
-                  className={`rv-btn-icon${viewMode === "side-by-side" ? " rv-active" : ""}`}
-                  onClick={() => setViewMode("side-by-side")}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
-                  SIDE-BY-SIDE
-                </button>
-                <button
-                  type="button"
-                  className={`rv-btn-icon${viewMode === "single-original" ? " rv-active" : ""}`}
-                  onClick={() => setViewMode("single-original")}
-                >
-                  ORIGINAL
-                </button>
-                <button
-                  type="button"
-                  className={`rv-btn-icon${viewMode === "single-retouched" ? " rv-active" : ""}`}
-                  onClick={() => setViewMode("single-retouched")}
-                >
-                  RETOUCHED
-                </button>
-              </div>
-
-              {/* Fullscreen */}
-              <div className="rv-tool-group">
-                <button type="button" className="rv-btn-icon" onClick={() => { setFullInitial("original"); setFullOpen(true); }}>
-                  <Maximize2 size={13} /> FULLSCREEN
-                </button>
-              </div>
-            </div>
-
             {/* Image stage */}
             <div style={{ flex: 1, padding: 24, display: "flex", gap: 16, overflow: "hidden" }}>
 
