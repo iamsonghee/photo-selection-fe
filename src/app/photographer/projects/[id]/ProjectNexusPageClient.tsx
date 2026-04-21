@@ -403,7 +403,7 @@ export function ProjectNexusPageClient() {
         },
         {
           label: "보정본 업로드",
-          desc: f3 === "done" ? "완료" : f3 === "active" ? "진행 중" : "이전 단계 완료 후 가능",
+          desc: "완료",
           icon: <PenLine size={20} color="#FF4D00" />,
           state: "done",
           onClick: canEditVersions ? () => router.push(`/photographer/projects/${id}/upload-versions`) : undefined,
@@ -413,6 +413,7 @@ export function ProjectNexusPageClient() {
           desc: "완료",
           icon: <Eye size={20} color="#FF4D00" />,
           state: "done",
+          onClick: () => router.push(`/photographer/projects/${id}/upload-versions`),
         },
         {
           label: "재보정 업로드",
