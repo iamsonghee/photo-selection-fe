@@ -369,10 +369,10 @@ export function ProjectNexusPageClient() {
     : delivered ? "done"
     : "active";
 
-  // 재보정 v2 (5단계 step 4)
+  // 재보정 v2 (5단계 step 4): editing_v2/reviewing_v2 모두 active, delivered만 done
   const f5r: FlowVisual =
-    project.status === "editing_v2" ? "active"
-    : ["reviewing_v2", "delivered"].includes(project.status) ? "done"
+    project.status === "delivered" ? "done"
+    : ["editing_v2", "reviewing_v2"].includes(project.status) ? "active"
     : "locked";
 
   const fDeliver: FlowVisual = delivered ? "done" : "locked";
@@ -721,14 +721,24 @@ export function ProjectNexusPageClient() {
             {actionFlowSteps.map((step, i) => {
               const isDone = step.state === "done";
               const isActive = step.state === "active";
+              const isLocked = step.state === "locked";
               return (
                 <div
                   key={i}
+                  role={step.onClick ? "button" : undefined}
+                  tabIndex={step.onClick ? 0 : undefined}
                   className={[
                     styles.flowStep,
                     isDone ? styles.flowDone : isActive ? styles.flowActive : styles.flowLocked,
                   ].join(" ")}
-                  style={{ cursor: "default" }}
+                  style={{ cursor: step.onClick ? "pointer" : isLocked ? "not-allowed" : "default" }}
+                  onClick={step.onClick}
+                  onKeyDown={(e) => {
+                    if (step.onClick && (e.key === "Enter" || e.key === " ")) {
+                      e.preventDefault();
+                      step.onClick();
+                    }
+                  }}
                 >
                   <div className={styles.flowInfo} style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -743,13 +753,7 @@ export function ProjectNexusPageClient() {
                     <span className={styles.flowMeta}>{step.desc}</span>
                   </div>
                   {step.onClick && (
-                    <button
-                      type="button"
-                      className={styles.flowNavBtn}
-                      onClick={step.onClick}
-                    >
-                      →
-                    </button>
+                    <span className={styles.flowNavBtn} aria-hidden>→</span>
                   )}
                 </div>
               );

@@ -699,17 +699,16 @@
 .flowNavBtn {
   flex-shrink: 0;
   margin-left: 12px;
-  padding: 6px 12px;
-  background: transparent;
+  padding: 6px 10px;
   border: 1px solid var(--nx-border-main);
-  color: var(--nx-text-secondary);
+  color: var(--nx-text-muted);
   font-family: var(--nx-font-mono), 'Noto Sans KR', sans-serif;
-  font-size: 12px;
-  cursor: pointer;
+  font-size: 13px;
   transition: border-color 0.15s, color 0.15s;
+  pointer-events: none;
 }
 
-.flowNavBtn:hover {
+.flowStep:hover .flowNavBtn {
   border-color: var(--nx-accent);
   color: var(--nx-accent);
 }
@@ -717,15 +716,6 @@
 .flowActive .flowNavBtn {
   border-color: rgba(255, 85, 0, 0.4);
   color: var(--nx-accent);
-}
-
-.flowActive .flowNavBtn:hover {
-  border-color: var(--nx-accent);
-  background: rgba(255, 85, 0, 0.08);
-}
-
-.flowDone .flowNavBtn {
-  opacity: 0.6;
 }
 
 .flowBadgeLive {
