@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getPhotosWithSelections, getProjectById } from "@/lib/db";
-import { getStatusLabel } from "@/lib/project-status";
 import type { Photo, Project, ProjectStatus } from "@/types";
 import CompareViewerModal from "@/components/CompareViewerModal";
+import { ProjectPipelineHeader } from "@/components/photographer/ProjectPipelineHeader";
 import styles from "./Workflow.module.css";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -410,24 +410,7 @@ export default function WorkflowPageClient() {
       <div className={styles.scanline} />
 
       {/* ── Header ── */}
-      <header className="h-[52px] shrink-0 sticky top-0 z-50 bg-black/90 backdrop-blur-md border-b border-[#222] flex items-center justify-between px-6">
-        <div className="flex items-center gap-4">
-          <h1 className="text-sm font-bold text-white">{project.name}</h1>
-          <span className="bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/30 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider font-bold">
-            {getStatusLabel(project.status)}
-          </span>
-        </div>
-
-        <button
-          className="text-[#888] hover:text-white font-mono text-[11px] uppercase tracking-widest transition-colors flex items-center gap-2"
-          onClick={() => router.push(`/photographer/projects/${id}`)}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5" /><path d="M12 19l-7-7 7-7" />
-          </svg>
-          뒤로가기
-        </button>
-      </header>
+      <ProjectPipelineHeader projectId={id} project={project} />
 
       {/* ── Selecting: waiting screen ── */}
       {isSelecting && (

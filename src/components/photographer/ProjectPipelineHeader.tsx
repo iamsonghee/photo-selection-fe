@@ -30,13 +30,11 @@ export type ProjectPipelineActiveStep = 0 | 1 | 2 | 3 | 4;
 type Props = {
   projectId: string;
   project: Pick<Project, "status" | "displayId" | "name">;
-  activeStepIndex: ProjectPipelineActiveStep;
+  activeStepIndex?: ProjectPipelineActiveStep;
 };
 
 export function ProjectPipelineHeader({ projectId, project, activeStepIndex }: Props) {
   const router = useRouter();
-  const idx = Math.max(0, Math.min(4, activeStepIndex)) as ProjectPipelineActiveStep;
-  const stepDisplay = String(idx + 1).padStart(2, "0");
   const idShort = (project.displayId ?? projectId).replace(/^PRJ-/i, "").slice(0, 12);
   const linkActive = project.status !== "preparing";
 
@@ -81,9 +79,11 @@ export function ProjectPipelineHeader({ projectId, project, activeStepIndex }: P
       </button>
 
       <div style={{ flex: 1 }} />
-      <span style={{ ...techLabel, color: TEXT_BRIGHT, flexShrink: 0, marginRight: 12 }}>
-        STEP <span style={{ color: ACCENT }}>{stepDisplay}/05</span>
-      </span>
+      {activeStepIndex !== undefined && (
+        <span style={{ ...techLabel, color: TEXT_BRIGHT, flexShrink: 0, marginRight: 12 }}>
+          STEP <span style={{ color: ACCENT }}>{String(Math.max(0, Math.min(4, activeStepIndex)) + 1).padStart(2, "0")}/05</span>
+        </span>
+      )}
       <span
         style={{
           ...techLabel,
