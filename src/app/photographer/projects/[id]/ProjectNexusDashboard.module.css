@@ -696,6 +696,50 @@
   opacity: 0.35;
 }
 
+.flowNavBtn {
+  flex-shrink: 0;
+  margin-left: 12px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--nx-border-main);
+  color: var(--nx-text-secondary);
+  font-family: var(--nx-font-mono), 'Noto Sans KR', sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.flowNavBtn:hover {
+  border-color: var(--nx-accent);
+  color: var(--nx-accent);
+}
+
+.flowActive .flowNavBtn {
+  border-color: rgba(255, 85, 0, 0.4);
+  color: var(--nx-accent);
+}
+
+.flowActive .flowNavBtn:hover {
+  border-color: var(--nx-accent);
+  background: rgba(255, 85, 0, 0.08);
+}
+
+.flowDone .flowNavBtn {
+  opacity: 0.6;
+}
+
+.flowBadgeLive {
+  font-family: var(--nx-font-mono), 'Noto Sans KR', sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  background: rgba(255, 85, 0, 0.12);
+  border: 1px solid rgba(255, 85, 0, 0.4);
+  color: var(--nx-accent);
+}
+
 .indicatorPulse {
   width: 8px;
   height: 8px;

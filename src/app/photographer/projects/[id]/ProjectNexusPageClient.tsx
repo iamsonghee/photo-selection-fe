@@ -355,84 +355,67 @@ export function ProjectNexusPageClient() {
 
   const preparing = project.status === "preparing";
   const selecting = project.status === "selecting";
-  const inRetouchPhase = ["confirmed", "editing", "editing_v2"].includes(project.status);
-  const retouchDone = ["reviewing_v1", "reviewing_v2", "delivered"].includes(project.status);
-  const reviewActive = project.status === "reviewing_v1" || project.status === "reviewing_v2";
   const delivered = project.status === "delivered";
 
   const f1: FlowVisual = !uploadDone ? "active" : "done";
   const f2: FlowVisual = !canViewSelections ? "locked" : selectingActive ? "active" : "done";
-  const f3: FlowVisual =
-    preparing || selecting ? "locked" : retouchDone ? "done" : inRetouchPhase ? "active" : "locked";
-  const f4: FlowVisual =
-    !["reviewing_v1", "reviewing_v2", "delivered"].includes(project.status) ? "locked" : delivered ? "done" : "active";
-  const f5: FlowVisual = delivered ? "done" : "locked";
 
-  const flowClass = (f: FlowVisual) =>
-    f === "done" ? styles.flowDone : f === "active" ? styles.flowActive : styles.flowLocked;
-
-  // 재보정 관련 상태 (7단계 전용)
   const inV2Phase = ["editing_v2", "reviewing_v2", "delivered"].includes(project.status);
-  const useSevenSteps = project.allowRevision && inV2Phase;
+  const useFiveSteps = project.allowRevision && inV2Phase;
 
-  const f5r: FlowVisual = // 재보정 업로드 (7단계 index 4)
+  // 보정본 통합 스텝 (4단계 step 3): editing/reviewing_v1 모두 active
+  const f3combined: FlowVisual =
+    preparing || selecting ? "locked"
+    : delivered ? "done"
+    : "active";
+
+  // 재보정 v2 (5단계 step 4)
+  const f5r: FlowVisual =
     project.status === "editing_v2" ? "active"
     : ["reviewing_v2", "delivered"].includes(project.status) ? "done"
     : "locked";
-  const f6r: FlowVisual = // 재보정 검토 (7단계 index 5)
-    project.status === "reviewing_v2" ? "active"
-    : project.status === "delivered" ? "done"
-    : "locked";
-  const f7r: FlowVisual = delivered ? "done" : "locked"; // 납품 완료 (7단계 index 6)
 
-  const actionFlowSteps: FlowStep[] = useSevenSteps
+  const fDeliver: FlowVisual = delivered ? "done" : "locked";
+
+  const actionFlowSteps: FlowStep[] = useFiveSteps
     ? [
         {
           label: "원본 업로드",
-          desc: f1 === "done" ? "완료" : "진행 중",
+          desc: "완료",
           icon: <Upload size={20} color="#FF4D00" />,
           state: f1,
           onClick: () => router.push(`/photographer/projects/${id}/upload`),
         },
         {
           label: "셀렉 결과 확인",
-          desc: f2 === "done" ? "완료" : f2 === "active" ? "고객 셀렉 중" : "이전 단계 완료 후 가능",
+          desc: f2 === "active" ? "고객 셀렉 중" : "완료",
           icon: <ListChecks size={20} color="#FF4D00" />,
           state: f2,
+          badge: f2 === "active" ? "LIVE" : null,
           onClick: canViewSelections ? () => router.push(`/photographer/projects/${id}/results`) : undefined,
         },
         {
-          label: "보정본 업로드",
-          desc: "완료",
+          label: "보정본 v1",
+          desc: "고객 검토 완료",
           icon: <PenLine size={20} color="#FF4D00" />,
-          state: "done",
-          onClick: canEditVersions ? () => router.push(`/photographer/projects/${id}/upload-versions`) : undefined,
-        },
-        {
-          label: "보정본 검토",
-          desc: "완료",
-          icon: <Eye size={20} color="#FF4D00" />,
           state: "done",
           onClick: () => router.push(`/photographer/projects/${id}/upload-versions`),
         },
         {
-          label: "재보정 업로드",
-          desc: f5r === "done" ? "완료" : f5r === "active" ? "진행 중" : "이전 단계 완료 후 가능",
+          label: "재보정 v2",
+          desc: project.status === "editing_v2" ? "업로드 진행 중"
+                : project.status === "reviewing_v2" ? "고객 검토 중"
+                : "완료",
+          badge: project.status === "editing_v2" ? "LIVE" : null,
           icon: <PenLine size={20} color="#FF4D00" />,
           state: f5r,
           onClick: f5r !== "locked" ? () => router.push(`/photographer/projects/${id}/upload-versions/v2`) : undefined,
         },
         {
-          label: "재보정 검토",
-          desc: f6r === "done" ? "완료" : f6r === "active" ? "고객 검토 중" : "이전 단계 완료 후 가능",
-          icon: <Eye size={20} color="#FF4D00" />,
-          state: f6r,
-        },
-        {
-          label: "최종 전달 완료",
-          desc: f7r === "done" ? "완료" : "최종 목표",
+          label: "납품 완료",
+          desc: delivered ? "완료" : "최종 목표",
           icon: <Flag size={20} color="#FF4D00" />,
-          state: f7r,
+          state: fDeliver,
         },
       ]
     : [
@@ -448,30 +431,28 @@ export function ProjectNexusPageClient() {
           desc: f2 === "done" ? "완료" : f2 === "active" ? "고객 셀렉 중" : "이전 단계 완료 후 가능",
           icon: <ListChecks size={20} color="#FF4D00" />,
           state: f2,
+          badge: f2 === "active" ? "LIVE" : null,
           onClick: canViewSelections ? () => router.push(`/photographer/projects/${id}/results`) : undefined,
         },
         {
-          label: "보정본 업로드",
-          desc: f3 === "done" ? "완료" : f3 === "active" ? "진행 중" : "이전 단계 완료 후 가능",
+          label: "보정본",
+          desc: delivered ? "완료"
+                : project.status === "reviewing_v1" ? "고객 검토 중"
+                : f3combined === "active" ? "업로드 진행 중"
+                : "이전 단계 완료 후 가능",
+          badge: project.status === "reviewing_v1" ? "LIVE" : null,
           icon: <PenLine size={20} color="#FF4D00" />,
-          state: f3,
+          state: f3combined,
           onClick: canEditVersions ? () => {
             if (project.status === "confirmed") setShowEditGuideModal(true);
-            else router.push(editVersionsPath);
+            else router.push(`/photographer/projects/${id}/upload-versions`);
           } : undefined,
         },
         {
-          label: "고객 최종 검토",
-          desc: f4 === "done" ? "완료" : f4 === "active" ? "고객 검토 중" : "이전 단계 완료 후 가능",
-          icon: <Eye size={20} color="#FF4D00" />,
-          state: f4,
-          onClick: canReview ? () => router.push(editVersionsPath) : undefined,
-        },
-        {
-          label: "최종 전달 완료",
-          desc: f5 === "done" ? "완료" : "최종 목표",
+          label: "납품 완료",
+          desc: delivered ? "완료" : "최종 목표",
           icon: <Flag size={20} color="#FF4D00" />,
-          state: f5,
+          state: fDeliver,
         },
       ];
 
@@ -736,8 +717,43 @@ export function ProjectNexusPageClient() {
 
         <div className={styles.workspaceRight}>
           <div className={styles.actionFlowContainer}>
-            <div className={styles.flowSectionTitle}>03. PIPELINE :: ACTION_FLOW</div>
-            <ProjectActionFlow steps={actionFlowSteps} />
+            <div className={styles.flowSectionTitle}>03. PIPELINE</div>
+            {actionFlowSteps.map((step, i) => {
+              const isDone = step.state === "done";
+              const isActive = step.state === "active";
+              return (
+                <div
+                  key={i}
+                  className={[
+                    styles.flowStep,
+                    isDone ? styles.flowDone : isActive ? styles.flowActive : styles.flowLocked,
+                  ].join(" ")}
+                  style={{ cursor: "default" }}
+                >
+                  <div className={styles.flowInfo} style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span className={styles.flowMeta} style={{ opacity: 0.5, flexShrink: 0 }}>
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <span className={styles.flowTitle}>{step.label}</span>
+                      {step.badge && (
+                        <span className={styles.flowBadgeLive}>{step.badge}</span>
+                      )}
+                    </div>
+                    <span className={styles.flowMeta}>{step.desc}</span>
+                  </div>
+                  {step.onClick && (
+                    <button
+                      type="button"
+                      className={styles.flowNavBtn}
+                      onClick={step.onClick}
+                    >
+                      →
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           <div className={styles.logSection}>
