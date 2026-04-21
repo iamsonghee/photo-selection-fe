@@ -205,7 +205,7 @@ export default function SettingsPage() {
       }
       const supabase = createClient();
       await supabase.auth.signOut();
-      router.push("/auth");
+      router.push("/");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "탈퇴 실패", true);
       setDeletingAccount(false);

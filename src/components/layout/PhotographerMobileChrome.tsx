@@ -40,7 +40,7 @@ export function PhotographerMobileChrome() {
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    window.location.href = "/auth";
+    window.location.href = "/";
   };
 
   const fabStyle: React.CSSProperties = {

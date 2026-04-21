@@ -396,7 +396,7 @@ export default function DashboardPage() {
         <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12, color: "#555" }}>
           로그인하면 프로젝트를 볼 수 있습니다
         </p>
-        <Link href="/auth" style={{
+        <Link href="/" style={{
           background: ACCENT, color: "#000", padding: "10px 24px",
           fontSize: 13, fontWeight: 700, textDecoration: "none",
           fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",

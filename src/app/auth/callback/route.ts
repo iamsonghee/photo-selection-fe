@@ -13,14 +13,14 @@ export async function GET(request: Request) {
   const next = requestUrl.searchParams.get("next") ?? "/photographer/dashboard";
 
   if (!code) {
-    return NextResponse.redirect(new URL("/auth", requestUrl.origin));
+    return NextResponse.redirect(new URL("/", requestUrl.origin));
   }
 
   const supabase = await createClient();
   const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
     console.error("[Auth Callback] exchangeCodeForSession error:", error);
-    return NextResponse.redirect(new URL("/auth?error=" + encodeURIComponent(error.message), requestUrl.origin));
+    return NextResponse.redirect(new URL("/?error=" + encodeURIComponent(error.message), requestUrl.origin));
   }
 
   const user = sessionData?.user;
