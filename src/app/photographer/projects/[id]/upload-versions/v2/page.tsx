@@ -1013,9 +1013,7 @@ export default function UploadVersionsV2Page() {
                 className="ph-uv-thumb-row"
                 style={{
                   display: "grid",
-                  gridTemplateColumns: revisionRowCols > 0
-                    ? `repeat(${revisionRowCols}, minmax(0, 1fr))`
-                    : "1fr",
+                  gridTemplateColumns: `repeat(${REVISION_ORIGINALS_ROW_MAX}, minmax(0, 1fr))`,
                   gap: 12,
                   width: "100%",
                 }}
@@ -1610,50 +1608,40 @@ function SelectedThumbV2({ target, num, onClick }: { target: V2Target; num: numb
   const [err, setErr] = useState(false);
   return (
     <div
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
+      className="ph-uv-thumb-tile"
       style={{
-        background: SURFACE_1,
+        aspectRatio: "1/1",
+        background: "#080808",
         border: `1px solid ${BORDER}`,
-        overflow: "hidden",
+        position: "relative",
         cursor: onClick ? "zoom-in" : "default",
+        overflow: "hidden",
       }}
     >
-      <div style={{ aspectRatio: "1/1", background: SURFACE_2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", inset: 0, background: "#111", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {target.photo.url && !err ? (
           <img src={target.photo.url} alt="" onError={() => setErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
           <Image size={16} color={TEXT_MUTED} />
         )}
+      </div>
+      <div style={{
+        position: "absolute", bottom: 3, left: 4,
+        fontSize: 8, color: "#666",
+        background: "rgba(0,0,0,0.8)", padding: "2px 4px",
+        fontFamily: MONO, border: "1px solid #222",
+      }}>
+        {String(num).padStart(3, "0")}
+      </div>
+      {target.comment?.trim() ? (
         <div style={{
-          position: "absolute", bottom: 3, left: 4,
-          fontSize: 9, color: "rgba(255,255,255,0.6)",
-          background: "rgba(0,0,0,0.5)", padding: "1px 4px",
-          fontFamily: MONO,
-        }}>
-          {num}
-        </div>
-      </div>
-      <div style={{ padding: "4px 6px" }}>
-        <div style={{ fontSize: 9, color: TEXT_MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: MONO }}>
-          {target.filename}
-        </div>
-        {target.comment?.trim() ? (
-          <div
-            style={{
-              marginTop: 3,
-              fontSize: 9,
-              color: AMBER,
-              lineHeight: 1.25,
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            {target.comment}
-          </div>
-        ) : null}
-      </div>
+          position: "absolute", bottom: 3, right: 4,
+          width: 6, height: 6, borderRadius: "50%", background: AMBER,
+        }} title={target.comment} />
+      ) : null}
     </div>
   );
 }
