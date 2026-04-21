@@ -16,12 +16,14 @@ type Props = {
   onClose: () => void;
   photos: CompareItem[];
   initialIndex: number;
+  initialTab?: "original" | "v1" | "v2";
 };
 
-export default function CompareViewerModal({ isOpen, onClose, photos, initialIndex }: Props) {
+export default function CompareViewerModal({ isOpen, onClose, photos, initialIndex, initialTab }: Props) {
   const [mounted, setMounted] = useState(false);
   const [index, setIndex] = useState(initialIndex);
   const [tab, setTab] = useState<"original" | "v1" | "v2">("original");
+  const [splitMode, setSplitMode] = useState(false);
   const total = photos.length;
 
   useEffect(() => {
@@ -31,18 +33,23 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
   useEffect(() => {
     if (!isOpen) return;
     setIndex(Math.min(Math.max(0, initialIndex), Math.max(0, total - 1)));
-  }, [isOpen, initialIndex, total]);
+    if (initialTab) setTab(initialTab);
+  }, [isOpen, initialIndex, total, initialTab]);
 
   const current = useMemo(() => {
     if (!isOpen || total === 0) return null;
     return photos[index] ?? null;
   }, [isOpen, photos, total, index]);
 
+  // Navigation fallback: only downgrade tab if current photo lacks that version
   useEffect(() => {
     if (!current) return;
-    if (current.v2?.url) setTab("v2");
-    else if (current.v1?.url || current.retouched?.url) setTab("v1");
-    else setTab("original");
+    const v1 = current.v1 ?? current.retouched;
+    setTab((prev) => {
+      if (prev === "v2" && !current.v2?.url) return v1?.url ? "v1" : "original";
+      if (prev === "v1" && !v1?.url) return "original";
+      return prev;
+    });
   }, [current]);
 
   useEffect(() => {
@@ -78,10 +85,24 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
   const v1 = current.v1 ?? current.retouched;
   const hasV1 = Boolean(v1?.url);
   const hasV2 = Boolean(current.v2?.url);
-  const singleView = hasV2;
+  const canSplit = hasV1 || hasV2; // split 버튼 표시 조건
   const activeImage =
     tab === "original" ? current.original : tab === "v1" ? (v1 ?? current.original) : (current.v2 ?? current.original);
   const activeLabel = tab === "original" ? "원본" : tab === "v1" ? "보정본 v1" : "보정본 v2";
+
+  // split 모드: 항상 원본 → v1 → v2 순서로 왼쪽=이전버전, 오른쪽=이후버전
+  const splitLeft =
+    tab === "v2" ? (v1 ?? current.original) : current.original;
+  const splitLeftLabel =
+    tab === "v2" ? (hasV1 ? "보정본 v1" : "원본") : "원본";
+  const splitRight =
+    tab === "original" ? (v1 ?? current.v2)
+    : tab === "v1"     ? (v1 ?? current.original)
+    :                    (current.v2 ?? current.original);
+  const splitRightLabel =
+    tab === "original" ? (hasV1 ? "보정본 v1" : "보정본 v2")
+    : tab === "v1"     ? "보정본 v1"
+    :                    "보정본 v2";
 
   /** document.body에 붙여 작가 레이아웃(main z-10)·사이드바(z-30)·하단 고정바(z-100) 스택 위에 표시 */
   return createPortal(
@@ -93,18 +114,31 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
         <div className="mb-3 shrink-0 flex items-center justify-between gap-3">
           <div className="text-sm text-zinc-200">
             <span className="font-semibold">{current.original.filename}</span>
-            <span className="ml-2 text-zinc-500">
-              {index + 1} / {total}
-            </span>
+            <span className="ml-2 text-zinc-500">{index + 1} / {total}</span>
           </div>
-          <button
-            type="button"
-            className="rounded-md border border-zinc-700 bg-zinc-900/70 p-2 text-zinc-200 hover:bg-zinc-800"
-            onClick={onClose}
-            aria-label="닫기"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {canSplit && (
+              <button
+                type="button"
+                onClick={() => setSplitMode((s) => !s)}
+                className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  splitMode
+                    ? "border-zinc-400 bg-zinc-200 text-zinc-900"
+                    : "border-zinc-700 bg-zinc-900/70 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500"
+                }`}
+              >
+                ⊞ 비교
+              </button>
+            )}
+            <button
+              type="button"
+              className="rounded-md border border-zinc-700 bg-zinc-900/70 p-2 text-zinc-200 hover:bg-zinc-800"
+              onClick={onClose}
+              aria-label="닫기"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div className="mb-2 shrink-0 flex flex-wrap items-center gap-2">
@@ -138,10 +172,10 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
         <div className="relative min-h-0 flex-1">
           <div
             className={`grid h-full min-h-0 w-full overflow-hidden ${
-              singleView ? "grid-cols-1" : "grid-cols-1 gap-3 md:grid-cols-2"
+              splitMode ? "grid-cols-1 gap-3 md:grid-cols-2" : "grid-cols-1"
             }`}
           >
-            {singleView ? (
+            {!splitMode ? (
               <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
                 <div className="mb-2 shrink-0 text-xs font-semibold text-zinc-300">{activeLabel}</div>
                 <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded bg-zinc-900">
@@ -156,10 +190,10 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
             ) : (
               <>
                 <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
-                  <div className="mb-2 shrink-0 text-xs font-semibold text-zinc-300">원본</div>
+                  <div className="mb-2 shrink-0 text-xs font-semibold text-zinc-300">{splitLeftLabel}</div>
                   <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded bg-zinc-900">
                     <img
-                      src={current.original.url}
+                      src={splitLeft.url}
                       alt=""
                       className="max-h-full max-w-full cursor-zoom-in object-contain"
                       draggable={false}
@@ -167,10 +201,10 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
                   </div>
                 </div>
                 <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
-                  <div className="mb-2 shrink-0 text-xs font-semibold text-zinc-300">보정본 v1</div>
+                  <div className="mb-2 shrink-0 text-xs font-semibold text-zinc-300">{splitRightLabel}</div>
                   <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded bg-zinc-900">
                     <img
-                      src={(v1 ?? current.original).url}
+                      src={(splitRight ?? current.original).url}
                       alt=""
                       className="max-h-full max-w-full cursor-zoom-in object-contain"
                       draggable={false}

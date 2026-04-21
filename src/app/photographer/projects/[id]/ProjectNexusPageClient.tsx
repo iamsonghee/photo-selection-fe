@@ -399,7 +399,7 @@ export function ProjectNexusPageClient() {
           desc: "고객 검토 완료",
           icon: <PenLine size={20} color="#FF4D00" />,
           state: "done",
-          onClick: () => router.push(`/photographer/projects/${id}/upload-versions`),
+          onClick: () => router.push(`/photographer/projects/${id}/workflow`),
         },
         {
           label: "재보정 v2",
@@ -409,7 +409,7 @@ export function ProjectNexusPageClient() {
           badge: project.status === "editing_v2" ? "LIVE" : null,
           icon: <PenLine size={20} color="#FF4D00" />,
           state: f5r,
-          onClick: f5r !== "locked" ? () => router.push(`/photographer/projects/${id}/upload-versions/v2`) : undefined,
+          onClick: f5r !== "locked" ? () => router.push(`/photographer/projects/${id}/workflow`) : undefined,
         },
         {
           label: "납품 완료",
@@ -443,10 +443,9 @@ export function ProjectNexusPageClient() {
           badge: project.status === "reviewing_v1" ? "LIVE" : null,
           icon: <PenLine size={20} color="#FF4D00" />,
           state: f3combined,
-          onClick: canEditVersions ? () => {
-            if (project.status === "confirmed") setShowEditGuideModal(true);
-            else router.push(`/photographer/projects/${id}/upload-versions`);
-          } : undefined,
+          onClick: canEditVersions
+            ? () => router.push(`/photographer/projects/${id}/workflow`)
+            : undefined,
         },
         {
           label: "납품 완료",
