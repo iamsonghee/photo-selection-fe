@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useProfile } from "@/contexts/ProfileContext";
+import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const ACCEPT_IMAGE = "image/jpeg,image/png,image/webp";
@@ -311,74 +312,21 @@ export default function SettingsPage() {
       <div className="st-grid-bg" />
       <div className="st-scanline" />
 
-      {/* ── 상단 헤더 (대시보드와 동일) ── */}
-      <header
-        className="st-topbar"
-        style={{
-          position: "sticky", top: 0, zIndex: 50,
-          height: 64, display: "flex", alignItems: "center",
-          justifyContent: "space-between", padding: "0 28px",
-          background: "rgba(0,0,0,0.95)", backdropFilter: "blur(12px)",
-          borderBottom: `1px solid ${BORDER_MID}`,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {ctxProfile?.profileImageUrl ? (
-            <img
-              src={getProfileImageUrl(ctxProfile.profileImageUrl)}
-              alt=""
-              style={{ width: 32, height: 32, objectFit: "cover", border: "1px solid #2a2a2a", flexShrink: 0 }}
-              onError={(e) => { (e.target as HTMLImageElement).src = getProfileImageUrl(null); }}
-            />
-          ) : (
-            <div style={{
-              width: 32, height: 32, background: "#111", border: "1px solid #2a2a2a",
-              flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 13, fontWeight: 700, color: "#777", fontFamily: "'Space Grotesk', sans-serif",
-            }}>
-              {userName.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <div>
-            <div style={{ fontSize: 13, color: "#ccc" }}>
-              안녕하세요, <strong style={{ color: "#fff" }}>{userName} 작가님</strong>
-            </div>
-            <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: "#666", textTransform: "uppercase", letterSpacing: "0.15em", marginTop: 1 }}>
-              세션 활성
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      {/* ── 상단 헤더 ── */}
+      <PhotographerPageHeader
+        crumbs={[{ label: "설정" }]}
+        title="설정"
+        actions={
           <div className="st-clock" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-            <span style={{ fontFamily: FONT_MONO, fontSize: 9, color: "#555", letterSpacing: "0.15em", textTransform: "uppercase" }}>SYS_TIME</span>
-            <span style={{ fontFamily: FONT_MONO, fontSize: 12, color: "#fff", letterSpacing: "0.1em" }}>{clockStr}</span>
+            <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 9, color: "#555", letterSpacing: "0.15em", textTransform: "uppercase" }}>SYS_TIME</span>
+            <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 12, color: "#fff", letterSpacing: "0.1em" }}>{clockStr}</span>
           </div>
-          <div style={{
-            fontFamily: FONT_MONO, fontSize: 10, color: TEXT_TERT,
-            letterSpacing: "0.1em", textTransform: "uppercase",
-            border: "1px solid #1a1a1a", padding: "5px 10px",
-          }}>
-            SYS :: SETTINGS
-          </div>
-        </div>
-      </header>
+        }
+      />
 
       {/* ── 본문 ── */}
       <div style={{ position: "relative", zIndex: 10, padding: "28px 28px 60px" }}>
 
-        {/* 타이틀 바 */}
-        <div style={{
-          display: "flex", justifyContent: "space-between", alignItems: "flex-end",
-          borderBottom: `1px solid ${BORDER_MID}`, paddingBottom: 20, marginBottom: 28,
-        }}>
-          <div>
-            <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: ACCENT, letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 6 }}>
-              SYS.USER :: PHOTOGRAPHER_SETTINGS
-            </div>
-            <h1 style={{ fontSize: 22, fontWeight: 900, color: "#fff", margin: 0 }}>설정</h1>
-          </div>
-        </div>
 
         {/* ── 히어로 패널 ── */}
         <section

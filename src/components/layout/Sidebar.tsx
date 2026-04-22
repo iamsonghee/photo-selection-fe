@@ -6,6 +6,8 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PHOTOGRAPHER_NAV_ITEMS } from "@/lib/photographer-nav";
+import { useProfile } from "@/contexts/ProfileContext";
+import { getProfileImageUrl } from "@/lib/photographer";
 import styles from "@/components/layout/Sidebar.module.css";
 
 const sidebarSans = Inter({
@@ -46,6 +48,8 @@ export function Sidebar({
   sidebarToggle: SidebarToggleProps;
 }) {
   const pathname = usePathname();
+  const { profile } = useProfile();
+  const displayName = profile?.name?.trim() || profile?.email?.split("@")[0] || "작가";
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -151,6 +155,49 @@ export function Sidebar({
           </span>
         </Link>
       </div>
+
+      {/* Profile section */}
+      {!collapsed && (
+        <div
+          className="px-6 py-4 border-b flex items-center gap-3"
+          style={{ borderColor: "var(--acb-border)" }}
+        >
+          <div
+            className="w-10 h-10 rounded-full overflow-hidden border flex-shrink-0 flex items-center justify-center text-sm font-bold text-white"
+            style={{ borderColor: "var(--acb-border)", background: "#1a1a1a" }}
+          >
+            {profile?.profileImageUrl ? (
+              <img
+                src={getProfileImageUrl(profile.profileImageUrl)}
+                alt=""
+                className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <span style={{ fontFamily: "var(--acb-sidebar-sans)" }}>
+                {displayName.charAt(0).toUpperCase()}
+              </span>
+            )}
+          </div>
+          <div className="overflow-hidden min-w-0">
+            <p
+              className="text-sm font-semibold text-white truncate"
+              style={{ fontFamily: "var(--acb-sidebar-sans)" }}
+            >
+              {displayName} 작가님
+            </p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+              <p
+                className="text-[10px] text-zinc-500 uppercase tracking-wider"
+                style={{ fontFamily: "var(--acb-sidebar-mono)" }}
+              >
+                세션 활성
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className={styles.navContainer}>
         <div

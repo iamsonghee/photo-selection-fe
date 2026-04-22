@@ -15,6 +15,7 @@ import { useProfile } from "@/contexts/ProfileContext";
 import EmptyDashboard from "./EmptyDashboard";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { ProjectPipelineMiniBar, getPipelineStepLabel } from "@/components/photographer/ProjectPipelineMiniBar";
+import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 
 // ── 새 디자인 컬러 팔레트 ───────────────────────────────────
 const ACCENT  = "#FF4D00";
@@ -514,94 +515,26 @@ export default function DashboardPage() {
       <div className="db-scanline" />
 
       {/* ── 상단 헤더 ── */}
-      <header
-        className="db-topbar"
-        style={{
-          position: "sticky", top: 0, zIndex: 50,
-          height: 64, display: "flex", alignItems: "center",
-          justifyContent: "space-between", padding: "0 28px",
-          background: "rgba(0,0,0,0.95)", backdropFilter: "blur(12px)",
-          borderBottom: "1px solid #222",
-        }}
-      >
-        {/* 좌: 유저 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {profile?.profileImageUrl ? (
-            <img
-              src={getProfileImageUrl(profile.profileImageUrl)}
-              alt=""
-              style={{
-                width: 32, height: 32, objectFit: "cover",
-                border: "1px solid #2a2a2a", flexShrink: 0,
-              }}
-              onError={(e) => { (e.target as HTMLImageElement).src = getProfileImageUrl(null); }}
-            />
-          ) : (
-            <div style={{
-              width: 32, height: 32, background: "#111",
-              border: "1px solid #2a2a2a", flexShrink: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 13, fontWeight: 700, color: "#777",
-              fontFamily: "'Space Grotesk', sans-serif",
-            }}>
-              {userName.charAt(0).toUpperCase()}
+      <PhotographerPageHeader
+        crumbs={[{ label: "대시보드" }]}
+        title="대시보드"
+        actions={
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div className="db-clock" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+              <span style={{ fontFamily: "var(--font-mono, 'Space Mono', monospace)", fontSize: 9, color: "#555", letterSpacing: "0.15em", textTransform: "uppercase" }}>SYS_TIME</span>
+              <span style={{ fontFamily: "var(--font-mono, 'Space Mono', monospace)", fontSize: 12, color: "#fff", letterSpacing: "0.1em" }}>{clockStr}</span>
             </div>
-          )}
-          <div>
-            <div style={{ fontSize: 13, color: "#ccc" }}>
-              안녕하세요, <strong style={{ color: "#fff" }}>{userName} 작가님</strong>
-            </div>
-            <div style={{
-              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
-              color: "#666", textTransform: "uppercase", letterSpacing: "0.15em", marginTop: 1,
-            }}>
-              세션 활성
-            </div>
+            <button
+              type="button"
+              onClick={() => router.push("/photographer/projects/new")}
+              className="flex items-center gap-2 bg-[#FF4D00] hover:bg-[#ff5e1a] text-black px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
+            >
+              <Plus size={14} />
+              새 프로젝트
+            </button>
           </div>
-        </div>
-
-        {/* 우: 시계 + 새 프로젝트 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div className="db-clock" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-            <span style={{
-              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9,
-              color: "#555", letterSpacing: "0.15em", textTransform: "uppercase",
-            }}>SYS_TIME</span>
-            <span style={{
-              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12,
-              color: "#fff", letterSpacing: "0.1em",
-            }}>{clockStr}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => router.push("/photographer/projects/new")}
-            style={{
-              display: "flex", alignItems: "center", gap: 8,
-              padding: "8px 18px", background: ACCENT,
-              color: "#000", border: "none",
-              fontSize: 13, fontWeight: 700, cursor: "pointer",
-              fontFamily: "'Pretendard', sans-serif",
-              transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
-              letterSpacing: "0.02em", textTransform: "uppercase",
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLButtonElement;
-              el.style.transform = "translateY(-1px)";
-              el.style.boxShadow = "0 0 20px rgba(255,77,0,0.4)";
-              el.style.background = "#ff5e1a";
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLButtonElement;
-              el.style.transform = "";
-              el.style.boxShadow = "";
-              el.style.background = ACCENT;
-            }}
-          >
-            <Plus size={14} />
-            새 프로젝트
-          </button>
-        </div>
-      </header>
+        }
+      />
 
       {/* ── 바디: 메인 + 우측 사이드바 ── */}
       <div

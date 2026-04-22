@@ -1,7 +1,20 @@
 import type { Viewport } from "next";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import { PhotographerDesktopShell } from "@/components/layout/PhotographerDesktopShell";
 import { ProfileProvider } from "@/contexts/ProfileContext";
 import "./photographer.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+const mono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 /** Next.js App Router: generates the same as meta viewport width=device-width, initial-scale=1, maximum-scale=1 */
 export const viewport: Viewport = {
@@ -17,7 +30,7 @@ export default function PhotographerLayout({
 }) {
   return (
     <ProfileProvider>
-      <div className="photographer-app relative flex min-h-screen bg-[#050505] text-zinc-100">
+      <div className={`photographer-app relative flex min-h-screen bg-[#050505] text-zinc-100 ${inter.variable} ${mono.variable}`} style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}>
         <div
           className="pointer-events-none fixed inset-0 z-0"
           aria-hidden

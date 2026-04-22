@@ -2,63 +2,141 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, AlertCircle } from "lucide-react";
-import { startOfMonth, subMonths } from "date-fns";
+import { createPortal } from "react-dom";
+import { Plus, Search, ChevronDown, Zap, Clock, CheckCircle2, Layers } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getPhotographerIdByAuthId, getProjectsByPhotographerId } from "@/lib/db";
-import { getProfileImageUrl } from "@/lib/photographer";
 import { useProfile } from "@/contexts/ProfileContext";
 import type { Project, ProjectStatus } from "@/types";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { ProjectPipelineMiniBar, getPipelineStepLabel } from "@/components/photographer/ProjectPipelineMiniBar";
+import { ProjectPipelineMiniBar } from "@/components/photographer/ProjectPipelineMiniBar";
+import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 
-// ── 컬러 팔레트 ────────────────────────────────────────────────
-const ACCENT = "#FF4D00";
-const RED    = "#EF4444";
+// ── constants ──────────────────────────────────────────────────────────────
 
-// ── 상수 ──────────────────────────────────────────────────────
 const ACTIVE_STATUSES: ProjectStatus[] = [
   "selecting", "confirmed", "editing", "reviewing_v1", "editing_v2", "reviewing_v2",
 ];
 
+const WAITING_STATUSES: ProjectStatus[] = ["reviewing_v1", "reviewing_v2"];
 
-// ── D-Day ──────────────────────────────────────────────────────
-function dday(deadline: string): { text: string; warn: boolean } {
+// ── helpers ────────────────────────────────────────────────────────────────
+
+function dday(deadline: string): { text: string; level: "ok" | "warn" | "danger" } {
   const diff = Math.ceil(
     (new Date(deadline).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86_400_000
   );
-  if (diff > 3)  return { text: `D-${String(diff).padStart(2, "0")}`, warn: false };
-  if (diff > 0)  return { text: `D-${String(diff).padStart(2, "0")}`, warn: true };
-  if (diff === 0) return { text: "D-Day", warn: true };
-  return           { text: `D+${String(Math.abs(diff)).padStart(2, "0")}`, warn: true };
+  if (diff > 3)  return { text: `D-${String(diff).padStart(2, "0")}`, level: "ok" };
+  if (diff > 0)  return { text: `D-${String(diff).padStart(2, "0")}`, level: "warn" };
+  if (diff === 0) return { text: "D-Day", level: "danger" };
+  return           { text: `D+${String(Math.abs(diff)).padStart(2, "0")}`, level: "danger" };
 }
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
-  return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function getInitial(name: string): string {
+  return name.trim().charAt(0);
+}
 
-// ══════════════ 메인 페이지 ══════════════════════════════════
+type CTAConfig = {
+  text: string;
+  href: string | null;
+  variant: "brand" | "secondary-purple" | "secondary-brand" | "secondary-rose" | "muted" | "dashed" | "disabled";
+};
+
+function getProjectCTA(project: Project): CTAConfig {
+  const base = `/photographer/projects/${project.id}`;
+  switch (project.status) {
+    case "preparing":    return { text: "원본 업로드",   href: `${base}/upload`,    variant: "dashed" };
+    case "selecting":    return { text: "셀렉 대기중",   href: null,                variant: "disabled" };
+    case "confirmed":    return { text: "보정 시작",     href: `${base}/workflow`,  variant: "brand" };
+    case "editing":      return { text: "작업 이어서",   href: `${base}/workflow`,  variant: "secondary-purple" };
+    case "reviewing_v1": return { text: "피드백 확인",   href: `${base}/workflow`,  variant: "secondary-brand" };
+    case "editing_v2":   return { text: "재보정 업로드", href: `${base}/workflow`,  variant: "secondary-rose" };
+    case "reviewing_v2": return { text: "피드백 확인",   href: `${base}/workflow`,  variant: "secondary-brand" };
+    case "delivered":    return { text: "완료됨",        href: `${base}/workflow`,  variant: "muted" };
+    default:             return { text: "상세보기",      href: base,                variant: "secondary-brand" };
+  }
+}
+
+function CTAButton({ cta, onClick }: { cta: CTAConfig; onClick?: () => void }) {
+  const base = "px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap";
+
+  const variantCls: Record<CTAConfig["variant"], string> = {
+    brand:             "bg-[#FF4D00] hover:bg-[#ff5e1a] text-black shadow-[0_0_15px_rgba(255,77,0,0.3)] hover:shadow-[0_0_20px_rgba(255,77,0,0.5)]",
+    "secondary-purple": "bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] hover:border-[#3f3f46] text-white",
+    "secondary-brand":  "bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] hover:border-[#3f3f46] text-white",
+    "secondary-rose":   "bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] hover:border-rose-500/50 text-white",
+    muted:             "bg-transparent text-zinc-500 hover:text-zinc-300 transition-colors",
+    dashed:            "bg-[#0a0a0c] border-2 border-dashed border-[#27272c] hover:border-[#FF4D00]/50 hover:text-[#FF4D00] hover:bg-[#FF4D00]/5 text-zinc-400",
+    disabled:          "bg-[#0a0a0c] border border-[#1a1a1e] text-zinc-600 cursor-not-allowed",
+  };
+
+  const iconCls: Record<CTAConfig["variant"], string> = {
+    brand:              "text-black",
+    "secondary-purple": "text-purple-400",
+    "secondary-brand":  "text-[#FF4D00]",
+    "secondary-rose":   "text-rose-400",
+    muted:              "text-emerald-500",
+    dashed:             "text-zinc-500",
+    disabled:           "text-zinc-600",
+  };
+
+  if (cta.variant === "disabled" || !cta.href) {
+    return (
+      <button type="button" disabled className={`${base} ${variantCls[cta.variant]}`}>
+        <span className={iconCls[cta.variant]}>{ctaIcon(cta.variant)}</span>
+        {cta.text}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${base} ${variantCls[cta.variant]}`}
+    >
+      <span className={iconCls[cta.variant]}>{ctaIcon(cta.variant)}</span>
+      {cta.text}
+    </button>
+  );
+}
+
+function ctaIcon(variant: CTAConfig["variant"]) {
+  switch (variant) {
+    case "brand":             return <Zap size={14} />;
+    case "secondary-purple":  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>;
+    case "secondary-brand":   return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>;
+    case "secondary-rose":    return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>;
+    case "muted":             return <CheckCircle2 size={14} />;
+    case "dashed":            return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>;
+    case "disabled":          return <Clock size={14} />;
+  }
+}
+
+// ── main component ─────────────────────────────────────────────────────────
+
 export default function ProjectsPage() {
   const router = useRouter();
   const { profile } = useProfile();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [clockStr, setClockStr] = useState("");
-
-  // 필터 상태
-  const [searchQuery,  setSearchQuery]  = useState("");
-  const [dateFrom,     setDateFrom]     = useState("");
-  const [dateTo,       setDateTo]       = useState("");
+  const [projects, setProjects]   = useState<Project[]>([]);
+  const [loading,  setLoading]    = useState(true);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPos,    setMenuPos]    = useState<{ top: number; right: number } | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [clockStr, setClockStr]   = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFrom, setDateFrom]   = useState("");
+  const [dateTo,   setDateTo]     = useState("");
   const dateFromRef = useRef<HTMLInputElement>(null);
   const dateToRef   = useRef<HTMLInputElement>(null);
-  const [activeTab,    setActiveTab]    = useState<"all" | "active" | "waiting" | "completed">("all");
-  const [sortBy,       setSortBy]       = useState<"latest" | "deadline" | "name" | "shoot_date">("latest");
+  const [activeTab, setActiveTab] = useState<"all" | "active" | "waiting" | "completed">("all");
+  const [sortBy,   setSortBy]     = useState<"latest" | "deadline" | "name" | "shoot_date">("latest");
 
-  const userName = profile?.name?.trim() || profile?.email?.split("@")[0] || "사용자";
-
-  // 시계
   useEffect(() => {
     const update = () => {
       const now = new Date();
@@ -71,7 +149,6 @@ export default function ProjectsPage() {
     return () => clearInterval(id);
   }, []);
 
-  // 데이터 로딩
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user?.id) { setLoading(false); return; }
@@ -96,516 +173,476 @@ export default function ProjectsPage() {
     setSortBy("latest");
   }, []);
 
-  // 탭 카운트
+  useEffect(() => {
+    if (!openMenuId) return;
+    const close = () => setOpenMenuId(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [openMenuId]);
+
+  const handleDelete = useCallback(async (project: Project) => {
+    setOpenMenuId(null);
+    if (!confirm(`"${project.name}" 프로젝트를 삭제하시겠습니까?\n\n업로드된 모든 사진 파일도 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.`)) return;
+    setDeletingId(project.id);
+    try {
+      const res = await fetch(`/api/photographer/projects/${project.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "삭제 실패");
+      }
+      setProjects((prev) => prev.filter((p) => p.id !== project.id));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "삭제 실패");
+    } finally {
+      setDeletingId(null);
+    }
+  }, []);
+
   const tabCounts = useMemo(() => ({
     all:       projects.length,
     active:    projects.filter((p) => ACTIVE_STATUSES.includes(p.status)).length,
-    waiting:   projects.filter((p) => p.status === "preparing").length,
+    waiting:   projects.filter((p) => WAITING_STATUSES.includes(p.status)).length,
     completed: projects.filter((p) => p.status === "delivered").length,
   }), [projects]);
 
-  // 필터링 + 정렬
   const filtered = useMemo(() => {
     let result = [...projects];
-
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
         (p) => p.name.toLowerCase().includes(q) || p.customerName.toLowerCase().includes(q)
       );
     }
-
-    if (dateFrom) {
-      result = result.filter((p) => new Date(p.shootDate) >= new Date(dateFrom));
-    }
-    if (dateTo) {
-      result = result.filter((p) => new Date(p.shootDate) <= new Date(dateTo));
-    }
-
+    if (dateFrom) result = result.filter((p) => new Date(p.shootDate) >= new Date(dateFrom));
+    if (dateTo)   result = result.filter((p) => new Date(p.shootDate) <= new Date(dateTo));
     if (activeTab === "active")    result = result.filter((p) => ACTIVE_STATUSES.includes(p.status));
-    if (activeTab === "waiting")   result = result.filter((p) => p.status === "preparing");
+    if (activeTab === "waiting")   result = result.filter((p) => WAITING_STATUSES.includes(p.status));
     if (activeTab === "completed") result = result.filter((p) => p.status === "delivered");
-
     if (sortBy === "latest")     result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     if (sortBy === "deadline")   result.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
     if (sortBy === "name")       result.sort((a, b) => a.name.localeCompare(b.name, "ko"));
     if (sortBy === "shoot_date") result.sort((a, b) => new Date(b.shootDate).getTime() - new Date(a.shootDate).getTime());
-
     return result;
   }, [projects, searchQuery, dateFrom, dateTo, activeTab, sortBy]);
 
-  const activeCount = projects.filter((p) => ACTIVE_STATUSES.includes(p.status)).length;
+  const STAT_CARDS = [
+    { key: "all" as const,       label: "전체 프로젝트", count: tabCounts.all,       icon: <Layers size={16} className="text-zinc-400" />,         color: "zinc",    ping: false },
+    { key: "active" as const,    label: "진행중",         count: tabCounts.active,    icon: <Zap size={16} className="text-[#FF4D00]" />,            color: "brand",   ping: true  },
+    { key: "waiting" as const,   label: "고객 대기",       count: tabCounts.waiting,   icon: <Clock size={16} className="text-amber-500" />,          color: "amber",   ping: false },
+    { key: "completed" as const, label: "완료",           count: tabCounts.completed, icon: <CheckCircle2 size={16} className="text-emerald-500" />, color: "emerald", ping: false },
+  ] as const;
 
-  const TABS = [
-    { key: "all" as const,       label: "전체",   count: tabCounts.all },
-    { key: "active" as const,    label: "진행중",  count: tabCounts.active },
-    { key: "waiting" as const,   label: "대기중",  count: tabCounts.waiting },
-    { key: "completed" as const, label: "완료",    count: tabCounts.completed },
-  ];
+  const colCls = "grid-cols-[minmax(280px,2fr)_minmax(140px,1fr)_minmax(160px,1.5fr)_minmax(100px,1fr)_minmax(160px,auto)]";
 
   return (
-    <div style={{
-      minHeight: "100vh", background: "#000", color: "#fff",
-      fontFamily: "'Pretendard', 'Noto Sans KR', sans-serif",
-      position: "relative",
-    }}>
-      <style>{`
-        .prj-grid-bg {
-          position: fixed; inset: 0;
-          background-image:
-            linear-gradient(#1a1a1a 1px, transparent 1px),
-            linear-gradient(90deg, #1a1a1a 1px, transparent 1px);
-          background-size: 40px 40px;
-          opacity: 0.15;
-          pointer-events: none; z-index: 0;
-        }
-        .prj-table { width: 100%; border-collapse: collapse; }
-        .prj-table th {
-          text-align: left; padding: 12px 16px;
-          color: #555; font-size: 11px; font-weight: 700;
-          text-transform: uppercase; letter-spacing: 0.08em;
-          border-bottom: 1px solid #222;
-          font-family: 'Space Mono', 'Noto Sans KR', sans-serif;
-          white-space: nowrap;
-        }
-        .prj-table td {
-          padding: 15px 16px; border-bottom: 1px solid #111;
-          font-size: 13px; color: #888; vertical-align: middle;
-          font-family: 'Space Mono', 'Noto Sans KR', sans-serif;
-          white-space: nowrap;
-        }
-        .prj-table tr { cursor: pointer; transition: background 0.15s; }
-        .prj-table tbody tr:hover td { background: #0d0d0d; color: #fff; }
-        .prj-filter-btn {
-          padding: 7px 14px; font-size: 12px; font-weight: 700;
-          font-family: 'Space Mono', 'Noto Sans KR', sans-serif; text-transform: uppercase;
-          cursor: pointer; transition: all 0.15s; letter-spacing: 0.05em;
-          border: 1px solid #111;
-        }
-        .prj-filter-btn.active { background: #1a1a1a; color: #fff; border-color: #333; }
-        .prj-filter-btn:not(.active) { background: transparent; color: #444; }
-        .prj-filter-btn:not(.active):hover { border-color: #333; color: #888; }
-        .prj-search:focus { outline: none; border-color: rgba(255,77,0,0.4) !important; }
-        .prj-search::placeholder { color: #333; }
-        .prj-date:focus { outline: none; border-color: rgba(255,77,0,0.4) !important; }
-        .prj-status-select-mobile { display: none; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: #000; }
-        ::-webkit-scrollbar-thumb { background: #222; }
-        @media (max-width: 768px) {
-          .prj-topbar { padding: 0 14px !important; flex-wrap: wrap; height: auto !important; gap: 10px; padding-top: max(12px, env(safe-area-inset-top)) !important; padding-bottom: 12px !important; }
-          .prj-clock { display: none !important; }
-          .prj-date-group { display: none !important; }
-          .prj-tab-group { display: none !important; }
-          .prj-status-select-mobile { display: block !important; flex: 1; min-width: 0; }
-          .prj-sort-select { flex: 1 !important; margin-left: 0 !important; min-width: 0; }
-          .prj-filter-bar { flex-wrap: wrap !important; overflow-x: unset !important; }
-          .prj-search { flex: 1 1 100% !important; width: 100% !important; }
-          .prj-title-section { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; padding-bottom: 14px !important; }
-          .prj-stats-group { display: none !important; }
-          .prj-body { padding: 16px 14px 60px !important; }
-          .prj-table th:nth-child(1),
-          .prj-table td:nth-child(1),
-          .prj-table th:nth-child(5),
-          .prj-table td:nth-child(5),
-          .prj-table th:nth-child(6),
-          .prj-table td:nth-child(6),
-          .prj-table th:nth-child(7),
-          .prj-table td:nth-child(7) { display: none; }
-          .prj-table th, .prj-table td { padding: 10px 8px !important; font-size: 11px !important; }
-          .prj-table td:nth-child(2) { max-width: 110px !important; }
-          .prj-table td:nth-child(3) { max-width: 70px !important; overflow: hidden; text-overflow: ellipsis; }
-        }
-      `}</style>
-
-      {/* 그리드 배경 */}
-      <div className="prj-grid-bg" />
-
-      {/* ── 헤더 ── */}
-      <header
-        className="prj-topbar"
-        style={{
-          position: "sticky", top: 0, zIndex: 50,
-          height: 64, display: "flex", alignItems: "center",
-          justifyContent: "space-between", padding: "0 28px",
-          background: "rgba(0,0,0,0.95)", backdropFilter: "blur(12px)",
-          borderBottom: "1px solid #222",
-        }}
-      >
-        {/* 좌: 프로필 + 유저 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative", zIndex: 1 }}>
-          {profile?.profileImageUrl ? (
-            <img
-              src={getProfileImageUrl(profile.profileImageUrl)}
-              alt=""
-              style={{ width: 32, height: 32, objectFit: "cover", border: "1px solid #2a2a2a", flexShrink: 0 }}
-              onError={(e) => { (e.target as HTMLImageElement).src = getProfileImageUrl(null); }}
-            />
-          ) : (
-            <div style={{
-              width: 32, height: 32, background: "#111", border: "1px solid #2a2a2a", flexShrink: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 13, fontWeight: 700, color: "#777",
-              fontFamily: "'Space Grotesk', sans-serif",
-            }}>
-              {userName.charAt(0).toUpperCase()}
+    <div
+      className="min-h-screen bg-[#0a0a0c] text-white"
+      style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}
+    >
+      {/* ── header ── */}
+      <PhotographerPageHeader
+        crumbs={[
+          { label: "프로젝트", href: "/photographer/projects" },
+          { label: "데이터베이스" },
+        ]}
+        title="프로젝트 목록"
+        stats={[
+          { label: "전체",  value: projects.length },
+          { label: "진행중", value: tabCounts.active, accent: true },
+        ]}
+        actions={
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <div className="text-[10px] text-zinc-500 font-mono" style={{ fontFamily: "var(--font-mono, monospace)" }}>SYS_TIME</div>
+              <div className="text-sm font-bold text-white mt-0.5 tracking-wider" style={{ fontFamily: "var(--font-mono, monospace)" }}>{clockStr}</div>
             </div>
-          )}
-          <div>
-            <div style={{ fontSize: 13, color: "#ccc" }}>
-              안녕하세요, <strong style={{ color: "#fff" }}>{userName} 작가님</strong>
-            </div>
-            <div style={{
-              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
-              color: "#666", textTransform: "uppercase", letterSpacing: "0.15em", marginTop: 1,
-            }}>
-              세션 활성
-            </div>
-          </div>
-        </div>
-
-        {/* 우: 시계 + 새 프로젝트 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div className="prj-clock" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-            <span style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9, color: "#555", letterSpacing: "0.15em", textTransform: "uppercase" }}>SYS_TIME</span>
-            <span style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12, color: "#fff", letterSpacing: "0.1em" }}>{clockStr}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => router.push("/photographer/projects/new")}
-            style={{
-              display: "flex", alignItems: "center", gap: 8,
-              padding: "8px 18px", background: ACCENT,
-              color: "#000", border: "none",
-              fontSize: 13, fontWeight: 700, cursor: "pointer",
-              fontFamily: "'Pretendard', sans-serif",
-              transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
-              letterSpacing: "0.02em", textTransform: "uppercase",
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLButtonElement;
-              el.style.transform = "translateY(-1px)";
-              el.style.boxShadow = "0 0 20px rgba(255,77,0,0.4)";
-              el.style.background = "#ff5e1a";
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLButtonElement;
-              el.style.transform = "";
-              el.style.boxShadow = "";
-              el.style.background = ACCENT;
-            }}
-          >
-            <Plus size={14} />
-            새 프로젝트
-          </button>
-        </div>
-      </header>
-
-      {/* ── 본문 ── */}
-      <div className="prj-body" style={{ position: "relative", zIndex: 10, padding: "28px 28px 60px" }}>
-
-        {/* 타이틀 + 통계 */}
-        <div className="prj-title-section" style={{
-          display: "flex", justifyContent: "space-between", alignItems: "flex-end",
-          borderBottom: "1px solid #222", paddingBottom: 20, marginBottom: 24,
-        }}>
-          <div>
-            <div style={{
-              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10,
-              color: ACCENT, letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 6,
-            }}>
-              프로젝트 데이터베이스
-            </div>
-            <h1 style={{ fontSize: 22, fontWeight: 900, color: "#fff", margin: 0 }}>프로젝트 목록</h1>
-          </div>
-          <div className="prj-stats-group" style={{ display: "flex", gap: 32 }}>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9, color: "#444", textTransform: "uppercase" }}>전체</div>
-              <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>
-                {projects.length}
-              </div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9, color: "#444", textTransform: "uppercase" }}>진행중</div>
-              <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 700, color: ACCENT, lineHeight: 1.2 }}>
-                {activeCount}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 필터 바 */}
-        <div className="prj-filter-bar" style={{
-          display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap",
-          background: "#0a0a0a", border: "1px solid #1a1a1a",
-          padding: "8px", marginBottom: 20,
-        }}>
-          {/* 검색 */}
-          <input
-            className="prj-search"
-            type="text"
-            placeholder="프로젝트명, 고객명 검색..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              flex: 1, minWidth: 120,
-              background: "#000", border: "1px solid #1a1a1a",
-              padding: "7px 12px", fontSize: 13, color: ACCENT,
-              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
-              transition: "border-color 0.15s",
-            }}
-          />
-
-          {/* 촬영일 날짜 필터 */}
-          <div className="prj-date-group" style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 10, borderLeft: "1px solid #222" }}>
-            <span
-              style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12, color: "#444", cursor: "pointer" }}
-              onClick={() => dateFromRef.current?.showPicker?.()}
+            <button
+              type="button"
+              onClick={() => router.push("/photographer/projects/new")}
+              className="flex items-center gap-2 bg-[#FF4D00] hover:bg-[#ff5e1a] text-black px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
             >
-              촬영일:
-            </span>
-            <div
-              style={{ position: "relative", cursor: "pointer" }}
-              onClick={() => dateFromRef.current?.showPicker?.()}
-            >
-              <span style={{
-                position: "absolute", inset: 0,
-                display: "flex", alignItems: "center",
-                paddingLeft: 8,
-                fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12,
-                color: dateFrom ? "#fff" : "#444",
-                pointerEvents: "none",
-              }}>
-                {dateFrom || "시작일"}
-              </span>
-              <input
-                ref={dateFromRef}
-                className="prj-date"
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                onClick={(e) => { e.stopPropagation(); (e.currentTarget as HTMLInputElement).showPicker?.(); }}
-                style={{
-                  background: "#000", border: "1px solid #1a1a1a",
-                  padding: "5px 8px", fontSize: 12,
-                  color: "transparent",
-                  fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
-                  transition: "border-color 0.15s",
-                  width: 96, cursor: "pointer",
-                }}
-              />
-            </div>
-            <span style={{ color: "#444", fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12 }}>~</span>
-            <div
-              style={{ position: "relative", cursor: "pointer" }}
-              onClick={() => dateToRef.current?.showPicker?.()}
-            >
-              <span style={{
-                position: "absolute", inset: 0,
-                display: "flex", alignItems: "center",
-                paddingLeft: 8,
-                fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12,
-                color: dateTo ? "#fff" : "#444",
-                pointerEvents: "none",
-              }}>
-                {dateTo || "종료일"}
-              </span>
-              <input
-                ref={dateToRef}
-                className="prj-date"
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                onClick={(e) => { e.stopPropagation(); (e.currentTarget as HTMLInputElement).showPicker?.(); }}
-                style={{
-                  background: "#000", border: "1px solid #1a1a1a",
-                  padding: "5px 8px", fontSize: 12,
-                  color: "transparent",
-                  fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
-                  transition: "border-color 0.15s",
-                  width: 96, cursor: "pointer",
-                }}
-              />
-            </div>
+              <Plus size={16} />
+              새 프로젝트
+            </button>
           </div>
+        }
+      />
 
-          {/* 탭 필터 버튼 (데스크탑) */}
-          <div className="prj-tab-group" style={{ display: "flex", gap: 1 }}>
-            {TABS.map((tab) => (
+      <div className="p-8 space-y-6 max-w-[1600px] mx-auto">
+
+        {/* ── stat cards ── */}
+        <div className="grid grid-cols-4 gap-4">
+          {STAT_CARDS.map((card) => {
+            const isActive = activeTab === card.key;
+            const cardCls = isActive
+              ? card.color === "brand"
+                ? "bg-[#FF4D00]/10 border-[#FF4D00]/30"
+                : card.color === "amber"
+                ? "bg-amber-500/10 border-amber-500/30"
+                : card.color === "emerald"
+                ? "bg-emerald-500/10 border-emerald-500/30"
+                : "bg-[#27272c] border-[#3f3f46]"
+              : "bg-[#121215]/80 hover:bg-[#121215] border-[#1a1a1e] hover:border-[#27272c]";
+
+            return (
               <button
-                key={tab.key}
+                key={card.key}
                 type="button"
-                onClick={() => setActiveTab(tab.key)}
-                className={`prj-filter-btn${activeTab === tab.key ? " active" : ""}`}
+                onClick={() => setActiveTab(card.key)}
+                className={`${cardCls} border rounded-2xl p-5 text-left transition-all`}
               >
-                {tab.label}
-                <span style={{
-                  marginLeft: 5,
-                  fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11,
-                  color: activeTab === tab.key ? "#fff" : "#333",
-                }}>
-                  {tab.count}
-                </span>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-bold text-white flex items-center gap-2">
+                    {card.icon}
+                    {card.label}
+                  </span>
+                  {card.ping && (
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF4D00] opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FF4D00]" />
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-end gap-2">
+                  <span
+                    className={`text-3xl font-black leading-none ${
+                      card.color === "brand"   ? "text-white" :
+                      card.color === "amber"   ? "text-white" :
+                      card.color === "emerald" ? "text-white" :
+                      "text-white"
+                    }`}
+                  >
+                    {card.count}
+                  </span>
+                  {card.key === "active" && <span className="text-sm text-zinc-400 mb-1">건 작업중</span>}
+                  {card.key === "waiting" && <span className="text-sm text-zinc-400 mb-1">고객 응답 대기</span>}
+                  {card.key === "completed" && <span className="text-sm text-zinc-400 mb-1">이번 달 완료</span>}
+                </div>
               </button>
-            ))}
-          </div>
-
-          {/* 상태 필터 셀렉트 (모바일 전용) */}
-          <select
-            className="prj-status-select-mobile"
-            value={activeTab}
-            onChange={(e) => setActiveTab(e.target.value as typeof activeTab)}
-            style={{
-              background: "#000", border: "1px solid #1a1a1a",
-              padding: "7px 10px", fontSize: 12, color: "#aaa",
-              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", cursor: "pointer",
-            }}
-          >
-            {TABS.map((tab) => (
-              <option key={tab.key} value={tab.key}>
-                {tab.label} ({tab.count})
-              </option>
-            ))}
-          </select>
-
-          {/* 정렬 */}
-          <select
-            className="prj-sort-select"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            style={{
-              background: "#000", border: "1px solid #1a1a1a",
-              padding: "7px 10px", fontSize: 12, color: "#666",
-              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", cursor: "pointer",
-              marginLeft: "auto",
-            }}
-          >
-            <option value="latest">최신순</option>
-            <option value="deadline">마감임박순</option>
-            <option value="name">이름순</option>
-            <option value="shoot_date">촬영일순</option>
-          </select>
+            );
+          })}
         </div>
 
-        {/* 테이블 */}
-        {loading ? (
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "center",
-            minHeight: 200,
-            fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11,
-            color: "#555", letterSpacing: "0.15em", textTransform: "uppercase",
-          }}>
-            SYS.LOADING…
+        {/* ── filter bar ── */}
+        <div className="bg-[#121215]/80 border border-[#1a1a1e] rounded-2xl p-2 flex flex-wrap items-center justify-between gap-3">
+          {/* search */}
+          <div className="flex-1 min-w-[260px] relative">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <input
+              type="text"
+              placeholder="프로젝트명, 고객명, ID 검색..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[#0a0a0c]/50 border border-[#1a1a1e] text-white text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-[#FF4D00] focus:ring-1 focus:ring-[#FF4D00]/30 transition-all placeholder:text-zinc-600"
+            />
           </div>
-        ) : (
-          <div style={{ border: "1px solid #1a1a1a", background: "#050505" }}>
-            <table className="prj-table">
-              <thead>
-                <tr>
-                  <th>프로젝트 ID</th>
-                  <th>프로젝트명</th>
-                  <th>고객</th>
-                  <th>상태</th>
-                  <th>파이프라인</th>
-                  <th>진행률</th>
-                  <th>촬영일</th>
-                  <th style={{ textAlign: "right" }}>마감일</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} style={{ textAlign: "center", padding: "48px 16px", color: "#444" }}>
-                      {projects.length > 0 ? (
-                        <span>
-                          검색 결과가 없습니다.{" "}
-                          <button
-                            type="button"
-                            onClick={resetFilters}
-                            style={{ background: "none", border: "none", color: ACCENT, cursor: "pointer", fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, textDecoration: "underline" }}
-                          >
-                            필터 초기화
-                          </button>
-                        </span>
-                      ) : "아직 프로젝트가 없습니다."}
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((project) => {
-                    const photoCount    = project.photoCount ?? 0;
-                    const requiredCount = project.requiredCount ?? 0;
-                    const stepLabel     = getPipelineStepLabel(project.status);
-                    const dd            = dday(project.deadline);
-                    const isDelivered   = project.status === "delivered";
 
-                    return (
-                      <tr
-                        key={project.id}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* date range */}
+            <div
+              className="flex items-center bg-[#0a0a0c]/50 border border-[#1a1a1e] rounded-xl px-3 py-2 gap-2 h-11 cursor-pointer"
+              onClick={() => dateFromRef.current?.showPicker?.()}
+            >
+              <span className="text-xs text-zinc-500" style={{ fontFamily: "var(--font-mono, monospace)" }}>촬영일:</span>
+              <div className="relative">
+                <span className="text-xs text-zinc-400 pointer-events-none" style={{ fontFamily: "var(--font-mono, monospace)" }}>{dateFrom || "시작"}</span>
+                <input
+                  ref={dateFromRef}
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  onClick={(e) => { e.stopPropagation(); (e.currentTarget as HTMLInputElement).showPicker?.(); }}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-20"
+                />
+              </div>
+              <span className="text-zinc-600 text-xs">~</span>
+              <div className="relative">
+                <span className="text-xs text-zinc-400 pointer-events-none" style={{ fontFamily: "var(--font-mono, monospace)" }}>{dateTo || "종료"}</span>
+                <input
+                  ref={dateToRef}
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  onClick={(e) => { e.stopPropagation(); (e.currentTarget as HTMLInputElement).showPicker?.(); }}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-20"
+                />
+              </div>
+            </div>
+
+            {/* status tabs */}
+            <div className="flex bg-[#0a0a0c]/50 p-1 rounded-xl border border-[#1a1a1e] h-11 items-center">
+              {(["all", "active", "waiting", "completed"] as const).map((key) => {
+                const labels = { all: "전체", active: "진행중", waiting: "고객대기", completed: "완료" };
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActiveTab(key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      activeTab === key
+                        ? "bg-[#27272c] text-white shadow-sm"
+                        : "text-zinc-400 hover:text-white hover:bg-[#27272c]/50"
+                    }`}
+                  >
+                    {labels[key]}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* sort */}
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="bg-[#0a0a0c]/50 border border-[#1a1a1e] text-zinc-300 text-sm rounded-xl px-4 py-2 h-11 focus:outline-none focus:border-[#FF4D00] appearance-none pr-8 cursor-pointer"
+              >
+                <option value="latest">최신 등록순</option>
+                <option value="deadline">마감일 임박순</option>
+                <option value="shoot_date">촬영일순</option>
+                <option value="name">이름순</option>
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+            </div>
+          </div>
+        </div>
+
+        {/* ── table ── */}
+        <div className="bg-[#121215]/50 border border-[#1a1a1e] rounded-2xl overflow-hidden">
+          {/* header row */}
+          <div
+            className={`grid ${colCls} gap-4 px-6 py-4 border-b border-[#1a1a1e] bg-[#0a0a0c]/30 text-[11px] font-bold text-zinc-500 uppercase tracking-wider`}
+            style={{ fontFamily: "var(--font-mono, monospace)" }}
+          >
+            <div>프로젝트 정보</div>
+            <div>고객 / 촬영일</div>
+            <div>현재 상태 / 진행률</div>
+            <div>마감 기한</div>
+            <div className="text-right">작업 관리</div>
+          </div>
+
+          {/* body */}
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <span className="text-zinc-600 text-sm" style={{ fontFamily: "var(--font-mono, monospace)" }}>
+                SYS.LOADING…
+              </span>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <Layers size={32} className="text-zinc-700" />
+              <p className="text-zinc-500 text-sm">
+                {projects.length > 0 ? (
+                  <>
+                    검색 결과가 없습니다.{" "}
+                    <button
+                      type="button"
+                      onClick={resetFilters}
+                      className="text-[#FF4D00] underline underline-offset-2"
+                    >
+                      필터 초기화
+                    </button>
+                  </>
+                ) : "아직 프로젝트가 없습니다."}
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col divide-y divide-[#1a1a1e]/50">
+              {filtered.map((project) => {
+                const cta = getProjectCTA(project);
+                const dd  = dday(project.deadline);
+                const isDelivered = project.status === "delivered";
+                const ddCls =
+                  dd.level === "danger" ? "bg-rose-500/10 text-rose-400 border-rose-500/20" :
+                  dd.level === "warn"   ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
+                  "bg-[#121215] text-zinc-500 border-[#1a1a1e]";
+
+                return (
+                  <div
+                    key={project.id}
+                    className={`grid ${colCls} gap-4 px-6 py-5 hover:bg-[#27272c]/20 transition-colors items-center group`}
+                  >
+                    {/* col 1: project info */}
+                    <div className="flex items-center gap-4 min-w-0">
+                      {/* thumbnail placeholder */}
+                      <div
+                        className="w-14 h-14 rounded-xl overflow-hidden border border-[#27272c] shrink-0 bg-[#121215] flex items-center justify-center cursor-pointer hover:border-[#FF4D00] transition-colors"
                         onClick={() => router.push(`/photographer/projects/${project.id}`)}
                       >
-                        {/* 프로젝트 ID */}
-                        <td style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 13, color: isDelivered ? "#444" : "#888", whiteSpace: "nowrap" }}>
-                          {project.displayId ?? `#${project.id.slice(0, 8).toUpperCase()}`}
-                        </td>
+                        <span
+                          className="text-lg font-black text-zinc-600 group-hover:text-zinc-400 transition-colors"
+                          style={{ fontFamily: "var(--font-inter, sans-serif)" }}
+                        >
+                          {project.name.charAt(0)}
+                        </span>
+                      </div>
 
-                        {/* 프로젝트명 */}
-                        <td style={{ color: isDelivered ? "#555" : "#fff", fontWeight: 700, maxWidth: 200 }}>
-                          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {project.name}
-                          </div>
-                        </td>
+                      <div className="flex flex-col gap-1 min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="text-[11px] text-zinc-500 bg-[#0a0a0c] px-1.5 py-0.5 rounded border border-[#1a1a1e]"
+                            style={{ fontFamily: "var(--font-mono, monospace)" }}
+                          >
+                            {project.displayId ?? project.id.slice(0, 12).toUpperCase()}
+                          </span>
+                          {dd.level === "danger" && !isDelivered && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                              긴급
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/photographer/projects/${project.id}`)}
+                          className={`text-base font-bold tracking-tight truncate text-left transition-colors ${
+                            isDelivered ? "text-zinc-400 hover:text-zinc-300" : "text-white hover:text-[#FF4D00]"
+                          }`}
+                        >
+                          {project.name}
+                        </button>
+                        {project.shootType && (
+                          <p className="text-xs text-zinc-500 flex items-center gap-1 truncate">
+                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                              <circle cx="12" cy="13" r="3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                            </svg>
+                            {project.shootType}
+                          </p>
+                        )}
+                      </div>
+                    </div>
 
-                        {/* 고객 */}
-                        <td style={{ color: isDelivered ? "#444" : "#666" }}>
+                    {/* col 2: customer / shoot date */}
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-6 h-6 rounded-full bg-[#27272c] flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                          style={{ fontFamily: "var(--font-inter, sans-serif)" }}
+                        >
+                          {getInitial(project.customerName || "?")}
+                        </div>
+                        <span className={`text-sm font-medium ${isDelivered ? "text-zinc-400" : "text-zinc-300"}`}>
                           {project.customerName || "—"}
-                        </td>
+                        </span>
+                      </div>
+                      <span
+                        className={`text-xs ${isDelivered ? "text-zinc-600" : "text-zinc-500"}`}
+                        style={{ fontFamily: "var(--font-mono, monospace)" }}
+                      >
+                        {formatDate(project.shootDate)} 촬영
+                      </span>
+                    </div>
 
-                        {/* 상태 */}
-                        <td>
-                          <StatusPill status={project.status} photoCount={photoCount} requiredCount={requiredCount} />
-                        </td>
+                    {/* col 3: status / progress */}
+                    <div className="flex flex-col gap-2">
+                      <StatusPill
+                        status={project.status}
+                        photoCount={project.photoCount ?? 0}
+                        requiredCount={project.requiredCount ?? 0}
+                      />
+                      <ProjectPipelineMiniBar status={project.status} />
+                    </div>
 
-                        {/* 파이프라인 */}
-                        <td style={{ color: isDelivered ? "#333" : "#555" }}>
-                          {stepLabel}
-                        </td>
+                    {/* col 4: deadline */}
+                    <div>
+                      {isDelivered ? (
+                        <span className="inline-flex px-2 py-1 rounded text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                          style={{ fontFamily: "var(--font-mono, monospace)" }}>
+                          납품완료
+                        </span>
+                      ) : (
+                        <span
+                          className={`inline-flex px-2 py-1 rounded text-xs font-bold border ${ddCls}`}
+                          style={{ fontFamily: "var(--font-mono, monospace)" }}
+                        >
+                          {dd.text}
+                        </span>
+                      )}
+                    </div>
 
-                        {/* 진행률 바 */}
-                        <td>
-                          <ProjectPipelineMiniBar status={project.status} />
-                        </td>
+                    {/* col 5: actions */}
+                    <div className="flex items-center justify-end gap-2">
+                      <CTAButton
+                        cta={cta}
+                        onClick={() => cta.href && router.push(cta.href)}
+                      />
+                      <div className="relative">
+                        <button
+                          type="button"
+                          disabled={deletingId === project.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (openMenuId === project.id) {
+                              setOpenMenuId(null);
+                            } else {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setMenuPos({ top: rect.bottom + window.scrollY + 4, right: window.innerWidth - rect.right });
+                              setOpenMenuId(project.id);
+                            }
+                          }}
+                          className="w-9 h-9 rounded-xl hover:bg-[#27272c] flex items-center justify-center text-zinc-400 hover:text-white transition-colors border border-transparent hover:border-[#27272c] disabled:opacity-40"
+                        >
+                          {deletingId === project.id ? (
+                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
-                        {/* 촬영일 */}
-                        <td>{formatDate(project.shootDate)}</td>
-
-                        {/* 마감일 */}
-                        <td style={{
-                          textAlign: "right",
-                          color: isDelivered ? "#333" : (dd.warn ? ACCENT : "#888"),
-                          fontWeight: dd.warn && !isDelivered ? 700 : 400,
-                        }}>
-                          {isDelivered && project.shootDate
-                            ? formatDate(project.shootDate)
-                            : dd.text
-                          }
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+        {/* ── dropdown portal ── */}
+        {openMenuId && menuPos && typeof window !== "undefined" && createPortal(
+          <div
+            className="fixed z-[9999] bg-[#121215] border border-[#27272c] rounded-xl shadow-xl overflow-hidden"
+            style={{ top: menuPos.top, right: menuPos.right, minWidth: 160 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                router.push(`/photographer/projects/${openMenuId}`);
+                setOpenMenuId(null);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-[#27272c] hover:text-white transition-colors text-left"
+            >
+              <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              상세정보 수정
+            </button>
+            <div className="h-px bg-[#1a1a1e]" />
+            <button
+              type="button"
+              onClick={() => {
+                const project = projects.find((p) => p.id === openMenuId);
+                if (project) handleDelete(project);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-rose-400 hover:bg-rose-500/10 transition-colors text-left"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+              </svg>
+              프로젝트 삭제
+            </button>
+          </div>,
+          document.body
         )}
 
-        {/* 하단 카운터 */}
+        {/* ── footer count ── */}
         {!loading && (
-          <div style={{
-            display: "flex", justifyContent: "space-between", alignItems: "center",
-            marginTop: 16,
-            fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: "#444",
-            textTransform: "uppercase", letterSpacing: "0.05em",
-          }}>
+          <div
+            className="flex justify-between items-center text-[10px] text-zinc-600 uppercase tracking-wide"
+            style={{ fontFamily: "var(--font-mono, monospace)" }}
+          >
             <span>표시중: {String(filtered.length).padStart(2, "0")} / {String(projects.length).padStart(2, "0")}</span>
             <span>시스템 준비완료</span>
           </div>
