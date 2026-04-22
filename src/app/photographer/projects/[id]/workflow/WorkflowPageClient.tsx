@@ -287,7 +287,11 @@ export default function WorkflowPageClient() {
   const v2Dimmed      = project.allowRevision && !inV2Phase;
   const canDeleteV1   = project.status === "editing";
   const canDeleteV2   = project.status === "editing_v2";
-  const cta           = getCTA(project.status, id);
+  const ctaBase       = getCTA(project.status, id);
+  // editing_v2 인데 재보정 요청이 없으면(= 모든 v1 확정) 업로드 불필요 안내로 덮어씀
+  const cta = (project.status === "editing_v2" && counts.revision === 0)
+    ? { text: "모든 사진 확정 완료", href: null, note: "재보정 요청 없음 — 납품 처리를 진행해주세요" }
+    : ctaBase;
   const isSelecting   = project.status === "selecting";
   const isReviewingV1 = project.status === "reviewing_v1";
   const isReviewingV2 = project.status === "reviewing_v2";
