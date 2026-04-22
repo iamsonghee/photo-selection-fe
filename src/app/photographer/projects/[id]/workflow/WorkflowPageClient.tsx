@@ -177,23 +177,43 @@ export default function WorkflowPageClient() {
     return () => { cancelled = true; };
   }, [id]);
 
-  const counts = useMemo(() => ({
-    total:      rows.length,
-    v1Uploaded: rows.filter((r) => r.v1 !== null).length,
-    approved:   rows.filter((r) => getEffectiveStatus(r) === "approved").length,
-    revision:   rows.filter((r) => getEffectiveStatus(r) === "revision_requested").length,
-    v2Uploaded: rows.filter((r) => r.v2 !== null).length,
-  }), [rows]);
+  const counts = useMemo(() => {
+    const inV2 = ["editing_v2", "reviewing_v2", "delivered"].includes(project?.status ?? "");
+    const effV1 = (s: string | null) => (inV2 && s === null ? "approved" : (s ?? "pending"));
+    const getEff = (row: WorkflowRow) => {
+      if (row.v2?.reviewStatus) return row.v2.reviewStatus;
+      const v1s = effV1(row.v1?.reviewStatus ?? null);
+      if (v1s === "approved" || v1s === "revision_requested") return v1s;
+      if (row.v1 !== null) return "pending";
+      return "missing";
+    };
+    return {
+      total:      rows.length,
+      v1Uploaded: rows.filter((r) => r.v1 !== null).length,
+      approved:   rows.filter((r) => getEff(r) === "approved").length,
+      revision:   rows.filter((r) => getEff(r) === "revision_requested").length,
+      v2Uploaded: rows.filter((r) => r.v2 !== null).length,
+    };
+  }, [rows, project?.status]);
 
   const filteredRows = useMemo(() => {
+    const inV2 = ["editing_v2", "reviewing_v2", "delivered"].includes(project?.status ?? "");
+    const effV1 = (s: string | null) => (inV2 && s === null ? "approved" : (s ?? "pending"));
+    const getEff = (row: WorkflowRow) => {
+      if (row.v2?.reviewStatus) return row.v2.reviewStatus;
+      const v1s = effV1(row.v1?.reviewStatus ?? null);
+      if (v1s === "approved" || v1s === "revision_requested") return v1s;
+      if (row.v1 !== null) return "pending";
+      return "missing";
+    };
     switch (filter) {
-      case "approved":   return rows.filter((r) => getEffectiveStatus(r) === "approved");
-      case "revision":   return rows.filter((r) => getEffectiveStatus(r) === "revision_requested");
+      case "approved":   return rows.filter((r) => getEff(r) === "approved");
+      case "revision":   return rows.filter((r) => getEff(r) === "revision_requested");
       case "v1_pending": return rows.filter((r) => r.v1 === null);
-      case "v2_pending": return rows.filter((r) => r.v1?.reviewStatus === "revision_requested" && r.v2 === null);
+      case "v2_pending": return rows.filter((r) => effV1(r.v1?.reviewStatus ?? null) === "revision_requested" && r.v2 === null);
       default:           return rows;
     }
-  }, [rows, filter]);
+  }, [rows, filter, project?.status]);
 
   const viewerItems = useMemo(() =>
     filteredRows.map((row) => ({
@@ -274,10 +294,13 @@ export default function WorkflowPageClient() {
   const canUploadV1   = ["confirmed", "editing"].includes(project.status);
   const canUploadV2   = project.status === "editing_v2";
 
+  // v2 단계 이상에서 reviewStatus null인 v1은 확정으로 간주 (프로젝트 진행 단계가 증거)
+  const effectiveV1Status = (s: string | null) => (inV2Phase && s === null ? "approved" : (s ?? "pending"));
+
   const colsClass = showV2Col ? "grid-cols-3" : "grid-cols-2";
 
   const v2PendingCount = rows.filter(
-    (r) => r.v1?.reviewStatus === "revision_requested" && r.v2 === null
+    (r) => effectiveV1Status(r.v1?.reviewStatus ?? null) === "revision_requested" && r.v2 === null
   ).length;
 
   const FILTER_TABS: { key: FilterTab; label: string; count: number }[] = [
@@ -397,11 +420,11 @@ export default function WorkflowPageClient() {
               </div>
               {/* Col 3 - v2 */}
               {showV2Col && (
-                <div className={`bg-[#0A0A0A] border border-[#222] ${canUploadV2 ? "border-b-[#FF4D00] border-b-2" : ""} rounded-t-xl p-4 flex items-center justify-between`}>
+                <div className={`bg-[#0A0A0A] border border-[#222] ${canUploadV2 && counts.revision > 0 ? "border-b-[#FF4D00] border-b-2" : ""} rounded-t-xl p-4 flex items-center justify-between`}>
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-gray-200">3단계: v2 재보정본</span>
                   </div>
-                  {canUploadV2 && (
+                  {canUploadV2 && counts.revision > 0 && (
                     <button
                       onClick={() => router.push(`/photographer/projects/${id}/upload-versions/v2`)}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-[#333] text-gray-500 hover:border-[#FF4D00] hover:text-[#FF4D00] transition-colors bg-[#0a0a0a]"
@@ -424,7 +447,7 @@ export default function WorkflowPageClient() {
             {/* Photo rows */}
             <div className="flex flex-col gap-4">
               {filteredRows.map((row, rowIdx) => {
-                const isRevisionPhoto = row.v1?.reviewStatus === "revision_requested";
+                const isRevisionPhoto = effectiveV1Status(row.v1?.reviewStatus ?? null) === "revision_requested";
                 const filename = row.photo.originalFilename ?? `#${row.photo.orderIndex}`;
 
                 const v1ThumbCls = !row.v1 ? "" :
@@ -488,7 +511,7 @@ export default function WorkflowPageClient() {
                           </div>
                           <div className="flex flex-col py-1 w-full min-w-0">
                             <div className="mb-2 flex items-center justify-between gap-2">
-                              <StatusBadge status={isReviewingV1 ? "reviewing" : (row.v1.reviewStatus ?? "pending")} />
+                              <StatusBadge status={isReviewingV1 ? "reviewing" : effectiveV1Status(row.v1.reviewStatus) as "approved" | "revision_requested" | "pending"} />
                               {canDeleteV1 && (
                                 <button
                                   onClick={() => handleDelete(row.v1!.id, row.photo.id, 1)}
