@@ -123,6 +123,17 @@
 .scrollArea::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
 .scrollArea::-webkit-scrollbar-thumb:hover { background: #FF4D00; }
 
+/* Diagonal stripe background for "v1 confirmed, no v2 needed" cells */
+.stripeBg {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #0a0a0a,
+    #0a0a0a 10px,
+    #111111 10px,
+    #111111 20px
+  );
+}
+
 /* CTA button */
 .ctaBtn {
   background-color: #FF4D00;
