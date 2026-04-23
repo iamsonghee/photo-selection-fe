@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
-import { Plus, Search, ChevronDown, Zap, Clock, CheckCircle2, Layers } from "lucide-react";
+import { Plus, Search, ChevronDown, Zap, Clock, CheckCircle2, Layers, MapPin, SlidersHorizontal } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getPhotographerIdByAuthId, getProjectsByPhotographerId } from "@/lib/db";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -118,6 +118,145 @@ function ctaIcon(variant: CTAConfig["variant"]) {
   }
 }
 
+
+function getCardAccent(status: ProjectStatus): string {
+  switch (status) {
+    case "editing":                       return "rgba(168,85,247,0.05)";
+    case "editing_v2":                    return "rgba(244,63,94,0.05)";
+    case "reviewing_v1":
+    case "reviewing_v2":
+    case "selecting":
+    case "confirmed":                     return "rgba(255,77,0,0.05)";
+    case "delivered":                     return "rgba(16,185,129,0.05)";
+    default:                              return "transparent";
+  }
+}
+
+function MobileProjectCard({ project, onNavigate }: { project: Project; onNavigate: (href: string) => void }) {
+  const cta        = getProjectCTA(project);
+  const isDelivered = project.status === "delivered";
+  const dd         = dday(project.deadline);
+  const ddCls      =
+    dd.level === "danger" ? "text-rose-400 bg-rose-500/10 border-rose-500/20" :
+    dd.level === "warn"   ? "text-amber-500 bg-amber-500/10 border-amber-500/20" :
+    "text-zinc-500 bg-[#1a1a1e] border-[#27272c]";
+  const base = `/photographer/projects/${project.id}`;
+  const showDots = !["preparing", "selecting", "delivered"].includes(project.status);
+
+  return (
+    <div className="bg-[#121215] border border-[#1a1a1e] rounded-2xl p-4 flex flex-col gap-4 relative overflow-hidden">
+      {/* corner accent */}
+      <div
+        className="absolute top-0 right-0 w-24 h-24 pointer-events-none rounded-bl-[100px]"
+        style={{ background: getCardAccent(project.status) }}
+      />
+
+      {/* top: thumbnail + info */}
+      <div className="flex gap-4">
+        <div
+          className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-[#27272c] shadow-md cursor-pointer"
+          onClick={() => onNavigate(base)}
+        >
+          {project.thumbnailUrl ? (
+            <img src={project.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-[#0a0a0c] flex flex-col items-center justify-center">
+              <svg className="w-5 h-5 text-zinc-600 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="text-[8px] text-zinc-500 font-medium">No Image</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0 pt-0.5">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-[10px] font-mono text-zinc-500 shrink-0">
+                {project.displayId ?? project.id.slice(0, 8)}
+              </span>
+              {project.shootType && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#27272c] text-zinc-400 border border-[#1a1a1e] shrink-0">
+                  {project.shootType}
+                </span>
+              )}
+            </div>
+            {isDelivered ? (
+              <span className="text-[10px] font-bold font-mono text-zinc-500 bg-[#1a1a1e] border border-[#27272c] px-1.5 py-0.5 rounded shrink-0">완료</span>
+            ) : (
+              <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${ddCls}`}>{dd.text}</span>
+            )}
+          </div>
+          <h3 className={`text-[15px] font-bold truncate mb-1 ${isDelivered ? "text-zinc-400" : "text-white"}`}>
+            {project.name}
+          </h3>
+          <p className="text-xs text-zinc-400 flex items-center gap-1.5 truncate">
+            <span className="w-4 h-4 rounded-full bg-[#27272c] flex items-center justify-center text-[8px] font-bold text-white shrink-0">
+              {getInitial(project.customerName || "?")}
+            </span>
+            {project.customerName || "—"}
+          </p>
+        </div>
+      </div>
+
+      {/* status box */}
+      <div className="bg-[#0a0a0c]/50 rounded-xl p-3 border border-[#1a1a1e]/50 flex flex-col gap-2 items-start">
+        <StatusPill status={project.status} />
+        <ProjectPipelineMiniBar status={project.status} variant="full" />
+      </div>
+
+      {/* CTA */}
+      <div className="flex gap-2">
+        {cta.variant === "disabled" ? (
+          <button type="button" disabled className="flex-1 py-2.5 rounded-xl bg-[#121215] border border-[#1a1a1e] text-zinc-600 text-sm font-bold flex items-center justify-center gap-2 cursor-not-allowed">
+            <Clock size={16} />
+            {cta.text}
+          </button>
+        ) : cta.variant === "dashed" ? (
+          <button type="button" onClick={() => cta.href && onNavigate(cta.href)}
+            className="flex-1 py-2.5 rounded-xl bg-[#0a0a0c] border-2 border-dashed border-zinc-600 text-zinc-300 text-sm font-bold flex items-center justify-center gap-2 active:bg-[#121215]">
+            {ctaIcon(cta.variant)}
+            {cta.text}
+          </button>
+        ) : cta.variant === "brand" ? (
+          <button type="button" onClick={() => cta.href && onNavigate(cta.href)}
+            className="flex-1 py-2.5 rounded-xl bg-[#FF4D00] active:bg-[#e64500] text-white text-sm font-bold shadow-[0_0_15px_rgba(255,77,0,0.2)] flex items-center justify-center gap-2">
+            {ctaIcon(cta.variant)}
+            {cta.text}
+          </button>
+        ) : cta.variant === "muted" ? (
+          <button type="button" onClick={() => cta.href && onNavigate(cta.href)}
+            className="flex-1 py-2.5 rounded-xl text-zinc-500 text-sm font-bold flex items-center justify-center gap-2 active:text-zinc-300">
+            {ctaIcon(cta.variant)}
+            {cta.text}
+          </button>
+        ) : (
+          <>
+            <button type="button" onClick={() => cta.href && onNavigate(cta.href)}
+              className="flex-1 py-2.5 rounded-xl bg-[#1a1a1e] border border-[#27272c] active:bg-[#27272c] text-white text-sm font-bold flex items-center justify-center gap-2">
+              <span className={
+                cta.variant === "secondary-purple" ? "text-purple-400" :
+                cta.variant === "secondary-rose"   ? "text-rose-400" : "text-[#FF4D00]"
+              }>
+                {ctaIcon(cta.variant)}
+              </span>
+              {cta.text}
+            </button>
+            {showDots && (
+              <button type="button" onClick={() => onNavigate(base)}
+                className="w-11 h-11 shrink-0 rounded-xl bg-[#1a1a1e] border border-[#27272c] flex items-center justify-center text-zinc-400 active:bg-[#27272c]">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                </svg>
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── main component ─────────────────────────────────────────────────────────
 
 export default function ProjectsPage() {
@@ -130,12 +269,17 @@ export default function ProjectsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [clockStr, setClockStr]   = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [dateFrom, setDateFrom]   = useState("");
-  const [dateTo,   setDateTo]     = useState("");
+  const [dateFrom, setDateFrom]   = useState(() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 1);
+    return d.toISOString().slice(0, 10);
+  });
+  const [dateTo,   setDateTo]     = useState(() => new Date().toISOString().slice(0, 10));
   const dateFromRef = useRef<HTMLInputElement>(null);
   const dateToRef   = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<"all" | "active" | "waiting" | "completed">("all");
   const [sortBy,   setSortBy]     = useState<"latest" | "deadline" | "name" | "shoot_date">("latest");
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   useEffect(() => {
     const update = () => {
@@ -167,8 +311,10 @@ export default function ProjectsPage() {
 
   const resetFilters = useCallback(() => {
     setSearchQuery("");
-    setDateFrom("");
-    setDateTo("");
+    const from = new Date();
+    from.setFullYear(from.getFullYear() - 1);
+    setDateFrom(from.toISOString().slice(0, 10));
+    setDateTo(new Date().toISOString().slice(0, 10));
     setActiveTab("all");
     setSortBy("latest");
   }, []);
@@ -235,8 +381,131 @@ export default function ProjectsPage() {
   const colCls = "grid-cols-[minmax(280px,2fr)_minmax(140px,1fr)_minmax(160px,1.5fr)_minmax(100px,1fr)_minmax(160px,auto)]";
 
   return (
+    <>
+    {/* ── Mobile View ──────────────────────────────────────────── */}
     <div
-      className="min-h-screen bg-[#0a0a0c] text-white"
+      className="md:hidden bg-[#0a0a0c] text-white"
+      style={{ fontFamily: "var(--font-inter, sans-serif)" }}
+    >
+      <div>
+
+        {/* stat cards */}
+        <div className="flex overflow-x-auto gap-3 px-5 pt-5 pb-4 snap-x hide-scrollbar">
+          {STAT_CARDS.map((card) => {
+            const isActive = activeTab === card.key;
+            const colors = {
+              zinc:    { border: isActive ? "#3f3f46" : "#1a1a1e", bg: isActive ? "#27272c" : "#121215" },
+              brand:   { border: isActive ? "rgba(255,77,0,0.3)" : "rgba(255,77,0,0.15)", bg: isActive ? "rgba(255,77,0,0.12)" : "rgba(255,77,0,0.06)" },
+              amber:   { border: isActive ? "rgba(245,158,11,0.3)" : "rgba(245,158,11,0.15)", bg: isActive ? "rgba(245,158,11,0.1)" : "rgba(245,158,11,0.05)" },
+              emerald: { border: isActive ? "rgba(16,185,129,0.3)" : "rgba(16,185,129,0.15)", bg: isActive ? "rgba(16,185,129,0.1)" : "rgba(16,185,129,0.05)" },
+            }[card.color];
+            return (
+              <button
+                key={card.key}
+                type="button"
+                onClick={() => setActiveTab(card.key)}
+                className="snap-start shrink-0 w-[140px] rounded-2xl p-4 flex flex-col justify-between shadow-sm"
+                style={{ background: colors.bg, border: `1px solid ${colors.border}` }}
+              >
+                <span className="text-xs font-semibold flex items-center gap-1.5 mb-2"
+                  style={{ color: card.color === "zinc" ? "#a1a1aa" : card.color === "brand" ? "#ff8a4c" : card.color === "amber" ? "#fbbf24" : "#34d399" }}>
+                  {card.icon}
+                  {card.label}
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-black text-white leading-none">{card.count}</span>
+                  {card.key !== "all" && <span className="text-[10px] font-medium text-zinc-500">건</span>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* search + filter */}
+        <div className="px-5 pb-4 flex gap-2">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <input
+              type="text"
+              placeholder="프로젝트명, 고객명 검색"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[#121215] border border-[#1a1a1e] text-white text-sm rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:border-[#FF4D00] focus:ring-1 focus:ring-[#FF4D00]/20 placeholder:text-zinc-600 transition-all"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobileFilterOpen((v) => !v)}
+            className={`w-12 h-12 flex items-center justify-center bg-[#121215] border rounded-xl transition-colors shrink-0 ${
+              mobileFilterOpen ? "border-[#FF4D00] text-[#FF4D00]" : "border-[#1a1a1e] text-zinc-400"
+            }`}
+          >
+            <SlidersHorizontal size={20} strokeWidth={1.5} />
+          </button>
+        </div>
+
+        {/* filter panel */}
+        {mobileFilterOpen && (
+          <div className="px-5 pb-4 flex gap-2 overflow-x-auto hide-scrollbar">
+            {(["all", "active", "waiting", "completed"] as const).map((key) => {
+              const labels = { all: "전체", active: "진행중", waiting: "고객대기", completed: "완료" };
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActiveTab(key)}
+                  className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                    activeTab === key
+                      ? "bg-[#FF4D00]/15 text-[#FF4D00] border-[#FF4D00]/30"
+                      : "bg-[#121215] text-zinc-400 border-[#1a1a1e]"
+                  }`}
+                >
+                  {labels[key]}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* cards list */}
+        <div className="px-5 pb-6 flex flex-col gap-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <span className="text-zinc-600 text-sm font-mono">SYS.LOADING…</span>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <Layers size={32} className="text-zinc-700" />
+              <p className="text-zinc-500 text-sm text-center">
+                {projects.length > 0 ? "검색 결과가 없습니다." : "아직 프로젝트가 없습니다."}
+              </p>
+            </div>
+          ) : (
+            filtered.map((project) => (
+              <MobileProjectCard
+                key={project.id}
+                project={project}
+                onNavigate={(href) => router.push(href)}
+              />
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+
+    {/* FAB — mobile only, fixed above bottom nav */}
+    <button
+      type="button"
+      onClick={() => router.push("/photographer/projects/new")}
+      className="fixed md:hidden right-5 bg-[#FF4D00] rounded-full shadow-[0_4px_20px_rgba(255,77,0,0.4)] flex items-center justify-center text-white active:scale-95 transition-transform z-40"
+      style={{ bottom: 80, width: 56, height: 56 }}
+    >
+      <Plus size={24} strokeWidth={2} />
+    </button>
+
+    {/* ── Desktop View ─────────────────────────────────────────── */}
+    <div
+      className="hidden md:block min-h-screen bg-[#0a0a0c] text-white"
       style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}
     >
       {/* ── header ── */}
@@ -411,14 +680,13 @@ export default function ProjectsPage() {
         <div className="bg-[#121215]/50 border border-[#1a1a1e] rounded-2xl overflow-hidden">
           {/* header row */}
           <div
-            className={`grid ${colCls} gap-4 px-6 py-4 border-b border-[#1a1a1e] bg-[#0a0a0c]/30 text-[11px] font-bold text-zinc-500 uppercase tracking-wider`}
-            style={{ fontFamily: "var(--font-mono, monospace)" }}
+            className={`grid ${colCls} gap-4 px-6 py-3 border-b border-[#1a1a1e] bg-[#0a0a0c]/50`}
+            style={{ fontFamily: "var(--font-inter, sans-serif)" }}
           >
-            <div>프로젝트 정보</div>
-            <div>고객 / 촬영일</div>
-            <div>현재 상태 / 진행률</div>
-            <div>마감 기한</div>
-            <div className="text-right">작업 관리</div>
+            {(["프로젝트 정보", "고객 / 촬영일", "현재 상태 / 진행률", "마감 기한"] as const).map((label) => (
+              <div key={label} className="text-xs font-semibold text-zinc-400">{label}</div>
+            ))}
+            <div className="text-xs font-semibold text-zinc-400 text-right">작업 관리</div>
           </div>
 
           {/* body */}
@@ -464,30 +732,38 @@ export default function ProjectsPage() {
                   >
                     {/* col 1: project info */}
                     <div className="flex items-center gap-4 min-w-0">
-                      {/* thumbnail placeholder */}
+                      {/* thumbnail */}
                       <div
                         className="w-14 h-14 rounded-xl overflow-hidden border border-[#27272c] shrink-0 bg-[#121215] flex items-center justify-center cursor-pointer hover:border-[#FF4D00] transition-colors"
                         onClick={() => router.push(`/photographer/projects/${project.id}`)}
                       >
-                        <span
-                          className="text-lg font-black text-zinc-600 group-hover:text-zinc-400 transition-colors"
-                          style={{ fontFamily: "var(--font-inter, sans-serif)" }}
-                        >
-                          {project.name.charAt(0)}
-                        </span>
+                        {project.thumbnailUrl ? (
+                          <img
+                            src={project.thumbnailUrl}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span
+                            className="text-lg font-black text-zinc-600 group-hover:text-zinc-400 transition-colors"
+                            style={{ fontFamily: "var(--font-inter, sans-serif)" }}
+                          >
+                            {project.name.charAt(0)}
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex flex-col gap-1 min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span
                             className="text-[11px] text-zinc-500 bg-[#0a0a0c] px-1.5 py-0.5 rounded border border-[#1a1a1e]"
                             style={{ fontFamily: "var(--font-mono, monospace)" }}
                           >
                             {project.displayId ?? project.id.slice(0, 12).toUpperCase()}
                           </span>
-                          {dd.level === "danger" && !isDelivered && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
-                              긴급
+                          {project.shootType && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#27272c] text-zinc-400 border border-[#1a1a1e]">
+                              {project.shootType}
                             </span>
                           )}
                         </div>
@@ -500,13 +776,10 @@ export default function ProjectsPage() {
                         >
                           {project.name}
                         </button>
-                        {project.shootType && (
+                        {project.location && (
                           <p className="text-xs text-zinc-500 flex items-center gap-1 truncate">
-                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                              <circle cx="12" cy="13" r="3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                            </svg>
-                            {project.shootType}
+                            <MapPin size={12} className="shrink-0" />
+                            {project.location}
                           </p>
                         )}
                       </div>
@@ -534,17 +807,17 @@ export default function ProjectsPage() {
                     </div>
 
                     {/* col 3: status / progress */}
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-2 items-start">
                       <StatusPill
                         status={project.status}
                         photoCount={project.photoCount ?? 0}
                         requiredCount={project.requiredCount ?? 0}
                       />
-                      <ProjectPipelineMiniBar status={project.status} />
+                      <ProjectPipelineMiniBar status={project.status} variant="full" />
                     </div>
 
                     {/* col 4: deadline */}
-                    <div>
+                    <div className="flex items-center">
                       {isDelivered ? (
                         <span className="inline-flex px-2 py-1 rounded text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
                           style={{ fontFamily: "var(--font-mono, monospace)" }}>
@@ -649,5 +922,6 @@ export default function ProjectsPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

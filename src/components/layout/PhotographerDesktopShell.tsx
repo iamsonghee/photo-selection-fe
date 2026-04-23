@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { PhotographerMobileChrome } from "@/components/layout/PhotographerMobileChrome";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { MobileHeader } from "@/components/layout/mobile/MobileHeader";
+import { MobileBottomNav } from "@/components/layout/mobile/MobileBottomNav";
 import { isProjectDetailRootPath } from "@/lib/photographer-sidebar-routes";
 
 /**
@@ -32,14 +33,15 @@ export function PhotographerDesktopShell({
       <div className="relative z-20 hidden md:block">
         <Sidebar collapsed={collapsed} sidebarToggle={{ onToggle: toggleSidebar }} />
       </div>
-      <PhotographerMobileChrome />
+      <MobileHeader />
       <main
-        className={`relative z-10 ml-0 min-h-0 min-w-0 flex-1 transition-[margin-left] duration-300 ease-[cubic-bezier(0.2,0,0,1)] ${
+        className={`relative z-10 ml-0 min-h-0 min-w-0 flex-1 transition-[margin-left] duration-300 ease-[cubic-bezier(0.2,0,0,1)] pt-[57px] pb-[76px] md:pt-0 md:pb-0 ${
           collapsed ? "md:ml-[72px]" : "md:ml-[240px]"
         }`}
       >
         {children}
       </main>
+      <MobileBottomNav />
     </>
   );
 }

@@ -14,6 +14,7 @@ function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Pr
     shoot_type?: string | null;
     customer_phone?: string | null;
     allow_revision?: boolean | null;
+    location?: string | null;
   };
   return {
     id: row.id,
@@ -33,6 +34,7 @@ function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Pr
     deliveredAt: row.delivered_at ?? undefined,
     displayId: (row as any).display_id ?? undefined,
     allowRevision: ext.allow_revision ?? true,
+    location: ext.location ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -125,7 +127,7 @@ function supabaseErrorMessage(err: { message?: string; details?: string; hint?: 
     .join(", ") || "Unknown error";
 }
 
-/** 작가 대시보드: photographer_id로 프로젝트 목록 조회 */
+/** 작가 대시보드: photographer_id로 프로젝트 목록 조회 (썸네일 포함) */
 export async function getProjectsByPhotographerId(
   photographerId: string
 ): Promise<Project[]> {
@@ -136,7 +138,21 @@ export async function getProjectsByPhotographerId(
     .order("updated_at", { ascending: false });
 
   if (error) throw error;
-  return (data ?? []).map(mapProjectRow);
+  const projects = (data ?? []).map(mapProjectRow);
+  if (projects.length === 0) return projects;
+
+  const projectIds = projects.map((p) => p.id);
+  const { data: thumbData } = await supabase
+    .from("photos")
+    .select("project_id, r2_thumb_url")
+    .in("project_id", projectIds)
+    .eq("number", 1);
+
+  const thumbMap: Record<string, string> = Object.fromEntries(
+    (thumbData ?? []).map((r) => [r.project_id, r.r2_thumb_url])
+  );
+
+  return projects.map((p) => ({ ...p, thumbnailUrl: thumbMap[p.id] ?? null }));
 }
 
 /** 프로젝트 ID로 단건 조회 */
@@ -188,6 +204,7 @@ export async function createProject(params: {
   customer_phone?: string | null;
   access_pin?: string | null;
   allow_revision?: boolean;
+  location?: string | null;
 }): Promise<string> {
   const accessToken = crypto.randomUUID();
   const { data, error } = await supabase
@@ -206,6 +223,7 @@ export async function createProject(params: {
       ...(params.shoot_type           ? { shoot_type: params.shoot_type } : {}),
       ...(params.customer_phone       ? { customer_phone: params.customer_phone } : {}),
       ...(params.access_pin           ? { access_pin: params.access_pin } : {}),
+      ...(params.location             ? { location: params.location } : {}),
     })
     .select("id")
     .single();

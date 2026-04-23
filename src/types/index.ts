@@ -91,6 +91,10 @@ export interface Project {
   displayId?: string; // "20260410-001" 형식 (작가별 당일 순번)
   /** 재보정 허용 여부. false이면 5단계 파이프라인, true이면 최대 7단계 */
   allowRevision: boolean;
+  /** 촬영 장소 (옵셔널) */
+  location?: string | null;
+  /** 런타임 전용 — photos 테이블에서 조회한 첫 번째 사진 썸네일 URL */
+  thumbnailUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }

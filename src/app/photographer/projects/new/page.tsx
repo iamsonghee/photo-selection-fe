@@ -6,6 +6,7 @@
  * ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS shoot_type text;
  * ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS customer_phone text;
  * ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS photo_count_expected int4;
+ * ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS location text;
  */
 
 import { useState, useEffect } from "react";
@@ -44,6 +45,7 @@ export default function NewProjectPage() {
   const [deadline,           setDeadline]           = useState<string>(() =>
     format(addDays(new Date(), 7), "yyyy-MM-dd")
   );
+  const [location,           setLocation]           = useState("");
   const [accessPin,          setAccessPin]          = useState("");
   const [allowRevision,      setAllowRevision]      = useState(true);
   const [submitting,         setSubmitting]         = useState(false);
@@ -128,6 +130,7 @@ export default function NewProjectPage() {
         customer_phone: customerPhone.trim() || null,
         access_pin: accessPin || null,
         allow_revision: allowRevision,
+        location: location.trim() || null,
       });
 
       await fetch("/api/photographer/project-logs", {
@@ -579,6 +582,25 @@ export default function NewProjectPage() {
                   <div className="np-ib np-ib-bl" /><div className="np-ib np-ib-br" />
                 </div>
                 <div style={{ fontSize:11, color:"#444", marginTop:6 }}>알림 기능 연동 시 사용됩니다 · 선택사항</div>
+              </div>
+
+              {/* 촬영 장소 — 전체 폭 */}
+              <div style={{ gridColumn:"1 / -1" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:10 }}>
+                  <label style={{ fontSize:14, fontWeight:700, color:"#ccc" }}>촬영 장소</label>
+                  <span style={{ fontFamily:"'Space Mono', 'Noto Sans KR', sans-serif", fontSize:10, color:"#444", letterSpacing:"0.15em", textTransform:"uppercase" }}>FIELD :: LOCATION</span>
+                </div>
+                <div className="np-input-wrap" style={{ position:"relative" }}>
+                  <input
+                    className="np-fi"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="예: 서울 강남 스튜디오, 한강공원 잠원지구 등"
+                  />
+                  <div className="np-ib np-ib-tl" /><div className="np-ib np-ib-tr" />
+                  <div className="np-ib np-ib-bl" /><div className="np-ib np-ib-br" />
+                </div>
+                <div style={{ fontSize:11, color:"#444", marginTop:6 }}>촬영 장소를 입력하면 목록에서 표시됩니다 · 선택사항</div>
               </div>
 
               {/* 셀렉 갯수 N */}
