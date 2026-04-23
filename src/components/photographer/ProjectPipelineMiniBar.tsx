@@ -46,6 +46,7 @@ export function ProjectPipelineMiniBar({ status, variant = "card" }: Props) {
         display: "flex",
         gap: variant === "full" ? 2 : 1,
         width: variant === "full" ? "100%" : 100,
+        minWidth: variant === "full" ? 0 : undefined,
         height: 4,
         background: variant === "full" ? "#0a0a0a" : undefined,
         overflow: variant === "full" ? "hidden" : undefined,

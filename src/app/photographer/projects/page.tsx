@@ -4,8 +4,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { Plus, Search, ChevronDown, Zap, Clock, CheckCircle2, Layers, MapPin, SlidersHorizontal } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { getPhotographerIdByAuthId, getProjectsByPhotographerId } from "@/lib/db";
+import { getProjectsByPhotographerId } from "@/lib/db";
 import { useProfile } from "@/contexts/ProfileContext";
 import type { Project, ProjectStatus } from "@/types";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -202,7 +201,9 @@ function MobileProjectCard({ project, onNavigate }: { project: Project; onNaviga
       {/* status box */}
       <div className="bg-[#0a0a0c]/50 rounded-xl p-3 border border-[#1a1a1e]/50 flex flex-col gap-2 items-start">
         <StatusPill status={project.status} />
-        <ProjectPipelineMiniBar status={project.status} variant="full" />
+        <div className="self-stretch">
+          <ProjectPipelineMiniBar status={project.status} variant="full" />
+        </div>
       </div>
 
       {/* CTA */}
@@ -261,7 +262,7 @@ function MobileProjectCard({ project, onNavigate }: { project: Project; onNaviga
 
 export default function ProjectsPage() {
   const router = useRouter();
-  const { profile } = useProfile();
+  const { profile, loading: profileLoading } = useProfile();
   const [projects, setProjects]   = useState<Project[]>([]);
   const [loading,  setLoading]    = useState(true);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -294,20 +295,13 @@ export default function ProjectsPage() {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user?.id) { setLoading(false); return; }
-      try {
-        const photographerId = await getPhotographerIdByAuthId(user.id);
-        if (!photographerId) { setLoading(false); return; }
-        const list = await getProjectsByPhotographerId(photographerId);
-        setProjects(list);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    });
-  }, []);
+    if (profileLoading) return;
+    if (!profile?.id) { setLoading(false); return; }
+    getProjectsByPhotographerId(profile.id)
+      .then(setProjects)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [profile?.id, profileLoading]);
 
   const resetFilters = useCallback(() => {
     setSearchQuery("");
@@ -813,7 +807,9 @@ export default function ProjectsPage() {
                         photoCount={project.photoCount ?? 0}
                         requiredCount={project.requiredCount ?? 0}
                       />
-                      <ProjectPipelineMiniBar status={project.status} variant="full" />
+                      <div className="self-stretch">
+                        <ProjectPipelineMiniBar status={project.status} variant="full" />
+                      </div>
                     </div>
 
                     {/* col 4: deadline */}

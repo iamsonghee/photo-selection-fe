@@ -13,8 +13,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Lock, RefreshCw, AlertCircle, AlertTriangle } from "lucide-react";
 import { addDays, format, differenceInCalendarDays } from "date-fns";
-import { supabase } from "@/lib/supabase";
-import { createProject, getPhotographerIdByAuthId, getProjectsByPhotographerId } from "@/lib/db";
+import { createProject, getProjectsByPhotographerId } from "@/lib/db";
+import { useProfile } from "@/contexts/ProfileContext";
 import { BETA_MAX_PROJECTS_TOTAL } from "@/lib/beta-limits";
 import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 
@@ -33,6 +33,7 @@ function getErrorMessage(e: unknown): string {
 
 export default function NewProjectPage() {
   const router = useRouter();
+  const { profile } = useProfile();
 
   // ── 폼 상태 ──
   const [shootType,          setShootType]          = useState<string | null>(null);
@@ -55,26 +56,19 @@ export default function NewProjectPage() {
 
   // ── 마운트 시 프로젝트 수 조회 + 사용자명 ──
   useEffect(() => {
+    if (!profile?.id) return;
     let cancelled = false;
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user?.id || cancelled) return;
-        const displayName =
-          (user.user_metadata?.name as string | undefined) ||
-          (user.user_metadata?.full_name as string | undefined) ||
-          "";
-        if (!cancelled) setUserName(displayName);
-        const photographerId = await getPhotographerIdByAuthId(user.id);
-        if (!photographerId || cancelled) return;
-        const projects = await getProjectsByPhotographerId(photographerId);
+        if (!cancelled) setUserName(profile.name ?? "");
+        const projects = await getProjectsByPhotographerId(profile.id);
         if (!cancelled) setProjectCount(projects.length);
       } catch {
         if (!cancelled) setProjectCount(0);
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [profile?.id]);
 
   // ── 기한 계산 ──
   const handleQuickDays = (days: number) => {
@@ -114,10 +108,8 @@ export default function NewProjectPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) throw new Error("로그인이 필요합니다.");
-      const photographerId = await getPhotographerIdByAuthId(user.id);
-      if (!photographerId) throw new Error("사진작가 계정 정보를 찾을 수 없습니다.");
+      if (!profile?.id) throw new Error("로그인이 필요합니다.");
+      const photographerId = profile.id;
 
       const id = await createProject({
         name: name.trim(),
