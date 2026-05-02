@@ -76,13 +76,14 @@ export function buildCompactSteps(
   const versionDesc =
     status === "reviewing_v1" ? "고객 검토 중"
     : isPageCompleted("upload-versions", status) ? "완료"
-    : ["confirmed", "editing"].includes(status) ? "업로드 진행 중"
+    : status === "confirmed" ? "보정 시작 대기"
+    : status === "editing" ? "업로드 / 검토 시작 대기"
     : "이전 단계 완료 후 가능";
 
   const v2Desc =
     status === "delivered" ? "완료"
     : status === "reviewing_v2" ? "고객 검토 중"
-    : status === "editing_v2" ? "업로드 진행 중"
+    : status === "editing_v2" ? "업로드 / 검토 시작 대기"
     : "이전 단계 완료 후 가능";
 
   const steps4: StepDef[] = [

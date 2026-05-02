@@ -199,11 +199,11 @@ function MobileProjectCard({ project, onNavigate }: { project: Project; onNaviga
       </div>
 
       {/* status box */}
-      <div className="bg-[#0a0a0c]/50 rounded-xl p-3 border border-[#1a1a1e]/50 flex flex-col gap-2 items-start">
-        <StatusPill status={project.status} />
-        <div className="self-stretch">
-          <ProjectPipelineMiniBar status={project.status} variant="full" />
+      <div className="bg-[#0a0a0c]/50 rounded-xl p-3 border border-[#1a1a1e]/50">
+        <div className="mb-2">
+          <StatusPill status={project.status} />
         </div>
+        <ProjectPipelineMiniBar status={project.status} variant="full" />
       </div>
 
       {/* CTA */}
@@ -268,7 +268,6 @@ export default function ProjectsPage() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPos,    setMenuPos]    = useState<{ top: number; right: number } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [clockStr, setClockStr]   = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFrom, setDateFrom]   = useState(() => {
     const d = new Date();
@@ -281,18 +280,6 @@ export default function ProjectsPage() {
   const [activeTab, setActiveTab] = useState<"all" | "active" | "waiting" | "completed">("all");
   const [sortBy,   setSortBy]     = useState<"latest" | "deadline" | "name" | "shoot_date">("latest");
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
-
-  useEffect(() => {
-    const update = () => {
-      const now = new Date();
-      setClockStr(
-        `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`
-      );
-    };
-    update();
-    const id = setInterval(update, 1000);
-    return () => clearInterval(id);
-  }, []);
 
   useEffect(() => {
     if (profileLoading) return;
@@ -372,7 +359,7 @@ export default function ProjectsPage() {
     { key: "completed" as const, label: "완료",           count: tabCounts.completed, icon: <CheckCircle2 size={16} className="text-emerald-500" />, color: "emerald", ping: false },
   ] as const;
 
-  const colCls = "grid-cols-[minmax(280px,2fr)_minmax(140px,1fr)_minmax(160px,1.5fr)_minmax(100px,1fr)_minmax(160px,auto)]";
+  const colCls = "grid-cols-[minmax(280px,2fr)_minmax(140px,1fr)_minmax(160px,1.5fr)_minmax(100px,1fr)_minmax(160px,1fr)]";
 
   return (
     <>
@@ -514,20 +501,14 @@ export default function ProjectsPage() {
           { label: "진행중", value: tabCounts.active, accent: true },
         ]}
         actions={
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <div className="text-[10px] text-zinc-500 font-mono" style={{ fontFamily: "var(--font-mono, monospace)" }}>SYS_TIME</div>
-              <div className="text-sm font-bold text-white mt-0.5 tracking-wider" style={{ fontFamily: "var(--font-mono, monospace)" }}>{clockStr}</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => router.push("/photographer/projects/new")}
-              className="flex items-center gap-2 bg-[#FF4D00] hover:bg-[#ff5e1a] text-black px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
-            >
-              <Plus size={16} />
-              새 프로젝트
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => router.push("/photographer/projects/new")}
+            className="flex items-center gap-2 bg-[#FF4D00] hover:bg-[#ff5e1a] text-black px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
+          >
+            <Plus size={16} />
+            새 프로젝트
+          </button>
         }
       />
 
@@ -801,15 +782,15 @@ export default function ProjectsPage() {
                     </div>
 
                     {/* col 3: status / progress */}
-                    <div className="flex flex-col gap-2 items-start">
-                      <StatusPill
-                        status={project.status}
-                        photoCount={project.photoCount ?? 0}
-                        requiredCount={project.requiredCount ?? 0}
-                      />
-                      <div className="self-stretch">
-                        <ProjectPipelineMiniBar status={project.status} variant="full" />
+                    <div>
+                      <div className="mb-2">
+                        <StatusPill
+                          status={project.status}
+                          photoCount={project.photoCount ?? 0}
+                          requiredCount={project.requiredCount ?? 0}
+                        />
                       </div>
+                      <ProjectPipelineMiniBar status={project.status} variant="full" />
                     </div>
 
                     {/* col 4: deadline */}

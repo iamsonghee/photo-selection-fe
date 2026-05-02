@@ -27,7 +27,13 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getPhotosWithSelections, getProjectById, getVersionReviewsByProjectId } from "@/lib/db";
-import { buildVersionMapping, clearSingleFile, remapSingleFile, type MappingResult } from "@/lib/version-mapping";
+import {
+  buildVersionMapping,
+  clearSingleFile,
+  remapSingleFile,
+  type MappingResult,
+  type MappingType,
+} from "@/lib/version-mapping";
 import type { Photo, Project } from "@/types";
 import CompareViewerModal from "@/components/CompareViewerModal";
 import { BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
@@ -433,7 +439,7 @@ export default function UploadVersionsV2Page() {
         const v2m = serverV2Map.get(t.id);
         return {
           target: t,
-          type: (v2m ? "exact" : "none") as "exact" | "none",
+          type: (v2m ? "exact" : "none") as MappingType,
           serverUrl: v2m?.url,
           storedFileSizeBytes: v2m?.fileSize ?? null,
           v1Url: v1m?.url,
@@ -858,7 +864,7 @@ export default function UploadVersionsV2Page() {
           </section>
 
 
-          {/* Customer review results */}
+          {/* Customer review summary — 상세는 보정 관리(워크플로우)에서 확인 */}
           <div
             style={{
               padding: "16px 20px",
@@ -869,7 +875,7 @@ export default function UploadVersionsV2Page() {
           >
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
-              marginBottom: 10,
+              marginBottom: 12,
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <MessageSquare size={12} color="#666" />
@@ -879,7 +885,7 @@ export default function UploadVersionsV2Page() {
                 <button
                   type="button"
                   onClick={handleCopy}
-                  title="클립보드 복사"
+                  title="재보정 요청을 클립보드에 복사"
                   className="ph-uv-prj-btn-secondary"
                   style={{ padding: "3px 7px", display: "flex", alignItems: "center", gap: 3 }}
                 >
@@ -888,7 +894,7 @@ export default function UploadVersionsV2Page() {
                 <button
                   type="button"
                   onClick={handleDownloadTxt}
-                  title="TXT 다운로드"
+                  title="재보정 요청을 TXT로 저장"
                   className="ph-uv-prj-btn-secondary"
                   style={{ padding: "3px 7px", display: "flex", alignItems: "center", gap: 3 }}
                 >
@@ -897,46 +903,63 @@ export default function UploadVersionsV2Page() {
               </div>
             </div>
 
-            {/* Approved */}
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: GREEN, marginBottom: 5, display: "flex", alignItems: "center", gap: 4, fontFamily: MONO, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                <Check size={9} />확정 ({approvedPhotos.length}장)
-              </div>
-              {approvedPhotos.length === 0 ? (
-                <div style={{ fontSize: 11, color: TEXT_MUTED, fontStyle: "italic" }}>없음</div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  {approvedPhotos.map((p) => (
-                    <div key={p.id} style={{ fontSize: 11, color: TEXT_NORMAL }}>{getDisplayFilename(p)}</div>
-                  ))}
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              <div style={{
+                flex: 1,
+                background: SURFACE_2,
+                border: `1px solid rgba(34,197,94,0.18)`,
+                padding: "8px 10px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <Check size={9} color={GREEN} />
+                  <span className="ph-uv-tech-label" style={{ color: GREEN, fontSize: "9px" }}>
+                    확정
+                  </span>
                 </div>
-              )}
+                <div style={{ fontFamily: MONO, fontSize: 14, color: TEXT_BRIGHT, fontWeight: 700 }}>
+                  {approvedPhotos.length}장
+                </div>
+              </div>
+              <div style={{
+                flex: 1,
+                background: SURFACE_2,
+                border: `1px solid rgba(245,158,11,0.25)`,
+                padding: "8px 10px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <AlertCircle size={9} color={AMBER} />
+                  <span className="ph-uv-tech-label" style={{ color: AMBER, fontSize: "9px" }}>
+                    재보정 요청
+                  </span>
+                </div>
+                <div style={{ fontFamily: MONO, fontSize: 14, color: TEXT_BRIGHT, fontWeight: 700 }}>
+                  {revisionTargets.length}장
+                </div>
+              </div>
             </div>
 
-            {/* Revision */}
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 600, color: AMBER, marginBottom: 5, display: "flex", alignItems: "center", gap: 4, fontFamily: MONO, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                <AlertCircle size={9} />재보정 요청 ({revisionTargets.length}장)
-              </div>
-              {revisionTargets.length === 0 ? (
-                <div style={{ fontSize: 11, color: TEXT_MUTED, fontStyle: "italic" }}>없음</div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  {revisionTargets.map((r) => (
-                    <div key={r.id} style={{
-                      background: SURFACE_2,
-                      border: `1px solid rgba(245,158,11,0.15)`,
-                      padding: "5px 8px",
-                    }}>
-                      <div style={{ fontSize: 11, fontWeight: 500, color: TEXT_BRIGHT, marginBottom: 2 }}>{r.filename}</div>
-                      {r.comment && (
-                        <div style={{ fontSize: 10, color: AMBER }}>{r.comment}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => router.push(`/photographer/projects/${id}/workflow`)}
+              className="ph-uv-prj-btn-secondary"
+              style={{
+                width: "100%",
+                padding: "8px 0",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+              }}
+            >
+              <ArrowRight size={10} />
+              보정 관리에서 코멘트 자세히 보기
+            </button>
           </div>
 
           {/* ACTION_FLOW compact */}
@@ -1036,8 +1059,8 @@ export default function UploadVersionsV2Page() {
                       <button
                         type="button"
                         className="ph-uv-thumb-more"
-                        aria-label={`나머지 ${revisionMoreCount}장 보기`}
-                        onClick={() => {/* no-op: show all items in lightbox if needed */}}
+                        aria-label={`보정 관리에서 나머지 ${revisionMoreCount}장 보기`}
+                        onClick={() => router.push(`/photographer/projects/${id}/workflow`)}
                         style={{
                           aspectRatio: "1 / 1",
                           minWidth: 0,
@@ -1651,7 +1674,7 @@ function MappingCardV2({
 }: {
   target: V2Target;
   file: File | null;
-  type: "exact" | "order" | "none";
+  type: MappingType;
   orderIndex?: number;
   previewUrl?: string;
   storedFileSizeBytes?: number | null;

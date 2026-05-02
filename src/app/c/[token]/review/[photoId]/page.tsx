@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Check, RefreshCw, Maximize2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, RefreshCw, Maximize2, LayoutGrid, X } from "lucide-react";
 import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
 import FullScreenCompareModal from "@/components/FullScreenCompareModal";
@@ -43,6 +43,8 @@ export default function ReviewViewerPage() {
   const [showSubmitModal,  setShowSubmitModal]  = useState(false);
   const [submitError,      setSubmitError]      = useState<string | null>(null);
   const [photographer,     setPhotographer]     = useState<string | null>(null);
+  const [galleryOpen,      setGalleryOpen]      = useState(false);
+  const galleryActiveRef = useRef<HTMLDivElement | null>(null);
 
   // URL 파라미터가 바뀔 때만 동기화 (브라우저 뒤로가기 등)
   useEffect(() => { setActivePhotoId(photoId); }, [photoId]);
@@ -95,18 +97,45 @@ export default function ReviewViewerPage() {
   let touchStartX = 0;
   const handleTouchStart = (e: React.TouchEvent) => { touchStartX = e.touches[0].clientX; };
   const handleTouchEnd   = (e: React.TouchEvent) => {
+    if (galleryOpen) return;
     const diff = touchStartX - e.changedTouches[0].clientX;
     if (Math.abs(diff) > 50) { diff > 0 ? goNext() : goPrev(); }
   };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (galleryOpen) {
+        if (e.key === "Escape") { e.preventDefault(); setGalleryOpen(false); }
+        return;
+      }
       if (e.key === "ArrowLeft")  { e.preventDefault(); goPrev(); }
       if (e.key === "ArrowRight") { e.preventDefault(); goNext(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [goPrev, goNext]);
+  }, [goPrev, goNext, galleryOpen]);
+
+  // 갤러리 모달 열릴 때 활성 썸네일을 보이는 위치로 스크롤
+  useEffect(() => {
+    if (!galleryOpen) return;
+    const t = window.setTimeout(() => {
+      galleryActiveRef.current?.scrollIntoView({ block: "nearest", behavior: "auto" });
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [galleryOpen, activePhotoId]);
+
+  // 모바일에서는 SIDE-BY-SIDE 모드를 단일 보기(보정본)로 자동 보정
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mql = window.matchMedia("(max-width: 900px)");
+    const apply = (matches: boolean) => {
+      if (matches) setViewMode((prev) => (prev === "side-by-side" ? "single-retouched" : prev));
+    };
+    apply(mql.matches);
+    const onChange = (e: MediaQueryListEvent) => apply(e.matches);
+    mql.addEventListener?.("change", onChange);
+    return () => mql.removeEventListener?.("change", onChange);
+  }, []);
 
   const handleApprove = useCallback(() => {
     if (!current) return;
@@ -129,12 +158,28 @@ export default function ReviewViewerPage() {
     const hasRealIds = photos.some((p) => (p as ReviewPhotoItem).photoVersionId?.length > 0);
     let finalStatus: string | null = null;
     if (hasRealIds) {
-      const reviews = photos
-        .filter((p) => (p as ReviewPhotoItem).photoVersionId)
-        .map((p) => {
-          const rev = getReview(p.id);
-          return { photo_version_id: (p as ReviewPhotoItem).photoVersionId, photo_id: p.id, status: (rev?.status ?? "approved") as "approved" | "revision_requested", customer_comment: rev?.comment ?? null };
+      const withVersion = photos.filter((p) => (p as ReviewPhotoItem).photoVersionId);
+      const reviews: Array<{
+        photo_version_id: string;
+        photo_id: string;
+        status: "approved" | "revision_requested";
+        customer_comment: string | null;
+      }> = [];
+      for (const p of withVersion) {
+        const rev = getReview(p.id);
+        if (!rev || (rev.status !== "approved" && rev.status !== "revision_requested")) {
+          setSubmitError(
+            "일부 사진의 검토 선택이 없습니다. 각 장에서 확정 또는 재보정을 선택한 뒤 다시 시도해 주세요."
+          );
+          return;
+        }
+        reviews.push({
+          photo_version_id: (p as ReviewPhotoItem).photoVersionId!,
+          photo_id: p.id,
+          status: rev.status,
+          customer_comment: rev.comment ?? null,
         });
+      }
       const res  = await fetch("/api/c/review/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, reviews }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setSubmitError((data && typeof data.error === "string" && data.error) || `서버 오류 (${res.status})`); return; }
@@ -147,7 +192,15 @@ export default function ReviewViewerPage() {
       finalStatus = typeof data?.status === "string" ? data.status : null;
     }
     resetAll();
-    if (finalStatus === "delivered") { window.location.replace(`/c/${token}/delivered`); return; }
+    if (finalStatus === "delivered") {
+      window.location.replace(`/c/${token}/delivered`);
+      return;
+    }
+    // 재보정이 포함되면 editing_v2 — '셀렉 확정' 문구의 confirmed 대신 잠금 갤러리로
+    if (finalStatus === "editing_v2" || finalStatus === "editing") {
+      window.location.replace(`/c/${token}/locked`);
+      return;
+    }
     window.location.replace(`/c/${token}/confirmed`);
   }, [allReviewed, token, revisionCount, photos, getReview, resetAll]);
 
@@ -194,10 +247,11 @@ export default function ReviewViewerPage() {
   const prjIdShort        = project.id.replace(/-/g, "").slice(0, 8).toUpperCase();
   const customerName      = project.customerName || "CLIENT";
 
-  const statusColor  = isApproved ? GREEN : isRevision ? ORANGE : DIM;
-  const statusBg     = isApproved ? "rgba(0,255,102,0.1)" : isRevision ? "rgba(255,170,0,0.1)" : "rgba(255,255,255,0.04)";
-  const statusBorder = isApproved ? "rgba(0,255,102,0.3)" : isRevision ? "rgba(255,170,0,0.3)" : BORDER_HI;
-  const statusLabel  = isApproved ? "APPROVED" : isRevision ? "REVISION" : "PENDING";
+  const statusColor   = isApproved ? GREEN : isRevision ? ORANGE : DIM;
+  const statusBg      = isApproved ? "rgba(0,255,102,0.1)" : isRevision ? "rgba(255,170,0,0.1)" : "rgba(255,255,255,0.04)";
+  const statusBorder  = isApproved ? "rgba(0,255,102,0.3)" : isRevision ? "rgba(255,170,0,0.3)" : BORDER_HI;
+  const statusLabel   = isApproved ? "APPROVED" : isRevision ? "REVISION" : "PENDING";
+  const statusLabelKo = isApproved ? "확정됨" : isRevision ? "재보정 요청" : "미검토";
 
   const showOriginal  = viewMode === "side-by-side" || viewMode === "single-original";
   const showRetouched = viewMode === "side-by-side" || viewMode === "single-retouched";
@@ -210,20 +264,30 @@ export default function ReviewViewerPage() {
         html, body { overflow: hidden; }
 
         .rv-workspace {
-          display: grid;
-          grid-template-columns: 260px 1fr 320px;
+          display: flex;
           flex: 1;
+          min-height: 0;
           overflow: hidden;
+        }
+        .rv-panel-left {
+          width: 260px;
+          flex-shrink: 0;
+        }
+        .rv-panel-right {
+          width: 320px;
+          flex-shrink: 0;
         }
 
         .rv-thumb-card {
-          aspect-ratio: 1;
           border: 1px solid ${BORDER};
           position: relative;
           background: ${BG_INPUT};
           cursor: pointer;
           transition: border-color 0.2s;
           overflow: hidden;
+          display: block;
+          height: 0;
+          padding-bottom: 100%;
         }
         .rv-thumb-card:hover { border-color: ${BORDER_HI}; }
         .rv-thumb-card.rv-active { border-color: ${ACCENT}; }
@@ -330,21 +394,81 @@ export default function ReviewViewerPage() {
         .rv-modal-b-bl { bottom: -1px; left: -1px; border-bottom: 2px solid; border-left: 2px solid; }
         .rv-modal-b-br { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
 
+        /* Mobile-only segmented toggle (hidden by default on desktop) */
+        .rv-mobile-toggle { display: none; }
+
+        /* Mobile-only generic util (hidden on desktop, shown via @media on mobile) */
+        .rv-mobile-only { display: none !important; }
+
+        /* Mobile gallery modal (hidden by default; rendered conditionally) */
+        .rv-gallery-modal {
+          position: fixed;
+          inset: 0;
+          z-index: 300;
+          background: rgba(0,0,0,0.94);
+          backdrop-filter: blur(6px);
+          display: flex;
+          flex-direction: column;
+        }
+        .rv-gallery-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px 14px;
+          border-bottom: 1px solid ${BORDER};
+          flex-shrink: 0;
+          background: rgba(10,10,10,0.95);
+        }
+        .rv-gallery-body {
+          flex: 1;
+          overflow-y: auto;
+          padding: 12px;
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 8px;
+          align-content: start;
+          padding-bottom: calc(12px + env(safe-area-inset-bottom));
+        }
+        .rv-mobile-seg { display: flex; flex: 1; border: 1px solid ${BORDER}; }
+        .rv-mobile-seg button {
+          flex: 1; height: 36px; background: transparent; border: none;
+          color: ${MUTED}; font-family: ${MONO}; font-size: 11px;
+          letter-spacing: 0.05em; cursor: pointer; text-transform: uppercase;
+        }
+        .rv-mobile-seg button.rv-active { background: ${ACCENT_DIM}; color: ${ACCENT}; }
+        .rv-mobile-seg button + button { border-left: 1px solid ${BORDER}; }
+        .rv-mobile-cmp {
+          background: transparent; border: 1px solid ${BORDER}; color: ${MUTED};
+          width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .rv-mobile-cmp:hover { color: ${TEXT}; border-color: ${BORDER_HI}; }
+
         @media (max-width: 900px) {
           .rv-header-top { height: 56px !important; padding: 0 14px !important; }
           .rv-header-project-title { font-size: 15px !important; }
           .rv-header-photographer { display: none !important; }
           .rv-header-reviewed-label { display: none !important; }
-          .rv-workspace { grid-template-columns: 1fr !important; grid-template-rows: auto 1fr auto; }
+          .rv-header-sub { display: none !important; }
+          .rv-workspace { flex-direction: column !important; }
           .rv-panel-left { display: none !important; }
-          .rv-panel-right { border-left: none !important; border-top: 1px solid ${BORDER} !important; max-height: 45vh; overflow-y: auto; }
-          .rv-toolbar { overflow-x: auto; }
+          .rv-panel-right { width: 100% !important; flex-shrink: 0 !important; border-left: none !important; border-top: 1px solid ${BORDER} !important; max-height: 45vh; overflow-y: auto; }
+          .rv-toolbar-desktop { display: none !important; }
+          .rv-mobile-toggle { display: flex !important; }
+          .rv-mobile-only { display: inline-flex !important; }
+          .rv-gallery-trigger { display: inline-flex !important; }
+          .rv-stage { padding: 12px !important; gap: 8px !important; }
+          .rv-stage-meta-right { display: none !important; }
+          .rv-info-section { display: none !important; }
+          .rv-memo-mobile-hidden { display: none !important; }
+          .rv-bg-grid { background-image: none !important; }
           .rv-footer-meta { display: none !important; }
+          .rv-footer { padding-bottom: env(safe-area-inset-bottom) !important; }
           .rv-btn-submit { height: 40px !important; padding: 0 18px !important; font-size: 12px !important; }
         }
       `}</style>
 
       <div
+        className="rv-bg-grid"
         style={{
           background: BG_BASE, height: "100vh", display: "flex", flexDirection: "column",
           color: TEXT, overflow: "hidden",
@@ -367,14 +491,32 @@ export default function ReviewViewerPage() {
                 <h1 className="rv-header-project-title" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 20, letterSpacing: "-0.5px", lineHeight: 1, color: TEXT, margin: 0 }}>
                   {project.name}
                 </h1>
-                <p style={{ fontFamily: MONO, fontSize: 10, color: DIM, marginTop: 4, letterSpacing: "0.1em" }}>
+                <p className="rv-header-sub" style={{ fontFamily: MONO, fontSize: 10, color: DIM, marginTop: 4, letterSpacing: "0.1em" }}>
                   REVIEW // 보정본 검토
                 </p>
               </div>
             </div>
 
             {/* Right */}
-            <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              {/* Mobile-only: open gallery modal */}
+              <button
+                type="button"
+                className="rv-mobile-only rv-gallery-trigger"
+                aria-label="전체 사진 목록"
+                onClick={() => setGalleryOpen(true)}
+                style={{
+                  width: 36, height: 36,
+                  background: "transparent",
+                  border: `1px solid ${BORDER_HI}`,
+                  color: TEXT,
+                  display: "none",
+                  alignItems: "center", justifyContent: "center",
+                  cursor: "pointer",
+                }}
+              >
+                <LayoutGrid size={16} />
+              </button>
               {photographer && (
                 <>
                   <div className="rv-header-photographer" style={{ textAlign: "right" }}>
@@ -396,8 +538,8 @@ export default function ReviewViewerPage() {
             </div>
           </div>
 
-          {/* Row 2: Toolbar */}
-          <div style={{ borderTop: `1px solid #111`, background: "rgba(0,0,0,0.5)" }}>
+          {/* Row 2: Toolbar (desktop only) */}
+          <div className="rv-toolbar-desktop" style={{ borderTop: `1px solid #111`, background: "rgba(0,0,0,0.5)" }}>
             <div className="rv-toolbar" style={{ height: 56, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "center", gap: 24, overflowX: "auto" }}>
               {/* Nav prev/next */}
               <div className="rv-tool-group">
@@ -434,6 +576,53 @@ export default function ReviewViewerPage() {
               </div>
             </div>
           </div>
+
+          {/* Row 2: Mobile-only toggle (원본 | 보정본 + 비교) */}
+          <div
+            className="rv-mobile-toggle"
+            style={{
+              borderTop: `1px solid #111`,
+              background: "rgba(0,0,0,0.6)",
+              padding: "8px 12px",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <div className="rv-mobile-seg" role="tablist" aria-label="이미지 보기 모드">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === "single-original"}
+                className={viewMode === "single-original" ? "rv-active" : ""}
+                onClick={() => setViewMode("single-original")}
+              >
+                원본
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === "single-retouched"}
+                className={viewMode === "single-retouched" ? "rv-active" : ""}
+                onClick={() => setViewMode("single-retouched")}
+              >
+                보정본
+              </button>
+            </div>
+            <button
+              type="button"
+              className="rv-mobile-cmp"
+              aria-label="원본/보정본 비교 보기"
+              onClick={() => {
+                setFullInitial(viewMode === "single-original" ? "original" : "version");
+                setFullOpen(true);
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="1" />
+                <line x1="12" y1="3" x2="12" y2="21" />
+              </svg>
+            </button>
+          </div>
         </header>
 
         {/* ── Workspace ── */}
@@ -441,11 +630,11 @@ export default function ReviewViewerPage() {
 
           {/* Left panel: thumbnail gallery */}
           <div className="rv-panel-left" style={{ borderRight: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", background: "rgba(3,3,3,0.95)" }}>
-            <div style={{ padding: "10px 14px", borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: MONO, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <div style={{ padding: "10px 14px", borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: MONO, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", flexShrink: 0 }}>
               <span>BATCH_01</span>
               <span style={{ color: MUTED }}>{photos.length} ITEMS</span>
             </div>
-            <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, alignContent: "start" }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 12, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, alignContent: "start" }}>
               {photos.map((p, i) => {
                 const pReview     = getReview(p.id);
                 const pStatus     = pReview?.status ?? "pending";
@@ -454,6 +643,7 @@ export default function ReviewViewerPage() {
                 const pRevision   = pStatus === "revision_requested";
                 const pillColor   = pApproved ? GREEN : pRevision ? ORANGE : undefined;
                 const pillLabel   = pApproved ? "APPROVED" : pRevision ? "REVISION" : null;
+                const thumbSrc    = p.versionUrl ?? p.originalUrl;
 
                 return (
                   <div
@@ -461,19 +651,67 @@ export default function ReviewViewerPage() {
                     className={`rv-thumb-card${isActive ? " rv-active" : ""}`}
                     onClick={() => navigate(p.id)}
                   >
-                    {p.versionUrl
-                      ? <img src={p.versionUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: isActive ? 1 : 0.6 }} />
-                      : <div style={{ width: "100%", height: "100%", background: `radial-gradient(circle at center, #1a1a1a 0%, #0a0a0a 100%)` }} />
-                    }
-                    <div style={{ position: "absolute", inset: 0, padding: 4, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                    {thumbSrc ? (
+                      <img
+                        src={thumbSrc}
+                        alt=""
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          opacity: isActive ? 1 : 0.6,
+                          display: "block",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          background: `radial-gradient(circle at center, #1a1a1a 0%, #0a0a0a 100%)`,
+                        }}
+                      />
+                    )}
+
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        padding: 4,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                      }}
+                    >
                       <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "flex-start" }}>
                         {pillLabel && (
-                          <span style={{ background: "rgba(0,0,0,0.8)", border: `1px solid ${pillColor}22`, color: pillColor, padding: "1px 4px", fontSize: 8, fontFamily: MONO, borderRadius: 1 }}>
+                          <span
+                            style={{
+                              background: "rgba(0,0,0,0.8)",
+                              border: `1px solid ${pillColor}22`,
+                              color: pillColor,
+                              padding: "1px 4px",
+                              fontSize: 8,
+                              fontFamily: MONO,
+                              borderRadius: 1,
+                            }}
+                          >
                             {pillLabel}
                           </span>
                         )}
                       </div>
-                      <span style={{ fontFamily: MONO, fontSize: 8, color: MUTED, background: "rgba(0,0,0,0.75)", padding: "1px 3px", alignSelf: "flex-start" }}>
+                      <span
+                        style={{
+                          fontFamily: MONO,
+                          fontSize: 8,
+                          color: MUTED,
+                          background: "rgba(0,0,0,0.75)",
+                          padding: "1px 3px",
+                          alignSelf: "flex-start",
+                        }}
+                      >
                         {p.originalFilename?.split("/").pop()?.slice(0, 14) ?? `IMG_${String(i + 1).padStart(4, "0")}`}
                       </span>
                     </div>
@@ -484,54 +722,41 @@ export default function ReviewViewerPage() {
           </div>
 
           {/* Center panel: viewer */}
-          <div style={{ display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             {/* Image stage */}
-            <div style={{ flex: 1, padding: 24, display: "flex", gap: 16, overflow: "hidden" }}>
+            <div className="rv-stage" style={{ flex: 1, minHeight: 0, padding: 24, display: "flex", gap: 16, overflow: "hidden" }}>
 
               {/* Original */}
               {showOriginal && (
                 <div
-                  style={{ flex: 1, border: `1px solid ${BORDER}`, background: BG_PANEL, position: "relative", display: "flex", flexDirection: "column", cursor: "pointer", overflow: "hidden", minHeight: 0 }}
+                  style={{ flex: 1, border: `1px solid ${BORDER}`, background: "radial-gradient(circle at center,#1a1a1a 0%,#0a0a0a 100%)", position: "relative", cursor: "pointer", overflow: "hidden" }}
                   onClick={() => { setFullInitial("original"); setFullOpen(true); }}
                 >
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "8px 12px", display: "flex", justifyContent: "space-between", background: "linear-gradient(rgba(0,0,0,0.8),transparent)", zIndex: 2, pointerEvents: "none" }}>
                     <span style={{ background: BG_BASE, border: `1px solid ${BORDER}`, padding: "4px 8px", fontFamily: MONO, fontSize: 9, color: MUTED, letterSpacing: "0.05em", textTransform: "uppercase" }}>ORIGINAL (RAW)</span>
-                    <span style={{ background: BG_BASE, border: `1px solid ${BORDER}`, padding: "4px 8px", fontFamily: MONO, fontSize: 9, color: DIM, letterSpacing: "0.05em" }}>{current.originalFilename?.split("/").pop() ?? "UNKNOWN"}</span>
+                    <span className="rv-stage-meta-right" style={{ background: BG_BASE, border: `1px solid ${BORDER}`, padding: "4px 8px", fontFamily: MONO, fontSize: 9, color: DIM, letterSpacing: "0.05em" }}>{current.originalFilename?.split("/").pop() ?? "UNKNOWN"}</span>
                   </div>
-                  <div style={{ flex: 1, position: "relative", background: "radial-gradient(circle at center,#1a1a1a 0%,#0a0a0a 100%)", overflow: "hidden", minHeight: 0 }}>
-                    {current.originalUrl
-                      ? <img src={current.originalUrl} alt="원본" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />
-                      : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: DIM }}>NO_ORIGINAL</div>
-                    }
-                  </div>
-                  {/* crosshair reticle */}
-                  <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 40, height: 40, border: "1px solid rgba(255,255,255,0.15)", pointerEvents: "none" }}>
-                    <div style={{ position: "absolute", top: "50%", left: -10, right: -10, height: 1, background: "rgba(255,255,255,0.15)" }} />
-                    <div style={{ position: "absolute", left: "50%", top: -10, bottom: -10, width: 1, background: "rgba(255,255,255,0.15)" }} />
-                  </div>
+                  {current.originalUrl
+                    ? <img src={current.originalUrl} alt="원본" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "contain" }} />
+                    : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: DIM }}>NO_ORIGINAL</div>
+                  }
                 </div>
               )}
 
               {/* Retouched */}
               {showRetouched && (
                 <div
-                  style={{ flex: 1, border: `1px solid ${BORDER_HI}`, background: BG_PANEL, position: "relative", display: "flex", flexDirection: "column", cursor: "pointer", overflow: "hidden", minHeight: 0 }}
+                  style={{ flex: 1, border: `1px solid ${BORDER_HI}`, background: "radial-gradient(circle at center,#1a1a1a 0%,#0a0a0a 100%)", position: "relative", cursor: "pointer", overflow: "hidden" }}
                   onClick={() => { setFullInitial("version"); setFullOpen(true); }}
                 >
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "8px 12px", display: "flex", justifyContent: "space-between", background: "linear-gradient(rgba(0,0,0,0.8),transparent)", zIndex: 2, pointerEvents: "none" }}>
                     <span style={{ background: BG_BASE, border: `1px solid ${ACCENT}`, padding: "4px 8px", fontFamily: MONO, fontSize: 9, color: ACCENT, letterSpacing: "0.05em", textTransform: "uppercase" }}>{versionLabel}</span>
-                    <span style={{ background: BG_BASE, border: `1px solid ${BORDER}`, padding: "4px 8px", fontFamily: MONO, fontSize: 9, color: DIM, letterSpacing: "0.05em" }}>{current.originalFilename?.split("/").pop()?.replace(/\.[^.]+$/, "_EDIT.JPG") ?? "UNKNOWN"}</span>
+                    <span className="rv-stage-meta-right" style={{ background: BG_BASE, border: `1px solid ${BORDER}`, padding: "4px 8px", fontFamily: MONO, fontSize: 9, color: DIM, letterSpacing: "0.05em" }}>{current.originalFilename?.split("/").pop()?.replace(/\.[^.]+$/, "_EDIT.JPG") ?? "UNKNOWN"}</span>
                   </div>
-                  <div style={{ flex: 1, position: "relative", background: "radial-gradient(circle at center,#1a1a1a 0%,#0a0a0a 100%)", overflow: "hidden", minHeight: 0 }}>
-                    {current.versionUrl
-                      ? <img src={current.versionUrl} alt="보정본" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />
-                      : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: DIM }}>NO_RETOUCHED</div>
-                    }
-                  </div>
-                  <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 40, height: 40, border: "1px solid rgba(255,255,255,0.15)", pointerEvents: "none" }}>
-                    <div style={{ position: "absolute", top: "50%", left: -10, right: -10, height: 1, background: "rgba(255,255,255,0.15)" }} />
-                    <div style={{ position: "absolute", left: "50%", top: -10, bottom: -10, width: 1, background: "rgba(255,255,255,0.15)" }} />
-                  </div>
+                  {current.versionUrl
+                    ? <img src={current.versionUrl} alt="보정본" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "contain" }} />
+                    : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: DIM }}>NO_RETOUCHED</div>
+                  }
                 </div>
               )}
             </div>
@@ -541,7 +766,7 @@ export default function ReviewViewerPage() {
           <div className="rv-panel-right" style={{ borderLeft: `1px solid ${BORDER}`, background: "rgba(3,3,3,0.95)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
             {/* File info / meta */}
-            <div style={{ padding: 16, borderBottom: `1px solid ${BORDER}` }}>
+            <div className="rv-info-section" style={{ padding: 16, borderBottom: `1px solid ${BORDER}` }}>
               <div className="rv-section-title">SYS.ASSET :: INFO</div>
               <div className="rv-meta-grid">
                 <div className="rv-meta-item">
@@ -569,8 +794,11 @@ export default function ReviewViewerPage() {
               </div>
             </div>
 
-            {/* Memo input */}
-            <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            {/* Memo input (mobile: shown only when revision) */}
+            <div
+              className={!isRevision ? "rv-memo-mobile-hidden" : undefined}
+              style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}
+            >
               <div className="rv-section-title">USER.MEMO :: INPUT</div>
               <textarea
                 value={revisionComment}
@@ -609,15 +837,49 @@ export default function ReviewViewerPage() {
                   SAVE_MEMO
                 </button>
               )}
+              {/* Current status chip */}
+              <div
+                aria-live="polite"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  height: 22,
+                  padding: "0 10px",
+                  alignSelf: "flex-start",
+                  background: statusBg,
+                  border: `1px solid ${statusBorder}`,
+                  color: statusColor,
+                  fontFamily: MONO,
+                  fontSize: 10,
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase",
+                }}
+              >
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: statusColor,
+                    opacity: isApproved || isRevision ? 1 : 0.5,
+                  }}
+                />
+                <span>현재 상태 :: {statusLabelKo}</span>
+              </div>
+
               <div style={{ display: "flex", gap: 8 }}>
                 <button type="button" onClick={handleRevisionToggle}
                   style={{
                     flex: 1, height: 44, display: "flex", alignItems: "center", justifyContent: "center",
                     fontFamily: MONO, fontSize: 11, fontWeight: 700, cursor: "pointer", border: "1px solid",
                     gap: 6, letterSpacing: "0.03em", transition: "all 0.2s",
-                    background: isRevision ? "rgba(255,170,0,0.1)" : "transparent",
+                    background: isRevision ? "rgba(255,170,0,0.12)" : "transparent",
                     color: isRevision ? ORANGE : MUTED,
-                    borderColor: isRevision ? "rgba(255,170,0,0.4)" : BORDER_HI,
+                    borderColor: isRevision ? "rgba(255,170,0,0.5)" : BORDER_HI,
+                    opacity: isApproved ? 0.55 : 1,
+                    boxShadow: isRevision ? "inset 0 0 0 1px rgba(255,170,0,0.25)" : "none",
                   }}>
                   <RefreshCw size={13} />
                   {isRevision ? "재보정 ✓" : "재보정"}
@@ -627,12 +889,14 @@ export default function ReviewViewerPage() {
                     flex: 1, height: 44, display: "flex", alignItems: "center", justifyContent: "center",
                     fontFamily: MONO, fontSize: 11, fontWeight: 700, cursor: "pointer", border: "1px solid",
                     gap: 6, letterSpacing: "0.03em", transition: "all 0.2s",
-                    background: isApproved ? "rgba(0,255,102,0.15)" : "rgba(0,255,102,0.08)",
-                    color: GREEN,
-                    borderColor: isApproved ? "rgba(0,255,102,0.5)" : "rgba(0,255,102,0.25)",
+                    background: isApproved ? "rgba(0,255,102,0.15)" : "transparent",
+                    color: isApproved ? GREEN : MUTED,
+                    borderColor: isApproved ? "rgba(0,255,102,0.5)" : BORDER_HI,
+                    opacity: isRevision ? 0.55 : 1,
+                    boxShadow: isApproved ? "inset 0 0 0 1px rgba(0,255,102,0.25)" : "none",
                   }}>
                   <Check size={13} />
-                  {isApproved ? "APPROVED ✓" : "확정"}
+                  {isApproved ? "확정 ✓" : "확정"}
                 </button>
               </div>
 
@@ -641,7 +905,7 @@ export default function ReviewViewerPage() {
         </div>
 
         {/* ── Submit bottom bar ── */}
-        <footer style={{ flexShrink: 0, background: "#000", borderTop: `1px solid rgba(255,77,0,0.3)`, backdropFilter: "blur(12px)" }}>
+        <footer className="rv-footer" style={{ flexShrink: 0, background: "#000", borderTop: `1px solid rgba(255,77,0,0.3)`, backdropFilter: "blur(12px)" }}>
           <div style={{ height: 72, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>
@@ -723,6 +987,131 @@ export default function ReviewViewerPage() {
         versionLabel={versionLabel}
         onClose={() => setFullOpen(false)}
       />
+
+      {/* ── Mobile Gallery Modal ── */}
+      {galleryOpen && (
+        <div
+          className="rv-gallery-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="전체 사진 목록"
+        >
+          <div className="rv-gallery-head">
+            <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+              BATCH_01
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                {photos.length} ITEMS
+              </span>
+              <button
+                type="button"
+                onClick={() => setGalleryOpen(false)}
+                aria-label="닫기"
+                style={{
+                  width: 32, height: 32,
+                  background: "transparent",
+                  border: `1px solid ${BORDER_HI}`,
+                  color: TEXT,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer",
+                }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+          <div className="rv-gallery-body">
+            {photos.map((p, i) => {
+              const pReview     = getReview(p.id);
+              const pStatus     = pReview?.status ?? "pending";
+              const isActive    = p.id === activePhotoId;
+              const pApproved   = pStatus === "approved";
+              const pRevision   = pStatus === "revision_requested";
+              const pillColor   = pApproved ? GREEN : pRevision ? ORANGE : undefined;
+              const pillLabel   = pApproved ? "APPROVED" : pRevision ? "REVISION" : null;
+              const thumbSrc    = p.versionUrl ?? p.originalUrl;
+
+              return (
+                <div
+                  key={p.id}
+                  ref={isActive ? galleryActiveRef : undefined}
+                  className={`rv-thumb-card${isActive ? " rv-active" : ""}`}
+                  onClick={() => {
+                    navigate(p.id);
+                    setGalleryOpen(false);
+                  }}
+                >
+                  {thumbSrc ? (
+                    <img
+                      src={thumbSrc}
+                      alt=""
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        opacity: isActive ? 1 : 0.7,
+                        display: "block",
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background: `radial-gradient(circle at center, #1a1a1a 0%, #0a0a0a 100%)`,
+                      }}
+                    />
+                  )}
+
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      padding: 4,
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "flex-start" }}>
+                      {pillLabel && (
+                        <span
+                          style={{
+                            background: "rgba(0,0,0,0.8)",
+                            border: `1px solid ${pillColor}22`,
+                            color: pillColor,
+                            padding: "1px 4px",
+                            fontSize: 8,
+                            fontFamily: MONO,
+                            borderRadius: 1,
+                          }}
+                        >
+                          {pillLabel}
+                        </span>
+                      )}
+                    </div>
+                    <span
+                      style={{
+                        fontFamily: MONO,
+                        fontSize: 9,
+                        color: MUTED,
+                        background: "rgba(0,0,0,0.75)",
+                        padding: "1px 4px",
+                        alignSelf: "flex-start",
+                      }}
+                    >
+                      {p.originalFilename?.split("/").pop()?.slice(0, 16) ?? `IMG_${String(i + 1).padStart(4, "0")}`}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </>
   );
 }

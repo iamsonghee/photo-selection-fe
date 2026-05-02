@@ -45,17 +45,16 @@ export function ProjectPipelineMiniBar({ status, variant = "card" }: Props) {
       style={{
         display: "flex",
         gap: variant === "full" ? 2 : 1,
-        width: variant === "full" ? "100%" : 100,
-        minWidth: variant === "full" ? 0 : undefined,
+        ...(variant === "card" ? { width: 100 } : {}),
         height: 4,
-        background: variant === "full" ? "#0a0a0a" : undefined,
+        background: variant === "full" ? "#252530" : undefined,
         overflow: variant === "full" ? "hidden" : undefined,
       }}
     >
       {PIPELINE_STEPS.map((_, i) => {
         const isDone   = i < completedSteps;
         const isActive = i === activeStep;
-        let bg      = "#1a1a1a";
+        let bg      = "#3a3a4a";
         let opacity = 1;
         if (allDone) {
           bg = "#333";

@@ -699,7 +699,6 @@ export default function GalleryPageClient() {
               </h3>
               <p style={{ color: "#888", fontSize: 13, lineHeight: 1.7, marginBottom: 32 }}>
                 총 <span style={{ color: "#FF4D00", fontWeight: 700 }}>{Y}장</span>의 사진이 선택되었습니다.
-                확정 후에는 수정을 위해 스튜디오에 별도 요청이 필요합니다. 계속하시겠습니까?
               </p>
 
               {confirmError && (

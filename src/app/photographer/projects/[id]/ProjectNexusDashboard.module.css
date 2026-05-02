@@ -1,7 +1,7 @@
 /* A-CUT_NEXUS // PROJECT_HUB */
 
 .pageRoot {
-  --nx-bg-root: #050505;
+  --nx-bg-root: #0a0a0c;
   --nx-bg-panel: #0a0a0c;
   --nx-bg-accent-dim: rgba(255, 85, 0, 0.1);
   --nx-grid-line: rgba(255, 255, 255, 0.04);
@@ -28,11 +28,6 @@
   font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.5;
-  background-image: linear-gradient(var(--nx-grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--nx-grid-line) 1px, transparent 1px);
-  background-size: var(--nx-grid-size) var(--nx-grid-size);
-  background-position: center top;
-  background-attachment: fixed;
 }
 
 .mono {
@@ -101,6 +96,7 @@
   .sysHeader { padding: 0 16px; padding-top: env(safe-area-inset-top, 0px); }
   .sysStatus { display: none; }
   .mainWorkspace { padding: 16px; gap: 20px; }
+  .logSection { display: none; }
 }
 
 .navReturn {

@@ -1,4 +1,4 @@
-export type MappingType = "exact" | "order" | "none";
+export type MappingType = "exact" | "order" | "none" | "server";
 
 export type MappingTarget = {
   id: string;
@@ -36,6 +36,28 @@ export function buildVersionMapping<T extends MappingTarget>(
     if (order) return { target, file: order, type: "order", orderIndex: index + 1 };
     return { target, file: null, type: "none" };
   });
+}
+
+/** 서버에 이미 있는 보정본 URL이 있으면 그 행을 "server"로 채워 검토·부분 교체 UI에 사용 */
+export function mergeServerPlaceholders<T extends MappingTarget & { serverRetouchUrl?: string | null }>(
+  rows: MappingResult<T>[]
+): MappingResult<T>[] {
+  return rows.map((m) => {
+    if (m.file != null) return m;
+    const url = (m.target as { serverRetouchUrl?: string | null }).serverRetouchUrl;
+    if (url) return { ...m, file: null, type: "server" as const };
+    return m;
+  });
+}
+
+export function buildServerPlaceholderMapping<T extends MappingTarget & { serverRetouchUrl?: string | null }>(
+  targets: T[]
+): MappingResult<T>[] {
+  return targets.map((target) =>
+    target.serverRetouchUrl
+      ? { target, file: null, type: "server" as const }
+      : { target, file: null, type: "none" as const }
+  );
 }
 
 export function remapSingleFile<T extends MappingTarget>(

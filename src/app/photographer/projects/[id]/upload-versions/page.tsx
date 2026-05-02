@@ -24,7 +24,13 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { getPhotosWithSelections, getProjectById } from "@/lib/db";
 import { BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
-import { buildVersionMapping, clearSingleFile, remapSingleFile, type MappingResult } from "@/lib/version-mapping";
+import {
+  buildVersionMapping,
+  clearSingleFile,
+  remapSingleFile,
+  type MappingResult,
+  type MappingType,
+} from "@/lib/version-mapping";
 import type { Photo, Project } from "@/types";
 import CompareViewerModal from "@/components/CompareViewerModal";
 import { PHOTOGRAPHER_THEME as C, photographerDock } from "@/lib/photographer-theme";
@@ -326,7 +332,7 @@ export default function UploadVersionsPage() {
         const meta = uploadedV1Info.get(t.id);
         return {
           target: t,
-          type: (meta ? "exact" : "none") as "exact" | "none",
+          type: (meta ? "exact" : "none") as MappingType,
           serverUrl: meta?.url,
           storedFileSizeBytes: meta?.fileSize ?? null,
         };
@@ -1596,7 +1602,7 @@ function MappingCard({
   target: V1Target;
   orgIndex: number;
   file: File | null;
-  type: "exact" | "order" | "none";
+  type: MappingType;
   orderIndex?: number;
   previewUrl?: string;
   storedFileSizeBytes?: number | null;

@@ -220,15 +220,31 @@ export async function getReviewDataByToken(
     .order("number", { ascending: true });
   if (photosErr || !photosRows?.length) return { project, globalPhotographerMemo: null, photos: [] };
 
-  const { data: pvRows, error: pvErr } = await admin
+  const { data: pvRowsRaw, error: pvErr } = await admin
     .from("photo_versions")
-    .select("id, photo_id, r2_url, photographer_memo")
+    .select("id, photo_id, r2_url, photographer_memo, created_at")
     .in("photo_id", photoIds)
-    .eq("version", version);
+    .eq("version", version)
+    .order("created_at", { ascending: false });
   if (pvErr) return { project, globalPhotographerMemo: null, photos: [] };
 
-  const pvByPhotoId = new Map((pvRows ?? []).map((r: { photo_id: string; id: string; r2_url: string; photographer_memo: string | null }) => [r.photo_id, r]));
-  const pvIds = (pvRows ?? []).map((r: { id: string }) => r.id);
+  // 사진당 동일 version 행이 여러 개면(재업로드) 최신 행만 사용. 무작위 행이면
+  // 고객 검토가 옛 photo_version_id에만 쌓여 '전부 확정'처럼 보일 수 있다.
+  const pvByPhotoId = new Map<
+    string,
+    { id: string; photo_id: string; r2_url: string; photographer_memo: string | null }
+  >();
+  for (const r of pvRowsRaw ?? []) {
+    const row = r as {
+      photo_id: string;
+      id: string;
+      r2_url: string;
+      photographer_memo: string | null;
+    };
+    if (pvByPhotoId.has(row.photo_id)) continue;
+    pvByPhotoId.set(row.photo_id, row);
+  }
+  const pvIds = [...pvByPhotoId.values()].map((r) => r.id);
 
   const { data: reviewRows } = await admin
     .from("version_reviews")

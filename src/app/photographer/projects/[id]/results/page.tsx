@@ -20,7 +20,7 @@ import {
 import { getProjectById, getPhotosWithSelections } from "@/lib/db";
 import type { Project, Photo, ColorTag } from "@/types";
 import { PHOTOGRAPHER_THEME as C } from "@/lib/photographer-theme";
-import { ProjectPipelineHeader } from "@/components/photographer/ProjectPipelineHeader";
+import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { ProjectActionFlow } from "@/components/photographer/ProjectActionFlow";
 import { buildCompactSteps } from "@/lib/project-flow-steps";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
@@ -30,9 +30,9 @@ import { galleryThumbPriorityProps } from "@/lib/gallery-filter";
 const ACCENT = "#FF5A1F";
 const ACCENT_DIM = "rgba(255, 90, 31, 0.15)";
 const ACCENT_GLOW = "rgba(255, 90, 31, 0.4)";
-const BORDER = "#1f1f1f";
-const BORDER_MID = "#2a2a2a";
-const SURFACE_0 = "#020202";
+const BORDER = "#1a1a1e";
+const BORDER_MID = "#27272c";
+const SURFACE_0 = "#0a0a0c";
 const SURFACE_1 = "#050505";
 const SURFACE_2 = "#0a0a0a";
 const MONO = "'Space Mono', 'JetBrains Mono', 'Noto Sans KR', sans-serif";
@@ -309,8 +309,6 @@ export default function ResultsPage() {
           100% { border-color: ${ACCENT_DIM}; }
         }
         .ph-ambient { position: fixed; bottom: -20%; left: -10%; width: 60vw; height: 60vw; background: radial-gradient(circle, ${ACCENT_DIM} 0%, transparent 50%); z-index: 0; pointer-events: none; opacity: 0.12; }
-        .prj-grid-bg { position: fixed; inset: 0; background-image: linear-gradient(rgba(30,30,30,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(30,30,30,0.18) 1px, transparent 1px); background-size: 30px 30px; z-index: 0; pointer-events: none; }
-        .prj-scanline-el { width: 100%; height: 100px; position: fixed; bottom: 100%; background: linear-gradient(0deg, rgba(255,90,31,0.03) 0%, rgba(255,90,31,0) 100%); animation: prj-scanline 8s linear infinite; pointer-events: none; z-index: 1; }
         .prj-tech-label { font-family: ${MONO}; font-size: 0.63rem; letter-spacing: 0.15em; text-transform: uppercase; }
         .ph-results-gallery { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
         @media (min-width: 1400px) { .ph-results-gallery { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 12px; } }
@@ -337,11 +335,18 @@ export default function ResultsPage() {
           .ph-results-modal-actions button { width: 100% !important; min-height: 44px !important; }
         }
       `}</style>
-      <div className="ph-ambient" aria-hidden />
-      <div className="prj-grid-bg" />
-      <div className="prj-scanline-el" />
-
-      <ProjectPipelineHeader projectId={id} project={project} activeStepIndex={1} />
+      <PhotographerPageHeader
+        crumbs={[
+          { label: "프로젝트", href: "/photographer/projects" },
+          { label: project.name, href: `/photographer/projects/${id}` },
+          { label: "셀렉 결과" },
+        ]}
+        title="셀렉 결과"
+        stats={[
+          { label: "선택", value: `${photos.length}장` },
+          { label: "목표", value: `${project.requiredCount || "—"}장`, accent: photos.length >= (project.requiredCount || 0) && (project.requiredCount || 0) > 0 },
+        ]}
+      />
 
       <main className="ph-results-main-split" style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden", zIndex: 10, position: "relative" }}>
         <aside className="ph-results-aside prj-scroll" style={{ width: ASIDE_W, flexShrink: 0, borderRight: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", overflowY: "auto", background: BORDER }}>

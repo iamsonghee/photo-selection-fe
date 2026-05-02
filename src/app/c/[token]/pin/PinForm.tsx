@@ -3,8 +3,23 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Lock } from "lucide-react";
-import { PHOTOGRAPHER_THEME as C, PS_DISPLAY, PS_FONT } from "@/lib/photographer-theme";
 import { BrandLogoBar } from "@/components/BrandLogo";
+
+/* ── design tokens (review 페이지와 동일 가이드) ── */
+const BG_BASE    = "#030303";
+const BG_PANEL   = "#0a0a0a";
+const BG_INPUT   = "#111111";
+const BORDER     = "#222222";
+const BORDER_HI  = "#333333";
+const TEXT       = "#ffffff";
+const MUTED      = "#888888";
+const ACCENT     = "#ff4d00";
+const ACCENT_DIM = "rgba(255,77,0,0.1)";
+const ORANGE     = "#ffaa00";
+const RED        = "#ff4757";
+const MONO       = "'JetBrains Mono', 'Space Mono', monospace";
+const DISPLAY    = "'Space Grotesk', 'Pretendard Variable', sans-serif";
+const BODY_FONT  = "'Pretendard Variable', -apple-system, sans-serif";
 
 export default function PinForm({ token, from }: { token: string; from: string }) {
   const router = useRouter();
@@ -13,22 +28,16 @@ export default function PinForm({ token, from }: { token: string; from: string }
   const [error, setError] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const inputRefs = [
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-  ];
+  const r0 = useRef<HTMLInputElement>(null);
+  const r1 = useRef<HTMLInputElement>(null);
+  const r2 = useRef<HTMLInputElement>(null);
+  const r3 = useRef<HTMLInputElement>(null);
+  const inputRefs = [r0, r1, r2, r3];
 
   useEffect(() => {
     inputRefs[0].current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (pins.every((p) => p !== "") && !submitting && !locked) {
-      handleSubmit(pins.join(""));
-    }
-  }, [pins]);
 
   const handleSubmit = async (pinValue: string) => {
     if (submitting || locked) return;
@@ -63,6 +72,13 @@ export default function PinForm({ token, from }: { token: string; from: string }
     }
   };
 
+  useEffect(() => {
+    if (pins.every((p) => p !== "") && !submitting && !locked) {
+      void handleSubmit(pins.join(""));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pins]);
+
   const handleInput = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return;
     const digit = value.slice(-1);
@@ -91,50 +107,64 @@ export default function PinForm({ token, from }: { token: string; from: string }
   };
 
   return (
-    <div style={{
-      minHeight: "100dvh",
-      background: "transparent",
-      backgroundImage: `
-        linear-gradient(rgba(79,126,255,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(79,126,255,0.04) 1px, transparent 1px)
-      `,
-      backgroundSize: "40px 40px",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 24,
-      fontFamily: PS_FONT,
-    }}>
-      <div style={{
-        width: "100%",
-        maxWidth: 360,
-        background: C.surface,
-        border: `1px solid ${C.borderMd}`,
-        borderRadius: 16,
-        padding: 32,
-        textAlign: "center",
-      }}>
+    <div
+      style={{
+        minHeight: "100dvh",
+        background: BG_BASE,
+        backgroundImage: `linear-gradient(#161616 1px, transparent 1px), linear-gradient(90deg, #161616 1px, transparent 1px)`,
+        backgroundSize: "40px 40px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        fontFamily: BODY_FONT,
+        color: TEXT,
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 360,
+          background: BG_PANEL,
+          border: `1px solid ${BORDER}`,
+          padding: 32,
+          textAlign: "center",
+          position: "relative",
+        }}
+      >
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
           <BrandLogoBar size="lg" priority href={token ? `/c/${token}` : undefined} />
         </div>
-        <div style={{
-          width: 52, height: 52, borderRadius: "50%",
-          background: "rgba(79,126,255,0.1)",
-          border: `1px solid ${C.borderMd}`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          margin: "0 auto 20px",
-        }}>
-          <Lock size={22} color={C.steel} />
+
+        <div
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: "50%",
+            background: ACCENT_DIM,
+            border: `1px solid rgba(255,77,0,0.35)`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto 20px",
+          }}
+        >
+          <Lock size={22} color={ACCENT} />
         </div>
 
-        <h1 style={{
-          fontFamily: PS_DISPLAY,
-          fontSize: 20, fontWeight: 700, color: C.text,
-          marginBottom: 8,
-        }}>
+        <h1
+          style={{
+            fontFamily: DISPLAY,
+            fontSize: 20,
+            fontWeight: 700,
+            color: TEXT,
+            marginBottom: 8,
+            letterSpacing: "-0.3px",
+          }}
+        >
           본인 확인이 필요해요
         </h1>
-        <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.6, marginBottom: 28 }}>
+        <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.6, marginBottom: 28 }}>
           작가에게 전달받은 4자리 비밀번호를 입력해주세요
         </p>
 
@@ -151,12 +181,14 @@ export default function PinForm({ token, from }: { token: string; from: string }
               onChange={(e) => handleInput(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
               style={{
-                width: 56, height: 64,
-                background: C.surface2,
-                border: `1px solid ${error ? C.red : pin ? C.steel : C.border}`,
-                borderRadius: 10,
-                color: C.text,
-                fontSize: 24, fontWeight: 700,
+                width: 56,
+                height: 64,
+                background: BG_INPUT,
+                border: `1px solid ${error ? RED : pin ? BORDER_HI : BORDER}`,
+                color: TEXT,
+                fontFamily: MONO,
+                fontSize: 24,
+                fontWeight: 700,
                 textAlign: "center",
                 outline: "none",
                 cursor: locked ? "not-allowed" : "text",
@@ -168,18 +200,20 @@ export default function PinForm({ token, from }: { token: string; from: string }
         </div>
 
         {locked && (
-          <p style={{ fontSize: 13, color: C.orange, marginBottom: 8 }}>
+          <p style={{ fontSize: 12, color: ORANGE, marginBottom: 8, fontFamily: MONO, letterSpacing: "0.05em" }}>
             5회 이상 틀렸습니다. 잠시 후 다시 시도해주세요
           </p>
         )}
         {!locked && error && (
-          <p style={{ fontSize: 13, color: C.red, marginBottom: 8 }}>
+          <p style={{ fontSize: 12, color: RED, marginBottom: 8, fontFamily: MONO, letterSpacing: "0.05em" }}>
             {error}
           </p>
         )}
 
         {submitting && (
-          <p style={{ fontSize: 12, color: C.muted }}>확인 중...</p>
+          <p style={{ fontSize: 12, color: MUTED, fontFamily: MONO, letterSpacing: "0.05em" }}>
+            확인 중...
+          </p>
         )}
       </div>
     </div>

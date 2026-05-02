@@ -5,13 +5,13 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { CheckCircle2, Lock, Image as ImageIcon, Clock, Package } from "lucide-react";
+import { Lock } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { getProfileImageUrl } from "@/lib/photographer";
-import { PS_DISPLAY } from "@/lib/photographer-theme";
 import { BrandLogoBar } from "@/components/BrandLogo";
 
 const CUSTOMER_CANCEL_MAX = 3;
+const MONO = "'JetBrains Mono', 'Courier New', Courier, monospace";
 
 type PhotographerInfo = {
   name: string | null;
@@ -21,27 +21,39 @@ type PhotographerInfo = {
   portfolio_url: string | null;
 } | null;
 
-const playfair: React.CSSProperties = { fontFamily: PS_DISPLAY };
-const headerBg: React.CSSProperties = { background: "rgba(10,10,11,0.92)", backdropFilter: "blur(12px)" };
-
-function PageHeader({ right, inviteHref }: { right?: React.ReactNode; inviteHref?: string }) {
-  return (
-    <header
-      className="sticky top-0 z-50 flex items-center justify-between border-b border-white/10 px-4"
-      style={{ ...headerBg, paddingTop: "env(safe-area-inset-top, 0px)", minHeight: 48 }}
-    >
-      <BrandLogoBar size="sm" href={inviteHref} />
-      {right && <div className="text-[12px] text-zinc-400 truncate max-w-[180px]">{right}</div>}
-    </header>
-  );
+function statusMessage(status: string): string {
+  switch (status) {
+    case "confirmed":   return "작가가 보정을 준비하고 있습니다";
+    case "editing":     return "작가가 보정을 진행 중입니다. 완료되면 검토 요청을 드립니다";
+    case "editing_v2":  return "작가가 재보정을 진행 중입니다";
+    case "delivered":   return "모든 보정이 완료되었습니다";
+    default:            return "작가가 보정을 진행 중입니다";
+  }
 }
 
-function PageFooter() {
-  return (
-    <footer className="py-5 text-center text-[11px] text-zinc-500">
-      © 2026 A CUT
-    </footer>
-  );
+/** 이 페이지는 셀렉 확정(confirmed)뿐 아니라 직접 URL로 들어오는 editing 등에도 쓰인다 */
+function confirmedHero(status: string, customerName: string | null): { cmd: string; heading: string; subtitle: string } {
+  const name = customerName ? `${customerName}님,` : "";
+  const br = customerName ? "\n" : "";
+  if (status === "editing_v2") {
+    return {
+      cmd: "REVIEW · SUBMITTED",
+      heading: `${name}${br}의견을 작가에게 전달했어요.`,
+      subtitle: "재보정을 요청한 장은 다시 손보고, 확정한 장은 그대로 반영돼요.",
+    };
+  }
+  if (status === "editing") {
+    return {
+      cmd: "RETOUCH · IN_PROGRESS",
+      heading: `${name}${br}보정이 진행 중이에요.`,
+      subtitle: "완료되면 다시 검토 링크를 드릴게요.",
+    };
+  }
+  return {
+    cmd: "SELECTION · CONFIRMED",
+    heading: `${name}${br}셀렉이 확정됐어요.`,
+    subtitle: "작가가 보정을 시작합니다",
+  };
 }
 
 export default function ConfirmedPage() {
@@ -77,17 +89,35 @@ export default function ConfirmedPage() {
     if (project.status === "selecting") { router.replace(`/c/${token}/gallery`); return; }
     if (project.status === "reviewing_v1" || project.status === "reviewing_v2") {
       router.replace(`/c/${token}`);
+      return;
     }
-  }, [project?.status, token, router]);
+    if (project.status === "delivered") {
+      router.replace(`/c/${token}/delivered`);
+    }
+  }, [project, token, router]);
 
   if (!mounted || loading) {
-    return <div className="flex min-h-screen items-center justify-center bg-[#050505]"><p className="text-sm text-[#5a5f78]">불러오는 중...</p></div>;
+    return (
+      <div style={{ display: "flex", minHeight: "100dvh", alignItems: "center", justifyContent: "center", background: "#030303" }}>
+        <div style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid rgba(255,77,0,0.2)", borderTopColor: "#FF4D00", animation: "spin 0.9s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
   }
   if (!project) {
-    return <div className="flex min-h-screen items-center justify-center bg-[#050505]"><p className="text-sm text-[#5a5f78]">존재하지 않는 초대 링크입니다.</p></div>;
+    return (
+      <div style={{ display: "flex", minHeight: "100dvh", alignItems: "center", justifyContent: "center", background: "#030303", color: "#555", fontFamily: MONO, fontSize: 13 }}>
+        존재하지 않는 초대 링크입니다.
+      </div>
+    );
   }
   if (project.status === "selecting" || project.status === "reviewing_v1" || project.status === "reviewing_v2") {
-    return <div className="flex min-h-screen items-center justify-center bg-[#050505]"><p className="text-sm text-[#5a5f78]">이동 중...</p></div>;
+    return (
+      <div style={{ display: "flex", minHeight: "100dvh", alignItems: "center", justifyContent: "center", background: "#030303" }}>
+        <div style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid rgba(255,77,0,0.2)", borderTopColor: "#FF4D00", animation: "spin 0.9s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
   }
 
   const N = project.requiredCount ?? 0;
@@ -96,8 +126,11 @@ export default function ConfirmedPage() {
   const atCancelLimit = cancelCount >= CUSTOMER_CANCEL_MAX;
   const remainingCancels = Math.max(0, CUSTOMER_CANCEL_MAX - cancelCount);
   const confirmedDate = project.confirmedAt
-    ? format(new Date(project.confirmedAt), "yyyy년 M월 d일 HH:mm", { locale: ko })
-    : "—";
+    ? format(new Date(project.confirmedAt), "yyyy.MM.dd HH:mm", { locale: ko })
+    : null;
+  const photographerName = photographer?.name ?? "담당 작가";
+  const customerName = project.customerName?.trim() || null;
+  const hero = confirmedHero(project.status, customerName);
 
   const handleConfirmCancel = async () => {
     if (!project?.id || !token) return;
@@ -122,140 +155,310 @@ export default function ConfirmedPage() {
     }
   };
 
-  const steps = [
-    { icon: <CheckCircle2 className="h-4 w-4" />, label: "사진 셀렉 완료", desc: `${N}장의 사진을 최종 확정했습니다`, badge: "완료", badgeColor: "#2ed573", badgeBg: "#0f2a1e", done: true },
-    { icon: <ImageIcon className="h-4 w-4" />, label: "보정 작업", desc: "작가님이 선택하신 사진을 보정합니다. 예상 기간 5~7일", badge: "진행 중", badgeColor: "#4f7eff", badgeBg: "#0d1535", done: false },
-    { icon: <Package className="h-4 w-4" />, label: "결과물 납품", desc: "보정 완료된 사진을 고해상도로 전달드립니다", badge: "대기 중", badgeColor: "#5a5f78", badgeBg: "#1a1d24", done: false },
-    { icon: <CheckCircle2 className="h-4 w-4" />, label: "완료", desc: "모든 작업이 마무리됩니다", badge: "대기 중", badgeColor: "#5a5f78", badgeBg: "#1a1d24", done: false },
-  ];
-
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-100">
-      <PageHeader right={project.name} inviteHref={token ? `/c/${token}` : undefined} />
+    <div style={{ minHeight: "100vh", background: "#030303", color: "#fff", display: "flex", flexDirection: "column", position: "relative", overflowX: "hidden", fontFamily: "'Pretendard Variable','Pretendard',-apple-system,sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
 
-      <div className="mx-auto max-w-[520px] px-4 pt-8 pb-16">
-        {/* Hero */}
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2 border-[#2ed573] bg-[#0f2a1e]">
-            <CheckCircle2 className="h-8 w-8 text-[#2ed573]" />
-          </div>
-          <h1 className="mb-1 text-[22px] font-bold text-zinc-100" style={playfair}>확정이 완료됐습니다!</h1>
-          <p className="mb-1 text-[13px] text-[#8b90a8]">작가가 보정을 시작합니다</p>
-          <p className="text-[12px] text-[#5a5f78]">{confirmedDate}</p>
+        .cf-grid-bg {
+          position: fixed; inset: 0; z-index: 0; pointer-events: none;
+          background-image: linear-gradient(to right, #1a1a1a 1px, transparent 1px), linear-gradient(to bottom, #1a1a1a 1px, transparent 1px);
+          background-size: 40px 40px;
+        }
+        .cf-bracket {
+          position: fixed; width: 32px; height: 32px;
+          border: 2px solid #555; z-index: 50; pointer-events: none;
+        }
+        .cf-bracket-tl { top: 20px; left: 20px; border-right: none; border-bottom: none; }
+        .cf-bracket-tr { top: 20px; right: 20px; border-left: none; border-bottom: none; }
+        .cf-bracket-bl { bottom: 20px; left: 20px; border-right: none; border-top: none; }
+        .cf-bracket-br { bottom: 20px; right: 20px; border-left: none; border-top: none; }
+
+        .cf-header {
+          position: sticky; top: 0; z-index: 50; padding: 12px 16px;
+        }
+        .cf-header-inner {
+          display: flex; height: 44px; align-items: center; justify-content: space-between;
+          border-radius: 999px; padding: 0 16px;
+          background: rgba(5,5,5,0.80); backdrop-filter: blur(20px);
+          border: 1px solid rgba(255,255,255,0.08);
+        }
+        .cf-header-badge {
+          display: flex; align-items: center; gap: 6px; border-radius: 999px;
+          padding: 4px 10px; font-size: 11px; color: #a1a1aa;
+          background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.07);
+          font-family: ${MONO}; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+
+        .cf-main {
+          flex: 1; display: flex; flex-direction: column; align-items: center;
+          padding: 40px 20px 80px; position: relative; z-index: 10;
+        }
+
+        .cf-cmd {
+          font-family: ${MONO}; font-size: 12px; color: #FF4D00;
+          letter-spacing: 2px; margin-bottom: 24px; text-transform: uppercase;
+          display: flex; align-items: center; gap: 12px;
+        }
+        .cf-cmd::before, .cf-cmd::after {
+          content: ''; width: 24px; height: 1px; background: #FF4D00;
+        }
+
+        .cf-card {
+          width: 100%; max-width: 640px;
+          background: rgba(10,10,10,0.6); border: 1px solid #2A2A2A;
+          padding: 48px 40px; position: relative; backdrop-filter: blur(4px);
+        }
+        @media (max-width: 600px) {
+          .cf-card { padding: 32px 20px; }
+        }
+        .cf-card-corner {
+          position: absolute; width: 8px; height: 8px;
+          border: 1px solid #555; pointer-events: none;
+        }
+        .cf-card-tl { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+        .cf-card-br { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+        .cf-heading {
+          font-size: clamp(32px, 6vw, 42px); font-weight: 800;
+          line-height: 1.2; letter-spacing: -1px; margin-bottom: 12px;
+          word-break: keep-all; text-align: center;
+        }
+        .cf-subtitle {
+          font-size: 16px; line-height: 1.6; color: #8C8C8C;
+          text-align: center; margin-bottom: 4px; word-break: keep-all;
+        }
+        .cf-date {
+          font-family: ${MONO}; font-size: 11px; color: #444;
+          text-align: center; margin-bottom: 40px; letter-spacing: 0.05em;
+        }
+
+        .cf-data-grid {
+          display: grid; grid-template-columns: 1fr 1fr;
+          gap: 1px; background: #2A2A2A;
+          border: 1px solid #2A2A2A; margin-bottom: 32px;
+        }
+        @media (max-width: 480px) {
+          .cf-data-grid { grid-template-columns: 1fr; }
+        }
+        .cf-data-cell {
+          background: #030303; padding: 18px 20px;
+          display: flex; flex-direction: column; gap: 6px;
+        }
+        .cf-data-cell-full { grid-column: 1 / -1; }
+        .cf-data-label {
+          font-family: ${MONO}; font-size: 10px; color: #555;
+          text-transform: uppercase; letter-spacing: 1px;
+        }
+        .cf-data-value { font-size: 15px; font-weight: 600; color: #fff; }
+        .cf-data-value-accent { font-size: 36px; font-weight: 800; color: #FF4D00; line-height: 1; letter-spacing: -1px; }
+        .cf-data-value-muted { font-size: 13px; color: #555; margin-top: 2px; }
+
+        .cf-btn-primary {
+          display: flex; align-items: center; justify-content: center; gap: 10px;
+          width: 100%; background: #FF4D00; color: #000;
+          font-size: 17px; font-weight: 700; padding: 18px 32px;
+          border: none; cursor: pointer; text-decoration: none;
+          transition: background 0.2s; font-family: inherit; margin-bottom: 16px;
+        }
+        .cf-btn-primary:hover { background: #ff6600; }
+        .cf-btn-primary .cf-arrow { margin-left: 4px; font-weight: 800; transition: transform 0.2s; }
+        .cf-btn-primary:hover .cf-arrow { transform: translateX(4px); }
+
+        .cf-btn-secondary {
+          display: flex; align-items: center; justify-content: center; gap: 8px;
+          width: 100%; height: 48px; background: transparent;
+          border: 1px solid #333; color: #555;
+          font-family: ${MONO}; font-size: 12px; letter-spacing: 0.08em;
+          cursor: pointer; transition: border-color 0.15s, color 0.15s;
+          text-decoration: none;
+        }
+        .cf-btn-secondary:hover { border-color: #555; color: #888; }
+
+        .cf-btn-cancel {
+          display: flex; align-items: center; justify-content: center;
+          width: 100%; height: 44px; background: transparent;
+          border: 1px solid #2a2a2a; color: #444;
+          font-family: ${MONO}; font-size: 11px; letter-spacing: 0.1em;
+          cursor: pointer; transition: border-color 0.15s, color 0.15s;
+        }
+        .cf-btn-cancel:hover:not(:disabled) { border-color: #ff4757; color: #ff4757; }
+        .cf-btn-cancel:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        .cf-photographer-card {
+          margin-top: 40px; padding-top: 28px;
+          border-top: 1px dashed #2A2A2A;
+          display: flex; align-items: center; justify-content: space-between;
+        }
+        .cf-photo-meta { display: flex; align-items: center; gap: 14px; }
+        .cf-avatar-box {
+          width: 48px; height: 48px; border: 1px solid #2A2A2A;
+          display: flex; align-items: center; justify-content: center;
+          background: rgba(255,255,255,0.03); overflow: hidden; flex-shrink: 0;
+        }
+        .cf-author-name { font-size: 15px; font-weight: 700; }
+        .cf-author-role {
+          font-family: ${MONO}; font-size: 10px; color: #555;
+          text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;
+        }
+        .cf-sys-tag {
+          font-family: ${MONO}; font-size: 10px; color: #FF4D00;
+          border: 1px solid rgba(255,77,0,0.3); padding: 4px 8px;
+          letter-spacing: 0.5px; white-space: nowrap;
+        }
+
+        .cf-footer {
+          text-align: center; padding: 20px;
+          font-family: ${MONO}; font-size: 10px; color: #333;
+          letter-spacing: 0.1em; position: relative; z-index: 10;
+        }
+
+        .cf-modal-overlay {
+          position: fixed; inset: 0; z-index: 100;
+          display: flex; align-items: center; justify-content: center;
+          background: rgba(0,0,0,0.85); backdrop-filter: blur(6px); padding: 16px;
+        }
+        .cf-modal-box {
+          width: 100%; max-width: 420px;
+          background: #0a0a0a; border: 1px solid #FF4D00;
+          padding: 32px; position: relative;
+        }
+        .cf-modal-title {
+          font-size: 22px; font-weight: 800; margin-bottom: 12px;
+          letter-spacing: -0.5px; color: #fff;
+        }
+        .cf-modal-desc { font-size: 13px; line-height: 1.7; color: #888; margin-bottom: 24px; }
+        .cf-modal-actions { display: flex; gap: 10px; }
+        .cf-modal-cancel {
+          flex: 1; height: 48px; border: 1px solid #333; background: none;
+          color: #888; font-size: 13px; font-weight: 700; cursor: pointer;
+          font-family: inherit; transition: all 0.15s;
+        }
+        .cf-modal-cancel:hover { background: #fff; color: #000; }
+        .cf-modal-confirm {
+          flex: 1; height: 48px; background: #FF4D00; color: #000;
+          font-size: 13px; font-weight: 900; border: none;
+          cursor: pointer; font-family: ${MONO}; letter-spacing: 0.05em;
+          transition: opacity 0.15s;
+        }
+        .cf-modal-confirm:disabled { opacity: 0.6; cursor: wait; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
+
+      <div className="cf-grid-bg" />
+      <div className="cf-bracket cf-bracket-tl" />
+      <div className="cf-bracket cf-bracket-tr" />
+      <div className="cf-bracket cf-bracket-bl" />
+      <div className="cf-bracket cf-bracket-br" />
+
+      {/* 헤더 */}
+      <header className="cf-header">
+        <div className="cf-header-inner">
+          <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
+          <div className="cf-header-badge">{project.name}</div>
         </div>
+      </header>
 
-        {/* Summary */}
-        <section className="mb-3 rounded-2xl border border-white/10 bg-[#111318] p-5">
-          <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-[#5a5f78]">선택 요약</h2>
-          <div className="mb-3 flex items-center justify-center gap-2">
-            <span className="font-mono text-[40px] font-bold text-[#2ed573]">{N}</span>
-            <span className="font-mono text-[28px] text-[#3a3f55]">/</span>
-            <span className="font-mono text-[28px] font-bold text-[#5a5f78]">{M}</span>
+      {/* 메인 */}
+      <main className="cf-main">
+        <div className="cf-cmd">{hero.cmd}</div>
+
+        <div className="cf-card">
+          <div className="cf-card-corner cf-card-tl" />
+          <div className="cf-card-corner cf-card-br" />
+
+          {/* 타이틀 */}
+          <h1 className="cf-heading" style={{ whiteSpace: "pre-line" }}>
+            {hero.heading}
+          </h1>
+          <p className="cf-subtitle">{hero.subtitle}</p>
+          {confirmedDate && <p className="cf-date">{confirmedDate}</p>}
+
+          {/* 데이터 그리드 */}
+          <div className="cf-data-grid">
+            <div className="cf-data-cell">
+              <span className="cf-data-label">DATA :: 선택한 사진</span>
+              <span className="cf-data-value-accent">{N}<span style={{ fontSize: 18, fontWeight: 600, color: "#FF4D00", marginLeft: 4 }}>장</span></span>
+              <span className="cf-data-value-muted">전체 {M}장 중</span>
+            </div>
+            <div className="cf-data-cell">
+              <span className="cf-data-label">FIELD :: 프로젝트</span>
+              <span className="cf-data-value">{project.name}</span>
+            </div>
+            <div className="cf-data-cell cf-data-cell-full">
+              <span className="cf-data-label">SYS :: 현재 상태</span>
+              <span className="cf-data-value" style={{ fontSize: 14, fontWeight: 500, color: "#a3a3a3" }}>
+                {statusMessage(project.status)}
+              </span>
+            </div>
           </div>
-          <div className="mb-4 flex justify-center gap-4 text-[11px] text-[#8b90a8]">
-            <span className="text-[#2ed573]">선택한 사진</span>
-            <span className="text-[#3a3f55]">|</span>
-            <span>전체 사진</span>
-          </div>
-          <Link
-            href={`/c/${token}/locked`}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#252b3d] bg-[#1a1d24] text-[13px] text-[#8b90a8] transition-colors hover:border-[#4f7eff] hover:text-[#4f7eff]"
-          >
-            <Lock className="h-3.5 w-3.5" />
-            선택한 사진 보기 (읽기 전용)
+
+          {/* 버튼 */}
+          <Link href={`/c/${token}/locked`} className="cf-btn-primary">
+            <Lock size={16} />
+            선택한 사진 보기
+            <span className="cf-arrow">→</span>
           </Link>
-        </section>
 
-        {/* Timeline */}
-        <section className="mb-3 rounded-2xl border border-white/10 bg-[#111318] p-5">
-          <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-[#5a5f78]">다음 진행 과정</h2>
-          <div>
-            {steps.map((step, i) => (
-              <div key={step.label} className="flex gap-3">
-                <div className="flex flex-col items-center">
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 ${step.done ? "border-[#2ed573] bg-[#0f2a1e] text-[#2ed573]" : "border-[#252b3d] bg-[#1a1d24] text-[#5a5f78]"}`}>
-                    {step.icon}
-                  </div>
-                  {i < steps.length - 1 && <div className="my-1 w-0.5 flex-1 min-h-[16px] bg-white/10" />}
-                </div>
-                <div className="pb-5 pt-1 flex-1 last:pb-1">
-                  <div className="text-[13px] font-semibold mb-0.5">{step.label}</div>
-                  <div className="text-[11px] text-[#8b90a8] leading-relaxed">{step.desc}</div>
-                  <span className="mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px]" style={{ color: step.badgeColor, background: step.badgeBg }}>
-                    {step.badge}
-                  </span>
-                </div>
+          {/* 작가 카드 */}
+          <div className="cf-photographer-card">
+            <div className="cf-photo-meta">
+              <div className="cf-avatar-box">
+                <img
+                  src={getProfileImageUrl(photographer?.profile_image_url)}
+                  alt={photographerName}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
               </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Photographer */}
-        <section className="rounded-2xl border border-white/10 bg-[#111318] p-5">
-          <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-[#5a5f78]">담당 작가</h2>
-          <div className="flex items-center gap-3 mb-3">
-            <img src={getProfileImageUrl(photographer?.profile_image_url)} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover" />
-            <div>
-              <div className="text-[15px] font-bold">{photographer?.name || "담당 작가"}</div>
-              <div className="text-[11px] text-[#8b90a8]">선택하신 사진을 꼼꼼히 보정해 드립니다</div>
+              <div>
+                <div className="cf-author-name">{photographerName}</div>
+                <div className="cf-author-role">담당 작가</div>
+              </div>
             </div>
-          </div>
-          {(photographer?.instagram_url || photographer?.portfolio_url) && (
-            <div className="mb-3 flex flex-wrap gap-2">
-              {photographer?.instagram_url && (
-                <a href={photographer.instagram_url} target="_blank" rel="noopener noreferrer" className="rounded-full border border-[#252b3d] bg-[#1a1d24] px-3 py-1.5 text-[11px] text-[#8b90a8] hover:border-[#4f7eff] hover:text-[#4f7eff]">
-                  인스타그램
-                </a>
-              )}
-              {photographer?.portfolio_url && (
-                <a href={photographer.portfolio_url} target="_blank" rel="noopener noreferrer" className="rounded-full border border-[#252b3d] bg-[#1a1d24] px-3 py-1.5 text-[11px] text-[#8b90a8] hover:border-[#4f7eff] hover:text-[#4f7eff]">
-                  포트폴리오
-                </a>
-              )}
-            </div>
-          )}
-          <div className="rounded-xl border-l-[3px] border-l-[#4f7eff] bg-[#1a1d24] p-3.5 text-[12px] text-[#8b90a8] leading-relaxed">
-            {photographer?.bio?.trim() || "소중한 순간을 함께할 수 있어 영광입니다. 남겨주신 코멘트 꼼꼼히 반영해서 예쁘게 보정해 드릴게요"}
+            <div className="cf-sys-tag">VERIFIED_CREATOR</div>
           </div>
 
+          {/* 확정 취소 */}
           {project.status === "confirmed" && (
-            <div className="mt-5 border-t border-white/10 pt-5 space-y-2">
-              <p className="text-center text-[11px] text-[#8b90a8]">
-                확정 취소 남은 횟수 <span className="font-mono text-zinc-100">{remainingCancels}회</span>
+            <div style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid #1a1a1a" }}>
+              <p style={{ textAlign: "center", fontFamily: MONO, fontSize: 11, color: "#444", marginBottom: 12 }}>
+                확정 취소 가능 횟수 <span style={{ color: "#888", fontWeight: 700 }}>{remainingCancels}회</span> 남음
               </p>
-              {atCancelLimit && (
-                <p className="text-center text-[11px] text-[#5a5f78]">확정 취소는 최대 3회까지 가능합니다</p>
-              )}
               <button
                 type="button"
                 disabled={atCancelLimit}
                 onClick={() => !atCancelLimit && setCancelModalOpen(true)}
-                className="flex h-11 w-full items-center justify-center rounded-xl border border-[#252b3d] text-[13px] text-[#8b90a8] transition-colors hover:border-[#ff4757] hover:text-[#ff4757] disabled:opacity-40 disabled:pointer-events-none"
+                className="cf-btn-cancel"
               >
-                확정 취소
+                확정 취소 후 다시 선택
               </button>
             </div>
           )}
-        </section>
-      </div>
+        </div>
+      </main>
 
-      <PageFooter />
+      {/* 푸터 */}
+      <footer className="cf-footer">
+        <div>V.2.0-CORE &nbsp;|&nbsp; SECURE_CONNECTION &nbsp;·&nbsp; © 2026 A컷</div>
+      </footer>
 
-      {/* Cancel modal */}
+      {/* 취소 모달 */}
       {cancelModalOpen && project.status === "confirmed" && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center">
-          <div className="w-full max-w-sm rounded-2xl border border-[#252b3d] bg-[#111318] p-6 shadow-xl">
-            <h3 className="mb-2 text-[16px] font-bold text-zinc-100">확정 취소</h3>
-            <p className="mb-6 text-[13px] leading-relaxed text-[#8b90a8]">
-              확정을 취소하고 다시 선택하시겠습니까?<br />
-              남은 횟수 <span className="font-medium text-zinc-100">{remainingCancels}회</span>
+        <div className="cf-modal-overlay" onClick={() => setCancelModalOpen(false)}>
+          <div className="cf-modal-box" onClick={(e) => e.stopPropagation()}>
+            <h3 className="cf-modal-title">확정을 취소할까요?</h3>
+            <p className="cf-modal-desc">
+              취소 후 갤러리로 돌아가 사진을 다시 선택할 수 있습니다.
+              <br />
+              남은 횟수 <span style={{ fontFamily: MONO, color: "#fff", fontWeight: 700 }}>{remainingCancels}회</span>
             </p>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setCancelModalOpen(false)} className="flex h-11 flex-1 items-center justify-center rounded-xl border border-[#252b3d] text-[13px] text-[#8b90a8]">
-                취소
+            <div className="cf-modal-actions">
+              <button type="button" className="cf-modal-cancel" onClick={() => setCancelModalOpen(false)}>
+                아니요
               </button>
-              <button type="button" onClick={handleConfirmCancel} disabled={cancelling} className="flex h-11 flex-1 items-center justify-center rounded-xl bg-[#4f7eff] text-[13px] font-semibold text-white disabled:opacity-60">
-                {cancelling ? "처리 중..." : "예, 다시 선택할게요"}
+              <button type="button" className="cf-modal-confirm" onClick={handleConfirmCancel} disabled={cancelling}>
+                {cancelling ? "처리 중..." : "예, 다시 선택"}
               </button>
             </div>
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { differenceInDays } from "date-fns";
@@ -959,6 +960,26 @@ export default function ProjectDetailPage() {
           }
           .prj-modal-box { max-width: 100% !important; margin: 0 8px !important; }
           .prj-btn-primary, .prj-btn-secondary, .prj-btn-danger { min-height: 44px !important; padding: 0 16px !important; }
+          /* 고객 초대 바: 모바일 하단 탭 위 고정(스크롤 끝까지 내릴 필요 없음) */
+          .prj-invite-bar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+            z-index: 60;
+            padding: 10px 12px !important;
+            gap: 10px !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+          }
+          .prj-invite-bar .prj-invite-sub { display: none !important; }
+          .prj-invite-bar .prj-invite-title { font-size: 12px !important; margin: 0 !important; }
+          .prj-invite-bar .prj-invite-meta { flex: 1; min-width: 0; }
+          .prj-invite-bar .prj-invite-btn { flex-shrink: 0; white-space: nowrap !important; padding: 8px 12px !important; font-size: 12px !important; }
+          /* 고정 초대 바 + 하단 네비 위 여유 */
+          .prj-photo-scroll-mobile-pad {
+            padding-bottom: calc(72px + 60px + env(safe-area-inset-bottom, 0px)) !important;
+          }
         }
       `}</style>
 
@@ -981,7 +1002,19 @@ export default function ProjectDetailPage() {
       <main style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden", zIndex: 10, position: "relative" }}>
 
         {/* ── Left Panel ── */}
-        <aside className="prj-scroll prj-aside" style={{ width: 360, flexShrink: 0, borderRight: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", overflowY: "auto" }}>
+        <aside
+          className="prj-scroll prj-aside"
+          style={{
+            width: 360,
+            flexShrink: 0,
+            alignSelf: "stretch",
+            minHeight: 0,
+            borderRight: `1px solid ${BORDER}`,
+            display: "flex",
+            flexDirection: "column",
+            overflowY: "auto",
+          }}
+        >
 
           {/* ACTIVE_PROJECT */}
           <section style={{ background: SURFACE_1, padding: 20, borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
@@ -1052,9 +1085,20 @@ export default function ProjectDetailPage() {
 
           </section>
 
-          {/* UPLINK_CONSOLE */}
-          <section style={{ background: SURFACE_1, padding: 20, borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          {/* UPLINK_CONSOLE — 남는 세로 공간을 드롭존이 메움 */}
+          <section
+            style={{
+              background: SURFACE_1,
+              padding: 20,
+              borderBottom: `1px solid ${BORDER}`,
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
               <span className="prj-tech-label" style={{ color: TEXT_BRIGHT }}>사진 업로드</span>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 {isUploading && <Loader2 size={10} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} />}
@@ -1069,7 +1113,19 @@ export default function ProjectDetailPage() {
               onDrop={onDrop}
               onDragOver={onDragOver}
               onDragLeave={onDragLeave}
-              style={{ background: dragOver ? ACCENT_DIM : "rgba(2,2,2,0.5)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: "48px 16px", minHeight: 160, cursor: isUploading ? "not-allowed" : "pointer", marginBottom: 14, opacity: isUploading ? 0.7 : 1 }}
+              style={{
+                flex: 1,
+                minHeight: 120,
+                background: dragOver ? ACCENT_DIM : "rgba(2,2,2,0.5)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 10,
+                padding: "32px 16px",
+                cursor: isUploading ? "not-allowed" : "pointer",
+                opacity: isUploading ? 0.7 : 1,
+              }}
             >
               <div style={{ width: 52, height: 52, borderRadius: "50%", border: `1px solid #222`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {isUploading ? <Loader2 size={20} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} /> : <Upload size={20} color="#444" />}
@@ -1095,11 +1151,13 @@ export default function ProjectDetailPage() {
             </div>
 
             {/* progress bar */}
-            <div style={{ background: SURFACE_2, border: `1px solid ${BORDER}`, padding: 12, marginBottom: 14 }}>
+            <div style={{ flexShrink: 0, background: SURFACE_2, border: `1px solid ${BORDER}`, padding: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 8 }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT }}>{M}장 업로드됨</span>
-                  {N > 0 && <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED }}>고객 셀렉 대상: {N}장</span>}
+                  <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED }}>
+                    {N > 0 ? `고객 셀렉 대상: ${N}장` : "고객 셀렉 대상: 미설정"}
+                  </span>
                 </div>
                 <span className="prj-tech-label" style={{ color: isUploading ? ACCENT : TEXT_MUTED }}>
                   {isUploading ? (showServerWorking ? "···" : `${uploadProgress}%`) : `${progressPct}%`}
@@ -1133,6 +1191,40 @@ export default function ProjectDetailPage() {
                     <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.25)", width: "20%", animation: "prj-bar-scan 2s linear infinite" }} />
                   ) : null}
                 </div>
+              </div>
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                  <span className="prj-tech-label" style={{ color: "#555", fontSize: "0.55rem" }}>진행</span>
+                  <span
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 9,
+                      color: N <= 0 ? "#555" : M >= N ? "#2ed573" : ACCENT,
+                      letterSpacing: "0.04em",
+                      textAlign: "right",
+                    }}
+                  >
+                    {N <= 0
+                      ? "셀렉 장수 미정"
+                      : M >= N
+                        ? "활성화 가능"
+                        : `${Math.max(0, N - M)}장 더 필요`}
+                  </span>
+                </div>
+                <p
+                  style={{
+                    margin: 0,
+                    fontFamily: MONO,
+                    fontSize: 8,
+                    color: "#444",
+                    lineHeight: 1.45,
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  {N > 0
+                    ? `${N}장 채우면 아래에서 초대 링크를 켤 수 있어요. 썸네일 탭 → 크게 보기`
+                    : "고객 셀렉 장수를 정하면 여기 안내가 바뀝니다."}
+                </p>
               </div>
               {uploadError && <p style={{ fontFamily: MONO, fontSize: 9, color: "#FF3333", marginTop: 8 }}>[ERR] {uploadError}</p>}
             </div>
@@ -1184,6 +1276,17 @@ export default function ProjectDetailPage() {
               <div style={{ height: 3, background: "#111", overflow: "hidden" }}>
                 <div style={{ width: `${isUploading ? uploadProgress : progressPct}%`, height: "100%", background: ACCENT, transition: "width 0.3s" }} />
               </div>
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid #1a1a1a`, display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED }}>진행</span>
+                  <span style={{ fontFamily: MONO, fontSize: 9, color: N <= 0 ? "#555" : M >= N ? "#2ed573" : ACCENT, textAlign: "right" }}>
+                    {N <= 0 ? "셀렉 장수 미정" : M >= N ? "활성화 가능" : `${Math.max(0, N - M)}장 더 필요`}
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontFamily: MONO, fontSize: 8, color: "#555", lineHeight: 1.45 }}>
+                  {N > 0 ? `${N}장 채우면 초대 링크를 켤 수 있어요.` : "셀렉 장수를 정하면 안내가 바뀝니다."}
+                </p>
+              </div>
               {uploadError && <p style={{ fontFamily: MONO, fontSize: 10, color: "#FF3333", marginTop: 8 }}>{uploadError}</p>}
             </div>
           </div>
@@ -1222,7 +1325,11 @@ export default function ProjectDetailPage() {
           )}
 
           {/* photo grid — 가상 스크롤로 보이는 행만 마운트·이미지 로드 */}
-          <div ref={photoScrollRef} className="prj-scroll" style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "rgba(3,3,3,0.4)" }}>
+          <div
+            ref={photoScrollRef}
+            className={`prj-scroll${!isInviteActive ? " prj-photo-scroll-mobile-pad" : ""}`}
+            style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "rgba(3,3,3,0.4)" }}
+          >
             {photosLoading ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", gap: 8 }}>
                 <span className="prj-tech-label" style={{ color: TEXT_MUTED }}>불러오는 중...</span>
@@ -1284,21 +1391,30 @@ export default function ProjectDetailPage() {
 
       {/* ── 고객 초대 하단 고정 바 ── */}
       {!isInviteActive && (
-        <div style={{
-          flexShrink: 0,
-          background: "rgba(8, 4, 2, 0.96)",
-          borderTop: "1px solid rgba(255, 77, 0, 0.2)",
-          backdropFilter: "blur(12px)",
-          padding: "12px 24px",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          gap: 16,
-          zIndex: 50,
-        }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: TEXT_BRIGHT }}>
-              고객 초대 준비
+        <div
+          className="prj-invite-bar"
+          style={{
+            flexShrink: 0,
+            background: "rgba(8, 4, 2, 0.96)",
+            borderTop: "1px solid rgba(255, 77, 0, 0.2)",
+            backdropFilter: "blur(12px)",
+            padding: "12px 24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+            zIndex: 50,
+          }}
+        >
+          <div className="prj-invite-meta" style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+            <div className="prj-invite-title" style={{ fontSize: 13, fontWeight: 500, color: TEXT_BRIGHT }}>
+              {isMobile
+                ? (N > 0
+                    ? (M >= N ? `${M}/${N}장 · 활성화 가능` : `${M}/${N}장`)
+                    : `${M}장 · 셀렉 미정`)
+                : "고객 초대 준비"}
             </div>
-            <div style={{ fontSize: 11, color: TEXT_MUTED }}>
+            <div className="prj-invite-sub" style={{ fontSize: 11, color: TEXT_MUTED }}>
               {M >= N && N > 0
                 ? `${M}장 업로드 완료 · 초대 링크를 활성화할 수 있습니다`
                 : `${M}장 업로드됨 · ${N}장 이상 업로드 후 활성화 가능합니다`}
@@ -1306,15 +1422,20 @@ export default function ProjectDetailPage() {
           </div>
           <button
             type="button"
+            className="prj-invite-btn"
             onClick={handleEnableClientAccess}
             disabled={inviteActivating || M < N}
             style={{
-              display: "flex", alignItems: "center", gap: 6,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
               padding: "9px 20px",
               background: M >= N ? ACCENT : "rgba(255,77,0,0.15)",
-              border: "none", borderRadius: 8,
+              border: "none",
+              borderRadius: 8,
               color: M >= N ? "#000" : ACCENT,
-              fontSize: 13, fontWeight: 600,
+              fontSize: 13,
+              fontWeight: 600,
               cursor: M >= N && !inviteActivating ? "pointer" : "not-allowed",
               fontFamily: MONO,
               opacity: inviteActivating ? 0.75 : 1,
@@ -1322,66 +1443,157 @@ export default function ProjectDetailPage() {
               transition: "all 0.2s",
             }}
           >
-            {inviteActivating ? "활성화 중…" : "고객 초대 링크 활성화"}
-            {!inviteActivating && M >= N && <ChevronRight size={14} />}
+            {inviteActivating ? "활성화 중…" : isMobile ? "초대링크 활성화" : "고객 초대 링크 활성화"}
+            {!inviteActivating && M >= N && !isMobile && <ChevronRight size={14} />}
           </button>
         </div>
       )}
 
-      {/* ── 라이트박스 ── */}
-      {lightboxIndex !== null && photos[lightboxIndex] && (
-        <div
-          onClick={() => setLightboxIndex(null)}
-          style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}
-        >
-          {/* 닫기 */}
-          <button
-            type="button"
-            onClick={() => setLightboxIndex(null)}
-            style={{ position: "absolute", top: 16, right: 16, width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "none", color: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-          >
-            <X size={18} />
-          </button>
-          {/* 카운터 */}
-          <div style={{ position: "absolute", top: 22, left: "50%", transform: "translateX(-50%)", fontFamily: MONO, fontSize: 11, color: "rgba(255,255,255,0.45)" }}>
-            {lightboxIndex + 1} / {photos.length}
-          </div>
-          {/* 이전 */}
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i! > 0 ? i! - 1 : photos.length - 1)); }}
-            style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "none", color: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
-          >
-            <ChevronLeft size={22} />
-          </button>
-          {/* 이미지 */}
-          <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", alignItems: "center", maxWidth: "90vw" }}>
-            <img
-              key={photos[lightboxIndex].id}
-              src={photos[lightboxIndex].previewUrl ?? photos[lightboxIndex].url}
-              alt={photos[lightboxIndex].originalFilename ?? ""}
-              style={{ maxHeight: "80vh", maxWidth: "90vw", objectFit: "contain", borderRadius: 6, display: "block" }}
-            />
-            {photos[lightboxIndex].originalFilename && (
-              <div style={{ marginTop: 12, fontFamily: MONO, fontSize: 11, color: "rgba(255,255,255,0.45)" }}>
-                {photos[lightboxIndex].originalFilename}
+      {/* ── 라이트박스 (body 포털: main z-10 < 사이드바 z-20 스택 때문에, 고정 오버레이가 사이드바에 가려지지 않게) ── */}
+      {lightboxIndex !== null && photos[lightboxIndex] && typeof document !== "undefined" && document.body
+        ? createPortal(
+            <div
+              role="presentation"
+              onClick={() => setLightboxIndex(null)}
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 100_000,
+                isolation: "isolate",
+                background: "rgba(0,0,0,0.92)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {/* 닫기 */}
+              <button
+                type="button"
+                onClick={() => setLightboxIndex(null)}
+                style={{
+                  position: "absolute",
+                  top: 16,
+                  right: 16,
+                  zIndex: 2,
+                  width: 36,
+                  height: 36,
+                  borderRadius: "50%",
+                  background: "rgba(255,255,255,0.1)",
+                  border: "none",
+                  color: "white",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <X size={18} />
+              </button>
+              {/* 카운터 */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: 22,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  zIndex: 2,
+                  fontFamily: MONO,
+                  fontSize: 11,
+                  color: "rgba(255,255,255,0.45)",
+                }}
+              >
+                {lightboxIndex + 1} / {photos.length}
               </div>
-            )}
-          </div>
-          {/* 다음 */}
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i! < photos.length - 1 ? i! + 1 : 0)); }}
-            style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "none", color: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
-          >
-            <ChevronRight size={22} />
-          </button>
-        </div>
-      )}
+              {/* 이전 */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxIndex((i) => (i! > 0 ? i! - 1 : photos.length - 1));
+                }}
+                style={{
+                  position: "absolute",
+                  left: 16,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  zIndex: 2,
+                  width: 44,
+                  height: 44,
+                  borderRadius: "50%",
+                  background: "rgba(255,255,255,0.1)",
+                  border: "none",
+                  color: "white",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                }}
+              >
+                <ChevronLeft size={22} />
+              </button>
+              {/* 이미지 */}
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", maxWidth: "90vw", zIndex: 1 }}
+              >
+                <img
+                  key={photos[lightboxIndex].id}
+                  src={photos[lightboxIndex].previewUrl ?? photos[lightboxIndex].url}
+                  alt={photos[lightboxIndex].originalFilename ?? ""}
+                  style={{ maxHeight: "80vh", maxWidth: "90vw", objectFit: "contain", borderRadius: 6, display: "block" }}
+                />
+                {photos[lightboxIndex].originalFilename && (
+                  <div style={{ marginTop: 12, fontFamily: MONO, fontSize: 11, color: "rgba(255,255,255,0.45)" }}>
+                    {photos[lightboxIndex].originalFilename}
+                  </div>
+                )}
+              </div>
+              {/* 다음 */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxIndex((i) => (i! < photos.length - 1 ? i! + 1 : 0));
+                }}
+                style={{
+                  position: "absolute",
+                  right: 16,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  zIndex: 2,
+                  width: 44,
+                  height: 44,
+                  borderRadius: "50%",
+                  background: "rgba(255,255,255,0.1)",
+                  border: "none",
+                  color: "white",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                }}
+              >
+                <ChevronRight size={22} />
+              </button>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {/* toast */}
       {toast && (
@@ -1403,8 +1615,7 @@ export default function ProjectDetailPage() {
                 {pendingFiles.length.toLocaleString()}장을 업로드할까요?
               </p>
               <p style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, lineHeight: 1.7, marginBottom: 24 }}>
-                업로드 후에는 취소할 수 없습니다.<br />
-                잘못된 파일이 포함됐다면 취소 후 다시 선택해주세요.
+                업로드 후에도 삭제·추가 업로드 가능합니다.
               </p>
               <div style={{ display: "flex", gap: 8 }}>
                 <button

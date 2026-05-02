@@ -56,8 +56,23 @@ export function ReviewProvider({ children }: { children: React.ReactNode }) {
     setReviewPhotosLoading(true);
     fetch(`/api/c/review?token=${encodeURIComponent(token)}`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setReviewPhotos(data?.photos ?? []))
-      .catch(() => setReviewPhotos([]))
+      .then((data) => {
+        const photos = (data?.photos ?? []) as ReviewPhotoItem[];
+        setReviewPhotos(photos);
+        setReviewState((prev) => {
+          const next = { ...prev };
+          for (const p of photos) {
+            const ex = p.existingReview;
+            if (ex && next[p.id] == null) {
+              next[p.id] = { status: ex.status, comment: ex.customerComment ?? null };
+            }
+          }
+          return next;
+        });
+      })
+      .catch(() => {
+        setReviewPhotos([]);
+      })
       .finally(() => setReviewPhotosLoading(false));
   }, []);
 

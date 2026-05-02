@@ -6,7 +6,6 @@ import { format, isToday, isYesterday, parseISO } from "date-fns";
 import { JetBrains_Mono } from "next/font/google";
 import {
   Check,
-  ChevronLeft,
   ChevronRight,
   CheckCircle2,
   Copy,
@@ -23,6 +22,7 @@ import {
 } from "lucide-react";
 import { getProjectById } from "@/lib/db";
 import type { Project, ProjectStatus } from "@/types";
+import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { PHOTOGRAPHER_THEME as C } from "@/lib/photographer-theme";
 import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -36,6 +36,16 @@ const jetbrains = JetBrains_Mono({
   variable: "--nx-font-mono",
   display: "swap",
 });
+
+function formatPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
+function isValidPhone(v: string): boolean {
+  return v === "" || /^010-\d{4}-\d{4}$/.test(v);
+}
 
 type WfState = "done" | "current" | "pending";
 
@@ -113,6 +123,7 @@ export function ProjectNexusPageClient() {
   const [editDeadline, setEditDeadline] = useState("");
   const [editRequiredCount, setEditRequiredCount] = useState(0);
   const [editAllowRevision, setEditAllowRevision] = useState(true);
+  const [editCustomerPhone, setEditCustomerPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -194,6 +205,10 @@ export function ProjectNexusPageClient() {
       setSaveError(`업로드된 사진 수(${project.photoCount}장) 이하로 설정해주세요.`);
       return;
     }
+    if (!isValidPhone(editCustomerPhone)) {
+      setSaveError("연락처는 010-XXXX-XXXX 형식으로 입력해주세요.");
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch(`/api/photographer/projects/${id}`, {
@@ -206,6 +221,7 @@ export function ProjectNexusPageClient() {
           deadline: editDeadline,
           required_count: newN,
           allow_revision: editAllowRevision,
+          customer_phone: editCustomerPhone || null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -218,6 +234,7 @@ export function ProjectNexusPageClient() {
         deadline: editDeadline,
         requiredCount: newN,
         allowRevision: editAllowRevision,
+        customerPhone: editCustomerPhone || null,
       });
       setEditMode(false);
       setToast("메타데이터가 저장되었습니다.");
@@ -296,6 +313,7 @@ export function ProjectNexusPageClient() {
     setEditDeadline(project.deadline);
     setEditRequiredCount(project.requiredCount);
     setEditAllowRevision(project.allowRevision);
+    setEditCustomerPhone(project.customerPhone ?? "");
     setSaveError("");
     setEditMode(true);
   };
@@ -303,7 +321,7 @@ export function ProjectNexusPageClient() {
   if (loading) {
     return (
       <div className={`${styles.pageRoot} ${jetbrains.variable}`}>
-        <div className={styles.loadingState}>LOADING_PROJECT...</div>
+        <div className={styles.loadingState}>로딩 중...</div>
       </div>
     );
   }
@@ -311,7 +329,7 @@ export function ProjectNexusPageClient() {
   if (!project) {
     return (
       <div className={`${styles.pageRoot} ${jetbrains.variable}`}>
-        <div className={styles.loadingState}>PROJECT_NOT_FOUND</div>
+        <div className={styles.loadingState}>프로젝트를 찾을 수 없습니다</div>
       </div>
     );
   }
@@ -457,24 +475,21 @@ export function ProjectNexusPageClient() {
 
   return (
     <div className={`${styles.pageRoot} ${jetbrains.variable}`}>
-      <header className={styles.sysHeader}>
-        <button type="button" className={`${styles.navReturn} ${styles.mono}`} onClick={() => router.push("/photographer/projects")}>
-          <ChevronLeft size={12} strokeWidth={2} />
-          뒤로가기
-        </button>
-        <div className={styles.sysStatus}>
-          <span className={styles.statusDot} aria-hidden />
-          SYS.PG_SESSION_ACTIVE
-        </div>
-      </header>
+      <PhotographerPageHeader
+        crumbs={[
+          { label: "프로젝트", href: "/photographer/projects" },
+          { label: project.name },
+        ]}
+        title={project.name}
+        stats={[
+          { label: "업로드", value: `${M}장` },
+          { label: "목표", value: `${N}장` },
+        ]}
+      />
 
       <main className={styles.mainWorkspace}>
         <div className={styles.workspaceLeft}>
           <div className={styles.projectHeader}>
-            <div className={`${styles.projectBreadcrumb} ${styles.mono}`}>
-              <span className={styles.textMuted}>SYS / WORKSPACE /</span>
-              <span className={styles.textMainBridge}>{prjBreadcrumb}</span>
-            </div>
             <div className={styles.projectTitleGroup}>
               <div>
                 <h1 className={styles.projectTitle}>{project.name}</h1>
@@ -487,9 +502,9 @@ export function ProjectNexusPageClient() {
 
           <div className={`${styles.sysPanel} ${styles.cornerBrackets}`}>
             <div className={styles.panelHeader}>
-              <span>01. METADATA :: SPECS</span>
+              <span>프로젝트 정보</span>
               <button type="button" className={styles.editBtn} onClick={openEdit}>
-                [ EDIT ]
+                수정
               </button>
             </div>
             <div className={styles.panelBody}>
@@ -585,7 +600,7 @@ export function ProjectNexusPageClient() {
                       <span className={`${styles.dataValLarge} ${styles.mono}`}>{M}</span>
                       <span className={styles.metaUnitSuffix}>장</span>
                     </div>
-                    <p className={styles.metaFieldHint}>현재 DATABANK에 올라간 원본 장수입니다.</p>
+                    <p className={styles.metaFieldHint}>현재 업로드된 원본 수입니다.</p>
                   </div>
                   <div style={{ gridColumn: "1 / -1" }}>
                     <div className={styles.metaFieldRow}>
@@ -630,9 +645,9 @@ export function ProjectNexusPageClient() {
 
           <div className={`${styles.sysPanel} ${styles.cornerBrackets}`}>
             <div className={styles.panelHeader}>
-              <span>02. ACCESS :: CLIENT PORTAL</span>
+              <span>고객 링크</span>
               <span className={`${styles.textGreen} ${styles.uppercase} ${styles.textXs}`}>
-                {isInviteActive ? "• LIVE_LINK" : "• PENDING_UPLOAD"}
+                {isInviteActive ? "• 활성" : "• 준비 중"}
               </span>
             </div>
             <div className={styles.panelBody}>
@@ -705,18 +720,17 @@ export function ProjectNexusPageClient() {
                     setShowPinModal(true);
                   }}
                 >
-                  {project.accessPin ? "CHANGE_PIN" : "SET_PIN"}
+                  {project.accessPin ? "비밀번호 변경" : "비밀번호 설정"}
                 </button>
               </div>
             </div>
           </div>
 
-          <div className={`${styles.serverNodeLine} ${styles.mono}`}>SERVER_NODE: KR-ST-04 // MEM_USAGE: 4.2GB</div>
         </div>
 
         <div className={styles.workspaceRight}>
           <div className={styles.actionFlowContainer}>
-            <div className={styles.flowSectionTitle}>03. PIPELINE</div>
+            <div className={styles.flowSectionTitle}>진행 단계</div>
             {actionFlowSteps.map((step, i) => {
               const isDone = step.state === "done";
               const isActive = step.state === "active";
@@ -760,10 +774,10 @@ export function ProjectNexusPageClient() {
           </div>
 
           <div className={styles.logSection}>
-            <div className={styles.logSectionTitle}>SYS.LOG :: RECENT</div>
+            <div className={styles.logSectionTitle}>최근 활동</div>
             <div className={styles.logList}>
               {logs.length === 0 ? (
-                <div className={`${styles.textMuted} ${styles.textSm}`}>NO_RECENT_EVENTS</div>
+                <div className={`${styles.textMuted} ${styles.textSm}`}>최근 활동 내역이 없습니다</div>
               ) : (
                 logs.map((log) => {
                   const orange = log.action === "selecting";
@@ -791,10 +805,7 @@ export function ProjectNexusPageClient() {
             </div>
           </div>
 
-          <section className={styles.dangerZone} aria-labelledby="nexus-danger-heading">
-            <h2 id="nexus-danger-heading" className={styles.dangerZoneTitle}>
-              ⚠ SYS.SEC :: DANGER_ZONE
-            </h2>
+          <section className={styles.dangerZone}>
             <button
               type="button"
               className={styles.dangerZoneBtn}
@@ -809,11 +820,6 @@ export function ProjectNexusPageClient() {
           </section>
         </div>
       </main>
-
-      <footer className={`${styles.sysFooter} ${styles.mono} ${styles.trackingWide}`}>
-        <span>V.1.2.0-CORE // SYNC_STABLE</span>
-        <span>SERVER_ID: KR-ST-04</span>
-      </footer>
 
       {toast && <div className={styles.toast}>{toast}</div>}
 
@@ -830,7 +836,7 @@ export function ProjectNexusPageClient() {
           <div className={styles.modalBox} style={{ maxWidth: 520 }}>
             <div className={styles.modalHead}>
               <span className={`${styles.fieldLabel}`} style={{ color: "var(--nx-accent)" }}>
-                SYS.META :: EDIT_PROJECT
+                프로젝트 수정
               </span>
               <button type="button" className={styles.iconBtn} onClick={() => { setEditMode(false); setSaveError(""); }} aria-label="닫기">
                 <X size={14} />
@@ -840,41 +846,13 @@ export function ProjectNexusPageClient() {
               <div className={styles.metaGrid2}>
                 {(
                   [
-                    {
-                      k: "프로젝트명",
-                      code: "PROJ_NAME",
-                      req: true,
-                      value: editName,
-                      onChange: setEditName,
-                      type: "text" as const,
-                    },
-                    {
-                      k: "고객 이름",
-                      code: "CLIENT_NAME",
-                      req: true,
-                      value: editCustomerName,
-                      onChange: setEditCustomerName,
-                      type: "text" as const,
-                    },
-                    {
-                      k: "촬영 일자",
-                      code: "SHOOT_DATE",
-                      req: true,
-                      value: editShootDate,
-                      onChange: setEditShootDate,
-                      type: "date" as const,
-                    },
-                    {
-                      k: "셀렉 기한",
-                      code: "DEADLINE",
-                      req: true,
-                      value: editDeadline,
-                      onChange: setEditDeadline,
-                      type: "date" as const,
-                    },
+                    { k: "프로젝트명", req: true, value: editName, onChange: setEditName, type: "text" as const },
+                    { k: "고객 이름", req: true, value: editCustomerName, onChange: setEditCustomerName, type: "text" as const },
+                    { k: "촬영 일자", req: true, value: editShootDate, onChange: setEditShootDate, type: "date" as const },
+                    { k: "셀렉 기한", req: true, value: editDeadline, onChange: setEditDeadline, type: "date" as const },
                   ] as const
                 ).map((f) => (
-                  <label key={f.code} style={{ display: "flex", flexDirection: "column", marginBottom: 4 }}>
+                  <label key={f.k} style={{ display: "flex", flexDirection: "column", marginBottom: 4 }}>
                     <div className={styles.metaFieldRow} style={{ marginBottom: 6 }}>
                       <span className={styles.metaFieldLabelK}>
                         {f.k}
@@ -884,6 +862,20 @@ export function ProjectNexusPageClient() {
                     <input type={f.type} value={f.value} onChange={(e) => f.onChange(e.target.value)} className={styles.inputLine} />
                   </label>
                 ))}
+                <label style={{ display: "flex", flexDirection: "column", marginBottom: 4, gridColumn: "1 / -1" }}>
+                  <div className={styles.metaFieldRow} style={{ marginBottom: 6 }}>
+                    <span className={styles.metaFieldLabelK}>연락처</span>
+                  </div>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="010-0000-0000"
+                    value={editCustomerPhone}
+                    onChange={(e) => setEditCustomerPhone(formatPhone(e.target.value))}
+                    className={styles.inputLine}
+                  />
+                  <p className={styles.metaFieldHint}>010-XXXX-XXXX 형식 · 선택사항</p>
+                </label>
               </div>
               <label style={{ display: "flex", flexDirection: "column", marginBottom: 20, marginTop: 16 }}>
                 <div className={styles.metaFieldRow} style={{ marginBottom: 6 }}>
@@ -893,7 +885,7 @@ export function ProjectNexusPageClient() {
                 </div>
                 {!["preparing", "selecting"].includes(project.status) && (
                   <span className={`${styles.mono} ${styles.textXs}`} style={{ color: C.orange, marginBottom: 6 }}>
-                    LOCKED
+                    변경 불가
                   </span>
                 )}
                 <input
@@ -940,13 +932,13 @@ export function ProjectNexusPageClient() {
                   </span>
                 </button>
               </label>
-              {saveError && <div className={styles.errBox}>[ERR] {saveError}</div>}
+              {saveError && <div className={styles.errBox}>{saveError}</div>}
               <div className={styles.btnRow}>
                 <button type="button" className={styles.btnSecondary} onClick={() => { setEditMode(false); setSaveError(""); }}>
-                  CANCEL
+                  취소
                 </button>
                 <button type="button" className={styles.btnPrimary} onClick={handleSaveEdit} disabled={saving}>
-                  {saving ? "SAVING..." : "COMMIT_CHANGES"}
+                  {saving ? "저장 중..." : "저장"}
                 </button>
               </div>
             </div>
@@ -968,7 +960,7 @@ export function ProjectNexusPageClient() {
           <div className={styles.modalBox} style={{ maxWidth: 380 }}>
             <div className={styles.modalHead}>
               <span className={styles.fieldLabel} style={{ color: "var(--nx-accent)" }}>
-                SYS.AUTH :: {project.accessPin ? "MODIFY_PIN" : "SET_PIN"}
+                비밀번호 설정
               </span>
               <button
                 type="button"
@@ -996,7 +988,7 @@ export function ProjectNexusPageClient() {
                 />
                 <button type="button" className={styles.btnSecondary} style={{ flex: "none", padding: "10px 12px" }} onClick={() => setPinInput(Math.floor(1000 + Math.random() * 9000).toString())}>
                   <RefreshCw size={11} style={{ display: "inline", marginRight: 4 }} />
-                  RANDOM
+                  랜덤
                 </button>
               </div>
               <p className={styles.metaFieldHint} style={{ marginBottom: 16 }}>
@@ -1004,15 +996,15 @@ export function ProjectNexusPageClient() {
                 <br />
                 4자리 숫자를 입력하거나 랜덤 생성 버튼을 누르세요
               </p>
-              {pinError && <div className={styles.errBox}>[ERR] {pinError}</div>}
+              {pinError && <div className={styles.errBox}>{pinError}</div>}
               <div className={styles.btnRow}>
                 {project.accessPin && (
                   <button type="button" className={styles.btnDanger} onClick={() => handleSavePin(null)} disabled={pinSaving}>
-                    DEL_PIN
+                    삭제
                   </button>
                 )}
                 <button type="button" className={styles.btnSecondary} onClick={() => { setShowPinModal(false); setPinInput(""); setPinError(""); }} disabled={pinSaving}>
-                  CANCEL
+                  취소
                 </button>
                 <button
                   type="button"
@@ -1020,7 +1012,7 @@ export function ProjectNexusPageClient() {
                   onClick={() => handleSavePin(pinInput || null)}
                   disabled={pinSaving || (!!pinInput && pinInput.length !== 4)}
                 >
-                  {pinSaving ? "SAVING..." : "COMMIT"}
+                  {pinSaving ? "저장 중..." : "저장"}
                 </button>
               </div>
             </div>

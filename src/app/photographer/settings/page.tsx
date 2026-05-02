@@ -15,11 +15,11 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const ACCEPT_IMAGE = "image/jpeg,image/png,image/webp";
 const ACCENT  = "#FF4D00";
 const DANGER  = "#FF3333";
-const SURFACE_0  = "#050505";
-const SURFACE_1  = "#0a0a0a";
-const SURFACE_2  = "#0d0d0d";
-const BORDER_MID  = "#222";
-const BORDER_HIGH = "#333";
+const SURFACE_0  = "#0a0a0c";
+const SURFACE_1  = "#121215";
+const SURFACE_2  = "#0f0f12";
+const BORDER_MID  = "#1a1a1e";
+const BORDER_HIGH = "#27272c";
 const TEXT_SEC  = "#888";
 const TEXT_TERT = "#444";
 const FONT_MONO = "'Space Mono', 'Noto Sans KR', sans-serif";
@@ -73,21 +73,6 @@ export default function SettingsPage() {
   const [toasts, setToasts]               = useState<ToastItem[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
-  const [clockStr, setClockStr]           = useState("");
-
-  // clock
-  useEffect(() => {
-    const tick = () => {
-      const n = new Date();
-      setClockStr(
-        `${n.getHours().toString().padStart(2, "0")}:${n.getMinutes().toString().padStart(2, "0")}:${n.getSeconds().toString().padStart(2, "0")}`
-      );
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
-
   // profile load
   useEffect(() => {
     fetch("/api/photographer/profile")
@@ -247,24 +232,13 @@ export default function SettingsPage() {
   return (
     <div
       className="st-root"
-      style={{ minHeight: "100vh", background: "#000", color: "#fff", fontFamily: FONT_SANS, position: "relative" }}
+      style={{ minHeight: "100vh", background: "#0a0a0c", color: "#fff", fontFamily: FONT_SANS, position: "relative" }}
     >
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes st-scanline { 0% { bottom: 100%; } 100% { bottom: -100px; } }
         @keyframes st-toastIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
 
-        .st-grid-bg {
-          position: fixed; inset: 0;
-          background-image: linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px);
-          background-size: 60px 60px; background-position: center top;
-          opacity: 0.2; pointer-events: none; z-index: 0;
-        }
-        .st-scanline {
-          width: 100%; height: 100px; position: fixed; bottom: 100%;
-          background: linear-gradient(0deg, rgba(255,77,0,0.02) 0%, rgba(255,77,0,0) 100%);
-          animation: st-scanline 8s linear infinite; pointer-events: none; z-index: 1;
-        }
         .st-input:focus {
           border-bottom-color: ${ACCENT} !important;
           background: rgba(255,77,0,0.04) !important;
@@ -293,7 +267,6 @@ export default function SettingsPage() {
 
         @media (max-width: 768px) {
           .st-topbar { flex-wrap: wrap; gap: 10px; padding: 10px 14px !important; padding-top: max(10px, env(safe-area-inset-top)) !important; height: auto !important; }
-          .st-clock { display: none !important; }
           .st-hero { flex-direction: column !important; align-items: flex-start !important; gap: 16px !important; }
           .st-hero-actions { width: 100% !important; align-items: stretch !important; }
           .st-hero-actions button { width: 100% !important; justify-content: center !important; }
@@ -308,20 +281,10 @@ export default function SettingsPage() {
         }
       `}</style>
 
-      {/* 배경 */}
-      <div className="st-grid-bg" />
-      <div className="st-scanline" />
-
       {/* ── 상단 헤더 ── */}
       <PhotographerPageHeader
         crumbs={[{ label: "설정" }]}
         title="설정"
-        actions={
-          <div className="st-clock" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-            <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 9, color: "#555", letterSpacing: "0.15em", textTransform: "uppercase" }}>SYS_TIME</span>
-            <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 12, color: "#fff", letterSpacing: "0.1em" }}>{clockStr}</span>
-          </div>
-        }
       />
 
       {/* ── 본문 ── */}
@@ -334,10 +297,9 @@ export default function SettingsPage() {
           style={{
             background: SURFACE_1, border: `1px solid ${BORDER_MID}`,
             padding: "28px 32px", display: "flex", alignItems: "center", gap: 28,
-            position: "relative", marginBottom: 28,
+            position: "relative", marginBottom: 28, borderRadius: 16,
           }}
         >
-          <Brackets />
 
           {/* 숨김 파일 인풋 */}
           <input
@@ -450,7 +412,7 @@ export default function SettingsPage() {
         >
 
           {/* ── 좌: 프로필 편집 ── */}
-          <div style={{ background: SURFACE_1, border: `1px solid ${BORDER_MID}`, display: "flex", flexDirection: "column" }}>
+          <div style={{ background: SURFACE_1, border: `1px solid ${BORDER_MID}`, display: "flex", flexDirection: "column", borderRadius: 16 }}>
 
             {/* 카드 헤더 */}
             <div style={{
@@ -625,7 +587,7 @@ export default function SettingsPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
 
             {/* 알림 설정 */}
-            <div style={{ background: SURFACE_1, border: `1px solid ${BORDER_MID}`, display: "flex", flexDirection: "column" }}>
+            <div style={{ background: SURFACE_1, border: `1px solid ${BORDER_MID}`, display: "flex", flexDirection: "column", borderRadius: 16 }}>
               <div style={{
                 padding: "16px 24px", borderBottom: `1px solid ${BORDER_MID}`,
                 background: SURFACE_0,

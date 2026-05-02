@@ -7,28 +7,35 @@ import { ko } from "date-fns/locale";
 import { Check, AlertTriangle, LayoutGrid, List } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import type { ColorTag } from "@/types";
-import { PHOTOGRAPHER_THEME as T, PS_DISPLAY } from "@/lib/photographer-theme";
 import { BrandLogoBar } from "@/components/BrandLogo";
 
 const CUSTOMER_CANCEL_MAX = 3;
 
-/* ── design tokens ──────────────────────────── */
-const INK = T.ink;
-const SURFACE = T.surface;
-const SURFACE2 = T.surface2;
-const SURFACE3 = T.surface3;
-const STEEL = T.steel;
-const GREEN = T.green;
-const GREEN_DIM = T.greenDim;
-const ORANGE = T.orange;
-const ORANGE_DIM = T.orangeDim;
-const RED = T.red;
-const RED_DIM = T.redDim;
-const DIM = T.dim;
-const MUTED = T.muted;
-const TEXT = T.text;
-const BORDER = T.border;
-const BORDER_MD = T.borderMd;
+/* ── design tokens (review 페이지와 동일 가이드) ── */
+const BG_BASE    = "#030303";
+const BG_PANEL   = "#0a0a0a";
+const BG_INPUT   = "#111111";
+const BORDER     = "#222222";
+const BORDER_HI  = "#333333";
+const TEXT       = "#ffffff";
+const MUTED      = "#888888";
+const DIM        = "#555555";
+const ACCENT     = "#ff4d00";
+const ACCENT_DIM = "rgba(255,77,0,0.1)";
+const GREEN      = "#00ff66";
+const GREEN_DIM  = "rgba(0,255,102,0.1)";
+const ORANGE     = "#ffaa00";
+const ORANGE_DIM = "rgba(255,170,0,0.1)";
+const RED        = "#ff4757";
+const RED_DIM    = "rgba(255,71,87,0.1)";
+const MONO       = "'JetBrains Mono', 'Space Mono', monospace";
+const DISPLAY    = "'Space Grotesk', 'Pretendard Variable', sans-serif";
+const BODY_FONT  = "'Pretendard Variable', -apple-system, sans-serif";
+
+const GRID_BG: React.CSSProperties = {
+  backgroundImage: `linear-gradient(#161616 1px, transparent 1px), linear-gradient(90deg, #161616 1px, transparent 1px)`,
+  backgroundSize: "40px 40px",
+};
 
 const COLOR_HEX: Record<ColorTag, string> = {
   red:    "#ff4757",
@@ -38,11 +45,22 @@ const COLOR_HEX: Record<ColorTag, string> = {
   purple: "#5352ed",
 };
 
-const playfair: React.CSSProperties = { fontFamily: PS_DISPLAY };
-
 function getTestImageUrl(photoId: string) {
   const seed = photoId.replace(/\D/g, "") || "1";
   return `https://picsum.photos/seed/${seed}/400/300`;
+}
+
+function modalBracketStyle(corner: "tl" | "tr" | "bl" | "br"): React.CSSProperties {
+  const base: React.CSSProperties = {
+    position: "absolute",
+    width: 14,
+    height: 14,
+    pointerEvents: "none",
+  };
+  if (corner === "tl") return { ...base, top: -1, left: -1, borderTop: `2px solid ${ACCENT}`, borderLeft: `2px solid ${ACCENT}` };
+  if (corner === "tr") return { ...base, top: -1, right: -1, borderTop: `2px solid ${ACCENT}`, borderRight: `2px solid ${ACCENT}` };
+  if (corner === "bl") return { ...base, bottom: -1, left: -1, borderBottom: `2px solid ${ACCENT}`, borderLeft: `2px solid ${ACCENT}` };
+  return { ...base, bottom: -1, right: -1, borderBottom: `2px solid ${ACCENT}`, borderRight: `2px solid ${ACCENT}` };
 }
 
 export default function LockedPage() {
@@ -63,7 +81,7 @@ export default function LockedPage() {
   useEffect(() => {
     if (!project || !token) return;
     if (project.status === "selecting") router.replace(`/c/${token}/gallery`);
-  }, [project?.status, token, router]);
+  }, [project, token, router]);
 
   const { photos, N, photoStates } = useMemo(() => {
     if (!project || !ctx?.photos?.length || !ctx?.selectedIds?.size) {
@@ -106,44 +124,43 @@ export default function LockedPage() {
   /* ── loading / guard ────────────────────────── */
   if (!mounted || loading) {
     return (
-      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: INK }}>
-        <p style={{ fontSize: 13, color: MUTED }}>불러오는 중...</p>
+      <div style={{ display: "flex", minHeight: "100dvh", alignItems: "center", justifyContent: "center", background: BG_BASE, fontFamily: MONO, fontSize: 12, color: MUTED, letterSpacing: "0.05em" }}>
+        불러오는 중...
       </div>
     );
   }
   if (!project) {
     return (
-      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: INK }}>
-        <p style={{ fontSize: 13, color: MUTED }}>존재하지 않는 초대 링크입니다.</p>
+      <div style={{ display: "flex", minHeight: "100dvh", alignItems: "center", justifyContent: "center", background: BG_BASE, fontFamily: MONO, fontSize: 12, color: MUTED, letterSpacing: "0.05em" }}>
+        존재하지 않는 초대 링크입니다.
       </div>
     );
   }
   if (project.status === "selecting") {
     return (
-      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: INK }}>
-        <p style={{ fontSize: 13, color: MUTED }}>이동 중...</p>
+      <div style={{ display: "flex", minHeight: "100dvh", alignItems: "center", justifyContent: "center", background: BG_BASE, fontFamily: MONO, fontSize: 12, color: MUTED, letterSpacing: "0.05em" }}>
+        이동 중...
       </div>
     );
   }
 
-  const M = project.photoCount;
   const confirmedDate = project.confirmedAt
     ? format(new Date(project.confirmedAt), "yyyy년 M월 d일 HH:mm", { locale: ko })
     : "—";
   const confirmedDateShort = project.confirmedAt
-    ? format(new Date(project.confirmedAt), "yyyy-MM-dd HH:mm")
+    ? format(new Date(project.confirmedAt), "yyyy.MM.dd HH:mm")
     : "—";
 
   const isEditing  = project.status === "editing" || project.status === "editing_v2";
   const isConfirmed = project.status === "confirmed";
 
   return (
-    <div style={{ background: INK, minHeight: "100vh", display: "flex", flexDirection: "column", color: TEXT }}>
+    <div style={{ background: BG_BASE, minHeight: "100dvh", display: "flex", flexDirection: "column", color: TEXT, fontFamily: BODY_FONT, ...GRID_BG }}>
 
       {/* ── Header ────────────────────────────── */}
       <header style={{
         minHeight: 48, flexShrink: 0,
-        background: "rgba(13,30,40,0.95)", backdropFilter: "blur(12px)",
+        background: "rgba(10,10,10,0.92)", backdropFilter: "blur(12px)",
         borderBottom: `1px solid ${BORDER}`,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 20px",
@@ -151,33 +168,37 @@ export default function LockedPage() {
         position: "sticky", top: 0, zIndex: 50,
       }}>
         <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
-        <span style={{ fontSize: 12, color: MUTED }}>{project.name}</span>
+        <span style={{ fontFamily: MONO, fontSize: 11, color: MUTED, letterSpacing: "0.05em", textTransform: "uppercase", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {project.name}
+        </span>
       </header>
 
       {/* ── Confirm banner ────────────────────── */}
       <div style={{
-        background: "rgba(46,213,115,0.06)",
-        borderBottom: "1px solid rgba(46,213,115,0.15)",
+        background: GREEN_DIM,
+        borderBottom: `1px solid rgba(0,255,102,0.18)`,
         padding: "14px 20px",
         display: "flex", alignItems: "center", gap: 16, flexShrink: 0,
       }}>
-        {/* Icon */}
         <div style={{
           width: 40, height: 40, flexShrink: 0,
-          background: GREEN_DIM, border: "1px solid rgba(46,213,115,0.3)",
+          background: GREEN_DIM, border: `1px solid rgba(0,255,102,0.4)`,
           borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           <Check style={{ width: 18, height: 18, color: GREEN }} />
         </div>
 
-        {/* Info */}
         <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-            <span style={{ fontSize: 15, fontWeight: 600, color: GREEN }}>{N}장 확정 완료</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: DISPLAY, fontSize: 16, fontWeight: 700, color: GREEN, letterSpacing: "-0.02em" }}>
+              {N}장 확정 완료
+            </span>
             <span style={{
-              fontSize: 10, fontWeight: 500, padding: "2px 8px", borderRadius: 10,
-              background: "rgba(46,213,115,0.1)", border: "1px solid rgba(46,213,115,0.2)", color: GREEN,
-            }}>읽기 전용</span>
+              fontFamily: MONO,
+              fontSize: 10, fontWeight: 700, padding: "2px 8px",
+              background: ACCENT_DIM, border: `1px solid rgba(255,77,0,0.3)`,
+              color: ACCENT, letterSpacing: "0.1em", textTransform: "uppercase",
+            }}>READ ONLY</span>
           </div>
           <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5 }}>
             {isEditing
@@ -186,16 +207,15 @@ export default function LockedPage() {
           </div>
         </div>
 
-        {/* Meta — 모바일에서 숨김 */}
-        <div className="hidden sm:flex" style={{ alignItems: "center", gap: 12, fontSize: 11, color: DIM, flexShrink: 0, textAlign: "right" }}>
+        <div className="hidden sm:flex" style={{ alignItems: "center", gap: 16, flexShrink: 0 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-end" }}>
-            <span style={{ fontSize: 10, color: DIM }}>확정 일시</span>
-            <span style={{ fontSize: 12, color: MUTED, fontWeight: 500 }}>{confirmedDateShort}</span>
+            <span style={{ fontFamily: MONO, fontSize: 9, color: DIM, letterSpacing: "0.1em", textTransform: "uppercase" }}>CONFIRMED</span>
+            <span style={{ fontFamily: MONO, fontSize: 12, color: MUTED, fontWeight: 500 }}>{confirmedDateShort}</span>
           </div>
           {isConfirmed && (
             <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-end" }}>
-              <span style={{ fontSize: 10, color: DIM }}>취소 가능</span>
-              <span style={{ fontSize: 12, fontWeight: 500, color: atCancelLimit ? MUTED : ORANGE }}>
+              <span style={{ fontFamily: MONO, fontSize: 9, color: DIM, letterSpacing: "0.1em", textTransform: "uppercase" }}>CANCEL LEFT</span>
+              <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: atCancelLimit ? MUTED : ACCENT }}>
                 {atCancelLimit ? "불가" : `${remainingCancels}회 남음`}
               </span>
             </div>
@@ -206,40 +226,44 @@ export default function LockedPage() {
       {/* ── Toolbar ───────────────────────────── */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "12px 20px 8px", flexShrink: 0,
+        padding: "14px 20px 10px", flexShrink: 0,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 13, fontWeight: 500, color: MUTED }}>선택한 사진</span>
+          <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+            SELECTED
+          </span>
           <span style={{
-            padding: "2px 8px", borderRadius: 20,
-            background: "rgba(79,126,255,0.1)", border: "1px solid rgba(79,126,255,0.2)",
-            fontSize: 11, color: STEEL, fontWeight: 500,
+            padding: "2px 10px",
+            background: ACCENT_DIM, border: `1px solid rgba(255,77,0,0.3)`,
+            fontFamily: MONO, fontSize: 11, color: ACCENT, fontWeight: 700, letterSpacing: "0.05em",
           }}>{N}장</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{
-            display: "flex", background: SURFACE,
-            border: `1px solid ${BORDER}`, borderRadius: 7, overflow: "hidden",
+            display: "flex", background: BG_PANEL,
+            border: `1px solid ${BORDER}`, overflow: "hidden",
           }}>
             <button type="button" onClick={() => setViewMode("grid")}
               style={{
-                padding: "5px 10px", border: "none", cursor: "pointer",
-                background: viewMode === "grid" ? SURFACE2 : "transparent",
-                color: viewMode === "grid" ? TEXT : MUTED,
-                display: "flex", alignItems: "center", gap: 4, fontSize: 11,
-                fontFamily: "inherit",
+                padding: "6px 12px", border: "none", cursor: "pointer",
+                background: viewMode === "grid" ? ACCENT_DIM : "transparent",
+                color: viewMode === "grid" ? ACCENT : MUTED,
+                display: "flex", alignItems: "center", gap: 6,
+                fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+                transition: "background 0.15s, color 0.15s",
               }}>
-              <LayoutGrid style={{ width: 12, height: 12 }} /> 갤러리
+              <LayoutGrid style={{ width: 12, height: 12 }} /> Grid
             </button>
             <button type="button" onClick={() => setViewMode("list")}
               style={{
-                padding: "5px 10px", border: "none", cursor: "pointer",
-                background: viewMode === "list" ? SURFACE2 : "transparent",
-                color: viewMode === "list" ? TEXT : MUTED,
-                display: "flex", alignItems: "center", gap: 4, fontSize: 11,
-                fontFamily: "inherit",
+                padding: "6px 12px", border: "none", cursor: "pointer",
+                background: viewMode === "list" ? ACCENT_DIM : "transparent",
+                color: viewMode === "list" ? ACCENT : MUTED,
+                display: "flex", alignItems: "center", gap: 6,
+                fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+                transition: "background 0.15s, color 0.15s",
               }}>
-              <List style={{ width: 12, height: 12 }} /> 목록
+              <List style={{ width: 12, height: 12 }} /> List
             </button>
           </div>
         </div>
@@ -248,7 +272,6 @@ export default function LockedPage() {
       {/* ── Gallery / List ────────────────────── */}
       <div style={{ flex: 1, padding: "0 16px 100px", overflowY: "auto" }}>
         {viewMode === "grid" ? (
-          /* Grid view */
           <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6" style={{ gap: 6 }}>
             {photos.map((photo, idx) => {
               const state    = photoStates[photo.id] ?? photo.tag;
@@ -258,42 +281,39 @@ export default function LockedPage() {
               const filename = photo.originalFilename ?? `photo_${photo.orderIndex}`;
               return (
                 <div key={photo.id} style={{
-                  background: SURFACE2,
-                  border: "2px solid rgba(79,126,255,0.4)",
-                  borderRadius: 8, overflow: "hidden", cursor: "default",
+                  background: BG_PANEL,
+                  border: `1px solid ${BORDER}`,
+                  overflow: "hidden", cursor: "default",
                 }}>
-                  {/* Image — 1:1 */}
                   <div style={{ aspectRatio: "1/1", position: "relative" }}>
                     <img
                       src={photo.url || getTestImageUrl(photo.id)}
                       alt=""
                       style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                     />
-                    {/* Check badge — top left */}
                     <div style={{
                       position: "absolute", top: 5, left: 5,
                       width: 18, height: 18,
-                      background: STEEL, borderRadius: "50%",
+                      background: ACCENT, borderRadius: "50%",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      border: "1.5px solid rgba(255,255,255,0.3)",
+                      border: "1.5px solid rgba(0,0,0,0.4)",
                     }}>
-                      <Check style={{ width: 9, height: 9, color: "white", strokeWidth: 3 }} />
+                      <Check style={{ width: 9, height: 9, color: "#000", strokeWidth: 3.5 }} />
                     </div>
-                    {/* Number — top right */}
                     <span style={{
                       position: "absolute", top: 4, right: 5,
-                      fontSize: 9, color: "rgba(255,255,255,0.5)",
-                      background: "rgba(0,0,0,0.35)", padding: "1px 4px", borderRadius: 3,
+                      fontFamily: MONO,
+                      fontSize: 9, color: "rgba(255,255,255,0.7)", fontWeight: 700,
+                      background: "rgba(0,0,0,0.55)", padding: "1px 5px",
+                      letterSpacing: "0.05em",
                     }}>{idx + 1}</span>
-                    {/* Stars — bottom left */}
                     {rating != null && rating > 0 && (
                       <div style={{ position: "absolute", bottom: 4, left: 4, display: "flex", gap: 1 }}>
                         {Array.from({ length: rating }).map((_, i) => (
-                          <span key={i} style={{ fontSize: 9, color: ORANGE, textShadow: "0 1px 2px rgba(0,0,0,0.8)" }}>★</span>
+                          <span key={i} style={{ fontSize: 10, color: ORANGE, textShadow: "0 1px 2px rgba(0,0,0,0.85)" }}>★</span>
                         ))}
                       </div>
                     )}
-                    {/* Color dots — bottom right */}
                     {colorTags.length > 0 && (
                       <div style={{ position: "absolute", bottom: 4, right: 4, display: "flex", gap: 1 }}>
                         {colorTags.map((tag) => (
@@ -306,15 +326,15 @@ export default function LockedPage() {
                       </div>
                     )}
                   </div>
-                  {/* Text strip — filename + comment */}
-                  <div style={{ padding: "4px 6px 5px", borderTop: `1px solid ${BORDER}`, background: "rgba(0,0,0,0.25)" }}>
+                  <div style={{ padding: "5px 7px 6px", borderTop: `1px solid ${BORDER}`, background: BG_INPUT }}>
                     <p style={{
-                      fontSize: 9, color: MUTED, margin: 0,
+                      fontFamily: MONO,
+                      fontSize: 9, color: MUTED, margin: 0, letterSpacing: "0.02em",
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                     }}>{filename}</p>
                     {comment && (
                       <p className="line-clamp-2" style={{
-                        fontSize: 9, color: DIM, margin: "2px 0 0", lineHeight: 1.4,
+                        fontSize: 10, color: DIM, margin: "2px 0 0", lineHeight: 1.4,
                       }}>{comment}</p>
                     )}
                   </div>
@@ -323,7 +343,6 @@ export default function LockedPage() {
             })}
           </div>
         ) : (
-          /* List view */
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {photos.map((photo, idx) => {
               const state    = photoStates[photo.id] ?? photo.tag;
@@ -333,17 +352,15 @@ export default function LockedPage() {
               return (
                 <div key={photo.id} style={{
                   display: "flex", alignItems: "flex-start", gap: 10,
-                  padding: "8px 10px",
-                  background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 8,
+                  padding: "10px 12px",
+                  background: BG_PANEL, border: `1px solid ${BORDER}`,
                 }}>
-                  {/* Thumb */}
-                  <div style={{ width: 44, height: 44, borderRadius: 5, overflow: "hidden", flexShrink: 0, background: SURFACE2 }}>
+                  <div style={{ width: 48, height: 48, overflow: "hidden", flexShrink: 0, background: BG_INPUT, border: `1px solid ${BORDER}` }}>
                     <img src={photo.url || getTestImageUrl(photo.id)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   </div>
-                  {/* Number + filename + comment */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, color: DIM, marginBottom: 2 }}>#{idx + 1}</div>
-                    <div style={{ fontSize: 12, color: TEXT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: comment ? 3 : 0 }}>
+                    <div style={{ fontFamily: MONO, fontSize: 10, color: DIM, marginBottom: 2, letterSpacing: "0.05em" }}>#{String(idx + 1).padStart(3, "0")}</div>
+                    <div style={{ fontFamily: MONO, fontSize: 12, color: TEXT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: comment ? 3 : 0 }}>
                       {photo.originalFilename ?? `photo_${photo.orderIndex}`}
                     </div>
                     {comment && (
@@ -352,7 +369,6 @@ export default function LockedPage() {
                       </div>
                     )}
                   </div>
-                  {/* Stars */}
                   {rating != null && rating > 0 && (
                     <div style={{ display: "flex", gap: 1, flexShrink: 0 }}>
                       {Array.from({ length: rating }).map((_, i) => (
@@ -360,7 +376,6 @@ export default function LockedPage() {
                       ))}
                     </div>
                   )}
-                  {/* Color dots */}
                   {colorTags.length > 0 && (
                     <div style={{ display: "flex", gap: 1, flexShrink: 0, alignItems: "center" }}>
                       {colorTags.map((tag) => (
@@ -371,12 +386,11 @@ export default function LockedPage() {
                       ))}
                     </div>
                   )}
-                  {/* Check */}
                   <div style={{
-                    width: 20, height: 20, background: STEEL, borderRadius: "50%", flexShrink: 0,
+                    width: 22, height: 22, background: ACCENT, borderRadius: "50%", flexShrink: 0,
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}>
-                    <Check style={{ width: 10, height: 10, color: "white", strokeWidth: 3 }} />
+                    <Check style={{ width: 11, height: 11, color: "#000", strokeWidth: 3.5 }} />
                   </div>
                 </div>
               );
@@ -388,57 +402,60 @@ export default function LockedPage() {
       {/* ── Fixed bottom bar ──────────────────── */}
       <div style={{
         position: "fixed", bottom: 0, left: 0, right: 0,
-        background: T.modalScrim, borderTop: "1px solid rgba(79,126,255,0.15)",
+        background: "rgba(10,10,10,0.94)",
+        borderTop: `1px solid rgba(255,77,0,0.2)`,
         backdropFilter: "blur(12px)",
-        padding: "10px 20px", zIndex: 100,
+        padding: "10px 20px",
+        paddingBottom: "calc(10px + env(safe-area-inset-bottom, 0px))",
+        zIndex: 100,
         display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
       }}>
-        {/* Left */}
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          {/* Confirmed info */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{
               width: 28, height: 28, background: GREEN_DIM,
-              border: "1px solid rgba(46,213,115,0.3)", borderRadius: "50%", flexShrink: 0,
+              border: `1px solid rgba(0,255,102,0.4)`, borderRadius: "50%", flexShrink: 0,
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               <Check style={{ width: 13, height: 13, color: GREEN }} />
             </div>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: GREEN }}>{N}장 확정 완료</div>
-              <div style={{ fontSize: 11, color: MUTED, marginTop: 1 }}>{confirmedDate} 확정</div>
+              <div style={{ fontFamily: DISPLAY, fontSize: 13, fontWeight: 700, color: GREEN, letterSpacing: "-0.02em" }}>
+                {N}장 확정 완료
+              </div>
+              <div style={{ fontFamily: MONO, fontSize: 10, color: MUTED, marginTop: 1, letterSpacing: "0.05em" }}>{confirmedDate}</div>
             </div>
           </div>
-          {/* Divider */}
           <span style={{ width: 1, height: 28, background: BORDER, display: "inline-block", flexShrink: 0 }} />
-          {/* Cancel count */}
           {isConfirmed && (
-            <div style={{ fontSize: 12, color: MUTED }}>
-              취소 가능 <strong style={{ color: atCancelLimit ? MUTED : ORANGE }}>
+            <div style={{ fontFamily: MONO, fontSize: 11, color: MUTED, letterSpacing: "0.05em" }}>
+              취소 가능 <strong style={{ color: atCancelLimit ? MUTED : ACCENT, fontWeight: 700 }}>
                 {atCancelLimit ? "불가" : `${remainingCancels}회`}
               </strong> 남음
             </div>
           )}
           {isEditing && (
-            <div style={{ fontSize: 12, color: MUTED }}>보정 진행 중</div>
+            <div style={{ fontFamily: MONO, fontSize: 11, color: MUTED, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+              EDITING IN PROGRESS
+            </div>
           )}
         </div>
 
-        {/* Right: cancel button */}
         {isConfirmed && (
           <button
             type="button"
             disabled={!canCancel}
             onClick={() => canCancel && setCancelModalOpen(true)}
+            className="locked-cancel-btn"
             style={{
               padding: "8px 16px", background: "transparent",
-              border: `1px solid ${canCancel ? "rgba(255,71,87,0.25)" : BORDER}`,
-              borderRadius: 8,
+              border: `1px solid ${canCancel ? "rgba(255,71,87,0.4)" : BORDER}`,
               color: canCancel ? RED : DIM,
-              fontSize: 12, fontWeight: 500, cursor: canCancel ? "pointer" : "not-allowed",
+              fontFamily: MONO,
+              fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+              cursor: canCancel ? "pointer" : "not-allowed",
               display: "flex", alignItems: "center", gap: 5,
               transition: "all 0.15s", opacity: canCancel ? 1 : 0.5,
-              fontFamily: "inherit",
             }}>
             확정 취소
           </button>
@@ -449,55 +466,64 @@ export default function LockedPage() {
       {cancelModalOpen && (
         <div
           style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
-            backdropFilter: "blur(4px)", display: "flex",
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.82)",
+            backdropFilter: "blur(6px)", display: "flex",
             alignItems: "center", justifyContent: "center",
             zIndex: 200, padding: 16,
           }}
           onClick={(e) => { if (e.target === e.currentTarget) setCancelModalOpen(false); }}>
           <div style={{
-            background: SURFACE, border: `1px solid ${BORDER_MD}`,
-            borderRadius: 16, padding: 28, maxWidth: 380, width: "90%", textAlign: "center",
+            background: BG_PANEL, border: `1px solid ${ACCENT}`,
+            padding: 32, maxWidth: 400, width: "100%", textAlign: "center",
+            position: "relative",
           }}>
-            {/* Icon */}
+            <span style={modalBracketStyle("tl")} />
+            <span style={modalBracketStyle("tr")} />
+            <span style={modalBracketStyle("bl")} />
+            <span style={modalBracketStyle("br")} />
+
             <div style={{
               width: 48, height: 48, background: RED_DIM,
-              border: "1px solid rgba(255,71,87,0.3)", borderRadius: "50%",
+              border: `1px solid rgba(255,71,87,0.4)`, borderRadius: "50%",
               margin: "0 auto 16px",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               <AlertTriangle style={{ width: 20, height: 20, color: RED }} />
             </div>
-            <h3 style={{ ...playfair, fontSize: 18, color: TEXT, marginBottom: 8 }}>확정을 취소하시겠습니까?</h3>
-            <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.6, marginBottom: 20 }}>
-              취소 후 다시 사진을 선택하고 확정할 수 있습니다.
+            <h3 style={{ fontFamily: DISPLAY, fontWeight: 900, fontSize: 22, fontStyle: "italic", textTransform: "uppercase", color: TEXT, marginBottom: 8, letterSpacing: "-0.02em" }}>
+              Cancel Confirm
+            </h3>
+            <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.7, marginBottom: 20 }}>
+              확정을 취소하고 다시 사진을 선택할 수 있습니다.
             </p>
-            {/* Warning */}
             <div style={{
-              padding: "10px 14px", background: ORANGE_DIM,
-              border: "1px solid rgba(245,166,35,0.2)", borderRadius: 8,
-              fontSize: 12, color: ORANGE, marginBottom: 20, lineHeight: 1.5, textAlign: "left",
+              padding: "12px 14px", background: ORANGE_DIM,
+              border: `1px solid rgba(255,170,0,0.3)`,
+              fontFamily: MONO,
+              fontSize: 11, color: ORANGE, marginBottom: 24, lineHeight: 1.6, textAlign: "left", letterSpacing: "0.02em",
             }}>
               취소 가능 횟수가 차감됩니다.<br />
-              현재 {remainingCancels}회 남음 · 0회가 되면 취소 불가합니다.
+              현재 <strong>{remainingCancels}회</strong> 남음 · 0회가 되면 취소 불가합니다.
             </div>
-            {/* Buttons */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <button type="button" onClick={() => setCancelModalOpen(false)}
+                className="locked-modal-secondary"
                 style={{
-                  height: 42, borderRadius: 9, fontSize: 13, fontWeight: 500,
-                  background: "transparent", border: `1px solid ${BORDER}`, color: MUTED,
-                  cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
+                  height: 46,
+                  fontFamily: MONO, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
+                  background: "transparent", border: `1px solid ${BORDER_HI}`, color: MUTED,
+                  cursor: "pointer", transition: "all 0.15s",
                 }}>
                 유지하기
               </button>
               <button type="button" onClick={handleConfirmCancel} disabled={cancelling}
                 style={{
-                  height: 42, borderRadius: 9, fontSize: 13, fontWeight: 500,
-                  background: RED_DIM, border: "1px solid rgba(255,71,87,0.3)", color: RED,
+                  height: 46,
+                  fontFamily: MONO, fontSize: 12, fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase",
+                  background: ACCENT, border: "none", color: "#000",
                   cursor: cancelling ? "not-allowed" : "pointer",
                   opacity: cancelling ? 0.6 : 1,
-                  transition: "all 0.15s", fontFamily: "inherit",
+                  transition: "all 0.15s",
                 }}>
                 {cancelling ? "처리 중..." : "취소하기"}
               </button>
@@ -505,6 +531,17 @@ export default function LockedPage() {
           </div>
         </div>
       )}
+
+      <style jsx global>{`
+        .locked-cancel-btn:hover:not(:disabled) {
+          border-color: ${RED} !important;
+          background: ${RED_DIM} !important;
+        }
+        .locked-modal-secondary:hover {
+          background: ${TEXT} !important;
+          color: #000 !important;
+        }
+      `}</style>
     </div>
   );
 }
