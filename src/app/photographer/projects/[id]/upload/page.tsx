@@ -13,6 +13,7 @@ import {
   Lock,
   RefreshCw,
   CheckCircle2,
+  LayoutGrid,
   List,
   Upload,
   X,
@@ -314,12 +315,14 @@ function VirtualizedPhotoGrid({
   onDelete,
   deletingId,
   isEditMode,
+  minCols = 1,
 }: {
   scrollRef: React.RefObject<HTMLDivElement | null>;
   photos: Photo[];
   onDelete: (id: string) => void;
   deletingId: string | null;
   isEditMode: boolean;
+  minCols?: number;
 }) {
   const [layout, setLayout] = useState(() => {
     const cw = GRID_MIN_CELL;
@@ -333,7 +336,7 @@ function VirtualizedPhotoGrid({
     const update = () => {
       const w = root.clientWidth - GRID_PAD * 2;
       if (w <= 0) return;
-      const cols = Math.max(1, Math.floor((w + GRID_GAP) / (GRID_MIN_CELL + GRID_GAP)));
+      const cols = Math.max(minCols, Math.floor((w + GRID_GAP) / (GRID_MIN_CELL + GRID_GAP)));
       const cellWidth = (w - GRID_GAP * (cols - 1)) / cols;
       const rowHeight = Math.ceil(cellWidth + GRID_FILENAME_H) + GRID_GAP;
       setLayout((prev) =>
@@ -571,6 +574,7 @@ export default function ProjectDetailPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [photosLoading, setPhotosLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [isMobile, setIsMobile] = useState(false);
   const [isPhotoEditMode, setIsPhotoEditMode] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -608,6 +612,13 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); }
   }, [toast]);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     const uploading = uploadPhase === "sending" || uploadPhase === "processing";
@@ -906,6 +917,7 @@ export default function ProjectDetailPage() {
         @media (max-width: 768px) {
           .prj-aside { display: none !important; }
           .prj-desktop-toolbar { display: none !important; }
+          .prj-view-toolbar { display: none !important; }
           .prj-mobile-upload {
             display: flex !important;
             flex-direction: column;
@@ -1159,6 +1171,25 @@ export default function ProjectDetailPage() {
             </div>
           </div>
 
+          {/* ── 뷰 토글 툴바 ── */}
+          {photos.length > 0 && (
+            <div className="prj-desktop-toolbar prj-view-toolbar" style={{ height: 44, borderBottom: `1px solid ${BORDER}`, background: SURFACE_1, display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 16, paddingRight: 16, flexShrink: 0 }}>
+              <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED }}>{photos.length.toLocaleString()}장</span>
+              <div style={{ display: "flex", background: SURFACE_2, border: `1px solid ${BORDER}`, padding: 2, gap: 1 }}>
+                {([["grid", <LayoutGrid key="g" size={13} />, "갤러리"] as const, ["list", <List key="l" size={13} />, "파일명"] as const]).map(([mode, icon, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setViewMode(mode)}
+                    style={{ padding: "4px 10px", background: viewMode === mode ? ACCENT_DIM : "transparent", border: "none", cursor: "pointer", color: viewMode === mode ? ACCENT : TEXT_MUTED, display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontFamily: MONO, transition: "all 0.15s" }}
+                  >
+                    {icon}{label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* photo grid — 가상 스크롤로 보이는 행만 마운트·이미지 로드 */}
           <div ref={photoScrollRef} className="prj-scroll" style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "rgba(3,3,3,0.4)" }}>
             {photosLoading ? (
@@ -1203,6 +1234,7 @@ export default function ProjectDetailPage() {
                 onDelete={handleDeletePhoto}
                 deletingId={deletingId}
                 isEditMode={isPhotoEditMode}
+                minCols={isMobile ? 3 : 1}
               />
             ) : (
               <VirtualizedPhotoList
