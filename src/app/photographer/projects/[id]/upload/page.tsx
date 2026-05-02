@@ -197,36 +197,108 @@ function PhotoThumb({
   }, [scrollRootRef, shouldLoadSrc]);
 
   return (
-    <div ref={cellRef} className="prj-data-cell" style={{ aspectRatio: "3/2", background: "#080808", border: `1px solid ${BORDER}`, overflow: "hidden", position: "relative" }}>
-      <div className="prj-overlay" />
-      <div style={{ position: "absolute", top: 4, left: 4, background: "rgba(0,0,0,0.8)", padding: "2px 5px", border: `1px solid #222`, zIndex: 5 }}>
-        <span style={{ fontFamily: MONO, fontSize: 8, color: "#666" }}>
-          IDX_{String(photo.orderIndex ?? index + 1).padStart(3, "0")}
-        </span>
-      </div>
-      <div style={{ position: "absolute", inset: 0, background: "#111", transition: "opacity 0.25s", opacity: loaded ? 0 : 1, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-        <ImageIcon size={10} color="#333" />
-      </div>
-      {shouldLoadSrc && (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
-          src={photo.url}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          onLoad={(e) => { setLoaded(true); (e.currentTarget as HTMLImageElement).style.opacity = "1"; }}
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: 0, transition: "opacity 0.25s" }}
-        />
-      )}
-      {isEditMode && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(photo.id); }}
-          disabled={deleting}
-          style={{ position: "absolute", top: 4, right: 4, width: 20, height: 20, background: "rgba(255,71,87,0.9)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", zIndex: 10 }}
+    <div
+      ref={cellRef}
+      className="prj-data-cell"
+      style={{
+        background: "#080808",
+        border: `1px solid ${BORDER}`,
+        overflow: "hidden",
+        position: "relative",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* square thumb */}
+      <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: "#111" }}>
+        <div className="prj-overlay" />
+        {/* filename overlay */}
+        <div
+          style={{
+            position: "absolute",
+            left: 6,
+            right: 6,
+            bottom: 6,
+            zIndex: 6,
+            background: "rgba(0,0,0,0.72)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            padding: "4px 6px",
+            fontFamily: MONO,
+            fontSize: 9,
+            color: "#c9c9c9",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+          title={photo.originalFilename ?? undefined}
         >
-          {deleting ? <Loader2 size={9} style={{ animation: "spin 1s linear infinite" }} /> : <X size={11} strokeWidth={2.5} color="#fff" />}
-        </button>
-      )}
+          {photo.originalFilename ?? `FRAME_${String(index + 1).padStart(4, "0")}`}
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "#111",
+            transition: "opacity 0.25s",
+            opacity: loaded ? 0 : 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: "none",
+          }}
+        >
+          <ImageIcon size={10} color="#333" />
+        </div>
+        {shouldLoadSrc && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={photo.url}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onLoad={(e) => {
+              setLoaded(true);
+              (e.currentTarget as HTMLImageElement).style.opacity = "1";
+            }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: "block",
+              opacity: 0,
+              transition: "opacity 0.25s",
+            }}
+          />
+        )}
+        {isEditMode && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(photo.id);
+            }}
+            disabled={deleting}
+            style={{
+              position: "absolute",
+              top: 4,
+              right: 4,
+              width: 20,
+              height: 20,
+              background: "rgba(255,71,87,0.9)",
+              border: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              zIndex: 10,
+            }}
+            aria-label="사진 삭제"
+          >
+            {deleting ? <Loader2 size={9} style={{ animation: "spin 1s linear infinite" }} /> : <X size={11} strokeWidth={2.5} color="#fff" />}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -235,6 +307,7 @@ function PhotoThumb({
 const GRID_MIN_CELL = 148;
 const GRID_GAP = 4;
 const GRID_PAD = 16;
+const GRID_FILENAME_H = 0; // filename is overlayed on image
 
 function VirtualizedPhotoGrid({
   scrollRef,
@@ -251,7 +324,7 @@ function VirtualizedPhotoGrid({
 }) {
   const [layout, setLayout] = useState(() => {
     const cw = GRID_MIN_CELL;
-    return { cols: 4, cellWidth: cw, rowHeight: Math.ceil(cw * (2 / 3)) + GRID_GAP };
+    return { cols: 4, cellWidth: cw, rowHeight: Math.ceil(cw + GRID_FILENAME_H) + GRID_GAP };
   });
 
   useLayoutEffect(() => {
@@ -263,7 +336,7 @@ function VirtualizedPhotoGrid({
       if (w <= 0) return;
       const cols = Math.max(1, Math.floor((w + GRID_GAP) / (GRID_MIN_CELL + GRID_GAP)));
       const cellWidth = (w - GRID_GAP * (cols - 1)) / cols;
-      const rowHeight = Math.ceil(cellWidth * (2 / 3)) + GRID_GAP;
+      const rowHeight = Math.ceil(cellWidth + GRID_FILENAME_H) + GRID_GAP;
       setLayout((prev) =>
         prev.cols !== cols || prev.rowHeight !== rowHeight ? { cols, cellWidth, rowHeight } : prev,
       );
@@ -429,7 +502,7 @@ function VirtualizedPhotoList({
                 onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = BORDER; }}
               >
                 <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED, width: 50, flexShrink: 0 }}>
-                  IDX_{String(photo.orderIndex ?? i + 1).padStart(3, "0")}
+                  {String(photo.orderIndex ?? i + 1).padStart(3, "0")}
                 </span>
                 <div
                   style={{
@@ -502,6 +575,7 @@ export default function ProjectDetailPage() {
   const [isPhotoEditMode, setIsPhotoEditMode] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [uploadPhase, setUploadPhase] = useState<"idle" | "sending" | "processing" | "done">("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -685,14 +759,14 @@ export default function ProjectDetailPage() {
     if (!chosen?.length) return;
     const list = Array.from(chosen).filter((f) => f.type.startsWith("image/") || f.type === "");
     if (fileInputRef.current) fileInputRef.current.value = "";
-    if (list.length) startUpload(list);
+    if (list.length) setPendingFiles(list);
   };
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setDragOver(false);
     const list = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/") || f.type === "");
-    if (list.length) startUpload(list);
-  }, [startUpload]);
+    if (list.length) setPendingFiles(list);
+  }, []);
 
   const onDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(true); }, []);
   const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(false); }, []);
@@ -876,13 +950,31 @@ export default function ProjectDetailPage() {
 
           {/* ACTIVE_PROJECT */}
           <section style={{ background: SURFACE_1, padding: 20, borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <div style={{ width: 6, height: 6, background: ACCENT }} />
+            {/* Row 1: Project ID */}
+            {project.displayId && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 10 }}>
+                <span style={{ fontFamily: MONO, fontSize: 10, color: "#444" }}>ID: {project.displayId}</span>
               </div>
-              {project.displayId && <span style={{ fontFamily: MONO, fontSize: 10, color: "#444" }}>ID: {project.displayId}</span>}
+            )}
+
+            {/* Row 2: Accent dot + Project name */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, minWidth: 0 }}>
+              <div style={{ width: 6, height: 6, background: ACCENT, flexShrink: 0 }} />
+              <h1
+                style={{
+                  fontFamily: "'Space Grotesk', 'Pretendard Variable', sans-serif",
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: TEXT_BRIGHT,
+                  lineHeight: 1.3,
+                  margin: 0,
+                  wordBreak: "break-word",
+                  minWidth: 0,
+                }}
+              >
+                {project.name}
+              </h1>
             </div>
-            <h1 style={{ fontFamily: "'Space Grotesk', 'Pretendard Variable', sans-serif", fontSize: 20, fontWeight: 700, color: TEXT_BRIGHT, lineHeight: 1.3, marginBottom: 14, wordBreak: "break-word" }}>{project.name}</h1>
 
             <div style={{ background: SURFACE_2, border: `1px solid #222`, padding: "10px 12px", marginBottom: 12 }}>
               <span className="prj-tech-label" style={{ color: "#555", display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}><Link2 size={9} />초대 링크</span>
@@ -1134,6 +1226,46 @@ export default function ProjectDetailPage() {
       {toast && (
         <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#080808", border: `1px solid ${BORDER_MID}`, padding: "10px 20px", zIndex: 200, fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT, pointerEvents: "none", whiteSpace: "nowrap" }}>
           {toast}
+        </div>
+      )}
+
+      {/* ── 업로드 확인 모달 ── */}
+      {pendingFiles.length > 0 && (
+        <div className="prj-modal-overlay">
+          <div className="prj-modal-box" style={{ maxWidth: 380 }}>
+            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 6, height: 6, background: ACCENT }} />
+              <span className="prj-tech-label" style={{ color: ACCENT }}>업로드 확인</span>
+            </div>
+            <div style={{ padding: 24 }}>
+              <p style={{ fontSize: 15, fontWeight: 600, color: TEXT_BRIGHT, marginBottom: 8 }}>
+                {pendingFiles.length.toLocaleString()}장을 업로드할까요?
+              </p>
+              <p style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, lineHeight: 1.7, marginBottom: 24 }}>
+                업로드 후에는 취소할 수 없습니다.<br />
+                잘못된 파일이 포함됐다면 취소 후 다시 선택해주세요.
+              </p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setPendingFiles([])}
+                  className="prj-btn-secondary"
+                  style={{ flex: 1, padding: "10px 0" }}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { const f = pendingFiles; setPendingFiles([]); startUpload(f); }}
+                  className="prj-btn-primary"
+                  style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                >
+                  <Upload size={12} />
+                  업로드
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
