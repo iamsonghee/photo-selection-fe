@@ -13,7 +13,6 @@ import {
   Lock,
   RefreshCw,
   CheckCircle2,
-  LayoutGrid,
   List,
   Upload,
   X,
@@ -906,11 +905,16 @@ export default function ProjectDetailPage() {
         .prj-dropzone-over { border-color: rgba(255,77,0,0.5) !important; background: ${ACCENT_DIM} !important; }
         @media (max-width: 768px) {
           .prj-aside { display: none !important; }
-          .prj-main-col { width: 100% !important; }
-          .prj-file-table th:nth-child(3),
-          .prj-file-table td:nth-child(3),
-          .prj-file-table th:nth-child(4),
-          .prj-file-table td:nth-child(4) { display: none !important; }
+          .prj-desktop-toolbar { display: none !important; }
+          .prj-mobile-upload {
+            display: flex !important;
+            flex-direction: column;
+            gap: 14px;
+            padding: 20px;
+            background: ${SURFACE_1};
+            border-bottom: 1px solid ${BORDER};
+            flex-shrink: 0;
+          }
           .prj-modal-box { max-width: 100% !important; margin: 0 8px !important; }
           .prj-btn-primary, .prj-btn-secondary, .prj-btn-danger { min-height: 44px !important; padding: 0 16px !important; }
         }
@@ -927,7 +931,7 @@ export default function ProjectDetailPage() {
         title="사진 업로드"
         stats={[
           { label: "업로드", value: `${M}장` },
-          { label: "목표", value: `${N}장`, accent: M >= N && N > 0 },
+          { label: "고객 셀렉", value: `${N}장`, accent: M >= N && N > 0 },
         ]}
       />
 
@@ -935,7 +939,7 @@ export default function ProjectDetailPage() {
       <main style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden", zIndex: 10, position: "relative" }}>
 
         {/* ── Left Panel ── */}
-        <aside className="prj-scroll" style={{ width: 360, flexShrink: 0, borderRight: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", overflowY: "auto" }}>
+        <aside className="prj-scroll prj-aside" style={{ width: 360, flexShrink: 0, borderRight: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", overflowY: "auto" }}>
 
           {/* ACTIVE_PROJECT */}
           <section style={{ background: SURFACE_1, padding: 20, borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
@@ -1051,8 +1055,9 @@ export default function ProjectDetailPage() {
             {/* progress bar */}
             <div style={{ background: SURFACE_2, border: `1px solid ${BORDER}`, padding: 12, marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 8 }}>
-                <div>
-                  <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT }}>{M} / {N > 0 ? N : "—"} 장</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT }}>{M}장 업로드됨</span>
+                  {N > 0 && <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED }}>고객 셀렉 대상: {N}장</span>}
                 </div>
                 <span className="prj-tech-label" style={{ color: isUploading ? ACCENT : TEXT_MUTED }}>
                   {isUploading ? (showServerWorking ? "···" : `${uploadProgress}%`) : `${progressPct}%`}
@@ -1092,43 +1097,65 @@ export default function ProjectDetailPage() {
 
           </section>
 
-          {/* ACTION_FLOW compact — 숨김 처리 */}
+          {/* 편집 / 전체삭제 */}
+          {project.status === "preparing" && photos.length > 0 && (
+            <div style={{ padding: "10px 20px", borderTop: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+              <button type="button" onClick={() => setIsPhotoEditMode((v) => !v)} className={isPhotoEditMode ? "prj-btn-primary" : "prj-btn-secondary"} style={{ padding: "5px 12px", fontSize: 11 }}>
+                {isPhotoEditMode ? "편집 완료" : "사진 편집"}
+              </button>
+              {isPhotoEditMode && (
+                <button type="button" onClick={handleFlushAll} disabled={deletingId === "__all__"} style={{ fontFamily: MONO, fontSize: 10, background: "transparent", border: "none", color: "#ff4444", cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                  <Trash2 size={11} />전체 삭제
+                </button>
+              )}
+            </div>
+          )}
         </aside>
 
         {/* ── Right Panel ── */}
         <section style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, overflow: "hidden" }}>
-          {/* toolbar */}
-          <div style={{ height: 52, borderBottom: `1px solid ${BORDER}`, background: SURFACE_1, display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 20, paddingRight: 20, flexShrink: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <div>
-                <span className="prj-tech-label" style={{ color: TEXT_BRIGHT, fontSize: "0.65rem" }}>업로드된 사진</span>
-              </div>
-              <div style={{ width: 1, height: 24, background: BORDER }} />
-              <div style={{ display: "flex", alignItems: "center", gap: 6, background: SURFACE_2, border: `1px solid ${BORDER}`, padding: "4px 10px" }}>
-                <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT }}>{photos.length.toLocaleString()}장</span>
-              </div>
+
+          {/* ── 모바일 전용 업로드 영역 ── */}
+          <div className="prj-mobile-upload" style={{ display: "none" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 5, height: 5, background: ACCENT, flexShrink: 0 }} />
+              <span style={{ fontSize: 16, fontWeight: 700, color: TEXT_BRIGHT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {project.name}
+              </span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {project.status === "preparing" && photos.length > 0 && (
-                <>
-                  <button type="button" onClick={() => setIsPhotoEditMode((v) => !v)} className={isPhotoEditMode ? "prj-btn-primary" : "prj-btn-secondary"} style={{ padding: "4px 10px" }}>
-                    {isPhotoEditMode ? "편집 중" : "편집"}
-                  </button>
-                  {isPhotoEditMode && (
-                    <button type="button" onClick={handleFlushAll} disabled={deletingId === "__all__"} style={{ fontFamily: MONO, fontSize: 10, background: "transparent", border: "none", color: "#ff4444", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, letterSpacing: "0.1em" }}>
-                      <Trash2 size={11} />전체 삭제
-                    </button>
-                  )}
-                  <div style={{ width: 1, height: 20, background: BORDER }} />
-                </>
-              )}
-              <div style={{ display: "flex", background: SURFACE_2, border: `1px solid ${BORDER}`, padding: 2, gap: 1 }}>
-                {([["grid", <LayoutGrid key="g" size={13} />], ["list", <List key="l" size={13} />]] as [string, React.ReactNode][]).map(([mode, icon]) => (
-                  <button key={mode} type="button" onClick={() => setViewMode(mode as "grid" | "list")} style={{ padding: "4px 8px", background: viewMode === mode ? ACCENT_DIM : "transparent", border: "none", cursor: "pointer", color: viewMode === mode ? ACCENT : TEXT_MUTED, display: "flex", alignItems: "center", transition: "all 0.15s" }}>
-                    {icon}
-                  </button>
-                ))}
+            <div
+              className={`prj-dropzone${dragOver ? " prj-dropzone-over" : ""}`}
+              onClick={() => !isUploading && fileInputRef.current?.click()}
+              onDrop={onDrop}
+              onDragOver={onDragOver}
+              onDragLeave={onDragLeave}
+              style={{ padding: "40px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12, cursor: isUploading ? "not-allowed" : "pointer", background: dragOver ? ACCENT_DIM : "rgba(2,2,2,0.5)", opacity: isUploading ? 0.7 : 1 }}
+            >
+              <div style={{ width: 60, height: 60, borderRadius: "50%", border: `1px solid ${isUploading ? ACCENT : "#333"}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {isUploading
+                  ? <Loader2 size={26} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} />
+                  : <Upload size={26} color={ACCENT} />}
               </div>
+              <p style={{ fontSize: 15, fontWeight: 600, color: TEXT_BRIGHT, textAlign: "center" }}>
+                {isUploading ? (showServerWorking ? "서버 처리 중..." : "업로드 중...") : "탭하여 사진 선택"}
+              </p>
+              <p style={{ fontSize: 12, color: TEXT_MUTED, textAlign: "center" }}>
+                {isUploading
+                  ? (showServerWorking ? "썸네일·저장 처리 중 · 창을 닫지 마세요" : `${uploadProgress}%`)
+                  : "JPG · PNG · HEIC 지원"}
+              </p>
+            </div>
+            <div style={{ background: SURFACE_2, border: `1px solid ${BORDER}`, padding: "12px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ fontFamily: MONO, fontSize: 12, color: TEXT_BRIGHT }}>{M}장 / {N > 0 ? N : "—"}장</span>
+                <span style={{ fontFamily: MONO, fontSize: 12, color: isUploading ? ACCENT : TEXT_MUTED }}>
+                  {isUploading ? `${uploadProgress}%` : `${progressPct}%`}
+                </span>
+              </div>
+              <div style={{ height: 3, background: "#111", overflow: "hidden" }}>
+                <div style={{ width: `${isUploading ? uploadProgress : progressPct}%`, height: "100%", background: ACCENT, transition: "width 0.3s" }} />
+              </div>
+              {uploadError && <p style={{ fontFamily: MONO, fontSize: 10, color: "#FF3333", marginTop: 8 }}>{uploadError}</p>}
             </div>
           </div>
 
@@ -1139,10 +1166,35 @@ export default function ProjectDetailPage() {
                 <span className="prj-tech-label" style={{ color: TEXT_MUTED }}>불러오는 중...</span>
               </div>
             ) : photos.length === 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 10 }}>
-                <div style={{ width: 48, height: 48, border: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "center" }}><Upload size={18} color={TEXT_MUTED} /></div>
-                <span className="prj-tech-label" style={{ color: "#333" }}>사진 없음</span>
-                <p style={{ fontFamily: MONO, fontSize: 10, color: "#2a2a2a", textAlign: "center" }}>왼쪽 드롭존에서 사진을 업로드하면 여기에 표시됩니다</p>
+              <div
+                onClick={() => !isUploading && fileInputRef.current?.click()}
+                onDrop={onDrop}
+                onDragOver={onDragOver}
+                onDragLeave={onDragLeave}
+                style={{
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  height: "100%", gap: 16,
+                  cursor: isUploading ? "not-allowed" : "pointer",
+                  background: dragOver ? ACCENT_DIM : "transparent",
+                  border: `2px dashed ${dragOver ? ACCENT : BORDER_MID}`,
+                  margin: 24,
+                  transition: "all 0.2s",
+                }}
+              >
+                <div style={{ width: 64, height: 64, borderRadius: "50%", border: `1px solid ${dragOver ? ACCENT : "#2a2a2a"}`, display: "flex", alignItems: "center", justifyContent: "center", transition: "border-color 0.2s" }}>
+                  {isUploading
+                    ? <Loader2 size={24} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} />
+                    : <Upload size={24} color={dragOver ? ACCENT : "#444"} />
+                  }
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 15, color: dragOver ? ACCENT : "#666", marginBottom: 6 }}>
+                    {isUploading ? "업로드 중..." : "사진을 드래그하거나 클릭해서 업로드"}
+                  </p>
+                  <p style={{ fontFamily: MONO, fontSize: 10, color: "#333" }}>
+                    JPG · PNG · HEIC 지원
+                  </p>
+                </div>
               </div>
             ) : viewMode === "grid" ? (
               <VirtualizedPhotoGrid
