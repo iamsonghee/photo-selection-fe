@@ -929,17 +929,6 @@ export default function ProjectDetailPage() {
           { label: "업로드", value: `${M}장` },
           { label: "목표", value: `${N}장`, accent: M >= N && N > 0 },
         ]}
-        actions={
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            className="flex items-center gap-2 bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-50 text-black px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all"
-          >
-            <Upload size={14} />
-            사진 업로드
-          </button>
-        }
       />
 
       {/* main */}
@@ -1034,10 +1023,10 @@ export default function ProjectDetailPage() {
               onDrop={onDrop}
               onDragOver={onDragOver}
               onDragLeave={onDragLeave}
-              style={{ background: dragOver ? ACCENT_DIM : "rgba(2,2,2,0.5)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: "24px 16px", cursor: isUploading ? "not-allowed" : "pointer", marginBottom: 14, opacity: isUploading ? 0.7 : 1 }}
+              style={{ background: dragOver ? ACCENT_DIM : "rgba(2,2,2,0.5)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: "48px 16px", minHeight: 160, cursor: isUploading ? "not-allowed" : "pointer", marginBottom: 14, opacity: isUploading ? 0.7 : 1 }}
             >
-              <div style={{ width: 40, height: 40, borderRadius: "50%", border: `1px solid #222`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {isUploading ? <Loader2 size={16} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} /> : <Upload size={16} color="#444" />}
+              <div style={{ width: 52, height: 52, borderRadius: "50%", border: `1px solid #222`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {isUploading ? <Loader2 size={20} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} /> : <Upload size={20} color="#444" />}
               </div>
               <div style={{ textAlign: "center" }}>
                 <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 13, color: isUploading ? TEXT_NORMAL : "#888", marginBottom: 4 }}>
