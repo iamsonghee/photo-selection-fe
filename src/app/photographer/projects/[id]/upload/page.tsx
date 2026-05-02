@@ -274,6 +274,7 @@ function PhotoThumb({
         )}
         {isEditMode && (
           <button
+            className="prj-del-btn"
             onClick={(e) => {
               e.stopPropagation();
               onDelete(photo.id);
@@ -531,17 +532,21 @@ function VirtualizedPhotoList({
                     onClick={() => onDelete(photo.id)}
                     disabled={deleting}
                     style={{
-                      background: "rgba(255,71,87,0.15)",
-                      border: "1px solid rgba(255,71,87,0.3)",
-                      color: "#FF4757",
+                      background: "transparent",
+                      border: "none",
+                      color: TEXT_MUTED,
                       cursor: "pointer",
-                      padding: "3px 8px",
+                      padding: "3px 6px",
                       flexShrink: 0,
                       display: "flex",
                       alignItems: "center",
+                      opacity: deleting ? 0.5 : 1,
+                      transition: "color 0.15s",
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#FF4757"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = TEXT_MUTED; }}
                   >
-                    {deleting ? <Loader2 size={10} style={{ animation: "spin 1s linear infinite" }} /> : <X size={10} />}
+                    {deleting ? <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> : <X size={13} />}
                   </button>
                 )}
               </div>
@@ -575,7 +580,6 @@ export default function ProjectDetailPage() {
   const [photosLoading, setPhotosLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isMobile, setIsMobile] = useState(false);
-  const [isPhotoEditMode, setIsPhotoEditMode] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -899,6 +903,9 @@ export default function ProjectDetailPage() {
         .prj-data-cell .prj-overlay { position: absolute; inset: 4px; border: 1px solid transparent; transition: all 0.3s; pointer-events: none; }
         .prj-data-cell:hover .prj-overlay { border-color: rgba(255,77,0,0.3); inset: 0px; }
         .prj-data-cell:hover { border-color: rgba(255,77,0,0.4) !important; }
+        .prj-del-btn { opacity: 0; transition: opacity 0.15s; }
+        .prj-data-cell:hover .prj-del-btn { opacity: 1; }
+        @media (max-width: 768px) { .prj-del-btn { opacity: 1; } }
         .prj-op-node { transition: all 0.2s; cursor: pointer; }
         .prj-op-node:hover { border-color: rgba(255,77,0,0.4) !important; background: rgba(255,77,0,0.04) !important; }
         .prj-op-node:hover .prj-op-arrow { color: ${ACCENT} !important; }
@@ -1109,19 +1116,6 @@ export default function ProjectDetailPage() {
 
           </section>
 
-          {/* 편집 / 전체삭제 */}
-          {project.status === "preparing" && photos.length > 0 && (
-            <div style={{ padding: "10px 20px", borderTop: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-              <button type="button" onClick={() => setIsPhotoEditMode((v) => !v)} className={isPhotoEditMode ? "prj-btn-primary" : "prj-btn-secondary"} style={{ padding: "5px 12px", fontSize: 11 }}>
-                {isPhotoEditMode ? "편집 완료" : "사진 편집"}
-              </button>
-              {isPhotoEditMode && (
-                <button type="button" onClick={handleFlushAll} disabled={deletingId === "__all__"} style={{ fontFamily: MONO, fontSize: 10, background: "transparent", border: "none", color: "#ff4444", cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
-                  <Trash2 size={11} />전체 삭제
-                </button>
-              )}
-            </div>
-          )}
         </aside>
 
         {/* ── Right Panel ── */}
@@ -1174,7 +1168,21 @@ export default function ProjectDetailPage() {
           {/* ── 뷰 토글 툴바 ── */}
           {photos.length > 0 && (
             <div className="prj-desktop-toolbar prj-view-toolbar" style={{ height: 44, borderBottom: `1px solid ${BORDER}`, background: SURFACE_1, display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 16, paddingRight: 16, flexShrink: 0 }}>
-              <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED }}>{photos.length.toLocaleString()}장</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED }}>{photos.length.toLocaleString()}장</span>
+                {project.status === "preparing" && (
+                  <button
+                    type="button"
+                    onClick={handleFlushAll}
+                    disabled={deletingId === "__all__"}
+                    style={{ fontFamily: MONO, fontSize: 10, background: "transparent", border: "none", color: TEXT_MUTED, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, opacity: deletingId === "__all__" ? 0.5 : 1, transition: "color 0.15s" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#FF4757"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = TEXT_MUTED; }}
+                  >
+                    <Trash2 size={11} />전체삭제
+                  </button>
+                )}
+              </div>
               <div style={{ display: "flex", background: SURFACE_2, border: `1px solid ${BORDER}`, padding: 2, gap: 1 }}>
                 {([["grid", <LayoutGrid key="g" size={13} />, "갤러리"] as const, ["list", <List key="l" size={13} />, "파일명"] as const]).map(([mode, icon, label]) => (
                   <button
@@ -1233,7 +1241,7 @@ export default function ProjectDetailPage() {
                 photos={photos}
                 onDelete={handleDeletePhoto}
                 deletingId={deletingId}
-                isEditMode={isPhotoEditMode}
+                isEditMode={project.status === "preparing"}
                 minCols={isMobile ? 3 : 1}
               />
             ) : (
@@ -1242,7 +1250,7 @@ export default function ProjectDetailPage() {
                 photos={photos}
                 onDelete={handleDeletePhoto}
                 deletingId={deletingId}
-                isEditMode={isPhotoEditMode}
+                isEditMode={project.status === "preparing"}
               />
             )}
           </div>
