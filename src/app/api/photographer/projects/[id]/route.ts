@@ -118,9 +118,11 @@ export async function PATCH(
     if (typeof body.deadline === "string") payload.deadline = body.deadline;
     if (typeof body.required_count === "number") {
       const photoCount = (project as { photo_count: number | null }).photo_count ?? 0;
-      if (photoCount < body.required_count) {
+      const projectStatus = (project as { status: string }).status;
+      // preparing 상태에서는 아직 업로드 전이므로 셀렉수를 자유롭게 설정 가능
+      if (projectStatus !== "preparing" && photoCount < body.required_count) {
         return NextResponse.json(
-          { error: `업로드 수(M=${photoCount}) 이상으로 N을 설정해주세요.` },
+          { error: `업로드 수(${photoCount}장) 이상으로 셀렉 수를 설정할 수 없습니다.` },
           { status: 400 }
         );
       }
