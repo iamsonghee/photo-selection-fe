@@ -8,6 +8,7 @@ import {
   Link2,
   Eye,
   EyeOff,
+  ChevronLeft,
   ChevronRight,
   Trash2,
   Lock,
@@ -163,6 +164,7 @@ function PhotoThumb({
   deletingId,
   isEditMode,
   scrollRootRef,
+  onPhotoClick,
 }: {
   photo: Photo;
   index: number;
@@ -171,6 +173,7 @@ function PhotoThumb({
   isEditMode: boolean;
   /** DATABANK 스크롤 박스 — 없으면 즉시 로드 */
   scrollRootRef?: React.RefObject<HTMLElement | null>;
+  onPhotoClick?: (index: number) => void;
 }) {
   const [loaded, setLoaded] = useState(false);
   const [shouldLoadSrc, setShouldLoadSrc] = useState(() => !scrollRootRef);
@@ -200,6 +203,7 @@ function PhotoThumb({
     <div
       ref={cellRef}
       className="prj-data-cell"
+      onClick={() => onPhotoClick?.(index)}
       style={{
         background: "#080808",
         border: `1px solid ${BORDER}`,
@@ -317,6 +321,7 @@ function VirtualizedPhotoGrid({
   deletingId,
   isEditMode,
   minCols = 1,
+  onPhotoClick,
 }: {
   scrollRef: React.RefObject<HTMLDivElement | null>;
   photos: Photo[];
@@ -324,6 +329,7 @@ function VirtualizedPhotoGrid({
   deletingId: string | null;
   isEditMode: boolean;
   minCols?: number;
+  onPhotoClick?: (index: number) => void;
 }) {
   const [layout, setLayout] = useState(() => {
     const cw = GRID_MIN_CELL;
@@ -397,6 +403,7 @@ function VirtualizedPhotoGrid({
                   deletingId={deletingId}
                   isEditMode={isEditMode}
                   scrollRootRef={scrollRef}
+                  onPhotoClick={onPhotoClick}
                 />
               ))}
             </div>
@@ -454,12 +461,14 @@ function VirtualizedPhotoList({
   onDelete,
   deletingId,
   isEditMode,
+  onPhotoClick,
 }: {
   scrollRef: React.RefObject<HTMLDivElement | null>;
   photos: Photo[];
   onDelete: (id: string) => void;
   deletingId: string | null;
   isEditMode: boolean;
+  onPhotoClick?: (index: number) => void;
 }) {
   const listVirtualizer = useVirtualizer({
     count: photos.length,
@@ -500,7 +509,9 @@ function VirtualizedPhotoList({
                   background: SURFACE_2,
                   transition: "border-color 0.2s",
                   boxSizing: "border-box",
+                  cursor: "pointer",
                 }}
+                onClick={() => onPhotoClick?.(i)}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,77,0,0.3)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = BORDER; }}
               >
@@ -529,7 +540,7 @@ function VirtualizedPhotoList({
                 {isEditMode && (
                   <button
                     type="button"
-                    onClick={() => onDelete(photo.id)}
+                    onClick={(e) => { e.stopPropagation(); onDelete(photo.id); }}
                     disabled={deleting}
                     style={{
                       background: "transparent",
@@ -580,6 +591,7 @@ export default function ProjectDetailPage() {
   const [photosLoading, setPhotosLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isMobile, setIsMobile] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -623,6 +635,17 @@ export default function ProjectDetailPage() {
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxIndex(null);
+      if (e.key === "ArrowLeft") setLightboxIndex((i) => (i! > 0 ? i! - 1 : photos.length - 1));
+      if (e.key === "ArrowRight") setLightboxIndex((i) => (i! < photos.length - 1 ? i! + 1 : 0));
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [lightboxIndex, photos.length]);
 
   useEffect(() => {
     const uploading = uploadPhase === "sending" || uploadPhase === "processing";
@@ -1243,6 +1266,7 @@ export default function ProjectDetailPage() {
                 deletingId={deletingId}
                 isEditMode={project.status === "preparing"}
                 minCols={isMobile ? 3 : 1}
+                onPhotoClick={setLightboxIndex}
               />
             ) : (
               <VirtualizedPhotoList
@@ -1251,6 +1275,7 @@ export default function ProjectDetailPage() {
                 onDelete={handleDeletePhoto}
                 deletingId={deletingId}
                 isEditMode={project.status === "preparing"}
+                onPhotoClick={setLightboxIndex}
               />
             )}
           </div>
@@ -1299,6 +1324,61 @@ export default function ProjectDetailPage() {
           >
             {inviteActivating ? "활성화 중…" : "고객 초대 링크 활성화"}
             {!inviteActivating && M >= N && <ChevronRight size={14} />}
+          </button>
+        </div>
+      )}
+
+      {/* ── 라이트박스 ── */}
+      {lightboxIndex !== null && photos[lightboxIndex] && (
+        <div
+          onClick={() => setLightboxIndex(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}
+        >
+          {/* 닫기 */}
+          <button
+            type="button"
+            onClick={() => setLightboxIndex(null)}
+            style={{ position: "absolute", top: 16, right: 16, width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "none", color: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            <X size={18} />
+          </button>
+          {/* 카운터 */}
+          <div style={{ position: "absolute", top: 22, left: "50%", transform: "translateX(-50%)", fontFamily: MONO, fontSize: 11, color: "rgba(255,255,255,0.45)" }}>
+            {lightboxIndex + 1} / {photos.length}
+          </div>
+          {/* 이전 */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i! > 0 ? i! - 1 : photos.length - 1)); }}
+            style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "none", color: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+          >
+            <ChevronLeft size={22} />
+          </button>
+          {/* 이미지 */}
+          <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", alignItems: "center", maxWidth: "90vw" }}>
+            <img
+              key={photos[lightboxIndex].id}
+              src={photos[lightboxIndex].previewUrl ?? photos[lightboxIndex].url}
+              alt={photos[lightboxIndex].originalFilename ?? ""}
+              style={{ maxHeight: "80vh", maxWidth: "90vw", objectFit: "contain", borderRadius: 6, display: "block" }}
+            />
+            {photos[lightboxIndex].originalFilename && (
+              <div style={{ marginTop: 12, fontFamily: MONO, fontSize: 11, color: "rgba(255,255,255,0.45)" }}>
+                {photos[lightboxIndex].originalFilename}
+              </div>
+            )}
+          </div>
+          {/* 다음 */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i! < photos.length - 1 ? i! + 1 : 0)); }}
+            style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "none", color: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+          >
+            <ChevronRight size={22} />
           </button>
         </div>
       )}
