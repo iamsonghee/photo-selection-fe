@@ -136,6 +136,12 @@ export async function PATCH(
     if (typeof body.allow_revision === 'boolean') {
       payload.allow_revision = body.allow_revision;
     }
+    if ('review_deadline' in body) {
+      payload.review_deadline = body.review_deadline ?? null;
+    }
+    if ('customer_phone' in body) {
+      payload.customer_phone = body.customer_phone ?? null;
+    }
     if (typeof body.status === "string" && body.status) {
       const currentStatus = (project as { status: string }).status as ProjectStatus;
       if (!canTransition(currentStatus, body.status as ProjectStatus)) {

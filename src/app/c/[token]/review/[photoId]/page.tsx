@@ -538,6 +538,16 @@ export default function ReviewViewerPage() {
             </div>
           </div>
 
+          {/* 검토 기한 배너 */}
+          {project.reviewDeadline && (
+            <div style={{ borderTop: `1px solid ${BORDER}`, background: "rgba(255,77,0,0.06)", padding: "6px 24px", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, letterSpacing: "0.05em" }}>검토 기한</span>
+              <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT, fontWeight: 700 }}>
+                {new Date(project.reviewDeadline).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })} 까지
+              </span>
+            </div>
+          )}
+
           {/* Row 2: Toolbar (desktop only) */}
           <div className="rv-toolbar-desktop" style={{ borderTop: `1px solid #111`, background: "rgba(0,0,0,0.5)" }}>
             <div className="rv-toolbar" style={{ height: 56, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "center", gap: 24, overflowX: "auto" }}>

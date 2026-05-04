@@ -15,6 +15,7 @@ function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Pr
     customer_phone?: string | null;
     allow_revision?: boolean | null;
     location?: string | null;
+    review_deadline?: string | null;
   };
   return {
     id: row.id,
@@ -35,6 +36,7 @@ function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Pr
     displayId: (row as any).display_id ?? undefined,
     allowRevision: ext.allow_revision ?? true,
     location: ext.location ?? null,
+    reviewDeadline: ext.review_deadline ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

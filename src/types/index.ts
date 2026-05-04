@@ -93,6 +93,8 @@ export interface Project {
   allowRevision: boolean;
   /** 촬영 장소 (옵셔널) */
   location?: string | null;
+  /** 고객 보정본 검토 기한 (reviewing_v1/v2 전환 시 설정) */
+  reviewDeadline?: string | null;
   /** 런타임 전용 — photos 테이블에서 조회한 첫 번째 사진 썸네일 URL */
   thumbnailUrl?: string | null;
   createdAt: string;

@@ -42,6 +42,18 @@ type WorkflowRow = {
 type FilterTab = "all" | "approved" | "revision" | "v1_pending" | "v2_pending";
 type StageTab = "original" | "v1" | "v2";
 
+function addDays(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split("T")[0];
+}
+const DEADLINE_PRESETS = [
+  { label: "5일 뒤",  days: 5  },
+  { label: "7일 뒤",  days: 7  },
+  { label: "14일 뒤", days: 14 },
+  { label: "30일 뒤", days: 30 },
+];
+
 type WorkflowConfirmContent = {
   title: string;
   description: string;
@@ -234,7 +246,7 @@ function StageStepper({
   };
 
   return (
-    <div className="shrink-0 px-8 py-3 border-b border-[#1a1a1e] bg-[#0a0a0c]/60">
+    <div className="shrink-0 px-4 md:px-8 py-2.5 md:py-3 border-b border-[#1a1a1e] bg-[#0a0a0c]/60">
       <div className="flex items-center justify-between gap-2 max-w-[1600px] mx-auto">
         {steps.map((step, i) => {
           const s = stateOf(step.key);
@@ -710,6 +722,7 @@ export default function WorkflowPageClient() {
   const [startingEditing, setStartingEditing] = useState(false);
   const [startingReview, setStartingReview] = useState<1 | 2 | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<WorkflowConfirmContent | null>(null);
+  const [reviewDeadlineModal, setReviewDeadlineModal] = useState<{ v: 1 | 2; dateInput: string } | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -1046,25 +1059,24 @@ export default function WorkflowPageClient() {
     if (!project) return;
     const expectedStatus = v === 1 ? "editing" : "editing_v2";
     if (project.status !== expectedStatus) return;
-    const label = v === 1 ? "V1" : "V2";
-    setConfirmDialog({
-      title: `고객에게 ${label} 검토 보내기`,
-      description: `고객에게 ${label} 보정본 검토를 시작할까요? 이후 고객이 검토 페이지에서 확정/재보정 요청을 보낼 수 있습니다.`,
-      confirmLabel: "검토 보내기",
-      onConfirm: () => {
-        setConfirmDialog(null);
-        void runStartCustomerReview(v);
-      },
-    });
+    setReviewDeadlineModal({ v, dateInput: "" });
   }
 
-  async function runStartCustomerReview(v: 1 | 2) {
+  async function runStartCustomerReview(v: 1 | 2, reviewDeadline?: string) {
     if (!project) return;
     const expectedStatus = v === 1 ? "editing" : "editing_v2";
     if (project.status !== expectedStatus) return;
     const nextStatus = v === 1 ? "reviewing_v1" : "reviewing_v2";
     setStartingReview(v);
     try {
+      // 검토 기한이 입력된 경우 먼저 저장
+      if (reviewDeadline) {
+        await fetch(`/api/photographer/projects/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ review_deadline: reviewDeadline }),
+        });
+      }
       const res = await fetch(`/api/photographer/projects/${id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -1110,7 +1122,7 @@ export default function WorkflowPageClient() {
               ]
         }
         actions={
-          <div className="flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-3">
             {isConfirmed && (
               <button
                 onClick={handleStartEditing}
@@ -1165,6 +1177,7 @@ export default function WorkflowPageClient() {
 
       {/* ── Stage stepper ── */}
       {!isSelecting && (
+        <div className="hidden md:block">
         <StageStepper
           status={project.status}
           allowRevision={project.allowRevision}
@@ -1175,11 +1188,12 @@ export default function WorkflowPageClient() {
           v2Uploaded={counts.v2Uploaded}
           v2Total={v2Total}
         />
+        </div>
       )}
 
       {/* ── Stage tabs ── */}
       {!isSelecting && (
-        <div className="shrink-0 px-8 py-3 border-b border-[#1a1a1e] bg-[#121215]/50 flex items-center gap-3 flex-wrap">
+        <div className="shrink-0 px-4 md:px-8 py-2.5 md:py-3 border-b border-[#1a1a1e] bg-[#121215]/50 flex items-center gap-2 md:gap-3 flex-wrap">
           <div className="flex bg-[#0a0a0c]/60 border border-[#1a1a1e] rounded-xl p-1 items-center gap-0.5">
             {[
               { key: "original" as StageTab, label: "원본", disabled: false },
@@ -1207,33 +1221,32 @@ export default function WorkflowPageClient() {
 
           {/* Filter chips for current stage */}
           {FILTER_TABS.length > 1 && (
-            <div className="flex bg-[#0a0a0c]/60 border border-[#1a1a1e] rounded-xl p-1 items-center gap-0.5">
-              {FILTER_TABS.map(({ key, label, count }) => (
-                <button
-                  key={key}
-                  onClick={() => setFilter(key)}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
-                    filter === key
-                      ? "bg-[#27272c] text-white"
-                      : "text-zinc-400 hover:text-white hover:bg-[#27272c]/50"
-                  }`}
-                >
-                  {label}
-                  <span
-                    className={`ml-1.5 text-[10px] ${
-                      filter === key ? "text-zinc-400" : "text-zinc-600"
+            <>
+              <div className="w-px h-4 bg-[#27272c] shrink-0" />
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {FILTER_TABS.map(({ key, label, count }) => (
+                  <button
+                    key={key}
+                    onClick={() => setFilter(key)}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
+                      filter === key
+                        ? "border-[#FF4D00]/40 bg-[#FF4D00]/10 text-[#FF4D00]"
+                        : "border-[#27272c] bg-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-500"
                     }`}
                   >
-                    {count}
-                  </span>
-                </button>
-              ))}
-            </div>
+                    {label}
+                    <span className={`text-[10px] font-mono ${filter === key ? "text-[#FF4D00]/70" : "text-zinc-600"}`}>
+                      {count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
           )}
 
           {/* progress summary */}
           {stageTab === "v1" && !isReviewingV1 && (
-            <div className="ml-auto flex items-center gap-2 text-[11px] font-mono text-zinc-500 bg-[#0a0a0c] border border-[#1a1a1e] rounded-xl px-3 py-1.5">
+            <div className="ml-auto hidden md:flex items-center gap-2 text-[11px] font-mono text-zinc-500 bg-[#0a0a0c] border border-[#1a1a1e] rounded-xl px-3 py-1.5">
               <span className="text-white font-semibold">{counts.v1Uploaded}</span>
               <span>/</span>
               <span>{counts.total}</span>
@@ -1251,7 +1264,7 @@ export default function WorkflowPageClient() {
             </div>
           )}
           {stageTab === "v2" && (
-            <div className="ml-auto flex items-center gap-2 text-[11px] font-mono text-zinc-500 bg-[#0a0a0c] border border-[#1a1a1e] rounded-xl px-3 py-1.5">
+            <div className="ml-auto hidden md:flex items-center gap-2 text-[11px] font-mono text-zinc-500 bg-[#0a0a0c] border border-[#1a1a1e] rounded-xl px-3 py-1.5">
               <span className="text-white font-semibold">{counts.v2Uploaded}</span>
               <span>/</span>
               <span>{v2Total}</span>
@@ -1277,7 +1290,7 @@ export default function WorkflowPageClient() {
       {/* ── Main content ── */}
       {!isSelecting && (
         <div className={`flex-1 overflow-y-auto ${styles.scrollArea}`}>
-          <div className="max-w-[1600px] mx-auto px-8 py-6 flex flex-col gap-4">
+          <div className="max-w-[1600px] mx-auto px-3 py-3 md:px-8 md:py-6 flex flex-col gap-3 md:gap-4">
             {isConfirmed && (
               <div className="rounded-2xl border border-[#FF4D00]/25 bg-[#FF4D00]/5 px-5 py-4 flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-[#FF4D00]/15 border border-[#FF4D00]/40 flex items-center justify-center text-[#FF4D00]">
@@ -1394,18 +1407,8 @@ export default function WorkflowPageClient() {
       {/* ── Footer ── */}
       <footer className="shrink-0 border-t border-[#1a1a1e] bg-[#0a0a0c]/95 backdrop-blur-md z-10">
         {footerNote && (
-          <div className="flex items-center gap-2.5 px-8 py-2.5 border-b border-[#FF4D00]/15 bg-[#FF4D00]/5">
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#FF4D00"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="shrink-0"
-            >
+          <div className="flex items-center gap-2.5 px-4 md:px-8 py-2 md:py-2.5 border-b border-[#FF4D00]/15 bg-[#FF4D00]/5">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FF4D00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -1413,65 +1416,66 @@ export default function WorkflowPageClient() {
             <span className="text-sm text-[#FF4D00] font-medium">{footerNote}</span>
           </div>
         )}
-        <div className="h-16 flex items-center justify-end px-8">
+        <div className="flex items-center justify-end px-4 md:px-8 py-3 md:py-0 md:h-16">
           {project.status === "delivered" ? (
-            <span className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <CheckCircle2 size={15} />납품 완료
             </span>
           ) : isConfirmed ? (
             <button
               onClick={handleStartEditing}
               disabled={startingEditing}
-              className="flex items-center gap-2 bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
+              className="flex items-center justify-center gap-2 w-full md:w-auto bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
             >
               <Sparkles size={15} />
               {startingEditing ? "처리 중…" : "보정 시작"}
             </button>
-          ) : canStartV1Review ? (
-            <button
-              onClick={() => handleStartCustomerReview(1)}
-              disabled={startingReview === 1}
-              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5"
-            >
-              <Send size={15} />
-              {startingReview === 1 ? "처리 중…" : "고객에게 V1 검토 보내기"}
-            </button>
-          ) : canStartV2Review ? (
-            <button
-              onClick={() => handleStartCustomerReview(2)}
-              disabled={startingReview === 2}
-              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5"
-            >
-              <Send size={15} />
-              {startingReview === 2 ? "처리 중…" : "고객에게 V2 검토 보내기"}
-            </button>
-          ) : canUploadV1 ? (
-            <button
-              onClick={() => openPanel(1)}
-              className="flex items-center gap-2 bg-[#FF4D00] hover:bg-[#ff5e1a] text-black px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
-            >
-              <Upload size={15} />
-              {project.status === "reviewing_v1"
-                ? "V1 확인·교체"
-                : counts.v1Uploaded > 0
-                  ? "V1 보정본 추가/교체"
-                  : "V1 보정본 일괄 업로드"}
-            </button>
-          ) : canUploadV2 && counts.revision > 0 ? (
-            <button
-              onClick={() => openPanel(2)}
-              className="flex items-center gap-2 bg-[#FF4D00] hover:bg-[#ff5e1a] text-black px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
-            >
-              <Upload size={15} />
-              {project.status === "reviewing_v2"
-                ? "V2 확인·교체"
-                : counts.v2Uploaded > 0
-                  ? "V2 재보정본 추가/교체"
-                  : "V2 재보정본 일괄 업로드"}
-            </button>
+          ) : (canUploadV1 || canStartV1Review || (canUploadV2 && counts.revision > 0) || canStartV2Review) ? (
+            <div className="flex flex-col-reverse md:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
+              {/* 업로드 버튼 (secondary) */}
+              {canUploadV1 && (
+                <button
+                  onClick={() => openPanel(1)}
+                  className="flex items-center justify-center gap-2 w-full md:w-auto border border-[#27272c] bg-[#0a0a0c] hover:border-zinc-500 hover:bg-[#121215] text-white px-5 py-3 md:py-2.5 rounded-xl text-sm font-semibold transition-all"
+                >
+                  <Upload size={14} />
+                  {project.status === "reviewing_v1" ? "V1 확인·교체" : counts.v1Uploaded > 0 ? "V1 추가/교체" : "V1 업로드"}
+                </button>
+              )}
+              {canUploadV2 && counts.revision > 0 && (
+                <button
+                  onClick={() => openPanel(2)}
+                  className="flex items-center justify-center gap-2 w-full md:w-auto border border-[#27272c] bg-[#0a0a0c] hover:border-zinc-500 hover:bg-[#121215] text-white px-5 py-3 md:py-2.5 rounded-xl text-sm font-semibold transition-all"
+                >
+                  <Upload size={14} />
+                  {project.status === "reviewing_v2" ? "V2 확인·교체" : counts.v2Uploaded > 0 ? "V2 추가/교체" : "V2 업로드"}
+                </button>
+              )}
+              {/* 검토 요청 버튼 (primary) */}
+              {canStartV1Review && (
+                <button
+                  onClick={() => handleStartCustomerReview(1)}
+                  disabled={startingReview === 1}
+                  className="flex items-center justify-center gap-2 w-full md:w-auto bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5"
+                >
+                  <Send size={15} />
+                  {startingReview === 1 ? "처리 중…" : "V1 검토 요청 보내기"}
+                </button>
+              )}
+              {canStartV2Review && (
+                <button
+                  onClick={() => handleStartCustomerReview(2)}
+                  disabled={startingReview === 2}
+                  className="flex items-center justify-center gap-2 w-full md:w-auto bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5"
+                >
+                  <Send size={15} />
+                  {startingReview === 2 ? "처리 중…" : "V2 검토 요청 보내기"}
+                </button>
+              )}
+            </div>
           ) : (
-            <span className="px-6 py-2.5 rounded-xl text-sm font-bold bg-[#121215] border border-[#27272c] text-zinc-500">
-              {footerNote ?? "다음 단계 대기 중"}
+            <span className="flex items-center justify-center w-full md:w-auto px-6 py-2.5 rounded-xl text-sm font-bold bg-[#121215] border border-[#27272c] text-zinc-500">
+              다음 단계 대기 중
             </span>
           )}
         </div>
@@ -1494,6 +1498,83 @@ export default function WorkflowPageClient() {
           onClose={() => setConfirmDialog(null)}
         />
       ) : null}
+
+      {reviewDeadlineModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setReviewDeadlineModal(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-[#0f0f12] border border-[#27272c] rounded-2xl p-6 flex flex-col gap-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h3 className="text-base font-bold text-white mb-1">
+                고객에게 {reviewDeadlineModal.v === 1 ? "V1" : "V2"} 검토 보내기
+              </h3>
+              <p className="text-sm text-[#71717a]">
+                검토 기한을 설정하면 고객 검토 페이지에 표시됩니다.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-medium text-[#a1a1aa]">검토 기한 (선택사항)</label>
+
+              {/* 빠른 선택 칩 */}
+              <div className="flex gap-2 flex-wrap">
+                {DEADLINE_PRESETS.map(({ label, days }) => {
+                  const val = addDays(days);
+                  const active = reviewDeadlineModal.dateInput === val;
+                  return (
+                    <button
+                      key={days}
+                      type="button"
+                      onClick={() => setReviewDeadlineModal({ ...reviewDeadlineModal, dateInput: val })}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                        active
+                          ? "bg-[#FF4D00] border-[#FF4D00] text-black"
+                          : "bg-transparent border-[#27272c] text-[#a1a1aa] hover:border-[#3f3f46] hover:text-white"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 직접 입력 (캘린더) */}
+              <input
+                type="date"
+                value={reviewDeadlineModal.dateInput}
+                onChange={(e) => setReviewDeadlineModal({ ...reviewDeadlineModal, dateInput: e.target.value })}
+                onClick={(e) => { try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.(); } catch { /* unsupported */ } }}
+                min={new Date().toISOString().split("T")[0]}
+                className="w-full rounded-xl bg-[#0a0a0c] border border-[#27272c] text-white px-3 py-2 text-sm focus:outline-none focus:border-[#FF4D00] cursor-pointer"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                className="flex-1 rounded-xl border border-[#27272c] text-[#71717a] text-sm font-medium py-2.5 hover:border-[#3f3f46] transition-colors"
+                onClick={() => setReviewDeadlineModal(null)}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={startingReview === reviewDeadlineModal.v}
+                className="flex-1 rounded-xl bg-[#FF4D00] text-black text-sm font-bold py-2.5 disabled:opacity-50 hover:bg-[#e64500] transition-colors"
+                onClick={() => {
+                  const { v, dateInput } = reviewDeadlineModal;
+                  setReviewDeadlineModal(null);
+                  void runStartCustomerReview(v, dateInput || undefined);
+                }}
+              >
+                {startingReview === reviewDeadlineModal.v ? "처리 중…" : "검토 링크 보내기"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

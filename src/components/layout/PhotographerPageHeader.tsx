@@ -47,7 +47,7 @@ export function PhotographerPageHeader({ crumbs, title, stats, actions }: Props)
       {(stats || actions) && (
         <div className="flex items-center gap-6">
           {stats && stats.length > 0 && (
-            <div className="flex gap-6 pr-6 border-r border-[#1a1a1e]">
+            <div className="hidden md:flex gap-6 pr-6 border-r border-[#1a1a1e]">
               {stats.map((s, i) => (
                 <div key={i} className="text-right">
                   <div
