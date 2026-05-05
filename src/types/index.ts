@@ -89,8 +89,10 @@ export interface Project {
   /** 고객이 확정 취소한 횟수 (최대 3회, 고객 측 "확정 취소"용) */
   customerCancelCount?: number;
   displayId?: string; // "20260410-001" 형식 (작가별 당일 순번)
-  /** 재보정 허용 여부. false이면 5단계 파이프라인, true이면 최대 7단계 */
-  allowRevision: boolean;
+  /** 재보정 허용 횟수 (0=없음, 1=1회, 2=2회) */
+  maxRevisionCount: 0 | 1 | 2;
+  /** 현재까지 진행된 재보정 라운드 수 */
+  revisionRound: number;
   /** 촬영 장소 (옵셔널) */
   location?: string | null;
   /** 고객 보정본 검토 기한 (reviewing_v1/v2 전환 시 설정) */

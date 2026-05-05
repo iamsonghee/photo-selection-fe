@@ -12,7 +12,6 @@ import { getReviewMockData } from "@/lib/mock-data";
 import { BrandLogoBar } from "@/components/BrandLogo";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
-const REVISION_LIMIT = 2;
 
 const STEPS = [
   { icon: "solar:gallery-minimalistic-bold", title: "갤러리 감상" },
@@ -107,7 +106,7 @@ export default function InvitePageClient() {
   if (project.status === "reviewing_v1" || project.status === "reviewing_v2") {
     const total             = reviewData?.photos.length ?? project.requiredCount ?? 0;
     const isV2              = project.status === "reviewing_v2";
-    const revisionRemaining = Math.max(0, REVISION_LIMIT - (isV2 ? 1 : 0));
+    const revisionRemaining = Math.max(0, (project.maxRevisionCount ?? 0) - (project.revisionRound ?? 0));
     const deadlineStr       = format(new Date(project.deadline), "yyyy.MM.dd", { locale: ko });
     const reviewPath        = `/c/${token}/review`;
     const photographerName  = photographer?.name ?? "담당 작가";
@@ -282,7 +281,7 @@ export default function InvitePageClient() {
 
         <footer className="cp-footer">
           <div>V.1.2.0-CORE &nbsp;&nbsp;|&nbsp;&nbsp; <span className="cp-footer-secure">SECURE_CONNECTION</span></div>
-          <div>© 2026 A컷 · Acut</div>
+          <div>© 2026 A컷 · A-CUT</div>
         </footer>
       </div>
     );
@@ -598,7 +597,7 @@ export default function InvitePageClient() {
       {/* Footer */}
       <footer className="cp-footer">
         <div>V.1.2.0-CORE &nbsp;&nbsp;|&nbsp;&nbsp; <span className="cp-footer-secure">SECURE_CONNECTION</span></div>
-        <div>© 2026 A컷 · Acut</div>
+        <div>© 2026 A컷 · A-CUT</div>
       </footer>
     </div>
   );

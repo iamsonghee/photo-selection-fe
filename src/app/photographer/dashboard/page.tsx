@@ -304,20 +304,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[#0a0a0c] text-white" style={{ fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif" }}>
 
       {/* ── 헤더 ── */}
-      <PhotographerPageHeader
-        crumbs={[{ label: "대시보드" }]}
-        title="대시보드"
-        actions={
-          <button
-            type="button"
-            onClick={() => router.push("/photographer/projects/new")}
-            className="flex items-center gap-2 bg-[#FF4D00] hover:bg-[#ff5e1a] text-black px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
-          >
-            <Plus size={14} />
-            새 프로젝트
-          </button>
-        }
-      />
+      <PhotographerPageHeader crumbs={[{ label: "대시보드" }]} title="대시보드" />
 
       {/* ── 바디 ── */}
       <div className="flex gap-6 p-6 pb-16 items-start">
@@ -499,6 +486,17 @@ export default function DashboardPage() {
           </div>
         </aside>
       </div>
+
+      {/* 새 프로젝트 FAB — 프로젝트 목록과 동일 (모바일: 하단 네비 위, PC: 우하단) */}
+      <button
+        type="button"
+        onClick={() => router.push("/photographer/projects/new")}
+        aria-label="새 프로젝트"
+        title="새 프로젝트"
+        className="fixed z-40 right-5 bottom-20 md:right-8 md:bottom-8 flex h-14 w-14 items-center justify-center rounded-full bg-[#FF4D00] text-white shadow-[0_4px_20px_rgba(255,77,0,0.4)] transition-transform active:scale-95 md:hover:scale-105 md:hover:shadow-[0_6px_28px_rgba(255,77,0,0.45)]"
+      >
+        <Plus size={24} strokeWidth={2} />
+      </button>
     </div>
   );
 }

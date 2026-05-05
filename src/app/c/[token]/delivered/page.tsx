@@ -84,7 +84,7 @@ export default function DeliveredPage() {
         <div className={styles.brandCluster}>
           <div className={styles.logoBox}>A</div>
           <div className={styles.brandName}>
-            A컷 <span>Acut</span>
+            A컷 <span>A-CUT</span>
           </div>
         </div>
         <div className={styles.headerSide} />
@@ -137,7 +137,7 @@ export default function DeliveredPage() {
       </main>
 
       <footer className={styles.pageFooter}>
-        <div>© 2026 A컷 · Acut</div>
+        <div>© 2026 A컷 · A-CUT</div>
         <div className={styles.footerNote}>{photographerName} 작가님이 A컷을 통해 전달했습니다.</div>
       </footer>
     </div>

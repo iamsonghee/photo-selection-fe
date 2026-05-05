@@ -3,7 +3,7 @@ import "./globals.css";
 import { BRAND_MARK_SVG } from "@/lib/brand-assets";
 
 export const metadata: Metadata = {
-  title: "PhotoSelect — 사진작가를 위한 셀렉 워크플로우",
+  title: "A-CUT — 사진작가를 위한 셀렉 워크플로우",
   description: "사진작가와 고객이 함께하는 사진 셀렉·보정 워크플로우",
   icons: {
     icon: [{ url: BRAND_MARK_SVG, type: "image/svg+xml" }],

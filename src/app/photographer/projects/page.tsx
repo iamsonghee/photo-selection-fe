@@ -474,12 +474,13 @@ export default function ProjectsPage() {
       </div>
     </div>
 
-    {/* FAB — mobile only, fixed above bottom nav */}
+    {/* FAB — 새 프로젝트 (모바일: 하단 네비 위, PC: 우하단 고정) */}
     <button
       type="button"
       onClick={() => router.push("/photographer/projects/new")}
-      className="fixed md:hidden right-5 bg-[#FF4D00] rounded-full shadow-[0_4px_20px_rgba(255,77,0,0.4)] flex items-center justify-center text-white active:scale-95 transition-transform z-40"
-      style={{ bottom: 80, width: 56, height: 56 }}
+      aria-label="새 프로젝트"
+      title="새 프로젝트"
+      className="fixed z-40 right-5 bottom-20 md:right-8 md:bottom-8 flex h-14 w-14 items-center justify-center rounded-full bg-[#FF4D00] text-white shadow-[0_4px_20px_rgba(255,77,0,0.4)] transition-transform active:scale-95 md:hover:scale-105 md:hover:shadow-[0_6px_28px_rgba(255,77,0,0.45)]"
     >
       <Plus size={24} strokeWidth={2} />
     </button>
@@ -500,16 +501,6 @@ export default function ProjectsPage() {
           { label: "전체",  value: projects.length },
           { label: "진행중", value: tabCounts.active, accent: true },
         ]}
-        actions={
-          <button
-            type="button"
-            onClick={() => router.push("/photographer/projects/new")}
-            className="flex items-center gap-2 bg-[#FF4D00] hover:bg-[#ff5e1a] text-black px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
-          >
-            <Plus size={16} />
-            새 프로젝트
-          </button>
-        }
       />
 
       <div className="p-8 space-y-6 max-w-[1600px] mx-auto">

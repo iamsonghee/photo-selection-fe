@@ -14,6 +14,8 @@ function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Pr
     shoot_type?: string | null;
     customer_phone?: string | null;
     allow_revision?: boolean | null;
+    max_revision_count?: number | null;
+    revision_round?: number | null;
     location?: string | null;
     review_deadline?: string | null;
   };
@@ -34,7 +36,8 @@ function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Pr
     confirmedAt: row.confirmed_at ?? undefined,
     deliveredAt: row.delivered_at ?? undefined,
     displayId: (row as any).display_id ?? undefined,
-    allowRevision: ext.allow_revision ?? true,
+    maxRevisionCount: (ext.max_revision_count ?? (ext.allow_revision ? 2 : 0)) as 0 | 1 | 2,
+    revisionRound: ext.revision_round ?? 0,
     location: ext.location ?? null,
     reviewDeadline: ext.review_deadline ?? null,
     createdAt: row.created_at,
@@ -205,7 +208,7 @@ export async function createProject(params: {
   shoot_type?: string | null;
   customer_phone?: string | null;
   access_pin?: string | null;
-  allow_revision?: boolean;
+  max_revision_count?: 0 | 1 | 2;
   location?: string | null;
 }): Promise<string> {
   const accessToken = crypto.randomUUID();
@@ -221,7 +224,8 @@ export async function createProject(params: {
       status: "preparing",
       photographer_id: params.photographer_id,
       access_token: accessToken,
-      allow_revision: params.allow_revision ?? true,
+      max_revision_count: params.max_revision_count ?? 0,
+      revision_round: 0,
       ...(params.shoot_type           ? { shoot_type: params.shoot_type } : {}),
       ...(params.customer_phone       ? { customer_phone: params.customer_phone } : {}),
       ...(params.access_pin           ? { access_pin: params.access_pin } : {}),
@@ -498,6 +502,15 @@ export async function submitVersionReviews(
     customer_comment?: string | null;
   }>
 ): Promise<{ status: ProjectStatus }> {
+  // 프로젝트의 재보정 설정 조회
+  const { data: projData } = await admin
+    .from("projects")
+    .select("max_revision_count, revision_round")
+    .eq("id", projectId)
+    .single();
+  const maxRevisionCount: number = (projData as { max_revision_count?: number } | null)?.max_revision_count ?? 0;
+  const currentRound: number = (projData as { revision_round?: number } | null)?.revision_round ?? 0;
+
   const now = new Date().toISOString();
   const rows = reviews.map((r) => ({
     photo_version_id: r.photo_version_id,
@@ -515,11 +528,15 @@ export async function submitVersionReviews(
   }
 
   const hasRevision = reviews.some((r) => r.status === "revision_requested");
-  const newStatus: ProjectStatus = hasRevision ? "editing_v2" : "delivered";
+  // 재보정 가능 여부: maxRevisionCount > 0 이고 현재 라운드가 한도 미만
+  const canRevise = hasRevision && maxRevisionCount > 0 && currentRound < maxRevisionCount;
+  const newStatus: ProjectStatus = canRevise ? "editing_v2" : "delivered";
   const updatePayload: Record<string, unknown> = {
     status: newStatus,
     updated_at: now,
   };
+  // 재보정 진행 시 revision_round 증가
+  if (newStatus === "editing_v2") updatePayload.revision_round = currentRound + 1;
   if (newStatus === "delivered") updatePayload.delivered_at = now;
 
   let updateError: { message: string } | null = null;

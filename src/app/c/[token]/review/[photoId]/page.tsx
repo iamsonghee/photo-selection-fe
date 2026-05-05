@@ -8,6 +8,7 @@ import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
 import FullScreenCompareModal from "@/components/FullScreenCompareModal";
 import type { ReviewPhotoItem } from "@/lib/customer-api-server";
+import { normalizeReviewDeadlineYmd } from "@/lib/format-review-deadline";
 
 /* ── design tokens ── */
 const BG_BASE    = "#030303";
@@ -63,6 +64,10 @@ export default function ReviewViewerPage() {
   }, [token, project?.id, project?.status, loadReviewPhotos]);
 
   const photos       = reviewPhotos;
+  const reviewDeadlineDisplay = useMemo(
+    () => normalizeReviewDeadlineYmd(project?.reviewDeadline ?? null),
+    [project?.reviewDeadline]
+  );
   const currentIndex = useMemo(() => photos.findIndex((p) => p.id === activePhotoId), [photos, activePhotoId]);
 
   const total         = photos.length;
@@ -243,7 +248,8 @@ export default function ReviewViewerPage() {
   }
 
   const versionLabel      = `RETOUCHED_${project.status === "reviewing_v2" ? "V2" : "V1"}`;
-  const revisionRemaining = project.status === "reviewing_v2" ? 1 : 2;
+  const revisionRemaining = Math.max(0, (project.maxRevisionCount ?? 0) - (project.revisionRound ?? 0));
+  const canRequestRevision = revisionRemaining > 0;
   const prjIdShort        = project.id.replace(/-/g, "").slice(0, 8).toUpperCase();
   const customerName      = project.customerName || "CLIENT";
 
@@ -539,11 +545,11 @@ export default function ReviewViewerPage() {
           </div>
 
           {/* 검토 기한 배너 */}
-          {project.reviewDeadline && (
+          {reviewDeadlineDisplay && (
             <div style={{ borderTop: `1px solid ${BORDER}`, background: "rgba(255,77,0,0.06)", padding: "6px 24px", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
               <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, letterSpacing: "0.05em" }}>검토 기한</span>
               <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT, fontWeight: 700 }}>
-                {new Date(project.reviewDeadline).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })} 까지
+                {reviewDeadlineDisplay} 까지
               </span>
             </div>
           )}
@@ -880,20 +886,22 @@ export default function ReviewViewerPage() {
               </div>
 
               <div style={{ display: "flex", gap: 8 }}>
-                <button type="button" onClick={handleRevisionToggle}
-                  style={{
-                    flex: 1, height: 44, display: "flex", alignItems: "center", justifyContent: "center",
-                    fontFamily: MONO, fontSize: 11, fontWeight: 700, cursor: "pointer", border: "1px solid",
-                    gap: 6, letterSpacing: "0.03em", transition: "all 0.2s",
-                    background: isRevision ? "rgba(255,170,0,0.12)" : "transparent",
-                    color: isRevision ? ORANGE : MUTED,
-                    borderColor: isRevision ? "rgba(255,170,0,0.5)" : BORDER_HI,
-                    opacity: isApproved ? 0.55 : 1,
-                    boxShadow: isRevision ? "inset 0 0 0 1px rgba(255,170,0,0.25)" : "none",
-                  }}>
-                  <RefreshCw size={13} />
-                  {isRevision ? "재보정 ✓" : "재보정"}
-                </button>
+                {canRequestRevision && (
+                  <button type="button" onClick={handleRevisionToggle}
+                    style={{
+                      flex: 1, height: 44, display: "flex", alignItems: "center", justifyContent: "center",
+                      fontFamily: MONO, fontSize: 11, fontWeight: 700, cursor: "pointer", border: "1px solid",
+                      gap: 6, letterSpacing: "0.03em", transition: "all 0.2s",
+                      background: isRevision ? "rgba(255,170,0,0.12)" : "transparent",
+                      color: isRevision ? ORANGE : MUTED,
+                      borderColor: isRevision ? "rgba(255,170,0,0.5)" : BORDER_HI,
+                      opacity: isApproved ? 0.55 : 1,
+                      boxShadow: isRevision ? "inset 0 0 0 1px rgba(255,170,0,0.25)" : "none",
+                    }}>
+                    <RefreshCw size={13} />
+                    {isRevision ? "재보정 ✓" : "재보정"}
+                  </button>
+                )}
                 <button type="button" onClick={handleApprove}
                   style={{
                     flex: 1, height: 44, display: "flex", alignItems: "center", justifyContent: "center",

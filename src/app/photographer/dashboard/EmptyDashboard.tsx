@@ -1,5 +1,7 @@
 "use client";
 
+import { Plus } from "lucide-react";
+
 export default function EmptyDashboard({
   userName,
   onCreateProject,
@@ -240,6 +242,16 @@ export default function EmptyDashboard({
           </div>
         </main>
       </div>
+
+      <button
+        type="button"
+        onClick={onCreateProject}
+        aria-label="새 프로젝트"
+        title="새 프로젝트"
+        className="fixed z-[100000] right-5 bottom-20 md:right-8 md:bottom-8 flex h-14 w-14 items-center justify-center rounded-full bg-[#FF4D00] text-white shadow-[0_4px_20px_rgba(255,77,0,0.4)] transition-transform active:scale-95 md:hover:scale-105 md:hover:shadow-[0_6px_28px_rgba(255,77,0,0.45)]"
+      >
+        <Plus size={24} strokeWidth={2} />
+      </button>
     </>
   );
 }

@@ -38,12 +38,12 @@ export async function PATCH(
     const admin = getAdminClient();
     const { data: project, error: projErr } = await admin
       .from("projects")
-      .select("id, photographer_id, status")
+      .select("id, photographer_id, status, max_revision_count, revision_round")
       .eq("id", projectId)
       .single();
 
     if (projErr || !project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
-    const proj = project as { photographer_id: string; status: string };
+    const proj = project as { photographer_id: string; status: string; max_revision_count: number; revision_round: number };
     if (proj.photographer_id !== photographerId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -63,9 +63,14 @@ export async function PATCH(
       );
     }
 
+    const updatePayload: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
+
+    // editing_v2로 전환 시(고객 재보정 요청 처리 경로가 아닌 작가 업로드→검토 전송)
+    // revision_round는 고객 제출 API에서 증가하므로 여기선 건드리지 않음
+
     const { error: updateErr } = await admin
       .from("projects")
-      .update({ status, updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq("id", projectId);
 
     if (updateErr) {

@@ -122,7 +122,7 @@ export function ProjectNexusPageClient() {
   const [editShootDate, setEditShootDate] = useState("");
   const [editDeadline, setEditDeadline] = useState("");
   const [editRequiredCount, setEditRequiredCount] = useState(0);
-  const [editAllowRevision, setEditAllowRevision] = useState(true);
+  const [editMaxRevisionCount, setEditMaxRevisionCount] = useState<0 | 1 | 2>(2);
   const [editCustomerPhone, setEditCustomerPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -220,7 +220,7 @@ export function ProjectNexusPageClient() {
           shoot_date: editShootDate,
           deadline: editDeadline,
           required_count: newN,
-          allow_revision: editAllowRevision,
+          max_revision_count: editMaxRevisionCount,
           customer_phone: editCustomerPhone || null,
         }),
       });
@@ -233,7 +233,7 @@ export function ProjectNexusPageClient() {
         shootDate: editShootDate,
         deadline: editDeadline,
         requiredCount: newN,
-        allowRevision: editAllowRevision,
+        maxRevisionCount: editMaxRevisionCount,
         customerPhone: editCustomerPhone || null,
       });
       setEditMode(false);
@@ -312,7 +312,7 @@ export function ProjectNexusPageClient() {
     setEditShootDate(project.shootDate);
     setEditDeadline(project.deadline);
     setEditRequiredCount(project.requiredCount);
-    setEditAllowRevision(project.allowRevision);
+    setEditMaxRevisionCount(project.maxRevisionCount);
     setEditCustomerPhone(project.customerPhone ?? "");
     setSaveError("");
     setEditMode(true);
@@ -379,7 +379,7 @@ export function ProjectNexusPageClient() {
   const f2: FlowVisual = !canViewSelections ? "locked" : selectingActive ? "active" : "done";
 
   const inV2Phase = ["editing_v2", "reviewing_v2", "delivered"].includes(project.status);
-  const useFiveSteps = project.allowRevision && inV2Phase;
+  const useFiveSteps = project.maxRevisionCount > 0 && inV2Phase;
 
   // 보정본 통합 스텝 (4단계 step 3): editing/reviewing_v1 모두 active
   const f3combined: FlowVisual =
@@ -604,37 +604,24 @@ export function ProjectNexusPageClient() {
                   </div>
                   <div style={{ gridColumn: "1 / -1" }}>
                     <div className={styles.metaFieldRow}>
-                      <span className={styles.metaFieldLabelK}>재보정 여부</span>
+                      <span className={styles.metaFieldLabelK}>재보정 허용 횟수</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
                       <span
                         style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
+                          display: "inline-flex", alignItems: "center", gap: 6,
                           padding: "3px 10px",
-                          border: `1px solid ${project.allowRevision ? "rgba(255,77,0,0.4)" : "#333"}`,
-                          background: project.allowRevision ? "rgba(255,77,0,0.08)" : "transparent",
-                          fontFamily: "var(--font-jetbrains-mono, monospace)",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: project.allowRevision ? "#FF4D00" : "#555",
-                          letterSpacing: "0.04em",
+                          border: `1px solid ${project.maxRevisionCount > 0 ? "rgba(255,77,0,0.4)" : "#333"}`,
+                          background: project.maxRevisionCount > 0 ? "rgba(255,77,0,0.08)" : "transparent",
+                          fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: 11, fontWeight: 600,
+                          color: project.maxRevisionCount > 0 ? "#FF4D00" : "#555",
                         }}
                       >
-                        <span
-                          style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: "50%",
-                            background: project.allowRevision ? "#FF4D00" : "#444",
-                            flexShrink: 0,
-                          }}
-                        />
-                        {project.allowRevision ? "재보정 허용" : "재보정 없음"}
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: project.maxRevisionCount > 0 ? "#FF4D00" : "#444", flexShrink: 0 }} />
+                        {project.maxRevisionCount === 0 ? "재보정 없음" : `최대 ${project.maxRevisionCount}회`}
                       </span>
                       <span style={{ fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: 10, color: "#444" }}>
-                        {project.allowRevision ? "보정본 검토 후 재보정 요청 가능" : "보정본 검토 후 바로 납품"}
+                        {project.maxRevisionCount === 0 ? "보정본 검토 후 바로 납품" : `보정본 검토 후 최대 ${project.maxRevisionCount}회 재보정 가능`}
                       </span>
                     </div>
                   </div>
@@ -898,40 +885,38 @@ export function ProjectNexusPageClient() {
                 />
                 <p className={styles.metaFieldHint}>고객이 선택할 사진 수</p>
               </label>
-              <label style={{ display: "flex", flexDirection: "column", marginBottom: 20 }}>
-                <div className={styles.metaFieldRow} style={{ marginBottom: 6 }}>
-                  <span className={styles.metaFieldLabelK}>재보정 허용</span>
+              <div style={{ display: "flex", flexDirection: "column", marginBottom: 20 }}>
+                <div className={styles.metaFieldRow} style={{ marginBottom: 8 }}>
+                  <span className={styles.metaFieldLabelK}>재보정 허용 횟수</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setEditAllowRevision((v) => !v)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "8px 14px", cursor: "pointer", alignSelf: "flex-start",
-                    background: editAllowRevision ? "rgba(255,77,0,0.08)" : "transparent",
-                    border: editAllowRevision ? "1px solid rgba(255,77,0,0.4)" : "1px solid #333",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  <div style={{
-                    width: 28, height: 16, borderRadius: 8,
-                    background: editAllowRevision ? "#FF4D00" : "#222",
-                    position: "relative", transition: "background 0.2s", flexShrink: 0,
-                  }}>
-                    <div style={{
-                      position: "absolute", top: 2, left: editAllowRevision ? 14 : 2,
-                      width: 12, height: 12, borderRadius: "50%",
-                      background: "#fff", transition: "left 0.2s",
-                    }} />
-                  </div>
-                  <span style={{
-                    fontFamily: "'Space Mono', 'JetBrains Mono', sans-serif", fontSize: 11,
-                    color: editAllowRevision ? "#FF4D00" : "#555",
-                  }}>
-                    {editAllowRevision ? "ON — 최대 2회 재보정 허용" : "OFF — 재보정 없음"}
-                  </span>
-                </button>
-              </label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {([
+                    { value: 0 as const, label: "없음",  desc: "바로 납품" },
+                    { value: 1 as const, label: "1회",   desc: "재보정 1회" },
+                    { value: 2 as const, label: "2회",   desc: "최대 2회" },
+                  ]).map(({ value, label, desc }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setEditMaxRevisionCount(value)}
+                      style={{
+                        flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
+                        gap: 2, padding: "8px 4px", cursor: "pointer",
+                        background: editMaxRevisionCount === value ? "rgba(255,77,0,0.08)" : "transparent",
+                        border: editMaxRevisionCount === value ? "1px solid rgba(255,77,0,0.5)" : "1px solid #333",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      <span style={{ fontFamily: "'Space Mono', sans-serif", fontSize: 12, fontWeight: 700, color: editMaxRevisionCount === value ? "#FF4D00" : "#555" }}>
+                        {label}
+                      </span>
+                      <span style={{ fontSize: 10, color: editMaxRevisionCount === value ? "rgba(255,77,0,0.6)" : "#444" }}>
+                        {desc}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
               {saveError && <div className={styles.errBox}>{saveError}</div>}
               <div className={styles.btnRow}>
                 <button type="button" className={styles.btnSecondary} onClick={() => { setEditMode(false); setSaveError(""); }}>

@@ -69,7 +69,8 @@ export function buildCompactSteps(
     onVersionsV2: () => void;
   }
 ): FlowStep[] {
-  const { status, allowRevision } = project;
+  const { status } = project;
+  const allowRevision = project.maxRevisionCount > 0;
   const stepCount = resolveStepCount(status, allowRevision);
   const isSelecting = status === "selecting";
 

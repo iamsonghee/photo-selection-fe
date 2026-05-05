@@ -14,7 +14,12 @@ type PhotosRow = Database["public"]["Tables"]["photos"]["Row"];
 type SelectionsRow = Database["public"]["Tables"]["selections"]["Row"];
 
 function mapProjectRow(row: ProjectsRow): Project {
-  const r = row as ProjectsRow & { customer_cancel_count?: number | null; allow_revision?: boolean | null };
+  const r = row as ProjectsRow & {
+    customer_cancel_count?: number | null;
+    max_revision_count?: number | null;
+    revision_round?: number | null;
+    review_deadline?: string | null;
+  };
   return {
     id: row.id,
     name: row.name,
@@ -30,7 +35,9 @@ function mapProjectRow(row: ProjectsRow): Project {
     confirmedAt: row.confirmed_at ?? undefined,
     deliveredAt: (row as { delivered_at?: string | null }).delivered_at ?? undefined,
     customerCancelCount: r.customer_cancel_count ?? 0,
-    allowRevision: r.allow_revision ?? true,
+    maxRevisionCount: (r.max_revision_count ?? 0) as 0 | 1 | 2,
+    revisionRound: r.revision_round ?? 0,
+    reviewDeadline: r.review_deadline ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

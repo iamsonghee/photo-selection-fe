@@ -42,30 +42,31 @@ export const GROUP_COMPLETED: ProjectStatus[] = ["delivered"];
 
 /**
  * 상태 전환 규칙
- * - preparing → selecting: 사진 업로드 완료 후 (M >= N)
- * - selecting → confirmed: 고객 최종확정
- * - confirmed → editing: 작가 보정 시작
- * - confirmed → selecting: 고객 확정 취소 (제한 횟수 내)
- * - editing → reviewing_v1: 작가 보정본 업로드 후 고객에게 전달
- * - reviewing_v1 → delivered: 고객 전부 확정
- * - reviewing_v1 → editing_v2: 고객 재보정 요청
- * - editing_v2 → reviewing_v2: 작가 v2 업로드 후 전달
- * - reviewing_v2 → delivered: 고객 전부 확정
- * - reviewing_v2 → editing_v2: 고객 재보정 요청 (1회 남은 경우)
+ * opts.maxRevisionCount (0|1|2): 재보정 허용 횟수
+ * opts.revisionRound: 현재까지 진행된 재보정 라운드 수
+ *
+ * - maxRevisionCount=0: reviewing_v1 → delivered 만 허용
+ * - maxRevisionCount>=1: reviewing_v1 → editing_v2 허용 (round=0→1)
+ * - revisionRound < maxRevisionCount: reviewing_v2 → editing_v2 허용
+ * - revisionRound >= maxRevisionCount: reviewing_v2 → delivered 만 허용
  */
 export function canTransition(
   from: ProjectStatus,
-  to: ProjectStatus
+  to: ProjectStatus,
+  opts?: { maxRevisionCount?: number; revisionRound?: number }
 ): boolean {
+  const max = opts?.maxRevisionCount ?? 2;
+  const round = opts?.revisionRound ?? 0;
+
   const allowed: Record<ProjectStatus, ProjectStatus[]> = {
-    preparing: ["selecting"],
-    selecting: ["confirmed"],
-    confirmed: ["editing", "selecting"],
-    editing: ["reviewing_v1"],
-    reviewing_v1: ["delivered", "editing_v2"],
-    editing_v2: ["reviewing_v2"],
-    reviewing_v2: ["delivered", "editing_v2"],
-    delivered: [],
+    preparing:    ["selecting"],
+    selecting:    ["confirmed"],
+    confirmed:    ["editing", "selecting"],
+    editing:      ["reviewing_v1"],
+    reviewing_v1: max > 0 ? ["delivered", "editing_v2"] : ["delivered"],
+    editing_v2:   ["reviewing_v2"],
+    reviewing_v2: round < max ? ["delivered", "editing_v2"] : ["delivered"],
+    delivered:    [],
   };
   return allowed[from]?.includes(to) ?? false;
 }

@@ -23,6 +23,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import styles from "./Workflow.module.css";
+import { normalizeReviewDeadlineYmd } from "@/lib/format-review-deadline";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -782,7 +783,7 @@ export default function WorkflowPageClient() {
   useEffect(() => {
     if (!project) return;
     if (!stageTabAuto) return;
-    setStageTab(defaultStageForStatus(project.status, project.allowRevision));
+    setStageTab(defaultStageForStatus(project.status, project.maxRevisionCount > 0));
   }, [project, stageTabAuto]);
 
   useEffect(() => {
@@ -922,8 +923,8 @@ export default function WorkflowPageClient() {
   // ── Derived state ──────────────────────────────────────────────────────────
 
   const inV2Phase     = ["editing_v2", "reviewing_v2", "delivered"].includes(project.status);
-  const showV2Tab     = project.allowRevision;
-  const v2Dimmed      = project.allowRevision && !inV2Phase;
+  const showV2Tab     = project.maxRevisionCount > 0;
+  const v2Dimmed      = project.maxRevisionCount > 0 && !inV2Phase;
   const canDeleteV1   = project.status === "editing";
   const canDeleteV2   = project.status === "editing_v2";
   const isSelecting   = project.status === "selecting";
@@ -1071,11 +1072,14 @@ export default function WorkflowPageClient() {
     try {
       // 검토 기한이 입력된 경우 먼저 저장
       if (reviewDeadline) {
-        await fetch(`/api/photographer/projects/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ review_deadline: reviewDeadline }),
-        });
+        const ymd = normalizeReviewDeadlineYmd(reviewDeadline);
+        if (ymd) {
+          await fetch(`/api/photographer/projects/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ review_deadline: ymd }),
+          });
+        }
       }
       const res = await fetch(`/api/photographer/projects/${id}/status`, {
         method: "PATCH",
@@ -1180,7 +1184,7 @@ export default function WorkflowPageClient() {
         <div className="hidden md:block">
         <StageStepper
           status={project.status}
-          allowRevision={project.allowRevision}
+          allowRevision={project.maxRevisionCount > 0}
           v1Uploaded={counts.v1Uploaded}
           v1Total={counts.total}
           approved={counts.approved}

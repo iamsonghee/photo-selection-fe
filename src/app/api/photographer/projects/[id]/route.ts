@@ -133,8 +133,8 @@ export async function PATCH(
         payload.access_pin = body.access_pin;
       }
     }
-    if (typeof body.allow_revision === 'boolean') {
-      payload.allow_revision = body.allow_revision;
+    if (typeof body.max_revision_count === 'number' && [0, 1, 2].includes(body.max_revision_count)) {
+      payload.max_revision_count = body.max_revision_count;
     }
     if ('review_deadline' in body) {
       payload.review_deadline = body.review_deadline ?? null;

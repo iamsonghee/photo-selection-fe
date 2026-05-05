@@ -21,6 +21,13 @@ import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHead
 
 const QUICK_DAYS = [3, 5, 7, 14, 30];
 
+function formatPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
+
 function getErrorMessage(e: unknown): string {
   if (e instanceof Error && e.message) return e.message;
   if (e && typeof e === "object") {
@@ -100,7 +107,7 @@ export default function NewProjectPage() {
   );
   const [location,      setLocation]      = useState("");
   const [accessPin,     setAccessPin]     = useState("");
-  const [allowRevision, setAllowRevision] = useState(true);
+  const [maxRevisionCount, setMaxRevisionCount] = useState<0 | 1 | 2>(2);
   const [submitting,    setSubmitting]    = useState(false);
   const [error,         setError]         = useState<string | null>(null);
   const [projectCount,  setProjectCount]  = useState<number | null>(null);
@@ -164,7 +171,7 @@ export default function NewProjectPage() {
         shoot_type: shootType || null,
         customer_phone: customerPhone.trim() || null,
         access_pin: accessPin || null,
-        allow_revision: allowRevision,
+        max_revision_count: maxRevisionCount,
         location: location.trim() || null,
       });
       await fetch("/api/photographer/project-logs", {
@@ -317,8 +324,9 @@ export default function NewProjectPage() {
                   <input
                     className="np-input"
                     value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    onChange={(e) => setCustomerPhone(formatPhone(e.target.value))}
                     placeholder="010-0000-0000"
+                    inputMode="numeric"
                   />
                   <span className="text-[10px] text-zinc-700">알림 기능 연동 시 사용됩니다</span>
                 </Field>
@@ -453,33 +461,28 @@ export default function NewProjectPage() {
               </Field>
 
               {/* 재보정 */}
-              <Field label="재보정 허용">
-                <div className="flex items-center gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setAllowRevision(!allowRevision)}
-                    className="flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-colors"
-                    style={{
-                      background: allowRevision ? "rgba(255,77,0,0.06)" : "transparent",
-                      borderColor: allowRevision ? "rgba(255,77,0,0.4)" : "#27272c",
-                    }}
-                  >
-                    <div
-                      className="w-9 h-5 rounded-full relative transition-colors shrink-0"
-                      style={{ background: allowRevision ? "#FF4D00" : "#27272c" }}
+              <Field label="재보정 허용 횟수">
+                <div className="flex gap-2">
+                  {([
+                    { value: 0, label: "없음",  desc: "보정 후 바로 납품" },
+                    { value: 1, label: "1회",   desc: "재보정 1회 허용" },
+                    { value: 2, label: "2회",   desc: "재보정 최대 2회" },
+                  ] as const).map(({ value, label, desc }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setMaxRevisionCount(value)}
+                      className="flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-semibold transition-colors"
+                      style={{
+                        background: maxRevisionCount === value ? "rgba(255,77,0,0.08)" : "transparent",
+                        borderColor: maxRevisionCount === value ? "rgba(255,77,0,0.5)" : "#27272c",
+                        color: maxRevisionCount === value ? "#FF4D00" : "#71717a",
+                      }}
                     >
-                      <div
-                        className="absolute top-[3px] w-3.5 h-3.5 bg-white rounded-full transition-all"
-                        style={{ left: allowRevision ? "18px" : "3px" }}
-                      />
-                    </div>
-                    <span className="text-xs font-semibold" style={{ color: allowRevision ? "#FF4D00" : "#52525b" }}>
-                      {allowRevision ? "허용" : "비허용"}
-                    </span>
-                  </button>
-                  <span className="text-xs text-zinc-500">
-                    {allowRevision ? "최대 2회 재보정이 가능합니다" : "재보정 없이 5단계로 진행됩니다"}
-                  </span>
+                      {label}
+                      <span className="text-[10px] font-normal" style={{ color: maxRevisionCount === value ? "rgba(255,77,0,0.6)" : "#52525b" }}>{desc}</span>
+                    </button>
+                  ))}
                 </div>
               </Field>
             </div>
