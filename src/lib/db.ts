@@ -62,6 +62,7 @@ function mapPhotoRow(
     previewUrl: row.r2_preview_url ?? row.r2_thumb_url,
     originalFilename: row.original_filename ?? null,
     fileSize: (row as unknown as Record<string, unknown>).file_size as number | null ?? null,
+    createdAt: row.created_at ?? null,
     photographerMemo: row.memo ?? undefined,
     selected,
     tag: state ? { star: state.rating as 1 | 2 | 3 | 4 | 5 | undefined, color: state.color } : undefined,

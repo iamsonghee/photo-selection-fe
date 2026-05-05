@@ -44,6 +44,8 @@ export interface Photo {
   originalFilename?: string | null;
   /** DB file_size (bytes). R2에 올라간 썸네일+미리보기 JPEG 합계 */
   fileSize?: number | null;
+  /** DB created_at — 업로드 일시 */
+  createdAt?: string | null;
   selected?: boolean;
   tag?: PhotoTag;
   comment?: string;

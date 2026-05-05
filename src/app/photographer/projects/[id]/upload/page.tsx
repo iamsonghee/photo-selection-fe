@@ -21,6 +21,7 @@ import {
   X,
   Loader2,
   ImageIcon,
+  ImagePlus,
 } from "lucide-react";
 import { getProjectById, getPhotosByProjectId } from "@/lib/db";
 import { getStatusLabel } from "@/lib/project-status";
@@ -29,8 +30,6 @@ import { parseBetaLimitError } from "@/lib/beta-limits";
 import { compressImageFileForMobileIfNeeded } from "@/lib/upload-client-compress";
 import type { Project, ProjectStatus, Photo } from "@/types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
-import { ProjectActionFlow } from "@/components/photographer/ProjectActionFlow";
-import { buildCompactSteps } from "@/lib/project-flow-steps";
 
 // ---------- constants ----------
 const ACCENT = "#FF4D00";
@@ -54,6 +53,12 @@ const PC_CONCURRENCY = 5;
 const MOBILE_BATCH_SIZE = 3;
 const MOBILE_CONCURRENCY = 2;
 const ACCEPT_TYPES = "image/*,image/heic,image/heif";
+
+/** 원본 사진을 추가 업로드할 수 있는 상태 — preparing은 자유, selecting은 경고 후 진행 */
+const UPLOADABLE_STATUSES: ReadonlyArray<ProjectStatus> = ["preparing", "selecting"];
+function canUploadOriginals(status: ProjectStatus): boolean {
+  return UPLOADABLE_STATUSES.includes(status);
+}
 
 // ---------- upload helpers ----------
 function uploadPhotosUrl(): string {
@@ -315,6 +320,107 @@ const GRID_GAP = 4;
 const GRID_PAD = 16;
 const GRID_FILENAME_H = 0; // filename is overlayed on image
 
+/**
+ * 모바일 그리드 첫 셀 — 사진 추가 CTA.
+ * 기존 prj-data-cell과 동일한 정사각 1px 보더 + paddingBottom 100% 형태를 유지하되,
+ * border-style만 dashed로 두어 그리드와 톤을 통일.
+ */
+function UploadTile({
+  isUploading,
+  uploadProgress,
+  showServerWorking,
+  hasPhotos,
+  onClick,
+}: {
+  isUploading: boolean;
+  uploadProgress: number;
+  showServerWorking: boolean;
+  hasPhotos: boolean;
+  onClick: () => void;
+}) {
+  const label = isUploading
+    ? showServerWorking
+      ? "처리 중..."
+      : `${uploadProgress}%`
+    : hasPhotos
+      ? "+ 사진 추가"
+      : "사진 선택";
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => { if (!isUploading) onClick(); }}
+      onKeyDown={(e) => {
+        if (isUploading) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className="prj-upload-tile"
+      style={{
+        background: "#080808",
+        border: `1px dashed ${isUploading ? ACCENT : "#2a2a2a"}`,
+        overflow: "hidden",
+        position: "relative",
+        display: "flex",
+        flexDirection: "column",
+        cursor: isUploading ? "wait" : "pointer",
+        transition: "border-color 0.2s, background 0.2s",
+      }}
+      aria-label={isUploading ? `업로드 중 ${uploadProgress}%` : "사진 추가하기"}
+    >
+      <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: isUploading ? ACCENT_DIM : "rgba(255,77,0,0.04)" }}>
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            padding: 8,
+          }}
+        >
+          <div
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: "50%",
+              border: `1px solid ${isUploading ? ACCENT : "#3a3a3a"}`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: isUploading ? "rgba(255,77,0,0.08)" : "transparent",
+            }}
+          >
+            {isUploading
+              ? <Loader2 size={14} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} />
+              : <ImagePlus size={14} color={ACCENT} />}
+          </div>
+          <span
+            style={{
+              fontFamily: MONO,
+              fontSize: 10,
+              letterSpacing: "0.04em",
+              color: isUploading ? ACCENT : "#9a9a9a",
+              textAlign: "center",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              maxWidth: "100%",
+            }}
+          >
+            {label}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function VirtualizedPhotoGrid({
   scrollRef,
   photos,
@@ -323,6 +429,7 @@ function VirtualizedPhotoGrid({
   isEditMode,
   minCols = 1,
   onPhotoClick,
+  leadingUploadCell,
 }: {
   scrollRef: React.RefObject<HTMLDivElement | null>;
   photos: Photo[];
@@ -331,6 +438,8 @@ function VirtualizedPhotoGrid({
   isEditMode: boolean;
   minCols?: number;
   onPhotoClick?: (index: number) => void;
+  /** 모바일 전용: 그리드 첫 셀(인덱스 0) 자리에 노출되는 업로드 CTA */
+  leadingUploadCell?: React.ReactNode;
 }) {
   const [layout, setLayout] = useState(() => {
     const cw = GRID_MIN_CELL;
@@ -356,9 +465,12 @@ function VirtualizedPhotoGrid({
     const ro = new ResizeObserver(update);
     ro.observe(root);
     return () => ro.disconnect();
-  }, [scrollRef]);
+  }, [scrollRef, minCols]);
 
-  const rowCount = Math.ceil(photos.length / layout.cols);
+  // 업로드 셀이 있으면 셀 인덱스 0에 끼워넣고, 사진은 1번 셀부터 표시
+  const hasUploadCell = !!leadingUploadCell;
+  const totalCells = photos.length + (hasUploadCell ? 1 : 0);
+  const rowCount = Math.ceil(totalCells / layout.cols);
 
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
@@ -378,7 +490,30 @@ function VirtualizedPhotoGrid({
       >
         {rowVirtualizer.getVirtualItems().map((vRow) => {
           const start = vRow.index * layout.cols;
-          const slice = photos.slice(start, start + layout.cols);
+          const cells: React.ReactNode[] = [];
+          for (let j = 0; j < layout.cols; j++) {
+            const cellIndex = start + j;
+            if (cellIndex >= totalCells) break;
+            if (hasUploadCell && cellIndex === 0) {
+              cells.push(<div key="upload-cell">{leadingUploadCell}</div>);
+              continue;
+            }
+            const photoIndex = hasUploadCell ? cellIndex - 1 : cellIndex;
+            const photo = photos[photoIndex];
+            if (!photo) continue;
+            cells.push(
+              <PhotoThumb
+                key={photo.id}
+                photo={photo}
+                index={photoIndex}
+                onDelete={onDelete}
+                deletingId={deletingId}
+                isEditMode={isEditMode}
+                scrollRootRef={scrollRef}
+                onPhotoClick={onPhotoClick}
+              />,
+            );
+          }
           return (
             <div
               key={vRow.key}
@@ -395,18 +530,7 @@ function VirtualizedPhotoGrid({
                 boxSizing: "border-box",
               }}
             >
-              {slice.map((photo, j) => (
-                <PhotoThumb
-                  key={photo.id}
-                  photo={photo}
-                  index={start + j}
-                  onDelete={onDelete}
-                  deletingId={deletingId}
-                  isEditMode={isEditMode}
-                  scrollRootRef={scrollRef}
-                  onPhotoClick={onPhotoClick}
-                />
-              ))}
+              {cells}
             </div>
           );
         })}
@@ -538,6 +662,18 @@ function VirtualizedPhotoList({
                     {(photo.fileSize / 1024).toFixed(0)}KB
                   </span>
                 )}
+                {photo.createdAt && (
+                  <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED, flexShrink: 0, whiteSpace: "nowrap" }}>
+                    {(() => {
+                      const d = new Date(photo.createdAt!);
+                      const mm = String(d.getMonth() + 1).padStart(2, "0");
+                      const dd = String(d.getDate()).padStart(2, "0");
+                      const hh = String(d.getHours()).padStart(2, "0");
+                      const min = String(d.getMinutes()).padStart(2, "0");
+                      return `${mm}/${dd} ${hh}:${min}`;
+                    })()}
+                  </span>
+                )}
                 {isEditMode && (
                   <button
                     type="button"
@@ -603,11 +739,15 @@ export default function ProjectDetailPage() {
   const [awaitingServerFinalize, setAwaitingServerFinalize] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  /** selecting 상태에서 추가 업로드 시도 시 1회 안내 모달 */
+  const [showSelectingWarn, setShowSelectingWarn] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoScrollRef = useRef<HTMLDivElement>(null);
   const stopRequestedRef = useRef(false);
   const useProxyRef = useRef(false);
+  /** selecting 안내 모달 확인 시 pending으로 넘길 드래그 파일 임시 보관 */
+  const pendingDropFilesRef = useRef<File[] | null>(null);
 
   const loadProject = useCallback(async () => {
     try {
@@ -636,6 +776,23 @@ export default function ProjectDetailPage() {
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
+
+  /** 모바일 헤더 아래 진행 라인: 업로드 종료 후 200ms 페이드아웃 */
+  const [mobileProgressBarMounted, setMobileProgressBarMounted] = useState(false);
+  useEffect(() => {
+    const uploading = uploadPhase === "sending" || uploadPhase === "processing";
+    const active = isMobile && (uploading || !!uploadError);
+    if (active) {
+      setMobileProgressBarMounted(true);
+      return;
+    }
+    if (!isMobile) {
+      setMobileProgressBarMounted(false);
+      return;
+    }
+    const id = window.setTimeout(() => setMobileProgressBarMounted(false), 200);
+    return () => window.clearTimeout(id);
+  }, [isMobile, uploadPhase, uploadError]);
 
   useEffect(() => {
     if (lightboxIndex === null) return;
@@ -802,12 +959,54 @@ export default function ProjectDetailPage() {
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setDragOver(false);
+    if (!project || !canUploadOriginals(project.status)) return;
     const list = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/") || f.type === "");
-    if (list.length) setPendingFiles(list);
-  }, []);
+    if (!list.length) return;
+    if (project.status === "selecting") {
+      // 셀렉 중에는 안내 모달 → 확인 시 pending으로 넘어가게 임시 보관
+      setPendingFiles([]);
+      setShowSelectingWarn(true);
+      pendingDropFilesRef.current = list;
+      return;
+    }
+    setPendingFiles(list);
+  }, [project]);
 
   const onDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(true); }, []);
   const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(false); }, []);
+
+  /** 파일 picker 진입 단일 통로: preparing → 즉시, selecting → 안내 모달 후, 그 외 → noop */
+  const requestOpenFilePicker = useCallback(() => {
+    if (!project) return;
+    if (uploadPhase === "sending" || uploadPhase === "processing") return;
+    if (project.status === "preparing") {
+      pendingDropFilesRef.current = null;
+      fileInputRef.current?.click();
+      return;
+    }
+    if (project.status === "selecting") {
+      pendingDropFilesRef.current = null;
+      setShowSelectingWarn(true);
+      return;
+    }
+  }, [project, uploadPhase]);
+
+  /** selecting 안내 모달 확인: 드롭 파일이 있었으면 pending으로 넘기고, 없으면 picker 오픈 */
+  const handleSelectingWarnConfirm = useCallback(() => {
+    setShowSelectingWarn(false);
+    const dropped = pendingDropFilesRef.current;
+    pendingDropFilesRef.current = null;
+    if (dropped && dropped.length) {
+      setPendingFiles(dropped);
+      return;
+    }
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleSelectingWarnCancel = useCallback(() => {
+    pendingDropFilesRef.current = null;
+    setShowSelectingWarn(false);
+  }, []);
 
   const inviteUrl = typeof window !== "undefined" ? `${window.location.origin}/c/${project?.accessToken ?? ""}` : `/c/${project?.accessToken ?? ""}`;
 
@@ -897,6 +1096,7 @@ export default function ProjectDetailPage() {
   const progressPct = N > 0 ? Math.min(100, Math.round((M / N) * 100)) : 0;
   const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
   const showServerWorking = uploadPhase === "sending" && awaitingServerFinalize;
+  const uploadAllowed = canUploadOriginals(project.status);
 
   const labelStyle: React.CSSProperties = { fontFamily: MONO, fontSize: "0.6rem", letterSpacing: "0.15em", textTransform: "uppercase", color: TEXT_MUTED, display: "block", marginBottom: 6 };
 
@@ -927,6 +1127,9 @@ export default function ProjectDetailPage() {
         .prj-data-cell .prj-overlay { position: absolute; inset: 4px; border: 1px solid transparent; transition: all 0.3s; pointer-events: none; }
         .prj-data-cell:hover .prj-overlay { border-color: rgba(255,77,0,0.3); inset: 0px; }
         .prj-data-cell:hover { border-color: rgba(255,77,0,0.4) !important; }
+        .prj-upload-tile:hover { border-color: rgba(255,77,0,0.45) !important; background: rgba(255,77,0,0.04) !important; }
+        .prj-upload-tile:active { border-color: rgba(255,77,0,0.4) !important; }
+        .prj-upload-tile:focus-visible { outline: none; border-color: ${ACCENT} !important; }
         .prj-del-btn { opacity: 0; transition: opacity 0.15s; }
         .prj-data-cell:hover .prj-del-btn { opacity: 1; }
         @media (max-width: 768px) { .prj-del-btn { opacity: 1; } }
@@ -949,15 +1152,6 @@ export default function ProjectDetailPage() {
           .prj-aside { display: none !important; }
           .prj-desktop-toolbar { display: none !important; }
           .prj-view-toolbar { display: none !important; }
-          .prj-mobile-upload {
-            display: flex !important;
-            flex-direction: column;
-            gap: 14px;
-            padding: 20px;
-            background: ${SURFACE_1};
-            border-bottom: 1px solid ${BORDER};
-            flex-shrink: 0;
-          }
           .prj-modal-box { max-width: 100% !important; margin: 0 8px !important; }
           .prj-btn-primary, .prj-btn-secondary, .prj-btn-danger { min-height: 44px !important; padding: 0 16px !important; }
           /* 고객 초대 바: 모바일 하단 탭 위 고정(스크롤 끝까지 내릴 필요 없음) */
@@ -997,6 +1191,35 @@ export default function ProjectDetailPage() {
           { label: "고객 셀렉", value: `${N}장`, accent: M >= N && N > 0 },
         ]}
       />
+
+      {/* 모바일: 헤더 바로 아래 전체 너비 진행 라인 (업로드·에러 시; 종료 시 200ms 페이드) */}
+      {mobileProgressBarMounted && (
+        <div
+          className="prj-mobile-progress md:hidden"
+          style={{
+            flexShrink: 0,
+            background: SURFACE_1,
+            opacity: isUploading || uploadError ? 1 : 0,
+            transition: "opacity 200ms ease",
+            zIndex: 11,
+          }}
+        >
+          <div style={{ height: 2, background: "#111", overflow: "hidden", position: "relative" }}>
+            {showServerWorking ? (
+              <div style={{ width: "100%", height: "100%", background: ACCENT, animation: "prj-bar-indeterminate-pulse 1.4s ease-in-out infinite", position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.35)", width: "35%", animation: "prj-bar-indet-sweep 1.1s linear infinite" }} />
+              </div>
+            ) : isUploading ? (
+              <div style={{ width: `${uploadProgress}%`, height: "100%", background: ACCENT, transition: "width 0.3s" }} />
+            ) : null}
+          </div>
+          {uploadError && (
+            <p style={{ margin: 0, padding: "6px 16px", fontFamily: MONO, fontSize: 10, color: "#FF3333", borderBottom: `1px solid ${BORDER}` }}>
+              {uploadError}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* main */}
       <main style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden", zIndex: 10, position: "relative" }}>
@@ -1109,10 +1332,10 @@ export default function ProjectDetailPage() {
             {/* dropzone */}
             <div
               className={`prj-dropzone${dragOver ? " prj-dropzone-over" : ""}`}
-              onClick={() => !isUploading && fileInputRef.current?.click()}
-              onDrop={onDrop}
-              onDragOver={onDragOver}
-              onDragLeave={onDragLeave}
+              onClick={() => !isUploading && uploadAllowed && requestOpenFilePicker()}
+              onDrop={uploadAllowed ? onDrop : undefined}
+              onDragOver={uploadAllowed ? onDragOver : undefined}
+              onDragLeave={uploadAllowed ? onDragLeave : undefined}
               style={{
                 flex: 1,
                 minHeight: 120,
@@ -1123,8 +1346,8 @@ export default function ProjectDetailPage() {
                 justifyContent: "center",
                 gap: 10,
                 padding: "32px 16px",
-                cursor: isUploading ? "not-allowed" : "pointer",
-                opacity: isUploading ? 0.7 : 1,
+                cursor: isUploading ? "not-allowed" : uploadAllowed ? "pointer" : "not-allowed",
+                opacity: isUploading ? 0.7 : uploadAllowed ? 1 : 0.5,
               }}
             >
               <div style={{ width: 52, height: 52, borderRadius: "50%", border: `1px solid #222`, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1236,61 +1459,6 @@ export default function ProjectDetailPage() {
         {/* ── Right Panel ── */}
         <section style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, overflow: "hidden" }}>
 
-          {/* ── 모바일 전용 업로드 영역 ── */}
-          <div className="prj-mobile-upload" style={{ display: "none" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 5, height: 5, background: ACCENT, flexShrink: 0 }} />
-              <span style={{ fontSize: 16, fontWeight: 700, color: TEXT_BRIGHT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {project.name}
-              </span>
-            </div>
-            <div
-              className={`prj-dropzone${dragOver ? " prj-dropzone-over" : ""}`}
-              onClick={() => !isUploading && fileInputRef.current?.click()}
-              onDrop={onDrop}
-              onDragOver={onDragOver}
-              onDragLeave={onDragLeave}
-              style={{ padding: "40px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12, cursor: isUploading ? "not-allowed" : "pointer", background: dragOver ? ACCENT_DIM : "rgba(2,2,2,0.5)", opacity: isUploading ? 0.7 : 1 }}
-            >
-              <div style={{ width: 60, height: 60, borderRadius: "50%", border: `1px solid ${isUploading ? ACCENT : "#333"}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {isUploading
-                  ? <Loader2 size={26} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} />
-                  : <Upload size={26} color={ACCENT} />}
-              </div>
-              <p style={{ fontSize: 15, fontWeight: 600, color: TEXT_BRIGHT, textAlign: "center" }}>
-                {isUploading ? (showServerWorking ? "서버 처리 중..." : "업로드 중...") : "탭하여 사진 선택"}
-              </p>
-              <p style={{ fontSize: 12, color: TEXT_MUTED, textAlign: "center" }}>
-                {isUploading
-                  ? (showServerWorking ? "썸네일·저장 처리 중 · 창을 닫지 마세요" : `${uploadProgress}%`)
-                  : "JPG · PNG · HEIC 지원"}
-              </p>
-            </div>
-            <div style={{ background: SURFACE_2, border: `1px solid ${BORDER}`, padding: "12px 16px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontFamily: MONO, fontSize: 12, color: TEXT_BRIGHT }}>{M}장 / {N > 0 ? N : "—"}장</span>
-                <span style={{ fontFamily: MONO, fontSize: 12, color: isUploading ? ACCENT : TEXT_MUTED }}>
-                  {isUploading ? `${uploadProgress}%` : `${progressPct}%`}
-                </span>
-              </div>
-              <div style={{ height: 3, background: "#111", overflow: "hidden" }}>
-                <div style={{ width: `${isUploading ? uploadProgress : progressPct}%`, height: "100%", background: ACCENT, transition: "width 0.3s" }} />
-              </div>
-              <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid #1a1a1a`, display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED }}>진행</span>
-                  <span style={{ fontFamily: MONO, fontSize: 9, color: N <= 0 ? "#555" : M >= N ? "#2ed573" : ACCENT, textAlign: "right" }}>
-                    {N <= 0 ? "셀렉 장수 미정" : M >= N ? "활성화 가능" : `${Math.max(0, N - M)}장 더 필요`}
-                  </span>
-                </div>
-                <p style={{ margin: 0, fontFamily: MONO, fontSize: 8, color: "#555", lineHeight: 1.45 }}>
-                  {N > 0 ? `${N}장 채우면 초대 링크를 켤 수 있어요.` : "셀렉 장수를 정하면 안내가 바뀝니다."}
-                </p>
-              </div>
-              {uploadError && <p style={{ fontFamily: MONO, fontSize: 10, color: "#FF3333", marginTop: 8 }}>{uploadError}</p>}
-            </div>
-          </div>
-
           {/* ── 뷰 토글 툴바 ── */}
           {photos.length > 0 && (
             <div className="prj-desktop-toolbar prj-view-toolbar" style={{ height: 44, borderBottom: `1px solid ${BORDER}`, background: SURFACE_1, display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 16, paddingRight: 16, flexShrink: 0 }}>
@@ -1334,20 +1502,21 @@ export default function ProjectDetailPage() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", gap: 8 }}>
                 <span className="prj-tech-label" style={{ color: TEXT_MUTED }}>불러오는 중...</span>
               </div>
-            ) : photos.length === 0 ? (
+            ) : photos.length === 0 && !(isMobile && uploadAllowed) ? (
               <div
-                onClick={() => !isUploading && fileInputRef.current?.click()}
-                onDrop={onDrop}
-                onDragOver={onDragOver}
-                onDragLeave={onDragLeave}
+                onClick={() => !isUploading && uploadAllowed && requestOpenFilePicker()}
+                onDrop={uploadAllowed ? onDrop : undefined}
+                onDragOver={uploadAllowed ? onDragOver : undefined}
+                onDragLeave={uploadAllowed ? onDragLeave : undefined}
                 style={{
                   display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                   height: "100%", gap: 16,
-                  cursor: isUploading ? "not-allowed" : "pointer",
+                  cursor: isUploading ? "not-allowed" : uploadAllowed ? "pointer" : "not-allowed",
                   background: dragOver ? ACCENT_DIM : "transparent",
                   border: `2px dashed ${dragOver ? ACCENT : BORDER_MID}`,
                   margin: 24,
                   transition: "all 0.2s",
+                  opacity: uploadAllowed ? 1 : 0.5,
                 }}
               >
                 <div style={{ width: 64, height: 64, borderRadius: "50%", border: `1px solid ${dragOver ? ACCENT : "#2a2a2a"}`, display: "flex", alignItems: "center", justifyContent: "center", transition: "border-color 0.2s" }}>
@@ -1365,7 +1534,7 @@ export default function ProjectDetailPage() {
                   </p>
                 </div>
               </div>
-            ) : viewMode === "grid" ? (
+            ) : viewMode === "grid" || (photos.length === 0 && isMobile && uploadAllowed) ? (
               <VirtualizedPhotoGrid
                 scrollRef={photoScrollRef}
                 photos={photos}
@@ -1374,6 +1543,17 @@ export default function ProjectDetailPage() {
                 isEditMode={project.status === "preparing"}
                 minCols={isMobile ? 3 : 1}
                 onPhotoClick={setLightboxIndex}
+                leadingUploadCell={
+                  isMobile && uploadAllowed ? (
+                    <UploadTile
+                      isUploading={isUploading}
+                      uploadProgress={uploadProgress}
+                      showServerWorking={showServerWorking}
+                      hasPhotos={photos.length > 0}
+                      onClick={requestOpenFilePicker}
+                    />
+                  ) : undefined
+                }
               />
             ) : (
               <VirtualizedPhotoList
@@ -1599,6 +1779,50 @@ export default function ProjectDetailPage() {
       {toast && (
         <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#080808", border: `1px solid ${BORDER_MID}`, padding: "10px 20px", zIndex: 200, fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT, pointerEvents: "none", whiteSpace: "nowrap" }}>
           {toast}
+        </div>
+      )}
+
+      {/* ── selecting 안내 모달 ── */}
+      {showSelectingWarn && (
+        <div
+          className="prj-modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleSelectingWarnCancel();
+          }}
+        >
+          <div className="prj-modal-box" style={{ maxWidth: 420 }}>
+            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 6, height: 6, background: ACCENT }} />
+              <span className="prj-tech-label" style={{ color: ACCENT }}>안내</span>
+            </div>
+            <div style={{ padding: 24 }}>
+              <p style={{ fontSize: 15, fontWeight: 700, color: TEXT_BRIGHT, marginBottom: 10 }}>
+                원본 사진을 추가할까요?
+              </p>
+              <p style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, lineHeight: 1.7, marginBottom: 18 }}>
+                고객이 사진을 고르고 있는 단계예요. 추가된 사진은 즉시 갤러리에 반영되며 고객 화면에도 곧바로 보입니다.
+              </p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={handleSelectingWarnCancel}
+                  className="prj-btn-secondary"
+                  style={{ flex: 1, padding: "10px 0" }}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSelectingWarnConfirm}
+                  className="prj-btn-primary"
+                  style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                >
+                  <ImagePlus size={12} />
+                  추가하기
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
