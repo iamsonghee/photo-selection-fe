@@ -978,6 +978,13 @@ export default function WorkflowPageClient() {
     }
   }, [rows, filter, project?.status]);
 
+  // 필터된 행의 photoId → viewer 인덱스 매핑 (전체 rows 렌더 시 올바른 뷰어 인덱스 전달용)
+  const filteredIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    filteredRows.forEach((row, i) => map.set(row.photo.id, i));
+    return map;
+  }, [filteredRows]);
+
   const viewerItems = useMemo(() =>
     filteredRows.map((row) => ({
       original: {
@@ -1518,57 +1525,70 @@ export default function WorkflowPageClient() {
               </div>
             ) : (
               <>
-                {/* 3개 탭 그리드를 항상 DOM에 유지 — 탭 전환 시 이미지 재로딩 방지 */}
+                {/* 3개 탭 그리드 항상 DOM 유지 + 필터 미통과 행도 display:none으로 유지
+                    → 탭 전환/필터 변경 시 카드 언마운트 없음 = 이미지 재요청 없음 */}
                 <div className={cardCols} style={{ display: stageTab === "original" ? undefined : "none" }}>
-                  {filteredRows.map((row, rowIdx) => (
-                    <OriginalCard
-                      key={row.photo.id}
-                      row={row}
-                      index={rowIdx}
-                      onOpenViewer={openViewer}
-                    />
-                  ))}
+                  {rows.map((row) => {
+                    const visIdx = filteredIndexMap.get(row.photo.id);
+                    return (
+                      <div key={row.photo.id} style={{ display: visIdx !== undefined ? "contents" : "none" }}>
+                        <OriginalCard
+                          row={row}
+                          index={visIdx ?? 0}
+                          onOpenViewer={openViewer}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className={cardCols} style={{ display: stageTab === "v1" ? undefined : "none" }}>
-                  {filteredRows.map((row, rowIdx) => (
-                    <V1Card
-                      key={row.photo.id}
-                      row={row}
-                      index={rowIdx}
-                      isReviewingV1={isReviewingV1}
-                      v1DisplayStatus={effectiveV1Status(row.v1?.reviewStatus ?? null)}
-                      canDeleteV1={canDeleteV1}
-                      deletingId={deletingId}
-                      canUploadV1={canUploadV1}
-                      onOpenViewer={openViewer}
-                      onDelete={handleDelete}
-                      onOpenPanel={() => openPanel(1)}
-                      onReplace={replaceVersion}
-                      replacingId={replacingId}
-                      getVersionUrl={getVersionUrl}
-                    />
-                  ))}
+                  {rows.map((row) => {
+                    const visIdx = filteredIndexMap.get(row.photo.id);
+                    return (
+                      <div key={row.photo.id} style={{ display: visIdx !== undefined ? "contents" : "none" }}>
+                        <V1Card
+                          row={row}
+                          index={visIdx ?? 0}
+                          isReviewingV1={isReviewingV1}
+                          v1DisplayStatus={effectiveV1Status(row.v1?.reviewStatus ?? null)}
+                          canDeleteV1={canDeleteV1}
+                          deletingId={deletingId}
+                          canUploadV1={canUploadV1}
+                          onOpenViewer={openViewer}
+                          onDelete={handleDelete}
+                          onOpenPanel={() => openPanel(1)}
+                          onReplace={replaceVersion}
+                          replacingId={replacingId}
+                          getVersionUrl={getVersionUrl}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className={cardCols} style={{ display: stageTab === "v2" ? undefined : "none" }}>
-                  {filteredRows.map((row, rowIdx) => (
-                    <V2Card
-                      key={row.photo.id}
-                      row={row}
-                      index={rowIdx}
-                      isReviewingV2={isReviewingV2}
-                      effectiveV1Status={effectiveV1Status(row.v1?.reviewStatus ?? null)}
-                      v2Dimmed={v2Dimmed}
-                      canDeleteV2={canDeleteV2}
-                      deletingId={deletingId}
-                      canUploadV2={canUploadV2}
-                      onOpenViewer={openViewer}
-                      onDelete={handleDelete}
-                      onOpenPanel={() => openPanel(2)}
-                      onReplace={replaceVersion}
-                      replacingId={replacingId}
-                      getVersionUrl={getVersionUrl}
-                    />
-                  ))}
+                  {rows.map((row) => {
+                    const visIdx = filteredIndexMap.get(row.photo.id);
+                    return (
+                      <div key={row.photo.id} style={{ display: visIdx !== undefined ? "contents" : "none" }}>
+                        <V2Card
+                          row={row}
+                          index={visIdx ?? 0}
+                          isReviewingV2={isReviewingV2}
+                          effectiveV1Status={effectiveV1Status(row.v1?.reviewStatus ?? null)}
+                          v2Dimmed={v2Dimmed}
+                          canDeleteV2={canDeleteV2}
+                          deletingId={deletingId}
+                          canUploadV2={canUploadV2}
+                          onOpenViewer={openViewer}
+                          onDelete={handleDelete}
+                          onOpenPanel={() => openPanel(2)}
+                          onReplace={replaceVersion}
+                          replacingId={replacingId}
+                          getVersionUrl={getVersionUrl}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </>
             )}
