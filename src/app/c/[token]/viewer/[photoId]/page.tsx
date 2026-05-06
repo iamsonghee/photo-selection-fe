@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Check, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useSelection } from "@/contexts/SelectionContext";
+import { PrevNextButton } from "@/components/PrevNextButton";
+import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
 import {
   parseFilterFromSearchParams,
   buildGalleryHrefWithFocus,
@@ -29,6 +31,45 @@ const COLOR_OPTIONS: { key: ColorTag; color: string }[] = [
 ];
 
 const COMMENT_MAX_LENGTH = 150;
+
+const MONO = "'JetBrains Mono', 'Space Mono', monospace";
+
+const SELECT_BASE = {
+  height: 40,
+  padding: "0 18px",
+  display: "flex" as const,
+  alignItems: "center" as const,
+  justifyContent: "center" as const,
+  gap: 7,
+  fontFamily: MONO,
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: "pointer" as const,
+  border: "1px solid",
+  borderRadius: 8,
+  transition: "all 0.15s",
+  letterSpacing: "0.02em",
+  flexShrink: 0,
+};
+
+const SELECT_ACTIVE = {
+  background: "rgba(255,77,0,0.12)",
+  color: "#FF4D00",
+  borderColor: "rgba(255,77,0,0.45)",
+} as const;
+
+const SELECT_INACTIVE = {
+  background: "#FF4D00",
+  color: "#000",
+  borderColor: "#FF4D00",
+} as const;
+
+const SELECT_BASE_MOBILE = {
+  ...SELECT_BASE,
+  height: 36,
+  padding: "0 14px",
+  fontSize: 12,
+};
 
 function getObjectFitContainOffset(
   containerW: number, containerH: number,
@@ -100,15 +141,21 @@ export default function ViewerPage() {
   const photoId = (params?.photoId as string) ?? "";
   const { project, photos: contextPhotos, selectedIds, Y, toggle, photoStates, updatePhotoState } = useSelection();
 
+  // 로컬 state로 현재 사진 관리 — router.push 없이 전환해 컴포넌트 재마운트 방지
+  const [activePhotoId, setActivePhotoId] = useState(photoId);
+
+  // 외부에서 URL이 바뀔 때(갤러리→뷰어 첫 진입, 브라우저 앞/뒤) 동기화
+  useEffect(() => { setActivePhotoId(photoId); }, [photoId]);
+
   const filterState = useMemo(() => parseFilterFromSearchParams(searchParams), [searchParams]);
   const filteredPhotos = useMemo(
     () => getFilteredPhotos(contextPhotos ?? [], selectedIds, photoStates, filterState),
     [contextPhotos, selectedIds, photoStates, filterState]
   );
-  const currentIndex = filteredPhotos.findIndex((p) => p.id === photoId);
+  const currentIndex = filteredPhotos.findIndex((p) => p.id === activePhotoId);
   const current = currentIndex >= 0
     ? filteredPhotos[currentIndex]
-    : (contextPhotos ?? []).find((p) => p.id === photoId) ?? null;
+    : (contextPhotos ?? []).find((p) => p.id === activePhotoId) ?? null;
 
   const star  = current ? photoStates[current.id]?.rating : undefined;
   const color = current ? photoStates[current.id]?.color  : undefined;
@@ -117,11 +164,40 @@ export default function ViewerPage() {
   const [starPressRing,  setStarPressRing]  = useState<number | null>(null);
   const [colorPressRing, setColorPressRing] = useState<ColorTag | null>(null);
   const [draftComment,   setDraftComment]   = useState("");
-  const [commentSaveFeedback, setCommentSaveFeedback] = useState<"idle" | "saved">("idle");
   const [showShortcuts,  setShowShortcuts]  = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirming,       setConfirming]       = useState(false);
+  const [confirmError,     setConfirmError]     = useState<string | null>(null);
 
   const N = project?.requiredCount ?? 0;
+  const canConfirm  = N > 0 && Y === N;
+  const progressPct = N > 0 ? Math.min(Math.round((Y / N) * 100), 100) : 0;
   const queryString = searchParams.toString() ? `?${searchParams.toString()}` : "";
+
+  const handleConfirm = useCallback(async () => {
+    if (!project?.id || !token) return;
+    setConfirming(true);
+    setConfirmError(null);
+    try {
+      const res = await fetch("/api/c/confirm", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ token, project_id: project.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setConfirmError((data as { error?: string }).error ?? `오류 (${res.status})`);
+        setConfirming(false);
+        return;
+      }
+      setShowConfirmModal(false);
+      window.location.href = `/c/${token}/confirmed`;
+    } catch (e) {
+      console.error(e);
+      setConfirming(false);
+      setConfirmError("네트워크 오류가 발생했습니다");
+    }
+  }, [project?.id, token]);
 
   const filmstripRef     = useRef<HTMLDivElement>(null);
   const filmstripSeenRef = useRef(false); // 마운트 후 첫 실행 여부 추적
@@ -133,8 +209,7 @@ export default function ViewerPage() {
     const GAP     = 16;
     const step    = THUMB_W + GAP;
     const target  = currentIndex * step - container.clientWidth / 2 + THUMB_W / 2;
-    // 컴포넌트가 매 내비게이션마다 리마운트되므로, 마운트 직후엔 즉시 이동(animation 없음)
-    // 동일 인스턴스에서 인덱스가 바뀔 때만 smooth 처리
+    // 첫 마운트(갤러리→뷰어 진입)는 instant, 이후 사진 전환은 smooth
     const behavior = filmstripSeenRef.current ? "smooth" : "instant";
     filmstripSeenRef.current = true;
     container.scrollTo({ left: Math.max(0, target), behavior });
@@ -144,15 +219,6 @@ export default function ViewerPage() {
     if (current?.id) setDraftComment(photoStates[current.id]?.comment ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id]);
-
-  useEffect(() => { setCommentSaveFeedback("idle"); }, [current?.id]);
-
-  const savedCommentForCurrent = current ? (photoStates[current.id]?.comment ?? "") : "";
-  const hasUnsavedComment = Boolean(current) && draftComment.trim() !== savedCommentForCurrent.trim();
-
-  useEffect(() => {
-    if (commentSaveFeedback === "saved" && hasUnsavedComment) setCommentSaveFeedback("idle");
-  }, [draftComment, commentSaveFeedback, hasUnsavedComment]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -173,35 +239,41 @@ export default function ViewerPage() {
   }, [current, photoStates, updatePhotoState]);
 
   const saveComment = useCallback(() => {
-    if (!current || !hasUnsavedComment) return;
-    updatePhotoState(current.id, { comment: draftComment.trim() });
-    setCommentSaveFeedback("saved");
-    window.setTimeout(() => setCommentSaveFeedback("idle"), 2500);
-  }, [current, draftComment, hasUnsavedComment, updatePhotoState]);
+    if (!current) return;
+    const trimmed = draftComment.trim();
+    if (trimmed === (photoStates[current.id]?.comment ?? "")) return;
+    updatePhotoState(current.id, { comment: trimmed });
+  }, [current, draftComment, photoStates, updatePhotoState]);
 
   const toggleSelect = useCallback(() => { if (current) toggle(current.id); }, [current, toggle]);
 
   // ── Navigation ───────────────────────────────────────────────────────────
 
+  // router.push 대신 history.replaceState 사용 → 컴포넌트 재마운트 없이 URL만 갱신
+  const navigateTo = useCallback((id: string) => {
+    setActivePhotoId(id);
+    window.history.replaceState(null, "", `/c/${token}/viewer/${id}${queryString}`);
+  }, [token, queryString]);
+
   const goPrev = useCallback(() => {
     if (currentIndex <= 0) return;
-    router.push(`/c/${token}/viewer/${filteredPhotos[currentIndex - 1].id}${queryString}`, { scroll: false });
-  }, [currentIndex, filteredPhotos, router, token, queryString]);
+    navigateTo(filteredPhotos[currentIndex - 1].id);
+  }, [currentIndex, filteredPhotos, navigateTo]);
 
   const goNext = useCallback(() => {
     if (currentIndex >= filteredPhotos.length - 1) return;
-    router.push(`/c/${token}/viewer/${filteredPhotos[currentIndex + 1].id}${queryString}`, { scroll: false });
-  }, [currentIndex, filteredPhotos, router, token, queryString]);
+    navigateTo(filteredPhotos[currentIndex + 1].id);
+  }, [currentIndex, filteredPhotos, navigateTo]);
 
   const goPrevWrap = useCallback(() => {
     if (!filteredPhotos.length) return;
-    router.push(`/c/${token}/viewer/${filteredPhotos[(currentIndex - 1 + filteredPhotos.length) % filteredPhotos.length].id}${queryString}`, { scroll: false });
-  }, [currentIndex, filteredPhotos, router, token, queryString]);
+    navigateTo(filteredPhotos[(currentIndex - 1 + filteredPhotos.length) % filteredPhotos.length].id);
+  }, [currentIndex, filteredPhotos, navigateTo]);
 
   const goNextWrap = useCallback(() => {
     if (!filteredPhotos.length) return;
-    router.push(`/c/${token}/viewer/${filteredPhotos[(currentIndex + 1) % filteredPhotos.length].id}${queryString}`, { scroll: false });
-  }, [currentIndex, filteredPhotos, router, token, queryString]);
+    navigateTo(filteredPhotos[(currentIndex + 1) % filteredPhotos.length].id);
+  }, [currentIndex, filteredPhotos, navigateTo]);
 
   // ── Touch swipe ───────────────────────────────────────────────────────────
 
@@ -221,6 +293,10 @@ export default function ViewerPage() {
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const tag = (e.target as HTMLElement).tagName;
     if (tag === "TEXTAREA" || tag === "INPUT") return;
+    if (showConfirmModal) {
+      if (e.key === "Escape" && !confirming) setShowConfirmModal(false);
+      return;
+    }
     if (e.key === "?" || (e.shiftKey && e.key === "/")) { setShowShortcuts(s => !s); return; }
     if (e.key === "Escape") { setShowShortcuts(false); return; }
     switch (e.code) {
@@ -237,12 +313,13 @@ export default function ViewerPage() {
       case "ArrowLeft":  e.preventDefault(); goPrevWrap(); break;
       case "ArrowRight": e.preventDefault(); goNextWrap(); break;
     }
-  }, [setStar, setColor, goPrevWrap, goNextWrap]);
+  }, [setStar, setColor, goPrevWrap, goNextWrap, showConfirmModal, confirming]);
 
   useEffect(() => {
     const handleKeyUp = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "TEXTAREA" || tag === "INPUT") return;
+      if (showConfirmModal) return;
       if (e.code === "Space") { e.preventDefault(); e.stopPropagation(); toggleSelect(); }
     };
     window.addEventListener("keydown", handleKeyDown, { capture: true });
@@ -251,7 +328,7 @@ export default function ViewerPage() {
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
       window.removeEventListener("keyup", handleKeyUp, { capture: true });
     };
-  }, [handleKeyDown, toggleSelect]);
+  }, [handleKeyDown, toggleSelect, showConfirmModal]);
 
   useEffect(() => {
     if (!project) return;
@@ -322,18 +399,10 @@ export default function ViewerPage() {
           background: rgba(255,255,255,0.05);
           border: 1px solid rgba(255,255,255,0.1);
           outline: none; font-size: 13px; color: #e5e7eb;
-          font-family: 'Pretendard', sans-serif;
+          font-family: 'Inter', -apple-system, sans-serif;
         }
         .fs-comment-input::placeholder { color: #555; }
         .fs-comment-input:focus { border-color: rgba(255,77,0,0.4); }
-        .fs-btn-clip {
-          clip-path: polygon(0 0, 100% 0, 100% 70%, 90% 100%, 0 100%);
-          display: flex; align-items: center; justify-content: center; gap: 6px;
-          cursor: pointer; border: none;
-          font-family: 'Space Grotesk', sans-serif;
-          font-weight: 900; letter-spacing: -0.02em; transition: opacity 0.15s;
-        }
-        .fs-btn-clip:hover { opacity: 0.85; }
         .fs-star { cursor: pointer; transition: transform 0.1s; }
         .fs-star:hover { transform: scale(1.2); }
       `}</style>
@@ -406,19 +475,22 @@ export default function ViewerPage() {
         {/* Main image area */}
         <main style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 10, overflow: "hidden", minHeight: 0 }}>
 
-          {/* Left nav */}
-          <button type="button" onClick={goPrev} disabled={currentIndex === 0}
-            className="fs-nav-btn"
-            style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", zIndex: 20, width: 48, height: 48, borderRadius: "50%" }}>
-            <ChevronLeft style={{ width: 24, height: 24 }} />
-          </button>
-
-          {/* Right nav */}
-          <button type="button" onClick={goNext} disabled={currentIndex === filteredPhotos.length - 1}
-            className="fs-nav-btn"
-            style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", zIndex: 20, width: 48, height: 48, borderRadius: "50%" }}>
-            <ChevronRight style={{ width: 24, height: 24 }} />
-          </button>
+          <PrevNextButton
+            direction="prev"
+            onClick={goPrev}
+            disabled={currentIndex === 0}
+            size="lg"
+            align="edge"
+            style={{ zIndex: 20 }}
+          />
+          <PrevNextButton
+            direction="next"
+            onClick={goNext}
+            disabled={currentIndex === filteredPhotos.length - 1}
+            size="lg"
+            align="edge"
+            style={{ zIndex: 20 }}
+          />
 
           {/* Image frame */}
           <div style={{ position: "relative" }}
@@ -568,51 +640,21 @@ export default function ViewerPage() {
                 className="fs-comment-input"
                 value={draftComment}
                 onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
+                onBlur={saveComment}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") saveComment();
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                 }}
-                placeholder="Retouching notes..."
-                style={{ flex: 1, padding: "10px 14px", borderRadius: 6, minWidth: 0, minHeight: 40 }}
+                placeholder="코멘트..."
+                style={{ flex: 1, padding: "0 14px", height: 38, borderRadius: 8, minWidth: 0 }}
               />
-              <button
-                type="button"
-                onClick={saveComment}
-                disabled={!hasUnsavedComment}
-                className="fs-btn-clip"
-                style={{
-                  height: 40,
-                  padding: "0 16px",
-                  fontSize: 11,
-                  flexShrink: 0,
-                  letterSpacing: "0.04em",
-                  ...(commentSaveFeedback === "saved"
-                    ? { background: "#22c55e", color: "black" }
-                    : hasUnsavedComment
-                      ? { background: "#FF4D00", color: "black" }
-                      : { background: "rgba(255,255,255,0.06)", color: "#555", cursor: "not-allowed" }),
-                }}
-              >
-                {commentSaveFeedback === "saved" ? (
-                  <Check style={{ width: 14, height: 14 }} strokeWidth={3} />
-                ) : (
-                  "Post"
-                )}
-              </button>
             </div>
 
             <button
               type="button"
               onClick={toggleSelect}
-              className="fs-btn-clip"
               style={{
-                height: 40,
-                padding: "0 18px",
-                fontSize: 12,
-                flexShrink: 0,
-                letterSpacing: "0.02em",
-                ...(isCurrentSelected
-                  ? { background: "rgba(255,77,0,0.15)", color: "#FF4D00", outline: "1px solid rgba(255,77,0,0.4)" }
-                  : { background: "#FF4D00", color: "black" }),
+                ...SELECT_BASE,
+                ...(isCurrentSelected ? SELECT_ACTIVE : SELECT_INACTIVE),
               }}
             >
               <Check style={{ width: 14, height: 14 }} strokeWidth={3} />
@@ -642,11 +684,13 @@ export default function ViewerPage() {
                   key={photo.id}
 
                   className={`fs-thumb${isActive ? " active" : ""}`}
-                  onClick={() => router.push(`/c/${token}/viewer/${photo.id}${queryString}`, { scroll: false })}
+                  onClick={() => navigateTo(photo.id)}
                 >
                   <img
                     src={thumbSrc}
                     alt={thumbName}
+                    loading="lazy"
+                    decoding="async"
                     style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                   />
                   <span style={{
@@ -682,6 +726,26 @@ export default function ViewerPage() {
             <div style={{ width: 16, height: 16, border: "1px solid rgba(255,255,255,0.2)" }} />
           </div>
         </footer>
+
+        {/* Selection footer (show on complete OR over-select, like gallery) */}
+        <div
+          style={{
+            maxHeight: N > 0 && Y >= N ? 88 : 0,
+            overflow: "hidden",
+            transition: "max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+            flexShrink: 0,
+          }}
+          aria-hidden={!(N > 0 && Y >= N)}
+        >
+          <SelectionConfirmFooter
+            Y={Y}
+            N={N}
+            position="static"
+            disabled={!canConfirm}
+            onConfirm={() => setShowConfirmModal(true)}
+            zIndex={50}
+          />
+        </div>
       </div>
 
       {/* ════ MOBILE (<md): fullscreen stack ════ */}
@@ -721,14 +785,8 @@ export default function ViewerPage() {
             )
             : <div style={{ color: "#3a5a6e", padding: 16 }}>사진 없음</div>
           }
-          <button type="button" onClick={goPrevWrap}
-            style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", width: 36, height: 36, borderRadius: "50%", background: "rgba(0,0,0,0.35)", border: "none", color: "rgba(255,255,255,0.85)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <ChevronLeft style={{ width: 18, height: 18 }} />
-          </button>
-          <button type="button" onClick={goNextWrap}
-            style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", width: 36, height: 36, borderRadius: "50%", background: "rgba(0,0,0,0.35)", border: "none", color: "rgba(255,255,255,0.85)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <ChevronRight style={{ width: 18, height: 18 }} />
-          </button>
+          <PrevNextButton direction="prev" onClick={goPrevWrap} size="sm" />
+          <PrevNextButton direction="next" onClick={goNextWrap} size="sm" />
         </div>
 
         {/* Bottom action bar */}
@@ -738,7 +796,7 @@ export default function ViewerPage() {
           padding: "10px 16px calc(10px + env(safe-area-inset-bottom))",
           flexShrink: 0, display: "flex", flexDirection: "column", gap: 8,
         }}>
-          {/* Row 1: Stars · Colors · Select */}
+          {/* Row 1: Stars · Colors */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {/* Stars */}
             <div style={{ display: "flex", gap: 1, flexShrink: 0 }}>
@@ -772,24 +830,6 @@ export default function ViewerPage() {
             </div>
 
             <div style={{ flex: 1 }} />
-
-            {/* Select button */}
-            <button type="button" onClick={toggleSelect}
-              style={{
-                height: 36, padding: "0 14px", borderRadius: 8,
-                fontSize: 12, fontWeight: 700, cursor: "pointer", flexShrink: 0,
-                fontFamily: "'Pretendard', system-ui, sans-serif", transition: "all 0.15s",
-                display: "flex", alignItems: "center", gap: 5,
-                ...(isCurrentSelected
-                  ? { background: "rgba(255,77,0,0.15)", border: "1px solid rgba(255,77,0,0.4)", color: "#FF4D00" }
-                  : { background: "#FF4D00", border: "none", color: "#000" }
-                ),
-              }}>
-              {isCurrentSelected
-                ? <><Check style={{ width: 12, height: 12, flexShrink: 0 }} strokeWidth={3} /><span>선택됨 {Y}/{N}</span></>
-                : <span>선택 {Y}/{N}</span>
-              }
-            </button>
           </div>
 
           {/* Row 2: Comment */}
@@ -798,32 +838,30 @@ export default function ViewerPage() {
               type="text"
               value={draftComment}
               onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
-              onKeyDown={(e) => { if (e.key === "Enter") saveComment(); }}
+              onBlur={saveComment}
+              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
               placeholder="코멘트..."
               style={{
-                flex: 1, height: 36, padding: "0 10px",
+                flex: 1, height: 38, padding: "0 12px",
                 background: "rgba(39,39,42,0.6)", border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 8, color: "#fafafa", fontSize: 12,
-                fontFamily: "'Pretendard', system-ui, sans-serif", outline: "none",
+                borderRadius: 8, color: "#fafafa", fontSize: 13,
+                fontFamily: "'Inter', system-ui, sans-serif", outline: "none",
               }}
             />
-            <button type="button" onClick={saveComment} disabled={!hasUnsavedComment}
+
+            {/* Select button (right of comment) */}
+            <button
+              type="button"
+              onClick={toggleSelect}
               style={{
-                height: 36, minWidth: 56, padding: "0 12px", borderRadius: 8,
-                fontSize: 12, fontWeight: 600, flexShrink: 0,
-                fontFamily: "'Pretendard', system-ui, sans-serif",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
-                transition: "background 0.2s, color 0.2s, border-color 0.2s",
-                ...(commentSaveFeedback === "saved"
-                  ? { background: "rgba(46,213,115,0.15)", border: "1px solid rgba(46,213,115,0.35)", color: "#2ed573", cursor: "default" }
-                  : hasUnsavedComment
-                    ? { background: "rgba(255,77,0,0.12)", border: "1px solid rgba(255,77,0,0.4)", color: "#FF4D00", cursor: "pointer" }
-                    : { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.06)", color: "#52525b", cursor: "not-allowed", opacity: 0.85 }
-                ),
-              }}>
-              {commentSaveFeedback === "saved"
-                ? <><Check style={{ width: 12, height: 12, flexShrink: 0 }} strokeWidth={3} />저장됨</>
-                : "저장"
+                ...SELECT_BASE_MOBILE,
+                ...(isCurrentSelected ? SELECT_ACTIVE : SELECT_INACTIVE),
+                height: 38,
+              }}
+            >
+              {isCurrentSelected
+                ? <><Check style={{ width: 12, height: 12, flexShrink: 0 }} strokeWidth={3} /><span>선택됨 {Y}/{N}</span></>
+                : <span>선택 {Y}/{N}</span>
               }
             </button>
           </div>
@@ -851,6 +889,65 @@ export default function ViewerPage() {
               <span style={{ color: "#FF4D00" }}>Q W E R T</span><span>색상 태그</span>
               <span style={{ color: "#FF4D00" }}>?</span><span>단축키 보기 / 닫기</span>
               <span style={{ color: "#FF4D00" }}>ESC</span><span>창 닫기</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Selection modal */}
+      {showConfirmModal && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(6px)", padding: 16 }}
+          onClick={() => !confirming && setShowConfirmModal(false)}
+        >
+          <div
+            style={{ width: "100%", maxWidth: 440, background: "#0A0A0A", border: "1px solid #FF4D00", borderRadius: 8, padding: 32, position: "relative" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{
+              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 24,
+              textTransform: "uppercase", fontStyle: "italic",
+              margin: 0, marginBottom: 16, color: "#fff",
+            }}>
+              Confirm Selection
+            </h3>
+            <p style={{ color: "#888", fontSize: 13, lineHeight: 1.7, margin: 0, marginBottom: 28 }}>
+              총 <span style={{ color: "#FF4D00", fontWeight: 700 }}>{Y}장</span>의 사진이 선택되었습니다.
+            </p>
+
+            {confirmError && (
+              <p style={{ color: "#ef4444", fontSize: 12, margin: 0, marginBottom: 16 }} role="alert">{confirmError}</p>
+            )}
+
+            <div style={{ display: "flex", gap: 12 }}>
+              <button
+                type="button"
+                onClick={() => !confirming && setShowConfirmModal(false)}
+                disabled={confirming}
+                style={{
+                  flex: 1, height: 44, borderRadius: 8,
+                  border: "1px solid #222", background: "transparent",
+                  color: "#888", fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                  cursor: confirming ? "not-allowed" : "pointer", transition: "all 0.15s",
+                }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={confirming}
+                style={{
+                  flex: 1, height: 44, borderRadius: 8,
+                  background: "#FF4D00", color: "#000",
+                  fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                  border: "1px solid #FF4D00",
+                  cursor: confirming ? "not-allowed" : "pointer",
+                  opacity: confirming ? 0.6 : 1,
+                }}
+              >
+                {confirming ? "처리 중..." : "확정 및 전송"}
+              </button>
             </div>
           </div>
         </div>
