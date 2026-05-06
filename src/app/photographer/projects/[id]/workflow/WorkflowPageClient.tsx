@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getPhotosWithSelections, getProjectById } from "@/lib/db";
 import type { Photo, Project, ProjectStatus } from "@/types";
 import CompareViewerModal from "@/components/CompareViewerModal";
@@ -9,6 +9,7 @@ import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHead
 import UploadVersionsPanel, {
   type UploadPanelTarget,
 } from "@/components/photographer/UploadVersionsPanel";
+import { createClient } from "@/lib/supabase/client";
 import {
   CheckCircle2,
   Clock,
@@ -21,6 +22,8 @@ import {
   Maximize2,
   Send,
   Sparkles,
+  Copy,
+  Check,
 } from "lucide-react";
 import styles from "./Workflow.module.css";
 import { normalizeReviewDeadlineYmd } from "@/lib/format-review-deadline";
@@ -327,7 +330,7 @@ function OriginalCard({
         className="w-full aspect-[4/3] bg-[#080808] rounded-lg overflow-hidden border border-[#1a1a1e] hover:border-zinc-500 transition-colors relative cursor-pointer mb-2"
       >
         {row.photo.url ? (
-          <img src={row.photo.url} alt={filename} className="w-full h-full object-cover" />
+          <img src={row.photo.url} alt={filename} loading="lazy" decoding="async" className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-zinc-700">
             <Layers size={24} />
@@ -369,6 +372,9 @@ function V1Card({
   onOpenViewer,
   onDelete,
   onOpenPanel,
+  onReplace,
+  replacingId,
+  getVersionUrl,
 }: {
   row: WorkflowRow;
   index: number;
@@ -380,6 +386,9 @@ function V1Card({
   onOpenViewer: (idx: number, tab: StageTab) => void;
   onDelete: (versionId: string, photoId: string, version: 1 | 2) => void;
   onOpenPanel: () => void;
+  onReplace: (photoId: string, version: 1 | 2, file: File) => void;
+  replacingId: string | null;
+  getVersionUrl: (url: string, photoId: string, version: 1 | 2) => string;
 }) {
   const filename = row.photo.originalFilename ?? `#${row.photo.orderIndex}`;
   const v1 = row.v1;
@@ -402,7 +411,7 @@ function V1Card({
           title="원본 보기"
         >
           {row.photo.url ? (
-            <img src={row.photo.url} alt="" className="w-full h-full object-cover" />
+            <img src={row.photo.url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
           ) : null}
         </button>
         <span className="text-[10px] font-mono text-zinc-400 truncate" title={filename}>
@@ -412,19 +421,32 @@ function V1Card({
 
       {/* Main V1 */}
       {v1 ? (
-        <button
-          type="button"
-          onClick={() => onOpenViewer(index, "v1")}
-          className="w-full aspect-[4/3] bg-[#080808] rounded-lg overflow-hidden relative cursor-pointer hover:opacity-95 transition-opacity mb-2 border border-[#1a1a1e]"
-        >
-          <img src={v1.url} alt="V1" className="w-full h-full object-cover" />
-          <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-zinc-300 border border-[#333]">
-            V1
-          </div>
-          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Maximize2 size={18} className="text-white" />
-          </div>
-        </button>
+        <div className="relative w-full aspect-[4/3] mb-2">
+          <button
+            type="button"
+            onClick={() => onOpenViewer(index, "v1")}
+            className="w-full h-full bg-[#080808] rounded-lg overflow-hidden relative cursor-pointer hover:opacity-95 transition-opacity border border-[#1a1a1e]"
+          >
+            <img
+              src={getVersionUrl(v1.url, row.photo.id, 1)}
+              alt="V1"
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-zinc-300 border border-[#333]">
+              V1
+            </div>
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <Maximize2 size={18} className="text-white" />
+            </div>
+          </button>
+          {replacingId === row.photo.id && (
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-lg pointer-events-none">
+              <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            </div>
+          )}
+        </div>
       ) : (
         <button
           type="button"
@@ -458,23 +480,48 @@ function V1Card({
             미업로드
           </span>
         )}
-        {v1 && canDeleteV1 && (
-          <button
-            type="button"
-            onClick={() => onDelete(v1.id, row.photo.id, 1)}
-            disabled={deletingId === v1.id}
-            className="text-zinc-600 hover:text-rose-400 transition-colors p-1 opacity-0 group-hover:opacity-100"
-            title="V1 삭제"
-          >
-            {deletingId === v1.id ? (
-              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-              </svg>
-            ) : (
-              <Trash2 size={13} />
+        {v1 && (canUploadV1 || canDeleteV1) && (
+          <div className="flex items-center gap-0.5">
+            {canUploadV1 && (
+              <label
+                className={`inline-flex items-center justify-center w-7 h-7 rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/5 transition-colors cursor-pointer ${
+                  replacingId ? "pointer-events-none opacity-40" : ""
+                }`}
+                title="V1 교체"
+              >
+                <Upload size={13} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={replacingId !== null}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (f) onReplace(row.photo.id, 1, f);
+                  }}
+                />
+              </label>
             )}
-          </button>
+            {canDeleteV1 && (
+              <button
+                type="button"
+                onClick={() => onDelete(v1.id, row.photo.id, 1)}
+                disabled={deletingId === v1.id || replacingId === row.photo.id}
+                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-zinc-600 hover:text-rose-400 hover:bg-white/5 transition-colors disabled:opacity-40"
+                title="V1 삭제"
+              >
+                {deletingId === v1.id ? (
+                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                ) : (
+                  <Trash2 size={13} />
+                )}
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -521,6 +568,9 @@ function V2Card({
   onOpenViewer,
   onDelete,
   onOpenPanel,
+  onReplace,
+  replacingId,
+  getVersionUrl,
 }: {
   row: WorkflowRow;
   index: number;
@@ -533,6 +583,9 @@ function V2Card({
   onOpenViewer: (idx: number, tab: StageTab) => void;
   onDelete: (versionId: string, photoId: string, version: 1 | 2) => void;
   onOpenPanel: () => void;
+  onReplace: (photoId: string, version: 1 | 2, file: File) => void;
+  replacingId: string | null;
+  getVersionUrl: (url: string, photoId: string, version: 1 | 2) => string;
 }) {
   const filename = row.photo.originalFilename ?? `#${row.photo.orderIndex}`;
   const v1 = row.v1;
@@ -557,7 +610,7 @@ function V2Card({
           title="원본 보기"
         >
           {row.photo.url ? (
-            <img src={row.photo.url} alt="" className="w-full h-full object-cover" />
+            <img src={row.photo.url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
           ) : null}
         </button>
         {v1 ? (
@@ -567,7 +620,13 @@ function V2Card({
             className="w-8 h-8 rounded-md bg-[#080808] border border-[#FF4D00]/30 overflow-hidden shrink-0 hover:border-[#FF4D00] transition-colors"
             title="V1 보기"
           >
-            <img src={v1.url} alt="" className="w-full h-full object-cover" />
+            <img
+              src={getVersionUrl(v1.url, row.photo.id, 1)}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover"
+            />
           </button>
         ) : null}
         <span className="text-[10px] font-mono text-zinc-400 truncate" title={filename}>
@@ -601,19 +660,32 @@ function V2Card({
           </span>
         </div>
       ) : v2 ? (
-        <button
-          type="button"
-          onClick={() => onOpenViewer(index, "v2")}
-          className="w-full aspect-[4/3] bg-[#080808] rounded-lg overflow-hidden relative cursor-pointer hover:opacity-95 transition-opacity mb-2 border border-[#1a1a1e]"
-        >
-          <img src={v2.url} alt="V2" className="w-full h-full object-cover" />
-          <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-[#FF4D00] border border-[#FF4D00]/40">
-            V2
-          </div>
-          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Maximize2 size={18} className="text-white" />
-          </div>
-        </button>
+        <div className="relative w-full aspect-[4/3] mb-2">
+          <button
+            type="button"
+            onClick={() => onOpenViewer(index, "v2")}
+            className="w-full h-full bg-[#080808] rounded-lg overflow-hidden relative cursor-pointer hover:opacity-95 transition-opacity border border-[#1a1a1e]"
+          >
+            <img
+              src={getVersionUrl(v2.url, row.photo.id, 2)}
+              alt="V2"
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-[#FF4D00] border border-[#FF4D00]/40">
+              V2
+            </div>
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <Maximize2 size={18} className="text-white" />
+            </div>
+          </button>
+          {replacingId === row.photo.id && (
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-lg pointer-events-none">
+              <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            </div>
+          )}
+        </div>
       ) : (
         <button
           type="button"
@@ -648,23 +720,48 @@ function V2Card({
               미업로드
             </span>
           )}
-          {v2 && canDeleteV2 && (
-            <button
-              type="button"
-              onClick={() => onDelete(v2.id, row.photo.id, 2)}
-              disabled={deletingId === v2.id}
-              className="text-zinc-600 hover:text-rose-400 transition-colors p-1 opacity-0 group-hover:opacity-100"
-              title="V2 삭제"
-            >
-              {deletingId === v2.id ? (
-                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                </svg>
-              ) : (
-                <Trash2 size={13} />
+          {v2 && (canUploadV2 || canDeleteV2) && (
+            <div className="flex items-center gap-0.5">
+              {canUploadV2 && (
+                <label
+                  className={`inline-flex items-center justify-center w-7 h-7 rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/5 transition-colors cursor-pointer ${
+                    replacingId ? "pointer-events-none opacity-40" : ""
+                  }`}
+                  title="V2 교체"
+                >
+                  <Upload size={13} />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={replacingId !== null}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = "";
+                      if (f) onReplace(row.photo.id, 2, f);
+                    }}
+                  />
+                </label>
               )}
-            </button>
+              {canDeleteV2 && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(v2.id, row.photo.id, 2)}
+                  disabled={deletingId === v2.id || replacingId === row.photo.id}
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-md text-zinc-600 hover:text-rose-400 hover:bg-white/5 transition-colors disabled:opacity-40"
+                  title="V2 삭제"
+                >
+                  {deletingId === v2.id ? (
+                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                  ) : (
+                    <Trash2 size={13} />
+                  )}
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -705,6 +802,7 @@ function V2Card({
 export default function WorkflowPageClient() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id as string;
 
   const [project, setProject]       = useState<Project | null>(null);
@@ -713,8 +811,15 @@ export default function WorkflowPageClient() {
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
   const [filter, setFilter]         = useState<FilterTab>("all");
-  const [stageTab, setStageTab]     = useState<StageTab>("v1");
-  const [stageTabAuto, setStageTabAuto] = useState(true);
+  // 첫 렌더에서 ?stage 쿼리를 즉시 반영 — V1 → 원본으로 바뀌는 깜빡임 방지
+  const [stageTab, setStageTab]     = useState<StageTab>(() => {
+    const raw = searchParams.get("stage");
+    return raw === "original" || raw === "v1" || raw === "v2" ? (raw as StageTab) : "v1";
+  });
+  const [stageTabAuto, setStageTabAuto] = useState(() => {
+    const raw = searchParams.get("stage");
+    return !(raw === "original" || raw === "v1" || raw === "v2");
+  });
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIdx, setViewerIdx]   = useState(0);
@@ -723,51 +828,66 @@ export default function WorkflowPageClient() {
   const [startingEditing, setStartingEditing] = useState(false);
   const [startingReview, setStartingReview] = useState<1 | 2 | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<WorkflowConfirmContent | null>(null);
-  const [reviewDeadlineModal, setReviewDeadlineModal] = useState<{ v: 1 | 2; dateInput: string } | null>(null);
+  const [reviewDeadlineModal, setReviewDeadlineModal] = useState<
+    { v: 1 | 2; dateInput: string; stage: "setup" | "share" } | null
+  >(null);
+  const [shareCopied, setShareCopied] = useState<"link" | "pin" | "bundle" | null>(null);
+  const [replacingId, setReplacingId] = useState<string | null>(null);
+  const [versionBust, setVersionBust] = useState<Record<string, number>>({});
+
+  const getVersionUrl = useCallback(
+    (url: string, photoId: string, version: 1 | 2) => {
+      const bust = versionBust[`${photoId}:${version}`];
+      if (!bust) return url;
+      const sep = url.includes("?") ? "&" : "?";
+      return `${url}${sep}t=${bust}`;
+    },
+    [versionBust],
+  );
 
   const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [projectData, photosResult, versionsRes] = await Promise.all([
-        getProjectById(id),
-        getPhotosWithSelections(id),
-        fetch(`/api/photographer/projects/${id}/versions`).then((r) => r.json()),
-      ]);
+      try {
+        setLoading(true);
+        const [projectData, photosResult, versionsRes] = await Promise.all([
+          getProjectById(id),
+          getPhotosWithSelections(id),
+          fetch(`/api/photographer/projects/${id}/versions`).then((r) => r.json()),
+        ]);
 
-      setProject(projectData);
+        setProject(projectData);
 
-      const selectedPhotos = photosResult.photos.filter((p) =>
-        photosResult.selectedIds.has(p.id)
-      );
+        const selectedPhotos = photosResult.photos.filter((p) =>
+          photosResult.selectedIds.has(p.id)
+        );
 
-      const v1Map = new Map<string, VersionInfo>();
-      const v2Map = new Map<string, VersionInfo>();
+        const v1Map = new Map<string, VersionInfo>();
+        const v2Map = new Map<string, VersionInfo>();
       const distinctVersions = new Set<number>();
-      for (const v of versionsRes.versions ?? []) {
-        const info: VersionInfo = {
-          id: v.id,
-          url: v.r2_url,
-          reviewStatus: v.review_status ?? null,
-          comment: v.customer_comment ?? null,
-        };
+        for (const v of versionsRes.versions ?? []) {
+          const info: VersionInfo = {
+            id: v.id,
+            url: v.r2_url,
+            reviewStatus: v.review_status ?? null,
+            comment: v.customer_comment ?? null,
+          };
         if (typeof v.version === "number") distinctVersions.add(v.version);
-        if (v.version === 1) v1Map.set(v.photo_id, info);
-        else if (v.version === 2) v2Map.set(v.photo_id, info);
-      }
+          if (v.version === 1) v1Map.set(v.photo_id, info);
+          else if (v.version === 2) v2Map.set(v.photo_id, info);
+        }
 
       setExistingVersionCount(distinctVersions.size);
-      setRows(
-        selectedPhotos.map((photo) => ({
-          photo,
-          v1: v1Map.get(photo.id) ?? null,
-          v2: v2Map.get(photo.id) ?? null,
-        }))
-      );
-    } catch (e) {
+        setRows(
+          selectedPhotos.map((photo) => ({
+            photo,
+            v1: v1Map.get(photo.id) ?? null,
+            v2: v2Map.get(photo.id) ?? null,
+          }))
+        );
+      } catch (e) {
       setError(e instanceof Error ? e.message : "불러오기 실패");
-    } finally {
+      } finally {
       setLoading(false);
-    }
+      }
   }, [id]);
 
   useEffect(() => {
@@ -779,12 +899,30 @@ export default function WorkflowPageClient() {
     return () => { cancelled = true; };
   }, [loadData]);
 
-  // 자동 탭 선택: status 가 바뀔 때마다, 사용자가 수동으로 탭을 바꾸지 않은 상태에서만 적용
+  // ?stage 쿼리 정리 + v2 폴백 + status 기반 자동 탭. 초기 stageTab은 useState lazy init에서 처리됨
   useEffect(() => {
+    const raw = searchParams.get("stage");
+    const qStage =
+      raw === "original" || raw === "v1" || raw === "v2" ? (raw as StageTab) : null;
+
+    // 쿼리가 있었으면 한 번 적용된 뒤 주소만 청소
+    if (qStage) {
+      router.replace(`/photographer/projects/${id}/workflow`, { scroll: false });
+    }
+
     if (!project) return;
+    const v2Ok = project.maxRevisionCount > 0;
+
+    // ?stage=v2 인데 재보정 없는 프로젝트면 폴백
+    if (qStage === "v2" && !v2Ok) {
+      setStageTabAuto(true);
+      setStageTab(defaultStageForStatus(project.status, v2Ok));
+      return;
+    }
+
     if (!stageTabAuto) return;
-    setStageTab(defaultStageForStatus(project.status, project.maxRevisionCount > 0));
-  }, [project, stageTabAuto]);
+    setStageTab(defaultStageForStatus(project.status, v2Ok));
+  }, [project, stageTabAuto, searchParams, id, router]);
 
   useEffect(() => {
     if (!confirmDialog) return;
@@ -846,10 +984,10 @@ export default function WorkflowPageClient() {
         url: row.photo.previewUrl ?? row.photo.url,
         filename: row.photo.originalFilename ?? `#${row.photo.orderIndex}`,
       },
-      v1: row.v1 ? { url: row.v1.url, filename: "보정본 v1" } : undefined,
-      v2: row.v2 ? { url: row.v2.url, filename: "보정본 v2" } : undefined,
+      v1: row.v1 ? { url: getVersionUrl(row.v1.url, row.photo.id, 1), filename: "보정본 v1" } : undefined,
+      v2: row.v2 ? { url: getVersionUrl(row.v2.url, row.photo.id, 2), filename: "보정본 v2" } : undefined,
     })),
-  [filteredRows]);
+  [filteredRows, getVersionUrl]);
 
   function openViewer(idx: number, tab: StageTab) {
     setViewerIdx(idx);
@@ -891,6 +1029,52 @@ export default function WorkflowPageClient() {
       alert(e instanceof Error ? e.message : "삭제 실패");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function replaceVersion(photoId: string, version: 1 | 2, file: File) {
+    if (replacingId) return;
+    if (panelVersion !== null) return;
+    setReplacingId(photoId);
+    try {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("로그인이 필요합니다.");
+
+      const form = new FormData();
+      form.append("project_id", id);
+      form.append("version", String(version));
+      form.append("photo_ids", photoId);
+      form.append("files", file, file.name);
+
+      const res = await fetch("/api/photographer/upload-versions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        detail?: string | Array<{ msg?: string; message?: string }>;
+      };
+      if (!res.ok) {
+        const msg =
+          data.error ??
+          (typeof data.detail === "string"
+            ? data.detail
+            : Array.isArray(data.detail)
+              ? data.detail[0]?.msg ?? data.detail[0]?.message
+              : null);
+        throw new Error(msg ?? "교체 실패");
+      }
+      // 전체 재조회 대신, 교체된 버전 URL만 캐시 버스트하여 해당 카드만 즉시 갱신한다.
+      setVersionBust((prev) => ({ ...prev, [`${photoId}:${version}`]: Date.now() }));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "교체 실패");
+    } finally {
+      setReplacingId(null);
     }
   }
 
@@ -1045,7 +1229,8 @@ export default function WorkflowPageClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project_id: id, action: "editing" }),
       }).catch(() => {});
-      await loadData();
+      // status만 변경 — rows(사진/보정본)는 그대로이므로 loadData() 불필요
+      setProject((prev) => prev ? { ...prev, status: "editing" } : null);
       setStageTab("v1");
       setStageTabAuto(true);
     } catch (e) {
@@ -1060,7 +1245,7 @@ export default function WorkflowPageClient() {
     if (!project) return;
     const expectedStatus = v === 1 ? "editing" : "editing_v2";
     if (project.status !== expectedStatus) return;
-    setReviewDeadlineModal({ v, dateInput: "" });
+    setReviewDeadlineModal({ v, dateInput: "", stage: "setup" });
   }
 
   async function runStartCustomerReview(v: 1 | 2, reviewDeadline?: string) {
@@ -1070,7 +1255,6 @@ export default function WorkflowPageClient() {
     const nextStatus = v === 1 ? "reviewing_v1" : "reviewing_v2";
     setStartingReview(v);
     try {
-      // 검토 기한이 입력된 경우 먼저 저장
       if (reviewDeadline) {
         const ymd = normalizeReviewDeadlineYmd(reviewDeadline);
         if (ymd) {
@@ -1090,12 +1274,51 @@ export default function WorkflowPageClient() {
         const data = await res.json().catch(() => ({}));
         throw new Error((data as { error?: string }).error ?? "상태 변경 실패");
       }
-      await loadData();
+      // status만 변경 — rows(사진/보정본)는 그대로이므로 loadData() 불필요
+      setProject((prev) => prev ? { ...prev, status: nextStatus } : null);
+      // 성공 시 같은 모달을 공유 단계로 전환 (작가가 직접 링크 공유)
+      setReviewDeadlineModal((m) => (m ? { ...m, stage: "share" } : null));
     } catch (e) {
       alert(e instanceof Error ? e.message : "고객 검토 시작 실패");
     } finally {
       setStartingReview(null);
     }
+  }
+
+  // ── Invite link share helpers (검토 단계 전환 후 작가가 직접 공유) ──────────
+  const inviteUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/c/${project?.accessToken ?? ""}`
+      : `/c/${project?.accessToken ?? ""}`;
+
+  function flashShareCopied(kind: "link" | "pin" | "bundle") {
+    setShareCopied(kind);
+    setTimeout(() => setShareCopied((cur) => (cur === kind ? null : cur)), 2000);
+  }
+
+  function copyShareLink() {
+    if (!project?.accessToken) return;
+    void navigator.clipboard.writeText(inviteUrl);
+    flashShareCopied("link");
+  }
+
+  function copyShareBundle() {
+    if (!project?.accessToken) return;
+    const pin = project.accessPin;
+    const text = pin ? `링크: ${inviteUrl}\n비밀번호: ${pin}` : inviteUrl;
+    void navigator.clipboard.writeText(text);
+    flashShareCopied(pin ? "bundle" : "link");
+  }
+
+  function copySharePin() {
+    if (!project?.accessPin) return;
+    void navigator.clipboard.writeText(project.accessPin);
+    flashShareCopied("pin");
+  }
+
+  function closeReviewDeadlineModal() {
+    setReviewDeadlineModal(null);
+    setShareCopied(null);
   }
 
   // 본문 그리드용 카드 인덱스를 viewer 인덱스에 맞추기 위해 filteredRows 사용
@@ -1125,58 +1348,6 @@ export default function WorkflowPageClient() {
                 ...(showV2Tab ? [{ label: "재보정", value: counts.revision }] : []),
               ]
         }
-        actions={
-          <div className="hidden md:flex items-center gap-3">
-            {isConfirmed && (
-              <button
-                onClick={handleStartEditing}
-                disabled={startingEditing}
-                className="flex items-center gap-2 bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
-              >
-                <Sparkles size={14} />
-                {startingEditing ? "처리 중…" : "보정 시작"}
-              </button>
-            )}
-            {canUploadV1 && (
-              <button
-                onClick={() => openPanel(1)}
-                className="flex items-center gap-2 bg-[#FF4D00] hover:bg-[#ff5e1a] text-black px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
-              >
-                <Upload size={14} />
-                {project.status === "reviewing_v1" ? "V1 확인·교체" : "V1 일괄 업로드"}
-              </button>
-            )}
-            {canStartV1Review && (
-              <button
-                onClick={() => handleStartCustomerReview(1)}
-                disabled={startingReview === 1}
-                className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-black px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5"
-              >
-                <Send size={14} />
-                {startingReview === 1 ? "처리 중…" : "고객에게 V1 검토 보내기"}
-              </button>
-            )}
-            {canUploadV2 && counts.revision > 0 && (
-              <button
-                onClick={() => openPanel(2)}
-                className="flex items-center gap-2 bg-[#FF4D00] hover:bg-[#ff5e1a] text-black px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
-              >
-                <Upload size={14} />
-                {project.status === "reviewing_v2" ? "V2 확인·교체" : "V2 일괄 업로드"}
-              </button>
-            )}
-            {canStartV2Review && (
-              <button
-                onClick={() => handleStartCustomerReview(2)}
-                disabled={startingReview === 2}
-                className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-black px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5"
-              >
-                <Send size={14} />
-                {startingReview === 2 ? "처리 중…" : "고객에게 V2 검토 보내기"}
-              </button>
-            )}
-          </div>
-        }
       />
 
       {/* ── Stage stepper ── */}
@@ -1198,29 +1369,38 @@ export default function WorkflowPageClient() {
       {/* ── Stage tabs ── */}
       {!isSelecting && (
         <div className="shrink-0 px-4 md:px-8 py-2.5 md:py-3 border-b border-[#1a1a1e] bg-[#121215]/50 flex items-center gap-2 md:gap-3 flex-wrap">
-          <div className="flex bg-[#0a0a0c]/60 border border-[#1a1a1e] rounded-xl p-1 items-center gap-0.5">
+          <div className="flex items-end gap-1 -mb-px">
             {[
               { key: "original" as StageTab, label: "원본", disabled: false },
               { key: "v1" as StageTab,        label: "V1 보정본", disabled: false },
               ...(showV2Tab
                 ? [{ key: "v2" as StageTab, label: "V2 재보정본", disabled: v2Dimmed && !inV2Phase }]
                 : []),
-            ].map((tab) => (
+            ].map((tab) => {
+              const isActive = stageTab === tab.key;
+              return (
               <button
-                key={tab.key}
-                onClick={() => !tab.disabled && setStageTabManual(tab.key)}
-                disabled={tab.disabled}
-                className={`px-4 py-1.5 rounded-lg text-xs font-bold tracking-wide transition-all ${
-                  stageTab === tab.key
-                    ? "bg-[#FF4D00] text-black shadow"
-                    : tab.disabled
-                      ? "text-zinc-700 cursor-not-allowed"
-                      : "text-zinc-400 hover:text-white hover:bg-[#27272c]/60"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+                  key={tab.key}
+                  onClick={() => !tab.disabled && setStageTabManual(tab.key)}
+                  disabled={tab.disabled}
+                  className={`relative px-4 py-2.5 text-[13px] font-semibold tracking-wide transition-colors ${
+                    isActive
+                      ? "text-white"
+                      : tab.disabled
+                        ? "text-zinc-700 cursor-not-allowed"
+                        : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  {tab.label}
+                  {isActive && !tab.disabled && (
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute left-2 right-2 -bottom-[1px] h-[2px] bg-[#FF4D00] rounded-full"
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* Filter chips for current stage */}
@@ -1228,23 +1408,23 @@ export default function WorkflowPageClient() {
             <>
               <div className="w-px h-4 bg-[#27272c] shrink-0" />
               <div className="flex items-center gap-1.5 flex-wrap">
-                {FILTER_TABS.map(({ key, label, count }) => (
-                  <button
-                    key={key}
-                    onClick={() => setFilter(key)}
+            {FILTER_TABS.map(({ key, label, count }) => (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
-                      filter === key
+                  filter === key
                         ? "border-[#FF4D00]/40 bg-[#FF4D00]/10 text-[#FF4D00]"
                         : "border-[#27272c] bg-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-500"
-                    }`}
-                  >
-                    {label}
+                }`}
+              >
+                {label}
                     <span className={`text-[10px] font-mono ${filter === key ? "text-[#FF4D00]/70" : "text-zinc-600"}`}>
-                      {count}
-                    </span>
-                  </button>
-                ))}
-              </div>
+                  {count}
+                </span>
+              </button>
+            ))}
+          </div>
             </>
           )}
 
@@ -1296,37 +1476,27 @@ export default function WorkflowPageClient() {
         <div className={`flex-1 overflow-y-auto ${styles.scrollArea}`}>
           <div className="max-w-[1600px] mx-auto px-3 py-3 md:px-8 md:py-6 flex flex-col gap-3 md:gap-4">
             {isConfirmed && (
-              <div className="rounded-2xl border border-[#FF4D00]/25 bg-[#FF4D00]/5 px-5 py-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#FF4D00]/15 border border-[#FF4D00]/40 flex items-center justify-center text-[#FF4D00]">
-                  <Sparkles size={16} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white font-semibold">고객이 셀렉을 확정했습니다.</p>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    보정을 시작해 주세요. 시작 후에 V1 보정본을 업로드할 수 있습니다.
-                  </p>
-                </div>
-                <button
-                  onClick={handleStartEditing}
-                  disabled={startingEditing}
-                  className="flex items-center gap-2 bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap"
-                >
+              <div className="rounded-2xl border border-[#1a1a1e] bg-[#121215]/50 px-5 py-3 flex items-start gap-2.5">
+                <div className="text-[#FF4D00] mt-0.5 shrink-0">
                   <Sparkles size={13} />
-                  {startingEditing ? "처리 중…" : "보정 시작"}
-                </button>
               </div>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  고객이 셀렉을 확정했습니다.
+                  <span className="text-white font-semibold"> 하단의 보정 시작</span> 버튼을 눌러 V1 보정본 업로드를 시작하세요.
+                </p>
+                </div>
             )}
             {(isEditing || isEditingV2) && (
               <div className="rounded-2xl border border-[#1a1a1e] bg-[#121215]/50 px-5 py-3 flex items-start gap-2.5">
                 <div className="text-zinc-500 mt-0.5">
                   <Send size={13} />
-                </div>
+              </div>
                 <p className="text-xs text-zinc-400 leading-relaxed">
                   업로드만으로 고객 화면이 자동 공개되지 않습니다. 매핑을 확인한 다음
-                  <span className="text-emerald-400 font-semibold"> &lsquo;고객에게 검토 보내기&rsquo;</span>
+                  <span className="text-[#FF4D00] font-semibold"> &lsquo;고객에게 검토 보내기&rsquo;</span>
                   를 눌러 공유하세요.
                 </p>
-              </div>
+                  </div>
             )}
             {isEditingV2 && rows.length > 0 && rows.every((r) => !r.v1?.reviewStatus) && (
               <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 px-5 py-4 flex items-start gap-3">
@@ -1338,7 +1508,7 @@ export default function WorkflowPageClient() {
                   <p className="text-xs text-amber-200/70 mt-0.5">
                     페이지를 새로고침 해주세요. 새로고침 후에도 동일하면 관리자에게 알려주세요.
                   </p>
-                </div>
+            </div>
               </div>
             )}
             {filteredRows.length === 0 ? (
@@ -1347,36 +1517,40 @@ export default function WorkflowPageClient() {
                 <p className="text-zinc-500 text-sm">해당하는 사진이 없습니다.</p>
               </div>
             ) : (
-              <div className={cardCols}>
-                {filteredRows.map((row, rowIdx) => {
-                  if (stageTab === "original") {
-                    return (
-                      <OriginalCard
-                        key={row.photo.id}
-                        row={row}
-                        index={rowIdx}
-                        onOpenViewer={openViewer}
-                      />
-                    );
-                  }
-                  if (stageTab === "v1") {
-                    return (
-                      <V1Card
-                        key={row.photo.id}
-                        row={row}
-                        index={rowIdx}
-                        isReviewingV1={isReviewingV1}
-                        v1DisplayStatus={effectiveV1Status(row.v1?.reviewStatus ?? null)}
-                        canDeleteV1={canDeleteV1}
-                        deletingId={deletingId}
-                        canUploadV1={canUploadV1}
-                        onOpenViewer={openViewer}
-                        onDelete={handleDelete}
-                        onOpenPanel={() => openPanel(1)}
-                      />
-                    );
-                  }
-                  return (
+              <>
+                {/* 3개 탭 그리드를 항상 DOM에 유지 — 탭 전환 시 이미지 재로딩 방지 */}
+                <div className={cardCols} style={{ display: stageTab === "original" ? undefined : "none" }}>
+                  {filteredRows.map((row, rowIdx) => (
+                    <OriginalCard
+                      key={row.photo.id}
+                      row={row}
+                      index={rowIdx}
+                      onOpenViewer={openViewer}
+                    />
+                  ))}
+                </div>
+                <div className={cardCols} style={{ display: stageTab === "v1" ? undefined : "none" }}>
+                  {filteredRows.map((row, rowIdx) => (
+                    <V1Card
+                      key={row.photo.id}
+                      row={row}
+                      index={rowIdx}
+                      isReviewingV1={isReviewingV1}
+                      v1DisplayStatus={effectiveV1Status(row.v1?.reviewStatus ?? null)}
+                      canDeleteV1={canDeleteV1}
+                      deletingId={deletingId}
+                      canUploadV1={canUploadV1}
+                      onOpenViewer={openViewer}
+                      onDelete={handleDelete}
+                      onOpenPanel={() => openPanel(1)}
+                      onReplace={replaceVersion}
+                      replacingId={replacingId}
+                      getVersionUrl={getVersionUrl}
+                    />
+                  ))}
+                </div>
+                <div className={cardCols} style={{ display: stageTab === "v2" ? undefined : "none" }}>
+                  {filteredRows.map((row, rowIdx) => (
                     <V2Card
                       key={row.photo.id}
                       row={row}
@@ -1390,13 +1564,16 @@ export default function WorkflowPageClient() {
                       onOpenViewer={openViewer}
                       onDelete={handleDelete}
                       onOpenPanel={() => openPanel(2)}
+                      onReplace={replaceVersion}
+                      replacingId={replacingId}
+                      getVersionUrl={getVersionUrl}
                     />
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              </>
             )}
-          </div>
-        </div>
+                        </div>
+                      </div>
       )}
 
       {/* ── Compare Viewer Modal ── */}
@@ -1418,7 +1595,7 @@ export default function WorkflowPageClient() {
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
             <span className="text-sm text-[#FF4D00] font-medium">{footerNote}</span>
-          </div>
+                            </div>
         )}
         <div className="flex items-center justify-end px-4 md:px-8 py-3 md:py-0 md:h-16">
           {project.status === "delivered" ? (
@@ -1426,7 +1603,7 @@ export default function WorkflowPageClient() {
               <CheckCircle2 size={15} />납품 완료
             </span>
           ) : isConfirmed ? (
-            <button
+                                  <button
               onClick={handleStartEditing}
               disabled={startingEditing}
               className="flex items-center justify-center gap-2 w-full md:w-auto bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
@@ -1434,55 +1611,35 @@ export default function WorkflowPageClient() {
               <Sparkles size={15} />
               {startingEditing ? "처리 중…" : "보정 시작"}
             </button>
-          ) : (canUploadV1 || canStartV1Review || (canUploadV2 && counts.revision > 0) || canStartV2Review) ? (
+          ) : (canStartV1Review || canStartV2Review) ? (
             <div className="flex flex-col-reverse md:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
-              {/* 업로드 버튼 (secondary) */}
-              {canUploadV1 && (
-                <button
-                  onClick={() => openPanel(1)}
-                  className="flex items-center justify-center gap-2 w-full md:w-auto border border-[#27272c] bg-[#0a0a0c] hover:border-zinc-500 hover:bg-[#121215] text-white px-5 py-3 md:py-2.5 rounded-xl text-sm font-semibold transition-all"
-                >
-                  <Upload size={14} />
-                  {project.status === "reviewing_v1" ? "V1 확인·교체" : counts.v1Uploaded > 0 ? "V1 추가/교체" : "V1 업로드"}
-                </button>
-              )}
-              {canUploadV2 && counts.revision > 0 && (
-                <button
-                  onClick={() => openPanel(2)}
-                  className="flex items-center justify-center gap-2 w-full md:w-auto border border-[#27272c] bg-[#0a0a0c] hover:border-zinc-500 hover:bg-[#121215] text-white px-5 py-3 md:py-2.5 rounded-xl text-sm font-semibold transition-all"
-                >
-                  <Upload size={14} />
-                  {project.status === "reviewing_v2" ? "V2 확인·교체" : counts.v2Uploaded > 0 ? "V2 추가/교체" : "V2 업로드"}
-                </button>
-              )}
-              {/* 검토 요청 버튼 (primary) */}
               {canStartV1Review && (
                 <button
                   onClick={() => handleStartCustomerReview(1)}
                   disabled={startingReview === 1}
-                  className="flex items-center justify-center gap-2 w-full md:w-auto bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5"
+                  className="flex items-center justify-center gap-2 w-full md:w-auto bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
                 >
                   <Send size={15} />
-                  {startingReview === 1 ? "처리 중…" : "V1 검토 요청 보내기"}
-                </button>
-              )}
+                  {startingReview === 1 ? "처리 중…" : "보정본 검토 요청"}
+                                  </button>
+                                )}
               {canStartV2Review && (
                 <button
                   onClick={() => handleStartCustomerReview(2)}
                   disabled={startingReview === 2}
-                  className="flex items-center justify-center gap-2 w-full md:w-auto bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5"
+                  className="flex items-center justify-center gap-2 w-full md:w-auto bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
                 >
                   <Send size={15} />
-                  {startingReview === 2 ? "처리 중…" : "V2 검토 요청 보내기"}
+                  {startingReview === 2 ? "처리 중…" : "재보정본 검토 요청"}
                 </button>
-              )}
-            </div>
+                              )}
+                            </div>
           ) : (
             <span className="flex items-center justify-center w-full md:w-auto px-6 py-2.5 rounded-xl text-sm font-bold bg-[#121215] border border-[#27272c] text-zinc-500">
               다음 단계 대기 중
             </span>
-          )}
-        </div>
+                        )}
+                      </div>
       </footer>
 
       {/* ── Upload slide-over panel ── */}
@@ -1506,76 +1663,206 @@ export default function WorkflowPageClient() {
       {reviewDeadlineModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-          onClick={() => setReviewDeadlineModal(null)}
+          onClick={() => {
+            if (startingReview === reviewDeadlineModal.v) return;
+            closeReviewDeadlineModal();
+          }}
         >
           <div
             className="w-full max-w-sm bg-[#0f0f12] border border-[#27272c] rounded-2xl p-6 flex flex-col gap-5"
             onClick={(e) => e.stopPropagation()}
           >
-            <div>
-              <h3 className="text-base font-bold text-white mb-1">
-                고객에게 {reviewDeadlineModal.v === 1 ? "V1" : "V2"} 검토 보내기
-              </h3>
-              <p className="text-sm text-[#71717a]">
-                검토 기한을 설정하면 고객 검토 페이지에 표시됩니다.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium text-[#a1a1aa]">검토 기한 (선택사항)</label>
+            {reviewDeadlineModal.stage === "setup" ? (
+              <>
+                <div>
+                  <h3 className="text-base font-bold text-white mb-1">
+                    고객에게 {reviewDeadlineModal.v === 1 ? "보정본" : "재보정본"} 검토 요청
+                  </h3>
+                  <p className="text-sm text-[#71717a] leading-relaxed">
+                    링크는 자동 발송되지 않습니다. 검토 단계로 전환한 뒤 다음 화면에서
+                    링크를 복사해 직접 공유해 주세요.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-medium text-[#a1a1aa]">검토 기한 (선택사항)</label>
 
-              {/* 빠른 선택 칩 */}
-              <div className="flex gap-2 flex-wrap">
-                {DEADLINE_PRESETS.map(({ label, days }) => {
-                  const val = addDays(days);
-                  const active = reviewDeadlineModal.dateInput === val;
-                  return (
-                    <button
-                      key={days}
-                      type="button"
-                      onClick={() => setReviewDeadlineModal({ ...reviewDeadlineModal, dateInput: val })}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                        active
-                          ? "bg-[#FF4D00] border-[#FF4D00] text-black"
-                          : "bg-transparent border-[#27272c] text-[#a1a1aa] hover:border-[#3f3f46] hover:text-white"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
+                  {/* 빠른 선택 칩 */}
+                  <div className="flex gap-2 flex-wrap">
+                    {DEADLINE_PRESETS.map(({ label, days }) => {
+                      const val = addDays(days);
+                      const active = reviewDeadlineModal.dateInput === val;
+                      return (
+                        <button
+                          key={days}
+                          type="button"
+                          onClick={() =>
+                            setReviewDeadlineModal({ ...reviewDeadlineModal, dateInput: val })
+                          }
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                            active
+                              ? "bg-[#FF4D00] border-[#FF4D00] text-black"
+                              : "bg-transparent border-[#27272c] text-[#a1a1aa] hover:border-[#3f3f46] hover:text-white"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-              {/* 직접 입력 (캘린더) */}
-              <input
-                type="date"
-                value={reviewDeadlineModal.dateInput}
-                onChange={(e) => setReviewDeadlineModal({ ...reviewDeadlineModal, dateInput: e.target.value })}
-                onClick={(e) => { try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.(); } catch { /* unsupported */ } }}
-                min={new Date().toISOString().split("T")[0]}
-                className="w-full rounded-xl bg-[#0a0a0c] border border-[#27272c] text-white px-3 py-2 text-sm focus:outline-none focus:border-[#FF4D00] cursor-pointer"
-              />
-            </div>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                className="flex-1 rounded-xl border border-[#27272c] text-[#71717a] text-sm font-medium py-2.5 hover:border-[#3f3f46] transition-colors"
-                onClick={() => setReviewDeadlineModal(null)}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                disabled={startingReview === reviewDeadlineModal.v}
-                className="flex-1 rounded-xl bg-[#FF4D00] text-black text-sm font-bold py-2.5 disabled:opacity-50 hover:bg-[#e64500] transition-colors"
-                onClick={() => {
-                  const { v, dateInput } = reviewDeadlineModal;
-                  setReviewDeadlineModal(null);
-                  void runStartCustomerReview(v, dateInput || undefined);
-                }}
-              >
-                {startingReview === reviewDeadlineModal.v ? "처리 중…" : "검토 링크 보내기"}
-              </button>
-            </div>
+                  {/* 직접 입력 (캘린더) */}
+                  <input
+                    type="date"
+                    value={reviewDeadlineModal.dateInput}
+                    onChange={(e) =>
+                      setReviewDeadlineModal({
+                        ...reviewDeadlineModal,
+                        dateInput: e.target.value,
+                      })
+                    }
+                    onClick={(e) => {
+                      try {
+                        (
+                          e.currentTarget as HTMLInputElement & { showPicker?: () => void }
+                        ).showPicker?.();
+                      } catch {
+                        /* unsupported */
+                      }
+                    }}
+                    min={new Date().toISOString().split("T")[0]}
+                    className="w-full rounded-xl bg-[#0a0a0c] border border-[#27272c] text-white px-3 py-2 text-sm focus:outline-none focus:border-[#FF4D00] cursor-pointer"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    disabled={startingReview === reviewDeadlineModal.v}
+                    className="flex-1 rounded-xl border border-[#27272c] text-[#71717a] text-sm font-medium py-2.5 hover:border-[#3f3f46] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    onClick={closeReviewDeadlineModal}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    disabled={startingReview === reviewDeadlineModal.v}
+                    className="flex-1 rounded-xl bg-[#FF4D00] text-black text-sm font-bold py-2.5 disabled:opacity-50 hover:bg-[#ff5e1a] transition-colors"
+                    onClick={() => {
+                      const { v, dateInput } = reviewDeadlineModal;
+                      void runStartCustomerReview(v, dateInput || undefined);
+                    }}
+                  >
+                    {startingReview === reviewDeadlineModal.v
+                      ? "처리 중…"
+                      : reviewDeadlineModal.v === 1
+                        ? "보정본 검토 요청"
+                        : "재보정본 검토 요청"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <h3 className="text-base font-bold text-white mb-1">
+                    링크를 직접 공유해 주세요
+                  </h3>
+                  <p className="text-sm text-[#71717a] leading-relaxed">
+                    카카오톡, 이메일 등으로 아래 링크
+                    {project?.accessPin ? "와 비밀번호" : ""}를 직접 보내주세요.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {/* 초대 링크 */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-[#a1a1aa]">초대 링크</label>
+                    <div className="flex items-center gap-2 rounded-xl bg-[#0a0a0c] border border-[#27272c] pl-3 pr-1 py-1">
+                      <input
+                        type="text"
+                        readOnly
+                        value={inviteUrl}
+                        onFocus={(e) => e.currentTarget.select()}
+                        className="flex-1 min-w-0 bg-transparent text-sm text-white truncate focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={copyShareLink}
+                        className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[#27272c] text-[#a1a1aa] hover:text-white hover:border-zinc-500 text-xs font-medium px-2.5 py-1.5 transition-colors"
+                        title="링크 복사"
+                      >
+                        {shareCopied === "link" ? (
+                          <>
+                            <Check size={12} />
+                            복사됨
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={12} />
+                            복사
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* PIN (있을 때만) */}
+                  {project?.accessPin ? (
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-medium text-[#a1a1aa]">비밀번호</label>
+                      <div className="flex items-center gap-2 rounded-xl bg-[#0a0a0c] border border-[#27272c] pl-3 pr-1 py-1">
+                        <span className="flex-1 min-w-0 text-sm text-white tracking-wider font-mono truncate">
+                          {project.accessPin}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={copySharePin}
+                          className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[#27272c] text-[#a1a1aa] hover:text-white hover:border-zinc-500 text-xs font-medium px-2.5 py-1.5 transition-colors"
+                          title="비밀번호 복사"
+                        >
+                          {shareCopied === "pin" ? (
+                            <>
+                              <Check size={12} />
+                              복사됨
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={12} />
+                              복사
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className="flex-1 rounded-xl border border-[#27272c] text-[#a1a1aa] text-sm font-medium py-2.5 hover:border-[#3f3f46] hover:text-white transition-colors"
+                    onClick={closeReviewDeadlineModal}
+                  >
+                    닫기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={copyShareBundle}
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#FF4D00] text-black text-sm font-bold py-2.5 hover:bg-[#ff5e1a] transition-colors"
+                  >
+                    {shareCopied === "bundle" || (shareCopied === "link" && !project?.accessPin) ? (
+                      <>
+                        <Check size={14} />
+                        복사됨
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} />
+                        {project?.accessPin ? "링크와 비밀번호 복사" : "링크 복사"}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
