@@ -402,7 +402,7 @@ function ProblemSection({ onAuthOpen }: { onAuthOpen: () => void }) {
           <div className="landing-mono text-[10px] tracking-[0.2em] text-[#FF4D00] mb-6 uppercase">
             SURVEY_RESULTS :: PAIN_POINTS
           </div>
-          <h2 className="landing-display text-4xl sm:text-5xl lg:text-7xl font-black uppercase leading-tight mb-8 landing-break">
+          <h2 className="landing-display text-3xl sm:text-5xl lg:text-7xl font-black uppercase leading-tight mb-8 landing-break">
             혹시 지금 이렇게<br />
             <span className="text-[#FF4D00]">하고 계신가요?</span>
           </h2>
@@ -423,13 +423,13 @@ function ProblemSection({ onAuthOpen }: { onAuthOpen: () => void }) {
               <div className="landing-mono text-[10px] tracking-[0.2em] text-[#FF4D00] uppercase mb-12">
                 {p.code}
               </div>
-              <blockquote className="text-lg sm:text-2xl lg:text-3xl font-light italic text-gray-300 mb-10 sm:mb-16 leading-relaxed landing-break whitespace-pre-line">
+              <blockquote className="text-base sm:text-xl lg:text-3xl font-light italic text-gray-300 mb-10 sm:mb-16 leading-relaxed landing-break whitespace-pre-line">
                 {p.quote}
               </blockquote>
-              <div className="space-y-6 text-xl text-gray-400">
+              <div className="space-y-6 text-sm sm:text-lg text-gray-400">
                 <p className="landing-break whitespace-pre-line">{p.body}</p>
                 {p.emphasis && (
-                  <p className="text-white font-bold text-2xl landing-break">{p.emphasis}</p>
+                  <p className="text-white font-bold text-base sm:text-xl landing-break">{p.emphasis}</p>
                 )}
                 {!p.emphasis && i === 1 && (
                   <p className="text-gray-500 italic landing-break">
@@ -460,7 +460,7 @@ function ProblemSection({ onAuthOpen }: { onAuthOpen: () => void }) {
           <p className="landing-mono text-xs text-gray-500 uppercase tracking-[0.3em] mb-4">
             System Upgrade Recommended
           </p>
-          <h3 className="text-3xl sm:text-5xl font-bold mb-10 sm:mb-16 landing-break">이 모든 비효율, A-CUT으로 즉시 해결하세요.</h3>
+          <h3 className="text-2xl sm:text-5xl font-bold mb-10 sm:mb-16 landing-break">이 모든 비효율,<br className="sm:hidden" /> A-CUT으로 즉시 해결하세요.</h3>
           <button
             type="button"
             onClick={onAuthOpen}
@@ -762,14 +762,14 @@ function CTASection({ onAuthOpen }: { onAuthOpen: () => void }) {
           <h2 className="landing-display text-3xl sm:text-4xl lg:text-5xl font-black uppercase leading-tight mb-6 landing-break">
             다음 촬영부터<br /><span className="text-[#FF4D00]">바로 써보세요</span>
           </h2>
-          <p className="text-gray-400 text-lg leading-relaxed max-w-xl mx-auto mb-12 landing-break">
+          <p className="text-gray-400 text-sm sm:text-base lg:text-lg leading-relaxed max-w-xl mx-auto mb-12 landing-break">
             지금 가입하면 베타 기간 동안 무료로 사용할 수 있습니다.<br />
             프로젝트 10개, 사진 1,500장까지 제한 없이 테스트해보세요.
           </p>
           <button
             type="button"
             onClick={onAuthOpen}
-            className="landing-btn-primary gap-4 px-16 py-6 text-black font-bold text-xl uppercase"
+            className="landing-btn-primary gap-3 px-8 sm:px-16 py-4 sm:py-6 text-black font-bold text-base sm:text-xl uppercase w-full sm:w-auto"
           >
             무료로 시작하기
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
