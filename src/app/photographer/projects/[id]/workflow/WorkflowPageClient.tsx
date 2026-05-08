@@ -1003,16 +1003,20 @@ export default function WorkflowPageClient() {
   [filteredRows, getVersionUrl]);
 
   const handleDownloadReview = useCallback(() => {
+    const isOriginal = stageTab === "original";
     const version = stageTab === "v2" ? 2 : 1;
-    const header = ["번호", "파일명", "상태", "고객 코멘트"];
+    const header = isOriginal
+      ? ["번호", "파일명"]
+      : ["번호", "파일명", "상태", "고객 코멘트"];
     const rowData = rows.map((row, i) => {
+      const filename = row.photo.originalFilename ?? `FRAME_${String(row.photo.orderIndex).padStart(4, "0")}`;
+      if (isOriginal) return [String(i + 1), filename];
       const ver = version === 2 ? row.v2 : row.v1;
       const status =
         ver?.reviewStatus === "approved" ? "확정"
         : ver?.reviewStatus === "revision_requested" ? "재보정 요청"
         : "미검토";
       const comment = ver?.comment ?? "";
-      const filename = row.photo.originalFilename ?? `FRAME_${String(row.photo.orderIndex).padStart(4, "0")}`;
       return [String(i + 1), filename, status, comment];
     });
     const csv = [header, ...rowData]
@@ -1023,7 +1027,9 @@ export default function WorkflowPageClient() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${project?.name ?? "review"}_v${version}_검토결과.csv`;
+    a.download = isOriginal
+      ? `${project?.name ?? "project"}_원본목록.csv`
+      : `${project?.name ?? "review"}_v${version}_검토결과.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }, [rows, stageTab, project?.name]);
@@ -1482,7 +1488,7 @@ export default function WorkflowPageClient() {
 
           {/* 다운로드 + 뷰 토글 */}
           <div className={`${stageTab === "v2" || (stageTab === "v1" && !isReviewingV1) ? "" : "ml-auto"} flex items-center gap-2 shrink-0`}>
-            {stageTab !== "original" && rows.length > 0 && (
+            {rows.length > 0 && (
               <button
                 type="button"
                 onClick={handleDownloadReview}
