@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Plus, AlertCircle, ChevronDown, ChevronRight, Clock, Activity,
+  Plus, AlertCircle, ChevronRight, Clock, Activity,
 } from "lucide-react";
 import { BETA_MAX_PROJECTS_TOTAL } from "@/lib/beta-limits";
 import { getProjectsByPhotographerId } from "@/lib/db";
@@ -65,51 +65,58 @@ function formatLogTime(iso: string): string {
 }
 
 // ── ProjectCard ────────────────────────────────────────────
-function ProjectCard({ project }: { project: Project }) {
-  const router    = useRouter();
+function PhotoProjectCard({ project }: { project: Project }) {
+  const router     = useRouter();
   const photoCount = project.photoCount ?? 0;
-  const reqCount  = project.requiredCount ?? 0;
+  const reqCount   = project.requiredCount ?? 0;
   const { text: ddayText, warn } = dday(project.deadline);
   const stepLabel  = getPipelineStepLabel(project.status);
   const isDelivered = project.status === "delivered";
+  const hasCover   = !!project.thumbnailUrl;
 
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={() => router.push(`/photographer/projects/${project.id}`)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          router.push(`/photographer/projects/${project.id}`);
-        }
-      }}
-      className="bg-[#121215] border border-[#1a1a1e] hover:border-[#27272c] rounded-2xl p-4 cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-[#FF4D00]/50"
-      style={{ opacity: isDelivered ? 0.6 : 1 }}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/photographer/projects/${project.id}`); } }}
+      className="bg-[#121215] border border-[#1a1a1e] hover:border-[#27272c] rounded-2xl overflow-hidden cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-[#FF4D00]/50 group"
+      style={{ opacity: isDelivered ? 0.65 : 1 }}
     >
-      {/* 상단: badge + name + customer + d-day */}
-      <div className="flex items-center gap-2 min-w-0 mb-3">
-        <div className="shrink-0">
+      {/* 썸네일 — 낮은 높이 */}
+      <div className="relative w-full h-28 overflow-hidden">
+        {hasCover ? (
+          <img
+            src={project.thumbnailUrl!}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div
+            className="w-full h-full flex items-center justify-center"
+            style={{ background: "linear-gradient(135deg, #1a1a1e 0%, #111113 100%)" }}
+          >
+            <span className="text-xl font-black text-zinc-800 uppercase tracking-widest select-none">
+              {project.name.slice(0, 2)}
+            </span>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute top-2 left-2">
           <StatusPill status={project.status} photoCount={photoCount} requiredCount={reqCount} />
         </div>
-        <span className="text-sm font-bold text-white truncate min-w-0 flex-1">
-          {project.name}
-        </span>
-        <span className="text-xs text-zinc-500 shrink-0 truncate max-w-[72px]">
-          {project.customerName || "—"}
-        </span>
-        <div className="shrink-0 ml-auto">
+        <div className="absolute top-2 right-2">
           {isDelivered ? (
-            <span className="text-[10px] text-zinc-600 border border-zinc-800 rounded-lg px-2 py-1">
-              완료
-            </span>
+            <span className="text-[9px] font-bold bg-black/60 border border-zinc-700 rounded px-1.5 py-0.5 text-zinc-400">완료</span>
           ) : (
             <span
-              className="text-[11px] font-bold rounded-lg px-2 py-1 border"
+              className="text-[10px] font-bold rounded px-1.5 py-0.5 border"
               style={{
-                color: warn ? ACCENT : "#71717a",
-                borderColor: warn ? `${ACCENT}40` : "#27272c",
-                background: warn ? "rgba(255,77,0,0.06)" : "transparent",
+                color: warn ? ACCENT : "#a1a1aa",
+                borderColor: warn ? `${ACCENT}50` : "rgba(255,255,255,0.12)",
+                background: warn ? "rgba(255,77,0,0.18)" : "rgba(0,0,0,0.55)",
               }}
             >
               {ddayText}
@@ -118,24 +125,21 @@ function ProjectCard({ project }: { project: Project }) {
         </div>
       </div>
 
-      {/* 파이프라인 바 */}
-      <div>
-        <div className="flex justify-between items-center mb-1.5">
-          <span className="text-[10px] text-zinc-500 font-medium">{stepLabel}</span>
-          <span className="text-[10px] text-zinc-600">
-            {(() => {
-              if (project.status === "preparing") return photoCount > 0 ? `${photoCount}장` : "";
-              if (["selecting", "confirmed", "editing", "editing_v2"].includes(project.status)) {
-                return reqCount > 0 ? `${photoCount} / ${reqCount}장` : photoCount > 0 ? `${photoCount}장` : "";
-              }
-              if (project.status === "delivered" && project.shootDate) {
-                return new Date(project.shootDate).toLocaleDateString("ko-KR", { year: "2-digit", month: "2-digit", day: "2-digit" });
-              }
-              return "";
-            })()}
-          </span>
+      {/* 카드 본문 */}
+      <div className="p-3 flex flex-col gap-2">
+        <div>
+          <div className="text-[13px] font-bold text-white leading-snug truncate">{project.name}</div>
+          <div className="text-[11px] text-zinc-500 truncate">{project.customerName || "—"}</div>
         </div>
-        <ProjectPipelineMiniBar status={project.status} variant="full" />
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-[10px] font-medium text-zinc-400">{stepLabel}</span>
+            <span className="text-[9px] text-zinc-600 font-mono">
+              {reqCount > 0 ? `${photoCount}/${reqCount}` : photoCount > 0 ? `${photoCount}장` : ""}
+            </span>
+          </div>
+          <ProjectPipelineMiniBar status={project.status} variant="full" />
+        </div>
       </div>
     </div>
   );
@@ -166,40 +170,6 @@ function ActionCard({
   );
 }
 
-// ── SectionHeader ──────────────────────────────────────────
-function SectionHeader({
-  title, count, dotColor, open, onToggle,
-  totalNote,
-}: {
-  title: string; count: number;
-  dotColor: string;
-  open: boolean; onToggle: () => void;
-  totalNote?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="w-full flex items-center justify-between px-4 py-3 bg-[#121215] border border-[#1a1a1e] hover:border-[#27272c] rounded-xl transition-colors text-left"
-    >
-      <div className="flex items-center gap-2.5">
-        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dotColor }} />
-        <span className="text-xs font-semibold text-zinc-300 tracking-wide">{title}</span>
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#1a1a1e] text-zinc-500">
-          {count}
-        </span>
-        {totalNote && (
-          <span className="text-[10px] text-zinc-700">{totalNote}</span>
-        )}
-      </div>
-      <ChevronDown
-        size={14}
-        className="text-zinc-600 transition-transform"
-        style={{ transform: open ? "rotate(180deg)" : "none" }}
-      />
-    </button>
-  );
-}
 
 // ── Main Page ──────────────────────────────────────────────
 export default function DashboardPage() {
@@ -208,13 +178,6 @@ export default function DashboardPage() {
   const [loading, setLoading]   = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const [logs, setLogs]         = useState<ProjectLogItem[]>([]);
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set(["pending", "active"]));
-
-  const toggleSection = (id: string) => setOpenSections((prev) => {
-    const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
-  });
 
   const userName =
     profile?.name?.trim() ||
@@ -274,11 +237,18 @@ export default function DashboardPage() {
     );
   }
 
-  const sortedAll = [...projects].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  );
-  const displayProjects = sortedAll.slice(0, 6);
-  const showViewAllBtn  = projects.length > 6;
+  // 정렬: 진행중(긴급순) → 대기중 → 완료
+  const urgencyScore = (p: Project): number => {
+    if (ACTIVE_STATUSES.includes(p.status)) {
+      const d = Math.ceil((new Date(p.deadline).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
+      return d <= 0 ? -1000 + d : d;
+    }
+    if (p.status === "preparing") return 500;
+    return 9999;
+  };
+  const sortedAll = [...projects].sort((a, b) => urgencyScore(a) - urgencyScore(b));
+  const displayProjects = sortedAll.slice(0, 12);
+  const showViewAllBtn  = projects.length > 12;
 
   const preparingProjects = displayProjects.filter((p) => p.status === "preparing");
   const activeProjects    = displayProjects.filter((p) => ACTIVE_STATUSES.includes(p.status));
@@ -339,65 +309,22 @@ export default function DashboardPage() {
             </section>
           )}
 
-          {/* 2. 프로젝트 목록 */}
-          <div className="flex flex-col gap-3">
-
-            {preparingProjects.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <SectionHeader
-                  title="대기중" count={preparingProjects.length}
-                  dotColor="#52525b"
-                  open={openSections.has("pending")}
-                  onToggle={() => toggleSection("pending")}
-                />
-                {openSections.has("pending") && (
-                  <div className="flex flex-col gap-2 pl-1">
-                    {preparingProjects.map((p) => <ProjectCard key={p.id} project={p} />)}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeProjects.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <SectionHeader
-                  title="진행중" count={activeProjects.length}
-                  dotColor={ACCENT}
-                  open={openSections.has("active")}
-                  onToggle={() => toggleSection("active")}
-                />
-                {openSections.has("active") && (
-                  <div className="flex flex-col gap-2 pl-1">
-                    {activeProjects.map((p) => <ProjectCard key={p.id} project={p} />)}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {recentDelivered.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <SectionHeader
-                  title="최근완료" count={recentDelivered.length}
-                  dotColor="#3f3f46"
-                  totalNote={totalDelivered > 1 ? `전체 ${totalDelivered}건` : undefined}
-                  open={openSections.has("delivered")}
-                  onToggle={() => toggleSection("delivered")}
-                />
-                {openSections.has("delivered") && (
-                  <div className="flex flex-col gap-2 pl-1">
-                    {recentDelivered.map((p) => <ProjectCard key={p.id} project={p} />)}
-                  </div>
-                )}
-              </div>
-            )}
-
+          {/* 2. 프로젝트 카드 그리드 */}
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">프로젝트</span>
+              <span className="text-[10px] text-zinc-600">{projects.length}개</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {displayProjects.map((p) => <PhotoProjectCard key={p.id} project={p} />)}
+            </div>
             {showViewAllBtn && (
               <Link
                 href="/photographer/projects"
                 className="flex items-center justify-center gap-2 px-6 py-4 bg-[#121215] border border-[#1a1a1e] hover:border-[#27272c] rounded-xl no-underline group transition-colors"
               >
                 <span className="text-sm font-semibold text-zinc-500 group-hover:text-zinc-300 transition-colors">
-                  전체 프로젝트 보기
+                  전체 프로젝트 보기 ({projects.length - 12}개 더)
                 </span>
                 <ChevronRight size={14} className="text-zinc-600 group-hover:text-zinc-400 transition-colors" />
               </Link>
