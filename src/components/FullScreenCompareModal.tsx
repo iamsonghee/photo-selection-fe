@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { PrevNextButton } from "@/components/PrevNextButton";
 
 type Side = "original" | "version";
 
@@ -131,30 +132,32 @@ export default function FullScreenCompareModal({
 
         {/* controls */}
         <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 flex items-center justify-between px-3">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              toggle();
-            }}
-            className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 active:opacity-80"
-            aria-label="이전(원본/보정본 전환)"
-          >
-            ←
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              toggle();
-            }}
-            className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 active:opacity-80"
-            aria-label="다음(원본/보정본 전환)"
-          >
-            →
-          </button>
+          <div className="pointer-events-auto">
+            <PrevNextButton
+              direction="prev"
+              ariaLabel="이전(원본/보정본 전환)"
+              size="md"
+              position="static"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggle();
+              }}
+            />
+          </div>
+          <div className="pointer-events-auto">
+            <PrevNextButton
+              direction="next"
+              ariaLabel="다음(원본/보정본 전환)"
+              size="md"
+              position="static"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggle();
+              }}
+            />
+          </div>
         </div>
 
         {/* dot indicator */}

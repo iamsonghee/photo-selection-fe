@@ -12,11 +12,11 @@ import {
   Clipboard,
   Download,
   ChevronRight,
-  ChevronLeft,
   X,
   Image,
   AlertTriangle,
 } from "lucide-react";
+import { PrevNextButton } from "@/components/PrevNextButton";
 import { getProjectById, getPhotosWithSelections } from "@/lib/db";
 import type { Project, Photo, ColorTag } from "@/types";
 import { PHOTOGRAPHER_THEME as C } from "@/lib/photographer-theme";
@@ -987,23 +987,12 @@ function Lightbox({
         {index + 1} / {total}
       </div>
 
-      {/* Prev */}
-      <button
-        type="button"
+      <PrevNextButton
+        direction="prev"
+        size="lg"
+        align="edge"
         onClick={(e) => { e.stopPropagation(); onPrev(); }}
-        style={{
-          position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
-          width: 44, height: 44, borderRadius: "50%",
-          background: "rgba(255,255,255,0.1)", border: "none",
-          color: "white", cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          transition: "background 0.15s",
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
-      >
-        <ChevronLeft size={22} />
-      </button>
+      />
 
       {/* Image */}
       <div
@@ -1047,23 +1036,12 @@ function Lightbox({
         </div>
       </div>
 
-      {/* Next */}
-      <button
-        type="button"
+      <PrevNextButton
+        direction="next"
+        size="lg"
+        align="edge"
         onClick={(e) => { e.stopPropagation(); onNext(); }}
-        style={{
-          position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
-          width: 44, height: 44, borderRadius: "50%",
-          background: "rgba(255,255,255,0.1)", border: "none",
-          color: "white", cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          transition: "background 0.15s",
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
-      >
-        <ChevronRight size={22} />
-      </button>
+      />
     </div>
   );
 }

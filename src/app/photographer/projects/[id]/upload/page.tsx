@@ -9,7 +9,6 @@ import {
   Link2,
   Eye,
   EyeOff,
-  ChevronLeft,
   ChevronRight,
   Trash2,
   Lock,
@@ -23,6 +22,7 @@ import {
   ImageIcon,
   ImagePlus,
 } from "lucide-react";
+import { PrevNextButton } from "@/components/PrevNextButton";
 import { getProjectById, getPhotosByProjectId } from "@/lib/db";
 import { getStatusLabel } from "@/lib/project-status";
 import { createClient } from "@/lib/supabase/client";
@@ -120,6 +120,10 @@ async function xhrPostWithRetry(
         xhr.send(buildForm());
       });
       if (shouldRetryStatus(result.status)) {
+        if (result.status === 503) {
+          const detail = await readDetail(result);
+          if (isAuthLikeDetail(detail)) return result;
+        }
         lastErr = new Error(`HTTP ${result.status}`);
         if (attempt < UPLOAD_MAX_ATTEMPTS) { await new Promise<void>((r) => setTimeout(r, 800 * attempt)); continue; }
       }
@@ -160,6 +164,24 @@ function isNetworkFailure(e: unknown) {
   if (e instanceof TypeError) return true;
   if (typeof DOMException !== "undefined" && e instanceof DOMException) return e.name === "NetworkError";
   return false;
+}
+
+async function readDetail(res: { json: () => Promise<unknown> }): Promise<string | null> {
+  try {
+    const body = (await res.json().catch(() => ({}))) as { detail?: unknown };
+    return typeof body?.detail === "string" ? body.detail : null;
+  } catch {
+    return null;
+  }
+}
+
+function isAuthLikeStatus(status: number) {
+  return status === 401 || status === 403;
+}
+
+function isAuthLikeDetail(detail: string | null) {
+  if (!detail) return false;
+  return /인증|Token|Invalid token|JWKS|Unauthorized/i.test(detail);
 }
 
 // ---------- thumbnail (스크롤 루트 기준: 보이는 영역 근처에서만 src 로드) ----------
@@ -864,8 +886,9 @@ export default function ProjectDetailPage() {
 
     const allFailed: File[] = [];
     let completedBatches = 0;
-    let abortReason: "betaLimit" | "network" | null = null;
+    let abortReason: "betaLimit" | "network" | "auth" | null = null;
     let abortMessage = "";
+    let firstFailDetail: string | null = null;
     const concurrency = isPhoneLikeClient() ? MOBILE_CONCURRENCY : PC_CONCURRENCY;
 
     for (let chunkStart = 0; chunkStart < batches.length; chunkStart += concurrency) {
@@ -910,7 +933,22 @@ export default function ProjectDetailPage() {
             }
             if (batchSizes[globalIdx] > 0) applyProgress(globalIdx, batchSizes[globalIdx]);
             if (!res.ok) {
-              try { const b = (await res.json().catch(() => ({}))) as unknown; const betaErr = parseBetaLimitError(b); if (betaErr) { abortReason = "betaLimit"; abortMessage = betaErr.message; return; } } catch {}
+              let body: unknown = {};
+              try { body = await res.json().catch(() => ({})); } catch {}
+              try {
+                const betaErr = parseBetaLimitError(body);
+                if (betaErr) { abortReason = "betaLimit"; abortMessage = betaErr.message; return; }
+              } catch {}
+              const detail = (body && typeof (body as { detail?: unknown }).detail === "string")
+                ? ((body as { detail: string }).detail)
+                : null;
+              const authLike = isAuthLikeStatus(res.status) || (res.status === 503 && isAuthLikeDetail(detail));
+              if (authLike) {
+                abortReason = "auth";
+                abortMessage = detail ?? "인증 오류로 업로드를 진행할 수 없습니다.";
+                return;
+              }
+              if (!firstFailDetail && detail) firstFailDetail = detail;
               allFailed.push(...batch);
             }
           } catch (e) {
@@ -936,6 +974,7 @@ export default function ProjectDetailPage() {
 
     if (abortReason === "betaLimit") { setAwaitingServerFinalize(false); setUploadError(abortMessage); setUploadPhase("idle"); setUploadProgress(0); return; }
     if (abortReason === "network") { setAwaitingServerFinalize(false); setUploadError("업로드에 실패했습니다. 인터넷 연결을 확인해 주세요."); setUploadPhase("idle"); setUploadProgress(0); return; }
+    if (abortReason === "auth") { setAwaitingServerFinalize(false); setUploadError(`업로드에 실패했습니다. (${abortMessage})`); setUploadPhase("idle"); setUploadProgress(0); return; }
 
     setAwaitingServerFinalize(false);
     setUploadProgress(100);
@@ -944,6 +983,11 @@ export default function ProjectDetailPage() {
     setTimeout(async () => {
       setAwaitingServerFinalize(false);
       setUploadPhase("idle"); setUploadProgress(0);
+      if (allFailed.length > 0) {
+        setUploadError(firstFailDetail
+          ? `${allFailed.length}장 실패: ${firstFailDetail}`
+          : `${allFailed.length}장 업로드에 실패했습니다.`);
+      }
       setToast(allFailed.length === 0 ? "업로드 완료!" : `${allFailed.length}장 실패`);
       await loadProject(); await loadPhotos(); router.refresh();
     }, 600);
@@ -1685,40 +1729,16 @@ export default function ProjectDetailPage() {
               >
                 {lightboxIndex + 1} / {photos.length}
               </div>
-              {/* 이전 */}
-              <button
-                type="button"
+              <PrevNextButton
+                direction="prev"
+                size="lg"
+                align="edge"
+                style={{ zIndex: 2 }}
                 onClick={(e) => {
                   e.stopPropagation();
                   setLightboxIndex((i) => (i! > 0 ? i! - 1 : photos.length - 1));
                 }}
-                style={{
-                  position: "absolute",
-                  left: 16,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  zIndex: 2,
-                  width: 44,
-                  height: 44,
-                  borderRadius: "50%",
-                  background: "rgba(255,255,255,0.1)",
-                  border: "none",
-                  color: "white",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transition: "background 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.2)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.1)";
-                }}
-              >
-                <ChevronLeft size={22} />
-              </button>
+              />
               {/* 이미지 */}
               <div
                 onClick={(e) => e.stopPropagation()}
@@ -1736,40 +1756,16 @@ export default function ProjectDetailPage() {
                   </div>
                 )}
               </div>
-              {/* 다음 */}
-              <button
-                type="button"
+              <PrevNextButton
+                direction="next"
+                size="lg"
+                align="edge"
+                style={{ zIndex: 2 }}
                 onClick={(e) => {
                   e.stopPropagation();
                   setLightboxIndex((i) => (i! < photos.length - 1 ? i! + 1 : 0));
                 }}
-                style={{
-                  position: "absolute",
-                  right: 16,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  zIndex: 2,
-                  width: 44,
-                  height: 44,
-                  borderRadius: "50%",
-                  background: "rgba(255,255,255,0.1)",
-                  border: "none",
-                  color: "white",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transition: "background 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.2)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.1)";
-                }}
-              >
-                <ChevronRight size={22} />
-              </button>
+              />
             </div>,
             document.body,
           )

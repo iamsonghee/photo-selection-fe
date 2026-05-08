@@ -4,14 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
-  Check,
   CheckCircle2,
   ChevronLeft,
   Image as ImageIcon,
   Info,
   MessageSquare,
   Minimize2,
-  Pencil,
   Upload,
   X,
 } from "lucide-react";
@@ -30,20 +28,10 @@ import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import type { Photo } from "@/types";
 
-const ACCENT = "#FF5A1F";
-const ACCENT_DIM = "rgba(255, 90, 31, 0.15)";
-const BORDER = "#1f1f1f";
-const BORDER_MID = "#2a2a2a";
-const SURFACE_1 = "#050505";
-const SURFACE_2 = "#0a0a0a";
-const MONO = "'Space Mono', 'JetBrains Mono', 'Noto Sans KR', sans-serif";
-const DISPLAY = "'Space Grotesk', 'Pretendard', sans-serif";
-const TEXT_MUTED = "#5c5c5c";
-const TEXT_NORMAL = "#a3a3a3";
-const TEXT_BRIGHT = "#ffffff";
-const GREEN = "#22c55e";
-const AMBER = "#f59e0b";
-const RED = "#ef4444";
+const ACCENT = "#FF4D00";
+const SURFACE_1 = "#0a0a0c";
+const BORDER = "#1a1a1e";
+const TEXT_NORMAL = "#a1a1aa";
 
 const ACCEPT_IMAGE_TYPES = "image/*,image/heic,image/heif";
 function isAcceptedImageFile(f: File): boolean {
@@ -103,6 +91,20 @@ export default function UploadVersionsPanel({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
+  const [uploadedBytes, setUploadedBytes] = useState(0);
+  const [totalBytes, setTotalBytes] = useState(0);
+  const [serverProcessing, setServerProcessing] = useState(false);
+
+  // submitting이 false가 되면 진행률 초기화
+  useEffect(() => {
+    if (!submitting) {
+      setUploadPct(0);
+      setUploadedBytes(0);
+      setTotalBytes(0);
+      setServerProcessing(false);
+    }
+  }, [submitting]);
 
   // 패널이 닫힐 때 상태 초기화
   useEffect(() => {
@@ -113,6 +115,10 @@ export default function UploadVersionsPanel({
       setError(null);
       setPerItemTargetId(null);
       setCollapsed(false);
+      setUploadPct(0);
+      setUploadedBytes(0);
+      setTotalBytes(0);
+      setServerProcessing(false);
     }
   }, [isOpen]);
 
@@ -189,7 +195,9 @@ export default function UploadVersionsPanel({
     if (overBetaLimit) return false;
     if (targets.length === 0) return false;
     if (mapping.length !== targets.length) return false;
-    return mapping.every((m) => m.file != null || m.type === "server");
+    // 전체 매핑 강제 대신, "업로드할 파일이 1개 이상"이면 업로드를 허용한다.
+    // (server 플레이스홀더만 있는 경우는 업로드할 파일이 없으므로 비활성)
+    return mapping.some((m) => m.file != null);
   }, [overBetaLimit, targets.length, mapping]);
 
   const handleDropFiles = useCallback(
@@ -269,15 +277,48 @@ export default function UploadVersionsPanel({
       changed.forEach((m) => form.append("files", m.file));
       form.append("global_memo", globalMemo);
 
-      const uploadRes = await fetch("/api/photographer/upload-versions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
-      });
-      const uploadData = (await uploadRes.json().catch(() => ({}))) as {
+      const uploadRes = await new Promise<{ ok: boolean; status: number; text: string }>(
+        (resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("POST", "/api/photographer/upload-versions");
+          xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+          xhr.upload.onprogress = (ev) => {
+            if (ev.lengthComputable && ev.total > 0) {
+              setUploadedBytes(ev.loaded);
+              setTotalBytes(ev.total);
+              setUploadPct(Math.min(100, Math.round((ev.loaded / ev.total) * 100)));
+              if (ev.loaded >= ev.total) setServerProcessing(true);
+            } else if (ev.loaded > 0) {
+              setUploadedBytes(ev.loaded);
+            }
+          };
+          xhr.upload.onload = () => setServerProcessing(true);
+
+          xhr.onload = () =>
+            resolve({
+              ok: xhr.status >= 200 && xhr.status < 300,
+              status: xhr.status,
+              text: xhr.responseText ?? "",
+            });
+          xhr.onerror = () => reject(new TypeError("NetworkError"));
+          xhr.onabort = () => reject(new Error("업로드가 중단되었습니다."));
+
+          xhr.send(form);
+        },
+      );
+
+      const uploadData = ((): {
         error?: string;
         detail?: string | Array<{ msg?: string; message?: string }>;
-      };
+      } => {
+        try {
+          return JSON.parse(uploadRes.text || "{}");
+        } catch {
+          return {};
+        }
+      })();
+
       if (!uploadRes.ok) {
         const msg =
           uploadData.error ??
@@ -306,10 +347,16 @@ export default function UploadVersionsPanel({
     mapping.length > 0
       ? mapping.filter((m) => m.file == null && m.type !== "server").length
       : 0;
-  const progressPct =
+  const mappingProgressPct =
     targets.length > 0
       ? Math.min(100, Math.round((mappedCount / targets.length) * 100))
       : 0;
+  // submitting 중에는 실제 바이트 진행률(uploadPct)을, 그 외에는 매핑 진행률을 보여준다.
+  const progressPct = submitting ? uploadPct : mappingProgressPct;
+  const totalUploadFileCount = mapping.filter((m) => m.file != null).length;
+  // RailProgress 회전: 진행률이 의미있게 차오르고 있을 때는 멈춰두고,
+  // (a) 송신 시작 직전(0%) (b) lengthComputable이 false인 환경 (c) 서버 처리 중일 때만 회전.
+  const railSpinning = submitting && (serverProcessing || uploadPct === 0);
 
   return (
     <div
@@ -332,47 +379,21 @@ export default function UploadVersionsPanel({
       <style>{`
         @keyframes uvp-bar-scan { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }
         @keyframes uvp-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .uvp-tech { font-family: ${MONO}; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; }
         .uvp-dropzone {
           box-sizing: border-box;
-          padding: 24px 28px 28px;
-          background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' stroke='%23333' stroke-width='2' stroke-dasharray='8%2c 8' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+          background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' rx='16' ry='16' fill='none' stroke='%2327272c' stroke-width='2' stroke-dasharray='8%2c 8'/%3e%3c/svg%3e");
           background-origin: border-box;
           background-clip: border-box;
           transition: background-color 0.2s ease, background-image 0.2s ease;
         }
         .uvp-dropzone:hover, .uvp-dropzone.uvp-over {
-          background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' stroke='%23FF5A1F' stroke-width='2' stroke-dasharray='8%2c 8' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
-          background-color: ${ACCENT_DIM};
+          background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' rx='16' ry='16' fill='none' stroke='%23FF4D00' stroke-width='2' stroke-dasharray='8%2c 8'/%3e%3c/svg%3e");
+          background-color: rgba(255, 77, 0, 0.06);
         }
         .uvp-scroll::-webkit-scrollbar { width: 6px; }
         .uvp-scroll::-webkit-scrollbar-track { background: ${SURFACE_1}; border-left: 1px solid ${BORDER}; }
-        .uvp-scroll::-webkit-scrollbar-thumb { background: #333; }
+        .uvp-scroll::-webkit-scrollbar-thumb { background: #2a2a2e; border-radius: 3px; }
         .uvp-scroll::-webkit-scrollbar-thumb:hover { background: ${ACCENT}; }
-        .uvp-btn-primary { background: ${ACCENT_DIM}; border: 1px solid rgba(255,90,31,0.5); color: ${ACCENT}; cursor: pointer; font-family: ${MONO}; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
-        .uvp-btn-primary:hover { background: ${ACCENT}; color: #000; }
-        .uvp-btn-secondary { background: transparent; border: 1px solid ${BORDER_MID}; color: ${TEXT_MUTED}; cursor: pointer; font-family: ${MONO}; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
-        .uvp-btn-secondary:hover { border-color: #444; color: ${TEXT_BRIGHT}; }
-        .uvp-btn-danger { background: transparent; border: 1px solid rgba(255,51,51,0.3); color: #FF3333; cursor: pointer; font-family: ${MONO}; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
-        .uvp-btn-danger:hover { background: rgba(255,51,51,0.1); }
-        .uvp-memo {
-          background: #080808; border: 1px solid ${BORDER}; color: ${TEXT_BRIGHT};
-          transition: border-color 0.2s; outline: none;
-        }
-        .uvp-memo:focus { border-color: ${ACCENT}; box-shadow: inset 0 0 10px rgba(255,90,31,0.1); }
-        .uvp-rail-btn {
-          background: transparent; border: 1px solid ${BORDER_MID};
-          color: ${TEXT_MUTED}; cursor: pointer;
-          width: 36px; height: 36px;
-          display: flex; align-items: center; justify-content: center;
-          transition: all 0.15s;
-        }
-        .uvp-rail-btn:hover:not(:disabled) { border-color: ${ACCENT}; color: ${ACCENT}; }
-        .uvp-rail-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .uvp-rail-btn-primary {
-          background: ${ACCENT_DIM}; border: 1px solid rgba(255,90,31,0.5); color: ${ACCENT};
-        }
-        .uvp-rail-btn-primary:hover { background: ${ACCENT}; color: #000; border-color: ${ACCENT}; }
         @media (max-width: 768px) {
           .uvp-sheet { width: 100% !important; max-width: 100% !important; }
           .uvp-collapse-toggle { display: none !important; }
@@ -397,6 +418,7 @@ export default function UploadVersionsPanel({
           transition: "width 200ms ease, box-shadow 200ms ease",
           overflow: "hidden",
           pointerEvents: "auto",
+          fontFamily: "var(--font-inter, 'Pretendard', sans-serif)",
         }}
       >
         {collapsed && (
@@ -406,6 +428,7 @@ export default function UploadVersionsPanel({
             totalCount={targets.length}
             progressPct={progressPct}
             submitting={submitting}
+            spinning={railSpinning}
             onExpand={() => setCollapsed(false)}
             onClose={onClose}
           />
@@ -413,77 +436,24 @@ export default function UploadVersionsPanel({
         {!collapsed && (
         <>
         {/* Header */}
-        <header
-          style={{
-            flexShrink: 0,
-            padding: "16px 24px",
-            borderBottom: `1px solid ${BORDER}`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            background: "rgba(2,2,2,0.95)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              style={{
-                width: 8,
-                height: 8,
-                background: ACCENT,
-                boxShadow: `0 0 8px ${ACCENT}`,
-              }}
-            />
-            <div>
-              <div
-                className="uvp-tech"
-                style={{ color: ACCENT, marginBottom: 2 }}
-              >
-                BULK_UPLOAD :: V{version}
-              </div>
-              <h2
-                style={{
-                  fontFamily: DISPLAY,
-                  fontSize: 16,
-                  fontWeight: 700,
-                  color: TEXT_BRIGHT,
-                  margin: 0,
-                  lineHeight: 1.3,
-                }}
-              >
-                {versionLabel} 일괄 업로드
-              </h2>
-              <p
-                style={{
-                  margin: "6px 0 0",
-                  fontSize: 11,
-                  color: TEXT_MUTED,
-                  lineHeight: 1.45,
-                  maxWidth: 280,
-                }}
-              >
-                {targets.some((t) => t.serverRetouchUrl)
-                  ? "서버에 올라간 보정본을 확인하고, 잘못 매핑된 장만 교체해 올릴 수 있어요."
-                  : "업로드 후 매핑을 확인한 다음, ‘고객 검토 시작’ 버튼으로 공유합니다."}
+        <header className="shrink-0 border-b border-[#1a1a1e] bg-[#0f0f12]/95 backdrop-blur px-6 py-4 flex items-center justify-between">
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-white leading-tight m-0">
+              {versionLabel} 업로드
+            </h2>
+            {targets.some((t) => t.serverRetouchUrl) && (
+              <p className="text-xs text-zinc-500 mt-1 m-0">
+                필요한 장만 골라 교체할 수 있어요.
               </p>
-            </div>
+            )}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div className="flex items-center gap-1">
             <button
               type="button"
-              className="uvp-collapse-toggle"
+              className="uvp-collapse-toggle p-1.5 rounded-md text-zinc-500 hover:text-white hover:bg-white/5 transition-colors"
               onClick={() => setCollapsed(true)}
               aria-label="패널 축소"
               title="패널 축소 (본문과 함께 보기)"
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: TEXT_MUTED,
-                padding: 4,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
             >
               <Minimize2 size={16} />
             </button>
@@ -492,16 +462,7 @@ export default function UploadVersionsPanel({
               onClick={onClose}
               disabled={submitting}
               aria-label="닫기"
-              style={{
-                background: "none",
-                border: "none",
-                cursor: submitting ? "not-allowed" : "pointer",
-                color: TEXT_MUTED,
-                padding: 4,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+              className="p-1.5 rounded-md text-zinc-500 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <X size={18} />
             </button>
@@ -509,96 +470,33 @@ export default function UploadVersionsPanel({
         </header>
 
         {/* Body */}
-        <div
-          className="uvp-scroll"
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: "auto",
-            padding: 24,
-            paddingBottom: 24,
-          }}
-        >
+        <div className="uvp-scroll flex-1 min-h-0 overflow-y-auto p-6">
           {/* targets summary */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 20,
-              flexWrap: "wrap",
-              gap: 12,
-            }}
-          >
-            <div>
-              <div className="uvp-tech" style={{ color: "#888", marginBottom: 4 }}>
-                {targetsLabel}
-              </div>
-              <div
-                style={{
-                  fontFamily: MONO,
-                  fontSize: 13,
-                  color: TEXT_BRIGHT,
-                }}
-              >
-                {targets.length}장
-              </div>
+          <div className="mb-5 flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-sm text-zinc-300">
+              <span className="text-zinc-500">{targetsLabel}</span>
+              <span className="mx-2 text-zinc-700">·</span>
+              <span className="font-semibold text-white">{targets.length}장</span>
             </div>
-            <div
-              style={{
-                background: SURFACE_2,
-                border: `1px solid #222`,
-                padding: "6px 14px",
-              }}
-            >
-              <span className="uvp-tech" style={{ color: "#555" }}>
-                MAPPED
-              </span>
-              <span
-                style={{
-                  marginLeft: 10,
-                  fontFamily: MONO,
-                  fontSize: 12,
-                  color: ACCENT,
-                }}
-              >
-                {mappedCount} / {targets.length}
-              </span>
+            <div className="text-xs text-zinc-400">
+              매핑 <span className="text-[#FF4D00] font-bold">{mappedCount}</span>
+              <span className="text-zinc-600"> / {targets.length}</span>
             </div>
           </div>
 
           {/* Beta limit warning */}
           {overBetaLimit ? (
-            <div
-              style={{
-                padding: "20px 16px",
-                textAlign: "center",
-                background: "rgba(239,68,68,0.06)",
-                border: "2px dashed rgba(239,68,68,0.35)",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 10,
-                marginBottom: 20,
-              }}
-            >
-              <AlertCircle size={20} color={RED} />
-              <div style={{ fontSize: 13, color: "#f87171", fontWeight: 600 }}>
+            <div className="rounded-2xl bg-rose-500/5 border border-rose-500/30 px-5 py-5 mb-5 flex flex-col items-center gap-2 text-center">
+              <AlertCircle size={20} className="text-rose-400" />
+              <div className="text-sm text-rose-300 font-semibold">
                 베타 기간 최대 보정 횟수({BETA_MAX_REVISION_COUNT}회)에 도달했습니다.
               </div>
-              <div style={{ fontFamily: MONO, fontSize: 10, color: TEXT_MUTED }}>
+              <div className="text-[11px] text-zinc-500">
                 현재 {existingVersionCount} / {BETA_MAX_REVISION_COUNT}회 사용 중
               </div>
             </div>
           ) : targets.length === 0 ? (
-            <div
-              style={{
-                padding: "32px 16px",
-                textAlign: "center",
-                color: TEXT_MUTED,
-                fontSize: 13,
-              }}
-            >
+            <div className="px-4 py-10 text-center text-sm text-zinc-500">
               {version === 1
                 ? "선택된 사진이 없습니다."
                 : "재보정 요청된 사진이 없습니다."}
@@ -606,11 +504,13 @@ export default function UploadVersionsPanel({
           ) : (
             <>
               {/* Dropzone */}
-              <div style={{ marginBottom: 24 }}>
+              <div className="mb-6">
                 <div
                   role="button"
                   tabIndex={0}
-                  className={`uvp-dropzone${dragOver ? " uvp-over" : ""}`}
+                  className={`uvp-dropzone${dragOver ? " uvp-over" : ""} rounded-2xl flex flex-col items-center justify-center min-h-[160px] px-7 py-7 ${
+                    mappedCount === 0 ? "cursor-pointer" : "cursor-default"
+                  } ${mappedCount > 0 ? "bg-emerald-500/[0.04]" : "bg-transparent"}`}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
@@ -631,193 +531,62 @@ export default function UploadVersionsPanel({
                     setDragOver(false);
                   }}
                   onClick={() => mappedCount === 0 && multiInputRef.current?.click()}
-                  style={{
-                    width: "100%",
-                    minHeight: 168,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: mappedCount === 0 ? "pointer" : "default",
-                    backgroundColor:
-                      mappedCount > 0 ? "rgba(34,197,94,0.04)" : "transparent",
-                  }}
                 >
                   <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: "50%",
-                      border: `1px solid ${mappedCount > 0 ? "rgba(34,197,94,0.5)" : "#333"}`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: SURFACE_2,
-                      marginBottom: 6,
-                    }}
+                    className={`w-10 h-10 rounded-full border ${
+                      mappedCount > 0 ? "border-emerald-500/50" : "border-[#27272c]"
+                    } bg-[#0a0a0c] flex items-center justify-center mb-2`}
                   >
                     {mappedCount > 0 ? (
-                      <CheckCircle2 size={18} color={GREEN} />
+                      <CheckCircle2 size={18} className="text-emerald-500" />
                     ) : (
-                      <Upload size={18} color="#666" strokeWidth={1.5} />
+                      <Upload size={18} className="text-zinc-500" strokeWidth={1.5} />
                     )}
                   </div>
-                  <p
-                    style={{
-                      fontFamily: DISPLAY,
-                      fontWeight: 700,
-                      fontSize: 14,
-                      color: mappedCount > 0 ? TEXT_BRIGHT : TEXT_NORMAL,
-                      margin: 0,
-                    }}
-                  >
+                  <p className="text-sm font-semibold text-white m-0">
                     {mappedCount > 0
-                      ? `${mappedCount}장 매핑됨 · 아래에서 확인`
-                      : version === 1
-                        ? "DROP_RETOUCHED_FILES"
-                        : "DROP_V2_RETOUCHED_FILES"}
+                      ? `${mappedCount}장 매핑 완료`
+                      : "이곳에 파일을 끌어다 놓으세요"}
                   </p>
-                  <p className="uvp-tech" style={{ color: "#555", marginTop: 6, marginBottom: 0 }}>
-                    JPEG / PNG / WebP 지원
-                  </p>
+                  <p className="text-[11px] text-zinc-600 mt-1 m-0">JPEG · PNG · WebP</p>
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       multiInputRef.current?.click();
                     }}
-                    className="uvp-tech"
-                    style={{
-                      marginTop: 16,
-                      padding: "8px 16px",
-                      background: ACCENT_DIM,
-                      border: "1px solid rgba(255,90,31,0.4)",
-                      color: ACCENT,
-                      cursor: "pointer",
-                    }}
+                    className="mt-4 px-4 py-2 rounded-xl bg-[#FF4D00] hover:bg-[#ff5e1a] text-black text-xs font-bold transition-colors"
                   >
-                    {mappedCount > 0 ? "RESELECT FILES" : "SELECT FILES"}
+                    {mappedCount > 0 ? "다시 선택" : "파일 선택"}
                   </button>
                 </div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    marginTop: 10,
-                    paddingLeft: 4,
-                  }}
-                >
-                  <Info size={12} color="#666" strokeWidth={2} />
-                  <span className="uvp-tech" style={{ color: "#666" }}>
-                    파일명 일치 시 자동 매핑 · 불일치 시 순서대로 매핑
-                  </span>
+                <div className="flex items-center gap-1.5 mt-2.5 pl-1 text-[11px] text-zinc-600">
+                  <Info size={12} strokeWidth={2} />
+                  <span>파일명 일치 시 자동 매핑 · 불일치 시 순서대로 매핑</span>
                 </div>
               </div>
 
               {/* Mapping result */}
               {mapping.length > 0 && (
                 <div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-end",
-                      justifyContent: "space-between",
-                      borderBottom: `1px solid ${BORDER}`,
-                      paddingBottom: 10,
-                      marginBottom: 14,
-                      flexWrap: "wrap",
-                      gap: 12,
-                    }}
-                  >
-                    <h3 className="uvp-tech" style={{ color: TEXT_BRIGHT, margin: 0 }}>
-                      MAPPING_RESULT
-                    </h3>
+                  <div className="flex items-end justify-between border-b border-[#1a1a1e] pb-2.5 mb-3.5 flex-wrap gap-3">
+                    <h3 className="text-sm font-semibold text-white m-0">매핑 결과</h3>
                     {(stats.exact > 0 || stats.order > 0 || stats.server > 0) && (
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 12,
-                          background: SURFACE_2,
-                          border: `1px solid #222`,
-                          padding: "4px 12px",
-                        }}
-                      >
+                      <div className="flex items-center gap-3 text-[11px]">
                         {stats.exact > 0 && (
-                          <span
-                            className="uvp-tech"
-                            style={{
-                              color: GREEN,
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: 6,
-                                height: 6,
-                                borderRadius: "50%",
-                                background: GREEN,
-                              }}
-                            />
-                            NAME_MATCH: {stats.exact}
-                          </span>
+                          <StatChip dotColor="bg-emerald-500" textColor="text-emerald-400" label={`자동 ${stats.exact}`} />
                         )}
-                        {stats.exact > 0 && stats.order > 0 ? (
-                          <span style={{ width: 1, height: 12, background: "#333" }} />
-                        ) : null}
                         {stats.order > 0 && (
-                          <span
-                            className="uvp-tech"
-                            style={{
-                              color: AMBER,
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: 6,
-                                height: 6,
-                                borderRadius: "50%",
-                                background: AMBER,
-                              }}
-                            />
-                            SEQ_MATCH: {stats.order}
-                          </span>
+                          <StatChip dotColor="bg-amber-500" textColor="text-amber-400" label={`순서 ${stats.order}`} />
                         )}
-                        {stats.server > 0 && (stats.exact > 0 || stats.order > 0) ? (
-                          <span style={{ width: 1, height: 12, background: "#333" }} />
-                        ) : null}
                         {stats.server > 0 && (
-                          <span
-                            className="uvp-tech"
-                            style={{
-                              color: "#38bdf8",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: 6,
-                                height: 6,
-                                borderRadius: "50%",
-                                background: "#38bdf8",
-                              }}
-                            />
-                            CURRENT: {stats.server}
-                          </span>
+                          <StatChip dotColor="bg-sky-500" textColor="text-sky-400" label={`현재 ${stats.server}`} />
                         )}
                       </div>
                     )}
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div className="flex flex-col gap-2.5">
                     {mapping.map((m) => (
                       <PanelMappingRow
                         key={m.target.id}
@@ -836,17 +605,7 @@ export default function UploadVersionsPanel({
           )}
 
           {error && (
-            <div
-              style={{
-                marginTop: 16,
-                padding: "10px 14px",
-                background: "rgba(239,68,68,0.1)",
-                border: "1px solid rgba(239,68,68,0.25)",
-                color: "#f87171",
-                fontFamily: MONO,
-                fontSize: 11,
-              }}
-            >
+            <div className="mt-4 px-3.5 py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-[12px] text-rose-300">
               {error}
             </div>
           )}
@@ -854,146 +613,89 @@ export default function UploadVersionsPanel({
 
         {/* Footer / action bar */}
         {!overBetaLimit && targets.length > 0 ? (
-          <footer
-            style={{
-              flexShrink: 0,
-              borderTop: `1px solid ${BORDER}`,
-              padding: 16,
-              background: "rgba(2,2,2,0.95)",
-              backdropFilter: "blur(8px)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
+          <footer className="shrink-0 border-t border-[#1a1a1e] bg-[#0f0f12]/95 backdrop-blur px-5 py-4 flex flex-col gap-3">
             {/* progress */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
-                }}
-              >
-                <span className="uvp-tech" style={{ color: TEXT_BRIGHT }}>
-                  V{version} UPLOAD STATUS
+            <div>
+              <div className="flex items-center justify-between mb-1.5 gap-3">
+                <span className="text-[11px] font-semibold text-zinc-300">
+                  {submitting ? "업로드 진행도" : "업로드 상태"}
                 </span>
-                <span
-                  style={{
-                    fontFamily: MONO,
-                    fontSize: 11,
-                    color: ACCENT,
-                  }}
-                >
-                  {emptyCount > 0 ? `${emptyCount}장 미매핑` : "전체 매핑 완료"}
+                <span className="text-[11px] text-[#FF4D00] font-medium">
+                  {submitting
+                    ? serverProcessing
+                      ? "서버 처리 중…"
+                      : totalBytes > 0
+                        ? `${uploadPct}% · ${formatStoredFileSizeBytes(uploadedBytes)} / ${formatStoredFileSizeBytes(totalBytes)}`
+                        : `${uploadPct}%`
+                    : emptyCount > 0
+                      ? `${emptyCount}장 미매핑`
+                      : "전체 매핑 완료"}
                 </span>
               </div>
-              <div
-                style={{
-                  height: 5,
-                  width: "100%",
-                  background: "#111",
-                  overflow: "hidden",
-                }}
-              >
+              <div className="h-1.5 rounded-full bg-[#1a1a1e] overflow-hidden">
                 <div
-                  style={{
-                    height: "100%",
-                    width: `${progressPct}%`,
-                    background: ACCENT,
-                    position: "relative",
-                    transition: "width 0.3s",
-                  }}
+                  className="h-full bg-[#FF4D00] relative transition-[width] duration-300"
+                  style={{ width: `${progressPct}%` }}
                 >
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      background: "rgba(255,255,255,0.18)",
-                      width: "25%",
-                      animation: "uvp-bar-scan 2s linear infinite",
-                    }}
-                  />
+                  {submitting && (
+                    <div
+                      className="absolute inset-0 bg-white/15"
+                      style={{ width: "25%", animation: "uvp-bar-scan 2s linear infinite" }}
+                    />
+                  )}
                 </div>
               </div>
+              {submitting && totalUploadFileCount > 0 && (
+                <p className="mt-1.5 text-[10px] text-zinc-500">
+                  총 {totalUploadFileCount}장
+                  {totalBytes > 0 ? ` · 합계 ${formatStoredFileSizeBytes(totalBytes)}` : ""}
+                </p>
+              )}
             </div>
 
             {/* memo */}
             <div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  marginBottom: 6,
-                }}
-              >
-                <MessageSquare size={11} color="#666" strokeWidth={2} />
-                <span className="uvp-tech" style={{ color: "#666" }}>
-                  PHOTOGRAPHER_MEMO (선택)
-                </span>
+              <div className="flex items-center gap-1.5 mb-1.5 text-[11px] text-zinc-500">
+                <MessageSquare size={11} strokeWidth={2} />
+                <span>메모(선택)</span>
               </div>
               <textarea
-                className="uvp-memo"
                 value={globalMemo}
                 onChange={(e) => setGlobalMemo(e.target.value)}
                 placeholder="고객 검토 화면에 표시될 메모"
                 rows={2}
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "8px 10px",
-                  fontFamily: MONO,
-                  fontSize: 11,
-                  lineHeight: 1.45,
-                  resize: "vertical",
-                  minHeight: 44,
-                  maxHeight: 120,
-                }}
+                className="w-full rounded-xl bg-[#0a0a0c] border border-[#27272c] text-white text-[12px] px-3 py-2 resize-y min-h-[44px] max-h-[120px] focus:outline-none focus:border-[#FF4D00] transition-colors leading-snug"
               />
             </div>
 
             {/* deliver */}
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                justifyContent: "flex-end",
-                alignItems: "center",
-              }}
-            >
+            <div className="flex items-center gap-2 justify-end">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={submitting}
-                className="uvp-btn-secondary"
-                style={{ padding: "10px 16px" }}
+                className="px-4 py-2.5 rounded-xl border border-[#27272c] bg-[#0a0a0c] text-zinc-300 text-sm font-medium hover:border-zinc-500 hover:bg-[#121215] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                CANCEL
+                취소
               </button>
               <button
                 type="button"
                 onClick={handleDeliver}
                 disabled={!canDeliver || submitting}
-                className="uvp-tech"
-                style={{
-                  padding: "10px 22px",
-                  background: canDeliver ? ACCENT_DIM : "#111",
-                  border: `1px solid ${canDeliver ? "rgba(255,90,31,0.45)" : "#333"}`,
-                  color: canDeliver ? ACCENT : "#555",
-                  cursor: canDeliver && !submitting ? "pointer" : "not-allowed",
-                  fontWeight: 700,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:bg-[#1a1a1e] disabled:text-zinc-600 disabled:cursor-not-allowed text-black text-sm font-bold transition-colors"
               >
                 {submitting ? (
-                  "업로드 중…"
+                  <>
+                    <span
+                      aria-hidden
+                      className="inline-block w-3 h-3 rounded-full border-2 border-black/40 border-t-black"
+                      style={{ animation: "uvp-spin 0.9s linear infinite" }}
+                    />
+                    {serverProcessing ? "서버 처리 중…" : `업로드 중 ${uploadPct}%`}
+                  </>
                 ) : (
                   <>
-                    <Upload size={12} />
+                    <Upload size={14} />
                     업로드
                   </>
                 )}
@@ -1025,6 +727,25 @@ export default function UploadVersionsPanel({
   );
 }
 
+// ── Stat chip ─────────────────────────────────────────────────────────────────
+
+function StatChip({
+  dotColor,
+  textColor,
+  label,
+}: {
+  dotColor: string;
+  textColor: string;
+  label: string;
+}) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 ${textColor}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+      <span>{label}</span>
+    </span>
+  );
+}
+
 // ── Collapsed rail ────────────────────────────────────────────────────────────
 
 function CollapsedRail({
@@ -1033,6 +754,7 @@ function CollapsedRail({
   totalCount,
   progressPct,
   submitting,
+  spinning,
   onExpand,
   onClose,
 }: {
@@ -1041,45 +763,25 @@ function CollapsedRail({
   totalCount: number;
   progressPct: number;
   submitting: boolean;
+  spinning: boolean;
   onExpand: () => void;
   onClose: () => void;
 }) {
   return (
-    <div
-      style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        padding: "16px 8px",
-        gap: 16,
-        height: "100%",
-      }}
-    >
+    <div className="flex-1 flex flex-col items-center px-2 py-4 gap-4 h-full">
       <button
         type="button"
-        className="uvp-rail-btn uvp-rail-btn-primary"
         onClick={onExpand}
         aria-label="패널 펼치기"
         title="패널 펼치기"
+        className="w-9 h-9 flex items-center justify-center rounded-md border border-[#FF4D00]/40 bg-[#FF4D00]/15 text-[#FF4D00] hover:bg-[#FF4D00] hover:text-black transition-colors"
       >
         <ChevronLeft size={16} />
       </button>
 
       <div
-        style={{
-          width: 36,
-          padding: "8px 0",
-          textAlign: "center",
-          background: ACCENT_DIM,
-          border: `1px solid rgba(255,90,31,0.3)`,
-          color: ACCENT,
-          fontFamily: MONO,
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: "0.08em",
-        }}
         aria-label={`V${version}`}
+        className="w-9 py-1.5 text-center rounded-md bg-[#FF4D00]/15 border border-[#FF4D00]/40 text-[#FF4D00] text-[11px] font-bold"
       >
         V{version}
       </div>
@@ -1089,17 +791,18 @@ function CollapsedRail({
         mappedCount={mappedCount}
         totalCount={totalCount}
         submitting={submitting}
+        spinning={spinning}
       />
 
-      <div style={{ flex: 1 }} />
+      <div className="flex-1" />
 
       <button
         type="button"
-        className="uvp-rail-btn"
         onClick={onClose}
         disabled={submitting}
         aria-label="닫기"
         title={submitting ? "업로드 중에는 닫을 수 없습니다" : "닫기"}
+        className="w-9 h-9 flex items-center justify-center rounded-md border border-[#27272c] text-zinc-500 hover:border-zinc-500 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
       >
         <X size={16} />
       </button>
@@ -1112,11 +815,13 @@ function RailProgress({
   mappedCount,
   totalCount,
   submitting,
+  spinning,
 }: {
   progressPct: number;
   mappedCount: number;
   totalCount: number;
   submitting: boolean;
+  spinning: boolean;
 }) {
   const size = 40;
   const stroke = 3;
@@ -1125,22 +830,17 @@ function RailProgress({
   const dash = (Math.max(0, Math.min(100, progressPct)) / 100) * circumference;
   return (
     <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 6,
-      }}
+      className="flex flex-col items-center gap-1.5"
       title={`매핑 ${mappedCount}/${totalCount}`}
     >
-      <div style={{ position: "relative", width: size, height: size }}>
+      <div className="relative" style={{ width: size, height: size }}>
         <svg
           width={size}
           height={size}
           viewBox={`0 0 ${size} ${size}`}
           style={{
             transform: "rotate(-90deg)",
-            animation: submitting ? "uvp-spin 1.4s linear infinite" : undefined,
+            animation: spinning ? "uvp-spin 1.4s linear infinite" : undefined,
           }}
         >
           <circle
@@ -1148,7 +848,7 @@ function RailProgress({
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke="#222"
+            stroke="#1a1a1e"
             strokeWidth={stroke}
           />
           <circle
@@ -1162,30 +862,11 @@ function RailProgress({
             strokeLinecap="round"
           />
         </svg>
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: MONO,
-            fontSize: 9,
-            color: TEXT_BRIGHT,
-            fontWeight: 700,
-          }}
-        >
+        <div className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white">
           {`${progressPct}`}
         </div>
       </div>
-      <span
-        style={{
-          fontFamily: MONO,
-          fontSize: 9,
-          color: TEXT_MUTED,
-          letterSpacing: "0.05em",
-        }}
-      >
+      <span className="text-[9px] text-zinc-500">
         {mappedCount}/{totalCount}
       </span>
     </div>
@@ -1220,115 +901,77 @@ function PanelMappingRow({
         : type === "server"
           ? "server"
           : "empty";
-  const borderColor =
+  const borderClass =
     state === "matched"
-      ? "rgba(34,197,94,0.25)"
+      ? "border-emerald-500/30"
       : state === "ordered"
-        ? "rgba(245,158,11,0.3)"
+        ? "border-amber-500/30"
         : state === "server"
-          ? "rgba(56,189,248,0.35)"
-          : "rgba(239,68,68,0.25)";
+          ? "border-sky-500/30"
+          : "border-rose-500/30";
   const fileSizeStr = file && file.size > 0 ? formatStoredFileSizeBytes(file.size) : "";
   const origSrc = viewerImageUrl(target.photo);
 
+  const primaryActionLabel = state === "empty" ? "선택" : state === "server" ? "교체" : "변경";
+  const primaryActionClass =
+    state === "empty" || state === "server"
+      ? "border-[#FF4D00]/40 bg-[#FF4D00]/10 text-[#FF4D00] hover:bg-[#FF4D00]/20"
+      : "border-[#27272c] text-zinc-300 hover:border-zinc-500 hover:text-white";
+
   return (
-    <div
-      style={{
-        background: SURFACE_2,
-        border: `1px solid ${borderColor}`,
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <div className={`rounded-xl border ${borderClass} bg-[#0f0f12] overflow-hidden`}>
       <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) 24px minmax(0, 1fr) auto",
-          alignItems: "center",
-          gap: 8,
-          padding: "10px 14px",
-        }}
+        className="grid items-center gap-2 px-3.5 py-2.5"
+        style={{ gridTemplateColumns: "minmax(0, 1fr) 20px minmax(0, 1fr) auto" }}
       >
         {/* Left: original (+v1 if provided) + filename + comment */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                background: SURFACE_1,
-                border: `1px solid ${BORDER}`,
-                overflow: "hidden",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex gap-1 shrink-0">
+            <div className="w-10 h-10 rounded-md bg-[#0a0a0c] border border-[#1a1a1e] overflow-hidden flex items-center justify-center">
               {origSrc && !origErr ? (
                 <img
                   src={origSrc}
                   alt=""
                   onError={() => setOrigErr(true)}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  className="w-full h-full object-cover"
                 />
               ) : (
-                <ImageIcon size={14} color={TEXT_MUTED} />
+                <ImageIcon size={14} className="text-zinc-600" />
               )}
             </div>
             {target.v1Url ? (
               <div
-                title="v1 보정본"
-                style={{
-                  width: 40,
-                  height: 40,
-                  background: SURFACE_1,
-                  border: "1px solid rgba(255,90,31,0.25)",
-                  overflow: "hidden",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
+                title="V1 보정본"
+                className="w-10 h-10 rounded-md bg-[#0a0a0c] border border-[#FF4D00]/25 overflow-hidden flex items-center justify-center"
               >
                 {!v1Err ? (
                   <img
                     src={target.v1Url}
                     alt=""
                     onError={() => setV1Err(true)}
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    className="w-full h-full object-cover"
                   />
                 ) : (
-                  <ImageIcon size={14} color={TEXT_MUTED} />
+                  <ImageIcon size={14} className="text-zinc-600" />
                 )}
               </div>
             ) : null}
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="flex-1 min-w-0">
             <div
-              style={{
-                fontSize: 12,
-                fontWeight: 500,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                marginBottom: 2,
-                color: TEXT_BRIGHT,
-                fontFamily: MONO,
-              }}
+              className="text-[12.5px] font-medium text-zinc-200 truncate"
               title={target.filename}
             >
               {target.filename}
             </div>
             {target.comment?.trim() ? (
               <div
+                className="text-[10.5px] text-amber-400 mt-0.5 leading-snug"
                 style={{
-                  fontSize: 10,
-                  color: AMBER,
                   display: "-webkit-box",
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: "vertical",
                   overflow: "hidden",
-                  lineHeight: 1.3,
                 }}
               >
                 {target.comment}
@@ -1337,251 +980,106 @@ function PanelMappingRow({
           </div>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            color: TEXT_MUTED,
-          }}
-        >
+        <div className="flex justify-center text-zinc-600">
           <ArrowRight size={13} />
         </div>
 
         {/* Right: retouched */}
         {state === "empty" ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                background: "transparent",
-                border: "2px dashed rgba(239,68,68,0.35)",
-                flexShrink: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <X size={14} color="rgba(239,68,68,0.6)" strokeWidth={1.5} />
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-12 h-12 rounded-md border-2 border-dashed border-rose-500/35 flex items-center justify-center shrink-0">
+              <X size={14} className="text-rose-500/60" strokeWidth={1.5} />
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <span
-                className="uvp-tech"
-                style={{ color: "rgba(239,68,68,0.85)", display: "block" }}
-              >
-                NO_RETOUCH_FOUND
-              </span>
-            </div>
+            <div className="flex-1 min-w-0 text-[12px] text-rose-300/90">매핑 없음</div>
           </div>
         ) : state === "server" ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                background: SURFACE_1,
-                border: "1px solid rgba(56,189,248,0.45)",
-                overflow: "hidden",
-                flexShrink: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-12 h-12 rounded-md bg-[#0a0a0c] border border-sky-500/45 overflow-hidden shrink-0 flex items-center justify-center">
               {target.serverRetouchUrl && !retouchErr ? (
                 <img
                   src={target.serverRetouchUrl}
                   alt=""
                   onError={() => setRetouchErr(true)}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  className="w-full h-full object-cover"
                 />
               ) : (
-                <ImageIcon size={14} color={TEXT_MUTED} />
+                <ImageIcon size={14} className="text-zinc-600" />
               )}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  fontFamily: MONO,
-                  fontSize: 11,
-                  color: TEXT_BRIGHT,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                서버에 등록된 보정본
-              </div>
-              <div style={{ fontFamily: MONO, fontSize: 9, color: "#38bdf8" }}>
-                교체 시에만 다시 업로드됩니다
-              </div>
+            <div
+              className="flex-1 min-w-0 text-[12px] text-zinc-200 truncate"
+              title={target.filename}
+            >
+              {target.filename}
             </div>
           </div>
         ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <div className="flex items-center gap-2.5 min-w-0">
             <div
-              style={{
-                width: 48,
-                height: 48,
-                background: SURFACE_1,
-                border: `1px solid ${state === "matched" ? "rgba(34,197,94,0.35)" : "rgba(245,158,11,0.5)"}`,
-                overflow: "hidden",
-                flexShrink: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+              className={`w-12 h-12 rounded-md bg-[#0a0a0c] overflow-hidden shrink-0 flex items-center justify-center border ${
+                state === "matched" ? "border-emerald-500/35" : "border-amber-500/45"
+              }`}
             >
               {previewUrl && !retouchErr ? (
                 <img
                   src={previewUrl}
                   alt=""
                   onError={() => setRetouchErr(true)}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  className="w-full h-full object-cover"
                 />
               ) : (
-                <ImageIcon size={14} color={TEXT_MUTED} />
+                <ImageIcon size={14} className="text-zinc-600" />
               )}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  fontFamily: MONO,
-                  fontSize: 11,
-                  color: TEXT_BRIGHT,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-                title={file?.name}
-              >
+            <div className="flex-1 min-w-0">
+              <div className="text-[12px] text-zinc-200 truncate" title={file?.name}>
                 {file?.name ?? ""}
               </div>
               {fileSizeStr ? (
-                <div style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED }}>
-                  {fileSizeStr}
-                </div>
+                <div className="text-[10.5px] text-zinc-500 mt-0.5">{fileSizeStr}</div>
               ) : null}
             </div>
           </div>
         )}
 
         {/* Actions */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            flexShrink: 0,
-            paddingLeft: 8,
-          }}
-        >
+        <div className="flex items-center gap-1.5 shrink-0 pl-2">
           {state === "matched" && (
-            <span
-              style={{
-                padding: "2px 6px",
-                fontSize: 9,
-                color: GREEN,
-                background: "rgba(34,197,94,0.1)",
-                border: "1px solid rgba(34,197,94,0.3)",
-                fontFamily: MONO,
-                letterSpacing: "0.08em",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 3,
-              }}
-            >
-              <Check size={9} />
-              AUTO
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold tracking-wide text-emerald-400 bg-emerald-500/10 border border-emerald-500/30">
+              자동
             </span>
           )}
           {state === "ordered" && (
-            <span
-              style={{
-                padding: "2px 6px",
-                fontSize: 9,
-                color: AMBER,
-                background: "rgba(245,158,11,0.1)",
-                border: "1px solid rgba(245,158,11,0.3)",
-                fontFamily: MONO,
-                letterSpacing: "0.08em",
-              }}
-            >
-              SEQ
-            </span>
-          )}
-          {state === "empty" && (
-            <span
-              style={{
-                padding: "2px 6px",
-                fontSize: 9,
-                color: RED,
-                background: "rgba(239,68,68,0.1)",
-                border: "1px solid rgba(239,68,68,0.3)",
-                fontFamily: MONO,
-                letterSpacing: "0.08em",
-              }}
-            >
-              MISS
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold tracking-wide text-amber-400 bg-amber-500/10 border border-amber-500/30">
+              순서
             </span>
           )}
           {state === "server" && (
-            <span
-              style={{
-                padding: "2px 6px",
-                fontSize: 9,
-                color: "#38bdf8",
-                background: "rgba(56,189,248,0.1)",
-                border: "1px solid rgba(56,189,248,0.35)",
-                fontFamily: MONO,
-                letterSpacing: "0.08em",
-              }}
-            >
-              CURRENT
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold tracking-wide text-sky-400 bg-sky-500/10 border border-sky-500/30">
+              현재
+            </span>
+          )}
+          {state === "empty" && (
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold tracking-wide text-rose-400 bg-rose-500/10 border border-rose-500/30">
+              미매핑
             </span>
           )}
           {file != null && (
             <button
               type="button"
               onClick={() => onClearFile(target.id)}
-              className="uvp-btn-danger"
-              style={{
-                padding: "3px 8px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 3,
-              }}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-[11px] transition-colors"
             >
-              <X size={9} />
+              <X size={10} />
               취소
             </button>
           )}
           <button
             type="button"
             onClick={() => onChangeOne(target.id)}
-            className={
-              state === "empty" || state === "server" ? "uvp-btn-primary" : "uvp-btn-secondary"
-            }
-            style={{
-              padding: "3px 8px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 3,
-            }}
+            className={`inline-flex items-center px-2.5 py-1 rounded-md border text-[11px] font-medium transition-colors ${primaryActionClass}`}
           >
-            {state === "empty" ? (
-              "선택"
-            ) : state === "server" ? (
-              <>
-                <Pencil size={9} />
-                교체
-              </>
-            ) : (
-              <>
-                <Pencil size={9} />
-                변경
-              </>
-            )}
+            {primaryActionLabel}
           </button>
         </div>
       </div>

@@ -2,7 +2,14 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Check, Camera } from "lucide-react";
+import {
+  Loader2,
+  Check,
+  Camera,
+  Bell,
+  AlertTriangle,
+  X,
+} from "lucide-react";
 import type { PhotographerProfile } from "@/app/api/photographer/profile/route";
 import { getProfileImageUrl } from "@/lib/photographer";
 import { createClient } from "@/lib/supabase/client";
@@ -13,17 +20,9 @@ import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHead
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const ACCEPT_IMAGE = "image/jpeg,image/png,image/webp";
-const ACCENT  = "#FF4D00";
-const DANGER  = "#FF3333";
-const SURFACE_0  = "#0a0a0c";
-const SURFACE_1  = "#121215";
-const SURFACE_2  = "#0f0f12";
-const BORDER_MID  = "#1a1a1e";
-const BORDER_HIGH = "#27272c";
-const TEXT_SEC  = "#888";
-const TEXT_TERT = "#444";
-const FONT_MONO = "'Space Mono', 'Noto Sans KR', sans-serif";
-const FONT_SANS = "'Pretendard', -apple-system, sans-serif";
+
+const INPUT_CLS =
+  "w-full bg-[#0a0a0c] border border-[#27272c] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#FF4D00] focus:ring-1 focus:ring-[#FF4D00]/20 transition-all disabled:opacity-50";
 
 function getInitial(name: string | null, email: string | null): string {
   if (name?.trim()) return name.trim().charAt(0).toUpperCase();
@@ -31,58 +30,48 @@ function getInitial(name: string | null, email: string | null): string {
   return "?";
 }
 
-/** 모서리 꺾쇠 장식 */
-function Brackets() {
-  const base: React.CSSProperties = {
-    position: "absolute", width: 12, height: 12,
-    border: `2px solid ${ACCENT}`, pointerEvents: "none",
-  };
-  return (
-    <>
-      <div style={{ ...base, top: -1, left: -1, borderRight: "none", borderBottom: "none" }} />
-      <div style={{ ...base, top: -1, right: -1, borderLeft: "none", borderBottom: "none" }} />
-      <div style={{ ...base, bottom: -1, left: -1, borderRight: "none", borderTop: "none" }} />
-      <div style={{ ...base, bottom: -1, right: -1, borderLeft: "none", borderTop: "none" }} />
-    </>
-  );
+interface ToastItem {
+  id: number;
+  message: string;
+  isError: boolean;
 }
-
-interface ToastItem { id: number; message: string; isError: boolean; }
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { profile: ctxProfile, updateProfile: updateCtxProfile } = useProfile();
+  const { updateProfile: updateCtxProfile } = useProfile();
 
   const [profile, setProfile] = useState<PhotographerProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // form
-  const [editName, setEditName]           = useState("");
-  const [editBio, setEditBio]             = useState("");
+  const [editName, setEditName] = useState("");
+  const [editBio, setEditBio] = useState("");
   const [editInstagram, setEditInstagram] = useState("");
   const [editPortfolio, setEditPortfolio] = useState("");
-  const [editPhone, setEditPhone]         = useState("");
-  const [saving, setSaving]               = useState(false);
-  const [formError, setFormError]         = useState<string | null>(null);
+  const [editPhone, setEditPhone] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  // image
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // UI
-  const [toasts, setToasts]               = useState<ToastItem[]>([]);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
-  // profile load
+
   useEffect(() => {
     fetch("/api/photographer/profile")
-      .then((r) => { if (!r.ok) throw new Error("프로필을 불러올 수 없습니다."); return r.json(); })
+      .then((r) => {
+        if (!r.ok) throw new Error("프로필을 불러올 수 없습니다.");
+        return r.json();
+      })
       .then((data: PhotographerProfile) => {
         setProfile(data);
         setEditName(data.name ?? "");
         setEditBio(data.bio ?? "");
         const raw = data.instagramUrl ?? "";
-        setEditInstagram(raw.replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/$/, ""));
+        setEditInstagram(
+          raw.replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/$/, ""),
+        );
         setEditPortfolio(data.portfolioUrl ?? "");
         setEditPhone(data.contactPhone ?? "");
       })
@@ -125,7 +114,7 @@ export default function SettingsPage() {
       };
       setProfile({ ...profile, ...patch });
       updateCtxProfile(patch);
-      showToast("프로필 데이터가 저장되었습니다.");
+      showToast("프로필이 저장되었습니다.");
     } catch (e) {
       setFormError(e instanceof Error ? e.message : "저장 실패");
     } finally {
@@ -138,7 +127,9 @@ export default function SettingsPage() {
     setEditName(profile.name ?? "");
     setEditBio(profile.bio ?? "");
     const raw = profile.instagramUrl ?? "";
-    setEditInstagram(raw.replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/$/, ""));
+    setEditInstagram(
+      raw.replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/$/, ""),
+    );
     setEditPortfolio(profile.portfolioUrl ?? "");
     setEditPhone(profile.contactPhone ?? "");
     setFormError(null);
@@ -152,7 +143,9 @@ export default function SettingsPage() {
     setUploadingImage(true);
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const token = session?.access_token;
       if (!token) throw new Error("로그인이 필요합니다.");
       const form = new FormData();
@@ -199,13 +192,13 @@ export default function SettingsPage() {
     }
   };
 
-  const userName = ctxProfile?.name?.trim() || ctxProfile?.email?.split("@")[0] || "작가";
-
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#000" }}>
-        <Loader2 size={24} color={TEXT_TERT} style={{ animation: "spin 1s linear infinite" }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div
+        className="min-h-screen bg-[#0a0a0c] flex items-center justify-center"
+        style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}
+      >
+        <Loader2 className="w-6 h-6 text-zinc-600 animate-spin" />
       </div>
     );
   }
@@ -217,300 +210,171 @@ export default function SettingsPage() {
     ? format(new Date(profile.createdAt), "yyyy년 M월", { locale: ko })
     : null;
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%", background: "transparent", border: "none",
-    borderBottom: `1px solid ${BORDER_HIGH}`, color: "#fff",
-    fontFamily: FONT_SANS, fontSize: 15, padding: "8px 0",
-    transition: "border-color 0.2s, background 0.2s",
-    borderRadius: 0, outline: "none",
-  };
-
-  const labelStyle: React.CSSProperties = {
-    fontSize: 13, color: TEXT_SEC, marginBottom: 6, display: "block",
-  };
+  const cardCls = "bg-[#121215] border border-[#1a1a1e] rounded-2xl overflow-hidden";
 
   return (
     <div
-      className="st-root"
-      style={{ minHeight: "100vh", background: "#0a0a0c", color: "#fff", fontFamily: FONT_SANS, position: "relative" }}
+      className="min-h-screen bg-[#0a0a0c] text-white"
+      style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}
     >
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes st-scanline { 0% { bottom: 100%; } 100% { bottom: -100px; } }
-        @keyframes st-toastIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
-
-        .st-input:focus {
-          border-bottom-color: ${ACCENT} !important;
-          background: rgba(255,77,0,0.04) !important;
-          padding-left: 4px;
-        }
-        .st-input::placeholder { color: ${TEXT_TERT}; }
-        .st-textarea:focus {
-          border-color: ${ACCENT} !important;
-          background: rgba(255,77,0,0.04) !important;
-          outline: none;
-        }
-        .st-textarea::placeholder { color: ${TEXT_TERT}; }
-        .st-instagram-row:focus-within .st-insta-prefix {
-          border-bottom-color: ${ACCENT} !important;
-          color: ${ACCENT} !important;
-        }
-        .st-instagram-row:focus-within .st-input {
-          border-bottom-color: ${ACCENT} !important;
-        }
-        .st-btn-outline:hover:not(:disabled) { border-color: ${ACCENT} !important; color: ${ACCENT} !important; }
-        .st-btn-primary:hover:not(:disabled) { background: #ff5e1a !important; }
-        .st-btn-danger:hover:not(:disabled) { background: ${DANGER} !important; color: #fff !important; }
-        .st-avatar-wrap:hover .st-avatar-hover { opacity: 1 !important; }
-        .st-toast { animation: st-toastIn 0.3s cubic-bezier(0.16,1,0.3,1) both; }
-        .st-toggle-row:hover { background: rgba(255,255,255,0.02); }
-
-        @media (max-width: 768px) {
-          .st-topbar { flex-wrap: wrap; gap: 10px; padding: 10px 14px !important; padding-top: max(10px, env(safe-area-inset-top)) !important; height: auto !important; }
-          .st-hero { flex-direction: column !important; align-items: flex-start !important; gap: 16px !important; }
-          .st-hero-actions { width: 100% !important; align-items: stretch !important; }
-          .st-hero-actions button { width: 100% !important; justify-content: center !important; }
-          .st-grid { grid-template-columns: 1fr !important; }
-          .st-card-footer { flex-direction: column-reverse !important; gap: 10px !important; }
-          .st-card-footer > div { width: 100% !important; justify-content: stretch !important; }
-          .st-card-footer button { width: 100% !important; min-height: 44px !important; justify-content: center !important; }
-          .st-danger-row { flex-direction: column !important; align-items: stretch !important; gap: 12px !important; }
-          .st-danger-row button { width: 100% !important; min-height: 44px !important; justify-content: center !important; }
-          .st-delete-actions { flex-direction: column-reverse !important; align-items: stretch !important; gap: 8px !important; }
-          .st-delete-actions button { width: 100% !important; min-height: 44px !important; justify-content: center !important; }
-        }
-      `}</style>
-
-      {/* ── 상단 헤더 ── */}
       <PhotographerPageHeader
         crumbs={[{ label: "설정" }]}
         title="설정"
+        stats={[
+          { label: "계정", value: profile.email?.split("@")[0] ?? "—" },
+        ]}
       />
 
-      {/* ── 본문 ── */}
-      <div style={{ position: "relative", zIndex: 10, padding: "28px 28px 60px" }}>
+      <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-6">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={ACCEPT_IMAGE}
+          className="hidden"
+          onChange={handleProfileImageChange}
+          disabled={uploadingImage}
+        />
 
-
-        {/* ── 히어로 패널 ── */}
-        <section
-          className="st-hero"
-          style={{
-            background: SURFACE_1, border: `1px solid ${BORDER_MID}`,
-            padding: "28px 32px", display: "flex", alignItems: "center", gap: 28,
-            position: "relative", marginBottom: 28, borderRadius: 16,
-          }}
-        >
-
-          {/* 숨김 파일 인풋 */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPT_IMAGE}
-            style={{ display: "none" }}
-            onChange={handleProfileImageChange}
-            disabled={uploadingImage}
-          />
-
-          {/* 아바타 */}
-          <div
-            className="st-avatar-wrap"
+        {/* 프로필 요약 */}
+        <section className={`${cardCls} p-6 flex flex-col sm:flex-row items-start sm:items-center gap-6`}>
+          <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
-            style={{ position: "relative", width: 80, height: 80, flexShrink: 0, cursor: "pointer" }}
+            className="relative w-20 h-20 rounded-full shrink-0 overflow-hidden border border-[#27272c] focus:outline-none focus:ring-2 focus:ring-[#FF4D00]/40"
           >
-            <div style={{
-              width: "100%", height: "100%", borderRadius: "50%",
-              background: profile.profileImageUrl ? "transparent" : ACCENT,
-              border: `1px solid ${profile.profileImageUrl ? BORDER_HIGH : ACCENT}`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              overflow: "hidden",
-            }}>
+            <div
+              className={`w-full h-full flex items-center justify-center ${
+                profile.profileImageUrl ? "bg-transparent" : "bg-[#FF4D00]"
+              }`}
+            >
               {profile.profileImageUrl ? (
                 <img
                   src={getProfileImageUrl(profile.profileImageUrl)}
-                  alt="프로필"
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  onError={(e) => { (e.target as HTMLImageElement).src = getProfileImageUrl(null); }}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = getProfileImageUrl(null);
+                  }}
                 />
               ) : (
-                <span style={{ fontFamily: FONT_MONO, fontWeight: 700, fontSize: 24, color: "#000", letterSpacing: "-1px" }}>
+                <span
+                  className="text-2xl font-bold text-black"
+                  style={{ fontFamily: "var(--font-mono, monospace)" }}
+                >
                   {initial}
                 </span>
               )}
             </div>
-            <div
-              className="st-avatar-hover"
-              style={{
-                position: "absolute", inset: 0, borderRadius: "50%",
-                background: "rgba(0,0,0,0.8)", color: ACCENT,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontFamily: FONT_MONO, fontSize: 10,
-                opacity: 0, transition: "opacity 0.2s",
-                border: `1px solid ${ACCENT}`,
-              }}
-            >
-              {uploadingImage
-                ? <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
-                : "EDIT"}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/75 text-[#FF4D00] text-[10px] font-semibold opacity-0 hover:opacity-100 transition-opacity">
+              {uploadingImage ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  <Camera size={16} className="mr-1" />
+                  변경
+                </>
+              )}
             </div>
-          </div>
+          </button>
 
-          {/* 히어로 정보 */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", color: "#fff", marginBottom: 6, lineHeight: 1.2 }}>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight truncate">
               {profile.name || "이름 없음"}
             </h2>
-            <div style={{ fontFamily: FONT_MONO, fontSize: 13, color: TEXT_SEC, marginBottom: 12 }}>
+            <p
+              className="text-sm text-zinc-500 mt-1 truncate"
+              style={{ fontFamily: "var(--font-mono, monospace)" }}
+            >
               {profile.email ?? ""}
-            </div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              <span style={{
-                fontFamily: FONT_MONO, fontSize: 10, padding: "3px 8px",
-                border: `1px solid ${ACCENT}`, color: ACCENT,
-                background: "rgba(255,77,0,0.15)", textTransform: "uppercase",
-                display: "inline-flex", alignItems: "center", gap: 5,
-              }}>
-                <Check size={9} strokeWidth={3} aria-hidden /> Google 연결됨
+            </p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/30">
+                <Check size={12} strokeWidth={2.5} aria-hidden />
+                Google 연결됨
               </span>
               {joinDate && (
-                <span style={{
-                  fontFamily: FONT_MONO, fontSize: 10, padding: "3px 8px",
-                  border: `1px solid ${BORDER_HIGH}`, color: TEXT_SEC, textTransform: "uppercase",
-                }}>
+                <span
+                  className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] text-zinc-400 bg-[#1a1a1e] border border-[#27272c]"
+                  style={{ fontFamily: "var(--font-mono, monospace)" }}
+                >
                   {joinDate} 가입
                 </span>
               )}
             </div>
           </div>
 
-          {/* 이미지 변경 */}
-          <div className="st-hero-actions" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
+          <div className="w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-2">
             <button
               type="button"
-              className="st-btn-outline"
               onClick={() => fileInputRef.current?.click()}
-              style={{
-                background: "transparent", border: `1px solid ${BORDER_HIGH}`,
-                color: "#fff", padding: "8px 16px", cursor: "pointer",
-                fontSize: 13, fontFamily: FONT_SANS, fontWeight: 500,
-                transition: "border-color 0.2s, color 0.2s",
-                display: "flex", alignItems: "center", gap: 6,
-              }}
+              disabled={uploadingImage}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-[#27272c] text-zinc-300 hover:border-[#FF4D00] hover:text-[#FF4D00] transition-colors disabled:opacity-50"
             >
-              <Camera size={13} />
+              <Camera size={16} />
               이미지 변경
             </button>
-            <span style={{ fontFamily: FONT_MONO, fontSize: 10, color: TEXT_TERT, textAlign: "right", lineHeight: 1.7 }}>
-              JPG, PNG · 최대 5MB<br />권장 크기 200×200px
-            </span>
+            <p className="text-[10px] text-zinc-600 text-center sm:text-right leading-relaxed">
+              JPG, PNG, WebP · 최대 5MB
+              <br />
+              권장 200×200px
+            </p>
           </div>
         </section>
 
-        {/* ── 2컬럼 그리드 ── */}
-        <div
-          className="st-grid"
-          style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 28, alignItems: "start" }}
-        >
-
-          {/* ── 좌: 프로필 편집 ── */}
-          <div style={{ background: SURFACE_1, border: `1px solid ${BORDER_MID}`, display: "flex", flexDirection: "column", borderRadius: 16 }}>
-
-            {/* 카드 헤더 */}
-            <div style={{
-              padding: "16px 24px", borderBottom: `1px solid ${BORDER_MID}`,
-              background: SURFACE_0, display: "flex", flexDirection: "column", gap: 4,
-            }}>
-              <div style={{
-                fontFamily: FONT_MONO, fontSize: 10, color: ACCENT,
-                letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: 8,
-              }}>
-                <div style={{ width: 6, height: 6, background: ACCENT, flexShrink: 0 }} />
-                &gt;_ SYS.USER :: PROFILE_DATA
-              </div>
-              <div style={{ fontSize: 17, fontWeight: 500 }}>프로필 편집</div>
+        <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6 items-start">
+          {/* 프로필 편집 */}
+          <div className={cardCls}>
+            <div className="px-6 py-4 border-b border-[#1a1a1e] bg-[#0a0a0c]/40">
+              <h3 className="text-base font-bold text-white">프로필 편집</h3>
+              <p className="text-xs text-zinc-500 mt-1">고객에게 보이는 이름과 링크를 관리합니다.</p>
             </div>
 
-            {/* 카드 바디 */}
-            <div style={{ padding: "24px 24px 8px", display: "flex", flexDirection: "column", gap: 22, flex: 1 }}>
-
-              {/* 이름 */}
+            <div className="p-6 flex flex-col gap-5">
               <div>
-                <label style={labelStyle}>이름</label>
+                <label className="text-sm font-semibold text-zinc-300 block mb-2">이름</label>
                 <input
-                  className="st-input"
-                  style={inputStyle}
+                  className={INPUT_CLS}
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                   placeholder="이름"
                 />
               </div>
 
-              {/* 소개 */}
               <div>
-                <label style={labelStyle}>소개</label>
+                <label className="text-sm font-semibold text-zinc-300 block mb-2">소개</label>
                 <textarea
-                  className="st-textarea"
-                  style={{
-                    width: "100%", background: "rgba(255,255,255,0.02)",
-                    border: `1px solid ${BORDER_HIGH}`, color: "#fff",
-                    fontFamily: FONT_SANS, fontSize: 14, padding: "8px 10px",
-                    resize: "none", height: 72, lineHeight: 1.5,
-                    transition: "border-color 0.2s, background 0.2s",
-                    outline: "none", borderRadius: 0, boxSizing: "border-box",
-                  }}
+                  className={`${INPUT_CLS} min-h-[88px] resize-none leading-relaxed`}
                   value={editBio}
                   onChange={(e) => setEditBio(e.target.value)}
                   placeholder="간단한 소개 (선택)"
                 />
-                <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: TEXT_TERT, marginTop: 4 }}>
-                  고객 갤러리 페이지에 표시됩니다
-                </div>
+                <p className="text-[11px] text-zinc-600 mt-1.5">고객 갤러리 페이지에 표시됩니다.</p>
               </div>
 
-              {/* 연락처 */}
               <div>
-                <label style={labelStyle}>연락처</label>
+                <label className="text-sm font-semibold text-zinc-300 block mb-2">연락처</label>
                 <input
-                  className="st-input"
-                  style={inputStyle}
+                  className={INPUT_CLS}
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
                   placeholder="010-0000-0000"
                 />
-                <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: TEXT_TERT, marginTop: 4 }}>
-                  알림 기능 연동 시 사용됩니다 (선택사항)
-                </div>
+                <p className="text-[11px] text-zinc-600 mt-1.5">알림 연동 시 사용됩니다 (선택).</p>
               </div>
 
-              {/* SNS 구분선 */}
-              <div style={{ height: 1, background: BORDER_MID, position: "relative", marginTop: 4 }}>
-                <span style={{
-                  position: "absolute", right: 0, top: -10,
-                  fontFamily: FONT_MONO, fontSize: 8, color: TEXT_TERT,
-                  background: SURFACE_1, paddingLeft: 8,
-                }}>
-                  LINK_DATA
-                </span>
-              </div>
+              <div className="h-px bg-[#1a1a1e] my-1" />
 
-              {/* 인스타그램 */}
               <div>
-                <label style={labelStyle}>인스타그램</label>
-                <div className="st-instagram-row" style={{ display: "flex", alignItems: "stretch" }}>
+                <label className="text-sm font-semibold text-zinc-300 block mb-2">인스타그램</label>
+                <div className="flex rounded-xl overflow-hidden border border-[#27272c] focus-within:border-[#FF4D00] focus-within:ring-1 focus-within:ring-[#FF4D00]/20 transition-all">
                   <span
-                    className="st-insta-prefix"
-                    style={{
-                      background: SURFACE_2,
-                      borderBottom: `1px solid ${BORDER_HIGH}`,
-                      padding: "8px 10px", fontFamily: FONT_MONO, fontSize: 12,
-                      color: TEXT_SEC, display: "flex", alignItems: "center",
-                      whiteSpace: "nowrap", transition: "border-color 0.2s, color 0.2s",
-                    }}
+                    className="shrink-0 px-3 py-2.5 text-xs text-zinc-500 bg-[#0a0a0c] border-r border-[#27272c] flex items-center"
+                    style={{ fontFamily: "var(--font-mono, monospace)" }}
                   >
                     instagram.com/
                   </span>
                   <input
-                    className="st-input"
-                    style={{ ...inputStyle, flex: 1 }}
+                    className="flex-1 min-w-0 bg-[#0a0a0c] px-4 py-2.5 text-sm text-white placeholder:text-zinc-600 outline-none"
                     value={editInstagram}
                     onChange={(e) => setEditInstagram(e.target.value)}
                     placeholder="계정명"
@@ -518,12 +382,10 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* 포트폴리오 */}
-              <div style={{ paddingBottom: 8 }}>
-                <label style={labelStyle}>포트폴리오</label>
+              <div>
+                <label className="text-sm font-semibold text-zinc-300 block mb-2">포트폴리오</label>
                 <input
-                  className="st-input"
-                  style={inputStyle}
+                  className={INPUT_CLS}
                   value={editPortfolio}
                   onChange={(e) => setEditPortfolio(e.target.value)}
                   placeholder="https://..."
@@ -531,156 +393,89 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* 카드 푸터 */}
-            <div
-              className="st-card-footer"
-              style={{
-                padding: "16px 24px", borderTop: `1px solid ${BORDER_MID}`,
-                background: SURFACE_0,
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-              }}
-            >
-              <span style={{
-                fontFamily: FONT_MONO, fontSize: 11, color: DANGER,
-                opacity: formError ? 1 : 0, transition: "opacity 0.2s",
-              }}>
-                {formError ?? ""}
-              </span>
-              <div style={{ display: "flex", gap: 8 }}>
+            <div className="px-6 py-4 border-t border-[#1a1a1e] bg-[#0a0a0c]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              {formError ? (
+                <p className="text-xs text-rose-400 order-2 sm:order-1">{formError}</p>
+              ) : (
+                <span className="hidden sm:block order-1" />
+              )}
+              <div className="flex gap-2 w-full sm:w-auto justify-end order-1 sm:order-2">
                 <button
                   type="button"
-                  className="st-btn-outline"
                   onClick={handleCancel}
                   disabled={saving}
-                  style={{
-                    background: "transparent", border: `1px solid ${BORDER_HIGH}`,
-                    color: "#fff", padding: "9px 18px", cursor: "pointer",
-                    fontSize: 13, fontFamily: FONT_SANS, fontWeight: 500,
-                    transition: "border-color 0.2s, color 0.2s", opacity: saving ? 0.5 : 1,
-                  }}
+                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-semibold border border-[#27272c] text-zinc-300 hover:bg-[#1a1a1e] transition-colors disabled:opacity-50"
                 >
                   취소
                 </button>
                 <button
                   type="button"
-                  className="st-btn-primary"
                   onClick={handleSave}
                   disabled={saving}
-                  style={{
-                    background: ACCENT, border: `1px solid ${ACCENT}`,
-                    color: "#000", padding: "9px 22px",
-                    cursor: saving ? "not-allowed" : "pointer",
-                    fontSize: 13, fontFamily: FONT_SANS, fontWeight: 600,
-                    transition: "background 0.2s",
-                    opacity: saving ? 0.7 : 1,
-                    display: "flex", alignItems: "center", gap: 6,
-                  }}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#FF4D00] hover:bg-[#ff5e1a] text-black transition-colors disabled:opacity-60"
                 >
-                  {saving && <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />}
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                   {saving ? "저장 중..." : "저장하기"}
                 </button>
               </div>
             </div>
           </div>
 
-          {/* ── 우측 컬럼 ── */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-
-            {/* 알림 설정 */}
-            <div style={{ background: SURFACE_1, border: `1px solid ${BORDER_MID}`, display: "flex", flexDirection: "column", borderRadius: 16 }}>
-              <div style={{
-                padding: "16px 24px", borderBottom: `1px solid ${BORDER_MID}`,
-                background: SURFACE_0,
-                display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-              }}>
-                <div>
-                  <div style={{
-                    fontFamily: FONT_MONO, fontSize: 10, color: ACCENT,
-                    letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: 8, marginBottom: 4,
-                  }}>
-                    <div style={{ width: 6, height: 6, background: ACCENT, flexShrink: 0 }} />
-                    &gt;_ SYS.NET :: ALERT_ROUTING
+          <div className="flex flex-col gap-6">
+            {/* 알림 */}
+            <div className={cardCls}>
+              <div className="px-6 py-4 border-b border-[#1a1a1e] bg-[#0a0a0c]/40 flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2 min-w-0">
+                  <Bell size={18} className="text-[#FF4D00] shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="text-base font-bold text-white">알림 설정</h3>
+                    <p className="text-xs text-zinc-500 mt-1">이메일·푸시 알림은 준비 중입니다.</p>
                   </div>
-                  <div style={{ fontSize: 17, fontWeight: 500 }}>알림 설정</div>
                 </div>
-                <span style={{
-                  fontFamily: FONT_MONO, fontSize: 9, padding: "3px 8px",
-                  background: BORDER_MID, color: TEXT_SEC, border: `1px solid ${BORDER_HIGH}`,
-                }}>준비 중</span>
+                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-[#1a1a1e] text-zinc-400 border border-[#27272c]">
+                  준비 중
+                </span>
               </div>
-
-              <div style={{ padding: "0 24px" }}>
+              <ul className="divide-y divide-[#1a1a1e]">
                 {[
                   { label: "고객 셀렉 완료 알림", desc: "최종 확정 시 알림" },
                   { label: "재보정 요청 알림", desc: "재보정 요청 시 알림" },
                   { label: "마감 임박 알림", desc: "셀렉 기한 3일 전 알림" },
-                ].map((item, i) => (
-                  <div
-                    key={i}
-                    className="st-toggle-row"
-                    onClick={() => showToast("준비 중인 기능입니다.")}
-                    style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "18px 0",
-                      borderBottom: i < 2 ? `1px solid ${BORDER_MID}` : "none",
-                      cursor: "pointer", transition: "background 0.15s",
-                      margin: "0 -24px", paddingLeft: 24, paddingRight: 24,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 14, color: "#fff", marginBottom: 3 }}>{item.label}</div>
-                      <div style={{ fontSize: 12, color: TEXT_SEC }}>{item.desc}</div>
-                    </div>
-                    {/* 토글 */}
-                    <div style={{
-                      width: 36, height: 18, flexShrink: 0,
-                      border: `1px solid ${BORDER_HIGH}`, background: SURFACE_2,
-                      position: "relative",
-                    }}>
-                      <div style={{
-                        width: 12, height: 12, background: BORDER_HIGH,
-                        position: "absolute", top: 2, left: 2,
-                      }} />
-                    </div>
-                  </div>
+                ].map((item) => (
+                  <li key={item.label}>
+                    <button
+                      type="button"
+                      onClick={() => showToast("준비 중인 기능입니다.")}
+                      className="w-full flex items-center justify-between gap-4 px-6 py-4 text-left hover:bg-[#1a1a1e]/30 transition-colors"
+                    >
+                      <div>
+                        <div className="text-sm font-medium text-white">{item.label}</div>
+                        <div className="text-xs text-zinc-500 mt-0.5">{item.desc}</div>
+                      </div>
+                      <div className="w-9 h-5 rounded-full border border-[#27272c] bg-[#0a0a0c] shrink-0 relative">
+                        <div className="absolute left-1 top-1 w-3 h-3 rounded-full bg-zinc-600" />
+                      </div>
+                    </button>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
 
-            {/* 위험 구역 */}
-            <div style={{ background: SURFACE_1, border: `1px solid ${BORDER_HIGH}`, display: "flex", flexDirection: "column" }}>
-              <div style={{
-                padding: "16px 24px", borderBottom: "1px solid rgba(255,51,51,0.2)",
-                background: SURFACE_0, display: "flex", flexDirection: "column", gap: 4,
-              }}>
-                <div style={{
-                  fontFamily: FONT_MONO, fontSize: 10, color: DANGER,
-                  letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: 8,
-                }}>
-                  <div style={{ width: 6, height: 6, background: DANGER, flexShrink: 0 }} />
-                  &gt;_ SYS.SEC :: DANGER_ZONE
-                </div>
-                <div style={{ fontSize: 17, fontWeight: 500, color: DANGER }}>위험 구역</div>
+            {/* 위험 영역 */}
+            <div className={`${cardCls} border-rose-500/20`}>
+              <div className="px-6 py-4 border-b border-rose-500/15 bg-rose-500/5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-2">
+                  <AlertTriangle size={14} />
+                  위험 영역
+                </h3>
+                <p className="text-base font-bold text-rose-300 mt-2">계정 탈퇴</p>
+                <p className="text-xs text-zinc-500 mt-1">모든 프로젝트와 데이터가 영구 삭제됩니다.</p>
               </div>
-              <div
-                className="st-danger-row"
-                style={{ padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}
-              >
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: "#fff", marginBottom: 3 }}>계정 탈퇴</div>
-                  <div style={{ fontSize: 12, color: TEXT_SEC }}>모든 데이터가 영구 삭제됩니다</div>
-                </div>
+              <div className="p-6">
                 <button
                   type="button"
-                  className="st-btn-danger"
                   onClick={() => setShowDeleteModal(true)}
-                  style={{
-                    background: "transparent", border: `1px solid ${DANGER}`,
-                    color: DANGER, padding: "8px 18px", cursor: "pointer",
-                    fontSize: 13, fontFamily: FONT_SANS, fontWeight: 500,
-                    transition: "background 0.2s, color 0.2s",
-                    flexShrink: 0, whiteSpace: "nowrap",
-                  }}
+                  className="w-full py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/30 text-rose-400 text-sm font-semibold transition-colors"
                 >
                   탈퇴하기
                 </button>
@@ -690,90 +485,73 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* ── 탈퇴 확인 모달 ── */}
+      {/* 탈퇴 모달 */}
       {showDeleteModal && (
         <div
-          style={{
-            position: "fixed", inset: 0,
-            background: "rgba(0,0,0,0.85)", backdropFilter: "blur(4px)",
-            zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center",
+          className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !deletingAccount) setShowDeleteModal(false);
           }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowDeleteModal(false); }}
         >
-          <div style={{
-            background: SURFACE_1, border: `1px solid ${BORDER_MID}`,
-            width: "100%", maxWidth: 400, padding: 32,
-            position: "relative", margin: "0 16px",
-          }}>
-            <Brackets />
-            <div style={{ fontFamily: FONT_MONO, fontSize: 28, color: DANGER, marginBottom: 16 }}>[!]</div>
-            <h3 style={{ fontSize: 18, fontWeight: 500, marginBottom: 8, color: "#fff" }}>정말 탈퇴하시겠습니까?</h3>
-            <p style={{ fontSize: 14, color: TEXT_SEC, lineHeight: 1.7, marginBottom: 24 }}>
-              모든 프로젝트와 사진 데이터가 삭제됩니다.{" "}
-              <strong style={{ color: DANGER, fontWeight: 400 }}>이 작업은 되돌릴 수 없습니다.</strong>
-            </p>
-            <div
-              className="st-delete-actions"
-              style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}
-            >
+          <div className="bg-[#121215] border border-rose-500/25 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#1a1a1e]">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <AlertTriangle size={18} className="text-rose-500" />
+                계정 탈퇴
+              </h3>
               <button
                 type="button"
-                className="st-btn-outline"
-                onClick={() => setShowDeleteModal(false)}
-                disabled={deletingAccount}
-                style={{
-                  background: "transparent", border: `1px solid ${BORDER_HIGH}`,
-                  color: "#fff", padding: "9px 18px", cursor: "pointer",
-                  fontSize: 13, fontFamily: FONT_SANS, fontWeight: 500,
-                  transition: "border-color 0.2s, color 0.2s",
-                  opacity: deletingAccount ? 0.5 : 1,
-                }}
+                onClick={() => !deletingAccount && setShowDeleteModal(false)}
+                aria-label="닫기"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-[#1a1a1e] hover:text-white"
               >
-                취소
+                <X size={16} />
               </button>
-              <button
-                type="button"
-                className="st-btn-danger"
-                onClick={handleDeleteAccount}
-                disabled={deletingAccount}
-                style={{
-                  background: "transparent", border: `1px solid ${DANGER}`,
-                  color: DANGER, padding: "9px 22px",
-                  cursor: deletingAccount ? "not-allowed" : "pointer",
-                  fontSize: 13, fontFamily: FONT_SANS, fontWeight: 500,
-                  transition: "background 0.2s, color 0.2s",
-                  opacity: deletingAccount ? 0.7 : 1,
-                  display: "flex", alignItems: "center", gap: 6,
-                }}
-              >
-                {deletingAccount && <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />}
-                탈퇴하기
-              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-zinc-300 leading-relaxed">
+                모든 프로젝트와 사진 데이터가 삭제됩니다.{" "}
+                <strong className="text-rose-400 font-semibold">되돌릴 수 없습니다.</strong>
+              </p>
+              <div className="flex flex-col-reverse sm:flex-row gap-2 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={deletingAccount}
+                  className="flex-1 py-3 rounded-xl border border-[#27272c] bg-[#1a1a1e] text-zinc-300 text-sm font-semibold hover:bg-[#27272c] disabled:opacity-50"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={deletingAccount}
+                  className="flex-1 py-3 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-400 text-sm font-bold disabled:opacity-50 inline-flex items-center justify-center gap-2"
+                >
+                  {deletingAccount && <Loader2 className="w-4 h-4 animate-spin" />}
+                  탈퇴하기
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Toast ── */}
-      <div style={{
-        position: "fixed", bottom: 28, right: 28,
-        display: "flex", flexDirection: "column", gap: 8, zIndex: 200,
-      }}>
+      {/* 토스트 */}
+      <div className="fixed bottom-6 right-4 md:right-8 z-[210] flex flex-col gap-2 max-w-[calc(100vw-2rem)]">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className="st-toast"
-            style={{
-              background: SURFACE_1, border: `1px solid ${BORDER_MID}`,
-              borderLeft: `3px solid ${t.isError ? DANGER : ACCENT}`,
-              padding: "14px 20px", fontSize: 13, color: "#fff",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
-              display: "flex", alignItems: "center", gap: 12,
-              minWidth: 240,
-            }}
+            className={`rounded-xl border px-4 py-3 text-sm shadow-lg flex items-start gap-3 ${
+              t.isError
+                ? "bg-[#121215] border-rose-500/40 text-rose-200"
+                : "bg-[#121215] border-[#27272c] text-white border-l-[3px] border-l-[#FF4D00]"
+            }`}
           >
-            <span style={{ fontFamily: FONT_MONO, fontSize: 10, color: t.isError ? DANGER : ACCENT, flexShrink: 0 }}>
-              {t.isError ? "[ERR]" : "[OK]"}
+            <span
+              className={`text-[10px] font-mono shrink-0 mt-0.5 ${t.isError ? "text-rose-400" : "text-[#FF4D00]"}`}
+            >
+              {t.isError ? "오류" : "완료"}
             </span>
             <span>{t.message}</span>
           </div>

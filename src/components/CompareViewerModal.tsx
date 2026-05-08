@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { X } from "lucide-react";
+import { PrevNextButton } from "@/components/PrevNextButton";
 
 type CompareItem = {
   original: { url: string; filename: string };
@@ -112,24 +113,16 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 shrink-0 flex items-center justify-between gap-3">
-          <div className="text-sm text-zinc-200">
-            <span className="font-semibold">{current.original.filename}</span>
-            <span className="ml-2 text-zinc-500">{index + 1} / {total}</span>
+          <div className="min-w-0 flex items-center gap-2 text-sm text-zinc-200">
+            <span
+              className="min-w-0 flex-1 truncate font-semibold"
+              title={current.original.filename}
+            >
+              {current.original.filename}
+            </span>
+            <span className="shrink-0 text-zinc-500">{index + 1} / {total}</span>
           </div>
-          <div className="flex items-center gap-2">
-            {canSplit && (
-              <button
-                type="button"
-                onClick={() => setSplitMode((s) => !s)}
-                className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  splitMode
-                    ? "border-zinc-400 bg-zinc-200 text-zinc-900"
-                    : "border-zinc-700 bg-zinc-900/70 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500"
-                }`}
-              >
-                ⊞ 비교
-              </button>
-            )}
+          <div className="shrink-0 flex items-center gap-2">
             <button
               type="button"
               className="rounded-md border border-zinc-700 bg-zinc-900/70 p-2 text-zinc-200 hover:bg-zinc-800"
@@ -141,31 +134,50 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
           </div>
         </div>
 
-        <div className="mb-2 shrink-0 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setTab("original")}
-            className={`rounded px-2 py-1 text-xs ${tab === "original" ? "bg-zinc-200 text-zinc-900" : "bg-zinc-800 text-zinc-300"}`}
-          >
-            원본
-          </button>
-          {hasV1 && (
+        <div className="mb-2 shrink-0 flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
             <button
               type="button"
-              onClick={() => setTab("v1")}
-              className={`rounded px-2 py-1 text-xs ${tab === "v1" ? "bg-zinc-200 text-zinc-900" : "bg-zinc-800 text-zinc-300"}`}
+              onClick={() => setTab("original")}
+              className={`rounded px-2 py-1 text-xs ${tab === "original" ? "bg-zinc-200 text-zinc-900" : "bg-zinc-800 text-zinc-300"}`}
             >
-              보정본 v1
+              원본
             </button>
-          )}
-          {hasV2 && (
-            <button
-              type="button"
-              onClick={() => setTab("v2")}
-              className={`rounded px-2 py-1 text-xs ${tab === "v2" ? "bg-zinc-200 text-zinc-900" : "bg-zinc-800 text-zinc-300"}`}
-            >
-              보정본 v2
-            </button>
+            {hasV1 && (
+              <button
+                type="button"
+                onClick={() => setTab("v1")}
+                className={`rounded px-2 py-1 text-xs ${tab === "v1" ? "bg-zinc-200 text-zinc-900" : "bg-zinc-800 text-zinc-300"}`}
+              >
+                보정본 v1
+              </button>
+            )}
+            {hasV2 && (
+              <button
+                type="button"
+                onClick={() => setTab("v2")}
+                className={`rounded px-2 py-1 text-xs ${tab === "v2" ? "bg-zinc-200 text-zinc-900" : "bg-zinc-800 text-zinc-300"}`}
+              >
+                보정본 v2
+              </button>
+            )}
+          </div>
+          {canSplit && (
+            <div className="shrink-0 flex items-center gap-2">
+              <span aria-hidden className="hidden sm:block w-px h-5 bg-zinc-700/70" />
+              <button
+                type="button"
+                onClick={() => setSplitMode((s) => !s)}
+                aria-pressed={splitMode}
+                className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  splitMode
+                    ? "border-zinc-400 bg-zinc-200 text-zinc-900"
+                    : "border-zinc-700 bg-zinc-900/70 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500"
+                }`}
+              >
+                ⊞ 비교
+              </button>
+            </div>
           )}
         </div>
 
@@ -215,24 +227,22 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
             )}
           </div>
 
-          <button
-            type="button"
-            aria-label="이전"
+          <PrevNextButton
+            direction="prev"
+            ariaLabel="이전"
             disabled={index <= 0}
             onClick={() => setIndex((prev) => Math.max(0, prev - 1))}
-            className="absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-zinc-700 bg-zinc-900/90 p-2 text-zinc-100 shadow-lg disabled:opacity-40"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            aria-label="다음"
+            size="md"
+            style={{ zIndex: 10 }}
+          />
+          <PrevNextButton
+            direction="next"
+            ariaLabel="다음"
             disabled={index >= total - 1}
             onClick={() => setIndex((prev) => Math.min(total - 1, prev + 1))}
-            className="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-full border border-zinc-700 bg-zinc-900/90 p-2 text-zinc-100 shadow-lg disabled:opacity-40"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
+            size="md"
+            style={{ zIndex: 10 }}
+          />
         </div>
       </div>
     </div>,

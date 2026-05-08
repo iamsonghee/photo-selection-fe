@@ -17,14 +17,13 @@ import {
   Download,
   MessageSquare,
   X,
-  ChevronLeft,
-  ChevronRight,
   Link2,
   Lock,
   Eye,
   EyeOff,
   Info,
 } from "lucide-react";
+import { PrevNextButton } from "@/components/PrevNextButton";
 import { createClient } from "@/lib/supabase/client";
 import { getPhotosWithSelections, getProjectById, getVersionReviewsByProjectId } from "@/lib/db";
 import {
@@ -1873,18 +1872,12 @@ function Lightbox({
       )}
 
       {multi && (
-        <button
-          type="button"
+        <PrevNextButton
+          direction="prev"
+          size="md"
+          align="edge"
           onClick={(e) => { e.stopPropagation(); onPrev(); }}
-          style={{
-            position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
-            background: "rgba(255,255,255,0.08)", border: "none",
-            width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "pointer", color: TEXT_NORMAL,
-          }}
-        >
-          <ChevronLeft size={20} />
-        </button>
+        />
       )}
 
       <div
@@ -1902,18 +1895,12 @@ function Lightbox({
       </div>
 
       {multi && (
-        <button
-          type="button"
+        <PrevNextButton
+          direction="next"
+          size="md"
+          align="edge"
           onClick={(e) => { e.stopPropagation(); onNext(); }}
-          style={{
-            position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
-            background: "rgba(255,255,255,0.08)", border: "none",
-            width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "pointer", color: TEXT_NORMAL,
-          }}
-        >
-          <ChevronRight size={20} />
-        </button>
+        />
       )}
 
       <div
