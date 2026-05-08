@@ -1572,28 +1572,26 @@ export default function WorkflowPageClient() {
                 <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontFamily: "'Space Mono','Noto Sans KR',monospace" }}>
                   <colgroup>
                     <col style={{ width: 36 }} />
-                    <col />
-                    {stageTab !== "original" && <col style={{ width: 88 }} />}
-                    {stageTab !== "original" && <col style={{ width: 36 }} />}
+                    <col style={{ width: "30%" }} />
+                    {stageTab !== "original" && <col style={{ width: 84 }} />}
+                    {stageTab !== "original" && <col />}
                   </colgroup>
                   <thead>
                     <tr style={{ borderBottom: "1px solid #1a1a1e", background: "#0a0a0c" }}>
                       <th style={{ padding: "7px 8px", fontSize: 10, color: "#5c5c5c", textAlign: "center", fontWeight: 600 }}>#</th>
-                      <th style={{ padding: "7px 10px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600, letterSpacing: "0.05em" }}>파일명</th>
+                      <th style={{ padding: "7px 10px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600 }}>파일명</th>
                       {stageTab !== "original" && <th style={{ padding: "7px 8px", fontSize: 10, color: "#5c5c5c", textAlign: "center", fontWeight: 600 }}>상태</th>}
-                      {stageTab !== "original" && <th style={{ padding: "7px 8px", fontSize: 10, color: "#5c5c5c", textAlign: "center", fontWeight: 600 }}>💬</th>}
+                      {stageTab !== "original" && <th style={{ padding: "7px 10px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600 }}>고객 코멘트</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((row) => {
                       const visIdx = filteredIndexMap.get(row.photo.id);
                       if (visIdx === undefined) return null;
-                      // V2 탭: v2 review가 없지만 v1이 confirmed → "approved"로 표시 (갤러리 뷰와 동일 로직)
                       const ver = stageTab === "v2"
                         ? (row.v2 ?? (row.v1?.reviewStatus === "approved" ? row.v1 : null))
                         : stageTab === "v1" ? row.v1 : null;
                       const filename = row.photo.originalFilename ?? `FRAME_${String(row.photo.orderIndex).padStart(4, "0")}`;
-                      const hasComment = !!ver?.comment;
                       return (
                         <tr
                           key={row.photo.id}
@@ -1602,18 +1600,16 @@ export default function WorkflowPageClient() {
                           onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "rgba(255,77,0,0.04)"; }}
                           onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = ""; }}
                         >
-                          <td style={{ padding: "8px 8px", fontSize: 11, color: "#5c5c5c", textAlign: "center" }}>{visIdx + 1}</td>
-                          <td style={{ padding: "8px 10px", fontSize: 11, color: "#a3a3a3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{filename}</td>
+                          <td style={{ padding: "10px 8px", fontSize: 11, color: "#5c5c5c", textAlign: "center" }}>{visIdx + 1}</td>
+                          <td style={{ padding: "10px 10px", fontSize: 11, color: "#a3a3a3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{filename}</td>
                           {stageTab !== "original" && (
-                            <td style={{ padding: "8px 8px", textAlign: "center" }}>
+                            <td style={{ padding: "10px 8px", textAlign: "center" }}>
                               <StatusBadge status={ver?.reviewStatus ?? "pending"} compact />
                             </td>
                           )}
                           {stageTab !== "original" && (
-                            <td style={{ padding: "8px 8px", textAlign: "center" }}>
-                              {hasComment
-                                ? <span title={ver!.comment!}><MessageSquare size={13} style={{ color: "#FF4D00", display: "inline" }} /></span>
-                                : <span style={{ color: "#3a3a3a", fontSize: 11 }}>—</span>}
+                            <td style={{ padding: "10px 10px", fontSize: 11, color: ver?.comment ? "#a3a3a3" : "#3a3a3a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {ver?.comment || "—"}
                             </td>
                           )}
                         </tr>
