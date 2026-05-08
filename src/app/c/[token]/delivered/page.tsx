@@ -84,17 +84,17 @@ export default function DeliveredPage() {
       </CustomerHeader>
 
       <main className={styles.container}>
-        <div className={styles.portalCmd}>LOG :: DELIVERY_COMPLETE</div>
+        <div className={styles.portalCmd}>셀렉 · 보정 완료</div>
         <h1 className={styles.title}>
-          납품이 완료됐습니다!
+          모든 과정이 완료됐어요
         </h1>
         <p className={styles.subtitle}>
-          {photographerName}님이 최종 보정본을 전달했습니다.
+          사진 선택과 보정 확인이 모두 끝났습니다.
           <br />
-          문의사항은 작가에게 연락해 주세요.
+          최종 사진 원본과 보정본은 {photographerName} 작가님을 통해 별도로 전달됩니다.
         </p>
 
-        <section className={styles.card} aria-label="납품 완료 정보">
+        <section className={styles.card} aria-label="완료 정보">
           <div className={styles.successBadge} aria-hidden>
             <PackageCheck style={{ width: 32, height: 32, color: "var(--accent-green)" }} />
           </div>
