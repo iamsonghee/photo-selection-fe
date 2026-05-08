@@ -1580,7 +1580,10 @@ export default function WorkflowPageClient() {
                     {rows.map((row) => {
                       const visIdx = filteredIndexMap.get(row.photo.id);
                       if (visIdx === undefined) return null;
-                      const ver = stageTab === "v2" ? row.v2 : stageTab === "v1" ? row.v1 : null;
+                      // V2 탭: v2 review가 없지만 v1이 confirmed → "approved"로 표시 (갤러리 뷰와 동일 로직)
+                      const ver = stageTab === "v2"
+                        ? (row.v2 ?? (row.v1?.reviewStatus === "approved" ? row.v1 : null))
+                        : stageTab === "v1" ? row.v1 : null;
                       const filename = row.photo.originalFilename ?? `FRAME_${String(row.photo.orderIndex).padStart(4, "0")}`;
                       return (
                         <tr
