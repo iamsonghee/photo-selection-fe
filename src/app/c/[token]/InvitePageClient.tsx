@@ -10,6 +10,8 @@ import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { getProfileImageUrl } from "@/lib/photographer";
 import { getReviewMockData } from "@/lib/mock-data";
 import { BrandLogoBar } from "@/components/BrandLogo";
+import { CustomerHeader } from "@/components/customer/CustomerHeader";
+import { CustomerFooter } from "@/components/customer/CustomerFooter";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 
@@ -197,19 +199,12 @@ export default function InvitePageClient() {
         <div className="cp-bracket cp-bracket-tl" /><div className="cp-bracket cp-bracket-tr" />
         <div className="cp-bracket cp-bracket-bl" /><div className="cp-bracket cp-bracket-br" />
 
-        <header className="cp-header">
-          <div className="cp-brand-cluster">
-            <div className="cp-logo-box">A</div>
-            <div className="cp-brand-name">A-CUT<span>.</span></div>
-          </div>
-          <div className="cp-sys-info">
-            <div className="cp-status-indicator">
-              <div className="cp-status-dot" style={{ background: "#FF4D00", boxShadow: "0 0 8px #FF4D00" }} />
-              {isV2 ? "SYS.REVIEW_V2_ACTIVE" : "SYS.REVIEW_V1_ACTIVE"}
-            </div>
-            <div>PRJ_ID: {prjIdShort}</div>
-          </div>
-        </header>
+        <CustomerHeader>
+          <BrandLogoBar size="sm" href={inviteHref} />
+          <span className="font-mono text-[11px] text-zinc-500 max-w-[200px] truncate">
+            {isV2 ? "보정본 V2 검토 중" : "보정본 V1 검토 중"}
+          </span>
+        </CustomerHeader>
 
         <main className="cp-main">
           <div className="cp-portal-cmd">CMD :: SYS.REVIEW_INVITE</div>
@@ -279,10 +274,10 @@ export default function InvitePageClient() {
           </div>
         </main>
 
-        <footer className="cp-footer">
-          <div>V.1.2.0-CORE &nbsp;&nbsp;|&nbsp;&nbsp; <span className="cp-footer-secure">SECURE_CONNECTION</span></div>
-          <div>© 2026 A컷 · A-CUT</div>
-        </footer>
+        <CustomerFooter>
+          <span className="font-mono text-[10px] text-zinc-600">SECURE_CONNECTION</span>
+          <span className="font-mono text-[10px] text-zinc-600">© 2026 A컷</span>
+        </CustomerFooter>
       </div>
     );
   }
@@ -490,19 +485,10 @@ export default function InvitePageClient() {
       <div className="cp-bracket cp-bracket-br" />
 
       {/* Header */}
-      <header className="cp-header">
-        <div className="cp-brand-cluster">
-          <div className="cp-logo-box">A</div>
-          <div className="cp-brand-name">A-CUT<span>.</span></div>
-        </div>
-        <div className="cp-sys-info">
-          <div className="cp-status-indicator">
-            <div className="cp-status-dot" />
-            SYS.CLIENT_LINK_ACTIVE
-          </div>
-          <div>PRJ_ID: {prjIdShort}</div>
-        </div>
-      </header>
+      <CustomerHeader>
+        <BrandLogoBar size="sm" href={inviteHref} />
+        <span className="font-mono text-[11px] text-zinc-500 max-w-[180px] truncate">{project.name}</span>
+      </CustomerHeader>
 
       {/* Main */}
       <main className="cp-main">
@@ -595,10 +581,10 @@ export default function InvitePageClient() {
       </main>
 
       {/* Footer */}
-      <footer className="cp-footer">
-        <div>V.1.2.0-CORE &nbsp;&nbsp;|&nbsp;&nbsp; <span className="cp-footer-secure">SECURE_CONNECTION</span></div>
-        <div>© 2026 A컷 · A-CUT</div>
-      </footer>
+      <CustomerFooter>
+        <span className="font-mono text-[10px] text-zinc-600">SECURE_CONNECTION</span>
+        <span className="font-mono text-[10px] text-zinc-600">© 2026 A컷</span>
+      </CustomerFooter>
     </div>
   );
 }

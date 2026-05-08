@@ -6,6 +6,9 @@ import { useParams, useRouter } from "next/navigation";
 import { PackageCheck } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import styles from "./delivered.module.css";
+import { BrandLogoBar } from "@/components/BrandLogo";
+import { CustomerHeader } from "@/components/customer/CustomerHeader";
+import { CustomerFooter } from "@/components/customer/CustomerFooter";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 
@@ -75,20 +78,10 @@ export default function DeliveredPage() {
       <div className={`${styles.viewportBracket} ${styles.bracketBl}`} aria-hidden />
       <div className={`${styles.viewportBracket} ${styles.bracketBr}`} aria-hidden />
 
-      <header className={styles.topHeader}>
-        <div className={styles.headerSide}>
-          <Link href={invitePath} className={styles.btnSub} scroll={false}>
-            ← 돌아가기
-          </Link>
-        </div>
-        <div className={styles.brandCluster}>
-          <div className={styles.logoBox}>A</div>
-          <div className={styles.brandName}>
-            A컷 <span>A-CUT</span>
-          </div>
-        </div>
-        <div className={styles.headerSide} />
-      </header>
+      <CustomerHeader>
+        <BrandLogoBar size="sm" href={invitePath} />
+        <span className="font-mono text-[11px] text-zinc-500 max-w-[180px] truncate">{project.name}</span>
+      </CustomerHeader>
 
       <main className={styles.container}>
         <div className={styles.portalCmd}>LOG :: DELIVERY_COMPLETE</div>
@@ -123,23 +116,14 @@ export default function DeliveredPage() {
             )}
 
             <div className={styles.message}>소중한 순간을 함께해서 영광이었습니다. 감사합니다</div>
-
-            <div className={styles.ctaRow}>
-              <Link href={galleryPath} className={styles.btnPrimary} scroll={false}>
-                갤러리로 이동
-              </Link>
-              <Link href={invitePath} className={styles.btnGhost} scroll={false}>
-                프로젝트 홈
-              </Link>
-            </div>
           </div>
         </section>
       </main>
 
-      <footer className={styles.pageFooter}>
-        <div>© 2026 A컷 · A-CUT</div>
-        <div className={styles.footerNote}>{photographerName} 작가님이 A컷을 통해 전달했습니다.</div>
-      </footer>
+      <CustomerFooter>
+        <span className="font-mono text-[10px] text-zinc-600">© 2026 A컷 · A-CUT</span>
+        <span className="font-mono text-[10px] text-zinc-600">{photographerName} 작가님이 A컷을 통해 전달했습니다.</span>
+      </CustomerFooter>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { RotateCcw } from "lucide-react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useSelection } from "@/contexts/SelectionContext";
+import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
 import {
   appendGalleryScrollQuery,
   buildFilterQueryString,
@@ -399,8 +400,9 @@ export default function GalleryPageClient() {
         {/* ── Header ── */}
         <header style={{
           position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
-          background: "rgba(0,0,0,0.92)", backdropFilter: "blur(20px)",
-          borderBottom: "1px solid #222",
+          background: "rgba(10,10,12,0.90)", backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          borderBottom: "1px solid #1a1a1e",
         }}>
           {/* Top row */}
           <div className="gl-header-top" style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -641,43 +643,14 @@ export default function GalleryPageClient() {
         </main>
 
         {/* ── Bottom Bar ── */}
-        <footer style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50, background: "#000", borderTop: "1px solid rgba(255,77,0,0.3)", backdropFilter: "blur(12px)" }}>
-          <div className="gl-footer-inner" style={{ maxWidth: 1800, margin: "0 auto", height: 72, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
-            <div className="gl-footer-progress" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-              <div className="gl-footer-progress-label" style={{ display: "flex", justifyContent: "space-between", fontFamily: "'JetBrains Mono', 'Space Mono', monospace", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                <span style={{ color: "#888" }}>사진 선택</span>
-                <span style={{ color: "#FF4D00" }}>{Y} / {N}장</span>
-              </div>
-              <div style={{ width: "100%", height: 3, background: "#111" }}>
-                <div style={{ height: "100%", background: "#FF4D00", width: `${progressPct}%`, transition: "width 0.3s" }} />
-              </div>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 20, flexShrink: 0 }}>
-              <div className="gl-footer-meta" style={{ textAlign: "right" }}>
-                <p style={{ fontFamily: "'JetBrains Mono', 'Space Mono', monospace", fontSize: 11, fontWeight: 700, color: remaining === 0 ? "#FF4D00" : "rgba(255,255,255,0.35)", margin: 0, whiteSpace: "nowrap" }}>
-                  {remaining > 0
-                    ? `사진을 ${remaining}장 더 골라주세요`
-                    : remaining === 0
-                    ? "모두 선택했어요! 의뢰 버튼을 눌러주세요"
-                    : `${Math.abs(remaining)}장 초과됐어요`}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="gl-btn-confirm"
-                disabled={!canConfirm}
-                onClick={() => canConfirm && setShowConfirmModal(true)}
-              >
-                <span>보정 의뢰하기</span>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 12 19" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </footer>
+        <SelectionConfirmFooter
+          Y={Y}
+          N={N}
+          position="fixed"
+          disabled={!canConfirm}
+          onConfirm={() => canConfirm && setShowConfirmModal(true)}
+          zIndex={50}
+        />
 
         {/* ── Confirm Modal ── */}
         {showConfirmModal && (

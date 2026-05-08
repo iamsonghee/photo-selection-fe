@@ -7,6 +7,8 @@ import { ko } from "date-fns/locale";
 import { Check, AlertTriangle, RefreshCw, Clock, Lock } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { BrandLogoBar } from "@/components/BrandLogo";
+import { CustomerHeader } from "@/components/customer/CustomerHeader";
+import { CustomerFooter } from "@/components/customer/CustomerFooter";
 import type { ReviewResultPhoto } from "@/app/api/c/review-result/route";
 
 const CUSTOMER_CANCEL_MAX = 3;
@@ -98,6 +100,41 @@ function SimplePhotoCard({ photo, index }: { photo: import("@/types").Photo; ind
   );
 }
 
+/* ── 비선택 원본 카드 (선택하지 않은 사진) ── */
+function UnselectedPhotoCard({ photo, index }: { photo: import("@/types").Photo; index: number }) {
+  const filename = photo.originalFilename?.split("/").pop() ?? `#${photo.orderIndex}`;
+  return (
+    <div className="bg-[#0a0a0c]/40 border border-[#1a1a1e] rounded-xl p-2 flex flex-col gap-2">
+      <div className="w-full aspect-[4/3] bg-[#080808] rounded-lg overflow-hidden border border-[#1a1a1e] relative opacity-70 hover:opacity-100 transition-opacity">
+        {photo.url ? (
+          <img src={photo.url} alt={filename} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-zinc-700 text-xs font-mono">NO IMG</div>
+        )}
+        <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-zinc-500 border border-[#333]">
+          {String(index + 1).padStart(2, "0")}
+        </div>
+      </div>
+      <p className="text-[11px] font-mono text-zinc-500 truncate" title={filename}>{filename}</p>
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
+        선택 안 함
+      </span>
+    </div>
+  );
+}
+
+/* ── 섹션 헤더 ── */
+function SectionHeader({ label, count, tone }: { label: string; count: number; tone: "brand" | "muted" }) {
+  const dot = tone === "brand" ? "bg-[#FF4D00]" : "bg-zinc-500";
+  return (
+    <div className="flex items-center gap-2 mb-2">
+      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+      <h3 className="text-[12px] font-semibold text-zinc-300 tracking-wide">{label}</h3>
+      <span className="font-mono text-[11px] text-zinc-500">{count}장</span>
+    </div>
+  );
+}
+
 export default function LockedPage() {
   const params  = useParams();
   const router  = useRouter();
@@ -127,13 +164,21 @@ export default function LockedPage() {
       .catch(() => {});
   }, [token, project?.status]);
 
-  const { photos, N } = useMemo(() => {
-    if (!project || !ctx?.photos?.length || !ctx?.selectedIds?.size) {
-      return { photos: [] as import("@/types").Photo[], N: 0 };
+  const { photos, unselected, N } = useMemo(() => {
+    type P = import("@/types").Photo;
+    if (!project || !ctx?.photos?.length) {
+      return { photos: [] as P[], unselected: [] as P[], N: 0 };
     }
-    const filtered = ctx.photos.filter((p) => ctx.selectedIds!.has(p.id));
-    filtered.sort((a, b) => a.orderIndex - b.orderIndex);
-    return { photos: filtered, N: filtered.length };
+    const sel: P[] = [];
+    const unsel: P[] = [];
+    const ids = ctx.selectedIds;
+    for (const p of ctx.photos) {
+      if (ids?.has(p.id)) sel.push(p);
+      else unsel.push(p);
+    }
+    sel.sort((a, b) => a.orderIndex - b.orderIndex);
+    unsel.sort((a, b) => a.orderIndex - b.orderIndex);
+    return { photos: sel, unselected: unsel, N: sel.length };
   }, [project, ctx?.photos, ctx?.selectedIds]);
 
   const cancelCount      = project?.customerCancelCount ?? 0;
@@ -175,6 +220,7 @@ export default function LockedPage() {
   const isEditing  = ["editing", "editing_v2"].includes(project.status);
   const isConfirmed = project.status === "confirmed";
   const hasReview  = reviewResult && reviewResult.length > 0;
+  const showUnselected = isConfirmed && !hasReview && unselected.length > 0;
 
   const approved = hasReview ? reviewResult!.filter((p) => p.reviewStatus === "approved").length : 0;
   const revision = hasReview ? reviewResult!.filter((p) => p.reviewStatus === "revision_requested").length : 0;
@@ -194,11 +240,10 @@ export default function LockedPage() {
     <div className="min-h-dvh bg-[#0a0a0c] text-white flex flex-col" style={{ fontFamily: "'Pretendard Variable',-apple-system,sans-serif" }}>
 
       {/* Header */}
-      <header className="sticky top-0 z-50 flex items-center justify-between px-5 py-3 bg-[#0a0a0c]/90 backdrop-blur-md border-b border-[#1a1a1e]"
-        style={{ paddingTop: "calc(12px + env(safe-area-inset-top,0px))" }}>
+      <CustomerHeader>
         <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
         <span className="font-mono text-[11px] text-zinc-500 max-w-[180px] truncate">{project.name}</span>
-      </header>
+      </CustomerHeader>
 
       {/* Status bar */}
       <div className="flex items-center justify-between px-5 py-3 bg-[#0f0f12] border-b border-[#1a1a1e]">
@@ -220,7 +265,12 @@ export default function LockedPage() {
               {revision > 0 && <span className="text-[#FF4D00]">재보정 {revision}</span>}
             </>
           )}
-          {!hasReview && <span>{N}장 선택</span>}
+          {!hasReview && (
+            <>
+              <span>{N}장 선택</span>
+              {showUnselected && <span className="text-zinc-600">· 비선택 {unselected.length}</span>}
+            </>
+          )}
           {confirmedDate && <span className="hidden sm:inline text-zinc-600">{confirmedDate}</span>}
         </div>
       </div>
@@ -234,10 +284,26 @@ export default function LockedPage() {
             ))}
           </div>
         ) : photos.length > 0 ? (
-          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2">
-            {photos.map((photo, i) => (
-              <SimplePhotoCard key={photo.id} photo={photo} index={i} />
-            ))}
+          <div className="flex flex-col gap-6">
+            <section>
+              <SectionHeader label="선택된 원본" count={photos.length} tone="brand" />
+              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2">
+                {photos.map((photo, i) => (
+                  <SimplePhotoCard key={photo.id} photo={photo} index={i} />
+                ))}
+              </div>
+            </section>
+
+            {showUnselected && (
+              <section>
+                <SectionHeader label="선택하지 않은 원본" count={unselected.length} tone="muted" />
+                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2">
+                  {unselected.map((photo, i) => (
+                    <UnselectedPhotoCard key={photo.id} photo={photo} index={i} />
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         ) : (
           <div className="flex items-center justify-center h-48 text-zinc-600 font-mono text-sm">
@@ -247,8 +313,7 @@ export default function LockedPage() {
       </div>
 
       {/* Bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between gap-3 px-5 py-3 bg-[#0a0a0c]/95 backdrop-blur-md border-t border-[#1a1a1e]"
-        style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom,0px))" }}>
+      <CustomerFooter>
         <span className="font-mono text-[11px] text-zinc-500">
           {isConfirmed ? `확정 취소 ${remainingCancels}회 남음` : statusText}
         </span>
@@ -265,7 +330,7 @@ export default function LockedPage() {
             확정 취소
           </button>
         )}
-      </div>
+      </CustomerFooter>
 
       {/* Cancel modal */}
       {cancelModalOpen && (

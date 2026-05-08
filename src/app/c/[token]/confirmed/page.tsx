@@ -9,6 +9,8 @@ import { Lock } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { getProfileImageUrl } from "@/lib/photographer";
 import { BrandLogoBar } from "@/components/BrandLogo";
+import { CustomerHeader } from "@/components/customer/CustomerHeader";
+import { CustomerFooter } from "@/components/customer/CustomerFooter";
 
 const CUSTOMER_CANCEL_MAX = 3;
 const MONO = "'JetBrains Mono', 'Courier New', Courier, monospace";
@@ -353,12 +355,10 @@ export default function ConfirmedPage() {
       <div className="cf-bracket cf-bracket-br" />
 
       {/* 헤더 */}
-      <header className="cf-header">
-        <div className="cf-header-inner">
-          <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
-          <div className="cf-header-badge">{project.name}</div>
-        </div>
-      </header>
+      <CustomerHeader>
+        <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
+        <span className="font-mono text-[11px] text-zinc-500 max-w-[180px] truncate">{project.name}</span>
+      </CustomerHeader>
 
       {/* 메인 */}
       <main className="cf-main">
@@ -439,9 +439,10 @@ export default function ConfirmedPage() {
       </main>
 
       {/* 푸터 */}
-      <footer className="cf-footer">
-        <div>V.2.0-CORE &nbsp;|&nbsp; SECURE_CONNECTION &nbsp;·&nbsp; © 2026 A컷</div>
-      </footer>
+      <CustomerFooter>
+        <span className="font-mono text-[10px] text-zinc-600">SECURE_CONNECTION</span>
+        <span className="font-mono text-[10px] text-zinc-600">© 2026 A컷</span>
+      </CustomerFooter>
 
       {/* 취소 모달 */}
       {cancelModalOpen && project.status === "confirmed" && (
