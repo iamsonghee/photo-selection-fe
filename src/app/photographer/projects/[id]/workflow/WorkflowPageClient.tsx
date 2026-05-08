@@ -1114,8 +1114,16 @@ export default function WorkflowPageClient() {
               : null);
         throw new Error(msg ?? "교체 실패");
       }
-      // 전체 재조회 대신, 교체된 버전 URL만 캐시 버스트하여 해당 카드만 즉시 갱신한다.
+      // 교체된 버전 URL 캐시 버스트 + reviewStatus null 초기화 (version_reviews 백엔드에서 삭제됨)
       setVersionBust((prev) => ({ ...prev, [`${photoId}:${version}`]: Date.now() }));
+      setRows((prev) =>
+        prev.map((row) => {
+          if (row.photo.id !== photoId) return row;
+          if (version === 2 && row.v2) return { ...row, v2: { ...row.v2, reviewStatus: null, comment: null } };
+          if (version === 1 && row.v1) return { ...row, v1: { ...row.v1, reviewStatus: null, comment: null } };
+          return row;
+        })
+      );
     } catch (e) {
       alert(e instanceof Error ? e.message : "교체 실패");
     } finally {
