@@ -83,8 +83,8 @@ function PhotoProjectCard({ project }: { project: Project }) {
       className="bg-[#121215] border border-[#1a1a1e] hover:border-[#27272c] rounded-2xl overflow-hidden cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-[#FF4D00]/50 group"
       style={{ opacity: isDelivered ? 0.65 : 1 }}
     >
-      {/* 썸네일 — 낮은 높이 */}
-      <div className="relative w-full h-28 overflow-hidden">
+      {/* 썸네일 — 3:2 비율 */}
+      <div className="relative w-full aspect-[3/2] overflow-hidden">
         {hasCover ? (
           <img
             src={project.thumbnailUrl!}
@@ -98,15 +98,17 @@ function PhotoProjectCard({ project }: { project: Project }) {
             className="w-full h-full flex items-center justify-center"
             style={{ background: "linear-gradient(135deg, #1a1a1e 0%, #111113 100%)" }}
           >
-            <span className="text-xl font-black text-zinc-800 uppercase tracking-widest select-none">
+            <span className="text-lg font-black text-zinc-800 uppercase tracking-widest select-none">
               {project.name.slice(0, 2)}
             </span>
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+        {/* 상태 배지 */}
         <div className="absolute top-2 left-2">
           <StatusPill status={project.status} photoCount={photoCount} requiredCount={reqCount} />
         </div>
+        {/* D-day */}
         <div className="absolute top-2 right-2">
           {isDelivered ? (
             <span className="text-[9px] font-bold bg-black/60 border border-zinc-700 rounded px-1.5 py-0.5 text-zinc-400">완료</span>
@@ -123,22 +125,29 @@ function PhotoProjectCard({ project }: { project: Project }) {
             </span>
           )}
         </div>
+        {/* 이미지 하단 오버레이 — 프로젝트명 + 고객명 */}
+        <div className="absolute bottom-0 left-0 right-0 px-2.5 pb-2 pt-4">
+          <div className="text-[13px] font-bold text-white leading-tight truncate drop-shadow-sm">{project.name}</div>
+          <div className="text-[10px] text-white/60 truncate">{project.customerName || "—"}</div>
+        </div>
       </div>
 
-      {/* 카드 본문 */}
-      <div className="p-3 flex flex-col gap-2">
-        <div>
-          <div className="text-[13px] font-bold text-white leading-snug truncate">{project.name}</div>
-          <div className="text-[11px] text-zinc-500 truncate">{project.customerName || "—"}</div>
+      {/* 카드 본문 — 진행 정보 */}
+      <div className="px-2.5 pt-2 pb-2.5 flex flex-col gap-1.5">
+        {/* 단계 + 촬영일 */}
+        <div className="flex justify-between items-center">
+          <span className="text-[11px] font-semibold text-zinc-300">{stepLabel}</span>
+          <span className="text-[10px] text-zinc-500 font-mono">
+            {project.shootDate
+              ? new Date(project.shootDate).toLocaleDateString("ko-KR", { year: "2-digit", month: "2-digit", day: "2-digit" })
+              : "—"}
+          </span>
         </div>
-        <div>
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-[10px] font-medium text-zinc-400">{stepLabel}</span>
-            <span className="text-[9px] text-zinc-600 font-mono">
-              {reqCount > 0 ? `${photoCount}/${reqCount}` : photoCount > 0 ? `${photoCount}장` : ""}
-            </span>
-          </div>
-          <ProjectPipelineMiniBar status={project.status} variant="full" />
+        {/* 파이프라인 진행바 */}
+        <ProjectPipelineMiniBar status={project.status} variant="full" />
+        {/* ID */}
+        <div className="text-[9px] font-mono text-zinc-700 pt-0.5">
+          {project.displayId ?? project.id.slice(0, 8).toUpperCase()}
         </div>
       </div>
     </div>
@@ -315,7 +324,7 @@ export default function DashboardPage() {
               <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">프로젝트</span>
               <span className="text-[10px] text-zinc-600">{projects.length}개</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {displayProjects.map((p) => <PhotoProjectCard key={p.id} project={p} />)}
             </div>
             {showViewAllBtn && (
