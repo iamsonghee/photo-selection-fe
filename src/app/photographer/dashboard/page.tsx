@@ -187,6 +187,7 @@ export default function DashboardPage() {
   const [loading, setLoading]   = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const [logs, setLogs]         = useState<ProjectLogItem[]>([]);
+  const [dashFilter, setDashFilter] = useState<"all" | "active" | "completed">("all");
 
   const userName =
     profile?.name?.trim() ||
@@ -256,8 +257,13 @@ export default function DashboardPage() {
     return 9999;
   };
   const sortedAll = [...projects].sort((a, b) => urgencyScore(a) - urgencyScore(b));
-  const displayProjects = sortedAll.slice(0, 12);
-  const showViewAllBtn  = projects.length > 12;
+  const filteredByDash = sortedAll.filter((p) => {
+    if (dashFilter === "active")    return ACTIVE_STATUSES.includes(p.status);
+    if (dashFilter === "completed") return p.status === "delivered";
+    return true;
+  });
+  const displayProjects = filteredByDash.slice(0, 12);
+  const showViewAllBtn  = filteredByDash.length > 12;
 
   const preparingProjects = displayProjects.filter((p) => p.status === "preparing");
   const activeProjects    = displayProjects.filter((p) => ACTIVE_STATUSES.includes(p.status));
@@ -287,40 +293,51 @@ export default function DashboardPage() {
         <div className="flex-1 min-w-0 flex flex-col gap-6">
 
           {/* 1. 프로젝트 요약 카드 */}
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: "전체 프로젝트", count: dashCounts.all,       icon: <Layers size={16} className="text-zinc-400" />,          color: "zinc",    sub: null,                                                                              },
-              { label: "진행중",        count: dashCounts.active,    icon: <Zap size={16} className="text-[#FF4D00]" />,             color: "brand",   sub: dashCounts.waiting > 0 ? `${dashCounts.waiting}건 고객 응답 대기` : null,         },
-              { label: "완료",          count: dashCounts.completed, icon: <CheckCircle2 size={16} className="text-emerald-500" />,  color: "emerald", sub: null,                                                                              },
-            ].map((card) => (
-              <Link key={card.label} href="/photographer/projects" className="no-underline block">
-                <div className={`border rounded-2xl p-5 transition-all hover:border-[#27272c] ${
-                  card.color === "brand"   ? "bg-[#FF4D00]/6 border-[#FF4D00]/20 hover:bg-[#FF4D00]/10" :
-                  card.color === "emerald" ? "bg-emerald-500/6 border-emerald-500/20 hover:bg-emerald-500/10" :
-                  "bg-[#121215]/80 border-[#1a1a1e]"
-                }`}>
+          <div className="grid grid-cols-3 gap-4 items-stretch">
+            {([
+              { key: "all" as const,       label: "전체 프로젝트", count: dashCounts.all,       icon: <Layers size={16} className="text-zinc-400" />,         color: "zinc",    sub: null },
+              { key: "active" as const,    label: "진행중",        count: dashCounts.active,    icon: <Zap size={16} className="text-[#FF4D00]" />,            color: "brand",   sub: dashCounts.waiting > 0 ? `${dashCounts.waiting}건 고객 응답 대기` : null },
+              { key: "completed" as const, label: "완료",          count: dashCounts.completed, icon: <CheckCircle2 size={16} className="text-emerald-500" />, color: "emerald", sub: null },
+            ]).map((card) => {
+              const isActive = dashFilter === card.key;
+              return (
+                <button
+                  key={card.key}
+                  type="button"
+                  onClick={() => setDashFilter(card.key)}
+                  className={`w-full text-left border rounded-2xl p-5 transition-all h-full flex flex-col ${
+                    isActive
+                      ? card.color === "brand"   ? "bg-[#FF4D00]/12 border-[#FF4D00]/40"
+                        : card.color === "emerald" ? "bg-emerald-500/12 border-emerald-500/40"
+                        : "bg-[#27272c] border-[#3f3f46]"
+                      : card.color === "brand"   ? "bg-[#FF4D00]/5 border-[#FF4D00]/15 hover:bg-[#FF4D00]/10 hover:border-[#FF4D00]/30"
+                        : card.color === "emerald" ? "bg-emerald-500/5 border-emerald-500/15 hover:bg-emerald-500/10 hover:border-emerald-500/30"
+                        : "bg-[#121215]/80 border-[#1a1a1e] hover:border-[#27272c]"
+                  }`}
+                >
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm font-bold text-white flex items-center gap-2">{card.icon}{card.label}</span>
                   </div>
-                  <div className="flex items-end gap-2">
+                  <div className="flex items-end gap-2 flex-1">
                     <span className="text-3xl font-black text-white leading-none">{card.count}</span>
-                    <span className="text-sm text-zinc-400 mb-1">{card.label === "전체 프로젝트" ? "개" : card.label === "진행중" ? "건 작업중" : "건"}</span>
+                    <span className="text-sm text-zinc-400 mb-1">
+                      {card.key === "all" ? "개" : card.key === "active" ? "건 작업중" : "건"}
+                    </span>
                   </div>
-                  {card.sub && (
-                    <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-amber-400/80">
-                      <Clock size={10} />{card.sub}
-                    </div>
-                  )}
-                </div>
-              </Link>
-            ))}
+                  {/* 높이 균일화: sub 영역은 항상 렌더링, 내용 없으면 빈 공간 */}
+                  <div className="mt-1.5 h-4 flex items-center gap-1.5 text-[11px] text-amber-400/80">
+                    {card.sub && <><Clock size={10} />{card.sub}</>}
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           {/* 2. 프로젝트 카드 그리드 */}
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">프로젝트</span>
-              <span className="text-[10px] text-zinc-600">{projects.length}개</span>
+              <span className="text-[10px] text-zinc-600">{filteredByDash.length}개</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {displayProjects.map((p) => <PhotoProjectCard key={p.id} project={p} />)}
