@@ -1558,6 +1558,20 @@ export default function WorkflowPageClient() {
                 </p>
                   </div>
             )}
+            {isEditingV2 && v2RevisionPending > 0 && (
+              <div className="rounded-2xl border border-[#FF4D00]/30 bg-[#FF4D00]/5 px-5 py-4 flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#FF4D00]/15 border border-[#FF4D00]/40 flex items-center justify-center text-[#FF4D00] shrink-0">
+                  <Upload size={16} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-white font-semibold">재보정본 업로드가 필요합니다</p>
+                  <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed">
+                    고객이 재보정을 요청한 사진이 <span className="text-[#FF4D00] font-semibold">{v2RevisionPending}장</span> 있습니다.
+                    V2 탭에서 해당 사진을 교체한 뒤 검토 요청을 보내주세요.
+                  </p>
+                </div>
+              </div>
+            )}
             {isEditingV2 && rows.length > 0 && rows.every((r) => !r.v1?.reviewStatus) && (
               <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 px-5 py-4 flex items-start gap-3">
                 <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
@@ -1759,11 +1773,19 @@ export default function WorkflowPageClient() {
                 </button>
                               )}
                             </div>
+          ) : isEditingV2 && v2RevisionPending > 0 ? (
+            <button
+              disabled
+              className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold border border-[#FF4D00]/30 text-[#FF4D00]/50 bg-[#FF4D00]/5 cursor-not-allowed"
+            >
+              <Send size={15} />
+              재보정본 검토 요청 ({v2RevisionPending}장 교체 필요)
+            </button>
           ) : (
             <span className="flex items-center justify-center w-full md:w-auto px-6 py-2.5 rounded-xl text-sm font-bold bg-[#121215] border border-[#27272c] text-zinc-500">
               다음 단계 대기 중
             </span>
-                        )}
+          )}
                       </div>
       </footer>
 
