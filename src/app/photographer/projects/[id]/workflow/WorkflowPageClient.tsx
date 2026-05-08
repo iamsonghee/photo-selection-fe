@@ -24,6 +24,9 @@ import {
   Sparkles,
   Copy,
   Check,
+  Download,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import styles from "./Workflow.module.css";
 import { normalizeReviewDeadlineYmd } from "@/lib/format-review-deadline";
@@ -186,7 +189,7 @@ function StatusBadge({
   );
 }
 
-// ── Stage stepper ──────────────────────────────────────────────────────────
+// ── Stage stepper (정의 유지, 렌더링은 제거됨) ──────────────────────────────
 
 type StepKey = "select" | "v1_upload" | "v1_review" | "v2_upload" | "v2_review" | "delivered";
 
@@ -811,6 +814,7 @@ export default function WorkflowPageClient() {
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
   const [filter, setFilter]         = useState<FilterTab>("all");
+  const [viewMode, setViewMode]     = useState<"gallery" | "list">("gallery");
   // 첫 렌더에서 ?stage 쿼리를 즉시 반영 — V1 → 원본으로 바뀌는 깜빡임 방지
   const [stageTab, setStageTab]     = useState<StageTab>(() => {
     const raw = searchParams.get("stage");
@@ -995,6 +999,32 @@ export default function WorkflowPageClient() {
       v2: row.v2 ? { url: getVersionUrl(row.v2.url, row.photo.id, 2), filename: "보정본 v2" } : undefined,
     })),
   [filteredRows, getVersionUrl]);
+
+  const handleDownloadReview = useCallback(() => {
+    const version = stageTab === "v2" ? 2 : 1;
+    const header = ["번호", "파일명", "상태", "고객 코멘트"];
+    const rowData = rows.map((row, i) => {
+      const ver = version === 2 ? row.v2 : row.v1;
+      const status =
+        ver?.reviewStatus === "approved" ? "확정"
+        : ver?.reviewStatus === "revision_requested" ? "재보정 요청"
+        : "미검토";
+      const comment = ver?.comment ?? "";
+      const filename = row.photo.originalFilename ?? `FRAME_${String(row.photo.orderIndex).padStart(4, "0")}`;
+      return [String(i + 1), filename, status, comment];
+    });
+    const csv = [header, ...rowData]
+      .map((cols) => cols.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const bom = "﻿";
+    const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${project?.name ?? "review"}_v${version}_검토결과.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [rows, stageTab, project?.name]);
 
   function openViewer(idx: number, tab: StageTab) {
     setViewerIdx(idx);
@@ -1357,21 +1387,6 @@ export default function WorkflowPageClient() {
         }
       />
 
-      {/* ── Stage stepper ── */}
-      {!isSelecting && (
-        <div className="hidden md:block">
-        <StageStepper
-          status={project.status}
-          allowRevision={project.maxRevisionCount > 0}
-          v1Uploaded={counts.v1Uploaded}
-          v1Total={counts.total}
-          approved={counts.approved}
-          revision={counts.revision}
-          v2Uploaded={counts.v2Uploaded}
-          v2Total={v2Total}
-        />
-        </div>
-      )}
 
       {/* ── Stage tabs ── */}
       {!isSelecting && (
@@ -1462,6 +1477,32 @@ export default function WorkflowPageClient() {
               <span className="text-zinc-600 mx-1">V2 업로드</span>
             </div>
           )}
+
+          {/* 다운로드 + 뷰 토글 */}
+          <div className={`${stageTab === "v2" || (stageTab === "v1" && !isReviewingV1) ? "" : "ml-auto"} flex items-center gap-2 shrink-0`}>
+            {stageTab !== "original" && rows.length > 0 && (
+              <button
+                type="button"
+                onClick={handleDownloadReview}
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border border-[#27272c] text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
+              >
+                <Download size={12} />
+                내보내기
+              </button>
+            )}
+            <div className="flex items-center border border-[#27272c] rounded-lg overflow-hidden">
+              {([["gallery", <LayoutGrid key="g" size={13} />] as const, ["list", <List key="l" size={13} />] as const]).map(([mode, icon]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setViewMode(mode as "gallery" | "list")}
+                  className={`px-2.5 py-1.5 transition-colors ${viewMode === mode ? "bg-[#FF4D00]/15 text-[#FF4D00]" : "bg-transparent text-zinc-500 hover:text-zinc-300"}`}
+                >
+                  {icon}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1522,6 +1563,50 @@ export default function WorkflowPageClient() {
               <div className="bg-[#121215]/50 border border-[#1a1a1e] rounded-2xl py-16 flex flex-col items-center justify-center gap-3">
                 <Layers size={28} className="text-zinc-700" />
                 <p className="text-zinc-500 text-sm">해당하는 사진이 없습니다.</p>
+              </div>
+            ) : viewMode === "list" ? (
+              /* ── 파일 리스트 뷰 ── */
+              <div className="border border-[#1a1a1e] rounded-xl overflow-hidden">
+                <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Space Mono','Noto Sans KR',monospace" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid #1a1a1e", background: "#0a0a0c" }}>
+                      <th style={{ padding: "8px 12px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", width: 44 }}>#</th>
+                      <th style={{ padding: "8px 12px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>파일명</th>
+                      {stageTab !== "original" && <th style={{ padding: "8px 12px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", width: 120 }}>상태</th>}
+                      {stageTab !== "original" && <th style={{ padding: "8px 12px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>고객 코멘트</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => {
+                      const visIdx = filteredIndexMap.get(row.photo.id);
+                      if (visIdx === undefined) return null;
+                      const ver = stageTab === "v2" ? row.v2 : stageTab === "v1" ? row.v1 : null;
+                      const filename = row.photo.originalFilename ?? `FRAME_${String(row.photo.orderIndex).padStart(4, "0")}`;
+                      return (
+                        <tr
+                          key={row.photo.id}
+                          onClick={() => openViewer(visIdx, stageTab)}
+                          style={{ borderBottom: "1px solid #1a1a1e", cursor: "pointer", transition: "background 0.15s" }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "rgba(255,77,0,0.04)"; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = ""; }}
+                        >
+                          <td style={{ padding: "8px 12px", fontSize: 11, color: "#5c5c5c", textAlign: "center" }}>{visIdx + 1}</td>
+                          <td style={{ padding: "8px 12px", fontSize: 12, color: "#a3a3a3", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{filename}</td>
+                          {stageTab !== "original" && (
+                            <td style={{ padding: "8px 12px" }}>
+                              <StatusBadge status={ver?.reviewStatus ?? "pending"} />
+                            </td>
+                          )}
+                          {stageTab !== "original" && (
+                            <td style={{ padding: "8px 12px", fontSize: 12, color: ver?.comment ? "#a3a3a3" : "#3a3a3a", fontStyle: ver?.comment ? "normal" : "italic", maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {ver?.comment || "—"}
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             ) : (
               <>
