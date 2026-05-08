@@ -13,8 +13,8 @@ export type ReviewResultPhoto = {
 
 /**
  * GET /api/c/review-result?token=
- * editing_v2 / reviewing_v2 / delivered 상태에서 v1 검토 결과를 반환.
- * 확정된 장 / 재보정 요청된 장 + 코멘트 포함.
+ * editing_v2 / reviewing_v2 / delivered 상태에서 검토 결과를 반환.
+ * v2 review가 있으면 v2 우선, 없으면 v1 fallback — workflow와 동일한 로직.
  */
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
@@ -49,24 +49,29 @@ export async function GET(req: NextRequest) {
       .in("id", photoIds)
       .order("number", { ascending: true });
 
-    // v1 photo_versions
+    // v1 + v2 photo_versions 동시 조회
     const { data: pvRows } = await admin
       .from("photo_versions")
-      .select("id, photo_id")
-      .in("photo_id", photoIds)
-      .eq("version", 1);
-    const pvByPhotoId = new Map(
-      (pvRows ?? []).map((r: { id: string; photo_id: string }) => [r.photo_id, r.id])
-    );
-    const pvIds = (pvRows ?? []).map((r: { id: string }) => r.id);
+      .select("id, photo_id, version")
+      .in("photo_id", photoIds);
 
-    // v1 version_reviews
+    type PvRow = { id: string; photo_id: string; version: number };
+    const pv1ByPhotoId = new Map<string, string>();
+    const pv2ByPhotoId = new Map<string, string>();
+    for (const r of (pvRows ?? []) as PvRow[]) {
+      if (r.version === 1) pv1ByPhotoId.set(r.photo_id, r.id);
+      else if (r.version === 2) pv2ByPhotoId.set(r.photo_id, r.id);
+    }
+    const allPvIds = (pvRows ?? []).map((r: PvRow) => r.id);
+
+    // v1 + v2 version_reviews 동시 조회
     const { data: reviewRows } = await admin
       .from("version_reviews")
       .select("photo_version_id, status, customer_comment")
-      .in("photo_version_id", pvIds);
+      .in("photo_version_id", allPvIds);
+    type VrRow = { photo_version_id: string; status: string; customer_comment: string | null };
     const reviewByPvId = new Map(
-      (reviewRows ?? []).map((r: { photo_version_id: string; status: string; customer_comment: string | null }) => [
+      (reviewRows ?? []).map((r: VrRow) => [
         r.photo_version_id,
         { status: r.status as "approved" | "revision_requested", customerComment: r.customer_comment },
       ])
@@ -75,8 +80,10 @@ export async function GET(req: NextRequest) {
     const photos: ReviewResultPhoto[] = (photosRows ?? []).map((row: {
       id: string; number: number; r2_thumb_url: string; original_filename: string | null;
     }) => {
-      const pvId = pvByPhotoId.get(row.id);
-      const review = pvId ? reviewByPvId.get(pvId) : undefined;
+      // v2 review 우선, 없으면 v1 fallback (workflow와 동일 로직)
+      const pv2Id = pv2ByPhotoId.get(row.id);
+      const pv1Id = pv1ByPhotoId.get(row.id);
+      const review = (pv2Id && reviewByPvId.get(pv2Id)) || (pv1Id ? reviewByPvId.get(pv1Id) : undefined);
       return {
         photoId: row.id,
         originalFilename: row.original_filename,
