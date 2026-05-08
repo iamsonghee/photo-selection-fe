@@ -343,7 +343,6 @@ export default function ProjectsPage() {
     if (dateFrom) result = result.filter((p) => new Date(p.shootDate) >= new Date(dateFrom));
     if (dateTo)   result = result.filter((p) => new Date(p.shootDate) <= new Date(dateTo));
     if (activeTab === "active")    result = result.filter((p) => ACTIVE_STATUSES.includes(p.status));
-    if (activeTab === "waiting")   result = result.filter((p) => WAITING_STATUSES.includes(p.status));
     if (activeTab === "completed") result = result.filter((p) => p.status === "delivered");
     if (sortBy === "latest")     result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     if (sortBy === "deadline")   result.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
@@ -353,10 +352,9 @@ export default function ProjectsPage() {
   }, [projects, searchQuery, dateFrom, dateTo, activeTab, sortBy]);
 
   const STAT_CARDS = [
-    { key: "all" as const,       label: "전체 프로젝트", count: tabCounts.all,       icon: <Layers size={16} className="text-zinc-400" />,         color: "zinc",    ping: false },
-    { key: "active" as const,    label: "진행중",         count: tabCounts.active,    icon: <Zap size={16} className="text-[#FF4D00]" />,            color: "brand",   ping: true  },
-    { key: "waiting" as const,   label: "고객 대기",       count: tabCounts.waiting,   icon: <Clock size={16} className="text-amber-500" />,          color: "amber",   ping: false },
-    { key: "completed" as const, label: "완료",           count: tabCounts.completed, icon: <CheckCircle2 size={16} className="text-emerald-500" />, color: "emerald", ping: false },
+    { key: "all" as const,       label: "전체 프로젝트", count: tabCounts.all,       icon: <Layers size={16} className="text-zinc-400" />,         color: "zinc",    ping: false, sub: null },
+    { key: "active" as const,    label: "진행중",         count: tabCounts.active,    icon: <Zap size={16} className="text-[#FF4D00]" />,            color: "brand",   ping: true,  sub: tabCounts.waiting > 0 ? `${tabCounts.waiting}건 고객 응답 대기` : null },
+    { key: "completed" as const, label: "완료",           count: tabCounts.completed, icon: <CheckCircle2 size={16} className="text-emerald-500" />, color: "emerald", ping: false, sub: null },
   ] as const;
 
   const colCls = "grid-cols-[minmax(280px,2fr)_minmax(140px,1fr)_minmax(160px,1.5fr)_minmax(100px,1fr)_minmax(160px,1fr)]";
@@ -389,7 +387,7 @@ export default function ProjectsPage() {
                 style={{ background: colors.bg, border: `1px solid ${colors.border}` }}
               >
                 <span className="text-xs font-semibold flex items-center gap-1.5 mb-2"
-                  style={{ color: card.color === "zinc" ? "#a1a1aa" : card.color === "brand" ? "#ff8a4c" : card.color === "amber" ? "#fbbf24" : "#34d399" }}>
+                  style={{ color: card.color === "zinc" ? "#a1a1aa" : card.color === "brand" ? "#ff8a4c" : "#34d399" }}>
                   {card.icon}
                   {card.label}
                 </span>
@@ -428,8 +426,8 @@ export default function ProjectsPage() {
         {/* filter panel */}
         {mobileFilterOpen && (
           <div className="px-5 pb-4 flex gap-2 overflow-x-auto hide-scrollbar">
-            {(["all", "active", "waiting", "completed"] as const).map((key) => {
-              const labels = { all: "전체", active: "진행중", waiting: "고객대기", completed: "완료" };
+            {(["all", "active", "completed"] as const).map((key) => {
+              const labels = { all: "전체", active: "진행중", completed: "완료" };
               return (
                 <button
                   key={key}
@@ -506,14 +504,12 @@ export default function ProjectsPage() {
       <div className="p-8 space-y-6 max-w-[1600px] mx-auto">
 
         {/* ── stat cards ── */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           {STAT_CARDS.map((card) => {
             const isActive = activeTab === card.key;
             const cardCls = isActive
               ? card.color === "brand"
                 ? "bg-[#FF4D00]/10 border-[#FF4D00]/30"
-                : card.color === "amber"
-                ? "bg-amber-500/10 border-amber-500/30"
                 : card.color === "emerald"
                 ? "bg-emerald-500/10 border-emerald-500/30"
                 : "bg-[#27272c] border-[#3f3f46]"
@@ -539,20 +535,17 @@ export default function ProjectsPage() {
                   )}
                 </div>
                 <div className="flex items-end gap-2">
-                  <span
-                    className={`text-3xl font-black leading-none ${
-                      card.color === "brand"   ? "text-white" :
-                      card.color === "amber"   ? "text-white" :
-                      card.color === "emerald" ? "text-white" :
-                      "text-white"
-                    }`}
-                  >
-                    {card.count}
-                  </span>
-                  {card.key === "active" && <span className="text-sm text-zinc-400 mb-1">건 작업중</span>}
-                  {card.key === "waiting" && <span className="text-sm text-zinc-400 mb-1">고객 응답 대기</span>}
-                  {card.key === "completed" && <span className="text-sm text-zinc-400 mb-1">이번 달 완료</span>}
+                  <span className="text-3xl font-black leading-none text-white">{card.count}</span>
+                  {card.key === "all"       && <span className="text-sm text-zinc-400 mb-1">개 프로젝트</span>}
+                  {card.key === "active"    && <span className="text-sm text-zinc-400 mb-1">건 작업중</span>}
+                  {card.key === "completed" && <span className="text-sm text-zinc-400 mb-1">건 완료</span>}
                 </div>
+                {"sub" in card && card.sub && (
+                  <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-amber-400/80">
+                    <Clock size={10} />
+                    {card.sub}
+                  </div>
+                )}
               </button>
             );
           })}
@@ -606,8 +599,8 @@ export default function ProjectsPage() {
 
             {/* status tabs */}
             <div className="flex bg-[#0a0a0c]/50 p-1 rounded-xl border border-[#1a1a1e] h-11 items-center">
-              {(["all", "active", "waiting", "completed"] as const).map((key) => {
-                const labels = { all: "전체", active: "진행중", waiting: "고객대기", completed: "완료" };
+              {(["all", "active", "completed"] as const).map((key) => {
+                const labels = { all: "전체", active: "진행중", completed: "완료" };
                 return (
                   <button
                     key={key}
