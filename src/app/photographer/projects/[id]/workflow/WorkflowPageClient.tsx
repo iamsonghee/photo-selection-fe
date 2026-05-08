@@ -158,33 +158,35 @@ function getFooterNote(status: ProjectStatus): string | null {
 
 function StatusBadge({
   status,
+  compact = false,
 }: {
   status: "approved" | "revision_requested" | "pending" | "reviewing";
+  compact?: boolean;
 }) {
   if (status === "reviewing") {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-        <Clock size={11} />검토 중
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 whitespace-nowrap">
+        <Clock size={11} />{compact ? "검토중" : "검토 중"}
       </span>
     );
   }
   if (status === "approved") {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap">
         <CheckCircle2 size={11} />확정
       </span>
     );
   }
   if (status === "revision_requested") {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-semibold bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20">
-        <AlertTriangle size={11} />재보정 요청
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20 whitespace-nowrap">
+        <AlertTriangle size={11} />{compact ? "재보정" : "재보정 요청"}
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20">
-      <Clock size={11} />검토 대기
+    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20 whitespace-nowrap">
+      <Clock size={11} />{compact ? "대기" : "검토 대기"}
     </span>
   );
 }
@@ -1567,13 +1569,19 @@ export default function WorkflowPageClient() {
             ) : viewMode === "list" ? (
               /* ── 파일 리스트 뷰 ── */
               <div className="border border-[#1a1a1e] rounded-xl overflow-hidden">
-                <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Space Mono','Noto Sans KR',monospace" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontFamily: "'Space Mono','Noto Sans KR',monospace" }}>
+                  <colgroup>
+                    <col style={{ width: 36 }} />
+                    <col />
+                    {stageTab !== "original" && <col style={{ width: 88 }} />}
+                    {stageTab !== "original" && <col style={{ width: 36 }} />}
+                  </colgroup>
                   <thead>
                     <tr style={{ borderBottom: "1px solid #1a1a1e", background: "#0a0a0c" }}>
-                      <th style={{ padding: "8px 12px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", width: 44 }}>#</th>
-                      <th style={{ padding: "8px 12px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>파일명</th>
-                      {stageTab !== "original" && <th style={{ padding: "8px 12px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", width: 120 }}>상태</th>}
-                      {stageTab !== "original" && <th style={{ padding: "8px 12px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>고객 코멘트</th>}
+                      <th style={{ padding: "7px 8px", fontSize: 10, color: "#5c5c5c", textAlign: "center", fontWeight: 600 }}>#</th>
+                      <th style={{ padding: "7px 10px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600, letterSpacing: "0.05em" }}>파일명</th>
+                      {stageTab !== "original" && <th style={{ padding: "7px 8px", fontSize: 10, color: "#5c5c5c", textAlign: "center", fontWeight: 600 }}>상태</th>}
+                      {stageTab !== "original" && <th style={{ padding: "7px 8px", fontSize: 10, color: "#5c5c5c", textAlign: "center", fontWeight: 600 }}>💬</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -1585,6 +1593,7 @@ export default function WorkflowPageClient() {
                         ? (row.v2 ?? (row.v1?.reviewStatus === "approved" ? row.v1 : null))
                         : stageTab === "v1" ? row.v1 : null;
                       const filename = row.photo.originalFilename ?? `FRAME_${String(row.photo.orderIndex).padStart(4, "0")}`;
+                      const hasComment = !!ver?.comment;
                       return (
                         <tr
                           key={row.photo.id}
@@ -1593,16 +1602,18 @@ export default function WorkflowPageClient() {
                           onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "rgba(255,77,0,0.04)"; }}
                           onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = ""; }}
                         >
-                          <td style={{ padding: "8px 12px", fontSize: 11, color: "#5c5c5c", textAlign: "center" }}>{visIdx + 1}</td>
-                          <td style={{ padding: "8px 12px", fontSize: 12, color: "#a3a3a3", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{filename}</td>
+                          <td style={{ padding: "8px 8px", fontSize: 11, color: "#5c5c5c", textAlign: "center" }}>{visIdx + 1}</td>
+                          <td style={{ padding: "8px 10px", fontSize: 11, color: "#a3a3a3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{filename}</td>
                           {stageTab !== "original" && (
-                            <td style={{ padding: "8px 12px" }}>
-                              <StatusBadge status={ver?.reviewStatus ?? "pending"} />
+                            <td style={{ padding: "8px 8px", textAlign: "center" }}>
+                              <StatusBadge status={ver?.reviewStatus ?? "pending"} compact />
                             </td>
                           )}
                           {stageTab !== "original" && (
-                            <td style={{ padding: "8px 12px", fontSize: 12, color: ver?.comment ? "#a3a3a3" : "#3a3a3a", fontStyle: ver?.comment ? "normal" : "italic", maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {ver?.comment || "—"}
+                            <td style={{ padding: "8px 8px", textAlign: "center" }}>
+                              {hasComment
+                                ? <span title={ver!.comment!}><MessageSquare size={13} style={{ color: "#FF4D00", display: "inline" }} /></span>
+                                : <span style={{ color: "#3a3a3a", fontSize: 11 }}>—</span>}
                             </td>
                           )}
                         </tr>
