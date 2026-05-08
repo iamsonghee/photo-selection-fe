@@ -91,6 +91,7 @@ export interface ProjectLogItem {
   id: string;
   projectId: string;
   projectName: string;
+  customerName: string;
   action: ProjectLogAction;
   createdAt: string;
 }
@@ -102,7 +103,7 @@ export async function getProjectLogsRecent(
 ): Promise<ProjectLogItem[]> {
   const { data, error } = await supabase
     .from("project_logs")
-    .select("id, project_id, action, created_at")
+    .select("id, project_id, action, created_at, projects(name, customer_name)")
     .eq("photographer_id", photographerId)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -110,13 +111,18 @@ export async function getProjectLogsRecent(
   if (error) return [];
   if (!data?.length) return [];
 
-  return data.map((row: { id: string; project_id: string; action: ProjectLogAction; created_at: string }) => ({
-    id: row.id,
-    projectId: row.project_id,
-    projectName: "프로젝트",
-    action: row.action,
-    createdAt: row.created_at,
-  }));
+  type LogRow = { id: string; project_id: string; action: ProjectLogAction; created_at: string; projects: { name: string; customer_name: string }[] | { name: string; customer_name: string } | null };
+  return (data as LogRow[]).map((row) => {
+    const proj = Array.isArray(row.projects) ? row.projects[0] : row.projects;
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      projectName: proj?.name ?? "프로젝트",
+      customerName: proj?.customer_name ?? "",
+      action: row.action,
+      createdAt: row.created_at,
+    };
+  });
 }
 
 /** Supabase/PostgREST 에러에서 읽을 수 있는 문자열 추출 (속성이 비열거형이어도 동작) */

@@ -401,7 +401,7 @@ export default function DashboardPage() {
             ) : null}
           </div>
 
-          {/* 최근 활동 패널 */}
+          {/* 최근 활동 패널 — 프로젝트 중심 피드 */}
           <div className="bg-[#121215] border border-[#1a1a1e] rounded-2xl p-5 flex flex-col gap-4">
             <div className="flex items-center gap-2 pb-3 border-b border-[#1a1a1e]">
               <Clock size={12} className="text-zinc-500" />
@@ -410,30 +410,58 @@ export default function DashboardPage() {
 
             {logs.length === 0 ? (
               <p className="text-xs text-zinc-600 text-center py-4">아직 활동이 없습니다</p>
-            ) : (
-              <div className="flex flex-col gap-4">
-                {logs.slice(0, 8).map((log) => {
-                  const dotColor = LOG_DOT[log.action] ?? "#52525b";
-                  const label    = LOG_LABEL[log.action] ?? log.action;
-                  return (
-                    <div
-                      key={log.id}
-                      className="relative pl-4 border-l border-[#1a1a1e]"
-                    >
+            ) : (() => {
+              // 프로젝트별 그룹화 (최신 순 최대 4개 프로젝트)
+              const seen = new Set<string>();
+              const projectOrder: string[] = [];
+              for (const log of logs) {
+                if (!seen.has(log.projectId)) { seen.add(log.projectId); projectOrder.push(log.projectId); }
+              }
+              const top = projectOrder.slice(0, 4);
+              return (
+                <div className="flex flex-col gap-3">
+                  {top.map((pid) => {
+                    const group = logs.filter((l) => l.projectId === pid).slice(0, 3);
+                    const first = group[0];
+                    return (
                       <div
-                        className="absolute left-[-5px] top-[4px] w-2 h-2 rounded-full bg-[#0a0a0c] border"
-                        style={{ borderColor: dotColor }}
-                      />
-                      <div className="text-[10px] text-zinc-700 mb-0.5">{formatLogTime(log.createdAt)}</div>
-                      <div className="text-xs font-semibold" style={{ color: dotColor }}>{label}</div>
-                      {log.projectName && (
-                        <div className="text-[11px] text-zinc-600 truncate mt-0.5">{log.projectName}</div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                        key={pid}
+                        onClick={() => router.push(`/photographer/projects/${pid}`)}
+                        className="border border-[#1a1a1e] hover:border-[#27272c] rounded-xl p-3 cursor-pointer transition-colors"
+                      >
+                        {/* 프로젝트명 + 고객 */}
+                        <div className="mb-2.5">
+                          <div className="text-[13px] font-bold text-white truncate leading-snug">
+                            {first.projectName}
+                          </div>
+                          {first.customerName && (
+                            <div className="text-[11px] text-zinc-500 truncate mt-0.5">
+                              {first.customerName}
+                            </div>
+                          )}
+                        </div>
+                        {/* 액션 목록 */}
+                        <div className="flex flex-col gap-1.5">
+                          {group.map((log) => {
+                            const dotColor = LOG_DOT[log.action] ?? "#52525b";
+                            const label = LOG_LABEL[log.action] ?? log.action;
+                            return (
+                              <div key={log.id} className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: dotColor }} />
+                                  <span className="text-[11px] font-medium truncate" style={{ color: dotColor }}>{label}</span>
+                                </div>
+                                <span className="text-[10px] text-zinc-700 shrink-0 font-mono">{formatLogTime(log.createdAt)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         </aside>
       </div>
