@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Plus, AlertCircle, ChevronRight, Clock, Activity,
+  Plus, AlertCircle, ChevronRight, Clock, Activity, Layers, Zap, CheckCircle2,
 } from "lucide-react";
 import { BETA_MAX_PROJECTS_TOTAL } from "@/lib/beta-limits";
 import { getProjectsByPhotographerId } from "@/lib/db";
@@ -264,17 +264,12 @@ export default function DashboardPage() {
   const recentDelivered   = displayProjects.filter((p) => p.status === "delivered").slice(0, 1);
   const totalDelivered    = projects.filter((p) => p.status === "delivered").length;
 
-  const confirmedCount  = projects.filter((p) => p.status === "confirmed").length;
-  const revisionCount   = projects.filter((p) => p.status === "editing_v2").length;
-  const reviewingCount  = projects.filter((p) => p.status === "reviewing_v1" || p.status === "reviewing_v2").length;
-  const inviteReadyProjects = projects.filter(
-    (p) => p.status === "preparing" && (p.photoCount ?? 0) >= (p.requiredCount ?? Infinity)
-  );
-  const inviteReadyCount = inviteReadyProjects.length;
-  const inviteReadyHref  = inviteReadyProjects.length === 1
-    ? `/photographer/projects/${inviteReadyProjects[0].id}`
-    : "/photographer/projects";
-  const hasAction = confirmedCount + revisionCount + reviewingCount + inviteReadyCount > 0;
+  const dashCounts = {
+    all:       projects.length,
+    active:    projects.filter((p) => ACTIVE_STATUSES.includes(p.status)).length,
+    waiting:   projects.filter((p) => p.status === "reviewing_v1" || p.status === "reviewing_v2").length,
+    completed: projects.filter((p) => p.status === "delivered").length,
+  };
 
   const betaCount = projects.length;
   const betaPct   = Math.min(100, Math.round((betaCount / BETA_MAX_PROJECTS_TOTAL) * 100));
@@ -291,32 +286,35 @@ export default function DashboardPage() {
         {/* ── 메인 좌측 ── */}
         <div className="flex-1 min-w-0 flex flex-col gap-6">
 
-          {/* 1. 처리 필요 */}
-          {hasAction && (
-            <section>
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">처리 필요</span>
-                <div className="flex-1 h-px bg-[#1a1a1e]" />
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {confirmedCount > 0 && (
-                  <ActionCard count={confirmedCount} label="고객 확정" sub="CONFIRMED" numColor={ACCENT} />
-                )}
-                {revisionCount > 0 && (
-                  <ActionCard count={revisionCount} label="재보정 요청" sub="EDIT_REQ" numColor={ACCENT} />
-                )}
-                {reviewingCount > 0 && (
-                  <ActionCard count={reviewingCount} label="검토 중" sub="REVIEWING" numColor="#71717a" />
-                )}
-                {inviteReadyCount > 0 && (
-                  <ActionCard
-                    count={inviteReadyCount} label="초대 대기" sub="READY"
-                    numColor="#52525b" href={inviteReadyHref}
-                  />
-                )}
-              </div>
-            </section>
-          )}
+          {/* 1. 프로젝트 요약 카드 */}
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { label: "전체 프로젝트", count: dashCounts.all,       icon: <Layers size={16} className="text-zinc-400" />,          color: "zinc",    sub: null,                                                                              },
+              { label: "진행중",        count: dashCounts.active,    icon: <Zap size={16} className="text-[#FF4D00]" />,             color: "brand",   sub: dashCounts.waiting > 0 ? `${dashCounts.waiting}건 고객 응답 대기` : null,         },
+              { label: "완료",          count: dashCounts.completed, icon: <CheckCircle2 size={16} className="text-emerald-500" />,  color: "emerald", sub: null,                                                                              },
+            ].map((card) => (
+              <Link key={card.label} href="/photographer/projects" className="no-underline block">
+                <div className={`border rounded-2xl p-5 transition-all hover:border-[#27272c] ${
+                  card.color === "brand"   ? "bg-[#FF4D00]/6 border-[#FF4D00]/20 hover:bg-[#FF4D00]/10" :
+                  card.color === "emerald" ? "bg-emerald-500/6 border-emerald-500/20 hover:bg-emerald-500/10" :
+                  "bg-[#121215]/80 border-[#1a1a1e]"
+                }`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-bold text-white flex items-center gap-2">{card.icon}{card.label}</span>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <span className="text-3xl font-black text-white leading-none">{card.count}</span>
+                    <span className="text-sm text-zinc-400 mb-1">{card.label === "전체 프로젝트" ? "개" : card.label === "진행중" ? "건 작업중" : "건"}</span>
+                  </div>
+                  {card.sub && (
+                    <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-amber-400/80">
+                      <Clock size={10} />{card.sub}
+                    </div>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
 
           {/* 2. 프로젝트 카드 그리드 */}
           <div className="flex flex-col gap-4">

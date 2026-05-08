@@ -351,11 +351,6 @@ export default function ProjectsPage() {
     return result;
   }, [projects, searchQuery, dateFrom, dateTo, activeTab, sortBy]);
 
-  const STAT_CARDS = [
-    { key: "all" as const,       label: "전체 프로젝트", count: tabCounts.all,       icon: <Layers size={16} className="text-zinc-400" />,         color: "zinc",    ping: false, sub: null },
-    { key: "active" as const,    label: "진행중",         count: tabCounts.active,    icon: <Zap size={16} className="text-[#FF4D00]" />,            color: "brand",   ping: true,  sub: tabCounts.waiting > 0 ? `${tabCounts.waiting}건 고객 응답 대기` : null },
-    { key: "completed" as const, label: "완료",           count: tabCounts.completed, icon: <CheckCircle2 size={16} className="text-emerald-500" />, color: "emerald", ping: false, sub: null },
-  ] as const;
 
   const colCls = "grid-cols-[minmax(280px,2fr)_minmax(140px,1fr)_minmax(160px,1.5fr)_minmax(100px,1fr)_minmax(160px,1fr)]";
 
@@ -367,38 +362,6 @@ export default function ProjectsPage() {
       style={{ fontFamily: "var(--font-inter, sans-serif)" }}
     >
       <div>
-
-        {/* stat cards */}
-        <div className="flex overflow-x-auto gap-3 px-5 pt-5 pb-4 snap-x hide-scrollbar">
-          {STAT_CARDS.map((card) => {
-            const isActive = activeTab === card.key;
-            const colors = {
-              zinc:    { border: isActive ? "#3f3f46" : "#1a1a1e", bg: isActive ? "#27272c" : "#121215" },
-              brand:   { border: isActive ? "rgba(255,77,0,0.3)" : "rgba(255,77,0,0.15)", bg: isActive ? "rgba(255,77,0,0.12)" : "rgba(255,77,0,0.06)" },
-              amber:   { border: isActive ? "rgba(245,158,11,0.3)" : "rgba(245,158,11,0.15)", bg: isActive ? "rgba(245,158,11,0.1)" : "rgba(245,158,11,0.05)" },
-              emerald: { border: isActive ? "rgba(16,185,129,0.3)" : "rgba(16,185,129,0.15)", bg: isActive ? "rgba(16,185,129,0.1)" : "rgba(16,185,129,0.05)" },
-            }[card.color];
-            return (
-              <button
-                key={card.key}
-                type="button"
-                onClick={() => setActiveTab(card.key)}
-                className="snap-start shrink-0 w-[140px] rounded-2xl p-4 flex flex-col justify-between shadow-sm"
-                style={{ background: colors.bg, border: `1px solid ${colors.border}` }}
-              >
-                <span className="text-xs font-semibold flex items-center gap-1.5 mb-2"
-                  style={{ color: card.color === "zinc" ? "#a1a1aa" : card.color === "brand" ? "#ff8a4c" : "#34d399" }}>
-                  {card.icon}
-                  {card.label}
-                </span>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-black text-white leading-none">{card.count}</span>
-                  {card.key !== "all" && <span className="text-[10px] font-medium text-zinc-500">건</span>}
-                </div>
-              </button>
-            );
-          })}
-        </div>
 
         {/* search + filter */}
         <div className="px-5 pb-4 flex gap-2">
@@ -502,54 +465,6 @@ export default function ProjectsPage() {
       />
 
       <div className="p-8 space-y-6 max-w-[1600px] mx-auto">
-
-        {/* ── stat cards ── */}
-        <div className="grid grid-cols-3 gap-4">
-          {STAT_CARDS.map((card) => {
-            const isActive = activeTab === card.key;
-            const cardCls = isActive
-              ? card.color === "brand"
-                ? "bg-[#FF4D00]/10 border-[#FF4D00]/30"
-                : card.color === "emerald"
-                ? "bg-emerald-500/10 border-emerald-500/30"
-                : "bg-[#27272c] border-[#3f3f46]"
-              : "bg-[#121215]/80 hover:bg-[#121215] border-[#1a1a1e] hover:border-[#27272c]";
-
-            return (
-              <button
-                key={card.key}
-                type="button"
-                onClick={() => setActiveTab(card.key)}
-                className={`${cardCls} border rounded-2xl p-5 text-left transition-all`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-bold text-white flex items-center gap-2">
-                    {card.icon}
-                    {card.label}
-                  </span>
-                  {card.ping && (
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF4D00] opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FF4D00]" />
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-end gap-2">
-                  <span className="text-3xl font-black leading-none text-white">{card.count}</span>
-                  {card.key === "all"       && <span className="text-sm text-zinc-400 mb-1">개 프로젝트</span>}
-                  {card.key === "active"    && <span className="text-sm text-zinc-400 mb-1">건 작업중</span>}
-                  {card.key === "completed" && <span className="text-sm text-zinc-400 mb-1">건 완료</span>}
-                </div>
-                {"sub" in card && card.sub && (
-                  <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-amber-400/80">
-                    <Clock size={10} />
-                    {card.sub}
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
 
         {/* ── filter bar ── */}
         <div className="bg-[#121215]/80 border border-[#1a1a1e] rounded-2xl p-2 flex flex-wrap items-center justify-between gap-3">
