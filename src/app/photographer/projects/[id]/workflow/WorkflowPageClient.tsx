@@ -1181,9 +1181,13 @@ export default function WorkflowPageClient() {
     (r) => effectiveV1Status(r.v1?.reviewStatus ?? null) === "revision_requested"
   ).length;
 
+  // editing_v2 재진입 시 아직 교체 안 된 revision_requested V2 사진 수
+  const v2RevisionPending = rows.filter((r) => r.v2?.reviewStatus === "revision_requested").length;
+
   // 고객 검토 시작 가능 여부: editing/editing_v2이면서 매핑이 모두 준비된 경우
   const canStartV1Review = isEditing && counts.total > 0 && counts.v1Uploaded === counts.total;
-  const canStartV2Review = isEditingV2 && v2Total > 0 && counts.v2Uploaded === v2Total;
+  // V2: 업로드 완료 + 재보정 요청 사진이 모두 교체됐을 때만 활성화
+  const canStartV2Review = isEditingV2 && v2Total > 0 && counts.v2Uploaded === v2Total && v2RevisionPending === 0;
 
   const FILTER_TABS: { key: FilterTab; label: string; count: number }[] = [
     { key: "all", label: "전체", count: counts.total },
