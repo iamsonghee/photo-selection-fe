@@ -115,7 +115,7 @@ function MetaItem({
   fullSpan?: boolean;
 }) {
   return (
-    <div className={fullSpan ? "sm:col-span-2" : undefined}>
+    <div className={fullSpan ? "col-span-2" : undefined}>
       <FieldLabel label={label} required={required} optional={optional} />
       <div className="text-base text-zinc-200">{children}</div>
       {hint && <p className="text-[11px] text-zinc-600 mt-1">{hint}</p>}
@@ -639,8 +639,8 @@ export function ProjectNexusPageClient() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
-              <div className="sm:col-span-2">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+              <div className="col-span-2">
                 <FieldLabel label="촬영 유형" optional />
                 <div className="flex gap-2 flex-wrap">
                   {SHOOT_TYPES.map(({ value, label, icon: Icon }) => {
@@ -714,7 +714,7 @@ export function ProjectNexusPageClient() {
                 </span>
               </MetaItem>
 
-              <div className="sm:col-span-2 pt-4 border-t border-[#1a1a1e]">
+              <div className="col-span-2 pt-4 border-t border-[#1a1a1e]">
                 <FieldLabel label="재보정 허용 횟수" />
                 <div className="flex items-center gap-3 flex-wrap">
                   <span
