@@ -807,7 +807,7 @@ export default function ProjectsPage() {
                         cta={cta}
                         onClick={() => cta.href && router.push(cta.href)}
                       />
-                      <div className="relative">
+                      <div className="relative hidden sm:block">
                         <button
                           type="button"
                           disabled={deletingId === project.id}
