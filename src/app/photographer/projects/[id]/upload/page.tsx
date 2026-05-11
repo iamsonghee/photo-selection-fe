@@ -1196,6 +1196,7 @@ export default function ProjectDetailPage() {
           .prj-aside { display: none !important; }
           .prj-desktop-toolbar { display: none !important; }
           .prj-view-toolbar { display: none !important; }
+          .prj-photo-grid-area { display: none !important; }
           .prj-modal-box { max-width: 100% !important; margin: 0 8px !important; }
           .prj-btn-primary, .prj-btn-secondary, .prj-btn-danger { min-height: 44px !important; padding: 0 16px !important; }
           /* 고객 초대 바: 모바일 하단 탭 위 고정(스크롤 끝까지 내릴 필요 없음) */
@@ -1459,16 +1460,14 @@ export default function ProjectDetailPage() {
                   ) : null}
                 </div>
               </div>
-              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                  <span className="prj-tech-label" style={{ color: "#555", fontSize: "0.55rem" }}>진행</span>
+                  <span style={{ fontSize: 12, color: "#888" }}>진행</span>
                   <span
                     style={{
-                      fontFamily: MONO,
-                      fontSize: 9,
-                      color: N <= 0 ? "#555" : M >= N ? "#2ed573" : ACCENT,
-                      letterSpacing: "0.04em",
-                      textAlign: "right",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: N <= 0 ? "#666" : M >= N ? "#2ed573" : ACCENT,
                     }}
                   >
                     {N <= 0
@@ -1478,22 +1477,13 @@ export default function ProjectDetailPage() {
                         : `${Math.max(0, N - M)}장 더 필요`}
                   </span>
                 </div>
-                <p
-                  style={{
-                    margin: 0,
-                    fontFamily: MONO,
-                    fontSize: 10,
-                    color: "#666",
-                    lineHeight: 1.45,
-                    letterSpacing: "0.02em",
-                  }}
-                >
-                  {N > 0
-                    ? `${N}장 채우면 아래에서 초대 링크를 켤 수 있어요. 썸네일 탭 → 크게 보기`
-                    : "고객 셀렉 장수를 정하면 여기 안내가 바뀝니다."}
-                </p>
+                {N > 0 && M < N && (
+                  <p style={{ margin: 0, fontSize: 12, color: "#666", lineHeight: 1.5 }}>
+                    {`${N}장 채우면 초대 링크를 활성화할 수 있어요.`}
+                  </p>
+                )}
               </div>
-              {uploadError && <p style={{ fontFamily: MONO, fontSize: 9, color: "#FF3333", marginTop: 8 }}>[ERR] {uploadError}</p>}
+              {uploadError && <p style={{ fontSize: 11, color: "#FF3333", marginTop: 8 }}>[ERR] {uploadError}</p>}
             </div>
 
           </section>
@@ -1536,10 +1526,10 @@ export default function ProjectDetailPage() {
             </div>
           )}
 
-          {/* photo grid — 가상 스크롤로 보이는 행만 마운트·이미지 로드 */}
+          {/* photo grid — 가상 스크롤로 보이는 행만 마운트·이미지 로드 (모바일에서는 숨김) */}
           <div
             ref={photoScrollRef}
-            className={`prj-scroll${!isInviteActive ? " prj-photo-scroll-mobile-pad" : ""}`}
+            className={`prj-scroll prj-photo-grid-area${!isInviteActive ? " prj-photo-scroll-mobile-pad" : ""}`}
             style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "rgba(3,3,3,0.4)" }}
           >
             {photosLoading ? (
