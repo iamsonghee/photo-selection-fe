@@ -1196,7 +1196,6 @@ export default function ProjectDetailPage() {
           .prj-aside { display: none !important; }
           .prj-desktop-toolbar { display: none !important; }
           .prj-view-toolbar { display: none !important; }
-          .prj-photo-grid-area { display: none !important; }
           .prj-modal-box { max-width: 100% !important; margin: 0 8px !important; }
           .prj-btn-primary, .prj-btn-secondary, .prj-btn-danger { min-height: 44px !important; padding: 0 16px !important; }
           /* 고객 초대 바: 모바일 하단 탭 위 고정(스크롤 끝까지 내릴 필요 없음) */
@@ -1526,10 +1525,10 @@ export default function ProjectDetailPage() {
             </div>
           )}
 
-          {/* photo grid — 가상 스크롤로 보이는 행만 마운트·이미지 로드 (모바일에서는 숨김) */}
+          {/* photo grid — 가상 스크롤로 보이는 행만 마운트·이미지 로드 */}
           <div
             ref={photoScrollRef}
-            className={`prj-scroll prj-photo-grid-area${!isInviteActive ? " prj-photo-scroll-mobile-pad" : ""}`}
+            className={`prj-scroll${!isInviteActive ? " prj-photo-scroll-mobile-pad" : ""}`}
             style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "rgba(3,3,3,0.4)" }}
           >
             {photosLoading ? (
