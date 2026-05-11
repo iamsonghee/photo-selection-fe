@@ -633,7 +633,7 @@ export function ProjectNexusPageClient() {
               <button
                 type="button"
                 onClick={openEdit}
-                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-[#27272c] text-zinc-300 hover:border-[#FF4D00] hover:text-[#FF4D00] transition-colors"
+                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#27272c] hover:bg-[#3f3f46] text-zinc-200 transition-colors"
               >
                 <PenLine size={12} /> 정보 수정
               </button>
@@ -642,29 +642,18 @@ export function ProjectNexusPageClient() {
             <div className="grid grid-cols-2 gap-x-4 gap-y-4">
               <div className="col-span-2">
                 <FieldLabel label="촬영 유형" optional />
-                <div className="flex gap-2 flex-wrap">
-                  {SHOOT_TYPES.map(({ value, label, icon: Icon }) => {
-                    const active = project.shootType === value;
-                    return (
-                      <span
-                        key={value}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border ${
-                          active
-                            ? "bg-[#FF4D00]/8 border-[#FF4D00]/40 text-[#FF4D00]"
-                            : "bg-transparent border-[#27272c] text-zinc-500"
-                        }`}
-                      >
-                        <Icon size={12} />
-                        {label}
-                      </span>
-                    );
-                  })}
-                  {project.shootType && !SHOOT_TYPES.some((t) => t.value === project.shootType) && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-[#FF4D00]/8 border border-[#FF4D00]/40 text-[#FF4D00]">
-                      {project.shootType}
+                {project.shootType ? (() => {
+                  const found = SHOOT_TYPES.find((t) => t.value === project.shootType);
+                  const Icon = found?.icon;
+                  return (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium bg-[#FF4D00]/8 border border-[#FF4D00]/40 text-[#FF4D00]">
+                      {Icon && <Icon size={13} />}
+                      {found?.label ?? project.shootType}
                     </span>
-                  )}
-                </div>
+                  );
+                })() : (
+                  <span className="text-sm text-zinc-600">—</span>
+                )}
               </div>
 
               <MetaItem label="촬영 일자" required>
