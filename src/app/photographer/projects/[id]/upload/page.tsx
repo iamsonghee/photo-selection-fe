@@ -561,9 +561,9 @@ function VirtualizedPhotoGrid({
   );
 }
 
-const LIST_ROW_H = 54;
-const LIST_THUMB_W = 56;
-const LIST_THUMB_H = 38;
+const LIST_ROW_H = 64;
+const LIST_THUMB_W = 72;
+const LIST_THUMB_H = 48;
 
 function ListRowThumb({
   url,
@@ -662,7 +662,7 @@ function VirtualizedPhotoList({
                 onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,77,0,0.3)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = BORDER; }}
               >
-                <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED, width: 50, flexShrink: 0 }}>
+                <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, width: 36, flexShrink: 0, textAlign: "right" }}>
                   {String(photo.orderIndex ?? i + 1).padStart(3, "0")}
                 </span>
                 <div
@@ -676,16 +676,16 @@ function VirtualizedPhotoList({
                 >
                   <ListRowThumb url={photo.url} scrollRootRef={scrollRef} />
                 </div>
-                <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT_NORMAL, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 13, color: TEXT_BRIGHT, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Pretendard Variable', sans-serif" }}>
                   {photo.originalFilename ?? `FRAME_${String(i + 1).padStart(4, "0")}`}
                 </span>
                 {photo.fileSize && (
-                  <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED, flexShrink: 0 }}>
+                  <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, flexShrink: 0 }}>
                     {(photo.fileSize / 1024).toFixed(0)}KB
                   </span>
                 )}
                 {photo.createdAt && (
-                  <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED, flexShrink: 0, whiteSpace: "nowrap" }}>
+                  <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, flexShrink: 0, whiteSpace: "nowrap" }}>
                     {(() => {
                       const d = new Date(photo.createdAt!);
                       const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -1482,8 +1482,8 @@ export default function ProjectDetailPage() {
                   style={{
                     margin: 0,
                     fontFamily: MONO,
-                    fontSize: 8,
-                    color: "#444",
+                    fontSize: 10,
+                    color: "#666",
                     lineHeight: 1.45,
                     letterSpacing: "0.02em",
                   }}
