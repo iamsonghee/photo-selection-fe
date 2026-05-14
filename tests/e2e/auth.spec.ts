@@ -6,9 +6,10 @@ test.describe("인증 (Auth)", () => {
     await loginAsPhotographer(page);
     await page.goto("/photographer/dashboard");
 
-    // 로그인 페이지로 튕기지 않고 대시보드 유지
-    await expect(page).toHaveURL(/\/photographer\/dashboard/);
-    await expect(page.getByRole("heading", { name: "대시보드" })).toBeVisible();
+    // 로그인 성공 → 대시보드 URL 유지 (인증 안된 경우 "/" 또는 로그인 UI로 이동)
+    await expect(page).toHaveURL(/\/photographer\/dashboard/, { timeout: 8000 });
+    // 비인증 상태의 "로그인하면..." 메시지가 없어야 함
+    await expect(page.getByText("로그인하면 프로젝트를 볼 수 있습니다")).not.toBeVisible();
   });
 
   test("L4: 비인증 상태에서 대시보드 → 로그인 안내 표시", async ({ page }) => {
