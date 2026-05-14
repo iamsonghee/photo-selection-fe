@@ -110,6 +110,7 @@ export default function NewProjectPage() {
   const [maxRevisionCount, setMaxRevisionCount] = useState<0 | 1 | 2>(2);
   const [submitting,    setSubmitting]    = useState(false);
   const [error,         setError]         = useState<string | null>(null);
+  const [fieldErrors,   setFieldErrors]   = useState<Record<string, string>>({});
   const [projectCount,  setProjectCount]  = useState<number | null>(null);
 
   useEffect(() => {
@@ -156,7 +157,24 @@ export default function NewProjectPage() {
     deadline !== "";
 
   const handleSubmit = async () => {
-    if (!isValid || submitting) return;
+    if (submitting) return;
+
+    // 필드별 검증
+    const errors: Record<string, string> = {};
+    if (!name.trim())              errors.name          = "프로젝트명을 입력해주세요.";
+    if (!shootDate)                errors.shootDate     = "촬영 일자를 선택해주세요.";
+    if (!customerName.trim())      errors.customerName  = "고객 이름을 입력해주세요.";
+    if (Number(requiredCount) < 1) errors.requiredCount = "셀렉 갯수를 1 이상으로 입력해주세요.";
+    if (!deadline)                 errors.deadline      = "셀렉 기한을 선택해주세요.";
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const firstKey = Object.keys(errors)[0];
+      document.getElementById(`field-${firstKey}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+    setFieldErrors({});
     setError(null);
     setSubmitting(true);
     try {
@@ -280,42 +298,52 @@ export default function NewProjectPage() {
               </Field>
 
               {/* 프로젝트명 */}
-              <Field label="프로젝트명" required>
-                <input
-                  className="np-input"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="예: 2024 김민수님 스튜디오 촬영"
-                  style={{ borderColor: name ? "rgba(255,77,0,0.3)" : undefined }}
-                />
-              </Field>
+              <div id="field-name">
+                <Field label="프로젝트명" required>
+                  <input
+                    className="np-input"
+                    value={name}
+                    onChange={(e) => { setName(e.target.value); setFieldErrors((p) => ({ ...p, name: "" })); }}
+                    placeholder="예: 2024 김민수님 스튜디오 촬영"
+                    style={{ borderColor: fieldErrors.name ? "rgba(239,68,68,0.7)" : name ? "rgba(255,77,0,0.3)" : undefined }}
+                  />
+                </Field>
+                {fieldErrors.name && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.name}</p>}
+              </div>
 
               {/* 2열: 촬영일자 + 고객이름 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="촬영 일자" required>
-                  <input
-                    className="np-input"
-                    type="date"
-                    value={shootDate}
-                    onChange={(e) => {
-                      setShootDate(e.target.value);
-                      if (quickDays && e.target.value) {
-                        setDeadline(format(addDays(new Date(e.target.value), quickDays), "yyyy-MM-dd"));
-                      }
-                    }}
-                    onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
-                    style={{ borderColor: shootDate ? "rgba(255,77,0,0.3)" : undefined }}
-                  />
-                </Field>
-                <Field label="고객 이름" required>
-                  <input
-                    className="np-input"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="고객님 성함"
-                    style={{ borderColor: customerName ? "rgba(255,77,0,0.3)" : undefined }}
-                  />
-                </Field>
+                <div id="field-shootDate">
+                  <Field label="촬영 일자" required>
+                    <input
+                      className="np-input"
+                      type="date"
+                      value={shootDate}
+                      onChange={(e) => {
+                        setShootDate(e.target.value);
+                        setFieldErrors((p) => ({ ...p, shootDate: "" }));
+                        if (quickDays && e.target.value) {
+                          setDeadline(format(addDays(new Date(e.target.value), quickDays), "yyyy-MM-dd"));
+                        }
+                      }}
+                      onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
+                      style={{ borderColor: fieldErrors.shootDate ? "rgba(239,68,68,0.7)" : shootDate ? "rgba(255,77,0,0.3)" : undefined }}
+                    />
+                  </Field>
+                  {fieldErrors.shootDate && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.shootDate}</p>}
+                </div>
+                <div id="field-customerName">
+                  <Field label="고객 이름" required>
+                    <input
+                      className="np-input"
+                      value={customerName}
+                      onChange={(e) => { setCustomerName(e.target.value); setFieldErrors((p) => ({ ...p, customerName: "" })); }}
+                      placeholder="고객님 성함"
+                      style={{ borderColor: fieldErrors.customerName ? "rgba(239,68,68,0.7)" : customerName ? "rgba(255,77,0,0.3)" : undefined }}
+                    />
+                  </Field>
+                  {fieldErrors.customerName && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.customerName}</p>}
+                </div>
               </div>
 
               {/* 2열: 연락처 + 셀렉 갯수 */}
@@ -330,21 +358,24 @@ export default function NewProjectPage() {
                   />
                   <span className="text-[10px] text-zinc-700">알림 기능 연동 시 사용됩니다</span>
                 </Field>
-                <Field label="셀렉 갯수 (N)" required>
-                  <div className="relative">
-                    <input
-                      className="np-input pr-8 text-right"
-                      type="number"
-                      min={1}
-                      value={requiredCount}
-                      onChange={(e) => setRequiredCount(e.target.value)}
-                      placeholder="5"
-                      style={{ borderColor: requiredCount ? "rgba(255,77,0,0.3)" : undefined }}
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-zinc-500 pointer-events-none">장</span>
-                  </div>
-                  <span className="text-[10px] text-zinc-700">고객이 선택할 사진 수</span>
-                </Field>
+                <div id="field-requiredCount">
+                  <Field label="셀렉 갯수 (N)" required>
+                    <div className="relative">
+                      <input
+                        className="np-input pr-8 text-right"
+                        type="number"
+                        min={1}
+                        value={requiredCount}
+                        onChange={(e) => { setRequiredCount(e.target.value); setFieldErrors((p) => ({ ...p, requiredCount: "" })); }}
+                        placeholder="5"
+                        style={{ borderColor: fieldErrors.requiredCount ? "rgba(239,68,68,0.7)" : requiredCount ? "rgba(255,77,0,0.3)" : undefined }}
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-zinc-500 pointer-events-none">장</span>
+                    </div>
+                    <span className="text-[10px] text-zinc-700">고객이 선택할 사진 수</span>
+                  </Field>
+                  {fieldErrors.requiredCount && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.requiredCount}</p>}
+                </div>
               </div>
 
               {/* 촬영 장소 */}
@@ -396,14 +427,17 @@ export default function NewProjectPage() {
                 </button>
               </div>
 
-              <input
-                className="np-input"
-                type="date"
-                value={deadline}
-                onChange={(e) => handleDeadlineInput(e.target.value)}
-                onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
-                style={{ borderColor: deadline ? "rgba(255,77,0,0.3)" : undefined }}
-              />
+              <div id="field-deadline">
+                <input
+                  className="np-input"
+                  type="date"
+                  value={deadline}
+                  onChange={(e) => { handleDeadlineInput(e.target.value); setFieldErrors((p) => ({ ...p, deadline: "" })); }}
+                  onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
+                  style={{ borderColor: fieldErrors.deadline ? "rgba(239,68,68,0.7)" : deadline ? "rgba(255,77,0,0.3)" : undefined }}
+                />
+                {fieldErrors.deadline && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.deadline}</p>}
+              </div>
 
               {deadlinePreview && (
                 <div className="flex items-center gap-2 bg-[#FF4D00]/5 border border-[#FF4D00]/15 rounded-xl px-4 py-2.5">
@@ -507,7 +541,7 @@ export default function NewProjectPage() {
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={!isValid || submitting}
+                disabled={submitting}
                 className="flex items-center gap-2 bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-40 disabled:cursor-not-allowed text-black px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5 disabled:translate-y-0 disabled:shadow-none"
               >
                 {submitting ? (
