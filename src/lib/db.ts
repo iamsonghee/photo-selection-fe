@@ -276,9 +276,10 @@ export async function updateProject(
 
 /** 프로젝트의 사진 목록 조회 */
 export async function getPhotosByProjectId(projectId: string): Promise<Photo[]> {
+  // OPT-03: * 대신 필요한 컬럼만 조회 → 전송 데이터량 감소
   const { data, error } = await supabase
     .from("photos")
-    .select("*")
+    .select("id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, created_at")
     .eq("project_id", projectId)
     .order("number", { ascending: true });
 
