@@ -1,5 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-type Page = import("@playwright/test").Page;
+import type { Page } from "@playwright/test";
 
 /**
  * 테스트용 작가 계정으로 로그인.
