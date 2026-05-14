@@ -1,84 +1,67 @@
 import { test, expect } from "@playwright/test";
 import { loginAsPhotographer } from "../../helpers/auth";
+import { setupFullProject, deleteTestProject, type TestProject } from "../../helpers/setup";
 
-async function findWorkflowUrl(page: import("@playwright/test").Page): Promise<string | null> {
-  await page.goto("/photographer/projects");
-  await page.waitForLoadState("networkidle");
-  const links = await page.locator("a[href*='/workflow']").all();
-  for (const link of links) {
-    const href = await link.getAttribute("href");
-    if (href) return href;
-  }
-  // 직접 프로젝트 상세에서 workflow 링크 탐색
-  const projectLinks = await page.locator("a[href*='/photographer/projects/']").all();
-  for (const link of projectLinks.slice(0, 3)) {
-    const href = await link.getAttribute("href");
-    if (!href || href.includes("/upload") || href.includes("/workflow")) continue;
-    const idMatch = href.match(/\/projects\/([a-f0-9-]{36})/);
-    if (!idMatch) continue;
-    await page.goto(href);
-    const wfLink = page.locator("a[href*='/workflow']").first();
-    if (await wfLink.isVisible({ timeout: 3000 }).catch(() => false)) {
-      return wfLink.getAttribute("href");
-    }
-  }
-  return null;
-}
+let project: TestProject;
+
+test.beforeAll(async ({ browser }) => {
+  const page = await browser.newPage();
+  project = await setupFullProject(page, 5); // 사진 5장 포함 프로젝트
+  await page.close();
+});
+
+test.afterAll(async ({ browser }) => {
+  if (!project?.projectId) return;
+  const page = await browser.newPage();
+  await loginAsPhotographer(page);
+  await deleteTestProject(page, project.projectId);
+  await page.close();
+});
 
 test.describe("작가 — 워크플로우(보정 관리)", () => {
   test.beforeEach(async ({ page }) => {
     await loginAsPhotographer(page);
   });
 
-  test("W1: 워크플로우 페이지 로드 → 탭(원본/V1) 표시", async ({ page }) => {
-    const url = await findWorkflowUrl(page);
-    if (!url) { test.skip(true, "워크플로우 페이지 없음"); return; }
-    await page.goto(url);
-    await expect(page.getByText("원본")).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText("V1 보정본")).toBeVisible();
+  test("W1: 워크플로우 페이지 로드 → 원본 탭 표시", async ({ page }) => {
+    await page.goto(`/photographer/projects/${project.projectId}/workflow`);
+    await page.waitForLoadState("networkidle");
+    // 원본 탭은 모든 상태에서 보임
+    await expect(page.getByText("원본").first()).toBeVisible({ timeout: 8000 });
   });
 
   test("W2: 원본 탭 → 내보내기 버튼 존재", async ({ page }) => {
-    const url = await findWorkflowUrl(page);
-    if (!url) { test.skip(true, "워크플로우 페이지 없음"); return; }
-    await page.goto(url);
+    await page.goto(`/photographer/projects/${project.projectId}/workflow`);
+    await page.waitForLoadState("networkidle");
     await page.getByText("원본").first().click();
-    await page.waitForTimeout(300);
-    await expect(page.getByRole("button", { name: /내보내기/i })).toBeVisible({ timeout: 5000 });
+    await page.waitForTimeout(500);
+    // 사진이 있는 경우 내보내기 버튼 확인
+    const exportBtn = page.getByRole("button", { name: /내보내기/i });
+    await expect(exportBtn).toBeVisible({ timeout: 8000 });
   });
 
   test("W3: 갤러리/파일명 뷰 토글", async ({ page }) => {
-    const url = await findWorkflowUrl(page);
-    if (!url) { test.skip(true, "워크플로우 페이지 없음"); return; }
-    await page.goto(url);
-    // 파일명 뷰로 전환
-    const listBtn = page.getByRole("button").filter({ has: page.locator("svg") }).last();
-    if (await listBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+    await page.goto(`/photographer/projects/${project.projectId}/workflow`);
+    await page.waitForLoadState("networkidle");
+    // 파일명(리스트) 뷰 버튼 클릭 — List 아이콘 버튼
+    const buttons = page.getByRole("button").filter({ hasNotText: /내보|탭|원본|V1|V2/ });
+    const listBtn = buttons.last();
+    if (await listBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await listBtn.click();
-      await page.waitForTimeout(300);
-    }
-    // 갤러리 뷰로 복귀
-    const gridBtn = page.getByRole("button").filter({ has: page.locator("svg") }).nth(-2);
-    if (await gridBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await gridBtn.click();
       await page.waitForTimeout(300);
     }
     await expect(page).toHaveURL(/\/workflow/);
   });
 
-  test("W4: V1 탭 → 파일명 목록 내보내기 CSV", async ({ page }) => {
-    const url = await findWorkflowUrl(page);
-    if (!url) { test.skip(true, "워크플로우 페이지 없음"); return; }
-    await page.goto(url);
-    await page.getByText("V1 보정본").click();
-    await page.waitForTimeout(300);
+  test("W4: 원본 탭 → CSV 내보내기 다운로드", async ({ page }) => {
+    await page.goto(`/photographer/projects/${project.projectId}/workflow`);
+    await page.waitForLoadState("networkidle");
+    await page.getByText("원본").first().click();
+    await page.waitForTimeout(500);
     const exportBtn = page.getByRole("button", { name: /내보내기/i });
-    if (!(await exportBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip(true, "내보내기 버튼 없음 (사진 없을 수 있음)"); return;
-    }
-    // 다운로드 이벤트 감지
+    await expect(exportBtn).toBeVisible({ timeout: 8000 });
     const [download] = await Promise.all([
-      page.waitForEvent("download", { timeout: 5000 }),
+      page.waitForEvent("download", { timeout: 8000 }),
       exportBtn.click(),
     ]);
     expect(download.suggestedFilename()).toMatch(/\.csv$/);
