@@ -885,6 +885,7 @@ export default function ProjectDetailPage() {
     };
 
     const allFailed: File[] = [];
+    const backendRejected: string[] = []; // BUG-01: 서버에서 거부된 파일명 (CR3 등 미지원 형식)
     let completedBatches = 0;
     let abortReason: "betaLimit" | "network" | "auth" | null = null;
     let abortMessage = "";
@@ -893,7 +894,9 @@ export default function ProjectDetailPage() {
 
     for (let chunkStart = 0; chunkStart < batches.length; chunkStart += concurrency) {
       if (stopRequestedRef.current || abortReason) break;
-      if (isPhoneLikeClient() && chunkStart > 0 && chunkStart % 20 === 0) {
+      // BUG-04: PC도 30배치(약 240장)마다 토큰 갱신 (대용량 업로드 중 만료 방지)
+      const refreshInterval = isPhoneLikeClient() ? 20 : 30;
+      if (chunkStart > 0 && chunkStart % refreshInterval === 0) {
         await supabase.auth.refreshSession();
         const { data: { session: fresh } } = await supabase.auth.getSession();
         if (fresh?.access_token) currentToken = fresh.access_token;
@@ -932,6 +935,13 @@ export default function ProjectDetailPage() {
               }
             }
             if (batchSizes[globalIdx] > 0) applyProgress(globalIdx, batchSizes[globalIdx]);
+            // BUG-01: 성공 응답에서 서버 거부 파일 목록 수집
+            if (res.ok) {
+              try {
+                const okBody = await res.json().catch(() => ({})) as { rejected?: string[] };
+                if (okBody.rejected?.length) backendRejected.push(...okBody.rejected);
+              } catch {}
+            }
             if (!res.ok) {
               let body: unknown = {};
               try { body = await res.json().catch(() => ({})); } catch {}
@@ -988,7 +998,13 @@ export default function ProjectDetailPage() {
           ? `${allFailed.length}장 실패: ${firstFailDetail}`
           : `${allFailed.length}장 업로드에 실패했습니다.`);
       }
-      setToast(allFailed.length === 0 ? "업로드 완료!" : `${allFailed.length}장 실패`);
+      if (backendRejected.length > 0) {
+        setUploadError(
+          `${backendRejected.length}개 파일은 지원하지 않는 형식입니다 (JPEG/PNG/WebP/HEIC만 가능): ${backendRejected.slice(0, 3).join(", ")}${backendRejected.length > 3 ? ` 외 ${backendRejected.length - 3}개` : ""}`
+        );
+      }
+      const totalFail = allFailed.length + backendRejected.length;
+      setToast(totalFail === 0 ? "업로드 완료!" : `${totalFail}개 파일 처리 실패`);
       await loadProject(); await loadPhotos(); router.refresh();
     }, 600);
   }, [id, loadProject, loadPhotos, router]);
