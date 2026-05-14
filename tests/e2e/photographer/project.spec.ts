@@ -1,6 +1,23 @@
 import { test, expect } from "@playwright/test";
 import { loginAsPhotographer } from "../../helpers/auth";
+import { setupTestProject, deleteTestProject, type TestProject } from "../../helpers/setup";
 import { findFirstProjectUrl } from "../../helpers/project";
+
+let project: TestProject;
+
+test.beforeAll(async ({ browser }) => {
+  const page = await browser.newPage();
+  project = await setupTestProject(page);
+  await page.close();
+});
+
+test.afterAll(async ({ browser }) => {
+  if (!project?.projectId) return;
+  const page = await browser.newPage();
+  await loginAsPhotographer(page);
+  await deleteTestProject(page, project.projectId);
+  await page.close();
+});
 
 test.describe("작가 — 프로젝트 관리", () => {
   test.beforeEach(async ({ page }) => {
@@ -67,25 +84,14 @@ test.describe("작가 — 프로젝트 관리", () => {
   });
 
   test("P5: 프로젝트 상세 페이지 로드", async ({ page }) => {
-    const projectUrl = await findFirstProjectUrl(page);
-    if (!projectUrl) {
-      test.skip(true, "프로젝트 없음");
-      return;
-    }
-    await page.goto(projectUrl);
-    // 상세 페이지 고유 요소 (상태 배지 또는 프로젝트명)
+    await page.goto(`/photographer/projects/${project.projectId}`);
     await expect(
-      page.locator("[class*='StatusPill']").or(page.locator("text=정보 수정")).or(page.locator("h1,h2").first())
+      page.locator("text=정보 수정").or(page.locator("h1,h2").first())
     ).toBeVisible({ timeout: 8000 });
   });
 
   test("P6: 정보 수정 모달 열기/닫기", async ({ page }) => {
-    const projectUrl = await findFirstProjectUrl(page);
-    if (!projectUrl) {
-      test.skip(true, "프로젝트 없음");
-      return;
-    }
-    await page.goto(projectUrl);
+    await page.goto(`/photographer/projects/${project.projectId}`);
     const editBtn = page.getByRole("button", { name: "정보 수정" });
     if (!(await editBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
       test.skip(true, "정보 수정 버튼 없음");
