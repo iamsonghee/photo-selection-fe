@@ -1,7 +1,7 @@
 # Photo-Selection 기술 분석 & 개선 로드맵
 
 > 최초 작성: 2026-05-14  
-> 최종 업데이트: 2026-05-14 (Sprint 1 + Sprint 2 완료)  
+> 최종 업데이트: 2026-05-14 (Sprint 1 + Sprint 2 + Sprint 3 완료)  
 > 버전: v1.1
 
 ---
@@ -299,11 +299,11 @@ IMAGE_EXECUTOR_MAX_WORKERS = 8  # ThreadPoolExecutor
 
 | 작업 | 대상 | 예상 공수 | 상태 |
 |-----|------|---------|------|
-| Playwright 설치 + config | playwright.config.ts | 0.5d | ⬜ |
-| 인증 E2E 테스트 | tests/e2e/auth.spec.ts | 0.5d | ⬜ |
-| 업로드 E2E 테스트 | tests/e2e/upload.spec.ts | 1d | ⬜ |
-| 고객 셀렉 E2E 테스트 | tests/e2e/gallery.spec.ts | 1d | ⬜ |
-| 파일 타입 경계 케이스 | tests/e2e/upload.spec.ts | 0.5d | ⬜ |
+| Playwright 설치 + config | playwright.config.ts | 0.5d | ✅ 2026-05-14 |
+| 인증 E2E 테스트 | tests/e2e/auth.spec.ts | 0.5d | ✅ 2026-05-14 |
+| 업로드 E2E 테스트 | tests/e2e/upload.spec.ts | 1d | ✅ 2026-05-14 |
+| 고객 셀렉 E2E 테스트 | tests/e2e/gallery.spec.ts | 1d | ✅ 2026-05-14 |
+| 파일 타입 경계 케이스 | tests/e2e/upload.spec.ts | 0.5d | ✅ 2026-05-14 |
 
 ---
 
