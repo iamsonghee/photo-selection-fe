@@ -1,7 +1,7 @@
 # Photo-Selection 기술 분석 & 개선 로드맵
 
 > 최초 작성: 2026-05-14  
-> 최종 업데이트: 2026-05-14 (Sprint 1 완료)  
+> 최종 업데이트: 2026-05-14 (Sprint 1 + Sprint 2 완료)  
 > 버전: v1.1
 
 ---
@@ -291,9 +291,9 @@ IMAGE_EXECUTOR_MAX_WORKERS = 8  # ThreadPoolExecutor
 
 | 작업 | 대상 | 예상 공수 | 상태 |
 |-----|------|---------|------|
-| OPT-01: Pillow 처리 최적화 | upload.py | 1d | ⬜ |
-| OPT-03: 갤러리 페이지네이션 | db.ts + GalleryPageClient | 1d | ⬜ |
-| OPT-04: JWKS TTL 캐시 | dependencies.py | 0.5d | ⬜ |
+| OPT-01: Pillow 처리 최적화 | upload.py | 1d | ✅ 2026-05-14 |
+| OPT-03: DB 쿼리 컬럼 최적화 | db.ts | 0.5d | ✅ 2026-05-14 |
+| OPT-04: JWKS TTL 캐시 | dependencies.py | 0.5d | ✅ 2026-05-14 |
 
 ### Sprint 3 — 테스트 자동화
 
