@@ -9,19 +9,37 @@ interface AuthModalProps {
   onClose: () => void;
 }
 
+function isKakaoInAppBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /KAKAOTALK/i.test(navigator.userAgent);
+}
+
 export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isKakao, setIsKakao] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
     setIsMobile(window.innerWidth <= 600);
+    setIsKakao(isKakaoInAppBrowser());
     const handler = () => setIsMobile(window.innerWidth <= 600);
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);
   }, []);
+
+  const handleCopyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setUrlCopied(true);
+      setTimeout(() => setUrlCopied(false), 2000);
+    } catch {
+      // fallback: select input
+    }
+  };
 
   const handleClose = useCallback(() => {
     setClosing(true);
@@ -153,13 +171,42 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
               </div>
             )}
 
+            {/* 카카오톡 인앱 브라우저 안내 */}
+            {isKakao && (
+              <div className="auth-modal-kakao-warning">
+                <div className="auth-modal-kakao-warning-icon">⚠️</div>
+                <div className="auth-modal-kakao-warning-text">
+                  <strong>카카오톡 내 브라우저에서는 구글 로그인이 제한됩니다.</strong>
+                  <br />
+                  아래 방법으로 외부 브라우저에서 열어주세요.
+                </div>
+                <div className="auth-modal-kakao-steps">
+                  <div className="auth-modal-kakao-step">
+                    <span className="auth-modal-kakao-step-num">iOS</span>
+                    <span>우측 하단 <strong>···</strong> 버튼 → <strong>Safari로 열기</strong></span>
+                  </div>
+                  <div className="auth-modal-kakao-step">
+                    <span className="auth-modal-kakao-step-num">Android</span>
+                    <span>우측 상단 <strong>···</strong> 버튼 → <strong>다른 앱으로 열기</strong> → Chrome</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="auth-modal-kakao-copy-btn"
+                  onClick={handleCopyUrl}
+                >
+                  {urlCopied ? "✓ 복사됨!" : "🔗 링크 복사하기"}
+                </button>
+              </div>
+            )}
+
             <div className="auth-modal-action-group">
               {/* Google */}
               <button
                 type="button"
                 className="auth-modal-btn auth-modal-btn-google"
                 onClick={handleGoogleLogin}
-                disabled={!!loading}
+                disabled={!!loading || isKakao}
               >
                 <span className="auth-modal-btn-icon">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20">
@@ -455,6 +502,73 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         .auth-modal-terms-link:hover {
           color: #FF4D00;
           border-bottom-color: #FF4D00;
+        }
+
+        /* ── 카카오 인앱 브라우저 안내 ── */
+        .auth-modal-kakao-warning {
+          width: 100%;
+          background: rgba(255, 180, 0, 0.07);
+          border: 1px solid rgba(255, 180, 0, 0.3);
+          border-radius: 12px;
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          text-align: left;
+          margin-top: 8px;
+        }
+        .auth-modal-kakao-warning-icon {
+          font-size: 22px;
+          line-height: 1;
+        }
+        .auth-modal-kakao-warning-text {
+          font-size: 13px;
+          color: #e8c97a;
+          line-height: 1.6;
+        }
+        .auth-modal-kakao-warning-text strong { color: #ffd966; }
+        .auth-modal-kakao-steps {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          border-top: 1px solid rgba(255,180,0,0.15);
+          padding-top: 10px;
+        }
+        .auth-modal-kakao-step {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          font-size: 12px;
+          color: #aaa;
+          line-height: 1.5;
+        }
+        .auth-modal-kakao-step strong { color: #e0c060; }
+        .auth-modal-kakao-step-num {
+          background: rgba(255,180,0,0.15);
+          color: #ffd966;
+          font-size: 10px;
+          font-weight: 700;
+          padding: 1px 6px;
+          border-radius: 4px;
+          white-space: nowrap;
+          margin-top: 1px;
+          flex-shrink: 0;
+        }
+        .auth-modal-kakao-copy-btn {
+          width: 100%;
+          padding: 10px;
+          background: rgba(255,180,0,0.12);
+          border: 1px solid rgba(255,180,0,0.35);
+          border-radius: 8px;
+          color: #ffd966;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.2s;
+          margin-top: 2px;
+        }
+        .auth-modal-kakao-copy-btn:hover {
+          background: rgba(255,180,0,0.2);
         }
 
         /* ── Mobile ── */
