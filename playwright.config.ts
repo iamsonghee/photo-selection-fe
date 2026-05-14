@@ -6,7 +6,7 @@ import path from "path";
 config({ path: path.resolve(__dirname, ".env.local") });
 
 export default defineConfig({
-  testDir: "./tests/e2e",
+  testDir: "./tests/e2e",       // photographer/** + customer/**
   fullyParallel: false,      // 테스트 간 세션 충돌 방지
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
