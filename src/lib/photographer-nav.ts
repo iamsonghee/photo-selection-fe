@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, FolderOpen, Users, BarChart3, Settings } from "lucide-react";
+import { LayoutDashboard, FolderOpen, Users, BarChart3, Settings, BookOpen } from "lucide-react";
 
 export type PhotographerNavItem = {
   href: string;
@@ -14,4 +14,5 @@ export const PHOTOGRAPHER_NAV_ITEMS: PhotographerNavItem[] = [
   { href: "#",                        label: "고객관리",  icon: Users,         comingSoon: true  },
   { href: "#",                        label: "통계",      icon: BarChart3,     comingSoon: true  },
   { href: "/photographer/settings",  label: "설정",      icon: Settings,      comingSoon: false },
+  { href: "/photographer/manual",    label: "매뉴얼",    icon: BookOpen,      comingSoon: false },
 ];

@@ -20,22 +20,18 @@ export function PhotographerPageHeader({ crumbs, title, stats, actions }: Props)
       style={{ minHeight: 80 }}
     >
       <div>
-        {crumbs.length > 0 && (
+        {crumbs.some((c) => c.href) ? (
           <div className="flex items-center gap-1 text-xs font-semibold text-[#FF4D00] mb-1">
-            {crumbs.map((c, i) => (
+            {crumbs.filter((c) => c.href).map((c, i) => (
               <span key={i} className="flex items-center gap-1">
                 {i > 0 && <ChevronRight size={11} className="text-zinc-600" strokeWidth={2.5} />}
-                {c.href ? (
-                  <Link href={c.href} className="hover:opacity-80 transition-opacity">
-                    {c.label}
-                  </Link>
-                ) : (
-                  <span className="text-zinc-400 font-medium">{c.label}</span>
-                )}
+                <Link href={c.href!} className="hover:opacity-80 transition-opacity">
+                  {c.label}
+                </Link>
               </span>
             ))}
           </div>
-        )}
+        ) : null}
         <h1
           className="text-2xl font-bold tracking-tight text-white"
           style={{ fontFamily: "var(--font-inter, sans-serif)" }}

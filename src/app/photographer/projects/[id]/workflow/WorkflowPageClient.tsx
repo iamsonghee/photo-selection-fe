@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getPhotosWithSelections, getProjectById } from "@/lib/db";
 import type { Photo, Project, ProjectStatus } from "@/types";
@@ -27,6 +27,7 @@ import {
   Download,
   LayoutGrid,
   List,
+  ChevronDown,
 } from "lucide-react";
 import styles from "./Workflow.module.css";
 import { normalizeReviewDeadlineYmd } from "@/lib/format-review-deadline";
@@ -840,6 +841,8 @@ export default function WorkflowPageClient() {
   const [shareCopied, setShareCopied] = useState<"link" | "pin" | "bundle" | null>(null);
   const [replacingId, setReplacingId] = useState<string | null>(null);
   const [versionBust, setVersionBust] = useState<Record<string, number>>({});
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   const getVersionUrl = useCallback(
     (url: string, photoId: string, version: 1 | 2) => {
@@ -1002,22 +1005,27 @@ export default function WorkflowPageClient() {
     })),
   [filteredRows, getVersionUrl]);
 
-  const handleDownloadReview = useCallback(() => {
+  const handleDownloadReview = useCallback((withComment: boolean) => {
     const isOriginal = stageTab === "original";
     const version = stageTab === "v2" ? 2 : 1;
     const header = isOriginal
-      ? ["번호", "파일명"]
-      : ["번호", "파일명", "상태", "고객 코멘트"];
+      ? withComment ? ["번호", "파일명", "고객 코멘트"] : ["번호", "파일명"]
+      : withComment ? ["번호", "파일명", "상태", "고객 코멘트"] : ["번호", "파일명", "상태"];
     const rowData = rows.map((row, i) => {
       const filename = row.photo.originalFilename ?? `FRAME_${String(row.photo.orderIndex).padStart(4, "0")}`;
-      if (isOriginal) return [String(i + 1), filename];
+      if (isOriginal) {
+        return withComment
+          ? [String(i + 1), filename, row.photo.comment ?? ""]
+          : [String(i + 1), filename];
+      }
       const ver = version === 2 ? row.v2 : row.v1;
       const status =
         ver?.reviewStatus === "approved" ? "확정"
         : ver?.reviewStatus === "revision_requested" ? "재보정 요청"
         : "미검토";
-      const comment = ver?.comment ?? "";
-      return [String(i + 1), filename, status, comment];
+      return withComment
+        ? [String(i + 1), filename, status, ver?.comment ?? ""]
+        : [String(i + 1), filename, status];
     });
     const csv = [header, ...rowData]
       .map((cols) => cols.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
@@ -1032,6 +1040,7 @@ export default function WorkflowPageClient() {
       : `${project?.name ?? "review"}_v${version}_검토결과.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    setShowExportMenu(false);
   }, [rows, stageTab, project?.name]);
 
   function openViewer(idx: number, tab: StageTab) {
@@ -1501,14 +1510,40 @@ export default function WorkflowPageClient() {
           {/* 다운로드 + 뷰 토글 */}
           <div className={`${stageTab === "v2" || (stageTab === "v1" && !isReviewingV1) ? "" : "ml-auto"} flex items-center gap-2 shrink-0`}>
             {rows.length > 0 && (
-              <button
-                type="button"
-                onClick={handleDownloadReview}
-                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border border-[#27272c] text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
-              >
-                <Download size={12} />
-                내보내기
-              </button>
+              <div ref={exportMenuRef} className="relative hidden md:block">
+                <button
+                  type="button"
+                  onClick={() => setShowExportMenu((v) => !v)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border border-[#27272c] text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
+                >
+                  <Download size={12} />
+                  내보내기
+                  <ChevronDown size={11} className={`transition-transform ${showExportMenu ? "rotate-180" : ""}`} />
+                </button>
+                {showExportMenu && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
+                    <div className="absolute right-0 top-full mt-1 z-20 bg-[#121215] border border-[#27272c] rounded-xl shadow-xl overflow-hidden min-w-[148px]">
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadReview(false)}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-[11px] text-zinc-300 hover:bg-[#1a1a1e] hover:text-white transition-colors text-left"
+                      >
+                        <Download size={11} className="text-zinc-500 shrink-0" />
+                        파일명만
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadReview(true)}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-[11px] text-zinc-300 hover:bg-[#1a1a1e] hover:text-white transition-colors text-left"
+                      >
+                        <Download size={11} className="text-[#FF4D00] shrink-0" />
+                        코멘트 포함
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
             <div className="flex items-center border border-[#27272c] rounded-lg overflow-hidden">
               {([["gallery", <LayoutGrid key="g" size={13} />] as const, ["list", <List key="l" size={13} />] as const]).map(([mode, icon]) => (

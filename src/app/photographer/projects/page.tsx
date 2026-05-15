@@ -453,10 +453,7 @@ export default function ProjectsPage() {
     >
       {/* ── header ── */}
       <PhotographerPageHeader
-        crumbs={[
-          { label: "프로젝트", href: "/photographer/projects" },
-          { label: "데이터베이스" },
-        ]}
+        crumbs={[{ label: "프로젝트 목록" }]}
         title="프로젝트 목록"
         stats={[
           { label: "전체",  value: projects.length },
