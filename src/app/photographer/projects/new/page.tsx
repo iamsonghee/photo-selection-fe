@@ -349,17 +349,23 @@ const isValid =
                 </Field>
                 <div id="field-requiredCount">
                   <Field label="셀렉 갯수 (N)" required>
-                    <div className="relative">
+                    <div className="flex items-center gap-2">
                       <input
-                        className="np-input pr-8 text-right"
-                        type="number"
+                        className="np-input text-right flex-1"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         min={1}
                         value={requiredCount}
-                        onChange={(e) => { setRequiredCount(e.target.value); setFieldErrors((p) => ({ ...p, requiredCount: "" })); }}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/[^0-9]/g, "");
+                          setRequiredCount(v);
+                          setFieldErrors((p) => ({ ...p, requiredCount: "" }));
+                        }}
                         placeholder="5"
                         style={{ borderColor: fieldErrors.requiredCount ? "rgba(239,68,68,0.7)" : requiredCount ? "rgba(255,77,0,0.3)" : undefined }}
                       />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-zinc-500 pointer-events-none">장</span>
+                      <span className="text-sm text-zinc-500 shrink-0">장</span>
                     </div>
                     <span className="text-[10px] text-zinc-700">고객이 선택할 사진 수</span>
                   </Field>
