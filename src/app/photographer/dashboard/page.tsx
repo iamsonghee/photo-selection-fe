@@ -295,9 +295,9 @@ export default function DashboardPage() {
           {/* 1. 프로젝트 요약 카드 */}
           <div className="grid grid-cols-3 gap-4 items-stretch">
             {([
-              { key: "all" as const,       label: "전체",  count: dashCounts.all,       icon: <Layers size={14} className="text-zinc-400" />,         color: "zinc",    sub: null },
-              { key: "active" as const,    label: "진행중", count: dashCounts.active,    icon: <Zap size={14} className="text-[#FF4D00]" />,            color: "brand",   sub: dashCounts.waiting > 0 ? `${dashCounts.waiting}건 대기` : null },
-              { key: "completed" as const, label: "완료",  count: dashCounts.completed, icon: <CheckCircle2 size={14} className="text-emerald-500" />, color: "emerald", sub: null },
+              { key: "all" as const,       label: "전체 프로젝트", mobileLabel: "전체",  count: dashCounts.all,       icon: <Layers size={16} className="text-zinc-400" />,         color: "zinc",    sub: null,                                                                              mobileSub: null },
+              { key: "active" as const,    label: "진행중",        mobileLabel: "진행중", count: dashCounts.active,    icon: <Zap size={16} className="text-[#FF4D00]" />,            color: "brand",   sub: dashCounts.waiting > 0 ? `${dashCounts.waiting}건 고객 응답 대기` : null, mobileSub: dashCounts.waiting > 0 ? `${dashCounts.waiting}건 대기` : null },
+              { key: "completed" as const, label: "완료",          mobileLabel: "완료",  count: dashCounts.completed, icon: <CheckCircle2 size={16} className="text-emerald-500" />, color: "emerald", sub: null,                                                                              mobileSub: null },
             ]).map((card) => {
               const isActive = dashFilter === card.key;
               return (
@@ -315,16 +315,23 @@ export default function DashboardPage() {
                         : "bg-[#121215]/80 border-[#1a1a1e] hover:border-[#27272c]"
                   }`}
                 >
-                  <div className="flex items-center gap-1.5 mb-2 md:mb-3">
-                    {card.icon}
-                    <span className="text-xs md:text-sm font-bold text-white">{card.label}</span>
+                  <div className="flex items-center justify-between mb-2 md:mb-3">
+                    <span className="text-xs md:text-sm font-bold text-white flex items-center gap-1.5 md:gap-2">
+                      {card.icon}
+                      <span className="md:hidden">{card.mobileLabel}</span>
+                      <span className="hidden md:inline">{card.label}</span>
+                    </span>
                   </div>
-                  <div className="flex items-end gap-1.5 flex-1">
+                  <div className="flex items-end gap-1.5 md:gap-2 flex-1">
                     <span className="text-2xl md:text-3xl font-black text-white leading-none">{card.count}</span>
-                    <span className="text-xs md:text-sm text-zinc-400 mb-0.5">건</span>
+                    <span className="text-xs md:text-sm text-zinc-400 mb-0.5">
+                      <span className="md:hidden">건</span>
+                      <span className="hidden md:inline">{card.key === "all" ? "개" : card.key === "active" ? "건 작업중" : "건"}</span>
+                    </span>
                   </div>
-                  <div className="mt-1 h-3 md:h-4 flex items-center gap-1 text-[10px] md:text-[11px] text-amber-400/80">
-                    {card.sub && <><Clock size={9} />{card.sub}</>}
+                  <div className="mt-1 md:mt-1.5 h-3 md:h-4 flex items-center gap-1 md:gap-1.5 text-[10px] md:text-[11px] text-amber-400/80">
+                    <span className="md:hidden">{card.mobileSub && <><Clock size={9} className="inline mr-0.5" />{card.mobileSub}</>}</span>
+                    <span className="hidden md:flex items-center gap-1.5">{card.sub && <><Clock size={10} />{card.sub}</>}</span>
                   </div>
                 </button>
               );
