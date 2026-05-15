@@ -12,7 +12,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Lock, RefreshCw, AlertCircle, AlertTriangle, ChevronRight } from "lucide-react";
-import { addDays, format, differenceInCalendarDays } from "date-fns";
+import { addDays, format } from "date-fns";
 import { createProject, getProjectsByPhotographerId } from "@/lib/db";
 import { useProfile } from "@/contexts/ProfileContext";
 import { BETA_MAX_PROJECTS_TOTAL } from "@/lib/beta-limits";
@@ -138,18 +138,7 @@ export default function NewProjectPage() {
     setQuickDays(null);
   };
 
-  const deadlinePreview = (() => {
-    if (!deadline) return null;
-    const base = shootDate ? new Date(shootDate) : null;
-    const deadlineDate = new Date(deadline);
-    const dFromShoot = base ? differenceInCalendarDays(deadlineDate, base) : null;
-    return {
-      dateStr: format(deadlineDate, "yyyy-MM-dd"),
-      dLabel: dFromShoot !== null ? `D+${dFromShoot}` : null,
-    };
-  })();
-
-  const isValid =
+const isValid =
     name.trim() !== "" &&
     shootDate !== "" &&
     customerName.trim() !== "" &&
@@ -439,19 +428,6 @@ export default function NewProjectPage() {
                 {fieldErrors.deadline && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.deadline}</p>}
               </div>
 
-              {deadlinePreview && (
-                <div className="flex items-center gap-2 bg-[#FF4D00]/5 border border-[#FF4D00]/15 rounded-xl px-4 py-2.5">
-                  <span className="text-xs text-zinc-500">기한:</span>
-                  <span className="text-xs font-semibold text-[#FF4D00]">{deadlinePreview.dateStr}</span>
-                  {deadlinePreview.dLabel && (
-                    <>
-                      <span className="text-xs text-zinc-600">·</span>
-                      <span className="text-xs text-zinc-500">촬영일로부터</span>
-                      <span className="text-xs font-semibold text-[#FF4D00]">{deadlinePreview.dLabel}</span>
-                    </>
-                  )}
-                </div>
-              )}
             </div>
 
             {/* ── 보안 설정 카드 ── */}
