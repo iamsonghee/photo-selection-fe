@@ -642,6 +642,7 @@ export default function ViewerPage() {
                 onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
                 onBlur={saveComment}
                 onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing) return;
                   if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                 }}
                 placeholder="코멘트..."

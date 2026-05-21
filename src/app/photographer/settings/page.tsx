@@ -216,6 +216,7 @@ export default function SettingsPage() {
     <div
       className="min-h-screen bg-[#0a0a0c] text-white"
       style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}
+      onKeyDown={(e) => { if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault(); }}
     >
       <PhotographerPageHeader
         crumbs={[{ label: "설정" }]}

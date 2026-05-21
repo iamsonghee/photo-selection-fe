@@ -1,4 +1,4 @@
-export type MappingType = "exact" | "order" | "none" | "server";
+export type MappingType = "exact" | "fuzzy" | "order" | "none" | "server";
 
 export type MappingTarget = {
   id: string;
@@ -20,18 +20,53 @@ export function normalizeFilename(name: string): string {
     .replace(/\.[a-z0-9]+$/i, "");
 }
 
+/**
+ * 편집 툴이 추가하는 공통 suffix를 제거해 원본 파일명의 stem만 추출.
+ * 예: "DSC_0001-Edit" → "DSC_0001", "DSC_0001_v1_final" → "DSC_0001"
+ */
+export function stemFilename(normalized: string): string {
+  return normalized
+    // Lightroom: -Edit, -Edit-2, -Edit-3 ...
+    .replace(/-edit(-\d+)?$/, "")
+    // Capture One: _Angle1, _1, _2 ...
+    .replace(/_angle\d+$/, "")
+    // 공통: _retouched, _retouche, _retouch, _edited, _final, _comp, _web
+    .replace(/[_-](retouched?|edited?|final|comp|web|export|out|lr|co|ps)$/, "")
+    // 공통: _v1, _v2, -v1, -v2, -1, -2, _1, _2 (숫자만)
+    .replace(/[_-]v?\d+$/, "")
+    // 연속 처리 (중첩 suffix 제거)
+    .replace(/[_-](retouched?|edited?|final|comp|web|export|out|lr|co|ps)$/, "")
+    .replace(/[_-]v?\d+$/, "")
+    .trim();
+}
+
 export function buildVersionMapping<T extends MappingTarget>(
   files: File[],
   targets: T[]
 ): MappingResult<T>[] {
   const remaining = [...files];
   return targets.map((target, index) => {
-    const targetName = normalizeFilename(target.filename);
-    const exactIdx = remaining.findIndex((f) => normalizeFilename(f.name) === targetName);
+    const targetNorm = normalizeFilename(target.filename);
+    const targetStem = stemFilename(targetNorm);
+
+    // 1단계: 정확 매칭 (확장자 제외 동일)
+    const exactIdx = remaining.findIndex((f) => normalizeFilename(f.name) === targetNorm);
     if (exactIdx >= 0) {
-      const exact = remaining.splice(exactIdx, 1)[0];
-      return { target, file: exact, type: "exact" };
+      const file = remaining.splice(exactIdx, 1)[0];
+      return { target, file, type: "exact" };
     }
+
+    // 2단계: 퍼지 매칭 — 원본 stem ↔ 보정본 stem 비교
+    const fuzzyIdx = remaining.findIndex((f) => {
+      const fStem = stemFilename(normalizeFilename(f.name));
+      return fStem === targetStem && targetStem.length > 0;
+    });
+    if (fuzzyIdx >= 0) {
+      const file = remaining.splice(fuzzyIdx, 1)[0];
+      return { target, file, type: "fuzzy" };
+    }
+
+    // 3단계: 순서 기반 fallback
     const order = files[index] ?? null;
     if (order) return { target, file: order, type: "order", orderIndex: index + 1 };
     return { target, file: null, type: "none" };

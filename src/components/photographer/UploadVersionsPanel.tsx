@@ -177,14 +177,16 @@ export default function UploadVersionsPanel({
 
   const stats = useMemo(() => {
     let exact = 0;
+    let fuzzy = 0;
     let order = 0;
     let server = 0;
     mapping.forEach((m) => {
       if (m.type === "exact") exact++;
+      else if (m.type === "fuzzy") fuzzy++;
       else if (m.type === "order") order++;
       else if (m.type === "server") server++;
     });
-    return { exact, order, server };
+    return { exact, fuzzy, order, server };
   }, [mapping]);
 
   // BE(upload.py)와 동일: 이미 존재하는 단계(v1/v2)의 교체 업로드는 허용한다.
@@ -560,9 +562,9 @@ export default function UploadVersionsPanel({
                     {mappedCount > 0 ? "다시 선택" : "파일 선택"}
                   </button>
                 </div>
-                <div className="flex items-center gap-1.5 mt-2.5 pl-1 text-[11px] text-zinc-600">
+                <div className="flex items-center gap-1.5 mt-2.5 pl-1 text-[11px] text-zinc-500">
                   <Info size={12} strokeWidth={2} />
-                  <span>파일명 일치 시 자동 매핑 · 불일치 시 순서대로 매핑</span>
+                  <span>파일명(편집 suffix 제외) 일치 시 자동 매핑 · 불일치 시 순서대로 매핑</span>
                 </div>
               </div>
 
@@ -574,7 +576,10 @@ export default function UploadVersionsPanel({
                     {(stats.exact > 0 || stats.order > 0 || stats.server > 0) && (
                       <div className="flex items-center gap-3 text-[11px]">
                         {stats.exact > 0 && (
-                          <StatChip dotColor="bg-emerald-500" textColor="text-emerald-400" label={`자동 ${stats.exact}`} />
+                          <StatChip dotColor="bg-emerald-500" textColor="text-emerald-400" label={`파일명 ${stats.exact}`} />
+                        )}
+                        {stats.fuzzy > 0 && (
+                          <StatChip dotColor="bg-teal-500" textColor="text-teal-400" label={`유사 ${stats.fuzzy}`} />
                         )}
                         {stats.order > 0 && (
                           <StatChip dotColor="bg-amber-500" textColor="text-amber-400" label={`순서 ${stats.order}`} />
@@ -894,7 +899,7 @@ function PanelMappingRow({
   const [v1Err, setV1Err] = useState(false);
   const [retouchErr, setRetouchErr] = useState(false);
   const state =
-    type === "exact"
+    type === "exact" || type === "fuzzy"
       ? "matched"
       : type === "order"
         ? "ordered"

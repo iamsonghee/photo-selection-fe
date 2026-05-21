@@ -200,6 +200,7 @@ const isValid =
     <div
       className="min-h-screen bg-[#0a0a0c] text-white"
       style={{ fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif" }}
+      onKeyDown={(e) => { if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault(); }}
     >
       <style>{`
         .np-input {

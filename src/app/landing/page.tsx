@@ -80,6 +80,8 @@ function Header({ onAuthOpen }: { onAuthOpen: () => void }) {
 
 // ─── Hero Section ────────────────────────────────────────────────────────────
 
+const COMPARE_EXAMPLE_SRC = "/landing/compare-wedding.jpg";
+
 const PHOTOS = [
   { src: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=800&auto=format&fit=crop", filename: "IMG_8421.RAW" },
   { src: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=800&auto=format&fit=crop", filename: "IMG_8422.RAW" },
@@ -560,24 +562,25 @@ function ServicesSection() {
                     <span className="text-white">BEFORE [RAW]</span>
                     <span className="text-[#FF4D00] font-bold">AFTER [PROC]</span>
                   </div>
-                  {/* Left vignette */}
-                  <div
-                    className="absolute top-0 left-0 z-[4] pointer-events-none"
-                    style={{ width: "50%", height: "100%", background: "radial-gradient(circle, transparent 40%, rgba(0,0,0,0.6) 100%)" }}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={COMPARE_EXAMPLE_SRC}
+                    alt="원본"
+                    className="absolute inset-0 w-full h-full object-cover"
+                    style={{
+                      objectPosition: "22% 42%",
+                      clipPath: "inset(0 50% 0 0)",
+                    }}
                   />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src="https://images.unsplash.com/photo-1502781259889-38fe4b170bcc?auto=format&fit=crop&q=80&w=800"
-                    alt="Before"
+                    src={COMPARE_EXAMPLE_SRC}
+                    alt="보정본"
                     className="absolute inset-0 w-full h-full object-cover"
-                    style={{ filter: "grayscale(0.5) contrast(0.7) brightness(0.8)", clipPath: "inset(0 50% 0 0)" }}
-                  />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="https://images.unsplash.com/photo-1502781259889-38fe4b170bcc?auto=format&fit=crop&q=80&w=800"
-                    alt="After"
-                    className="absolute inset-0 w-full h-full object-cover"
-                    style={{ filter: "saturate(1.4) contrast(1.1) brightness(1.05) sepia(0.15)", clipPath: "inset(0 0 0 50%)" }}
+                    style={{
+                      objectPosition: "78% 42%",
+                      clipPath: "inset(0 0 0 50%)",
+                    }}
                   />
                   {/* Split line */}
                   <div className="absolute top-0 left-1/2 w-[1px] h-full bg-[#FF4D00] z-[5]" />
