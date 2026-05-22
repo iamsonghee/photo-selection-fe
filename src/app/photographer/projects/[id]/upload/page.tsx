@@ -1205,7 +1205,7 @@ export default function ProjectDetailPage() {
       .filter((p) => !confirmedNames.has(p.filename))
       .map((p) => ({ id: p.tempId, projectId: id, orderIndex: 99999, url: p.blobUrl, originalFilename: p.filename, isPending: true, isUploading: true }));
     if (pendingAsPhotos.length === 0 && uploadingAsPhotos.length === 0) return photos;
-    return [...photos, ...pendingAsPhotos, ...uploadingAsPhotos];
+    return [...uploadingAsPhotos, ...pendingAsPhotos, ...photos];
   }, [photos, pendingPhotos, uploadingPhotos, id]);
 
   if (loading) return <PageLoader variant="full" />;
