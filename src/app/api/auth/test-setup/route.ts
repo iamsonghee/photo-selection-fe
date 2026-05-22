@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 const DUMMY_THUMB   = "https://picsum.photos/seed/e2e-thumb/400/400";
 const DUMMY_PREVIEW = "https://picsum.photos/seed/e2e-prev/1200/900";
 
-type Action = "create_project" | "create_full_project" | "delete_project";
+type Action = "create_project" | "create_full_project" | "create_editing_project" | "delete_project";
 
 /** 테스트 전용 데이터 세팅 — ENABLE_TEST_LOGIN=true 일 때만 동작 */
 export async function POST(req: Request) {
@@ -55,6 +55,47 @@ export async function POST(req: Request) {
     await admin.from("projects").update({
       photo_count: photoCount,
       status: "selecting",
+    }).eq("id", project.id);
+
+    return NextResponse.json({
+      ok: true,
+      projectId: project.id,
+      accessToken: project.access_token,
+      photoCount,
+      requiredCount,
+    });
+  }
+
+  // ── editing 상태 프로젝트 (보정본 업로드 테스트용) ──────────────────────
+  if (action === "create_editing_project") {
+    const photoCount = body.photoCount ?? 5;
+    const requiredCount = Math.min(3, photoCount);
+
+    const project = await _createProject(admin, photographer.id, requiredCount, "preparing");
+
+    const photos = Array.from({ length: photoCount }, (_, i) => ({
+      project_id: project.id,
+      number: i + 1,
+      r2_thumb_url:   `${DUMMY_THUMB}?n=${i}`,
+      r2_preview_url: `${DUMMY_PREVIEW}?n=${i}`,
+      original_filename: `E2E_TEST_${String(i + 1).padStart(3, "0")}.jpg`,
+      file_size: 12345,
+    }));
+    const { data: insertedPhotos } = await admin.from("photos").insert(photos).select("id");
+
+    // 고객 선택 더미 삽입 (requiredCount 장)
+    if (insertedPhotos && insertedPhotos.length > 0) {
+      const selections = insertedPhotos.slice(0, requiredCount).map((p: { id: string }) => ({
+        project_id: project.id,
+        photo_id: p.id,
+      }));
+      await admin.from("selections").insert(selections);
+    }
+
+    // photo_count + status → editing (보정 진행 중)
+    await admin.from("projects").update({
+      photo_count: photoCount,
+      status: "editing",
     }).eq("id", project.id);
 
     return NextResponse.json({

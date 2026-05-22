@@ -40,6 +40,23 @@ export async function createFullProject(page: Page, photoCount = 5): Promise<Tes
   };
 }
 
+/** editing 상태 프로젝트 생성 (보정본 업로드 테스트용) */
+export async function createEditingProject(page: Page, photoCount = 5): Promise<TestProject> {
+  const res = await page.request.post("/api/auth/test-setup", {
+    data: { action: "create_editing_project", photoCount },
+  });
+  if (!res.ok()) throw new Error(`createEditingProject failed (${res.status()}): ${await res.text()}`);
+  const data = await res.json() as { projectId: string; accessToken: string; photoCount: number; requiredCount: number };
+  return {
+    projectId: data.projectId,
+    accessToken: data.accessToken,
+    uploadUrl: `/photographer/projects/${data.projectId}/upload`,
+    galleryUrl: `/c/${data.accessToken}/gallery`,
+    photoCount: data.photoCount,
+    requiredCount: data.requiredCount,
+  };
+}
+
 /** 테스트 프로젝트 삭제 (사진·선택 포함) */
 export async function deleteTestProject(page: Page, projectId: string): Promise<void> {
   await page.request.delete("/api/auth/test-setup", { data: { projectId } });
