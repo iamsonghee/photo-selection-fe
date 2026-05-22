@@ -170,12 +170,15 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   const toggle = useCallback(
     (photoId: string) => {
       if (!project?.id || !token) return;
+      const maxN = project.requiredCount ?? 0;
       setSelectedIds((prev) => {
         const next = new Set(prev);
         if (next.has(photoId)) {
           next.delete(photoId);
           deleteSelectionApi(token, project.id, photoId).catch(console.error);
         } else {
+          // 최대 선택 수 초과 방지
+          if (maxN > 0 && prev.size >= maxN) return prev;
           next.add(photoId);
           upsertSelectionApi(token, project.id, photoId, {
             rating: photoStates[photoId]?.rating ?? null,
@@ -186,7 +189,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         return next;
       });
     },
-    [project?.id, token, photoStates]
+    [project?.id, project?.requiredCount, token, photoStates]
   );
 
   const isSelected = useCallback(
