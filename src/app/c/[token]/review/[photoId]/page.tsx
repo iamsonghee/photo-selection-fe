@@ -741,13 +741,17 @@ export default function ReviewViewerPage() {
             >
               <ChevronLeft size={14} />
             </button>
-            <div style={{ padding: "8px 14px", borderBottom: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", gap: 5, flexShrink: 0 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: MONO, fontSize: 10 }}>
-                <span style={{ color: MUTED }}>검토 진행</span>
-                <span style={{ color: allReviewed ? GREEN : ACCENT, fontWeight: 700 }}>{reviewedCount} / {total}</span>
-              </div>
-              <div style={{ height: 2, background: BORDER, borderRadius: 1 }}>
-                <div style={{ height: "100%", background: allReviewed ? GREEN : ACCENT, width: `${progressPct}%`, transition: "width 0.3s", borderRadius: 1 }} />
+            <div style={{ padding: "8px 14px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <button type="button" onClick={goPrev} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, padding: 0, display: "flex", alignItems: "center" }}>
+                  <ChevronLeft size={13} />
+                </button>
+                <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED, minWidth: 36, textAlign: "center" }}>
+                  {currentIndex + 1} / {total}
+                </span>
+                <button type="button" onClick={goNext} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, padding: 0, display: "flex", alignItems: "center" }}>
+                  <ChevronRight size={13} />
+                </button>
               </div>
             </div>
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 12, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, alignContent: "start" }}>
@@ -899,31 +903,6 @@ export default function ReviewViewerPage() {
                   }
                 </div>
               )}
-              {/* 페이지 네비게이션 — 이미지 하단 중앙 오버레이 */}
-              <div style={{
-                position: "absolute",
-                bottom: 28,
-                left: "50%",
-                transform: "translateX(-50%)",
-                zIndex: 10,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                background: "rgba(0,0,0,0.6)",
-                backdropFilter: "blur(8px)",
-                border: `1px solid ${BORDER_HI}`,
-                borderRadius: 99,
-                padding: "4px 6px",
-                pointerEvents: "auto",
-              }}>
-                <PrevNextButton direction="prev" onClick={goPrev} position="static" size="sm"
-                  style={{ width: 28, height: 28, background: "rgba(255,255,255,0.08)", border: "none" }} />
-                <span style={{ fontFamily: MONO, fontSize: 11, color: MUTED, minWidth: 44, textAlign: "center", userSelect: "none" }}>
-                  {currentIndex + 1} / {photos.length}
-                </span>
-                <PrevNextButton direction="next" onClick={goNext} position="static" size="sm"
-                  style={{ width: 28, height: 28, background: "rgba(255,255,255,0.08)", border: "none" }} />
-              </div>
             </div>
 
             {/* Action bar */}
