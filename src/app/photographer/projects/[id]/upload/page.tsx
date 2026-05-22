@@ -1284,7 +1284,6 @@ export default function ProjectDetailPage() {
         .prj-dropzone { border: 1px dashed #333; transition: all 0.2s; }
         .prj-dropzone-over { border-color: rgba(255,77,0,0.5) !important; background: ${ACCENT_DIM} !important; }
         @media (max-width: 768px) {
-          .prj-aside { display: none !important; }
           .prj-desktop-toolbar { display: none !important; }
           .prj-view-toolbar { display: none !important; }
           .prj-modal-box { max-width: 100% !important; margin: 0 8px !important; }
@@ -1325,6 +1324,16 @@ export default function ProjectDetailPage() {
           { label: "업로드", value: `${displayPhotos.length}장` },
           { label: "고객 셀렉", value: `${N}장`, accent: displayPhotos.length >= N && N > 0 },
         ]}
+        actions={isInviteActive ? (
+          <button
+            type="button"
+            onClick={() => setInviteShareModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border border-[#27272c] text-zinc-300 hover:border-[#FF4D00] hover:text-[#FF4D00] transition-colors"
+          >
+            <Link2 size={15} />
+            초대 링크
+          </button>
+        ) : undefined}
       />
 
       {/* 모바일: 헤더 바로 아래 전체 너비 진행 라인 (업로드·에러 시; 종료 시 200ms 페이드) */}
@@ -1358,221 +1367,6 @@ export default function ProjectDetailPage() {
 
       {/* main */}
       <main style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden", zIndex: 10, position: "relative" }}>
-
-        {/* ── Left Panel ── */}
-        <aside
-          className="prj-scroll prj-aside"
-          style={{
-            width: 360,
-            flexShrink: 0,
-            alignSelf: "stretch",
-            minHeight: 0,
-            borderRight: `1px solid ${BORDER}`,
-            display: "flex",
-            flexDirection: "column",
-            overflowY: "auto",
-          }}
-        >
-
-          {/* ACTIVE_PROJECT */}
-          <section style={{ background: SURFACE_1, padding: 20, borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
-            {/* Row 1: Project ID */}
-            {project.displayId && (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 10 }}>
-                <span style={{ fontFamily: MONO, fontSize: 10, color: "#444" }}>ID: {project.displayId}</span>
-              </div>
-            )}
-
-            {/* Row 2: Accent dot + Project name */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, minWidth: 0 }}>
-              <div style={{ width: 6, height: 6, background: ACCENT, flexShrink: 0 }} />
-              <h1
-                style={{
-                  fontFamily: "'Space Grotesk', 'Pretendard Variable', sans-serif",
-                  fontSize: 20,
-                  fontWeight: 700,
-                  color: TEXT_BRIGHT,
-                  lineHeight: 1.3,
-                  margin: 0,
-                  wordBreak: "break-word",
-                  minWidth: 0,
-                }}
-              >
-                {project.name}
-              </h1>
-            </div>
-
-            <div style={{ background: SURFACE_2, border: `1px solid #222`, padding: "10px 12px", marginBottom: 12 }}>
-              <span className="prj-tech-label" style={{ color: "#555", display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}><Link2 size={9} />초대 링크</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontFamily: MONO, fontSize: 10, color: isInviteActive ? TEXT_NORMAL : "#555", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {isInviteActive ? inviteUrl.replace(/^https?:\/\//, "") : "업로드 완료 후 활성화"}
-                </span>
-                {isInviteActive && (
-                  <button type="button" onClick={handleCopyLink} style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.1em", padding: "4px 8px", flexShrink: 0, background: copied ? "rgba(46,213,115,0.15)" : ACCENT, border: "none", color: copied ? "#2ed573" : "#000", cursor: "pointer", fontWeight: 700 }}>
-                    {copied ? "복사됨" : "복사"}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", border: `1px solid ${BORDER}`, marginBottom: 12, background: SURFACE_2 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}><Lock size={10} color={TEXT_MUTED} /><span className="prj-tech-label" style={{ color: TEXT_MUTED }}>접속 PIN</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {project.accessPin ? (
-                  <>
-                    <span style={{ fontFamily: MONO, fontSize: 13, color: TEXT_NORMAL, letterSpacing: 4 }}>{pinVisible ? project.accessPin : "●●●●"}</span>
-                    <button type="button" onClick={() => setPinVisible(!pinVisible)} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 2 }}>{pinVisible ? <EyeOff size={12} /> : <Eye size={12} />}</button>
-                    <button type="button" onClick={() => { setPinInput(project.accessPin ?? ""); setShowPinModal(true); setPinError(""); }} className="prj-btn-secondary" style={{ padding: "3px 8px" }}>수정</button>
-                  </>
-                ) : (
-                  <>
-                    <span style={{ fontFamily: MONO, fontSize: 10, color: "#444" }}>미설정</span>
-                    <button type="button" onClick={() => { setPinInput(""); setShowPinModal(true); setPinError(""); }} className="prj-btn-secondary" style={{ padding: "3px 8px" }}>설정</button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", marginBottom: 12, background: isInviteActive ? "rgba(46,213,115,0.04)" : "transparent", border: `1px solid ${isInviteActive ? "rgba(46,213,115,0.15)" : "#222"}` }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: isInviteActive ? "#2ed573" : "#444", flexShrink: 0 }} />
-              <span style={{ fontFamily: MONO, fontSize: 10, color: isInviteActive ? "#2ed573" : "#555" }}>
-                {isInviteActive ? `링크 활성화됨 · ${getStatusLabel(project.status)}` : "링크 비활성화 · 업로드 전"}
-              </span>
-            </div>
-
-          </section>
-
-          {/* UPLINK_CONSOLE — 남는 세로 공간을 드롭존이 메움 */}
-          <section
-            style={{
-              background: SURFACE_1,
-              padding: 20,
-              borderBottom: `1px solid ${BORDER}`,
-              flex: 1,
-              minHeight: 0,
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-              <span className="prj-tech-label" style={{ color: TEXT_BRIGHT }}>사진 업로드</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                {isUploading && <Loader2 size={10} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} />}
-                <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT }}>{displayPhotos.length}장</span>
-              </div>
-            </div>
-
-            {/* dropzone */}
-            <div
-              className={`prj-dropzone${dragOver ? " prj-dropzone-over" : ""}`}
-              onClick={() => !isUploading && uploadAllowed && requestOpenFilePicker()}
-              onDrop={uploadAllowed ? onDrop : undefined}
-              onDragOver={uploadAllowed ? onDragOver : undefined}
-              onDragLeave={uploadAllowed ? onDragLeave : undefined}
-              style={{
-                flex: 1,
-                minHeight: 120,
-                background: dragOver ? ACCENT_DIM : "rgba(2,2,2,0.5)",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 10,
-                padding: "32px 16px",
-                cursor: isUploading ? "not-allowed" : uploadAllowed ? "pointer" : "not-allowed",
-                opacity: isUploading ? 0.7 : uploadAllowed ? 1 : 0.5,
-              }}
-            >
-              <div style={{ width: 52, height: 52, borderRadius: "50%", border: `1px solid #222`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {isUploading ? <Loader2 size={20} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} /> : <Upload size={20} color="#444" />}
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 13, color: isUploading ? TEXT_NORMAL : "#888", marginBottom: 4 }}>
-                  {isUploading
-                    ? uploadPhase === "processing"
-                      ? "처리 중..."
-                      : showServerWorking
-                        ? "서버 처리 중..."
-                        : "업로드 중..."
-                    : "클릭 또는 드래그"}
-                </p>
-                <p className="prj-tech-label" style={{ color: "#444", fontSize: "0.55rem" }}>
-                  {isUploading
-                    ? showServerWorking
-                      ? "썸네일·저장 처리 중 · 완료될 때까지 창을 닫지 마세요"
-                      : `${uploadProgress}%`
-                    : "클릭 또는 드래그하여 선택"}
-                </p>
-              </div>
-            </div>
-
-            {/* progress bar — 링크 미활성화(preparing) 상태에서만 표시 */}
-            {!isInviteActive && (
-              <div style={{ flexShrink: 0, background: SURFACE_2, border: `1px solid ${BORDER}`, padding: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 8 }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT }}>{displayPhotos.length}장 업로드됨</span>
-                  </div>
-                  <span className="prj-tech-label" style={{ color: isUploading ? ACCENT : TEXT_MUTED }}>
-                    {isUploading ? (showServerWorking ? "···" : `${uploadProgress}%`) : `${progressPct}%`}
-                  </span>
-                </div>
-                <div style={{ height: 3, background: "#111", position: "relative", overflow: "hidden" }}>
-                  <div
-                    style={
-                      showServerWorking
-                        ? {
-                            width: "100%",
-                            background: ACCENT,
-                            height: "100%",
-                            position: "relative",
-                            overflow: "hidden",
-                            animation: "prj-bar-indeterminate-pulse 1.4s ease-in-out infinite",
-                          }
-                        : {
-                            width: `${isUploading ? uploadProgress : progressPct}%`,
-                            background: ACCENT,
-                            height: "100%",
-                            position: "relative",
-                            overflow: "hidden",
-                            transition: "width 0.3s",
-                          }
-                    }
-                  >
-                    {showServerWorking ? (
-                      <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.35)", width: "35%", animation: "prj-bar-indet-sweep 1.1s linear infinite" }} />
-                    ) : (isUploading || progressPct > 0) ? (
-                      <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.25)", width: "20%", animation: "prj-bar-scan 2s linear infinite" }} />
-                    ) : null}
-                  </div>
-                </div>
-                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 12, color: "#888" }}>진행</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: N <= 0 ? "#666" : displayPhotos.length >= N ? "#2ed573" : ACCENT }}>
-                      {N <= 0 ? "셀렉 장수 미정" : displayPhotos.length >= N ? "활성화 가능" : `${Math.max(0, N - displayPhotos.length)}장 더 필요`}
-                    </span>
-                  </div>
-                  {N > 0 && M < N && (
-                    <p style={{ margin: 0, fontSize: 12, color: "#666", lineHeight: 1.5 }}>
-                      {`${N}장 채우면 초대 링크를 활성화할 수 있어요.`}
-                    </p>
-                  )}
-                </div>
-                {uploadError && <p style={{ fontSize: 11, color: "#FF3333", marginTop: 8 }}>[ERR] {uploadError}</p>}
-              </div>
-            )}
-            {isInviteActive && uploadError && (
-              <div style={{ flexShrink: 0, padding: "8px 12px" }}>
-                <p style={{ fontSize: 11, color: "#FF3333", margin: 0 }}>[ERR] {uploadError}</p>
-              </div>
-            )}
-
-          </section>
-
-        </aside>
 
         {/* ── Right Panel ── */}
         <section style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, overflow: "hidden" }}>
