@@ -725,8 +725,14 @@ export default function ReviewViewerPage() {
 
           {/* Left panel: thumbnail gallery */}
           <div className="rv-panel-left" style={{ borderRight: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", background: "rgba(3,3,3,0.95)" }}>
-            <div style={{ padding: "10px 14px", borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "flex-end", alignItems: "center", fontFamily: MONO, fontSize: 10, flexShrink: 0 }}>
-              <span style={{ color: MUTED }}>{photos.length}장</span>
+            <div style={{ padding: "8px 14px", borderBottom: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", gap: 5, flexShrink: 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: MONO, fontSize: 10 }}>
+                <span style={{ color: MUTED }}>검토 진행</span>
+                <span style={{ color: allReviewed ? GREEN : ACCENT, fontWeight: 700 }}>{reviewedCount} / {total}</span>
+              </div>
+              <div style={{ height: 2, background: BORDER, borderRadius: 1 }}>
+                <div style={{ height: "100%", background: allReviewed ? GREEN : ACCENT, width: `${progressPct}%`, transition: "width 0.3s", borderRadius: 1 }} />
+              </div>
             </div>
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 12, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, alignContent: "start" }}>
               {photos.map((p, i) => {
@@ -838,7 +844,6 @@ export default function ReviewViewerPage() {
                 >
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "8px 12px", display: "flex", justifyContent: "space-between", background: "linear-gradient(rgba(0,0,0,0.8),transparent)", zIndex: 2, pointerEvents: "none" }}>
                     <span style={{ background: BG_BASE, border: `1px solid ${BORDER}`, padding: "4px 8px", fontFamily: MONO, fontSize: 9, color: MUTED, letterSpacing: "0.05em", textTransform: "uppercase" }}>원본</span>
-                    <span className="rv-stage-meta-right" style={{ background: BG_BASE, border: `1px solid ${BORDER}`, padding: "4px 8px", fontFamily: MONO, fontSize: 9, color: DIM }}>{current.originalFilename?.split("/").pop() ?? "UNKNOWN"}</span>
                   </div>
                   {current.originalUrl
                     ? <img src={current.originalUrl} alt="원본" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "contain" }} />
@@ -853,7 +858,6 @@ export default function ReviewViewerPage() {
                 >
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "8px 12px", display: "flex", justifyContent: "space-between", background: "linear-gradient(rgba(0,0,0,0.8),transparent)", zIndex: 2, pointerEvents: "none" }}>
                     <span style={{ background: BG_BASE, border: `1px solid ${ACCENT}`, padding: "4px 8px", fontFamily: MONO, fontSize: 9, color: ACCENT, letterSpacing: "0.05em", textTransform: "uppercase" }}>{versionLabel}</span>
-                    <span className="rv-stage-meta-right" style={{ background: BG_BASE, border: `1px solid ${BORDER}`, padding: "4px 8px", fontFamily: MONO, fontSize: 9, color: DIM }}>{current.originalFilename?.split("/").pop()?.replace(/\.[^.]+$/, "_EDIT") ?? "UNKNOWN"}</span>
                   </div>
                   {current.versionUrl
                     ? <img src={current.versionUrl} alt="보정본" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "contain" }} />
@@ -892,31 +896,42 @@ export default function ReviewViewerPage() {
             <div className="rv-action-bar" style={{ flexShrink: 0, borderTop: `1px solid ${BORDER}`, background: "rgba(5,5,5,0.95)" }}>
 
               {/* 재보정 코멘트 한 줄 인풋 (재보정 선택 시 자동 노출) */}
-              {isRevision && (
-                <div style={{ padding: "10px 20px 0", display: "flex", alignItems: "center", gap: 8 }}>
-                  {current.photographerMemo && (
-                    <span style={{ fontFamily: MONO, fontSize: 10, color: DIM, flexShrink: 0 }}>
-                      📌 {current.photographerMemo.slice(0, 30)}{current.photographerMemo.length > 30 ? "…" : ""}
-                    </span>
-                  )}
-                  <input
-                    type="text"
-                    value={revisionDraft}
-                    onChange={(e) => setRevisionDraft(e.target.value.slice(0, 100))}
-                    onBlur={handleRevisionSave}
-                    placeholder="코멘트 입력 (선택, 100자)"
-                    maxLength={100}
-                    style={{
-                      flex: 1, height: 36,
-                      background: BG_INPUT, border: `1px solid ${BORDER}`, borderRadius: 8,
-                      color: TEXT, padding: "0 12px",
-                      fontFamily: "'Inter', -apple-system, sans-serif",
-                      fontSize: 13, outline: "none", transition: "border-color 0.15s",
-                    }}
-                    onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(255,170,0,0.5)"; }}
-                  />
-                </div>
-              )}
+              {/* 코멘트 입력 — 항상 표시, 재보정 선택 시 강조 */}
+              <div style={{ padding: "10px 20px 0", display: "flex", alignItems: "center", gap: 8 }}>
+                {current.photographerMemo && isRevision && (
+                  <span style={{ fontFamily: MONO, fontSize: 10, color: DIM, flexShrink: 0 }}>
+                    📌 {current.photographerMemo.slice(0, 30)}{current.photographerMemo.length > 30 ? "…" : ""}
+                  </span>
+                )}
+                <input
+                  type="text"
+                  value={revisionDraft}
+                  onChange={(e) => {
+                    const v = e.target.value.slice(0, 100);
+                    setRevisionDraft(v);
+                    // 타이핑 시작 시 재보정 모드 자동 전환
+                    if (v && !isRevision && current) {
+                      setReview(current.id, "revision_requested", v);
+                    }
+                  }}
+                  onBlur={handleRevisionSave}
+                  placeholder={isRevision ? "재보정 코멘트 (선택, 100자)" : "코멘트를 입력하면 재보정 요청으로 전환됩니다"}
+                  maxLength={100}
+                  style={{
+                    flex: 1, height: 36,
+                    background: BG_INPUT,
+                    border: `1px solid ${isRevision ? "rgba(255,170,0,0.4)" : BORDER}`,
+                    borderRadius: 8,
+                    color: TEXT, padding: "0 12px",
+                    fontFamily: "'Inter', -apple-system, sans-serif",
+                    fontSize: 13, outline: "none", transition: "border-color 0.15s",
+                    opacity: isApproved ? 0.4 : 1,
+                  }}
+                  disabled={isApproved}
+                  onFocus={(e) => { if (!isApproved) e.currentTarget.style.borderColor = "rgba(255,170,0,0.5)"; }}
+                  onBlurCapture={(e) => { e.currentTarget.style.borderColor = isRevision ? "rgba(255,170,0,0.4)" : BORDER; }}
+                />
+              </div>
 
               {/* 하단 버튼 행 */}
               <div style={{ padding: "8px 20px 4px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
