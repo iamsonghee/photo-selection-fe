@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Check, RefreshCw, Maximize2, X } from "lucide-react";
+import { Check, RefreshCw, Maximize2, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
 import { PrevNextButton } from "@/components/PrevNextButton";
@@ -48,6 +48,7 @@ export default function ReviewViewerPage() {
   const [revisionDraft,    setRevisionDraft]    = useState("");
   const [submitError,      setSubmitError]      = useState<string | null>(null);
   const [photographer,     setPhotographer]     = useState<string | null>(null);
+  const [sidebarOpen,      setSidebarOpen]      = useState(true);
 
   // URL 파라미터가 바뀔 때만 동기화 (브라우저 뒤로가기 등)
   useEffect(() => { setActivePhotoId(photoId); }, [photoId]);
@@ -724,11 +725,21 @@ export default function ReviewViewerPage() {
         <div className="rv-workspace">
 
           {/* Left panel: thumbnail gallery */}
-          <div className="rv-panel-left" style={{ borderRight: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", background: "rgba(3,3,3,0.95)" }}>
+          <div className="rv-panel-left" style={{ borderRight: `1px solid ${BORDER}`, display: sidebarOpen ? "flex" : "none", flexDirection: "column", background: "rgba(3,3,3,0.95)", position: "relative" }}>
             <div style={{ padding: "8px 14px", borderBottom: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", gap: 5, flexShrink: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: MONO, fontSize: 10 }}>
                 <span style={{ color: MUTED }}>검토 진행</span>
-                <span style={{ color: allReviewed ? GREEN : ACCENT, fontWeight: 700 }}>{reviewedCount} / {total}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ color: allReviewed ? GREEN : ACCENT, fontWeight: 700 }}>{reviewedCount} / {total}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarOpen(false)}
+                    title="사이드바 닫기"
+                    style={{ background: "none", border: "none", cursor: "pointer", color: DIM, padding: 0, display: "flex", alignItems: "center" }}
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                </div>
               </div>
               <div style={{ height: 2, background: BORDER, borderRadius: 1 }}>
                 <div style={{ height: "100%", background: allReviewed ? GREEN : ACCENT, width: `${progressPct}%`, transition: "width 0.3s", borderRadius: 1 }} />
@@ -834,7 +845,25 @@ export default function ReviewViewerPage() {
           </div>
 
           {/* Center panel: viewer + action bar */}
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
+            {/* 사이드바 열기 버튼 — 닫혔을 때만 표시 */}
+            {!sidebarOpen && (
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                title="사이드바 열기"
+                style={{
+                  position: "absolute", top: "50%", left: 0, transform: "translateY(-50%)",
+                  zIndex: 20, background: "rgba(10,10,12,0.9)", border: `1px solid ${BORDER_HI}`,
+                  borderLeft: "none", borderRadius: "0 6px 6px 0",
+                  color: MUTED, cursor: "pointer", padding: "10px 4px",
+                  display: "flex", alignItems: "center",
+                  transition: "color 0.15s",
+                }}
+              >
+                <ChevronRight size={14} />
+              </button>
+            )}
             {/* Image stage */}
             <div className="rv-stage" style={{ flex: 1, minHeight: 0, padding: 20, display: "flex", gap: 12, overflow: "hidden", position: "relative" }}>
               {showOriginal && (
