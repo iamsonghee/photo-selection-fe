@@ -724,7 +724,7 @@ export default function ReviewViewerPage() {
                 const pRevision   = pStatus === "revision_requested";
                 const pillColor   = pApproved ? GREEN : pRevision ? ORANGE : undefined;
                 const pillLabel   = pApproved ? "APPROVED" : pRevision ? "REVISION" : null;
-                const thumbSrc    = p.versionUrl ?? p.originalUrl;
+                const thumbSrc    = p.versionThumbUrl ?? p.versionUrl ?? p.originalUrl;
 
                 return (
                   <div

@@ -190,6 +190,7 @@ export interface ReviewPhotoItem {
   originalFilename: string;
   originalUrl: string;
   versionUrl: string;
+  versionThumbUrl: string;
   photographerMemo: string | null;
   orderIndex: number;
   /** 이미 제출된 검토가 있으면 */
@@ -229,7 +230,7 @@ export async function getReviewDataByToken(
 
   const { data: pvRowsRaw, error: pvErr } = await admin
     .from("photo_versions")
-    .select("id, photo_id, r2_url, photographer_memo, created_at")
+    .select("id, photo_id, r2_url, r2_thumb_url, photographer_memo, created_at")
     .in("photo_id", photoIds)
     .eq("version", version)
     .order("created_at", { ascending: false });
@@ -239,13 +240,14 @@ export async function getReviewDataByToken(
   // 고객 검토가 옛 photo_version_id에만 쌓여 '전부 확정'처럼 보일 수 있다.
   const pvByPhotoId = new Map<
     string,
-    { id: string; photo_id: string; r2_url: string; photographer_memo: string | null }
+    { id: string; photo_id: string; r2_url: string; r2_thumb_url: string | null; photographer_memo: string | null }
   >();
   for (const r of pvRowsRaw ?? []) {
     const row = r as {
       photo_id: string;
       id: string;
       r2_url: string;
+      r2_thumb_url: string | null;
       photographer_memo: string | null;
     };
     if (pvByPhotoId.has(row.photo_id)) continue;
@@ -280,8 +282,9 @@ export async function getReviewDataByToken(
       photoVersionId: pv.id,
       originalFilename: (row.original_filename ?? "").trim() || String(row.number),
       originalUrl: row.r2_preview_url ?? row.r2_thumb_url,
-      versionUrl: (pv as { r2_url: string }).r2_url,
-      photographerMemo: (pv as { photographer_memo: string | null }).photographer_memo ?? null,
+      versionUrl: pv.r2_url,
+      versionThumbUrl: pv.r2_thumb_url ?? pv.r2_url,
+      photographerMemo: pv.photographer_memo ?? null,
       orderIndex: row.number,
       existingReview: existing,
     });

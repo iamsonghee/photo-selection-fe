@@ -265,7 +265,7 @@ function MobileReviewGalleryView({
             const pRevision = pStatus === "revision_requested";
             const pillColor = pApproved ? GREEN : pRevision ? ORANGE : undefined;
             const pillLabel = pApproved ? "APPROVED" : pRevision ? "REVISION" : null;
-            const thumbSrc = p.versionUrl ?? p.originalUrl;
+            const thumbSrc = p.versionThumbUrl ?? p.versionUrl ?? p.originalUrl;
             return (
               <button
                 key={p.id}
@@ -767,7 +767,7 @@ function DeliveryReceiptView({
         <div style={{ borderTop: `1px solid ${BORDER}`, background: "rgba(5,5,8,0.7)", padding: "10px 12px 110px" }}>
           <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6 }}>
             {photos.map((p, i) => {
-              const thumbSrc = p.versionUrl ?? p.originalUrl;
+              const thumbSrc = p.versionThumbUrl ?? p.versionUrl ?? p.originalUrl;
               const isActive = i === activeIdx;
               return (
                 <button

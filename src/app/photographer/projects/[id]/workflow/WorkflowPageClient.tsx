@@ -36,7 +36,8 @@ import { normalizeReviewDeadlineYmd } from "@/lib/format-review-deadline";
 
 type VersionInfo = {
   id: string;
-  url: string;
+  url: string;      // 1500px — 뷰어·라이트박스용
+  thumbUrl: string; // 400px — 카드 그리드용 (없으면 url fallback)
   reviewStatus: "approved" | "revision_requested" | null;
   comment: string | null;
 };
@@ -434,7 +435,7 @@ function V1Card({
             className="w-full h-full bg-[#080808] rounded-lg overflow-hidden relative cursor-pointer hover:opacity-95 transition-opacity border border-[#1a1a1e]"
           >
             <img
-              src={getVersionUrl(v1.url, row.photo.id, 1)}
+              src={getVersionUrl(v1.thumbUrl, row.photo.id, 1)}
               alt="V1"
               loading="lazy"
               decoding="async"
@@ -627,7 +628,7 @@ function V2Card({
             title="V1 보기"
           >
             <img
-              src={getVersionUrl(v1.url, row.photo.id, 1)}
+              src={getVersionUrl(v1.thumbUrl, row.photo.id, 1)}
               alt=""
               loading="lazy"
               decoding="async"
@@ -673,7 +674,7 @@ function V2Card({
             className="w-full h-full bg-[#080808] rounded-lg overflow-hidden relative cursor-pointer hover:opacity-95 transition-opacity border border-[#1a1a1e]"
           >
             <img
-              src={getVersionUrl(v2.url, row.photo.id, 2)}
+              src={getVersionUrl(v2.thumbUrl, row.photo.id, 2)}
               alt="V2"
               loading="lazy"
               decoding="async"
@@ -876,6 +877,7 @@ export default function WorkflowPageClient() {
           const info: VersionInfo = {
             id: v.id,
             url: v.r2_url,
+            thumbUrl: v.r2_thumb_url ?? v.r2_url,
             reviewStatus: v.review_status ?? null,
             comment: v.customer_comment ?? null,
           };
