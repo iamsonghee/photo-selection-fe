@@ -44,6 +44,8 @@ import { buildCompactSteps } from "@/lib/project-flow-steps";
 import { getStatusLabel } from "@/lib/project-status";
 
 /** Nexus design tokens — 동일한 오렌지 테마 */
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
 const ACCENT       = "#FF5A1F";
 const ACCENT_DIM   = "rgba(255, 90, 31, 0.15)";
 const BORDER       = "#1f1f1f";
@@ -381,7 +383,7 @@ export default function UploadVersionsV2Page() {
       ordered.forEach((m) => form.append("files", m.file));
       form.append("global_memo", globalMemo);
 
-      const uploadRes = await fetch("/api/photographer/upload-versions", {
+      const uploadRes = await fetch(`${API_BASE}/api/upload/versions`, {
         method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form,
       });
       const uploadData = await uploadRes.json().catch(() => ({}));
