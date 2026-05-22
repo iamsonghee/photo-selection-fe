@@ -122,6 +122,7 @@ export default function ReviewViewerPage() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.isComposing) return;
       if (e.key === "ArrowLeft")  { e.preventDefault(); goPrev(); }
       if (e.key === "ArrowRight") { e.preventDefault(); goNext(); }
       if (e.key === "Escape")     { e.preventDefault(); router.replace(`/c/${token}/review`); }
@@ -161,6 +162,18 @@ export default function ReviewViewerPage() {
       setReview(current.id, "revision_requested", review?.comment || undefined);
     }
   }, [current, isRevision, review, setReview]);
+
+  // Y/R 키보드 단축키 — 확정 / 재보정
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.isComposing) return;
+      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") return;
+      if (e.key === "y" || e.key === "Y") { e.preventDefault(); handleApprove(); }
+      if (e.key === "r" || e.key === "R") { e.preventDefault(); openRevisionInline(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleApprove, openRevisionInline]);
 
   // 코멘트 인풋 blur 시 자동 저장
   const handleRevisionSave = useCallback(() => {
@@ -527,7 +540,7 @@ export default function ReviewViewerPage() {
           display: flex; align-items: center; gap: 10px;
           padding: 0 28px; height: 48px; font-size: 14px; white-space: nowrap;
         }
-        .rv-btn-submit:disabled { opacity: 0.4; cursor: not-allowed; background: #555; }
+        .rv-btn-submit:disabled { opacity: 1; cursor: not-allowed; background: #1a1a1a; color: rgba(255,255,255,0.25); clip-path: none; border: 1px solid #333; }
         .rv-btn-submit:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(255,77,0,0.3); }
 
         .rv-modal-bracket { position: absolute; width: 12px; height: 12px; border-color: ${ACCENT}; pointer-events: none; }
@@ -723,7 +736,8 @@ export default function ReviewViewerPage() {
                 const pApproved   = pStatus === "approved";
                 const pRevision   = pStatus === "revision_requested";
                 const pillColor   = pApproved ? GREEN : pRevision ? ORANGE : undefined;
-                const pillLabel   = pApproved ? "APPROVED" : pRevision ? "REVISION" : null;
+                const pillLabel   = pApproved ? "✓" : pRevision ? "↺" : null;
+                const statusBarColor = pApproved ? GREEN : pRevision ? ORANGE : null;
                 const thumbSrc    = p.versionThumbUrl ?? p.versionUrl ?? p.originalUrl;
 
                 return (
@@ -766,17 +780,28 @@ export default function ReviewViewerPage() {
                         justifyContent: "space-between",
                       }}
                     >
+                      {/* 하단 상태 바 */}
+                      {statusBarColor && (
+                        <div style={{
+                          position: "absolute",
+                          bottom: 0, left: 0, right: 0,
+                          height: 3,
+                          background: statusBarColor,
+                          borderRadius: "0 0 2px 2px",
+                        }} />
+                      )}
                       <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "flex-start" }}>
                         {pillLabel && (
                           <span
                             style={{
-                              background: "rgba(0,0,0,0.8)",
-                              border: `1px solid ${pillColor}22`,
+                              background: "rgba(0,0,0,0.85)",
+                              border: `1px solid ${pillColor}40`,
                               color: pillColor,
-                              padding: "1px 4px",
-                              fontSize: 8,
+                              padding: "2px 5px",
+                              fontSize: 9,
                               fontFamily: MONO,
-                              borderRadius: 1,
+                              fontWeight: 700,
+                              borderRadius: 2,
                             }}
                           >
                             {pillLabel}
@@ -894,7 +919,7 @@ export default function ReviewViewerPage() {
               )}
 
               {/* 하단 버튼 행 */}
-              <div style={{ padding: "10px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ padding: "8px 20px 4px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ width: 7, height: 7, borderRadius: "50%", background: isApproved ? GREEN : isRevision ? ORANGE : DIM, flexShrink: 0 }} />
                   <span style={{ fontFamily: MONO, fontSize: 11, color: isApproved ? GREEN : isRevision ? ORANGE : MUTED }}>
@@ -930,6 +955,12 @@ export default function ReviewViewerPage() {
                   </button>
                 </div>
               </div>
+              {/* 키보드 단축키 힌트 */}
+              <div className="rv-header-photographer" style={{ padding: "2px 20px 8px", textAlign: "right" }}>
+                <span style={{ fontFamily: MONO, fontSize: 9, color: DIM, letterSpacing: "0.05em" }}>
+                  [Y] 확정 &nbsp; [R] 재보정 &nbsp; [←][→] 이동
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -953,7 +984,7 @@ export default function ReviewViewerPage() {
                 </p>
               </div>
               <button type="button" className="rv-btn-submit" disabled={!allReviewed} onClick={() => allReviewed && setShowSubmitModal(true)}>
-                <span>작가에게 전달</span>
+                <span>{allReviewed ? "작가에게 전달" : `${pendingCount}장 검토 후 전달`}</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
                   <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
                 </svg>
