@@ -397,8 +397,9 @@ export default function UploadVersionsPanel({
         .uvp-scroll::-webkit-scrollbar-thumb { background: #2a2a2e; border-radius: 3px; }
         .uvp-scroll::-webkit-scrollbar-thumb:hover { background: ${ACCENT}; }
         @media (max-width: 768px) {
-          .uvp-sheet { width: 100% !important; max-width: 100% !important; }
+          .uvp-sheet { width: 100% !important; max-width: 100% !important; height: calc(100dvh - 60px) !important; }
           .uvp-collapse-toggle { display: none !important; }
+          .uvp-footer { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important; }
         }
       `}</style>
 
@@ -618,7 +619,7 @@ export default function UploadVersionsPanel({
 
         {/* Footer / action bar */}
         {!overBetaLimit && targets.length > 0 ? (
-          <footer className="shrink-0 border-t border-[#1a1a1e] bg-[#0f0f12]/95 backdrop-blur px-5 py-4 flex flex-col gap-3">
+          <footer className="uvp-footer shrink-0 border-t border-[#1a1a1e] bg-[#0f0f12]/95 backdrop-blur px-5 py-4 flex flex-col gap-3">
             {/* progress */}
             <div>
               <div className="flex items-center justify-between mb-1.5 gap-3">
