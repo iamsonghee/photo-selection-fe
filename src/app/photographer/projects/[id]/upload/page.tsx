@@ -1324,16 +1324,6 @@ export default function ProjectDetailPage() {
           { label: "업로드", value: `${displayPhotos.length}장` },
           { label: "고객 셀렉", value: `${N}장`, accent: displayPhotos.length >= N && N > 0 },
         ]}
-        actions={isInviteActive ? (
-          <button
-            type="button"
-            onClick={() => setInviteShareModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border border-[#27272c] text-zinc-300 hover:border-[#FF4D00] hover:text-[#FF4D00] transition-colors"
-          >
-            <Link2 size={15} />
-            초대 링크
-          </button>
-        ) : undefined}
       />
 
       {/* 모바일: 헤더 바로 아래 전체 너비 진행 라인 (업로드·에러 시; 종료 시 200ms 페이드) */}
@@ -1407,7 +1397,7 @@ export default function ProjectDetailPage() {
           {/* photo grid — 가상 스크롤로 보이는 행만 마운트·이미지 로드 */}
           <div
             ref={photoScrollRef}
-            className={`prj-scroll${!isInviteActive ? " prj-photo-scroll-mobile-pad" : ""}`}
+            className="prj-scroll prj-photo-scroll-mobile-pad"
             style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "rgba(3,3,3,0.4)" }}
           >
             {photosLoading ? (
@@ -1482,64 +1472,92 @@ export default function ProjectDetailPage() {
       </main>
 
       {/* ── 고객 초대 하단 고정 바 ── */}
-      {!isInviteActive && (
-        <div
-          className="prj-invite-bar"
-          style={{
-            flexShrink: 0,
-            background: "rgba(8, 4, 2, 0.96)",
-            borderTop: "1px solid rgba(255, 77, 0, 0.2)",
-            backdropFilter: "blur(12px)",
-            padding: "12px 24px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 16,
-            zIndex: 50,
-          }}
-        >
-          <div className="prj-invite-meta" style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-            <div className="prj-invite-title" style={{ fontSize: 13, fontWeight: 500, color: TEXT_BRIGHT }}>
-              {isMobile
-                ? (N > 0
-                    ? (displayPhotos.length >= N ? `${displayPhotos.length}/${N}장 · 활성화 가능` : `${displayPhotos.length}/${N}장`)
-                    : `${displayPhotos.length}장 · 셀렉 미정`)
-                : "고객 초대 준비"}
+      <div
+        className="prj-invite-bar"
+        style={{
+          flexShrink: 0,
+          background: "rgba(8, 4, 2, 0.96)",
+          borderTop: `1px solid ${isInviteActive ? "rgba(255, 77, 0, 0.35)" : "rgba(255, 77, 0, 0.2)"}`,
+          backdropFilter: "blur(12px)",
+          padding: "12px 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          zIndex: 50,
+        }}
+      >
+        {isInviteActive ? (
+          /* 활성화 후 — 초대 링크 공유 버튼 */
+          <>
+            <div className="prj-invite-meta" style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+              <div className="prj-invite-title" style={{ fontSize: 13, fontWeight: 500, color: TEXT_BRIGHT }}>
+                {isMobile ? "고객 초대 링크" : "고객 초대 링크가 활성화되었습니다"}
+              </div>
+              <div className="prj-invite-sub" style={{ fontSize: 11, color: TEXT_MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {inviteUrl.replace(/^https?:\/\//, "")}
+              </div>
             </div>
-            <div className="prj-invite-sub" style={{ fontSize: 11, color: TEXT_MUTED }}>
-              {displayPhotos.length >= N && N > 0
-                ? `${displayPhotos.length}장 업로드 완료 · 초대 링크를 활성화할 수 있습니다`
-                : `${displayPhotos.length}장 업로드됨 · ${N}장 이상 업로드 후 활성화 가능합니다`}
+            <button
+              type="button"
+              className="prj-invite-btn"
+              onClick={() => setInviteShareModalOpen(true)}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "9px 20px",
+                background: ACCENT, border: "none", borderRadius: 8,
+                color: "#000", fontSize: 13, fontWeight: 600,
+                cursor: "pointer", fontFamily: MONO,
+                boxShadow: `0 0 16px ${ACCENT_GLOW}`,
+                transition: "all 0.2s",
+              }}
+            >
+              <Link2 size={14} />
+              {isMobile ? "링크 공유" : "초대 링크 공유"}
+            </button>
+          </>
+        ) : (
+          /* 활성화 전 — 초대 링크 활성화 버튼 */
+          <>
+            <div className="prj-invite-meta" style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+              <div className="prj-invite-title" style={{ fontSize: 13, fontWeight: 500, color: TEXT_BRIGHT }}>
+                {isMobile
+                  ? (N > 0
+                      ? (displayPhotos.length >= N ? `${displayPhotos.length}/${N}장 · 활성화 가능` : `${displayPhotos.length}/${N}장`)
+                      : `${displayPhotos.length}장 · 셀렉 미정`)
+                  : "고객 초대 준비"}
+              </div>
+              <div className="prj-invite-sub" style={{ fontSize: 11, color: TEXT_MUTED }}>
+                {displayPhotos.length >= N && N > 0
+                  ? `${displayPhotos.length}장 업로드 완료 · 초대 링크를 활성화할 수 있습니다`
+                  : `${displayPhotos.length}장 업로드됨 · ${N}장 이상 업로드 후 활성화 가능합니다`}
+              </div>
             </div>
-          </div>
-          <button
-            type="button"
-            className="prj-invite-btn"
-            onClick={handleEnableClientAccess}
-            disabled={inviteActivating || M < N}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              padding: "9px 20px",
-              background: displayPhotos.length >= N ? ACCENT : "rgba(255,77,0,0.15)",
-              border: "none",
-              borderRadius: 8,
-              color: displayPhotos.length >= N ? "#000" : ACCENT,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: displayPhotos.length >= N && !inviteActivating ? "pointer" : "not-allowed",
-              fontFamily: MONO,
-              opacity: inviteActivating ? 0.75 : 1,
-              boxShadow: displayPhotos.length >= N ? `0 0 16px ${ACCENT_GLOW}` : "none",
-              transition: "all 0.2s",
-            }}
-          >
-            {inviteActivating ? "활성화 중…" : isMobile ? "초대링크 활성화" : "고객 초대 링크 활성화"}
-            {!inviteActivating && M >= N && !isMobile && <ChevronRight size={14} />}
-          </button>
-        </div>
-      )}
+            <button
+              type="button"
+              className="prj-invite-btn"
+              onClick={handleEnableClientAccess}
+              disabled={inviteActivating || M < N}
+              style={{
+                display: "flex", alignItems: "center", gap: 4,
+                padding: "9px 20px",
+                background: displayPhotos.length >= N ? ACCENT : "rgba(255,77,0,0.15)",
+                border: "none", borderRadius: 8,
+                color: displayPhotos.length >= N ? "#000" : ACCENT,
+                fontSize: 13, fontWeight: 600,
+                cursor: displayPhotos.length >= N && !inviteActivating ? "pointer" : "not-allowed",
+                fontFamily: MONO,
+                opacity: inviteActivating ? 0.75 : 1,
+                boxShadow: displayPhotos.length >= N ? `0 0 16px ${ACCENT_GLOW}` : "none",
+                transition: "all 0.2s",
+              }}
+            >
+              {inviteActivating ? "활성화 중…" : isMobile ? "초대링크 활성화" : "고객 초대 링크 활성화"}
+              {!inviteActivating && M >= N && !isMobile && <ChevronRight size={14} />}
+            </button>
+          </>
+        )}
+      </div>
 
       {/* ── 라이트박스 (body 포털: main z-10 < 사이드바 z-20 스택 때문에, 고정 오버레이가 사이드바에 가려지지 않게) ── */}
       {lightboxIndex !== null && photos[lightboxIndex] && typeof document !== "undefined" && document.body
