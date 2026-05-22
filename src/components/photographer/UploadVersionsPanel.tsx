@@ -28,6 +28,8 @@ import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import type { Photo } from "@/types";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
 const ACCENT = "#FF4D00";
 const SURFACE_1 = "#0a0a0c";
 const BORDER = "#1a1a1e";
@@ -282,7 +284,7 @@ export default function UploadVersionsPanel({
       const uploadRes = await new Promise<{ ok: boolean; status: number; text: string }>(
         (resolve, reject) => {
           const xhr = new XMLHttpRequest();
-          xhr.open("POST", "/api/photographer/upload-versions");
+          xhr.open("POST", `${API_BASE}/api/upload/versions`);
           xhr.setRequestHeader("Authorization", `Bearer ${token}`);
 
           xhr.upload.onprogress = (ev) => {
