@@ -11,7 +11,6 @@ import {
   Eye,
   EyeOff,
   Flag,
-  Info,
   ListChecks,
   Lock,
   PenLine,
@@ -25,6 +24,7 @@ import type { Project, ProjectStatus } from "@/types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { FieldInfoTip } from "@/components/ui/FieldInfoTip";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -79,27 +79,6 @@ type FlowStepItem = {
 const MONO_FONT = "var(--font-mono, monospace)";
 
 // ── shared sub-components ──────────────────────────────────────────────────
-
-function FieldInfoTip({ text }: { text: string }) {
-  return (
-    <span className="relative inline-flex shrink-0 group/info">
-      <button
-        type="button"
-        tabIndex={0}
-        className="inline-flex items-center justify-center w-4 h-4 rounded-full text-zinc-600 hover:text-zinc-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#FF4D00]/50 transition-colors"
-        aria-label="필드 설명"
-      >
-        <Info size={12} strokeWidth={2.25} />
-      </button>
-      <span
-        role="tooltip"
-        className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+6px)] z-50 w-max max-w-[min(16rem,calc(100vw-2rem))] px-2.5 py-2 rounded-lg text-[11px] leading-snug text-zinc-200 bg-[#1a1a1e] border border-[#27272c] shadow-lg opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible group-focus-within/info:opacity-100 group-focus-within/info:visible transition-opacity"
-      >
-        {text}
-      </span>
-    </span>
-  );
-}
 
 function FieldLabel({
   label,
@@ -671,7 +650,7 @@ export function ProjectNexusPageClient() {
                 <FieldLabel
                   label="촬영 유형"
                   optional
-                  info="웨딩, 가족·베이비 등 촬영 종류입니다. 프로젝트 목록에서 유형별로 구분할 때 사용합니다."
+                  info="목록 분류용 (웨딩, 가족 등)"
                 />
                 {project.shootType ? (() => {
                   const found = SHOOT_TYPES.find((t) => t.value === project.shootType);
@@ -690,7 +669,7 @@ export function ProjectNexusPageClient() {
               <MetaItem
                 label="촬영 일자"
                 required
-                info="실제 촬영이 진행된 날짜입니다."
+                info="실제 촬영일"
               >
                 <span style={{ fontFamily: MONO_FONT }}>{shootDisplay}</span>
               </MetaItem>
@@ -698,7 +677,7 @@ export function ProjectNexusPageClient() {
               <MetaItem
                 label="셀렉 기한"
                 required
-                info="고객이 셀렉을 마쳐야 하는 날짜입니다."
+                info="고객 셀렉 마감일"
               >
                 <span style={{ fontFamily: MONO_FONT }}>{deadlineDisplay}</span>
               </MetaItem>
@@ -706,7 +685,7 @@ export function ProjectNexusPageClient() {
               <MetaItem
                 label="고객 이름"
                 required
-                info="고객 화면과 알림에 표시되는 이름입니다."
+                info="고객 화면·알림에 표시"
               >
                 <span className="inline-flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-[#27272c] flex items-center justify-center text-[10px] font-bold text-white">
@@ -719,7 +698,7 @@ export function ProjectNexusPageClient() {
               <MetaItem
                 label="연락처"
                 optional
-                info="알림 기능 연동 시 사용됩니다."
+                info="알림 발송용 (선택)"
               >
                 <span style={{ fontFamily: MONO_FONT }}>
                   {project.customerPhone?.trim() || "—"}
@@ -729,7 +708,7 @@ export function ProjectNexusPageClient() {
               <MetaItem
                 label="셀렉 갯수 (N)"
                 required
-                info="고객이 최종 선택해야 하는 사진 장수입니다."
+                info="고객이 고를 최종 장수"
               >
                 <span>
                   <span
@@ -744,7 +723,7 @@ export function ProjectNexusPageClient() {
 
               <MetaItem
                 label="업로드 사진 수"
-                info="작가가 업로드한 원본 사진의 현재 개수입니다."
+                info="업로드된 원본 장수"
               >
                 <span>
                   <span
@@ -760,7 +739,7 @@ export function ProjectNexusPageClient() {
               <div className="col-span-2 pt-4 border-t border-[#1a1a1e]">
                 <FieldLabel
                   label="재보정 허용 횟수"
-                  info="보정본 검토 단계에서 고객이 요청할 수 있는 재보정 횟수입니다. 0회면 검토 후 바로 납품합니다."
+                  info="검토 후 재보정 허용 (0=없음)"
                 />
                 <span
                   className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border ${
@@ -798,7 +777,7 @@ export function ProjectNexusPageClient() {
               <div className="flex flex-col gap-1.5 min-w-0">
                 <FieldLabel
                   label="초대 링크"
-                  info="고객이 셀렉·보정 검토에 접속하는 URL입니다. 원본 업로드 완료 후 활성화됩니다."
+                  info="고객 셀렉·검토 링크"
                   className="mb-0"
                 />
                 <div className="flex items-stretch bg-[#0a0a0c] border border-[#27272c] rounded-xl overflow-hidden focus-within:border-[#FF4D00] transition-colors">
@@ -827,7 +806,7 @@ export function ProjectNexusPageClient() {
               <div className="flex flex-col gap-1.5 min-w-0">
                 <FieldLabel
                   label="고객 비밀번호"
-                  info="링크 접속 시 입력하는 4자리 PIN입니다. 미설정 시 비밀번호 없이 접속할 수 있습니다."
+                  info="접속 PIN 4자리 (선택)"
                   className="mb-0"
                 />
                 <div className="flex items-stretch bg-[#0a0a0c] border border-[#27272c] rounded-xl overflow-hidden focus-within:border-[#FF4D00] transition-colors">
@@ -1063,7 +1042,7 @@ export function ProjectNexusPageClient() {
             <FieldLabel
               label="촬영 유형"
               optional
-              info="웨딩, 가족·베이비 등 촬영 종류입니다. 프로젝트 목록에서 유형별로 구분할 때 사용합니다."
+              info="목록 분류용 (웨딩, 가족 등)"
             />
             <div className="flex gap-2 flex-wrap mt-2">
               {SHOOT_TYPES.map(({ value, label, icon: Icon }) => (
@@ -1108,7 +1087,7 @@ export function ProjectNexusPageClient() {
                 placeholder="고객님 성함"
               />
             </ModalField>
-            <ModalField label="연락처" optional info="010-XXXX-XXXX 형식으로 입력해주세요. 알림 연동 시 사용됩니다.">
+            <ModalField label="연락처" optional info="010-XXXX-XXXX · 알림용">
               <input
                 type="text"
                 inputMode="numeric"
@@ -1138,7 +1117,7 @@ export function ProjectNexusPageClient() {
             </ModalField>
           </div>
 
-          <ModalField label="셀렉 갯수 (N)" required info="고객이 최종 선택해야 하는 사진 장수입니다.">
+          <ModalField label="셀렉 갯수 (N)" required info="고객이 고를 최종 장수">
             {!["preparing", "selecting"].includes(project.status) && (
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/5 border border-yellow-500/20 text-xs text-yellow-500/90">
                 <AlertTriangle size={12} className="shrink-0" />
@@ -1158,7 +1137,7 @@ export function ProjectNexusPageClient() {
           <div>
             <FieldLabel
               label="재보정 허용 횟수"
-              info="보정본 검토 단계에서 고객이 요청할 수 있는 재보정 횟수입니다. 0회면 검토 후 바로 납품합니다."
+              info="검토 후 재보정 허용 (0=없음)"
             />
             <div className="grid grid-cols-3 gap-2">
               {(
