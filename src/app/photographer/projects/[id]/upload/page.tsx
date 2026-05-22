@@ -510,6 +510,13 @@ function VirtualizedPhotoGrid({
     overscan: 2,
   });
 
+  // 사이드바 축소/확장 등으로 컨테이너 너비가 바뀌면 rowHeight도 바뀜.
+  // virtualizer는 함수 참조가 바뀌지 않으면 자동 remeasure를 하지 않으므로 명시 호출.
+  useEffect(() => {
+    rowVirtualizer.measure();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout.rowHeight]);
+
   return (
     <div style={{ padding: GRID_PAD }}>
       <div
