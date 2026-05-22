@@ -726,20 +726,25 @@ export default function ReviewViewerPage() {
 
           {/* Left panel: thumbnail gallery */}
           <div className="rv-panel-left" style={{ borderRight: `1px solid ${BORDER}`, display: sidebarOpen ? "flex" : "none", flexDirection: "column", background: "rgba(3,3,3,0.95)", position: "relative" }}>
+            {/* 사이드바 닫기 버튼 — 우측 엣지 중앙 */}
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              title="사이드바 닫기"
+              style={{
+                position: "absolute", top: "50%", right: 0, transform: "translateY(-50%)",
+                zIndex: 20, background: "rgba(10,10,12,0.9)", border: `1px solid ${BORDER_HI}`,
+                borderRight: "none", borderRadius: "6px 0 0 6px",
+                color: MUTED, cursor: "pointer", padding: "10px 4px",
+                display: "flex", alignItems: "center",
+              }}
+            >
+              <ChevronLeft size={14} />
+            </button>
             <div style={{ padding: "8px 14px", borderBottom: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", gap: 5, flexShrink: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: MONO, fontSize: 10 }}>
                 <span style={{ color: MUTED }}>검토 진행</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ color: allReviewed ? GREEN : ACCENT, fontWeight: 700 }}>{reviewedCount} / {total}</span>
-                  <button
-                    type="button"
-                    onClick={() => setSidebarOpen(false)}
-                    title="사이드바 닫기"
-                    style={{ background: "none", border: "none", cursor: "pointer", color: DIM, padding: 0, display: "flex", alignItems: "center" }}
-                  >
-                    <ChevronLeft size={14} />
-                  </button>
-                </div>
+                <span style={{ color: allReviewed ? GREEN : ACCENT, fontWeight: 700 }}>{reviewedCount} / {total}</span>
               </div>
               <div style={{ height: 2, background: BORDER, borderRadius: 1 }}>
                 <div style={{ height: "100%", background: allReviewed ? GREEN : ACCENT, width: `${progressPct}%`, transition: "width 0.3s", borderRadius: 1 }} />
