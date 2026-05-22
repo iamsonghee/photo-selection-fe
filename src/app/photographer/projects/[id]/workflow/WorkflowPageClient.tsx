@@ -347,7 +347,7 @@ function OriginalCard({
           </div>
         )}
         <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-zinc-300 border border-[#333]">
-          ORIG
+          원본
         </div>
         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
           <Maximize2 size={18} className="text-white" />
@@ -445,7 +445,7 @@ function V1Card({
               className="w-full h-full object-cover"
             />
             <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-zinc-300 border border-[#333]">
-              V1
+              보정
             </div>
             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
               <Maximize2 size={18} className="text-white" />
@@ -684,7 +684,7 @@ function V2Card({
               className="w-full h-full object-cover"
             />
             <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-[#FF4D00] border border-[#FF4D00]/40">
-              V2
+              재보정
             </div>
             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
               <Maximize2 size={18} className="text-white" />
