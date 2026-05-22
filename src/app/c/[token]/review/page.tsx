@@ -600,9 +600,6 @@ function DeliveryReceiptView({
             <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {project.name}
             </div>
-            <div style={{ fontFamily: MONO, fontSize: 10, color: "#7a7a82", marginTop: 2 }}>
-              {photos.length > 0 ? `${activeIdx + 1} / ${photos.length}` : "불러오는 중"}
-            </div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
@@ -691,6 +688,18 @@ function DeliveryReceiptView({
             <div style={{ flex: 1, minWidth: 0, display: "flex", gap: 10, position: "relative" }}>
               <PrevNextButton direction="prev" onClick={goPrev} size="md" />
               <PrevNextButton direction="next" onClick={goNext} size="md" />
+              {/* 카운터 오버레이 */}
+              {photos.length > 0 && (
+                <div style={{
+                  position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)",
+                  zIndex: 10, fontFamily: MONO, fontSize: 11, color: "rgba(255,255,255,0.7)",
+                  background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)",
+                  border: "1px solid rgba(255,255,255,0.1)", borderRadius: 99,
+                  padding: "3px 12px", pointerEvents: "none", userSelect: "none",
+                }}>
+                  {activeIdx + 1} / {photos.length}
+                </div>
+              )}
 
               {showOriginal && (
                 <div

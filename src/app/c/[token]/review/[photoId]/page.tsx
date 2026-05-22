@@ -259,7 +259,7 @@ export default function ReviewViewerPage() {
     return null;
   }
 
-  const versionLabel      = `RETOUCHED_${project.status === "reviewing_v2" ? "V2" : "V1"}`;
+  const versionLabel      = project.status === "reviewing_v2" ? "보정 V2" : "보정 V1";
   const revisionRemaining = Math.max(0, (project.maxRevisionCount ?? 0) - (project.revisionRound ?? 0));
   const canRequestRevision = revisionRemaining > 0;
   const statusLabelKo = isApproved ? "확정됨" : isRevision ? "재보정 요청" : "미검토";
@@ -636,19 +636,9 @@ export default function ReviewViewerPage() {
             </div>
           </div>
 
-          {/* Toolbar (desktop) */}
+          {/* Toolbar (desktop) — 뷰 모드 + 풀스크린만 */}
           <div className="rv-toolbar-desktop" style={{ borderTop: `1px solid ${BORDER}`, background: "rgba(5,5,5,0.8)" }}>
-            <div style={{ height: 46, padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-              {/* 네비게이션 — 좌측 */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <PrevNextButton direction="prev" onClick={goPrev} position="static" size="sm" />
-                <span style={{ fontFamily: MONO, fontSize: 12, color: MUTED, minWidth: 52, textAlign: "center" }}>
-                  {currentIndex + 1} / {photos.length}
-                </span>
-                <PrevNextButton direction="next" onClick={goNext} position="static" size="sm" />
-              </div>
-
-              {/* 뷰 모드 + 풀스크린 — 우측 */}
+            <div style={{ height: 46, padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 16 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <div className="rv-tool-group">
                   <button type="button" className={`rv-btn-icon${viewMode === "single-original" ? " rv-active" : ""}`} onClick={() => setViewMode("single-original")} title="원본만 보기">
@@ -659,7 +649,7 @@ export default function ReviewViewerPage() {
                     나란히
                   </button>
                   <button type="button" className={`rv-btn-icon${viewMode === "single-retouched" ? " rv-active" : ""}`} onClick={() => setViewMode("single-retouched")} title="보정본만 보기">
-                    보정본
+                    보정
                   </button>
                 </div>
                 <button type="button" className="rv-btn-icon" onClick={() => { setFullInitial("version"); setFullOpen(true); }} style={{ border: `1px solid ${BORDER}`, borderRadius: 8, padding: "5px 9px" }}>
@@ -815,7 +805,7 @@ export default function ReviewViewerPage() {
           {/* Center panel: viewer + action bar */}
           <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             {/* Image stage */}
-            <div className="rv-stage" style={{ flex: 1, minHeight: 0, padding: 20, display: "flex", gap: 12, overflow: "hidden" }}>
+            <div className="rv-stage" style={{ flex: 1, minHeight: 0, padding: 20, display: "flex", gap: 12, overflow: "hidden", position: "relative" }}>
               {showOriginal && (
                 <div
                   style={{ flex: 1, border: `1px solid ${BORDER}`, background: "radial-gradient(circle at center,#1a1a1a 0%,#0a0a0a 100%)", position: "relative", cursor: "pointer", overflow: "hidden", borderRadius: 4 }}
@@ -846,6 +836,31 @@ export default function ReviewViewerPage() {
                   }
                 </div>
               )}
+              {/* 페이지 네비게이션 — 이미지 하단 중앙 오버레이 */}
+              <div style={{
+                position: "absolute",
+                bottom: 28,
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 10,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                background: "rgba(0,0,0,0.6)",
+                backdropFilter: "blur(8px)",
+                border: `1px solid ${BORDER_HI}`,
+                borderRadius: 99,
+                padding: "4px 6px",
+                pointerEvents: "auto",
+              }}>
+                <PrevNextButton direction="prev" onClick={goPrev} position="static" size="sm"
+                  style={{ width: 28, height: 28, background: "rgba(255,255,255,0.08)", border: "none" }} />
+                <span style={{ fontFamily: MONO, fontSize: 11, color: MUTED, minWidth: 44, textAlign: "center", userSelect: "none" }}>
+                  {currentIndex + 1} / {photos.length}
+                </span>
+                <PrevNextButton direction="next" onClick={goNext} position="static" size="sm"
+                  style={{ width: 28, height: 28, background: "rgba(255,255,255,0.08)", border: "none" }} />
+              </div>
             </div>
 
             {/* Action bar */}
