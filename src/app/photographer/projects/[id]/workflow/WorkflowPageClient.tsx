@@ -11,6 +11,7 @@ import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHead
 import UploadVersionsPanel, {
   type UploadPanelTarget,
 } from "@/components/photographer/UploadVersionsPanel";
+import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
 import { createClient } from "@/lib/supabase/client";
 import {
   CheckCircle2,
@@ -24,8 +25,6 @@ import {
   Maximize2,
   Send,
   Sparkles,
-  Copy,
-  Check,
   Download,
   LayoutGrid,
   List,
@@ -33,6 +32,8 @@ import {
 } from "lucide-react";
 import styles from "./Workflow.module.css";
 import { normalizeReviewDeadlineYmd } from "@/lib/format-review-deadline";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -841,7 +842,6 @@ export default function WorkflowPageClient() {
   const [reviewDeadlineModal, setReviewDeadlineModal] = useState<
     { v: 1 | 2; dateInput: string; stage: "setup" | "share" } | null
   >(null);
-  const [shareCopied, setShareCopied] = useState<"link" | "pin" | "bundle" | null>(null);
   const [replacingId, setReplacingId] = useState<string | null>(null);
   const [versionBust, setVersionBust] = useState<Record<string, number>>({});
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -1108,7 +1108,7 @@ export default function WorkflowPageClient() {
       form.append("photo_ids", photoId);
       form.append("files", file, file.name);
 
-      const res = await fetch("/api/photographer/upload-versions", {
+      const res = await fetch(`${API_BASE}/api/upload/versions`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: form,
@@ -1354,31 +1354,6 @@ export default function WorkflowPageClient() {
     typeof window !== "undefined"
       ? `${window.location.origin}/c/${project?.accessToken ?? ""}`
       : `/c/${project?.accessToken ?? ""}`;
-
-  function flashShareCopied(kind: "link" | "pin" | "bundle") {
-    setShareCopied(kind);
-    setTimeout(() => setShareCopied((cur) => (cur === kind ? null : cur)), 2000);
-  }
-
-  function copyShareLink() {
-    if (!project?.accessToken) return;
-    void navigator.clipboard.writeText(inviteUrl);
-    flashShareCopied("link");
-  }
-
-  function copyShareBundle() {
-    if (!project?.accessToken) return;
-    const pin = project.accessPin;
-    const text = pin ? `링크: ${inviteUrl}\n비밀번호: ${pin}` : inviteUrl;
-    void navigator.clipboard.writeText(text);
-    flashShareCopied(pin ? "bundle" : "link");
-  }
-
-  function copySharePin() {
-    if (!project?.accessPin) return;
-    void navigator.clipboard.writeText(project.accessPin);
-    flashShareCopied("pin");
-  }
 
   function closeReviewDeadlineModal() {
     setReviewDeadlineModal(null);
@@ -1848,7 +1823,7 @@ export default function WorkflowPageClient() {
         />
       ) : null}
 
-      {reviewDeadlineModal && (
+      {reviewDeadlineModal?.stage === "setup" && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
           onClick={() => {
@@ -1860,8 +1835,7 @@ export default function WorkflowPageClient() {
             className="w-full max-w-sm bg-[#0f0f12] border border-[#27272c] rounded-2xl p-6 flex flex-col gap-5"
             onClick={(e) => e.stopPropagation()}
           >
-            {reviewDeadlineModal.stage === "setup" ? (
-              <>
+            <>
                 <div>
                   <h3 className="text-base font-bold text-white mb-1">
                     고객에게 {reviewDeadlineModal.v === 1 ? "보정본" : "재보정본"} 검토 요청
@@ -1946,114 +1920,17 @@ export default function WorkflowPageClient() {
                         : "재보정본 검토 요청"}
                   </button>
                 </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <h3 className="text-base font-bold text-white mb-1">
-                    링크를 직접 공유해 주세요
-                  </h3>
-                  <p className="text-sm text-[#71717a] leading-relaxed">
-                    카카오톡, 이메일 등으로 아래 링크
-                    {project?.accessPin ? "와 비밀번호" : ""}를 직접 보내주세요.
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  {/* 초대 링크 */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-[#a1a1aa]">초대 링크</label>
-                    <div className="flex items-center gap-2 rounded-xl bg-[#0a0a0c] border border-[#27272c] pl-3 pr-1 py-1">
-                      <input
-                        type="text"
-                        readOnly
-                        value={inviteUrl}
-                        onFocus={(e) => e.currentTarget.select()}
-                        className="flex-1 min-w-0 bg-transparent text-sm text-white truncate focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={copyShareLink}
-                        className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[#27272c] text-[#a1a1aa] hover:text-white hover:border-zinc-500 text-xs font-medium px-2.5 py-1.5 transition-colors"
-                        title="링크 복사"
-                      >
-                        {shareCopied === "link" ? (
-                          <>
-                            <Check size={12} />
-                            복사됨
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={12} />
-                            복사
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* PIN (있을 때만) */}
-                  {project?.accessPin ? (
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-[#a1a1aa]">비밀번호</label>
-                      <div className="flex items-center gap-2 rounded-xl bg-[#0a0a0c] border border-[#27272c] pl-3 pr-1 py-1">
-                        <span className="flex-1 min-w-0 text-sm text-white tracking-wider font-mono truncate">
-                          {project.accessPin}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={copySharePin}
-                          className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[#27272c] text-[#a1a1aa] hover:text-white hover:border-zinc-500 text-xs font-medium px-2.5 py-1.5 transition-colors"
-                          title="비밀번호 복사"
-                        >
-                          {shareCopied === "pin" ? (
-                            <>
-                              <Check size={12} />
-                              복사됨
-                            </>
-                          ) : (
-                            <>
-                              <Copy size={12} />
-                              복사
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    className="flex-1 rounded-xl border border-[#27272c] text-[#a1a1aa] text-sm font-medium py-2.5 hover:border-[#3f3f46] hover:text-white transition-colors"
-                    onClick={closeReviewDeadlineModal}
-                  >
-                    닫기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={copyShareBundle}
-                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#FF4D00] text-black text-sm font-bold py-2.5 hover:bg-[#ff5e1a] transition-colors"
-                  >
-                    {shareCopied === "bundle" || (shareCopied === "link" && !project?.accessPin) ? (
-                      <>
-                        <Check size={14} />
-                        복사됨
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={14} />
-                        {project?.accessPin ? "링크와 비밀번호 복사" : "링크 복사"}
-                      </>
-                    )}
-                  </button>
-                </div>
-              </>
-            )}
+            </>
           </div>
         </div>
       )}
+
+      <CustomerInviteShareModal
+        open={reviewDeadlineModal?.stage === "share"}
+        onClose={closeReviewDeadlineModal}
+        inviteUrl={inviteUrl}
+        accessPin={project?.accessPin}
+      />
     </div>
   );
 }
