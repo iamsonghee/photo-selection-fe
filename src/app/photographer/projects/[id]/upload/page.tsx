@@ -1171,6 +1171,22 @@ export default function ProjectDetailPage() {
     }
   };
 
+  /** 기존 photos + 배치 완료 직후 blob URL 낙관적 사진 합산 — early return 이전에 선언해야 Rules of Hooks 준수 */
+  const displayPhotos = useMemo(() => {
+    if (pendingPhotos.length === 0) return photos;
+    const confirmedNames = new Set(photos.map((p) => p.originalFilename));
+    const uniquePending = pendingPhotos.filter((p) => !confirmedNames.has(p.filename));
+    const pendingAsPhotos: Photo[] = uniquePending.map((p) => ({
+      id: p.tempId,
+      projectId: id,
+      orderIndex: 99999,
+      url: p.blobUrl,
+      originalFilename: p.filename,
+      isPending: true,
+    }));
+    return [...photos, ...pendingAsPhotos];
+  }, [photos, pendingPhotos, id]);
+
   if (loading) return <PageLoader variant="full" />;
   if (!project) return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", background: SURFACE_0 }}><span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, letterSpacing: "0.15em" }}>PROJECT_NOT_FOUND</span></div>;
 
@@ -1186,22 +1202,6 @@ export default function ProjectDetailPage() {
   const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
   const showServerWorking = uploadPhase === "sending" && awaitingServerFinalize;
   const uploadAllowed = canUploadOriginals(project.status);
-
-  /** 기존 photos + 배치 완료 직후 blob URL 낙관적 사진 합산 */
-  const displayPhotos = useMemo(() => {
-    if (pendingPhotos.length === 0) return photos;
-    const confirmedNames = new Set(photos.map((p) => p.originalFilename));
-    const uniquePending = pendingPhotos.filter((p) => !confirmedNames.has(p.filename));
-    const pendingAsPhotos: Photo[] = uniquePending.map((p) => ({
-      id: p.tempId,
-      projectId: id,
-      orderIndex: 99999,
-      url: p.blobUrl,
-      originalFilename: p.filename,
-      isPending: true,
-    }));
-    return [...photos, ...pendingAsPhotos];
-  }, [photos, pendingPhotos, id]);
 
   const labelStyle: React.CSSProperties = { fontFamily: MONO, fontSize: "0.6rem", letterSpacing: "0.15em", textTransform: "uppercase", color: TEXT_MUTED, display: "block", marginBottom: 6 };
 
