@@ -1198,7 +1198,7 @@ export default function ProjectDetailPage() {
   const canEditVersions = ["confirmed", "editing", "editing_v2", "reviewing_v1", "reviewing_v2", "delivered"].includes(project.status);
   const canReview = ["reviewing_v1", "reviewing_v2", "delivered"].includes(project.status);
   const editVersionsPath = project.status === "editing_v2" || project.status === "reviewing_v2" ? `/photographer/projects/${id}/upload-versions/v2` : `/photographer/projects/${id}/upload-versions`;
-  const progressPct = N > 0 ? Math.min(100, Math.round((M / N) * 100)) : 0;
+  const progressPct = N > 0 ? Math.min(100, Math.round((displayPhotos.length / N) * 100)) : 0;
   const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
   const showServerWorking = uploadPhase === "sending" && awaitingServerFinalize;
   const uploadAllowed = canUploadOriginals(project.status);
@@ -1292,8 +1292,8 @@ export default function ProjectDetailPage() {
         ]}
         title="사진 업로드"
         stats={[
-          { label: "업로드", value: `${M}장` },
-          { label: "고객 셀렉", value: `${N}장`, accent: M >= N && N > 0 },
+          { label: "업로드", value: `${displayPhotos.length}장` },
+          { label: "고객 셀렉", value: `${N}장`, accent: displayPhotos.length >= N && N > 0 },
         ]}
       />
 
@@ -1430,7 +1430,7 @@ export default function ProjectDetailPage() {
               <span className="prj-tech-label" style={{ color: TEXT_BRIGHT }}>사진 업로드</span>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 {isUploading && <Loader2 size={10} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} />}
-                <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT }}>{M}장</span>
+                <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT }}>{displayPhotos.length}장</span>
               </div>
             </div>
 
@@ -1483,7 +1483,7 @@ export default function ProjectDetailPage() {
               <div style={{ flexShrink: 0, background: SURFACE_2, border: `1px solid ${BORDER}`, padding: 12 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 8 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT }}>{M}장 업로드됨</span>
+                    <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT }}>{displayPhotos.length}장 업로드됨</span>
                   </div>
                   <span className="prj-tech-label" style={{ color: isUploading ? ACCENT : TEXT_MUTED }}>
                     {isUploading ? (showServerWorking ? "···" : `${uploadProgress}%`) : `${progressPct}%`}
@@ -1521,8 +1521,8 @@ export default function ProjectDetailPage() {
                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 12, color: "#888" }}>진행</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: N <= 0 ? "#666" : M >= N ? "#2ed573" : ACCENT }}>
-                      {N <= 0 ? "셀렉 장수 미정" : M >= N ? "활성화 가능" : `${Math.max(0, N - M)}장 더 필요`}
+                    <span style={{ fontSize: 13, fontWeight: 600, color: N <= 0 ? "#666" : displayPhotos.length >= N ? "#2ed573" : ACCENT }}>
+                      {N <= 0 ? "셀렉 장수 미정" : displayPhotos.length >= N ? "활성화 가능" : `${Math.max(0, N - displayPhotos.length)}장 더 필요`}
                     </span>
                   </div>
                   {N > 0 && M < N && (
@@ -1690,14 +1690,14 @@ export default function ProjectDetailPage() {
             <div className="prj-invite-title" style={{ fontSize: 13, fontWeight: 500, color: TEXT_BRIGHT }}>
               {isMobile
                 ? (N > 0
-                    ? (M >= N ? `${M}/${N}장 · 활성화 가능` : `${M}/${N}장`)
-                    : `${M}장 · 셀렉 미정`)
+                    ? (displayPhotos.length >= N ? `${displayPhotos.length}/${N}장 · 활성화 가능` : `${displayPhotos.length}/${N}장`)
+                    : `${displayPhotos.length}장 · 셀렉 미정`)
                 : "고객 초대 준비"}
             </div>
             <div className="prj-invite-sub" style={{ fontSize: 11, color: TEXT_MUTED }}>
-              {M >= N && N > 0
-                ? `${M}장 업로드 완료 · 초대 링크를 활성화할 수 있습니다`
-                : `${M}장 업로드됨 · ${N}장 이상 업로드 후 활성화 가능합니다`}
+              {displayPhotos.length >= N && N > 0
+                ? `${displayPhotos.length}장 업로드 완료 · 초대 링크를 활성화할 수 있습니다`
+                : `${displayPhotos.length}장 업로드됨 · ${N}장 이상 업로드 후 활성화 가능합니다`}
             </div>
           </div>
           <button
@@ -1710,16 +1710,16 @@ export default function ProjectDetailPage() {
               alignItems: "center",
               gap: 4,
               padding: "9px 20px",
-              background: M >= N ? ACCENT : "rgba(255,77,0,0.15)",
+              background: displayPhotos.length >= N ? ACCENT : "rgba(255,77,0,0.15)",
               border: "none",
               borderRadius: 8,
-              color: M >= N ? "#000" : ACCENT,
+              color: displayPhotos.length >= N ? "#000" : ACCENT,
               fontSize: 13,
               fontWeight: 600,
-              cursor: M >= N && !inviteActivating ? "pointer" : "not-allowed",
+              cursor: displayPhotos.length >= N && !inviteActivating ? "pointer" : "not-allowed",
               fontFamily: MONO,
               opacity: inviteActivating ? 0.75 : 1,
-              boxShadow: M >= N ? `0 0 16px ${ACCENT_GLOW}` : "none",
+              boxShadow: displayPhotos.length >= N ? `0 0 16px ${ACCENT_GLOW}` : "none",
               transition: "all 0.2s",
             }}
           >
