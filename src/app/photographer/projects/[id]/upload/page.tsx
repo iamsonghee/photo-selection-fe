@@ -2,7 +2,7 @@
 
 import { PageLoader } from "@/components/ui/PageLoader";
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, cloneElement } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -526,7 +526,7 @@ function VirtualizedPhotoGrid({
             const cellIndex = start + j;
             if (cellIndex >= totalCells) break;
             if (hasUploadCell && cellIndex === 0) {
-              cells.push(<div key="upload-cell">{leadingUploadCell}</div>);
+              cells.push(cloneElement(leadingUploadCell as React.ReactElement, { key: "upload-cell" }));
               continue;
             }
             const photoIndex = hasUploadCell ? cellIndex - 1 : cellIndex;
@@ -559,6 +559,8 @@ function VirtualizedPhotoGrid({
                 gridTemplateColumns: `repeat(${layout.cols}, 1fr)`,
                 gap: GRID_GAP,
                 boxSizing: "border-box",
+                alignItems: "start",
+                overflow: "hidden",
               }}
             >
               {cells}
