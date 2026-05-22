@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/ui/PageLoader";
+
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getPhotosWithSelections, getProjectById } from "@/lib/db";
@@ -1145,13 +1147,7 @@ export default function WorkflowPageClient() {
   // ── Loading / Error ────────────────────────────────────────────────────────
 
   if (loading) {
-    return (
-      <div className="h-screen bg-[#0a0a0c] flex items-center justify-center">
-        <span className="font-mono text-zinc-600 text-sm uppercase tracking-widest animate-pulse">
-          Loading…
-        </span>
-      </div>
-    );
+    return <PageLoader variant="full" />;
   }
 
   if (error || !project) {

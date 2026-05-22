@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/ui/PageLoader";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSelection } from "@/contexts/SelectionContext";
@@ -68,13 +70,7 @@ export default function ReviewRedirectPage() {
   }, [selectionLoading, reviewPhotosLoading, project, reviewPhotos, token, router, isReceiptOnly, isMobile]);
 
   if (selectionLoading || reviewPhotosLoading || !project) {
-    return (
-      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: BG_BASE }}>
-        <p style={{ fontFamily: MONO, fontSize: 11, color: "#555", letterSpacing: "0.1em" }}>
-          LOADING_REVIEW...
-        </p>
-      </div>
-    );
+    return <PageLoader variant="full" />;
   }
 
   if (isReceiptOnly) {

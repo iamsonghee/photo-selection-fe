@@ -10,6 +10,7 @@ import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { getProfileImageUrl } from "@/lib/photographer";
 import { getReviewMockData } from "@/lib/mock-data";
 import { BrandLogoBar } from "@/components/BrandLogo";
+import { PageLoader } from "@/components/ui/PageLoader";
 import { CustomerHeader } from "@/components/customer/CustomerHeader";
 import { CustomerFooter } from "@/components/customer/CustomerFooter";
 
@@ -50,12 +51,7 @@ function PageHeader({ inviteHref, right }: { inviteHref?: string; right?: React.
 
 /* ── Loading ── */
 function LoadingScreen() {
-  return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[#030303]">
-      <div className="mb-3 h-7 w-7 animate-spin rounded-full border-2 border-[#ff4d00]/20 border-t-[#ff4d00]" />
-      <p className="text-[13px] text-zinc-600">불러오는 중...</p>
-    </div>
-  );
+  return <PageLoader variant="full" />;
 }
 
 /* ══════════════════════════════════════════════════════════ */

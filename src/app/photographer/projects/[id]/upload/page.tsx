@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/ui/PageLoader";
+
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
@@ -1142,7 +1144,7 @@ export default function ProjectDetailPage() {
     }
   };
 
-  if (loading) return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", background: SURFACE_0 }}><span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, letterSpacing: "0.15em" }}>LOADING_PROJECT...</span></div>;
+  if (loading) return <PageLoader variant="full" />;
   if (!project) return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", background: SURFACE_0 }}><span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, letterSpacing: "0.15em" }}>PROJECT_NOT_FOUND</span></div>;
 
   const N = project.requiredCount;

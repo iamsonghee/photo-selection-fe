@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/ui/PageLoader";
+
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -193,14 +195,7 @@ export default function SettingsPage() {
   };
 
   if (loading) {
-    return (
-      <div
-        className="min-h-screen bg-[#0a0a0c] flex items-center justify-center"
-        style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}
-      >
-        <Loader2 className="w-6 h-6 text-zinc-600 animate-spin" />
-      </div>
-    );
+    return <PageLoader variant="full" />;
   }
 
   if (!profile) return null;

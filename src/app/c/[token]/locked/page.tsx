@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/ui/PageLoader";
+
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
@@ -201,11 +203,7 @@ export default function LockedPage() {
     } catch { setCancelling(false); }
   };
 
-  if (!mounted || loading) return (
-    <div className="flex min-h-dvh items-center justify-center bg-[#030303]">
-      <div className="w-6 h-6 rounded-full border-2 border-[#FF4D00]/20 border-t-[#FF4D00] animate-spin" />
-    </div>
-  );
+  if (!mounted || loading) return <PageLoader variant="full" />;
   if (!project) return (
     <div className="flex min-h-dvh items-center justify-center bg-[#030303] text-zinc-600 font-mono text-sm">
       존재하지 않는 초대 링크입니다.

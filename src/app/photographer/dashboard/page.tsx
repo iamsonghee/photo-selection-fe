@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/ui/PageLoader";
+
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -217,11 +219,7 @@ export default function DashboardPage() {
   }, [profile, profileLoading]);
 
   if (profileLoading || loading) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0c] flex items-center justify-center">
-        <div className="text-xs text-zinc-600 tracking-widest uppercase">로딩 중…</div>
-      </div>
-    );
+    return <PageLoader variant="full" />;
   }
 
   if (!profile?.id) {

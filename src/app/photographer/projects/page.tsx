@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/ui/PageLoader";
+
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -413,7 +415,7 @@ export default function ProjectsPage() {
         <div className="px-5 pb-6 flex flex-col gap-4">
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <span className="text-zinc-600 text-sm font-mono">SYS.LOADING…</span>
+              <PageLoader variant="inline" />
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
@@ -563,9 +565,7 @@ export default function ProjectsPage() {
           {/* body */}
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <span className="text-zinc-600 text-sm" style={{ fontFamily: "var(--font-mono, monospace)" }}>
-                SYS.LOADING…
-              </span>
+              <PageLoader variant="inline" />
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
