@@ -1317,9 +1317,9 @@ export default function ProjectDetailPage() {
         crumbs={[
           { label: "프로젝트", href: "/photographer/projects" },
           { label: project.name, href: `/photographer/projects/${id}` },
-          { label: "사진 업로드" },
+          { label: "원본 업로드" },
         ]}
-        title="사진 업로드"
+        title="원본 업로드"
         stats={[
           { label: "업로드", value: `${displayPhotos.length}장` },
           { label: "고객 셀렉", value: `${N}장`, accent: displayPhotos.length >= N && N > 0 },
