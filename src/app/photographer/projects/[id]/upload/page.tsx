@@ -1548,10 +1548,10 @@ export default function ProjectDetailPage() {
         <section style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, overflow: "hidden" }}>
 
           {/* ── 뷰 토글 툴바 ── */}
-          {photos.length > 0 && (
+          {displayPhotos.length > 0 && (
             <div className="prj-desktop-toolbar prj-view-toolbar" style={{ height: 44, borderBottom: `1px solid ${BORDER}`, background: SURFACE_1, display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 16, paddingRight: 16, flexShrink: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED }}>{photos.length.toLocaleString()}장</span>
+                <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED }}>{displayPhotos.length.toLocaleString()}장</span>
                 {project.status !== "delivered" && uploadAllowed && (
                   <button
                     type="button"
@@ -1602,7 +1602,7 @@ export default function ProjectDetailPage() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", gap: 8 }}>
                 <span className="prj-tech-label" style={{ color: TEXT_MUTED }}>불러오는 중...</span>
               </div>
-            ) : photos.length === 0 && !(isMobile && uploadAllowed) ? (
+            ) : displayPhotos.length === 0 && !(isMobile && uploadAllowed) ? (
               <div
                 onClick={() => !isUploading && uploadAllowed && requestOpenFilePicker()}
                 onDrop={uploadAllowed ? onDrop : undefined}
