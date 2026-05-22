@@ -1573,18 +1573,6 @@ export default function ProjectDetailPage() {
             <div className="prj-desktop-toolbar prj-view-toolbar" style={{ height: 44, borderBottom: `1px solid ${BORDER}`, background: SURFACE_1, display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 16, paddingRight: 16, flexShrink: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED }}>{displayPhotos.length.toLocaleString()}장</span>
-                {project.status !== "delivered" && uploadAllowed && (
-                  <button
-                    type="button"
-                    onClick={requestOpenFilePicker}
-                    disabled={isUploading}
-                    style={{ fontFamily: MONO, fontSize: 10, background: "transparent", border: `1px solid ${BORDER}`, borderRadius: 4, color: TEXT_MUTED, cursor: isUploading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", opacity: isUploading ? 0.5 : 1, transition: "color 0.15s, border-color 0.15s" }}
-                    onMouseEnter={(e) => { if (!isUploading) { e.currentTarget.style.color = ACCENT; e.currentTarget.style.borderColor = ACCENT; } }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = TEXT_MUTED; e.currentTarget.style.borderColor = BORDER; }}
-                  >
-                    <Plus size={11} />사진 추가
-                  </button>
-                )}
                 {project.status === "preparing" && (
                   <button
                     type="button"
@@ -1623,7 +1611,7 @@ export default function ProjectDetailPage() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", gap: 8 }}>
                 <span className="prj-tech-label" style={{ color: TEXT_MUTED }}>불러오는 중...</span>
               </div>
-            ) : displayPhotos.length === 0 && !(isMobile && uploadAllowed) ? (
+            ) : displayPhotos.length === 0 && !uploadAllowed ? (
               <div
                 onClick={() => !isUploading && uploadAllowed && requestOpenFilePicker()}
                 onDrop={uploadAllowed ? onDrop : undefined}
@@ -1655,7 +1643,7 @@ export default function ProjectDetailPage() {
                   </p>
                 </div>
               </div>
-            ) : viewMode === "grid" || (displayPhotos.length === 0 && isMobile && uploadAllowed) ? (
+            ) : viewMode === "grid" || (displayPhotos.length === 0 && uploadAllowed) ? (
               <VirtualizedPhotoGrid
                 scrollRef={photoScrollRef}
                 photos={displayPhotos}
@@ -1665,7 +1653,7 @@ export default function ProjectDetailPage() {
                 minCols={isMobile ? 3 : 1}
                 onPhotoClick={setLightboxIndex}
                 leadingUploadCell={
-                  isMobile && uploadAllowed ? (
+                  uploadAllowed ? (
                     <UploadTile
                       isUploading={isUploading}
                       uploadProgress={uploadProgress}
