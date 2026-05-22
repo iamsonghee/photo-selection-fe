@@ -246,15 +246,9 @@ export default function DashboardPage() {
   }
 
   // 정렬: 진행중(긴급순) → 대기중 → 완료
-  const urgencyScore = (p: Project): number => {
-    if (ACTIVE_STATUSES.includes(p.status)) {
-      const d = Math.ceil((new Date(p.deadline).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
-      return d <= 0 ? -1000 + d : d;
-    }
-    if (p.status === "preparing") return 500;
-    return 9999;
-  };
-  const sortedAll = [...projects].sort((a, b) => urgencyScore(a) - urgencyScore(b));
+  const sortedAll = [...projects].sort((a, b) =>
+    new Date(b.shootDate ?? 0).getTime() - new Date(a.shootDate ?? 0).getTime()
+  );
   const filteredByDash = sortedAll.filter((p) => {
     if (dashFilter === "active")    return ACTIVE_STATUSES.includes(p.status);
     if (dashFilter === "completed") return p.status === "delivered";

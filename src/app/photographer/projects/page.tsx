@@ -280,7 +280,7 @@ export default function ProjectsPage() {
   const dateFromRef = useRef<HTMLInputElement>(null);
   const dateToRef   = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<"all" | "active" | "waiting" | "completed">("all");
-  const [sortBy,   setSortBy]     = useState<"latest" | "deadline" | "name" | "shoot_date">("latest");
+  const [sortBy,   setSortBy]     = useState<"latest" | "deadline" | "name" | "shoot_date">("shoot_date");
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   useEffect(() => {
