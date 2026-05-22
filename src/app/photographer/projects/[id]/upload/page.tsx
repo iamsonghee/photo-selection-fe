@@ -23,6 +23,7 @@ import {
   Loader2,
   ImageIcon,
   ImagePlus,
+  Plus,
 } from "lucide-react";
 import { PrevNextButton } from "@/components/PrevNextButton";
 import { getProjectById, getPhotosByProjectId } from "@/lib/db";
@@ -32,6 +33,7 @@ import { parseBetaLimitError } from "@/lib/beta-limits";
 import { compressImageFileForMobileIfNeeded } from "@/lib/upload-client-compress";
 import type { Project, ProjectStatus, Photo } from "@/types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
+import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
 
 // ---------- constants ----------
 const ACCENT = "#FF4D00";
@@ -747,6 +749,7 @@ export default function ProjectDetailPage() {
   const [pinSaving, setPinSaving] = useState(false);
   const [pinError, setPinError] = useState("");
   const [inviteActivating, setInviteActivating] = useState(false);
+  const [inviteShareModalOpen, setInviteShareModalOpen] = useState(false);
 
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [photosLoading, setPhotosLoading] = useState(true);
@@ -1135,7 +1138,11 @@ export default function ProjectDetailPage() {
         body: JSON.stringify({ project_id: id, action: "selecting" }),
       }).catch(() => {});
       setProject({ ...project, status: "selecting" });
-      setToast("고객 초대 링크가 활성화되었습니다.");
+      if (isMobile) {
+        setInviteShareModalOpen(true);
+      } else {
+        setToast("고객 초대 링크가 활성화되었습니다.");
+      }
       router.refresh();
     } catch (e) {
       setToast(e instanceof Error ? e.message : "초대 링크 활성화에 실패했습니다.");
@@ -1435,73 +1442,67 @@ export default function ProjectDetailPage() {
               </div>
             </div>
 
-            {/* progress bar */}
-            <div style={{ flexShrink: 0, background: SURFACE_2, border: `1px solid ${BORDER}`, padding: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 8 }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT }}>{M}장 업로드됨</span>
-                  <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED }}>
-                    {N > 0 ? `고객 셀렉 대상: ${N}장` : "고객 셀렉 대상: 미설정"}
+            {/* progress bar — 링크 미활성화(preparing) 상태에서만 표시 */}
+            {!isInviteActive && (
+              <div style={{ flexShrink: 0, background: SURFACE_2, border: `1px solid ${BORDER}`, padding: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 8 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT }}>{M}장 업로드됨</span>
+                  </div>
+                  <span className="prj-tech-label" style={{ color: isUploading ? ACCENT : TEXT_MUTED }}>
+                    {isUploading ? (showServerWorking ? "···" : `${uploadProgress}%`) : `${progressPct}%`}
                   </span>
                 </div>
-                <span className="prj-tech-label" style={{ color: isUploading ? ACCENT : TEXT_MUTED }}>
-                  {isUploading ? (showServerWorking ? "···" : `${uploadProgress}%`) : `${progressPct}%`}
-                </span>
-              </div>
-              <div style={{ height: 3, background: "#111", position: "relative", overflow: "hidden" }}>
-                <div
-                  style={
-                    showServerWorking
-                      ? {
-                          width: "100%",
-                          background: ACCENT,
-                          height: "100%",
-                          position: "relative",
-                          overflow: "hidden",
-                          animation: "prj-bar-indeterminate-pulse 1.4s ease-in-out infinite",
-                        }
-                      : {
-                          width: `${isUploading ? uploadProgress : progressPct}%`,
-                          background: ACCENT,
-                          height: "100%",
-                          position: "relative",
-                          overflow: "hidden",
-                          transition: "width 0.3s",
-                        }
-                  }
-                >
-                  {showServerWorking ? (
-                    <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.35)", width: "35%", animation: "prj-bar-indet-sweep 1.1s linear infinite" }} />
-                  ) : (isUploading || progressPct > 0) ? (
-                    <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.25)", width: "20%", animation: "prj-bar-scan 2s linear infinite" }} />
-                  ) : null}
-                </div>
-              </div>
-              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 12, color: "#888" }}>진행</span>
-                  <span
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: N <= 0 ? "#666" : M >= N ? "#2ed573" : ACCENT,
-                    }}
+                <div style={{ height: 3, background: "#111", position: "relative", overflow: "hidden" }}>
+                  <div
+                    style={
+                      showServerWorking
+                        ? {
+                            width: "100%",
+                            background: ACCENT,
+                            height: "100%",
+                            position: "relative",
+                            overflow: "hidden",
+                            animation: "prj-bar-indeterminate-pulse 1.4s ease-in-out infinite",
+                          }
+                        : {
+                            width: `${isUploading ? uploadProgress : progressPct}%`,
+                            background: ACCENT,
+                            height: "100%",
+                            position: "relative",
+                            overflow: "hidden",
+                            transition: "width 0.3s",
+                          }
+                    }
                   >
-                    {N <= 0
-                      ? "셀렉 장수 미정"
-                      : M >= N
-                        ? "활성화 가능"
-                        : `${Math.max(0, N - M)}장 더 필요`}
-                  </span>
+                    {showServerWorking ? (
+                      <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.35)", width: "35%", animation: "prj-bar-indet-sweep 1.1s linear infinite" }} />
+                    ) : (isUploading || progressPct > 0) ? (
+                      <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.25)", width: "20%", animation: "prj-bar-scan 2s linear infinite" }} />
+                    ) : null}
+                  </div>
                 </div>
-                {N > 0 && M < N && (
-                  <p style={{ margin: 0, fontSize: 12, color: "#666", lineHeight: 1.5 }}>
-                    {`${N}장 채우면 초대 링크를 활성화할 수 있어요.`}
-                  </p>
-                )}
+                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 12, color: "#888" }}>진행</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: N <= 0 ? "#666" : M >= N ? "#2ed573" : ACCENT }}>
+                      {N <= 0 ? "셀렉 장수 미정" : M >= N ? "활성화 가능" : `${Math.max(0, N - M)}장 더 필요`}
+                    </span>
+                  </div>
+                  {N > 0 && M < N && (
+                    <p style={{ margin: 0, fontSize: 12, color: "#666", lineHeight: 1.5 }}>
+                      {`${N}장 채우면 초대 링크를 활성화할 수 있어요.`}
+                    </p>
+                  )}
+                </div>
+                {uploadError && <p style={{ fontSize: 11, color: "#FF3333", marginTop: 8 }}>[ERR] {uploadError}</p>}
               </div>
-              {uploadError && <p style={{ fontSize: 11, color: "#FF3333", marginTop: 8 }}>[ERR] {uploadError}</p>}
-            </div>
+            )}
+            {isInviteActive && uploadError && (
+              <div style={{ flexShrink: 0, padding: "8px 12px" }}>
+                <p style={{ fontSize: 11, color: "#FF3333", margin: 0 }}>[ERR] {uploadError}</p>
+              </div>
+            )}
 
           </section>
 
@@ -1515,6 +1516,18 @@ export default function ProjectDetailPage() {
             <div className="prj-desktop-toolbar prj-view-toolbar" style={{ height: 44, borderBottom: `1px solid ${BORDER}`, background: SURFACE_1, display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 16, paddingRight: 16, flexShrink: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED }}>{photos.length.toLocaleString()}장</span>
+                {project.status !== "delivered" && uploadAllowed && (
+                  <button
+                    type="button"
+                    onClick={requestOpenFilePicker}
+                    disabled={isUploading}
+                    style={{ fontFamily: MONO, fontSize: 10, background: "transparent", border: `1px solid ${BORDER}`, borderRadius: 4, color: TEXT_MUTED, cursor: isUploading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", opacity: isUploading ? 0.5 : 1, transition: "color 0.15s, border-color 0.15s" }}
+                    onMouseEnter={(e) => { if (!isUploading) { e.currentTarget.style.color = ACCENT; e.currentTarget.style.borderColor = ACCENT; } }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = TEXT_MUTED; e.currentTarget.style.borderColor = BORDER; }}
+                  >
+                    <Plus size={11} />사진 추가
+                  </button>
+                )}
                 {project.status === "preparing" && (
                   <button
                     type="button"
@@ -1893,6 +1906,15 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       )}
+
+      <CustomerInviteShareModal
+        open={inviteShareModalOpen}
+        onClose={() => setInviteShareModalOpen(false)}
+        inviteUrl={inviteUrl}
+        accessPin={project.accessPin}
+        title="고객 초대 링크가 활성화되었습니다"
+        description="카카오톡, 이메일 등으로 아래 링크를 보내주세요. 고객이 사진 셀렉을 시작할 수 있습니다."
+      />
 
       {/* ── EDIT GUIDE MODAL ── */}
       {showEditGuideModal && (
