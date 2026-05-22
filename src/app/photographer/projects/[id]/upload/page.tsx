@@ -2,7 +2,7 @@
 
 import { PageLoader } from "@/components/ui/PageLoader";
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -208,7 +208,8 @@ function PhotoThumb({
   onPhotoClick?: (index: number) => void;
 }) {
   const [loaded, setLoaded] = useState(false);
-  const [shouldLoadSrc, setShouldLoadSrc] = useState(() => !scrollRootRef);
+  // blob URL(isPending)은 레이지 로드 불필요 — 로컬 메모리에 있어 즉시 로드
+  const [shouldLoadSrc, setShouldLoadSrc] = useState(() => !scrollRootRef || !!photo.isPending);
   const cellRef = useRef<HTMLDivElement>(null);
   const deleting = deletingId === photo.id;
 
@@ -235,10 +236,10 @@ function PhotoThumb({
     <div
       ref={cellRef}
       className="prj-data-cell"
-      onClick={() => onPhotoClick?.(index)}
+      onClick={() => !photo.isPending && onPhotoClick?.(index)}
       style={{
         background: "#080808",
-        border: `1px solid ${BORDER}`,
+        border: photo.isPending ? "1px solid rgba(255,77,0,0.55)" : `1px solid ${BORDER}`,
         overflow: "hidden",
         position: "relative",
         display: "flex",
@@ -248,6 +249,10 @@ function PhotoThumb({
       {/* square thumb */}
       <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: "#111" }}>
         <div className="prj-overlay" />
+        {/* 업로드 중 인디케이터 */}
+        {photo.isPending && (
+          <div style={{ position: "absolute", top: 5, right: 5, zIndex: 10, width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,77,0,0.3)", borderTopColor: "rgba(255,77,0,0.9)", animation: "spin 0.8s linear infinite" }} />
+        )}
         {/* filename overlay */}
         <div
           style={{
@@ -758,6 +763,10 @@ export default function ProjectDetailPage() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  /** 배치 업로드 완료 직후 blob URL로 즉시 표시되는 낙관적 사진 */
+  const [pendingPhotos, setPendingPhotos] = useState<Array<{ tempId: string; blobUrl: string; filename: string }>>([]);
+  const pendingBlobsRef = useRef<string[]>([]);
+
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [uploadPhase, setUploadPhase] = useState<"idle" | "sending" | "processing" | "done">("idle");
@@ -946,6 +955,14 @@ export default function ProjectDetailPage() {
                 const okBody = await res.json().catch(() => ({})) as { rejected?: string[] };
                 if (okBody.rejected?.length) backendRejected.push(...okBody.rejected);
               } catch {}
+              // 배치 성공: blob URL로 갤러리에 즉시 표시 (낙관적 UI)
+              const now = Date.now();
+              const newPending = batch.map((file, fi) => {
+                const blobUrl = URL.createObjectURL(file);
+                pendingBlobsRef.current.push(blobUrl);
+                return { tempId: `pending-${now}-${chunkStart}-${chunkOffset}-${fi}`, blobUrl, filename: file.name };
+              });
+              setPendingPhotos((prev) => [...prev, ...newPending]);
             }
             if (!res.ok) {
               let body: unknown = {};
@@ -984,6 +1001,9 @@ export default function ProjectDetailPage() {
       setUploadPhase("idle");
       setUploadProgress(0);
       await loadPhotos();
+      setPendingPhotos([]);
+      pendingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      pendingBlobsRef.current = [];
       return;
     }
 
@@ -1011,6 +1031,10 @@ export default function ProjectDetailPage() {
       const totalFail = allFailed.length + backendRejected.length;
       setToast(totalFail === 0 ? "업로드 완료!" : `${totalFail}개 파일 처리 실패`);
       await loadProject(); await loadPhotos(); router.refresh();
+      // 낙관적 프리뷰 정리 (DB에서 실제 R2 URL로 교체됨)
+      setPendingPhotos([]);
+      pendingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      pendingBlobsRef.current = [];
     }, 600);
   }, [id, loadProject, loadPhotos, router]);
 
@@ -1162,6 +1186,22 @@ export default function ProjectDetailPage() {
   const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
   const showServerWorking = uploadPhase === "sending" && awaitingServerFinalize;
   const uploadAllowed = canUploadOriginals(project.status);
+
+  /** 기존 photos + 배치 완료 직후 blob URL 낙관적 사진 합산 */
+  const displayPhotos = useMemo(() => {
+    if (pendingPhotos.length === 0) return photos;
+    const confirmedNames = new Set(photos.map((p) => p.originalFilename));
+    const uniquePending = pendingPhotos.filter((p) => !confirmedNames.has(p.filename));
+    const pendingAsPhotos: Photo[] = uniquePending.map((p) => ({
+      id: p.tempId,
+      projectId: id,
+      orderIndex: 99999,
+      url: p.blobUrl,
+      originalFilename: p.filename,
+      isPending: true,
+    }));
+    return [...photos, ...pendingAsPhotos];
+  }, [photos, pendingPhotos, id]);
 
   const labelStyle: React.CSSProperties = { fontFamily: MONO, fontSize: "0.6rem", letterSpacing: "0.15em", textTransform: "uppercase", color: TEXT_MUTED, display: "block", marginBottom: 6 };
 
@@ -1594,10 +1634,10 @@ export default function ProjectDetailPage() {
                   </p>
                 </div>
               </div>
-            ) : viewMode === "grid" || (photos.length === 0 && isMobile && uploadAllowed) ? (
+            ) : viewMode === "grid" || (displayPhotos.length === 0 && isMobile && uploadAllowed) ? (
               <VirtualizedPhotoGrid
                 scrollRef={photoScrollRef}
-                photos={photos}
+                photos={displayPhotos}
                 onDelete={handleDeletePhoto}
                 deletingId={deletingId}
                 isEditMode={project.status === "preparing"}
@@ -1609,7 +1649,7 @@ export default function ProjectDetailPage() {
                       isUploading={isUploading}
                       uploadProgress={uploadProgress}
                       showServerWorking={showServerWorking}
-                      hasPhotos={photos.length > 0}
+                      hasPhotos={displayPhotos.length > 0}
                       onClick={requestOpenFilePicker}
                     />
                   ) : undefined
@@ -1618,7 +1658,7 @@ export default function ProjectDetailPage() {
             ) : (
               <VirtualizedPhotoList
                 scrollRef={photoScrollRef}
-                photos={photos}
+                photos={displayPhotos}
                 onDelete={handleDeletePhoto}
                 deletingId={deletingId}
                 isEditMode={project.status === "preparing"}

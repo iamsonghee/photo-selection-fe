@@ -50,6 +50,8 @@ export interface Photo {
   tag?: PhotoTag;
   comment?: string;
   photographerMemo?: string;
+  /** 업로드 중인 낙관적 프리뷰 (blob URL). loadPhotos() 후 제거됨 */
+  isPending?: boolean;
 }
 
 // ========== 프로젝트 ==========
