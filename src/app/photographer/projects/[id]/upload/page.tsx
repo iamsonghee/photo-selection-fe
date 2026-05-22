@@ -249,10 +249,6 @@ function PhotoThumb({
       {/* square thumb */}
       <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: "#111" }}>
         <div className="prj-overlay" />
-        {/* 업로드 중 인디케이터 */}
-        {photo.isPending && (
-          <div style={{ position: "absolute", top: 5, right: 5, zIndex: 10, width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,77,0,0.3)", borderTopColor: "rgba(255,77,0,0.9)", animation: "spin 0.8s linear infinite" }} />
-        )}
         {/* filename overlay */}
         <div
           style={{
