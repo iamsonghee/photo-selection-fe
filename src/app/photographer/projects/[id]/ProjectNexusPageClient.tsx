@@ -223,6 +223,7 @@ export function ProjectNexusPageClient() {
   const [editRequiredCount, setEditRequiredCount] = useState(0);
   const [editMaxRevisionCount, setEditMaxRevisionCount] = useState<0 | 1 | 2>(2);
   const [editCustomerPhone, setEditCustomerPhone] = useState("");
+  const [editShootType, setEditShootType] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -316,6 +317,7 @@ export function ProjectNexusPageClient() {
           required_count: newN,
           max_revision_count: editMaxRevisionCount,
           customer_phone: editCustomerPhone || null,
+          shoot_type: editShootType,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -329,6 +331,7 @@ export function ProjectNexusPageClient() {
         requiredCount: newN,
         maxRevisionCount: editMaxRevisionCount,
         customerPhone: editCustomerPhone || null,
+        shootType: editShootType,
       });
       setEditMode(false);
       setToast("프로젝트 정보가 저장되었습니다.");
@@ -409,6 +412,7 @@ export function ProjectNexusPageClient() {
     setEditRequiredCount(project.requiredCount);
     setEditMaxRevisionCount(project.maxRevisionCount);
     setEditCustomerPhone(project.customerPhone ?? "");
+    setEditShootType(project.shootType ?? null);
     setSaveError("");
     setEditMode(true);
   };
@@ -1001,6 +1005,32 @@ export function ProjectNexusPageClient() {
         title="프로젝트 정보 수정"
       >
         <div className="flex flex-col gap-5">
+          <div>
+            <FieldLabel label="촬영 유형" optional />
+            <div className="flex gap-2 flex-wrap mt-2">
+              {SHOOT_TYPES.map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() =>
+                    setEditShootType(editShootType === value ? null : value)
+                  }
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-colors"
+                  style={{
+                    background:
+                      editShootType === value ? "rgba(255,77,0,0.08)" : "transparent",
+                    borderColor:
+                      editShootType === value ? "rgba(255,77,0,0.5)" : "#27272c",
+                    color: editShootType === value ? "#FF4D00" : "#71717a",
+                  }}
+                >
+                  <Icon size={12} />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <ModalField label="프로젝트명" required fullSpan>
               <input

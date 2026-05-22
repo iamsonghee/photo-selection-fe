@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { canTransition } from "@/lib/project-status";
+import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 import type { ProjectStatus } from "@/types";
+
+const VALID_SHOOT_TYPES = new Set(SHOOT_TYPES.map((t) => t.value));
 
 async function getPhotographerIdFromSession(): Promise<string | null> {
   const supabase = await createClient();
@@ -141,6 +144,16 @@ export async function PATCH(
     }
     if ('customer_phone' in body) {
       payload.customer_phone = body.customer_phone ?? null;
+    }
+    if ("shoot_type" in body) {
+      if (body.shoot_type === null) {
+        payload.shoot_type = null;
+      } else if (
+        typeof body.shoot_type === "string" &&
+        VALID_SHOOT_TYPES.has(body.shoot_type)
+      ) {
+        payload.shoot_type = body.shoot_type;
+      }
     }
     if (typeof body.status === "string" && body.status) {
       const currentStatus = (project as { status: string }).status as ProjectStatus;
