@@ -249,6 +249,10 @@ function PhotoThumb({
       {/* square thumb */}
       <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: "#111" }}>
         <div className="prj-overlay" />
+        {/* XHR 전송 중 스피너 */}
+        {photo.isUploading && (
+          <div style={{ position: "absolute", top: 5, right: 5, zIndex: 10, width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,77,0,0.25)", borderTopColor: "rgba(255,77,0,0.85)", animation: "spin 0.9s linear infinite" }} />
+        )}
         {/* filename overlay */}
         <div
           style={{
@@ -762,6 +766,9 @@ export default function ProjectDetailPage() {
   /** 배치 업로드 완료 직후 blob URL로 즉시 표시되는 낙관적 사진 */
   const [pendingPhotos, setPendingPhotos] = useState<Array<{ tempId: string; blobUrl: string; filename: string }>>([]);
   const pendingBlobsRef = useRef<string[]>([]);
+  /** XHR 전송 중인 사진 (스피너 표시) */
+  const [uploadingPhotos, setUploadingPhotos] = useState<Array<{ tempId: string; blobUrl: string; filename: string }>>([]);
+  const uploadingBlobsRef = useRef<string[]>([]);
 
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -918,8 +925,23 @@ export default function ProjectDetailPage() {
         setAwaitingServerFinalize(chunk.some((_, j) => bodySent[j] && !reqDone[j]));
       };
       await Promise.all(chunk.map(async (batch, chunkOffset) => {
+        // XHR 전 blob URL 생성 → uploadingPhotos(스피너)에 추가
+        const inFlightNow = Date.now();
+        const inFlight = batch.map((file, fi) => {
+          const blobUrl = URL.createObjectURL(file);
+          uploadingBlobsRef.current.push(blobUrl);
+          return { tempId: `uploading-${inFlightNow}-${chunkStart}-${chunkOffset}-${fi}`, blobUrl, filename: file.name };
+        });
+        const inFlightIds = new Set(inFlight.map((p) => p.tempId));
+        setUploadingPhotos((prev) => [...prev, ...inFlight]);
         try {
-          if (abortReason) { allFailed.push(...batch); return; }
+          if (abortReason) {
+            allFailed.push(...batch);
+            setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
+            inFlight.forEach((p) => URL.revokeObjectURL(p.blobUrl));
+            uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
+            return;
+          }
           const globalIdx = chunkStart + chunkOffset;
           const buildForm = () => { const f = new FormData(); f.append("project_id", id); batch.forEach((file) => f.append("files", file)); return f; };
           try {
@@ -951,14 +973,11 @@ export default function ProjectDetailPage() {
                 const okBody = await res.json().catch(() => ({})) as { rejected?: string[] };
                 if (okBody.rejected?.length) backendRejected.push(...okBody.rejected);
               } catch {}
-              // 배치 성공: blob URL로 갤러리에 즉시 표시 (낙관적 UI)
-              const now = Date.now();
-              const newPending = batch.map((file, fi) => {
-                const blobUrl = URL.createObjectURL(file);
-                pendingBlobsRef.current.push(blobUrl);
-                return { tempId: `pending-${now}-${chunkStart}-${chunkOffset}-${fi}`, blobUrl, filename: file.name };
-              });
-              setPendingPhotos((prev) => [...prev, ...newPending]);
+              // 배치 성공: uploading → pending 이동 (blob URL 재활용, 스피너 제거)
+              setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
+              uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
+              setPendingPhotos((prev) => [...prev, ...inFlight]);
+              pendingBlobsRef.current.push(...inFlight.map((p) => p.blobUrl));
             }
             if (!res.ok) {
               let body: unknown = {};
@@ -986,6 +1005,9 @@ export default function ProjectDetailPage() {
           completedBatches++;
           setUploadProgress(Math.min(90, Math.round((completedBatches / batches.length) * 100)));
         } finally {
+          // 실패·중단 케이스에서 uploading 상태 잔류 방지
+          setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
+          uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
           reqDone[chunkOffset] = true;
           syncAwaitingServer();
         }
@@ -1000,6 +1022,9 @@ export default function ProjectDetailPage() {
       setPendingPhotos([]);
       pendingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
       pendingBlobsRef.current = [];
+      setUploadingPhotos([]);
+      uploadingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      uploadingBlobsRef.current = [];
       return;
     }
 
@@ -1031,6 +1056,9 @@ export default function ProjectDetailPage() {
       setPendingPhotos([]);
       pendingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
       pendingBlobsRef.current = [];
+      setUploadingPhotos([]);
+      uploadingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      uploadingBlobsRef.current = [];
     }, 600);
   }, [id, loadProject, loadPhotos, router]);
 
@@ -1167,21 +1195,18 @@ export default function ProjectDetailPage() {
     }
   };
 
-  /** 기존 photos + 배치 완료 직후 blob URL 낙관적 사진 합산 — early return 이전에 선언해야 Rules of Hooks 준수 */
+  /** 기존 photos + 배치 완료(pending) + 전송 중(uploading) 합산 — early return 이전에 선언해야 Rules of Hooks 준수 */
   const displayPhotos = useMemo(() => {
-    if (pendingPhotos.length === 0) return photos;
     const confirmedNames = new Set(photos.map((p) => p.originalFilename));
-    const uniquePending = pendingPhotos.filter((p) => !confirmedNames.has(p.filename));
-    const pendingAsPhotos: Photo[] = uniquePending.map((p) => ({
-      id: p.tempId,
-      projectId: id,
-      orderIndex: 99999,
-      url: p.blobUrl,
-      originalFilename: p.filename,
-      isPending: true,
-    }));
-    return [...photos, ...pendingAsPhotos];
-  }, [photos, pendingPhotos, id]);
+    const pendingAsPhotos: Photo[] = pendingPhotos
+      .filter((p) => !confirmedNames.has(p.filename))
+      .map((p) => ({ id: p.tempId, projectId: id, orderIndex: 99999, url: p.blobUrl, originalFilename: p.filename, isPending: true, isUploading: false }));
+    const uploadingAsPhotos: Photo[] = uploadingPhotos
+      .filter((p) => !confirmedNames.has(p.filename))
+      .map((p) => ({ id: p.tempId, projectId: id, orderIndex: 99999, url: p.blobUrl, originalFilename: p.filename, isPending: true, isUploading: true }));
+    if (pendingAsPhotos.length === 0 && uploadingAsPhotos.length === 0) return photos;
+    return [...photos, ...pendingAsPhotos, ...uploadingAsPhotos];
+  }, [photos, pendingPhotos, uploadingPhotos, id]);
 
   if (loading) return <PageLoader variant="full" />;
   if (!project) return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", background: SURFACE_0 }}><span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, letterSpacing: "0.15em" }}>PROJECT_NOT_FOUND</span></div>;

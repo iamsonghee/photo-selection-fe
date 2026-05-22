@@ -52,6 +52,8 @@ export interface Photo {
   photographerMemo?: string;
   /** 업로드 중인 낙관적 프리뷰 (blob URL). loadPhotos() 후 제거됨 */
   isPending?: boolean;
+  /** XHR 전송 중 (true=스피너, false=테두리만) */
+  isUploading?: boolean;
 }
 
 // ========== 프로젝트 ==========
