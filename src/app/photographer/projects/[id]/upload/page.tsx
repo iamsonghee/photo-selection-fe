@@ -1138,11 +1138,7 @@ export default function ProjectDetailPage() {
         body: JSON.stringify({ project_id: id, action: "selecting" }),
       }).catch(() => {});
       setProject({ ...project, status: "selecting" });
-      if (isMobile) {
-        setInviteShareModalOpen(true);
-      } else {
-        setToast("고객 초대 링크가 활성화되었습니다.");
-      }
+      setInviteShareModalOpen(true);
       router.refresh();
     } catch (e) {
       setToast(e instanceof Error ? e.message : "초대 링크 활성화에 실패했습니다.");

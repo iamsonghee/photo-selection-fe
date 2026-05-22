@@ -11,6 +11,7 @@ import {
   Eye,
   EyeOff,
   Flag,
+  Info,
   ListChecks,
   Lock,
   PenLine,
@@ -79,20 +80,44 @@ const MONO_FONT = "var(--font-mono, monospace)";
 
 // ── shared sub-components ──────────────────────────────────────────────────
 
+function FieldInfoTip({ text }: { text: string }) {
+  return (
+    <span className="relative inline-flex shrink-0 group/info">
+      <button
+        type="button"
+        tabIndex={0}
+        className="inline-flex items-center justify-center w-4 h-4 rounded-full text-zinc-600 hover:text-zinc-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#FF4D00]/50 transition-colors"
+        aria-label="필드 설명"
+      >
+        <Info size={12} strokeWidth={2.25} />
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+6px)] z-50 w-max max-w-[min(16rem,calc(100vw-2rem))] px-2.5 py-2 rounded-lg text-[11px] leading-snug text-zinc-200 bg-[#1a1a1e] border border-[#27272c] shadow-lg opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible group-focus-within/info:opacity-100 group-focus-within/info:visible transition-opacity"
+      >
+        {text}
+      </span>
+    </span>
+  );
+}
+
 function FieldLabel({
   label,
   required,
   optional,
+  info,
   className = "",
 }: {
   label: string;
   required?: boolean;
   optional?: boolean;
+  info?: string;
   className?: string;
 }) {
   return (
-    <div className={`flex items-center gap-2 mb-1.5 ${className}`}>
+    <div className={`flex items-center gap-1.5 mb-1.5 ${className}`}>
       <span className="text-xs font-semibold text-zinc-300">{label}</span>
+      {info && <FieldInfoTip text={info} />}
       {required && <span className="text-[10px] text-[#FF4D00] font-medium">필수</span>}
       {optional && <span className="text-[10px] text-zinc-600">선택</span>}
     </div>
@@ -103,22 +128,21 @@ function MetaItem({
   label,
   required,
   optional,
-  hint,
+  info,
   children,
   fullSpan,
 }: {
   label: string;
   required?: boolean;
   optional?: boolean;
-  hint?: string;
+  info?: string;
   children: React.ReactNode;
   fullSpan?: boolean;
 }) {
   return (
     <div className={fullSpan ? "col-span-2" : undefined}>
-      <FieldLabel label={label} required={required} optional={optional} />
+      <FieldLabel label={label} required={required} optional={optional} info={info} />
       <div className="text-base text-zinc-200">{children}</div>
-      {hint && <p className="text-[11px] text-zinc-600 mt-1">{hint}</p>}
     </div>
   );
 }
@@ -130,22 +154,21 @@ function ModalField({
   label,
   required,
   optional,
-  hint,
+  info,
   children,
   fullSpan,
 }: {
   label: string;
   required?: boolean;
   optional?: boolean;
-  hint?: string;
+  info?: string;
   children: React.ReactNode;
   fullSpan?: boolean;
 }) {
   return (
     <div className={`flex flex-col gap-1.5 ${fullSpan ? "sm:col-span-2" : ""}`}>
-      <FieldLabel label={label} required={required} optional={optional} className="mb-0" />
+      <FieldLabel label={label} required={required} optional={optional} info={info} className="mb-0" />
       {children}
-      {hint && <p className="text-[11px] text-zinc-600">{hint}</p>}
     </div>
   );
 }
@@ -645,7 +668,11 @@ export function ProjectNexusPageClient() {
 
             <div className="grid grid-cols-2 gap-x-4 gap-y-4">
               <div className="col-span-2">
-                <FieldLabel label="촬영 유형" optional />
+                <FieldLabel
+                  label="촬영 유형"
+                  optional
+                  info="웨딩, 가족·베이비 등 촬영 종류입니다. 프로젝트 목록에서 유형별로 구분할 때 사용합니다."
+                />
                 {project.shootType ? (() => {
                   const found = SHOOT_TYPES.find((t) => t.value === project.shootType);
                   const Icon = found?.icon;
@@ -660,15 +687,27 @@ export function ProjectNexusPageClient() {
                 )}
               </div>
 
-              <MetaItem label="촬영 일자" required>
+              <MetaItem
+                label="촬영 일자"
+                required
+                info="실제 촬영이 진행된 날짜입니다."
+              >
                 <span style={{ fontFamily: MONO_FONT }}>{shootDisplay}</span>
               </MetaItem>
 
-              <MetaItem label="셀렉 기한" required>
+              <MetaItem
+                label="셀렉 기한"
+                required
+                info="고객이 셀렉을 마쳐야 하는 날짜입니다."
+              >
                 <span style={{ fontFamily: MONO_FONT }}>{deadlineDisplay}</span>
               </MetaItem>
 
-              <MetaItem label="고객 이름" required>
+              <MetaItem
+                label="고객 이름"
+                required
+                info="고객 화면과 알림에 표시되는 이름입니다."
+              >
                 <span className="inline-flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-[#27272c] flex items-center justify-center text-[10px] font-bold text-white">
                     {getInitial(project.customerName || "?")}
@@ -677,13 +716,21 @@ export function ProjectNexusPageClient() {
                 </span>
               </MetaItem>
 
-              <MetaItem label="연락처" optional hint="알림 기능 연동 시 사용됩니다">
+              <MetaItem
+                label="연락처"
+                optional
+                info="알림 기능 연동 시 사용됩니다."
+              >
                 <span style={{ fontFamily: MONO_FONT }}>
                   {project.customerPhone?.trim() || "—"}
                 </span>
               </MetaItem>
 
-              <MetaItem label="셀렉 갯수 (N)" required hint="고객이 선택할 사진 수">
+              <MetaItem
+                label="셀렉 갯수 (N)"
+                required
+                info="고객이 최종 선택해야 하는 사진 장수입니다."
+              >
                 <span>
                   <span
                     className="text-2xl font-bold text-[#FF4D00] leading-none"
@@ -695,7 +742,10 @@ export function ProjectNexusPageClient() {
                 </span>
               </MetaItem>
 
-              <MetaItem label="업로드 사진 수" hint="현재 업로드된 원본 수">
+              <MetaItem
+                label="업로드 사진 수"
+                info="작가가 업로드한 원본 사진의 현재 개수입니다."
+              >
                 <span>
                   <span
                     className="text-2xl font-bold text-white leading-none"
@@ -708,27 +758,23 @@ export function ProjectNexusPageClient() {
               </MetaItem>
 
               <div className="col-span-2 pt-4 border-t border-[#1a1a1e]">
-                <FieldLabel label="재보정 허용 횟수" />
-                <div className="flex items-center gap-3 flex-wrap">
+                <FieldLabel
+                  label="재보정 허용 횟수"
+                  info="보정본 검토 단계에서 고객이 요청할 수 있는 재보정 횟수입니다. 0회면 검토 후 바로 납품합니다."
+                />
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border ${
+                    project.maxRevisionCount > 0
+                      ? "bg-[#FF4D00]/10 border-[#FF4D00]/40 text-[#FF4D00]"
+                      : "bg-[#1a1a1e] border-[#27272c] text-zinc-500"
+                  }`}
+                >
                   <span
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border ${
-                      project.maxRevisionCount > 0
-                        ? "bg-[#FF4D00]/10 border-[#FF4D00]/40 text-[#FF4D00]"
-                        : "bg-[#1a1a1e] border-[#27272c] text-zinc-500"
-                    }`}
-                  >
-                    <span
-                      className="w-1.5 h-1.5 rounded-full"
-                      style={{ background: project.maxRevisionCount > 0 ? "#FF4D00" : "#3f3f46" }}
-                    />
-                    {project.maxRevisionCount === 0 ? "재보정 없음" : `최대 ${project.maxRevisionCount}회`}
-                  </span>
-                  <span className="text-xs text-zinc-600">
-                    {project.maxRevisionCount === 0
-                      ? "보정본 검토 후 바로 납품"
-                      : `보정본 검토 후 최대 ${project.maxRevisionCount}회 재보정 가능`}
-                  </span>
-                </div>
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{ background: project.maxRevisionCount > 0 ? "#FF4D00" : "#3f3f46" }}
+                  />
+                  {project.maxRevisionCount === 0 ? "재보정 없음" : `최대 ${project.maxRevisionCount}회`}
+                </span>
               </div>
             </div>
           </section>
@@ -750,7 +796,11 @@ export function ProjectNexusPageClient() {
 
             <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
               <div className="flex flex-col gap-1.5 min-w-0">
-                <FieldLabel label="초대 링크" className="mb-0" />
+                <FieldLabel
+                  label="초대 링크"
+                  info="고객이 셀렉·보정 검토에 접속하는 URL입니다. 원본 업로드 완료 후 활성화됩니다."
+                  className="mb-0"
+                />
                 <div className="flex items-stretch bg-[#0a0a0c] border border-[#27272c] rounded-xl overflow-hidden focus-within:border-[#FF4D00] transition-colors">
                   <input
                     type="text"
@@ -775,7 +825,11 @@ export function ProjectNexusPageClient() {
               </div>
 
               <div className="flex flex-col gap-1.5 min-w-0">
-                <FieldLabel label="고객 비밀번호" className="mb-0" />
+                <FieldLabel
+                  label="고객 비밀번호"
+                  info="링크 접속 시 입력하는 4자리 PIN입니다. 미설정 시 비밀번호 없이 접속할 수 있습니다."
+                  className="mb-0"
+                />
                 <div className="flex items-stretch bg-[#0a0a0c] border border-[#27272c] rounded-xl overflow-hidden focus-within:border-[#FF4D00] transition-colors">
                   <input
                     type={pinReveal ? "text" : "password"}
@@ -1006,7 +1060,11 @@ export function ProjectNexusPageClient() {
       >
         <div className="flex flex-col gap-5">
           <div>
-            <FieldLabel label="촬영 유형" optional />
+            <FieldLabel
+              label="촬영 유형"
+              optional
+              info="웨딩, 가족·베이비 등 촬영 종류입니다. 프로젝트 목록에서 유형별로 구분할 때 사용합니다."
+            />
             <div className="flex gap-2 flex-wrap mt-2">
               {SHOOT_TYPES.map(({ value, label, icon: Icon }) => (
                 <button
@@ -1050,7 +1108,7 @@ export function ProjectNexusPageClient() {
                 placeholder="고객님 성함"
               />
             </ModalField>
-            <ModalField label="연락처" optional hint="010-XXXX-XXXX 형식">
+            <ModalField label="연락처" optional info="010-XXXX-XXXX 형식으로 입력해주세요. 알림 연동 시 사용됩니다.">
               <input
                 type="text"
                 inputMode="numeric"
@@ -1080,7 +1138,7 @@ export function ProjectNexusPageClient() {
             </ModalField>
           </div>
 
-          <ModalField label="셀렉 갯수 (N)" required hint="고객이 선택할 사진 수">
+          <ModalField label="셀렉 갯수 (N)" required info="고객이 최종 선택해야 하는 사진 장수입니다.">
             {!["preparing", "selecting"].includes(project.status) && (
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/5 border border-yellow-500/20 text-xs text-yellow-500/90">
                 <AlertTriangle size={12} className="shrink-0" />
@@ -1098,7 +1156,10 @@ export function ProjectNexusPageClient() {
           </ModalField>
 
           <div>
-            <FieldLabel label="재보정 허용 횟수" />
+            <FieldLabel
+              label="재보정 허용 횟수"
+              info="보정본 검토 단계에서 고객이 요청할 수 있는 재보정 횟수입니다. 0회면 검토 후 바로 납품합니다."
+            />
             <div className="grid grid-cols-3 gap-2">
               {(
                 [
