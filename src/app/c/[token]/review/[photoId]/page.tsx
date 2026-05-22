@@ -164,13 +164,19 @@ export default function ReviewViewerPage() {
     }
   }, [current, isRevision, review, setReview]);
 
-  // Y/R 키보드 단축키 — 확정 / 재보정
+  // Y/R 키보드 단축키 — 확정 / 재보정 (한글 IME에서도 e.code로 물리 키 인식)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.isComposing) return;
-      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") return;
-      if (e.key === "y" || e.key === "Y") { e.preventDefault(); handleApprove(); }
-      if (e.key === "r" || e.key === "R") { e.preventDefault(); openRevisionInline(); }
+      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") {
+        return;
+      }
+      if (e.code === "KeyY") {
+        e.preventDefault();
+        handleApprove();
+      } else if (e.code === "KeyR") {
+        e.preventDefault();
+        openRevisionInline();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
