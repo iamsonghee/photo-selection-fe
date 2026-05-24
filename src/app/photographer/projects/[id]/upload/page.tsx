@@ -891,7 +891,7 @@ export default function ProjectDetailPage() {
 
     setUploadPhase("sending");
     setUploadProgress(3);
-    photoScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    if (photoScrollRef.current) photoScrollRef.current.scrollTop = 0;
 
     const effectiveBatch = isPhoneLikeClient() ? MOBILE_BATCH_SIZE : BATCH_SIZE;
     const batches: File[][] = [];
@@ -1168,6 +1168,7 @@ export default function ProjectDetailPage() {
     try {
       const res = await fetch(`/api/photographer/projects/${id}/photos`, { method: "DELETE" });
       if (res.ok) { setPhotos([]); setProject({ ...project, photoCount: 0 }); setToast("전체 삭제됨"); }
+      else { const d = await res.json().catch(() => ({})); setToast(d.error ?? "삭제 실패"); }
     } finally { setDeletingId(null); }
   };
 
