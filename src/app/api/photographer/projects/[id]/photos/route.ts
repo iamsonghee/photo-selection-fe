@@ -102,14 +102,18 @@ export async function DELETE(
       .filter(Boolean);
     if (keys.length > 0) {
       const backendUrl = process.env.BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? "http://localhost:8000";
-      const res = await fetch(`${backendUrl}/api/storage/delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keys }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as { detail?: string }).detail ?? "R2 삭제 실패");
+      try {
+        const res = await fetch(`${backendUrl}/api/storage/delete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keys }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          console.warn("[DELETE projects photos] R2 삭제 실패 (DB 삭제는 계속 진행):", (data as { detail?: string }).detail);
+        }
+      } catch (e) {
+        console.warn("[DELETE projects photos] R2 삭제 요청 실패 (DB 삭제는 계속 진행):", e);
       }
     }
 
