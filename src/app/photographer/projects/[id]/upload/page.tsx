@@ -295,7 +295,7 @@ function PhotoThumb({
           <img
             src={photo.url}
             alt=""
-            loading="lazy"
+            loading={photo.isPending ? "eager" : "lazy"}
             decoding="async"
             onLoad={(e) => {
               setLoaded(true);
@@ -1026,6 +1026,11 @@ export default function ProjectDetailPage() {
           syncAwaitingServer();
         }
       }));
+
+      // 청크 완료 후 DB에서 실제 사진 목록 갱신 → iPhone에서도 업로드된 사진이 순차적으로 갤러리에 표시됨
+      if (!stopRequestedRef.current && !abortReason) {
+        await loadPhotos();
+      }
     }
 
     if (stopRequestedRef.current) {
