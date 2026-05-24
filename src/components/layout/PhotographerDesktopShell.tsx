@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileHeader } from "@/components/layout/mobile/MobileHeader";
 import { MobileBottomNav } from "@/components/layout/mobile/MobileBottomNav";
+import { usePhotographerModalChromeHidden } from "@/contexts/PhotographerModalContext";
 import { isProjectDetailRootPath } from "@/lib/photographer-sidebar-routes";
 
 /**
@@ -18,6 +19,7 @@ export function PhotographerDesktopShell({
 }) {
   const pathname = usePathname();
   const [narrow, setNarrow] = useState(false);
+  const hideMobileChrome = usePhotographerModalChromeHidden();
 
   /** 프로젝트 상세 루트 진입 시 기본 좁은 사이드바 */
   useEffect(() => {
@@ -33,15 +35,17 @@ export function PhotographerDesktopShell({
       <div className="relative z-20 hidden md:block">
         <Sidebar collapsed={collapsed} sidebarToggle={{ onToggle: toggleSidebar }} />
       </div>
-      <MobileHeader />
+      {!hideMobileChrome && <MobileHeader />}
       <main
-        className={`relative z-10 ml-0 min-h-0 min-w-0 flex-1 transition-[margin-left] duration-300 ease-[cubic-bezier(0.2,0,0,1)] pt-[57px] pb-[76px] md:pt-0 md:pb-0 ${
+        className={`relative z-10 ml-0 min-h-0 min-w-0 flex-1 transition-[margin-left] duration-300 ease-[cubic-bezier(0.2,0,0,1)] md:pt-0 md:pb-0 ${
+          hideMobileChrome ? "pt-0 pb-0" : "pt-[57px] pb-[76px]"
+        } ${
           collapsed ? "md:ml-[72px]" : "md:ml-[240px]"
         }`}
       >
         {children}
       </main>
-      <MobileBottomNav />
+      {!hideMobileChrome && <MobileBottomNav />}
     </>
   );
 }
