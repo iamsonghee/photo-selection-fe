@@ -24,7 +24,6 @@ import {
   ImageIcon,
   ImagePlus,
   Plus,
-  AlertTriangle,
 } from "lucide-react";
 import { PrevNextButton } from "@/components/PrevNextButton";
 import { getProjectById, getPhotosByProjectId } from "@/lib/db";
@@ -35,7 +34,6 @@ import { compressImageForUpload } from "@/lib/upload-client-compress";
 import type { Project, ProjectStatus, Photo } from "@/types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
-import { PhotographerModal } from "@/components/ui/PhotographerModal";
 
 // ---------- constants ----------
 const ACCENT = "#FF4D00";
@@ -1753,54 +1751,52 @@ export default function ProjectDetailPage() {
           )
         : null}
 
-      {/* ── 전체삭제 확인 모달 ── */}
-      <PhotographerModal
-        open={showFlushAllConfirm}
-        onClose={() => {
-          if (deletingId === "__all__") return;
-          setShowFlushAllConfirm(false);
-        }}
-        title={
-          <>
-            <AlertTriangle size={16} className="text-rose-500" />
-            전체 삭제
-          </>
-        }
-        maxWidth={420}
-        titleAccent="danger"
-        footer={
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setShowFlushAllConfirm(false)}
-              disabled={deletingId === "__all__"}
-              className="flex-1 py-3 rounded-xl bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] text-zinc-300 text-sm font-semibold transition-colors disabled:opacity-50"
-            >
-              취소
-            </button>
-            <button
-              type="button"
-              onClick={handleFlushAll}
-              disabled={deletingId === "__all__"}
-              className="flex-1 py-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/40 hover:border-rose-500/60 text-rose-400 text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              <Trash2 size={14} />
-              {deletingId === "__all__" ? "삭제 중..." : "전체 삭제"}
-            </button>
+      {/* ── 전체삭제 확인 팝업 ── */}
+      {showFlushAllConfirm && (
+        <div
+          className="prj-modal-overlay"
+          onClick={(e) => {
+            if (deletingId === "__all__") return;
+            if (e.target === e.currentTarget) setShowFlushAllConfirm(false);
+          }}
+        >
+          <div className="prj-modal-box" style={{ maxWidth: 360 }}>
+            <div style={{ padding: "14px 18px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 8 }}>
+              <Trash2 size={14} style={{ color: "#FF4757" }} />
+              <span className="prj-tech-label" style={{ color: "#FF4757" }}>전체 삭제</span>
+            </div>
+            <div style={{ padding: "20px 18px" }}>
+              <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_BRIGHT, marginBottom: 8, lineHeight: 1.5 }}>
+                {displayPhotos.length.toLocaleString()}장을 모두 삭제할까요?
+              </p>
+              <p style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, lineHeight: 1.6, marginBottom: 16 }}>
+                되돌릴 수 없습니다.
+              </p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowFlushAllConfirm(false)}
+                  disabled={deletingId === "__all__"}
+                  className="prj-btn-secondary"
+                  style={{ flex: 1, padding: "10px 0", opacity: deletingId === "__all__" ? 0.5 : 1 }}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleFlushAll}
+                  disabled={deletingId === "__all__"}
+                  className="prj-btn-danger"
+                  style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, opacity: deletingId === "__all__" ? 0.5 : 1 }}
+                >
+                  <Trash2 size={12} />
+                  {deletingId === "__all__" ? "삭제 중..." : "삭제"}
+                </button>
+              </div>
+            </div>
           </div>
-        }
-      >
-        <div className="flex flex-col gap-4">
-          <p className="text-sm text-zinc-300 leading-relaxed">
-            업로드된{" "}
-            <span className="text-white font-semibold">{displayPhotos.length.toLocaleString()}장</span>
-            의 사진을 모두 삭제합니다.
-          </p>
-          <p className="text-xs text-zinc-500 leading-relaxed">
-            서버에 저장된 원본과 업로드 대기 중인 사진이 함께 삭제되며, 이 작업은 되돌릴 수 없습니다.
-          </p>
         </div>
-      </PhotographerModal>
+      )}
 
       {/* toast */}
       {toast && (
