@@ -1428,9 +1428,9 @@ export default function WorkflowPageClient() {
             })}
           </div>
 
-          {/* Filter chips for current stage */}
+          {/* Filter chips for current stage (PC only) */}
           {FILTER_TABS.length > 1 && (
-            <>
+            <div className="hidden md:flex items-center gap-1.5">
               <div className="w-px h-4 bg-[#27272c] shrink-0" />
               <div className="flex items-center gap-1.5 flex-wrap">
             {FILTER_TABS.map(({ key, label, count }) => (
@@ -1450,7 +1450,7 @@ export default function WorkflowPageClient() {
               </button>
             ))}
           </div>
-            </>
+            </div>
           )}
 
           {/* progress summary */}
