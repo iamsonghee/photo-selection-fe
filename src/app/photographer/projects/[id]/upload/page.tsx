@@ -55,7 +55,7 @@ const UPLOAD_MAX_ATTEMPTS = 3;
 const BATCH_SIZE = 8;
 const PC_CONCURRENCY = 5;
 const MOBILE_BATCH_SIZE = 3;
-const MOBILE_CONCURRENCY = 2;
+const MOBILE_CONCURRENCY = 1;
 const ACCEPT_TYPES = "image/*,image/heic,image/heif";
 
 /** 원본 사진을 추가 업로드할 수 있는 상태 — preparing은 자유, selecting은 경고 후 진행 */
@@ -950,6 +950,8 @@ export default function ProjectDetailPage() {
         const inFlightIds = new Set(inFlight.map((p) => p.tempId));
         // XHR 시작 전 스피너 강제 렌더 (iOS WKWebView scheduler 우회)
         flushSync(() => setUploadingPhotos((prev) => [...prev, ...inFlight]));
+        // WKWebView가 실제로 paint할 시간 확보 (concurrency=1이므로 여기서 대기해도 안전)
+        await new Promise<void>((r) => requestAnimationFrame(() => r()));
         try {
           if (abortReason) {
             allFailed.push(...batch);
@@ -995,6 +997,8 @@ export default function ProjectDetailPage() {
                 setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
                 setPendingPhotos((prev) => [...prev, ...inFlight]);
               });
+              // WKWebView paint 기회 확보 (concurrency=1이므로 다음 batch 시작 전 실제로 화면 갱신됨)
+              await new Promise<void>((r) => requestAnimationFrame(() => r()));
               uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
               pendingBlobsRef.current.push(...inFlight.map((p) => p.blobUrl));
             }
