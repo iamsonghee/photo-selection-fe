@@ -9,7 +9,7 @@ export function MobileHeader() {
   const displayName = profile?.name?.trim() || profile?.email?.split("@")[0] || "작가";
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 md:hidden flex items-center justify-between px-5 py-4 bg-[#0a0a0c]/90 backdrop-blur-md border-b border-[#121215]">
+    <header className="photographer-mobile-header fixed top-0 left-0 right-0 z-50 md:hidden flex items-center justify-between px-5 py-4 bg-[#0a0a0c]/90 backdrop-blur-md border-b border-[#121215]">
       <Link href="/photographer/dashboard" className="flex items-center gap-2.5">
         <div className="w-7 h-7 rounded bg-[#FF4D00] flex items-center justify-center text-white font-black text-sm tracking-tighter">
           A

@@ -67,7 +67,7 @@ export function MobileBottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#121215]/90 backdrop-blur-xl border-t border-[#1a1a1e] pb-safe">
+    <nav className="photographer-mobile-bottom-nav fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#121215]/90 backdrop-blur-xl border-t border-[#1a1a1e] pb-safe">
       <div className="flex justify-around items-center h-[60px] px-2">
         {NAV_ITEMS.map(({ href, label, comingSoon, icon }) => {
           const isActive = href !== "#" && pathname.startsWith(href);

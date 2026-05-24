@@ -16,3 +16,10 @@
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .pb-safe { padding-bottom: env(safe-area-inset-bottom, 16px); }
+
+/** PhotographerModal 열림 — 모바일 고정 헤더·하단 nav가 실기기에서 모달 위에 겹치는 것 방지 */
+body[data-photographer-modal-open] .photographer-mobile-header,
+body[data-photographer-modal-open] .photographer-mobile-bottom-nav {
+  visibility: hidden;
+  pointer-events: none;
+}
