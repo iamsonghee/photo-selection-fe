@@ -24,6 +24,7 @@ import {
   ImageIcon,
   ImagePlus,
   Plus,
+  AlertTriangle,
 } from "lucide-react";
 import { PrevNextButton } from "@/components/PrevNextButton";
 import { getProjectById, getPhotosByProjectId } from "@/lib/db";
@@ -34,6 +35,7 @@ import { compressImageForUpload } from "@/lib/upload-client-compress";
 import type { Project, ProjectStatus, Photo } from "@/types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
+import { PhotographerModal } from "@/components/ui/PhotographerModal";
 
 // ---------- constants ----------
 const ACCENT = "#FF4D00";
@@ -793,6 +795,7 @@ export default function ProjectDetailPage() {
   const [toast, setToast] = useState<string | null>(null);
   /** selecting 상태에서 추가 업로드 시도 시 1회 안내 모달 */
   const [showSelectingWarn, setShowSelectingWarn] = useState(false);
+  const [showFlushAllConfirm, setShowFlushAllConfirm] = useState(false);
   const [isPreparingFiles, setIsPreparingFiles] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1190,12 +1193,31 @@ export default function ProjectDetailPage() {
 
   const handleFlushAll = async () => {
     if (!project || project.status !== "preparing") return;
+    setShowFlushAllConfirm(false);
     setDeletingId("__all__");
+    stopRequestedRef.current = true;
     try {
       const res = await fetch(`/api/photographer/projects/${id}/photos`, { method: "DELETE" });
-      if (res.ok) { setPhotos([]); setProject({ ...project, photoCount: 0 }); setToast("전체 삭제됨"); }
-      else { const d = await res.json().catch(() => ({})); setToast(d.error ?? "삭제 실패"); }
-    } finally { setDeletingId(null); }
+      if (res.ok) {
+        setPhotos([]);
+        setProject({ ...project, photoCount: 0 });
+        setPendingPhotos([]);
+        pendingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
+        pendingBlobsRef.current = [];
+        setUploadingPhotos([]);
+        uploadingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
+        uploadingBlobsRef.current = [];
+        setUploadPhase("idle");
+        setUploadProgress(0);
+        setAwaitingServerFinalize(false);
+        setToast("전체 삭제됨");
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setToast((d as { error?: string }).error ?? "삭제 실패");
+      }
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handleEnableClientAccess = async () => {
@@ -1258,6 +1280,11 @@ export default function ProjectDetailPage() {
   const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
   const showServerWorking = uploadPhase === "sending" && awaitingServerFinalize;
   const uploadAllowed = canUploadOriginals(project.status);
+  const canFlushAll =
+    project.status === "preparing" &&
+    displayPhotos.length > 0 &&
+    !isUploading &&
+    deletingId !== "__all__";
 
   const labelStyle: React.CSSProperties = { fontFamily: MONO, fontSize: "0.6rem", letterSpacing: "0.15em", textTransform: "uppercase", color: TEXT_MUTED, display: "block", marginBottom: 6 };
 
@@ -1309,9 +1336,11 @@ export default function ProjectDetailPage() {
         .prj-btn-danger:hover { background: rgba(255,51,51,0.1); }
         .prj-dropzone { border: 1px dashed #333; transition: all 0.2s; }
         .prj-dropzone-over { border-color: rgba(255,77,0,0.5) !important; background: ${ACCENT_DIM} !important; }
+        .prj-mobile-toolbar { display: none; }
         @media (max-width: 768px) {
           .prj-desktop-toolbar { display: none !important; }
           .prj-view-toolbar { display: none !important; }
+          .prj-mobile-toolbar { display: flex !important; }
           .prj-modal-box { max-width: 100% !important; margin: 0 8px !important; }
           .prj-btn-primary, .prj-btn-secondary, .prj-btn-danger { min-height: 44px !important; padding: 0 16px !important; }
           /* 고객 초대 바: 모바일 하단 탭 위 고정(스크롤 끝까지 내릴 필요 없음) */
@@ -1392,12 +1421,11 @@ export default function ProjectDetailPage() {
             <div className="prj-desktop-toolbar prj-view-toolbar" style={{ height: 44, borderBottom: `1px solid ${BORDER}`, background: SURFACE_1, display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 16, paddingRight: 16, flexShrink: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED }}>{displayPhotos.length.toLocaleString()}장</span>
-                {project.status === "preparing" && (
+                {canFlushAll && (
                   <button
                     type="button"
-                    onClick={handleFlushAll}
-                    disabled={deletingId === "__all__"}
-                    style={{ fontFamily: MONO, fontSize: 10, background: "transparent", border: "none", color: TEXT_MUTED, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, opacity: deletingId === "__all__" ? 0.5 : 1, transition: "color 0.15s" }}
+                    onClick={() => setShowFlushAllConfirm(true)}
+                    style={{ fontFamily: MONO, fontSize: 10, background: "transparent", border: "none", color: TEXT_MUTED, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, transition: "color 0.15s" }}
                     onMouseEnter={(e) => { e.currentTarget.style.color = "#FF4757"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = TEXT_MUTED; }}
                   >
@@ -1417,6 +1445,47 @@ export default function ProjectDetailPage() {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* ── 모바일 툴바 (장수 + 전체삭제) ── */}
+          {displayPhotos.length > 0 && (
+            <div
+              className="prj-mobile-toolbar"
+              style={{
+                height: 40,
+                borderBottom: `1px solid ${BORDER}`,
+                background: SURFACE_1,
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingLeft: 14,
+                paddingRight: 14,
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED }}>{displayPhotos.length.toLocaleString()}장</span>
+              {canFlushAll && (
+                <button
+                  type="button"
+                  onClick={() => setShowFlushAllConfirm(true)}
+                  style={{
+                    fontFamily: MONO,
+                    fontSize: 11,
+                    background: "transparent",
+                    border: "none",
+                    color: "#FF4757",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    minHeight: 36,
+                    padding: "0 4px",
+                  }}
+                >
+                  <Trash2 size={13} />
+                  전체삭제
+                </button>
+              )}
             </div>
           )}
 
@@ -1683,6 +1752,55 @@ export default function ProjectDetailPage() {
             document.body,
           )
         : null}
+
+      {/* ── 전체삭제 확인 모달 ── */}
+      <PhotographerModal
+        open={showFlushAllConfirm}
+        onClose={() => {
+          if (deletingId === "__all__") return;
+          setShowFlushAllConfirm(false);
+        }}
+        title={
+          <>
+            <AlertTriangle size={16} className="text-rose-500" />
+            전체 삭제
+          </>
+        }
+        maxWidth={420}
+        titleAccent="danger"
+        footer={
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowFlushAllConfirm(false)}
+              disabled={deletingId === "__all__"}
+              className="flex-1 py-3 rounded-xl bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] text-zinc-300 text-sm font-semibold transition-colors disabled:opacity-50"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={handleFlushAll}
+              disabled={deletingId === "__all__"}
+              className="flex-1 py-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/40 hover:border-rose-500/60 text-rose-400 text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <Trash2 size={14} />
+              {deletingId === "__all__" ? "삭제 중..." : "전체 삭제"}
+            </button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-zinc-300 leading-relaxed">
+            업로드된{" "}
+            <span className="text-white font-semibold">{displayPhotos.length.toLocaleString()}장</span>
+            의 사진을 모두 삭제합니다.
+          </p>
+          <p className="text-xs text-zinc-500 leading-relaxed">
+            서버에 저장된 원본과 업로드 대기 중인 사진이 함께 삭제되며, 이 작업은 되돌릴 수 없습니다.
+          </p>
+        </div>
+      </PhotographerModal>
 
       {/* toast */}
       {toast && (
