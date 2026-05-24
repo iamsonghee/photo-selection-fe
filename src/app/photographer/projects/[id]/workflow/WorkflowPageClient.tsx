@@ -18,6 +18,7 @@ import {
   Clock,
   Upload,
   Trash2,
+  Replace,
   Lock,
   AlertTriangle,
   Layers,
@@ -500,7 +501,7 @@ function V1Card({
                 }`}
                 title="V1 교체"
               >
-                <Upload size={13} />
+                <Replace size={13} />
                 <input
                   type="file"
                   accept="image/*"
@@ -740,7 +741,7 @@ function V2Card({
                   }`}
                   title="V2 교체"
                 >
-                  <Upload size={13} />
+                  <Replace size={13} />
                   <input
                     type="file"
                     accept="image/*"
