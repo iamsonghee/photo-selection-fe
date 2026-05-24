@@ -3,7 +3,7 @@
 import { PageLoader } from "@/components/ui/PageLoader";
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, cloneElement } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { differenceInDays } from "date-fns";
@@ -824,13 +824,6 @@ export default function ProjectDetailPage() {
     if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); }
   }, [toast]);
 
-  // WKWebView(iOS Chrome/Safari)는 async 루프 내 setState를 throttle하여 업로드 중 갤러리가
-  // 업데이트되지 않는다. setInterval(macrotask)로 루프 밖에서 polling하면 re-render가 보장된다.
-  useEffect(() => {
-    if (uploadPhase !== "sending") return;
-    const interval = setInterval(() => { loadPhotos(); }, 1500);
-    return () => clearInterval(interval);
-  }, [uploadPhase, loadPhotos]);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 768);
@@ -995,11 +988,15 @@ export default function ProjectDetailPage() {
                 const okBody = await res.json().catch(() => ({})) as { rejected?: string[] };
                 if (okBody.rejected?.length) backendRejected.push(...okBody.rejected);
               } catch {}
-              // 배치 성공: uploading → pending 이동 (blob URL 재활용, 스피너 제거)
-              setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
+              // 배치 성공: DB 즉시 조회 후 flushSync로 강제 렌더 (scheduler 우회)
+              // 백엔드는 200 OK 이전에 DB insert 완료 → 즉시 최신 사진 반환 보장
+              const freshPhotos = await getPhotosByProjectId(id);
+              flushSync(() => {
+                setPhotos(freshPhotos);
+                setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
+              });
               uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
-              setPendingPhotos((prev) => [...prev, ...inFlight]);
-              pendingBlobsRef.current.push(...inFlight.map((p) => p.blobUrl));
+              inFlight.forEach((p) => URL.revokeObjectURL(p.blobUrl));
             }
             if (!res.ok) {
               let body: unknown = {};
