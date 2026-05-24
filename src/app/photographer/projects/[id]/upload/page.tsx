@@ -824,6 +824,14 @@ export default function ProjectDetailPage() {
     if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); }
   }, [toast]);
 
+  // WKWebView(iOS Chrome/Safari)는 async 루프 내 setState를 throttle하여 업로드 중 갤러리가
+  // 업데이트되지 않는다. setInterval(macrotask)로 루프 밖에서 polling하면 re-render가 보장된다.
+  useEffect(() => {
+    if (uploadPhase !== "sending") return;
+    const interval = setInterval(() => { loadPhotos(); }, 1500);
+    return () => clearInterval(interval);
+  }, [uploadPhase, loadPhotos]);
+
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 768);
     check();
@@ -1026,11 +1034,6 @@ export default function ProjectDetailPage() {
           syncAwaitingServer();
         }
       }));
-
-      // 청크 완료 후 DB에서 실제 사진 목록 갱신 → iPhone에서도 업로드된 사진이 순차적으로 갤러리에 표시됨
-      if (!stopRequestedRef.current && !abortReason) {
-        await loadPhotos();
-      }
     }
 
     if (stopRequestedRef.current) {
