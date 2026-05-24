@@ -25,6 +25,7 @@ import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHead
 import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { FieldInfoTip } from "@/components/ui/FieldInfoTip";
+import { PhotographerModal } from "@/components/ui/PhotographerModal";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -156,51 +157,6 @@ function ErrBox({ children }: { children: React.ReactNode }) {
   return (
     <div className="px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-400">
       {children}
-    </div>
-  );
-}
-
-function ModalShell({
-  open,
-  onClose,
-  title,
-  children,
-  maxWidth = 560,
-  titleAccent,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: React.ReactNode;
-  children: React.ReactNode;
-  maxWidth?: number;
-  titleAccent?: "danger";
-}) {
-  if (!open) return null;
-  const borderCls = titleAccent === "danger" ? "border-rose-500/25" : "border-[#1a1a1e]";
-  return (
-    <div
-      className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div
-        className={`bg-[#121215] border ${borderCls} rounded-2xl shadow-2xl w-full max-h-[90vh] overflow-y-auto`}
-        style={{ maxWidth }}
-      >
-        <header className="flex items-center justify-between px-6 py-4 border-b border-[#1a1a1e]">
-          <h3 className="text-base font-bold text-white flex items-center gap-2">{title}</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="닫기"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-[#1a1a1e] hover:text-white transition-colors"
-          >
-            <X size={16} />
-          </button>
-        </header>
-        <div className="p-6">{children}</div>
-      </div>
     </div>
   );
 }
@@ -1029,13 +985,38 @@ export function ProjectNexusPageClient() {
       )}
 
       {/* Edit modal */}
-      <ModalShell
+      <PhotographerModal
         open={editMode}
         onClose={() => {
           setEditMode(false);
           setSaveError("");
         }}
         title="프로젝트 정보 수정"
+        footer={
+          <div className="flex flex-col gap-3">
+            {saveError && <ErrBox>{saveError}</ErrBox>}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditMode(false);
+                  setSaveError("");
+                }}
+                className="flex-1 py-3 rounded-xl bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] text-zinc-300 text-sm font-semibold transition-colors"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEdit}
+                disabled={saving}
+                className="flex-1 py-3 rounded-xl bg-[#FF4D00] hover:bg-[#ff5e1a] text-black text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? "저장 중..." : "저장"}
+              </button>
+            </div>
+          </div>
+        }
       >
         <div className="flex flex-col gap-5">
           <div>
@@ -1167,33 +1148,11 @@ export function ProjectNexusPageClient() {
             </div>
           </div>
 
-          {saveError && <ErrBox>{saveError}</ErrBox>}
-
-          <div className="flex gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => {
-                setEditMode(false);
-                setSaveError("");
-              }}
-              className="flex-1 py-3 rounded-xl bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] text-zinc-300 text-sm font-semibold transition-colors"
-            >
-              취소
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveEdit}
-              disabled={saving}
-              className="flex-1 py-3 rounded-xl bg-[#FF4D00] hover:bg-[#ff5e1a] text-black text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? "저장 중..." : "저장"}
-            </button>
-          </div>
         </div>
-      </ModalShell>
+      </PhotographerModal>
 
       {/* PIN modal */}
-      <ModalShell
+      <PhotographerModal
         open={showPinModal}
         onClose={() => {
           if (pinSaving) return;
@@ -1203,6 +1162,44 @@ export function ProjectNexusPageClient() {
         }}
         title="고객 접속 비밀번호"
         maxWidth={400}
+        footer={
+          <div className="flex flex-col gap-3">
+            {pinError && <ErrBox>{pinError}</ErrBox>}
+            <div className="flex gap-2">
+              {project.accessPin && (
+                <button
+                  type="button"
+                  onClick={() => handleSavePin(null)}
+                  disabled={pinSaving}
+                  className="px-4 py-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/30 text-rose-400 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  제거
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (pinSaving) return;
+                  setShowPinModal(false);
+                  setPinInput("");
+                  setPinError("");
+                }}
+                disabled={pinSaving}
+                className="flex-1 py-3 rounded-xl bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] text-zinc-300 text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSavePin(pinInput || null)}
+                disabled={pinSaving || (!!pinInput && pinInput.length !== 4)}
+                className="flex-1 py-3 rounded-xl bg-[#FF4D00] hover:bg-[#ff5e1a] text-black text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {pinSaving ? "저장 중..." : "저장"}
+              </button>
+            </div>
+          </div>
+        }
       >
         <div className="flex flex-col gap-4">
           <div>
@@ -1232,47 +1229,11 @@ export function ProjectNexusPageClient() {
               설정 시 고객이 링크에 접속할 때 이 비밀번호를 입력해야 합니다. 비워두면 비밀번호 없이 접속할 수 있습니다.
             </p>
           </div>
-
-          {pinError && <ErrBox>{pinError}</ErrBox>}
-
-          <div className="flex gap-2 pt-1">
-            {project.accessPin && (
-              <button
-                type="button"
-                onClick={() => handleSavePin(null)}
-                disabled={pinSaving}
-                className="px-4 py-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/30 text-rose-400 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                제거
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                if (pinSaving) return;
-                setShowPinModal(false);
-                setPinInput("");
-                setPinError("");
-              }}
-              disabled={pinSaving}
-              className="flex-1 py-3 rounded-xl bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] text-zinc-300 text-sm font-semibold transition-colors disabled:opacity-50"
-            >
-              취소
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSavePin(pinInput || null)}
-              disabled={pinSaving || (!!pinInput && pinInput.length !== 4)}
-              className="flex-1 py-3 rounded-xl bg-[#FF4D00] hover:bg-[#ff5e1a] text-black text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {pinSaving ? "저장 중..." : "저장"}
-            </button>
-          </div>
         </div>
-      </ModalShell>
+      </PhotographerModal>
 
       {/* Delete modal */}
-      <ModalShell
+      <PhotographerModal
         open={showDeleteModal}
         onClose={() => {
           if (deleting) return;
@@ -1286,6 +1247,29 @@ export function ProjectNexusPageClient() {
         }
         maxWidth={420}
         titleAccent="danger"
+        footer={
+          <div className="flex flex-col gap-3">
+            {deleteError && <ErrBox>{deleteError}</ErrBox>}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+                className="flex-1 py-3 rounded-xl bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] text-zinc-300 text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteProject}
+                disabled={deleting}
+                className="flex-1 py-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/40 hover:border-rose-500/60 text-rose-400 text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <Trash2 size={14} /> {deleting ? "삭제 중..." : "프로젝트 삭제"}
+              </button>
+            </div>
+          </div>
+        }
       >
         <div className="flex flex-col gap-4">
           <p className="text-sm text-zinc-300 leading-relaxed">
@@ -1295,29 +1279,8 @@ export function ProjectNexusPageClient() {
           <p className="text-xs text-zinc-500 leading-relaxed">
             모든 사진, 셀렉 데이터, 보정본이 함께 삭제되며 이 작업은 되돌릴 수 없습니다.
           </p>
-
-          {deleteError && <ErrBox>{deleteError}</ErrBox>}
-
-          <div className="flex gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => setShowDeleteModal(false)}
-              disabled={deleting}
-              className="flex-1 py-3 rounded-xl bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] text-zinc-300 text-sm font-semibold transition-colors disabled:opacity-50"
-            >
-              취소
-            </button>
-            <button
-              type="button"
-              onClick={handleDeleteProject}
-              disabled={deleting}
-              className="flex-1 py-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/40 hover:border-rose-500/60 text-rose-400 text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              <Trash2 size={14} /> {deleting ? "삭제 중..." : "프로젝트 삭제"}
-            </button>
-          </div>
         </div>
-      </ModalShell>
+      </PhotographerModal>
     </div>
   );
 }
