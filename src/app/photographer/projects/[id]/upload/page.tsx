@@ -361,21 +361,25 @@ function UploadTile({
   uploadProgress,
   showServerWorking,
   hasPhotos,
+  isPreparing,
   onClick,
 }: {
   isUploading: boolean;
   uploadProgress: number;
   showServerWorking: boolean;
   hasPhotos: boolean;
+  isPreparing: boolean;
   onClick: () => void;
 }) {
-  const label = isUploading
-    ? showServerWorking
-      ? "처리 중..."
-      : `${uploadProgress}%`
-    : hasPhotos
-      ? "+ 사진 추가"
-      : "사진 선택";
+  const label = isPreparing
+    ? "사진 가져오는 중..."
+    : isUploading
+      ? showServerWorking
+        ? "처리 중..."
+        : `${uploadProgress}%`
+      : hasPhotos
+        ? "+ 사진 추가"
+        : "사진 선택";
 
   return (
     <div
@@ -392,17 +396,17 @@ function UploadTile({
       className="prj-upload-tile"
       style={{
         background: "#080808",
-        border: `1px dashed ${isUploading ? ACCENT : "#2a2a2a"}`,
+        border: `1px dashed ${(isUploading || isPreparing) ? ACCENT : "#2a2a2a"}`,
         overflow: "hidden",
         position: "relative",
         display: "flex",
         flexDirection: "column",
-        cursor: isUploading ? "wait" : "pointer",
+        cursor: (isUploading || isPreparing) ? "wait" : "pointer",
         transition: "border-color 0.2s, background 0.2s",
       }}
       aria-label={isUploading ? `업로드 중 ${uploadProgress}%` : "사진 추가하기"}
     >
-      <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: isUploading ? ACCENT_DIM : "rgba(255,77,0,0.04)" }}>
+      <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: (isUploading || isPreparing) ? ACCENT_DIM : "rgba(255,77,0,0.04)" }}>
         <div
           style={{
             position: "absolute",
@@ -420,14 +424,14 @@ function UploadTile({
               width: 30,
               height: 30,
               borderRadius: "50%",
-              border: `1px solid ${isUploading ? ACCENT : "#3a3a3a"}`,
+              border: `1px solid ${(isUploading || isPreparing) ? ACCENT : "#3a3a3a"}`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              background: isUploading ? "rgba(255,77,0,0.08)" : "transparent",
+              background: (isUploading || isPreparing) ? "rgba(255,77,0,0.08)" : "transparent",
             }}
           >
-            {isUploading
+            {(isUploading || isPreparing)
               ? <Loader2 size={14} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} />
               : <ImagePlus size={14} color={ACCENT} />}
           </div>
@@ -436,7 +440,7 @@ function UploadTile({
               fontFamily: MONO,
               fontSize: 10,
               letterSpacing: "0.04em",
-              color: isUploading ? ACCENT : "#9a9a9a",
+              color: (isUploading || isPreparing) ? ACCENT : "#9a9a9a",
               textAlign: "center",
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -789,8 +793,10 @@ export default function ProjectDetailPage() {
   const [toast, setToast] = useState<string | null>(null);
   /** selecting 상태에서 추가 업로드 시도 시 1회 안내 모달 */
   const [showSelectingWarn, setShowSelectingWarn] = useState(false);
+  const [isPreparingFiles, setIsPreparingFiles] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pickerPendingRef = useRef(false);
   const photoScrollRef = useRef<HTMLDivElement>(null);
   const stopRequestedRef = useRef(false);
   const useProxyRef = useRef(false);
@@ -1071,6 +1077,8 @@ export default function ProjectDetailPage() {
   }, [id, loadProject, loadPhotos, router]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    pickerPendingRef.current = false;
+    setIsPreparingFiles(false);
     const chosen = e.target.files;
     if (!chosen?.length) return;
     const list = Array.from(chosen).filter((f) => f.type.startsWith("image/") || f.type === "");
@@ -1097,12 +1105,21 @@ export default function ProjectDetailPage() {
   const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(false); }, []);
 
   /** 파일 picker 진입 단일 통로: preparing → 즉시, selecting → 안내 모달 후, 그 외 → noop */
+  const openFilePicker = useCallback(() => {
+    fileInputRef.current?.click();
+    pickerPendingRef.current = true;
+    const onFocus = () => {
+      if (pickerPendingRef.current) setIsPreparingFiles(true);
+    };
+    window.addEventListener("focus", onFocus, { once: true });
+  }, []);
+
   const requestOpenFilePicker = useCallback(() => {
     if (!project) return;
     if (uploadPhase === "sending" || uploadPhase === "processing") return;
     if (project.status === "preparing") {
       pendingDropFilesRef.current = null;
-      fileInputRef.current?.click();
+      openFilePicker();
       return;
     }
     if (project.status === "selecting") {
@@ -1121,8 +1138,8 @@ export default function ProjectDetailPage() {
       setPendingFiles(dropped);
       return;
     }
-    fileInputRef.current?.click();
-  }, []);
+    openFilePicker();
+  }, [openFilePicker]);
 
   const handleSelectingWarnCancel = useCallback(() => {
     pendingDropFilesRef.current = null;
@@ -1452,6 +1469,7 @@ export default function ProjectDetailPage() {
                       uploadProgress={uploadProgress}
                       showServerWorking={showServerWorking}
                       hasPhotos={displayPhotos.length > 0}
+                      isPreparing={isPreparingFiles}
                       onClick={requestOpenFilePicker}
                     />
                   ) : undefined
