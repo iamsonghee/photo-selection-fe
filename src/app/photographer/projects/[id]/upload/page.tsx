@@ -1766,11 +1766,8 @@ export default function ProjectDetailPage() {
               <span className="prj-tech-label" style={{ color: "#FF4757" }}>전체 삭제</span>
             </div>
             <div style={{ padding: "20px 18px" }}>
-              <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_BRIGHT, marginBottom: 8, lineHeight: 1.5 }}>
+              <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_BRIGHT, marginBottom: 16, lineHeight: 1.5 }}>
                 {displayPhotos.length.toLocaleString()}장을 모두 삭제할까요?
-              </p>
-              <p style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, lineHeight: 1.6, marginBottom: 16 }}>
-                되돌릴 수 없습니다.
               </p>
               <div style={{ display: "flex", gap: 8 }}>
                 <button
