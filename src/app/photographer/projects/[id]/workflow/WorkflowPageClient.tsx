@@ -1359,7 +1359,6 @@ export default function WorkflowPageClient() {
 
   function closeReviewDeadlineModal() {
     setReviewDeadlineModal(null);
-    setShareCopied(null);
   }
 
   // 본문 그리드용 카드 인덱스를 viewer 인덱스에 맞추기 위해 filteredRows 사용
