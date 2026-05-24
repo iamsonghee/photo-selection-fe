@@ -1036,6 +1036,11 @@ export default function ProjectDetailPage() {
           syncAwaitingServer();
         }
       }));
+      // batch 간 macrotask 경계 생성: iOS WKWebView는 macrotask 사이에서만 paint
+      // 이 시점에 이전 batch blob preview가 DOM에 있고 다음 XHR이 아직 시작 안 됨 → paint 보장
+      if (isPhoneLikeClient()) {
+        await new Promise<void>((r) => setTimeout(r, 0));
+      }
     }
 
     if (stopRequestedRef.current) {
