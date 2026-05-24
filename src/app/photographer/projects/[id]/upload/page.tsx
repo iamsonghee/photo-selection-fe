@@ -948,7 +948,8 @@ export default function ProjectDetailPage() {
           return { tempId: `uploading-${inFlightNow}-${chunkStart}-${chunkOffset}-${fi}`, blobUrl, filename: file.name };
         });
         const inFlightIds = new Set(inFlight.map((p) => p.tempId));
-        setUploadingPhotos((prev) => [...prev, ...inFlight]);
+        // XHR 시작 전 스피너 강제 렌더 (iOS WKWebView scheduler 우회)
+        flushSync(() => setUploadingPhotos((prev) => [...prev, ...inFlight]));
         try {
           if (abortReason) {
             allFailed.push(...batch);
@@ -988,15 +989,14 @@ export default function ProjectDetailPage() {
                 const okBody = await res.json().catch(() => ({})) as { rejected?: string[] };
                 if (okBody.rejected?.length) backendRejected.push(...okBody.rejected);
               } catch {}
-              // 배치 성공: DB 즉시 조회 후 flushSync로 강제 렌더 (scheduler 우회)
-              // 백엔드는 200 OK 이전에 DB insert 완료 → 즉시 최신 사진 반환 보장
-              const freshPhotos = await getPhotosByProjectId(id);
+              // 배치 성공: blob URL 프리뷰로 즉시 갱신 (추가 네트워크 요청 없음)
+              // iOS에서 업로드 XHR과 동시에 DB 조회하면 연결 한도 초과 → blob URL 사용
               flushSync(() => {
-                setPhotos(freshPhotos);
                 setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
+                setPendingPhotos((prev) => [...prev, ...inFlight]);
               });
               uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
-              inFlight.forEach((p) => URL.revokeObjectURL(p.blobUrl));
+              pendingBlobsRef.current.push(...inFlight.map((p) => p.blobUrl));
             }
             if (!res.ok) {
               let body: unknown = {};
