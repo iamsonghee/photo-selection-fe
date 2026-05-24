@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import styles from "./Workflow.module.css";
 import { normalizeReviewDeadlineYmd } from "@/lib/format-review-deadline";
+import { compressImageForUpload } from "@/lib/upload-client-compress";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -1102,11 +1103,12 @@ export default function WorkflowPageClient() {
       const token = session?.access_token;
       if (!token) throw new Error("로그인이 필요합니다.");
 
+      const compressed = await compressImageForUpload(file);
       const form = new FormData();
       form.append("project_id", id);
       form.append("version", String(version));
       form.append("photo_ids", photoId);
-      form.append("files", file, file.name);
+      form.append("files", compressed, compressed.name);
 
       const res = await fetch(`${API_BASE}/api/upload/versions`, {
         method: "POST",

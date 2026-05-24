@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useProfile } from "@/contexts/ProfileContext";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
+import { compressImageForUpload } from "@/lib/upload-client-compress";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const ACCEPT_IMAGE = "image/jpeg,image/png,image/webp";
@@ -150,8 +151,9 @@ export default function SettingsPage() {
       } = await supabase.auth.getSession();
       const token = session?.access_token;
       if (!token) throw new Error("로그인이 필요합니다.");
+      const compressed = await compressImageForUpload(file);
       const form = new FormData();
-      form.append("file", file);
+      form.append("file", compressed);
       const res = await fetch(`${API_BASE}/api/upload/profile-image`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },

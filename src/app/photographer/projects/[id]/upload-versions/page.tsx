@@ -35,6 +35,7 @@ import CompareViewerModal from "@/components/CompareViewerModal";
 import { PHOTOGRAPHER_THEME as C, photographerDock } from "@/lib/photographer-theme";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
+import { compressImageForUpload } from "@/lib/upload-client-compress";
 import { ProjectPipelineHeader } from "@/components/photographer/ProjectPipelineHeader";
 import { ProjectActionFlow } from "@/components/photographer/ProjectActionFlow";
 import { buildCompactSteps } from "@/lib/project-flow-steps";
@@ -292,11 +293,12 @@ export default function UploadVersionsPage() {
       if (!token) throw new Error("로그인이 필요합니다.");
 
       const ordered = mapping.filter((m) => m.file != null) as Array<MappingResult<V1Target> & { file: File }>;
+      const compressedFiles = await Promise.all(ordered.map((m) => compressImageForUpload(m.file)));
       const form = new FormData();
       form.append("project_id", id);
       form.append("version", "1");
       form.append("photo_ids", ordered.map((m) => m.target.id).join(","));
-      ordered.forEach((m) => form.append("files", m.file));
+      compressedFiles.forEach((f) => form.append("files", f));
       form.append("global_memo", globalMemo);
 
       const uploadRes = await fetch(`${API_BASE}/api/upload/versions`, {

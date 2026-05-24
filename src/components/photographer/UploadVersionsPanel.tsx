@@ -25,6 +25,7 @@ import {
 } from "@/lib/version-mapping";
 import { BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
 import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
+import { compressImageForUpload } from "@/lib/upload-client-compress";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import type { Photo } from "@/types";
 
@@ -274,11 +275,12 @@ export default function UploadVersionsPanel({
         return;
       }
 
+      const compressedFiles = await Promise.all(changed.map((m) => compressImageForUpload(m.file)));
       const form = new FormData();
       form.append("project_id", projectId);
       form.append("version", String(version));
       form.append("photo_ids", changed.map((m) => m.target.id).join(","));
-      changed.forEach((m) => form.append("files", m.file));
+      compressedFiles.forEach((f) => form.append("files", f));
       form.append("global_memo", globalMemo);
 
       const uploadRes = await new Promise<{ ok: boolean; status: number; text: string }>(

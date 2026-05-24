@@ -1,6 +1,6 @@
 /**
- * 모바일 업로드 전: 전송량·실패율 완화를 위해 브라우저에서 해상도·용량을 줄입니다.
- * PC 업로드는 호출하지 않는 것을 권장(원본 보존).
+ * 업로드 전: 전송량 최적화를 위해 브라우저에서 해상도·용량을 줄입니다.
+ * 디코드 실패·결과가 원본보다 크면 원본 File을 그대로 반환합니다.
  */
 
 const DEFAULT_MAX_EDGE = 2560;
@@ -8,7 +8,7 @@ const DEFAULT_JPEG_QUALITY = 0.82;
 /** 이보다 작은 파일은 디코딩·재인코딩 생략 */
 const DEFAULT_SKIP_BELOW_BYTES = 600 * 1024;
 
-export type MobileUploadCompressOptions = {
+export type UploadCompressOptions = {
   maxEdge?: number;
   jpegQuality?: number;
   /** 이 크기 이하면 압축 시도 안 함 */
@@ -51,13 +51,9 @@ async function decodeToDrawable(file: File): Promise<{ drawable: CanvasImageSour
   }
 }
 
-/**
- * 휴대폰에서 선택한 이미지 1장을 최대 변 기준으로 줄이고 JPEG로 재인코딩합니다.
- * 디코드 실패·결과가 원본보다 크면 원본 File을 그대로 반환합니다.
- */
-export async function compressImageFileForMobileIfNeeded(
+export async function compressImageForUpload(
   file: File,
-  options?: MobileUploadCompressOptions,
+  options?: UploadCompressOptions,
 ): Promise<File> {
   const maxEdge = options?.maxEdge ?? DEFAULT_MAX_EDGE;
   const jpegQuality = options?.jpegQuality ?? DEFAULT_JPEG_QUALITY;

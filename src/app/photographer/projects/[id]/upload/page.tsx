@@ -30,7 +30,7 @@ import { getProjectById, getPhotosByProjectId } from "@/lib/db";
 import { getStatusLabel } from "@/lib/project-status";
 import { createClient } from "@/lib/supabase/client";
 import { parseBetaLimitError } from "@/lib/beta-limits";
-import { compressImageFileForMobileIfNeeded } from "@/lib/upload-client-compress";
+import { compressImageForUpload } from "@/lib/upload-client-compress";
 import type { Project, ProjectStatus, Photo } from "@/types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
@@ -866,7 +866,7 @@ export default function ProjectDetailPage() {
     if (!uploadFiles.length) return;
     setUploadError(null);
     setAwaitingServerFinalize(false);
-    setUploadPhase(isPhoneLikeClient() ? "processing" : "sending");
+    setUploadPhase("processing");
     setUploadProgress(0);
     stopRequestedRef.current = false;
     useProxyRef.current = false;
@@ -881,18 +881,17 @@ export default function ProjectDetailPage() {
     let currentToken = token;
     let filesToUpload = uploadFiles;
 
-    if (isPhoneLikeClient()) {
-      const compressed: File[] = [];
-      for (let i = 0; i < uploadFiles.length; i++) {
-        if (stopRequestedRef.current) { setUploadPhase("idle"); setUploadProgress(0); await loadPhotos(); return; }
-        compressed.push(await compressImageFileForMobileIfNeeded(uploadFiles[i]));
-        setUploadProgress(Math.round(((i + 1) / uploadFiles.length) * 100));
-      }
-      filesToUpload = compressed;
+    const compressed: File[] = [];
+    for (let i = 0; i < uploadFiles.length; i++) {
+      if (stopRequestedRef.current) { setUploadPhase("idle"); setUploadProgress(0); await loadPhotos(); return; }
+      compressed.push(await compressImageForUpload(uploadFiles[i]));
+      setUploadProgress(Math.round(((i + 1) / uploadFiles.length) * 100));
     }
+    filesToUpload = compressed;
 
     setUploadPhase("sending");
     setUploadProgress(3);
+    photoScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
 
     const effectiveBatch = isPhoneLikeClient() ? MOBILE_BATCH_SIZE : BATCH_SIZE;
     const batches: File[][] = [];
