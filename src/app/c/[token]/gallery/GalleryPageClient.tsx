@@ -462,9 +462,7 @@ export default function GalleryPageClient() {
 
                 {/* Star filter */}
                 <div className="gl-filter-stars" style={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  {starFilter > 0 && (
-                    <span style={{ fontSize: 9, color: "#FF4D00", fontFamily: "'Space Mono', monospace", marginRight: 2, letterSpacing: "-0.02em", lineHeight: 1 }}>≥</span>
-                  )}
+                  <span style={{ fontSize: 13, color: starFilter > 0 ? "#FF4D00" : "#444", fontFamily: "'Space Mono', monospace", marginRight: 3, lineHeight: 1, userSelect: "none" }}>≥</span>
                   {([1, 2, 3, 4, 5] as const).map((s) => {
                     const filled = s <= (hoverStar || starFilter);
                     return (
