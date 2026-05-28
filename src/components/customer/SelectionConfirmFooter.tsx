@@ -101,7 +101,7 @@ export function SelectionConfirmFooter({
               }}
             >
               <span style={{ color: "#888" }}>{progressLabel}</span>
-              <span style={{ color: "#FF4D00" }}>
+              <span style={{ color: remaining < 0 ? "#ef4444" : "#FF4D00" }}>
                 {Y} / {N}장
               </span>
             </div>
@@ -109,7 +109,7 @@ export function SelectionConfirmFooter({
               <div
                 style={{
                   height: "100%",
-                  background: "#FF4D00",
+                  background: remaining < 0 ? "#ef4444" : "#FF4D00",
                   width: `${progressPct}%`,
                   transition: "width 0.3s",
                 }}
@@ -125,7 +125,7 @@ export function SelectionConfirmFooter({
                     fontFamily: "'JetBrains Mono', 'Space Mono', monospace",
                     fontSize: 11,
                     fontWeight: 700,
-                    color: remaining === 0 ? "#FF4D00" : "rgba(255,255,255,0.35)",
+                    color: remaining === 0 ? "#FF4D00" : remaining < 0 ? "#ef4444" : "rgba(255,255,255,0.35)",
                     margin: 0,
                     whiteSpace: "nowrap",
                   }}
