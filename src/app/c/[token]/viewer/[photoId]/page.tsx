@@ -343,7 +343,6 @@ export default function ViewerPage() {
   const filename           = getPhotoDisplayName(current);
   const viewerSrc          = viewerImageUrl(current);
   const galleryHref        = buildGalleryHrefWithFocus(token, searchParams, photoId);
-  const shotSeq            = String(currentIndex + 1).padStart(3, "0");
 
   return (
     <div
@@ -466,7 +465,7 @@ export default function ViewerPage() {
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}>
-                SHOT_{shotSeq} · {project?.name ?? "PROJECT"}
+                {project?.name ?? "PROJECT"}
               </p>
             </div>
           </div>
@@ -548,7 +547,7 @@ export default function ViewerPage() {
               color: "rgba(255,255,255,0.3)", whiteSpace: "nowrap",
               pointerEvents: "none",
             }}>
-              SHOT_{shotSeq} // {filename}
+              {filename}
             </div>
           </div>
         </main>

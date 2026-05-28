@@ -284,15 +284,6 @@ export default function GalleryPageClient() {
         }
         .gl-card-overlay .gl-overlay-interactive { pointer-events: auto; }
 
-        .gl-bracket {
-          position: absolute; width: 12px; height: 12px;
-          border-color: #FF4D00; pointer-events: none; z-index: 10;
-        }
-        .gl-b-tl { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
-        .gl-b-tr { top: -1px; right: -1px; border-top: 2px solid; border-right: 2px solid; }
-        .gl-b-bl { bottom: -1px; left: -1px; border-bottom: 2px solid; border-left: 2px solid; }
-        .gl-b-br { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
-
         .gl-check-box {
           position: absolute; top: 10px; left: 10px;
           width: 22px; height: 22px;
@@ -563,11 +554,6 @@ export default function GalleryPageClient() {
                   }}
                   className={`gl-photo-card${selected ? " gl-selected" : ""}`}
                 >
-                  <div className="gl-bracket gl-b-tl" />
-                  <div className="gl-bracket gl-b-tr" />
-                  <div className="gl-bracket gl-b-bl" />
-                  <div className="gl-bracket gl-b-br" />
-
                   <img
                     src={photo.url}
                     alt={getPhotoDisplayName(photo)}
