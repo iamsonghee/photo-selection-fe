@@ -119,7 +119,6 @@ export default function UploadVersionsV2Page() {
   const [uploadedFiles,   setUploadedFiles]   = useState<File[]>([]);
   const [mapping,         setMapping]         = useState<MappingResult<V2Target>[]>([]);
   const [dragOver,        setDragOver]        = useState(false);
-  const [globalMemo,      setGlobalMemo]      = useState("");
   const [showConfirm,     setShowConfirm]     = useState(false);
   const [submitting,      setSubmitting]      = useState(false);
   const [error,           setError]           = useState<string | null>(null);
@@ -383,8 +382,6 @@ export default function UploadVersionsV2Page() {
       form.append("version", "2");
       form.append("photo_ids", ordered.map((m) => m.target.id).join(","));
       compressedFiles.forEach((f) => form.append("files", f));
-      form.append("global_memo", globalMemo);
-
       const uploadRes = await fetch(`${API_BASE}/api/upload/versions`, {
         method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form,
       });
@@ -408,7 +405,7 @@ export default function UploadVersionsV2Page() {
     } finally {
       setSubmitting(false); setShowConfirm(false);
     }
-  }, [project, canDeliver, mapping, id, globalMemo, router]);
+  }, [project, canDeliver, mapping, id, router]);
 
   const handleSavePin = useCallback(async (newPin: string | null) => {
     if (!project) return;
@@ -554,11 +551,6 @@ export default function UploadVersionsV2Page() {
           background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' stroke='%23FF5A1F' stroke-width='2' stroke-dasharray='8%2c 8' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
           background-color: ${ACCENT_DIM};
         }
-        .ph-uv-memo {
-          background: #080808; border: 1px solid ${BORDER}; color: ${TEXT_BRIGHT};
-          transition: border-color 0.2s; resize: none; outline: none;
-        }
-        .ph-uv-memo:focus { border-color: ${ACCENT}; box-shadow: inset 0 0 10px rgba(255, 90, 31, 0.1); }
         .ph-uv-thumb-more { transition: border-color 0.2s, background-color 0.2s, color 0.2s; }
         .ph-uv-thumb-more:hover {
           border-color: ${ACCENT} !important;
@@ -595,10 +587,9 @@ export default function UploadVersionsV2Page() {
           .ph-uv-action-bar > div:last-child { margin-left: 0 !important; flex-direction: column; width: 100%; }
           .ph-uv-modal-actions { flex-direction: column !important; align-items: stretch !important; gap: 10px !important; }
           .ph-uv-modal-actions button { width: 100% !important; min-height: 44px !important; }
-          .ph-uv-mapping-row { flex-direction: column !important; align-items: stretch !important; min-height: 0 !important; }
-          .ph-uv-mapping-mid { width: 100% !important; border-left: none !important; border-right: none !important; border-top: 1px solid ${BORDER}; border-bottom: 1px solid ${BORDER}; padding: 8px !important; }
-          .ph-uv-mapping-mid svg { transform: rotate(90deg); }
-          .ph-uv-mapping-left, .ph-uv-mapping-right { width: 100% !important; }
+          .ph-uv-mapping-row { padding: 8px 10px !important; }
+          .ph-uv-mapping-thumb { width: 32px !important; height: 32px !important; }
+          .ph-uv-comment { -webkit-line-clamp: 1 !important; }
         }
       `}</style>
 
@@ -1530,32 +1521,6 @@ export default function UploadVersionsV2Page() {
               <br />
               전달 후 고객이 v2 최종 검토를 진행합니다.
             </p>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-              <MessageSquare size={13} color="#666" strokeWidth={2} />
-              <span className="ph-uv-tech-label" style={{ color: "#666", fontSize: "0.6rem" }}>
-                PHOTOGRAPHER_MEMO
-              </span>
-            </div>
-            <textarea
-              className="ph-uv-memo"
-              value={globalMemo}
-              onChange={(e) => setGlobalMemo(e.target.value)}
-              placeholder="고객 검토 화면에 표시될 메모 (선택)"
-              rows={3}
-              style={{
-                width: "100%",
-                height: 72,
-                minHeight: 72,
-                maxHeight: 120,
-                boxSizing: "border-box",
-                padding: "8px 10px",
-                fontFamily: MONO,
-                fontSize: 11,
-                lineHeight: 1.45,
-                resize: "vertical",
-                marginBottom: 20,
-              }}
-            />
             {error && <p style={{ marginBottom: 12, fontSize: 12, color: "#f87171", fontFamily: MONO }}>{error}</p>}
             <div className="ph-uv-modal-actions" style={{ display: "flex", gap: 10 }}>
               <button
@@ -1704,32 +1669,40 @@ function MappingCardV2({
 
         {/* Left: original + v1 + filename + comment */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
             {/* original */}
-            <div
-              onClick={() => target.photo.url && onOpenLightbox([{ url: viewerImageUrl(target.photo), label: target.filename, sublabel: "원본 선택 사진" }], 0)}
-              style={{ width: 36, height: 36, background: SURFACE_1, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${BORDER}`, overflow: "hidden", cursor: target.photo.url ? "zoom-in" : "default" }}
-            >
-              {target.photo.url && !origErr ? (
-                <img src={target.photo.url} alt="" onError={() => setOrigErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : <Image size={12} color={TEXT_MUTED} />}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+              <span style={{ fontSize: 8, color: TEXT_MUTED, textTransform: "uppercase", letterSpacing: "0.08em" }}>원본</span>
+              <div
+                className="ph-uv-mapping-thumb"
+                onClick={() => target.photo.url && onOpenLightbox([{ url: viewerImageUrl(target.photo), label: target.filename, sublabel: "원본 선택 사진" }], 0)}
+                style={{ width: 48, height: 48, background: SURFACE_1, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${BORDER}`, overflow: "hidden", cursor: target.photo.url ? "zoom-in" : "default" }}
+              >
+                {target.photo.url && !origErr ? (
+                  <img src={target.photo.url} alt="" onError={() => setOrigErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : <Image size={12} color={TEXT_MUTED} />}
+              </div>
             </div>
             {/* v1 */}
             {v1Url && (
-              <div
-                onClick={() => onOpenLightbox([{ url: v1Url, label: target.filename, sublabel: "v1 보정본" }], 0)}
-                style={{ width: 36, height: 36, background: SURFACE_1, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid rgba(255,90,31,0.25)`, overflow: "hidden", cursor: "zoom-in" }}
-              >
-                {!v1Err ? (
-                  <img src={v1Url} alt="" onError={() => setV1Err(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : <Image size={12} color={TEXT_MUTED} />}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                <span style={{ fontSize: 8, color: "rgba(255,90,31,0.5)", textTransform: "uppercase", letterSpacing: "0.08em" }}>V1</span>
+                <div
+                  className="ph-uv-mapping-thumb"
+                  onClick={() => onOpenLightbox([{ url: v1Url, label: target.filename, sublabel: "v1 보정본" }], 0)}
+                  style={{ width: 48, height: 48, background: SURFACE_1, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid rgba(255,90,31,0.25)`, overflow: "hidden", cursor: "zoom-in" }}
+                >
+                  {!v1Err ? (
+                    <img src={v1Url} alt="" onError={() => setV1Err(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : <Image size={12} color={TEXT_MUTED} />}
+                </div>
               </div>
             )}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 11, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2, color: TEXT_BRIGHT }}>{target.filename}</div>
             {target.comment?.trim() ? (
-              <div style={{ fontSize: 10, color: AMBER, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", lineHeight: 1.3 }}>{target.comment}</div>
+              <div className="ph-uv-comment" style={{ fontSize: 10, color: AMBER, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", lineHeight: 1.3 }}>{target.comment}</div>
             ) : null}
           </div>
         </div>
@@ -1740,7 +1713,7 @@ function MappingCardV2({
         {/* Right: v2 upload */}
         {state === "empty" ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <div style={{ width: 52, height: 52, background: "transparent", border: `2px dashed ${BORDER}`, flexShrink: 0 }} />
+            <div className="ph-uv-mapping-thumb" style={{ width: 56, height: 56, background: "transparent", border: `2px dashed ${BORDER}`, flexShrink: 0 }} />
             <div style={{ fontSize: 11, color: TEXT_MUTED, fontStyle: "italic" }}>v2 없음</div>
           </div>
         ) : (
@@ -1748,7 +1721,7 @@ function MappingCardV2({
             style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, cursor: previewUrl ? "zoom-in" : "default" }}
             onClick={() => previewUrl && onCompare(target.id)}
           >
-            <div style={{ width: 52, height: 52, background: SURFACE_1, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${BORDER}`, overflow: "hidden" }}>
+            <div className="ph-uv-mapping-thumb" style={{ width: 56, height: 56, background: SURFACE_1, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${BORDER}`, overflow: "hidden" }}>
               {previewUrl && !retouchErr ? (
                 <img src={previewUrl} alt="" onError={() => setRetouchErr(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : <Image size={16} color={TEXT_MUTED} />}

@@ -191,7 +191,6 @@ export interface ReviewPhotoItem {
   originalUrl: string;
   versionUrl: string;
   versionThumbUrl: string;
-  photographerMemo: string | null;
   orderIndex: number;
   /** 이미 제출된 검토가 있으면 */
   existingReview?: { status: "approved" | "revision_requested"; customerComment: string | null };
@@ -199,7 +198,6 @@ export interface ReviewPhotoItem {
 
 export interface ReviewDataResponse {
   project: Project;
-  globalPhotographerMemo: string | null;
   photos: ReviewPhotoItem[];
 }
 
@@ -219,28 +217,28 @@ export async function getReviewDataByToken(
     .select("photo_id")
     .eq("project_id", project.id);
   const photoIds = (selections ?? []).map((s: { photo_id: string }) => s.photo_id);
-  if (photoIds.length === 0) return { project, globalPhotographerMemo: null, photos: [] };
+  if (photoIds.length === 0) return { project, photos: [] };
 
   const { data: photosRows, error: photosErr } = await admin
     .from("photos")
     .select("id, number, r2_thumb_url, r2_preview_url, original_filename")
     .in("id", photoIds)
     .order("number", { ascending: true });
-  if (photosErr || !photosRows?.length) return { project, globalPhotographerMemo: null, photos: [] };
+  if (photosErr || !photosRows?.length) return { project, photos: [] };
 
   const { data: pvRowsRaw, error: pvErr } = await admin
     .from("photo_versions")
-    .select("id, photo_id, r2_url, r2_thumb_url, photographer_memo, created_at")
+    .select("id, photo_id, r2_url, r2_thumb_url, created_at")
     .in("photo_id", photoIds)
     .eq("version", version)
     .order("created_at", { ascending: false });
-  if (pvErr) return { project, globalPhotographerMemo: null, photos: [] };
+  if (pvErr) return { project, photos: [] };
 
   // 사진당 동일 version 행이 여러 개면(재업로드) 최신 행만 사용. 무작위 행이면
   // 고객 검토가 옛 photo_version_id에만 쌓여 '전부 확정'처럼 보일 수 있다.
   const pvByPhotoId = new Map<
     string,
-    { id: string; photo_id: string; r2_url: string; r2_thumb_url: string | null; photographer_memo: string | null }
+    { id: string; photo_id: string; r2_url: string; r2_thumb_url: string | null }
   >();
   for (const r of pvRowsRaw ?? []) {
     const row = r as {
@@ -248,7 +246,6 @@ export async function getReviewDataByToken(
       id: string;
       r2_url: string;
       r2_thumb_url: string | null;
-      photographer_memo: string | null;
     };
     if (pvByPhotoId.has(row.photo_id)) continue;
     pvByPhotoId.set(row.photo_id, row);
@@ -284,13 +281,11 @@ export async function getReviewDataByToken(
       originalUrl: row.r2_preview_url ?? row.r2_thumb_url,
       versionUrl: pv.r2_url,
       versionThumbUrl: pv.r2_thumb_url ?? pv.r2_url,
-      photographerMemo: pv.photographer_memo ?? null,
       orderIndex: row.number,
       existingReview: existing,
     });
   }
   photos.sort((a, b) => a.orderIndex - b.orderIndex);
 
-  const globalPhotographerMemo = null;
-  return { project, globalPhotographerMemo, photos };
+  return { project, photos };
 }

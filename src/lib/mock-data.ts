@@ -181,7 +181,6 @@ function generatePhotos(projectId: string, count: number, selectedCount: number)
           }
         : undefined,
       comment: selected && i % 4 === 0 ? `이 사진 보정 시 밝기 살려주세요 (${i + 1}번)` : undefined,
-      photographerMemo: selected && i % 3 === 0 ? "Lightroom 밝기+2" : undefined,
     });
   }
   return photos;
@@ -273,13 +272,11 @@ export interface ReviewPhotoItem {
   originalFilename: string;
   originalUrl: string;
   versionUrl: string;
-  photographerMemo: string | null;
   orderIndex: number;
 }
 
-/** 프로젝트의 보정본 검토용 목업 데이터. 선택된 N장(목업 5장) + v1 보정본 URL/메모 */
+/** 프로젝트의 보정본 검토용 목업 데이터. 선택된 N장(목업 5장) + v1 보정본 URL */
 export function getReviewMockData(projectId: string): {
-  globalPhotographerMemo: string;
   photos: ReviewPhotoItem[];
 } {
   const proj = mockProjects.find((p) => p.id === projectId);
@@ -300,12 +297,8 @@ export function getReviewMockData(projectId: string): {
       originalFilename: `IMG_00${i + 1}.jpg`,
       originalUrl: baseUrl(i + 1),
       versionUrl: versionUrl(i + 1),
-      photographerMemo: i % 2 === 0 ? `피부톤 보정, 밝기+1 적용 (${i + 1}번)` : null,
       orderIndex: i + 1,
     });
   }
-  return {
-    globalPhotographerMemo: "전체 밝기+1, 피부톤 보정 적용했습니다. 수정 원하시면 말씀해 주세요.",
-    photos,
-  };
+  return { photos };
 }

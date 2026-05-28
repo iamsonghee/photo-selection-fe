@@ -63,7 +63,6 @@ function mapPhotoRow(
     originalFilename: row.original_filename ?? null,
     fileSize: (row as unknown as Record<string, unknown>).file_size as number | null ?? null,
     createdAt: row.created_at ?? null,
-    photographerMemo: row.memo ?? undefined,
     selected,
     tag: state ? { star: state.rating as 1 | 2 | 3 | 4 | 5 | undefined, color: state.color } : undefined,
     comment: state?.comment ?? undefined,
@@ -367,7 +366,6 @@ export interface PhotoVersionRecord {
   photoId: string;
   version: 1 | 2;
   r2Url: string;
-  photographerMemo: string | null;
   createdAt: string;
 }
 
@@ -387,7 +385,6 @@ function mapPhotoVersionRow(row: PhotoVersionRow): PhotoVersionRecord {
     photoId: row.photo_id,
     version: row.version as 1 | 2,
     r2Url: row.r2_url,
-    photographerMemo: row.photographer_memo ?? null,
     createdAt: row.created_at,
   };
 }

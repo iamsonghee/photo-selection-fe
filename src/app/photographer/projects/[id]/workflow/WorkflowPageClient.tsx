@@ -45,6 +45,7 @@ type VersionInfo = {
   thumbUrl: string; // 400px — 카드 그리드용 (없으면 url fallback)
   reviewStatus: "approved" | "revision_requested" | null;
   comment: string | null;
+  filename: string | null;
 };
 
 type WorkflowRow = {
@@ -884,6 +885,7 @@ export default function WorkflowPageClient() {
             thumbUrl: v.r2_thumb_url ?? v.r2_url,
             reviewStatus: v.review_status ?? null,
             comment: v.customer_comment ?? null,
+            filename: v.version_filename ?? null,
           };
         if (typeof v.version === "number") distinctVersions.add(v.version);
           if (v.version === 1) v1Map.set(v.photo_id, info);
@@ -1016,7 +1018,7 @@ export default function WorkflowPageClient() {
     const version = stageTab === "v2" ? 2 : 1;
     const header = isOriginal
       ? withComment ? ["번호", "파일명", "고객 코멘트"] : ["번호", "파일명"]
-      : withComment ? ["번호", "파일명", "상태", "고객 코멘트"] : ["번호", "파일명", "상태"];
+      : withComment ? ["번호", "파일명", "보정본 파일명", "상태", "고객 코멘트"] : ["번호", "파일명", "보정본 파일명", "상태"];
     const rowData = rows.map((row, i) => {
       const filename = row.photo.originalFilename ?? `FRAME_${String(row.photo.orderIndex).padStart(4, "0")}`;
       if (isOriginal) {
@@ -1029,9 +1031,10 @@ export default function WorkflowPageClient() {
         ver?.reviewStatus === "approved" ? "확정"
         : ver?.reviewStatus === "revision_requested" ? "재보정 요청"
         : "미검토";
+      const versionFilename = ver?.filename ?? "";
       return withComment
-        ? [String(i + 1), filename, status, ver?.comment ?? ""]
-        : [String(i + 1), filename, status];
+        ? [String(i + 1), filename, versionFilename, status, ver?.comment ?? ""]
+        : [String(i + 1), filename, versionFilename, status];
     });
     const csv = [header, ...rowData]
       .map((cols) => cols.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
@@ -1615,15 +1618,17 @@ export default function WorkflowPageClient() {
                   <colgroup>
                     <col style={{ width: 36 }} />
                     <col style={{ width: "30%" }} />
-                    {stageTab !== "original" && <col style={{ width: 84 }} />}
                     {stageTab !== "original" && <col />}
+                    {stageTab !== "original" && <col style={{ width: 84 }} />}
+                    <col />
                   </colgroup>
                   <thead>
                     <tr style={{ borderBottom: "1px solid #1a1a1e", background: "#0a0a0c" }}>
                       <th style={{ padding: "7px 8px", fontSize: 10, color: "#5c5c5c", textAlign: "center", fontWeight: 600 }}>#</th>
                       <th style={{ padding: "7px 10px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600 }}>파일명</th>
+                      {stageTab !== "original" && <th style={{ padding: "7px 10px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600 }}>보정본 파일명</th>}
                       {stageTab !== "original" && <th style={{ padding: "7px 8px", fontSize: 10, color: "#5c5c5c", textAlign: "center", fontWeight: 600 }}>상태</th>}
-                      {stageTab !== "original" && <th style={{ padding: "7px 10px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600 }}>고객 코멘트</th>}
+                      <th style={{ padding: "7px 10px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600 }}>고객 코멘트</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1645,15 +1650,18 @@ export default function WorkflowPageClient() {
                           <td style={{ padding: "10px 8px", fontSize: 11, color: "#5c5c5c", textAlign: "center" }}>{visIdx + 1}</td>
                           <td style={{ padding: "10px 10px", fontSize: 11, color: "#a3a3a3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{filename}</td>
                           {stageTab !== "original" && (
+                            <td style={{ padding: "10px 10px", fontSize: 11, color: ver?.filename ? "#a3a3a3" : "#3a3a3a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {ver?.filename || "—"}
+                            </td>
+                          )}
+                          {stageTab !== "original" && (
                             <td style={{ padding: "10px 8px", textAlign: "center" }}>
                               <StatusBadge status={ver?.reviewStatus ?? "pending"} compact />
                             </td>
                           )}
-                          {stageTab !== "original" && (
-                            <td style={{ padding: "10px 10px", fontSize: 11, color: ver?.comment ? "#a3a3a3" : "#3a3a3a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {ver?.comment || "—"}
-                            </td>
-                          )}
+                          <td style={{ padding: "10px 10px", fontSize: 11, color: (stageTab === "original" ? row.photo.comment : ver?.comment) ? "#a3a3a3" : "#3a3a3a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {stageTab === "original" ? (row.photo.comment || "—") : (ver?.comment || "—")}
+                          </td>
                         </tr>
                       );
                     })}

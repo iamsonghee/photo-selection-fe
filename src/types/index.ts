@@ -49,7 +49,6 @@ export interface Photo {
   selected?: boolean;
   tag?: PhotoTag;
   comment?: string;
-  photographerMemo?: string;
   /** 업로드 중인 낙관적 프리뷰 (blob URL). loadPhotos() 후 제거됨 */
   isPending?: boolean;
   /** XHR 전송 중 (true=스피너, false=테두리만) */
@@ -151,7 +150,6 @@ export interface PhotoVersion {
   photoId: string;
   version: 1 | 2;
   r2Url: string;
-  photographerMemo: string | null;
   createdAt: string;
 }
 

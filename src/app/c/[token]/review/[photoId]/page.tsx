@@ -917,11 +917,6 @@ export default function ReviewViewerPage() {
               {/* 재보정 코멘트 한 줄 인풋 (재보정 선택 시 자동 노출) */}
               {/* 코멘트 입력 — 항상 표시, 재보정 선택 시 강조 */}
               <div style={{ padding: "10px 20px 0", display: "flex", alignItems: "center", gap: 8 }}>
-                {current.photographerMemo && isRevision && (
-                  <span style={{ fontFamily: MONO, fontSize: 10, color: DIM, flexShrink: 0 }}>
-                    📌 {current.photographerMemo.slice(0, 30)}{current.photographerMemo.length > 30 ? "…" : ""}
-                  </span>
-                )}
                 <input
                   type="text"
                   value={revisionDraft}

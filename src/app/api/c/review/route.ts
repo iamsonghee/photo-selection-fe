@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     }
     const project = await getProjectByToken(admin, token);
     if (project?.status === "reviewing_v1" || project?.status === "reviewing_v2") {
-      return NextResponse.json({ project, globalPhotographerMemo: null, photos: [] });
+      return NextResponse.json({ project, photos: [] });
     }
     return NextResponse.json({ error: "Invalid token or not in review phase" }, { status: 404 });
   } catch (e) {

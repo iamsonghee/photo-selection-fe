@@ -95,7 +95,6 @@ export default function UploadVersionsPage() {
   const [uploadedV1Info,      setUploadedV1Info]      = useState<Map<string, VersionRowMeta>>(new Map());
   const [existingVersionCount, setExistingVersionCount] = useState<number>(0);
   const [dragOver,        setDragOver]        = useState(false);
-  const [globalMemo,      setGlobalMemo]      = useState("");
   const [showConfirm,     setShowConfirm]     = useState(false);
   const [submitting,      setSubmitting]      = useState(false);
   const [error,           setError]           = useState<string | null>(null);
@@ -299,8 +298,6 @@ export default function UploadVersionsPage() {
       form.append("version", "1");
       form.append("photo_ids", ordered.map((m) => m.target.id).join(","));
       compressedFiles.forEach((f) => form.append("files", f));
-      form.append("global_memo", globalMemo);
-
       const uploadRes = await fetch(`${API_BASE}/api/upload/versions`, {
         method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form,
       });
@@ -324,7 +321,7 @@ export default function UploadVersionsPage() {
     } finally {
       setSubmitting(false); setShowConfirm(false);
     }
-  }, [project, canDeliver, mapping, id, globalMemo, router]);
+  }, [project, canDeliver, mapping, id, router]);
 
   // ── derived display ──
   const displayMapping = mapping.length > 0 ? mapping : buildVersionMapping([], targets);
@@ -468,11 +465,6 @@ export default function UploadVersionsPage() {
           background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' stroke='%23FF5A1F' stroke-width='2' stroke-dasharray='8%2c 8' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
           background-color: ${ACCENT_DIM};
         }
-        .ph-uv-memo {
-          background: #080808; border: 1px solid ${BORDER}; color: ${TEXT_BRIGHT};
-          transition: border-color 0.2s; resize: none; outline: none;
-        }
-        .ph-uv-memo:focus { border-color: ${ACCENT}; box-shadow: inset 0 0 10px rgba(255, 90, 31, 0.1); }
         .ph-uv-thumb-tile:hover .ph-uv-thumb-hover-ring { border-color: ${ACCENT} !important; }
         .ph-uv-mapping-card:hover .ph-uv-map-orig-overlay { opacity: 1 !important; }
         .ph-uv-thumb-more { transition: border-color 0.2s, background-color 0.2s, color 0.2s; }
@@ -1388,32 +1380,6 @@ export default function UploadVersionsPage() {
               <br />
               전달 후 고객이 v1 검토를 진행합니다.
             </p>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-              <MessageSquare size={13} color="#666" strokeWidth={2} />
-              <span className="ph-uv-tech-label" style={{ color: "#666", fontSize: "0.6rem" }}>
-                PHOTOGRAPHER_MEMO
-              </span>
-            </div>
-            <textarea
-              className="ph-uv-memo"
-              value={globalMemo}
-              onChange={(e) => setGlobalMemo(e.target.value)}
-              placeholder="고객 검토 화면에 표시될 메모 (선택)"
-              rows={3}
-              style={{
-                width: "100%",
-                height: 72,
-                minHeight: 72,
-                maxHeight: 120,
-                boxSizing: "border-box",
-                padding: "8px 10px",
-                fontFamily: MONO,
-                fontSize: 11,
-                lineHeight: 1.45,
-                resize: "vertical",
-                marginBottom: 20,
-              }}
-            />
             {error && <p style={{ marginBottom: 12, fontSize: 12, color: "#f87171", fontFamily: MONO }}>{error}</p>}
             <div className="ph-uv-modal-actions" style={{ display: "flex", gap: 10 }}>
               <button

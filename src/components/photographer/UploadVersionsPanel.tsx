@@ -5,11 +5,8 @@ import {
   AlertCircle,
   ArrowRight,
   CheckCircle2,
-  ChevronLeft,
   Image as ImageIcon,
   Info,
-  MessageSquare,
-  Minimize2,
   Upload,
   X,
 } from "lucide-react";
@@ -90,10 +87,8 @@ export default function UploadVersionsPanel({
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [mapping, setMapping] = useState<MappingResult<UploadPanelTarget>[]>([]);
   const [dragOver, setDragOver] = useState(false);
-  const [globalMemo, setGlobalMemo] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
   const [uploadedBytes, setUploadedBytes] = useState(0);
   const [totalBytes, setTotalBytes] = useState(0);
@@ -114,10 +109,8 @@ export default function UploadVersionsPanel({
     if (!isOpen) {
       setUploadedFiles([]);
       setMapping([]);
-      setGlobalMemo("");
       setError(null);
       setPerItemTargetId(null);
-      setCollapsed(false);
       setUploadPct(0);
       setUploadedBytes(0);
       setTotalBytes(0);
@@ -125,15 +118,15 @@ export default function UploadVersionsPanel({
     }
   }, [isOpen]);
 
-  // ESC 로 닫기 (단, 전송 중과 collapsed 상태에서는 무시)
+  // ESC 로 닫기 (전송 중에는 무시)
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !submitting && !collapsed) onClose();
+      if (e.key === "Escape" && !submitting) onClose();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [isOpen, submitting, collapsed, onClose]);
+  }, [isOpen, submitting, onClose]);
 
   // 타깃 목록이 바뀌면 mapping 구조를 맞추되, 같은 집합이면 행 편집은 유지
   const uploadedFilesRef = useRef<File[]>([]);
@@ -281,7 +274,6 @@ export default function UploadVersionsPanel({
       form.append("version", String(version));
       form.append("photo_ids", changed.map((m) => m.target.id).join(","));
       compressedFiles.forEach((f) => form.append("files", f));
-      form.append("global_memo", globalMemo);
 
       const uploadRes = await new Promise<{ ok: boolean; status: number; text: string }>(
         (resolve, reject) => {
@@ -342,7 +334,7 @@ export default function UploadVersionsPanel({
     } finally {
       setSubmitting(false);
     }
-  }, [canDeliver, mapping, projectId, version, globalMemo, onDelivered]);
+  }, [canDeliver, mapping, projectId, version, onDelivered]);
 
   if (!isOpen) return null;
 
@@ -362,24 +354,21 @@ export default function UploadVersionsPanel({
   const totalUploadFileCount = mapping.filter((m) => m.file != null).length;
   // RailProgress 회전: 진행률이 의미있게 차오르고 있을 때는 멈춰두고,
   // (a) 송신 시작 직전(0%) (b) lengthComputable이 false인 환경 (c) 서버 처리 중일 때만 회전.
-  const railSpinning = submitting && (serverProcessing || uploadPct === 0);
-
   return (
     <div
       role="presentation"
       onClick={(e) => {
-        if (e.target === e.currentTarget && !submitting && !collapsed) onClose();
+        if (e.target === e.currentTarget && !submitting) onClose();
       }}
       style={{
         position: "fixed",
         inset: 0,
         zIndex: 1000,
-        background: collapsed ? "transparent" : "rgba(0,0,0,0.7)",
-        backdropFilter: collapsed ? "none" : "blur(4px)",
+        background: "rgba(0,0,0,0.7)",
+        backdropFilter: "blur(4px)",
         transition: "background-color 200ms ease, backdrop-filter 200ms ease",
         display: "flex",
         justifyContent: "flex-end",
-        pointerEvents: collapsed ? "none" : "auto",
       }}
     >
       <style>{`
@@ -402,7 +391,6 @@ export default function UploadVersionsPanel({
         .uvp-scroll::-webkit-scrollbar-thumb:hover { background: ${ACCENT}; }
         @media (max-width: 768px) {
           .uvp-sheet { width: 100% !important; max-width: 100% !important; height: calc(100dvh - 60px) !important; }
-          .uvp-collapse-toggle { display: none !important; }
           .uvp-footer { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important; }
         }
       `}</style>
@@ -411,7 +399,7 @@ export default function UploadVersionsPanel({
         className="uvp-sheet"
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: collapsed ? 56 : "min(720px, 100%)",
+          width: "min(720px, 100%)",
           maxWidth: "100%",
           background: SURFACE_1,
           borderLeft: `1px solid ${BORDER}`,
@@ -419,28 +407,12 @@ export default function UploadVersionsPanel({
           display: "flex",
           flexDirection: "column",
           height: "100dvh",
-          boxShadow: collapsed
-            ? "0 0 24px rgba(0,0,0,0.55)"
-            : "0 0 60px rgba(0,0,0,0.7)",
-          transition: "width 200ms ease, box-shadow 200ms ease",
+          boxShadow: "0 0 60px rgba(0,0,0,0.7)",
           overflow: "hidden",
           pointerEvents: "auto",
           fontFamily: "var(--font-inter, 'Pretendard', sans-serif)",
         }}
       >
-        {collapsed && (
-          <CollapsedRail
-            version={version}
-            mappedCount={mappedCount}
-            totalCount={targets.length}
-            progressPct={progressPct}
-            submitting={submitting}
-            spinning={railSpinning}
-            onExpand={() => setCollapsed(false)}
-            onClose={onClose}
-          />
-        )}
-        {!collapsed && (
         <>
         {/* Header */}
         <header className="shrink-0 border-b border-[#1a1a1e] bg-[#0f0f12]/95 backdrop-blur px-6 py-4 flex items-center justify-between">
@@ -454,26 +426,15 @@ export default function UploadVersionsPanel({
               </p>
             )}
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              className="uvp-collapse-toggle p-1.5 rounded-md text-zinc-500 hover:text-white hover:bg-white/5 transition-colors"
-              onClick={() => setCollapsed(true)}
-              aria-label="패널 축소"
-              title="패널 축소 (본문과 함께 보기)"
-            >
-              <Minimize2 size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              aria-label="닫기"
-              className="p-1.5 rounded-md text-zinc-500 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <X size={18} />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            aria-label="닫기"
+            className="p-1.5 rounded-md text-zinc-500 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <X size={18} />
+          </button>
         </header>
 
         {/* Body */}
@@ -663,21 +624,6 @@ export default function UploadVersionsPanel({
               )}
             </div>
 
-            {/* memo */}
-            <div>
-              <div className="flex items-center gap-1.5 mb-1.5 text-[11px] text-zinc-500">
-                <MessageSquare size={11} strokeWidth={2} />
-                <span>메모(선택)</span>
-              </div>
-              <textarea
-                value={globalMemo}
-                onChange={(e) => setGlobalMemo(e.target.value)}
-                placeholder="고객 검토 화면에 표시될 메모"
-                rows={2}
-                className="w-full rounded-xl bg-[#0a0a0c] border border-[#27272c] text-white text-[12px] px-3 py-2 resize-y min-h-[44px] max-h-[120px] focus:outline-none focus:border-[#FF4D00] transition-colors leading-snug"
-              />
-            </div>
-
             {/* deliver */}
             <div className="flex items-center gap-2 justify-end">
               <button
@@ -714,7 +660,6 @@ export default function UploadVersionsPanel({
           </footer>
         ) : null}
         </>
-        )}
 
         {/* Hidden file inputs */}
         <input
@@ -753,133 +698,6 @@ function StatChip({
       <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
       <span>{label}</span>
     </span>
-  );
-}
-
-// ── Collapsed rail ────────────────────────────────────────────────────────────
-
-function CollapsedRail({
-  version,
-  mappedCount,
-  totalCount,
-  progressPct,
-  submitting,
-  spinning,
-  onExpand,
-  onClose,
-}: {
-  version: 1 | 2;
-  mappedCount: number;
-  totalCount: number;
-  progressPct: number;
-  submitting: boolean;
-  spinning: boolean;
-  onExpand: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="flex-1 flex flex-col items-center px-2 py-4 gap-4 h-full">
-      <button
-        type="button"
-        onClick={onExpand}
-        aria-label="패널 펼치기"
-        title="패널 펼치기"
-        className="w-9 h-9 flex items-center justify-center rounded-md border border-[#FF4D00]/40 bg-[#FF4D00]/15 text-[#FF4D00] hover:bg-[#FF4D00] hover:text-black transition-colors"
-      >
-        <ChevronLeft size={16} />
-      </button>
-
-      <div
-        aria-label={`V${version}`}
-        className="w-9 py-1.5 text-center rounded-md bg-[#FF4D00]/15 border border-[#FF4D00]/40 text-[#FF4D00] text-[11px] font-bold"
-      >
-        V{version}
-      </div>
-
-      <RailProgress
-        progressPct={progressPct}
-        mappedCount={mappedCount}
-        totalCount={totalCount}
-        submitting={submitting}
-        spinning={spinning}
-      />
-
-      <div className="flex-1" />
-
-      <button
-        type="button"
-        onClick={onClose}
-        disabled={submitting}
-        aria-label="닫기"
-        title={submitting ? "업로드 중에는 닫을 수 없습니다" : "닫기"}
-        className="w-9 h-9 flex items-center justify-center rounded-md border border-[#27272c] text-zinc-500 hover:border-zinc-500 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-      >
-        <X size={16} />
-      </button>
-    </div>
-  );
-}
-
-function RailProgress({
-  progressPct,
-  mappedCount,
-  totalCount,
-  submitting,
-  spinning,
-}: {
-  progressPct: number;
-  mappedCount: number;
-  totalCount: number;
-  submitting: boolean;
-  spinning: boolean;
-}) {
-  const size = 40;
-  const stroke = 3;
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const dash = (Math.max(0, Math.min(100, progressPct)) / 100) * circumference;
-  return (
-    <div
-      className="flex flex-col items-center gap-1.5"
-      title={`매핑 ${mappedCount}/${totalCount}`}
-    >
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg
-          width={size}
-          height={size}
-          viewBox={`0 0 ${size} ${size}`}
-          style={{
-            transform: "rotate(-90deg)",
-            animation: spinning ? "uvp-spin 1.4s linear infinite" : undefined,
-          }}
-        >
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke="#1a1a1e"
-            strokeWidth={stroke}
-          />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke={ACCENT}
-            strokeWidth={stroke}
-            strokeDasharray={`${dash} ${circumference - dash}`}
-            strokeLinecap="round"
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white">
-          {`${progressPct}`}
-        </div>
-      </div>
-      <span className="text-[9px] text-zinc-500">
-        {mappedCount}/{totalCount}
-      </span>
-    </div>
   );
 }
 
@@ -936,34 +754,37 @@ function PanelMappingRow({
       >
         {/* Left: original (+v1 if provided) + filename + comment */}
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex gap-1 shrink-0">
-            <div className="w-10 h-10 rounded-md bg-[#0a0a0c] border border-[#1a1a1e] overflow-hidden flex items-center justify-center">
-              {origSrc && !origErr ? (
-                <img
-                  src={origSrc}
-                  alt=""
-                  onError={() => setOrigErr(true)}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <ImageIcon size={14} className="text-zinc-600" />
-              )}
-            </div>
-            {target.v1Url ? (
-              <div
-                title="V1 보정본"
-                className="w-10 h-10 rounded-md bg-[#0a0a0c] border border-[#FF4D00]/25 overflow-hidden flex items-center justify-center"
-              >
-                {!v1Err ? (
+          <div className="flex gap-2 shrink-0">
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="text-[8px] text-zinc-500 uppercase tracking-wide">원본</span>
+              <div className="w-12 h-12 rounded-md bg-[#0a0a0c] border border-[#1a1a1e] overflow-hidden flex items-center justify-center">
+                {origSrc && !origErr ? (
                   <img
-                    src={target.v1Url}
+                    src={origSrc}
                     alt=""
-                    onError={() => setV1Err(true)}
+                    onError={() => setOrigErr(true)}
                     className="w-full h-full object-cover"
                   />
                 ) : (
                   <ImageIcon size={14} className="text-zinc-600" />
                 )}
+              </div>
+            </div>
+            {target.v1Url ? (
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-[8px] text-[#FF4D00]/50 uppercase tracking-wide">V1</span>
+                <div className="w-12 h-12 rounded-md bg-[#0a0a0c] border border-[#FF4D00]/25 overflow-hidden flex items-center justify-center">
+                  {!v1Err ? (
+                    <img
+                      src={target.v1Url}
+                      alt=""
+                      onError={() => setV1Err(true)}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <ImageIcon size={14} className="text-zinc-600" />
+                  )}
+                </div>
               </div>
             ) : null}
           </div>
