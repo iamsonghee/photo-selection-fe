@@ -467,7 +467,7 @@ export default function ViewerPage() {
         </header>
 
         {/* Main image area */}
-        <main style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 10, overflow: "hidden", minHeight: 0 }}>
+        <main style={{ flex: 1, height: 0, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 10, overflow: "hidden" }}>
 
           <PrevNextButton
             direction="prev"
@@ -487,7 +487,7 @@ export default function ViewerPage() {
           />
 
           {/* Image frame */}
-          <div style={{ position: "relative" }}
+          <div style={{ position: "relative", height: "100%", display: "flex", alignItems: "center" }}
             onContextMenu={viewerImageDownloadBlocked ? (e) => e.preventDefault() : undefined}>
             {viewerSrc ? (
               <img
@@ -495,7 +495,7 @@ export default function ViewerPage() {
                 alt={filename}
                 {...viewerImageBlockDownloadHandlers}
                 style={{
-                  maxHeight: "calc(100vh - 336px)",
+                  maxHeight: "100%",
                   maxWidth: "calc(100vw - 140px)",
                   width: "auto",
                   objectFit: "contain",
