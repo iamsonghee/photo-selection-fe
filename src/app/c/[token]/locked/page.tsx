@@ -35,8 +35,8 @@ function StatusBadge({ status }: { status: "approved" | "revision_requested" | "
 }
 
 /* ── photo card ── */
-function PhotoCard({ photo, index }: { photo: ReviewResultPhoto; index: number }) {
-  const filename = photo.originalFilename?.split("/").pop() ?? `#${index + 1}`;
+function PhotoCard({ photo }: { photo: ReviewResultPhoto }) {
+  const filename = photo.originalFilename?.split("/").pop() ?? "—";
   const isRevision = photo.reviewStatus === "revision_requested";
   const isApproved = photo.reviewStatus === "approved";
   const ring = isApproved
@@ -54,9 +54,6 @@ function PhotoCard({ photo, index }: { photo: ReviewResultPhoto; index: number }
         ) : (
           <div className="w-full h-full flex items-center justify-center text-zinc-700 text-xs font-mono">NO IMG</div>
         )}
-        <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-zinc-400 border border-[#333]">
-          {String(index + 1).padStart(2, "0")}
-        </div>
       </div>
 
       {/* 파일명 */}
@@ -80,7 +77,7 @@ function PhotoCard({ photo, index }: { photo: ReviewResultPhoto; index: number }
 }
 
 /* ── 선택 사진 카드 (검토 결과 없을 때) ── */
-function SimplePhotoCard({ photo, index }: { photo: import("@/types").Photo; index: number }) {
+function SimplePhotoCard({ photo }: { photo: import("@/types").Photo }) {
   const filename = photo.originalFilename?.split("/").pop() ?? `#${photo.orderIndex}`;
   return (
     <div className="bg-[#0a0a0c]/70 border border-[#1a1a1e] rounded-xl p-2 flex flex-col gap-2">
@@ -90,20 +87,17 @@ function SimplePhotoCard({ photo, index }: { photo: import("@/types").Photo; ind
         ) : (
           <div className="w-full h-full flex items-center justify-center text-zinc-700 text-xs font-mono">NO IMG</div>
         )}
-        <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-zinc-400 border border-[#333]">
-          {String(index + 1).padStart(2, "0")}
+        <div className="absolute top-1.5 right-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#FF4D00]/90 rounded text-[9px] font-semibold text-white">
+          <Check size={8} />선택
         </div>
       </div>
       <p className="text-[11px] font-mono text-zinc-400 truncate" title={filename}>{filename}</p>
-      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-[#FF4D00]/8 text-[#FF4D00] border border-[#FF4D00]/20">
-        <Check size={10} />선택됨
-      </span>
     </div>
   );
 }
 
 /* ── 비선택 원본 카드 (선택하지 않은 사진) ── */
-function UnselectedPhotoCard({ photo, index }: { photo: import("@/types").Photo; index: number }) {
+function UnselectedPhotoCard({ photo }: { photo: import("@/types").Photo }) {
   const filename = photo.originalFilename?.split("/").pop() ?? `#${photo.orderIndex}`;
   return (
     <div className="bg-[#0a0a0c]/40 border border-[#1a1a1e] rounded-xl p-2 flex flex-col gap-2">
@@ -113,14 +107,11 @@ function UnselectedPhotoCard({ photo, index }: { photo: import("@/types").Photo;
         ) : (
           <div className="w-full h-full flex items-center justify-center text-zinc-700 text-xs font-mono">NO IMG</div>
         )}
-        <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-zinc-500 border border-[#333]">
-          {String(index + 1).padStart(2, "0")}
+        <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-black/70 rounded text-[9px] text-zinc-500 border border-[#333]">
+          미선택
         </div>
       </div>
       <p className="text-[11px] font-mono text-zinc-500 truncate" title={filename}>{filename}</p>
-      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
-        선택 안 함
-      </span>
     </div>
   );
 }
@@ -277,8 +268,8 @@ export default function LockedPage() {
       <div className="flex-1 p-4 pb-32 overflow-y-auto">
         {hasReview ? (
           <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2">
-            {reviewResult!.map((photo, i) => (
-              <PhotoCard key={photo.photoId} photo={photo} index={i} />
+            {reviewResult!.map((photo) => (
+              <PhotoCard key={photo.photoId} photo={photo} />
             ))}
           </div>
         ) : photos.length > 0 ? (
@@ -286,8 +277,8 @@ export default function LockedPage() {
             <section>
               <SectionHeader label="선택된 원본" count={photos.length} tone="brand" />
               <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2">
-                {photos.map((photo, i) => (
-                  <SimplePhotoCard key={photo.id} photo={photo} index={i} />
+                {photos.map((photo) => (
+                  <SimplePhotoCard key={photo.id} photo={photo} />
                 ))}
               </div>
             </section>
@@ -296,8 +287,8 @@ export default function LockedPage() {
               <section>
                 <SectionHeader label="선택하지 않은 원본" count={unselected.length} tone="muted" />
                 <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2">
-                  {unselected.map((photo, i) => (
-                    <UnselectedPhotoCard key={photo.id} photo={photo} index={i} />
+                  {unselected.map((photo) => (
+                    <UnselectedPhotoCard key={photo.id} photo={photo} />
                   ))}
                 </div>
               </section>
