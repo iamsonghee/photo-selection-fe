@@ -48,7 +48,7 @@ export default function GalleryPageClient() {
 
   const [tabFilter,     setTabFilter]     = useState<TabFilter>("all");
   const [starFilter,    setStarFilter]    = useState<number>(0);
-  const [colorFilter,   setColorFilter]   = useState<ColorTag | null>(null);
+  const [colorFilter,   setColorFilter]   = useState<ColorTag[]>([]);
   const [sortOrder,     setSortOrder]     = useState<SortOrder>("filename");
   const [hoverStar,     setHoverStar]     = useState(0);
   const [gridStarHover, setGridStarHover] = useState<{ photoId: string; star: number } | null>(null);
@@ -137,7 +137,7 @@ export default function GalleryPageClient() {
   const filterState = useMemo<GalleryFilterState>(() => ({
     selectedFilter: tabFilter === "selected" ? "selected" : "all",
     starFilter:     starFilter === 0 ? "all" : (starFilter as StarRating),
-    colorFilter:    colorFilter ?? "all",
+    colorFilter:    colorFilter.length > 0 ? colorFilter : "all",
     sortOrder,
   }), [tabFilter, starFilter, colorFilter, sortOrder]);
 
@@ -490,13 +490,19 @@ export default function GalleryPageClient() {
               <div className="gl-filter-right" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
                 <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
                   {COLOR_OPTIONS.map((opt) => {
-                    const isActive = colorFilter === opt.key;
+                    const isActive = colorFilter.includes(opt.key);
                     return (
                       <button
                         key={opt.key}
                         type="button"
                         title={opt.key}
-                        onClick={() => setColorFilter((prev) => (prev === opt.key ? null : opt.key))}
+                        onClick={() =>
+                          setColorFilter((prev) =>
+                            prev.includes(opt.key)
+                              ? prev.filter((c) => c !== opt.key)
+                              : [...prev, opt.key]
+                          )
+                        }
                         style={{
                           width: 13, height: 13, borderRadius: "50%",
                           background: opt.hex,
@@ -511,7 +517,7 @@ export default function GalleryPageClient() {
                 <button
                   type="button"
                   title="초기화"
-                  onClick={() => { setStarFilter(0); setColorFilter(null); setHoverStar(0); window.setTimeout(() => setHoverStar(0), 0); }}
+                  onClick={() => { setStarFilter(0); setColorFilter([]); setHoverStar(0); window.setTimeout(() => setHoverStar(0), 0); }}
                   style={{ background: "none", border: "none", color: "#444", cursor: "pointer", display: "flex", alignItems: "center", padding: "4px 6px" }}
                   onMouseEnter={(e) => (e.currentTarget.style.color = "#888")}
                   onMouseLeave={(e) => (e.currentTarget.style.color = "#444")}

@@ -98,7 +98,7 @@ export function appendGalleryScrollQuery(viewerQueryString: string, scrollY: num
 
 export type GalleryFilterState = {
   starFilter: StarRating | "all";
-  colorFilter: ColorTag | "none" | "all";
+  colorFilter: ColorTag[] | "none" | "all";
   selectedFilter: "all" | "selected";
   sortOrder: SortOrder;
 };
@@ -126,10 +126,14 @@ export function parseFilterFromSearchParams(
     rating != null && VALID_STARS.includes(Number(rating) as StarRating)
       ? (Number(rating) as StarRating)
       : "all";
-  const colorFilter: ColorTag | "none" | "all" =
-    color === "all" || (color != null && VALID_COLORS.includes(color as ColorTag | "none"))
-      ? (color as ColorTag | "none" | "all")
-      : "all";
+  const colorFilter: ColorTag[] | "none" | "all" = (() => {
+    if (!color || color === "all") return "all";
+    if (color === "none") return "none";
+    const tags = color.split(",").filter((v): v is ColorTag =>
+      VALID_COLORS.includes(v as ColorTag | "none") && v !== "none"
+    );
+    return tags.length > 0 ? tags : "all";
+  })();
   const sortOrder: SortOrder =
     sort === "oldest" ? "oldest" : sort === "newest" ? "newest" : "filename";
   const selectedFilter: "all" | "selected" =
@@ -142,7 +146,11 @@ export function parseFilterFromSearchParams(
 export function buildFilterQueryString(state: GalleryFilterState): string {
   const params = new URLSearchParams();
   if (state.starFilter !== "all") params.set(FILTER_PARAM.rating, String(state.starFilter));
-  if (state.colorFilter !== "all") params.set(FILTER_PARAM.color_tag, state.colorFilter);
+  if (Array.isArray(state.colorFilter)) {
+    if (state.colorFilter.length > 0) params.set(FILTER_PARAM.color_tag, state.colorFilter.join(","));
+  } else if (state.colorFilter !== "all") {
+    params.set(FILTER_PARAM.color_tag, state.colorFilter);
+  }
   if (state.sortOrder !== "filename") params.set(FILTER_PARAM.sort, state.sortOrder);
   if (state.selectedFilter !== "all") params.set(FILTER_PARAM.selected, state.selectedFilter);
   const qs = params.toString();
@@ -168,8 +176,10 @@ export function getFilteredPhotos(
   if (state.starFilter !== "all") {
     list = list.filter((p) => photoStates[p.id]?.rating === state.starFilter);
   }
-  if (state.colorFilter !== "all" && state.colorFilter !== "none") {
-    list = list.filter((p) => photoStates[p.id]?.color?.includes(state.colorFilter as ColorTag));
+  if (Array.isArray(state.colorFilter) && state.colorFilter.length > 0) {
+    list = list.filter((p) =>
+      (state.colorFilter as ColorTag[]).some((c) => photoStates[p.id]?.color?.includes(c))
+    );
   }
   if (state.colorFilter === "none") {
     list = list.filter((p) => !photoStates[p.id]?.color?.length);
