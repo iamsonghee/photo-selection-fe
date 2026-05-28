@@ -174,7 +174,7 @@ export function getFilteredPhotos(
     list = list.filter((p) => selectedIds.has(p.id));
   }
   if (state.starFilter !== "all") {
-    list = list.filter((p) => photoStates[p.id]?.rating === state.starFilter);
+    list = list.filter((p) => (photoStates[p.id]?.rating ?? 0) >= (state.starFilter as number));
   }
   if (Array.isArray(state.colorFilter) && state.colorFilter.length > 0) {
     list = list.filter((p) =>
