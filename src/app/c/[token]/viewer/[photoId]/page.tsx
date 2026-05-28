@@ -376,11 +376,6 @@ export default function ViewerPage() {
         .fs-nav-btn:hover { background: #FF4D00; color: black; border-color: #FF4D00; }
         .fs-nav-btn:disabled { opacity: 0.2; cursor: not-allowed; }
         .fs-nav-btn:disabled:hover { background: rgba(0,0,0,0.4); color: white; border-color: #1A1A1A; }
-        .fs-bracket { position: absolute; width: 16px; height: 16px; border-color: #FF4D00; pointer-events: none; z-index: 10; }
-        .fs-b-tl { top: -2px; left: -2px; border-top: 2px solid; border-left: 2px solid; }
-        .fs-b-tr { top: -2px; right: -2px; border-top: 2px solid; border-right: 2px solid; }
-        .fs-b-bl { bottom: -2px; left: -2px; border-bottom: 2px solid; border-left: 2px solid; }
-        .fs-b-br { bottom: -2px; right: -2px; border-bottom: 2px solid; border-right: 2px solid; }
         .fs-thumb {
           height: 100px; width: 150px; flex-shrink: 0;
           border: 1px solid #1A1A1A;
@@ -494,10 +489,6 @@ export default function ViewerPage() {
           {/* Image frame */}
           <div style={{ position: "relative" }}
             onContextMenu={viewerImageDownloadBlocked ? (e) => e.preventDefault() : undefined}>
-            <div className="fs-bracket fs-b-tl" />
-            <div className="fs-bracket fs-b-tr" />
-            <div className="fs-bracket fs-b-bl" />
-            <div className="fs-bracket fs-b-br" />
             {viewerSrc ? (
               <img
                 src={viewerSrc}
