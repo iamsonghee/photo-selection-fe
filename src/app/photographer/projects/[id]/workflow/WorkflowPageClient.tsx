@@ -1012,9 +1012,10 @@ export default function WorkflowPageClient() {
       original: {
         url: row.photo.previewUrl ?? row.photo.url,
         filename: row.photo.originalFilename ?? `#${row.photo.orderIndex}`,
+        comment: row.photo.comment ?? null,
       },
-      v1: row.v1 ? { url: getVersionUrl(row.v1.url, row.photo.id, 1), filename: "보정본 v1" } : undefined,
-      v2: row.v2 ? { url: getVersionUrl(row.v2.url, row.photo.id, 2), filename: "보정본 v2" } : undefined,
+      v1: row.v1 ? { url: getVersionUrl(row.v1.url, row.photo.id, 1), filename: "보정본 v1", comment: row.v1.comment ?? null } : undefined,
+      v2: row.v2 ? { url: getVersionUrl(row.v2.url, row.photo.id, 2), filename: "보정본 v2", comment: row.v2.comment ?? null } : undefined,
     })),
   [filteredRows, getVersionUrl]);
 

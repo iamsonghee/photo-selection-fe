@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { MessageSquare, X } from "lucide-react";
 import { PrevNextButton } from "@/components/PrevNextButton";
 
 type CompareItem = {
-  original: { url: string; filename: string };
-  retouched?: { url: string; filename: string };
-  v1?: { url: string; filename: string };
-  v2?: { url: string; filename: string };
+  original: { url: string; filename: string; comment?: string | null };
+  retouched?: { url: string; filename: string; comment?: string | null };
+  v1?: { url: string; filename: string; comment?: string | null };
+  v2?: { url: string; filename: string; comment?: string | null };
 };
 
 type Props = {
@@ -90,6 +90,10 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
   const activeImage =
     tab === "original" ? current.original : tab === "v1" ? (v1 ?? current.original) : (current.v2 ?? current.original);
   const activeLabel = tab === "original" ? "원본" : tab === "v1" ? "보정본 v1" : "보정본 v2";
+  const activeComment =
+    tab === "original" ? (current.original.comment ?? null)
+    : tab === "v1"     ? (v1?.comment ?? null)
+    :                    (current.v2?.comment ?? null);
 
   // split 모드: 항상 원본 → v1 → v2 순서로 왼쪽=이전버전, 오른쪽=이후버전
   const splitLeft =
@@ -180,6 +184,13 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
             </div>
           )}
         </div>
+
+        {activeComment && (
+          <div className="mb-2 shrink-0 flex items-start gap-2 rounded-lg border border-[#27272c] bg-[#0a0a0c] px-3 py-2">
+            <MessageSquare size={11} className="text-[#FF4D00] shrink-0 mt-0.5" />
+            <p className="text-[11px] text-zinc-300 leading-relaxed">&ldquo;{activeComment}&rdquo;</p>
+          </div>
+        )}
 
         <div className="relative min-h-0 flex-1">
           <div
