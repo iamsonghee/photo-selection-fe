@@ -1221,7 +1221,6 @@ export default function WorkflowPageClient() {
     { key: "all", label: "전체", count: counts.total },
     ...(stageTab === "v1" && !isReviewingV1
       ? [
-          { key: "approved" as FilterTab, label: "확정", count: counts.approved },
           { key: "revision" as FilterTab, label: "재보정 요청", count: counts.revision },
         ]
       : []),
@@ -1483,7 +1482,7 @@ export default function WorkflowPageClient() {
           )}
 
           {/* 다운로드 + 뷰 토글 */}
-          <div className={`${stageTab === "v2" || (stageTab === "v1" && !isReviewingV1) ? "" : "ml-auto"} flex items-center gap-2 shrink-0`}>
+          <div className="ml-auto flex items-center gap-2 shrink-0">
             {rows.length > 0 && (
               <div ref={exportMenuRef} className="relative hidden md:block">
                 <button
