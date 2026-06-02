@@ -393,7 +393,7 @@ function V1Card({
   row: WorkflowRow;
   index: number;
   isReviewingV1: boolean;
-  v1DisplayStatus: "approved" | "revision_requested" | "pending";
+  v1DisplayStatus: "approved" | "revision_requested" | "pending" | "uploaded";
   canDeleteV1: boolean;
   deletingId: string | null;
   canUploadV1: boolean;
@@ -482,13 +482,15 @@ function V1Card({
       {/* Status row */}
       <div className="flex items-center justify-between gap-2 mb-2">
         {v1 ? (
-          <StatusBadge
-            status={
-              isReviewingV1
-                ? "reviewing"
-                : (effectiveStatus as "approved" | "revision_requested" | "pending")
-            }
-          />
+          effectiveStatus === "uploaded" ? null : (
+            <StatusBadge
+              status={
+                isReviewingV1
+                  ? "reviewing"
+                  : (effectiveStatus as "approved" | "revision_requested" | "pending")
+              }
+            />
+          )
         ) : (
           <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider">
             미업로드
@@ -589,7 +591,7 @@ function V2Card({
   row: WorkflowRow;
   index: number;
   isReviewingV2: boolean;
-  effectiveV1Status: "approved" | "revision_requested" | "pending";
+  effectiveV1Status: "approved" | "revision_requested" | "pending" | "uploaded";
   v2Dimmed: boolean;
   canDeleteV2: boolean;
   deletingId: string | null;
@@ -1191,12 +1193,14 @@ export default function WorkflowPageClient() {
   const canUploadV2   = project.status === "editing_v2" || project.status === "reviewing_v2";
 
   /** delivered + 리뷰 행 없음: 구버전 일괄 제출 등. 그 외 단계에서 null은 확정으로 보지 않는다. */
-  const effectiveV1Status = (s: string | null): "approved" | "revision_requested" | "pending" =>
+  const effectiveV1Status = (s: string | null): "approved" | "revision_requested" | "pending" | "uploaded" =>
     s === "approved" || s === "revision_requested"
       ? s
       : project.status === "delivered"
         ? "approved"
-        : "pending";
+        : project.status === "editing"
+          ? "uploaded"   // 검토 요청 전 — 뱃지 없이 표시
+          : "pending";   // reviewing_v1 이상에서만 "검토 대기"
 
   const v2PendingCount = rows.filter(
     (r) => effectiveV1Status(r.v1?.reviewStatus ?? null) === "revision_requested" && r.v2 === null
@@ -1649,7 +1653,9 @@ export default function WorkflowPageClient() {
                           )}
                           {stageTab !== "original" && (
                             <td style={{ padding: "10px 8px", textAlign: "center" }}>
-                              <StatusBadge status={ver?.reviewStatus ?? "pending"} compact />
+                              {(ver?.reviewStatus || project.status !== "editing") && (
+                                <StatusBadge status={ver?.reviewStatus ?? "pending"} compact />
+                              )}
                             </td>
                           )}
                           <td style={{ padding: "10px 10px", fontSize: 11, color: (stageTab === "original" ? row.photo.comment : ver?.comment) ? "#a3a3a3" : "#3a3a3a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
