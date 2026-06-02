@@ -1763,50 +1763,48 @@ export default function WorkflowPageClient() {
 
       {/* ── Footer ── */}
       <footer className="shrink-0 border-t border-[#1a1a1e] bg-[#0a0a0c]/95 backdrop-blur-md z-10">
-        {footerNote && (
-          <div className="flex items-center gap-2.5 px-4 md:px-8 py-2 md:py-2.5 border-b border-[#FF4D00]/15 bg-[#FF4D00]/5">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FF4D00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <span className="text-sm text-[#FF4D00] font-medium">{footerNote}</span>
+        <div className="flex items-center justify-between gap-4 px-4 md:px-8 py-3 md:py-0 md:h-16">
+          {/* 좌측: 안내 메시지 */}
+          <div className="flex-1 min-w-0">
+            {reviewHint ? (
+              <div className="flex items-center gap-2 min-w-0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                <span className="text-sm text-amber-400 font-medium truncate">{reviewHint}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilter("v1_pending");
+                    setReviewHint(null);
+                    if (reviewHintTimerRef.current) clearTimeout(reviewHintTimerRef.current);
+                  }}
+                  className="text-xs font-semibold text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors whitespace-nowrap shrink-0"
+                >
+                  미업로드 사진 보기 →
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setReviewHint(null); if (reviewHintTimerRef.current) clearTimeout(reviewHintTimerRef.current); }}
+                  className="text-amber-500/60 hover:text-amber-400 transition-colors shrink-0"
+                  aria-label="닫기"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ) : footerNote ? (
+              <div className="flex items-center gap-2">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FF4D00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <span className="text-sm text-[#FF4D00] font-medium">{footerNote}</span>
+              </div>
+            ) : null}
           </div>
-        )}
-        {reviewHint && (
-          <div className="flex items-center justify-between gap-3 px-4 md:px-8 py-2.5 border-b border-amber-500/20 bg-amber-500/8">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                <line x1="12" y1="9" x2="12" y2="13" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-              <span className="text-sm text-amber-400 font-medium truncate">{reviewHint}</span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  setFilter("v1_pending");
-                  setReviewHint(null);
-                  if (reviewHintTimerRef.current) clearTimeout(reviewHintTimerRef.current);
-                }}
-                className="text-xs font-semibold text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors whitespace-nowrap"
-              >
-                미업로드 사진 보기 →
-              </button>
-              <button
-                type="button"
-                onClick={() => { setReviewHint(null); if (reviewHintTimerRef.current) clearTimeout(reviewHintTimerRef.current); }}
-                className="text-amber-500/60 hover:text-amber-400 transition-colors"
-                aria-label="닫기"
-              >
-                <X size={13} />
-              </button>
-            </div>
-          </div>
-        )}
-        <div className="flex items-center justify-end px-4 md:px-8 py-3 md:py-0 md:h-16">
           {project.status === "delivered" ? (
             <span className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <CheckCircle2 size={15} />납품 완료
