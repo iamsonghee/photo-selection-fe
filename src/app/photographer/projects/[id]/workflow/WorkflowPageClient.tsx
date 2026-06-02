@@ -30,6 +30,7 @@ import {
   LayoutGrid,
   List,
   ChevronDown,
+  X,
 } from "lucide-react";
 import styles from "./Workflow.module.css";
 import { normalizeReviewDeadlineYmd } from "@/lib/format-review-deadline";
@@ -847,6 +848,8 @@ export default function WorkflowPageClient() {
   >(null);
   const [replacingId, setReplacingId] = useState<string | null>(null);
   const [versionBust, setVersionBust] = useState<Record<string, number>>({});
+  const [reviewHint, setReviewHint] = useState<string | null>(null);
+  const reviewHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
@@ -1247,7 +1250,15 @@ export default function WorkflowPageClient() {
       serverRetouchUrl: r.v2?.url ?? null,
     }));
 
-  const footerNote = getFooterNote(project.status);
+  const footerNote = (() => {
+    const base = getFooterNote(project.status);
+    if (base) return base;
+    if (isEditing && counts.total > 0 && !canStartV1Review)
+      return `보정본 ${counts.v1Uploaded} / ${counts.total}장 업로드됨`;
+    if (isEditingV2 && v2Total > 0 && !canStartV2Review)
+      return `재보정본 ${counts.v2Uploaded} / ${v2Total}장 업로드됨`;
+    return null;
+  })();
 
   function setStageTabManual(t: StageTab) {
     setStageTabAuto(false);
@@ -1760,7 +1771,40 @@ export default function WorkflowPageClient() {
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
             <span className="text-sm text-[#FF4D00] font-medium">{footerNote}</span>
-                            </div>
+          </div>
+        )}
+        {reviewHint && (
+          <div className="flex items-center justify-between gap-3 px-4 md:px-8 py-2.5 border-b border-amber-500/20 bg-amber-500/8">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              <span className="text-sm text-amber-400 font-medium truncate">{reviewHint}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setFilter("v1_pending");
+                  setReviewHint(null);
+                  if (reviewHintTimerRef.current) clearTimeout(reviewHintTimerRef.current);
+                }}
+                className="text-xs font-semibold text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors whitespace-nowrap"
+              >
+                미업로드 사진 보기 →
+              </button>
+              <button
+                type="button"
+                onClick={() => { setReviewHint(null); if (reviewHintTimerRef.current) clearTimeout(reviewHintTimerRef.current); }}
+                className="text-amber-500/60 hover:text-amber-400 transition-colors"
+                aria-label="닫기"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          </div>
         )}
         <div className="flex items-center justify-end px-4 md:px-8 py-3 md:py-0 md:h-16">
           {project.status === "delivered" ? (
@@ -1768,7 +1812,7 @@ export default function WorkflowPageClient() {
               <CheckCircle2 size={15} />납품 완료
             </span>
           ) : isConfirmed ? (
-                                  <button
+            <button
               onClick={handleStartEditing}
               disabled={startingEditing}
               className="flex items-center justify-center gap-2 w-full md:w-auto bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
@@ -1776,43 +1820,54 @@ export default function WorkflowPageClient() {
               <Sparkles size={15} />
               {startingEditing ? "처리 중…" : "보정 시작"}
             </button>
-          ) : (canStartV1Review || canStartV2Review) ? (
-            <div className="flex flex-col-reverse md:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
-              {canStartV1Review && (
-                <button
-                  onClick={() => handleStartCustomerReview(1)}
-                  disabled={startingReview === 1}
-                  className="flex items-center justify-center gap-2 w-full md:w-auto bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
-                >
-                  <Send size={15} />
-                  {startingReview === 1 ? "처리 중…" : "보정본 검토 요청"}
-                                  </button>
-                                )}
-              {canStartV2Review && (
-                <button
-                  onClick={() => handleStartCustomerReview(2)}
-                  disabled={startingReview === 2}
-                  className="flex items-center justify-center gap-2 w-full md:w-auto bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
-                >
-                  <Send size={15} />
-                  {startingReview === 2 ? "처리 중…" : "재보정본 검토 요청"}
-                </button>
-                              )}
-                            </div>
-          ) : isEditingV2 && v2RevisionPending > 0 ? (
+          ) : (isEditing && counts.total > 0) ? (
             <button
-              disabled
-              className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold border border-[#FF4D00]/30 text-[#FF4D00]/50 bg-[#FF4D00]/5 cursor-not-allowed"
+              onClick={() => {
+                if (canStartV1Review) {
+                  setReviewHint(null);
+                  handleStartCustomerReview(1);
+                } else {
+                  const missing = counts.total - counts.v1Uploaded;
+                  const msg = `아직 ${missing}장의 보정본이 업로드되지 않았어요.`;
+                  setReviewHint(msg);
+                  if (reviewHintTimerRef.current) clearTimeout(reviewHintTimerRef.current);
+                  reviewHintTimerRef.current = setTimeout(() => setReviewHint(null), 5000);
+                }
+              }}
+              disabled={startingReview === 1}
+              className="flex items-center justify-center gap-2 w-full md:w-auto bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
             >
               <Send size={15} />
-              재보정본 검토 요청 ({v2RevisionPending}장 교체 필요)
+              {startingReview === 1 ? "처리 중…" : "보정본 검토 요청"}
+            </button>
+          ) : (isEditingV2 && v2Total > 0) ? (
+            <button
+              onClick={() => {
+                if (canStartV2Review) {
+                  setReviewHint(null);
+                  handleStartCustomerReview(2);
+                } else {
+                  const missing = v2Total - counts.v2Uploaded;
+                  const msg = missing > 0
+                    ? `아직 ${missing}장의 재보정본이 업로드되지 않았어요.`
+                    : `${v2RevisionPending}장이 아직 재보정 요청 상태예요.`;
+                  setReviewHint(msg);
+                  if (reviewHintTimerRef.current) clearTimeout(reviewHintTimerRef.current);
+                  reviewHintTimerRef.current = setTimeout(() => setReviewHint(null), 5000);
+                }
+              }}
+              disabled={startingReview === 2}
+              className="flex items-center justify-center gap-2 w-full md:w-auto bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
+            >
+              <Send size={15} />
+              {startingReview === 2 ? "처리 중…" : "재보정본 검토 요청"}
             </button>
           ) : (
             <span className="flex items-center justify-center w-full md:w-auto px-6 py-2.5 rounded-xl text-sm font-bold bg-[#121215] border border-[#27272c] text-zinc-500">
               다음 단계 대기 중
             </span>
           )}
-                      </div>
+        </div>
       </footer>
 
       {/* ── Upload slide-over panel ── */}
