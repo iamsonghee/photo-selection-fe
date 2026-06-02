@@ -1468,25 +1468,7 @@ export default function WorkflowPageClient() {
             </div>
           )}
 
-          {/* progress summary */}
-          {stageTab === "v1" && !isReviewingV1 && (
-            <div className="ml-auto hidden md:flex items-center gap-2 text-[11px] font-mono text-zinc-500 bg-[#0a0a0c] border border-[#1a1a1e] rounded-xl px-3 py-1.5">
-              <span className="text-white font-semibold">{counts.v1Uploaded}</span>
-              <span>/</span>
-              <span>{counts.total}</span>
-              <span className="text-zinc-600 mx-1">업로드</span>
-              <span className="w-px h-3 bg-[#27272c]" />
-              <span className="text-emerald-400 font-semibold">{counts.approved}</span>
-              <span className="text-zinc-600">확정</span>
-              {counts.revision > 0 && (
-                <>
-                  <span className="w-px h-3 bg-[#27272c]" />
-                  <span className="text-[#FF4D00] font-semibold">{counts.revision}</span>
-                  <span className="text-zinc-600">재보정</span>
-                </>
-              )}
-            </div>
-          )}
+          {/* progress summary — V2 only (V1은 footer note에 표시) */}
           {stageTab === "v2" && (
             <div className="ml-auto hidden md:flex items-center gap-2 text-[11px] font-mono text-zinc-500 bg-[#0a0a0c] border border-[#1a1a1e] rounded-xl px-3 py-1.5">
               <span className="text-white font-semibold">{counts.v2Uploaded}</span>
