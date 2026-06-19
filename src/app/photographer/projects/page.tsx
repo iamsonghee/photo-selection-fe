@@ -12,6 +12,7 @@ import type { Project, ProjectStatus } from "@/types";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { ProjectPipelineMiniBar } from "@/components/photographer/ProjectPipelineMiniBar";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
+import { getActiveDeadline } from "@/lib/project-deadline";
 
 // ── constants ──────────────────────────────────────────────────────────────
 
@@ -136,8 +137,9 @@ function getCardAccent(status: ProjectStatus): string {
 function MobileProjectCard({ project, onNavigate }: { project: Project; onNavigate: (href: string) => void }) {
   const cta        = getProjectCTA(project);
   const isDelivered = project.status === "delivered";
-  const dd         = dday(project.deadline);
-  const ddCls      =
+  const deadlineInfo = getActiveDeadline(project);
+  const dd         = deadlineInfo ? dday(deadlineInfo.date) : null;
+  const ddCls      = !dd ? "" :
     dd.level === "danger" ? "text-rose-400 bg-rose-500/10 border-rose-500/20" :
     dd.level === "warn"   ? "text-amber-500 bg-amber-500/10 border-amber-500/20" :
     "text-zinc-500 bg-[#1a1a1e] border-[#27272c]";
@@ -184,9 +186,9 @@ function MobileProjectCard({ project, onNavigate }: { project: Project; onNaviga
             </div>
             {isDelivered ? (
               <span className="text-[10px] font-bold font-mono text-zinc-500 bg-[#1a1a1e] border border-[#27272c] px-1.5 py-0.5 rounded shrink-0">완료</span>
-            ) : (
-              <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${ddCls}`}>{dd.text}</span>
-            )}
+            ) : dd ? (
+              <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${ddCls}`} title={deadlineInfo?.label}>{dd.text}</span>
+            ) : null}
           </div>
           <h3 className={`text-[15px] font-bold truncate mb-1 ${isDelivered ? "text-zinc-400" : "text-white"}`}>
             {project.name}
@@ -589,9 +591,10 @@ export default function ProjectsPage() {
             <div className="flex flex-col divide-y divide-[#1a1a1e]/50">
               {filtered.map((project) => {
                 const cta = getProjectCTA(project);
-                const dd  = dday(project.deadline);
+                const deadlineInfo = getActiveDeadline(project);
+                const dd  = deadlineInfo ? dday(deadlineInfo.date) : null;
                 const isDelivered = project.status === "delivered";
-                const ddCls =
+                const ddCls = !dd ? "" :
                   dd.level === "danger" ? "bg-rose-500/10 text-rose-400 border-rose-500/20" :
                   dd.level === "warn"   ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
                   "bg-[#121215] text-zinc-500 border-[#1a1a1e]";
@@ -696,14 +699,16 @@ export default function ProjectsPage() {
                           style={{ fontFamily: "var(--font-mono, monospace)" }}>
                           납품완료
                         </span>
-                      ) : (
+                      ) : dd ? (
                         <span
-                          className={`inline-flex px-2 py-1 rounded text-xs font-bold border ${ddCls}`}
+                          className={`inline-flex flex-col px-2 py-1 rounded text-xs font-bold border ${ddCls}`}
                           style={{ fontFamily: "var(--font-mono, monospace)" }}
+                          title={deadlineInfo?.label}
                         >
+                          <span className="text-[9px] font-normal opacity-60 leading-none mb-0.5">{deadlineInfo?.label}</span>
                           {dd.text}
                         </span>
-                      )}
+                      ) : null}
                     </div>
 
                     {/* col 5: actions */}

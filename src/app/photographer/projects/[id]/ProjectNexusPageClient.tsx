@@ -440,6 +440,15 @@ export function ProjectNexusPageClient() {
     }
   })();
 
+  const reviewDeadlineDisplay = (() => {
+    if (!project.reviewDeadline) return null;
+    try {
+      return format(parseISO(project.reviewDeadline), "yyyy-MM-dd");
+    } catch {
+      return project.reviewDeadline;
+    }
+  })();
+
   const uploadDone = project.status !== "preparing";
   const selectingActive = project.status === "selecting";
   const preparing = project.status === "preparing";
@@ -637,6 +646,15 @@ export function ProjectNexusPageClient() {
               >
                 <span style={{ fontFamily: MONO_FONT }}>{deadlineDisplay}</span>
               </MetaItem>
+
+              {reviewDeadlineDisplay && (
+                <MetaItem
+                  label="검토 기한"
+                  info="보정본 검토 마감일"
+                >
+                  <span style={{ fontFamily: MONO_FONT }}>{reviewDeadlineDisplay}</span>
+                </MetaItem>
+              )}
 
               <MetaItem
                 label="고객 이름"

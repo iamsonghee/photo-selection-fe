@@ -17,6 +17,7 @@ import EmptyDashboard from "./EmptyDashboard";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { ProjectPipelineMiniBar, getPipelineStepLabel } from "@/components/photographer/ProjectPipelineMiniBar";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
+import { getActiveDeadline } from "@/lib/project-deadline";
 
 const ACCENT = "#FF4D00";
 const RED    = "#EF4444";
@@ -71,7 +72,10 @@ function PhotoProjectCard({ project }: { project: Project }) {
   const router     = useRouter();
   const photoCount = project.photoCount ?? 0;
   const reqCount   = project.requiredCount ?? 0;
-  const { text: ddayText, warn } = dday(project.deadline);
+  const deadlineInfo = getActiveDeadline(project);
+  const ddayResult  = deadlineInfo ? dday(deadlineInfo.date) : null;
+  const ddayText    = ddayResult?.text ?? null;
+  const warn        = ddayResult?.warn ?? false;
   const stepLabel  = getPipelineStepLabel(project.status);
   const isDelivered = project.status === "delivered";
   const hasCover   = !!project.thumbnailUrl;
@@ -114,9 +118,10 @@ function PhotoProjectCard({ project }: { project: Project }) {
         <div className="absolute top-2 right-2">
           {isDelivered ? (
             <span className="text-[9px] font-bold bg-black/60 border border-zinc-700 rounded px-1.5 py-0.5 text-zinc-400">완료</span>
-          ) : (
+          ) : ddayText ? (
             <span
               className="text-[10px] font-bold rounded px-1.5 py-0.5 border"
+              title={deadlineInfo?.label}
               style={{
                 color: warn ? ACCENT : "#a1a1aa",
                 borderColor: warn ? `${ACCENT}50` : "rgba(255,255,255,0.12)",
@@ -125,7 +130,7 @@ function PhotoProjectCard({ project }: { project: Project }) {
             >
               {ddayText}
             </span>
-          )}
+          ) : null}
         </div>
         {/* 이미지 하단 오버레이 — 프로젝트명 + 고객명 */}
         <div className="absolute bottom-0 left-0 right-0 px-2.5 pb-2 pt-4">

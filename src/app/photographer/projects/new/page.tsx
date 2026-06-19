@@ -194,7 +194,52 @@ const isValid =
     }
   };
 
-  const withinLimit = projectCount === null || projectCount < BETA_MAX_PROJECTS_TOTAL;
+  // 로딩 중 — 한도 확인 전에는 폼을 렌더하지 않음
+  if (projectCount === null) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0c] flex items-center justify-center">
+        <div className="w-6 h-6 rounded-full border-2 border-[#FF4D00]/20 border-t-[#FF4D00]" style={{ animation: "spin 0.9s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  // 한도 초과 — 폼 대신 안내 화면 바로 표시
+  if (projectCount >= BETA_MAX_PROJECTS_TOTAL) {
+    return (
+      <div
+        className="min-h-screen bg-[#0a0a0c] text-white"
+        style={{ fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif" }}
+      >
+        <PhotographerPageHeader
+          crumbs={[
+            { label: "프로젝트", href: "/photographer/projects" },
+            { label: "새 프로젝트" },
+          ]}
+          title="새 프로젝트 만들기"
+        />
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-16 flex flex-col items-center text-center gap-6">
+          <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+            <AlertCircle size={28} color="#ef4444" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white mb-2">베타 기간 프로젝트 한도 도달</h2>
+            <p className="text-sm text-zinc-400 leading-relaxed">
+              베타 기간 중 최대 {BETA_MAX_PROJECTS_TOTAL}개의 프로젝트를 생성할 수 있습니다.<br />
+              현재 <strong className="text-white">{projectCount} / {BETA_MAX_PROJECTS_TOTAL}개</strong> 사용 중입니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push("/photographer/projects")}
+            className="px-6 py-2.5 bg-[#FF4D00] text-black text-sm font-bold rounded-xl hover:bg-[#ff5e1a] transition-colors"
+          >
+            프로젝트 목록으로
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -228,39 +273,17 @@ const isValid =
       {/* ── 메인 ── */}
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-20">
 
-        {/* 베타 한도 초과 */}
-        {projectCount !== null && projectCount >= BETA_MAX_PROJECTS_TOTAL && (
-          <div className="flex items-start gap-3 bg-red-500/5 border border-red-500/20 rounded-2xl p-4 mb-6">
-            <AlertCircle size={16} color="#ef4444" className="shrink-0 mt-0.5" />
-            <div>
-              <div className="text-sm font-semibold text-red-400 mb-1">베타 기간 프로젝트 한도 도달</div>
-              <div className="text-xs text-zinc-500 leading-relaxed">
-                베타 기간 중 최대 {BETA_MAX_PROJECTS_TOTAL}개의 프로젝트를 생성할 수 있습니다.
-                현재 <strong className="text-white">{projectCount} / {BETA_MAX_PROJECTS_TOTAL}개</strong> 사용 중입니다.
-              </div>
-              <button
-                type="button"
-                onClick={() => router.push("/photographer/projects")}
-                className="mt-3 text-xs text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 rounded-lg px-3 py-1.5 transition-colors"
-              >
-                프로젝트 목록 보기
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 베타 한도 임박 */}
-        {projectCount !== null && projectCount === BETA_MAX_PROJECTS_TOTAL - 1 && (
+        {/* 베타 한도 임박 (잔여 1개) */}
+        {projectCount === BETA_MAX_PROJECTS_TOTAL - 1 && (
           <div className="flex items-center gap-2 bg-yellow-500/5 border border-yellow-500/20 rounded-xl px-4 py-2.5 mb-4">
             <AlertTriangle size={13} color="#eab308" />
             <span className="text-xs text-yellow-500/80">
-              잔여 1개 · 베타 기간 중 최대 {BETA_MAX_PROJECTS_TOTAL}개의 프로젝트를 생성할 수 있습니다.
+              잔여 1개 · 베타 기간 중 최대 {BETA_MAX_PROJECTS_TOTAL}개까지 생성 가능합니다.
             </span>
           </div>
         )}
 
-        {withinLimit && (
-          <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-5">
 
             {/* ── 폼 카드 ── */}
             <div className="bg-[#121215] border border-[#1a1a1e] rounded-2xl p-6 flex flex-col gap-6">
@@ -535,7 +558,6 @@ const isValid =
               </button>
             </div>
           </div>
-        )}
       </main>
     </div>
   );

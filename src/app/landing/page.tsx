@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { AuthModal } from "@/components/AuthModal";
 
 // ─── Shared utilities ────────────────────────────────────────────────────────
@@ -151,6 +152,13 @@ function HeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
               <div className="w-1 h-1 bg-[#FF4D00]" /> 신용카드 불필요
             </span>
           </div>
+          <Link
+            href="/guide"
+            className="text-[13px] text-gray-500 hover:text-gray-300 transition-colors"
+            style={{ textDecoration: "underline", textUnderlineOffset: 3 }}
+          >
+            처음 쓰신다면 → 사용 가이드 먼저 보기
+          </Link>
         </div>
       </div>
 
@@ -306,6 +314,13 @@ function MobileHeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
               <div className="w-1 h-1 bg-[#FF4D00]" /> NO CREDIT CARD
             </span>
           </div>
+          <Link
+            href="/guide"
+            className="text-[12px] text-gray-500 hover:text-gray-300 transition-colors text-center block mt-1"
+            style={{ textDecoration: "underline", textUnderlineOffset: 3 }}
+          >
+            처음 쓰신다면 → 사용 가이드 먼저 보기
+          </Link>
         </div>
 
         {/* Mockup + Stats */}
