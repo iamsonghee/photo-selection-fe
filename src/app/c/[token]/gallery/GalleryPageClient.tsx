@@ -191,7 +191,7 @@ export default function GalleryPageClient() {
       const res = await fetch("/api/c/confirm", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ token, project_id: project.id }),
+        body:    JSON.stringify({ token, project_id: project.id, selected_photo_ids: [...selectedIds] }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
