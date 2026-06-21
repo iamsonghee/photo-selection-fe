@@ -115,7 +115,42 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     }
   };
 
-  const handleKakaoLogin = () => setError("카카오 로그인은 준비 중입니다.");
+  const handleKakaoLogin = async () => {
+    setError(null);
+    setLoading("kakao");
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+    if (!url || !key || url.includes("placeholder") || key.includes("placeholder")) {
+      setError(
+        "NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY를 .env.local에 설정한 뒤 개발 서버를 재시작해 주세요.",
+      );
+      setLoading(null);
+      return;
+    }
+    try {
+      const { data, error: err } = await supabase.auth.signInWithOAuth({
+        provider: "kakao",
+        options: {
+          redirectTo:
+            typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
+        },
+      });
+      if (err) {
+        setError(err.message);
+        setLoading(null);
+        return;
+      }
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        setError("로그인 URL을 받지 못했습니다. Supabase Kakao Provider 설정을 확인하세요.");
+        setLoading(null);
+      }
+    } catch {
+      setError("로그인 중 오류가 발생했습니다.");
+      setLoading(null);
+    }
+  };
   // ─────────────────────────────────────────────────────────────────────────
 
   if (!isOpen && !closing) return null;
@@ -234,7 +269,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                     />
                   </svg>
                 </span>
-                카카오로 시작하기
+                {loading === "kakao" ? "연결 중…" : "카카오로 시작하기"}
               </button>
             </div>
           </div>
