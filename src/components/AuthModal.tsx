@@ -133,6 +133,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         options: {
           redirectTo:
             typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
+          scopes: "profile_nickname profile_image",
         },
       });
       if (err) {
