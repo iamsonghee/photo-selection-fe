@@ -24,6 +24,7 @@ import {
   ImageIcon,
   ImagePlus,
   Plus,
+  Sparkles,
 } from "lucide-react";
 import { PrevNextButton } from "@/components/PrevNextButton";
 import { getProjectById, getPhotosByProjectId } from "@/lib/db";
@@ -796,6 +797,12 @@ export default function ProjectDetailPage() {
   const [showFlushAllConfirm, setShowFlushAllConfirm] = useState(false);
   const [isPreparingFiles, setIsPreparingFiles] = useState(false);
 
+  /** AI 유사컷 분석 — 업로드와 별개의 명시적 트리거 (초대 링크 활성화와 무관) */
+  const [clipAnalysisStatus, setClipAnalysisStatus] = useState<
+    "processing" | "completed" | "failed" | null
+  >(null);
+  const [clipAnalysisTriggering, setClipAnalysisTriggering] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pickerPendingRef = useRef(false);
   const photoScrollRef = useRef<HTMLDivElement>(null);
@@ -824,6 +831,22 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); }
   }, [toast]);
+
+  /** AI 유사컷 분석 상태 polling — 처리 중일 때만 짧은 간격으로 조회 */
+  useEffect(() => {
+    if (clipAnalysisStatus !== "processing") return;
+    const t = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/photographer/projects/${id}/clip-analysis`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { clip_analysis_status?: "processing" | "completed" | "failed" | null };
+        if (data.clip_analysis_status && data.clip_analysis_status !== "processing") {
+          setClipAnalysisStatus(data.clip_analysis_status);
+        }
+      } catch {}
+    }, 4000);
+    return () => clearInterval(t);
+  }, [clipAnalysisStatus, id]);
 
 
   useEffect(() => {
@@ -1255,6 +1278,23 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleStartClipAnalysis = async () => {
+    setClipAnalysisTriggering(true);
+    try {
+      const res = await fetch(`/api/photographer/projects/${id}/clip-analysis`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setToast((data as { error?: string; detail?: string }).error ?? (data as { detail?: string }).detail ?? "분석 시작에 실패했습니다.");
+        return;
+      }
+      setClipAnalysisStatus("processing");
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : "분석 시작에 실패했습니다.");
+    } finally {
+      setClipAnalysisTriggering(false);
+    }
+  };
+
   /** 기존 photos + 배치 완료(pending) + 전송 중(uploading) 합산 — early return 이전에 선언해야 Rules of Hooks 준수 */
   const displayPhotos = useMemo(() => {
     const confirmedNames = new Set(photos.map((p) => p.originalFilename));
@@ -1569,6 +1609,62 @@ export default function ProjectDetailPage() {
           </div>
         </section>
       </main>
+
+      {/* ── AI 유사컷 분석 — 초대 링크 활성화와 독립된 별도 트리거 ── */}
+      {project.status === "preparing" && displayPhotos.length > 0 && (
+        <div
+          className="prj-clip-analysis-bar"
+          style={{
+            flexShrink: 0,
+            background: "rgba(8, 4, 2, 0.96)",
+            borderTop: "1px solid rgba(255,255,255,0.08)",
+            padding: "10px 24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: TEXT_BRIGHT }}>
+              AI 유사컷 분석
+            </div>
+            <div style={{ fontSize: 11, color: TEXT_MUTED }}>
+              {clipAnalysisStatus === "processing"
+                ? "분석 중… 잠시 후 완료됩니다"
+                : clipAnalysisStatus === "completed"
+                ? "분석이 완료되었습니다"
+                : clipAnalysisStatus === "failed"
+                ? "분석에 실패했습니다. 다시 시도해주세요"
+                : "연속 촬영된 유사컷을 자동으로 찾아 묶어드립니다"}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleStartClipAnalysis}
+            disabled={clipAnalysisTriggering || clipAnalysisStatus === "processing"}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "8px 16px",
+              background: "transparent",
+              border: `1px solid ${BORDER_MID}`,
+              borderRadius: 8,
+              color: TEXT_NORMAL,
+              fontSize: 12, fontWeight: 500,
+              cursor: clipAnalysisTriggering || clipAnalysisStatus === "processing" ? "not-allowed" : "pointer",
+              fontFamily: MONO,
+              opacity: clipAnalysisTriggering || clipAnalysisStatus === "processing" ? 0.6 : 1,
+            }}
+          >
+            <Sparkles size={14} />
+            {clipAnalysisStatus === "processing"
+              ? "분석 중…"
+              : clipAnalysisStatus === "completed"
+              ? "다시 분석"
+              : "AI 유사컷 분석 시작"}
+          </button>
+        </div>
+      )}
 
       {/* ── 고객 초대 하단 고정 바 ── */}
       <div
