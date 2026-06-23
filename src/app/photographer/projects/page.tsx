@@ -68,23 +68,23 @@ function CTAButton({ cta, onClick }: { cta: CTAConfig; onClick?: () => void }) {
   const base = "px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap";
 
   const variantCls: Record<CTAConfig["variant"], string> = {
-    brand:             "bg-[#FF4D00] hover:bg-[#ff5e1a] text-black shadow-[0_0_15px_rgba(255,77,0,0.3)] hover:shadow-[0_0_20px_rgba(255,77,0,0.5)]",
-    "secondary-purple": "bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] hover:border-[#3f3f46] text-white",
-    "secondary-brand":  "bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] hover:border-[#3f3f46] text-white",
-    "secondary-rose":   "bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] hover:border-rose-500/50 text-white",
-    muted:             "bg-transparent text-zinc-500 hover:text-zinc-300 transition-colors",
-    dashed:            "bg-[#0a0a0c] border-2 border-dashed border-[#27272c] hover:border-[#FF4D00]/50 hover:text-[#FF4D00] hover:bg-[#FF4D00]/5 text-zinc-400",
-    disabled:          "bg-[#0a0a0c] border border-[#1a1a1e] text-zinc-600 cursor-not-allowed",
+    brand:             "bg-accent hover:bg-[#ff5e1a] text-black shadow-[0_0_15px_rgba(var(--accent-rgb),0.3)] hover:shadow-[0_0_20px_rgba(var(--accent-rgb),0.5)]",
+    "secondary-purple": "bg-surface-raised hover:brightness-110 border border-border hover:border-border-strong text-foreground",
+    "secondary-brand":  "bg-surface-raised hover:brightness-110 border border-border hover:border-border-strong text-foreground",
+    "secondary-rose":   "bg-surface-raised hover:brightness-110 border border-border hover:border-rose-500/50 text-foreground",
+    muted:             "bg-transparent text-subtle-foreground hover:text-muted-foreground transition-colors",
+    dashed:            "bg-background border-2 border-dashed border-border hover:border-accent/50 hover:text-accent hover:bg-accent/5 text-muted-foreground",
+    disabled:          "bg-background border border-surface-raised text-disabled-foreground cursor-not-allowed",
   };
 
   const iconCls: Record<CTAConfig["variant"], string> = {
     brand:              "text-black",
     "secondary-purple": "text-purple-400",
-    "secondary-brand":  "text-[#FF4D00]",
+    "secondary-brand":  "text-accent",
     "secondary-rose":   "text-rose-400",
     muted:              "text-emerald-500",
-    dashed:             "text-zinc-500",
-    disabled:           "text-zinc-600",
+    dashed:             "text-subtle-foreground",
+    disabled:           "text-disabled-foreground",
   };
 
   if (cta.variant === "disabled" || !cta.href) {
@@ -128,7 +128,7 @@ function getCardAccent(status: ProjectStatus): string {
     case "reviewing_v1":
     case "reviewing_v2":
     case "selecting":
-    case "confirmed":                     return "rgba(255,77,0,0.05)";
+    case "confirmed":                     return "rgba(var(--accent-rgb),0.05)";
     case "delivered":                     return "rgba(16,185,129,0.05)";
     default:                              return "transparent";
   }
@@ -142,12 +142,12 @@ function MobileProjectCard({ project, onNavigate }: { project: Project; onNaviga
   const ddCls      = !dd ? "" :
     dd.level === "danger" ? "text-rose-400 bg-rose-500/10 border-rose-500/20" :
     dd.level === "warn"   ? "text-amber-500 bg-amber-500/10 border-amber-500/20" :
-    "text-zinc-500 bg-[#1a1a1e] border-[#27272c]";
+    "text-subtle-foreground bg-surface-raised border-border";
   const base = `/photographer/projects/${project.id}`;
   const showDots = !["preparing", "selecting", "delivered"].includes(project.status);
 
   return (
-    <div className="bg-[#121215] border border-[#1a1a1e] rounded-2xl p-4 flex flex-col gap-4 relative overflow-hidden">
+    <div className="bg-surface border border-surface-raised rounded-2xl p-4 flex flex-col gap-4 relative overflow-hidden">
       {/* corner accent */}
       <div
         className="absolute top-0 right-0 w-24 h-24 pointer-events-none rounded-bl-[100px]"
@@ -157,17 +157,17 @@ function MobileProjectCard({ project, onNavigate }: { project: Project; onNaviga
       {/* top: thumbnail + info */}
       <div className="flex gap-4">
         <div
-          className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-[#27272c] shadow-md cursor-pointer"
+          className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-border shadow-md cursor-pointer"
           onClick={() => onNavigate(base)}
         >
           {project.thumbnailUrl ? (
             <img src={project.thumbnailUrl} alt="" className="w-full h-full object-cover" />
           ) : (
-            <div className="w-full h-full bg-[#0a0a0c] flex flex-col items-center justify-center">
-              <svg className="w-5 h-5 text-zinc-600 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-full h-full bg-background flex flex-col items-center justify-center">
+              <svg className="w-5 h-5 text-disabled-foreground mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <span className="text-[8px] text-zinc-500 font-medium">No Image</span>
+              <span className="text-[8px] text-subtle-foreground font-medium">No Image</span>
             </div>
           )}
         </div>
@@ -175,26 +175,26 @@ function MobileProjectCard({ project, onNavigate }: { project: Project; onNaviga
         <div className="flex-1 min-w-0 pt-0.5">
           <div className="flex items-center justify-between mb-1.5">
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[10px] font-mono text-zinc-500 shrink-0">
+              <span className="text-[10px] font-mono text-subtle-foreground shrink-0">
                 {project.displayId ?? project.id.slice(0, 8)}
               </span>
               {project.shootType && (
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#27272c] text-zinc-400 border border-[#1a1a1e] shrink-0">
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-surface-raised text-muted-foreground border border-border-subtle shrink-0">
                   {project.shootType}
                 </span>
               )}
             </div>
             {isDelivered ? (
-              <span className="text-[10px] font-bold font-mono text-zinc-500 bg-[#1a1a1e] border border-[#27272c] px-1.5 py-0.5 rounded shrink-0">완료</span>
+              <span className="text-[10px] font-bold font-mono text-subtle-foreground bg-surface-raised border border-border px-1.5 py-0.5 rounded shrink-0">완료</span>
             ) : dd ? (
               <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${ddCls}`} title={deadlineInfo?.label}>{dd.text}</span>
             ) : null}
           </div>
-          <h3 className={`text-[15px] font-bold truncate mb-1 ${isDelivered ? "text-zinc-400" : "text-white"}`}>
+          <h3 className={`text-[15px] font-bold truncate mb-1 ${isDelivered ? "text-muted-foreground" : "text-foreground"}`}>
             {project.name}
           </h3>
-          <p className="text-xs text-zinc-400 flex items-center gap-1.5 truncate">
-            <span className="w-4 h-4 rounded-full bg-[#27272c] flex items-center justify-center text-[8px] font-bold text-white shrink-0">
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5 truncate">
+            <span className="w-4 h-4 rounded-full bg-surface-raised flex items-center justify-center text-[8px] font-bold text-foreground shrink-0">
               {getInitial(project.customerName || "?")}
             </span>
             {project.customerName || "—"}
@@ -203,7 +203,7 @@ function MobileProjectCard({ project, onNavigate }: { project: Project; onNaviga
       </div>
 
       {/* status box */}
-      <div className="bg-[#0a0a0c]/50 rounded-xl p-3 border border-[#1a1a1e]/50">
+      <div className="bg-background/50 rounded-xl p-3 border border-surface-raised/50">
         <div className="mb-2">
           <StatusPill status={project.status} />
         </div>
@@ -213,35 +213,35 @@ function MobileProjectCard({ project, onNavigate }: { project: Project; onNaviga
       {/* CTA */}
       <div className="flex gap-2">
         {cta.variant === "disabled" ? (
-          <button type="button" disabled className="flex-1 py-2.5 rounded-xl bg-[#121215] border border-[#1a1a1e] text-zinc-600 text-sm font-bold flex items-center justify-center gap-2 cursor-not-allowed">
+          <button type="button" disabled className="flex-1 py-2.5 rounded-xl bg-surface border border-surface-raised text-disabled-foreground text-sm font-bold flex items-center justify-center gap-2 cursor-not-allowed">
             <Clock size={16} />
             {cta.text}
           </button>
         ) : cta.variant === "dashed" ? (
           <button type="button" onClick={() => cta.href && onNavigate(cta.href)}
-            className="flex-1 py-2.5 rounded-xl bg-[#0a0a0c] border-2 border-dashed border-zinc-600 text-zinc-300 text-sm font-bold flex items-center justify-center gap-2 active:bg-[#121215]">
+            className="flex-1 py-2.5 rounded-xl bg-background border-2 border-dashed border-border-strong text-muted-foreground text-sm font-bold flex items-center justify-center gap-2 active:bg-surface">
             {ctaIcon(cta.variant)}
             {cta.text}
           </button>
         ) : cta.variant === "brand" ? (
           <button type="button" onClick={() => cta.href && onNavigate(cta.href)}
-            className="flex-1 py-2.5 rounded-xl bg-[#FF4D00] active:bg-[#e64500] text-white text-sm font-bold shadow-[0_0_15px_rgba(255,77,0,0.2)] flex items-center justify-center gap-2">
+            className="flex-1 py-2.5 rounded-xl bg-accent active:bg-[#e64500] text-foreground text-sm font-bold shadow-[0_0_15px_rgba(var(--accent-rgb),0.2)] flex items-center justify-center gap-2">
             {ctaIcon(cta.variant)}
             {cta.text}
           </button>
         ) : cta.variant === "muted" ? (
           <button type="button" onClick={() => cta.href && onNavigate(cta.href)}
-            className="flex-1 py-2.5 rounded-xl text-zinc-500 text-sm font-bold flex items-center justify-center gap-2 active:text-zinc-300">
+            className="flex-1 py-2.5 rounded-xl text-subtle-foreground text-sm font-bold flex items-center justify-center gap-2 active:text-muted-foreground">
             {ctaIcon(cta.variant)}
             {cta.text}
           </button>
         ) : (
           <>
             <button type="button" onClick={() => cta.href && onNavigate(cta.href)}
-              className="flex-1 py-2.5 rounded-xl bg-[#1a1a1e] border border-[#27272c] active:bg-[#27272c] text-white text-sm font-bold flex items-center justify-center gap-2">
+              className="flex-1 py-2.5 rounded-xl bg-surface-raised border border-border active:brightness-110 text-foreground text-sm font-bold flex items-center justify-center gap-2">
               <span className={
                 cta.variant === "secondary-purple" ? "text-purple-400" :
-                cta.variant === "secondary-rose"   ? "text-rose-400" : "text-[#FF4D00]"
+                cta.variant === "secondary-rose"   ? "text-rose-400" : "text-accent"
               }>
                 {ctaIcon(cta.variant)}
               </span>
@@ -249,7 +249,7 @@ function MobileProjectCard({ project, onNavigate }: { project: Project; onNaviga
             </button>
             {showDots && (
               <button type="button" onClick={() => onNavigate(base)}
-                className="w-11 h-11 shrink-0 rounded-xl bg-[#1a1a1e] border border-[#27272c] flex items-center justify-center text-zinc-400 active:bg-[#27272c]">
+                className="w-11 h-11 shrink-0 rounded-xl bg-surface-raised border border-border flex items-center justify-center text-muted-foreground active:brightness-110">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                 </svg>
@@ -362,7 +362,7 @@ export default function ProjectsPage() {
     <>
     {/* ── Mobile View ──────────────────────────────────────────── */}
     <div
-      className="md:hidden bg-[#0a0a0c] text-white"
+      className="md:hidden bg-background text-foreground"
       style={{ fontFamily: "var(--font-inter, sans-serif)" }}
     >
       <div>
@@ -370,20 +370,20 @@ export default function ProjectsPage() {
         {/* search + filter */}
         <div className="px-5 pb-4 flex gap-2">
           <div className="relative flex-1">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-subtle-foreground" />
             <input
               type="text"
               placeholder="프로젝트명, 고객명 검색"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#121215] border border-[#1a1a1e] text-white text-sm rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:border-[#FF4D00] focus:ring-1 focus:ring-[#FF4D00]/20 placeholder:text-zinc-600 transition-all"
+              className="w-full bg-surface border border-border-subtle text-foreground text-sm rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 placeholder:text-disabled-foreground transition-all"
             />
           </div>
           <button
             type="button"
             onClick={() => setMobileFilterOpen((v) => !v)}
-            className={`w-12 h-12 flex items-center justify-center bg-[#121215] border rounded-xl transition-colors shrink-0 ${
-              mobileFilterOpen ? "border-[#FF4D00] text-[#FF4D00]" : "border-[#1a1a1e] text-zinc-400"
+            className={`w-12 h-12 flex items-center justify-center bg-surface border rounded-xl transition-colors shrink-0 ${
+              mobileFilterOpen ? "border-accent text-accent" : "border-border-subtle text-muted-foreground"
             }`}
           >
             <SlidersHorizontal size={20} strokeWidth={1.5} />
@@ -402,8 +402,8 @@ export default function ProjectsPage() {
                   onClick={() => setActiveTab(key)}
                   className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
                     activeTab === key
-                      ? "bg-[#FF4D00]/15 text-[#FF4D00] border-[#FF4D00]/30"
-                      : "bg-[#121215] text-zinc-400 border-[#1a1a1e]"
+                      ? "bg-accent/15 text-accent border-accent/30"
+                      : "bg-surface text-muted-foreground border-border-subtle"
                   }`}
                 >
                   {labels[key]}
@@ -421,8 +421,8 @@ export default function ProjectsPage() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <Layers size={32} className="text-zinc-700" />
-              <p className="text-zinc-500 text-sm text-center">
+              <Layers size={32} className="text-disabled-foreground" />
+              <p className="text-subtle-foreground text-sm text-center">
                 {projects.length > 0 ? "검색 결과가 없습니다." : "아직 프로젝트가 없습니다."}
               </p>
             </div>
@@ -445,14 +445,14 @@ export default function ProjectsPage() {
       onClick={() => router.push("/photographer/projects/new")}
       aria-label="새 프로젝트"
       title="새 프로젝트"
-      className="fixed z-40 right-5 bottom-20 md:right-8 md:bottom-8 flex h-14 w-14 items-center justify-center rounded-full bg-[#FF4D00] text-white shadow-[0_4px_20px_rgba(255,77,0,0.4)] transition-transform active:scale-95 md:hover:scale-105 md:hover:shadow-[0_6px_28px_rgba(255,77,0,0.45)]"
+      className="fixed z-40 right-5 bottom-20 md:right-8 md:bottom-8 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-foreground shadow-[0_4px_20px_rgba(var(--accent-rgb),0.4)] transition-transform active:scale-95 md:hover:scale-105 md:hover:shadow-[0_6px_28px_rgba(var(--accent-rgb),0.45)]"
     >
       <Plus size={24} strokeWidth={2} />
     </button>
 
     {/* ── Desktop View ─────────────────────────────────────────── */}
     <div
-      className="hidden md:block min-h-screen bg-[#0a0a0c] text-white"
+      className="hidden md:block min-h-screen bg-background text-foreground"
       style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}
     >
       {/* ── header ── */}
@@ -468,28 +468,28 @@ export default function ProjectsPage() {
       <div className="p-8 space-y-6 max-w-[1600px] mx-auto">
 
         {/* ── filter bar ── */}
-        <div className="bg-[#121215]/80 border border-[#1a1a1e] rounded-2xl p-2 flex flex-wrap items-center justify-between gap-3">
+        <div className="bg-surface/80 border border-border-subtle rounded-2xl p-2 flex flex-wrap items-center justify-between gap-3">
           {/* search */}
           <div className="flex-1 min-w-[260px] relative">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-subtle-foreground" />
             <input
               type="text"
               placeholder="프로젝트명, 고객명, ID 검색..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#0a0a0c]/50 border border-[#1a1a1e] text-white text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-[#FF4D00] focus:ring-1 focus:ring-[#FF4D00]/30 transition-all placeholder:text-zinc-600"
+              className="w-full bg-background/50 border border-border-subtle text-foreground text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all placeholder:text-disabled-foreground"
             />
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             {/* date range */}
             <div
-              className="flex items-center bg-[#0a0a0c]/50 border border-[#1a1a1e] rounded-xl px-3 py-2 gap-2 h-11 cursor-pointer"
+              className="flex items-center bg-background/50 border border-border-subtle rounded-xl px-3 py-2 gap-2 h-11 cursor-pointer"
               onClick={() => dateFromRef.current?.showPicker?.()}
             >
-              <span className="text-xs text-zinc-500" style={{ fontFamily: "var(--font-mono, monospace)" }}>촬영일:</span>
+              <span className="text-xs text-subtle-foreground" style={{ fontFamily: "var(--font-mono, monospace)" }}>촬영일:</span>
               <div className="relative">
-                <span className="text-xs text-zinc-400 pointer-events-none" style={{ fontFamily: "var(--font-mono, monospace)" }}>{dateFrom || "시작"}</span>
+                <span className="text-xs text-muted-foreground pointer-events-none" style={{ fontFamily: "var(--font-mono, monospace)" }}>{dateFrom || "시작"}</span>
                 <input
                   ref={dateFromRef}
                   type="date"
@@ -499,9 +499,9 @@ export default function ProjectsPage() {
                   className="absolute inset-0 opacity-0 cursor-pointer w-20"
                 />
               </div>
-              <span className="text-zinc-600 text-xs">~</span>
+              <span className="text-disabled-foreground text-xs">~</span>
               <div className="relative">
-                <span className="text-xs text-zinc-400 pointer-events-none" style={{ fontFamily: "var(--font-mono, monospace)" }}>{dateTo || "종료"}</span>
+                <span className="text-xs text-muted-foreground pointer-events-none" style={{ fontFamily: "var(--font-mono, monospace)" }}>{dateTo || "종료"}</span>
                 <input
                   ref={dateToRef}
                   type="date"
@@ -514,7 +514,7 @@ export default function ProjectsPage() {
             </div>
 
             {/* status tabs */}
-            <div className="flex bg-[#0a0a0c]/50 p-1 rounded-xl border border-[#1a1a1e] h-11 items-center">
+            <div className="flex bg-background/50 p-1 rounded-xl border border-border-subtle h-11 items-center">
               {(["all", "active", "completed"] as const).map((key) => {
                 const labels = { all: "전체", active: "진행중", completed: "완료" };
                 return (
@@ -524,8 +524,8 @@ export default function ProjectsPage() {
                     onClick={() => setActiveTab(key)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                       activeTab === key
-                        ? "bg-[#27272c] text-white shadow-sm"
-                        : "text-zinc-400 hover:text-white hover:bg-[#27272c]/50"
+                        ? "bg-surface-raised text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground hover:bg-surface-raised/50"
                     }`}
                   >
                     {labels[key]}
@@ -539,29 +539,29 @@ export default function ProjectsPage() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                className="bg-[#0a0a0c]/50 border border-[#1a1a1e] text-zinc-300 text-sm rounded-xl px-4 py-2 h-11 focus:outline-none focus:border-[#FF4D00] appearance-none pr-8 cursor-pointer"
+                className="bg-background/50 border border-border-subtle text-muted-foreground text-sm rounded-xl px-4 py-2 h-11 focus:outline-none focus:border-accent appearance-none pr-8 cursor-pointer"
               >
                 <option value="latest">최신 등록순</option>
                 <option value="deadline">마감일 임박순</option>
                 <option value="shoot_date">촬영일순</option>
                 <option value="name">이름순</option>
               </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle-foreground pointer-events-none" />
             </div>
           </div>
         </div>
 
         {/* ── table ── */}
-        <div className="bg-[#121215]/50 border border-[#1a1a1e] rounded-2xl overflow-hidden">
+        <div className="bg-surface/50 border border-border-subtle rounded-2xl overflow-hidden">
           {/* header row */}
           <div
-            className={`grid ${colCls} gap-4 px-6 py-3 border-b border-[#1a1a1e] bg-[#0a0a0c]/50`}
+            className={`grid ${colCls} gap-4 px-6 py-3 border-b border-border-subtle bg-background/50`}
             style={{ fontFamily: "var(--font-inter, sans-serif)" }}
           >
             {(["프로젝트 정보", "고객 / 촬영일", "현재 상태 / 진행률", "마감 기한"] as const).map((label) => (
-              <div key={label} className="text-xs font-semibold text-zinc-400">{label}</div>
+              <div key={label} className="text-xs font-semibold text-muted-foreground">{label}</div>
             ))}
-            <div className="text-xs font-semibold text-zinc-400 text-right">작업 관리</div>
+            <div className="text-xs font-semibold text-muted-foreground text-right">작업 관리</div>
           </div>
 
           {/* body */}
@@ -571,15 +571,15 @@ export default function ProjectsPage() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <Layers size={32} className="text-zinc-700" />
-              <p className="text-zinc-500 text-sm">
+              <Layers size={32} className="text-disabled-foreground" />
+              <p className="text-subtle-foreground text-sm">
                 {projects.length > 0 ? (
                   <>
                     검색 결과가 없습니다.{" "}
                     <button
                       type="button"
                       onClick={resetFilters}
-                      className="text-[#FF4D00] underline underline-offset-2"
+                      className="text-accent underline underline-offset-2"
                     >
                       필터 초기화
                     </button>
@@ -588,7 +588,7 @@ export default function ProjectsPage() {
               </p>
             </div>
           ) : (
-            <div className="flex flex-col divide-y divide-[#1a1a1e]/50">
+            <div className="flex flex-col divide-y divide-border-subtle/50">
               {filtered.map((project) => {
                 const cta = getProjectCTA(project);
                 const deadlineInfo = getActiveDeadline(project);
@@ -597,18 +597,18 @@ export default function ProjectsPage() {
                 const ddCls = !dd ? "" :
                   dd.level === "danger" ? "bg-rose-500/10 text-rose-400 border-rose-500/20" :
                   dd.level === "warn"   ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
-                  "bg-[#121215] text-zinc-500 border-[#1a1a1e]";
+                  "bg-surface text-subtle-foreground border-border-subtle";
 
                 return (
                   <div
                     key={project.id}
-                    className={`grid ${colCls} gap-4 px-6 py-5 hover:bg-[#27272c]/20 transition-colors items-center group`}
+                    className={`grid ${colCls} gap-4 px-6 py-5 hover:bg-surface-raised/20 transition-colors items-center group`}
                   >
                     {/* col 1: project info */}
                     <div className="flex items-center gap-4 min-w-0">
                       {/* thumbnail */}
                       <div
-                        className="w-14 h-14 rounded-xl overflow-hidden border border-[#27272c] shrink-0 bg-[#121215] flex items-center justify-center cursor-pointer hover:border-[#FF4D00] transition-colors"
+                        className="w-14 h-14 rounded-xl overflow-hidden border border-border shrink-0 bg-surface flex items-center justify-center cursor-pointer hover:border-accent transition-colors"
                         onClick={() => router.push(`/photographer/projects/${project.id}`)}
                       >
                         {project.thumbnailUrl ? (
@@ -619,7 +619,7 @@ export default function ProjectsPage() {
                           />
                         ) : (
                           <span
-                            className="text-lg font-black text-zinc-600 group-hover:text-zinc-400 transition-colors"
+                            className="text-lg font-black text-disabled-foreground group-hover:text-muted-foreground transition-colors"
                             style={{ fontFamily: "var(--font-inter, sans-serif)" }}
                           >
                             {project.name.charAt(0)}
@@ -630,13 +630,13 @@ export default function ProjectsPage() {
                       <div className="flex flex-col gap-1 min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span
-                            className="text-[11px] text-zinc-500 bg-[#0a0a0c] px-1.5 py-0.5 rounded border border-[#1a1a1e]"
+                            className="text-[11px] text-subtle-foreground bg-background px-1.5 py-0.5 rounded border border-border-subtle"
                             style={{ fontFamily: "var(--font-mono, monospace)" }}
                           >
                             {project.displayId ?? project.id.slice(0, 12).toUpperCase()}
                           </span>
                           {project.shootType && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#27272c] text-zinc-400 border border-[#1a1a1e]">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-surface-raised text-muted-foreground border border-border-subtle">
                               {project.shootType}
                             </span>
                           )}
@@ -645,13 +645,13 @@ export default function ProjectsPage() {
                           type="button"
                           onClick={() => router.push(`/photographer/projects/${project.id}`)}
                           className={`text-base font-bold tracking-tight truncate text-left transition-colors ${
-                            isDelivered ? "text-zinc-400 hover:text-zinc-300" : "text-white hover:text-[#FF4D00]"
+                            isDelivered ? "text-muted-foreground hover:text-muted-foreground" : "text-foreground hover:text-accent"
                           }`}
                         >
                           {project.name}
                         </button>
                         {project.location && (
-                          <p className="text-xs text-zinc-500 flex items-center gap-1 truncate">
+                          <p className="text-xs text-subtle-foreground flex items-center gap-1 truncate">
                             <MapPin size={12} className="shrink-0" />
                             {project.location}
                           </p>
@@ -663,17 +663,17 @@ export default function ProjectsPage() {
                     <div className="flex flex-col gap-1.5">
                       <div className="flex items-center gap-2">
                         <div
-                          className="w-6 h-6 rounded-full bg-[#27272c] flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                          className="w-6 h-6 rounded-full bg-surface-raised flex items-center justify-center text-[10px] font-bold text-foreground shrink-0"
                           style={{ fontFamily: "var(--font-inter, sans-serif)" }}
                         >
                           {getInitial(project.customerName || "?")}
                         </div>
-                        <span className={`text-sm font-medium ${isDelivered ? "text-zinc-400" : "text-zinc-300"}`}>
+                        <span className={`text-sm font-medium ${isDelivered ? "text-muted-foreground" : "text-muted-foreground"}`}>
                           {project.customerName || "—"}
                         </span>
                       </div>
                       <span
-                        className={`text-xs ${isDelivered ? "text-zinc-600" : "text-zinc-500"}`}
+                        className={`text-xs ${isDelivered ? "text-disabled-foreground" : "text-subtle-foreground"}`}
                         style={{ fontFamily: "var(--font-mono, monospace)" }}
                       >
                         {formatDate(project.shootDate)} 촬영
@@ -731,7 +731,7 @@ export default function ProjectsPage() {
                               setOpenMenuId(project.id);
                             }
                           }}
-                          className="w-9 h-9 rounded-xl hover:bg-[#27272c] flex items-center justify-center text-zinc-400 hover:text-white transition-colors border border-transparent hover:border-[#27272c] disabled:opacity-40"
+                          className="w-9 h-9 rounded-xl hover:bg-surface-raised flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors border border-transparent hover:border-border disabled:opacity-40"
                         >
                           {deletingId === project.id ? (
                             <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
@@ -753,7 +753,7 @@ export default function ProjectsPage() {
         {/* ── dropdown portal ── */}
         {openMenuId && menuPos && typeof window !== "undefined" && createPortal(
           <div
-            className="fixed z-[9999] bg-[#121215] border border-[#27272c] rounded-xl shadow-xl overflow-hidden"
+            className="fixed z-[9999] bg-surface border border-border rounded-xl shadow-xl overflow-hidden"
             style={{ top: menuPos.top, right: menuPos.right, minWidth: 160 }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -763,14 +763,14 @@ export default function ProjectsPage() {
                 router.push(`/photographer/projects/${openMenuId}`);
                 setOpenMenuId(null);
               }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-[#27272c] hover:text-white transition-colors text-left"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground hover:bg-surface-raised hover:text-foreground transition-colors text-left"
             >
-              <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-subtle-foreground" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
               상세정보 수정
             </button>
-            <div className="h-px bg-[#1a1a1e]" />
+            <div className="h-px bg-surface-raised" />
             <button
               type="button"
               onClick={() => {
@@ -791,7 +791,7 @@ export default function ProjectsPage() {
         {/* ── footer count ── */}
         {!loading && (
           <div
-            className="flex justify-between items-center text-[10px] text-zinc-600 uppercase tracking-wide"
+            className="flex justify-between items-center text-[10px] text-disabled-foreground uppercase tracking-wide"
             style={{ fontFamily: "var(--font-mono, monospace)" }}
           >
             <span>표시중: {String(filtered.length).padStart(2, "0")} / {String(projects.length).padStart(2, "0")}</span>

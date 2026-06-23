@@ -53,15 +53,15 @@ const SELECT_BASE = {
 };
 
 const SELECT_ACTIVE = {
-  background: "rgba(255,77,0,0.12)",
-  color: "#FF4D00",
-  borderColor: "rgba(255,77,0,0.45)",
+  background: "rgba(var(--accent-rgb), 0.12)",
+  color: "var(--accent)",
+  borderColor: "rgba(var(--accent-rgb), 0.45)",
 } as const;
 
 const SELECT_INACTIVE = {
-  background: "#FF4D00",
+  background: "var(--accent)",
   color: "#000",
-  borderColor: "#FF4D00",
+  borderColor: "var(--accent)",
 } as const;
 
 const SELECT_BASE_MOBILE = {
@@ -125,7 +125,7 @@ function ViewerPhotoWithBadge({ src, alt, showBadge }: { src: string; alt: strin
       />
       {showBadge && (
         <div className="pointer-events-none absolute z-[3] flex items-center justify-center rounded-full"
-          style={{ left: badgeOffset.left, top: badgeOffset.top, width: 20, height: 20, background: "#FF4D00", border: "2px solid white", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }} aria-hidden>
+          style={{ left: badgeOffset.left, top: badgeOffset.top, width: 20, height: 20, background: "var(--accent)", border: "2px solid white", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }} aria-hidden>
           <Check style={{ width: 10, height: 10, color: "white" }} strokeWidth={3} />
         </div>
       )}
@@ -355,11 +355,11 @@ export default function ViewerPage() {
 
         .fs-grid-bg {
           position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.15;
-          background-image: linear-gradient(#1A1A1A 1px, transparent 1px), linear-gradient(90deg, #1A1A1A 1px, transparent 1px);
+          background-image: linear-gradient(var(--border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
           background-size: 40px 40px;
         }
         .fs-hud {
-          background: rgba(5,5,5,0.75);
+          background: rgba(10, 11, 13, 0.75);
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
           border: 1px solid rgba(255,255,255,0.1);
@@ -367,24 +367,24 @@ export default function ViewerPage() {
         .fs-nav-btn {
           background: rgba(0,0,0,0.4);
           backdrop-filter: blur(4px);
-          border: 1px solid #1A1A1A;
-          color: white;
+          border: 1px solid var(--border-subtle);
+          color: var(--foreground);
           transition: all 0.2s ease;
           display: flex; align-items: center; justify-content: center;
           cursor: pointer;
         }
-        .fs-nav-btn:hover { background: #FF4D00; color: black; border-color: #FF4D00; }
+        .fs-nav-btn:hover { background: var(--accent); color: black; border-color: var(--accent); }
         .fs-nav-btn:disabled { opacity: 0.2; cursor: not-allowed; }
-        .fs-nav-btn:disabled:hover { background: rgba(0,0,0,0.4); color: white; border-color: #1A1A1A; }
+        .fs-nav-btn:disabled:hover { background: rgba(0,0,0,0.4); color: var(--foreground); border-color: var(--border-subtle); }
         .fs-thumb {
           height: 100px; width: 150px; flex-shrink: 0;
-          border: 1px solid #1A1A1A;
+          border: 1px solid var(--border-subtle);
           filter: grayscale(1); opacity: 0.5;
           transition: all 0.3s ease; cursor: pointer; position: relative; overflow: hidden;
         }
         .fs-thumb.active {
           filter: grayscale(0); opacity: 1;
-          border-color: #FF4D00; transform: scale(1.05); z-index: 5;
+          border-color: var(--accent); transform: scale(1.05); z-index: 5;
         }
         .fs-thumb:not(.active):hover { opacity: 0.75; filter: grayscale(0.4); }
         .fs-hide-scrollbar::-webkit-scrollbar { display: none; }
@@ -392,11 +392,11 @@ export default function ViewerPage() {
         .fs-comment-input {
           background: rgba(255,255,255,0.05);
           border: 1px solid rgba(255,255,255,0.1);
-          outline: none; font-size: 13px; color: #e5e7eb;
+          outline: none; font-size: 13px; color: var(--foreground);
           font-family: 'Inter', -apple-system, sans-serif;
         }
-        .fs-comment-input::placeholder { color: #555; }
-        .fs-comment-input:focus { border-color: rgba(255,77,0,0.4); }
+        .fs-comment-input::placeholder { color: var(--placeholder-foreground); }
+        .fs-comment-input:focus { border-color: rgba(var(--accent-rgb), 0.4); }
         .fs-star { cursor: pointer; transition: transform 0.1s; }
         .fs-star:hover { transform: scale(1.2); }
       `}</style>
@@ -410,10 +410,10 @@ export default function ViewerPage() {
         {/* Header HUD bar */}
         <header style={{
           flexShrink: 0, zIndex: 40,
-          background: "rgba(5,5,5,0.92)",
+          background: "rgba(10, 11, 13, 0.92)",
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
-          borderBottom: "1px solid #1A1A1A",
+          borderBottom: "1px solid var(--border-subtle)",
         }}>
           <div style={{
             display: "flex", alignItems: "center", gap: 20,
@@ -421,19 +421,19 @@ export default function ViewerPage() {
           }}>
             {/* Back link */}
             <Link href={galleryHref} scroll={false} title="갤러리로"
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, color: "rgba(255,255,255,0.55)", textDecoration: "none", flexShrink: 0, transition: "color 0.15s", borderRadius: 8 }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#FF4D00")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.55)")}>
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, color: "var(--subtle-foreground)", textDecoration: "none", flexShrink: 0, transition: "color 0.15s", borderRadius: 8 }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--subtle-foreground)")}>
               <X style={{ width: 18, height: 18 }} strokeWidth={2} />
             </Link>
 
             {/* Divider */}
-            <div style={{ width: 1, height: 36, background: "rgba(255,255,255,0.12)", flexShrink: 0 }} />
+            <div style={{ width: 1, height: 36, background: "var(--border)", flexShrink: 0 }} />
 
             {/* 사진 정보만 */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, flex: 1, justifyContent: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                <span style={{ width: 8, height: 8, background: "#FF4D00", flexShrink: 0 }} />
+                <span style={{ width: 8, height: 8, background: "var(--accent)", flexShrink: 0 }} />
                 <h2 style={{
                   fontFamily: "'Space Grotesk', sans-serif",
                   fontWeight: 800,
@@ -443,7 +443,7 @@ export default function ViewerPage() {
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
-                  color: "#fafafa",
+                  color: "var(--foreground)",
                   lineHeight: 1.25,
                 }}>
                   {filename}
@@ -452,7 +452,7 @@ export default function ViewerPage() {
               <p style={{
                 fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
                 fontSize: 11,
-                color: "#9ca3af",
+                color: "var(--muted-foreground)",
                 letterSpacing: "0.06em",
                 margin: 0,
                 lineHeight: 1.3,
@@ -506,7 +506,7 @@ export default function ViewerPage() {
                 }}
               />
             ) : (
-              <div style={{ color: "#3a5a6e", padding: 16 }}>사진 없음</div>
+              <div style={{ color: "var(--muted-foreground)", padding: 16 }}>사진 없음</div>
             )}
             {/* 필름스트립과 동일: 선택 시 좌상단 오렌지 체크 */}
             {isCurrentSelected && viewerSrc ? (
@@ -517,7 +517,7 @@ export default function ViewerPage() {
                   left: 8,
                   width: 22,
                   height: 22,
-                  background: "#FF4D00",
+                  background: "var(--accent)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -579,7 +579,7 @@ export default function ViewerPage() {
                         fontSize: 20,
                         lineHeight: 1,
                         userSelect: "none",
-                        color: filled ? "#FF4D00" : "#3f3f46",
+                        color: filled ? "var(--accent)" : "var(--border-strong)",
                         transform: starPressRing === s ? "scale(1.2)" : undefined,
                       }}
                     >
@@ -588,7 +588,7 @@ export default function ViewerPage() {
                   );
                 })}
               </div>
-              <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.12)", flexShrink: 0 }} />
+              <div style={{ width: 1, height: 28, background: "var(--border)", flexShrink: 0 }} />
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
                 {COLOR_OPTIONS.map((opt) => {
                   const isActive = color?.includes(opt.key) ?? false;
@@ -687,14 +687,14 @@ export default function ViewerPage() {
                   <span style={{
                     position: "absolute", bottom: 4, right: 4,
                     fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 8,
-                    background: "rgba(0,0,0,0.8)", padding: "0 4px", color: "white",
+                    background: "rgba(0,0,0,0.8)", padding: "0 4px", color: "var(--foreground)",
                   }}>
                     {String(i + 1).padStart(3, "0")}
                   </span>
                   {isSelected && (
                     <div style={{
                       position: "absolute", top: 4, left: 4, width: 14, height: 14,
-                      background: "#FF4D00", display: "flex", alignItems: "center", justifyContent: "center",
+                      background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center",
                     }}>
                       <Check style={{ width: 8, height: 8, color: "black" }} strokeWidth={4} />
                     </div>
@@ -751,13 +751,13 @@ export default function ViewerPage() {
         }}>
           <div style={{ height: 52, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "0 16px" }}>
             <Link href={galleryHref} scroll={false}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", borderRadius: 10, color: "rgba(255,255,255,0.85)", fontSize: 14, fontWeight: 600, textDecoration: "none", flexShrink: 0 }}>
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", borderRadius: 10, color: "var(--foreground)", fontSize: 14, fontWeight: 600, textDecoration: "none", flexShrink: 0 }}>
               ← 갤러리
             </Link>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.92)", flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 4px" }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 4px" }}>
               {filename}
             </span>
-            <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", color: "#FF4D00", flexShrink: 0 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", color: "var(--accent)", flexShrink: 0 }}>
               {currentIndex + 1} / {filteredPhotos.length}
             </span>
           </div>
@@ -774,7 +774,7 @@ export default function ViewerPage() {
                 onZoomStateChange={(z) => { mobileImageZoomedRef.current = z; }}
               />
             )
-            : <div style={{ color: "#3a5a6e", padding: 16 }}>사진 없음</div>
+            : <div style={{ color: "var(--muted-foreground)", padding: 16 }}>사진 없음</div>
           }
           <PrevNextButton direction="prev" onClick={goPrevWrap} size="sm" />
           <PrevNextButton direction="next" onClick={goNextWrap} size="sm" />
@@ -798,14 +798,14 @@ export default function ViewerPage() {
                     onClick={() => setStar(s)}
                     onMouseEnter={() => setHoverStar(s)}
                     onMouseLeave={() => setHoverStar(0)}
-                    style={{ fontSize: 20, lineHeight: 1, padding: "4px 2px", color: filled ? "#FF4D00" : "#333", background: "none", border: "none", cursor: "pointer" }}>
+                    style={{ fontSize: 20, lineHeight: 1, padding: "4px 2px", color: filled ? "var(--accent)" : "var(--border-strong)", background: "none", border: "none", cursor: "pointer" }}>
                     {filled ? "★" : "☆"}
                   </button>
                 );
               })}
             </div>
 
-            <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
+            <div style={{ width: 1, height: 22, background: "var(--border)", flexShrink: 0 }} />
 
             {/* Color tags */}
             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
@@ -834,8 +834,8 @@ export default function ViewerPage() {
               placeholder="코멘트..."
               style={{
                 flex: 1, height: 38, padding: "0 12px",
-                background: "rgba(39,39,42,0.6)", border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 8, color: "#fafafa", fontSize: 13,
+                background: "rgba(29, 30, 35, 0.6)", border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 8, color: "var(--foreground)", fontSize: 13,
                 fontFamily: "'Inter', system-ui, sans-serif", outline: "none",
               }}
             />
@@ -867,19 +867,19 @@ export default function ViewerPage() {
         >
           <div className="fs-hud" style={{ padding: "28px 32px", minWidth: 320, borderRadius: 2 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <div style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#FF4D00", letterSpacing: "0.1em" }}>KEYBOARD SHORTCUTS</div>
+              <div style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "var(--accent)", letterSpacing: "0.1em" }}>KEYBOARD SHORTCUTS</div>
               <button type="button" onClick={() => setShowShortcuts(false)}
-                style={{ background: "none", border: "none", color: "#8C8C8C", cursor: "pointer", padding: 4 }}>
+                style={{ background: "none", border: "none", color: "var(--muted-foreground)", cursor: "pointer", padding: 4 }}>
                 <X style={{ width: 14, height: 14 }} />
               </button>
             </div>
-            <div style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: "#8C8C8C", display: "grid", gridTemplateColumns: "auto 1fr", gap: "10px 24px" }}>
-              <span style={{ color: "#FF4D00" }}>← →</span><span>이전 / 다음 사진</span>
-              <span style={{ color: "#FF4D00" }}>SPACE</span><span>선택 / 선택 해제</span>
-              <span style={{ color: "#FF4D00" }}>1 – 5</span><span>별점 설정</span>
-              <span style={{ color: "#FF4D00" }}>Q W E R T</span><span>색상 태그</span>
-              <span style={{ color: "#FF4D00" }}>?</span><span>단축키 보기 / 닫기</span>
-              <span style={{ color: "#FF4D00" }}>ESC</span><span>창 닫기</span>
+            <div style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: "var(--muted-foreground)", display: "grid", gridTemplateColumns: "auto 1fr", gap: "10px 24px" }}>
+              <span style={{ color: "var(--accent)" }}>← →</span><span>이전 / 다음 사진</span>
+              <span style={{ color: "var(--accent)" }}>SPACE</span><span>선택 / 선택 해제</span>
+              <span style={{ color: "var(--accent)" }}>1 – 5</span><span>별점 설정</span>
+              <span style={{ color: "var(--accent)" }}>Q W E R T</span><span>색상 태그</span>
+              <span style={{ color: "var(--accent)" }}>?</span><span>단축키 보기 / 닫기</span>
+              <span style={{ color: "var(--accent)" }}>ESC</span><span>창 닫기</span>
             </div>
           </div>
         </div>
@@ -892,18 +892,18 @@ export default function ViewerPage() {
           onClick={() => !confirming && setShowConfirmModal(false)}
         >
           <div
-            style={{ width: "100%", maxWidth: 440, background: "#0A0A0A", border: "1px solid #FF4D00", borderRadius: 8, padding: 32, position: "relative" }}
+            style={{ width: "100%", maxWidth: 440, background: "var(--surface)", border: "1px solid var(--accent)", borderRadius: 8, padding: 32, position: "relative" }}
             onClick={(e) => e.stopPropagation()}
           >
             <h3 style={{
               fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 24,
               textTransform: "uppercase", fontStyle: "italic",
-              margin: 0, marginBottom: 16, color: "#fff",
+              margin: 0, marginBottom: 16, color: "var(--foreground)",
             }}>
               Confirm Selection
             </h3>
-            <p style={{ color: "#888", fontSize: 13, lineHeight: 1.7, margin: 0, marginBottom: 28 }}>
-              총 <span style={{ color: "#FF4D00", fontWeight: 700 }}>{Y}장</span>의 사진이 선택되었습니다.
+            <p style={{ color: "var(--muted-foreground)", fontSize: 13, lineHeight: 1.7, margin: 0, marginBottom: 28 }}>
+              총 <span style={{ color: "var(--accent)", fontWeight: 700 }}>{Y}장</span>의 사진이 선택되었습니다.
             </p>
 
             {confirmError && (
@@ -917,8 +917,8 @@ export default function ViewerPage() {
                 disabled={confirming}
                 style={{
                   flex: 1, height: 44, borderRadius: 8,
-                  border: "1px solid #222", background: "transparent",
-                  color: "#888", fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                  border: "1px solid var(--border-subtle)", background: "transparent",
+                  color: "var(--muted-foreground)", fontFamily: MONO, fontSize: 12, fontWeight: 700,
                   cursor: confirming ? "not-allowed" : "pointer", transition: "all 0.15s",
                 }}
               >
@@ -930,9 +930,9 @@ export default function ViewerPage() {
                 disabled={confirming}
                 style={{
                   flex: 1, height: 44, borderRadius: 8,
-                  background: "#FF4D00", color: "#000",
+                  background: "var(--accent)", color: "#000",
                   fontFamily: MONO, fontSize: 12, fontWeight: 700,
-                  border: "1px solid #FF4D00",
+                  border: "1px solid var(--accent)",
                   cursor: confirming ? "not-allowed" : "pointer",
                   opacity: confirming ? 0.6 : 1,
                 }}

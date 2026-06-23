@@ -9,7 +9,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
     return (
       <Comp
         ref={ref}
-        className={`rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 ${className}`}
+        className={`rounded-xl border border-border bg-surface/50 p-5 ${className}`}
         {...props}
       />
     );
@@ -21,13 +21,13 @@ export function CardHeader({
   className = "",
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={`mb-4 text-lg font-semibold text-zinc-100 ${className}`} {...props} />;
+  return <div className={`mb-4 text-lg font-semibold text-foreground ${className}`} {...props} />;
 }
 
 export function CardTitle({ className = "", ...props }: HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={`text-base font-medium text-zinc-200 ${className}`} {...props} />;
+  return <h3 className={`text-base font-medium text-foreground ${className}`} {...props} />;
 }
 
 export function CardDescription({ className = "", ...props }: HTMLAttributes<HTMLParagraphElement>) {
-  return <p className={`text-sm text-zinc-400 mt-1 ${className}`} {...props} />;
+  return <p className={`text-sm text-muted-foreground mt-1 ${className}`} {...props} />;
 }

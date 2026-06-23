@@ -91,7 +91,7 @@ export function buildCompactSteps(
     {
       label: "원본 업로드",
       desc: status === "preparing" ? "진행 중" : "완료",
-      icon: <Upload size={14} color="#FF4D00" />,
+      icon: <Upload size={14} color="var(--accent)" />,
       pageKey: "upload",
       onClick: handlers.onUpload,
     },
@@ -100,7 +100,7 @@ export function buildCompactSteps(
       desc: isSelecting ? "고객 셀렉 중"
         : !["preparing", "selecting"].includes(status) ? "완료"
         : "이전 단계 완료 후 가능",
-      icon: <ListChecks size={14} color="#FF4D00" />,
+      icon: <ListChecks size={14} color="var(--accent)" />,
       pageKey: "results",
       onClick: handlers.onResults,
       badge: isSelecting ? "LIVE" : null,
@@ -108,7 +108,7 @@ export function buildCompactSteps(
     {
       label: "보정본",
       desc: versionDesc,
-      icon: <PenLine size={14} color="#FF4D00" />,
+      icon: <PenLine size={14} color="var(--accent)" />,
       pageKey: "upload-versions",
       onClick: handlers.onVersions,
       badge: status === "reviewing_v1" ? "LIVE" : null,
@@ -116,7 +116,7 @@ export function buildCompactSteps(
     {
       label: "납품 완료",
       desc: status === "delivered" ? "완료" : "최종 목표",
-      icon: <Flag size={14} color="#FF4D00" />,
+      icon: <Flag size={14} color="var(--accent)" />,
     },
   ];
 
@@ -126,14 +126,14 @@ export function buildCompactSteps(
     {
       label: "보정본 v1",
       desc: "완료",
-      icon: <PenLine size={14} color="#FF4D00" />,
+      icon: <PenLine size={14} color="var(--accent)" />,
       pageKey: "upload-versions",
       onClick: handlers.onVersions,
     },
     {
       label: "재보정 v2",
       desc: v2Desc,
-      icon: <PenLine size={14} color="#FF4D00" />,
+      icon: <PenLine size={14} color="var(--accent)" />,
       pageKey: "upload-versions-v2",
       onClick: handlers.onVersionsV2,
       badge: status === "editing_v2" ? "LIVE" : null,

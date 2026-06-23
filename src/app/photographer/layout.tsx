@@ -33,7 +33,7 @@ export default function PhotographerLayout({
     <ProfileProvider>
       <PhotographerModalProvider>
         <div
-          className={`photographer-app relative flex min-h-screen bg-[#050505] text-zinc-100 ${inter.variable} ${mono.variable}`}
+          className={`photographer-app relative flex min-h-screen bg-background text-foreground ${inter.variable} ${mono.variable}`}
           style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}
         >
           <div className="pointer-events-none fixed inset-0 z-0" aria-hidden>

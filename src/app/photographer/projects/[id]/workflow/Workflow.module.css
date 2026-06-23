@@ -5,8 +5,8 @@
   position: fixed;
   inset: 0;
   background-image:
-    linear-gradient(#222 1px, transparent 1px),
-    linear-gradient(90deg, #222 1px, transparent 1px);
+    linear-gradient(var(--border-subtle) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
   background-size: 60px 60px;
   background-position: center top;
   opacity: 0.15;
@@ -19,7 +19,7 @@
   width: 100%;
   height: 100px;
   z-index: 1;
-  background: linear-gradient(0deg, rgba(255, 77, 0, 0.02) 0%, rgba(255, 77, 0, 0) 100%);
+  background: linear-gradient(0deg, rgba(var(--accent-rgb), 0.02) 0%, rgba(var(--accent-rgb), 0) 100%);
   position: fixed;
   bottom: 100%;
   animation: scanline 8s linear infinite;
@@ -36,7 +36,7 @@
   position: absolute;
   width: 6px;
   height: 6px;
-  border-color: #FF4D00;
+  border-color: var(--accent);
   z-index: 10;
   pointer-events: none;
   opacity: 0;
@@ -54,8 +54,8 @@
 .techCheckbox .box {
   width: 16px;
   height: 16px;
-  border: 1px solid #444;
-  background: #111;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -63,8 +63,8 @@
   flex-shrink: 0;
 }
 .techCheckbox input:checked + .box {
-  border-color: #FF4D00;
-  background: rgba(255, 77, 0, 0.1);
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.1);
 }
 .techCheckbox input:checked + .box svg { display: block; }
 .techCheckbox .box svg { display: none; }
@@ -88,14 +88,14 @@
   border: 1px solid rgba(0, 255, 102, 0.2);
 }
 .statusRequest {
-  background: rgba(255, 77, 0, 0.1);
-  color: #FF4D00;
-  border: 1px solid rgba(255, 77, 0, 0.3);
+  background: rgba(var(--accent-rgb), 0.1);
+  color: var(--accent);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
 }
 .statusPending {
-  background: rgba(255, 255, 255, 0.05);
-  color: #AAA;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface-raised);
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
 }
 .statusReviewing {
   background: rgba(100, 149, 237, 0.08);
@@ -105,7 +105,7 @@
 
 /* Delete button – revealed on cell hover */
 .deleteBtn {
-  color: #555;
+  color: var(--subtle-foreground);
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s, color 0.15s;
@@ -114,32 +114,32 @@
   border: none;
   line-height: 0;
 }
-.deleteBtn:hover { color: #FF4D00; }
+.deleteBtn:hover { color: var(--accent); }
 .versionCell:hover .deleteBtn { opacity: 1; }
 
 /* Custom scrollbar */
 .scrollArea::-webkit-scrollbar { width: 4px; height: 4px; }
 .scrollArea::-webkit-scrollbar-track { background: transparent; }
-.scrollArea::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
-.scrollArea::-webkit-scrollbar-thumb:hover { background: #FF4D00; }
+.scrollArea::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+.scrollArea::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 /* Diagonal stripe background for "v1 confirmed, no v2 needed" cells */
 .stripeBg {
   background-image: repeating-linear-gradient(
     -45deg,
-    #0a0a0a,
-    #0a0a0a 10px,
-    #111111 10px,
-    #111111 20px
+    var(--background),
+    var(--background) 10px,
+    var(--surface) 10px,
+    var(--surface) 20px
   );
 }
 
 /* CTA button */
 .ctaBtn {
-  background-color: #FF4D00;
+  background-color: var(--accent);
   color: black;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 4px 12px rgba(255, 77, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.2);
   height: 40px;
   padding: 0 32px;
   display: flex;
@@ -155,12 +155,12 @@
 }
 .ctaBtn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 0 20px rgba(255, 77, 0, 0.4);
+  box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.4);
   background-color: #ff5e1a;
 }
 .ctaBtn:disabled {
-  background-color: #333;
-  color: #888;
+  background-color: var(--surface-raised);
+  color: var(--disabled-foreground);
   box-shadow: none;
   cursor: not-allowed;
 }

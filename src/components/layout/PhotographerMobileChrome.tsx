@@ -6,8 +6,7 @@ import { usePathname } from "next/navigation";
 import { Menu, Settings, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PHOTOGRAPHER_NAV_ITEMS } from "@/lib/photographer-nav";
-// New design tokens
-const ACCENT = "#FF4D00";
+const ACCENT = "var(--accent)";
 
 /**
  * 모바일(~md 미만)에서만 표시. 사이드바가 숨겨질 때 네비·설정·로그아웃 접근 제공.
@@ -44,10 +43,10 @@ export function PhotographerMobileChrome() {
   };
 
   const fabStyle: React.CSSProperties = {
-    border: "1px solid #222",
-    background: "rgba(5,5,5,0.95)",
+    border: "1px solid var(--border-subtle)",
+    background: "rgba(10, 11, 13, 0.95)",
     backdropFilter: "blur(10px)",
-    color: "#666",
+    color: "var(--subtle-foreground)",
     boxShadow: "0 4px 24px rgba(0,0,0,0.6)",
   };
 
@@ -78,11 +77,11 @@ export function PhotographerMobileChrome() {
           className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full"
           style={{
             ...fabStyle,
-            color: pathname.startsWith("/photographer/settings") ? ACCENT : "#666",
-            borderColor: pathname.startsWith("/photographer/settings") ? `rgba(255,77,0,0.4)` : "#222",
+            color: pathname.startsWith("/photographer/settings") ? ACCENT : "var(--subtle-foreground)",
+            borderColor: pathname.startsWith("/photographer/settings") ? `rgba(var(--accent-rgb), 0.4)` : "var(--border-subtle)",
             background: pathname.startsWith("/photographer/settings")
-              ? "rgba(255,77,0,0.1)"
-              : "rgba(5,5,5,0.95)",
+              ? "rgba(var(--accent-rgb), 0.1)"
+              : "rgba(10, 11, 13, 0.95)",
           }}
         >
           <Settings size={22} strokeWidth={2} />
@@ -101,8 +100,8 @@ export function PhotographerMobileChrome() {
             className="fixed bottom-0 left-0 top-0 z-[150] flex w-[min(280px,88vw)] flex-col md:hidden"
             style={{
               fontFamily: "'Pretendard', sans-serif",
-              backgroundColor: "#050505",
-              borderRight: "1px solid #222",
+              backgroundColor: "var(--background)",
+              borderRight: "1px solid var(--border-subtle)",
               paddingTop: "max(12px, env(safe-area-inset-top))",
               paddingBottom: "max(12px, env(safe-area-inset-bottom))",
             }}
@@ -110,7 +109,7 @@ export function PhotographerMobileChrome() {
             {/* 헤더 */}
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "14px 16px", borderBottom: "1px solid #1a1a1a",
+              padding: "14px 16px", borderBottom: "1px solid var(--border)",
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <div style={{
@@ -121,7 +120,7 @@ export function PhotographerMobileChrome() {
                 }}>A</div>
                 <span style={{
                   fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700,
-                  fontSize: 15, letterSpacing: "-0.03em", textTransform: "uppercase", color: "#fff",
+                  fontSize: 15, letterSpacing: "-0.03em", textTransform: "uppercase", color: "var(--foreground)",
                 }}>
                   A-Cut<span style={{ color: ACCENT }}>.</span>
                 </span>
@@ -130,8 +129,8 @@ export function PhotographerMobileChrome() {
                 type="button"
                 aria-label="닫기"
                 style={{
-                  width: 34, height: 34, border: "1px solid #1e1e1e",
-                  background: "transparent", color: "#555", cursor: "pointer",
+                  width: 34, height: 34, border: "1px solid var(--border)",
+                  background: "transparent", color: "var(--subtle-foreground)", cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}
                 onClick={() => setOpen(false)}
@@ -143,7 +142,7 @@ export function PhotographerMobileChrome() {
             {/* MENU 라벨 */}
             <div style={{
               fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9,
-              color: "#444", letterSpacing: "0.2em", textTransform: "uppercase",
+              color: "var(--subtle-foreground)", letterSpacing: "0.2em", textTransform: "uppercase",
               padding: "18px 20px 8px",
             }}>
               MENU
@@ -162,8 +161,8 @@ export function PhotographerMobileChrome() {
                 const baseStyle: React.CSSProperties = {
                   display: "flex", alignItems: "center", gap: 10,
                   padding: "11px 14px", fontSize: 13, fontWeight: 700,
-                  color: comingSoon ? "#333" : isActive ? ACCENT : "#777",
-                  backgroundColor: isActive ? "rgba(255,77,0,0.08)" : "transparent",
+                  color: comingSoon ? "var(--disabled-foreground)" : isActive ? ACCENT : "var(--muted-foreground)",
+                  backgroundColor: isActive ? "rgba(var(--accent-rgb), 0.08)" : "transparent",
                   borderLeft: `2px solid ${isActive ? ACCENT : "transparent"}`,
                   textDecoration: "none", transition: "all 0.15s",
                 };
@@ -175,8 +174,8 @@ export function PhotographerMobileChrome() {
                       <span style={{ flex: 1 }}>{label}</span>
                       <span style={{
                         fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 8, fontWeight: 700,
-                        padding: "2px 6px", background: "rgba(30,30,30,0.8)", border: "1px solid #222",
-                        color: "#333", letterSpacing: "0.1em", textTransform: "uppercase",
+                        padding: "2px 6px", background: "var(--surface)", border: "1px solid var(--border-subtle)",
+                        color: "var(--disabled-foreground)", letterSpacing: "0.1em", textTransform: "uppercase",
                       }}>준비중</span>
                     </div>
                   );
@@ -191,13 +190,13 @@ export function PhotographerMobileChrome() {
               })}
             </nav>
 
-            <div style={{ borderTop: "1px solid #1a1a1a", padding: "12px 16px" }}>
+            <div style={{ borderTop: "1px solid var(--border)", padding: "12px 16px" }}>
               <button
                 type="button"
                 style={{
                   width: "100%", padding: "9px 0",
-                  background: "transparent", border: "1px solid #222",
-                  fontSize: 11, color: "#555", cursor: "pointer",
+                  background: "transparent", border: "1px solid var(--border-subtle)",
+                  fontSize: 11, color: "var(--subtle-foreground)", cursor: "pointer",
                   fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
                   letterSpacing: "0.1em", textTransform: "uppercase",
                   transition: "border-color 0.15s, color 0.15s",
@@ -207,8 +206,8 @@ export function PhotographerMobileChrome() {
                   (e.currentTarget as HTMLButtonElement).style.color = ACCENT;
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = "#222";
-                  (e.currentTarget as HTMLButtonElement).style.color = "#555";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-subtle)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "var(--subtle-foreground)";
                 }}
                 onClick={handleLogout}
               >

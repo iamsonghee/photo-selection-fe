@@ -27,8 +27,8 @@ export function PageLoader({ variant = "full", text }: Props) {
             inset: 0,
             borderRadius: "50%",
             border: `2px solid transparent`,
-            borderTopColor: "#FF4D00",
-            borderRightColor: "#FF4D00",
+            borderTopColor: "var(--accent)",
+            borderRightColor: "var(--accent)",
             animation: "pl-spin-cw 2.4s linear infinite",
           }}
         />
@@ -39,8 +39,8 @@ export function PageLoader({ variant = "full", text }: Props) {
             inset: isInline ? 7 : 10,
             borderRadius: "50%",
             border: `1.5px solid transparent`,
-            borderTopColor: "rgba(255,77,0,0.4)",
-            borderLeftColor: "rgba(255,77,0,0.4)",
+            borderTopColor: "rgba(var(--accent-rgb), 0.4)",
+            borderLeftColor: "rgba(var(--accent-rgb), 0.4)",
             animation: "pl-spin-ccw 1.6s linear infinite",
           }}
         />
@@ -50,7 +50,7 @@ export function PageLoader({ variant = "full", text }: Props) {
             position: "absolute",
             inset: isInline ? 14 : 20,
             borderRadius: 4,
-            background: "#FF4D00",
+            background: "var(--accent)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -80,7 +80,7 @@ export function PageLoader({ variant = "full", text }: Props) {
               width: isInline ? 4 : 5,
               height: isInline ? 4 : 5,
               borderRadius: "50%",
-              background: "#FF4D00",
+              background: "var(--accent)",
               animation: `pl-dot 1.2s ease-in-out ${i * 0.2}s infinite`,
             }}
           />
@@ -93,7 +93,7 @@ export function PageLoader({ variant = "full", text }: Props) {
           style={{
             fontFamily: "'JetBrains Mono', 'Space Mono', monospace",
             fontSize: 11,
-            color: "rgba(255,255,255,0.35)",
+            color: "var(--subtle-foreground)",
             letterSpacing: "0.05em",
             margin: 0,
           }}
@@ -135,7 +135,7 @@ export function PageLoader({ variant = "full", text }: Props) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "#0a0a0c",
+        background: "var(--background)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

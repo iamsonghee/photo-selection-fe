@@ -28,10 +28,10 @@ import type { Photo } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-const ACCENT = "#FF4D00";
-const SURFACE_1 = "#0a0a0c";
-const BORDER = "#1a1a1e";
-const TEXT_NORMAL = "#a1a1aa";
+const ACCENT = "var(--accent)";
+const SURFACE_1 = "var(--surface-raised)";
+const BORDER = "var(--border)";
+const TEXT_NORMAL = "var(--muted-foreground)";
 
 const ACCEPT_IMAGE_TYPES = "image/*,image/heic,image/heif";
 function isAcceptedImageFile(f: File): boolean {
@@ -383,11 +383,11 @@ export default function UploadVersionsPanel({
         }
         .uvp-dropzone:hover, .uvp-dropzone.uvp-over {
           background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' rx='16' ry='16' fill='none' stroke='%23FF4D00' stroke-width='2' stroke-dasharray='8%2c 8'/%3e%3c/svg%3e");
-          background-color: rgba(255, 77, 0, 0.06);
+          background-color: rgba(var(--accent-rgb), 0.06);
         }
         .uvp-scroll::-webkit-scrollbar { width: 6px; }
         .uvp-scroll::-webkit-scrollbar-track { background: ${SURFACE_1}; border-left: 1px solid ${BORDER}; }
-        .uvp-scroll::-webkit-scrollbar-thumb { background: #2a2a2e; border-radius: 3px; }
+        .uvp-scroll::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
         .uvp-scroll::-webkit-scrollbar-thumb:hover { background: ${ACCENT}; }
         @media (max-width: 768px) {
           .uvp-sheet { width: 100% !important; max-width: 100% !important; height: calc(100dvh - 60px) !important; }
@@ -415,13 +415,13 @@ export default function UploadVersionsPanel({
       >
         <>
         {/* Header */}
-        <header className="shrink-0 border-b border-[#1a1a1e] bg-[#0f0f12]/95 backdrop-blur px-6 py-4 flex items-center justify-between">
+        <header className="shrink-0 border-b border-border bg-surface/95 backdrop-blur px-6 py-4 flex items-center justify-between">
           <div className="min-w-0">
-            <h2 className="text-base font-bold text-white leading-tight m-0">
+            <h2 className="text-base font-bold text-foreground leading-tight m-0">
               {versionLabel} 업로드
             </h2>
             {targets.some((t) => t.serverRetouchUrl) && (
-              <p className="text-xs text-zinc-500 mt-1 m-0">
+              <p className="text-xs text-subtle-foreground mt-1 m-0">
                 필요한 장만 골라 교체할 수 있어요.
               </p>
             )}
@@ -431,7 +431,7 @@ export default function UploadVersionsPanel({
             onClick={onClose}
             disabled={submitting}
             aria-label="닫기"
-            className="p-1.5 rounded-md text-zinc-500 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-1.5 rounded-md text-subtle-foreground hover:text-foreground hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X size={18} />
           </button>
@@ -441,14 +441,14 @@ export default function UploadVersionsPanel({
         <div className="uvp-scroll flex-1 min-h-0 overflow-y-auto p-6">
           {/* targets summary */}
           <div className="mb-5 flex items-center justify-between gap-3 flex-wrap">
-            <div className="text-sm text-zinc-300">
-              <span className="text-zinc-500">{targetsLabel}</span>
-              <span className="mx-2 text-zinc-700">·</span>
-              <span className="font-semibold text-white">{targets.length}장</span>
+            <div className="text-sm text-muted-foreground">
+              <span className="text-subtle-foreground">{targetsLabel}</span>
+              <span className="mx-2 text-subtle-foreground">·</span>
+              <span className="font-semibold text-foreground">{targets.length}장</span>
             </div>
-            <div className="text-xs text-zinc-400">
-              매핑 <span className="text-[#FF4D00] font-bold">{mappedCount}</span>
-              <span className="text-zinc-600"> / {targets.length}</span>
+            <div className="text-xs text-muted-foreground">
+              매핑 <span className="text-accent font-bold">{mappedCount}</span>
+              <span className="text-subtle-foreground"> / {targets.length}</span>
             </div>
           </div>
 
@@ -459,12 +459,12 @@ export default function UploadVersionsPanel({
               <div className="text-sm text-rose-300 font-semibold">
                 베타 기간 최대 보정 횟수({BETA_MAX_REVISION_COUNT}회)에 도달했습니다.
               </div>
-              <div className="text-[11px] text-zinc-500">
+              <div className="text-[11px] text-subtle-foreground">
                 현재 {existingVersionCount} / {BETA_MAX_REVISION_COUNT}회 사용 중
               </div>
             </div>
           ) : targets.length === 0 ? (
-            <div className="px-4 py-10 text-center text-sm text-zinc-500">
+            <div className="px-4 py-10 text-center text-sm text-subtle-foreground">
               {version === 1
                 ? "선택된 사진이 없습니다."
                 : "재보정 요청된 사진이 없습니다."}
@@ -502,33 +502,33 @@ export default function UploadVersionsPanel({
                 >
                   <div
                     className={`w-10 h-10 rounded-full border ${
-                      mappedCount > 0 ? "border-emerald-500/50" : "border-[#27272c]"
-                    } bg-[#0a0a0c] flex items-center justify-center mb-2`}
+                      mappedCount > 0 ? "border-emerald-500/50" : "border-border-strong"
+                    } bg-background flex items-center justify-center mb-2`}
                   >
                     {mappedCount > 0 ? (
                       <CheckCircle2 size={18} className="text-emerald-500" />
                     ) : (
-                      <Upload size={18} className="text-zinc-500" strokeWidth={1.5} />
+                      <Upload size={18} className="text-subtle-foreground" strokeWidth={1.5} />
                     )}
                   </div>
-                  <p className="text-sm font-semibold text-white m-0">
+                  <p className="text-sm font-semibold text-foreground m-0">
                     {mappedCount > 0
                       ? `${mappedCount}장 매핑 완료`
                       : "이곳에 파일을 끌어다 놓으세요"}
                   </p>
-                  <p className="text-[11px] text-zinc-600 mt-1 m-0">JPEG · PNG · WebP</p>
+                  <p className="text-[11px] text-subtle-foreground mt-1 m-0">JPEG · PNG · WebP</p>
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       multiInputRef.current?.click();
                     }}
-                    className="mt-4 px-4 py-2 rounded-xl bg-[#FF4D00] hover:bg-[#ff5e1a] text-black text-xs font-bold transition-colors"
+                    className="mt-4 px-4 py-2 rounded-xl bg-accent hover:bg-[#ff5e1a] text-black text-xs font-bold transition-colors"
                   >
                     {mappedCount > 0 ? "다시 선택" : "파일 선택"}
                   </button>
                 </div>
-                <div className="flex items-center gap-1.5 mt-2.5 pl-1 text-[11px] text-zinc-500">
+                <div className="flex items-center gap-1.5 mt-2.5 pl-1 text-[11px] text-subtle-foreground">
                   <Info size={12} strokeWidth={2} />
                   <span>파일명(편집 suffix 제외) 일치 시 자동 매핑 · 불일치 시 순서대로 매핑</span>
                 </div>
@@ -537,8 +537,8 @@ export default function UploadVersionsPanel({
               {/* Mapping result */}
               {mapping.length > 0 && (
                 <div>
-                  <div className="flex items-end justify-between border-b border-[#1a1a1e] pb-2.5 mb-3.5 flex-wrap gap-3">
-                    <h3 className="text-sm font-semibold text-white m-0">매핑 결과</h3>
+                  <div className="flex items-end justify-between border-b border-border pb-2.5 mb-3.5 flex-wrap gap-3">
+                    <h3 className="text-sm font-semibold text-foreground m-0">매핑 결과</h3>
                     {(stats.exact > 0 || stats.order > 0 || stats.server > 0) && (
                       <div className="flex items-center gap-3 text-[11px]">
                         {stats.exact > 0 && (
@@ -584,14 +584,14 @@ export default function UploadVersionsPanel({
 
         {/* Footer / action bar */}
         {!overBetaLimit && targets.length > 0 ? (
-          <footer className="uvp-footer shrink-0 border-t border-[#1a1a1e] bg-[#0f0f12]/95 backdrop-blur px-5 py-4 flex flex-col gap-3">
+          <footer className="uvp-footer shrink-0 border-t border-border bg-surface/95 backdrop-blur px-5 py-4 flex flex-col gap-3">
             {/* progress */}
             <div>
               <div className="flex items-center justify-between mb-1.5 gap-3">
-                <span className="text-[11px] font-semibold text-zinc-300">
+                <span className="text-[11px] font-semibold text-muted-foreground">
                   {submitting ? "업로드 진행도" : "업로드 상태"}
                 </span>
-                <span className="text-[11px] text-[#FF4D00] font-medium">
+                <span className="text-[11px] text-accent font-medium">
                   {submitting
                     ? serverProcessing
                       ? "서버 처리 중…"
@@ -603,9 +603,9 @@ export default function UploadVersionsPanel({
                       : "전체 매핑 완료"}
                 </span>
               </div>
-              <div className="h-1.5 rounded-full bg-[#1a1a1e] overflow-hidden">
+              <div className="h-1.5 rounded-full bg-border overflow-hidden">
                 <div
-                  className="h-full bg-[#FF4D00] relative transition-[width] duration-300"
+                  className="h-full bg-accent relative transition-[width] duration-300"
                   style={{ width: `${progressPct}%` }}
                 >
                   {submitting && (
@@ -617,7 +617,7 @@ export default function UploadVersionsPanel({
                 </div>
               </div>
               {submitting && totalUploadFileCount > 0 && (
-                <p className="mt-1.5 text-[10px] text-zinc-500">
+                <p className="mt-1.5 text-[10px] text-subtle-foreground">
                   총 {totalUploadFileCount}장
                   {totalBytes > 0 ? ` · 합계 ${formatStoredFileSizeBytes(totalBytes)}` : ""}
                 </p>
@@ -630,7 +630,7 @@ export default function UploadVersionsPanel({
                 type="button"
                 onClick={onClose}
                 disabled={submitting}
-                className="px-4 py-2.5 rounded-xl border border-[#27272c] bg-[#0a0a0c] text-zinc-300 text-sm font-medium hover:border-zinc-500 hover:bg-[#121215] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2.5 rounded-xl border border-border-strong bg-background text-muted-foreground text-sm font-medium hover:border-border-strong hover:bg-surface-raised disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 취소
               </button>
@@ -638,7 +638,7 @@ export default function UploadVersionsPanel({
                 type="button"
                 onClick={handleDeliver}
                 disabled={!canDeliver || submitting}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:bg-[#1a1a1e] disabled:text-zinc-600 disabled:cursor-not-allowed text-black text-sm font-bold transition-colors"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent hover:bg-[#ff5e1a] disabled:bg-border disabled:text-subtle-foreground disabled:cursor-not-allowed text-black text-sm font-bold transition-colors"
               >
                 {submitting ? (
                   <>
@@ -743,11 +743,11 @@ function PanelMappingRow({
   const primaryActionLabel = state === "empty" ? "선택" : state === "server" ? "교체" : "변경";
   const primaryActionClass =
     state === "empty" || state === "server"
-      ? "border-[#FF4D00]/40 bg-[#FF4D00]/10 text-[#FF4D00] hover:bg-[#FF4D00]/20"
-      : "border-[#27272c] text-zinc-300 hover:border-zinc-500 hover:text-white";
+      ? "border-accent/40 bg-accent/10 text-accent hover:bg-accent/20"
+      : "border-border-strong text-muted-foreground hover:border-border-strong hover:text-foreground";
 
   return (
-    <div className={`rounded-xl border ${borderClass} bg-[#0f0f12] overflow-hidden`}>
+    <div className={`rounded-xl border ${borderClass} bg-surface overflow-hidden`}>
       <div
         className="grid items-center gap-2 px-3.5 py-2.5"
         style={{ gridTemplateColumns: "minmax(0, 1fr) 20px minmax(0, 1fr) auto" }}
@@ -756,8 +756,8 @@ function PanelMappingRow({
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="flex gap-2 shrink-0">
             <div className="flex flex-col items-center gap-0.5">
-              <span className="text-[8px] text-zinc-500 uppercase tracking-wide">원본</span>
-              <div className="w-12 h-12 rounded-md bg-[#0a0a0c] border border-[#1a1a1e] overflow-hidden flex items-center justify-center">
+              <span className="text-[8px] text-subtle-foreground uppercase tracking-wide">원본</span>
+              <div className="w-12 h-12 rounded-md bg-background border border-border overflow-hidden flex items-center justify-center">
                 {origSrc && !origErr ? (
                   <img
                     src={origSrc}
@@ -766,14 +766,14 @@ function PanelMappingRow({
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <ImageIcon size={14} className="text-zinc-600" />
+                  <ImageIcon size={14} className="text-subtle-foreground" />
                 )}
               </div>
             </div>
             {target.v1Url ? (
               <div className="flex flex-col items-center gap-0.5">
-                <span className="text-[8px] text-[#FF4D00]/50 uppercase tracking-wide">V1</span>
-                <div className="w-12 h-12 rounded-md bg-[#0a0a0c] border border-[#FF4D00]/25 overflow-hidden flex items-center justify-center">
+                <span className="text-[8px] text-accent/50 uppercase tracking-wide">V1</span>
+                <div className="w-12 h-12 rounded-md bg-background border border-accent/25 overflow-hidden flex items-center justify-center">
                   {!v1Err ? (
                     <img
                       src={target.v1Url}
@@ -782,7 +782,7 @@ function PanelMappingRow({
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <ImageIcon size={14} className="text-zinc-600" />
+                    <ImageIcon size={14} className="text-subtle-foreground" />
                   )}
                 </div>
               </div>
@@ -790,7 +790,7 @@ function PanelMappingRow({
           </div>
           <div className="flex-1 min-w-0">
             <div
-              className="text-[12.5px] font-medium text-zinc-200 truncate"
+              className="text-[12.5px] font-medium text-muted-foreground truncate"
               title={target.filename}
             >
               {target.filename}
@@ -811,7 +811,7 @@ function PanelMappingRow({
           </div>
         </div>
 
-        <div className="flex justify-center text-zinc-600">
+        <div className="flex justify-center text-subtle-foreground">
           <ArrowRight size={13} />
         </div>
 
@@ -825,7 +825,7 @@ function PanelMappingRow({
           </div>
         ) : state === "server" ? (
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-12 h-12 rounded-md bg-[#0a0a0c] border border-sky-500/45 overflow-hidden shrink-0 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-md bg-background border border-sky-500/45 overflow-hidden shrink-0 flex items-center justify-center">
               {target.serverRetouchUrl && !retouchErr ? (
                 <img
                   src={target.serverRetouchUrl}
@@ -834,11 +834,11 @@ function PanelMappingRow({
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <ImageIcon size={14} className="text-zinc-600" />
+                <ImageIcon size={14} className="text-subtle-foreground" />
               )}
             </div>
             <div
-              className="flex-1 min-w-0 text-[12px] text-zinc-200 truncate"
+              className="flex-1 min-w-0 text-[12px] text-muted-foreground truncate"
               title={target.filename}
             >
               {target.filename}
@@ -847,7 +847,7 @@ function PanelMappingRow({
         ) : (
           <div className="flex items-center gap-2.5 min-w-0">
             <div
-              className={`w-12 h-12 rounded-md bg-[#0a0a0c] overflow-hidden shrink-0 flex items-center justify-center border ${
+              className={`w-12 h-12 rounded-md bg-background overflow-hidden shrink-0 flex items-center justify-center border ${
                 state === "matched" ? "border-emerald-500/35" : "border-amber-500/45"
               }`}
             >
@@ -859,15 +859,15 @@ function PanelMappingRow({
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <ImageIcon size={14} className="text-zinc-600" />
+                <ImageIcon size={14} className="text-subtle-foreground" />
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[12px] text-zinc-200 truncate" title={file?.name}>
+              <div className="text-[12px] text-muted-foreground truncate" title={file?.name}>
                 {file?.name ?? ""}
               </div>
               {fileSizeStr ? (
-                <div className="text-[10.5px] text-zinc-500 mt-0.5">{fileSizeStr}</div>
+                <div className="text-[10.5px] text-subtle-foreground mt-0.5">{fileSizeStr}</div>
               ) : null}
             </div>
           </div>

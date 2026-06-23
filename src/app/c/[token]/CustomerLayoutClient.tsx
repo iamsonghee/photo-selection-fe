@@ -11,7 +11,7 @@ export default function CustomerLayoutClient({
   return (
     <SelectionProvider>
       <ReviewProvider>
-        <div className="customer-app-shell relative min-h-[100dvh] bg-[#050505] text-zinc-100">
+        <div className="customer-app-shell relative min-h-[100dvh] bg-background text-foreground">
           <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
             <div className="absolute -left-24 top-[6%] h-72 w-72 rounded-full bg-[#4f7eff]/12 blur-[100px]" />
             <div className="absolute right-[-12%] top-[32%] h-64 w-64 rounded-full bg-violet-500/8 blur-[90px]" />

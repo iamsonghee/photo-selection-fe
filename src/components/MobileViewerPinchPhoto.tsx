@@ -309,7 +309,7 @@ export function MobileViewerPinchPhoto({ src, alt, showBadge, onZoomStateChange 
             top: badgeOffset.top,
             width: 22,
             height: 22,
-            background: "#FF4D00",
+            background: "var(--accent)",
             boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
           }}
           aria-hidden

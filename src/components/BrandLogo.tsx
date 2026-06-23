@@ -4,7 +4,7 @@ import Link from "next/link";
 import { memo } from "react";
 
 /** 작가 사이드바(`Sidebar`)와 동일 톤 */
-const ACCENT = "#ff4d00";
+const ACCENT = "var(--accent)";
 const MARK_FONT = "'JetBrains Mono', 'Space Mono', ui-monospace, monospace";
 const WORD_FONT = "'Space Grotesk', 'Pretendard Variable', system-ui, sans-serif";
 
@@ -48,7 +48,7 @@ function LogoWordmark({ fontSize }: { fontSize: number }) {
         fontWeight: 700,
         fontSize,
         letterSpacing: "-0.05em",
-        color: "#fff",
+        color: "var(--foreground)",
         whiteSpace: "nowrap",
         lineHeight: 1,
       }}

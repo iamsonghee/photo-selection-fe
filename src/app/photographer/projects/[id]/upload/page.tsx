@@ -36,18 +36,18 @@ import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHead
 import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
 
 // ---------- constants ----------
-const ACCENT = "#FF4D00";
-const ACCENT_DIM = "rgba(255,77,0,0.12)";
-const ACCENT_GLOW = "rgba(255,77,0,0.4)";
-const BORDER = "#1a1a1e";
-const BORDER_MID = "#27272c";
-const SURFACE_0 = "#0a0a0c";
-const SURFACE_1 = "#050505";
-const SURFACE_2 = "#0a0a0a";
+const ACCENT = "var(--accent)";
+const ACCENT_DIM = "rgba(var(--accent-rgb), 0.12)";
+const ACCENT_GLOW = "rgba(var(--accent-rgb), 0.4)";
+const BORDER = "var(--border)";
+const BORDER_MID = "var(--border-strong)";
+const SURFACE_0 = "var(--background)";
+const SURFACE_1 = "var(--surface-raised)";
+const SURFACE_2 = "var(--surface)";
 const MONO = "'Space Mono', 'JetBrains Mono', 'Noto Sans KR', sans-serif";
-const TEXT_MUTED = "#5c5c5c";
-const TEXT_NORMAL = "#a3a3a3";
-const TEXT_BRIGHT = "#ffffff";
+const TEXT_MUTED = "var(--subtle-foreground)";
+const TEXT_NORMAL = "var(--muted-foreground)";
+const TEXT_BRIGHT = "var(--foreground)";
 
 // ---------- upload constants ----------
 const UPLOAD_PHOTOS_PATH = "/api/photographer/upload/photos";
@@ -238,8 +238,8 @@ function PhotoThumb({
       className="prj-data-cell"
       onClick={() => !photo.isPending && onPhotoClick?.(index)}
       style={{
-        background: "#080808",
-        border: photo.isPending ? "1px solid rgba(255,77,0,0.55)" : `1px solid ${BORDER}`,
+        background: "var(--background)",
+        border: photo.isPending ? "1px solid rgba(var(--accent-rgb), 0.55)" : `1px solid ${BORDER}`,
         overflow: "hidden",
         position: "relative",
         display: "flex",
@@ -247,11 +247,11 @@ function PhotoThumb({
       }}
     >
       {/* square thumb */}
-      <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: "#111" }}>
+      <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: "var(--background)" }}>
         <div className="prj-overlay" />
         {/* XHR 전송 중 스피너 */}
         {photo.isUploading && (
-          <div style={{ position: "absolute", top: 5, right: 5, zIndex: 10, width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,77,0,0.25)", borderTopColor: "rgba(255,77,0,0.85)", animation: "spin 0.9s linear infinite" }} />
+          <div style={{ position: "absolute", top: 5, right: 5, zIndex: 10, width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(var(--accent-rgb), 0.25)", borderTopColor: "rgba(var(--accent-rgb), 0.85)", animation: "spin 0.9s linear infinite" }} />
         )}
         {/* filename overlay */}
         <div
@@ -266,7 +266,7 @@ function PhotoThumb({
             padding: "4px 6px",
             fontFamily: MONO,
             fontSize: 9,
-            color: "#c9c9c9",
+            color: "var(--subtle-foreground)",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -279,7 +279,7 @@ function PhotoThumb({
           style={{
             position: "absolute",
             inset: 0,
-            background: "#111",
+            background: "var(--background)",
             transition: "opacity 0.25s",
             opacity: loaded ? 0 : 1,
             display: "flex",
@@ -288,7 +288,7 @@ function PhotoThumb({
             pointerEvents: "none",
           }}
         >
-          <ImageIcon size={10} color="#333" />
+          <ImageIcon size={10} color="var(--subtle-foreground)" />
         </div>
         {shouldLoadSrc && (
           /* eslint-disable-next-line @next/next/no-img-element */
@@ -337,7 +337,7 @@ function PhotoThumb({
             }}
             aria-label="사진 삭제"
           >
-            {deleting ? <Loader2 size={9} style={{ animation: "spin 1s linear infinite" }} /> : <X size={11} strokeWidth={2.5} color="#fff" />}
+            {deleting ? <Loader2 size={9} style={{ animation: "spin 1s linear infinite" }} /> : <X size={11} strokeWidth={2.5} color="var(--foreground)" />}
           </button>
         )}
       </div>
@@ -395,8 +395,8 @@ function UploadTile({
       }}
       className="prj-upload-tile"
       style={{
-        background: "#080808",
-        border: `1px dashed ${(isUploading || isPreparing) ? ACCENT : "#2a2a2a"}`,
+        background: "var(--background)",
+        border: `1px dashed ${(isUploading || isPreparing) ? ACCENT : "var(--border)"}`,
         overflow: "hidden",
         position: "relative",
         display: "flex",
@@ -406,7 +406,7 @@ function UploadTile({
       }}
       aria-label={isUploading ? `업로드 중 ${uploadProgress}%` : "사진 추가하기"}
     >
-      <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: (isUploading || isPreparing) ? ACCENT_DIM : "rgba(255,77,0,0.04)" }}>
+      <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: (isUploading || isPreparing) ? ACCENT_DIM : "rgba(var(--accent-rgb), 0.04)" }}>
         <div
           style={{
             position: "absolute",
@@ -424,11 +424,11 @@ function UploadTile({
               width: 30,
               height: 30,
               borderRadius: "50%",
-              border: `1px solid ${(isUploading || isPreparing) ? ACCENT : "#3a3a3a"}`,
+              border: `1px solid ${(isUploading || isPreparing) ? ACCENT : "var(--border)"}`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              background: (isUploading || isPreparing) ? "rgba(255,77,0,0.08)" : "transparent",
+              background: (isUploading || isPreparing) ? "rgba(var(--accent-rgb), 0.08)" : "transparent",
             }}
           >
             {(isUploading || isPreparing)
@@ -440,7 +440,7 @@ function UploadTile({
               fontFamily: MONO,
               fontSize: 10,
               letterSpacing: "0.04em",
-              color: (isUploading || isPreparing) ? ACCENT : "#9a9a9a",
+              color: (isUploading || isPreparing) ? ACCENT : "var(--subtle-foreground)",
               textAlign: "center",
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -615,7 +615,7 @@ function ListRowThumb({
     return () => io.disconnect();
   }, [scrollRootRef, load]);
   return (
-    <div ref={wrapRef} style={{ width: "100%", height: "100%", background: "#111" }}>
+    <div ref={wrapRef} style={{ width: "100%", height: "100%", background: "var(--background)" }}>
       {load && (
         /* eslint-disable-next-line @next/next/no-img-element */
         <img src={url} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
@@ -681,7 +681,7 @@ function VirtualizedPhotoList({
                   cursor: "pointer",
                 }}
                 onClick={() => onPhotoClick?.(i)}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,77,0,0.3)"; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(var(--accent-rgb), 0.3)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = BORDER; }}
               >
                 <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, width: 36, flexShrink: 0, textAlign: "right" }}>
@@ -1312,33 +1312,33 @@ export default function ProjectDetailPage() {
         .prj-tech-label { font-family: 'Space Mono', 'JetBrains Mono', 'Noto Sans KR', sans-serif; font-size: 0.63rem; letter-spacing: 0.15em; text-transform: uppercase; }
         .prj-scroll::-webkit-scrollbar { width: 4px; }
         .prj-scroll::-webkit-scrollbar-track { background: ${SURFACE_2}; }
-        .prj-scroll::-webkit-scrollbar-thumb { background: #2a2a2a; }
+        .prj-scroll::-webkit-scrollbar-thumb { background: var(--border-strong); }
         .prj-scroll::-webkit-scrollbar-thumb:hover { background: ${ACCENT}; }
         .prj-data-cell { position: relative; cursor: pointer; transition: border-color 0.2s; }
         .prj-data-cell .prj-overlay { position: absolute; inset: 4px; border: 1px solid transparent; transition: all 0.3s; pointer-events: none; }
-        .prj-data-cell:hover .prj-overlay { border-color: rgba(255,77,0,0.3); inset: 0px; }
-        .prj-data-cell:hover { border-color: rgba(255,77,0,0.4) !important; }
-        .prj-upload-tile:hover { border-color: rgba(255,77,0,0.45) !important; background: rgba(255,77,0,0.04) !important; }
-        .prj-upload-tile:active { border-color: rgba(255,77,0,0.4) !important; }
+        .prj-data-cell:hover .prj-overlay { border-color: rgba(var(--accent-rgb), 0.3); inset: 0px; }
+        .prj-data-cell:hover { border-color: rgba(var(--accent-rgb), 0.4) !important; }
+        .prj-upload-tile:hover { border-color: rgba(var(--accent-rgb), 0.45) !important; background: rgba(var(--accent-rgb), 0.04) !important; }
+        .prj-upload-tile:active { border-color: rgba(var(--accent-rgb), 0.4) !important; }
         .prj-upload-tile:focus-visible { outline: none; border-color: ${ACCENT} !important; }
         .prj-del-btn { opacity: 0; transition: opacity 0.15s; }
         .prj-data-cell:hover .prj-del-btn { opacity: 1; }
         @media (max-width: 768px) { .prj-del-btn { opacity: 1; } }
         .prj-op-node { transition: all 0.2s; cursor: pointer; }
-        .prj-op-node:hover { border-color: rgba(255,77,0,0.4) !important; background: rgba(255,77,0,0.04) !important; }
+        .prj-op-node:hover { border-color: rgba(var(--accent-rgb), 0.4) !important; background: rgba(var(--accent-rgb), 0.04) !important; }
         .prj-op-node:hover .prj-op-arrow { color: ${ACCENT} !important; }
         .prj-modal-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); padding: 16px; }
-        .prj-modal-box { background: #080808; border: 1px solid ${BORDER_MID}; width: 100%; position: relative; }
+        .prj-modal-box { background: var(--surface-raised); border: 1px solid ${BORDER_MID}; width: 100%; position: relative; }
         .prj-modal-box::before { content: ''; position: absolute; top: -1px; left: -1px; width: 28px; height: 2px; background: ${ACCENT}; }
         .prj-modal-box::after { content: ''; position: absolute; bottom: -1px; right: -1px; width: 28px; height: 2px; background: ${ACCENT}; }
-        .prj-btn-primary { background: ${ACCENT_DIM}; border: 1px solid rgba(255,77,0,0.5); color: ${ACCENT}; cursor: pointer; font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
+        .prj-btn-primary { background: ${ACCENT_DIM}; border: 1px solid rgba(var(--accent-rgb), 0.5); color: ${ACCENT}; cursor: pointer; font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
         .prj-btn-primary:hover { background: ${ACCENT}; color: #000; }
         .prj-btn-secondary { background: transparent; border: 1px solid ${BORDER_MID}; color: ${TEXT_MUTED}; cursor: pointer; font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
-        .prj-btn-secondary:hover { border-color: #444; color: ${TEXT_BRIGHT}; }
+        .prj-btn-secondary:hover { border-color: var(--border-strong); color: ${TEXT_BRIGHT}; }
         .prj-btn-danger { background: transparent; border: 1px solid rgba(255,51,51,0.3); color: #FF3333; cursor: pointer; font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
         .prj-btn-danger:hover { background: rgba(255,51,51,0.1); }
-        .prj-dropzone { border: 1px dashed #333; transition: all 0.2s; }
-        .prj-dropzone-over { border-color: rgba(255,77,0,0.5) !important; background: ${ACCENT_DIM} !important; }
+        .prj-dropzone { border: 1px dashed var(--border); transition: all 0.2s; }
+        .prj-dropzone-over { border-color: rgba(var(--accent-rgb), 0.5) !important; background: ${ACCENT_DIM} !important; }
         .prj-mobile-toolbar { display: none; }
         @media (max-width: 768px) {
           .prj-desktop-toolbar { display: none !important; }
@@ -1396,7 +1396,7 @@ export default function ProjectDetailPage() {
             zIndex: 11,
           }}
         >
-          <div style={{ height: 2, background: "#111", overflow: "hidden", position: "relative" }}>
+          <div style={{ height: 2, background: "var(--border)", overflow: "hidden", position: "relative" }}>
             {showServerWorking ? (
               <div style={{ width: "100%", height: "100%", background: ACCENT, animation: "prj-bar-indeterminate-pulse 1.4s ease-in-out infinite", position: "relative", overflow: "hidden" }}>
                 <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.35)", width: "35%", animation: "prj-bar-indet-sweep 1.1s linear infinite" }} />
@@ -1519,17 +1519,17 @@ export default function ProjectDetailPage() {
                   opacity: uploadAllowed ? 1 : 0.5,
                 }}
               >
-                <div style={{ width: 64, height: 64, borderRadius: "50%", border: `1px solid ${dragOver ? ACCENT : "#2a2a2a"}`, display: "flex", alignItems: "center", justifyContent: "center", transition: "border-color 0.2s" }}>
+                <div style={{ width: 64, height: 64, borderRadius: "50%", border: `1px solid ${dragOver ? ACCENT : "var(--border)"}`, display: "flex", alignItems: "center", justifyContent: "center", transition: "border-color 0.2s" }}>
                   {isUploading
                     ? <Loader2 size={24} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} />
-                    : <Upload size={24} color={dragOver ? ACCENT : "#444"} />
+                    : <Upload size={24} color={dragOver ? ACCENT : "var(--subtle-foreground)"} />
                   }
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 15, color: dragOver ? ACCENT : "#666", marginBottom: 6 }}>
+                  <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 15, color: dragOver ? ACCENT : "var(--muted-foreground)", marginBottom: 6 }}>
                     {isUploading ? "업로드 중..." : "사진을 드래그하거나 클릭해서 업로드"}
                   </p>
-                  <p style={{ fontFamily: MONO, fontSize: 10, color: "#333" }}>
+                  <p style={{ fontFamily: MONO, fontSize: 10, color: "var(--subtle-foreground)" }}>
                     JPG · PNG · HEIC 지원
                   </p>
                 </div>
@@ -1576,7 +1576,7 @@ export default function ProjectDetailPage() {
         style={{
           flexShrink: 0,
           background: "rgba(8, 4, 2, 0.96)",
-          borderTop: `1px solid ${isInviteActive ? "rgba(255, 77, 0, 0.35)" : "rgba(255, 77, 0, 0.2)"}`,
+          borderTop: `1px solid ${isInviteActive ? "rgba(var(--accent-rgb), 0.35)" : "rgba(var(--accent-rgb), 0.2)"}`,
           backdropFilter: "blur(12px)",
           padding: "12px 24px",
           display: "flex",
@@ -1640,7 +1640,7 @@ export default function ProjectDetailPage() {
               style={{
                 display: "flex", alignItems: "center", gap: 4,
                 padding: "9px 20px",
-                background: displayPhotos.length >= N ? ACCENT : "rgba(255,77,0,0.15)",
+                background: displayPhotos.length >= N ? ACCENT : "rgba(var(--accent-rgb), 0.15)",
                 border: "none", borderRadius: 8,
                 color: displayPhotos.length >= N ? "#000" : ACCENT,
                 fontSize: 13, fontWeight: 600,
@@ -1802,7 +1802,7 @@ export default function ProjectDetailPage() {
 
       {/* toast */}
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#080808", border: `1px solid ${BORDER_MID}`, padding: "10px 20px", zIndex: 200, fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT, pointerEvents: "none", whiteSpace: "nowrap" }}>
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "var(--surface-raised)", border: `1px solid ${BORDER_MID}`, padding: "10px 20px", zIndex: 200, fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT, pointerEvents: "none", whiteSpace: "nowrap" }}>
           {toast}
         </div>
       )}

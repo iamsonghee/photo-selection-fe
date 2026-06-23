@@ -211,8 +211,8 @@ export default function GalleryPageClient() {
   /* ── Loading / error states ── */
   if (loading) {
     return (
-      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#000" }}>
-        <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#555", letterSpacing: "0.1em" }}>
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "var(--background)" }}>
+        <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "var(--subtle-foreground)", letterSpacing: "0.1em" }}>
           LOADING_GALLERY...
         </p>
       </div>
@@ -220,17 +220,17 @@ export default function GalleryPageClient() {
   }
   if (!project) {
     return (
-      <div style={{ display: "flex", minHeight: "100vh", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#000" }}>
-        <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#555" }}>INVALID_TOKEN</p>
+      <div style={{ display: "flex", minHeight: "100vh", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "var(--background)" }}>
+        <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "var(--subtle-foreground)" }}>INVALID_TOKEN</p>
       </div>
     );
   }
   if (project.status === "editing") return null;
   if (!loading && photos.length === 0) {
     return (
-      <div style={{ display: "flex", minHeight: "100vh", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, background: "#000" }}>
-        <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#555" }}>NO_PHOTOS_FOUND</p>
-        <Link href={`/c/${token}`} style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#FF4D00", textDecoration: "none", border: "1px solid #1A1A1A", padding: "8px 16px" }}>
+      <div style={{ display: "flex", minHeight: "100vh", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, background: "var(--background)" }}>
+        <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "var(--subtle-foreground)" }}>NO_PHOTOS_FOUND</p>
+        <Link href={`/c/${token}`} style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "var(--accent)", textDecoration: "none", border: "1px solid var(--border-subtle)", padding: "8px 16px" }}>
           ← BACK_TO_INVITE
         </Link>
       </div>
@@ -248,8 +248,8 @@ export default function GalleryPageClient() {
 
         .gl-grid-bg {
           position: fixed; inset: 0;
-          background-image: linear-gradient(#1A1A1A 1px, transparent 1px),
-                            linear-gradient(90deg, #1A1A1A 1px, transparent 1px);
+          background-image: linear-gradient(var(--border-subtle) 1px, transparent 1px),
+                            linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
           background-size: 40px 40px;
           pointer-events: none; z-index: 0; opacity: 0.5;
         }
@@ -257,8 +257,8 @@ export default function GalleryPageClient() {
         .gl-photo-card {
           position: relative;
           aspect-ratio: 1 / 1;
-          background: #111;
-          border: 1px solid #1A1A1A;
+          background: var(--surface);
+          border: 1px solid var(--border-subtle);
           transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
           cursor: pointer; overflow: hidden;
           display: block; text-decoration: none;
@@ -269,11 +269,11 @@ export default function GalleryPageClient() {
         }
         .gl-photo-card:hover img { transform: scale(1.05); }
         .gl-photo-card.gl-selected {
-          border-color: #FF4D00;
-          box-shadow: inset 0 0 0 1px #FF4D00;
+          border-color: var(--accent);
+          box-shadow: inset 0 0 0 1px var(--accent);
         }
         .gl-photo-card.gl-selected .gl-check-box {
-          background: #FF4D00 !important; border-color: #FF4D00 !important;
+          background: var(--accent) !important; border-color: var(--accent) !important;
         }
 
         .gl-card-overlay {
@@ -294,18 +294,18 @@ export default function GalleryPageClient() {
         }
         .gl-filter-tab {
           position: relative; padding: 8px 14px;
-          font-size: 12px; font-weight: 700; color: #555;
+          font-size: 12px; font-weight: 700; color: var(--subtle-foreground);
           transition: color 0.2s; background: none; border: none;
           cursor: pointer; white-space: nowrap; font-family: inherit;
         }
-        .gl-filter-tab.gl-tab-active { color: #FF4D00; }
+        .gl-filter-tab.gl-tab-active { color: var(--accent); }
         .gl-filter-tab.gl-tab-active::after {
           content: ''; position: absolute; bottom: -1px; left: 0;
-          width: 100%; height: 2px; background: #FF4D00;
+          width: 100%; height: 2px; background: var(--accent);
         }
 
         .gl-btn-confirm {
-          background: #FF4D00; color: #000; font-weight: 900;
+          background: var(--accent); color: #000; font-weight: 900;
           font-family: inherit; transition: all 0.3s ease;
           clip-path: polygon(0 0, 100% 0, 100% 65%, 88% 100%, 0 100%);
           border: none; cursor: pointer;
@@ -314,16 +314,16 @@ export default function GalleryPageClient() {
         }
         .gl-btn-confirm:disabled {
           opacity: 0.4; cursor: not-allowed;
-          background: #555;
+          background: var(--border-strong);
         }
         .gl-btn-confirm:not(:disabled):hover {
           transform: translateY(-2px);
-          box-shadow: 0 10px 20px rgba(255,77,0,0.3);
+          box-shadow: 0 10px 20px rgba(var(--accent-rgb), 0.3);
         }
 
         .gl-modal-bracket {
           position: absolute; width: 12px; height: 12px;
-          border-color: #FF4D00; pointer-events: none;
+          border-color: var(--accent); pointer-events: none;
         }
         .gl-modal-b-tl { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
         .gl-modal-b-tr { top: -1px; right: -1px; border-top: 2px solid; border-right: 2px solid; }
@@ -331,8 +331,8 @@ export default function GalleryPageClient() {
         .gl-modal-b-br { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
 
         ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: #000; }
-        ::-webkit-scrollbar-thumb { background: #FF4D00; }
+        ::-webkit-scrollbar-track { background: var(--background); }
+        ::-webkit-scrollbar-thumb { background: var(--accent); }
 
         @media (max-width: 767px) {
           /* 헤더 상단 줄 */
@@ -385,7 +385,7 @@ export default function GalleryPageClient() {
         }
       `}</style>
 
-      <div className="gl-page-wrapper" style={{ background: "#000", minHeight: "100vh", paddingTop: 140, paddingBottom: 100 }}>
+      <div className="gl-page-wrapper" style={{ background: "var(--background)", minHeight: "100vh", paddingTop: 140, paddingBottom: 100 }}>
         <div className="gl-grid-bg" />
 
         {/* ── Header ── */}
@@ -393,19 +393,19 @@ export default function GalleryPageClient() {
           position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
           background: "rgba(10,10,12,0.90)", backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
-          borderBottom: "1px solid #1a1a1e",
+          borderBottom: "1px solid var(--border-subtle)",
         }}>
           {/* Top row */}
           <div className="gl-header-top" style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
               <Link href={token ? `/c/${token}` : "#"} style={{ textDecoration: "none" }}>
-                <div style={{ width: 32, height: 32, background: "#FF4D00", display: "flex", alignItems: "center", justifyContent: "center", color: "#000", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 18, flexShrink: 0 }}>A</div>
+                <div style={{ width: 32, height: 32, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", color: "#000", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 18, flexShrink: 0 }}>A</div>
               </Link>
               <div>
-                <h1 className="gl-header-project-title" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 20, letterSpacing: "-0.5px", lineHeight: 1, color: "#fff", margin: 0 }}>
+                <h1 className="gl-header-project-title" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 20, letterSpacing: "-0.5px", lineHeight: 1, color: "var(--foreground)", margin: 0 }}>
                   {project.name}
                 </h1>
-                <p className="gl-header-deadline" style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: "#555", marginTop: 4, letterSpacing: "0.1em" }}>
+                <p className="gl-header-deadline" style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: "var(--subtle-foreground)", marginTop: 4, letterSpacing: "0.1em" }}>
                   DEADLINE // {format(new Date(project.deadline), "yyyy.MM.dd", { locale: ko })}
                 </p>
               </div>
@@ -415,18 +415,18 @@ export default function GalleryPageClient() {
               {photographer?.name && (
                 <>
                   <div className="gl-photographer-section" style={{ textAlign: "right" }}>
-                    <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>Photography by</p>
-                    <p style={{ fontWeight: 700, fontSize: 14, color: "#fff", marginTop: 2 }}>{photographer.name}</p>
+                    <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: "var(--subtle-foreground)", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>Photography by</p>
+                    <p style={{ fontWeight: 700, fontSize: 14, color: "var(--foreground)", marginTop: 2 }}>{photographer.name}</p>
                   </div>
-                  <div className="gl-photographer-section" style={{ width: 1, height: 32, background: "#222", flexShrink: 0 }} />
+                  <div className="gl-photographer-section" style={{ width: 1, height: 32, background: "var(--border)", flexShrink: 0 }} />
                 </>
               )}
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span className="gl-header-selected-label" style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#FF4D00", fontWeight: 700 }}>SELECTED</span>
-                  <span className="gl-header-selected-count" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 28, lineHeight: 1, color: "#fff" }}>
+                  <span className="gl-header-selected-label" style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>SELECTED</span>
+                  <span className="gl-header-selected-count" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 28, lineHeight: 1, color: "var(--foreground)" }}>
                     {Y}{" "}
-                    <span style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12, color: "#444", fontWeight: 400 }}>/ {N}</span>
+                    <span style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12, color: "var(--disabled-foreground)", fontWeight: 400 }}>/ {N}</span>
                   </span>
                 </div>
               </div>
@@ -434,7 +434,7 @@ export default function GalleryPageClient() {
           </div>
 
           {/* Filter bar */}
-          <div style={{ borderTop: "1px solid #111", background: "rgba(0,0,0,0.5)" }}>
+          <div style={{ borderTop: "1px solid var(--border-subtle)", background: "rgba(0,0,0,0.5)" }}>
             <div className="gl-header-filter" style={{ maxWidth: 1800, margin: "0 auto", height: 56, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", overflowX: "auto" }}>
               {/* Left: tabs + star buttons */}
               <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
@@ -449,11 +449,11 @@ export default function GalleryPageClient() {
                   </button>
                 ))}
 
-                <div className="gl-filter-divider" style={{ width: 1, height: 16, background: "#222", margin: "0 8px", flexShrink: 0 }} />
+                <div className="gl-filter-divider" style={{ width: 1, height: 16, background: "var(--border)", margin: "0 8px", flexShrink: 0 }} />
 
                 {/* Star filter */}
                 <div className="gl-filter-stars" style={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <span style={{ fontSize: 13, color: starFilter > 0 ? "#FF4D00" : "#444", fontFamily: "'Space Mono', monospace", marginRight: 3, lineHeight: 1, userSelect: "none" }}>≥</span>
+                  <span style={{ fontSize: 13, color: starFilter > 0 ? "var(--accent)" : "var(--disabled-foreground)", fontFamily: "'Space Mono', monospace", marginRight: 3, lineHeight: 1, userSelect: "none" }}>≥</span>
                   {([1, 2, 3, 4, 5] as const).map((s) => {
                     const filled = s <= (hoverStar || starFilter);
                     return (
@@ -465,7 +465,7 @@ export default function GalleryPageClient() {
                         onMouseLeave={() => setHoverStar(0)}
                         style={{
                           width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 13, lineHeight: 1, color: filled ? "#FF4D00" : "#444",
+                          fontSize: 13, lineHeight: 1, color: filled ? "var(--accent)" : "var(--disabled-foreground)",
                           background: "none", border: "none", cursor: "pointer",
                           transition: "color 0.1s, transform 0.1s",
                           transform: hoverStar === s ? "scale(1.2)" : "scale(1)",
@@ -498,7 +498,7 @@ export default function GalleryPageClient() {
                         style={{
                           width: 13, height: 13, borderRadius: "50%",
                           background: opt.hex,
-                          border: isActive ? "2px solid #fff" : "2px solid transparent",
+                          border: isActive ? "2px solid var(--foreground)" : "2px solid transparent",
                           cursor: "pointer", flexShrink: 0, outline: "none", transition: "border-color 0.15s",
                         }}
                       />
@@ -510,9 +510,9 @@ export default function GalleryPageClient() {
                   type="button"
                   title="초기화"
                   onClick={() => { setStarFilter(0); setColorFilter([]); setHoverStar(0); window.setTimeout(() => setHoverStar(0), 0); }}
-                  style={{ background: "none", border: "none", color: "#444", cursor: "pointer", display: "flex", alignItems: "center", padding: "4px 6px" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "#888")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "#444")}
+                  style={{ background: "none", border: "none", color: "var(--disabled-foreground)", cursor: "pointer", display: "flex", alignItems: "center", padding: "4px 6px" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--muted-foreground)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--disabled-foreground)")}
                 >
                   <RotateCcw style={{ width: 12, height: 12 }} />
                 </button>
@@ -521,10 +521,10 @@ export default function GalleryPageClient() {
                   className="gl-filter-sort"
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-                  style={{ background: "transparent", fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, textTransform: "uppercase", border: "1px solid #222", padding: "4px 8px", color: "#888", outline: "none", cursor: "pointer" }}
+                  style={{ background: "transparent", fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, textTransform: "uppercase", border: "1px solid var(--border)", padding: "4px 8px", color: "var(--muted-foreground)", outline: "none", cursor: "pointer" }}
                 >
                   {SORT_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value} style={{ background: "#0a0a0a" }}>{o.label}</option>
+                    <option key={o.value} value={o.value} style={{ background: "var(--surface-raised)" }}>{o.label}</option>
                   ))}
                 </select>
               </div>
@@ -606,7 +606,7 @@ export default function GalleryPageClient() {
                                 window.setTimeout(() => setGridStarHover(null), 0);
                               }}
                               onMouseEnter={() => setGridStarHover({ photoId: photo.id, star: s })}
-                              style={{ fontSize: 9, lineHeight: 1, padding: 0, border: "none", background: "none", cursor: "pointer", color: filled ? "#FF4D00" : "rgba(60,60,70,0.95)" }}
+                              style={{ fontSize: 9, lineHeight: 1, padding: 0, border: "none", background: "none", cursor: "pointer", color: filled ? "var(--accent)" : "rgba(60,60,70,0.95)" }}
                             >
                               {filled ? "★" : "☆"}
                             </button>
@@ -629,8 +629,8 @@ export default function GalleryPageClient() {
 
           {filteredPhotos.length === 0 && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0", gap: 12 }}>
-              <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#333", letterSpacing: "0.1em" }}>NO_RESULTS</p>
-              <p style={{ fontSize: 12, color: "#555" }}>필터 조건에 맞는 사진이 없습니다</p>
+              <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "var(--border-strong)", letterSpacing: "0.1em" }}>NO_RESULTS</p>
+              <p style={{ fontSize: 12, color: "var(--subtle-foreground)" }}>필터 조건에 맞는 사진이 없습니다</p>
             </div>
           )}
         </main>
@@ -652,7 +652,7 @@ export default function GalleryPageClient() {
             onClick={() => !confirming && setShowConfirmModal(false)}
           >
             <div
-              style={{ width: "100%", maxWidth: 440, background: "#0A0A0A", border: "1px solid #FF4D00", padding: 40, position: "relative" }}
+              style={{ width: "100%", maxWidth: 440, background: "var(--surface)", border: "1px solid var(--accent)", padding: 40, position: "relative" }}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="gl-modal-bracket gl-modal-b-tl" />
@@ -660,11 +660,11 @@ export default function GalleryPageClient() {
               <div className="gl-modal-bracket gl-modal-b-bl" />
               <div className="gl-modal-bracket gl-modal-b-br" />
 
-              <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 28, textTransform: "uppercase", fontStyle: "italic", marginBottom: 16, color: "#fff" }}>
+              <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 28, textTransform: "uppercase", fontStyle: "italic", marginBottom: 16, color: "var(--foreground)" }}>
                 Confirm Selection
               </h3>
-              <p style={{ color: "#888", fontSize: 13, lineHeight: 1.7, marginBottom: 32 }}>
-                총 <span style={{ color: "#FF4D00", fontWeight: 700 }}>{Y}장</span>의 사진이 선택되었습니다.
+              <p style={{ color: "var(--muted-foreground)", fontSize: 13, lineHeight: 1.7, marginBottom: 32 }}>
+                총 <span style={{ color: "var(--accent)", fontWeight: 700 }}>{Y}장</span>의 사진이 선택되었습니다.
               </p>
 
               {confirmError && (
@@ -675,9 +675,9 @@ export default function GalleryPageClient() {
                 <button
                   type="button"
                   onClick={() => !confirming && setShowConfirmModal(false)}
-                  style={{ flex: 1, height: 48, border: "1px solid #222", background: "none", color: "#888", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s" }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = "#000"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "#888"; }}
+                  style={{ flex: 1, height: 48, border: "1px solid var(--border)", background: "none", color: "var(--muted-foreground)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--foreground)"; e.currentTarget.style.color = "#000"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "var(--muted-foreground)"; }}
                 >
                   취소
                 </button>
@@ -685,7 +685,7 @@ export default function GalleryPageClient() {
                   type="button"
                   onClick={handleConfirm}
                   disabled={confirming}
-                  style={{ flex: 1, height: 48, background: "#FF4D00", color: "#000", fontSize: 13, fontWeight: 900, textTransform: "uppercase", border: "none", cursor: confirming ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: confirming ? 0.6 : 1 }}
+                  style={{ flex: 1, height: 48, background: "var(--accent)", color: "#000", fontSize: 13, fontWeight: 900, textTransform: "uppercase", border: "none", cursor: confirming ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: confirming ? 0.6 : 1 }}
                 >
                   {confirming ? "처리 중..." : "확정 및 전송"}
                 </button>

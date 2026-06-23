@@ -40,11 +40,11 @@ export function SystemLoadingScreen() {
         }
         @keyframes sls-breathe {
           0%, 100% {
-            box-shadow: 0 0 0px rgba(255,77,0,0);
+            box-shadow: 0 0 0px rgba(var(--accent-rgb), 0);
             transform: scale(1);
           }
           50% {
-            box-shadow: 0 0 40px rgba(255,77,0,0.4);
+            box-shadow: 0 0 40px rgba(var(--accent-rgb), 0.4);
             transform: scale(1.05);
           }
         }
@@ -58,7 +58,7 @@ export function SystemLoadingScreen() {
           position: absolute;
           top: -150px;
           left: 0;
-          background: linear-gradient(to bottom, rgba(255,77,0,0) 0%, rgba(255,77,0,0.03) 50%, rgba(255,77,0,0) 100%);
+          background: linear-gradient(to bottom, rgba(var(--accent-rgb), 0) 0%, rgba(var(--accent-rgb), 0.03) 50%, rgba(var(--accent-rgb), 0) 100%);
           animation: sls-scanline 8s linear infinite;
           pointer-events: none;
           z-index: 1;
@@ -66,7 +66,7 @@ export function SystemLoadingScreen() {
         .sls-logo {
           width: 64px;
           height: 64px;
-          background-color: #FF4D00;
+          background-color: var(--accent);
           color: #000;
           display: flex;
           align-items: center;
@@ -79,7 +79,7 @@ export function SystemLoadingScreen() {
         .sls-pulse {
           width: 6px;
           height: 6px;
-          background-color: #FF4D00;
+          background-color: var(--accent);
           border-radius: 50%;
           animation: sls-pulse 2s infinite alternate;
           flex-shrink: 0;
@@ -90,8 +90,8 @@ export function SystemLoadingScreen() {
         style={{
           position: "fixed",
           inset: 0,
-          background: "#030303",
-          color: "#E8E8E8",
+          background: "var(--background)",
+          color: "var(--foreground)",
           fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
           display: "flex",
           flexDirection: "column",
@@ -118,13 +118,13 @@ export function SystemLoadingScreen() {
 
         {/* Corner brackets */}
         {/* TL */}
-        <div style={{ position: "absolute", top: 32, left: 32, width: 32, height: 32, borderTop: "2px solid #222", borderLeft: "2px solid #222", zIndex: 10, pointerEvents: "none" }} />
+        <div style={{ position: "absolute", top: 32, left: 32, width: 32, height: 32, borderTop: "2px solid var(--border-subtle)", borderLeft: "2px solid var(--border-subtle)", zIndex: 10, pointerEvents: "none" }} />
         {/* TR */}
-        <div style={{ position: "absolute", top: 32, right: 32, width: 32, height: 32, borderTop: "2px solid #222", borderRight: "2px solid #222", zIndex: 10, pointerEvents: "none" }} />
+        <div style={{ position: "absolute", top: 32, right: 32, width: 32, height: 32, borderTop: "2px solid var(--border-subtle)", borderRight: "2px solid var(--border-subtle)", zIndex: 10, pointerEvents: "none" }} />
         {/* BL */}
-        <div style={{ position: "absolute", bottom: 32, left: 32, width: 32, height: 32, borderBottom: "2px solid #222", borderLeft: "2px solid #222", zIndex: 10, pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: 32, left: 32, width: 32, height: 32, borderBottom: "2px solid var(--border-subtle)", borderLeft: "2px solid var(--border-subtle)", zIndex: 10, pointerEvents: "none" }} />
         {/* BR */}
-        <div style={{ position: "absolute", bottom: 32, right: 32, width: 32, height: 32, borderBottom: "2px solid #222", borderRight: "2px solid #222", zIndex: 10, pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: 32, right: 32, width: 32, height: 32, borderBottom: "2px solid var(--border-subtle)", borderRight: "2px solid var(--border-subtle)", zIndex: 10, pointerEvents: "none" }} />
 
         {/* Content */}
         <div style={{ position: "relative", zIndex: 10, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "48px" }}>
@@ -132,16 +132,16 @@ export function SystemLoadingScreen() {
           {/* Header */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             {/* Status badge */}
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, border: "1px solid #222", padding: "6px 12px" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, border: "1px solid var(--border-subtle)", padding: "6px 12px" }}>
               <div className="sls-pulse" />
-              <span style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
+              <span style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--subtle-foreground)" }}>
                 SYS :: STANDBY
               </span>
             </div>
 
             {/* Clock */}
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#666", marginBottom: 4 }}>
+              <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--subtle-foreground)", marginBottom: 4 }}>
                 LOCAL_TIME
               </div>
               <span ref={clockRef} style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 14, opacity: 0.6 }}>
@@ -153,7 +153,7 @@ export function SystemLoadingScreen() {
           {/* Center logo */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1 }}>
             <div className="sls-logo">A</div>
-            <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#666", marginTop: 32, opacity: 0.4 }}>
+            <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--subtle-foreground)", marginTop: 32, opacity: 0.4 }}>
               INITIALIZING ENVIRONMENT...
             </div>
           </div>
@@ -163,7 +163,7 @@ export function SystemLoadingScreen() {
 
             {/* Terminal log */}
             <div style={{ width: 400, height: 100, padding: 12, display: "flex", flexDirection: "column", justifyContent: "flex-end", overflow: "hidden" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10, color: "#666" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10, color: "var(--subtle-foreground)" }}>
                 {LOG_LINES.map((line, i) => (
                   <div key={i} style={{ display: "flex", gap: 8, opacity: 0.3 + i * 0.2 }}>
                     <span style={{ flexShrink: 0 }}>{line.ts}</span>
@@ -175,15 +175,15 @@ export function SystemLoadingScreen() {
 
             {/* System info */}
             <div style={{ textAlign: "right", display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#666" }}>
-                TARGET_ENV: <span style={{ color: "#E8E8E8" }}>PRODUCTION</span>
+              <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--subtle-foreground)" }}>
+                TARGET_ENV: <span style={{ color: "var(--foreground)" }}>PRODUCTION</span>
               </div>
-              <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#666" }}>
-                A-CUT_VERSION: <span style={{ color: "#E8E8E8" }}>1.2.0-CORE</span>
+              <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--subtle-foreground)" }}>
+                A-CUT_VERSION: <span style={{ color: "var(--foreground)" }}>1.2.0-CORE</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
-                <span style={{ fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "#444" }}>SECURE</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2">
+                <span style={{ fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--disabled-foreground)" }}>SECURE</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--border-strong)" strokeWidth="2">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>

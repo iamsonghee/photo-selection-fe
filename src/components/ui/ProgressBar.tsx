@@ -25,14 +25,14 @@ export function ProgressBar({
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
     <div className={`w-full ${className}`} {...props}>
-      <div className="h-2 w-full rounded-full bg-zinc-800 overflow-hidden">
+      <div className="h-2 w-full rounded-full bg-surface-raised overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-300 ${variantBg[variant]}`}
           style={{ width: `${pct}%` }}
         />
       </div>
       {showLabel && (
-        <span className="mt-1 text-xs text-zinc-400 font-mono">
+        <span className="mt-1 text-xs text-muted-foreground font-mono">
           {value}/{max} ({pct}%)
         </span>
       )}

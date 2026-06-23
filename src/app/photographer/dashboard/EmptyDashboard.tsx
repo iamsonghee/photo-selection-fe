@@ -14,7 +14,7 @@ export default function EmptyDashboard({
       <style>{`
         .ed-wrap {
           position: fixed; inset: 0; z-index: 99999;
-          background: #000;
+          background: var(--background);
           display: flex; flex-direction: column;
           align-items: center;
           font-family: 'Pretendard', sans-serif;
@@ -22,8 +22,8 @@ export default function EmptyDashboard({
         }
         .ed-grid-bg {
           position: fixed; inset: 0; z-index: 0; pointer-events: none;
-          background-image: linear-gradient(#1a1a1a 1px, transparent 1px),
-            linear-gradient(90deg, #1a1a1a 1px, transparent 1px);
+          background-image: linear-gradient(var(--border-subtle) 1px, transparent 1px),
+            linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
           background-size: 50px 50px;
         }
         .ed-header {
@@ -37,16 +37,16 @@ export default function EmptyDashboard({
           display: flex; align-items: center; gap: 8px;
         }
         .ed-logo-mark {
-          width: 24px; height: 24px; background: #FF4D00;
+          width: 24px; height: 24px; background: var(--accent);
           display: flex; align-items: center; justify-content: center;
           color: #000; font-weight: 900; font-size: 12px;
         }
         .ed-logo-text {
           font-weight: 700; font-size: 22px;
-          letter-spacing: -0.05em; color: #fff;
+          letter-spacing: -0.05em; color: var(--foreground);
         }
         .ed-user-badge {
-          font-size: 14px; color: #d1d5db;
+          font-size: 14px; color: var(--muted-foreground);
         }
         .ed-main {
           position: relative; z-index: 10;
@@ -60,22 +60,22 @@ export default function EmptyDashboard({
           display: flex; flex-direction: column; align-items: center;
         }
         .ed-kicker {
-          font-size: 12px; color: #FF4D00; letter-spacing: 0.15em;
+          font-size: 12px; color: var(--accent); letter-spacing: 0.15em;
           text-transform: uppercase; margin-bottom: 20px;
           display: flex; align-items: center; gap: 8px;
         }
         .ed-title {
           font-size: clamp(28px, 5vw, 48px); font-weight: 900;
           line-height: 1.1; letter-spacing: -0.03em;
-          color: #fff; margin-bottom: 14px;
+          color: var(--foreground); margin-bottom: 14px;
         }
         .ed-subtitle {
-          font-size: 17px; color: #888; font-weight: 300;
+          font-size: 17px; color: var(--placeholder-foreground); font-weight: 300;
         }
         .ed-card {
           width: 100%;
-          background: rgba(8,8,8,0.9);
-          border: 1px solid #2a2a2a;
+          background: var(--surface);
+          border: 1px solid var(--border-subtle);
           padding: 40px 40px 48px;
           margin-bottom: 32px;
           position: relative;
@@ -89,7 +89,7 @@ export default function EmptyDashboard({
         }
         .ed-steps-line {
           position: absolute; top: 40px; left: 40px; right: 40px;
-          height: 1px; background: #2a2a2a; z-index: 1;
+          height: 1px; background: var(--border-subtle); z-index: 1;
         }
         .ed-step {
           display: flex; flex-direction: column;
@@ -98,23 +98,23 @@ export default function EmptyDashboard({
         }
         .ed-step-icon {
           width: 80px; height: 80px;
-          background: #080808; border: 1px solid #2a2a2a;
+          background: var(--background); border: 1px solid var(--border-subtle);
           display: flex; align-items: center; justify-content: center;
-          color: #888;
+          color: var(--placeholder-foreground);
         }
         .ed-step-label {
           text-align: center;
         }
         .ed-step-num {
-          font-size: 9px; color: #555; letter-spacing: 0.1em;
+          font-size: 9px; color: var(--disabled-foreground); letter-spacing: 0.1em;
           margin-bottom: 4px;
         }
         .ed-step-name {
-          font-size: 12px; font-weight: 700; color: #fff;
+          font-size: 12px; font-weight: 700; color: var(--foreground);
         }
         .ed-btn-primary {
           display: flex; align-items: center; justify-content: center; gap: 10px;
-          background: #FF4D00; border: none; cursor: pointer;
+          background: var(--accent); border: none; cursor: pointer;
           padding: 18px 48px; color: #000;
           font-weight: 700; font-size: 17px;
           letter-spacing: -0.01em; width: 100%; max-width: 360px;
@@ -123,11 +123,11 @@ export default function EmptyDashboard({
         .ed-btn-primary:hover {
           background: #ff5e1a;
           transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(255,77,0,0.25);
+          box-shadow: 0 8px 24px rgba(var(--accent-rgb),0.25);
         }
         .ed-btn-primary:active { transform: translateY(0); }
         .ed-free-note {
-          font-size: 12px; color: #555;
+          font-size: 12px; color: var(--disabled-foreground);
           display: flex; align-items: center; gap: 6px;
           margin-top: 14px; text-align: center;
         }
@@ -161,10 +161,10 @@ export default function EmptyDashboard({
         <header className="ed-header">
           <div className="ed-logo">
             <div className="ed-logo-mark">A</div>
-            <span className="ed-logo-text">A-Cut<span style={{ color: "#FF4D00" }}>.</span></span>
+            <span className="ed-logo-text">A-Cut<span style={{ color: "var(--accent)" }}>.</span></span>
           </div>
           <span className="ed-user-badge">
-            안녕하세요, <strong style={{ color: "#fff" }}>{userName} 작가님</strong>
+            안녕하세요, <strong style={{ color: "var(--foreground)" }}>{userName} 작가님</strong>
           </span>
         </header>
 
@@ -172,9 +172,9 @@ export default function EmptyDashboard({
         <main className="ed-main">
           <div className="ed-title-area">
             <div className="ed-kicker">
-              <div style={{ width: 12, height: 1, background: "#FF4D00" }} />
+              <div style={{ width: 12, height: 1, background: "var(--accent)" }} />
               시작하기
-              <div style={{ width: 12, height: 1, background: "#FF4D00" }} />
+              <div style={{ width: 12, height: 1, background: "var(--accent)" }} />
             </div>
             <h1 className="ed-title">첫 프로젝트를<br />만들어보세요</h1>
             <p className="ed-subtitle">3분이면 고객에게 사진을 보낼 수 있습니다</p>
@@ -233,7 +233,7 @@ export default function EmptyDashboard({
             새 프로젝트 만들기
           </button>
           <div className="ed-free-note">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FF4D00" strokeWidth="2">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -248,7 +248,7 @@ export default function EmptyDashboard({
         onClick={onCreateProject}
         aria-label="새 프로젝트"
         title="새 프로젝트"
-        className="fixed z-[100000] right-5 bottom-20 md:right-8 md:bottom-8 flex h-14 w-14 items-center justify-center rounded-full bg-[#FF4D00] text-white shadow-[0_4px_20px_rgba(255,77,0,0.4)] transition-transform active:scale-95 md:hover:scale-105 md:hover:shadow-[0_6px_28px_rgba(255,77,0,0.45)]"
+        className="fixed z-[100000] right-5 bottom-20 md:right-8 md:bottom-8 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-foreground shadow-[0_4px_20px_rgba(var(--accent-rgb),0.4)] transition-transform active:scale-95 md:hover:scale-105 md:hover:shadow-[0_6px_28px_rgba(var(--accent-rgb),0.45)]"
       >
         <Plus size={24} strokeWidth={2} />
       </button>

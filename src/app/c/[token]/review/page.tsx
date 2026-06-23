@@ -15,14 +15,14 @@ import type { ReviewPhotoItem } from "@/lib/customer-api-server";
 import type { Project } from "@/types";
 
 const MONO   = "'JetBrains Mono', 'Space Mono', monospace";
-const ACCENT = "#ff4d00";
-const BORDER = "#27272c";
-const BORDER_HI = "#333333";
-const BG_BASE  = "#030303";
-const BG_PANEL = "#0a0a0a";
-const BG_INPUT = "#111111";
-const TEXT  = "#ffffff";
-const MUTED = "#888888";
+const ACCENT = "var(--accent)";
+const BORDER = "var(--border)";
+const BORDER_HI = "var(--border-strong)";
+const BG_BASE  = "var(--background)";
+const BG_PANEL = "var(--surface-raised)";
+const BG_INPUT = "var(--surface)";
+const TEXT  = "var(--foreground)";
+const MUTED = "var(--muted-foreground)";
 const GREEN  = "#00ff66";
 const ORANGE = "#ffaa00";
 
@@ -104,7 +104,7 @@ export default function ReviewRedirectPage() {
   // 데스크탑: 위 useEffect가 redirect 처리. 임시 로딩 표시
   return (
     <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: BG_BASE }}>
-      <p style={{ fontFamily: MONO, fontSize: 11, color: "#555", letterSpacing: "0.1em" }}>
+      <p style={{ fontFamily: MONO, fontSize: 11, color: "var(--subtle-foreground)", letterSpacing: "0.1em" }}>
         LOADING_REVIEW...
       </p>
     </div>
@@ -240,7 +240,7 @@ function MobileReviewGalleryView({
     >
       <CustomerHeader>
         <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
-        <span className="font-mono text-[11px] text-zinc-500 max-w-[180px] truncate">{project.name}</span>
+        <span className="font-mono text-[11px] text-subtle-foreground max-w-[180px] truncate">{project.name}</span>
       </CustomerHeader>
 
       <section style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
@@ -300,7 +300,7 @@ function MobileReviewGalleryView({
                     style={{
                       position: "absolute",
                       inset: 0,
-                      background: "radial-gradient(circle at center,#1a1a1a 0%,#0a0a0a 100%)",
+                      background: "radial-gradient(circle at center,var(--surface-raised) 0%,var(--background) 100%)",
                     }}
                   />
                 )}
@@ -571,8 +571,8 @@ function DeliveryReceiptView({
     <div
       style={{
         minHeight: "100dvh",
-        background: "#0a0a0c",
-        color: "#fff",
+        background: "var(--background)",
+        color: "var(--foreground)",
         display: "flex",
         flexDirection: "column",
         fontFamily: "'Pretendard Variable',-apple-system,sans-serif",
@@ -593,7 +593,7 @@ function DeliveryReceiptView({
         <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
           <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--foreground)", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {project.name}
             </div>
           </div>
@@ -604,8 +604,8 @@ function DeliveryReceiptView({
               fontFamily: MONO,
               fontSize: 10,
               color: ACCENT,
-              background: "rgba(255,77,0,0.1)",
-              border: "1px solid rgba(255,77,0,0.3)",
+              background: "rgba(var(--accent-rgb), 0.1)",
+              border: "1px solid rgba(var(--accent-rgb), 0.3)",
               padding: "3px 8px",
               borderRadius: 6,
               letterSpacing: "0.05em",
@@ -624,10 +624,10 @@ function DeliveryReceiptView({
           background: "rgba(5,5,8,0.6)",
         }}
       >
-        <h1 style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: 0, lineHeight: 1.35 }}>
+        <h1 style={{ fontSize: 14, fontWeight: 700, color: "var(--foreground)", margin: 0, lineHeight: 1.35 }}>
           {filename}
         </h1>
-        <p style={{ fontSize: 13, color: "#9b9ba1", margin: "8px 0 0", lineHeight: 1.6 }}>
+        <p style={{ fontSize: 13, color: "var(--muted-foreground)", margin: "8px 0 0", lineHeight: 1.6 }}>
           작가가 보정한 사진을 확인해 주세요. 확인이 끝나면 아래 [수령 완료]를 눌러 알려주세요.
         </p>
       </section>
@@ -650,7 +650,7 @@ function DeliveryReceiptView({
                 fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.03em",
-                color: viewMode === "single-retouched" ? ACCENT : "#8b8b93",
+                color: viewMode === "single-retouched" ? ACCENT : "var(--subtle-foreground)",
                 borderBottom: viewMode === "single-retouched" ? `2px solid ${ACCENT}` : "2px solid transparent",
               }}
             >
@@ -669,8 +669,8 @@ function DeliveryReceiptView({
                 fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.03em",
-                color: viewMode === "single-original" ? "#c9c9d1" : "#8b8b93",
-                borderBottom: viewMode === "single-original" ? `2px solid #c9c9d1` : "2px solid transparent",
+                color: viewMode === "single-original" ? "var(--muted-foreground)" : "var(--subtle-foreground)",
+                borderBottom: viewMode === "single-original" ? `2px solid var(--muted-foreground)` : "2px solid transparent",
               }}
             >
               원본
@@ -702,7 +702,7 @@ function DeliveryReceiptView({
                   style={{
                     flex: 1,
                     border: `1px solid ${BORDER}`,
-                    background: "radial-gradient(circle at center,#1a1a1a 0%,#0a0a0c 100%)",
+                    background: "radial-gradient(circle at center,var(--surface-raised) 0%,var(--background) 100%)",
                     position: "relative",
                     overflow: "hidden",
                     borderRadius: 12,
@@ -712,7 +712,7 @@ function DeliveryReceiptView({
                   aria-label="원본 크게 보기"
                 >
                   <div style={{ position: "absolute", top: 10, left: 10, zIndex: 2, display: "flex", gap: 8, pointerEvents: "none" }}>
-                    <span style={{ fontFamily: MONO, fontSize: 10, color: "#c9c9d1", background: "rgba(0,0,0,0.55)", border: `1px solid ${BORDER}`, padding: "4px 8px", borderRadius: 10 }}>
+                    <span style={{ fontFamily: MONO, fontSize: 10, color: "var(--muted-foreground)", background: "rgba(0,0,0,0.55)", border: `1px solid ${BORDER}`, padding: "4px 8px", borderRadius: 10 }}>
                       원본
                     </span>
                   </div>
@@ -728,8 +728,8 @@ function DeliveryReceiptView({
                 <div
                   style={{
                     flex: 1,
-                    border: `1px solid rgba(255,77,0,0.35)`,
-                    background: "radial-gradient(circle at center,#1a1a1a 0%,#0a0a0c 100%)",
+                    border: `1px solid rgba(var(--accent-rgb), 0.35)`,
+                    background: "radial-gradient(circle at center,var(--surface-raised) 0%,var(--background) 100%)",
                     position: "relative",
                     overflow: "hidden",
                     borderRadius: 12,
@@ -739,7 +739,7 @@ function DeliveryReceiptView({
                   aria-label="보정본 크게 보기"
                 >
                   <div style={{ position: "absolute", top: 10, left: 10, zIndex: 2, display: "flex", gap: 8, pointerEvents: "none" }}>
-                    <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, background: "rgba(0,0,0,0.55)", border: `1px solid rgba(255,77,0,0.35)`, padding: "4px 8px", borderRadius: 10 }}>
+                    <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, background: "rgba(0,0,0,0.55)", border: `1px solid rgba(var(--accent-rgb), 0.35)`, padding: "4px 8px", borderRadius: 10 }}>
                       {versionLabel}
                     </span>
                   </div>
@@ -753,7 +753,7 @@ function DeliveryReceiptView({
               )}
             </div>
           ) : (
-            <div style={{ flex: 1, border: `1px solid ${BORDER}`, borderRadius: 12, background: "#0a0a0c", display: "flex", alignItems: "center", justifyContent: "center", color: "#777", fontFamily: MONO, fontSize: 11 }}>
+            <div style={{ flex: 1, border: `1px solid ${BORDER}`, borderRadius: 12, background: "var(--background)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--subtle-foreground)", fontFamily: MONO, fontSize: 11 }}>
               보정본을 불러오는 중…
             </div>
           )}
@@ -774,8 +774,8 @@ function DeliveryReceiptView({
                     width: 86,
                     flexShrink: 0,
                     borderRadius: 12,
-                    border: `1px solid ${isActive ? "rgba(255,77,0,0.55)" : BORDER}`,
-                    background: "#0a0a0c",
+                    border: `1px solid ${isActive ? "rgba(var(--accent-rgb), 0.55)" : BORDER}`,
+                    background: "var(--background)",
                     overflow: "hidden",
                     cursor: "pointer",
                     padding: 0,
@@ -811,7 +811,7 @@ function DeliveryReceiptView({
           zIndex: 50,
           background: "rgba(5,5,8,0.97)",
           backdropFilter: "blur(12px)",
-          borderTop: `1px solid rgba(255,77,0,0.25)`,
+          borderTop: `1px solid rgba(var(--accent-rgb), 0.25)`,
           padding: "12px 16px",
           paddingBottom: "calc(12px + env(safe-area-inset-bottom,0px))",
         }}
@@ -877,16 +877,16 @@ function DeliveryReceiptView({
             style={{
               width: "100%",
               maxWidth: 380,
-              background: "#0f0f12",
+              background: "var(--surface)",
               border: `1px solid ${BORDER}`,
               borderRadius: 16,
               padding: 22,
             }}
           >
-            <h3 id="rcpt-confirm-title" style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#fff" }}>
+            <h3 id="rcpt-confirm-title" style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--foreground)" }}>
               보정본 수령 완료
             </h3>
-            <p style={{ margin: "10px 0 18px", fontSize: 13, color: "#a1a1aa", lineHeight: 1.6 }}>
+            <p style={{ margin: "10px 0 18px", fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6 }}>
               수령 완료 시 프로젝트가 납품 완료 상태로 바뀌고, 더 이상 변경할 수 없습니다.
             </p>
             {errorMsg && (
@@ -900,8 +900,8 @@ function DeliveryReceiptView({
                 style={{
                   flex: 1, height: 44,
                   border: `1px solid ${BORDER}`,
-                  background: "#0a0a0c",
-                  color: "#a1a1aa",
+                  background: "var(--background)",
+                  color: "var(--muted-foreground)",
                   fontSize: 13, fontWeight: 600,
                   borderRadius: 10,
                   cursor: submitting ? "not-allowed" : "pointer",

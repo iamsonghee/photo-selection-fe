@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-const ORANGE = "#FF4D00";
-const BG = "#000";
-const SURFACE = "#0a0a0a";
-const BORDER = "#1f1f1f";
-const MUTED = "#666";
+const ORANGE = "var(--accent)";
+const BG = "var(--background)";
+const SURFACE = "var(--surface)";
+const BORDER = "var(--border-subtle)";
+const MUTED = "var(--subtle-foreground)";
 
 type Tab = "photographer" | "client";
 
@@ -76,12 +76,12 @@ function TipBox({ children }: { children: React.ReactNode }) {
         paddingTop: 12,
         paddingBottom: 12,
         paddingRight: 16,
-        background: "#0d0d0d",
+        background: "var(--surface-raised)",
         borderRadius: "0 4px 4px 0",
         marginTop: 24,
         fontSize: 14,
         lineHeight: 1.7,
-        color: "#aaa",
+        color: "var(--muted-foreground)",
       }}
     >
       <span
@@ -124,8 +124,8 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
         {n}
       </span>
       <div style={{ flex: 1 }}>
-        <strong style={{ color: "#fff", display: "block", marginBottom: 4 }}>{title}</strong>
-        <div style={{ color: "#aaa", fontSize: 14, lineHeight: 1.7 }}>{children}</div>
+        <strong style={{ color: "var(--foreground)", display: "block", marginBottom: 4 }}>{title}</strong>
+        <div style={{ color: "var(--muted-foreground)", fontSize: 14, lineHeight: 1.7 }}>{children}</div>
       </div>
     </li>
   );
@@ -155,7 +155,7 @@ function PhotographerContent() {
           ].map(([href, badge, label]) => (
             <li key={href} style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ color: badge === "—" ? MUTED : ORANGE, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, width: 20 }}>{badge}</span>
-              <a href={href} style={{ color: "#ccc", textDecoration: "none", fontSize: 14 }}>{label}</a>
+              <a href={href} style={{ color: "var(--muted-foreground)", textDecoration: "none", fontSize: 14 }}>{label}</a>
             </li>
           ))}
         </ol>
@@ -175,11 +175,11 @@ function PhotographerContent() {
         <ScreenshotPlaceholder />
         <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
           <Step n={1} title="로그인">
-            <a href="https://acut.vercel.app" target="_blank" rel="noreferrer" style={{ color: ORANGE }}>acut.vercel.app</a>에 접속한 뒤 <strong style={{ color: "#fff" }}>"Google로 시작하기"</strong> 버튼을 클릭합니다.
+            <a href="https://acut.vercel.app" target="_blank" rel="noreferrer" style={{ color: ORANGE }}>acut.vercel.app</a>에 접속한 뒤 <strong style={{ color: "var(--foreground)" }}>"Google로 시작하기"</strong> 버튼을 클릭합니다.
             <br /><span style={{ fontSize: 12, color: MUTED }}>※ 베타 기간 중 구글 로그인만 지원합니다. 카카오 로그인은 정식 출시 후 제공 예정.</span>
           </Step>
           <Step n={2} title="대시보드 진입">로그인하면 대시보드로 자동 이동합니다.</Step>
-          <Step n={3} title="새 프로젝트 생성">화면 오른쪽 하단의 <strong style={{ color: "#fff" }}>"새 프로젝트" (+) 버튼</strong>을 클릭합니다.</Step>
+          <Step n={3} title="새 프로젝트 생성">화면 오른쪽 하단의 <strong style={{ color: "var(--foreground)" }}>"새 프로젝트" (+) 버튼</strong>을 클릭합니다.</Step>
           <Step n={4} title="프로젝트 정보 입력">
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
@@ -204,22 +204,22 @@ function PhotographerContent() {
                     ["재보정 횟수", "선택", "0 / 1 / 2회 — 보정본 피드백 라운드 수"],
                   ].map(([item, req, desc]) => (
                     <tr key={item}>
-                      <td style={{ padding: "9px 12px", borderBottom: `1px solid ${BORDER}`, color: "#ddd", fontWeight: 500 }}>{item}</td>
+                      <td style={{ padding: "9px 12px", borderBottom: `1px solid ${BORDER}`, color: "var(--foreground)", fontWeight: 500 }}>{item}</td>
                       <td style={{ padding: "9px 12px", borderBottom: `1px solid ${BORDER}`, color: req === "필수" ? ORANGE : MUTED, fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>{req}</td>
-                      <td style={{ padding: "9px 12px", borderBottom: `1px solid ${BORDER}`, color: "#888" }}>{desc}</td>
+                      <td style={{ padding: "9px 12px", borderBottom: `1px solid ${BORDER}`, color: "var(--muted-foreground)" }}>{desc}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <br />입력 완료 후 <strong style={{ color: "#fff" }}>"만들기" 버튼</strong>을 클릭합니다.
+            <br />입력 완료 후 <strong style={{ color: "var(--foreground)" }}>"만들기" 버튼</strong>을 클릭합니다.
           </Step>
         </ol>
         <TipBox>
           <ul style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: 6 }}>
             <li>셀렉 기한은 프로젝트 생성 후에도 수정할 수 있어요.</li>
-            <li>PIN을 설정했다면 링크와 비밀번호를 <strong style={{ color: "#ddd" }}>함께</strong> 고객에게 전달해야 합니다.</li>
-            <li>베타 기간 중 프로젝트는 최대 <strong style={{ color: "#ddd" }}>10개</strong>까지 생성 가능합니다.</li>
+            <li>PIN을 설정했다면 링크와 비밀번호를 <strong style={{ color: "var(--foreground)" }}>함께</strong> 고객에게 전달해야 합니다.</li>
+            <li>베타 기간 중 프로젝트는 최대 <strong style={{ color: "var(--foreground)" }}>10개</strong>까지 생성 가능합니다.</li>
           </ul>
         </TipBox>
       </section>
@@ -236,18 +236,18 @@ function PhotographerContent() {
         <ScreenshotPlaceholder />
         <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
           <Step n={1} title="프로젝트 진입">대시보드에서 해당 프로젝트 카드를 클릭합니다.</Step>
-          <Step n={2} title="업로드 시작">프로젝트 상세 페이지 상단의 <strong style={{ color: "#fff" }}>"원본 업로드" 버튼</strong>을 클릭합니다.</Step>
+          <Step n={2} title="업로드 시작">프로젝트 상세 페이지 상단의 <strong style={{ color: "var(--foreground)" }}>"원본 업로드" 버튼</strong>을 클릭합니다.</Step>
           <Step n={3} title="파일 선택">
             업로드할 사진 파일을 선택합니다. 단일 또는 다중 선택 모두 가능합니다.<br />
-            지원 형식: <strong style={{ color: "#fff" }}>JPEG, PNG, WebP, HEIC/HEIF</strong>
+            지원 형식: <strong style={{ color: "var(--foreground)" }}>JPEG, PNG, WebP, HEIC/HEIF</strong>
           </Step>
           <Step n={4} title="업로드 진행 확인">업로드 진행률이 화면에 표시됩니다. 프로젝트 상태가 "업로드 중"으로 표시됩니다.</Step>
-          <Step n={5} title="완료 확인">셀렉 갯수(N장) 이상 업로드가 완료되면 화면 하단의 <strong style={{ color: "#fff" }}>"고객 초대 링크 활성화" 버튼</strong>이 활성화됩니다.</Step>
+          <Step n={5} title="완료 확인">셀렉 갯수(N장) 이상 업로드가 완료되면 화면 하단의 <strong style={{ color: "var(--foreground)" }}>"고객 초대 링크 활성화" 버튼</strong>이 활성화됩니다.</Step>
         </ol>
         <TipBox>
           <ul style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: 6 }}>
-            <li>RAW 파일(CR3, NEF 등)은 지원하지 않습니다. <strong style={{ color: "#ddd" }}>JPEG 또는 HEIC로 변환</strong> 후 업로드해 주세요.</li>
-            <li>한 프로젝트에 최대 <strong style={{ color: "#ddd" }}>1,500장</strong>까지 업로드 가능합니다 (베타 제한).</li>
+            <li>RAW 파일(CR3, NEF 등)은 지원하지 않습니다. <strong style={{ color: "var(--foreground)" }}>JPEG 또는 HEIC로 변환</strong> 후 업로드해 주세요.</li>
+            <li>한 프로젝트에 최대 <strong style={{ color: "var(--foreground)" }}>1,500장</strong>까지 업로드 가능합니다 (베타 제한).</li>
             <li>업로드 도중에도 갤러리에서 실시간으로 진행 상황을 확인할 수 있어요.</li>
           </ul>
         </TipBox>
@@ -265,23 +265,23 @@ function PhotographerContent() {
         <ScreenshotPlaceholder />
         <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
           <Step n={1} title="초대 링크 활성화">
-            업로드 페이지 하단의 <strong style={{ color: "#fff" }}>"고객 초대 링크 활성화" 버튼</strong>을 클릭합니다.<br />
+            업로드 페이지 하단의 <strong style={{ color: "var(--foreground)" }}>"고객 초대 링크 활성화" 버튼</strong>을 클릭합니다.<br />
             <span style={{ fontSize: 12, color: MUTED }}>이 버튼은 셀렉 갯수(N장) 이상 업로드됐을 때만 클릭할 수 있어요.</span>
           </Step>
-          <Step n={2} title="공유 모달 확인">버튼 클릭 즉시 프로젝트 상태가 <strong style={{ color: "#fff" }}>"셀렉 중"</strong>으로 변경되고, 공유 모달이 자동으로 열립니다.</Step>
+          <Step n={2} title="공유 모달 확인">버튼 클릭 즉시 프로젝트 상태가 <strong style={{ color: "var(--foreground)" }}>"셀렉 중"</strong>으로 변경되고, 공유 모달이 자동으로 열립니다.</Step>
           <Step n={3} title="링크 복사">
-            PIN을 설정한 경우 <strong style={{ color: "#fff" }}>"링크와 비밀번호 복사"</strong> 버튼을 클릭합니다.<br />
-            PIN이 없는 경우 <strong style={{ color: "#fff" }}>"초대 링크 공유"</strong> 버튼을 클릭합니다.
+            PIN을 설정한 경우 <strong style={{ color: "var(--foreground)" }}>"링크와 비밀번호 복사"</strong> 버튼을 클릭합니다.<br />
+            PIN이 없는 경우 <strong style={{ color: "var(--foreground)" }}>"초대 링크 공유"</strong> 버튼을 클릭합니다.
           </Step>
           <Step n={4} title="고객에게 전달">
-            복사된 링크를 카카오톡, 문자 등으로 고객에게 <strong style={{ color: "#fff" }}>직접 전달</strong>합니다.<br />
+            복사된 링크를 카카오톡, 문자 등으로 고객에게 <strong style={{ color: "var(--foreground)" }}>직접 전달</strong>합니다.<br />
             <span style={{ fontSize: 12, color: MUTED }}>※ 앱 내 자동 전송 기능은 베타 기간 중 제공하지 않습니다.</span>
           </Step>
           <Step n={5} title="고객 셀렉 시작">고객이 링크 접속 → 사진 선택 시작.</Step>
         </ol>
         <TipBox>
           <ul style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: 6 }}>
-            <li>"링크와 비밀번호 복사" 버튼으로 링크와 PIN을 <strong style={{ color: "#ddd" }}>한 번에</strong> 복사할 수 있어요.</li>
+            <li>"링크와 비밀번호 복사" 버튼으로 링크와 PIN을 <strong style={{ color: "var(--foreground)" }}>한 번에</strong> 복사할 수 있어요.</li>
             <li>나중에 링크를 다시 공유해야 할 때는 프로젝트 페이지에서 언제든 다시 복사 가능합니다.</li>
             <li>고객은 갤러리에서 사진마다 별점(1~5점)과 색상 태그를 달 수 있어요. 보정 참고 자료로 활용하세요.</li>
           </ul>
@@ -299,13 +299,13 @@ function PhotographerContent() {
         <p style={{ color: MUTED, fontSize: 14, marginBottom: 28, marginLeft: 40 }}>고객이 최종 확정한 사진 목록을 확인하고 보정을 시작합니다.</p>
         <ScreenshotPlaceholder />
         <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
-          <Step n={1} title="셀렉 완료 확인">대시보드에서 해당 프로젝트 상태 배지가 <strong style={{ color: "#fff" }}>"셀렉 완료"</strong>로 변경됐는지 확인합니다.</Step>
-          <Step n={2} title="결과 페이지 진입">프로젝트 카드를 클릭한 뒤, 워크플로우에서 <strong style={{ color: "#fff" }}>"셀렉 확인"</strong> 단계를 클릭합니다.</Step>
+          <Step n={1} title="셀렉 완료 확인">대시보드에서 해당 프로젝트 상태 배지가 <strong style={{ color: "var(--foreground)" }}>"셀렉 완료"</strong>로 변경됐는지 확인합니다.</Step>
+          <Step n={2} title="결과 페이지 진입">프로젝트 카드를 클릭한 뒤, 워크플로우에서 <strong style={{ color: "var(--foreground)" }}>"셀렉 확인"</strong> 단계를 클릭합니다.</Step>
           <Step n={3} title="선택 결과 확인">고객이 선택한 사진 목록과 각 사진에 남긴 코멘트를 확인합니다.</Step>
           <Step n={4} title="목록 내보내기 (선택)">
-            <strong style={{ color: "#fff" }}>"CSV"</strong> 버튼으로 파일명 목록을 다운로드하거나, <strong style={{ color: "#fff" }}>"CLIPBOARD"</strong> 버튼으로 복사할 수 있어요.
+            <strong style={{ color: "var(--foreground)" }}>"CSV"</strong> 버튼으로 파일명 목록을 다운로드하거나, <strong style={{ color: "var(--foreground)" }}>"CLIPBOARD"</strong> 버튼으로 복사할 수 있어요.
           </Step>
-          <Step n={5} title="보정 시작">결과를 확인했으면 <strong style={{ color: "#fff" }}>"보정 시작하기" 버튼</strong>을 클릭합니다. 프로젝트 상태가 "보정 중"으로 전환됩니다.</Step>
+          <Step n={5} title="보정 시작">결과를 확인했으면 <strong style={{ color: "var(--foreground)" }}>"보정 시작하기" 버튼</strong>을 클릭합니다. 프로젝트 상태가 "보정 중"으로 전환됩니다.</Step>
         </ol>
         <TipBox>
           <ul style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -340,7 +340,7 @@ function ClientContent() {
           ].map(([href, badge, label]) => (
             <li key={href} style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ color: badge === "—" ? MUTED : ORANGE, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, width: 20 }}>{badge}</span>
-              <a href={href} style={{ color: "#ccc", textDecoration: "none", fontSize: 14 }}>{label}</a>
+              <a href={href} style={{ color: "var(--muted-foreground)", textDecoration: "none", fontSize: 14 }}>{label}</a>
             </li>
           ))}
         </ol>
@@ -357,7 +357,7 @@ function ClientContent() {
         <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
           <Step n={1} title="링크 열기">작가에게 받은 링크를 브라우저에서 엽니다.</Step>
           <Step n={2} title="비밀번호 입력 (설정된 경우)">작가가 PIN을 설정했다면 4자리 비밀번호 입력 화면이 나타납니다. 작가에게 받은 비밀번호를 입력합니다.</Step>
-          <Step n={3} title="갤러리 진입">작가 정보, 선택 갯수, 셀렉 기한을 확인한 뒤 <strong style={{ color: "#fff" }}>"사진 보러 가기"</strong> 버튼을 클릭합니다.</Step>
+          <Step n={3} title="갤러리 진입">작가 정보, 선택 갯수, 셀렉 기한을 확인한 뒤 <strong style={{ color: "var(--foreground)" }}>"사진 보러 가기"</strong> 버튼을 클릭합니다.</Step>
         </ol>
         <TipBox>
           <ul style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -381,14 +381,14 @@ function ClientContent() {
         <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
           <Step n={1} title="사진 선택">갤러리에서 원하는 사진을 클릭해 선택합니다. 다시 클릭하면 해제됩니다.</Step>
           <Step n={2} title="별점·태그·코멘트 추가 (선택 사항)">사진을 클릭하면 상세 보기에서 별점(1~5), 색상 태그, 텍스트 코멘트를 남길 수 있어요. 작가의 보정 참고 자료가 됩니다.</Step>
-          <Step n={3} title="선택 확인">상단 <strong style={{ color: "#fff" }}>"선택됨"</strong> 탭을 누르면 선택한 사진만 필터해서 확인할 수 있어요.</Step>
+          <Step n={3} title="선택 확인">상단 <strong style={{ color: "var(--foreground)" }}>"선택됨"</strong> 탭을 누르면 선택한 사진만 필터해서 확인할 수 있어요.</Step>
           <Step n={4} title="보정 의뢰">
-            N장 선택이 완료되면 하단 <strong style={{ color: "#fff" }}>"보정 의뢰하기"</strong> 버튼이 활성화됩니다. 클릭 후 모달에서 <strong style={{ color: "#fff" }}>"확정 및 전송"</strong>을 눌러 최종 확정합니다.
+            N장 선택이 완료되면 하단 <strong style={{ color: "var(--foreground)" }}>"보정 의뢰하기"</strong> 버튼이 활성화됩니다. 클릭 후 모달에서 <strong style={{ color: "var(--foreground)" }}>"확정 및 전송"</strong>을 눌러 최종 확정합니다.
           </Step>
         </ol>
         <TipBox>
           <ul style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: 6 }}>
-            <li>확정 후 작가가 보정을 시작하기 전이라면 확정 화면의 <strong style={{ color: "#ddd" }}>"확정 취소 후 다시 선택"</strong> 버튼으로 최대 3회까지 되돌릴 수 있어요.</li>
+            <li>확정 후 작가가 보정을 시작하기 전이라면 확정 화면의 <strong style={{ color: "var(--foreground)" }}>"확정 취소 후 다시 선택"</strong> 버튼으로 최대 3회까지 되돌릴 수 있어요.</li>
             <li>별점·색상 태그·코멘트는 모두 선택 사항입니다.</li>
           </ul>
         </TipBox>
@@ -406,13 +406,13 @@ function ClientContent() {
         <ScreenshotPlaceholder />
         <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
           <Step n={1} title="재접속">작가에게서 보정 완료 알림을 받으면 기존 링크로 다시 접속합니다.</Step>
-          <Step n={2} title="보정본 확인">각 사진의 보정본을 확인하며 <strong style={{ color: "#fff" }}>확정</strong> 또는 <strong style={{ color: "#fff" }}>재보정 요청</strong> 중 하나를 선택합니다.</Step>
+          <Step n={2} title="보정본 확인">각 사진의 보정본을 확인하며 <strong style={{ color: "var(--foreground)" }}>확정</strong> 또는 <strong style={{ color: "var(--foreground)" }}>재보정 요청</strong> 중 하나를 선택합니다.</Step>
           <Step n={3} title="코멘트 추가 (재보정 요청 시)">재보정을 요청할 경우 코멘트로 수정 내용을 남길 수 있어요.</Step>
-          <Step n={4} title="검토 완료 전달">모든 사진 검토 후 <strong style={{ color: "#fff" }}>"작가에게 전달"</strong> 버튼을 클릭합니다.</Step>
+          <Step n={4} title="검토 완료 전달">모든 사진 검토 후 <strong style={{ color: "var(--foreground)" }}>"작가에게 전달"</strong> 버튼을 클릭합니다.</Step>
         </ol>
         <TipBox>
           <ul style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: 6 }}>
-            <li>재보정 횟수가 0회로 설정된 프로젝트는 이 단계가 없습니다. 보정본 전체를 확인 후 <strong style={{ color: "#ddd" }}>"수령 완료"</strong> 버튼을 클릭하세요.</li>
+            <li>재보정 횟수가 0회로 설정된 프로젝트는 이 단계가 없습니다. 보정본 전체를 확인 후 <strong style={{ color: "var(--foreground)" }}>"수령 완료"</strong> 버튼을 클릭하세요.</li>
             <li>이 섹션은 작가가 재보정 횟수를 1회 이상으로 설정한 프로젝트에만 해당합니다.</li>
           </ul>
         </TipBox>
@@ -499,7 +499,7 @@ function FaqSection({ items }: { items: { q: string; a: string }[] }) {
             <div
               style={{
                 padding: "14px 20px 18px",
-                color: "#999",
+                color: "var(--muted-foreground)",
                 fontSize: 14,
                 lineHeight: 1.8,
                 borderTop: `1px solid ${BORDER}`,
@@ -528,7 +528,7 @@ export default function GuidePageClient() {
   }
 
   return (
-    <div style={{ background: BG, minHeight: "100vh", color: "#fff" }}>
+    <div style={{ background: BG, minHeight: "100vh", color: "var(--foreground)" }}>
       {/* Corner brackets */}
       <div style={{ position: "fixed", top: 16, left: 16, width: 16, height: 16, borderTop: `2px solid ${ORANGE}`, borderLeft: `2px solid ${ORANGE}`, zIndex: 50, pointerEvents: "none" }} />
       <div style={{ position: "fixed", top: 16, right: 16, width: 16, height: 16, borderTop: `2px solid ${ORANGE}`, borderRight: `2px solid ${ORANGE}`, zIndex: 50, pointerEvents: "none" }} />
@@ -557,7 +557,7 @@ export default function GuidePageClient() {
         <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "clamp(28px, 5vw, 40px)", fontWeight: 700, lineHeight: 1.2, marginBottom: 16 }}>
           A컷 사용 가이드
         </h1>
-        <p style={{ color: "#888", fontSize: 16, lineHeight: 1.6, marginBottom: 40 }}>
+        <p style={{ color: "var(--muted-foreground)", fontSize: 16, lineHeight: 1.6, marginBottom: 40 }}>
           서비스 전체 흐름을 순서대로 안내합니다.
         </p>
 
@@ -591,10 +591,10 @@ export default function GuidePageClient() {
                   transition: "border-color 0.15s",
                 }}
               >
-                <span style={{ display: "block", fontWeight: 700, fontSize: 15, color: isActive ? "#fff" : MUTED, marginBottom: 3 }}>
+                <span style={{ display: "block", fontWeight: 700, fontSize: 15, color: isActive ? "var(--foreground)" : MUTED, marginBottom: 3 }}>
                   {label}
                 </span>
-                <span style={{ display: "block", fontSize: 11, color: isActive ? "#666" : "#333", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.06em" }}>
+                <span style={{ display: "block", fontSize: 11, color: isActive ? "var(--subtle-foreground)" : "var(--disabled-foreground)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.06em" }}>
                   {sub}
                 </span>
               </button>
@@ -615,7 +615,7 @@ export default function GuidePageClient() {
           <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 700, marginBottom: 8 }}>
             이제 직접 써보세요.
           </h3>
-          <p style={{ color: "#888", fontSize: 15, marginBottom: 32 }}>베타 기간 동안 무료로 사용할 수 있습니다.</p>
+          <p style={{ color: "var(--muted-foreground)", fontSize: 15, marginBottom: 32 }}>베타 기간 동안 무료로 사용할 수 있습니다.</p>
           <Link
             href="/"
             style={{ display: "inline-flex", alignItems: "center", gap: 10, background: ORANGE, color: "#000", fontWeight: 700, fontSize: 16, padding: "14px 32px", textDecoration: "none", letterSpacing: "0.04em" }}

@@ -27,27 +27,27 @@ function getVariant(
     if (photoCount === 0) {
       return {
         label: "업로드전",
-        pillStyle: { border: "1px solid rgba(39,39,42,0.8)", background: "#111", opacity: 0.7 },
+        pillStyle: { border: "1px solid var(--border-subtle)", background: "var(--surface)" },
         dotType: "filled",
-        dotStyle: { background: "#3f3f46" },
-        textStyle: { fontWeight: 500, color: "#71717a" },
+        dotStyle: { background: "var(--border-strong)" },
+        textStyle: { fontWeight: 500, color: "var(--subtle-foreground)" },
       };
     }
     if (photoCount < requiredCount) {
       return {
         label: "업로드중",
-        pillStyle: { border: "1px solid #27272a", background: "#151515" },
+        pillStyle: { border: "1px solid var(--border-subtle)", background: "var(--surface)" },
         dotType: "outline",
-        dotStyle: { border: "1px solid #71717a" },
-        textStyle: { fontWeight: 500, color: "#a1a1aa" },
+        dotStyle: { border: "1px solid var(--subtle-foreground)" },
+        textStyle: { fontWeight: 500, color: "var(--subtle-foreground)" },
       };
     }
     return {
       label: "초대대기",
-      pillStyle: { border: "1px solid #3f3f46", background: "#1A1A1A" },
+      pillStyle: { border: "1px solid var(--border)", background: "var(--surface)" },
       dotType: "filled",
-      dotStyle: { background: "#a1a1aa" },
-      textStyle: { fontWeight: 500, color: "#d4d4d8" },
+      dotStyle: { background: "var(--subtle-foreground)" },
+      textStyle: { fontWeight: 500, color: "var(--muted-foreground)" },
     };
   }
 
@@ -55,67 +55,67 @@ function getVariant(
     case "selecting":
       return {
         label: "셀렉중",
-        pillStyle: { border: "1px solid #3f3f46", background: "#151515" },
+        pillStyle: { border: "1px solid var(--border)", background: "var(--surface)" },
         dotType: "outline",
-        dotStyle: { border: "1px solid rgba(255,77,0,0.6)" },
-        textStyle: { fontWeight: 500, color: "#d4d4d8" },
+        dotStyle: { border: "1px solid rgba(var(--accent-rgb), 0.6)" },
+        textStyle: { fontWeight: 500, color: "var(--foreground)" },
       };
     case "confirmed":
       return {
         label: "보정대기",
-        pillStyle: { border: "1px solid #52525b", background: "#1A1A1A" },
+        pillStyle: { border: "1px solid var(--border-strong)", background: "var(--surface)" },
         dotType: "outline",
-        dotStyle: { border: "1px solid #FF4D00" },
-        textStyle: { fontWeight: 500, color: "#e4e4e7" },
+        dotStyle: { border: "1px solid var(--accent)" },
+        textStyle: { fontWeight: 500, color: "var(--foreground)" },
       };
     case "editing":
       return {
         label: "보정중",
-        pillStyle: { border: "1px solid #3f3f46", background: "#1A1A1A" },
+        pillStyle: { border: "1px solid var(--border)", background: "var(--surface)" },
         dotType: "filled",
-        dotStyle: { background: "#FF4D00", boxShadow: "0 0 5px rgba(255,77,0,0.4)" },
-        textStyle: { fontWeight: 600, color: "#fff" },
+        dotStyle: { background: "var(--accent)", boxShadow: "0 0 5px rgba(var(--accent-rgb), 0.4)" },
+        textStyle: { fontWeight: 600, color: "var(--foreground)" },
       };
     case "reviewing_v1":
       return {
         label: "검토중",
-        pillStyle: { border: "1px solid rgba(255,77,0,0.3)", background: "rgba(255,77,0,0.05)" },
+        pillStyle: { border: "1px solid rgba(var(--accent-rgb), 0.3)", background: "rgba(var(--accent-rgb), 0.05)" },
         dotType: "filled",
-        dotStyle: { background: "#FF4D00", boxShadow: "0 0 8px rgba(255,77,0,0.6)" },
-        textStyle: { fontWeight: 600, color: "#FF4D00" },
+        dotStyle: { background: "var(--accent)", boxShadow: "0 0 8px rgba(var(--accent-rgb), 0.6)" },
+        textStyle: { fontWeight: 600, color: "var(--accent)" },
       };
     case "editing_v2":
       return {
         label: "재보정",
         pillStyle: {
-          border: "1px solid rgba(255,77,0,0.5)",
-          background: "rgba(255,77,0,0.1)",
-          boxShadow: "0 0 10px rgba(255,77,0,0.1)",
+          border: "1px solid rgba(var(--accent-rgb), 0.5)",
+          background: "rgba(var(--accent-rgb), 0.1)",
+          boxShadow: "0 0 10px rgba(var(--accent-rgb), 0.1)",
         },
         dotType: "ping-orange",
-        textStyle: { fontWeight: 700, color: "#FF4D00" },
+        textStyle: { fontWeight: 700, color: "var(--accent)" },
       };
     case "reviewing_v2":
       return {
         label: "재검토",
         pillStyle: {
-          border: "1px solid rgba(255,77,0,0.8)",
-          background: "rgba(255,77,0,0.2)",
-          boxShadow: "0 0 12px rgba(255,77,0,0.2)",
+          border: "1px solid rgba(var(--accent-rgb), 0.8)",
+          background: "rgba(var(--accent-rgb), 0.2)",
+          boxShadow: "0 0 12px rgba(var(--accent-rgb), 0.2)",
         },
         dotType: "ping-white",
-        textStyle: { fontWeight: 700, color: "#FF4D00" },
+        textStyle: { fontWeight: 700, color: "var(--accent)" },
       };
     case "delivered":
       return {
         label: "납품완료",
         pillStyle: {
-          border: "1px solid #FF4D00",
-          background: "rgba(255,77,0,0.05)",
-          boxShadow: "0 0 15px rgba(255,77,0,0.15)",
+          border: "1px solid var(--accent)",
+          background: "rgba(var(--accent-rgb), 0.05)",
+          boxShadow: "0 0 15px rgba(var(--accent-rgb), 0.15)",
         },
         dotType: "check",
-        textStyle: { fontWeight: 900, color: "#FF4D00" },
+        textStyle: { fontWeight: 900, color: "var(--accent)" },
       };
   }
 }
@@ -128,7 +128,7 @@ function Dot({ type, dotStyle }: { type: DotType; dotStyle?: React.CSSProperties
         fill="none"
         viewBox="0 0 24 24"
         strokeWidth={3}
-        stroke="#FF4D00"
+        stroke="var(--accent)"
         style={{ width: 12, height: 12, flexShrink: 0 }}
       >
         <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -141,11 +141,11 @@ function Dot({ type, dotStyle }: { type: DotType; dotStyle?: React.CSSProperties
       <div className="relative flex" style={{ width: 8, height: 8, flexShrink: 0 }}>
         <span
           className="animate-ping absolute inline-flex rounded-full"
-          style={{ width: "100%", height: "100%", background: "#FF4D00", opacity: 0.75 }}
+          style={{ width: "100%", height: "100%", background: "var(--accent)", opacity: 0.75 }}
         />
         <span
           className="relative inline-flex rounded-full"
-          style={{ width: 8, height: 8, background: "#FF4D00" }}
+          style={{ width: 8, height: 8, background: "var(--accent)" }}
         />
       </div>
     );
@@ -160,7 +160,7 @@ function Dot({ type, dotStyle }: { type: DotType; dotStyle?: React.CSSProperties
         />
         <span
           className="relative inline-flex rounded-full"
-          style={{ width: 8, height: 8, background: "#FF4D00", border: "1px solid rgba(255,255,255,0.5)" }}
+          style={{ width: 8, height: 8, background: "var(--accent)", border: "1px solid rgba(255,255,255,0.5)" }}
         />
       </div>
     );

@@ -7,13 +7,13 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 const variantClasses: Record<Variant, string> = {
-  default: "bg-zinc-700 text-zinc-200",
+  default: "bg-surface-raised text-foreground",
   success: "bg-success/20 text-success",
   warning: "bg-warning/20 text-warning",
   danger: "bg-danger/20 text-danger",
   info: "bg-primary/20 text-primary",
   in_progress: "bg-warning/20 text-warning",
-  waiting: "bg-zinc-600 text-zinc-300",
+  waiting: "bg-border-strong text-foreground",
   completed: "bg-success text-white",
 };
 

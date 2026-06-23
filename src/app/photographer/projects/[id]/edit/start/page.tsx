@@ -55,7 +55,7 @@ export default function EditStartPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-zinc-400">로딩 중...</p>
+        <p className="text-muted-foreground">로딩 중...</p>
       </div>
     );
   }
@@ -103,7 +103,7 @@ export default function EditStartPage() {
       </div>
 
       <Card>
-        <ol className="list-decimal space-y-3 pl-5 text-sm text-zinc-300">
+        <ol className="list-decimal space-y-3 pl-5 text-sm text-muted-foreground">
           <li>보정 시작 후 고객은 &quot;최종확정&quot;을 취소할 수 없습니다</li>
           <li>선택된 사진이 고정됩니다 (추가/삭제 불가)</li>
           <li>고객은 읽기 전용 모드로 전환됩니다</li>

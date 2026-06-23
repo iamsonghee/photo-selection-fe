@@ -309,11 +309,11 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
           position: relative;
           width: 100%;
           max-width: 440px;
-          background-color: #050505;
-          border: 1px solid #222222;
+          background-color: var(--surface-raised);
+          border: 1px solid var(--border-subtle);
           box-shadow:
-            0 0 60px rgba(255, 77, 0, 0.05),
-            inset 0 0 20px rgba(255, 77, 0, 0.02);
+            0 0 60px rgba(var(--accent-rgb), 0.05),
+            inset 0 0 20px rgba(var(--accent-rgb), 0.02);
           z-index: 20;
           overflow: hidden;
           animation: authModalEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1);
@@ -333,7 +333,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
           position: absolute;
           width: 16px;
           height: 16px;
-          border: 2px solid #FF4D00;
+          border: 2px solid var(--accent);
           z-index: 30;
           pointer-events: none;
         }
@@ -382,7 +382,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         .auth-modal-sys-status {
           font-family: 'Space Mono', 'Noto Sans KR', sans-serif;
           font-size: 11px;
-          color: #888;
+          color: var(--subtle-foreground);
           letter-spacing: 0.05em;
           display: flex;
           align-items: center;
@@ -392,22 +392,22 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         .auth-modal-status-dot {
           width: 6px;
           height: 6px;
-          background-color: #FF4D00;
+          background-color: var(--accent);
           border-radius: 50%;
-          box-shadow: 0 0 8px #FF4D00;
+          box-shadow: 0 0 8px var(--accent);
           animation: authModalPulse 2s infinite;
         }
 
         @keyframes authModalPulse {
-          0%   { opacity: 0.4; box-shadow: 0 0 2px #FF4D00; }
-          50%  { opacity: 1;   box-shadow: 0 0 12px #FF4D00; }
-          100% { opacity: 0.4; box-shadow: 0 0 2px #FF4D00; }
+          0%   { opacity: 0.4; box-shadow: 0 0 2px var(--accent); }
+          50%  { opacity: 1;   box-shadow: 0 0 12px var(--accent); }
+          100% { opacity: 0.4; box-shadow: 0 0 2px var(--accent); }
         }
 
         .auth-modal-close-btn {
           background: none;
           border: none;
-          color: #888;
+          color: var(--subtle-foreground);
           font-family: 'Space Mono', 'Noto Sans KR', sans-serif;
           font-size: 24px;
           line-height: 1;
@@ -422,7 +422,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
           align-items: center;
           justify-content: center;
         }
-        .auth-modal-close-btn:hover { color: #FF4D00; }
+        .auth-modal-close-btn:hover { color: var(--accent); }
 
         .auth-modal-body {
           display: flex;
@@ -437,16 +437,16 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
           font-size: 42px;
           font-weight: 700;
           letter-spacing: -0.02em;
-          color: #fff;
+          color: var(--foreground);
           margin-bottom: 8px;
         }
 
-        .auth-modal-accent { color: #FF4D00; }
+        .auth-modal-accent { color: var(--accent); }
 
         .auth-modal-headline {
           font-size: 20px;
           font-weight: 600;
-          color: #fff;
+          color: var(--foreground);
           letter-spacing: -0.02em;
           margin-bottom: 8px;
         }
@@ -460,8 +460,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         .auth-modal-sys-label {
           font-family: 'Space Mono', 'Noto Sans KR', sans-serif;
           font-size: 10px;
-          color: #444;
-          border: 1px solid #222;
+          color: var(--disabled-foreground);
+          border: 1px solid var(--border-subtle);
           padding: 2px 6px;
           letter-spacing: 0.05em;
         }
@@ -469,8 +469,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         .auth-modal-error {
           width: 100%;
           padding: 10px 14px;
-          background: rgba(255, 77, 0, 0.08);
-          border: 1px solid rgba(255, 77, 0, 0.25);
+          background: rgba(var(--accent-rgb), 0.08);
+          border: 1px solid rgba(var(--accent-rgb), 0.25);
           font-size: 12px;
           color: rgba(255, 160, 100, 0.9);
           line-height: 1.5;
@@ -524,20 +524,20 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
         .auth-modal-terms {
           font-size: 12px;
-          color: #888;
+          color: var(--subtle-foreground);
           line-height: 1.5;
         }
 
         .auth-modal-terms-link {
-          color: #888;
+          color: var(--subtle-foreground);
           text-decoration: none;
-          border-bottom: 1px solid #222;
+          border-bottom: 1px solid var(--border-subtle);
           transition: color 0.2s, border-color 0.2s;
           padding-bottom: 1px;
         }
         .auth-modal-terms-link:hover {
-          color: #FF4D00;
-          border-bottom-color: #FF4D00;
+          color: var(--accent);
+          border-bottom-color: var(--accent);
         }
 
         /* ── 카카오 인앱 브라우저 안내 ── */
@@ -575,7 +575,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
           align-items: flex-start;
           gap: 8px;
           font-size: 12px;
-          color: #aaa;
+          color: var(--muted-foreground);
           line-height: 1.5;
         }
         .auth-modal-kakao-step strong { color: #e0c060; }
@@ -644,7 +644,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
             display: block;
             width: 36px;
             height: 4px;
-            background: #333;
+            background: var(--border-strong);
             border-radius: 2px;
             margin: 0 auto 4px;
           }

@@ -57,7 +57,7 @@ export function FieldInfoTip({ text }: { text: string }) {
               transform: placement === "above" ? "translate(-50%, -100%)" : "translate(-50%, 0)",
               zIndex: 100_001,
             }}
-            className="pointer-events-none w-max max-w-[min(16rem,calc(100vw-2rem))] px-2.5 py-2 rounded-lg text-[11px] leading-snug text-zinc-200 bg-[#1a1a1e] border border-[#27272c] shadow-lg"
+            className="pointer-events-none w-max max-w-[min(16rem,calc(100vw-2rem))] px-2.5 py-2 rounded-lg text-[11px] leading-snug text-foreground bg-surface-raised border border-border shadow-lg"
           >
             {text}
           </span>,
@@ -71,7 +71,7 @@ export function FieldInfoTip({ text }: { text: string }) {
         ref={btnRef}
         type="button"
         tabIndex={0}
-        className="inline-flex shrink-0 items-center justify-center w-4 h-4 rounded-full text-zinc-600 hover:text-zinc-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#FF4D00]/50 transition-colors"
+        className="inline-flex shrink-0 items-center justify-center w-4 h-4 rounded-full text-subtle-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/50 transition-colors"
         aria-label="필드 설명"
         onMouseEnter={show}
         onMouseLeave={hide}

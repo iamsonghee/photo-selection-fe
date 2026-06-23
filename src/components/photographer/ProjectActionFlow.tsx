@@ -20,10 +20,10 @@ interface Props {
   variant?: "full" | "compact";
 }
 
-const ORANGE     = "#FF4D00";
+const ORANGE     = "var(--accent)";
 const GREEN      = "#00E676";
-const MUTED      = "#555555";
-const BORDER_DIM = "#222222";
+const MUTED      = "var(--disabled-foreground)";
+const BORDER_DIM = "var(--border-subtle)";
 const MONO       = "'Space Mono', 'JetBrains Mono', 'Noto Sans KR', monospace";
 
 const KEYFRAMES = `
@@ -157,7 +157,7 @@ export function ProjectActionFlow({ steps, variant = "full" }: Props) {
                   }}
                 >
                   {isDone ? (
-                    <Check size={isCompact ? 11 : 14} color="#fff" strokeWidth={2.5} />
+                    <Check size={isCompact ? 11 : 14} color="var(--foreground)" strokeWidth={2.5} />
                   ) : isLocked ? (
                     <Lock size={isCompact ? 10 : 13} color={MUTED} strokeWidth={2} />
                   ) : isCurrent ? (
@@ -190,7 +190,7 @@ export function ProjectActionFlow({ steps, variant = "full" }: Props) {
                     fontFamily: MONO,
                     fontSize: isCompact ? 12 : 13,
                     fontWeight: isCurrent || isActive ? 700 : 500,
-                    color: isLocked ? MUTED : isDone ? "#aaaaaa" : "#ffffff",
+                    color: isLocked ? MUTED : isDone ? "var(--muted-foreground)" : "var(--foreground)",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
@@ -205,14 +205,14 @@ export function ProjectActionFlow({ steps, variant = "full" }: Props) {
                     fontFamily: MONO,
                     fontSize: isCompact ? 9 : 10,
                     color: isLocked
-                      ? `${MUTED}66`
+                      ? "var(--disabled-foreground)"
                       : isCurrent
-                      ? `${ORANGE}99`
+                      ? "rgba(var(--accent-rgb), 0.6)"
                       : isActive
-                      ? `${ORANGE}66`
+                      ? "rgba(var(--accent-rgb), 0.4)"
                       : isDone
-                      ? "#333333"
-                      : "#444444",
+                      ? "var(--disabled-foreground)"
+                      : "var(--disabled-foreground)",
                     letterSpacing: "0.06em",
                     textTransform: "uppercase",
                     marginTop: 2,
@@ -287,8 +287,8 @@ export function ProjectActionFlow({ steps, variant = "full" }: Props) {
                   <span
                     style={{
                       padding: "1px 4px",
-                      background: "rgba(255,77,0,0.15)",
-                      border: `1px solid rgba(255,77,0,0.3)`,
+                      background: "rgba(var(--accent-rgb), 0.15)",
+                      border: `1px solid rgba(var(--accent-rgb), 0.3)`,
                       fontFamily: MONO,
                       fontSize: 7,
                       color: ORANGE,
@@ -303,7 +303,7 @@ export function ProjectActionFlow({ steps, variant = "full" }: Props) {
                   style={{
                     fontFamily: MONO,
                     fontSize: isCompact ? 8 : 9,
-                    color: `${MUTED}66`,
+                    color: "var(--disabled-foreground)",
                     letterSpacing: "0.05em",
                     flexShrink: 0,
                   }}
@@ -350,7 +350,7 @@ export function ProjectActionFlow({ steps, variant = "full" }: Props) {
       <div
         style={{
           position: "relative",
-          background: "#030303",
+          background: "var(--background)",
           backgroundImage: [
             "linear-gradient(rgba(34,34,34,0.5) 1px, transparent 1px)",
             "linear-gradient(90deg, rgba(34,34,34,0.5) 1px, transparent 1px)",
@@ -375,7 +375,7 @@ export function ProjectActionFlow({ steps, variant = "full" }: Props) {
             left: 0,
             right: 0,
             height: "40%",
-            background: "linear-gradient(to bottom, transparent, rgba(255,77,0,0.025), transparent)",
+            background: "linear-gradient(to bottom, transparent, rgba(var(--accent-rgb), 0.025), transparent)",
             pointerEvents: "none",
             zIndex: 1,
           }}
@@ -410,7 +410,7 @@ export function ProjectActionFlow({ steps, variant = "full" }: Props) {
               style={{
                 fontFamily: MONO,
                 fontSize: 10,
-                color: "#888888",
+                color: "var(--subtle-foreground)",
                 letterSpacing: "0.04em",
                 lineHeight: 1.4,
               }}
@@ -452,7 +452,7 @@ export function ProjectActionFlow({ steps, variant = "full" }: Props) {
             left: 0,
             right: 0,
             height: 22,
-            background: "linear-gradient(to top, #030303, transparent)",
+            background: "linear-gradient(to top, var(--background), transparent)",
             pointerEvents: "none",
             zIndex: 3,
           }}

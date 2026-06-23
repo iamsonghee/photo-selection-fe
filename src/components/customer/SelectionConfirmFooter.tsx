@@ -35,7 +35,7 @@ export function SelectionConfirmFooter({
     <>
       <style>{`
         .ac-confirm-footer-btn {
-          background: #FF4D00; color: #000; font-weight: 900;
+          background: var(--accent); color: #000; font-weight: 900;
           font-family: inherit; transition: all 0.3s ease;
           clip-path: polygon(0 0, 100% 0, 100% 65%, 88% 100%, 0 100%);
           border: none; cursor: pointer;
@@ -44,11 +44,11 @@ export function SelectionConfirmFooter({
         }
         .ac-confirm-footer-btn:disabled {
           opacity: 0.4; cursor: not-allowed;
-          background: #555;
+          background: var(--disabled-foreground);
         }
         .ac-confirm-footer-btn:not(:disabled):hover {
           transform: translateY(-2px);
-          box-shadow: 0 10px 20px rgba(255,77,0,0.3);
+          box-shadow: 0 10px 20px rgba(var(--accent-rgb), 0.3);
         }
 
         @media (max-width: 767px) {
@@ -67,8 +67,8 @@ export function SelectionConfirmFooter({
           left: position === "fixed" ? 0 : undefined,
           right: position === "fixed" ? 0 : undefined,
           zIndex,
-          background: "#000",
-          borderTop: "1px solid rgba(255,77,0,0.3)",
+          background: "var(--background)",
+          borderTop: "1px solid rgba(var(--accent-rgb), 0.3)",
           backdropFilter: "blur(12px)",
         }}
       >
@@ -100,16 +100,16 @@ export function SelectionConfirmFooter({
                 letterSpacing: "0.08em",
               }}
             >
-              <span style={{ color: "#888" }}>{progressLabel}</span>
-              <span style={{ color: remaining < 0 ? "#ef4444" : "#FF4D00" }}>
+              <span style={{ color: "var(--muted-foreground)" }}>{progressLabel}</span>
+              <span style={{ color: remaining < 0 ? "#ef4444" : "var(--accent)" }}>
                 {Y} / {N}장
               </span>
             </div>
-            <div style={{ width: "100%", height: 3, background: "#111" }}>
+            <div style={{ width: "100%", height: 3, background: "var(--surface)" }}>
               <div
                 style={{
                   height: "100%",
-                  background: remaining < 0 ? "#ef4444" : "#FF4D00",
+                  background: remaining < 0 ? "#ef4444" : "var(--accent)",
                   width: `${progressPct}%`,
                   transition: "width 0.3s",
                 }}
@@ -125,7 +125,7 @@ export function SelectionConfirmFooter({
                     fontFamily: "'JetBrains Mono', 'Space Mono', monospace",
                     fontSize: 11,
                     fontWeight: 700,
-                    color: remaining === 0 ? "#FF4D00" : remaining < 0 ? "#ef4444" : "rgba(255,255,255,0.35)",
+                    color: remaining === 0 ? "var(--accent)" : remaining < 0 ? "#ef4444" : "var(--subtle-foreground)",
                     margin: 0,
                     whiteSpace: "nowrap",
                   }}

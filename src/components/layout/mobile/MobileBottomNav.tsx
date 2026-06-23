@@ -67,14 +67,14 @@ export function MobileBottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="photographer-mobile-bottom-nav fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#121215]/90 backdrop-blur-xl border-t border-[#1a1a1e] pb-safe">
+    <nav className="photographer-mobile-bottom-nav fixed bottom-0 left-0 right-0 z-50 md:hidden bg-surface-raised/90 backdrop-blur-xl border-t border-border pb-safe">
       <div className="flex justify-around items-center h-[60px] px-2">
         {NAV_ITEMS.map(({ href, label, comingSoon, icon }) => {
           const isActive = href !== "#" && pathname.startsWith(href);
 
           if (comingSoon) {
             return (
-              <div key={label} className="flex flex-col items-center justify-center w-16 h-full gap-1 text-zinc-600">
+              <div key={label} className="flex flex-col items-center justify-center w-16 h-full gap-1 text-disabled-foreground">
                 {icon(false)}
                 <span className="text-[10px] font-medium">{label}</span>
               </div>
@@ -86,7 +86,7 @@ export function MobileBottomNav() {
               key={label}
               href={href}
               className={`flex flex-col items-center justify-center w-16 h-full gap-1 rounded-lg transition-colors ${
-                isActive ? "text-[#FF4D00]" : "text-zinc-500 active:bg-[#1a1a1e]"
+                isActive ? "text-accent" : "text-muted-foreground active:bg-surface"
               }`}
             >
               {icon(isActive)}

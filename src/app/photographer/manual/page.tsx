@@ -46,16 +46,16 @@ function Screenshot({ src, alt, caption }: { src: string; alt: string; caption?:
 
   if (!exists) {
     return (
-      <div className="w-full rounded-xl border-2 border-dashed border-[#27272c] bg-[#0f0f12] flex flex-col items-center justify-center gap-3 py-14 my-6">
-        <Camera size={32} className="text-zinc-600" />
-        <span className="text-xs text-zinc-600">{alt}</span>
+      <div className="w-full rounded-xl border-2 border-dashed border-border bg-surface flex flex-col items-center justify-center gap-3 py-14 my-6">
+        <Camera size={32} className="text-subtle-foreground" />
+        <span className="text-xs text-subtle-foreground">{alt}</span>
       </div>
     );
   }
 
   return (
     <figure className="my-6">
-      <div className="rounded-xl overflow-hidden border border-[#1a1a1e] shadow-lg">
+      <div className="rounded-xl overflow-hidden border border-border-subtle shadow-lg">
         <img
           src={src}
           alt={alt}
@@ -64,7 +64,7 @@ function Screenshot({ src, alt, caption }: { src: string; alt: string; caption?:
         />
       </div>
       {caption && (
-        <figcaption className="mt-2 text-xs text-zinc-500 text-center">{caption}</figcaption>
+        <figcaption className="mt-2 text-xs text-subtle-foreground text-center">{caption}</figcaption>
       )}
     </figure>
   );
@@ -77,10 +77,10 @@ function Steps({ items }: { items: string[] }) {
     <ol className="space-y-3 my-5">
       {items.map((text, i) => (
         <li key={i} className="flex items-start gap-3">
-          <span className="shrink-0 w-6 h-6 rounded-full bg-[#FF4D00]/15 border border-[#FF4D00]/30 text-[#FF4D00] text-xs font-bold flex items-center justify-center mt-0.5">
+          <span className="shrink-0 w-6 h-6 rounded-full bg-accent/15 border border-accent/30 text-accent text-xs font-bold flex items-center justify-center mt-0.5">
             {i + 1}
           </span>
-          <span className="text-sm text-zinc-300 leading-relaxed" dangerouslySetInnerHTML={{ __html: text }} />
+          <span className="text-sm text-muted-foreground leading-relaxed" dangerouslySetInnerHTML={{ __html: text }} />
         </li>
       ))}
     </ol>
@@ -91,9 +91,9 @@ function Steps({ items }: { items: string[] }) {
 
 function Tip({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex gap-3 px-4 py-3 rounded-xl bg-[#FF4D00]/8 border border-[#FF4D00]/20 my-4">
-      <span className="text-[#FF4D00] text-xs font-bold uppercase tracking-wider shrink-0 mt-0.5">TIP</span>
-      <p className="text-sm text-zinc-300 leading-relaxed">{children}</p>
+    <div className="flex gap-3 px-4 py-3 rounded-xl bg-accent/8 border border-accent/20 my-4">
+      <span className="text-accent text-xs font-bold uppercase tracking-wider shrink-0 mt-0.5">TIP</span>
+      <p className="text-sm text-muted-foreground leading-relaxed">{children}</p>
     </div>
   );
 }
@@ -104,7 +104,7 @@ function Warning({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex gap-3 px-4 py-3 rounded-xl bg-amber-500/8 border border-amber-500/20 my-4">
       <span className="text-amber-400 text-xs font-bold shrink-0 mt-0.5">⚠</span>
-      <p className="text-sm text-zinc-300 leading-relaxed">{children}</p>
+      <p className="text-sm text-muted-foreground leading-relaxed">{children}</p>
     </div>
   );
 }
@@ -127,16 +127,16 @@ function SectionHeader({
   return (
     <div id={id} className="scroll-mt-24 mb-6">
       <div className="flex items-center gap-3 mb-2">
-        <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">{num}</span>
-        <div className="flex-1 h-px bg-[#1a1a1e]" />
+        <span className="text-[10px] font-mono text-subtle-foreground uppercase tracking-widest">{num}</span>
+        <div className="flex-1 h-px bg-border-subtle" />
       </div>
       <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-xl bg-[#FF4D00]/10 border border-[#FF4D00]/20 text-[#FF4D00] flex items-center justify-center shrink-0">
+        <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 text-accent flex items-center justify-center shrink-0">
           {icon}
         </div>
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">{title}</h2>
-          <p className="text-sm text-zinc-500 mt-1">{desc}</p>
+          <h2 className="text-xl font-bold text-foreground tracking-tight">{title}</h2>
+          <p className="text-sm text-muted-foreground mt-1">{desc}</p>
         </div>
       </div>
     </div>
@@ -148,11 +148,11 @@ function SectionHeader({
 function CustomerGroupBanner() {
   return (
     <div className="flex items-center gap-4 my-10">
-      <div className="flex-1 h-px bg-[#1a1a1e]" />
-      <span className="shrink-0 px-4 py-1.5 rounded-full bg-[#1a1a1e] border border-[#27272c] text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+      <div className="flex-1 h-px bg-border-subtle" />
+      <span className="shrink-0 px-4 py-1.5 rounded-full bg-surface-raised border border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
         고객이 보는 화면
       </span>
-      <div className="flex-1 h-px bg-[#1a1a1e]" />
+      <div className="flex-1 h-px bg-border-subtle" />
     </div>
   );
 }
@@ -175,14 +175,14 @@ function WorkflowChart() {
         {steps.map((s, i) => (
           <div key={i} className="flex items-center gap-1">
             <div className="flex flex-col items-center text-center w-24">
-              <div className="w-10 h-10 rounded-full bg-[#FF4D00]/15 border border-[#FF4D00]/30 flex items-center justify-center text-[#FF4D00] text-sm font-bold">
+              <div className="w-10 h-10 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center text-accent text-sm font-bold">
                 {i + 1}
               </div>
-              <span className="text-xs font-semibold text-white mt-2 leading-tight">{s.label}</span>
-              <span className="text-[10px] text-zinc-600 mt-1 leading-tight">{s.sub}</span>
+              <span className="text-xs font-semibold text-foreground mt-2 leading-tight">{s.label}</span>
+              <span className="text-[10px] text-subtle-foreground mt-1 leading-tight">{s.sub}</span>
             </div>
             {i < steps.length - 1 && (
-              <ChevronRight size={16} className="text-zinc-600 shrink-0 mb-4" />
+              <ChevronRight size={16} className="text-subtle-foreground shrink-0 mb-4" />
             )}
           </div>
         ))}
@@ -196,19 +196,19 @@ function WorkflowChart() {
 function FaqItem({ q, a }: { q: string; a: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border-b border-[#1a1a1e] last:border-0">
+    <div className="border-b border-border-subtle last:border-0">
       <button
         type="button"
-        className="w-full flex items-center justify-between gap-4 py-4 text-left hover:bg-[#1a1a1e]/30 px-2 -mx-2 rounded-lg transition-colors"
+        className="w-full flex items-center justify-between gap-4 py-4 text-left hover:bg-surface-raised/30 px-2 -mx-2 rounded-lg transition-colors"
         onClick={() => setOpen((o) => !o)}
       >
-        <span className="text-sm font-semibold text-white leading-snug">{q}</span>
-        <span className={`text-zinc-500 shrink-0 transition-transform ${open ? "rotate-90" : ""}`}>
+        <span className="text-sm font-semibold text-foreground leading-snug">{q}</span>
+        <span className={`text-muted-foreground shrink-0 transition-transform ${open ? "rotate-90" : ""}`}>
           <ChevronRight size={16} />
         </span>
       </button>
       {open && (
-        <div className="pb-4 px-2 -mx-2 text-sm text-zinc-400 leading-relaxed">{a}</div>
+        <div className="pb-4 px-2 -mx-2 text-sm text-muted-foreground leading-relaxed">{a}</div>
       )}
     </div>
   );
@@ -248,11 +248,11 @@ export default function ManualPage() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const cardCls = "bg-[#121215] border border-[#1a1a1e] rounded-2xl overflow-hidden";
+  const cardCls = "bg-surface border border-border-subtle rounded-2xl overflow-hidden";
 
   return (
     <div
-      className="min-h-screen bg-[#0a0a0c] text-white"
+      className="min-h-screen bg-background text-foreground"
       style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}
     >
       <PhotographerPageHeader
@@ -266,7 +266,7 @@ export default function ManualPage() {
         <aside className="hidden md:block shrink-0 w-52">
           <nav className="sticky top-24 space-y-0.5">
             {/* 작가 관점 */}
-            <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest px-3 py-2 mt-1">
+            <p className="text-[10px] font-mono text-subtle-foreground uppercase tracking-widest px-3 py-2 mt-1">
               작가 관점
             </p>
             {SECTIONS.filter((s) => s.group === "photographer").map((s) => (
@@ -276,8 +276,8 @@ export default function ManualPage() {
                 onClick={() => scrollTo(s.id)}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
                   activeId === s.id
-                    ? "bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20"
-                    : "text-zinc-400 hover:text-white hover:bg-[#1a1a1e]"
+                    ? "bg-accent/10 text-accent border border-accent/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-surface-raised"
                 }`}
               >
                 <span className="shrink-0">{s.icon}</span>
@@ -285,10 +285,10 @@ export default function ManualPage() {
               </button>
             ))}
 
-            <div className="h-px bg-[#1a1a1e] my-2" />
+            <div className="h-px bg-border-subtle my-2" />
 
             {/* 고객 화면 */}
-            <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest px-3 py-2">
+            <p className="text-[10px] font-mono text-subtle-foreground uppercase tracking-widest px-3 py-2">
               고객 화면
             </p>
             {SECTIONS.filter((s) => s.group === "customer").map((s) => (
@@ -298,8 +298,8 @@ export default function ManualPage() {
                 onClick={() => scrollTo(s.id)}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
                   activeId === s.id
-                    ? "bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20"
-                    : "text-zinc-400 hover:text-white hover:bg-[#1a1a1e]"
+                    ? "bg-accent/10 text-accent border border-accent/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-surface-raised"
                 }`}
               >
                 <span className="shrink-0">{s.icon}</span>
@@ -307,7 +307,7 @@ export default function ManualPage() {
               </button>
             ))}
 
-            <div className="h-px bg-[#1a1a1e] my-2" />
+            <div className="h-px bg-border-subtle my-2" />
 
             {/* 공통 */}
             {SECTIONS.filter((s) => s.group === "common").map((s) => (
@@ -317,8 +317,8 @@ export default function ManualPage() {
                 onClick={() => scrollTo(s.id)}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
                   activeId === s.id
-                    ? "bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20"
-                    : "text-zinc-400 hover:text-white hover:bg-[#1a1a1e]"
+                    ? "bg-accent/10 text-accent border border-accent/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-surface-raised"
                 }`}
               >
                 <span className="shrink-0">{s.icon}</span>
@@ -341,8 +341,8 @@ export default function ManualPage() {
                 desc="사진작가와 고객 사이의 셀렉·보정 과정을 하나의 링크로 연결하는 서비스입니다."
                 icon={<Camera size={18} />}
               />
-              <p className="text-sm text-zinc-400 leading-relaxed mb-4">
-                A-CUT은 <strong className="text-white">프로젝트 단위</strong>로 촬영 건을 관리합니다.
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                A-CUT은 <strong className="text-foreground">프로젝트 단위</strong>로 촬영 건을 관리합니다.
                 작가가 원본 사진을 업로드하면, 고객은 초대 링크 하나로 사진을 선택하고 코멘트를 남길 수 있습니다.
                 보정본 업로드, 검토 요청, 재보정까지 하나의 흐름으로 이어집니다.
               </p>
@@ -505,7 +505,7 @@ export default function ManualPage() {
                 icon={<Users size={18} />}
               />
               <Screenshot src="/manual/07-customer-gallery.png" alt="고객 갤러리 화면" caption="고객 갤러리 — 초대 링크 접속 후 표시되는 화면" />
-              <p className="text-sm text-zinc-400 leading-relaxed mb-4">
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
                 고객은 초대 링크 하나로 별도 회원가입·로그인 없이 갤러리에 접속합니다.
                 작가가 설정한 장수만큼 원하는 사진을 선택할 수 있습니다.
               </p>
@@ -534,7 +534,7 @@ export default function ManualPage() {
                 icon={<Eye size={18} />}
               />
               <Screenshot src="/manual/08-customer-review.png" alt="고객 보정본 검토 화면" caption="보정본 검토 화면 — 확정 또는 재보정 요청 선택" />
-              <p className="text-sm text-zinc-400 leading-relaxed mb-4">
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
                 작가가 검토 요청을 보내면 고객은 초대 링크로 접속했을 때 자동으로 보정본 검토 페이지를
                 볼 수 있습니다. 고객은 각 사진을 확인한 후 전체를 확정하거나, 특정 사진에 재보정을
                 요청할 수 있습니다.

@@ -6,17 +6,17 @@ import { Lock } from "lucide-react";
 import { BrandLogoBar } from "@/components/BrandLogo";
 
 /* ── design tokens (review 페이지와 동일 가이드) ── */
-const BG_BASE    = "#030303";
-const BG_PANEL   = "#0a0a0a";
-const BG_INPUT   = "#111111";
-const BORDER     = "#222222";
-const BORDER_HI  = "#333333";
-const TEXT       = "#ffffff";
-const MUTED      = "#888888";
-const ACCENT     = "#ff4d00";
-const ACCENT_DIM = "rgba(255,77,0,0.1)";
-const ORANGE     = "#ffaa00";
-const RED        = "#ff4757";
+const BG_BASE    = "var(--background)";
+const BG_PANEL   = "var(--surface)";
+const BG_INPUT   = "var(--surface-raised)";
+const BORDER     = "var(--border-subtle)";
+const BORDER_HI  = "var(--border)";
+const TEXT       = "var(--foreground)";
+const MUTED      = "var(--muted-foreground)";
+const ACCENT     = "var(--accent)";
+const ACCENT_DIM = "rgba(var(--accent-rgb), 0.1)";
+const ORANGE     = "var(--warning)";
+const RED        = "var(--danger)";
 const MONO       = "'JetBrains Mono', 'Space Mono', monospace";
 const DISPLAY    = "'Space Grotesk', 'Pretendard Variable', sans-serif";
 const BODY_FONT  = "'Pretendard Variable', -apple-system, sans-serif";
@@ -111,7 +111,7 @@ export default function PinForm({ token, from }: { token: string; from: string }
       style={{
         minHeight: "100dvh",
         background: BG_BASE,
-        backgroundImage: `linear-gradient(#161616 1px, transparent 1px), linear-gradient(90deg, #161616 1px, transparent 1px)`,
+        backgroundImage: `linear-gradient(var(--border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px)`,
         backgroundSize: "40px 40px",
         display: "flex",
         alignItems: "center",
@@ -142,7 +142,7 @@ export default function PinForm({ token, from }: { token: string; from: string }
             height: 52,
             borderRadius: "50%",
             background: ACCENT_DIM,
-            border: `1px solid rgba(255,77,0,0.35)`,
+            border: `1px solid rgba(var(--accent-rgb), 0.35)`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",

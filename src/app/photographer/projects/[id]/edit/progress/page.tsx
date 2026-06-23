@@ -39,7 +39,7 @@ export default function EditProgressPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-zinc-400">로딩 중...</p>
+        <p className="text-muted-foreground">로딩 중...</p>
       </div>
     );
   }
@@ -90,11 +90,11 @@ export default function EditProgressPage() {
           }
         }
       `}</style>
-      <h1 className="text-2xl font-semibold text-white">보정 진행도</h1>
+      <h1 className="text-2xl font-semibold text-foreground">보정 진행도</h1>
 
       <Card>
-        <h3 className="mb-3 text-base font-medium text-zinc-200">보정 진행 현황</h3>
-        <p className="font-mono text-2xl text-white">
+        <h3 className="mb-3 text-base font-medium text-muted-foreground">보정 진행 현황</h3>
+        <p className="font-mono text-2xl text-foreground">
           완료 {completedCount}/{photos.length}장 (
           {photos.length ? Math.round((completedCount / photos.length) * 100) : 0}%)
         </p>
@@ -105,25 +105,25 @@ export default function EditProgressPage() {
           className="mt-3"
           showLabel
         />
-        <p className="mt-2 text-sm text-zinc-400">
+        <p className="mt-2 text-sm text-muted-foreground">
           예상 완료일: {format(addDays(new Date(), 14), "yyyy-MM-dd")}
         </p>
       </Card>
 
       {nextPhoto && (
         <Card>
-          <h3 className="mb-4 text-base font-medium text-zinc-200">다음 보정 사진</h3>
+          <h3 className="mb-4 text-base font-medium text-muted-foreground">다음 보정 사진</h3>
           <div className="ph-edit-progress-next flex gap-4">
-            <div className="aspect-square w-32 shrink-0 overflow-hidden rounded-lg bg-zinc-800">
+            <div className="aspect-square w-32 shrink-0 overflow-hidden rounded-lg bg-surface-raised">
               <img src={nextPhoto.url} alt="" className="h-full w-full object-cover" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-zinc-400">
+              <p className="text-sm text-muted-foreground">
                 별점 {photoStates[nextPhoto.id]?.rating ?? nextPhoto.tag?.star ?? "-"} ·{" "}
                 {photoStates[nextPhoto.id]?.color ?? nextPhoto.tag?.color ?? "태그 없음"}
               </p>
               {(photoStates[nextPhoto.id]?.comment || nextPhoto.comment) && (
-                <p className="mt-1 text-sm text-zinc-300">
+                <p className="mt-1 text-sm text-muted-foreground">
                   고객: {photoStates[nextPhoto.id]?.comment ?? nextPhoto.comment}
                 </p>
               )}
@@ -142,7 +142,7 @@ export default function EditProgressPage() {
       )}
 
       <Card>
-        <h3 className="mb-4 text-base font-medium text-zinc-200">결과 내보내기</h3>
+        <h3 className="mb-4 text-base font-medium text-muted-foreground">결과 내보내기</h3>
         <div className="space-y-2">
           <EditProgressActions />
         </div>
