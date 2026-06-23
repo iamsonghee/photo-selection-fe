@@ -4,8 +4,8 @@
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap");
 
 .landing-root {
-  background-color: #000;
-  color: #fff;
+  background-color: var(--background);
+  color: var(--foreground);
   font-family: 'Pretendard', sans-serif;
   overflow-x: hidden;
 }
@@ -20,8 +20,8 @@
   position: fixed;
   inset: 0;
   background-image:
-    linear-gradient(#222 1px, transparent 1px),
-    linear-gradient(90deg, #222 1px, transparent 1px);
+    linear-gradient(var(--border-subtle) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
   background-size: 50px 50px;
   pointer-events: none;
   z-index: 0;
@@ -33,7 +33,7 @@
   width: 100%;
   height: 100px;
   z-index: 1;
-  background: linear-gradient(0deg, rgba(255, 77, 0, 0.03) 0%, rgba(255, 77, 0, 0) 100%);
+  background: linear-gradient(0deg, rgba(var(--accent-rgb), 0.03) 0%, rgba(var(--accent-rgb), 0) 100%);
   position: fixed;
   bottom: 100%;
   animation: landingScanline 8s linear infinite;
@@ -50,7 +50,7 @@
   position: fixed;
   width: 20px;
   height: 20px;
-  border-color: #FF4D00;
+  border-color: var(--accent);
   z-index: 50;
   pointer-events: none;
 }
@@ -62,9 +62,9 @@
 /* ── Photo cards ── */
 .landing-photo-card {
   aspect-ratio: 3 / 4;
-  background: #151515;
+  background: var(--surface);
   position: relative;
-  border: 1px solid #222;
+  border: 1px solid var(--border);
   overflow: hidden;
   transition: all 0.3s ease;
 }
@@ -79,8 +79,8 @@
 }
 
 .landing-photo-card.is-active {
-  border-color: #FF4D00;
-  box-shadow: 0 0 20px rgba(255, 77, 0, 0.2);
+  border-color: var(--accent);
+  box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.2);
 }
 
 .landing-photo-card.is-active img {
@@ -94,7 +94,7 @@
   position: absolute;
   top: 10px;
   right: 10px;
-  background: #FF4D00;
+  background: var(--accent);
   color: black;
   font-family: 'Space Mono', 'Noto Sans KR', sans-serif;
   font-size: 10px;
@@ -130,7 +130,7 @@
 
 /* ── CTA button ── */
 .landing-btn-primary {
-  background-color: #FF4D00;
+  background-color: var(--accent);
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
@@ -141,19 +141,19 @@
 
 .landing-btn-primary:hover {
   transform: scale(1.05);
-  box-shadow: 0 0 30px rgba(255, 77, 0, 0.4);
+  box-shadow: 0 0 30px rgba(var(--accent-rgb), 0.4);
 }
 
 /* ── Stats panel ── */
 .landing-stats-panel {
-  background: rgba(13, 13, 13, 0.8);
+  background: var(--surface-raised);
   backdrop-filter: blur(10px);
-  border: 1px solid #222;
+  border: 1px solid var(--border);
   padding: 20px;
   font-family: 'Space Mono', 'Noto Sans KR', sans-serif;
   font-size: 11px;
   line-height: 1.8;
-  color: #777;
+  color: var(--subtle-foreground);
 }
 
 /* ── Glitch ── */
@@ -171,7 +171,7 @@
 /* ── Strikethrough ── */
 .landing-strikethrough {
   text-decoration: line-through;
-  text-decoration-color: #FF4D00;
+  text-decoration-color: var(--accent);
   opacity: 0.5;
 }
 
@@ -184,7 +184,7 @@
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 900;
   font-size: 20rem;
-  color: rgba(255, 77, 0, 0.03);
+  color: rgba(var(--accent-rgb), 0.03);
   white-space: nowrap;
   z-index: -1;
   pointer-events: none;
@@ -197,8 +197,8 @@
   left: -10%;
   width: 10%;
   height: 100%;
-  background: linear-gradient(to right, transparent, rgba(255, 77, 0, 0.4), transparent);
-  box-shadow: 0 0 20px rgba(255, 77, 0, 0.2);
+  background: linear-gradient(to right, transparent, rgba(var(--accent-rgb), 0.4), transparent);
+  box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.2);
   z-index: 6;
   animation: landingScanSweep 3s infinite linear;
 }
@@ -210,8 +210,8 @@
 
 /* ── Services: panels ── */
 .landing-panel {
-  background: rgba(10, 10, 10, 0.8);
-  border: 1px solid #262626;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   transition: border-color 0.2s ease;
@@ -219,15 +219,15 @@
 }
 
 .landing-panel:hover {
-  border-color: #FF4D00;
+  border-color: var(--accent);
 }
 
 .landing-panel:hover .landing-panel-num {
-  background: #FF4D00;
+  background: var(--accent);
 }
 
 .landing-panel-num {
-  background: #E8E8E8;
+  background: var(--foreground);
   color: #030303;
   padding: 2px 6px;
   font-weight: 700;
@@ -236,7 +236,7 @@
 
 /* ── Services: effect block ── */
 .landing-effect-block {
-  border: 1px solid #262626;
+  border: 1px solid var(--border);
   padding: 16px;
   background: rgba(0, 0, 0, 0.5);
   position: relative;
@@ -247,11 +247,11 @@
   position: absolute;
   top: -7px;
   left: 16px;
-  background: #030303;
+  background: var(--background);
   padding: 0 4px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
-  color: #FF4D00;
+  color: var(--accent);
   font-weight: 700;
 }
 

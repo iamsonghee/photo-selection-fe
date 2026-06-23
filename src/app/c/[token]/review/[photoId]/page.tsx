@@ -12,17 +12,17 @@ import type { ReviewPhotoItem } from "@/lib/customer-api-server";
 import { normalizeReviewDeadlineYmd } from "@/lib/format-review-deadline";
 
 /* ── design tokens ── */
-const BG_BASE    = "#030303";
-const BG_PANEL   = "#0a0a0a";
-const BG_INPUT   = "#111111";
-const BORDER     = "#222222";
-const BORDER_HI  = "#333333";
-const TEXT       = "#ffffff";
-const MUTED      = "#888888";
-const DIM        = "#555555";
-const ACCENT     = "#ff4d00";
+const BG_BASE    = "var(--background)";
+const BG_PANEL   = "var(--surface-raised)";
+const BG_INPUT   = "var(--surface)";
+const BORDER     = "var(--border)";
+const BORDER_HI  = "var(--border-strong)";
+const TEXT       = "var(--foreground)";
+const MUTED      = "var(--muted-foreground)";
+const DIM        = "var(--subtle-foreground)";
+const ACCENT     = "var(--accent)";
 const ACCENT_HO  = "#e64500";
-const ACCENT_DIM = "rgba(255,77,0,0.1)";
+const ACCENT_DIM = "rgba(var(--accent-rgb), 0.1)";
 const GREEN      = "#00ff66";
 const ORANGE     = "#ffaa00";
 const MONO       = "'JetBrains Mono', 'Space Mono', monospace";
@@ -334,7 +334,7 @@ export default function ReviewViewerPage() {
         </div>
 
         {/* 이미지 */}
-        <div style={{ flex: 1, minHeight: 0, position: "relative", background: "#0a0a0a", overflow: "hidden" }}
+        <div style={{ flex: 1, minHeight: 0, position: "relative", background: "var(--surface-raised)", overflow: "hidden" }}
           onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
           {mobileTab === "retouched" ? (
             current.versionUrl
@@ -547,8 +547,8 @@ export default function ReviewViewerPage() {
           display: flex; align-items: center; gap: 10px;
           padding: 0 28px; height: 48px; font-size: 14px; white-space: nowrap;
         }
-        .rv-btn-submit:disabled { opacity: 1; cursor: not-allowed; background: #1a1a1a; color: rgba(255,255,255,0.25); clip-path: none; border: 1px solid #333; }
-        .rv-btn-submit:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(255,77,0,0.3); }
+        .rv-btn-submit:disabled { opacity: 1; cursor: not-allowed; background: var(--surface-raised); color: rgba(255,255,255,0.25); clip-path: none; border: 1px solid var(--border-strong); }
+        .rv-btn-submit:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(var(--accent-rgb), 0.3); }
 
         .rv-modal-bracket { position: absolute; width: 12px; height: 12px; border-color: ${ACCENT}; pointer-events: none; }
         .rv-modal-b-tl { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
@@ -599,7 +599,7 @@ export default function ReviewViewerPage() {
         style={{
           background: BG_BASE, height: "100vh", display: "flex", flexDirection: "column",
           color: TEXT, overflow: "hidden",
-          backgroundImage: `linear-gradient(#161616 1px, transparent 1px), linear-gradient(90deg, #161616 1px, transparent 1px)`,
+          backgroundImage: `linear-gradient(var(--border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px)`,
           backgroundSize: "40px 40px",
         }}
         onTouchStart={handleTouchStart}
@@ -640,7 +640,7 @@ export default function ReviewViewerPage() {
                   <div className="rv-deadline-badge" style={{
                     display: "flex", alignItems: "center", gap: 5,
                     padding: "3px 10px", borderRadius: 20,
-                    background: "rgba(255,77,0,0.1)", border: "1px solid rgba(255,77,0,0.25)",
+                    background: "rgba(var(--accent-rgb), 0.1)", border: "1px solid rgba(var(--accent-rgb), 0.25)",
                   }}>
                     <span style={{ fontFamily: MONO, fontSize: 9, color: ACCENT }}>기한</span>
                     <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT, fontWeight: 700 }}>{reviewDeadlineDisplay}</span>
@@ -683,7 +683,7 @@ export default function ReviewViewerPage() {
           <div
             className="rv-mobile-toggle"
             style={{
-              borderTop: `1px solid #111`,
+              borderTop: `1px solid var(--border-subtle)`,
               background: "rgba(0,0,0,0.6)",
               padding: "8px 12px",
               alignItems: "center",
@@ -797,7 +797,7 @@ export default function ReviewViewerPage() {
                         style={{
                           position: "absolute",
                           inset: 0,
-                          background: `radial-gradient(circle at center, #1a1a1a 0%, #0a0a0a 100%)`,
+                          background: `radial-gradient(circle at center, var(--surface-raised) 0%, var(--background) 100%)`,
                         }}
                       />
                     )}
@@ -883,7 +883,7 @@ export default function ReviewViewerPage() {
             <div className="rv-stage" style={{ flex: 1, minHeight: 0, padding: 20, display: "flex", gap: 12, overflow: "hidden", position: "relative" }}>
               {showOriginal && (
                 <div
-                  style={{ flex: 1, border: `1px solid ${BORDER}`, background: "radial-gradient(circle at center,#1a1a1a 0%,#0a0a0a 100%)", position: "relative", cursor: "pointer", overflow: "hidden", borderRadius: 4 }}
+                  style={{ flex: 1, border: `1px solid ${BORDER}`, background: "radial-gradient(circle at center,var(--surface-raised) 0%,var(--background) 100%)", position: "relative", cursor: "pointer", overflow: "hidden", borderRadius: 4 }}
                   onClick={() => { setFullInitial("original"); setFullOpen(true); }}
                 >
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "8px 12px", display: "flex", justifyContent: "space-between", background: "linear-gradient(rgba(0,0,0,0.8),transparent)", zIndex: 2, pointerEvents: "none" }}>
@@ -897,7 +897,7 @@ export default function ReviewViewerPage() {
               )}
               {showRetouched && (
                 <div
-                  style={{ flex: 1, border: `1px solid ${isRevision ? "rgba(255,170,0,0.4)" : isApproved ? "rgba(0,255,102,0.35)" : BORDER_HI}`, background: "radial-gradient(circle at center,#1a1a1a 0%,#0a0a0a 100%)", position: "relative", cursor: "pointer", overflow: "hidden", borderRadius: 4, transition: "border-color 0.2s" }}
+                  style={{ flex: 1, border: `1px solid ${isRevision ? "rgba(255,170,0,0.4)" : isApproved ? "rgba(0,255,102,0.35)" : BORDER_HI}`, background: "radial-gradient(circle at center,var(--surface-raised) 0%,var(--background) 100%)", position: "relative", cursor: "pointer", overflow: "hidden", borderRadius: 4, transition: "border-color 0.2s" }}
                   onClick={() => { setFullInitial("version"); setFullOpen(true); }}
                 >
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "8px 12px", display: "flex", justifyContent: "space-between", background: "linear-gradient(rgba(0,0,0,0.8),transparent)", zIndex: 2, pointerEvents: "none" }}>
@@ -995,14 +995,14 @@ export default function ReviewViewerPage() {
         </div>
 
         {/* ── Submit bottom bar ── */}
-        <footer className="rv-footer" style={{ flexShrink: 0, background: "#000", borderTop: `1px solid rgba(255,77,0,0.3)`, backdropFilter: "blur(12px)" }}>
+        <footer className="rv-footer" style={{ flexShrink: 0, background: "var(--background)", borderTop: `1px solid rgba(var(--accent-rgb), 0.3)`, backdropFilter: "blur(12px)" }}>
           <div style={{ height: 72, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 <span style={{ color: MUTED }}>보정본 검토</span>
                 <span style={{ color: ACCENT }}>{reviewedCount} / {total}장</span>
               </div>
-              <div style={{ width: "100%", height: 3, background: "#111" }}>
+              <div style={{ width: "100%", height: 3, background: "var(--border-subtle)" }}>
                 <div style={{ height: "100%", background: ACCENT, width: `${progressPct}%`, transition: "width 0.3s" }} />
               </div>
             </div>

@@ -297,10 +297,10 @@ export function SelectionConfirmBar() {
 
   return (
     <>
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-zinc-800 bg-zinc-900/95 p-4 backdrop-blur">
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-surface-raised/95 p-4 backdrop-blur">
         <div className="mx-auto flex max-w-4xl flex-col gap-3">
           <div className="flex items-center justify-between">
-            <span className="font-mono text-sm text-zinc-300">
+            <span className="font-mono text-sm text-muted-foreground">
               선택 {Y} / {N}
             </span>
             {Y < N && (
@@ -340,9 +340,9 @@ export function SelectionConfirmBar() {
       </div>
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-900 p-6">
-            <h3 className="text-lg font-semibold text-white">최종확정</h3>
-            <p className="mt-2 text-sm text-zinc-400">
+          <div className="w-full max-w-sm rounded-xl border border-border bg-surface-raised p-6">
+            <h3 className="text-lg font-semibold text-foreground">최종확정</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
               정말 이 {N}장으로 선택을 완료하시겠습니까?
             </p>
             <div className="mt-4 flex gap-2">

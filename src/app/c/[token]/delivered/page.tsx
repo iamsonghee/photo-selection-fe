@@ -39,7 +39,7 @@ export default function DeliveredPage() {
   if (!mounted || loading) {
     return (
       <div className={styles.root}>
-        <p style={{ margin: "auto", fontFamily: "var(--font-mono)", fontSize: 11, color: "#555", letterSpacing: "0.12em" }}>
+        <p style={{ margin: "auto", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--subtle-foreground)", letterSpacing: "0.12em" }}>
           LOADING_DELIVERED…
         </p>
       </div>
@@ -60,7 +60,7 @@ export default function DeliveredPage() {
   if (project.status !== "delivered") {
     return (
       <div className={styles.root}>
-        <p style={{ margin: "auto", fontFamily: "var(--font-mono)", fontSize: 11, color: "#555", letterSpacing: "0.12em" }}>
+        <p style={{ margin: "auto", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--subtle-foreground)", letterSpacing: "0.12em" }}>
           REDIRECTING…
         </p>
       </div>
@@ -80,7 +80,7 @@ export default function DeliveredPage() {
 
       <CustomerHeader>
         <BrandLogoBar size="sm" href={invitePath} />
-        <span className="font-mono text-[11px] text-zinc-500 max-w-[180px] truncate">{project.name}</span>
+        <span className="font-mono text-[11px] text-subtle-foreground max-w-[180px] truncate">{project.name}</span>
       </CustomerHeader>
 
       <main className={styles.container}>
@@ -121,8 +121,8 @@ export default function DeliveredPage() {
       </main>
 
       <CustomerFooter>
-        <span className="font-mono text-[10px] text-zinc-600">© 2026 A컷 · A-CUT</span>
-        <span className="font-mono text-[10px] text-zinc-600">{photographerName} 작가님이 A컷을 통해 전달했습니다.</span>
+        <span className="font-mono text-[10px] text-subtle-foreground">© 2026 A컷 · A-CUT</span>
+        <span className="font-mono text-[10px] text-subtle-foreground">{photographerName} 작가님이 A컷을 통해 전달했습니다.</span>
       </CustomerFooter>
     </div>
   );

@@ -33,7 +33,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className="min-h-screen bg-[#0a0b0d] text-zinc-200 antialiased"
+        className="min-h-screen bg-background text-foreground antialiased"
         suppressHydrationWarning
       >
         {/* 확장(엔딕/WXT 등)이 DOM을 주입하면 hydration mismatch 발생. 직후 + rAF + 다음 태스크에 정리. */}

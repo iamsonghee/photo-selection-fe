@@ -68,29 +68,29 @@ export function CustomerInviteShareModal({
       }}
     >
       <div
-        className="w-full max-w-sm bg-[#0f0f12] border border-[#27272c] rounded-2xl p-6 flex flex-col gap-5"
+        className="w-full max-w-sm bg-surface-raised border border-border-subtle rounded-2xl p-6 flex flex-col gap-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div>
-          <h3 className="text-base font-bold text-white mb-1">{title}</h3>
-          <p className="text-sm text-[#71717a] leading-relaxed">{desc}</p>
+          <h3 className="text-base font-bold text-foreground mb-1">{title}</h3>
+          <p className="text-sm text-subtle-foreground leading-relaxed">{desc}</p>
         </div>
 
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-[#a1a1aa]">초대 링크</label>
-            <div className="flex items-center gap-2 rounded-xl bg-[#0a0a0c] border border-[#27272c] pl-3 pr-1 py-1">
+            <label className="text-xs font-medium text-muted-foreground">초대 링크</label>
+            <div className="flex items-center gap-2 rounded-xl bg-surface border border-border-subtle pl-3 pr-1 py-1">
               <input
                 type="text"
                 readOnly
                 value={inviteUrl}
                 onFocus={(e) => e.currentTarget.select()}
-                className="flex-1 min-w-0 bg-transparent text-sm text-white truncate focus:outline-none"
+                className="flex-1 min-w-0 bg-transparent text-sm text-foreground truncate focus:outline-none"
               />
               <button
                 type="button"
                 onClick={copyShareLink}
-                className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[#27272c] text-[#a1a1aa] hover:text-white hover:border-zinc-500 text-xs font-medium px-2.5 py-1.5 transition-colors"
+                className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-border-subtle text-muted-foreground hover:text-foreground hover:border-border-strong text-xs font-medium px-2.5 py-1.5 transition-colors"
                 title="링크 복사"
               >
                 {shareCopied === "link" ? (
@@ -110,15 +110,15 @@ export function CustomerInviteShareModal({
 
           {accessPin ? (
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-[#a1a1aa]">비밀번호</label>
-              <div className="flex items-center gap-2 rounded-xl bg-[#0a0a0c] border border-[#27272c] pl-3 pr-1 py-1">
-                <span className="flex-1 min-w-0 text-sm text-white tracking-wider font-mono truncate">
+              <label className="text-xs font-medium text-muted-foreground">비밀번호</label>
+              <div className="flex items-center gap-2 rounded-xl bg-surface border border-border-subtle pl-3 pr-1 py-1">
+                <span className="flex-1 min-w-0 text-sm text-foreground tracking-wider font-mono truncate">
                   {accessPin}
                 </span>
                 <button
                   type="button"
                   onClick={copySharePin}
-                  className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[#27272c] text-[#a1a1aa] hover:text-white hover:border-zinc-500 text-xs font-medium px-2.5 py-1.5 transition-colors"
+                  className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-border-subtle text-muted-foreground hover:text-foreground hover:border-border-strong text-xs font-medium px-2.5 py-1.5 transition-colors"
                   title="비밀번호 복사"
                 >
                   {shareCopied === "pin" ? (
@@ -142,7 +142,7 @@ export function CustomerInviteShareModal({
           <button
             type="button"
             disabled={closeDisabled}
-            className="flex-1 rounded-xl border border-[#27272c] text-[#71717a] text-sm font-medium py-2.5 hover:border-[#3f3f46] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex-1 rounded-xl border border-border-subtle text-subtle-foreground text-sm font-medium py-2.5 hover:border-border hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             onClick={onClose}
           >
             닫기
@@ -150,7 +150,7 @@ export function CustomerInviteShareModal({
           <button
             type="button"
             onClick={copyShareBundle}
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#FF4D00] text-black text-sm font-bold py-2.5 hover:bg-[#ff5e1a] transition-colors"
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-accent text-black text-sm font-bold py-2.5 hover:bg-[#ff5e1a] transition-colors"
           >
             {shareCopied === "bundle" || (shareCopied === "link" && !accessPin) ? (
               <>

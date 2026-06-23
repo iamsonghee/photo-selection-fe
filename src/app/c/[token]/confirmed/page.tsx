@@ -100,23 +100,23 @@ export default function ConfirmedPage() {
 
   if (!mounted || loading) {
     return (
-      <div style={{ display: "flex", minHeight: "100dvh", alignItems: "center", justifyContent: "center", background: "#030303" }}>
-        <div style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid rgba(255,77,0,0.2)", borderTopColor: "#FF4D00", animation: "spin 0.9s linear infinite" }} />
+      <div style={{ display: "flex", minHeight: "100dvh", alignItems: "center", justifyContent: "center", background: "var(--background)" }}>
+        <div style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid rgba(var(--accent-rgb), 0.2)", borderTopColor: "var(--accent)", animation: "spin 0.9s linear infinite" }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
   if (!project) {
     return (
-      <div style={{ display: "flex", minHeight: "100dvh", alignItems: "center", justifyContent: "center", background: "#030303", color: "#555", fontFamily: MONO, fontSize: 13 }}>
+      <div style={{ display: "flex", minHeight: "100dvh", alignItems: "center", justifyContent: "center", background: "var(--background)", color: "var(--subtle-foreground)", fontFamily: MONO, fontSize: 13 }}>
         존재하지 않는 초대 링크입니다.
       </div>
     );
   }
   if (project.status === "selecting" || project.status === "reviewing_v1" || project.status === "reviewing_v2") {
     return (
-      <div style={{ display: "flex", minHeight: "100dvh", alignItems: "center", justifyContent: "center", background: "#030303" }}>
-        <div style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid rgba(255,77,0,0.2)", borderTopColor: "#FF4D00", animation: "spin 0.9s linear infinite" }} />
+      <div style={{ display: "flex", minHeight: "100dvh", alignItems: "center", justifyContent: "center", background: "var(--background)" }}>
+        <div style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid rgba(var(--accent-rgb), 0.2)", borderTopColor: "var(--accent)", animation: "spin 0.9s linear infinite" }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -158,18 +158,18 @@ export default function ConfirmedPage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#030303", color: "#fff", display: "flex", flexDirection: "column", position: "relative", overflowX: "hidden", fontFamily: "'Pretendard Variable','Pretendard',-apple-system,sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)", display: "flex", flexDirection: "column", position: "relative", overflowX: "hidden", fontFamily: "'Pretendard Variable','Pretendard',-apple-system,sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
 
         .cf-grid-bg {
           position: fixed; inset: 0; z-index: 0; pointer-events: none;
-          background-image: linear-gradient(to right, #1a1a1a 1px, transparent 1px), linear-gradient(to bottom, #1a1a1a 1px, transparent 1px);
+          background-image: linear-gradient(to right, var(--border-subtle) 1px, transparent 1px), linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
           background-size: 40px 40px;
         }
         .cf-bracket {
           position: fixed; width: 32px; height: 32px;
-          border: 2px solid #555; z-index: 50; pointer-events: none;
+          border: 2px solid var(--border-strong); z-index: 50; pointer-events: none;
         }
         .cf-bracket-tl { top: 20px; left: 20px; border-right: none; border-bottom: none; }
         .cf-bracket-tr { top: 20px; right: 20px; border-left: none; border-bottom: none; }
@@ -187,7 +187,7 @@ export default function ConfirmedPage() {
         }
         .cf-header-badge {
           display: flex; align-items: center; gap: 6px; border-radius: 999px;
-          padding: 4px 10px; font-size: 11px; color: #a1a1aa;
+          padding: 4px 10px; font-size: 11px; color: var(--muted-foreground);
           background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.07);
           font-family: ${MONO}; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
@@ -198,17 +198,17 @@ export default function ConfirmedPage() {
         }
 
         .cf-cmd {
-          font-family: ${MONO}; font-size: 12px; color: #FF4D00;
+          font-family: ${MONO}; font-size: 12px; color: var(--accent);
           letter-spacing: 2px; margin-bottom: 24px; text-transform: uppercase;
           display: flex; align-items: center; gap: 12px;
         }
         .cf-cmd::before, .cf-cmd::after {
-          content: ''; width: 24px; height: 1px; background: #FF4D00;
+          content: ''; width: 24px; height: 1px; background: var(--accent);
         }
 
         .cf-card {
           width: 100%; max-width: 640px;
-          background: rgba(10,10,10,0.6); border: 1px solid #2A2A2A;
+          background: rgba(10,10,10,0.6); border: 1px solid var(--border);
           padding: 48px 40px; position: relative; backdrop-filter: blur(4px);
         }
         @media (max-width: 600px) {
@@ -216,7 +216,7 @@ export default function ConfirmedPage() {
         }
         .cf-card-corner {
           position: absolute; width: 8px; height: 8px;
-          border: 1px solid #555; pointer-events: none;
+          border: 1px solid var(--border-strong); pointer-events: none;
         }
         .cf-card-tl { top: -1px; left: -1px; border-right: none; border-bottom: none; }
         .cf-card-br { bottom: -1px; right: -1px; border-left: none; border-top: none; }
@@ -227,38 +227,38 @@ export default function ConfirmedPage() {
           word-break: keep-all; text-align: center;
         }
         .cf-subtitle {
-          font-size: 16px; line-height: 1.6; color: #8C8C8C;
+          font-size: 16px; line-height: 1.6; color: var(--muted-foreground);
           text-align: center; margin-bottom: 4px; word-break: keep-all;
         }
         .cf-date {
-          font-family: ${MONO}; font-size: 11px; color: #444;
+          font-family: ${MONO}; font-size: 11px; color: var(--subtle-foreground);
           text-align: center; margin-bottom: 40px; letter-spacing: 0.05em;
         }
 
         .cf-data-grid {
           display: grid; grid-template-columns: 1fr 1fr;
-          gap: 1px; background: #2A2A2A;
-          border: 1px solid #2A2A2A; margin-bottom: 32px;
+          gap: 1px; background: var(--border);
+          border: 1px solid var(--border); margin-bottom: 32px;
         }
         @media (max-width: 480px) {
           .cf-data-grid { grid-template-columns: 1fr; }
         }
         .cf-data-cell {
-          background: #030303; padding: 18px 20px;
+          background: var(--background); padding: 18px 20px;
           display: flex; flex-direction: column; gap: 6px;
         }
         .cf-data-cell-full { grid-column: 1 / -1; }
         .cf-data-label {
-          font-family: ${MONO}; font-size: 10px; color: #555;
+          font-family: ${MONO}; font-size: 10px; color: var(--subtle-foreground);
           text-transform: uppercase; letter-spacing: 1px;
         }
-        .cf-data-value { font-size: 15px; font-weight: 600; color: #fff; }
-        .cf-data-value-accent { font-size: 36px; font-weight: 800; color: #FF4D00; line-height: 1; letter-spacing: -1px; }
-        .cf-data-value-muted { font-size: 13px; color: #555; margin-top: 2px; }
+        .cf-data-value { font-size: 15px; font-weight: 600; color: var(--foreground); }
+        .cf-data-value-accent { font-size: 36px; font-weight: 800; color: var(--accent); line-height: 1; letter-spacing: -1px; }
+        .cf-data-value-muted { font-size: 13px; color: var(--subtle-foreground); margin-top: 2px; }
 
         .cf-btn-primary {
           display: flex; align-items: center; justify-content: center; gap: 10px;
-          width: 100%; background: #FF4D00; color: #000;
+          width: 100%; background: var(--accent); color: #000;
           font-size: 17px; font-weight: 700; padding: 18px 32px;
           border: none; cursor: pointer; text-decoration: none;
           transition: background 0.2s; font-family: inherit; margin-bottom: 16px;
@@ -270,17 +270,17 @@ export default function ConfirmedPage() {
         .cf-btn-secondary {
           display: flex; align-items: center; justify-content: center; gap: 8px;
           width: 100%; height: 48px; background: transparent;
-          border: 1px solid #333; color: #555;
+          border: 1px solid var(--border-strong); color: var(--subtle-foreground);
           font-family: ${MONO}; font-size: 12px; letter-spacing: 0.08em;
           cursor: pointer; transition: border-color 0.15s, color 0.15s;
           text-decoration: none;
         }
-        .cf-btn-secondary:hover { border-color: #555; color: #888; }
+        .cf-btn-secondary:hover { border-color: var(--border-strong); color: var(--muted-foreground); }
 
         .cf-btn-cancel {
           display: flex; align-items: center; justify-content: center;
           width: 100%; height: 44px; background: transparent;
-          border: 1px solid #2a2a2a; color: #444;
+          border: 1px solid var(--border); color: var(--subtle-foreground);
           font-family: ${MONO}; font-size: 11px; letter-spacing: 0.1em;
           cursor: pointer; transition: border-color 0.15s, color 0.15s;
         }
@@ -289,29 +289,29 @@ export default function ConfirmedPage() {
 
         .cf-photographer-card {
           margin-top: 40px; padding-top: 28px;
-          border-top: 1px dashed #2A2A2A;
+          border-top: 1px dashed var(--border);
           display: flex; align-items: center; justify-content: space-between;
         }
         .cf-photo-meta { display: flex; align-items: center; gap: 14px; }
         .cf-avatar-box {
-          width: 48px; height: 48px; border: 1px solid #2A2A2A;
+          width: 48px; height: 48px; border: 1px solid var(--border);
           display: flex; align-items: center; justify-content: center;
           background: rgba(255,255,255,0.03); overflow: hidden; flex-shrink: 0;
         }
         .cf-author-name { font-size: 15px; font-weight: 700; }
         .cf-author-role {
-          font-family: ${MONO}; font-size: 10px; color: #555;
+          font-family: ${MONO}; font-size: 10px; color: var(--subtle-foreground);
           text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;
         }
         .cf-sys-tag {
-          font-family: ${MONO}; font-size: 10px; color: #FF4D00;
-          border: 1px solid rgba(255,77,0,0.3); padding: 4px 8px;
+          font-family: ${MONO}; font-size: 10px; color: var(--accent);
+          border: 1px solid rgba(var(--accent-rgb), 0.3); padding: 4px 8px;
           letter-spacing: 0.5px; white-space: nowrap;
         }
 
         .cf-footer {
           text-align: center; padding: 20px;
-          font-family: ${MONO}; font-size: 10px; color: #333;
+          font-family: ${MONO}; font-size: 10px; color: var(--disabled-foreground);
           letter-spacing: 0.1em; position: relative; z-index: 10;
         }
 
@@ -322,23 +322,23 @@ export default function ConfirmedPage() {
         }
         .cf-modal-box {
           width: 100%; max-width: 420px;
-          background: #0a0a0a; border: 1px solid #FF4D00;
+          background: var(--surface-raised); border: 1px solid var(--accent);
           padding: 32px; position: relative;
         }
         .cf-modal-title {
           font-size: 22px; font-weight: 800; margin-bottom: 12px;
-          letter-spacing: -0.5px; color: #fff;
+          letter-spacing: -0.5px; color: var(--foreground);
         }
-        .cf-modal-desc { font-size: 13px; line-height: 1.7; color: #888; margin-bottom: 24px; }
+        .cf-modal-desc { font-size: 13px; line-height: 1.7; color: var(--muted-foreground); margin-bottom: 24px; }
         .cf-modal-actions { display: flex; gap: 10px; }
         .cf-modal-cancel {
-          flex: 1; height: 48px; border: 1px solid #333; background: none;
-          color: #888; font-size: 13px; font-weight: 700; cursor: pointer;
+          flex: 1; height: 48px; border: 1px solid var(--border-strong); background: none;
+          color: var(--muted-foreground); font-size: 13px; font-weight: 700; cursor: pointer;
           font-family: inherit; transition: all 0.15s;
         }
-        .cf-modal-cancel:hover { background: #fff; color: #000; }
+        .cf-modal-cancel:hover { background: var(--foreground); color: #000; }
         .cf-modal-confirm {
-          flex: 1; height: 48px; background: #FF4D00; color: #000;
+          flex: 1; height: 48px; background: var(--accent); color: #000;
           font-size: 13px; font-weight: 900; border: none;
           cursor: pointer; font-family: ${MONO}; letter-spacing: 0.05em;
           transition: opacity 0.15s;
@@ -357,7 +357,7 @@ export default function ConfirmedPage() {
       {/* 헤더 */}
       <CustomerHeader>
         <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
-        <span className="font-mono text-[11px] text-zinc-500 max-w-[180px] truncate">{project.name}</span>
+        <span className="font-mono text-[11px] text-subtle-foreground max-w-[180px] truncate">{project.name}</span>
       </CustomerHeader>
 
       {/* 메인 */}
@@ -379,7 +379,7 @@ export default function ConfirmedPage() {
           <div className="cf-data-grid">
             <div className="cf-data-cell">
               <span className="cf-data-label">DATA :: 선택한 사진</span>
-              <span className="cf-data-value-accent">{N}<span style={{ fontSize: 18, fontWeight: 600, color: "#FF4D00", marginLeft: 4 }}>장</span></span>
+              <span className="cf-data-value-accent">{N}<span style={{ fontSize: 18, fontWeight: 600, color: "var(--accent)", marginLeft: 4 }}>장</span></span>
               <span className="cf-data-value-muted">전체 {M}장 중</span>
             </div>
             <div className="cf-data-cell">
@@ -388,7 +388,7 @@ export default function ConfirmedPage() {
             </div>
             <div className="cf-data-cell cf-data-cell-full">
               <span className="cf-data-label">SYS :: 현재 상태</span>
-              <span className="cf-data-value" style={{ fontSize: 14, fontWeight: 500, color: "#a3a3a3" }}>
+              <span className="cf-data-value" style={{ fontSize: 14, fontWeight: 500, color: "var(--muted-foreground)" }}>
                 {statusMessage(project.status)}
               </span>
             </div>
@@ -421,9 +421,9 @@ export default function ConfirmedPage() {
 
           {/* 확정 취소 */}
           {project.status === "confirmed" && (
-            <div style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid #1a1a1a" }}>
-              <p style={{ textAlign: "center", fontFamily: MONO, fontSize: 11, color: "#444", marginBottom: 12 }}>
-                확정 취소 가능 횟수 <span style={{ color: "#888", fontWeight: 700 }}>{remainingCancels}회</span> 남음
+            <div style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid var(--border-subtle)" }}>
+              <p style={{ textAlign: "center", fontFamily: MONO, fontSize: 11, color: "var(--subtle-foreground)", marginBottom: 12 }}>
+                확정 취소 가능 횟수 <span style={{ color: "var(--muted-foreground)", fontWeight: 700 }}>{remainingCancels}회</span> 남음
               </p>
               <button
                 type="button"
@@ -440,8 +440,8 @@ export default function ConfirmedPage() {
 
       {/* 푸터 */}
       <CustomerFooter>
-        <span className="font-mono text-[10px] text-zinc-600">SECURE_CONNECTION</span>
-        <span className="font-mono text-[10px] text-zinc-600">© 2026 A컷</span>
+        <span className="font-mono text-[10px] text-subtle-foreground">SECURE_CONNECTION</span>
+        <span className="font-mono text-[10px] text-subtle-foreground">© 2026 A컷</span>
       </CustomerFooter>
 
       {/* 취소 모달 */}
@@ -452,7 +452,7 @@ export default function ConfirmedPage() {
             <p className="cf-modal-desc">
               취소 후 갤러리로 돌아가 사진을 다시 선택할 수 있습니다.
               <br />
-              남은 횟수 <span style={{ fontFamily: MONO, color: "#fff", fontWeight: 700 }}>{remainingCancels}회</span>
+              남은 횟수 <span style={{ fontFamily: MONO, color: "var(--foreground)", fontWeight: 700 }}>{remainingCancels}회</span>
             </p>
             <div className="cf-modal-actions">
               <button type="button" className="cf-modal-cancel" onClick={() => setCancelModalOpen(false)}>

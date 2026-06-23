@@ -2,7 +2,7 @@
 
 import type { ProjectStatus } from "@/types";
 
-const ACCENT = "#FF4D00";
+const ACCENT = "var(--accent)";
 const GREEN  = "#22C55E";
 
 const PIPELINE_STEPS = ["업로드", "셀렉", "보정", "재보정", "완료"];
@@ -47,19 +47,19 @@ export function ProjectPipelineMiniBar({ status, variant = "card" }: Props) {
         gap: variant === "full" ? 2 : 1,
         ...(variant === "card" ? { width: 100 } : {}),
         height: 4,
-        background: variant === "full" ? "#252530" : undefined,
+        background: variant === "full" ? "var(--surface-raised)" : undefined,
         overflow: variant === "full" ? "hidden" : undefined,
       }}
     >
       {PIPELINE_STEPS.map((_, i) => {
         const isDone   = i < completedSteps;
         const isActive = i === activeStep;
-        let bg      = "#3a3a4a";
+        let bg      = "var(--border-strong)";
         let opacity = 1;
         if (allDone) {
-          bg = "#333";
+          bg = "var(--disabled-foreground)";
         } else if (isDone) {
-          bg = "#fff";
+          bg = "var(--foreground)";
         } else if (isActive) {
           bg = activeColor;
           if (isPreparing) opacity = 0.4;

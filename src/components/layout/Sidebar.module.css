@@ -1,15 +1,15 @@
 /* A-CUT navigation component — scoped to photographer sidebar only */
 
 .root {
-  --acb-bg-sidebar: #050505;
-  --acb-bg-hover: #111111;
-  --acb-bg-active: #140800;
-  --acb-accent: #ff4d00;
-  --acb-accent-glow: rgba(255, 77, 0, 0.2);
-  --acb-text-primary: #eeeeee;
-  --acb-text-secondary: #888888;
-  --acb-text-tertiary: #444444;
-  --acb-border: #1a1a1a;
+  --acb-bg-sidebar: var(--background);
+  --acb-bg-hover: var(--surface);
+  --acb-bg-active: rgba(var(--accent-rgb), 0.12);
+  --acb-accent: var(--accent);
+  --acb-accent-glow: rgba(var(--accent-rgb), 0.2);
+  --acb-text-primary: var(--foreground);
+  --acb-text-secondary: var(--muted-foreground);
+  --acb-text-tertiary: var(--subtle-foreground);
+  --acb-border: var(--border);
   --acb-transition: 0.3s;
 
   position: fixed;
@@ -82,7 +82,7 @@
   font-weight: 700;
   font-size: 18px;
   letter-spacing: -0.5px;
-  color: #ffffff;
+  color: var(--acb-text-primary);
   white-space: nowrap;
   transition: opacity var(--acb-transition);
 }
@@ -125,7 +125,7 @@
 .toggleBtn:hover {
   color: var(--acb-text-primary);
   border-color: var(--acb-text-secondary);
-  background-color: #1a1a1a;
+  background-color: var(--acb-bg-hover);
 }
 
 .toggleIcon {
@@ -209,12 +209,12 @@
 }
 
 .navItemDisabled {
-  color: #3a3a3a;
+  color: var(--disabled-foreground);
   cursor: default;
 }
 
 .navItemDisabled:hover {
-  color: #3a3a3a;
+  color: var(--disabled-foreground);
   background-color: transparent;
 }
 
@@ -251,9 +251,9 @@
   font-size: 8px;
   font-weight: 700;
   padding: 2px 6px;
-  background: rgba(50, 50, 50, 0.6);
-  border: 1px solid #2a2a2a;
-  color: #3a3a3a;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  color: var(--disabled-foreground);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   flex-shrink: 0;

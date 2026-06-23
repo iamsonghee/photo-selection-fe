@@ -96,10 +96,10 @@ function FieldLabel({
 }) {
   return (
     <div className={`flex items-center gap-1.5 mb-1.5 ${className}`}>
-      <span className="text-xs font-semibold text-zinc-300">{label}</span>
+      <span className="text-xs font-semibold text-muted-foreground">{label}</span>
       {info && <FieldInfoTip text={info} />}
-      {required && <span className="text-[10px] text-[#FF4D00] font-medium">필수</span>}
-      {optional && <span className="text-[10px] text-zinc-600">선택</span>}
+      {required && <span className="text-[10px] text-accent font-medium">필수</span>}
+      {optional && <span className="text-[10px] text-disabled-foreground">선택</span>}
     </div>
   );
 }
@@ -122,13 +122,13 @@ function MetaItem({
   return (
     <div className={fullSpan ? "col-span-2" : undefined}>
       <FieldLabel label={label} required={required} optional={optional} info={info} />
-      <div className="text-base text-zinc-200">{children}</div>
+      <div className="text-base text-foreground">{children}</div>
     </div>
   );
 }
 
 const MODAL_INPUT_CLS =
-  "w-full bg-[#0a0a0c] border border-[#27272c] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#FF4D00] focus:ring-1 focus:ring-[#FF4D00]/20 transition-all disabled:bg-[#0a0a0c]/50 disabled:text-zinc-600 disabled:cursor-not-allowed";
+  "w-full bg-background border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-placeholder-foreground focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition-all disabled:bg-background/50 disabled:text-disabled-foreground disabled:cursor-not-allowed";
 
 function ModalField({
   label,
@@ -379,13 +379,13 @@ export function ProjectNexusPageClient() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0c] text-white" style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}>
+      <div className="min-h-screen bg-background text-foreground" style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}>
         <PhotographerPageHeader
           crumbs={[{ label: "프로젝트", href: "/photographer/projects" }, { label: "로딩 중" }]}
           title="프로젝트 불러오는 중"
         />
         <div className="flex items-center justify-center py-32">
-          <span className="text-zinc-600 text-sm" style={{ fontFamily: MONO_FONT }}>
+          <span className="text-disabled-foreground text-sm" style={{ fontFamily: MONO_FONT }}>
             SYS.LOADING…
           </span>
         </div>
@@ -395,17 +395,17 @@ export function ProjectNexusPageClient() {
 
   if (!project) {
     return (
-      <div className="min-h-screen bg-[#0a0a0c] text-white" style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}>
+      <div className="min-h-screen bg-background text-foreground" style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}>
         <PhotographerPageHeader
           crumbs={[{ label: "프로젝트", href: "/photographer/projects" }, { label: "찾을 수 없음" }]}
           title="프로젝트를 찾을 수 없습니다"
         />
         <div className="flex flex-col items-center justify-center py-32 gap-3">
-          <p className="text-sm text-zinc-500">존재하지 않거나 접근 권한이 없습니다.</p>
+          <p className="text-sm text-subtle-foreground">존재하지 않거나 접근 권한이 없습니다.</p>
           <button
             type="button"
             onClick={() => router.push("/photographer/projects")}
-            className="px-4 py-2 rounded-xl text-sm font-semibold bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] text-zinc-300"
+            className="px-4 py-2 rounded-xl text-sm font-semibold bg-surface-raised hover:bg-border-subtle border border-border-subtle text-muted-foreground"
           >
             프로젝트 목록으로
           </button>
@@ -560,13 +560,13 @@ export function ProjectNexusPageClient() {
         },
       ];
 
-  const cardCls = "bg-[#121215] border border-[#1a1a1e] rounded-2xl";
+  const cardCls = "bg-surface border border-border-subtle rounded-2xl";
 
   // ── render ────────────────────────────────────────────────────────────
 
   return (
     <div
-      className="min-h-screen bg-[#0a0a0c] text-white"
+      className="min-h-screen bg-background text-foreground"
       style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}
     >
       <PhotographerPageHeader
@@ -590,21 +590,21 @@ export function ProjectNexusPageClient() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <span
-                    className="text-[11px] text-zinc-500 bg-[#0a0a0c] px-1.5 py-0.5 rounded border border-[#1a1a1e]"
+                    className="text-[11px] text-subtle-foreground bg-background px-1.5 py-0.5 rounded border border-border-subtle"
                     style={{ fontFamily: MONO_FONT }}
                   >
                     {project.displayId ?? id.slice(0, 12).toUpperCase()}
                   </span>
                   <StatusPill status={project.status} photoCount={M} requiredCount={N} />
                 </div>
-                <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white">
+                <h2 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
                   {project.name}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={openEdit}
-                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#27272c] hover:bg-[#3f3f46] text-zinc-200 transition-colors"
+                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-raised hover:bg-border-strong text-muted-foreground transition-colors"
               >
                 <PenLine size={12} /> 정보 수정
               </button>
@@ -621,13 +621,13 @@ export function ProjectNexusPageClient() {
                   const found = SHOOT_TYPES.find((t) => t.value === project.shootType);
                   const Icon = found?.icon;
                   return (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium bg-[#FF4D00]/8 border border-[#FF4D00]/40 text-[#FF4D00]">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium bg-accent/8 border border-accent/40 text-accent">
                       {Icon && <Icon size={13} />}
                       {found?.label ?? project.shootType}
                     </span>
                   );
                 })() : (
-                  <span className="text-sm text-zinc-600">—</span>
+                  <span className="text-sm text-disabled-foreground">—</span>
                 )}
               </div>
 
@@ -662,7 +662,7 @@ export function ProjectNexusPageClient() {
                 info="고객 화면·알림에 표시"
               >
                 <span className="inline-flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-[#27272c] flex items-center justify-center text-[10px] font-bold text-white">
+                  <span className="w-6 h-6 rounded-full bg-surface-raised flex items-center justify-center text-[10px] font-bold text-foreground">
                     {getInitial(project.customerName || "?")}
                   </span>
                   <span>{project.customerName || "—"}</span>
@@ -686,12 +686,12 @@ export function ProjectNexusPageClient() {
               >
                 <span>
                   <span
-                    className="text-2xl font-bold text-[#FF4D00] leading-none"
+                    className="text-2xl font-bold text-accent leading-none"
                     style={{ fontFamily: MONO_FONT }}
                   >
                     {N}
                   </span>
-                  <span className="text-sm text-zinc-500 ml-1.5">장</span>
+                  <span className="text-sm text-subtle-foreground ml-1.5">장</span>
                 </span>
               </MetaItem>
 
@@ -701,16 +701,16 @@ export function ProjectNexusPageClient() {
               >
                 <span>
                   <span
-                    className="text-2xl font-bold text-white leading-none"
+                    className="text-2xl font-bold text-foreground leading-none"
                     style={{ fontFamily: MONO_FONT }}
                   >
                     {M}
                   </span>
-                  <span className="text-sm text-zinc-500 ml-1.5">장</span>
+                  <span className="text-sm text-subtle-foreground ml-1.5">장</span>
                 </span>
               </MetaItem>
 
-              <div className="col-span-2 pt-4 border-t border-[#1a1a1e]">
+              <div className="col-span-2 pt-4 border-t border-border-subtle">
                 <FieldLabel
                   label="재보정 허용 횟수"
                   info="검토 후 재보정 허용 (0=없음)"
@@ -718,13 +718,13 @@ export function ProjectNexusPageClient() {
                 <span
                   className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border ${
                     project.maxRevisionCount > 0
-                      ? "bg-[#FF4D00]/10 border-[#FF4D00]/40 text-[#FF4D00]"
-                      : "bg-[#1a1a1e] border-[#27272c] text-zinc-500"
+                      ? "bg-accent/10 border-accent/40 text-accent"
+                      : "bg-border-subtle border-surface-raised text-subtle-foreground"
                   }`}
                 >
                   <span
                     className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: project.maxRevisionCount > 0 ? "#FF4D00" : "#3f3f46" }}
+                    style={{ background: project.maxRevisionCount > 0 ? "var(--accent)" : "var(--border-strong)" }}
                   />
                   {project.maxRevisionCount === 0 ? "재보정 없음" : `최대 ${project.maxRevisionCount}회`}
                 </span>
@@ -735,12 +735,12 @@ export function ProjectNexusPageClient() {
           {/* Customer link card */}
           <section className={`${cardCls} p-6`}>
             <div className="flex items-center justify-between mb-5 gap-2">
-              <h3 className="text-base font-bold text-white">고객 링크</h3>
+              <h3 className="text-base font-bold text-foreground">고객 링크</h3>
               <span
                 className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-md border ${
                   isInviteActive
                     ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/30"
-                    : "text-zinc-500 bg-[#1a1a1e] border-[#27272c]"
+                    : "text-subtle-foreground bg-border-subtle border-surface-raised"
                 }`}
               >
                 {isInviteActive ? "활성" : "준비 중"}
@@ -754,13 +754,13 @@ export function ProjectNexusPageClient() {
                   info="고객 셀렉·검토 링크"
                   className="mb-0"
                 />
-                <div className="flex items-stretch bg-[#0a0a0c] border border-[#27272c] rounded-xl overflow-hidden focus-within:border-[#FF4D00] transition-colors">
+                <div className="flex items-stretch bg-background border border-border-subtle rounded-xl overflow-hidden focus-within:border-accent transition-colors">
                   <input
                     type="text"
                     readOnly
                     value={isInviteActive ? inviteUrl : "업로드 완료 후 활성화"}
                     disabled={!isInviteActive}
-                    className="flex-1 min-w-0 bg-transparent text-zinc-300 text-sm px-4 py-3 outline-none disabled:text-zinc-600 disabled:cursor-not-allowed"
+                    className="flex-1 min-w-0 bg-transparent text-muted-foreground text-sm px-4 py-3 outline-none disabled:text-disabled-foreground disabled:cursor-not-allowed"
                     style={{ fontFamily: MONO_FONT }}
                   />
                   <button
@@ -768,8 +768,8 @@ export function ProjectNexusPageClient() {
                     disabled={!isInviteActive}
                     onClick={handleCopyUrl}
                     aria-label="URL 복사"
-                    className={`shrink-0 w-12 flex items-center justify-center border-l border-[#27272c] transition-colors ${
-                      copied ? "text-emerald-400" : "text-zinc-400 hover:text-white hover:bg-[#1a1a1e]"
+                    className={`shrink-0 w-12 flex items-center justify-center border-l border-border-subtle transition-colors ${
+                      copied ? "text-emerald-400" : "text-subtle-foreground hover:text-foreground hover:bg-surface-raised"
                     } disabled:opacity-30 disabled:cursor-not-allowed`}
                   >
                     {copied ? <Check size={16} /> : <Copy size={16} />}
@@ -783,14 +783,14 @@ export function ProjectNexusPageClient() {
                   info="접속 PIN 4자리 (선택)"
                   className="mb-0"
                 />
-                <div className="flex items-stretch bg-[#0a0a0c] border border-[#27272c] rounded-xl overflow-hidden focus-within:border-[#FF4D00] transition-colors">
+                <div className="flex items-stretch bg-background border border-border-subtle rounded-xl overflow-hidden focus-within:border-accent transition-colors">
                   <input
                     type={pinReveal ? "text" : "password"}
                     readOnly
                     value={project.accessPin ?? ""}
                     placeholder={project.accessPin ? undefined : "미설정"}
                     disabled={!project.accessPin}
-                    className="flex-1 min-w-0 bg-transparent text-zinc-300 text-sm px-4 py-3 outline-none disabled:text-zinc-600 disabled:cursor-not-allowed"
+                    className="flex-1 min-w-0 bg-transparent text-muted-foreground text-sm px-4 py-3 outline-none disabled:text-disabled-foreground disabled:cursor-not-allowed"
                     style={{ fontFamily: MONO_FONT, letterSpacing: pinReveal ? "0.2em" : undefined }}
                   />
                   <button
@@ -798,7 +798,7 @@ export function ProjectNexusPageClient() {
                     disabled={!project.accessPin}
                     onClick={() => setPinReveal((v) => !v)}
                     aria-label={pinReveal ? "PIN 숨기기" : "PIN 표시"}
-                    className="shrink-0 w-12 flex items-center justify-center border-l border-[#27272c] text-zinc-400 hover:text-white hover:bg-[#1a1a1e] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="shrink-0 w-12 flex items-center justify-center border-l border-border-subtle text-subtle-foreground hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     {pinReveal ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -811,11 +811,11 @@ export function ProjectNexusPageClient() {
                 type="button"
                 onClick={handleCopyInviteBundle}
                 disabled={!isInviteActive}
-                className="text-xs text-zinc-400 hover:text-[#FF4D00] underline underline-offset-2 transition-colors disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
+                className="text-xs text-subtle-foreground hover:text-accent underline underline-offset-2 transition-colors disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
               >
                 링크와 비밀번호 함께 복사
               </button>
-              <span className="text-zinc-700">·</span>
+              <span className="text-disabled-foreground">·</span>
               <button
                 type="button"
                 onClick={() => {
@@ -823,7 +823,7 @@ export function ProjectNexusPageClient() {
                   setPinError("");
                   setShowPinModal(true);
                 }}
-                className="text-xs text-zinc-400 hover:text-[#FF4D00] transition-colors"
+                className="text-xs text-subtle-foreground hover:text-accent transition-colors"
               >
                 {project.accessPin ? "비밀번호 변경" : "비밀번호 설정"}
               </button>
@@ -835,7 +835,7 @@ export function ProjectNexusPageClient() {
         <aside className="flex flex-col gap-6 min-w-0">
           {/* Action flow */}
           <section className={`${cardCls} p-5`}>
-            <h3 className="text-base font-bold text-white mb-4">진행 단계</h3>
+            <h3 className="text-base font-bold text-foreground mb-4">진행 단계</h3>
             <div className="flex flex-col gap-2">
               {actionFlowSteps.map((step, i) => {
                 const isDone = step.state === "done";
@@ -844,40 +844,40 @@ export function ProjectNexusPageClient() {
                 const clickable = !!step.onClick;
 
                 const cardStateCls = isActive
-                  ? "bg-[#FF4D00]/5 border-[#FF4D00]/40"
+                  ? "bg-accent/5 border-accent/40"
                   : isDone
-                  ? "bg-[#0a0a0c]/50 border-[#1a1a1e]"
-                  : "bg-transparent border border-dashed border-[#27272c] opacity-60";
+                  ? "bg-background/50 border-border-subtle"
+                  : "bg-transparent border border-dashed border-border-subtle opacity-60";
 
                 const cursorCls = clickable
-                  ? "hover:border-[#FF4D00]/50 cursor-pointer"
+                  ? "hover:border-accent/50 cursor-pointer"
                   : isLocked
                   ? "cursor-not-allowed"
                   : "cursor-default";
 
                 const numCls = isActive
-                  ? "text-[#FF4D00]"
+                  ? "text-accent"
                   : isDone
                   ? "text-emerald-500"
-                  : "text-zinc-600";
+                  : "text-disabled-foreground";
 
                 const iconBoxCls = isActive
-                  ? "bg-[#FF4D00]/15 border-[#FF4D00]/40 text-[#FF4D00]"
+                  ? "bg-accent/15 border-accent/40 text-accent"
                   : isDone
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                  : "bg-[#1a1a1e] border-[#27272c] text-zinc-500";
+                  : "bg-surface-raised border-border-subtle text-subtle-foreground";
 
                 const labelCls = isActive
-                  ? "text-white"
+                  ? "text-foreground"
                   : isDone
-                  ? "text-zinc-300"
-                  : "text-zinc-500";
+                  ? "text-muted-foreground"
+                  : "text-subtle-foreground";
 
                 const descCls = isActive
-                  ? "text-[#FF4D00]"
+                  ? "text-accent"
                   : isDone
-                  ? "text-zinc-600"
-                  : "text-zinc-700";
+                  ? "text-disabled-foreground"
+                  : "text-disabled-foreground";
 
                 return (
                   <button
@@ -908,7 +908,7 @@ export function ProjectNexusPageClient() {
                           {step.label}
                         </span>
                         {step.badge && (
-                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#FF4D00]/15 text-[#FF4D00] border border-[#FF4D00]/30">
+                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/30">
                             {step.badge}
                           </span>
                         )}
@@ -920,7 +920,7 @@ export function ProjectNexusPageClient() {
                     {clickable && (
                       <ChevronRight
                         size={16}
-                        className="text-zinc-500 shrink-0 group-hover:text-[#FF4D00] transition-colors"
+                        className="text-subtle-foreground shrink-0 group-hover:text-accent transition-colors"
                       />
                     )}
                   </button>
@@ -931,32 +931,32 @@ export function ProjectNexusPageClient() {
 
           {/* Recent activity */}
           <section className={`${cardCls} p-5 hidden md:block`}>
-            <h3 className="text-base font-bold text-white mb-4">최근 활동</h3>
+            <h3 className="text-base font-bold text-foreground mb-4">최근 활동</h3>
             {logs.length === 0 ? (
-              <p className="text-xs text-zinc-600">최근 활동 내역이 없습니다.</p>
+              <p className="text-xs text-disabled-foreground">최근 활동 내역이 없습니다.</p>
             ) : (
               <ul className="flex flex-col gap-3">
                 {logs.map((log) => {
                   const orange = log.action === "selecting";
                   const green = log.action === "uploaded" || log.action === "confirmed";
                   const dotCls = orange
-                    ? "border-[#FF4D00]"
+                    ? "border-accent"
                     : green
                     ? "border-emerald-500"
-                    : "border-zinc-600";
+                    : "border-disabled-foreground";
                   const msgCls = orange
-                    ? "text-[#FF4D00]"
+                    ? "text-accent"
                     : green
                     ? "text-emerald-400"
-                    : "text-zinc-300";
+                    : "text-muted-foreground";
                   return (
                     <li key={log.id} className="flex gap-3 min-w-0">
                       <span
-                        className={`mt-1.5 w-2 h-2 rounded-full bg-[#0a0a0c] border-2 ${dotCls} shrink-0`}
+                        className={`mt-1.5 w-2 h-2 rounded-full bg-background border-2 ${dotCls} shrink-0`}
                       />
                       <div className="flex flex-col gap-0.5 min-w-0">
                         <span
-                          className="text-[10px] text-zinc-600"
+                          className="text-[10px] text-disabled-foreground"
                           style={{ fontFamily: MONO_FONT }}
                         >
                           {formatLogTime(log.createdAt)}
@@ -975,7 +975,7 @@ export function ProjectNexusPageClient() {
             <h3 className="text-xs font-bold uppercase tracking-wider text-rose-500 mb-2 flex items-center gap-1.5">
               <AlertTriangle size={12} /> 위험 영역
             </h3>
-            <p className="text-xs text-zinc-500 mb-3 leading-relaxed">
+            <p className="text-xs text-subtle-foreground mb-3 leading-relaxed">
               삭제 시 모든 사진과 셀렉·보정 데이터가 함께 사라지며 되돌릴 수 없습니다.
             </p>
             <button
@@ -995,7 +995,7 @@ export function ProjectNexusPageClient() {
       {/* Toast */}
       {toast && (
         <div
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[210] bg-[#121215] border border-[#27272c] rounded-xl px-4 py-2.5 text-sm text-white shadow-lg pointer-events-none"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[210] bg-surface border border-border-subtle rounded-xl px-4 py-2.5 text-sm text-foreground shadow-lg pointer-events-none"
           style={{ fontFamily: "var(--font-inter, sans-serif)" }}
         >
           {toast}
@@ -1020,7 +1020,7 @@ export function ProjectNexusPageClient() {
                   setEditMode(false);
                   setSaveError("");
                 }}
-                className="flex-1 py-3 rounded-xl bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] text-zinc-300 text-sm font-semibold transition-colors"
+                className="flex-1 py-3 rounded-xl bg-surface-raised hover:bg-border-subtle border border-border-subtle text-muted-foreground text-sm font-semibold transition-colors"
               >
                 취소
               </button>
@@ -1028,7 +1028,7 @@ export function ProjectNexusPageClient() {
                 type="button"
                 onClick={handleSaveEdit}
                 disabled={saving}
-                className="flex-1 py-3 rounded-xl bg-[#FF4D00] hover:bg-[#ff5e1a] text-black text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-3 rounded-xl bg-accent hover:bg-[#ff5e1a] text-black text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? "저장 중..." : "저장"}
               </button>
@@ -1054,10 +1054,10 @@ export function ProjectNexusPageClient() {
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-colors"
                   style={{
                     background:
-                      editShootType === value ? "rgba(255,77,0,0.08)" : "transparent",
+                      editShootType === value ? "rgba(var(--accent-rgb), 0.08)" : "transparent",
                     borderColor:
-                      editShootType === value ? "rgba(255,77,0,0.5)" : "#27272c",
-                    color: editShootType === value ? "#FF4D00" : "#71717a",
+                      editShootType === value ? "rgba(var(--accent-rgb), 0.5)" : "var(--border-subtle)",
+                    color: editShootType === value ? "var(--accent)" : "var(--subtle-foreground)",
                   }}
                 >
                   <Icon size={12} />
@@ -1154,8 +1154,8 @@ export function ProjectNexusPageClient() {
                     onClick={() => setEditMaxRevisionCount(value)}
                     className={`flex flex-col items-center gap-1 px-3 py-3 rounded-xl border transition-colors ${
                       active
-                        ? "bg-[#FF4D00]/8 border-[#FF4D00]/40 text-[#FF4D00]"
-                        : "bg-transparent border-[#27272c] text-zinc-500 hover:border-[#3f3f46] hover:text-zinc-300"
+                        ? "bg-accent/8 border-accent/40 text-accent"
+                        : "bg-transparent border-border-subtle text-subtle-foreground hover:border-border-strong hover:text-muted-foreground"
                     }`}
                   >
                     <span className="text-sm font-bold">{label}</span>
@@ -1203,7 +1203,7 @@ export function ProjectNexusPageClient() {
                   setPinError("");
                 }}
                 disabled={pinSaving}
-                className="flex-1 py-3 rounded-xl bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] text-zinc-300 text-sm font-semibold transition-colors disabled:opacity-50"
+                className="flex-1 py-3 rounded-xl bg-surface-raised hover:bg-border-subtle border border-border-subtle text-muted-foreground text-sm font-semibold transition-colors disabled:opacity-50"
               >
                 취소
               </button>
@@ -1211,7 +1211,7 @@ export function ProjectNexusPageClient() {
                 type="button"
                 onClick={() => handleSavePin(pinInput || null)}
                 disabled={pinSaving || (!!pinInput && pinInput.length !== 4)}
-                className="flex-1 py-3 rounded-xl bg-[#FF4D00] hover:bg-[#ff5e1a] text-black text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-3 rounded-xl bg-accent hover:bg-[#ff5e1a] text-black text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {pinSaving ? "저장 중..." : "저장"}
               </button>
@@ -1230,7 +1230,7 @@ export function ProjectNexusPageClient() {
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4))}
                 placeholder="0000"
-                className="flex-1 text-center text-3xl font-bold bg-[#0a0a0c] border border-[#27272c] rounded-xl px-4 py-3 text-white placeholder:text-zinc-700 focus:outline-none focus:border-[#FF4D00] focus:ring-1 focus:ring-[#FF4D00]/20 transition-all"
+                className="flex-1 text-center text-3xl font-bold bg-background border border-border-subtle rounded-xl px-4 py-3 text-foreground placeholder:text-placeholder-foreground focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition-all"
                 style={{ letterSpacing: "0.5em", fontFamily: MONO_FONT }}
               />
               <button
@@ -1238,12 +1238,12 @@ export function ProjectNexusPageClient() {
                 onClick={() =>
                   setPinInput(Math.floor(1000 + Math.random() * 9000).toString())
                 }
-                className="shrink-0 px-4 rounded-xl bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                className="shrink-0 px-4 rounded-xl bg-surface-raised hover:bg-border-subtle border border-border-subtle text-muted-foreground text-xs font-semibold flex items-center gap-1.5 transition-colors"
               >
                 <RefreshCw size={12} /> 랜덤
               </button>
             </div>
-            <p className="text-[11px] text-zinc-600 mt-2 leading-relaxed">
+            <p className="text-[11px] text-disabled-foreground mt-2 leading-relaxed">
               설정 시 고객이 링크에 접속할 때 이 비밀번호를 입력해야 합니다. 비워두면 비밀번호 없이 접속할 수 있습니다.
             </p>
           </div>
@@ -1273,7 +1273,7 @@ export function ProjectNexusPageClient() {
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
                 disabled={deleting}
-                className="flex-1 py-3 rounded-xl bg-[#1a1a1e] hover:bg-[#27272c] border border-[#27272c] text-zinc-300 text-sm font-semibold transition-colors disabled:opacity-50"
+                className="flex-1 py-3 rounded-xl bg-surface-raised hover:bg-border-subtle border border-border-subtle text-muted-foreground text-sm font-semibold transition-colors disabled:opacity-50"
               >
                 취소
               </button>
@@ -1290,11 +1290,11 @@ export function ProjectNexusPageClient() {
         }
       >
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-zinc-300 leading-relaxed">
-            <span className="text-white font-semibold">&ldquo;{project.name}&rdquo;</span>{" "}
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            <span className="text-foreground font-semibold">&ldquo;{project.name}&rdquo;</span>{" "}
             프로젝트를 영구적으로 삭제합니다.
           </p>
-          <p className="text-xs text-zinc-500 leading-relaxed">
+          <p className="text-xs text-subtle-foreground leading-relaxed">
             모든 사진, 셀렉 데이터, 보정본이 함께 삭제되며 이 작업은 되돌릴 수 없습니다.
           </p>
         </div>

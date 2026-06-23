@@ -97,7 +97,7 @@ function WorkflowConfirmModal({
   const confirmClass =
     tone === "danger"
       ? "bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-600/25"
-      : "bg-[#FF4D00] hover:bg-[#ff5e1a] text-black shadow-lg shadow-[#FF4D00]/20";
+      : "bg-accent hover:bg-[#ff5e1a] text-black shadow-lg shadow-accent/20";
 
   return (
     <div
@@ -110,20 +110,20 @@ function WorkflowConfirmModal({
       }}
     >
       <div
-        className="relative w-full max-w-md overflow-hidden rounded-2xl border border-[#1a1a1e] bg-[#121215] shadow-2xl"
+        className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border-subtle bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="h-0.5 w-full bg-[#FF4D00]" aria-hidden />
+        <div className="h-0.5 w-full bg-accent" aria-hidden />
         <div className="p-6 sm:p-7">
-          <h2 id="workflow-confirm-title" className="text-lg font-bold tracking-tight text-white">
+          <h2 id="workflow-confirm-title" className="text-lg font-bold tracking-tight text-foreground">
             {title}
           </h2>
-          <p className="mt-3 text-sm leading-relaxed text-zinc-400">{description}</p>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{description}</p>
           <div className="mt-8 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="w-full rounded-xl border border-[#27272c] bg-[#0a0a0c] px-5 py-2.5 text-sm font-semibold text-zinc-300 transition-colors hover:border-zinc-500 hover:text-white sm:w-auto"
+              className="w-full rounded-xl border border-border-subtle bg-background px-5 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:border-border-strong hover:text-foreground sm:w-auto"
             >
               {cancelLabel}
             </button>
@@ -188,7 +188,7 @@ function StatusBadge({
   }
   if (status === "revision_requested") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20 whitespace-nowrap">
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-accent/10 text-accent border border-accent/20 whitespace-nowrap">
         <AlertTriangle size={11} />{compact ? "재보정" : "재보정 요청"}
       </span>
     );
@@ -264,22 +264,22 @@ function StageStepper({
   };
 
   return (
-    <div className="shrink-0 px-4 md:px-8 py-2.5 md:py-3 border-b border-[#1a1a1e] bg-[#0a0a0c]/60">
+    <div className="shrink-0 px-4 md:px-8 py-2.5 md:py-3 border-b border-border-subtle bg-background/60">
       <div className="flex items-center justify-between gap-2 max-w-[1600px] mx-auto">
         {steps.map((step, i) => {
           const s = stateOf(step.key);
           const dot =
             s === "done" ? "bg-emerald-500"
-            : s === "active" ? "bg-[#FF4D00] shadow-[0_0_8px_rgba(255,77,0,0.6)]"
-            : "bg-zinc-700";
+            : s === "active" ? "bg-accent shadow-[0_0_8px_rgba(var(--accent-rgb),0.6)]"
+            : "bg-disabled-foreground";
           const label =
-            s === "done" ? "text-zinc-300"
-            : s === "active" ? "text-white"
-            : "text-zinc-600";
+            s === "done" ? "text-muted-foreground"
+            : s === "active" ? "text-foreground"
+            : "text-disabled-foreground";
           const sub =
-            s === "active" ? "text-[#FF4D00]" : "text-zinc-500";
+            s === "active" ? "text-accent" : "text-subtle-foreground";
           const line =
-            s === "done" ? "bg-emerald-500/40" : "bg-[#27272c]";
+            s === "done" ? "bg-emerald-500/40" : "bg-border-subtle";
           return (
             <div key={step.key} className="flex items-center gap-2 flex-1 min-w-0">
               <div className="flex items-center gap-2 min-w-0">
@@ -317,10 +317,10 @@ function CardShell({
     highlight === "approved"
       ? "border-emerald-500/30"
       : highlight === "revision"
-        ? "border-[#FF4D00]/35"
-        : "border-[#1a1a1e]";
+        ? "border-accent/35"
+        : "border-border-subtle";
   return (
-    <div className={`bg-[#0a0a0c]/70 border ${ring} rounded-xl p-2 group hover:border-zinc-600/60 transition-colors`}>
+    <div className={`bg-background/70 border ${ring} rounded-xl p-2 group hover:border-border-strong/60 transition-colors`}>
       {children}
     </div>
   );
@@ -341,35 +341,35 @@ function OriginalCard({
       <button
         type="button"
         onClick={() => onOpenViewer(index, "original")}
-        className="w-full aspect-[4/3] bg-[#080808] rounded-lg overflow-hidden border border-[#1a1a1e] hover:border-zinc-500 transition-colors relative cursor-pointer mb-2"
+        className="w-full aspect-[4/3] bg-background rounded-lg overflow-hidden border border-border-subtle hover:border-border-strong transition-colors relative cursor-pointer mb-2"
       >
         {row.photo.url ? (
           <img src={row.photo.url} alt={filename} loading="lazy" decoding="async" className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-zinc-700">
+          <div className="w-full h-full flex items-center justify-center text-disabled-foreground">
             <Layers size={24} />
           </div>
         )}
-        <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-zinc-300 border border-[#333]">
+        <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-muted-foreground border border-border-strong">
           원본
         </div>
         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <Maximize2 size={18} className="text-white" />
+          <Maximize2 size={18} className="text-foreground" />
         </div>
       </button>
-      <div className="text-[11px] font-mono text-zinc-300 truncate mb-1.5" title={filename}>
+      <div className="text-[11px] font-mono text-muted-foreground truncate mb-1.5" title={filename}>
         {filename}
       </div>
       {row.photo.comment ? (
-        <div className="bg-[#0a0a0c] border border-[#27272c] rounded-lg p-2 text-[11px] text-zinc-300 leading-relaxed">
-          <div className="text-[9px] text-[#FF4D00] font-semibold uppercase tracking-wide mb-1 flex items-center gap-1">
+        <div className="bg-background border border-border-subtle rounded-lg p-2 text-[11px] text-muted-foreground leading-relaxed">
+          <div className="text-[9px] text-accent font-semibold uppercase tracking-wide mb-1 flex items-center gap-1">
             <MessageSquare size={9} />
             고객 코멘트
           </div>
           &ldquo;{row.photo.comment}&rdquo;
         </div>
       ) : (
-        <div className="text-[10px] text-zinc-600 italic">코멘트 없음</div>
+        <div className="text-[10px] text-disabled-foreground italic">코멘트 없음</div>
       )}
     </CardShell>
   );
@@ -421,14 +421,14 @@ function V1Card({
         <button
           type="button"
           onClick={() => onOpenViewer(index, "original")}
-          className="w-8 h-8 rounded-md bg-[#080808] border border-[#1a1a1e] overflow-hidden shrink-0 hover:border-zinc-500 transition-colors"
+          className="w-8 h-8 rounded-md bg-background border border-border-subtle overflow-hidden shrink-0 hover:border-border-strong transition-colors"
           title="원본 보기"
         >
           {row.photo.url ? (
             <img src={row.photo.url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
           ) : null}
         </button>
-        <span className="text-[10px] font-mono text-zinc-400 truncate" title={filename}>
+        <span className="text-[10px] font-mono text-subtle-foreground truncate" title={filename}>
           {filename}
         </span>
       </div>
@@ -439,7 +439,7 @@ function V1Card({
           <button
             type="button"
             onClick={() => onOpenViewer(index, "v1")}
-            className="w-full h-full bg-[#080808] rounded-lg overflow-hidden relative cursor-pointer hover:opacity-95 transition-opacity border border-[#1a1a1e]"
+            className="w-full h-full bg-background rounded-lg overflow-hidden relative cursor-pointer hover:opacity-95 transition-opacity border border-border-subtle"
           >
             <img
               src={getVersionUrl(v1.thumbUrl, row.photo.id, 1)}
@@ -448,11 +448,11 @@ function V1Card({
               decoding="async"
               className="w-full h-full object-cover"
             />
-            <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-zinc-300 border border-[#333]">
+            <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-muted-foreground border border-border-strong">
               보정
             </div>
             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <Maximize2 size={18} className="text-white" />
+              <Maximize2 size={18} className="text-foreground" />
             </div>
           </button>
           {replacingId === row.photo.id && (
@@ -468,12 +468,12 @@ function V1Card({
           disabled={!canUploadV1}
           className={`w-full aspect-[4/3] rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-1 mb-2 transition-all ${
             canUploadV1
-              ? "border-[#27272c] bg-[#080808] hover:border-[#FF4D00]/60 hover:bg-[#FF4D00]/5 cursor-pointer"
-              : "border-[#1a1a1e] bg-[#080808] opacity-50 cursor-not-allowed"
+              ? "border-border-subtle bg-background hover:border-accent/60 hover:bg-accent/5 cursor-pointer"
+              : "border-border-subtle bg-background opacity-50 cursor-not-allowed"
           }`}
         >
-          <Upload size={20} className={canUploadV1 ? "text-zinc-500" : "text-zinc-700"} />
-          <span className="text-[11px] text-zinc-500 font-medium">
+          <Upload size={20} className={canUploadV1 ? "text-subtle-foreground" : "text-disabled-foreground"} />
+          <span className="text-[11px] text-subtle-foreground font-medium">
             {canUploadV1 ? "V1 업로드" : "업로드 대기"}
           </span>
         </button>
@@ -492,7 +492,7 @@ function V1Card({
             />
           )
         ) : (
-          <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider">
+          <span className="text-[10px] font-mono text-disabled-foreground uppercase tracking-wider">
             미업로드
           </span>
         )}
@@ -500,7 +500,7 @@ function V1Card({
           <div className="flex items-center gap-0.5">
             {canUploadV1 && (
               <label
-                className={`inline-flex items-center justify-center w-7 h-7 rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/5 transition-colors cursor-pointer ${
+                className={`inline-flex items-center justify-center w-7 h-7 rounded-md text-subtle-foreground hover:text-foreground hover:bg-white/5 transition-colors cursor-pointer ${
                   replacingId ? "pointer-events-none opacity-40" : ""
                 }`}
                 title="V1 교체"
@@ -524,7 +524,7 @@ function V1Card({
                 type="button"
                 onClick={() => onDelete(v1.id, row.photo.id, 1)}
                 disabled={deletingId === v1.id || replacingId === row.photo.id}
-                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-zinc-600 hover:text-rose-400 hover:bg-white/5 transition-colors disabled:opacity-40"
+                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-disabled-foreground hover:text-rose-400 hover:bg-white/5 transition-colors disabled:opacity-40"
                 title="V1 삭제"
               >
                 {deletingId === v1.id ? (
@@ -544,19 +544,19 @@ function V1Card({
       {/* Comment */}
       {v1?.comment && !isReviewingV1 && (
         <div
-          className={`bg-[#0a0a0c] border rounded-lg p-2 text-[11px] text-zinc-300 leading-relaxed ${
+          className={`bg-background border rounded-lg p-2 text-[11px] text-muted-foreground leading-relaxed ${
             v1.reviewStatus === "revision_requested"
-              ? "border-[#FF4D00]/30 border-l-2 border-l-[#FF4D00]"
-              : "border-[#27272c]"
+              ? "border-accent/30 border-l-2 border-l-accent"
+              : "border-border-subtle"
           }`}
         >
           <div
             className={`text-[9px] font-semibold uppercase tracking-wide mb-1 ${
               v1.reviewStatus === "revision_requested"
-                ? "text-[#FF4D00]"
+                ? "text-accent"
                 : v1.reviewStatus === "approved"
                   ? "text-emerald-400"
-                  : "text-zinc-500"
+                  : "text-subtle-foreground"
             }`}
           >
             {v1.reviewStatus === "revision_requested"
@@ -622,7 +622,7 @@ function V2Card({
         <button
           type="button"
           onClick={() => onOpenViewer(index, "original")}
-          className="w-8 h-8 rounded-md bg-[#080808] border border-[#1a1a1e] overflow-hidden shrink-0 hover:border-zinc-500 transition-colors"
+          className="w-8 h-8 rounded-md bg-background border border-border-subtle overflow-hidden shrink-0 hover:border-border-strong transition-colors"
           title="원본 보기"
         >
           {row.photo.url ? (
@@ -633,7 +633,7 @@ function V2Card({
           <button
             type="button"
             onClick={() => onOpenViewer(index, "v1")}
-            className="w-8 h-8 rounded-md bg-[#080808] border border-[#FF4D00]/30 overflow-hidden shrink-0 hover:border-[#FF4D00] transition-colors"
+            className="w-8 h-8 rounded-md bg-background border border-accent/30 overflow-hidden shrink-0 hover:border-accent transition-colors"
             title="V1 보기"
           >
             <img
@@ -645,33 +645,33 @@ function V2Card({
             />
           </button>
         ) : null}
-        <span className="text-[10px] font-mono text-zinc-400 truncate" title={filename}>
+        <span className="text-[10px] font-mono text-subtle-foreground truncate" title={filename}>
           {filename}
         </span>
       </div>
 
       {/* Main V2 */}
       {v2Dimmed ? (
-        <div className="w-full aspect-[4/3] rounded-lg border border-[#1a1a1e] bg-[#080808] flex flex-col items-center justify-center gap-1 mb-2 opacity-50">
-          <Lock size={18} className="text-zinc-600" />
-          <span className="text-[10px] text-zinc-600 text-center px-3">
+        <div className="w-full aspect-[4/3] rounded-lg border border-border-subtle bg-background flex flex-col items-center justify-center gap-1 mb-2 opacity-50">
+          <Lock size={18} className="text-disabled-foreground" />
+          <span className="text-[10px] text-disabled-foreground text-center px-3">
             V1 검토 완료 후 업로드 가능
           </span>
         </div>
       ) : effectiveV1Status === "approved" ? (
-        <div className="w-full aspect-[4/3] rounded-lg border border-dashed border-[#1a1a1e] bg-[#080808] flex flex-col items-center justify-center gap-1 mb-2 opacity-40">
+        <div className="w-full aspect-[4/3] rounded-lg border border-dashed border-border-subtle bg-background flex flex-col items-center justify-center gap-1 mb-2 opacity-40">
           <CheckCircle2 size={18} className="text-emerald-500" />
-          <span className="text-[10px] text-zinc-500 text-center px-3">
+          <span className="text-[10px] text-subtle-foreground text-center px-3">
             V1 확정 — 재보정 불필요
           </span>
         </div>
       ) : effectiveV1Status === "pending" ? (
-        <div className="w-full aspect-[4/3] rounded-lg border border-dashed border-amber-500/30 bg-[#080808] flex flex-col items-center justify-center gap-1 mb-2 opacity-80 px-3">
+        <div className="w-full aspect-[4/3] rounded-lg border border-dashed border-amber-500/30 bg-background flex flex-col items-center justify-center gap-1 mb-2 opacity-80 px-3">
           <AlertTriangle size={18} className="text-amber-400" />
           <span className="text-[10px] text-amber-300 text-center font-medium">
             V1 검토 결과 없음
           </span>
-          <span className="text-[9px] text-zinc-500 text-center">
+          <span className="text-[9px] text-subtle-foreground text-center">
             페이지를 새로고침 해주세요
           </span>
         </div>
@@ -680,7 +680,7 @@ function V2Card({
           <button
             type="button"
             onClick={() => onOpenViewer(index, "v2")}
-            className="w-full h-full bg-[#080808] rounded-lg overflow-hidden relative cursor-pointer hover:opacity-95 transition-opacity border border-[#1a1a1e]"
+            className="w-full h-full bg-background rounded-lg overflow-hidden relative cursor-pointer hover:opacity-95 transition-opacity border border-border-subtle"
           >
             <img
               src={getVersionUrl(v2.thumbUrl, row.photo.id, 2)}
@@ -689,11 +689,11 @@ function V2Card({
               decoding="async"
               className="w-full h-full object-cover"
             />
-            <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-[#FF4D00] border border-[#FF4D00]/40">
+            <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-accent border border-accent/40">
               재보정
             </div>
             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <Maximize2 size={18} className="text-white" />
+              <Maximize2 size={18} className="text-foreground" />
             </div>
           </button>
           {replacingId === row.photo.id && (
@@ -709,12 +709,12 @@ function V2Card({
           disabled={!canUploadV2}
           className={`w-full aspect-[4/3] rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-1 mb-2 transition-all ${
             canUploadV2
-              ? "border-[#27272c] bg-[#080808] hover:border-[#FF4D00]/60 hover:bg-[#FF4D00]/5 cursor-pointer"
-              : "border-[#1a1a1e] bg-[#080808] opacity-50 cursor-not-allowed"
+              ? "border-border-subtle bg-background hover:border-accent/60 hover:bg-accent/5 cursor-pointer"
+              : "border-border-subtle bg-background opacity-50 cursor-not-allowed"
           }`}
         >
-          <Upload size={20} className={canUploadV2 ? "text-zinc-500" : "text-zinc-700"} />
-          <span className="text-[11px] text-zinc-500 font-medium">
+          <Upload size={20} className={canUploadV2 ? "text-subtle-foreground" : "text-disabled-foreground"} />
+          <span className="text-[11px] text-subtle-foreground font-medium">
             {canUploadV2 ? "V2 업로드" : "업로드 대기"}
           </span>
         </button>
@@ -732,7 +732,7 @@ function V2Card({
               }
             />
           ) : (
-            <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider">
+            <span className="text-[10px] font-mono text-disabled-foreground uppercase tracking-wider">
               미업로드
             </span>
           )}
@@ -740,7 +740,7 @@ function V2Card({
             <div className="flex items-center gap-0.5">
               {canUploadV2 && (
                 <label
-                  className={`inline-flex items-center justify-center w-7 h-7 rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/5 transition-colors cursor-pointer ${
+                  className={`inline-flex items-center justify-center w-7 h-7 rounded-md text-subtle-foreground hover:text-foreground hover:bg-white/5 transition-colors cursor-pointer ${
                     replacingId ? "pointer-events-none opacity-40" : ""
                   }`}
                   title="V2 교체"
@@ -764,7 +764,7 @@ function V2Card({
                   type="button"
                   onClick={() => onDelete(v2.id, row.photo.id, 2)}
                   disabled={deletingId === v2.id || replacingId === row.photo.id}
-                  className="inline-flex items-center justify-center w-7 h-7 rounded-md text-zinc-600 hover:text-rose-400 hover:bg-white/5 transition-colors disabled:opacity-40"
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-md text-disabled-foreground hover:text-rose-400 hover:bg-white/5 transition-colors disabled:opacity-40"
                   title="V2 삭제"
                 >
                   {deletingId === v2.id ? (
@@ -785,10 +785,10 @@ function V2Card({
       {/* Comment */}
       {v2?.comment && !isReviewingV2 && (
         <div
-          className={`bg-[#0a0a0c] border rounded-lg p-2 text-[11px] text-zinc-300 leading-relaxed ${
+          className={`bg-background border rounded-lg p-2 text-[11px] text-muted-foreground leading-relaxed ${
             v2.reviewStatus === "revision_requested"
-              ? "border-[#FF4D00]/30 border-l-2 border-l-[#FF4D00]"
-              : "border-[#27272c]"
+              ? "border-accent/30 border-l-2 border-l-accent"
+              : "border-border-subtle"
           }`}
         >
           <div
@@ -796,8 +796,8 @@ function V2Card({
               v2.reviewStatus === "approved"
                 ? "text-emerald-400"
                 : v2.reviewStatus === "revision_requested"
-                  ? "text-[#FF4D00]"
-                  : "text-zinc-500"
+                  ? "text-accent"
+                  : "text-subtle-foreground"
             }`}
           >
             {v2.reviewStatus === "approved"
@@ -1164,11 +1164,11 @@ export default function WorkflowPageClient() {
 
   if (error || !project) {
     return (
-      <div className="h-screen bg-[#0a0a0c] flex flex-col items-center justify-center gap-4">
-        <span className="text-[#FF4D00] text-sm">{error ?? "프로젝트를 찾을 수 없습니다."}</span>
+      <div className="h-screen bg-background flex flex-col items-center justify-center gap-4">
+        <span className="text-accent text-sm">{error ?? "프로젝트를 찾을 수 없습니다."}</span>
         <button
           onClick={() => router.push(`/photographer/projects`)}
-          className="text-sm text-zinc-400 border border-[#27272c] px-4 py-2 rounded-xl hover:text-white hover:border-zinc-500 transition-colors"
+          className="text-sm text-muted-foreground border border-border-subtle px-4 py-2 rounded-xl hover:text-foreground hover:border-border-strong transition-colors"
         >
           목록으로 돌아가기
         </button>
@@ -1386,7 +1386,7 @@ export default function WorkflowPageClient() {
 
   return (
     <div
-      className="h-screen flex flex-col overflow-hidden bg-[#0a0a0c] text-white"
+      className="h-screen flex flex-col overflow-hidden bg-background text-foreground"
       style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}
     >
       {/* ── Header ── */}
@@ -1412,7 +1412,7 @@ export default function WorkflowPageClient() {
 
       {/* ── Stage tabs ── */}
       {!isSelecting && (
-        <div className="shrink-0 px-4 md:px-8 py-2.5 md:py-3 border-b border-[#1a1a1e] bg-[#121215]/50 flex items-center gap-2 md:gap-3 flex-wrap">
+        <div className="shrink-0 px-4 md:px-8 py-2.5 md:py-3 border-b border-border-subtle bg-surface/50 flex items-center gap-2 md:gap-3 flex-wrap">
           <div className="flex items-end gap-1 -mb-px">
             {[
               { key: "original" as StageTab, label: "원본", disabled: false },
@@ -1429,17 +1429,17 @@ export default function WorkflowPageClient() {
                   disabled={tab.disabled}
                   className={`relative px-4 py-2.5 text-[13px] font-semibold tracking-wide transition-colors ${
                     isActive
-                      ? "text-white"
+                      ? "text-foreground"
                       : tab.disabled
-                        ? "text-zinc-700 cursor-not-allowed"
-                        : "text-zinc-400 hover:text-white"
+                        ? "text-disabled-foreground cursor-not-allowed"
+                        : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {tab.label}
                   {isActive && !tab.disabled && (
                     <span
                       aria-hidden
-                      className="pointer-events-none absolute left-2 right-2 -bottom-[1px] h-[2px] bg-[#FF4D00] rounded-full"
+                      className="pointer-events-none absolute left-2 right-2 -bottom-[1px] h-[2px] bg-accent rounded-full"
                     />
                   )}
                 </button>
@@ -1450,7 +1450,7 @@ export default function WorkflowPageClient() {
           {/* Filter chips for current stage (PC only) */}
           {FILTER_TABS.length > 1 && (
             <div className="hidden md:flex items-center gap-1.5">
-              <div className="w-px h-4 bg-[#27272c] shrink-0" />
+              <div className="w-px h-4 bg-border-subtle shrink-0" />
               <div className="flex items-center gap-1.5 flex-wrap">
             {FILTER_TABS.map(({ key, label, count }) => (
               <button
@@ -1458,12 +1458,12 @@ export default function WorkflowPageClient() {
                 onClick={() => setFilter(key)}
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
                   filter === key
-                        ? "border-[#FF4D00]/40 bg-[#FF4D00]/10 text-[#FF4D00]"
-                        : "border-[#27272c] bg-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-500"
+                        ? "border-accent/40 bg-accent/10 text-accent"
+                        : "border-border-subtle bg-transparent text-subtle-foreground hover:text-muted-foreground hover:border-border-strong"
                 }`}
               >
                 {label}
-                    <span className={`text-[10px] font-mono ${filter === key ? "text-[#FF4D00]/70" : "text-zinc-600"}`}>
+                    <span className={`text-[10px] font-mono ${filter === key ? "text-accent/70" : "text-disabled-foreground"}`}>
                   {count}
                 </span>
               </button>
@@ -1474,11 +1474,11 @@ export default function WorkflowPageClient() {
 
           {/* progress summary — V2 only (V1은 footer note에 표시) */}
           {stageTab === "v2" && (
-            <div className="ml-auto hidden md:flex items-center gap-2 text-[11px] font-mono text-zinc-500 bg-[#0a0a0c] border border-[#1a1a1e] rounded-xl px-3 py-1.5">
-              <span className="text-white font-semibold">{counts.v2Uploaded}</span>
+            <div className="ml-auto hidden md:flex items-center gap-2 text-[11px] font-mono text-subtle-foreground bg-background border border-border-subtle rounded-xl px-3 py-1.5">
+              <span className="text-foreground font-semibold">{counts.v2Uploaded}</span>
               <span>/</span>
               <span>{v2Total}</span>
-              <span className="text-zinc-600 mx-1">V2 업로드</span>
+              <span className="text-disabled-foreground mx-1">V2 업로드</span>
             </div>
           )}
 
@@ -1489,7 +1489,7 @@ export default function WorkflowPageClient() {
                 <button
                   type="button"
                   onClick={() => setShowExportMenu((v) => !v)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border border-[#27272c] text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border border-border-subtle text-muted-foreground hover:text-foreground hover:border-border-strong transition-colors"
                 >
                   <Download size={12} />
                   내보내기
@@ -1498,21 +1498,21 @@ export default function WorkflowPageClient() {
                 {showExportMenu && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
-                    <div className="absolute right-0 top-full mt-1 z-20 bg-[#121215] border border-[#27272c] rounded-xl shadow-xl overflow-hidden min-w-[148px]">
+                    <div className="absolute right-0 top-full mt-1 z-20 bg-surface border border-border-subtle rounded-xl shadow-xl overflow-hidden min-w-[148px]">
                       <button
                         type="button"
                         onClick={() => handleDownloadReview(false)}
-                        className="w-full flex items-center gap-2 px-4 py-2.5 text-[11px] text-zinc-300 hover:bg-[#1a1a1e] hover:text-white transition-colors text-left"
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-[11px] text-muted-foreground hover:bg-surface-raised hover:text-foreground transition-colors text-left"
                       >
-                        <Download size={11} className="text-zinc-500 shrink-0" />
+                        <Download size={11} className="text-subtle-foreground shrink-0" />
                         파일명만
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDownloadReview(true)}
-                        className="w-full flex items-center gap-2 px-4 py-2.5 text-[11px] text-zinc-300 hover:bg-[#1a1a1e] hover:text-white transition-colors text-left"
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-[11px] text-muted-foreground hover:bg-surface-raised hover:text-foreground transition-colors text-left"
                       >
-                        <Download size={11} className="text-[#FF4D00] shrink-0" />
+                        <Download size={11} className="text-accent shrink-0" />
                         코멘트 포함
                       </button>
                     </div>
@@ -1520,13 +1520,13 @@ export default function WorkflowPageClient() {
                 )}
               </div>
             )}
-            <div className="flex items-center border border-[#27272c] rounded-lg overflow-hidden">
+            <div className="flex items-center border border-border-subtle rounded-lg overflow-hidden">
               {([["gallery", <LayoutGrid key="g" size={13} />] as const, ["list", <List key="l" size={13} />] as const]).map(([mode, icon]) => (
                 <button
                   key={mode}
                   type="button"
                   onClick={() => setViewMode(mode as "gallery" | "list")}
-                  className={`px-2.5 py-1.5 transition-colors ${viewMode === mode ? "bg-[#FF4D00]/15 text-[#FF4D00]" : "bg-transparent text-zinc-500 hover:text-zinc-300"}`}
+                  className={`px-2.5 py-1.5 transition-colors ${viewMode === mode ? "bg-accent/15 text-accent" : "bg-transparent text-subtle-foreground hover:text-muted-foreground"}`}
                 >
                   {icon}
                 </button>
@@ -1539,12 +1539,12 @@ export default function WorkflowPageClient() {
       {/* ── Selecting: waiting screen ── */}
       {isSelecting && (
         <div className="flex-1 flex flex-col items-center justify-center gap-5">
-          <div className="w-16 h-16 rounded-2xl border border-[#1a1a1e] bg-[#121215] flex items-center justify-center text-zinc-600">
+          <div className="w-16 h-16 rounded-2xl border border-border-subtle bg-surface flex items-center justify-center text-disabled-foreground">
             <Clock size={28} strokeWidth={1.5} />
           </div>
           <div className="text-center flex flex-col gap-2">
-            <p className="text-white font-semibold">고객이 셀렉 중입니다</p>
-            <p className="text-zinc-500 text-sm">고객 셀렉 완료 후 보정 업로드가 가능합니다</p>
+            <p className="text-foreground font-semibold">고객이 셀렉 중입니다</p>
+            <p className="text-subtle-foreground text-sm">고객 셀렉 완료 후 보정 업로드가 가능합니다</p>
           </div>
         </div>
       )}
@@ -1554,37 +1554,37 @@ export default function WorkflowPageClient() {
         <div className={`flex-1 overflow-y-auto ${styles.scrollArea}`}>
           <div className="max-w-[1600px] mx-auto px-3 py-3 md:px-8 md:py-6 flex flex-col gap-3 md:gap-4">
             {isConfirmed && (
-              <div className="rounded-2xl border border-[#1a1a1e] bg-[#121215]/50 px-5 py-3 flex items-start gap-2.5">
-                <div className="text-[#FF4D00] mt-0.5 shrink-0">
+              <div className="rounded-2xl border border-border-subtle bg-surface/50 px-5 py-3 flex items-start gap-2.5">
+                <div className="text-accent mt-0.5 shrink-0">
                   <Sparkles size={13} />
               </div>
-                <p className="text-xs text-zinc-400 leading-relaxed">
+                <p className="text-xs text-muted-foreground leading-relaxed">
                   고객이 셀렉을 확정했습니다.
-                  <span className="text-white font-semibold"> 하단의 보정 시작</span> 버튼을 눌러 V1 보정본 업로드를 시작하세요.
+                  <span className="text-foreground font-semibold"> 하단의 보정 시작</span> 버튼을 눌러 V1 보정본 업로드를 시작하세요.
                 </p>
                 </div>
             )}
             {(isEditing || isEditingV2) && (
-              <div className="rounded-2xl border border-[#1a1a1e] bg-[#121215]/50 px-5 py-3 flex items-start gap-2.5">
-                <div className="text-zinc-500 mt-0.5">
+              <div className="rounded-2xl border border-border-subtle bg-surface/50 px-5 py-3 flex items-start gap-2.5">
+                <div className="text-subtle-foreground mt-0.5">
                   <Send size={13} />
               </div>
-                <p className="text-xs text-zinc-400 leading-relaxed">
+                <p className="text-xs text-muted-foreground leading-relaxed">
                   업로드만으로 고객 화면이 자동 공개되지 않습니다. 매핑을 확인한 다음
-                  <span className="text-[#FF4D00] font-semibold"> &lsquo;고객에게 검토 보내기&rsquo;</span>
+                  <span className="text-accent font-semibold"> &lsquo;고객에게 검토 보내기&rsquo;</span>
                   를 눌러 공유하세요.
                 </p>
                   </div>
             )}
             {isEditingV2 && v2RevisionPending > 0 && (
-              <div className="rounded-2xl border border-[#FF4D00]/30 bg-[#FF4D00]/5 px-5 py-4 flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#FF4D00]/15 border border-[#FF4D00]/40 flex items-center justify-center text-[#FF4D00] shrink-0">
+              <div className="rounded-2xl border border-accent/30 bg-accent/5 px-5 py-4 flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-accent/15 border border-accent/40 flex items-center justify-center text-accent shrink-0">
                   <Upload size={16} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white font-semibold">재보정본 업로드가 필요합니다</p>
-                  <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed">
-                    고객이 재보정을 요청한 사진이 <span className="text-[#FF4D00] font-semibold">{v2RevisionPending}장</span> 있습니다.
+                  <p className="text-sm text-foreground font-semibold">재보정본 업로드가 필요합니다</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                    고객이 재보정을 요청한 사진이 <span className="text-accent font-semibold">{v2RevisionPending}장</span> 있습니다.
                     V2 탭에서 해당 사진을 교체한 뒤 검토 요청을 보내주세요.
                   </p>
                 </div>
@@ -1604,13 +1604,13 @@ export default function WorkflowPageClient() {
               </div>
             )}
             {filteredRows.length === 0 ? (
-              <div className="bg-[#121215]/50 border border-[#1a1a1e] rounded-2xl py-16 flex flex-col items-center justify-center gap-3">
-                <Layers size={28} className="text-zinc-700" />
-                <p className="text-zinc-500 text-sm">해당하는 사진이 없습니다.</p>
+              <div className="bg-surface/50 border border-border-subtle rounded-2xl py-16 flex flex-col items-center justify-center gap-3">
+                <Layers size={28} className="text-disabled-foreground" />
+                <p className="text-subtle-foreground text-sm">해당하는 사진이 없습니다.</p>
               </div>
             ) : viewMode === "list" ? (
               /* ── 파일 리스트 뷰 ── */
-              <div className="border border-[#1a1a1e] rounded-xl overflow-hidden">
+              <div className="border border-border-subtle rounded-xl overflow-hidden">
                 <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontFamily: "'Space Mono','Noto Sans KR',monospace" }}>
                   <colgroup>
                     <col style={{ width: 36 }} />
@@ -1620,12 +1620,12 @@ export default function WorkflowPageClient() {
                     <col />
                   </colgroup>
                   <thead>
-                    <tr style={{ borderBottom: "1px solid #1a1a1e", background: "#0a0a0c" }}>
-                      <th style={{ padding: "7px 8px", fontSize: 10, color: "#5c5c5c", textAlign: "center", fontWeight: 600 }}>#</th>
-                      <th style={{ padding: "7px 10px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600 }}>파일명</th>
-                      {stageTab !== "original" && <th style={{ padding: "7px 10px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600 }}>보정본 파일명</th>}
-                      {stageTab !== "original" && <th style={{ padding: "7px 8px", fontSize: 10, color: "#5c5c5c", textAlign: "center", fontWeight: 600 }}>상태</th>}
-                      <th style={{ padding: "7px 10px", fontSize: 10, color: "#5c5c5c", textAlign: "left", fontWeight: 600 }}>고객 코멘트</th>
+                    <tr style={{ borderBottom: "1px solid var(--border-subtle)", background: "var(--background)" }}>
+                      <th style={{ padding: "7px 8px", fontSize: 10, color: "var(--subtle-foreground)", textAlign: "center", fontWeight: 600 }}>#</th>
+                      <th style={{ padding: "7px 10px", fontSize: 10, color: "var(--subtle-foreground)", textAlign: "left", fontWeight: 600 }}>파일명</th>
+                      {stageTab !== "original" && <th style={{ padding: "7px 10px", fontSize: 10, color: "var(--subtle-foreground)", textAlign: "left", fontWeight: 600 }}>보정본 파일명</th>}
+                      {stageTab !== "original" && <th style={{ padding: "7px 8px", fontSize: 10, color: "var(--subtle-foreground)", textAlign: "center", fontWeight: 600 }}>상태</th>}
+                      <th style={{ padding: "7px 10px", fontSize: 10, color: "var(--subtle-foreground)", textAlign: "left", fontWeight: 600 }}>고객 코멘트</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1640,14 +1640,14 @@ export default function WorkflowPageClient() {
                         <tr
                           key={row.photo.id}
                           onClick={() => openViewer(visIdx, stageTab)}
-                          style={{ borderBottom: "1px solid #1a1a1e", cursor: "pointer", transition: "background 0.15s" }}
-                          onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "rgba(255,77,0,0.04)"; }}
+                          style={{ borderBottom: "1px solid var(--border-subtle)", cursor: "pointer", transition: "background 0.15s" }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "rgba(var(--accent-rgb),0.04)"; }}
                           onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = ""; }}
                         >
-                          <td style={{ padding: "10px 8px", fontSize: 11, color: "#5c5c5c", textAlign: "center" }}>{visIdx + 1}</td>
-                          <td style={{ padding: "10px 10px", fontSize: 11, color: "#a3a3a3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{filename}</td>
+                          <td style={{ padding: "10px 8px", fontSize: 11, color: "var(--subtle-foreground)", textAlign: "center" }}>{visIdx + 1}</td>
+                          <td style={{ padding: "10px 10px", fontSize: 11, color: "var(--muted-foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{filename}</td>
                           {stageTab !== "original" && (
-                            <td style={{ padding: "10px 10px", fontSize: 11, color: ver?.filename ? "#a3a3a3" : "#3a3a3a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <td style={{ padding: "10px 10px", fontSize: 11, color: ver?.filename ? "var(--muted-foreground)" : "var(--disabled-foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {ver?.filename || "—"}
                             </td>
                           )}
@@ -1658,7 +1658,7 @@ export default function WorkflowPageClient() {
                               )}
                             </td>
                           )}
-                          <td style={{ padding: "10px 10px", fontSize: 11, color: (stageTab === "original" ? row.photo.comment : ver?.comment) ? "#a3a3a3" : "#3a3a3a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <td style={{ padding: "10px 10px", fontSize: 11, color: (stageTab === "original" ? row.photo.comment : ver?.comment) ? "var(--muted-foreground)" : "var(--disabled-foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {stageTab === "original" ? (row.photo.comment || "—") : (ver?.comment || "—")}
                           </td>
                         </tr>
@@ -1750,7 +1750,7 @@ export default function WorkflowPageClient() {
       />
 
       {/* ── Footer ── */}
-      <footer className="shrink-0 border-t border-[#1a1a1e] bg-[#0a0a0c]/95 backdrop-blur-md z-10">
+      <footer className="shrink-0 border-t border-border-subtle bg-background/95 backdrop-blur-md z-10">
         <div className="flex items-center justify-between gap-4 px-4 md:px-8 py-3 md:py-0 md:h-16">
           {/* 좌측: 안내 메시지 */}
           <div className="flex-1 min-w-0">
@@ -1784,12 +1784,12 @@ export default function WorkflowPageClient() {
               </div>
             ) : footerNote ? (
               <div className="flex items-center gap-2">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FF4D00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
                   <circle cx="12" cy="12" r="10" />
                   <line x1="12" y1="8" x2="12" y2="12" />
                   <line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
-                <span className="text-sm text-[#FF4D00] font-medium">{footerNote}</span>
+                <span className="text-sm text-accent font-medium">{footerNote}</span>
               </div>
             ) : null}
           </div>
@@ -1801,7 +1801,7 @@ export default function WorkflowPageClient() {
             <button
               onClick={handleStartEditing}
               disabled={startingEditing}
-              className="flex items-center justify-center gap-2 w-full md:w-auto bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
+              className="flex items-center justify-center gap-2 w-full md:w-auto bg-accent hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-accent/20 transition-all hover:-translate-y-0.5"
             >
               <Sparkles size={15} />
               {startingEditing ? "처리 중…" : "보정 시작"}
@@ -1821,7 +1821,7 @@ export default function WorkflowPageClient() {
                 }
               }}
               disabled={startingReview === 1}
-              className="flex items-center justify-center gap-2 w-full md:w-auto bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
+              className="flex items-center justify-center gap-2 w-full md:w-auto bg-accent hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-accent/20 transition-all hover:-translate-y-0.5"
             >
               <Send size={15} />
               {startingReview === 1 ? "처리 중…" : "보정본 검토 요청"}
@@ -1843,13 +1843,13 @@ export default function WorkflowPageClient() {
                 }
               }}
               disabled={startingReview === 2}
-              className="flex items-center justify-center gap-2 w-full md:w-auto bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5"
+              className="flex items-center justify-center gap-2 w-full md:w-auto bg-accent hover:bg-[#ff5e1a] disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 md:py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-accent/20 transition-all hover:-translate-y-0.5"
             >
               <Send size={15} />
               {startingReview === 2 ? "처리 중…" : "재보정본 검토 요청"}
             </button>
           ) : (
-            <span className="flex items-center justify-center w-full md:w-auto px-6 py-2.5 rounded-xl text-sm font-bold bg-[#121215] border border-[#27272c] text-zinc-500">
+            <span className="flex items-center justify-center w-full md:w-auto px-6 py-2.5 rounded-xl text-sm font-bold bg-surface border border-border-subtle text-subtle-foreground">
               다음 단계 대기 중
             </span>
           )}
@@ -1883,21 +1883,21 @@ export default function WorkflowPageClient() {
           }}
         >
           <div
-            className="w-full max-w-sm bg-[#0f0f12] border border-[#27272c] rounded-2xl p-6 flex flex-col gap-5"
+            className="w-full max-w-sm bg-surface border border-border-subtle rounded-2xl p-6 flex flex-col gap-5"
             onClick={(e) => e.stopPropagation()}
           >
             <>
                 <div>
-                  <h3 className="text-base font-bold text-white mb-1">
+                  <h3 className="text-base font-bold text-foreground mb-1">
                     고객에게 {reviewDeadlineModal.v === 1 ? "보정본" : "재보정본"} 검토 요청
                   </h3>
-                  <p className="text-sm text-[#71717a] leading-relaxed">
+                  <p className="text-sm text-subtle-foreground leading-relaxed">
                     링크는 자동 발송되지 않습니다. 검토 단계로 전환한 뒤 다음 화면에서
                     링크를 복사해 직접 공유해 주세요.
                   </p>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-medium text-[#a1a1aa]">검토 기한 (선택사항)</label>
+                  <label className="text-xs font-medium text-subtle-foreground">검토 기한 (선택사항)</label>
 
                   {/* 빠른 선택 칩 */}
                   <div className="flex gap-2 flex-wrap">
@@ -1913,8 +1913,8 @@ export default function WorkflowPageClient() {
                           }
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                             active
-                              ? "bg-[#FF4D00] border-[#FF4D00] text-black"
-                              : "bg-transparent border-[#27272c] text-[#a1a1aa] hover:border-[#3f3f46] hover:text-white"
+                              ? "bg-accent border-accent text-black"
+                              : "bg-transparent border-border-subtle text-subtle-foreground hover:border-border-strong hover:text-foreground"
                           }`}
                         >
                           {label}
@@ -1943,14 +1943,14 @@ export default function WorkflowPageClient() {
                       }
                     }}
                     min={new Date().toISOString().split("T")[0]}
-                    className="w-full rounded-xl bg-[#0a0a0c] border border-[#27272c] text-white px-3 py-2 text-sm focus:outline-none focus:border-[#FF4D00] cursor-pointer"
+                    className="w-full rounded-xl bg-background border border-border-subtle text-foreground px-3 py-2 text-sm focus:outline-none focus:border-accent cursor-pointer"
                   />
                 </div>
                 <div className="flex gap-3">
                   <button
                     type="button"
                     disabled={startingReview === reviewDeadlineModal.v}
-                    className="flex-1 rounded-xl border border-[#27272c] text-[#71717a] text-sm font-medium py-2.5 hover:border-[#3f3f46] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="flex-1 rounded-xl border border-border-subtle text-subtle-foreground text-sm font-medium py-2.5 hover:border-border-strong disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     onClick={closeReviewDeadlineModal}
                   >
                     취소
@@ -1958,7 +1958,7 @@ export default function WorkflowPageClient() {
                   <button
                     type="button"
                     disabled={startingReview === reviewDeadlineModal.v}
-                    className="flex-1 rounded-xl bg-[#FF4D00] text-black text-sm font-bold py-2.5 disabled:opacity-50 hover:bg-[#ff5e1a] transition-colors"
+                    className="flex-1 rounded-xl bg-accent text-black text-sm font-bold py-2.5 disabled:opacity-50 hover:bg-[#ff5e1a] transition-colors"
                     onClick={() => {
                       const { v, dateInput } = reviewDeadlineModal;
                       void runStartCustomerReview(v, dateInput || undefined);

@@ -48,9 +48,9 @@ function Field({ label, hint, required, children }: {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <label className="text-sm font-semibold text-zinc-300">{label}</label>
-        {required && <span className="text-[10px] text-[#FF4D00] font-medium">필수</span>}
-        {hint && <span className="text-[10px] text-zinc-600 ml-auto">{hint}</span>}
+        <label className="text-sm font-semibold text-muted-foreground">{label}</label>
+        {required && <span className="text-[10px] text-accent font-medium">필수</span>}
+        {hint && <span className="text-[10px] text-disabled-foreground ml-auto">{hint}</span>}
       </div>
       {children}
     </div>
@@ -68,22 +68,22 @@ function StepDots({ current }: { current: number }) {
             <div
               className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border transition-colors"
               style={{
-                background: i === current ? "#FF4D00" : "transparent",
-                color: i === current ? "#000" : i < current ? "#fff" : "#3f3f46",
-                borderColor: i === current ? "#FF4D00" : i < current ? "#52525b" : "#27272c",
+                background: i === current ? "var(--accent)" : "transparent",
+                color: i === current ? "#000" : i < current ? "var(--foreground)" : "var(--border-strong)",
+                borderColor: i === current ? "var(--accent)" : i < current ? "var(--border-strong)" : "var(--border)",
               }}
             >
               {i < current ? "✓" : i + 1}
             </div>
             <span
               className="text-xs font-medium hidden sm:block"
-              style={{ color: i === current ? "#fff" : "#52525b" }}
+              style={{ color: i === current ? "var(--foreground)" : "var(--border-strong)" }}
             >
               {label}
             </span>
           </div>
           {i < steps.length - 1 && (
-            <div className="w-8 sm:w-16 h-px mx-2 sm:mx-3" style={{ background: i < current ? "#52525b" : "#27272c" }} />
+            <div className="w-8 sm:w-16 h-px mx-2 sm:mx-3" style={{ background: i < current ? "var(--border-strong)" : "var(--border)" }} />
           )}
         </div>
       ))}
@@ -197,8 +197,8 @@ const isValid =
   // 로딩 중 — 한도 확인 전에는 폼을 렌더하지 않음
   if (projectCount === null) {
     return (
-      <div className="min-h-screen bg-[#0a0a0c] flex items-center justify-center">
-        <div className="w-6 h-6 rounded-full border-2 border-[#FF4D00]/20 border-t-[#FF4D00]" style={{ animation: "spin 0.9s linear infinite" }} />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-6 h-6 rounded-full border-2 border-accent/20 border-t-accent" style={{ animation: "spin 0.9s linear infinite" }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -208,7 +208,7 @@ const isValid =
   if (projectCount >= BETA_MAX_PROJECTS_TOTAL) {
     return (
       <div
-        className="min-h-screen bg-[#0a0a0c] text-white"
+        className="min-h-screen bg-background text-foreground"
         style={{ fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif" }}
       >
         <PhotographerPageHeader
@@ -223,16 +223,16 @@ const isValid =
             <AlertCircle size={28} color="#ef4444" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white mb-2">베타 기간 프로젝트 한도 도달</h2>
-            <p className="text-sm text-zinc-400 leading-relaxed">
+            <h2 className="text-xl font-bold text-foreground mb-2">베타 기간 프로젝트 한도 도달</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
               베타 기간 중 최대 {BETA_MAX_PROJECTS_TOTAL}개의 프로젝트를 생성할 수 있습니다.<br />
-              현재 <strong className="text-white">{projectCount} / {BETA_MAX_PROJECTS_TOTAL}개</strong> 사용 중입니다.
+              현재 <strong className="text-foreground">{projectCount} / {BETA_MAX_PROJECTS_TOTAL}개</strong> 사용 중입니다.
             </p>
           </div>
           <button
             type="button"
             onClick={() => router.push("/photographer/projects")}
-            className="px-6 py-2.5 bg-[#FF4D00] text-black text-sm font-bold rounded-xl hover:bg-[#ff5e1a] transition-colors"
+            className="px-6 py-2.5 bg-accent text-black text-sm font-bold rounded-xl hover:bg-[#ff5e1a] transition-colors"
           >
             프로젝트 목록으로
           </button>
@@ -243,19 +243,19 @@ const isValid =
 
   return (
     <div
-      className="min-h-screen bg-[#0a0a0c] text-white"
+      className="min-h-screen bg-background text-foreground"
       style={{ fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif" }}
       onKeyDown={(e) => { if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault(); }}
     >
       <style>{`
         .np-input {
-          width: 100%; background: #0a0a0c; border: 1px solid #27272c;
-          color: #fff; padding: 12px 16px; font-size: 14px; outline: none;
+          width: 100%; background: var(--background); border: 1px solid var(--border);
+          color: var(--foreground); padding: 12px 16px; font-size: 14px; outline: none;
           border-radius: 12px; transition: border-color 0.2s; box-sizing: border-box;
           font-family: inherit;
         }
-        .np-input:focus { border-color: rgba(255,77,0,0.5); }
-        .np-input::placeholder { color: #3f3f46; }
+        .np-input:focus { border-color: rgba(var(--accent-rgb),0.5); }
+        .np-input::placeholder { color: var(--placeholder-foreground); }
         .np-input::-webkit-calendar-picker-indicator { filter: invert(0.4); cursor: pointer; }
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
@@ -286,7 +286,7 @@ const isValid =
         <div className="flex flex-col gap-5">
 
             {/* ── 폼 카드 ── */}
-            <div className="bg-[#121215] border border-[#1a1a1e] rounded-2xl p-6 flex flex-col gap-6">
+            <div className="bg-surface border border-surface-raised rounded-2xl p-6 flex flex-col gap-6">
 
               {/* 촬영 유형 */}
               <Field label="촬영 유형" hint="선택사항">
@@ -298,9 +298,9 @@ const isValid =
                       onClick={() => setShootType(shootType === value ? null : value)}
                       className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-colors"
                       style={{
-                        background: shootType === value ? "rgba(255,77,0,0.08)" : "transparent",
-                        borderColor: shootType === value ? "rgba(255,77,0,0.5)" : "#27272c",
-                        color: shootType === value ? "#FF4D00" : "#71717a",
+                        background: shootType === value ? "rgba(var(--accent-rgb),0.08)" : "transparent",
+                        borderColor: shootType === value ? "rgba(var(--accent-rgb),0.5)" : "var(--border)",
+                        color: shootType === value ? "var(--accent)" : "var(--subtle-foreground)",
                       }}
                     >
                       <Icon size={12} />
@@ -318,7 +318,7 @@ const isValid =
                     value={name}
                     onChange={(e) => { setName(e.target.value); setFieldErrors((p) => ({ ...p, name: "" })); }}
                     placeholder="예: 2024 김민수님 스튜디오 촬영"
-                    style={{ borderColor: fieldErrors.name ? "rgba(239,68,68,0.7)" : name ? "rgba(255,77,0,0.3)" : undefined }}
+                    style={{ borderColor: fieldErrors.name ? "rgba(239,68,68,0.7)" : name ? "rgba(var(--accent-rgb),0.3)" : undefined }}
                   />
                 </Field>
                 {fieldErrors.name && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.name}</p>}
@@ -340,7 +340,7 @@ const isValid =
                         }
                       }}
                       onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
-                      style={{ borderColor: fieldErrors.shootDate ? "rgba(239,68,68,0.7)" : shootDate ? "rgba(255,77,0,0.3)" : undefined }}
+                      style={{ borderColor: fieldErrors.shootDate ? "rgba(239,68,68,0.7)" : shootDate ? "rgba(var(--accent-rgb),0.3)" : undefined }}
                     />
                   </Field>
                   {fieldErrors.shootDate && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.shootDate}</p>}
@@ -352,7 +352,7 @@ const isValid =
                       value={customerName}
                       onChange={(e) => { setCustomerName(e.target.value); setFieldErrors((p) => ({ ...p, customerName: "" })); }}
                       placeholder="고객님 성함"
-                      style={{ borderColor: fieldErrors.customerName ? "rgba(239,68,68,0.7)" : customerName ? "rgba(255,77,0,0.3)" : undefined }}
+                      style={{ borderColor: fieldErrors.customerName ? "rgba(239,68,68,0.7)" : customerName ? "rgba(var(--accent-rgb),0.3)" : undefined }}
                     />
                   </Field>
                   {fieldErrors.customerName && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.customerName}</p>}
@@ -369,7 +369,7 @@ const isValid =
                     placeholder="010-0000-0000"
                     inputMode="numeric"
                   />
-                  <span className="text-[10px] text-zinc-700">알림 기능 연동 시 사용됩니다</span>
+                  <span className="text-[10px] text-disabled-foreground">알림 기능 연동 시 사용됩니다</span>
                 </Field>
                 <div id="field-requiredCount">
                   <Field label="셀렉 갯수 (N)" required>
@@ -387,11 +387,11 @@ const isValid =
                           setFieldErrors((p) => ({ ...p, requiredCount: "" }));
                         }}
                         placeholder="5"
-                        style={{ borderColor: fieldErrors.requiredCount ? "rgba(239,68,68,0.7)" : requiredCount ? "rgba(255,77,0,0.3)" : undefined }}
+                        style={{ borderColor: fieldErrors.requiredCount ? "rgba(239,68,68,0.7)" : requiredCount ? "rgba(var(--accent-rgb),0.3)" : undefined }}
                       />
-                      <span className="text-sm text-zinc-500 shrink-0">장</span>
+                      <span className="text-sm text-subtle-foreground shrink-0">장</span>
                     </div>
-                    <span className="text-[10px] text-zinc-700">고객이 선택할 사진 수</span>
+                    <span className="text-[10px] text-disabled-foreground">고객이 선택할 사진 수</span>
                   </Field>
                   {fieldErrors.requiredCount && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.requiredCount}</p>}
                 </div>
@@ -409,10 +409,10 @@ const isValid =
             </div>
 
             {/* ── 셀렉 기한 카드 ── */}
-            <div className="bg-[#121215] border border-[#1a1a1e] rounded-2xl p-6 flex flex-col gap-4">
-              <div className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
+            <div className="bg-surface border border-surface-raised rounded-2xl p-6 flex flex-col gap-4">
+              <div className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
                 셀렉 기한
-                <span className="text-[10px] text-[#FF4D00] font-medium">필수</span>
+                <span className="text-[10px] text-accent font-medium">필수</span>
               </div>
 
               {/* 빠른 선택 */}
@@ -424,9 +424,9 @@ const isValid =
                     onClick={() => handleQuickDays(days)}
                     className="px-3 py-2 rounded-xl text-xs font-medium border transition-colors"
                     style={{
-                      background: quickDays === days ? "rgba(255,77,0,0.08)" : "transparent",
-                      borderColor: quickDays === days ? "rgba(255,77,0,0.5)" : "#27272c",
-                      color: quickDays === days ? "#FF4D00" : "#71717a",
+                      background: quickDays === days ? "rgba(var(--accent-rgb),0.08)" : "transparent",
+                      borderColor: quickDays === days ? "rgba(var(--accent-rgb),0.5)" : "var(--border)",
+                      color: quickDays === days ? "var(--accent)" : "var(--subtle-foreground)",
                     }}
                   >
                     +{days}일
@@ -437,9 +437,9 @@ const isValid =
                   onClick={() => setQuickDays(null)}
                   className="px-3 py-2 rounded-xl text-xs font-medium border transition-colors"
                   style={{
-                    background: quickDays === null ? "rgba(255,77,0,0.08)" : "transparent",
-                    borderColor: quickDays === null ? "rgba(255,77,0,0.5)" : "#27272c",
-                    color: quickDays === null ? "#FF4D00" : "#71717a",
+                    background: quickDays === null ? "rgba(var(--accent-rgb),0.08)" : "transparent",
+                    borderColor: quickDays === null ? "rgba(var(--accent-rgb),0.5)" : "var(--border)",
+                    color: quickDays === null ? "var(--accent)" : "var(--subtle-foreground)",
                   }}
                 >
                   직접 입력
@@ -453,7 +453,7 @@ const isValid =
                   value={deadline}
                   onChange={(e) => { handleDeadlineInput(e.target.value); setFieldErrors((p) => ({ ...p, deadline: "" })); }}
                   onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
-                  style={{ borderColor: fieldErrors.deadline ? "rgba(239,68,68,0.7)" : deadline ? "rgba(255,77,0,0.3)" : undefined }}
+                  style={{ borderColor: fieldErrors.deadline ? "rgba(239,68,68,0.7)" : deadline ? "rgba(var(--accent-rgb),0.3)" : undefined }}
                 />
                 {fieldErrors.deadline && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.deadline}</p>}
               </div>
@@ -461,12 +461,12 @@ const isValid =
             </div>
 
             {/* ── 보안 설정 카드 ── */}
-            <div className="bg-[#121215] border border-[#1a1a1e] rounded-2xl p-6 flex flex-col gap-6">
+            <div className="bg-surface border border-surface-raised rounded-2xl p-6 flex flex-col gap-6">
 
               {/* PIN */}
               <Field label="고객 비밀번호 (PIN)" hint="선택사항">
                 <div className="flex items-center gap-3 flex-wrap">
-                  <Lock size={13} className="text-zinc-600 shrink-0" />
+                  <Lock size={13} className="text-disabled-foreground shrink-0" />
                   <input
                     className="np-input w-28 text-center tracking-widest text-lg font-bold"
                     type="text"
@@ -483,7 +483,7 @@ const isValid =
                   <button
                     type="button"
                     onClick={() => setAccessPin(Math.floor(1000 + Math.random() * 9000).toString())}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs text-zinc-500 border border-[#27272c] hover:border-zinc-500 hover:text-zinc-300 rounded-xl transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs text-subtle-foreground border border-border hover:border-border-strong hover:text-muted-foreground rounded-xl transition-colors"
                   >
                     <RefreshCw size={11} /> 랜덤
                   </button>
@@ -491,13 +491,13 @@ const isValid =
                     <button
                       type="button"
                       onClick={() => setAccessPin("")}
-                      className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
+                      className="text-xs text-disabled-foreground hover:text-muted-foreground transition-colors"
                     >
                       삭제
                     </button>
                   )}
                 </div>
-                <span className="text-[10px] text-zinc-700">설정 시 고객이 링크 접속 시 비밀번호를 입력해야 합니다</span>
+                <span className="text-[10px] text-disabled-foreground">설정 시 고객이 링크 접속 시 비밀번호를 입력해야 합니다</span>
               </Field>
 
               {/* 재보정 */}
@@ -514,13 +514,13 @@ const isValid =
                       onClick={() => setMaxRevisionCount(value)}
                       className="flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-semibold transition-colors"
                       style={{
-                        background: maxRevisionCount === value ? "rgba(255,77,0,0.08)" : "transparent",
-                        borderColor: maxRevisionCount === value ? "rgba(255,77,0,0.5)" : "#27272c",
-                        color: maxRevisionCount === value ? "#FF4D00" : "#71717a",
+                        background: maxRevisionCount === value ? "rgba(var(--accent-rgb),0.08)" : "transparent",
+                        borderColor: maxRevisionCount === value ? "rgba(var(--accent-rgb),0.5)" : "var(--border)",
+                        color: maxRevisionCount === value ? "var(--accent)" : "var(--subtle-foreground)",
                       }}
                     >
                       {label}
-                      <span className="text-[10px] font-normal" style={{ color: maxRevisionCount === value ? "rgba(255,77,0,0.6)" : "#52525b" }}>{desc}</span>
+                      <span className="text-[10px] font-normal" style={{ color: maxRevisionCount === value ? "rgba(var(--accent-rgb),0.6)" : "var(--border-strong)" }}>{desc}</span>
                     </button>
                   ))}
                 </div>
@@ -540,7 +540,7 @@ const isValid =
               <button
                 type="button"
                 onClick={() => router.push("/photographer/projects")}
-                className="flex items-center gap-2 px-5 py-2.5 text-sm text-zinc-500 hover:text-zinc-300 border border-[#27272c] hover:border-zinc-600 rounded-xl transition-colors"
+                className="flex items-center gap-2 px-5 py-2.5 text-sm text-subtle-foreground hover:text-muted-foreground border border-border hover:border-border-strong rounded-xl transition-colors"
               >
                 ← 뒤로
               </button>
@@ -548,7 +548,7 @@ const isValid =
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="flex items-center gap-2 bg-[#FF4D00] hover:bg-[#ff5e1a] disabled:opacity-40 disabled:cursor-not-allowed text-black px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-[#FF4D00]/20 transition-all hover:-translate-y-0.5 disabled:translate-y-0 disabled:shadow-none"
+                className="flex items-center gap-2 bg-accent hover:bg-[#ff5e1a] disabled:opacity-40 disabled:cursor-not-allowed text-black px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-accent/20 transition-all hover:-translate-y-0.5 disabled:translate-y-0 disabled:shadow-none"
               >
                 {submitting ? (
                   <><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> 생성 중...</>

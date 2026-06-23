@@ -16,15 +16,15 @@ type Props = {
 export function PhotographerPageHeader({ crumbs, title, stats, actions }: Props) {
   return (
     <header
-      className="px-8 flex items-center justify-between border-b border-[#1a1a1e] bg-[#0a0a0c]/90 backdrop-blur-md sticky top-0 z-10 shrink-0"
+      className="px-8 flex items-center justify-between border-b border-border bg-background/90 backdrop-blur-md sticky top-0 z-10 shrink-0"
       style={{ minHeight: 80 }}
     >
       <div>
         {crumbs.some((c) => c.href) ? (
-          <div className="flex items-center gap-1 text-xs font-semibold text-[#FF4D00] mb-1">
+          <div className="flex items-center gap-1 text-xs font-semibold text-accent mb-1">
             {crumbs.filter((c) => c.href).map((c, i) => (
               <span key={i} className="flex items-center gap-1">
-                {i > 0 && <ChevronRight size={11} className="text-zinc-600" strokeWidth={2.5} />}
+                {i > 0 && <ChevronRight size={11} className="text-subtle-foreground" strokeWidth={2.5} />}
                 <Link href={c.href!} className="hover:opacity-80 transition-opacity">
                   {c.label}
                 </Link>
@@ -33,7 +33,7 @@ export function PhotographerPageHeader({ crumbs, title, stats, actions }: Props)
           </div>
         ) : null}
         <h1
-          className="text-2xl font-bold tracking-tight text-white"
+          className="text-2xl font-bold tracking-tight text-foreground"
           style={{ fontFamily: "var(--font-inter, sans-serif)" }}
         >
           {title}
@@ -43,16 +43,16 @@ export function PhotographerPageHeader({ crumbs, title, stats, actions }: Props)
       {(stats || actions) && (
         <div className="flex items-center gap-6">
           {stats && stats.length > 0 && (
-            <div className="hidden md:flex gap-6 pr-6 border-r border-[#1a1a1e]">
+            <div className="hidden md:flex gap-6 pr-6 border-r border-border">
               {stats.map((s, i) => (
                 <div key={i} className="text-right">
                   <div
-                    className={`text-[10px] font-bold uppercase tracking-wider ${s.accent ? "text-[#FF4D00]" : "text-zinc-500"}`}
+                    className={`text-[10px] font-bold uppercase tracking-wider ${s.accent ? "text-accent" : "text-muted-foreground"}`}
                     style={{ fontFamily: "var(--font-mono, monospace)" }}
                   >
                     {s.label}
                   </div>
-                  <div className={`text-xl font-bold leading-none mt-1 ${s.accent ? "text-[#FF4D00]" : "text-white"}`}>
+                  <div className={`text-xl font-bold leading-none mt-1 ${s.accent ? "text-accent" : "text-foreground"}`}>
                     {s.value}
                   </div>
                 </div>

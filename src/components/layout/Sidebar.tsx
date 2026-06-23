@@ -163,8 +163,8 @@ export function Sidebar({
           style={{ borderColor: "var(--acb-border)" }}
         >
           <div
-            className="w-10 h-10 rounded-full overflow-hidden border flex-shrink-0 flex items-center justify-center text-sm font-bold text-white"
-            style={{ borderColor: "var(--acb-border)", background: "#1a1a1a" }}
+            className="w-10 h-10 rounded-full overflow-hidden border flex-shrink-0 flex items-center justify-center text-sm font-bold text-foreground"
+            style={{ borderColor: "var(--acb-border)", background: "var(--surface)" }}
           >
             {profile?.profileImageUrl ? (
               <img
@@ -181,7 +181,7 @@ export function Sidebar({
           </div>
           <div className="overflow-hidden min-w-0">
             <p
-              className="text-sm font-semibold text-white truncate"
+              className="text-sm font-semibold text-foreground truncate"
               style={{ fontFamily: "var(--acb-sidebar-sans)" }}
             >
               {displayName} 작가님
@@ -189,7 +189,7 @@ export function Sidebar({
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
               <p
-                className="text-[10px] text-zinc-500 uppercase tracking-wider"
+                className="text-[10px] text-muted-foreground uppercase tracking-wider"
                 style={{ fontFamily: "var(--acb-sidebar-mono)" }}
               >
                 세션 활성

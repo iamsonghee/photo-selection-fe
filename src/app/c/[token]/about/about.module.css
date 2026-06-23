@@ -1,15 +1,15 @@
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Pretendard:wght@400;600;700;800&display=swap");
 
 .root {
-  --bg-color: #030303;
-  --grid-color: #1a1a1a;
-  --accent-orange: #ff4d00;
+  --bg-color: var(--background);
+  --grid-color: var(--border-subtle);
+  --accent-orange: var(--accent);
   --accent-green: #00e676;
-  --text-primary: #ffffff;
-  --text-secondary: #8c8c8c;
-  --text-muted: #555555;
-  --border-color: #2a2a2a;
-  --surface-color: rgba(10, 10, 10, 0.6);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--muted-foreground);
+  --text-muted: var(--subtle-foreground);
+  --border-color: var(--border);
+  --surface-color: var(--surface);
   --font-sans: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
   --font-mono: "JetBrains Mono", "Courier New", Courier, monospace;
   --grid-size: 40px;
@@ -319,7 +319,7 @@
 .compCellNew {
   color: var(--text-primary);
   font-weight: 600;
-  background: rgba(255, 77, 0, 0.05);
+  background: rgba(var(--accent-rgb), 0.05);
 }
 
 .compHeaderNew {
@@ -467,12 +467,12 @@
   overflow: hidden;
   border: none;
   cursor: pointer;
-  box-shadow: 0 0 20px rgba(255, 77, 0, 0.15);
+  box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.15);
 }
 
 .btnPrimary:hover {
   background-color: #ff6600;
-  box-shadow: 0 0 30px rgba(255, 77, 0, 0.3);
+  box-shadow: 0 0 30px rgba(var(--accent-rgb), 0.3);
 }
 
 .arrow {

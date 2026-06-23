@@ -19,7 +19,7 @@ import { ProjectPipelineMiniBar, getPipelineStepLabel } from "@/components/photo
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { getActiveDeadline } from "@/lib/project-deadline";
 
-const ACCENT = "#FF4D00";
+const ACCENT = "var(--accent)";
 const RED    = "#EF4444";
 
 const ACTIVE_STATUSES: ProjectStatus[] = [
@@ -37,12 +37,12 @@ function dday(deadline: string): { text: string; warn: boolean } {
 }
 
 const LOG_DOT: Record<string, string> = {
-  created:   "#52525b",
+  created:   "var(--border-strong)",
   uploaded:  ACCENT,
-  selecting: "#71717a",
-  confirmed: "#a1a1aa",
-  editing:   "#a1a1aa",
-  delivered: "#fff",
+  selecting: "var(--subtle-foreground)",
+  confirmed: "var(--muted-foreground)",
+  editing:   "var(--muted-foreground)",
+  delivered: "var(--foreground)",
   revision:  ACCENT,
 };
 
@@ -86,7 +86,7 @@ function PhotoProjectCard({ project }: { project: Project }) {
       tabIndex={0}
       onClick={() => router.push(`/photographer/projects/${project.id}`)}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/photographer/projects/${project.id}`); } }}
-      className="bg-[#121215] border border-[#1a1a1e] hover:border-[#27272c] rounded-2xl overflow-hidden cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-[#FF4D00]/50 group"
+      className="bg-surface border border-border-subtle hover:border-border rounded-2xl overflow-hidden cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-accent/50 group"
       style={{ opacity: isDelivered ? 0.65 : 1 }}
     >
       {/* 썸네일 — 3:2 비율 */}
@@ -102,9 +102,9 @@ function PhotoProjectCard({ project }: { project: Project }) {
         ) : (
           <div
             className="w-full h-full flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, #1a1a1e 0%, #111113 100%)" }}
+            style={{ background: "linear-gradient(135deg, var(--surface-raised) 0%, var(--background) 100%)" }}
           >
-            <span className="text-lg font-black text-zinc-800 uppercase tracking-widest select-none">
+            <span className="text-lg font-black text-disabled-foreground uppercase tracking-widest select-none">
               {project.name.slice(0, 2)}
             </span>
           </div>
@@ -117,15 +117,15 @@ function PhotoProjectCard({ project }: { project: Project }) {
         {/* D-day */}
         <div className="absolute top-2 right-2">
           {isDelivered ? (
-            <span className="text-[9px] font-bold bg-black/60 border border-zinc-700 rounded px-1.5 py-0.5 text-zinc-400">완료</span>
+            <span className="text-[9px] font-bold bg-black/60 border border-border-strong rounded px-1.5 py-0.5 text-muted-foreground">완료</span>
           ) : ddayText ? (
             <span
               className="text-[10px] font-bold rounded px-1.5 py-0.5 border"
               title={deadlineInfo?.label}
               style={{
-                color: warn ? ACCENT : "#a1a1aa",
-                borderColor: warn ? `${ACCENT}50` : "rgba(255,255,255,0.12)",
-                background: warn ? "rgba(255,77,0,0.18)" : "rgba(0,0,0,0.55)",
+                color: warn ? ACCENT : "var(--muted-foreground)",
+                borderColor: warn ? "rgba(var(--accent-rgb),0.31)" : "rgba(255,255,255,0.12)",
+                background: warn ? "rgba(var(--accent-rgb),0.18)" : "rgba(0,0,0,0.55)",
               }}
             >
               {ddayText}
@@ -134,8 +134,8 @@ function PhotoProjectCard({ project }: { project: Project }) {
         </div>
         {/* 이미지 하단 오버레이 — 프로젝트명 + 고객명 */}
         <div className="absolute bottom-0 left-0 right-0 px-2.5 pb-2 pt-4">
-          <div className="text-[13px] font-bold text-white leading-tight truncate drop-shadow-sm">{project.name}</div>
-          <div className="text-[10px] text-white/60 truncate">{project.customerName || "—"}</div>
+          <div className="text-[13px] font-bold text-foreground leading-tight truncate drop-shadow-sm">{project.name}</div>
+          <div className="text-[10px] text-muted-foreground truncate">{project.customerName || "—"}</div>
         </div>
       </div>
 
@@ -143,8 +143,8 @@ function PhotoProjectCard({ project }: { project: Project }) {
       <div className="px-2.5 pt-2 pb-2.5 flex flex-col gap-1.5">
         {/* 단계 + 촬영일 */}
         <div className="flex justify-between items-center">
-          <span className="text-[11px] font-semibold text-zinc-300">{stepLabel}</span>
-          <span className="text-[10px] text-zinc-500 font-mono">
+          <span className="text-[11px] font-semibold text-muted-foreground">{stepLabel}</span>
+          <span className="text-[10px] text-subtle-foreground font-mono">
             {project.shootDate
               ? new Date(project.shootDate).toLocaleDateString("ko-KR", { year: "2-digit", month: "2-digit", day: "2-digit" })
               : "—"}
@@ -153,7 +153,7 @@ function PhotoProjectCard({ project }: { project: Project }) {
         {/* 파이프라인 진행바 */}
         <ProjectPipelineMiniBar status={project.status} variant="full" />
         {/* ID */}
-        <div className="text-[9px] font-mono text-zinc-700 pt-0.5">
+        <div className="text-[9px] font-mono text-disabled-foreground pt-0.5">
           {project.displayId ?? project.id.slice(0, 8).toUpperCase()}
         </div>
       </div>
@@ -173,13 +173,13 @@ function ActionCard({
 }) {
   return (
     <Link href={href ?? "/photographer/projects"} className="block no-underline group">
-      <div className="bg-[#121215] border border-[#1a1a1e] group-hover:border-[#27272c] rounded-xl p-4 transition-colors flex flex-col gap-2 min-h-[90px]">
+      <div className="bg-surface border border-border-subtle group-hover:border-border rounded-xl p-4 transition-colors flex flex-col gap-2 min-h-[90px]">
         <span className="text-3xl font-bold leading-none" style={{ color: numColor }}>
           {count}
         </span>
         <div>
-          <div className="text-sm font-semibold text-white">{label}</div>
-          <div className="text-[10px] text-zinc-600 mt-0.5 uppercase tracking-wider font-medium">{sub}</div>
+          <div className="text-sm font-semibold text-foreground">{label}</div>
+          <div className="text-[10px] text-disabled-foreground mt-0.5 uppercase tracking-wider font-medium">{sub}</div>
         </div>
       </div>
     </Link>
@@ -229,11 +229,11 @@ export default function DashboardPage() {
 
   if (!profile?.id) {
     return (
-      <div className="min-h-screen bg-[#0a0a0c] flex flex-col items-center justify-center gap-4">
-        <p className="text-sm text-zinc-500">로그인하면 프로젝트를 볼 수 있습니다</p>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+        <p className="text-sm text-muted-foreground">로그인하면 프로젝트를 볼 수 있습니다</p>
         <Link
           href="/"
-          className="bg-[#FF4D00] text-black px-6 py-2.5 rounded-xl text-sm font-bold no-underline"
+          className="bg-accent text-black px-6 py-2.5 rounded-xl text-sm font-bold no-underline"
         >
           로그인
         </Link>
@@ -278,7 +278,7 @@ export default function DashboardPage() {
   const betaPct   = Math.min(100, Math.round((betaCount / BETA_MAX_PROJECTS_TOTAL) * 100));
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white" style={{ fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif" }}>
+    <div className="min-h-screen bg-background text-foreground" style={{ fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif" }}>
 
       {/* ── 헤더 ── */}
       <PhotographerPageHeader crumbs={[{ label: "대시보드" }]} title="대시보드" />
@@ -292,8 +292,8 @@ export default function DashboardPage() {
           {/* 1. 프로젝트 요약 카드 */}
           <div className="grid grid-cols-3 gap-4 items-stretch">
             {([
-              { key: "all" as const,       label: "전체 프로젝트", mobileLabel: "전체",  count: dashCounts.all,       icon: <Layers size={16} className="text-zinc-400" />,         color: "zinc",    sub: null,                                                                              mobileSub: null },
-              { key: "active" as const,    label: "진행중",        mobileLabel: "진행중", count: dashCounts.active,    icon: <Zap size={16} className="text-[#FF4D00]" />,            color: "brand",   sub: dashCounts.waiting > 0 ? `${dashCounts.waiting}건 고객 응답 대기` : null, mobileSub: dashCounts.waiting > 0 ? `${dashCounts.waiting}건 대기` : null },
+              { key: "all" as const,       label: "전체 프로젝트", mobileLabel: "전체",  count: dashCounts.all,       icon: <Layers size={16} className="text-muted-foreground" />,         color: "zinc",    sub: null,                                                                              mobileSub: null },
+              { key: "active" as const,    label: "진행중",        mobileLabel: "진행중", count: dashCounts.active,    icon: <Zap size={16} className="text-accent" />,            color: "brand",   sub: dashCounts.waiting > 0 ? `${dashCounts.waiting}건 고객 응답 대기` : null, mobileSub: dashCounts.waiting > 0 ? `${dashCounts.waiting}건 대기` : null },
               { key: "completed" as const, label: "완료",          mobileLabel: "완료",  count: dashCounts.completed, icon: <CheckCircle2 size={16} className="text-emerald-500" />, color: "emerald", sub: null,                                                                              mobileSub: null },
             ]).map((card) => {
               const isActive = dashFilter === card.key;
@@ -304,24 +304,24 @@ export default function DashboardPage() {
                   onClick={() => setDashFilter(card.key)}
                   className={`w-full text-left border rounded-2xl p-3 md:p-5 transition-all h-full flex flex-col ${
                     isActive
-                      ? card.color === "brand"   ? "bg-[#FF4D00]/12 border-[#FF4D00]/40"
+                      ? card.color === "brand"   ? "bg-accent/12 border-accent/40"
                         : card.color === "emerald" ? "bg-emerald-500/12 border-emerald-500/40"
-                        : "bg-[#27272c] border-[#3f3f46]"
-                      : card.color === "brand"   ? "bg-[#FF4D00]/5 border-[#FF4D00]/15 hover:bg-[#FF4D00]/10 hover:border-[#FF4D00]/30"
+                        : "bg-surface-raised border-border-strong"
+                      : card.color === "brand"   ? "bg-accent/5 border-accent/15 hover:bg-accent/10 hover:border-accent/30"
                         : card.color === "emerald" ? "bg-emerald-500/5 border-emerald-500/15 hover:bg-emerald-500/10 hover:border-emerald-500/30"
-                        : "bg-[#121215]/80 border-[#1a1a1e] hover:border-[#27272c]"
+                        : "bg-surface/80 border-border-subtle hover:border-border"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2 md:mb-3">
-                    <span className="text-xs md:text-sm font-bold text-white flex items-center gap-1.5 md:gap-2">
+                    <span className="text-xs md:text-sm font-bold text-foreground flex items-center gap-1.5 md:gap-2">
                       {card.icon}
                       <span className="md:hidden">{card.mobileLabel}</span>
                       <span className="hidden md:inline">{card.label}</span>
                     </span>
                   </div>
                   <div className="flex items-end gap-1.5 md:gap-2 flex-1">
-                    <span className="text-2xl md:text-3xl font-black text-white leading-none">{card.count}</span>
-                    <span className="text-xs md:text-sm text-zinc-400 mb-0.5">
+                    <span className="text-2xl md:text-3xl font-black text-foreground leading-none">{card.count}</span>
+                    <span className="text-xs md:text-sm text-muted-foreground mb-0.5">
                       <span className="md:hidden">건</span>
                       <span className="hidden md:inline">{card.key === "all" ? "개" : card.key === "active" ? "건 작업중" : "건"}</span>
                     </span>
@@ -338,8 +338,8 @@ export default function DashboardPage() {
           {/* 2. 프로젝트 카드 그리드 */}
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">프로젝트</span>
-              <span className="text-[10px] text-zinc-600">{filteredByDash.length}개</span>
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">프로젝트</span>
+              <span className="text-[10px] text-disabled-foreground">{filteredByDash.length}개</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {displayProjects.map((p) => <PhotoProjectCard key={p.id} project={p} />)}
@@ -347,12 +347,12 @@ export default function DashboardPage() {
             {showViewAllBtn && (
               <Link
                 href="/photographer/projects"
-                className="flex items-center justify-center gap-2 px-6 py-4 bg-[#121215] border border-[#1a1a1e] hover:border-[#27272c] rounded-xl no-underline group transition-colors"
+                className="flex items-center justify-center gap-2 px-6 py-4 bg-surface border border-border-subtle hover:border-border rounded-xl no-underline group transition-colors"
               >
-                <span className="text-sm font-semibold text-zinc-500 group-hover:text-zinc-300 transition-colors">
+                <span className="text-sm font-semibold text-subtle-foreground group-hover:text-muted-foreground transition-colors">
                   전체 프로젝트 보기 ({projects.length - 12}개 더)
                 </span>
-                <ChevronRight size={14} className="text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+                <ChevronRight size={14} className="text-disabled-foreground group-hover:text-subtle-foreground transition-colors" />
               </Link>
             )}
           </div>
@@ -362,26 +362,26 @@ export default function DashboardPage() {
         <aside className="hidden lg:flex w-72 shrink-0 flex-col gap-4 sticky top-[92px]">
 
           {/* 사용량 패널 */}
-          <div className="bg-[#121215] border border-[#1a1a1e] rounded-2xl p-5 flex flex-col gap-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-[#1a1a1e]">
-              <Activity size={12} className="text-zinc-500" />
-              <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">사용량</span>
+          <div className="bg-surface border border-border-subtle rounded-2xl p-5 flex flex-col gap-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-border-subtle">
+              <Activity size={12} className="text-subtle-foreground" />
+              <span className="text-[10px] text-subtle-foreground uppercase tracking-wider font-semibold">사용량</span>
             </div>
 
             <div className="flex flex-col gap-2">
               <div className="flex justify-between items-end">
-                <span className="text-sm font-semibold text-white">프로젝트</span>
+                <span className="text-sm font-semibold text-foreground">프로젝트</span>
                 <div className="text-sm font-mono">
-                  <span className="text-white font-bold">{betaCount}</span>
-                  <span className="text-zinc-600"> / {BETA_MAX_PROJECTS_TOTAL}</span>
+                  <span className="text-foreground font-bold">{betaCount}</span>
+                  <span className="text-disabled-foreground"> / {BETA_MAX_PROJECTS_TOTAL}</span>
                 </div>
               </div>
-              <div className="w-full h-1.5 bg-[#1a1a1e] rounded-full overflow-hidden">
+              <div className="w-full h-1.5 bg-border-subtle rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
                   style={{
                     width: `${betaPct}%`,
-                    background: betaPct >= 100 ? RED : betaPct >= 80 ? ACCENT : "#fff",
+                    background: betaPct >= 100 ? RED : betaPct >= 80 ? ACCENT : "var(--foreground)",
                   }}
                 />
               </div>
@@ -392,26 +392,26 @@ export default function DashboardPage() {
                 <AlertCircle size={13} color={RED} className="shrink-0 mt-0.5" />
                 <div>
                   <div className="text-[10px] text-red-400 font-bold uppercase tracking-wide mb-1">한도 초과</div>
-                  <div className="text-xs text-zinc-500 leading-relaxed">베타 프로젝트 한도에 도달했습니다.</div>
+                  <div className="text-xs text-subtle-foreground leading-relaxed">베타 프로젝트 한도에 도달했습니다.</div>
                 </div>
               </div>
             ) : betaCount >= BETA_MAX_PROJECTS_TOTAL - 2 ? (
-              <div className="bg-[#1a1a1e] rounded-xl p-3">
-                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wide mb-1">한도 근접</div>
-                <div className="text-xs text-zinc-600 leading-relaxed">프로젝트 생성 한도에 근접했습니다.</div>
+              <div className="bg-border-subtle rounded-xl p-3">
+                <div className="text-[10px] text-subtle-foreground font-bold uppercase tracking-wide mb-1">한도 근접</div>
+                <div className="text-xs text-disabled-foreground leading-relaxed">프로젝트 생성 한도에 근접했습니다.</div>
               </div>
             ) : null}
           </div>
 
           {/* 최근 활동 패널 — 프로젝트 중심 피드 */}
-          <div className="bg-[#121215] border border-[#1a1a1e] rounded-2xl p-5 flex flex-col gap-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-[#1a1a1e]">
-              <Clock size={12} className="text-zinc-500" />
-              <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">최근 활동</span>
+          <div className="bg-surface border border-border-subtle rounded-2xl p-5 flex flex-col gap-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-border-subtle">
+              <Clock size={12} className="text-subtle-foreground" />
+              <span className="text-[10px] text-subtle-foreground uppercase tracking-wider font-semibold">최근 활동</span>
             </div>
 
             {logs.length === 0 ? (
-              <p className="text-xs text-zinc-600 text-center py-4">아직 활동이 없습니다</p>
+              <p className="text-xs text-disabled-foreground text-center py-4">아직 활동이 없습니다</p>
             ) : (() => {
               // 프로젝트별 그룹화 (최신 순 최대 4개 프로젝트)
               const seen = new Set<string>();
@@ -429,15 +429,15 @@ export default function DashboardPage() {
                       <div
                         key={pid}
                         onClick={() => router.push(`/photographer/projects/${pid}`)}
-                        className="border border-[#1a1a1e] hover:border-[#27272c] rounded-xl p-3 cursor-pointer transition-colors"
+                        className="border border-border-subtle hover:border-border rounded-xl p-3 cursor-pointer transition-colors"
                       >
                         {/* 프로젝트명 + 고객 */}
                         <div className="mb-2.5">
-                          <div className="text-[13px] font-bold text-white truncate leading-snug">
+                          <div className="text-[13px] font-bold text-foreground truncate leading-snug">
                             {first.projectName}
                           </div>
                           {first.customerName && (
-                            <div className="text-[11px] text-zinc-500 truncate mt-0.5">
+                            <div className="text-[11px] text-subtle-foreground truncate mt-0.5">
                               {first.customerName}
                             </div>
                           )}
@@ -445,7 +445,7 @@ export default function DashboardPage() {
                         {/* 액션 목록 */}
                         <div className="flex flex-col gap-1.5">
                           {group.map((log) => {
-                            const dotColor = LOG_DOT[log.action] ?? "#52525b";
+                            const dotColor = LOG_DOT[log.action] ?? "var(--border-strong)";
                             const label = LOG_LABEL[log.action] ?? log.action;
                             return (
                               <div key={log.id} className="flex items-center justify-between gap-2">
@@ -453,7 +453,7 @@ export default function DashboardPage() {
                                   <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: dotColor }} />
                                   <span className="text-[11px] font-medium truncate" style={{ color: dotColor }}>{label}</span>
                                 </div>
-                                <span className="text-[10px] text-zinc-700 shrink-0 font-mono">{formatLogTime(log.createdAt)}</span>
+                                <span className="text-[10px] text-disabled-foreground shrink-0 font-mono">{formatLogTime(log.createdAt)}</span>
                               </div>
                             );
                           })}
@@ -474,7 +474,7 @@ export default function DashboardPage() {
         onClick={() => router.push("/photographer/projects/new")}
         aria-label="새 프로젝트"
         title="새 프로젝트"
-        className="fixed z-40 right-5 bottom-20 md:right-8 md:bottom-8 flex h-14 w-14 items-center justify-center rounded-full bg-[#FF4D00] text-white shadow-[0_4px_20px_rgba(255,77,0,0.4)] transition-transform active:scale-95 md:hover:scale-105 md:hover:shadow-[0_6px_28px_rgba(255,77,0,0.45)]"
+        className="fixed z-40 right-5 bottom-20 md:right-8 md:bottom-8 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-foreground shadow-[0_4px_20px_rgba(var(--accent-rgb),0.4)] transition-transform active:scale-95 md:hover:scale-105 md:hover:shadow-[0_6px_28px_rgba(var(--accent-rgb),0.45)]"
       >
         <Plus size={24} strokeWidth={2} />
       </button>

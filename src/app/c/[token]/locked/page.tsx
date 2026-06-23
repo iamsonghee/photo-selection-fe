@@ -23,7 +23,7 @@ function StatusBadge({ status }: { status: "approved" | "revision_requested" | "
     </span>
   );
   if (status === "revision_requested") return (
-    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20">
+    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-accent/10 text-accent border border-accent/20">
       <RefreshCw size={10} />재보정 요청
     </span>
   );
@@ -42,33 +42,33 @@ function PhotoCard({ photo }: { photo: ReviewResultPhoto }) {
   const ring = isApproved
     ? "border-emerald-500/40"
     : isRevision
-      ? "border-[#FF4D00]/40"
-      : "border-[#1a1a1e]";
+      ? "border-accent/40"
+      : "border-border-subtle";
 
   return (
-    <div className={`bg-[#0a0a0c]/70 border ${ring} rounded-xl p-2 flex flex-col gap-2`}>
+    <div className={`bg-surface/70 border ${ring} rounded-xl p-2 flex flex-col gap-2`}>
       {/* 썸네일 */}
-      <div className="w-full aspect-[4/3] bg-[#080808] rounded-lg overflow-hidden border border-[#1a1a1e] relative">
+      <div className="w-full aspect-[4/3] bg-surface rounded-lg overflow-hidden border border-border-subtle relative">
         {photo.thumbUrl ? (
           <img src={photo.thumbUrl} alt={filename} className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-zinc-700 text-xs font-mono">NO IMG</div>
+          <div className="w-full h-full flex items-center justify-center text-disabled-foreground text-xs font-mono">NO IMG</div>
         )}
       </div>
 
       {/* 파일명 */}
-      <p className="text-[11px] font-mono text-zinc-400 truncate" title={filename}>{filename}</p>
+      <p className="text-[11px] font-mono text-muted-foreground truncate" title={filename}>{filename}</p>
 
       {/* 상태 뱃지 */}
       <StatusBadge status={photo.reviewStatus} />
 
       {/* 코멘트 (재보정 요청 시) */}
       {isRevision && (
-        <div className="bg-[#0a0a0c] border border-[#FF4D00]/25 border-l-2 border-l-[#FF4D00] rounded-lg p-2 text-[11px] text-zinc-300 leading-relaxed">
-          <div className="text-[9px] text-[#FF4D00] font-semibold uppercase tracking-wide mb-1">재보정 요청</div>
+        <div className="bg-surface border border-accent/25 border-l-2 border-l-accent rounded-lg p-2 text-[11px] text-muted-foreground leading-relaxed">
+          <div className="text-[9px] text-accent font-semibold uppercase tracking-wide mb-1">재보정 요청</div>
           {photo.customerComment
             ? <>&ldquo;{photo.customerComment}&rdquo;</>
-            : <span className="text-zinc-600 italic">코멘트 없음</span>
+            : <span className="text-subtle-foreground italic">코멘트 없음</span>
           }
         </div>
       )}
@@ -80,18 +80,18 @@ function PhotoCard({ photo }: { photo: ReviewResultPhoto }) {
 function SimplePhotoCard({ photo }: { photo: import("@/types").Photo }) {
   const filename = photo.originalFilename?.split("/").pop() ?? `#${photo.orderIndex}`;
   return (
-    <div className="bg-[#0a0a0c]/70 border border-[#1a1a1e] rounded-xl p-2 flex flex-col gap-2">
-      <div className="w-full aspect-[4/3] bg-[#080808] rounded-lg overflow-hidden border border-[#1a1a1e] relative">
+    <div className="bg-surface/70 border border-border-subtle rounded-xl p-2 flex flex-col gap-2">
+      <div className="w-full aspect-[4/3] bg-surface rounded-lg overflow-hidden border border-border-subtle relative">
         {photo.url ? (
           <img src={photo.url} alt={filename} className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-zinc-700 text-xs font-mono">NO IMG</div>
+          <div className="w-full h-full flex items-center justify-center text-disabled-foreground text-xs font-mono">NO IMG</div>
         )}
-        <div className="absolute top-1.5 right-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#FF4D00]/90 rounded text-[9px] font-semibold text-white">
+        <div className="absolute top-1.5 right-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-accent/90 rounded text-[9px] font-semibold text-foreground">
           <Check size={8} />선택
         </div>
       </div>
-      <p className="text-[11px] font-mono text-zinc-400 truncate" title={filename}>{filename}</p>
+      <p className="text-[11px] font-mono text-muted-foreground truncate" title={filename}>{filename}</p>
     </div>
   );
 }
@@ -100,30 +100,30 @@ function SimplePhotoCard({ photo }: { photo: import("@/types").Photo }) {
 function UnselectedPhotoCard({ photo }: { photo: import("@/types").Photo }) {
   const filename = photo.originalFilename?.split("/").pop() ?? `#${photo.orderIndex}`;
   return (
-    <div className="bg-[#0a0a0c]/40 border border-[#1a1a1e] rounded-xl p-2 flex flex-col gap-2">
-      <div className="w-full aspect-[4/3] bg-[#080808] rounded-lg overflow-hidden border border-[#1a1a1e] relative opacity-70 hover:opacity-100 transition-opacity">
+    <div className="bg-surface/40 border border-border-subtle rounded-xl p-2 flex flex-col gap-2">
+      <div className="w-full aspect-[4/3] bg-surface rounded-lg overflow-hidden border border-border-subtle relative opacity-70 hover:opacity-100 transition-opacity">
         {photo.url ? (
           <img src={photo.url} alt={filename} className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-zinc-700 text-xs font-mono">NO IMG</div>
+          <div className="w-full h-full flex items-center justify-center text-disabled-foreground text-xs font-mono">NO IMG</div>
         )}
-        <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-black/70 rounded text-[9px] text-zinc-500 border border-[#333]">
+        <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-black/70 rounded text-[9px] text-subtle-foreground border border-border">
           미선택
         </div>
       </div>
-      <p className="text-[11px] font-mono text-zinc-500 truncate" title={filename}>{filename}</p>
+      <p className="text-[11px] font-mono text-subtle-foreground truncate" title={filename}>{filename}</p>
     </div>
   );
 }
 
 /* ── 섹션 헤더 ── */
 function SectionHeader({ label, count, tone }: { label: string; count: number; tone: "brand" | "muted" }) {
-  const dot = tone === "brand" ? "bg-[#FF4D00]" : "bg-zinc-500";
+  const dot = tone === "brand" ? "bg-accent" : "bg-subtle-foreground";
   return (
     <div className="flex items-center gap-2 mb-2">
       <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
-      <h3 className="text-[12px] font-semibold text-zinc-300 tracking-wide">{label}</h3>
-      <span className="font-mono text-[11px] text-zinc-500">{count}장</span>
+      <h3 className="text-[12px] font-semibold text-muted-foreground tracking-wide">{label}</h3>
+      <span className="font-mono text-[11px] text-subtle-foreground">{count}장</span>
     </div>
   );
 }
@@ -196,11 +196,11 @@ export default function LockedPage() {
 
   if (!mounted || loading) return <PageLoader variant="full" />;
   if (!project) return (
-    <div className="flex min-h-dvh items-center justify-center bg-[#030303] text-zinc-600 font-mono text-sm">
+    <div className="flex min-h-dvh items-center justify-center bg-background text-subtle-foreground font-mono text-sm">
       존재하지 않는 초대 링크입니다.
     </div>
   );
-  if (project.status === "selecting") return <div className="min-h-dvh bg-[#030303]" />;
+  if (project.status === "selecting") return <div className="min-h-dvh bg-background" />;
 
   const confirmedDate = project.confirmedAt
     ? format(new Date(project.confirmedAt), "yyyy.MM.dd HH:mm", { locale: ko })
@@ -226,41 +226,41 @@ export default function LockedPage() {
   })();
 
   return (
-    <div className="min-h-dvh bg-[#0a0a0c] text-white flex flex-col" style={{ fontFamily: "'Pretendard Variable',-apple-system,sans-serif" }}>
+    <div className="min-h-dvh bg-background text-foreground flex flex-col" style={{ fontFamily: "'Pretendard Variable',-apple-system,sans-serif" }}>
 
       {/* Header */}
       <CustomerHeader>
         <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} />
-        <span className="font-mono text-[11px] text-zinc-500 max-w-[180px] truncate">{project.name}</span>
+        <span className="font-mono text-[11px] text-subtle-foreground max-w-[180px] truncate">{project.name}</span>
       </CustomerHeader>
 
       {/* Status bar */}
-      <div className="flex items-center justify-between px-5 py-3 bg-[#0f0f12] border-b border-[#1a1a1e]">
+      <div className="flex items-center justify-between px-5 py-3 bg-surface border-b border-border-subtle">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${isEditing ? "bg-amber-400" : "bg-emerald-400"}`}
               style={{ boxShadow: isEditing ? "0 0 6px #fbbf24" : "0 0 6px #34d399" }} />
-            <span className="text-sm font-medium text-white">{statusText}</span>
+            <span className="text-sm font-medium text-foreground">{statusText}</span>
           </div>
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#FF4D00]/8 border border-[#FF4D00]/15">
-            <Lock size={10} className="text-[#FF4D00]" />
-            <span className="font-mono text-[10px] text-[#FF4D00]">읽기 전용</span>
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/8 border border-accent/15">
+            <Lock size={10} className="text-accent" />
+            <span className="font-mono text-[10px] text-accent">읽기 전용</span>
           </div>
         </div>
-        <div className="flex items-center gap-3 font-mono text-[11px] text-zinc-500">
+        <div className="flex items-center gap-3 font-mono text-[11px] text-subtle-foreground">
           {hasReview && (
             <>
               {approved > 0 && <span className="text-emerald-400">확정 {approved}</span>}
-              {revision > 0 && <span className="text-[#FF4D00]">재보정 {revision}</span>}
+              {revision > 0 && <span className="text-accent">재보정 {revision}</span>}
             </>
           )}
           {!hasReview && (
             <>
               <span>{N}장 선택</span>
-              {showUnselected && <span className="text-zinc-600">· 비선택 {unselected.length}</span>}
+              {showUnselected && <span className="text-subtle-foreground">· 비선택 {unselected.length}</span>}
             </>
           )}
-          {confirmedDate && <span className="hidden sm:inline text-zinc-600">{confirmedDate}</span>}
+          {confirmedDate && <span className="hidden sm:inline text-subtle-foreground">{confirmedDate}</span>}
         </div>
       </div>
 
@@ -295,7 +295,7 @@ export default function LockedPage() {
             )}
           </div>
         ) : (
-          <div className="flex items-center justify-center h-48 text-zinc-600 font-mono text-sm">
+          <div className="flex items-center justify-center h-48 text-subtle-foreground font-mono text-sm">
             불러오는 중...
           </div>
         )}
@@ -303,7 +303,7 @@ export default function LockedPage() {
 
       {/* Bottom bar */}
       <CustomerFooter>
-        <span className="font-mono text-[11px] text-zinc-500">
+        <span className="font-mono text-[11px] text-subtle-foreground">
           {isConfirmed ? `확정 취소 ${remainingCancels}회 남음` : statusText}
         </span>
         {isConfirmed && (
@@ -314,7 +314,7 @@ export default function LockedPage() {
             className={`px-4 py-2 rounded-xl font-mono text-[11px] font-semibold border transition-all ${
               canCancel
                 ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
-                : "border-[#27272c] text-zinc-600 cursor-not-allowed opacity-50"
+                : "border-border text-subtle-foreground cursor-not-allowed opacity-50"
             }`}>
             확정 취소
           </button>
@@ -325,14 +325,14 @@ export default function LockedPage() {
       {cancelModalOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-5"
           onClick={(e) => { if (e.target === e.currentTarget) setCancelModalOpen(false); }}>
-          <div className="w-full max-w-sm bg-[#121215] border border-[#27272c] rounded-2xl p-6 flex flex-col gap-5">
+          <div className="w-full max-w-sm bg-surface-raised border border-border rounded-2xl p-6 flex flex-col gap-5">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-red-500/10 border border-red-500/25 flex items-center justify-center shrink-0">
                 <AlertTriangle size={16} className="text-red-400" />
               </div>
-              <h3 className="text-base font-bold text-white">확정을 취소할까요?</h3>
+              <h3 className="text-base font-bold text-foreground">확정을 취소할까요?</h3>
             </div>
-            <p className="text-sm text-zinc-400 leading-relaxed">
+            <p className="text-sm text-muted-foreground leading-relaxed">
               갤러리로 돌아가 사진을 다시 선택할 수 있습니다.
             </p>
             <div className="bg-amber-500/6 border border-amber-500/20 rounded-xl px-4 py-3 font-mono text-[11px] text-amber-400 leading-relaxed">
@@ -340,11 +340,11 @@ export default function LockedPage() {
             </div>
             <div className="flex gap-3">
               <button type="button" onClick={() => setCancelModalOpen(false)}
-                className="flex-1 h-11 rounded-xl border border-[#27272c] text-zinc-400 text-sm font-medium hover:border-zinc-500 transition-colors">
+                className="flex-1 h-11 rounded-xl border border-border text-muted-foreground text-sm font-medium hover:border-border-strong transition-colors">
                 유지하기
               </button>
               <button type="button" onClick={handleConfirmCancel} disabled={cancelling}
-                className="flex-1 h-11 rounded-xl bg-[#FF4D00] text-black text-sm font-bold disabled:opacity-60 hover:bg-[#e64500] transition-colors">
+                className="flex-1 h-11 rounded-xl bg-accent text-black text-sm font-bold disabled:opacity-60 hover:bg-[#e64500] transition-colors">
                 {cancelling ? "처리 중..." : "취소하기"}
               </button>
             </div>

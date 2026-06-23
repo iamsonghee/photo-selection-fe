@@ -117,19 +117,19 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 shrink-0 flex items-center justify-between gap-3">
-          <div className="min-w-0 flex items-center gap-2 text-sm text-zinc-200">
+          <div className="min-w-0 flex items-center gap-2 text-sm text-foreground">
             <span
               className="min-w-0 flex-1 truncate font-semibold"
               title={current.original.filename}
             >
               {current.original.filename}
             </span>
-            <span className="shrink-0 text-zinc-500">{index + 1} / {total}</span>
+            <span className="shrink-0 text-subtle-foreground">{index + 1} / {total}</span>
           </div>
           <div className="shrink-0 flex items-center gap-2">
             <button
               type="button"
-              className="rounded-md border border-zinc-700 bg-zinc-900/70 p-2 text-zinc-200 hover:bg-zinc-800"
+              className="rounded-md border border-border bg-surface-raised/70 p-2 text-foreground hover:bg-surface-raised"
               onClick={onClose}
               aria-label="닫기"
             >
@@ -143,7 +143,7 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
             <button
               type="button"
               onClick={() => setTab("original")}
-              className={`rounded px-2 py-1 text-xs ${tab === "original" ? "bg-zinc-200 text-zinc-900" : "bg-zinc-800 text-zinc-300"}`}
+              className={`rounded px-2 py-1 text-xs ${tab === "original" ? "bg-foreground text-background" : "bg-surface-raised text-muted-foreground"}`}
             >
               원본
             </button>
@@ -151,7 +151,7 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
               <button
                 type="button"
                 onClick={() => setTab("v1")}
-                className={`rounded px-2 py-1 text-xs ${tab === "v1" ? "bg-zinc-200 text-zinc-900" : "bg-zinc-800 text-zinc-300"}`}
+                className={`rounded px-2 py-1 text-xs ${tab === "v1" ? "bg-foreground text-background" : "bg-surface-raised text-muted-foreground"}`}
               >
                 보정본 v1
               </button>
@@ -160,7 +160,7 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
               <button
                 type="button"
                 onClick={() => setTab("v2")}
-                className={`rounded px-2 py-1 text-xs ${tab === "v2" ? "bg-zinc-200 text-zinc-900" : "bg-zinc-800 text-zinc-300"}`}
+                className={`rounded px-2 py-1 text-xs ${tab === "v2" ? "bg-foreground text-background" : "bg-surface-raised text-muted-foreground"}`}
               >
                 보정본 v2
               </button>
@@ -168,15 +168,15 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
           </div>
           {canSplit && (
             <div className="shrink-0 flex items-center gap-2">
-              <span aria-hidden className="hidden sm:block w-px h-5 bg-zinc-700/70" />
+              <span aria-hidden className="hidden sm:block w-px h-5 bg-border/70" />
               <button
                 type="button"
                 onClick={() => setSplitMode((s) => !s)}
                 aria-pressed={splitMode}
                 className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
                   splitMode
-                    ? "border-zinc-400 bg-zinc-200 text-zinc-900"
-                    : "border-zinc-700 bg-zinc-900/70 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500"
+                    ? "border-border-strong bg-foreground text-background"
+                    : "border-border bg-surface-raised/70 text-muted-foreground hover:text-foreground hover:border-border-strong"
                 }`}
               >
                 ⊞ 비교
@@ -186,9 +186,9 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
         </div>
 
         {activeComment && (
-          <div className="mb-2 shrink-0 flex items-start gap-2 rounded-lg border border-[#27272c] bg-[#0a0a0c] px-3 py-2">
-            <MessageSquare size={11} className="text-[#FF4D00] shrink-0 mt-0.5" />
-            <p className="text-[11px] text-zinc-300 leading-relaxed">&ldquo;{activeComment}&rdquo;</p>
+          <div className="mb-2 shrink-0 flex items-start gap-2 rounded-lg border border-border-subtle bg-surface px-3 py-2">
+            <MessageSquare size={11} className="text-accent shrink-0 mt-0.5" />
+            <p className="text-[11px] text-muted-foreground leading-relaxed">&ldquo;{activeComment}&rdquo;</p>
           </div>
         )}
 
@@ -199,9 +199,9 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
             }`}
           >
             {!splitMode ? (
-              <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
-                <div className="mb-2 shrink-0 text-xs font-semibold text-zinc-300">{activeLabel}</div>
-                <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded bg-zinc-900">
+              <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface/70 p-3">
+                <div className="mb-2 shrink-0 text-xs font-semibold text-muted-foreground">{activeLabel}</div>
+                <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded bg-surface-raised">
                   <img
                     src={activeImage.url}
                     alt=""
@@ -212,9 +212,9 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
               </div>
             ) : (
               <>
-                <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
-                  <div className="mb-2 shrink-0 text-xs font-semibold text-zinc-300">{splitLeftLabel}</div>
-                  <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded bg-zinc-900">
+                <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface/70 p-3">
+                  <div className="mb-2 shrink-0 text-xs font-semibold text-muted-foreground">{splitLeftLabel}</div>
+                  <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded bg-surface-raised">
                     <img
                       src={splitLeft.url}
                       alt=""
@@ -223,9 +223,9 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
                     />
                   </div>
                 </div>
-                <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
-                  <div className="mb-2 shrink-0 text-xs font-semibold text-zinc-300">{splitRightLabel}</div>
-                  <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded bg-zinc-900">
+                <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface/70 p-3">
+                  <div className="mb-2 shrink-0 text-xs font-semibold text-muted-foreground">{splitRightLabel}</div>
+                  <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded bg-surface-raised">
                     <img
                       src={(splitRight ?? current.original).url}
                       alt=""

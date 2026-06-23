@@ -38,7 +38,7 @@ function PageHeader({ inviteHref, right }: { inviteHref?: string; right?: React.
         <BrandLogoBar size="sm" href={inviteHref} />
         {right && (
           <div
-            className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] text-zinc-400 max-w-[150px] truncate"
+            className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] text-muted-foreground max-w-[150px] truncate"
             style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)" }}
           >
             {right}
@@ -90,10 +90,10 @@ export default function InvitePageClient() {
 
   if (!project) {
     return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[#030303] px-4 text-center">
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-4 text-center">
         <Icon icon="solar:link-broken-bold" width={36} style={{ color: "#3a3f55", marginBottom: 12 }} />
-        <p className="text-[15px] font-semibold text-zinc-300">존재하지 않는 초대 링크입니다</p>
-        <p className="mt-1 text-[13px] text-zinc-600">URL을 다시 확인해주세요</p>
+        <p className="text-[15px] font-semibold text-muted-foreground">존재하지 않는 초대 링크입니다</p>
+        <p className="mt-1 text-[13px] text-subtle-foreground">URL을 다시 확인해주세요</p>
       </div>
     );
   }
@@ -112,16 +112,16 @@ export default function InvitePageClient() {
     const MONO              = "'JetBrains Mono', 'Courier New', Courier, monospace";
 
     return (
-      <div style={{ minHeight: "100vh", background: "#030303", color: "#fff", display: "flex", flexDirection: "column", position: "relative", overflowX: "hidden", fontFamily: "'Pretendard Variable','Pretendard',-apple-system,sans-serif" }}>
+      <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)", display: "flex", flexDirection: "column", position: "relative", overflowX: "hidden", fontFamily: "'Pretendard Variable','Pretendard',-apple-system,sans-serif" }}>
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
 
           .cp-grid-bg {
             position: fixed; inset: 0; z-index: 0; pointer-events: none;
-            background-image: linear-gradient(to right, #1a1a1a 1px, transparent 1px), linear-gradient(to bottom, #1a1a1a 1px, transparent 1px);
+            background-image: linear-gradient(to right, var(--border-subtle) 1px, transparent 1px), linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
             background-size: 40px 40px;
           }
-          .cp-bracket { position: fixed; width: 32px; height: 32px; border: 2px solid #555; z-index: 50; pointer-events: none; }
+          .cp-bracket { position: fixed; width: 32px; height: 32px; border: 2px solid var(--border-strong); z-index: 50; pointer-events: none; }
           .cp-bracket-tl { top: 20px; left: 20px; border-right: none; border-bottom: none; }
           .cp-bracket-tr { top: 20px; right: 20px; border-left: none; border-bottom: none; }
           .cp-bracket-bl { bottom: 20px; left: 20px; border-right: none; border-top: none; }
@@ -132,46 +132,46 @@ export default function InvitePageClient() {
             padding: 32px 64px; position: relative; z-index: 10;
           }
           .cp-brand-cluster { display: flex; align-items: center; gap: 12px; }
-          .cp-logo-box { background: #FF4D00; color: #000; font-weight: 800; font-size: 14px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+          .cp-logo-box { background: var(--accent); color: #000; font-weight: 800; font-size: 14px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
           .cp-brand-name { font-weight: 800; font-size: 20px; letter-spacing: -0.5px; }
-          .cp-brand-name span { color: #FF4D00; }
-          .cp-sys-info { display: flex; align-items: center; gap: 24px; font-family: ${MONO}; font-size: 11px; letter-spacing: 1px; color: #8C8C8C; }
-          .cp-status-indicator { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid #2A2A2A; background: #030303; }
+          .cp-brand-name span { color: var(--accent); }
+          .cp-sys-info { display: flex; align-items: center; gap: 24px; font-family: ${MONO}; font-size: 11px; letter-spacing: 1px; color: var(--muted-foreground); }
+          .cp-status-indicator { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid var(--border); background: var(--background); }
           .cp-status-dot { width: 6px; height: 6px; border-radius: 50%; }
 
           .cp-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; position: relative; z-index: 10; }
-          .cp-portal-cmd { font-family: ${MONO}; font-size: 12px; color: #FF4D00; letter-spacing: 2px; margin-bottom: 24px; text-transform: uppercase; display: flex; align-items: center; gap: 12px; }
-          .cp-portal-cmd::before, .cp-portal-cmd::after { content: ''; width: 24px; height: 1px; background: #FF4D00; }
+          .cp-portal-cmd { font-family: ${MONO}; font-size: 12px; color: var(--accent); letter-spacing: 2px; margin-bottom: 24px; text-transform: uppercase; display: flex; align-items: center; gap: 12px; }
+          .cp-portal-cmd::before, .cp-portal-cmd::after { content: ''; width: 24px; height: 1px; background: var(--accent); }
 
-          .cp-card { width: 100%; max-width: 640px; background: rgba(10,10,10,0.6); border: 1px solid #2A2A2A; padding: 56px 48px; position: relative; backdrop-filter: blur(4px); }
-          .cp-card-corner-tl { position: absolute; top: -1px; left: -1px; width: 8px; height: 8px; border: 1px solid #555; border-right: none; border-bottom: none; pointer-events: none; }
-          .cp-card-corner-br { position: absolute; bottom: -1px; right: -1px; width: 8px; height: 8px; border: 1px solid #555; border-left: none; border-top: none; pointer-events: none; }
+          .cp-card { width: 100%; max-width: 640px; background: rgba(10,10,10,0.6); border: 1px solid var(--border); padding: 56px 48px; position: relative; backdrop-filter: blur(4px); }
+          .cp-card-corner-tl { position: absolute; top: -1px; left: -1px; width: 8px; height: 8px; border: 1px solid var(--border-strong); border-right: none; border-bottom: none; pointer-events: none; }
+          .cp-card-corner-br { position: absolute; bottom: -1px; right: -1px; width: 8px; height: 8px; border: 1px solid var(--border-strong); border-left: none; border-top: none; pointer-events: none; }
           .cp-card-header { margin-bottom: 48px; text-align: center; }
           .cp-h1 { font-size: 42px; font-weight: 800; line-height: 1.2; letter-spacing: -1px; margin-bottom: 16px; word-break: keep-all; }
-          .cp-subtitle { font-size: 16px; line-height: 1.6; color: #8C8C8C; max-width: 80%; margin: 0 auto; word-break: keep-all; }
+          .cp-subtitle { font-size: 16px; line-height: 1.6; color: var(--muted-foreground); max-width: 80%; margin: 0 auto; word-break: keep-all; }
 
-          .cp-data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #2A2A2A; border: 1px solid #2A2A2A; margin-bottom: 48px; }
-          .cp-data-cell { background: #030303; padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; }
-          .cp-data-label { font-family: ${MONO}; font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 1px; }
-          .cp-data-value { font-size: 16px; font-weight: 600; color: #fff; }
+          .cp-data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 48px; }
+          .cp-data-cell { background: var(--background); padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; }
+          .cp-data-label { font-family: ${MONO}; font-size: 10px; color: var(--subtle-foreground); text-transform: uppercase; letter-spacing: 1px; }
+          .cp-data-value { font-size: 16px; font-weight: 600; color: var(--foreground); }
 
           .cp-action-area { display: flex; flex-direction: column; align-items: center; gap: 24px; }
-          .cp-btn-primary { display: inline-flex; align-items: center; justify-content: center; width: 100%; background: #FF4D00; color: #000; font-size: 18px; font-weight: 700; padding: 20px 32px; border: none; cursor: pointer; transition: background 0.2s; text-decoration: none; font-family: inherit; }
+          .cp-btn-primary { display: inline-flex; align-items: center; justify-content: center; width: 100%; background: var(--accent); color: #000; font-size: 18px; font-weight: 700; padding: 20px 32px; border: none; cursor: pointer; transition: background 0.2s; text-decoration: none; font-family: inherit; }
           .cp-btn-primary:hover:not(:disabled) { background: #ff6600; }
-          .cp-btn-primary:disabled { opacity: 0.35; cursor: not-allowed; background: #555; }
+          .cp-btn-primary:disabled { opacity: 0.35; cursor: not-allowed; background: var(--border-strong); }
           .cp-btn-arrow { margin-left: 12px; font-weight: 800; transition: transform 0.2s; }
           .cp-btn-primary:hover:not(:disabled) .cp-btn-arrow { transform: translateX(4px); }
 
-          .cp-photographer-card { margin-top: 48px; padding-top: 32px; border-top: 1px dashed #2A2A2A; display: flex; align-items: center; justify-content: space-between; }
+          .cp-photographer-card { margin-top: 48px; padding-top: 32px; border-top: 1px dashed var(--border); display: flex; align-items: center; justify-content: space-between; }
           .cp-photo-meta { display: flex; align-items: center; gap: 16px; }
-          .cp-avatar-box { width: 48px; height: 48px; border: 1px solid #2A2A2A; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); overflow: hidden; flex-shrink: 0; }
+          .cp-avatar-box { width: 48px; height: 48px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); overflow: hidden; flex-shrink: 0; }
           .cp-author-name { font-size: 15px; font-weight: 700; }
-          .cp-author-role { font-family: ${MONO}; font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
-          .cp-sys-tag { font-family: ${MONO}; font-size: 10px; color: #FF4D00; letter-spacing: 1px; display: flex; align-items: center; gap: 6px; }
-          .cp-sys-tag::before { content: ''; width: 4px; height: 4px; background: #FF4D00; display: inline-block; }
+          .cp-author-role { font-family: ${MONO}; font-size: 10px; color: var(--subtle-foreground); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+          .cp-sys-tag { font-family: ${MONO}; font-size: 10px; color: var(--accent); letter-spacing: 1px; display: flex; align-items: center; gap: 6px; }
+          .cp-sys-tag::before { content: ''; width: 4px; height: 4px; background: var(--accent); display: inline-block; }
 
-          .cp-footer { padding: 24px 64px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #2A2A2A; font-family: ${MONO}; font-size: 10px; color: #555; letter-spacing: 1px; position: relative; z-index: 10; background: #030303; }
-          .cp-footer-secure { color: #8C8C8C; }
+          .cp-footer { padding: 24px 64px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); font-family: ${MONO}; font-size: 10px; color: var(--subtle-foreground); letter-spacing: 1px; position: relative; z-index: 10; background: var(--background); }
+          .cp-footer-secure { color: var(--muted-foreground); }
 
           @media (max-width: 768px) {
             .cp-header { padding: env(safe-area-inset-top, 16px) 20px 16px; }
@@ -197,7 +197,7 @@ export default function InvitePageClient() {
 
         <CustomerHeader>
           <BrandLogoBar size="sm" href={inviteHref} />
-          <span className="font-mono text-[11px] text-zinc-500 max-w-[200px] truncate">
+          <span className="font-mono text-[11px] text-subtle-foreground max-w-[200px] truncate">
             {isV2 ? "보정본 V2 검토 중" : "보정본 V1 검토 중"}
           </span>
         </CustomerHeader>
@@ -235,8 +235,8 @@ export default function InvitePageClient() {
               <div className="cp-data-cell">
                 <span className="cp-data-label">DATA :: REVISION_QUOTA</span>
                 <span className="cp-data-value" style={{ fontFamily: MONO, fontSize: 18 }}>
-                  <span style={{ color: "#FF4D00" }}>{revisionRemaining}</span>회 가능
-                  <span style={{ fontFamily: MONO, fontSize: 11, color: "#555", marginLeft: 8 }}>
+                  <span style={{ color: "var(--accent)" }}>{revisionRemaining}</span>회 가능
+                  <span style={{ fontFamily: MONO, fontSize: 11, color: "var(--subtle-foreground)", marginLeft: 8 }}>
                     {isV2 ? "2차 검토" : "1차 검토"}
                   </span>
                 </span>
@@ -257,7 +257,7 @@ export default function InvitePageClient() {
                   {photographer?.profile_image_url ? (
                     <img src={getProfileImageUrl(photographer.profile_image_url)} alt={photographerName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   ) : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.5"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" /></svg>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--subtle-foreground)" strokeWidth="1.5"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" /></svg>
                   )}
                 </div>
                 <div>
@@ -271,8 +271,8 @@ export default function InvitePageClient() {
         </main>
 
         <CustomerFooter>
-          <span className="font-mono text-[10px] text-zinc-600">SECURE_CONNECTION</span>
-          <span className="font-mono text-[10px] text-zinc-600">© 2026 A컷</span>
+          <span className="font-mono text-[10px] text-subtle-foreground">SECURE_CONNECTION</span>
+          <span className="font-mono text-[10px] text-subtle-foreground">© 2026 A컷</span>
         </CustomerFooter>
       </div>
     );
@@ -295,12 +295,12 @@ export default function InvitePageClient() {
 
         .cp-grid-bg {
           position: fixed; inset: 0; z-index: 0; pointer-events: none;
-          background-image: linear-gradient(to right, #1a1a1a 1px, transparent 1px), linear-gradient(to bottom, #1a1a1a 1px, transparent 1px);
+          background-image: linear-gradient(to right, var(--border-subtle) 1px, transparent 1px), linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
           background-size: 40px 40px;
         }
         .cp-bracket {
           position: fixed; width: 32px; height: 32px;
-          border: 2px solid #555; z-index: 50; pointer-events: none;
+          border: 2px solid var(--border-strong); z-index: 50; pointer-events: none;
         }
         .cp-bracket-tl { top: 20px; left: 20px; border-right: none; border-bottom: none; }
         .cp-bracket-tr { top: 20px; right: 20px; border-left: none; border-bottom: none; }
@@ -313,21 +313,21 @@ export default function InvitePageClient() {
         }
         .cp-brand-cluster { display: flex; align-items: center; gap: 12px; }
         .cp-logo-box {
-          background: #FF4D00; color: #000;
+          background: var(--accent); color: #000;
           font-weight: 800; font-size: 14px;
           width: 24px; height: 24px;
           display: flex; align-items: center; justify-content: center;
         }
         .cp-brand-name { font-weight: 800; font-size: 20px; letter-spacing: -0.5px; }
-        .cp-brand-name span { color: #FF4D00; }
+        .cp-brand-name span { color: var(--accent); }
 
         .cp-sys-info {
           display: flex; align-items: center; gap: 24px;
-          font-family: ${MONO}; font-size: 11px; letter-spacing: 1px; color: #8C8C8C;
+          font-family: ${MONO}; font-size: 11px; letter-spacing: 1px; color: var(--muted-foreground);
         }
         .cp-status-indicator {
           display: flex; align-items: center; gap: 8px;
-          padding: 6px 12px; border: 1px solid #2A2A2A; background: #030303;
+          padding: 6px 12px; border: 1px solid var(--border); background: var(--background);
         }
         .cp-status-dot {
           width: 6px; height: 6px; background: #00E676;
@@ -340,18 +340,18 @@ export default function InvitePageClient() {
           padding: 40px 20px; position: relative; z-index: 10;
         }
         .cp-portal-cmd {
-          font-family: ${MONO}; font-size: 12px; color: #FF4D00;
+          font-family: ${MONO}; font-size: 12px; color: var(--accent);
           letter-spacing: 2px; margin-bottom: 24px; text-transform: uppercase;
           display: flex; align-items: center; gap: 12px;
         }
         .cp-portal-cmd::before, .cp-portal-cmd::after {
-          content: ''; width: 24px; height: 1px; background: #FF4D00;
+          content: ''; width: 24px; height: 1px; background: var(--accent);
         }
 
         .cp-card {
           width: 100%; max-width: 640px;
           background: rgba(10,10,10,0.6);
-          border: 1px solid #2A2A2A;
+          border: 1px solid var(--border);
           padding: 56px 48px;
           position: relative;
           backdrop-filter: blur(4px);
@@ -359,14 +359,14 @@ export default function InvitePageClient() {
         .cp-card-corner-tl {
           position: absolute; top: -1px; left: -1px;
           width: 8px; height: 8px;
-          border: 1px solid #555;
+          border: 1px solid var(--border-strong);
           border-right: none; border-bottom: none;
           pointer-events: none;
         }
         .cp-card-corner-br {
           position: absolute; bottom: -1px; right: -1px;
           width: 8px; height: 8px;
-          border: 1px solid #555;
+          border: 1px solid var(--border-strong);
           border-left: none; border-top: none;
           pointer-events: none;
         }
@@ -377,81 +377,81 @@ export default function InvitePageClient() {
           letter-spacing: -1px; margin-bottom: 16px; word-break: keep-all;
         }
         .cp-subtitle {
-          font-size: 16px; line-height: 1.6; color: #8C8C8C;
+          font-size: 16px; line-height: 1.6; color: var(--muted-foreground);
           max-width: 80%; margin: 0 auto; word-break: keep-all;
         }
 
         .cp-data-grid {
           display: grid; grid-template-columns: 1fr 1fr;
-          gap: 1px; background: #2A2A2A;
-          border: 1px solid #2A2A2A; margin-bottom: 48px;
+          gap: 1px; background: var(--border);
+          border: 1px solid var(--border); margin-bottom: 48px;
         }
         .cp-data-cell {
-          background: #030303; padding: 20px 24px;
+          background: var(--background); padding: 20px 24px;
           display: flex; flex-direction: column; gap: 8px;
         }
         .cp-data-label {
-          font-family: ${MONO}; font-size: 10px; color: #555;
+          font-family: ${MONO}; font-size: 10px; color: var(--subtle-foreground);
           text-transform: uppercase; letter-spacing: 1px;
         }
-        .cp-data-value { font-size: 16px; font-weight: 600; color: #fff; }
+        .cp-data-value { font-size: 16px; font-weight: 600; color: var(--foreground); }
 
         .cp-action-area {
           display: flex; flex-direction: column; align-items: center; gap: 24px;
         }
         .cp-btn-primary {
           display: inline-flex; align-items: center; justify-content: center;
-          width: 100%; background: #FF4D00; color: #000;
+          width: 100%; background: var(--accent); color: #000;
           font-size: 18px; font-weight: 700;
           padding: 20px 32px; border: none; cursor: pointer;
           transition: background 0.2s; text-decoration: none;
           font-family: inherit;
         }
         .cp-btn-primary:hover:not(:disabled) { background: #ff6600; }
-        .cp-btn-primary:disabled { opacity: 0.35; cursor: not-allowed; background: #555; }
+        .cp-btn-primary:disabled { opacity: 0.35; cursor: not-allowed; background: var(--border-strong); }
         .cp-btn-arrow { margin-left: 12px; font-weight: 800; transition: transform 0.2s; }
         .cp-btn-primary:hover:not(:disabled) .cp-btn-arrow { transform: translateX(4px); }
 
         .cp-btn-sub {
-          font-family: ${MONO}; font-size: 12px; color: #8C8C8C;
+          font-family: ${MONO}; font-size: 12px; color: var(--muted-foreground);
           text-decoration: none; display: flex; align-items: center; gap: 8px;
           transition: color 0.2s; letter-spacing: 0.5px; background: none; border: none; cursor: pointer;
         }
-        .cp-btn-sub:hover { color: #fff; }
+        .cp-btn-sub:hover { color: var(--foreground); }
 
         .cp-photographer-card {
           margin-top: 48px; padding-top: 32px;
-          border-top: 1px dashed #2A2A2A;
+          border-top: 1px dashed var(--border);
           display: flex; align-items: center; justify-content: space-between;
         }
         .cp-photo-meta { display: flex; align-items: center; gap: 16px; }
         .cp-avatar-box {
-          width: 48px; height: 48px; border: 1px solid #2A2A2A;
+          width: 48px; height: 48px; border: 1px solid var(--border);
           display: flex; align-items: center; justify-content: center;
           background: rgba(255,255,255,0.03); overflow: hidden; flex-shrink: 0;
         }
         .cp-author-name { font-size: 15px; font-weight: 700; }
         .cp-author-role {
-          font-family: ${MONO}; font-size: 10px; color: #555;
+          font-family: ${MONO}; font-size: 10px; color: var(--subtle-foreground);
           text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;
         }
         .cp-sys-tag {
-          font-family: ${MONO}; font-size: 10px; color: #FF4D00;
+          font-family: ${MONO}; font-size: 10px; color: var(--accent);
           letter-spacing: 1px; display: flex; align-items: center; gap: 6px;
         }
         .cp-sys-tag::before {
-          content: ''; width: 4px; height: 4px; background: #FF4D00;
+          content: ''; width: 4px; height: 4px; background: var(--accent);
           display: inline-block;
         }
 
         .cp-footer {
           padding: 24px 64px;
           display: flex; justify-content: space-between; align-items: center;
-          border-top: 1px solid #2A2A2A;
-          font-family: ${MONO}; font-size: 10px; color: #555;
-          letter-spacing: 1px; position: relative; z-index: 10; background: #030303;
+          border-top: 1px solid var(--border);
+          font-family: ${MONO}; font-size: 10px; color: var(--subtle-foreground);
+          letter-spacing: 1px; position: relative; z-index: 10; background: var(--background);
         }
-        .cp-footer-secure { color: #8C8C8C; }
+        .cp-footer-secure { color: var(--muted-foreground); }
 
         @media (max-width: 768px) {
           .cp-header { padding: env(safe-area-inset-top, 16px) 20px 16px; }
@@ -483,7 +483,7 @@ export default function InvitePageClient() {
       {/* Header */}
       <CustomerHeader>
         <BrandLogoBar size="sm" href={inviteHref} />
-        <span className="font-mono text-[11px] text-zinc-500 max-w-[180px] truncate">{project.name}</span>
+        <span className="font-mono text-[11px] text-subtle-foreground max-w-[180px] truncate">{project.name}</span>
       </CustomerHeader>
 
       {/* Main */}
@@ -526,7 +526,7 @@ export default function InvitePageClient() {
             <div className="cp-data-cell">
               <span className="cp-data-label">DATA :: SELECTION_QUOTA</span>
               <span className="cp-data-value" style={{ fontFamily: MONO, fontSize: 18 }}>
-                <span style={{ color: "#FF4D00" }}>{N}</span> / {M} 장
+                <span style={{ color: "var(--accent)" }}>{N}</span> / {M} 장
               </span>
             </div>
           </div>
@@ -560,7 +560,7 @@ export default function InvitePageClient() {
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
                   />
                 ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.5">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--subtle-foreground)" strokeWidth="1.5">
                     <circle cx="12" cy="8" r="4" />
                     <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
                   </svg>
@@ -578,8 +578,8 @@ export default function InvitePageClient() {
 
       {/* Footer */}
       <CustomerFooter>
-        <span className="font-mono text-[10px] text-zinc-600">SECURE_CONNECTION</span>
-        <span className="font-mono text-[10px] text-zinc-600">© 2026 A컷</span>
+        <span className="font-mono text-[10px] text-subtle-foreground">SECURE_CONNECTION</span>
+        <span className="font-mono text-[10px] text-subtle-foreground">© 2026 A컷</span>
       </CustomerFooter>
     </div>
   );
