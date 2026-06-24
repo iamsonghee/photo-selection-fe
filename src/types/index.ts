@@ -53,6 +53,15 @@ export interface Photo {
   isPending?: boolean;
   /** XHR 전송 중 (true=스피너, false=테두리만) */
   isUploading?: boolean;
+  /** AI 유사컷 그룹 id (photo_groups.id). 그룹에 속하지 않으면 null/undefined */
+  similarityGroupId?: string | null;
+}
+
+/** AI 유사컷 그룹 정보 (photo_groups 테이블) */
+export interface PhotoGroupInfo {
+  id: string;
+  representativePhotoId: string;
+  photoCount: number;
 }
 
 // ========== 프로젝트 ==========
@@ -102,6 +111,8 @@ export interface Project {
   location?: string | null;
   /** 고객 보정본 검토 기한 (reviewing_v1/v2 전환 시 설정) */
   reviewDeadline?: string | null;
+  /** AI 유사컷(burst shot) 분석 상태 (clip-service가 기록) */
+  clipAnalysisStatus?: "processing" | "completed" | "failed" | null;
   /** 런타임 전용 — photos 테이블에서 조회한 첫 번째 사진 썸네일 URL */
   thumbnailUrl?: string | null;
   createdAt: string;

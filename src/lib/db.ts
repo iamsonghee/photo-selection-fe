@@ -40,6 +40,9 @@ function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Pr
     revisionRound: ext.revision_round ?? 0,
     location: ext.location ?? null,
     reviewDeadline: ext.review_deadline ?? null,
+    clipAnalysisStatus:
+      (row as { clip_analysis_status?: "processing" | "completed" | "failed" | null })
+        .clip_analysis_status ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -66,6 +69,7 @@ function mapPhotoRow(
     selected,
     tag: state ? { star: state.rating as 1 | 2 | 3 | 4 | 5 | undefined, color: state.color } : undefined,
     comment: state?.comment ?? undefined,
+    similarityGroupId: (row as { similarity_group_id?: string | null }).similarity_group_id ?? null,
   };
 }
 
@@ -278,13 +282,13 @@ export async function getPhotosByProjectId(projectId: string): Promise<Photo[]> 
   // OPT-03: 필요한 컬럼만 조회 (created_at은 photos 테이블에 없으므로 제외)
   const { data, error } = await supabase
     .from("photos")
-    .select("id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size")
+    .select("id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, similarity_group_id")
     .eq("project_id", projectId)
     .order("number", { ascending: true });
 
   if (error) throw error;
   return (data ?? []).map((row) =>
-    mapPhotoRow(row as Database["public"]["Tables"]["photos"]["Row"])
+    mapPhotoRow(row as unknown as Database["public"]["Tables"]["photos"]["Row"])
   );
 }
 

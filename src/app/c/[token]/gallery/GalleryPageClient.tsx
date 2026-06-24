@@ -43,7 +43,7 @@ export default function GalleryPageClient() {
   const searchParams = useSearchParams();
   const token        = (params?.token as string) ?? "";
 
-  const { project, photos, Y, N, toggle, selectedIds, photoStates, loading, updatePhotoState } = useSelection();
+  const { project, photos, photoGroups, Y, N, toggle, selectedIds, photoStates, loading, updatePhotoState } = useSelection();
   const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
 
   const [tabFilter,     setTabFilter]     = useState<TabFilter>("all");
@@ -56,6 +56,8 @@ export default function GalleryPageClient() {
   const [confirming,       setConfirming]       = useState(false);
   const [confirmError,     setConfirmError]     = useState<string | null>(null);
   const [galleryThumbFocusId, setGalleryThumbFocusId] = useState<string | null>(null);
+  const [similarityToggleOn, setSimilarityToggleOn] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const galleryScrollKey = token ? `ps:c-gallery-scroll:${token}` : "";
 
@@ -145,23 +147,62 @@ export default function GalleryPageClient() {
     return getFilteredPhotos(photos, selectedIds, photoStates, filterState);
   }, [photos, selectedIds, photoStates, filterState]);
 
+  /* ── AI 유사컷 그룹 ── */
+  const groupsById = useMemo(() => {
+    const map = new Map<string, (typeof photoGroups)[number]>();
+    for (const g of photoGroups) map.set(g.id, g);
+    return map;
+  }, [photoGroups]);
+
+  const membersByGroup = useMemo(() => {
+    const map = new Map<string, typeof filteredPhotos>();
+    for (const p of filteredPhotos) {
+      if (!p.similarityGroupId) continue;
+      const arr = map.get(p.similarityGroupId) ?? [];
+      arr.push(p);
+      map.set(p.similarityGroupId, arr);
+    }
+    return map;
+  }, [filteredPhotos]);
+
+  const showSimilarityToggle = project?.clipAnalysisStatus === "completed" && photoGroups.length > 0;
+
+  /* 토글 ON: 대표컷 + 미분류 사진만, 펼쳐진 그룹은 대표컷 바로 뒤에 나머지 인라인 삽입 */
+  const displayPhotos = useMemo(() => {
+    if (!similarityToggleOn) return filteredPhotos;
+    const result: typeof filteredPhotos = [];
+    for (const photo of filteredPhotos) {
+      const groupId = photo.similarityGroupId;
+      if (!groupId) { result.push(photo); continue; }
+      const group = groupsById.get(groupId);
+      if (!group) { result.push(photo); continue; }
+      if (photo.id !== group.representativePhotoId) continue;
+      result.push(photo);
+      if (expandedGroups.has(groupId)) {
+        const members = membersByGroup.get(groupId) ?? [];
+        result.push(...members.filter((p) => p.id !== group.representativePhotoId));
+      }
+    }
+    return result;
+  }, [filteredPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup]);
+
   /* ── Thumbnail focus index ── */
   const galleryFocusIndex = useMemo(() => {
     if (!galleryThumbFocusId) return null;
-    const i = filteredPhotos.findIndex((p) => p.id === galleryThumbFocusId);
+    const i = displayPhotos.findIndex((p) => p.id === galleryThumbFocusId);
     return i >= 0 ? i : null;
-  }, [filteredPhotos, galleryThumbFocusId]);
+  }, [displayPhotos, galleryThumbFocusId]);
 
   /* ── Priority preload on focus ── */
   useEffect(() => {
-    if (galleryFocusIndex == null || filteredPhotos.length === 0) return;
+    if (galleryFocusIndex == null || displayPhotos.length === 0) return;
     const anchor  = galleryFocusIndex;
     const ordered: string[] = [];
-    const push = (i: number) => { const u = filteredPhotos[i]?.url; if (u) ordered.push(u); };
+    const push = (i: number) => { const u = displayPhotos[i]?.url; if (u) ordered.push(u); };
     push(anchor);
-    for (let d = 1; d < filteredPhotos.length; d++) {
+    for (let d = 1; d < displayPhotos.length; d++) {
       if (anchor - d >= 0) push(anchor - d);
-      if (anchor + d < filteredPhotos.length) push(anchor + d);
+      if (anchor + d < displayPhotos.length) push(anchor + d);
     }
     const seen = new Set<string>();
     ordered.forEach((url, i) => {
@@ -172,7 +213,7 @@ export default function GalleryPageClient() {
       img.fetchPriority = i < 24 ? "high" : "low";
       img.src = url;
     });
-  }, [galleryFocusIndex, filteredPhotos]);
+  }, [galleryFocusIndex, displayPhotos]);
 
   const viewerQueryString = useMemo(() => buildFilterQueryString(filterState), [filterState]);
 
@@ -182,6 +223,17 @@ export default function GalleryPageClient() {
     e.stopPropagation();
     toggle(photoId);
   }, [toggle]);
+
+  const handleGroupBadgeClick = useCallback((e: React.MouseEvent, groupId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }, []);
 
   const handleConfirm = useCallback(async () => {
     if (!project?.id || !token) return;
@@ -292,6 +344,32 @@ export default function GalleryPageClient() {
           z-index: 20; transition: all 0.2s ease;
           background: rgba(0,0,0,0.35);
         }
+        .gl-group-badge {
+          position: absolute; bottom: 8px; right: 8px;
+          min-width: 22px; height: 20px; padding: 0 6px;
+          background: rgba(0,0,0,0.7); border: 1px solid #FF4D00;
+          color: #FF4D00; font-family: 'Space Mono', monospace;
+          font-size: 10px; font-weight: 700;
+          display: flex; align-items: center; justify-content: center;
+          z-index: 20; cursor: pointer; transition: all 0.15s ease;
+        }
+        .gl-group-badge:hover { background: #FF4D00; color: #000; }
+
+        .gl-similarity-toggle {
+          display: flex; align-items: center; gap: 6px;
+          font-size: 12px; font-weight: 700; background: none; border: none;
+          cursor: pointer; white-space: nowrap; font-family: inherit; padding: 8px 10px;
+        }
+        .gl-similarity-checkbox {
+          width: 14px; height: 14px; flex-shrink: 0;
+          border: 1.5px solid rgba(255,255,255,0.35);
+          display: flex; align-items: center; justify-content: center;
+          transition: all 0.15s ease;
+        }
+        .gl-similarity-toggle.gl-similarity-on .gl-similarity-checkbox {
+          background: #FF4D00; border-color: #FF4D00;
+        }
+
         .gl-filter-tab {
           position: relative; padding: 8px 14px;
           font-size: 12px; font-weight: 700; color: var(--subtle-foreground);
@@ -476,6 +554,27 @@ export default function GalleryPageClient() {
                     );
                   })}
                 </div>
+
+                {showSimilarityToggle && (
+                  <>
+                    <div className="gl-filter-divider" style={{ width: 1, height: 16, background: "#222", margin: "0 8px", flexShrink: 0 }} />
+                    <button
+                      type="button"
+                      onClick={() => setSimilarityToggleOn((v) => !v)}
+                      className={`gl-similarity-toggle${similarityToggleOn ? " gl-similarity-on" : ""}`}
+                      style={{ color: similarityToggleOn ? "#FF4D00" : "#555" }}
+                    >
+                      <span className="gl-similarity-checkbox">
+                        {similarityToggleOn && (
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </span>
+                      유사컷 대표이미지 적용
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* Right: colors + reset + sort */}
@@ -535,11 +634,15 @@ export default function GalleryPageClient() {
         {/* ── Gallery Grid ── */}
         <main className="gl-grid-main" style={{ position: "relative", zIndex: 10, maxWidth: 1800, margin: "0 auto", padding: "0 24px" }}>
           <div className="gl-photo-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 12 }}>
-            {filteredPhotos.map((photo, gridIndex) => {
+            {displayPhotos.map((photo, gridIndex) => {
               const selected  = selectedIds.has(photo.id);
               const state     = photoStates[photo.id];
               const rating    = state?.rating;
               const colorTags = state?.color ?? [];
+              const group     = photo.similarityGroupId ? groupsById.get(photo.similarityGroupId) : undefined;
+              const isRepresentative = !!group && group.representativePhotoId === photo.id;
+              const restCount = group ? group.photoCount - 1 : 0;
+              const showGroupBadge = similarityToggleOn && isRepresentative && restCount > 0;
 
               return (
                 <Link
@@ -574,6 +677,17 @@ export default function GalleryPageClient() {
                       </svg>
                     )}
                   </button>
+
+                  {showGroupBadge && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleGroupBadgeClick(e, group!.id)}
+                      aria-label={`유사컷 ${restCount}장 ${expandedGroups.has(group!.id) ? "접기" : "펼치기"}`}
+                      className="gl-group-badge"
+                    >
+                      {expandedGroups.has(group!.id) ? "−" : `+${restCount}`}
+                    </button>
+                  )}
 
                   <div className="gl-card-overlay">
                     <div className="gl-card-overlay-content">
@@ -627,7 +741,7 @@ export default function GalleryPageClient() {
             })}
           </div>
 
-          {filteredPhotos.length === 0 && (
+          {displayPhotos.length === 0 && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0", gap: 12 }}>
               <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "var(--border-strong)", letterSpacing: "0.1em" }}>NO_RESULTS</p>
               <p style={{ fontSize: 12, color: "var(--subtle-foreground)" }}>필터 조건에 맞는 사진이 없습니다</p>
