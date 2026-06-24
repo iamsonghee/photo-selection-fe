@@ -66,7 +66,7 @@ async function confirmProjectApi(token: string, projectId: string) {
     throw new Error(data.error ?? "Failed");
   }
 }
-import type { StarRating, ColorTag } from "@/types";
+import type { StarRating, ColorTag, PhotoGroupInfo } from "@/types";
 import { serializeColorTags } from "@/types";
 
 export type PhotoState = {
@@ -78,6 +78,7 @@ export type PhotoState = {
 type SelectionContextValue = {
   project: import("@/types").Project | null;
   photos: import("@/types").Photo[];
+  photoGroups: PhotoGroupInfo[];
   selectedIds: Set<string>;
   photoStates: Record<string, PhotoState>;
   Y: number;
@@ -109,6 +110,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
 
   const [project, setProject] = useState<import("@/types").Project | null>(null);
   const [photos, setPhotos] = useState<import("@/types").Photo[]>([]);
+  const [photoGroups, setPhotoGroups] = useState<PhotoGroupInfo[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [photoStates, setPhotoStates] = useState<Record<string, PhotoState>>({});
   const [loading, setLoading] = useState(true);
@@ -117,6 +119,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     if (!token) {
       setProject(null);
       setPhotos([]);
+      setPhotoGroups([]);
       setSelectedIds(new Set());
       setPhotoStates({});
       setLoading(false);
@@ -129,6 +132,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         setProject(data.project ?? null);
         setPhotos(data.photos ?? []);
+        setPhotoGroups(data.photoGroups ?? []);
         setSelectedIds(new Set(data.selectedIds ?? []));
         setPhotoStates(data.photoStates ?? {});
       })
@@ -203,6 +207,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     () => ({
       project,
       photos,
+      photoGroups,
       selectedIds,
       photoStates,
       Y,
@@ -217,6 +222,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     [
       project,
       photos,
+      photoGroups,
       selectedIds,
       photoStates,
       Y,

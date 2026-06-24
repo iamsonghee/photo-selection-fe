@@ -4,7 +4,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminClient } from "@/lib/supabase-admin";
-import type { Project, Photo, ProjectStatus } from "@/types";
+import type { Project, Photo, PhotoGroupInfo, ProjectStatus } from "@/types";
 import { parseColorTags } from "@/types";
 import type { PhotoState } from "@/contexts/SelectionContext";
 import type { Database } from "@/types/supabase";
@@ -38,6 +38,9 @@ function mapProjectRow(row: ProjectsRow): Project {
     maxRevisionCount: (r.max_revision_count ?? 0) as 0 | 1 | 2,
     revisionRound: r.revision_round ?? 0,
     reviewDeadline: r.review_deadline ?? null,
+    clipAnalysisStatus:
+      (row as { clip_analysis_status?: "processing" | "completed" | "failed" | null })
+        .clip_analysis_status ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -61,6 +64,7 @@ function mapPhotoRow(
       ? { star: photoStates[pid].rating as 1 | 2 | 3 | 4 | 5 | undefined, color: photoStates[pid].color }
       : undefined,
     comment: undefined,
+    similarityGroupId: (row as { similarity_group_id?: string | null }).similarity_group_id ?? null,
   };
 }
 
@@ -79,21 +83,31 @@ export async function getProjectByToken(
   return mapProjectRow(data as ProjectsRow);
 }
 
-/** 프로젝트의 사진 + selections (admin). */
+/** 프로젝트의 사진 + selections + AI 유사컷 그룹 (admin). */
 export async function getPhotosWithSelectionsAdmin(
   admin: SupabaseClient,
   projectId: string
-): Promise<{ photos: Photo[]; selectedIds: Set<string>; photoStates: Record<string, PhotoState> }> {
-  const [photosRes, selectionsRes] = await Promise.all([
+): Promise<{
+  photos: Photo[];
+  selectedIds: Set<string>;
+  photoStates: Record<string, PhotoState>;
+  photoGroups: PhotoGroupInfo[];
+}> {
+  const [photosRes, selectionsRes, groupsRes] = await Promise.all([
     admin
       .from("photos")
       .select("*")
       .eq("project_id", projectId)
       .order("number", { ascending: true }),
     admin.from("selections").select("*").eq("project_id", projectId),
+    admin
+      .from("photo_groups")
+      .select("id, representative_photo_id, photo_count")
+      .eq("project_id", projectId),
   ]);
   if (photosRes.error) throw new Error(photosRes.error.message);
   if (selectionsRes.error) throw new Error(selectionsRes.error.message);
+  if (groupsRes.error) throw new Error(groupsRes.error.message);
 
   const rows = (photosRes.data ?? []) as PhotosRow[];
   const selections = (selectionsRes.data ?? []) as SelectionsRow[];
@@ -108,7 +122,17 @@ export async function getPhotosWithSelectionsAdmin(
     };
   }
   const photos = rows.map((row) => mapPhotoRow(row, selectedIds, photoStates));
-  return { photos, selectedIds, photoStates };
+  const groupRows = (groupsRes.data ?? []) as {
+    id: string;
+    representative_photo_id: string;
+    photo_count: number;
+  }[];
+  const photoGroups: PhotoGroupInfo[] = groupRows.map((g) => ({
+    id: g.id,
+    representativePhotoId: g.representative_photo_id,
+    photoCount: g.photo_count,
+  }));
+  return { photos, selectedIds, photoStates, photoGroups };
 }
 
 export async function upsertSelectionAdmin(

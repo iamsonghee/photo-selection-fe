@@ -8,6 +8,7 @@ import {
   getProjectByToken as getProjectByTokenMock,
   getPhotosByProject,
 } from "@/lib/mock-data";
+import type { PhotoGroupInfo } from "@/types";
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
@@ -20,12 +21,14 @@ export async function GET(req: NextRequest) {
     let photos: Awaited<ReturnType<typeof getPhotosWithSelectionsAdmin>>["photos"];
     let selectedIds: Set<string>;
     let photoStates: Record<string, { rating?: number; color?: import("@/types").ColorTag[]; comment?: string }>;
+    let photoGroups: PhotoGroupInfo[];
 
     if (project) {
       const result = await getPhotosWithSelectionsAdmin(admin, project.id);
       photos = result.photos;
       selectedIds = result.selectedIds;
       photoStates = result.photoStates;
+      photoGroups = result.photoGroups;
     } else {
       // 목업: DB에 없으면 mock 데이터 사용 (보정본 검토 등)
       const mockProject = getProjectByTokenMock(token);
@@ -39,6 +42,7 @@ export async function GET(req: NextRequest) {
         allPhotos.filter((p) => p.selected).map((p) => p.id)
       );
       photoStates = {};
+      photoGroups = [];
     }
 
     return NextResponse.json({
@@ -46,6 +50,7 @@ export async function GET(req: NextRequest) {
       photos,
       selectedIds: Array.from(selectedIds),
       photoStates,
+      photoGroups,
     });
   } catch (e) {
     console.error("[api/c/photos]", e);

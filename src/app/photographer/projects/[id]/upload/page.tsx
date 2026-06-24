@@ -32,7 +32,7 @@ import { getStatusLabel } from "@/lib/project-status";
 import { createClient } from "@/lib/supabase/client";
 import { parseBetaLimitError } from "@/lib/beta-limits";
 import { compressImageForUpload } from "@/lib/upload-client-compress";
-import type { Project, ProjectStatus, Photo } from "@/types";
+import type { Project, ProjectStatus, Photo, PhotoGroupInfo } from "@/types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
 
@@ -198,6 +198,8 @@ function PhotoThumb({
   isEditMode,
   scrollRootRef,
   onPhotoClick,
+  groupBadge,
+  onGroupBadgeClick,
 }: {
   photo: Photo;
   index: number;
@@ -207,6 +209,9 @@ function PhotoThumb({
   /** DATABANK 스크롤 박스 — 없으면 즉시 로드 */
   scrollRootRef?: React.RefObject<HTMLElement | null>;
   onPhotoClick?: (index: number) => void;
+  /** AI 유사컷 대표컷 배지 — 토글 ON이고 이 사진이 대표컷이며 그룹원이 더 있을 때만 전달됨 */
+  groupBadge?: { groupId: string; restCount: number; isExpanded: boolean };
+  onGroupBadgeClick?: (e: React.MouseEvent, groupId: string) => void;
 }) {
   const [loaded, setLoaded] = useState(false);
   // blob URL(isPending)은 레이지 로드 불필요 — 로컬 메모리에 있어 즉시 로드
@@ -341,6 +346,16 @@ function PhotoThumb({
             {deleting ? <Loader2 size={9} style={{ animation: "spin 1s linear infinite" }} /> : <X size={11} strokeWidth={2.5} color="#fff" />}
           </button>
         )}
+        {groupBadge && (
+          <button
+            type="button"
+            className="prj-group-badge"
+            onClick={(e) => onGroupBadgeClick?.(e, groupBadge.groupId)}
+            aria-label={`유사컷 ${groupBadge.restCount}장 ${groupBadge.isExpanded ? "접기" : "펼치기"}`}
+          >
+            {groupBadge.isExpanded ? "−" : `+${groupBadge.restCount}`}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -466,6 +481,10 @@ function VirtualizedPhotoGrid({
   minCols = 1,
   onPhotoClick,
   leadingUploadCell,
+  groupsById,
+  similarityToggleOn,
+  expandedGroups,
+  onGroupBadgeClick,
 }: {
   scrollRef: React.RefObject<HTMLDivElement | null>;
   photos: Photo[];
@@ -476,6 +495,11 @@ function VirtualizedPhotoGrid({
   onPhotoClick?: (index: number) => void;
   /** 모바일 전용: 그리드 첫 셀(인덱스 0) 자리에 노출되는 업로드 CTA */
   leadingUploadCell?: React.ReactNode;
+  /** AI 유사컷 그룹 정보 — 대표컷 배지 표시용 */
+  groupsById?: Map<string, PhotoGroupInfo>;
+  similarityToggleOn?: boolean;
+  expandedGroups?: Set<string>;
+  onGroupBadgeClick?: (e: React.MouseEvent, groupId: string) => void;
 }) {
   const [layout, setLayout] = useState(() => {
     const cw = GRID_MIN_CELL;
@@ -544,6 +568,13 @@ function VirtualizedPhotoGrid({
             const photoIndex = hasUploadCell ? cellIndex - 1 : cellIndex;
             const photo = photos[photoIndex];
             if (!photo) continue;
+            const group = photo.similarityGroupId ? groupsById?.get(photo.similarityGroupId) : undefined;
+            const isRepresentative = !!group && group.representativePhotoId === photo.id;
+            const restCount = group ? group.photoCount - 1 : 0;
+            const groupBadge =
+              similarityToggleOn && isRepresentative && restCount > 0
+                ? { groupId: group!.id, restCount, isExpanded: !!expandedGroups?.has(group!.id) }
+                : undefined;
             cells.push(
               <PhotoThumb
                 key={photo.id}
@@ -554,6 +585,8 @@ function VirtualizedPhotoGrid({
                 isEditMode={isEditMode}
                 scrollRootRef={scrollRef}
                 onPhotoClick={onPhotoClick}
+                groupBadge={groupBadge}
+                onGroupBadgeClick={onGroupBadgeClick}
               />,
             );
           }
@@ -632,6 +665,10 @@ function VirtualizedPhotoList({
   deletingId,
   isEditMode,
   onPhotoClick,
+  groupsById,
+  similarityToggleOn,
+  expandedGroups,
+  onGroupBadgeClick,
 }: {
   scrollRef: React.RefObject<HTMLDivElement | null>;
   photos: Photo[];
@@ -639,6 +676,10 @@ function VirtualizedPhotoList({
   deletingId: string | null;
   isEditMode: boolean;
   onPhotoClick?: (index: number) => void;
+  groupsById?: Map<string, PhotoGroupInfo>;
+  similarityToggleOn?: boolean;
+  expandedGroups?: Set<string>;
+  onGroupBadgeClick?: (e: React.MouseEvent, groupId: string) => void;
 }) {
   const listVirtualizer = useVirtualizer({
     count: photos.length,
@@ -654,6 +695,11 @@ function VirtualizedPhotoList({
           const photo = photos[v.index];
           const i = v.index;
           const deleting = deletingId === photo.id;
+          const group = photo.similarityGroupId ? groupsById?.get(photo.similarityGroupId) : undefined;
+          const isRepresentative = !!group && group.representativePhotoId === photo.id;
+          const restCount = group ? group.photoCount - 1 : 0;
+          const showGroupBadge = similarityToggleOn && isRepresentative && restCount > 0;
+          const isExpanded = !!group && !!expandedGroups?.has(group.id);
           return (
             <div
               key={photo.id}
@@ -702,6 +748,16 @@ function VirtualizedPhotoList({
                 <span style={{ fontSize: 13, color: TEXT_BRIGHT, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Pretendard Variable', sans-serif" }}>
                   {photo.originalFilename ?? `FRAME_${String(i + 1).padStart(4, "0")}`}
                 </span>
+                {showGroupBadge && group && (
+                  <button
+                    type="button"
+                    className="prj-group-badge-inline"
+                    onClick={(e) => onGroupBadgeClick?.(e, group.id)}
+                    aria-label={`유사컷 ${restCount}장 ${isExpanded ? "접기" : "펼치기"}`}
+                  >
+                    {isExpanded ? "−" : `+${restCount}`}
+                  </button>
+                )}
                 {photo.fileSize && (
                   <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, flexShrink: 0 }}>
                     {(photo.fileSize / 1024).toFixed(0)}KB
@@ -772,6 +828,9 @@ export default function ProjectDetailPage() {
 
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [photosLoading, setPhotosLoading] = useState(true);
+  const [photoGroups, setPhotoGroups] = useState<PhotoGroupInfo[]>([]);
+  const [similarityToggleOn, setSimilarityToggleOn] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isMobile, setIsMobile] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -826,7 +885,80 @@ export default function ProjectDetailPage() {
     finally { setPhotosLoading(false); }
   }, [id]);
 
-  useEffect(() => { loadProject().then((p) => { if (p) loadPhotos(); }); }, [id, loadProject, loadPhotos]);
+  const loadPhotoGroups = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/photographer/projects/${id}/photo-groups`);
+      if (res.ok) setPhotoGroups((await res.json()).photoGroups ?? []);
+    } catch {}
+  }, [id]);
+
+  useEffect(() => {
+    loadProject().then((p) => { if (p) { loadPhotos(); loadPhotoGroups(); } });
+  }, [id, loadProject, loadPhotos, loadPhotoGroups]);
+
+  /** 기존 photos + 배치 완료(pending) + 전송 중(uploading) 합산 — early return 이전에 선언해야 Rules of Hooks 준수 */
+  const displayPhotos = useMemo(() => {
+    const confirmedNames = new Set(photos.map((p) => p.originalFilename));
+    const pendingAsPhotos: Photo[] = pendingPhotos
+      .filter((p) => !confirmedNames.has(p.filename))
+      .map((p) => ({ id: p.tempId, projectId: id, orderIndex: 99999, url: p.blobUrl, originalFilename: p.filename, isPending: true, isUploading: false }));
+    const uploadingAsPhotos: Photo[] = uploadingPhotos
+      .filter((p) => !confirmedNames.has(p.filename))
+      .map((p) => ({ id: p.tempId, projectId: id, orderIndex: 99999, url: p.blobUrl, originalFilename: p.filename, isPending: true, isUploading: true }));
+    if (pendingAsPhotos.length === 0 && uploadingAsPhotos.length === 0) return photos;
+    return [...uploadingAsPhotos, ...pendingAsPhotos, ...photos];
+  }, [photos, pendingPhotos, uploadingPhotos, id]);
+
+  /** ── AI 유사컷 그룹 — 대표이미지 토글. 키보드 네비/라이트박스보다 먼저 선언해야
+   *  groupedDisplayPhotos를 그 효과들에서 참조할 수 있다 (선언 순서 = 평가 순서). ── */
+  const groupsById = useMemo(() => {
+    const map = new Map<string, PhotoGroupInfo>();
+    for (const g of photoGroups) map.set(g.id, g);
+    return map;
+  }, [photoGroups]);
+
+  const membersByGroup = useMemo(() => {
+    const map = new Map<string, Photo[]>();
+    for (const p of photos) {
+      if (!p.similarityGroupId) continue;
+      const arr = map.get(p.similarityGroupId) ?? [];
+      arr.push(p);
+      map.set(p.similarityGroupId, arr);
+    }
+    return map;
+  }, [photos]);
+
+  const showSimilarityToggle = project?.clipAnalysisStatus === "completed" && photoGroups.length > 0;
+
+  const handleGroupBadgeClick = useCallback((e: React.MouseEvent, groupId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }, []);
+
+  /** 토글 OFF면 displayPhotos 그대로, ON이면 대표컷+미분류만 (펼친 그룹은 대표컷 뒤에 나머지 인라인) */
+  const groupedDisplayPhotos = useMemo(() => {
+    if (!similarityToggleOn) return displayPhotos;
+    const result: Photo[] = [];
+    for (const photo of displayPhotos) {
+      const groupId = photo.similarityGroupId;
+      if (!groupId) { result.push(photo); continue; }
+      const group = groupsById.get(groupId);
+      if (!group) { result.push(photo); continue; }
+      if (photo.id !== group.representativePhotoId) continue;
+      result.push(photo);
+      if (expandedGroups.has(groupId)) {
+        const members = membersByGroup.get(groupId) ?? [];
+        result.push(...members.filter((p) => p.id !== group.representativePhotoId));
+      }
+    }
+    return result;
+  }, [displayPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup]);
 
   useEffect(() => {
     if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); }
@@ -842,11 +974,19 @@ export default function ProjectDetailPage() {
         const data = (await res.json()) as { clip_analysis_status?: "processing" | "completed" | "failed" | null };
         if (data.clip_analysis_status && data.clip_analysis_status !== "processing") {
           setClipAnalysisStatus(data.clip_analysis_status);
+          // 체크박스가 보는 project.clipAnalysisStatus / photoGroups는 마운트 시 1회만 로드되므로,
+          // 완료 시점에 다시 불러와야 새로고침 없이 체크박스가 나타난다. 또한 분석 완료 시
+          // 토글을 자동으로 켜서 대표컷 묶음 표시가 즉시 보이도록 한다 (수동 클릭 불필요).
+          if (data.clip_analysis_status === "completed") {
+            loadProject();
+            loadPhotoGroups();
+            setSimilarityToggleOn(true);
+          }
         }
       } catch {}
     }, 4000);
     return () => clearInterval(t);
-  }, [clipAnalysisStatus, id]);
+  }, [clipAnalysisStatus, id, loadProject, loadPhotoGroups]);
 
 
   useEffect(() => {
@@ -877,12 +1017,12 @@ export default function ProjectDetailPage() {
     if (lightboxIndex === null) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") setLightboxIndex(null);
-      if (e.key === "ArrowLeft") setLightboxIndex((i) => (i! > 0 ? i! - 1 : photos.length - 1));
-      if (e.key === "ArrowRight") setLightboxIndex((i) => (i! < photos.length - 1 ? i! + 1 : 0));
+      if (e.key === "ArrowLeft") setLightboxIndex((i) => (i! > 0 ? i! - 1 : groupedDisplayPhotos.length - 1));
+      if (e.key === "ArrowRight") setLightboxIndex((i) => (i! < groupedDisplayPhotos.length - 1 ? i! + 1 : 0));
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [lightboxIndex, photos.length]);
+  }, [lightboxIndex, groupedDisplayPhotos.length]);
 
   useEffect(() => {
     const uploading = uploadPhase === "sending" || uploadPhase === "processing";
@@ -1295,19 +1435,6 @@ export default function ProjectDetailPage() {
     }
   };
 
-  /** 기존 photos + 배치 완료(pending) + 전송 중(uploading) 합산 — early return 이전에 선언해야 Rules of Hooks 준수 */
-  const displayPhotos = useMemo(() => {
-    const confirmedNames = new Set(photos.map((p) => p.originalFilename));
-    const pendingAsPhotos: Photo[] = pendingPhotos
-      .filter((p) => !confirmedNames.has(p.filename))
-      .map((p) => ({ id: p.tempId, projectId: id, orderIndex: 99999, url: p.blobUrl, originalFilename: p.filename, isPending: true, isUploading: false }));
-    const uploadingAsPhotos: Photo[] = uploadingPhotos
-      .filter((p) => !confirmedNames.has(p.filename))
-      .map((p) => ({ id: p.tempId, projectId: id, orderIndex: 99999, url: p.blobUrl, originalFilename: p.filename, isPending: true, isUploading: true }));
-    if (pendingAsPhotos.length === 0 && uploadingAsPhotos.length === 0) return photos;
-    return [...uploadingAsPhotos, ...pendingAsPhotos, ...photos];
-  }, [photos, pendingPhotos, uploadingPhotos, id]);
-
   if (loading) return <PageLoader variant="full" />;
   if (!project) return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", background: SURFACE_0 }}><span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, letterSpacing: "0.15em" }}>PROJECT_NOT_FOUND</span></div>;
 
@@ -1364,6 +1491,39 @@ export default function ProjectDetailPage() {
         .prj-del-btn { opacity: 0; transition: opacity 0.15s; }
         .prj-data-cell:hover .prj-del-btn { opacity: 1; }
         @media (max-width: 768px) { .prj-del-btn { opacity: 1; } }
+        .prj-group-badge {
+          position: absolute; bottom: 4px; right: 4px;
+          min-width: 20px; height: 18px; padding: 0 5px;
+          background: rgba(0,0,0,0.75); border: 1px solid ${ACCENT};
+          color: ${ACCENT}; font-family: ${MONO};
+          font-size: 9px; font-weight: 700;
+          display: flex; align-items: center; justify-content: center;
+          z-index: 10; cursor: pointer; transition: all 0.15s ease;
+        }
+        .prj-group-badge:hover { background: ${ACCENT}; color: #000; }
+        .prj-group-badge-inline {
+          flex-shrink: 0; min-width: 20px; height: 18px; padding: 0 5px;
+          background: transparent; border: 1px solid ${ACCENT};
+          color: ${ACCENT}; font-family: ${MONO};
+          font-size: 9px; font-weight: 700;
+          display: flex; align-items: center; justify-content: center;
+          cursor: pointer; transition: all 0.15s ease;
+        }
+        .prj-group-badge-inline:hover { background: ${ACCENT}; color: #000; }
+        .prj-similarity-toggle {
+          display: flex; align-items: center; gap: 6px;
+          font-size: 11px; font-weight: 500; background: none; border: none;
+          cursor: pointer; white-space: nowrap; font-family: ${MONO}; padding: 4px 6px;
+        }
+        .prj-similarity-checkbox {
+          width: 13px; height: 13px; flex-shrink: 0;
+          border: 1.5px solid rgba(255,255,255,0.3);
+          display: flex; align-items: center; justify-content: center;
+          transition: all 0.15s ease;
+        }
+        .prj-similarity-toggle.prj-similarity-on .prj-similarity-checkbox {
+          background: ${ACCENT}; border-color: ${ACCENT};
+        }
         .prj-op-node { transition: all 0.2s; cursor: pointer; }
         .prj-op-node:hover { border-color: rgba(255,77,0,0.4) !important; background: rgba(255,77,0,0.04) !important; }
         .prj-op-node:hover .prj-op-arrow { color: ${ACCENT} !important; }
@@ -1475,6 +1635,23 @@ export default function ProjectDetailPage() {
                     <Trash2 size={11} />전체삭제
                   </button>
                 )}
+                {showSimilarityToggle && (
+                  <button
+                    type="button"
+                    onClick={() => setSimilarityToggleOn((v) => !v)}
+                    className={`prj-similarity-toggle${similarityToggleOn ? " prj-similarity-on" : ""}`}
+                    style={{ color: similarityToggleOn ? ACCENT : TEXT_MUTED }}
+                  >
+                    <span className="prj-similarity-checkbox">
+                      {similarityToggleOn && (
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </span>
+                    유사컷 대표이미지 적용
+                  </button>
+                )}
               </div>
               <div style={{ display: "flex", background: SURFACE_2, border: `1px solid ${BORDER}`, padding: 2, gap: 1 }}>
                 {([["grid", <LayoutGrid key="g" size={13} />, "갤러리"] as const, ["list", <List key="l" size={13} />, "파일명"] as const]).map(([mode, icon, label]) => (
@@ -1529,6 +1706,23 @@ export default function ProjectDetailPage() {
                   전체삭제
                 </button>
               )}
+              {showSimilarityToggle && (
+                <button
+                  type="button"
+                  onClick={() => setSimilarityToggleOn((v) => !v)}
+                  className={`prj-similarity-toggle${similarityToggleOn ? " prj-similarity-on" : ""}`}
+                  style={{ color: similarityToggleOn ? ACCENT : TEXT_MUTED }}
+                >
+                  <span className="prj-similarity-checkbox">
+                    {similarityToggleOn && (
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </span>
+                  유사컷 적용
+                </button>
+              )}
             </div>
           )}
 
@@ -1577,12 +1771,16 @@ export default function ProjectDetailPage() {
             ) : viewMode === "grid" || (displayPhotos.length === 0 && uploadAllowed) ? (
               <VirtualizedPhotoGrid
                 scrollRef={photoScrollRef}
-                photos={displayPhotos}
+                photos={groupedDisplayPhotos}
                 onDelete={handleDeletePhoto}
                 deletingId={deletingId}
                 isEditMode={project.status === "preparing"}
                 minCols={isMobile ? 3 : 1}
                 onPhotoClick={setLightboxIndex}
+                groupsById={groupsById}
+                similarityToggleOn={similarityToggleOn}
+                expandedGroups={expandedGroups}
+                onGroupBadgeClick={handleGroupBadgeClick}
                 leadingUploadCell={
                   uploadAllowed ? (
                     <UploadTile
@@ -1599,11 +1797,15 @@ export default function ProjectDetailPage() {
             ) : (
               <VirtualizedPhotoList
                 scrollRef={photoScrollRef}
-                photos={displayPhotos}
+                photos={groupedDisplayPhotos}
                 onDelete={handleDeletePhoto}
                 deletingId={deletingId}
                 isEditMode={project.status === "preparing"}
                 onPhotoClick={setLightboxIndex}
+                groupsById={groupsById}
+                similarityToggleOn={similarityToggleOn}
+                expandedGroups={expandedGroups}
+                onGroupBadgeClick={handleGroupBadgeClick}
               />
             )}
           </div>
@@ -1755,7 +1957,7 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* ── 라이트박스 (body 포털: main z-10 < 사이드바 z-20 스택 때문에, 고정 오버레이가 사이드바에 가려지지 않게) ── */}
-      {lightboxIndex !== null && photos[lightboxIndex] && typeof document !== "undefined" && document.body
+      {lightboxIndex !== null && groupedDisplayPhotos[lightboxIndex] && typeof document !== "undefined" && document.body
         ? createPortal(
             <div
               role="presentation"
@@ -1808,7 +2010,7 @@ export default function ProjectDetailPage() {
                   color: "rgba(255,255,255,0.45)",
                 }}
               >
-                {lightboxIndex + 1} / {photos.length}
+                {lightboxIndex + 1} / {groupedDisplayPhotos.length}
               </div>
               <PrevNextButton
                 direction="prev"
@@ -1817,7 +2019,7 @@ export default function ProjectDetailPage() {
                 style={{ zIndex: 2 }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setLightboxIndex((i) => (i! > 0 ? i! - 1 : photos.length - 1));
+                  setLightboxIndex((i) => (i! > 0 ? i! - 1 : groupedDisplayPhotos.length - 1));
                 }}
               />
               {/* 이미지 */}
@@ -1826,14 +2028,14 @@ export default function ProjectDetailPage() {
                 style={{ display: "flex", flexDirection: "column", alignItems: "center", maxWidth: "90vw", zIndex: 1 }}
               >
                 <img
-                  key={photos[lightboxIndex].id}
-                  src={photos[lightboxIndex].previewUrl ?? photos[lightboxIndex].url}
-                  alt={photos[lightboxIndex].originalFilename ?? ""}
+                  key={groupedDisplayPhotos[lightboxIndex].id}
+                  src={groupedDisplayPhotos[lightboxIndex].previewUrl ?? groupedDisplayPhotos[lightboxIndex].url}
+                  alt={groupedDisplayPhotos[lightboxIndex].originalFilename ?? ""}
                   style={{ maxHeight: "80vh", maxWidth: "90vw", objectFit: "contain", borderRadius: 6, display: "block" }}
                 />
-                {photos[lightboxIndex].originalFilename && (
+                {groupedDisplayPhotos[lightboxIndex].originalFilename && (
                   <div style={{ marginTop: 12, fontFamily: MONO, fontSize: 11, color: "rgba(255,255,255,0.45)" }}>
-                    {photos[lightboxIndex].originalFilename}
+                    {groupedDisplayPhotos[lightboxIndex].originalFilename}
                   </div>
                 )}
               </div>
@@ -1844,7 +2046,7 @@ export default function ProjectDetailPage() {
                 style={{ zIndex: 2 }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setLightboxIndex((i) => (i! < photos.length - 1 ? i! + 1 : 0));
+                  setLightboxIndex((i) => (i! < groupedDisplayPhotos.length - 1 ? i! + 1 : 0));
                 }}
               />
             </div>,
