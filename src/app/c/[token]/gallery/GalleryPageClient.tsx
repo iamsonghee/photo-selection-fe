@@ -16,6 +16,7 @@ import {
   galleryThumbPriorityProps,
   getFilteredPhotos,
   getPhotoDisplayName,
+  usePriorityImagePreload,
 } from "@/lib/gallery-filter";
 import type { GalleryFilterState } from "@/lib/gallery-filter";
 import type { StarRating, ColorTag, SortOrder } from "@/types";
@@ -194,26 +195,8 @@ export default function GalleryPageClient() {
   }, [displayPhotos, galleryThumbFocusId]);
 
   /* ── Priority preload on focus ── */
-  useEffect(() => {
-    if (galleryFocusIndex == null || displayPhotos.length === 0) return;
-    const anchor  = galleryFocusIndex;
-    const ordered: string[] = [];
-    const push = (i: number) => { const u = displayPhotos[i]?.url; if (u) ordered.push(u); };
-    push(anchor);
-    for (let d = 1; d < displayPhotos.length; d++) {
-      if (anchor - d >= 0) push(anchor - d);
-      if (anchor + d < displayPhotos.length) push(anchor + d);
-    }
-    const seen = new Set<string>();
-    ordered.forEach((url, i) => {
-      if (seen.has(url)) return;
-      seen.add(url);
-      const img = document.createElement("img");
-      img.decoding      = "async";
-      img.fetchPriority = i < 24 ? "high" : "low";
-      img.src = url;
-    });
-  }, [galleryFocusIndex, displayPhotos]);
+  const displayPhotoUrls = useMemo(() => displayPhotos.map((p) => p.url), [displayPhotos]);
+  usePriorityImagePreload(displayPhotoUrls, galleryFocusIndex);
 
   const viewerQueryString = useMemo(() => buildFilterQueryString(filterState), [filterState]);
 

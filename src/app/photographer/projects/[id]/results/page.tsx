@@ -24,7 +24,7 @@ import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHead
 import { ProjectActionFlow } from "@/components/photographer/ProjectActionFlow";
 import { buildCompactSteps } from "@/lib/project-flow-steps";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
-import { galleryThumbPriorityProps } from "@/lib/gallery-filter";
+import { galleryThumbPriorityProps, usePriorityImagePreload } from "@/lib/gallery-filter";
 
 /** 업로드 페이지(`upload/page.tsx`)와 동일 토큰 — 상단·좌측 레이아웃 정렬 */
 const ACCENT = "#FF5A1F";
@@ -127,29 +127,8 @@ export default function ResultsPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  useEffect(() => {
-    if (galleryThumbFocusIndex == null || photos.length === 0) return;
-    const anchor = galleryThumbFocusIndex;
-    const ordered: string[] = [];
-    const push = (i: number) => {
-      const u = photos[i]?.url;
-      if (u) ordered.push(u);
-    };
-    push(anchor);
-    for (let d = 1; d < photos.length; d++) {
-      if (anchor - d >= 0) push(anchor - d);
-      if (anchor + d < photos.length) push(anchor + d);
-    }
-    const seen = new Set<string>();
-    ordered.forEach((url, i) => {
-      if (seen.has(url)) return;
-      seen.add(url);
-      const img = document.createElement("img");
-      img.decoding = "async";
-      img.fetchPriority = i < 24 ? "high" : "low";
-      img.src = url;
-    });
-  }, [galleryThumbFocusIndex, photos]);
+  const photoUrls = useMemo(() => photos.map((p) => p.url), [photos]);
+  usePriorityImagePreload(photoUrls, galleryThumbFocusIndex);
 
   const confirmedText = useMemo(() => {
     if (!project?.confirmedAt) return null;

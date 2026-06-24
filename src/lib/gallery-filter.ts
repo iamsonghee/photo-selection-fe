@@ -1,6 +1,7 @@
 /**
  * 갤러리 필터 상태를 URL 쿼리와 동기화하고, photos 필터/정렬에 공통 사용.
  */
+import { useEffect, useRef } from "react";
 import type { Photo } from "@/types";
 import type { StarRating, ColorTag, SortOrder } from "@/types";
 
@@ -84,6 +85,41 @@ export function galleryThumbPriorityProps(
     };
   }
   return { loading: "lazy", fetchPriority: "low" };
+}
+
+/**
+ * 포커스 주변 사진을 우선순위로 미리 로드. 이미 프리로드한 URL은 컴포넌트가 살아있는 동안
+ * (effect 재실행 여부와 무관하게) 다시 요청하지 않는다 — 목록 배열이 새 레퍼런스로 바뀌어도
+ * (필터/그룹 펼침 등) 이미 로드된 사진까지 매번 다시 프리로드하는 트래픽 낭비를 막기 위함.
+ */
+export function usePriorityImagePreload(
+  urls: (string | null | undefined)[],
+  focusIndex: number | null
+) {
+  const preloadedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (focusIndex == null || urls.length === 0) return;
+    const ordered: string[] = [];
+    const push = (i: number) => {
+      const u = urls[i];
+      if (u) ordered.push(u);
+    };
+    push(focusIndex);
+    for (let d = 1; d < urls.length; d++) {
+      if (focusIndex - d >= 0) push(focusIndex - d);
+      if (focusIndex + d < urls.length) push(focusIndex + d);
+    }
+    const seen = preloadedRef.current;
+    ordered.forEach((url, i) => {
+      if (seen.has(url)) return;
+      seen.add(url);
+      const img = document.createElement("img");
+      img.decoding = "async";
+      img.fetchPriority = i < 24 ? "high" : "low";
+      img.src = url;
+    });
+  }, [focusIndex, urls]);
 }
 
 /**
