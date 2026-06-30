@@ -10,6 +10,7 @@ import {
   Camera,
   Bell,
   AlertTriangle,
+  LogOut,
   X,
 } from "lucide-react";
 import type { PhotographerProfile } from "@/app/api/photographer/profile/route";
@@ -178,6 +179,12 @@ export default function SettingsPage() {
     }
   };
 
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    window.location.href = "/";
+  };
+
   const handleDeleteAccount = async () => {
     setDeletingAccount(true);
     try {
@@ -302,6 +309,15 @@ export default function SettingsPage() {
           </div>
 
           <div className="w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-2">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-border-strong text-muted-foreground hover:border-accent hover:text-accent transition-colors"
+            >
+              <LogOut size={16} />
+              로그아웃
+            </button>
+            <div className="w-full h-px bg-border-subtle" />
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}

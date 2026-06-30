@@ -17,7 +17,11 @@ export function MobileHeader() {
         <span className="font-bold text-foreground text-lg tracking-tight">A-CUT.</span>
       </Link>
 
-      <div className="w-8 h-8 rounded-full bg-surface-raised overflow-hidden border border-border-strong flex items-center justify-center text-sm font-bold text-foreground shrink-0">
+      <Link
+        href="/photographer/settings"
+        aria-label="설정"
+        className="w-8 h-8 rounded-full bg-surface-raised overflow-hidden border border-border-strong flex items-center justify-center text-sm font-bold text-foreground shrink-0"
+      >
         {profile?.profileImageUrl ? (
           <img
             src={getProfileImageUrl(profile.profileImageUrl)}
@@ -28,7 +32,7 @@ export function MobileHeader() {
         ) : (
           displayName.charAt(0).toUpperCase()
         )}
-      </div>
+      </Link>
     </header>
   );
 }
