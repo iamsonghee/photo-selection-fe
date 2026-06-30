@@ -20,6 +20,7 @@ import {
   type MappingResult,
   type MappingType,
 } from "@/lib/version-mapping";
+import { applyClipMatches, matchRetouchByClip } from "@/lib/retouch-clip-match";
 import { BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
 import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
 import { compressImageForUpload } from "@/lib/upload-client-compress";
@@ -93,6 +94,7 @@ export default function UploadVersionsPanel({
   const [uploadedBytes, setUploadedBytes] = useState(0);
   const [totalBytes, setTotalBytes] = useState(0);
   const [serverProcessing, setServerProcessing] = useState(false);
+  const [clipMatching, setClipMatching] = useState(false);
 
   // submitting이 false가 되면 진행률 초기화
   useEffect(() => {
@@ -115,6 +117,7 @@ export default function UploadVersionsPanel({
       setUploadedBytes(0);
       setTotalBytes(0);
       setServerProcessing(false);
+      setClipMatching(false);
     }
   }, [isOpen]);
 
@@ -134,22 +137,53 @@ export default function UploadVersionsPanel({
     uploadedFilesRef.current = uploadedFiles;
   }, [uploadedFiles]);
 
+  const mappingRef = useRef<MappingResult<UploadPanelTarget>[]>([]);
+  useEffect(() => {
+    mappingRef.current = mapping;
+  }, [mapping]);
+
+  // exact/fuzzy 매칭에 실패한 잔여 항목(type "none")에 대해 CLIP 유사도 매칭을 시도.
+  // 실패해도 절대 throw하지 않으므로(matchRetouchByClip 내부에서 보장) 그대로 "none" 유지.
+  const runClipMatchPass = useCallback(
+    async (files: File[], rows: MappingResult<UploadPanelTarget>[]) => {
+      const claimed = new Set(rows.map((r) => r.file).filter((f): f is File => f != null));
+      const leftoverFiles = files.filter((f) => !claimed.has(f));
+      const leftoverPhotoIds = rows.filter((r) => r.type === "none").map((r) => r.target.id);
+      if (leftoverFiles.length === 0 || leftoverPhotoIds.length === 0) return;
+
+      setClipMatching(true);
+      try {
+        const matches = await matchRetouchByClip(projectId, leftoverPhotoIds, leftoverFiles, {
+          signal: AbortSignal.timeout(20000),
+        });
+        if (matches.length === 0) return;
+        setMapping((prev) => applyClipMatches(prev, leftoverFiles, matches));
+      } finally {
+        setClipMatching(false);
+      }
+    },
+    [projectId],
+  );
+
   useEffect(() => {
     if (!isOpen) return;
     if (targets.length === 0) {
       setMapping([]);
       return;
     }
-    setMapping((prev) => {
-      const sameStructure =
-        prev.length === targets.length &&
-        prev.every((m, i) => m.target.id === targets[i]?.id);
-      if (sameStructure) return prev;
-      const files = uploadedFilesRef.current;
-      if (files.length === 0) return buildServerPlaceholderMapping(targets);
-      return mergeServerPlaceholders(buildVersionMapping(files, targets));
-    });
-  }, [isOpen, targets]);
+    const prev = mappingRef.current;
+    const sameStructure =
+      prev.length === targets.length && prev.every((m, i) => m.target.id === targets[i]?.id);
+    if (sameStructure) return;
+    const files = uploadedFilesRef.current;
+    if (files.length === 0) {
+      setMapping(buildServerPlaceholderMapping(targets));
+      return;
+    }
+    const initial = mergeServerPlaceholders(buildVersionMapping(files, targets));
+    setMapping(initial);
+    void runClipMatchPass(files, initial);
+  }, [isOpen, targets, runClipMatchPass]);
 
   const localPreviewMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -174,15 +208,19 @@ export default function UploadVersionsPanel({
   const stats = useMemo(() => {
     let exact = 0;
     let fuzzy = 0;
+    let clip = 0;
+    let clipLow = 0;
     let order = 0;
     let server = 0;
     mapping.forEach((m) => {
       if (m.type === "exact") exact++;
       else if (m.type === "fuzzy") fuzzy++;
+      else if (m.type === "clip") clip++;
+      else if (m.type === "clip_low") clipLow++;
       else if (m.type === "order") order++;
       else if (m.type === "server") server++;
     });
-    return { exact, fuzzy, order, server };
+    return { exact, fuzzy, clip, clipLow, order, server };
   }, [mapping]);
 
   // BE(upload.py)와 동일: 이미 존재하는 단계(v1/v2)의 교체 업로드는 허용한다.
@@ -203,9 +241,11 @@ export default function UploadVersionsPanel({
       const filtered = files.filter(isAcceptedImageFile);
       if (targets.length === 0) return;
       setUploadedFiles(filtered);
-      setMapping(mergeServerPlaceholders(buildVersionMapping(filtered, targets)));
+      const initial = mergeServerPlaceholders(buildVersionMapping(filtered, targets));
+      setMapping(initial);
+      void runClipMatchPass(filtered, initial);
     },
-    [targets],
+    [targets, runClipMatchPass],
   );
 
   const handleClearFile = useCallback((targetId: string) => {
@@ -530,8 +570,18 @@ export default function UploadVersionsPanel({
                 </div>
                 <div className="flex items-center gap-1.5 mt-2.5 pl-1 text-[11px] text-subtle-foreground">
                   <Info size={12} strokeWidth={2} />
-                  <span>파일명(편집 suffix 제외) 일치 시 자동 매핑 · 불일치 시 순서대로 매핑</span>
+                  <span>파일명 일치 시 자동 매핑 · 불일치 시 AI 이미지 유사도로 매칭 · 그래도 안 되면 직접 선택</span>
                 </div>
+                {clipMatching && (
+                  <div className="flex items-center gap-1.5 mt-2 pl-1 text-[11px] text-accent">
+                    <span
+                      aria-hidden
+                      className="inline-block w-3 h-3 rounded-full border-2 border-accent/30 border-t-accent"
+                      style={{ animation: "uvp-spin 0.9s linear infinite" }}
+                    />
+                    AI 이미지 유사도 매칭 중…
+                  </div>
+                )}
               </div>
 
               {/* Mapping result */}
@@ -539,13 +589,23 @@ export default function UploadVersionsPanel({
                 <div>
                   <div className="flex items-end justify-between border-b border-border pb-2.5 mb-3.5 flex-wrap gap-3">
                     <h3 className="text-sm font-semibold text-foreground m-0">매핑 결과</h3>
-                    {(stats.exact > 0 || stats.order > 0 || stats.server > 0) && (
+                    {(stats.exact > 0 ||
+                      stats.clip > 0 ||
+                      stats.clipLow > 0 ||
+                      stats.order > 0 ||
+                      stats.server > 0) && (
                       <div className="flex items-center gap-3 text-[11px]">
                         {stats.exact > 0 && (
                           <StatChip dotColor="bg-emerald-500" textColor="text-emerald-400" label={`파일명 ${stats.exact}`} />
                         )}
                         {stats.fuzzy > 0 && (
                           <StatChip dotColor="bg-teal-500" textColor="text-teal-400" label={`유사 ${stats.fuzzy}`} />
+                        )}
+                        {stats.clip > 0 && (
+                          <StatChip dotColor="bg-emerald-500" textColor="text-emerald-400" label={`AI ${stats.clip}`} />
+                        )}
+                        {stats.clipLow > 0 && (
+                          <StatChip dotColor="bg-amber-500" textColor="text-amber-400" label={`AI 추정 ${stats.clipLow}`} />
                         )}
                         {stats.order > 0 && (
                           <StatChip dotColor="bg-amber-500" textColor="text-amber-400" label={`순서 ${stats.order}`} />
@@ -564,6 +624,7 @@ export default function UploadVersionsPanel({
                         target={m.target}
                         file={m.file}
                         type={m.type}
+                        similarity={m.similarity}
                         previewUrl={localPreviewMap.get(m.target.id)}
                         onChangeOne={handleChangeOne}
                         onClearFile={handleClearFile}
@@ -707,6 +768,7 @@ function PanelMappingRow({
   target,
   file,
   type,
+  similarity,
   previewUrl,
   onChangeOne,
   onClearFile,
@@ -714,6 +776,7 @@ function PanelMappingRow({
   target: UploadPanelTarget;
   file: File | null;
   type: MappingType;
+  similarity?: number;
   previewUrl?: string;
   onChangeOne: (id: string) => void;
   onClearFile: (id: string) => void;
@@ -722,21 +785,25 @@ function PanelMappingRow({
   const [v1Err, setV1Err] = useState(false);
   const [retouchErr, setRetouchErr] = useState(false);
   const state =
-    type === "exact" || type === "fuzzy"
+    type === "exact" || type === "fuzzy" || type === "clip"
       ? "matched"
-      : type === "order"
-        ? "ordered"
-        : type === "server"
-          ? "server"
-          : "empty";
+      : type === "clip_low"
+        ? "clip_low"
+        : type === "order"
+          ? "ordered"
+          : type === "server"
+            ? "server"
+            : "empty";
   const borderClass =
     state === "matched"
       ? "border-emerald-500/30"
-      : state === "ordered"
-        ? "border-amber-500/30"
-        : state === "server"
-          ? "border-sky-500/30"
-          : "border-rose-500/30";
+      : state === "clip_low"
+        ? "border-amber-400/40"
+        : state === "ordered"
+          ? "border-amber-500/30"
+          : state === "server"
+            ? "border-sky-500/30"
+            : "border-rose-500/30";
   const fileSizeStr = file && file.size > 0 ? formatStoredFileSizeBytes(file.size) : "";
   const origSrc = viewerImageUrl(target.photo);
 
@@ -875,9 +942,19 @@ function PanelMappingRow({
 
         {/* Actions */}
         <div className="flex items-center gap-1.5 shrink-0 pl-2">
-          {state === "matched" && (
+          {(type === "exact" || type === "fuzzy") && (
             <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold tracking-wide text-emerald-400 bg-emerald-500/10 border border-emerald-500/30">
               자동
+            </span>
+          )}
+          {type === "clip" && (
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold tracking-wide text-emerald-400 bg-emerald-500/10 border border-emerald-500/30">
+              AI
+            </span>
+          )}
+          {type === "clip_low" && (
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold tracking-wide text-amber-400 bg-amber-500/10 border border-amber-500/30">
+              AI {similarity != null ? `${Math.round(similarity * 100)}%` : ""}
             </span>
           )}
           {state === "ordered" && (

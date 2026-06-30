@@ -1,4 +1,4 @@
-export type MappingType = "exact" | "fuzzy" | "order" | "none" | "server";
+export type MappingType = "exact" | "fuzzy" | "clip" | "clip_low" | "order" | "none" | "server";
 
 export type MappingTarget = {
   id: string;
@@ -10,6 +10,8 @@ export type MappingResult<T extends MappingTarget> = {
   file: File | null;
   type: MappingType;
   orderIndex?: number;
+  /** CLIP 유사도 매칭 결과 (0~1). type이 "clip" | "clip_low"일 때만 설정됨 */
+  similarity?: number;
 };
 
 export function normalizeFilename(name: string): string {
@@ -32,10 +34,13 @@ export function stemFilename(normalized: string): string {
     .replace(/_angle\d+$/, "")
     // 공통: _retouched, _retouche, _retouch, _edited, _final, _comp, _web
     .replace(/[_-](retouched?|edited?|final|comp|web|export|out|lr|co|ps)$/, "")
+    // 한글 접미사: 보정, 편집, 수정, 완성, 최종, 납품, 리터칭
+    .replace(/[_-](보정|편집|수정|완성|최종|납품|리터칭)$/, "")
     // 공통: _v1, _v2, -v1, -v2, -1, -2, _1, _2 (숫자만)
     .replace(/[_-]v?\d+$/, "")
     // 연속 처리 (중첩 suffix 제거)
     .replace(/[_-](retouched?|edited?|final|comp|web|export|out|lr|co|ps)$/, "")
+    .replace(/[_-](보정|편집|수정|완성|최종|납품|리터칭)$/, "")
     .replace(/[_-]v?\d+$/, "")
     .trim();
 }
@@ -45,7 +50,7 @@ export function buildVersionMapping<T extends MappingTarget>(
   targets: T[]
 ): MappingResult<T>[] {
   const remaining = [...files];
-  return targets.map((target, index) => {
+  return targets.map((target) => {
     const targetNorm = normalizeFilename(target.filename);
     const targetStem = stemFilename(targetNorm);
 
@@ -66,9 +71,8 @@ export function buildVersionMapping<T extends MappingTarget>(
       return { target, file, type: "fuzzy" };
     }
 
-    // 3단계: 순서 기반 fallback
-    const order = files[index] ?? null;
-    if (order) return { target, file: order, type: "order", orderIndex: index + 1 };
+    // 3단계(CLIP 유사도 매칭)는 비동기라 여기선 처리할 수 없음 — 호출부에서
+    // type "none"인 행과 미점유 파일을 모아 matchRetouchByClip으로 넘긴다.
     return { target, file: null, type: "none" };
   });
 }
