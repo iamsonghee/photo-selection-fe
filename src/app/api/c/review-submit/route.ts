@@ -4,6 +4,7 @@ import {
   getProjectByToken,
 } from "@/lib/customer-api-server";
 import { getProjectByToken as getProjectByTokenMock, updateProject as updateProjectMock } from "@/lib/mock-data";
+import { checkPinAuth } from "@/lib/customer-auth-server";
 import type { ProjectStatus } from "@/types";
 
 export async function POST(req: NextRequest) {
@@ -18,6 +19,8 @@ export async function POST(req: NextRequest) {
     if (!result || !["all_approved", "has_revision"].includes(result)) {
       return NextResponse.json({ error: "result must be all_approved or has_revision" }, { status: 400 });
     }
+    const pinErr = checkPinAuth(req, token);
+    if (pinErr) return pinErr;
 
     const admin = getAdminClient();
     let project = await getProjectByToken(admin, token);

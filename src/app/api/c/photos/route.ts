@@ -8,6 +8,7 @@ import {
   getProjectByToken as getProjectByTokenMock,
   getPhotosByProject,
 } from "@/lib/mock-data";
+import { checkPinAuth } from "@/lib/customer-auth-server";
 import type { PhotoGroupInfo } from "@/types";
 
 export async function GET(req: NextRequest) {
@@ -15,6 +16,8 @@ export async function GET(req: NextRequest) {
   if (!token?.trim()) {
     return NextResponse.json({ error: "token required" }, { status: 400 });
   }
+  const pinErr = checkPinAuth(req, token);
+  if (pinErr) return pinErr;
   try {
     const admin = getAdminClient();
     let project = await getProjectByToken(admin, token);

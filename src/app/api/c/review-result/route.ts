@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { getProjectByToken } from "@/lib/customer-api-server";
+import { checkPinAuth } from "@/lib/customer-auth-server";
 
 export type ReviewResultPhoto = {
   photoId: string;
@@ -21,6 +22,8 @@ export async function GET(req: NextRequest) {
   if (!token?.trim()) {
     return NextResponse.json({ error: "token required" }, { status: 400 });
   }
+  const pinErr = checkPinAuth(req, token);
+  if (pinErr) return pinErr;
   try {
     const admin = getAdminClient();
     const project = await getProjectByToken(admin, token);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
+import { signPinCookie } from "@/lib/customer-auth-server";
 
 export async function POST(req: NextRequest) {
   try {
@@ -58,8 +59,9 @@ export async function POST(req: NextRequest) {
       // 5. Set verification cookie
       const cookieName = `pin_verified_${token}`;
       const response = NextResponse.json({ success: true });
-      response.cookies.set(cookieName, "1", {
+      response.cookies.set(cookieName, signPinCookie(token), {
         httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         maxAge: 86400,
         path: "/",

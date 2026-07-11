@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
+import { signPinCookie } from "@/lib/customer-auth-server";
 
 /**
  * PIN 없는 프로젝트에서 미들웨어를 통과할 수 있도록 pin_verified 쿠키를 자동 발급.
@@ -35,8 +36,9 @@ export async function GET(req: NextRequest) {
   // PIN 없음 → 쿠키 발급 후 원래 페이지로
   const cookieName = `pin_verified_${token}`;
   const response = NextResponse.redirect(new URL(to, req.url));
-  response.cookies.set(cookieName, "1", {
+  response.cookies.set(cookieName, signPinCookie(token), {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     maxAge: 86400,
     path: "/",

@@ -4,6 +4,7 @@ import {
   upsertSelectionAdmin,
 } from "@/lib/customer-api-server";
 import { getAdminClient } from "@/lib/supabase-admin";
+import { checkPinAuth } from "@/lib/customer-auth-server";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,6 +16,8 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    const pinErr = checkPinAuth(req, token);
+    if (pinErr) return pinErr;
     const project = await validateTokenAndProject(token, project_id);
     if (!project) {
       return NextResponse.json({ error: "Invalid token or project" }, { status: 401 });

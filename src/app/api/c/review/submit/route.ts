@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { getProjectByToken } from "@/lib/customer-api-server";
 import { submitVersionReviews } from "@/lib/db";
+import { checkPinAuth } from "@/lib/customer-auth-server";
 
 type ReviewItem = {
   photo_version_id: string;
@@ -23,6 +24,8 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(reviews) || reviews.length === 0) {
       return NextResponse.json({ error: "reviews array required" }, { status: 400 });
     }
+    const pinErr = checkPinAuth(req, token);
+    if (pinErr) return pinErr;
 
     const admin = getAdminClient();
     const project = await getProjectByToken(admin, token);

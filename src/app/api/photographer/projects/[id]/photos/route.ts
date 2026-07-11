@@ -96,9 +96,12 @@ export async function DELETE(
       return NextResponse.json({ error: "preparing 상태에서만 삭제할 수 있습니다." }, { status: 403 });
     }
 
-    const { data: photos } = await admin.from("photos").select("id, r2_thumb_url").eq("project_id", id);
+    const { data: photos } = await admin.from("photos").select("id, r2_thumb_url, r2_preview_url").eq("project_id", id);
     const keys = (photos ?? [])
-      .map((p: { r2_thumb_url: string }) => urlToR2Key(p.r2_thumb_url))
+      .flatMap((p: { r2_thumb_url: string; r2_preview_url: string | null }) => [
+        urlToR2Key(p.r2_thumb_url),
+        p.r2_preview_url ? urlToR2Key(p.r2_preview_url) : "",
+      ])
       .filter(Boolean);
     if (keys.length > 0) {
       const backendUrl = process.env.BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? "http://localhost:8000";
