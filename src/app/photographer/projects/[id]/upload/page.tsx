@@ -58,6 +58,15 @@ const PC_CONCURRENCY = 5;
 const MOBILE_BATCH_SIZE = 3;
 const MOBILE_CONCURRENCY = 1;
 const ACCEPT_TYPES = "image/*,image/heic,image/heif";
+const RAW_EXTENSIONS = new Set([
+  ".cr2", ".cr3", ".nef", ".nrw", ".arw", ".srf", ".sr2",
+  ".dng", ".raf", ".rw2", ".orf", ".pef", ".ptx", ".srw",
+  ".x3f", ".3fr", ".fff", ".rwl", ".kdc", ".dcr",
+]);
+function isRawFile(file: File): boolean {
+  const dot = file.name.lastIndexOf(".");
+  return dot >= 0 && RAW_EXTENSIONS.has(file.name.slice(dot).toLowerCase());
+}
 
 /** 원본 사진을 추가 업로드할 수 있는 상태 — preparing은 자유, selecting은 경고 후 진행 */
 const UPLOADABLE_STATUSES: ReadonlyArray<ProjectStatus> = ["preparing", "selecting"];
@@ -1287,6 +1296,9 @@ export default function ProjectDetailPage() {
     if (!chosen?.length) return;
     let list = Array.from(chosen).filter((f) => f.type.startsWith("image/") || f.type === "");
     if (fileInputRef.current) fileInputRef.current.value = "";
+    const rawCount = list.filter(isRawFile).length;
+    list = list.filter((f) => !isRawFile(f));
+    if (rawCount > 0) setUploadError(`RAW 파일은 지원하지 않습니다 (${rawCount}개 제외). JPEG/PNG/WebP/HEIC로 내보내기 후 업로드해주세요.`);
     if (!list.length) return;
     const remaining = Math.max(0, BETA_MAX_PHOTOS_PER_PROJECT - photos.length);
     if (list.length > remaining) {
@@ -1303,6 +1315,9 @@ export default function ProjectDetailPage() {
     e.preventDefault(); setDragOver(false);
     if (!project || !canUploadOriginals(project.status)) return;
     let list = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/") || f.type === "");
+    const rawCount = list.filter(isRawFile).length;
+    list = list.filter((f) => !isRawFile(f));
+    if (rawCount > 0) setUploadError(`RAW 파일은 지원하지 않습니다 (${rawCount}개 제외). JPEG/PNG/WebP/HEIC로 내보내기 후 업로드해주세요.`);
     if (!list.length) return;
     if (project.status === "selecting") {
       // 셀렉 중에는 안내 모달 → 확인 시 pending으로 넘어가게 임시 보관
