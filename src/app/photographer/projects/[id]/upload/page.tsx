@@ -30,7 +30,7 @@ import { PrevNextButton } from "@/components/PrevNextButton";
 import { getProjectById, getPhotosByProjectId } from "@/lib/db";
 import { getStatusLabel } from "@/lib/project-status";
 import { createClient } from "@/lib/supabase/client";
-import { parseBetaLimitError } from "@/lib/beta-limits";
+import { parseBetaLimitError, BETA_MAX_PHOTOS_PER_PROJECT } from "@/lib/beta-limits";
 import { compressImageForUpload } from "@/lib/upload-client-compress";
 import type { Project, ProjectStatus, Photo, PhotoGroupInfo } from "@/types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
@@ -1032,6 +1032,24 @@ export default function ProjectDetailPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [uploadPhase]);
 
+  // iOS에서 업로드 중 앱 전환/화면 잠금 감지 → 복귀 시 경고
+  useEffect(() => {
+    if (uploadPhase !== "sending" || !isPhoneLikeClient()) return;
+    let hiddenAt: number | null = null;
+    const handler = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt = Date.now();
+      } else if (document.visibilityState === "visible" && hiddenAt !== null) {
+        if (Date.now() - hiddenAt > 3000) {
+          setUploadError("업로드 중 화면이 전환되어 일부 사진이 누락됐을 수 있습니다. 업로드 현황을 확인 후 필요 시 재업로드해 주세요.");
+        }
+        hiddenAt = null;
+      }
+    };
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
+  }, [uploadPhase]);
+
   // ── upload ──
   const startUpload = useCallback(async (uploadFiles: File[]) => {
     if (!uploadFiles.length) return;
@@ -1259,15 +1277,24 @@ export default function ProjectDetailPage() {
     setIsPreparingFiles(false);
     const chosen = e.target.files;
     if (!chosen?.length) return;
-    const list = Array.from(chosen).filter((f) => f.type.startsWith("image/") || f.type === "");
+    let list = Array.from(chosen).filter((f) => f.type.startsWith("image/") || f.type === "");
     if (fileInputRef.current) fileInputRef.current.value = "";
-    if (list.length) setPendingFiles(list);
+    if (!list.length) return;
+    const remaining = Math.max(0, BETA_MAX_PHOTOS_PER_PROJECT - photos.length);
+    if (list.length > remaining) {
+      setUploadError(`최대 ${BETA_MAX_PHOTOS_PER_PROJECT}장까지 업로드 가능합니다. ${list.length - remaining}장이 제외됩니다.`);
+      list = list.slice(0, remaining);
+      if (!list.length) return;
+    } else if (isPhoneLikeClient() && list.length >= 100) {
+      setUploadError("모바일에서 100장 이상 업로드 시 시간이 오래 걸릴 수 있습니다. PC 사용을 권장합니다.");
+    }
+    setPendingFiles(list);
   };
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setDragOver(false);
     if (!project || !canUploadOriginals(project.status)) return;
-    const list = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/") || f.type === "");
+    let list = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/") || f.type === "");
     if (!list.length) return;
     if (project.status === "selecting") {
       // 셀렉 중에는 안내 모달 → 확인 시 pending으로 넘어가게 임시 보관
@@ -1276,8 +1303,17 @@ export default function ProjectDetailPage() {
       pendingDropFilesRef.current = list;
       return;
     }
+    const remaining = Math.max(0, BETA_MAX_PHOTOS_PER_PROJECT - photos.length);
+    if (list.length > remaining) {
+      setUploadError(`최대 ${BETA_MAX_PHOTOS_PER_PROJECT}장까지 업로드 가능합니다. ${list.length - remaining}장이 제외됩니다.`);
+      list = list.slice(0, remaining);
+      if (!list.length) return;
+    } else if (isPhoneLikeClient() && list.length >= 100) {
+      setUploadError("모바일에서 100장 이상 업로드 시 시간이 오래 걸릴 수 있습니다. PC 사용을 권장합니다.");
+    }
     setPendingFiles(list);
-  }, [project]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project, photos.length]);
 
   const onDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(true); }, []);
   const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(false); }, []);

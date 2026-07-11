@@ -1,5 +1,5 @@
 export const BETA_MAX_PROJECTS_TOTAL = 10;
-export const BETA_MAX_PHOTOS_PER_PROJECT = 1500;
+export const BETA_MAX_PHOTOS_PER_PROJECT = 3000;
 export const BETA_MAX_REVISION_COUNT = 2;
 
 export interface BetaLimitError {
