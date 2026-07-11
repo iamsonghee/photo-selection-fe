@@ -24,7 +24,13 @@ async function upsertSelectionApi(
   token: string,
   projectId: string,
   photoId: string,
-  state: { rating?: number | null; color_tag?: string | null; comment?: string | null }
+  state: {
+    rating?: number | null;
+    color_tag?: string | null;
+    comment?: string | null;
+    /** 생략하면 서버가 기존 선택 상태를 그대로 유지한다 (별점/코멘트만 저장할 때). */
+    is_selected?: boolean;
+  }
 ) {
   const res = await fetch("/api/c/selections", {
     method: "POST",
@@ -35,18 +41,6 @@ async function upsertSelectionApi(
       photo_id: photoId,
       ...state,
     }),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? "Failed");
-  }
-}
-
-async function deleteSelectionApi(token: string, projectId: string, photoId: string) {
-  const res = await fetch("/api/c/selections", {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token, project_id: projectId, photo_id: photoId }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -174,19 +168,27 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   const toggle = useCallback(
     (photoId: string) => {
       if (!project?.id || !token) return;
+      const requiredCount = project.requiredCount;
       setSelectedIds((prev) => {
+        const isSelected = prev.has(photoId);
+        // 이미 목표 장수(N)를 채운 상태면 새 사진은 추가 선택할 수 없다 —
+        // 그렇지 않으면 고객이 N장을 넘겨 선택해도 확정 버튼이 계속 비활성화된 채로 남는다.
+        if (!isSelected && requiredCount > 0 && prev.size >= requiredCount) {
+          return prev;
+        }
         const next = new Set(prev);
-        if (next.has(photoId)) {
+        if (isSelected) {
           next.delete(photoId);
-          deleteSelectionApi(token, project.id, photoId).catch(console.error);
         } else {
           next.add(photoId);
-          upsertSelectionApi(token, project.id, photoId, {
-            rating: photoStates[photoId]?.rating ?? null,
-            color_tag: serializeColorTags(photoStates[photoId]?.color),
-            comment: photoStates[photoId]?.comment ?? null,
-          }).catch(console.error);
         }
+        // is_selected만 명시적으로 바꾼다 — 별점/코멘트는 건드리지 않고 그대로 유지.
+        upsertSelectionApi(token, project.id, photoId, {
+          rating: photoStates[photoId]?.rating ?? null,
+          color_tag: serializeColorTags(photoStates[photoId]?.color),
+          comment: photoStates[photoId]?.comment ?? null,
+          is_selected: !isSelected,
+        }).catch(console.error);
         return next;
       });
     },

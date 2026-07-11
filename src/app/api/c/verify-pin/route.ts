@@ -23,18 +23,25 @@ export async function POST(req: NextRequest) {
 
     const accessPin = (project as { access_pin: string | null }).access_pin;
 
-    // 2. Check rate limiting: 5 attempts within 30 minutes
-    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    // 2. Check rate limiting: 5 attempts within 1 minute
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
     const { data: attempts } = await admin
       .from("pin_attempts")
-      .select("id")
+      .select("attempted_at")
       .eq("project_token", token)
-      .gte("attempted_at", thirtyMinutesAgo);
+      .gte("attempted_at", oneMinuteAgo)
+      .order("attempted_at", { ascending: true });
 
     const attemptsCount = attempts?.length ?? 0;
 
     if (attemptsCount >= 5) {
-      return NextResponse.json({ success: false, locked: true }, { status: 429 });
+      const oldestAttempt = new Date((attempts as { attempted_at: string }[])[0].attempted_at);
+      const unlockAt = oldestAttempt.getTime() + 60 * 1000;
+      const retryAfterSeconds = Math.max(1, Math.ceil((unlockAt - Date.now()) / 1000));
+      return NextResponse.json(
+        { success: false, locked: true, retryAfterSeconds },
+        { status: 429 }
+      );
     }
 
     // 3. Record this attempt

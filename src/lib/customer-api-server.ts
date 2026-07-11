@@ -111,7 +111,11 @@ export async function getPhotosWithSelectionsAdmin(
 
   const rows = (photosRes.data ?? []) as PhotosRow[];
   const selections = (selectionsRes.data ?? []) as SelectionsRow[];
-  const selectedIds = new Set(selections.map((s) => s.photo_id));
+  // is_selected로 명시적으로 선택된 사진만 카운트한다.
+  // 별점/컬러태그/코멘트만 남긴 행은 selections 테이블에 존재하지만 "선택"은 아니다.
+  const selectedIds = new Set(
+    selections.filter((s) => s.is_selected).map((s) => s.photo_id)
+  );
   const photoStates: Record<string, PhotoState> = {};
   for (const s of selections) {
     const parsedColor = parseColorTags(s.color_tag as string | null);
@@ -143,33 +147,26 @@ export async function upsertSelectionAdmin(
     rating?: number | null;
     color_tag?: string | null;
     comment?: string | null;
+    /** 생략 시 기존 선택 상태를 그대로 둔다 (별점/코멘트만 남기는 경우 등). */
+    is_selected?: boolean;
   }
 ): Promise<void> {
-  const { error } = await admin.from("selections").upsert(
-    {
-      project_id: params.project_id,
-      photo_id: params.photo_id,
-      rating: params.rating ?? null,
-      color_tag: params.color_tag ?? null,
-      comment: params.comment ?? null,
-    },
-    { onConflict: "project_id,photo_id" }
-  );
+  const payload: Record<string, unknown> = {
+    project_id: params.project_id,
+    photo_id: params.photo_id,
+    rating: params.rating ?? null,
+    color_tag: params.color_tag ?? null,
+    comment: params.comment ?? null,
+  };
+  if (params.is_selected !== undefined) {
+    payload.is_selected = params.is_selected;
+  }
+  const { error } = await admin
+    .from("selections")
+    .upsert(payload, { onConflict: "project_id,photo_id" });
   if (error) throw new Error(error.message);
 }
 
-export async function deleteSelectionAdmin(
-  admin: SupabaseClient,
-  projectId: string,
-  photoId: string
-): Promise<void> {
-  const { error } = await admin
-    .from("selections")
-    .delete()
-    .eq("project_id", projectId)
-    .eq("photo_id", photoId);
-  if (error) throw new Error(error.message);
-}
 
 export async function confirmProjectAdmin(admin: SupabaseClient, projectId: string): Promise<void> {
   const { error } = await admin

@@ -27,6 +27,7 @@ export default function PinForm({ token, from }: { token: string; from: string }
   const [pins, setPins] = useState(["", "", "", ""]);
   const [error, setError] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
+  const [retryAfter, setRetryAfter] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const r0 = useRef<HTMLInputElement>(null);
   const r1 = useRef<HTMLInputElement>(null);
@@ -56,8 +57,8 @@ export default function PinForm({ token, from }: { token: string; from: string }
         router.replace(from);
       } else if (data.locked) {
         setLocked(true);
+        setRetryAfter(data.retryAfterSeconds ?? 60);
         setPins(["", "", "", ""]);
-        setTimeout(() => inputRefs[0].current?.focus(), 50);
       } else {
         setError("비밀번호가 올바르지 않습니다");
         setPins(["", "", "", ""]);
@@ -78,6 +79,23 @@ export default function PinForm({ token, from }: { token: string; from: string }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pins]);
+
+  useEffect(() => {
+    if (!locked || retryAfter <= 0) return;
+    const timer = setInterval(() => {
+      setRetryAfter((s) => {
+        if (s <= 1) {
+          clearInterval(timer);
+          setLocked(false);
+          setTimeout(() => inputRefs[0].current?.focus(), 50);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locked]);
 
   const handleInput = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return;
@@ -201,7 +219,7 @@ export default function PinForm({ token, from }: { token: string; from: string }
 
         {locked && (
           <p style={{ fontSize: 12, color: ORANGE, marginBottom: 8, fontFamily: MONO, letterSpacing: "0.05em" }}>
-            5회 이상 틀렸습니다. 잠시 후 다시 시도해주세요
+            5회 이상 틀렸습니다. {retryAfter}초 후 다시 시도해주세요
           </p>
         )}
         {!locked && error && (

@@ -137,6 +137,7 @@ export interface Database {
           rating: number | null;
           color_tag: ColorTagDb | null;
           comment: string | null;
+          is_selected: boolean;
           created_at: string;
         };
         Insert: {
@@ -146,6 +147,7 @@ export interface Database {
           rating?: number | null;
           color_tag?: ColorTagDb | null;
           comment?: string | null;
+          is_selected?: boolean;
           created_at?: string;
         };
         Update: {
@@ -155,6 +157,7 @@ export interface Database {
           rating?: number | null;
           color_tag?: ColorTagDb | null;
           comment?: string | null;
+          is_selected?: boolean;
           created_at?: string;
         };
       };

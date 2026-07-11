@@ -53,7 +53,8 @@ export function SelectionConfirmFooter({
 
         @media (max-width: 767px) {
           .ac-confirm-footer-inner { height: 60px !important; padding: 0 14px !important; gap: 12px !important; }
-          .ac-confirm-footer-meta { display: none !important; }
+          .ac-confirm-footer-meta { max-width: 108px; }
+          .ac-confirm-footer-meta p { font-size: 9px !important; white-space: normal !important; line-height: 1.3 !important; }
           .ac-confirm-footer-progress { gap: 4px !important; }
           .ac-confirm-footer-progress-label { font-size: 9px !important; }
           .ac-confirm-footer-btn { height: 40px !important; padding: 0 18px !important; font-size: 12px !important; }
