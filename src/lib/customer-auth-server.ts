@@ -29,14 +29,13 @@ export function verifyPinCookie(token: string, cookieValue: string): boolean {
     if (isNaN(ts)) return false;
     if (Math.floor(Date.now() / 1000) - ts > COOKIE_TTL_SECONDS) return false;
 
-    const expected = createHmac("sha256", getSecret())
+    const expectedRaw = createHmac("sha256", getSecret())
       .update(`${token}:${timestamp}`)
-      .digest("base64url");
+      .digest();
 
-    const sigBuf = Buffer.from(sig);
-    const expBuf = Buffer.from(expected);
-    if (sigBuf.length !== expBuf.length) return false;
-    return timingSafeEqual(sigBuf, expBuf);
+    const sigRaw = Buffer.from(sig, "base64url");
+    if (sigRaw.length !== expectedRaw.length) return false;
+    return timingSafeEqual(sigRaw, expectedRaw);
   } catch {
     return false;
   }
