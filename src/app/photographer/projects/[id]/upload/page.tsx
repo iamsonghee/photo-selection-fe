@@ -906,7 +906,7 @@ export default function ProjectDetailPage() {
       .filter((p) => !confirmedNames.has(p.filename))
       .map((p) => ({ id: p.tempId, projectId: id, orderIndex: 99999, url: p.blobUrl, originalFilename: p.filename, isPending: true, isUploading: true }));
     if (pendingAsPhotos.length === 0 && uploadingAsPhotos.length === 0) return photos;
-    return [...uploadingAsPhotos, ...pendingAsPhotos, ...photos];
+    return [...photos, ...pendingAsPhotos, ...uploadingAsPhotos];
   }, [photos, pendingPhotos, uploadingPhotos, id]);
 
   /** ── AI 유사컷 그룹 — 대표이미지 토글. 키보드 네비/라이트박스보다 먼저 선언해야
@@ -1080,7 +1080,7 @@ export default function ProjectDetailPage() {
 
     setUploadPhase("sending");
     setUploadProgress(3);
-    if (photoScrollRef.current) photoScrollRef.current.scrollTop = 0;
+    if (photoScrollRef.current) photoScrollRef.current.scrollTop = photoScrollRef.current.scrollHeight;
 
     const effectiveBatch = isPhoneLikeClient() ? MOBILE_BATCH_SIZE : BATCH_SIZE;
     const batches: File[][] = [];
@@ -1261,14 +1261,22 @@ export default function ProjectDetailPage() {
       }
       const totalFail = allFailed.length + backendRejected.length;
       setToast(totalFail === 0 ? "업로드 완료!" : `${totalFail}개 파일 처리 실패`);
-      await loadProject(); await loadPhotos(); router.refresh();
-      // 낙관적 프리뷰 정리 (DB에서 실제 R2 URL로 교체됨)
-      setPendingPhotos([]);
+      await loadProject();
+      let freshPhotos: Photo[] = [];
+      try { freshPhotos = await getPhotosByProjectId(id); } catch {}
+      // blob URL 먼저 해제
       pendingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
       pendingBlobsRef.current = [];
-      setUploadingPhotos([]);
       uploadingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
       uploadingBlobsRef.current = [];
+      // 단일 렌더로 DB 사진 표시 + 임시 프리뷰 동시 제거 (중간 프레임 없음)
+      flushSync(() => {
+        setPhotos(freshPhotos);
+        setPendingPhotos([]);
+        setUploadingPhotos([]);
+        setPhotosLoading(false);
+      });
+      router.refresh();
     }, 600);
   }, [id, loadProject, loadPhotos, router]);
 
