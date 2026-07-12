@@ -32,6 +32,7 @@ import { getStatusLabel } from "@/lib/project-status";
 import { createClient } from "@/lib/supabase/client";
 import { parseBetaLimitError, BETA_MAX_PHOTOS_PER_PROJECT } from "@/lib/beta-limits";
 import { compressImageForUpload } from "@/lib/upload-client-compress";
+import { createThumbLoadQueue, useQueuedThumbSrc, type ThumbLoadQueue } from "@/lib/thumb-load-queue";
 import type { Project, ProjectStatus, Photo, PhotoGroupInfo } from "@/types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
@@ -206,6 +207,7 @@ function PhotoThumb({
   deletingId,
   isEditMode,
   scrollRootRef,
+  thumbQueue,
   onPhotoClick,
   groupBadge,
   onGroupBadgeClick,
@@ -217,35 +219,20 @@ function PhotoThumb({
   isEditMode: boolean;
   /** DATABANK 스크롤 박스 — 없으면 즉시 로드 */
   scrollRootRef?: React.RefObject<HTMLElement | null>;
+  thumbQueue: ThumbLoadQueue;
   onPhotoClick?: (index: number) => void;
   /** AI 유사컷 대표컷 배지 — 토글 ON이고 이 사진이 대표컷이며 그룹원이 더 있을 때만 전달됨 */
   groupBadge?: { groupId: string; restCount: number; isExpanded: boolean };
   onGroupBadgeClick?: (e: React.MouseEvent, groupId: string) => void;
 }) {
   const [loaded, setLoaded] = useState(false);
-  // blob URL(isPending)은 레이지 로드 불필요 — 로컬 메모리에 있어 즉시 로드
-  const [shouldLoadSrc, setShouldLoadSrc] = useState(() => !scrollRootRef || !!photo.isPending);
-  const cellRef = useRef<HTMLDivElement>(null);
   const deleting = deletingId === photo.id;
-
-  useEffect(() => {
-    if (shouldLoadSrc) return;
-    const el = cellRef.current;
-    const root = scrollRootRef?.current ?? null;
-    if (!el) return;
-    if (!root) {
-      setShouldLoadSrc(true);
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) setShouldLoadSrc(true);
-      },
-      { root, rootMargin: "100px", threshold: 0 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [scrollRootRef, shouldLoadSrc]);
+  // blob URL(isPending)은 큐를 건너뛰고 즉시 로드 — 로컬 메모리라 네트워크 요청이 없다.
+  const { cellRef, imgRef, shouldLoad, handleLoad, handleError } = useQueuedThumbSrc(photo.url, {
+    queue: thumbQueue,
+    rootRef: scrollRootRef,
+    bypass: !scrollRootRef || !!photo.isPending,
+  });
 
   return (
     <div
@@ -305,9 +292,10 @@ function PhotoThumb({
         >
           <ImageIcon size={10} color="var(--subtle-foreground)" />
         </div>
-        {shouldLoadSrc && (
+        {shouldLoad && (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
+            ref={imgRef}
             src={photo.url}
             alt=""
             loading={photo.isPending ? "eager" : "lazy"}
@@ -315,7 +303,9 @@ function PhotoThumb({
             onLoad={(e) => {
               setLoaded(true);
               (e.currentTarget as HTMLImageElement).style.opacity = "1";
+              handleLoad();
             }}
+            onError={handleError}
             style={{
               position: "absolute",
               inset: 0,
@@ -488,6 +478,7 @@ function VirtualizedPhotoGrid({
   deletingId,
   isEditMode,
   minCols = 1,
+  thumbQueue,
   onPhotoClick,
   leadingUploadCell,
   groupsById,
@@ -501,6 +492,7 @@ function VirtualizedPhotoGrid({
   deletingId: string | null;
   isEditMode: boolean;
   minCols?: number;
+  thumbQueue: ThumbLoadQueue;
   onPhotoClick?: (index: number) => void;
   /** 모바일 전용: 그리드 첫 셀(인덱스 0) 자리에 노출되는 업로드 CTA */
   leadingUploadCell?: React.ReactNode;
@@ -593,6 +585,7 @@ function VirtualizedPhotoGrid({
                 deletingId={deletingId}
                 isEditMode={isEditMode}
                 scrollRootRef={scrollRef}
+                thumbQueue={thumbQueue}
                 onPhotoClick={onPhotoClick}
                 groupBadge={groupBadge}
                 onGroupBadgeClick={onGroupBadgeClick}
@@ -633,35 +626,21 @@ const LIST_THUMB_H = 48;
 function ListRowThumb({
   url,
   scrollRootRef,
+  thumbQueue,
 }: {
   url: string;
   scrollRootRef: React.RefObject<HTMLElement | null>;
+  thumbQueue: ThumbLoadQueue;
 }) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [load, setLoad] = useState(false);
-  useEffect(() => {
-    if (load) return;
-    const el = wrapRef.current;
-    const root = scrollRootRef.current;
-    if (!el) return;
-    if (!root) {
-      setLoad(true);
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) setLoad(true);
-      },
-      { root, rootMargin: "100px", threshold: 0 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [scrollRootRef, load]);
+  const { cellRef, imgRef, shouldLoad, handleLoad, handleError } = useQueuedThumbSrc(url, {
+    queue: thumbQueue,
+    rootRef: scrollRootRef,
+  });
   return (
-    <div ref={wrapRef} style={{ width: "100%", height: "100%", background: "var(--background)" }}>
-      {load && (
+    <div ref={cellRef} style={{ width: "100%", height: "100%", background: "var(--background)" }}>
+      {shouldLoad && (
         /* eslint-disable-next-line @next/next/no-img-element */
-        <img src={url} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        <img ref={imgRef} src={url} alt="" loading="lazy" decoding="async" onLoad={handleLoad} onError={handleError} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
       )}
     </div>
   );
@@ -673,6 +652,7 @@ function VirtualizedPhotoList({
   onDelete,
   deletingId,
   isEditMode,
+  thumbQueue,
   onPhotoClick,
   groupsById,
   similarityToggleOn,
@@ -684,6 +664,7 @@ function VirtualizedPhotoList({
   onDelete: (id: string) => void;
   deletingId: string | null;
   isEditMode: boolean;
+  thumbQueue: ThumbLoadQueue;
   onPhotoClick?: (index: number) => void;
   groupsById?: Map<string, PhotoGroupInfo>;
   similarityToggleOn?: boolean;
@@ -752,7 +733,7 @@ function VirtualizedPhotoList({
                     border: `1px solid ${BORDER}`,
                   }}
                 >
-                  <ListRowThumb url={photo.url} scrollRootRef={scrollRef} />
+                  <ListRowThumb url={photo.url} scrollRootRef={scrollRef} thumbQueue={thumbQueue} />
                 </div>
                 <span style={{ fontSize: 13, color: TEXT_BRIGHT, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Pretendard Variable', sans-serif" }}>
                   {photo.originalFilename ?? `FRAME_${String(i + 1).padStart(4, "0")}`}
@@ -826,6 +807,8 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showEditGuideModal, setShowEditGuideModal] = useState(false);
   const [copied, setCopied] = useState(false);
+  // 그리드/리스트 뷰는 동시에 하나만 마운트되므로 큐 하나를 공유해도 무방하다.
+  const [thumbQueue] = useState(() => createThumbLoadQueue(12));
 
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinInput, setPinInput] = useState("");
@@ -1835,6 +1818,7 @@ export default function ProjectDetailPage() {
                 deletingId={deletingId}
                 isEditMode={project.status === "preparing"}
                 minCols={isMobile ? 3 : 1}
+                thumbQueue={thumbQueue}
                 onPhotoClick={setLightboxIndex}
                 groupsById={groupsById}
                 similarityToggleOn={similarityToggleOn}
@@ -1860,6 +1844,7 @@ export default function ProjectDetailPage() {
                 onDelete={handleDeletePhoto}
                 deletingId={deletingId}
                 isEditMode={project.status === "preparing"}
+                thumbQueue={thumbQueue}
                 onPhotoClick={setLightboxIndex}
                 groupsById={groupsById}
                 similarityToggleOn={similarityToggleOn}

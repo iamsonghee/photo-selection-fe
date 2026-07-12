@@ -193,6 +193,14 @@ export function buildFilterQueryString(state: GalleryFilterState): string {
   return qs ? `?${qs}` : "";
 }
 
+export const COLOR_OPTIONS: { key: ColorTag; hex: string }[] = [
+  { key: "red",    hex: "#ef4444" },
+  { key: "yellow", hex: "#f59e0b" },
+  { key: "green",  hex: "#22c55e" },
+  { key: "blue",   hex: "#3b82f6" },
+  { key: "purple", hex: "#8b5cf6" },
+];
+
 export type PhotoStateMap = Record<
   string,
   { rating?: StarRating; color?: ColorTag[]; comment?: string }

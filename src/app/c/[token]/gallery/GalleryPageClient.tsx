@@ -1,22 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { RotateCcw } from "lucide-react";
+import Link from "next/link";
+import { RotateCcw, ChevronsUp, ChevronsDown } from "lucide-react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useSelection } from "@/contexts/SelectionContext";
 import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
+import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
+import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import {
   appendGalleryScrollQuery,
   buildFilterQueryString,
+  COLOR_OPTIONS,
   GALLERY_FOCUS_PARAM,
   GALLERY_SCROLL_PARAM,
-  galleryThumbPriorityProps,
   getFilteredPhotos,
-  getPhotoDisplayName,
-  usePriorityImagePreload,
 } from "@/lib/gallery-filter";
 import type { GalleryFilterState } from "@/lib/gallery-filter";
 import type { StarRating, ColorTag, SortOrder } from "@/types";
@@ -24,19 +25,24 @@ import type { StarRating, ColorTag, SortOrder } from "@/types";
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 type TabFilter = "all" | "selected";
 
-const COLOR_OPTIONS: { key: ColorTag; hex: string }[] = [
-  { key: "red",    hex: "#ef4444" },
-  { key: "yellow", hex: "#f59e0b" },
-  { key: "green",  hex: "#22c55e" },
-  { key: "blue",   hex: "#3b82f6" },
-  { key: "purple", hex: "#8b5cf6" },
-];
-
 const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
   { value: "filename", label: "Sort: Filename" },
   { value: "oldest",   label: "Sort: Number"   },
   { value: "newest",   label: "Sort: Newest"   },
 ];
+
+/** 그리드 레이아웃 상수 — 가상화된 행 높이·열 수 계산에 사용 */
+const GRID_MIN_CELL   = 148;
+const GRID_GAP        = 12;
+const MOBILE_MAX_W    = 767;
+const MOBILE_COLS     = 3;
+const MOBILE_GAP      = 3;
+const PRESIGN_BATCH_MAX = 100;
+const PRESIGN_DEBOUNCE_MS = 80;
+const PRESIGN_CACHE_MAX = 500;
+
+type GridLayout = { cols: number; gap: number; rowHeight: number; overscan: number };
+const DEFAULT_LAYOUT: GridLayout = { cols: 4, gap: GRID_GAP, rowHeight: GRID_MIN_CELL + GRID_GAP, overscan: 6 };
 
 export default function GalleryPageClient() {
   const params       = useParams();
@@ -52,22 +58,26 @@ export default function GalleryPageClient() {
   const [colorFilter,   setColorFilter]   = useState<ColorTag[]>([]);
   const [sortOrder,     setSortOrder]     = useState<SortOrder>("filename");
   const [hoverStar,     setHoverStar]     = useState(0);
-  const [gridStarHover, setGridStarHover] = useState<{ photoId: string; star: number } | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirming,       setConfirming]       = useState(false);
   const [confirmError,     setConfirmError]     = useState<string | null>(null);
-  const [galleryThumbFocusId, setGalleryThumbFocusId] = useState<string | null>(null);
   const [similarityToggleOn, setSimilarityToggleOn] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [jumpToValue, setJumpToValue] = useState("");
 
   // ── Presigned thumb 관리 ──────────────────────────────────────────────────
   const gridRef        = useRef<HTMLDivElement>(null);
   const pendingIdsRef  = useRef(new Set<string>()); // 이미 요청한 photoId
   const retryingIdsRef = useRef(new Set<string>()); // onError 재시도 중
-  const batchTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [presignedUrls, setPresignedUrls] = useState(
     new Map<string, { url: string; expiresAt: number }>()
   );
+  // 화면 밖으로 스크롤된 카드의 진행 중인 썸네일 다운로드를 실제로 취소하기 위한 동시성 큐.
+  const [thumbQueue] = useState(() => createThumbLoadQueue(8));
+
+  // ── 가상화 그리드 레이아웃 (열 수·행 높이는 컨테이너 폭 기준으로 JS에서 계산) ──
+  const [layout, setLayout] = useState<GridLayout>(DEFAULT_LAYOUT);
+  const [scrollMargin, setScrollMargin] = useState(0);
 
   const galleryScrollKey = token ? `ps:c-gallery-scroll:${token}` : "";
 
@@ -86,9 +96,10 @@ export default function GalleryPageClient() {
     if (loading || typeof window === "undefined") return;
 
     const gsRaw = searchParams.get(GALLERY_SCROLL_PARAM);
-    const gfRaw = searchParams.get(GALLERY_FOCUS_PARAM);
     const hasGsParam = gsRaw != null;
-    const hasGfParam = gfRaw != null;
+    // gf(포커스 사진 id)는 더 이상 프리로드에 쓰지 않지만, 뷰어가 계속 링크에 붙여
+    // 보내므로 URL 정리 차원에서 존재 여부만 확인해 지운다.
+    const hasGfParam = searchParams.get(GALLERY_FOCUS_PARAM) != null;
 
     if (hasGsParam) {
       const y = Number(gsRaw);
@@ -113,10 +124,6 @@ export default function GalleryPageClient() {
       } catch {
         /* ignore */
       }
-    }
-
-    if (hasGfParam) {
-      setGalleryThumbFocusId(gfRaw);
     }
 
     if (hasGsParam || hasGfParam) {
@@ -196,27 +203,26 @@ export default function GalleryPageClient() {
     return result;
   }, [filteredPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup]);
 
-  /* ── Thumbnail focus index ── */
-  const galleryFocusIndex = useMemo(() => {
-    if (!galleryThumbFocusId) return null;
-    const i = displayPhotos.findIndex((p) => p.id === galleryThumbFocusId);
-    return i >= 0 ? i : null;
-  }, [displayPhotos, galleryThumbFocusId]);
-
-  /* ── Priority preload on focus ── */
-  const displayPhotoUrls = useMemo(() => displayPhotos.map((p) => p.url), [displayPhotos]);
-  usePriorityImagePreload(displayPhotoUrls, galleryFocusIndex);
-
   const viewerQueryString = useMemo(() => buildFilterQueryString(filterState), [filterState]);
 
-  // presigned URL 일괄 적용
+  // presigned URL 일괄 적용. 4,000장 갤러리를 끝까지 스크롤해도 Map이 무한히 커지지
+  // 않도록 오래된 항목부터 정리한다 — pendingIdsRef도 같은 id를 같이 제거해야
+  // range-fetch 이펙트가 스크롤로 돌아왔을 때 재요청을 계속 건너뛰지 않는다.
   const applyPresignedUrls = useCallback(
     (data: Record<string, { url: string; expiresAt: number }>) => {
+      const evictedIds: string[] = [];
       setPresignedUrls((prev) => {
         const next = new Map(prev);
         for (const [id, info] of Object.entries(data)) next.set(id, info);
+        while (next.size > PRESIGN_CACHE_MAX) {
+          const oldestId = next.keys().next().value;
+          if (oldestId === undefined) break;
+          next.delete(oldestId);
+          evictedIds.push(oldestId);
+        }
         return next;
       });
+      for (const id of evictedIds) pendingIdsRef.current.delete(id);
     },
     []
   );
@@ -252,50 +258,113 @@ export default function GalleryPageClient() {
     [fetchPresignBatch]
   );
 
-  // IntersectionObserver — viewport 진입 시 100장씩 batch presign
-  useEffect(() => {
-    if (loading || !token || typeof IntersectionObserver === "undefined") return;
-    const grid = gridRef.current;
-    if (!grid) return;
+  // 컨테이너 폭 → 열 수·행 높이·overscan(화면 2.5개 분량) 계산.
+  // 모바일(<=767px)은 CSS 미디어쿼리와 동일하게 3열 고정.
+  useLayoutEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
 
-    const queuedIds: string[] = [];
-
-    const flush = () => {
-      while (queuedIds.length > 0) {
-        fetchPresignBatch(queuedIds.splice(0, 100));
-      }
+    const update = () => {
+      const isMobile = window.innerWidth <= MOBILE_MAX_W;
+      const gap = isMobile ? MOBILE_GAP : GRID_GAP;
+      const width = el.clientWidth;
+      if (width <= 0) return;
+      const cols = isMobile
+        ? MOBILE_COLS
+        : Math.max(1, Math.floor((width + gap) / (GRID_MIN_CELL + gap)));
+      const cellSize = (width - gap * (cols - 1)) / cols;
+      const rowHeight = Math.ceil(cellSize) + gap;
+      const visibleRows = Math.max(1, Math.ceil(window.innerHeight / rowHeight));
+      const overscan = Math.ceil(visibleRows * 2.5);
+      setLayout((prev) =>
+        prev.cols === cols && prev.rowHeight === rowHeight && prev.gap === gap && prev.overscan === overscan
+          ? prev
+          : { cols, gap, rowHeight, overscan }
+      );
+      const rect = el.getBoundingClientRect();
+      setScrollMargin(rect.top + window.scrollY);
     };
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        let added = false;
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          const photoId = (entry.target as HTMLElement).dataset.photoId;
-          if (!photoId || pendingIdsRef.current.has(photoId)) continue;
-          pendingIdsRef.current.add(photoId);
-          queuedIds.push(photoId);
-          observer.unobserve(entry.target);
-          added = true;
-        }
-        if (!added) return;
-        if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
-        // 80ms 내 추가 진입이 없으면 한 번에 flush
-        batchTimerRef.current = setTimeout(flush, 80);
-      },
-      { rootMargin: "400px 0px", threshold: 0 }
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [loading]);
+
+  const rowCount = layout.cols > 0 ? Math.ceil(displayPhotos.length / layout.cols) : 0;
+
+  const rowVirtualizer = useWindowVirtualizer({
+    count: rowCount,
+    estimateSize: () => layout.rowHeight,
+    overscan: layout.overscan,
+    scrollMargin,
+  });
+
+  // 컨테이너 폭 변경으로 rowHeight가 바뀌면 명시적으로 재측정해야 한다
+  // (virtualizer는 함수 참조가 그대로면 자동 remeasure를 하지 않음).
+  useEffect(() => {
+    rowVirtualizer.measure();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout.rowHeight]);
+
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const rangeKey = virtualRows.length > 0
+    ? `${virtualRows[0].index}-${virtualRows[virtualRows.length - 1].index}-${layout.cols}`
+    : "";
+
+  // 현재 렌더 범위(visible + overscan)의 photoId만 모아 100장 단위로 presign.
+  // 빠른 스크롤 중에는 range가 계속 바뀌므로 80ms 안정될 때까지 실제 fetch를 미룬다 —
+  // 그사이 range가 또 바뀌면 cleanup에서 취소되어 스쳐 지나간 사진은 요청되지 않는다.
+  useEffect(() => {
+    if (loading || !token || virtualRows.length === 0) return;
+    const startPhoto = virtualRows[0].index * layout.cols;
+    const endPhoto = Math.min(
+      (virtualRows[virtualRows.length - 1].index + 1) * layout.cols,
+      displayPhotos.length
     );
 
-    grid.querySelectorAll<HTMLElement>("[data-photo-id]").forEach((el) => {
-      const photoId = el.dataset.photoId;
-      if (photoId && !pendingIdsRef.current.has(photoId)) observer.observe(el);
-    });
+    const timer = setTimeout(() => {
+      const ids: string[] = [];
+      for (let i = startPhoto; i < endPhoto; i++) {
+        const photo = displayPhotos[i];
+        if (!photo || pendingIdsRef.current.has(photo.id)) continue;
+        pendingIdsRef.current.add(photo.id);
+        ids.push(photo.id);
+      }
+      for (let i = 0; i < ids.length; i += PRESIGN_BATCH_MAX) {
+        fetchPresignBatch(ids.slice(i, i + PRESIGN_BATCH_MAX));
+      }
+    }, PRESIGN_DEBOUNCE_MS);
 
-    return () => {
-      observer.disconnect();
-      if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
-    };
-  }, [loading, token, displayPhotos, fetchPresignBatch]);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rangeKey, loading, token, displayPhotos, fetchPresignBatch]);
+
+  /* ── 처음/마지막/인덱스로 이동 ── */
+  const scrollToPhotoIndex = useCallback(
+    (photoIndex: number, align: "start" | "center" = "start") => {
+      if (layout.cols <= 0) return;
+      const clamped = Math.min(Math.max(photoIndex, 0), Math.max(displayPhotos.length - 1, 0));
+      const rowIndex = Math.floor(clamped / layout.cols);
+      rowVirtualizer.scrollToIndex(rowIndex, { align });
+    },
+    [layout.cols, displayPhotos.length, rowVirtualizer]
+  );
+
+  const handleJumpToFirst = useCallback(() => scrollToPhotoIndex(0, "start"), [scrollToPhotoIndex]);
+  const handleJumpToLast = useCallback(
+    () => scrollToPhotoIndex(displayPhotos.length - 1, "start"),
+    [scrollToPhotoIndex, displayPhotos.length]
+  );
+  const handleJumpToNumber = useCallback(() => {
+    const n = Number(jumpToValue);
+    if (!Number.isFinite(n)) return;
+    scrollToPhotoIndex(n - 1, "center");
+  }, [jumpToValue, scrollToPhotoIndex]);
 
   /* ── Handlers ── */
   const handleCheckClick = useCallback((e: React.MouseEvent, photoId: string) => {
@@ -314,6 +383,28 @@ export default function GalleryPageClient() {
       return next;
     });
   }, []);
+
+  const handleRate = useCallback(
+    (photoId: string, star: StarRating | undefined) => {
+      updatePhotoState(photoId, { rating: star });
+    },
+    [updatePhotoState]
+  );
+
+  const handlePhotoClick = useCallback(
+    (e: React.MouseEvent, photoId: string) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+      e.preventDefault();
+      const path = `/c/${token}/viewer/${photoId}${appendGalleryScrollQuery(viewerQueryString, window.scrollY)}`;
+      router.push(path);
+      try {
+        if (galleryScrollKey) sessionStorage.setItem(galleryScrollKey, String(window.scrollY));
+      } catch {
+        /* ignore */
+      }
+    },
+    [token, viewerQueryString, galleryScrollKey, router]
+  );
 
   const handleConfirm = useCallback(async () => {
     if (!project?.id || !token) return;
@@ -450,6 +541,23 @@ export default function GalleryPageClient() {
           background: #FF4D00; border-color: #FF4D00;
         }
 
+        .gl-jump-group {
+          display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+        }
+        .gl-jump-btn {
+          display: flex; align-items: center; justify-content: center;
+          width: 26px; height: 26px; padding: 0;
+          background: none; border: 1px solid var(--border); color: var(--muted-foreground);
+          cursor: pointer; transition: all 0.15s ease;
+        }
+        .gl-jump-btn:hover { color: var(--accent); border-color: var(--accent); }
+        .gl-jump-input {
+          width: 52px; height: 26px; padding: 0 6px;
+          background: transparent; border: 1px solid var(--border); color: var(--foreground);
+          font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 11px;
+          outline: none; text-align: center;
+        }
+
         .gl-filter-tab {
           position: relative; padding: 8px 14px;
           font-size: 12px; font-weight: 700; color: var(--subtle-foreground);
@@ -519,10 +627,10 @@ export default function GalleryPageClient() {
           .gl-filter-divider { margin: 0 4px !important; }
           .gl-filter-stars button { width: 20px !important; height: 20px !important; font-size: 12px !important; }
 
-          /* 그리드 */
+          /* 그리드 — 열 수/간격은 JS에서 뷰포트 폭 기준으로 계산(가상화) */
           .gl-page-wrapper { padding-top: 104px !important; padding-bottom: 72px !important; }
           .gl-grid-main { padding: 0 6px !important; }
-          .gl-photo-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 3px !important; }
+          .gl-jump-input { width: 44px !important; }
 
           /* 카드 오버레이 — 모바일 크기 축소 */
           .gl-card-overlay { padding: 6px !important; }
@@ -706,126 +814,92 @@ export default function GalleryPageClient() {
                     <option key={o.value} value={o.value} style={{ background: "var(--surface-raised)" }}>{o.label}</option>
                   ))}
                 </select>
+
+                <div className="gl-jump-group">
+                  <button type="button" title="처음으로" aria-label="처음으로 이동" onClick={handleJumpToFirst} className="gl-jump-btn">
+                    <ChevronsUp style={{ width: 14, height: 14 }} />
+                  </button>
+                  <button type="button" title="마지막으로" aria-label="마지막으로 이동" onClick={handleJumpToLast} className="gl-jump-btn">
+                    <ChevronsDown style={{ width: 14, height: 14 }} />
+                  </button>
+                  <input
+                    type="number"
+                    min={1}
+                    max={displayPhotos.length}
+                    placeholder="#"
+                    value={jumpToValue}
+                    onChange={(e) => setJumpToValue(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleJumpToNumber()}
+                    className="gl-jump-input"
+                    aria-label="사진 번호로 이동"
+                  />
+                  <button type="button" title="이동" aria-label="입력한 번호로 이동" onClick={handleJumpToNumber} className="gl-jump-btn">
+                    →
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </header>
 
-        {/* ── Gallery Grid ── */}
+        {/* ── Gallery Grid (가상화: 화면 + overscan 범위만 실제 DOM에 렌더) ── */}
         <main className="gl-grid-main" style={{ position: "relative", zIndex: 10, maxWidth: 1800, margin: "0 auto", padding: "0 24px" }}>
-          <div ref={gridRef} className="gl-photo-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 12 }}>
-            {displayPhotos.map((photo, gridIndex) => {
-              const selected       = selectedIds.has(photo.id);
-              const state          = photoStates[photo.id];
-              const rating         = state?.rating;
-              const colorTags      = state?.color ?? [];
-              const group          = photo.similarityGroupId ? groupsById.get(photo.similarityGroupId) : undefined;
-              const isRepresentative = !!group && group.representativePhotoId === photo.id;
-              const restCount      = group ? group.photoCount - 1 : 0;
-              const showGroupBadge = similarityToggleOn && isRepresentative && restCount > 0;
-              const presignedThumb = presignedUrls.get(photo.id)?.url;
+          <div ref={gridRef} style={{ position: "relative", width: "100%", height: rowVirtualizer.getTotalSize() }}>
+            {virtualRows.map((vRow) => {
+              const rowStart = vRow.index * layout.cols;
+              const cells: React.ReactNode[] = [];
+              for (let c = 0; c < layout.cols; c++) {
+                const photoIndex = rowStart + c;
+                if (photoIndex >= displayPhotos.length) break;
+                const photo = displayPhotos[photoIndex];
+                const selected        = selectedIds.has(photo.id);
+                const state           = photoStates[photo.id];
+                const rating          = state?.rating;
+                const colorTags       = state?.color;
+                const group           = photo.similarityGroupId ? groupsById.get(photo.similarityGroupId) : undefined;
+                const isRepresentative = !!group && group.representativePhotoId === photo.id;
+                const restCount       = group ? group.photoCount - 1 : 0;
+                const showGroupBadge  = similarityToggleOn && isRepresentative && restCount > 0;
+                const presignedThumb  = presignedUrls.get(photo.id)?.url;
 
+                cells.push(
+                  <GalleryPhotoCard
+                    key={photo.id}
+                    token={token}
+                    photo={photo}
+                    selected={selected}
+                    rating={rating}
+                    colorTags={colorTags}
+                    showGroupBadge={showGroupBadge}
+                    groupId={group?.id}
+                    restCount={restCount}
+                    isGroupExpanded={!!group && expandedGroups.has(group.id)}
+                    presignedThumb={presignedThumb}
+                    thumbQueue={thumbQueue}
+                    viewerQueryString={viewerQueryString}
+                    onPhotoClick={handlePhotoClick}
+                    onCheckClick={handleCheckClick}
+                    onGroupBadgeClick={handleGroupBadgeClick}
+                    onRate={handleRate}
+                    onThumbError={handleThumbError}
+                  />
+                );
+              }
               return (
-                <Link
-                  key={photo.id}
-                  data-photo-id={photo.id}
-                  href={`/c/${token}/viewer/${photo.id}${viewerQueryString}`}
-                  onClick={(e) => {
-                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-                    e.preventDefault();
-                    const path = `/c/${token}/viewer/${photo.id}${appendGalleryScrollQuery(viewerQueryString, window.scrollY)}`;
-                    router.push(path);
-                    try { if (galleryScrollKey) sessionStorage.setItem(galleryScrollKey, String(window.scrollY)); } catch { /* */ }
+                <div
+                  key={vRow.key}
+                  style={{
+                    position: "absolute", top: 0, left: 0, width: "100%",
+                    height: vRow.size,
+                    transform: `translateY(${vRow.start - scrollMargin}px)`,
+                    display: "grid",
+                    gridTemplateColumns: `repeat(${layout.cols}, 1fr)`,
+                    gap: layout.gap,
+                    boxSizing: "border-box",
                   }}
-                  className={`gl-photo-card${selected ? " gl-selected" : ""}`}
                 >
-                  {presignedThumb ? (
-                    <img
-                      key={presignedThumb}
-                      src={presignedThumb}
-                      alt={getPhotoDisplayName(photo)}
-                      {...galleryThumbPriorityProps(gridIndex, galleryFocusIndex, { whenNoFocus: "lazy" })}
-                      decoding="async"
-                      draggable={false}
-                      onError={() => handleThumbError(photo.id)}
-                    />
-                  ) : (
-                    // presigned URL 대기 중 placeholder
-                    <div style={{ width: "100%", height: "100%", background: "var(--surface)" }} aria-hidden />
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={(e) => handleCheckClick(e, photo.id)}
-                    aria-label={selected ? "선택 해제" : "선택"}
-                    className="gl-check-box"
-                  >
-                    {selected && (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={4}>
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </button>
-
-                  {showGroupBadge && (
-                    <button
-                      type="button"
-                      onClick={(e) => handleGroupBadgeClick(e, group!.id)}
-                      aria-label={`유사컷 ${restCount}장 ${expandedGroups.has(group!.id) ? "접기" : "펼치기"}`}
-                      className="gl-group-badge"
-                    >
-                      {expandedGroups.has(group!.id) ? "−" : `+${restCount}`}
-                    </button>
-                  )}
-
-                  <div className="gl-card-overlay">
-                    <div className="gl-card-overlay-content">
-                    <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9, color: "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
-                      {getPhotoDisplayName(photo)}
-                    </p>
-                    <div className="gl-overlay-interactive" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 14 }}>
-                      <div
-                        style={{ display: "flex", gap: 1 }}
-                        onClick={(e) => e.stopPropagation()}
-                        onMouseLeave={() => setGridStarHover((h) => (h?.photoId === photo.id ? null : h))}
-                      >
-                        {([1, 2, 3, 4, 5] as const).map((s) => {
-                          const hoverVal      = gridStarHover?.photoId === photo.id ? gridStarHover.star : 0;
-                          const currentRating = Number(rating) || 0;
-                          const displayRating = hoverVal || currentRating;
-                          const isHovering    = hoverVal > 0;
-                          // hover 없고 rating 없으면 숨김, hover 없고 rating 있으면 채워진 별만 표시
-                          if (!isHovering && s > currentRating) return null;
-                          const filled = s <= displayRating;
-                          return (
-                            <button
-                              key={s}
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault(); e.stopPropagation();
-                                const cur = photoStates[photo.id]?.rating != null ? Number(photoStates[photo.id]?.rating) as StarRating : undefined;
-                                updatePhotoState(photo.id, { rating: cur === s ? undefined : s });
-                                setGridStarHover(null);
-                                window.setTimeout(() => setGridStarHover(null), 0);
-                              }}
-                              onMouseEnter={() => setGridStarHover({ photoId: photo.id, star: s })}
-                              style={{ fontSize: 9, lineHeight: 1, padding: 0, border: "none", background: "none", cursor: "pointer", color: filled ? "var(--accent)" : "rgba(60,60,70,0.95)" }}
-                            >
-                              {filled ? "★" : "☆"}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
-                        {colorTags.map((tag) => {
-                          const hex = COLOR_OPTIONS.find((c) => c.key === tag)?.hex;
-                          return hex ? <span key={tag} style={{ width: 6, height: 6, borderRadius: "50%", background: hex, display: "block", flexShrink: 0 }} /> : null;
-                        })}
-                      </div>
-                    </div>
-                    </div>{/* gl-card-overlay-content */}
-                  </div>
-                </Link>
+                  {cells}
+                </div>
               );
             })}
           </div>
