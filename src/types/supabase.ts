@@ -225,6 +225,8 @@ export interface Database {
           photo_id: string;
           version: number;
           r2_url: string;
+          r2_thumb_url: string | null;
+          filename: string | null;
           photographer_memo: string | null;
           file_size: number | null;
           created_at: string;
@@ -234,6 +236,8 @@ export interface Database {
           photo_id: string;
           version: number;
           r2_url: string;
+          r2_thumb_url?: string | null;
+          filename?: string | null;
           photographer_memo?: string | null;
           file_size?: number | null;
           created_at?: string;
@@ -243,6 +247,8 @@ export interface Database {
           photo_id?: string;
           version?: number;
           r2_url?: string;
+          r2_thumb_url?: string | null;
+          filename?: string | null;
           photographer_memo?: string | null;
           file_size?: number | null;
           created_at?: string;
