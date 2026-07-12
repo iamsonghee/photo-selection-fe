@@ -96,8 +96,19 @@ export async function DELETE(
       return NextResponse.json({ error: "preparing 상태에서만 삭제할 수 있습니다." }, { status: 403 });
     }
 
-    const { data: photos } = await admin.from("photos").select("id, r2_thumb_url, r2_preview_url").eq("project_id", id);
-    const keys = (photos ?? [])
+    // BETA_MAX=3000이므로 3페이지 병렬 — PostgREST 1000행 limit 우회
+    const photoPages = await Promise.all(
+      [0, 1, 2].map((i) =>
+        admin
+          .from("photos")
+          .select("id, r2_thumb_url, r2_preview_url")
+          .eq("project_id", id)
+          .order("number", { ascending: true })
+          .range(i * 1000, (i + 1) * 1000 - 1)
+      )
+    );
+    const photos = photoPages.flatMap(({ data }) => data ?? []);
+    const keys = photos
       .flatMap((p: { r2_thumb_url: string; r2_preview_url: string | null }) => [
         urlToR2Key(p.r2_thumb_url),
         p.r2_preview_url ? urlToR2Key(p.r2_preview_url) : "",
