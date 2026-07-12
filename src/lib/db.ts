@@ -279,30 +279,22 @@ export async function updateProject(
 
 /** 프로젝트의 사진 목록 조회 */
 export async function getPhotosByProjectId(projectId: string): Promise<Photo[]> {
-  // Supabase PostgREST 기본 limit=1000 우회: count 먼저 조회 후 페이지 병렬 요청
+  // Supabase PostgREST 기본 limit=1000 우회.
+  // BETA_MAX=3000이므로 3페이지를 처음부터 병렬 요청 — count 왕복 없음.
   const PAGE = 1000;
   const COLS = "id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, similarity_group_id";
 
-  const { count, error: countError } = await supabase
-    .from("photos")
-    .select("*", { count: "exact", head: true })
-    .eq("project_id", projectId);
-  if (countError) throw countError;
-
-  const total = count ?? 0;
-  if (total === 0) return [];
-
-  const pageCount = Math.ceil(total / PAGE);
-  const requests = Array.from({ length: pageCount }, (_, i) =>
-    supabase
-      .from("photos")
-      .select(COLS)
-      .eq("project_id", projectId)
-      .order("number", { ascending: true })
-      .range(i * PAGE, (i + 1) * PAGE - 1)
+  const results = await Promise.all(
+    [0, 1, 2].map((i) =>
+      supabase
+        .from("photos")
+        .select(COLS)
+        .eq("project_id", projectId)
+        .order("number", { ascending: true })
+        .range(i * PAGE, (i + 1) * PAGE - 1)
+    )
   );
 
-  const results = await Promise.all(requests);
   const all: Photo[] = [];
   for (const { data, error } of results) {
     if (error) throw error;
@@ -317,27 +309,20 @@ export async function getPhotosByProjectId(projectId: string): Promise<Photo[]> 
 export async function getPhotosWithSelections(
   projectId: string
 ): Promise<{ photos: Photo[]; selectedIds: Set<string>; photoStates: Record<string, PhotoState> }> {
-  // count 먼저 조회 후 photos 페이지 병렬 + selections 동시 요청
+  // BETA_MAX=3000이므로 3페이지 병렬 + selections 동시 요청 — count 왕복 없음
   const PAGE = 1000;
 
-  const { count, error: countError } = await supabase
-    .from("photos")
-    .select("*", { count: "exact", head: true })
-    .eq("project_id", projectId);
-  if (countError) throw countError;
-
-  const pageCount = Math.ceil((count ?? 0) / PAGE);
-  const photoRequests = Array.from({ length: Math.max(1, pageCount) }, (_, i) =>
-    supabase
-      .from("photos")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("number", { ascending: true })
-      .range(i * PAGE, (i + 1) * PAGE - 1)
-  );
-
   const [photoResults, selectionsResult] = await Promise.all([
-    Promise.all(photoRequests),
+    Promise.all(
+      [0, 1, 2].map((i) =>
+        supabase
+          .from("photos")
+          .select("*")
+          .eq("project_id", projectId)
+          .order("number", { ascending: true })
+          .range(i * PAGE, (i + 1) * PAGE - 1)
+      )
+    ),
     supabase.from("selections").select("*").eq("project_id", projectId),
   ]);
 
