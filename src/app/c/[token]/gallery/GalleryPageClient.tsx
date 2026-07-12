@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { RotateCcw } from "lucide-react";
@@ -59,6 +59,15 @@ export default function GalleryPageClient() {
   const [galleryThumbFocusId, setGalleryThumbFocusId] = useState<string | null>(null);
   const [similarityToggleOn, setSimilarityToggleOn] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  // ── Presigned thumb 관리 ──────────────────────────────────────────────────
+  const gridRef        = useRef<HTMLDivElement>(null);
+  const pendingIdsRef  = useRef(new Set<string>()); // 이미 요청한 photoId
+  const retryingIdsRef = useRef(new Set<string>()); // onError 재시도 중
+  const batchTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [presignedUrls, setPresignedUrls] = useState(
+    new Map<string, { url: string; expiresAt: number }>()
+  );
 
   const galleryScrollKey = token ? `ps:c-gallery-scroll:${token}` : "";
 
@@ -199,6 +208,94 @@ export default function GalleryPageClient() {
   usePriorityImagePreload(displayPhotoUrls, galleryFocusIndex);
 
   const viewerQueryString = useMemo(() => buildFilterQueryString(filterState), [filterState]);
+
+  // presigned URL 일괄 적용
+  const applyPresignedUrls = useCallback(
+    (data: Record<string, { url: string; expiresAt: number }>) => {
+      setPresignedUrls((prev) => {
+        const next = new Map(prev);
+        for (const [id, info] of Object.entries(data)) next.set(id, info);
+        return next;
+      });
+    },
+    []
+  );
+
+  // presign-thumbs API 배치 호출 (최대 100장)
+  const fetchPresignBatch = useCallback(
+    async (ids: string[]) => {
+      if (!token || ids.length === 0) return;
+      try {
+        const res = await fetch(
+          `/api/c/presign-thumbs?token=${encodeURIComponent(token)}&photoIds=${ids.join(",")}`
+        );
+        if (!res.ok) { console.warn("[gallery] presign-thumbs", res.status); return; }
+        const data = (await res.json()) as {
+          presignedUrls: Record<string, { url: string; expiresAt: number }>;
+        };
+        applyPresignedUrls(data.presignedUrls ?? {});
+      } catch (e) {
+        console.warn("[gallery] presign batch error", e);
+      }
+    },
+    [token, applyPresignedUrls]
+  );
+
+  // img onError → 해당 사진 1회만 재발급 (HEAD 요청 없음)
+  const handleThumbError = useCallback(
+    (photoId: string) => {
+      if (retryingIdsRef.current.has(photoId)) return;
+      retryingIdsRef.current.add(photoId);
+      console.warn("[gallery] thumb error, re-presigning:", photoId);
+      fetchPresignBatch([photoId]).finally(() => retryingIdsRef.current.delete(photoId));
+    },
+    [fetchPresignBatch]
+  );
+
+  // IntersectionObserver — viewport 진입 시 100장씩 batch presign
+  useEffect(() => {
+    if (loading || !token || typeof IntersectionObserver === "undefined") return;
+    const grid = gridRef.current;
+    if (!grid) return;
+
+    const queuedIds: string[] = [];
+
+    const flush = () => {
+      while (queuedIds.length > 0) {
+        fetchPresignBatch(queuedIds.splice(0, 100));
+      }
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        let added = false;
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const photoId = (entry.target as HTMLElement).dataset.photoId;
+          if (!photoId || pendingIdsRef.current.has(photoId)) continue;
+          pendingIdsRef.current.add(photoId);
+          queuedIds.push(photoId);
+          observer.unobserve(entry.target);
+          added = true;
+        }
+        if (!added) return;
+        if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
+        // 80ms 내 추가 진입이 없으면 한 번에 flush
+        batchTimerRef.current = setTimeout(flush, 80);
+      },
+      { rootMargin: "400px 0px", threshold: 0 }
+    );
+
+    grid.querySelectorAll<HTMLElement>("[data-photo-id]").forEach((el) => {
+      const photoId = el.dataset.photoId;
+      if (photoId && !pendingIdsRef.current.has(photoId)) observer.observe(el);
+    });
+
+    return () => {
+      observer.disconnect();
+      if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
+    };
+  }, [loading, token, displayPhotos, fetchPresignBatch]);
 
   /* ── Handlers ── */
   const handleCheckClick = useCallback((e: React.MouseEvent, photoId: string) => {
@@ -616,20 +713,22 @@ export default function GalleryPageClient() {
 
         {/* ── Gallery Grid ── */}
         <main className="gl-grid-main" style={{ position: "relative", zIndex: 10, maxWidth: 1800, margin: "0 auto", padding: "0 24px" }}>
-          <div className="gl-photo-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 12 }}>
+          <div ref={gridRef} className="gl-photo-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 12 }}>
             {displayPhotos.map((photo, gridIndex) => {
-              const selected  = selectedIds.has(photo.id);
-              const state     = photoStates[photo.id];
-              const rating    = state?.rating;
-              const colorTags = state?.color ?? [];
-              const group     = photo.similarityGroupId ? groupsById.get(photo.similarityGroupId) : undefined;
+              const selected       = selectedIds.has(photo.id);
+              const state          = photoStates[photo.id];
+              const rating         = state?.rating;
+              const colorTags      = state?.color ?? [];
+              const group          = photo.similarityGroupId ? groupsById.get(photo.similarityGroupId) : undefined;
               const isRepresentative = !!group && group.representativePhotoId === photo.id;
-              const restCount = group ? group.photoCount - 1 : 0;
+              const restCount      = group ? group.photoCount - 1 : 0;
               const showGroupBadge = similarityToggleOn && isRepresentative && restCount > 0;
+              const presignedThumb = presignedUrls.get(photo.id)?.url;
 
               return (
                 <Link
                   key={photo.id}
+                  data-photo-id={photo.id}
                   href={`/c/${token}/viewer/${photo.id}${viewerQueryString}`}
                   onClick={(e) => {
                     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
@@ -640,13 +739,20 @@ export default function GalleryPageClient() {
                   }}
                   className={`gl-photo-card${selected ? " gl-selected" : ""}`}
                 >
-                  <img
-                    src={photo.url}
-                    alt={getPhotoDisplayName(photo)}
-                    {...galleryThumbPriorityProps(gridIndex, galleryFocusIndex, { whenNoFocus: "lazy" })}
-                    decoding="async"
-                    draggable={false}
-                  />
+                  {presignedThumb ? (
+                    <img
+                      key={presignedThumb}
+                      src={presignedThumb}
+                      alt={getPhotoDisplayName(photo)}
+                      {...galleryThumbPriorityProps(gridIndex, galleryFocusIndex, { whenNoFocus: "lazy" })}
+                      decoding="async"
+                      draggable={false}
+                      onError={() => handleThumbError(photo.id)}
+                    />
+                  ) : (
+                    // presigned URL 대기 중 placeholder
+                    <div style={{ width: "100%", height: "100%", background: "var(--surface)" }} aria-hidden />
+                  )}
 
                   <button
                     type="button"

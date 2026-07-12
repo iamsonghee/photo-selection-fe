@@ -160,6 +160,22 @@ export default function ViewerPage() {
   const star  = current ? photoStates[current.id]?.rating : undefined;
   const color = current ? photoStates[current.id]?.color  : undefined;
 
+  const [presignedPreviewUrl, setPresignedPreviewUrl] = useState<string | null>(null);
+
+  // activePhotoId 변경마다 preview presigned URL 발급
+  useEffect(() => {
+    if (!token || !activePhotoId) return;
+    setPresignedPreviewUrl(null);
+    let cancelled = false;
+    fetch(`/api/c/presign-preview?token=${encodeURIComponent(token)}&photoId=${activePhotoId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { url: string; expiresAt: number } | null) => {
+        if (!cancelled && data?.url) setPresignedPreviewUrl(data.url);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [token, activePhotoId]);
+
   const [hoverStar,      setHoverStar]      = useState(0);
   const [starPressRing,  setStarPressRing]  = useState<number | null>(null);
   const [colorPressRing, setColorPressRing] = useState<ColorTag | null>(null);
@@ -341,7 +357,8 @@ export default function ViewerPage() {
   const displayRating      = hoverStar || star || 0;
   const isCurrentSelected  = selectedIds.has(current.id);
   const filename           = getPhotoDisplayName(current);
-  const viewerSrc          = viewerImageUrl(current);
+  // presigned preview 우선, 발급 전에는 공개 URL 폴백 (Phase B: R2 public 유지)
+  const viewerSrc = presignedPreviewUrl ?? viewerImageUrl(current);
   const galleryHref        = buildGalleryHrefWithFocus(token, searchParams, photoId);
 
   return (
