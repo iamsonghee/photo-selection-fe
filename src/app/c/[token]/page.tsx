@@ -20,12 +20,12 @@ export default async function InvitePage({
     redirect(`/c/${token}/delivered`);
   }
 
-  // PIN 인증 체크
-  if (project?.accessPin) {
+  // PIN 인증 체크 — PIN 유무와 무관하게 쿠키가 없으면 pin 페이지로 (auto-verify가 PIN 없는 경우를 처리)
+  if (project) {
     const cookieStore = await cookies();
     const verified = cookieStore.get(`pin_verified_${token}`);
     if (!verified) {
-      redirect(`/c/${token}/pin`);
+      redirect(`/c/${token}/pin?from=${encodeURIComponent(`/c/${token}`)}`);
     }
   }
 
