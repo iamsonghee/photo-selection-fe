@@ -279,25 +279,36 @@ export async function updateProject(
 
 /** 프로젝트의 사진 목록 조회 */
 export async function getPhotosByProjectId(projectId: string): Promise<Photo[]> {
-  // Supabase PostgREST 기본 limit=1000 우회: 1000장씩 페이지네이션으로 전체 로드
+  // Supabase PostgREST 기본 limit=1000 우회: count 먼저 조회 후 페이지 병렬 요청
   const PAGE = 1000;
-  const all: Photo[] = [];
-  let from = 0;
-  while (true) {
-    const { data, error } = await supabase
+  const COLS = "id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, similarity_group_id";
+
+  const { count, error: countError } = await supabase
+    .from("photos")
+    .select("*", { count: "exact", head: true })
+    .eq("project_id", projectId);
+  if (countError) throw countError;
+
+  const total = count ?? 0;
+  if (total === 0) return [];
+
+  const pageCount = Math.ceil(total / PAGE);
+  const requests = Array.from({ length: pageCount }, (_, i) =>
+    supabase
       .from("photos")
-      .select("id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, similarity_group_id")
+      .select(COLS)
       .eq("project_id", projectId)
       .order("number", { ascending: true })
-      .range(from, from + PAGE - 1);
+      .range(i * PAGE, (i + 1) * PAGE - 1)
+  );
 
+  const results = await Promise.all(requests);
+  const all: Photo[] = [];
+  for (const { data, error } of results) {
     if (error) throw error;
-    const rows = data ?? [];
-    all.push(...rows.map((row) =>
+    all.push(...(data ?? []).map((row) =>
       mapPhotoRow(row as unknown as Database["public"]["Tables"]["photos"]["Row"])
     ));
-    if (rows.length < PAGE) break;
-    from += PAGE;
   }
   return all;
 }
@@ -306,28 +317,37 @@ export async function getPhotosByProjectId(projectId: string): Promise<Photo[]> 
 export async function getPhotosWithSelections(
   projectId: string
 ): Promise<{ photos: Photo[]; selectedIds: Set<string>; photoStates: Record<string, PhotoState> }> {
-  // Supabase PostgREST 기본 limit=1000 우회: photos는 페이지네이션, selections는 단건
+  // count 먼저 조회 후 photos 페이지 병렬 + selections 동시 요청
   const PAGE = 1000;
-  const allPhotoRows: Database["public"]["Tables"]["photos"]["Row"][] = [];
-  let from = 0;
-  while (true) {
-    const { data, error } = await supabase
+
+  const { count, error: countError } = await supabase
+    .from("photos")
+    .select("*", { count: "exact", head: true })
+    .eq("project_id", projectId);
+  if (countError) throw countError;
+
+  const pageCount = Math.ceil((count ?? 0) / PAGE);
+  const photoRequests = Array.from({ length: Math.max(1, pageCount) }, (_, i) =>
+    supabase
       .from("photos")
       .select("*")
       .eq("project_id", projectId)
       .order("number", { ascending: true })
-      .range(from, from + PAGE - 1);
+      .range(i * PAGE, (i + 1) * PAGE - 1)
+  );
+
+  const [photoResults, selectionsResult] = await Promise.all([
+    Promise.all(photoRequests),
+    supabase.from("selections").select("*").eq("project_id", projectId),
+  ]);
+
+  const allPhotoRows: Database["public"]["Tables"]["photos"]["Row"][] = [];
+  for (const { data, error } of photoResults) {
     if (error) throw error;
-    const rows = (data ?? []) as Database["public"]["Tables"]["photos"]["Row"][];
-    allPhotoRows.push(...rows);
-    if (rows.length < PAGE) break;
-    from += PAGE;
+    allPhotoRows.push(...((data ?? []) as Database["public"]["Tables"]["photos"]["Row"][]));
   }
 
-  const { data: selectionsData, error: selectionsError } = await supabase
-    .from("selections")
-    .select("*")
-    .eq("project_id", projectId);
+  const { data: selectionsData, error: selectionsError } = selectionsResult;
   if (selectionsError) throw selectionsError;
 
   const selections = selectionsData ?? [];
