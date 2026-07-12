@@ -279,33 +279,58 @@ export async function updateProject(
 
 /** 프로젝트의 사진 목록 조회 */
 export async function getPhotosByProjectId(projectId: string): Promise<Photo[]> {
-  // OPT-03: 필요한 컬럼만 조회 (created_at은 photos 테이블에 없으므로 제외)
-  const { data, error } = await supabase
-    .from("photos")
-    .select("id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, similarity_group_id")
-    .eq("project_id", projectId)
-    .order("number", { ascending: true });
+  // Supabase PostgREST 기본 limit=1000 우회: 1000장씩 페이지네이션으로 전체 로드
+  const PAGE = 1000;
+  const all: Photo[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("photos")
+      .select("id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, similarity_group_id")
+      .eq("project_id", projectId)
+      .order("number", { ascending: true })
+      .range(from, from + PAGE - 1);
 
-  if (error) throw error;
-  return (data ?? []).map((row) =>
-    mapPhotoRow(row as unknown as Database["public"]["Tables"]["photos"]["Row"])
-  );
+    if (error) throw error;
+    const rows = data ?? [];
+    all.push(...rows.map((row) =>
+      mapPhotoRow(row as unknown as Database["public"]["Tables"]["photos"]["Row"])
+    ));
+    if (rows.length < PAGE) break;
+    from += PAGE;
+  }
+  return all;
 }
 
 /** 프로젝트의 사진 목록 + 선택/태그 상태 (고객 갤러리용) */
 export async function getPhotosWithSelections(
   projectId: string
 ): Promise<{ photos: Photo[]; selectedIds: Set<string>; photoStates: Record<string, PhotoState> }> {
-  const [photosRes, selectionsRes] = await Promise.all([
-    supabase.from("photos").select("*").eq("project_id", projectId).order("number", { ascending: true }),
-    supabase.from("selections").select("*").eq("project_id", projectId),
-  ]);
+  // Supabase PostgREST 기본 limit=1000 우회: photos는 페이지네이션, selections는 단건
+  const PAGE = 1000;
+  const allPhotoRows: Database["public"]["Tables"]["photos"]["Row"][] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("photos")
+      .select("*")
+      .eq("project_id", projectId)
+      .order("number", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as Database["public"]["Tables"]["photos"]["Row"][];
+    allPhotoRows.push(...rows);
+    if (rows.length < PAGE) break;
+    from += PAGE;
+  }
 
-  if (photosRes.error) throw photosRes.error;
-  if (selectionsRes.error) throw selectionsRes.error;
+  const { data: selectionsData, error: selectionsError } = await supabase
+    .from("selections")
+    .select("*")
+    .eq("project_id", projectId);
+  if (selectionsError) throw selectionsError;
 
-  const rows = (photosRes.data ?? []) as Database["public"]["Tables"]["photos"]["Row"][];
-  const selections = selectionsRes.data ?? [];
+  const selections = selectionsData ?? [];
   const selectedIds = new Set(selections.map((s: { photo_id: string }) => s.photo_id));
   const photoStates: Record<string, PhotoState> = {};
   for (const s of selections as Array<{ photo_id: string; rating: number | null; color_tag: string | null; comment: string | null }>) {
@@ -317,7 +342,7 @@ export async function getPhotosWithSelections(
     };
   }
 
-  const photos = rows.map((row) => mapPhotoRow(row, selectedIds, photoStates));
+  const photos = allPhotoRows.map((row) => mapPhotoRow(row, selectedIds, photoStates));
   return { photos, selectedIds, photoStates };
 }
 
