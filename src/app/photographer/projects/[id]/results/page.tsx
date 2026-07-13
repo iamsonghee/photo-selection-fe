@@ -215,7 +215,7 @@ export default function ResultsPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((data as { error?: string }).error ?? "상태 변경 실패");
       setShowEditStartModal(false);
-      router.push(`/photographer/projects/${id}/upload-versions`);
+      router.push(`/photographer/projects/${id}/workflow`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "상태 변경 실패");
     } finally {
@@ -255,10 +255,7 @@ export default function ResultsPage() {
   const canViewSelections = project.status !== "preparing";
   const canEditVersions = ["confirmed", "editing", "editing_v2", "reviewing_v1", "reviewing_v2", "delivered"].includes(project.status);
   const canReview = ["reviewing_v1", "reviewing_v2", "delivered"].includes(project.status);
-  const editVersionsPath =
-    project.status === "editing_v2" || project.status === "reviewing_v2"
-      ? `/photographer/projects/${id}/upload-versions/v2`
-      : `/photographer/projects/${id}/upload-versions`;
+  const workflowPath = `/photographer/projects/${id}/workflow`;
 
   const N = project.requiredCount || 0;
   const selectionPct = N > 0 ? Math.min(100, Math.round((photos.length / N) * 100)) : photos.length > 0 ? 100 : 0;
@@ -381,8 +378,8 @@ export default function ResultsPage() {
             <ProjectActionFlow variant="compact" steps={buildCompactSteps("results", project, {
               onUpload: () => router.push(`/photographer/projects/${id}/upload`),
               onResults: () => router.push(`/photographer/projects/${id}/results`),
-              onVersions: () => { if (project.status === "confirmed") setShowEditGuideModal(true); else router.push(editVersionsPath); },
-              onVersionsV2: () => router.push(`/photographer/projects/${id}/upload-versions/v2`),
+              onVersions: () => { if (project.status === "confirmed") setShowEditGuideModal(true); else router.push(workflowPath); },
+              onVersionsV2: () => router.push(workflowPath),
             })} />
           </section>
         </aside>
@@ -510,7 +507,7 @@ export default function ResultsPage() {
                   {project.status === "editing" && (
                     <button
                       type="button"
-                      onClick={() => router.push(editVersionsPath)}
+                      onClick={() => router.push(workflowPath)}
                       style={{
                         display: "flex", alignItems: "center", gap: 6,
                         padding: "9px 20px", background: ACCENT,

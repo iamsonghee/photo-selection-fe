@@ -1484,10 +1484,6 @@ export default function ProjectDetailPage() {
   const M = project.photoCount;
   const daysLeft = differenceInDays(new Date(project.deadline), new Date());
   const isInviteActive = project.status !== "preparing";
-  const canViewSelections = project.status !== "preparing";
-  const canEditVersions = ["confirmed", "editing", "editing_v2", "reviewing_v1", "reviewing_v2", "delivered"].includes(project.status);
-  const canReview = ["reviewing_v1", "reviewing_v2", "delivered"].includes(project.status);
-  const editVersionsPath = project.status === "editing_v2" || project.status === "reviewing_v2" ? `/photographer/projects/${id}/upload-versions/v2` : `/photographer/projects/${id}/upload-versions`;
   const progressPct = N > 0 ? Math.min(100, Math.round((displayPhotos.length / N) * 100)) : 0;
   const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
   const showServerWorking = uploadPhase === "sending" && awaitingServerFinalize;
