@@ -9,7 +9,7 @@
 
 import { test, expect, type BrowserContext } from "@playwright/test";
 import { createHmac } from "crypto";
-import { setupFullProject, deleteTestProject, type TestProject } from "../../helpers/setup";
+import { setupFullProject, setProjectPin, deleteTestProject, type TestProject } from "../../helpers/setup";
 import { loginAsPhotographer } from "../../helpers/auth";
 
 // ─── 서명 헬퍼 (customer-auth-server.ts 와 동일) ─────────────────────────
@@ -191,6 +191,49 @@ test.describe("Phase A — middleware redirect", () => {
     await page.goto(`/c/${project.accessToken}/gallery`, { waitUntil: "commit" });
     // pin 페이지로 redirect 되지 않아야 함
     expect(page.url()).not.toContain("/pin");
+    await ctx.close();
+  });
+});
+
+// ─── PIN 폼 UI 흐름 (regression: 인증 직후 목적지 렌더링) ────────────────────
+// BUG-001: PinForm 성공 후 router.replace(from) 로 클라이언트 사이드 전환하면
+// [token] 세그먼트를 감싸는 SelectionProvider가 리마운트되지 않아 /pin 페이지
+// 진입 시 이미 실패했던 /api/c/photos fetch 결과(project=null)가 유지되어
+// 갤러리가 "INVALID_TOKEN"을 표시했다. window.location.href 로 전체 페이지
+// 이동을 강제해 새 쿠키로 fetch가 재실행되도록 수정했다.
+test.describe("Phase A — PIN 폼 UI 흐름", () => {
+  let pinProject: TestProject;
+
+  test.beforeAll(async ({ browser }) => {
+    const page = await browser.newPage();
+    pinProject = await setupFullProject(page, 3);
+    await setProjectPin(page, pinProject.projectId, "1234");
+    await page.close();
+  });
+
+  test.afterAll(async ({ browser }) => {
+    if (!pinProject?.projectId) return;
+    const page = await browser.newPage();
+    await loginAsPhotographer(page);
+    await deleteTestProject(page, pinProject.projectId);
+    await page.close();
+  });
+
+  test("U1: 올바른 PIN 입력 후 새로고침 없이 갤러리가 정상 렌더링된다", async ({ browser }) => {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+
+    await page.goto(pinProject.galleryUrl);
+    await expect(page).toHaveURL(/\/pin/);
+
+    for (const digit of "1234") {
+      await page.keyboard.press(digit);
+    }
+
+    await page.waitForURL(/\/gallery/, { timeout: 10_000 });
+    await expect(page.locator(".gl-header-project-title")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("INVALID_TOKEN")).toHaveCount(0);
+
     await ctx.close();
   });
 });

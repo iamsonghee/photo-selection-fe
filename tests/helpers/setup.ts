@@ -57,6 +57,14 @@ export async function createEditingProject(page: Page, photoCount = 5): Promise<
   };
 }
 
+/** 프로젝트에 4자리 PIN 설정 (로그인된 작가 세션 필요) */
+export async function setProjectPin(page: Page, projectId: string, pin: string): Promise<void> {
+  const res = await page.request.patch(`/api/photographer/projects/${projectId}`, {
+    data: { access_pin: pin },
+  });
+  if (!res.ok()) throw new Error(`setProjectPin failed (${res.status()}): ${await res.text()}`);
+}
+
 /** 테스트 프로젝트 삭제 (사진·선택 포함) */
 export async function deleteTestProject(page: Page, projectId: string): Promise<void> {
   await page.request.delete("/api/auth/test-setup", { data: { projectId } });

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Lock } from "lucide-react";
 import { BrandLogoBar } from "@/components/BrandLogo";
 
@@ -22,8 +21,6 @@ const DISPLAY    = "'Space Grotesk', 'Pretendard Variable', sans-serif";
 const BODY_FONT  = "'Pretendard Variable', -apple-system, sans-serif";
 
 export default function PinForm({ token, from }: { token: string; from: string }) {
-  const router = useRouter();
-
   const [pins, setPins] = useState(["", "", "", ""]);
   const [error, setError] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
@@ -54,7 +51,12 @@ export default function PinForm({ token, from }: { token: string; from: string }
       const data = await res.json();
 
       if (data.success) {
-        router.replace(from);
+        // router.replace 로 클라이언트 사이드 전환하면 같은 [token] 세그먼트를
+        // 감싸는 SelectionProvider 가 리마운트되지 않아, PIN 페이지 진입 시
+        // 이미 실패했던 /api/c/photos fetch(useEffect deps=[token])가 재실행되지 않고
+        // project=null 상태가 그대로 유지된다. 전체 페이지 이동으로 새 쿠키가
+        // 적용된 상태에서 fetch가 다시 실행되도록 강제한다.
+        window.location.href = from;
       } else if (data.locked) {
         setLocked(true);
         setRetryAfter(data.retryAfterSeconds ?? 60);
