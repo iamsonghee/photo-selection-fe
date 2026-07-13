@@ -20,11 +20,16 @@ export type ThumbLoadQueue = {
   /** 슬롯을 요청. 즉시 또는 나중에 onGranted가 호출된다. 아직 대기 중일 때만 취소 가능한 함수를 반환. */
   requestSlot(onGranted: () => void): () => void;
   releaseSlot(): void;
+  /** 이 URL이 이번 세션에서 이미 한 번 성공적으로 로드된 적이 있는지. */
+  hasLoaded(url: string): boolean;
+  /** 이 URL이 성공적으로 로드됐음을 기록 (재마운트 시 IO/큐 대기를 건너뛰기 위함). */
+  markLoaded(url: string): void;
 };
 
 export function createThumbLoadQueue(maxConcurrent: number): ThumbLoadQueue {
   let active = 0;
   const queue: Array<() => void> = [];
+  const loaded = new Set<string>();
 
   return {
     requestSlot(onGranted) {
@@ -48,6 +53,12 @@ export function createThumbLoadQueue(maxConcurrent: number): ThumbLoadQueue {
         next();
       }
     },
+    hasLoaded(url) {
+      return loaded.has(url);
+    },
+    markLoaded(url) {
+      loaded.add(url);
+    },
   };
 }
 
@@ -70,6 +81,9 @@ export function useQueuedThumbSrc(
   handleError: () => void;
 } {
   const { queue, rootRef, rootMargin = "100px", bypass = false } = opts;
+  // 이미 한 번 성공적으로 로드된 URL이면 로컬 blob 미리보기와 동일하게 즉시 표시 —
+  // 화면 밖으로 나갔다 돌아온 사진이 새 다운로드처럼 큐에서 다시 대기하지 않게 한다.
+  const effectiveBypass = bypass || (url !== undefined && queue.hasLoaded(url));
   const cellElRef = useRef<Element | null>(null);
   const cellRef = useCallback((node: Element | null) => {
     cellElRef.current = node;
@@ -80,7 +94,7 @@ export function useQueuedThumbSrc(
   const lastMountedImgRef = useRef<HTMLImageElement | null>(null);
   const holdsSlotRef = useRef(false);
   const finishedRef = useRef(false);
-  const [shouldLoad, setShouldLoad] = useState(bypass);
+  const [shouldLoad, setShouldLoad] = useState(effectiveBypass);
 
   const releaseSlotIfHeld = useCallback(() => {
     if (holdsSlotRef.current) {
@@ -91,10 +105,10 @@ export function useQueuedThumbSrc(
 
   // url이 바뀌면(재시도 등) 처음부터 다시 로드해야 한다 — 렌더 중 상태 조정(React 권장 패턴).
   // ref는 렌더 중에 건드릴 수 없으므로 finishedRef 리셋과 이전 슬롯 반환은 아래 이펙트에서 처리.
-  const [tracked, setTracked] = useState({ url, bypass });
-  if (tracked.url !== url || tracked.bypass !== bypass) {
-    setTracked({ url, bypass });
-    setShouldLoad(bypass);
+  const [tracked, setTracked] = useState({ url, bypass: effectiveBypass });
+  if (tracked.url !== url || tracked.bypass !== effectiveBypass) {
+    setTracked({ url, bypass: effectiveBypass });
+    setShouldLoad(effectiveBypass);
   }
 
   // url/bypass가 바뀌어 새 로드 주기가 시작될 때: 이전 주기에서 슬롯을 들고 아직
@@ -111,7 +125,7 @@ export function useQueuedThumbSrc(
   }, [tracked, queue]);
 
   useEffect(() => {
-    if (bypass || shouldLoad || !url) return;
+    if (effectiveBypass || shouldLoad || !url) return;
     const el = cellElRef.current;
     if (!el) return;
     const root = rootRef?.current ?? null;
@@ -133,7 +147,7 @@ export function useQueuedThumbSrc(
       io.disconnect();
       cancelSlotRequest?.();
     };
-  }, [bypass, shouldLoad, url, queue, rootRef, rootMargin]);
+  }, [effectiveBypass, shouldLoad, url, queue, rootRef, rootMargin]);
 
   // <img>는 shouldLoad가 true일 때만 마운트되므로, 그때마다 마지막으로 마운트된
   // 노드를 별도로 기록해둔다 (언마운트 cleanup 시점엔 React가 imgRef.current를
@@ -156,13 +170,14 @@ export function useQueuedThumbSrc(
 
   const handleLoad = useCallback(() => {
     finishedRef.current = true;
+    if (url) queue.markLoaded(url);
     releaseSlotIfHeld();
-  }, [releaseSlotIfHeld]);
+  }, [releaseSlotIfHeld, url, queue]);
 
   const handleError = useCallback(() => {
     finishedRef.current = true;
     releaseSlotIfHeld();
   }, [releaseSlotIfHeld]);
 
-  return { cellRef, imgRef, shouldLoad: bypass || shouldLoad, handleLoad, handleError };
+  return { cellRef, imgRef, shouldLoad: effectiveBypass || shouldLoad, handleLoad, handleError };
 }
