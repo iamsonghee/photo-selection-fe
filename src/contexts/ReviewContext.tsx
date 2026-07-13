@@ -4,10 +4,12 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import { useParams } from "next/navigation";
 import type { ReviewStatus } from "@/types";
 import type { ReviewPhotoItem } from "@/lib/customer-api-server";
 
@@ -42,7 +44,15 @@ export function useReviewOptional() {
   return useContext(ReviewContext);
 }
 
+/** 새로고침 시 아직 제출하지 않은 검토(확정/재보정 선택)가 사라지지 않도록 탭 단위로 임시 저장 */
+function reviewStateStorageKey(token: string) {
+  return `review_state_${token}`;
+}
+
 export function ReviewProvider({ children }: { children: React.ReactNode }) {
+  const params = useParams();
+  const token = (params?.token as string) ?? "";
+
   const [reviewPhotos, setReviewPhotos] = useState<ReviewPhotoItem[]>([]);
   const [reviewPhotosLoading, setReviewPhotosLoading] = useState(false);
   const loadedKeyRef = useRef<string | null>(null);
@@ -76,7 +86,28 @@ export function ReviewProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setReviewPhotosLoading(false));
   }, []);
 
-  const [reviewState, setReviewState] = useState<Record<string, ReviewStateItem>>({});
+  const [reviewState, setReviewState] = useState<Record<string, ReviewStateItem>>(() => {
+    if (typeof window === "undefined" || !token) return {};
+    try {
+      const raw = sessionStorage.getItem(reviewStateStorageKey(token));
+      return raw ? (JSON.parse(raw) as Record<string, ReviewStateItem>) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    if (!token) return;
+    try {
+      if (Object.keys(reviewState).length === 0) {
+        sessionStorage.removeItem(reviewStateStorageKey(token));
+      } else {
+        sessionStorage.setItem(reviewStateStorageKey(token), JSON.stringify(reviewState));
+      }
+    } catch {
+      // sessionStorage 사용 불가(시크릿 모드 등) — 로컬 state만으로 계속 동작
+    }
+  }, [reviewState, token]);
 
   const setReview = useCallback((photoId: string, status: ReviewStatus, comment?: string | null) => {
     setReviewState((prev) => ({

@@ -349,6 +349,8 @@ export default function UploadVersionsPanel({
       const uploadData = ((): {
         error?: string;
         detail?: string | Array<{ msg?: string; message?: string }>;
+        uploaded?: number;
+        message?: string;
       } => {
         try {
           return JSON.parse(uploadRes.text || "{}");
@@ -366,6 +368,16 @@ export default function UploadVersionsPanel({
               ? uploadData.detail[0]?.msg ?? uploadData.detail[0]?.message
               : null);
         throw new Error(msg ?? "업로드 실패");
+      }
+
+      // 서버가 200을 반환해도 일부 파일(빈 파일·지원하지 않는 형식 등)은 조용히 스킵할 수 있다.
+      // 제출한 사진 수보다 실제 처리된 수가 적으면 성공으로 간주하지 않고 사용자에게 알린다.
+      if (typeof uploadData.uploaded === "number" && uploadData.uploaded < changed.length) {
+        const failedCount = changed.length - uploadData.uploaded;
+        throw new Error(
+          uploadData.message ??
+            `${changed.length}장 중 ${failedCount}장이 업로드되지 않았습니다. 파일 형식과 용량을 확인한 뒤 다시 시도해주세요.`
+        );
       }
 
       onDelivered(version);

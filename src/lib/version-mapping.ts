@@ -36,12 +36,13 @@ export function stemFilename(normalized: string): string {
     .replace(/[_-](retouched?|edited?|final|comp|web|export|out|lr|co|ps)$/, "")
     // 한글 접미사: 보정, 편집, 수정, 완성, 최종, 납품, 리터칭
     .replace(/[_-](보정|편집|수정|완성|최종|납품|리터칭)$/, "")
-    // 공통: _v1, _v2, -v1, -v2, -1, -2, _1, _2 (숫자만)
-    .replace(/[_-]v?\d+$/, "")
+    // 공통: _v1, _v2, -v1, -v2, -1, -2, _1, _2 (버전 표기·1~2자리 변형 번호만 — "DSC_0001"처럼
+    // 3자리 이상인 원본 파일명 고유 번호까지 지워버리면 서로 다른 사진이 같은 stem으로 충돌한다)
+    .replace(/[_-](?:v\d+|\d{1,2})$/, "")
     // 연속 처리 (중첩 suffix 제거)
     .replace(/[_-](retouched?|edited?|final|comp|web|export|out|lr|co|ps)$/, "")
     .replace(/[_-](보정|편집|수정|완성|최종|납품|리터칭)$/, "")
-    .replace(/[_-]v?\d+$/, "")
+    .replace(/[_-](?:v\d+|\d{1,2})$/, "")
     .trim();
 }
 
