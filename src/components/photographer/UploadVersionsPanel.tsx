@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
+  applySequentialFallback,
   buildServerPlaceholderMapping,
   buildVersionMapping,
   clearSingleFile,
@@ -142,8 +143,10 @@ export default function UploadVersionsPanel({
     mappingRef.current = mapping;
   }, [mapping]);
 
-  // exact/fuzzy 매칭에 실패한 잔여 항목(type "none")에 대해 CLIP 유사도 매칭을 시도.
-  // 실패해도 절대 throw하지 않으므로(matchRetouchByClip 내부에서 보장) 그대로 "none" 유지.
+  // exact/fuzzy 매칭에 실패한 잔여 항목(type "none")에 대해 CLIP 유사도 매칭을 시도하고,
+  // 그래도 남은 항목은 순서대로 짝지어 "order"(순서 배지)로 표시한다 — 매칭 근거가 없는
+  // 최후 폴백이므로 항상 시각적으로 구분되고, 작가가 "변경"으로 언제든 재지정할 수 있다.
+  // matchRetouchByClip은 실패해도 절대 throw하지 않는다(내부에서 보장).
   const runClipMatchPass = useCallback(
     async (files: File[], rows: MappingResult<UploadPanelTarget>[]) => {
       const claimed = new Set(rows.map((r) => r.file).filter((f): f is File => f != null));
@@ -156,8 +159,12 @@ export default function UploadVersionsPanel({
         const matches = await matchRetouchByClip(projectId, leftoverPhotoIds, leftoverFiles, {
           signal: AbortSignal.timeout(20000),
         });
-        if (matches.length === 0) return;
-        setMapping((prev) => applyClipMatches(prev, leftoverFiles, matches));
+        setMapping((prev) => {
+          const afterClip = matches.length > 0 ? applyClipMatches(prev, leftoverFiles, matches) : prev;
+          const stillClaimed = new Set(afterClip.map((r) => r.file).filter((f): f is File => f != null));
+          const stillLeftoverFiles = leftoverFiles.filter((f) => !stillClaimed.has(f));
+          return applySequentialFallback(afterClip, stillLeftoverFiles);
+        });
       } finally {
         setClipMatching(false);
       }

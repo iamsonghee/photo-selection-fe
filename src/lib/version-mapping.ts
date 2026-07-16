@@ -100,6 +100,23 @@ export function buildServerPlaceholderMapping<T extends MappingTarget & { server
   );
 }
 
+/**
+ * exact/fuzzy/CLIP 매칭에도 실패한 잔여 항목("none")을 잔여 파일과 순서대로 짝짓는
+ * 최후 폴백. 매칭 근거가 없으므로 반드시 "order" 타입(순서 배지)으로 표시해
+ * 작가가 확인 후 필요 시 "변경"으로 재지정할 수 있게 한다.
+ */
+export function applySequentialFallback<T extends MappingTarget>(
+  rows: MappingResult<T>[],
+  leftoverFiles: File[]
+): MappingResult<T>[] {
+  const files = [...leftoverFiles];
+  return rows.map((row) => {
+    if (row.type !== "none" || files.length === 0) return row;
+    const file = files.shift()!;
+    return { ...row, file, type: "order" as const };
+  });
+}
+
 export function remapSingleFile<T extends MappingTarget>(
   prev: MappingResult<T>[],
   targetId: string,

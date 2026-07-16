@@ -283,7 +283,7 @@
 - **시작 조건**: `status === "confirmed"`(V1) 또는 `status === "editing_v2"`(V2, 고객이 재보정을 요청한 경우에만 존재).
 - **사용자가 수행하는 단계**:
   1. "보정 시작" 클릭 → `confirmed → editing` 전환.
-  2. 보정된 파일을 원본과 매칭(파일명 자동 매칭 또는 CLIP 기반 퍼지 매칭)하여 업로드.
+  2. 보정된 파일을 원본과 매칭해 업로드. 매칭은 4단계 순서로 자동 시도된다: ① 파일명 완전 일치 → ② 편집 툴 접미사 제거 후 유사 파일명 → ③ CLIP 이미지 유사도 → ④(2026-07-13 추가) 위 세 단계 모두 실패한 잔여 사진·잔여 파일을 순서대로 짝짓는 최후 폴백("순서" 배지로 표시, 근거가 약하므로 작가가 확인 후 "변경"으로 재지정 가능).
   3. "고객에게 전달" 클릭 → `editing → reviewing_v1` 또는 `editing_v2 → reviewing_v2` 전환.
 - **프론트엔드 라우트**: `/photographer/projects/[id]/workflow`(**실제 사용되는 유일한 V1/V2 업로드·전달 화면** — 프로젝트 상세 허브의 모든 보정 관련 버튼이 여기로 연결됨, `UploadVersionsPanel.tsx` 컴포넌트가 담당). (`/photographer/projects/[id]/edit/start`와 `/photographer/projects/[id]/upload-versions`, `.../upload-versions/v2`는 어디서도 링크되지 않던 레거시 페이지로 2026-07-13 삭제됨 — `/results` 페이지의 "보정 시작하기"/"보정본 업로드" 버튼도 이때 `/workflow`로 가도록 함께 수정됨)
 - **호출되는 API**:
@@ -294,7 +294,7 @@
 - **성공 시 기대 결과**: 고객 쪽 `/c/[token]/review`가 활성화되고, `/c/[token]/locked` 등에서도 "보정본이 도착했습니다" 안내가 노출(고객 흐름 §Part1-11).
 - **실패 및 경계 상황**: 재보정 횟수 베타 한도(`BETA_MAX_REVISION_COUNT=2`)를 넘는 버전 업로드는 FastAPI가 거부. 2MB를 넘는 보정본은 품질을 85%→60%까지 단계적으로 낮춰 자동으로 맞춤(그래도 못 맞추면 어떻게 되는지는 **확인 필요**). V1을 다시 업로드(교체)하면 해당 사진의 `version_reviews`가 삭제되어 고객이 재검토해야 함.
 - **관련 권한/인증 조건**: 로그인 세션(Supabase JWT를 FastAPI에 직접 전달), 소유권.
-- **QA에서 확인해야 할 항목**: `canUploadV1`/`canUploadV2` 조건(`["editing","reviewing_v1"]`/`["editing_v2","reviewing_v2"]`) 밖의 상태에서 업로드 시도 시 UI 차단 여부, 파일명 매칭이 실패했을 때 CLIP 매칭 제안 UI의 정확도.
+- **QA에서 확인해야 할 항목**: `canUploadV1`/`canUploadV2` 조건(`["editing","reviewing_v1"]`/`["editing_v2","reviewing_v2"]`) 밖의 상태에서 업로드 시도 시 UI 차단 여부, 파일명 매칭이 실패했을 때 CLIP 매칭 제안 UI의 정확도, 순차 폴백("순서" 배지)으로 잘못 매칭된 경우 "변경"으로 정상 재지정되는지.
 
 ---
 
