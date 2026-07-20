@@ -5,6 +5,14 @@ import { getAdminClient } from "@/lib/supabase-admin";
 const CLIP_SERVICE_URL = process.env.CLIP_SERVICE_URL ?? "";
 const CLIP_INTERNAL_TOKEN = process.env.CLIP_INTERNAL_TOKEN ?? "";
 
+/** clip-service 실패 응답 상태 코드 → 사용자 노출용 한국어 메시지 */
+const CLIP_ERROR_MESSAGES: Record<number, string> = {
+  404: "프로젝트를 찾을 수 없습니다.",
+  409: "이미 분석이 진행 중입니다.",
+  503: "분석 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.",
+};
+const CLIP_ERROR_FALLBACK = "분석 시작에 실패했습니다. 잠시 후 다시 시도해주세요.";
+
 async function getPhotographerIdFromSession(): Promise<string | null> {
   const supabase = await createClient();
   const {
@@ -59,6 +67,15 @@ export async function POST(
       },
       body: JSON.stringify({ project_id: projectId }),
     });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      const detail = (body as { detail?: string }).detail;
+      return NextResponse.json(
+        { error: CLIP_ERROR_MESSAGES[res.status] ?? CLIP_ERROR_FALLBACK, detail },
+        { status: res.status }
+      );
+    }
 
     const text = await res.text();
     return new NextResponse(text, {

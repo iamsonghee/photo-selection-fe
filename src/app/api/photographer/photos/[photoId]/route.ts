@@ -73,7 +73,10 @@ export async function DELETE(
       }
     }
 
-    const { error: delErr } = await admin.from("photos").delete().eq("id", photoId);
+    const { data: groupResult, error: delErr } = await admin.rpc(
+      "delete_photo_and_resolve_group",
+      { p_photo_id: photoId }
+    );
     if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
 
     const { count } = await admin
@@ -86,7 +89,7 @@ export async function DELETE(
       .update({ photo_count: newCount, updated_at: new Date().toISOString() })
       .eq("id", projectId);
 
-    return NextResponse.json({ photoId });
+    return NextResponse.json({ photoId, group: groupResult ?? null });
   } catch (e) {
     console.error("[DELETE photo]", e);
     return NextResponse.json(

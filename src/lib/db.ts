@@ -70,6 +70,9 @@ function mapPhotoRow(
     tag: state ? { star: state.rating as 1 | 2 | 3 | 4 | 5 | undefined, color: state.color } : undefined,
     comment: state?.comment ?? undefined,
     similarityGroupId: (row as { similarity_group_id?: string | null }).similarity_group_id ?? null,
+    isBlurry: (row as { is_blurry?: boolean | null }).is_blurry ?? null,
+    faceDetected: (row as { face_detected?: boolean | null }).face_detected ?? null,
+    eyesClosed: (row as { eyes_closed?: boolean | null }).eyes_closed ?? null,
   };
 }
 
@@ -282,7 +285,8 @@ export async function getPhotosByProjectId(projectId: string): Promise<Photo[]> 
   // Supabase PostgREST 기본 limit=1000 우회.
   // BETA_MAX=3000이므로 3페이지를 처음부터 병렬 요청 — count 왕복 없음.
   const PAGE = 1000;
-  const COLS = "id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, similarity_group_id";
+  const COLS =
+    "id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, similarity_group_id, is_blurry, face_detected, eyes_closed";
 
   const results = await Promise.all(
     [0, 1, 2].map((i) =>

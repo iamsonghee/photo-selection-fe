@@ -2,8 +2,10 @@
 
 import { memo, useState } from "react";
 import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
 import { COLOR_OPTIONS, getPhotoDisplayName } from "@/lib/gallery-filter";
 import { useQueuedThumbSrc, type ThumbLoadQueue } from "@/lib/thumb-load-queue";
+import { qualityWarningLabel } from "@/lib/photo-quality";
 import type { Photo, StarRating, ColorTag } from "@/types";
 
 const EMPTY_COLOR_TAGS: ColorTag[] = [];
@@ -48,6 +50,7 @@ function GalleryPhotoCardImpl({
   onThumbError,
 }: GalleryPhotoCardProps) {
   const [hoverStar, setHoverStar] = useState(0);
+  const warningLabel = qualityWarningLabel(photo);
   const { cellRef, imgRef, shouldLoad, handleLoad, handleError } = useQueuedThumbSrc(presignedThumb, {
     queue: thumbQueue,
     rootMargin: "150px",
@@ -92,6 +95,12 @@ function GalleryPhotoCardImpl({
           </svg>
         )}
       </button>
+
+      {warningLabel && (
+        <div className="gl-quality-badge" title={warningLabel} aria-label={warningLabel}>
+          <AlertTriangle size={11} />
+        </div>
+      )}
 
       {showGroupBadge && groupId && (
         <button

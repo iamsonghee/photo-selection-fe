@@ -184,6 +184,10 @@ export default function GalleryPageClient() {
 
   const showSimilarityToggle = project?.clipAnalysisStatus === "completed" && photoGroups.length > 0;
 
+  /** 작가가 대표컷을 삭제한 직후 photoGroups가 아직 갱신되지 않은 경우(방어 폴백) 대비 —
+   *  대표컷이 현재 photos 목록에 없는 그룹은 없는 것처럼 취급해 멤버가 전부 누락되는 걸 막는다. */
+  const photoIdSet = useMemo(() => new Set(photos.map((p) => p.id)), [photos]);
+
   /* 토글 ON: 대표컷 + 미분류 사진만, 펼쳐진 그룹은 대표컷 바로 뒤에 나머지 인라인 삽입 */
   const displayPhotos = useMemo(() => {
     if (!similarityToggleOn) return filteredPhotos;
@@ -192,7 +196,7 @@ export default function GalleryPageClient() {
       const groupId = photo.similarityGroupId;
       if (!groupId) { result.push(photo); continue; }
       const group = groupsById.get(groupId);
-      if (!group) { result.push(photo); continue; }
+      if (!group || !photoIdSet.has(group.representativePhotoId)) { result.push(photo); continue; }
       if (photo.id !== group.representativePhotoId) continue;
       result.push(photo);
       if (expandedGroups.has(groupId)) {
@@ -201,7 +205,7 @@ export default function GalleryPageClient() {
       }
     }
     return result;
-  }, [filteredPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup]);
+  }, [filteredPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup, photoIdSet]);
 
   const viewerQueryString = useMemo(() => buildFilterQueryString(filterState), [filterState]);
 
@@ -526,6 +530,15 @@ export default function GalleryPageClient() {
         }
         .gl-group-badge:hover { background: #FF4D00; color: #000; }
 
+        .gl-quality-badge {
+          position: absolute; top: 10px; right: 10px;
+          width: 22px; height: 20px;
+          background: rgba(0,0,0,0.7); border: 1px solid #FFB800;
+          color: #FFB800;
+          display: flex; align-items: center; justify-content: center;
+          z-index: 20; pointer-events: none;
+        }
+
         .gl-similarity-toggle {
           display: flex; align-items: center; gap: 6px;
           font-size: 12px; font-weight: 700; background: none; border: none;
@@ -640,6 +653,7 @@ export default function GalleryPageClient() {
 
           /* 체크박스 크기 */
           .gl-check-box { width: 18px !important; height: 18px !important; top: 6px !important; left: 6px !important; }
+          .gl-quality-badge { width: 18px !important; height: 18px !important; top: 6px !important; right: 6px !important; }
 
           /* 하단 바 */
           .gl-footer-inner { height: 60px !important; padding: 0 14px !important; gap: 12px !important; }

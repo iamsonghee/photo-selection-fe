@@ -55,6 +55,12 @@ export interface Photo {
   isUploading?: boolean;
   /** AI 유사컷 그룹 id (photo_groups.id). 그룹에 속하지 않으면 null/undefined */
   similarityGroupId?: string | null;
+  /** AI 블러(흔들림) 의심 여부. 미분석/디코딩 실패 시 null/undefined */
+  isBlurry?: boolean | null;
+  /** AI 얼굴 감지 여부 — false/null이면 eyesClosed는 무의미 */
+  faceDetected?: boolean | null;
+  /** AI 눈 감음 의심 여부 (faceDetected가 true일 때만 유효) */
+  eyesClosed?: boolean | null;
 }
 
 /** AI 유사컷 그룹 정보 (photo_groups 테이블) */

@@ -65,6 +65,9 @@ function mapPhotoRow(
       : undefined,
     comment: undefined,
     similarityGroupId: (row as { similarity_group_id?: string | null }).similarity_group_id ?? null,
+    isBlurry: (row as { is_blurry?: boolean | null }).is_blurry ?? null,
+    faceDetected: (row as { face_detected?: boolean | null }).face_detected ?? null,
+    eyesClosed: (row as { eyes_closed?: boolean | null }).eyes_closed ?? null,
   };
 }
 

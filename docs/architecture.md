@@ -167,17 +167,18 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 |---|---|---|
 | `photographers` | `id, auth_id, email, name, profile_image_url, bio, instagram_url, portfolio_url, contact_phone, created_at` | `auth_id`는 Supabase Auth의 `user.id`. 회원가입 시 자동 생성(`src/app/auth/callback/route.ts`). |
 | `projects` | `id, photographer_id, name, customer_name, shoot_date, deadline, required_count, photo_count, status, access_token, access_pin, confirmed_at, delivered_at, customer_cancel_count, max_revision_count, revision_round, review_deadline, shoot_type, customer_phone, clip_analysis_status, display_id, created_at, updated_at` | `status`는 8가지 값의 상태 머신(§9). `access_token`이 고객 링크의 토큰, `access_pin`이 4자리 PIN(nullable). |
-| `photos` | `id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, memo, similarity_group_id, created_at` | `number`는 `insert_photos_with_numbers` RPC로 원자적 할당(경쟁 조건 방지, `photo-selection-be/app/routers/upload.py`). |
+| `photos` | `id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, memo, similarity_group_id, blur_variance, is_blurry, face_detected, eyes_closed, created_at` | `number`는 `insert_photos_with_numbers` RPC로 원자적 할당(경쟁 조건 방지, `photo-selection-be/app/routers/upload.py`). `blur_variance/is_blurry/face_detected/eyes_closed`는 `clip-service/migration_002_quality_flags.sql`에서 추가된 흔들림/눈감음 경고 배지 전용 컬럼(정보성, 자동 삭제/제외 없음) — §176 아래 콜아웃 참고. |
 | `selections` | `project_id, photo_id, rating, color_tag, comment, is_selected` | `(project_id, photo_id)` unique 제약으로 upsert. |
 | `photo_versions` | `id, photo_id, version(1\|2), r2_url, r2_thumb_url, file_size, filename, created_at` | `(photo_id, version)` conflict로 upsert. |
 | `version_reviews` | `photo_version_id, photo_id, status("approved"\|"revision_requested"), customer_comment, reviewed_at` | `photo_version_id` unique(conflict 대상). 보정본 재업로드 시 관련 행 삭제됨. |
 | `project_logs` | `id, project_id, photographer_id, action, created_at` | 상태 변경 이력. |
 | `pin_attempts` | `project_token, ip_address, attempted_at` | PIN 시도 rate-limit(1분 내 5회)용. |
-| `photo_groups` | `id, project_id, representative_photo_id, photo_count` | CLIP 유사도 그룹. `src/types/supabase.ts` 생성 타입에는 **없음**(수동 캐스팅으로 접근). |
+| `photo_groups` | `id, project_id, representative_photo_id, photo_count` | CLIP 유사도 그룹. `src/types/supabase.ts` 생성 타입에는 **없음**(수동 캐스팅으로 접근). 사진 삭제 시 `delete_photo_and_resolve_group` RPC(`supabase/migrations/20260720_delete_photo_group_cleanup.sql`)가 대표컷 재지정/`photo_count` 갱신/그룹 해체를 원자적으로 처리 — `insert_photos_with_numbers`와 동일한 이유(PostgREST 다중 호출의 비원자성 방지)로 RPC화됨. |
 | `deleted_photographers` | `id, deleted_at, project_count, join_month` | 계정 삭제 시 익명화 통계로 남김. |
 | `photos.clip_embedding` | (컬럼) | `clip-service/migration.sql`에서 추가. CLIP 임베딩 저장. |
+| `photos.blur_variance` / `is_blurry` / `face_detected` / `eyes_closed` | (컬럼) | `clip-service/migration_002_quality_flags.sql`에서 추가. 흔들림/눈감음 경고 배지용 — §6.4 참고. |
 
-`src/types/supabase.ts` 생성 타입에 등록된 테이블은 8개(`projects, pin_attempts, photos, selections, project_logs, photographers, photo_versions, version_reviews`)뿐이며, `photo_groups`·`deleted_photographers`·`clip_analysis_*` 관련 컬럼은 타입 생성 이후 추가된 것으로 보입니다(타입 재생성 여부 `확인 필요`).
+`src/types/supabase.ts` 생성 타입에 등록된 테이블은 8개(`projects, pin_attempts, photos, selections, project_logs, photographers, photo_versions, version_reviews`)뿐이며, `photo_groups`·`deleted_photographers`·`clip_analysis_*`·흔들림/눈감음 품질 컬럼들은 타입 생성 이후 추가된 것으로 보입니다(타입 재생성 여부 `확인 필요`) — FE 코드는 이 컬럼들을 전부 수동 `as {...}` 캐스팅으로 접근합니다(`src/lib/db.ts`, `src/lib/customer-api-server.ts`).
 
 ### 5.1 프로젝트 상태 머신
 
@@ -208,7 +209,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `/photographer/projects` | `src/app/photographer/projects/page.tsx` | 프로젝트 목록/검색/필터 |
 | `/photographer/projects/new` | `src/app/photographer/projects/new/page.tsx` | 프로젝트 생성 폼 (PIN·재보정 횟수 포함) |
 | `/photographer/projects/[id]` | `ProjectNexusPageClient.tsx` | 프로젝트 상세 허브 (상태, 초대 링크, PIN, 삭제) |
-| `/photographer/projects/[id]/upload` | `upload/page.tsx` | 원본 사진 업로드/관리 (2292줄, 메인 업로드 UI) |
+| `/photographer/projects/[id]/upload` | `upload/page.tsx` | 원본 사진 업로드/관리 (메인 업로드 UI). CLIP 분석 완료 후 흔들림/눈감음 의심 사진에 경고 배지 표시(정보성, 셀렉/업로드 차단 없음) — `src/lib/photo-quality.ts`. AI 유사컷 분석 트리거는 `preparing`/`selecting` 상태 모두에서 노출(`canUploadOriginals`) — 초대 링크 활성화 이후 추가 업로드된 사진도 재분석 가능. 완료 후에는 버튼이 "새 사진 분석"으로 바뀌며 직전 분석 이후 신규 사진만 증분 분석 |
 | `/photographer/projects/[id]/workflow` | `WorkflowPageClient.tsx` | **보정본 V1/V2 업로드·전달을 포함한 실사용 통합 화면.** 실제 업로드 UI는 하위 컴포넌트 `src/components/photographer/UploadVersionsPanel.tsx`가 담당하며, `src/lib/version-mapping.ts`(파일-사진 매칭)와 `src/lib/retouch-clip-match.ts`(CLIP 폴백 매칭)를 사용한다. `ProjectNexusPageClient.tsx`의 모든 보정 관련 버튼은 이 라우트로만 연결된다. |
 | `/photographer/projects/[id]/results` | `results/page.tsx` | 최종 납품 결과 화면(CSV/TXT 내보내기). `confirmed`/`editing` 상태에서는 "보정 시작하기"/"보정본 업로드" 버튼과 진행단계 사이드바가 `/workflow`로 이동시킨다(2026-07-13부터 — 이전에는 `/upload-versions`로 이동했음, 아래 삭제 이력 참고). |
 | `/photographer/settings` | `settings/page.tsx` | 프로필 설정, 프로필 이미지 업로드, 계정 삭제 |
@@ -223,7 +224,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `/c/[token]` | 진입점. 서버에서 `delivered` 여부·PIN 쿠키 존재 여부 우선 확인 후 클라이언트에서 상태별 재분기 |
 | `/c/[token]/pin` | PIN 입력 폼 (PIN 없는 프로젝트는 `/api/c/auto-verify`로 자동 통과) |
 | `/c/[token]/about` | 고객 온보딩/도움말 |
-| `/c/[token]/gallery` | 사진 선택 그리드 |
+| `/c/[token]/gallery` | 사진 선택 그리드. 흔들림/눈감음 의심 사진에 경고 배지 표시(정보성, 선택/확정 차단 없음). 유사도분석이 완료된 프로젝트는 "유사컷 대표이미지 적용" 토글도 노출(기본 OFF) — 켜면 그룹별 대표컷만 보이고 나머지 멤버는 "+N" 배지를 눌러야 펼쳐짐. 가시성에 직접 영향을 주는 기능 |
 | `/c/[token]/viewer/[photoId]` | 선택 단계 전체화면 뷰어(별점/색상/코멘트/선택) |
 | `/c/[token]/confirmed` | 확정 직후 화면, 확정 취소(최대 3회) |
 | `/c/[token]/locked` | 보정 중(`editing`/`editing_v2`) 등 읽기 전용 상태 화면 |
@@ -238,6 +239,10 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 ### 6.4 CLIP 서비스
 
 `/health`, `/analyze`, `/analyze/{project_id}/status`, `/match-retouch` — 모두 `X-Internal-Token` 헤더(`CLIP_INTERNAL_TOKEN`)로 보호(단 `/health` 제외).
+
+`/analyze`의 백그라운드 파이프라인(`app/analyzer.py`)은 CLIP 유사컷 그룹핑 외에, 분석 대상이 된 모든 사진(그룹 여부 무관)에 대해 흔들림(`app/quality.py`의 절대 Laplacian 분산 임계값)과 눈감음(`app/eyes.py`, mediapipe Face Mesh 기반 Eye Aspect Ratio) 경고 플래그를 계산해 `photos.blur_variance/is_blurry/face_detected/eyes_closed`에 저장한다. 요청/응답 스펙 변경은 없음 — 결과는 기존 `photos` 조회 경로로 FE에 전달된다. 정보성 배지 전용이며 자동 삭제/제외는 하지 않는다.
+
+**증분 분석의 배치 경계 스티칭**: 증분 분석(신규 사진끼리만 비교)은 원래 직전 배치의 마지막 사진(경계)을 비교 대상에서 제외해, 배치 경계를 넘는 연속 촬영본이 영구히 그룹화되지 않는 한계가 있었다. 이제 경계 사진의 저장된 임베딩(`photos.clip_embedding`, 재다운로드/재계산 없음)을 이번 배치 임베딩 배열 맨 앞에 포함해 함께 그룹핑한 뒤, 경계가 포함된 연결 요소만 따로 처리한다: 경계 사진이 이미 기존 그룹의 멤버였으면 신규 연결된 사진들을 그 그룹에 편입(대표컷 유지, `photo_count`만 증가), 경계 사진이 그룹에 속한 적 없었으면 경계 사진을 포함한 신규 그룹을 생성한다(이 경우에 한해 경계 사진 썸네일을 온디맨드로 1장 다운로드해 대표컷 화질 점수를 계산). `grouping.py`의 인접 비교+union-find 로직 자체는 변경 없음.
 
 ---
 
@@ -267,7 +272,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/photographer/projects/[id]/versions/[versionId]` | DELETE | 세션+소유권 | 보정본 1건 삭제 |
 | `api/photographer/projects/[id]/clip-analysis` | POST/GET | 세션+소유권 | CLIP 분석 트리거/폴링(clip-service 프록시) |
 | `api/photographer/projects/[id]/retouch-match` | POST | 세션+소유권 | 보정본↔원본 CLIP 매칭(clip-service 프록시) |
-| `api/photographer/photos/[photoId]` | DELETE | 세션+소유권 | 사진 1건 삭제 |
+| `api/photographer/photos/[photoId]` | DELETE | 세션+소유권 | 사진 1건 삭제(`preparing`만). RPC `delete_photo_and_resolve_group`을 호출해 소속 유사컷 그룹도 원자적으로 정리 — 대표컷 삭제 시 `blur_variance` 기준 근사치로 재지정, 멤버가 1명 이하로 줄면 그룹 해체 |
 | `api/photographer/photos/[photoId]/memo` | PATCH | 세션+소유권 | 작가 메모 저장 |
 | `api/photographer/upload/photos` | POST | 클라이언트 Bearer 전달(자체 검증 없음) | FastAPI 업로드 프록시(CORS 우회용). 보정본용 프록시(`api/photographer/upload-versions`)는 호출하는 곳이 없어 2026-07-13 삭제됨 — 실제 보정본 업로드는 `UploadVersionsPanel.tsx`가 FastAPI를 직접 호출 |
 | `api/projects/[id]` | PATCH | **없음** | 레거시 엔드포인트, §12 위험 항목 참고 |

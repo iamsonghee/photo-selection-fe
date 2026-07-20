@@ -25,6 +25,7 @@ import {
   ImagePlus,
   Plus,
   Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 import { PrevNextButton } from "@/components/PrevNextButton";
 import { getProjectById, getPhotosByProjectId } from "@/lib/db";
@@ -33,6 +34,7 @@ import { createClient } from "@/lib/supabase/client";
 import { parseBetaLimitError, BETA_MAX_PHOTOS_PER_PROJECT } from "@/lib/beta-limits";
 import { compressImageForUpload } from "@/lib/upload-client-compress";
 import { createThumbLoadQueue, useQueuedThumbSrc, type ThumbLoadQueue } from "@/lib/thumb-load-queue";
+import { qualityWarningLabel } from "@/lib/photo-quality";
 import type { Project, ProjectStatus, Photo, PhotoGroupInfo } from "@/types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
@@ -227,6 +229,7 @@ function PhotoThumb({
 }) {
   const [loaded, setLoaded] = useState(false);
   const deleting = deletingId === photo.id;
+  const warningLabel = qualityWarningLabel(photo);
   // blob URL(isPending)은 큐를 건너뛰고 즉시 로드 — 로컬 메모리라 네트워크 요청이 없다.
   const { cellRef, imgRef, shouldLoad, handleLoad, handleError } = useQueuedThumbSrc(photo.url, {
     queue: thumbQueue,
@@ -251,6 +254,12 @@ function PhotoThumb({
       {/* square thumb */}
       <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: "var(--background)" }}>
         <div className="prj-overlay" />
+        {/* AI 흔들림/눈감음 경고 배지 — 정보성, 카드 클릭/삭제 등 기존 인터랙션을 가로채지 않음 */}
+        {warningLabel && (
+          <div className="prj-quality-badge" title={warningLabel} aria-label={warningLabel}>
+            <AlertTriangle size={10} />
+          </div>
+        )}
         {/* XHR 전송 중 스피너 */}
         {photo.isUploading && (
           <div style={{ position: "absolute", top: 5, right: 5, zIndex: 10, width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(var(--accent-rgb), 0.25)", borderTopColor: "rgba(var(--accent-rgb), 0.85)", animation: "spin 0.9s linear infinite" }} />
@@ -888,6 +897,11 @@ export default function ProjectDetailPage() {
     loadProject().then((p) => { if (p) { loadPhotos(); loadPhotoGroups(); } });
   }, [id, loadProject, loadPhotos, loadPhotoGroups]);
 
+  /** 마운트/재진입 시 로컬 분석 상태를 서버 상태로 시드 — processing이면 아래 폴링 이펙트가 자동 재개된다 */
+  useEffect(() => {
+    if (project?.clipAnalysisStatus) setClipAnalysisStatus(project.clipAnalysisStatus);
+  }, [project?.clipAnalysisStatus]);
+
   /** 기존 photos + 배치 완료(pending) + 전송 중(uploading) 합산 — early return 이전에 선언해야 Rules of Hooks 준수 */
   const displayPhotos = useMemo(() => {
     const confirmedNames = new Set(photos.map((p) => p.originalFilename));
@@ -920,6 +934,10 @@ export default function ProjectDetailPage() {
     return map;
   }, [photos]);
 
+  /** 대표컷 삭제 직후 photoGroups가 아직 갱신되지 않은 경우(E2 방어 폴백) 대비 —
+   *  대표컷이 현재 photos 목록에 없는 그룹은 없는 것처럼 취급해 멤버가 전부 누락되는 걸 막는다. */
+  const photoIdSet = useMemo(() => new Set(photos.map((p) => p.id)), [photos]);
+
   const showSimilarityToggle = project?.clipAnalysisStatus === "completed" && photoGroups.length > 0;
 
   const handleGroupBadgeClick = useCallback((e: React.MouseEvent, groupId: string) => {
@@ -941,7 +959,7 @@ export default function ProjectDetailPage() {
       const groupId = photo.similarityGroupId;
       if (!groupId) { result.push(photo); continue; }
       const group = groupsById.get(groupId);
-      if (!group) { result.push(photo); continue; }
+      if (!group || !photoIdSet.has(group.representativePhotoId)) { result.push(photo); continue; }
       if (photo.id !== group.representativePhotoId) continue;
       result.push(photo);
       if (expandedGroups.has(groupId)) {
@@ -950,7 +968,7 @@ export default function ProjectDetailPage() {
       }
     }
     return result;
-  }, [displayPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup]);
+  }, [displayPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup, photoIdSet]);
 
   useEffect(() => {
     if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); }
@@ -972,13 +990,16 @@ export default function ProjectDetailPage() {
           if (data.clip_analysis_status === "completed") {
             loadProject();
             loadPhotoGroups();
+            // 흔들림/눈감음 경고 배지는 photos 행에 저장되므로, 그룹/프로젝트만 새로고침하면
+            // 새로고침 없이는 배지가 보이지 않는다.
+            loadPhotos();
             setSimilarityToggleOn(true);
           }
         }
       } catch {}
     }, 4000);
     return () => clearInterval(t);
-  }, [clipAnalysisStatus, id, loadProject, loadPhotoGroups]);
+  }, [clipAnalysisStatus, id, loadProject, loadPhotoGroups, loadPhotos]);
 
 
   useEffect(() => {
@@ -1394,6 +1415,22 @@ export default function ProjectDetailPage() {
       if (!res.ok) throw new Error((data as { error?: string }).error ?? "삭제 실패");
       setPhotos((prev) => prev.filter((p) => p.id !== photoId));
       setProject((prev) => prev ? { ...prev, photoCount: Math.max(0, prev.photoCount - 1) } : null);
+
+      const group = (data as {
+        group?: { groupId: string | null; action?: string; representativePhotoId?: string; photoCount?: number };
+      }).group;
+      if (group?.groupId) {
+        if (group.action === "disbanded") {
+          setPhotoGroups((prev) => prev.filter((g) => g.id !== group.groupId));
+        } else if (group.action === "reassigned" && group.representativePhotoId && typeof group.photoCount === "number") {
+          const { representativePhotoId, photoCount } = group;
+          setPhotoGroups((prev) => prev.map((g) => (g.id === group.groupId ? { ...g, representativePhotoId, photoCount } : g)));
+        } else if (group.action === "updated" && typeof group.photoCount === "number") {
+          const { photoCount } = group;
+          setPhotoGroups((prev) => prev.map((g) => (g.id === group.groupId ? { ...g, photoCount } : g)));
+        }
+      }
+
       setToast("삭제되었습니다.");
     } catch (e) { setToast(e instanceof Error ? e.message : "삭제 실패"); }
     finally { setDeletingId(null); }
@@ -1539,6 +1576,14 @@ export default function ProjectDetailPage() {
           z-index: 10; cursor: pointer; transition: all 0.15s ease;
         }
         .prj-group-badge:hover { background: ${ACCENT}; color: #000; }
+        .prj-quality-badge {
+          position: absolute; top: 4px; left: 4px;
+          width: 18px; height: 18px;
+          background: rgba(0,0,0,0.75); border: 1px solid #FFB800;
+          color: #FFB800;
+          display: flex; align-items: center; justify-content: center;
+          z-index: 10; pointer-events: none;
+        }
         .prj-group-badge-inline {
           flex-shrink: 0; min-width: 20px; height: 18px; padding: 0 5px;
           background: transparent; border: 1px solid ${ACCENT};
@@ -1853,7 +1898,7 @@ export default function ProjectDetailPage() {
       </main>
 
       {/* ── AI 유사컷 분석 — 초대 링크 활성화와 독립된 별도 트리거 ── */}
-      {project.status === "preparing" && displayPhotos.length > 0 && (
+      {canUploadOriginals(project.status) && displayPhotos.length > 0 && (
         <div
           className="prj-clip-analysis-bar"
           style={{
@@ -1875,7 +1920,7 @@ export default function ProjectDetailPage() {
               {clipAnalysisStatus === "processing"
                 ? "분석 중… 잠시 후 완료됩니다"
                 : clipAnalysisStatus === "completed"
-                ? "분석이 완료되었습니다"
+                ? "지난 분석 이후 추가된 사진만 분석합니다"
                 : clipAnalysisStatus === "failed"
                 ? "분석에 실패했습니다. 다시 시도해주세요"
                 : "연속 촬영된 유사컷을 자동으로 찾아 묶어드립니다"}
@@ -1902,7 +1947,7 @@ export default function ProjectDetailPage() {
             {clipAnalysisStatus === "processing"
               ? "분석 중…"
               : clipAnalysisStatus === "completed"
-              ? "다시 분석"
+              ? "새 사진 분석"
               : "AI 유사컷 분석 시작"}
           </button>
         </div>
