@@ -315,7 +315,11 @@ export default function UploadVersionsPanel({
         return;
       }
 
-      const compressedFiles = await Promise.all(changed.map((m) => compressImageForUpload(m.file)));
+      const compressedFiles = await Promise.all(
+        changed.map((m) =>
+          compressImageForUpload(m.file, { maxEdge: 1500, jpegQuality: 0.85 }),
+        ),
+      );
       const form = new FormData();
       form.append("project_id", projectId);
       form.append("version", String(version));
