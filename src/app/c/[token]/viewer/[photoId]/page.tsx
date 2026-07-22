@@ -147,6 +147,17 @@ export default function ViewerPage() {
   // 외부에서 URL이 바뀔 때(갤러리→뷰어 첫 진입, 브라우저 앞/뒤) 동기화
   useEffect(() => { setActivePhotoId(photoId); }, [photoId]);
 
+  // 갤러리로 돌아갔을 때 스크롤 위치를 이 사진 기준으로 복원할 수 있도록, 필름스트립/화살표로
+  // 넘길 때마다(navigateTo는 history.replaceState라 URL의 gf만으로는 부족) 매번 최신값을 기록해둔다.
+  useEffect(() => {
+    if (!token || !activePhotoId) return;
+    try {
+      sessionStorage.setItem(`ps:c-gallery-focus:${token}`, activePhotoId);
+    } catch {
+      /* ignore */
+    }
+  }, [token, activePhotoId]);
+
   const filterState = useMemo(() => parseFilterFromSearchParams(searchParams), [searchParams]);
   const filteredPhotos = useMemo(
     () => getFilteredPhotos(contextPhotos ?? [], selectedIds, photoStates, filterState),
@@ -359,7 +370,9 @@ export default function ViewerPage() {
   const filename           = getPhotoDisplayName(current);
   // presigned preview 우선, 발급 전에는 공개 URL 폴백 (Phase B: R2 public 유지)
   const viewerSrc = presignedPreviewUrl ?? viewerImageUrl(current);
-  const galleryHref        = buildGalleryHrefWithFocus(token, searchParams, photoId);
+  // photoId(라우트 파라미터)는 최초 진입 사진 id에 고정돼 있음(navigateTo가 history.replaceState만
+  // 사용) — 필름스트립/화살표로 다른 사진을 보다가 닫으면 activePhotoId를 써야 실제로 보던 사진으로 돌아간다.
+  const galleryHref        = buildGalleryHrefWithFocus(token, searchParams, activePhotoId);
 
   return (
     <div

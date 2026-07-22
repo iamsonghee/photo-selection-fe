@@ -38,7 +38,11 @@ export const FILTER_PARAM = {
   color_tag: "color_tag",
   sort: "sort",
   selected: "selected",
+  name: "name",
+  quality: "quality",
 } as const;
+
+export type QualityFilterFlag = "blurry" | "eyesClosed";
 
 /** 갤러리 스크롤 복원용(필터와 무관). 인앱 브라우저에서 sessionStorage 대신 URL로 전달 */
 export const GALLERY_SCROLL_PARAM = "gs";
@@ -137,6 +141,10 @@ export type GalleryFilterState = {
   colorFilter: ColorTag[] | "none" | "all";
   selectedFilter: "all" | "selected";
   sortOrder: SortOrder;
+  /** 파일명 검색(쉼표/공백으로 구분한 여러 파일명, LIKE OR) — 원문 그대로 보관, 매칭 시 split */
+  nameFilter: string;
+  /** 흔들림/눈감음 경고 필터 (OR) */
+  qualityFilter: QualityFilterFlag[];
 };
 
 const VALID_STARS: StarRating[] = [1, 2, 3, 4, 5];
@@ -157,6 +165,8 @@ export function parseFilterFromSearchParams(
   const color = searchParams.get(FILTER_PARAM.color_tag);
   const sort = searchParams.get(FILTER_PARAM.sort);
   const selected = searchParams.get(FILTER_PARAM.selected);
+  const name = searchParams.get(FILTER_PARAM.name);
+  const quality = searchParams.get(FILTER_PARAM.quality);
 
   const starFilter: StarRating | "all" =
     rating != null && VALID_STARS.includes(Number(rating) as StarRating)
@@ -174,8 +184,12 @@ export function parseFilterFromSearchParams(
     sort === "oldest" ? "oldest" : sort === "newest" ? "newest" : "filename";
   const selectedFilter: "all" | "selected" =
     selected === "selected" ? "selected" : "all";
+  const nameFilter = name ?? "";
+  const qualityFilter: QualityFilterFlag[] = (quality ?? "")
+    .split(",")
+    .filter((v): v is QualityFilterFlag => v === "blurry" || v === "eyesClosed");
 
-  return { starFilter, colorFilter, selectedFilter, sortOrder };
+  return { starFilter, colorFilter, selectedFilter, sortOrder, nameFilter, qualityFilter };
 }
 
 /** 현재 필터 상태로 URL 쿼리 문자열 생성 (기본값은 생략) */
@@ -189,6 +203,8 @@ export function buildFilterQueryString(state: GalleryFilterState): string {
   }
   if (state.sortOrder !== "filename") params.set(FILTER_PARAM.sort, state.sortOrder);
   if (state.selectedFilter !== "all") params.set(FILTER_PARAM.selected, state.selectedFilter);
+  if (state.nameFilter.trim()) params.set(FILTER_PARAM.name, state.nameFilter.trim());
+  if (state.qualityFilter.length > 0) params.set(FILTER_PARAM.quality, state.qualityFilter.join(","));
   const qs = params.toString();
   return qs ? `?${qs}` : "";
 }
@@ -227,6 +243,26 @@ export function getFilteredPhotos(
   }
   if (state.colorFilter === "none") {
     list = list.filter((p) => !photoStates[p.id]?.color?.length);
+  }
+  const nameTerms = Array.from(
+    new Set(
+      state.nameFilter
+        .split(/[,\s]+/)
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean)
+    )
+  );
+  if (nameTerms.length > 0) {
+    list = list.filter((p) => {
+      const name = getPhotoDisplayName(p).toLowerCase();
+      return nameTerms.some((term) => name.includes(term));
+    });
+  }
+  if (state.qualityFilter.length > 0) {
+    list = list.filter((p) =>
+      (state.qualityFilter.includes("blurry") && p.isBlurry === true) ||
+      (state.qualityFilter.includes("eyesClosed") && p.faceDetected === true && p.eyesClosed === true)
+    );
   }
   if (state.sortOrder === "filename") {
     list = list.sort((a, b) =>

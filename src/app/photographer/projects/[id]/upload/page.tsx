@@ -34,7 +34,6 @@ import { createClient } from "@/lib/supabase/client";
 import { parseBetaLimitError, BETA_MAX_PHOTOS_PER_PROJECT } from "@/lib/beta-limits";
 import { compressImageForUpload } from "@/lib/upload-client-compress";
 import { createThumbLoadQueue, useQueuedThumbSrc, type ThumbLoadQueue } from "@/lib/thumb-load-queue";
-import { qualityWarningLabel } from "@/lib/photo-quality";
 import type { Project, ProjectStatus, Photo, PhotoGroupInfo } from "@/types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
@@ -213,6 +212,7 @@ function PhotoThumb({
   onPhotoClick,
   groupBadge,
   onGroupBadgeClick,
+  inExpandedGroup,
 }: {
   photo: Photo;
   index: number;
@@ -226,10 +226,13 @@ function PhotoThumb({
   /** AI 유사컷 대표컷 배지 — 토글 ON이고 이 사진이 대표컷이며 그룹원이 더 있을 때만 전달됨 */
   groupBadge?: { groupId: string; restCount: number; isExpanded: boolean };
   onGroupBadgeClick?: (e: React.MouseEvent, groupId: string) => void;
+  /** 펼쳐진 그룹(대표컷+멤버 전체)에 속함 — 그룹 경계를 테두리로 시각 구분 */
+  inExpandedGroup?: boolean;
 }) {
   const [loaded, setLoaded] = useState(false);
   const deleting = deletingId === photo.id;
-  const warningLabel = qualityWarningLabel(photo);
+  const isBlurry = photo.isBlurry === true;
+  const isEyesClosed = photo.faceDetected === true && photo.eyesClosed === true;
   // blob URL(isPending)은 큐를 건너뛰고 즉시 로드 — 로컬 메모리라 네트워크 요청이 없다.
   const { cellRef, imgRef, shouldLoad, handleLoad, handleError } = useQueuedThumbSrc(photo.url, {
     queue: thumbQueue,
@@ -244,7 +247,11 @@ function PhotoThumb({
       onClick={() => !photo.isPending && onPhotoClick?.(index)}
       style={{
         background: "var(--background)",
-        border: photo.isPending ? "1px solid rgba(var(--accent-rgb), 0.55)" : `1px solid ${BORDER}`,
+        border: photo.isPending
+          ? "1px solid rgba(var(--accent-rgb), 0.55)"
+          : inExpandedGroup
+          ? `2px solid ${ACCENT}`
+          : `1px solid ${BORDER}`,
         overflow: "hidden",
         position: "relative",
         display: "flex",
@@ -254,10 +261,21 @@ function PhotoThumb({
       {/* square thumb */}
       <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: "var(--background)" }}>
         <div className="prj-overlay" />
-        {/* AI 흔들림/눈감음 경고 배지 — 정보성, 카드 클릭/삭제 등 기존 인터랙션을 가로채지 않음 */}
-        {warningLabel && (
-          <div className="prj-quality-badge" title={warningLabel} aria-label={warningLabel}>
+        {/* AI 흔들림/눈감음 경고 배지 — 정보성, 카드 클릭/삭제 등 기존 인터랙션을 가로채지 않음.
+            둘 다 해당하면 나란히 표시 — 원인이 다르므로 하나로 합치지 않는다. */}
+        {isBlurry && (
+          <div className="prj-quality-badge prj-quality-badge-blur" title="흔들림 의심" aria-label="흔들림 의심">
             <AlertTriangle size={10} />
+          </div>
+        )}
+        {isEyesClosed && (
+          <div
+            className="prj-quality-badge prj-quality-badge-eyes"
+            style={{ left: isBlurry ? 26 : 4 }}
+            title="눈 감음 의심"
+            aria-label="눈 감음 의심"
+          >
+            <EyeOff size={10} />
           </div>
         )}
         {/* XHR 전송 중 스피너 */}
@@ -361,7 +379,7 @@ function PhotoThumb({
             onClick={(e) => onGroupBadgeClick?.(e, groupBadge.groupId)}
             aria-label={`유사컷 ${groupBadge.restCount}장 ${groupBadge.isExpanded ? "접기" : "펼치기"}`}
           >
-            {groupBadge.isExpanded ? "−" : `+${groupBadge.restCount}`}
+            {groupBadge.isExpanded ? `${groupBadge.restCount + 1}장 −` : `+${groupBadge.restCount}`}
           </button>
         )}
       </div>
@@ -581,9 +599,10 @@ function VirtualizedPhotoGrid({
             const group = photo.similarityGroupId ? groupsById?.get(photo.similarityGroupId) : undefined;
             const isRepresentative = !!group && group.representativePhotoId === photo.id;
             const restCount = group ? group.photoCount - 1 : 0;
+            const isExpanded = !!similarityToggleOn && !!group && !!expandedGroups?.has(group.id);
             const groupBadge =
               similarityToggleOn && isRepresentative && restCount > 0
-                ? { groupId: group!.id, restCount, isExpanded: !!expandedGroups?.has(group!.id) }
+                ? { groupId: group!.id, restCount, isExpanded }
                 : undefined;
             cells.push(
               <PhotoThumb
@@ -598,6 +617,7 @@ function VirtualizedPhotoGrid({
                 onPhotoClick={onPhotoClick}
                 groupBadge={groupBadge}
                 onGroupBadgeClick={onGroupBadgeClick}
+                inExpandedGroup={!!group && isExpanded}
               />,
             );
           }
@@ -698,7 +718,8 @@ function VirtualizedPhotoList({
           const isRepresentative = !!group && group.representativePhotoId === photo.id;
           const restCount = group ? group.photoCount - 1 : 0;
           const showGroupBadge = similarityToggleOn && isRepresentative && restCount > 0;
-          const isExpanded = !!group && !!expandedGroups?.has(group.id);
+          const isExpanded = !!similarityToggleOn && !!group && !!expandedGroups?.has(group.id);
+          const inExpandedGroup = !!group && isExpanded;
           return (
             <div
               key={photo.id}
@@ -720,15 +741,15 @@ function VirtualizedPhotoList({
                   gap: 12,
                   padding: "8px 10px",
                   height: LIST_ROW_H - 2,
-                  border: `1px solid ${BORDER}`,
+                  border: inExpandedGroup ? `2px solid ${ACCENT}` : `1px solid ${BORDER}`,
                   background: SURFACE_2,
                   transition: "border-color 0.2s",
                   boxSizing: "border-box",
                   cursor: "pointer",
                 }}
                 onClick={() => onPhotoClick?.(i)}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(var(--accent-rgb), 0.3)"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = BORDER; }}
+                onMouseEnter={(e) => { if (!inExpandedGroup) (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(var(--accent-rgb), 0.3)"; }}
+                onMouseLeave={(e) => { if (!inExpandedGroup) (e.currentTarget as HTMLDivElement).style.borderColor = BORDER; }}
               >
                 <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, width: 36, flexShrink: 0, textAlign: "right" }}>
                   {String(photo.orderIndex ?? i + 1).padStart(3, "0")}
@@ -754,7 +775,7 @@ function VirtualizedPhotoList({
                     onClick={(e) => onGroupBadgeClick?.(e, group.id)}
                     aria-label={`유사컷 ${restCount}장 ${isExpanded ? "접기" : "펼치기"}`}
                   >
-                    {isExpanded ? "−" : `+${restCount}`}
+                    {isExpanded ? `${restCount + 1}장 −` : `+${restCount}`}
                   </button>
                 )}
                 {photo.fileSize && (
@@ -832,6 +853,8 @@ export default function ProjectDetailPage() {
   const [photoGroups, setPhotoGroups] = useState<PhotoGroupInfo[]>([]);
   const [similarityToggleOn, setSimilarityToggleOn] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  /** 흔들림/눈감음 경고 필터 — 켜진 조건 중 하나라도 해당하면 표시(OR), 켜져 있으면 그룹 접기보다 우선 */
+  const [qualityFilter, setQualityFilter] = useState<Set<"blurry" | "eyesClosed">>(new Set());
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isMobile, setIsMobile] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -939,6 +962,11 @@ export default function ProjectDetailPage() {
   const photoIdSet = useMemo(() => new Set(photos.map((p) => p.id)), [photos]);
 
   const showSimilarityToggle = project?.clipAnalysisStatus === "completed" && photoGroups.length > 0;
+  const hasBlurryPhotos = useMemo(() => photos.some((p) => p.isBlurry === true), [photos]);
+  const hasEyesClosedPhotos = useMemo(
+    () => photos.some((p) => p.faceDetected === true && p.eyesClosed === true),
+    [photos]
+  );
 
   const handleGroupBadgeClick = useCallback((e: React.MouseEvent, groupId: string) => {
     e.preventDefault();
@@ -951,8 +979,29 @@ export default function ProjectDetailPage() {
     });
   }, []);
 
-  /** 토글 OFF면 displayPhotos 그대로, ON이면 대표컷+미분류만 (펼친 그룹은 대표컷 뒤에 나머지 인라인) */
+  const toggleQualityFilter = useCallback((key: "blurry" | "eyesClosed") => {
+    setQualityFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  /** 흔들림/눈감음 필터로 걸러낸 목록 — 켜진 조건이 없으면 원본 그대로 */
+  const qualityFilteredPhotos = useMemo(() => {
+    if (qualityFilter.size === 0) return displayPhotos;
+    return displayPhotos.filter(
+      (p) =>
+        (qualityFilter.has("blurry") && p.isBlurry === true) ||
+        (qualityFilter.has("eyesClosed") && p.faceDetected === true && p.eyesClosed === true)
+    );
+  }, [displayPhotos, qualityFilter]);
+
+  /** 토글 OFF면 displayPhotos 그대로, ON이면 대표컷+미분류만 (펼친 그룹은 대표컷 뒤에 나머지 인라인).
+   *  품질 필터가 켜져 있으면 그룹 접기보다 우선 — 문제 사진을 그룹 속에 숨기지 않고 그대로 보여준다. */
   const groupedDisplayPhotos = useMemo(() => {
+    if (qualityFilter.size > 0) return qualityFilteredPhotos;
     if (!similarityToggleOn) return displayPhotos;
     const result: Photo[] = [];
     for (const photo of displayPhotos) {
@@ -968,7 +1017,7 @@ export default function ProjectDetailPage() {
       }
     }
     return result;
-  }, [displayPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup, photoIdSet]);
+  }, [displayPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup, photoIdSet, qualityFilter, qualityFilteredPhotos]);
 
   useEffect(() => {
     if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); }
@@ -1584,6 +1633,9 @@ export default function ProjectDetailPage() {
           display: flex; align-items: center; justify-content: center;
           z-index: 10; pointer-events: none;
         }
+        .prj-quality-badge-eyes {
+          border-color: #4DA3FF; color: #4DA3FF;
+        }
         .prj-group-badge-inline {
           flex-shrink: 0; min-width: 20px; height: 18px; padding: 0 5px;
           background: transparent; border: 1px solid ${ACCENT};
@@ -1735,6 +1787,40 @@ export default function ProjectDetailPage() {
                     유사컷 대표이미지 적용
                   </button>
                 )}
+                {hasBlurryPhotos && (
+                  <button
+                    type="button"
+                    onClick={() => toggleQualityFilter("blurry")}
+                    className={`prj-similarity-toggle${qualityFilter.has("blurry") ? " prj-similarity-on" : ""}`}
+                    style={{ color: qualityFilter.has("blurry") ? "#FFB800" : TEXT_MUTED }}
+                  >
+                    <span className="prj-similarity-checkbox" style={{ borderColor: qualityFilter.has("blurry") ? "#FFB800" : undefined, background: qualityFilter.has("blurry") ? "#FFB800" : undefined }}>
+                      {qualityFilter.has("blurry") && (
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </span>
+                    흔들림만
+                  </button>
+                )}
+                {hasEyesClosedPhotos && (
+                  <button
+                    type="button"
+                    onClick={() => toggleQualityFilter("eyesClosed")}
+                    className={`prj-similarity-toggle${qualityFilter.has("eyesClosed") ? " prj-similarity-on" : ""}`}
+                    style={{ color: qualityFilter.has("eyesClosed") ? "#4DA3FF" : TEXT_MUTED }}
+                  >
+                    <span className="prj-similarity-checkbox" style={{ borderColor: qualityFilter.has("eyesClosed") ? "#4DA3FF" : undefined, background: qualityFilter.has("eyesClosed") ? "#4DA3FF" : undefined }}>
+                      {qualityFilter.has("eyesClosed") && (
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </span>
+                    눈감음만
+                  </button>
+                )}
               </div>
               <div style={{ display: "flex", background: SURFACE_2, border: `1px solid ${BORDER}`, padding: 2, gap: 1 }}>
                 {([["grid", <LayoutGrid key="g" size={13} />, "갤러리"] as const, ["list", <List key="l" size={13} />, "파일명"] as const]).map(([mode, icon, label]) => (
@@ -1756,14 +1842,18 @@ export default function ProjectDetailPage() {
             <div
               className="prj-mobile-toolbar"
               style={{
-                height: 40,
+                minHeight: 40,
                 borderBottom: `1px solid ${BORDER}`,
                 background: SURFACE_1,
                 alignItems: "center",
                 justifyContent: "space-between",
                 paddingLeft: 14,
                 paddingRight: 14,
+                paddingTop: 4,
+                paddingBottom: 4,
                 flexShrink: 0,
+                flexWrap: "wrap",
+                rowGap: 4,
               }}
             >
               <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED }}>{displayPhotos.length.toLocaleString()}장</span>
@@ -1804,6 +1894,40 @@ export default function ProjectDetailPage() {
                     )}
                   </span>
                   유사컷 적용
+                </button>
+              )}
+              {hasBlurryPhotos && (
+                <button
+                  type="button"
+                  onClick={() => toggleQualityFilter("blurry")}
+                  className={`prj-similarity-toggle${qualityFilter.has("blurry") ? " prj-similarity-on" : ""}`}
+                  style={{ color: qualityFilter.has("blurry") ? "#FFB800" : TEXT_MUTED }}
+                >
+                  <span className="prj-similarity-checkbox" style={{ borderColor: qualityFilter.has("blurry") ? "#FFB800" : undefined, background: qualityFilter.has("blurry") ? "#FFB800" : undefined }}>
+                    {qualityFilter.has("blurry") && (
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </span>
+                  흔들림
+                </button>
+              )}
+              {hasEyesClosedPhotos && (
+                <button
+                  type="button"
+                  onClick={() => toggleQualityFilter("eyesClosed")}
+                  className={`prj-similarity-toggle${qualityFilter.has("eyesClosed") ? " prj-similarity-on" : ""}`}
+                  style={{ color: qualityFilter.has("eyesClosed") ? "#4DA3FF" : TEXT_MUTED }}
+                >
+                  <span className="prj-similarity-checkbox" style={{ borderColor: qualityFilter.has("eyesClosed") ? "#4DA3FF" : undefined, background: qualityFilter.has("eyesClosed") ? "#4DA3FF" : undefined }}>
+                    {qualityFilter.has("eyesClosed") && (
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </span>
+                  눈감음
                 </button>
               )}
             </div>
@@ -1862,7 +1986,7 @@ export default function ProjectDetailPage() {
                 thumbQueue={thumbQueue}
                 onPhotoClick={setLightboxIndex}
                 groupsById={groupsById}
-                similarityToggleOn={similarityToggleOn}
+                similarityToggleOn={similarityToggleOn && qualityFilter.size === 0}
                 expandedGroups={expandedGroups}
                 onGroupBadgeClick={handleGroupBadgeClick}
                 leadingUploadCell={
@@ -1888,7 +2012,7 @@ export default function ProjectDetailPage() {
                 thumbQueue={thumbQueue}
                 onPhotoClick={setLightboxIndex}
                 groupsById={groupsById}
-                similarityToggleOn={similarityToggleOn}
+                similarityToggleOn={similarityToggleOn && qualityFilter.size === 0}
                 expandedGroups={expandedGroups}
                 onGroupBadgeClick={handleGroupBadgeClick}
               />

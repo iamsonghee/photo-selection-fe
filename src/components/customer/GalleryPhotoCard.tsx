@@ -2,10 +2,9 @@
 
 import { memo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, EyeOff } from "lucide-react";
 import { COLOR_OPTIONS, getPhotoDisplayName } from "@/lib/gallery-filter";
 import { useQueuedThumbSrc, type ThumbLoadQueue } from "@/lib/thumb-load-queue";
-import { qualityWarningLabel } from "@/lib/photo-quality";
 import type { Photo, StarRating, ColorTag } from "@/types";
 
 const EMPTY_COLOR_TAGS: ColorTag[] = [];
@@ -20,6 +19,8 @@ type GalleryPhotoCardProps = {
   groupId?: string;
   restCount: number;
   isGroupExpanded: boolean;
+  /** 펼쳐진 그룹(대표컷+멤버 전체)에 속함 — 그룹 경계를 테두리로 시각 구분 */
+  inExpandedGroup?: boolean;
   presignedThumb?: string;
   thumbQueue: ThumbLoadQueue;
   viewerQueryString: string;
@@ -40,6 +41,7 @@ function GalleryPhotoCardImpl({
   groupId,
   restCount,
   isGroupExpanded,
+  inExpandedGroup,
   presignedThumb,
   thumbQueue,
   viewerQueryString,
@@ -50,7 +52,8 @@ function GalleryPhotoCardImpl({
   onThumbError,
 }: GalleryPhotoCardProps) {
   const [hoverStar, setHoverStar] = useState(0);
-  const warningLabel = qualityWarningLabel(photo);
+  const isBlurry = photo.isBlurry === true;
+  const isEyesClosed = photo.faceDetected === true && photo.eyesClosed === true;
   const { cellRef, imgRef, shouldLoad, handleLoad, handleError } = useQueuedThumbSrc(presignedThumb, {
     queue: thumbQueue,
     rootMargin: "150px",
@@ -61,7 +64,7 @@ function GalleryPhotoCardImpl({
       ref={cellRef}
       href={`/c/${token}/viewer/${photo.id}${viewerQueryString}`}
       onClick={(e) => onPhotoClick(e, photo.id)}
-      className={`gl-photo-card${selected ? " gl-selected" : ""}`}
+      className={`gl-photo-card${selected ? " gl-selected" : ""}${inExpandedGroup ? " gl-in-expanded-group" : ""}`}
     >
       {shouldLoad && presignedThumb ? (
         <img
@@ -96,9 +99,20 @@ function GalleryPhotoCardImpl({
         )}
       </button>
 
-      {warningLabel && (
-        <div className="gl-quality-badge" title={warningLabel} aria-label={warningLabel}>
+      {/* 둘 다 해당하면 나란히 표시 — 원인이 다르므로 하나로 합치지 않는다 */}
+      {isBlurry && (
+        <div className="gl-quality-badge gl-quality-badge-blur" title="흔들림 의심" aria-label="흔들림 의심">
           <AlertTriangle size={11} />
+        </div>
+      )}
+      {isEyesClosed && (
+        <div
+          className="gl-quality-badge gl-quality-badge-eyes"
+          style={{ right: isBlurry ? 36 : 10 }}
+          title="눈 감음 의심"
+          aria-label="눈 감음 의심"
+        >
+          <EyeOff size={11} />
         </div>
       )}
 
@@ -109,7 +123,7 @@ function GalleryPhotoCardImpl({
           aria-label={`유사컷 ${restCount}장 ${isGroupExpanded ? "접기" : "펼치기"}`}
           className="gl-group-badge"
         >
-          {isGroupExpanded ? "−" : `+${restCount}`}
+          {isGroupExpanded ? `${restCount + 1}장 −` : `+${restCount}`}
         </button>
       )}
 

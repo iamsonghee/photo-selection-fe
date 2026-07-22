@@ -96,24 +96,41 @@ export async function getPhotosWithSelectionsAdmin(
   photoStates: Record<string, PhotoState>;
   photoGroups: PhotoGroupInfo[];
 }> {
-  const [photosRes, selectionsRes, groupsRes] = await Promise.all([
-    admin
-      .from("photos")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("number", { ascending: true }),
-    admin.from("selections").select("*").eq("project_id", projectId),
+  // Supabase PostgREST 기본 limit=1000 우회(src/lib/db.ts와 동일 패턴) — BETA_MAX=3000이므로
+  // photos/selections는 3페이지를 병렬 요청한다. 안 하면 1000장 넘는 프로젝트에서 고객 갤러리/
+  // 뷰어의 전체 장수·뒷 순번 사진들이 통째로 잘려서 안 보이는 문제가 생긴다.
+  const PAGE = 1000;
+  const [photoPages, selectionPages, groupsRes] = await Promise.all([
+    Promise.all(
+      [0, 1, 2].map((i) =>
+        admin
+          .from("photos")
+          .select("*")
+          .eq("project_id", projectId)
+          .order("number", { ascending: true })
+          .range(i * PAGE, (i + 1) * PAGE - 1)
+      )
+    ),
+    Promise.all(
+      [0, 1, 2].map((i) =>
+        admin
+          .from("selections")
+          .select("*")
+          .eq("project_id", projectId)
+          .range(i * PAGE, (i + 1) * PAGE - 1)
+      )
+    ),
     admin
       .from("photo_groups")
       .select("id, representative_photo_id, photo_count")
       .eq("project_id", projectId),
   ]);
-  if (photosRes.error) throw new Error(photosRes.error.message);
-  if (selectionsRes.error) throw new Error(selectionsRes.error.message);
+  for (const p of photoPages) if (p.error) throw new Error(p.error.message);
+  for (const s of selectionPages) if (s.error) throw new Error(s.error.message);
   if (groupsRes.error) throw new Error(groupsRes.error.message);
 
-  const rows = (photosRes.data ?? []) as PhotosRow[];
-  const selections = (selectionsRes.data ?? []) as SelectionsRow[];
+  const rows = photoPages.flatMap((p) => (p.data ?? []) as PhotosRow[]);
+  const selections = selectionPages.flatMap((s) => (s.data ?? []) as SelectionsRow[]);
   // is_selected로 명시적으로 선택된 사진만 카운트한다.
   // 별점/컬러태그/코멘트만 남긴 행은 selections 테이블에 존재하지만 "선택"은 아니다.
   const selectedIds = new Set(

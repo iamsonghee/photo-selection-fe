@@ -143,6 +143,10 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
 
   const updatePhotoState = useCallback(
     (photoId: string, patch: Partial<PhotoState>) => {
+      // setState 업데이터는 React가 순수성 검증을 위해 두 번 호출할 수 있으므로(Strict Mode 등),
+      // 그 안에서 직접 fetch를 실행하면 매번 API가 2번씩 나간다. 업데이터는 상태 계산만 하고,
+      // 실제로 저장할 값은 바깥 변수에 담아뒀다가 setState 호출이 끝난 뒤 한 번만 호출한다.
+      let mergedForApi: PhotoState | null = null;
       setPhotoStates((prev) => {
         const prevPhoto = prev[photoId] ?? {};
         const merged: PhotoState = { ...prevPhoto, ...patch };
@@ -150,17 +154,17 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         if ("rating" in patch && patch.rating === undefined) {
           delete merged.rating;
         }
-        const next = { ...prev, [photoId]: merged };
-        if (project?.id && token) {
-          const state = next[photoId];
-          upsertSelectionApi(token, project.id, photoId, {
-            rating: state?.rating ?? null,
-            color_tag: serializeColorTags(state?.color),
-            comment: state?.comment ?? null,
-          }).catch(console.error);
-        }
-        return next;
+        mergedForApi = merged;
+        return { ...prev, [photoId]: merged };
       });
+      if (project?.id && token && mergedForApi) {
+        const state: PhotoState = mergedForApi;
+        upsertSelectionApi(token, project.id, photoId, {
+          rating: state.rating ?? null,
+          color_tag: serializeColorTags(state.color),
+          comment: state.comment ?? null,
+        }).catch(console.error);
+      }
     },
     [project?.id, token]
   );
@@ -169,6 +173,9 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     (photoId: string) => {
       if (!project?.id || !token) return;
       const requiredCount = project.requiredCount;
+      // updatePhotoState와 동일한 이유로 API 호출을 업데이터 밖으로 뺀다.
+      let changed = false;
+      let nextIsSelected = false;
       setSelectedIds((prev) => {
         const isSelected = prev.has(photoId);
         // 이미 목표 장수(N)를 채운 상태면 새 사진은 추가 선택할 수 없다 —
@@ -182,15 +189,19 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         } else {
           next.add(photoId);
         }
+        changed = true;
+        nextIsSelected = !isSelected;
+        return next;
+      });
+      if (changed) {
         // is_selected만 명시적으로 바꾼다 — 별점/코멘트는 건드리지 않고 그대로 유지.
         upsertSelectionApi(token, project.id, photoId, {
           rating: photoStates[photoId]?.rating ?? null,
           color_tag: serializeColorTags(photoStates[photoId]?.color),
           comment: photoStates[photoId]?.comment ?? null,
-          is_selected: !isSelected,
+          is_selected: nextIsSelected,
         }).catch(console.error);
-        return next;
-      });
+      }
     },
     [project?.id, project?.requiredCount, token, photoStates]
   );

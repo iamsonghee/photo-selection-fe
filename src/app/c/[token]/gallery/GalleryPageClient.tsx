@@ -63,7 +63,10 @@ export default function GalleryPageClient() {
   const [confirmError,     setConfirmError]     = useState<string | null>(null);
   const [similarityToggleOn, setSimilarityToggleOn] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [jumpToValue, setJumpToValue] = useState("");
+  /** 파일명 검색(필터) — 쉼표/공백으로 구분해 여러 파일명을 한 번에 LIKE 검색 */
+  const [searchValue, setSearchValue] = useState("");
+  /** 흔들림/눈감음 경고 필터 — 켜진 조건 중 하나라도 해당하면 표시(OR) */
+  const [qualityFilter, setQualityFilter] = useState<Set<"blurry" | "eyesClosed">>(new Set());
 
   // ── Presigned thumb 관리 ──────────────────────────────────────────────────
   const gridRef        = useRef<HTMLDivElement>(null);
@@ -78,8 +81,12 @@ export default function GalleryPageClient() {
   // ── 가상화 그리드 레이아웃 (열 수·행 높이는 컨테이너 폭 기준으로 JS에서 계산) ──
   const [layout, setLayout] = useState<GridLayout>(DEFAULT_LAYOUT);
   const [scrollMargin, setScrollMargin] = useState(0);
+  /** 실제 컨테이너 폭 기준 열 수 측정이 최소 1회 끝났는지 — 스크롤/포커스 복원이
+   *  DEFAULT_LAYOUT(4열 가정)으로 잘못 계산되지 않도록 이 값이 true가 될 때까지 기다린다. */
+  const [layoutMeasured, setLayoutMeasured] = useState(false);
 
   const galleryScrollKey = token ? `ps:c-gallery-scroll:${token}` : "";
+  const galleryFocusKey = token ? `ps:c-gallery-focus:${token}` : "";
 
   /* 브라우저 기본 스크롤 복원과 충돌하지 않도록 (갤러리에 있는 동안만 manual) */
   useLayoutEffect(() => {
@@ -90,50 +97,6 @@ export default function GalleryPageClient() {
       history.scrollRestoration = prev;
     };
   }, []);
-
-  /* 스크롤·썸네일 포커스 복원: 페인트 전에 적용 + gs/gf 정리는 router.replace 1회만 */
-  useLayoutEffect(() => {
-    if (loading || typeof window === "undefined") return;
-
-    const gsRaw = searchParams.get(GALLERY_SCROLL_PARAM);
-    const hasGsParam = gsRaw != null;
-    // gf(포커스 사진 id)는 더 이상 프리로드에 쓰지 않지만, 뷰어가 계속 링크에 붙여
-    // 보내므로 URL 정리 차원에서 존재 여부만 확인해 지운다.
-    const hasGfParam = searchParams.get(GALLERY_FOCUS_PARAM) != null;
-
-    if (hasGsParam) {
-      const y = Number(gsRaw);
-      if (Number.isFinite(y) && y >= 0) {
-        window.scrollTo({ top: y, behavior: "auto" });
-      }
-      try {
-        if (galleryScrollKey) sessionStorage.removeItem(galleryScrollKey);
-      } catch {
-        /* ignore */
-      }
-    } else if (galleryScrollKey) {
-      try {
-        const raw = sessionStorage.getItem(galleryScrollKey);
-        if (raw != null) {
-          sessionStorage.removeItem(galleryScrollKey);
-          const y = Number(raw);
-          if (Number.isFinite(y) && y >= 0) {
-            window.scrollTo({ top: y, behavior: "auto" });
-          }
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-
-    if (hasGsParam || hasGfParam) {
-      const next = new URLSearchParams(searchParams.toString());
-      next.delete(GALLERY_SCROLL_PARAM);
-      next.delete(GALLERY_FOCUS_PARAM);
-      const q = next.toString();
-      router.replace(`/c/${token}/gallery${q ? `?${q}` : ""}`, { scroll: false });
-    }
-  }, [loading, galleryScrollKey, searchParams, token, router]);
 
   /* ── Photographer info ── */
   useEffect(() => {
@@ -152,13 +115,18 @@ export default function GalleryPageClient() {
     if (project.status === "editing")   { router.replace(`/c/${token}/locked`);    return; }
   }, [project, token, router]);
 
-  /* ── Filter state ── */
+  /* ── Filter state ──
+   * 파일명 검색/품질 필터도 여기 포함해야 뷰어(별도 라우트, viewerQueryString으로 URL을 통해
+   * 이 상태를 넘겨받아 parseFilterFromSearchParams+getFilteredPhotos로 동일한 목록을 재구성함)의
+   * 이전/다음 이동이 갤러리에서 보이는 필터링된 목록과 정확히 일치한다. */
   const filterState = useMemo<GalleryFilterState>(() => ({
     selectedFilter: tabFilter === "selected" ? "selected" : "all",
     starFilter:     starFilter === 0 ? "all" : (starFilter as StarRating),
     colorFilter:    colorFilter.length > 0 ? colorFilter : "all",
     sortOrder,
-  }), [tabFilter, starFilter, colorFilter, sortOrder]);
+    nameFilter: searchValue,
+    qualityFilter: Array.from(qualityFilter),
+  }), [tabFilter, starFilter, colorFilter, sortOrder, searchValue, qualityFilter]);
 
   const filteredPhotos = useMemo(() => {
     return getFilteredPhotos(photos, selectedIds, photoStates, filterState);
@@ -188,8 +156,29 @@ export default function GalleryPageClient() {
    *  대표컷이 현재 photos 목록에 없는 그룹은 없는 것처럼 취급해 멤버가 전부 누락되는 걸 막는다. */
   const photoIdSet = useMemo(() => new Set(photos.map((p) => p.id)), [photos]);
 
-  /* 토글 ON: 대표컷 + 미분류 사진만, 펼쳐진 그룹은 대표컷 바로 뒤에 나머지 인라인 삽입 */
+  const hasBlurryPhotos = useMemo(() => photos.some((p) => p.isBlurry === true), [photos]);
+  const hasEyesClosedPhotos = useMemo(
+    () => photos.some((p) => p.faceDetected === true && p.eyesClosed === true),
+    [photos]
+  );
+
+  const toggleQualityFilter = useCallback((key: "blurry" | "eyesClosed") => {
+    setQualityFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  /** 파일명 검색/품질 필터가 켜져 있는지 — 그룹 접기보다 우선시켜야 하므로 별도로 추적.
+   *  실제 필터링 자체는 filterState를 통해 getFilteredPhotos(공유 로직, 뷰어와 동일)가 수행한다. */
+  const narrowingFilterActive = searchValue.trim().length > 0 || qualityFilter.size > 0;
+
+  /* 토글 ON: 대표컷 + 미분류 사진만, 펼쳐진 그룹은 대표컷 바로 뒤에 나머지 인라인 삽입.
+   *  파일명/품질 필터가 켜져 있으면 그룹 접기보다 우선 — 검색·필터된 사진을 그룹 속에 숨기지 않는다. */
   const displayPhotos = useMemo(() => {
+    if (narrowingFilterActive) return filteredPhotos;
     if (!similarityToggleOn) return filteredPhotos;
     const result: typeof filteredPhotos = [];
     for (const photo of filteredPhotos) {
@@ -205,7 +194,7 @@ export default function GalleryPageClient() {
       }
     }
     return result;
-  }, [filteredPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup, photoIdSet]);
+  }, [filteredPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup, photoIdSet, narrowingFilterActive]);
 
   const viewerQueryString = useMemo(() => buildFilterQueryString(filterState), [filterState]);
 
@@ -287,6 +276,7 @@ export default function GalleryPageClient() {
       );
       const rect = el.getBoundingClientRect();
       setScrollMargin(rect.top + window.scrollY);
+      setLayoutMeasured(true);
     };
 
     update();
@@ -314,6 +304,69 @@ export default function GalleryPageClient() {
     rowVirtualizer.measure();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout.rowHeight]);
+
+  /** 뷰어에서 갤러리로 돌아왔을 때 스크롤 위치 복원.
+   *  픽셀 위치(gs)가 아니라 "보고 있던 사진 id"(gf, 없으면 sessionStorage 폴백)를 우선 사용해
+   *  현재 필터/그룹 적용된 목록에서의 인덱스로 복원한다 — 실제로 측정된 열 수(layoutMeasured)가
+   *  나오기 전에는 대기해서, 모바일(3열)/데스크톱 등 열 수가 달라도 항상 정확한 행으로 스크롤된다.
+   *  포커스 사진을 못 찾으면(필터로 가려짐/삭제됨 등) 저장된 픽셀 위치로 폴백한다. */
+  useLayoutEffect(() => {
+    if (loading || !layoutMeasured || typeof window === "undefined") return;
+
+    const gsRaw = searchParams.get(GALLERY_SCROLL_PARAM);
+    const gfId = searchParams.get(GALLERY_FOCUS_PARAM);
+    let focusId = gfId;
+    if (!focusId && galleryFocusKey) {
+      try {
+        focusId = sessionStorage.getItem(galleryFocusKey);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    let restored = false;
+    if (focusId) {
+      const index = displayPhotos.findIndex((p) => p.id === focusId);
+      if (index >= 0 && layout.cols > 0) {
+        rowVirtualizer.scrollToIndex(Math.floor(index / layout.cols), { align: "center" });
+        restored = true;
+      }
+    }
+
+    if (!restored) {
+      let y: number | null = null;
+      if (gsRaw != null) {
+        y = Number(gsRaw);
+      } else if (galleryScrollKey) {
+        try {
+          const raw = sessionStorage.getItem(galleryScrollKey);
+          if (raw != null) y = Number(raw);
+        } catch {
+          /* ignore */
+        }
+      }
+      if (y != null && Number.isFinite(y) && y >= 0) {
+        window.scrollTo({ top: y, behavior: "auto" });
+      }
+    }
+
+    try {
+      if (galleryScrollKey) sessionStorage.removeItem(galleryScrollKey);
+      if (galleryFocusKey) sessionStorage.removeItem(galleryFocusKey);
+    } catch {
+      /* ignore */
+    }
+
+    if (gsRaw != null || gfId != null) {
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete(GALLERY_SCROLL_PARAM);
+      next.delete(GALLERY_FOCUS_PARAM);
+      const q = next.toString();
+      router.replace(`/c/${token}/gallery${q ? `?${q}` : ""}`, { scroll: false });
+    }
+    // rowVirtualizer는 매 렌더마다 새 참조라 deps에 넣으면 매번 재실행된다(파일 내 다른 곳과 동일 관례로 제외).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, layoutMeasured, displayPhotos, layout.cols, galleryScrollKey, galleryFocusKey, searchParams, token, router]);
 
   const virtualRows = rowVirtualizer.getVirtualItems();
   const rangeKey = virtualRows.length > 0
@@ -364,12 +417,6 @@ export default function GalleryPageClient() {
     () => scrollToPhotoIndex(displayPhotos.length - 1, "start"),
     [scrollToPhotoIndex, displayPhotos.length]
   );
-  const handleJumpToNumber = useCallback(() => {
-    const n = Number(jumpToValue);
-    if (!Number.isFinite(n)) return;
-    scrollToPhotoIndex(n - 1, "center");
-  }, [jumpToValue, scrollToPhotoIndex]);
-
   /* ── Handlers ── */
   const handleCheckClick = useCallback((e: React.MouseEvent, photoId: string) => {
     e.preventDefault();
@@ -502,6 +549,10 @@ export default function GalleryPageClient() {
         .gl-photo-card.gl-selected .gl-check-box {
           background: var(--accent) !important; border-color: var(--accent) !important;
         }
+        .gl-photo-card.gl-in-expanded-group {
+          border-color: var(--accent);
+          box-shadow: inset 0 0 0 1px var(--accent);
+        }
 
         .gl-card-overlay {
           position: absolute; inset: 0;
@@ -538,6 +589,9 @@ export default function GalleryPageClient() {
           display: flex; align-items: center; justify-content: center;
           z-index: 20; pointer-events: none;
         }
+        .gl-quality-badge-eyes {
+          border-color: #4DA3FF; color: #4DA3FF;
+        }
 
         .gl-similarity-toggle {
           display: flex; align-items: center; gap: 6px;
@@ -564,12 +618,16 @@ export default function GalleryPageClient() {
           cursor: pointer; transition: all 0.15s ease;
         }
         .gl-jump-btn:hover { color: var(--accent); border-color: var(--accent); }
-        .gl-jump-input {
-          width: 52px; height: 26px; padding: 0 6px;
+        .gl-search-group {
+          display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+        }
+        .gl-search-input {
+          width: 190px; height: 26px; padding: 0 8px;
           background: transparent; border: 1px solid var(--border); color: var(--foreground);
           font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 11px;
-          outline: none; text-align: center;
+          outline: none;
         }
+        .gl-search-input:focus { border-color: var(--accent); }
 
         .gl-filter-tab {
           position: relative; padding: 8px 14px;
@@ -643,7 +701,7 @@ export default function GalleryPageClient() {
           /* 그리드 — 열 수/간격은 JS에서 뷰포트 폭 기준으로 계산(가상화) */
           .gl-page-wrapper { padding-top: 104px !important; padding-bottom: 72px !important; }
           .gl-grid-main { padding: 0 6px !important; }
-          .gl-jump-input { width: 44px !important; }
+          .gl-search-group { display: none !important; }
 
           /* 카드 오버레이 — 모바일 크기 축소 */
           .gl-card-overlay { padding: 6px !important; }
@@ -777,6 +835,40 @@ export default function GalleryPageClient() {
                     </button>
                   </>
                 )}
+                {hasBlurryPhotos && (
+                  <button
+                    type="button"
+                    onClick={() => toggleQualityFilter("blurry")}
+                    className={`gl-similarity-toggle${qualityFilter.has("blurry") ? " gl-similarity-on" : ""}`}
+                    style={{ color: qualityFilter.has("blurry") ? "#FFB800" : "#555" }}
+                  >
+                    <span className="gl-similarity-checkbox" style={{ borderColor: qualityFilter.has("blurry") ? "#FFB800" : undefined, background: qualityFilter.has("blurry") ? "#FFB800" : undefined }}>
+                      {qualityFilter.has("blurry") && (
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </span>
+                    흔들림만
+                  </button>
+                )}
+                {hasEyesClosedPhotos && (
+                  <button
+                    type="button"
+                    onClick={() => toggleQualityFilter("eyesClosed")}
+                    className={`gl-similarity-toggle${qualityFilter.has("eyesClosed") ? " gl-similarity-on" : ""}`}
+                    style={{ color: qualityFilter.has("eyesClosed") ? "#4DA3FF" : "#555" }}
+                  >
+                    <span className="gl-similarity-checkbox" style={{ borderColor: qualityFilter.has("eyesClosed") ? "#4DA3FF" : undefined, background: qualityFilter.has("eyesClosed") ? "#4DA3FF" : undefined }}>
+                      {qualityFilter.has("eyesClosed") && (
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </span>
+                    눈감음만
+                  </button>
+                )}
               </div>
 
               {/* Right: colors + reset + sort */}
@@ -836,20 +928,24 @@ export default function GalleryPageClient() {
                   <button type="button" title="마지막으로" aria-label="마지막으로 이동" onClick={handleJumpToLast} className="gl-jump-btn">
                     <ChevronsDown style={{ width: 14, height: 14 }} />
                   </button>
+                </div>
+
+                {/* 파일명 검색(필터) — PC 전용(모바일은 화면이 좁아 gl-search-group을 숨김).
+                    쉼표/공백으로 여러 파일명을 구분하면 LIKE(부분 일치)로 OR 검색된다. */}
+                <div className="gl-search-group">
                   <input
-                    type="number"
-                    min={1}
-                    max={displayPhotos.length}
-                    placeholder="#"
-                    value={jumpToValue}
-                    onChange={(e) => setJumpToValue(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleJumpToNumber()}
-                    className="gl-jump-input"
-                    aria-label="사진 번호로 이동"
+                    type="text"
+                    placeholder="파일명 검색 (쉼표로 여러 개)"
+                    value={searchValue}
+                    onChange={(e) => setSearchValue(e.target.value)}
+                    className="gl-search-input"
+                    aria-label="파일명으로 필터링"
                   />
-                  <button type="button" title="이동" aria-label="입력한 번호로 이동" onClick={handleJumpToNumber} className="gl-jump-btn">
-                    →
-                  </button>
+                  {searchValue && (
+                    <button type="button" title="검색 초기화" aria-label="파일명 필터 초기화" onClick={() => setSearchValue("")} className="gl-jump-btn">
+                      ×
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -873,7 +969,8 @@ export default function GalleryPageClient() {
                 const group           = photo.similarityGroupId ? groupsById.get(photo.similarityGroupId) : undefined;
                 const isRepresentative = !!group && group.representativePhotoId === photo.id;
                 const restCount       = group ? group.photoCount - 1 : 0;
-                const showGroupBadge  = similarityToggleOn && isRepresentative && restCount > 0;
+                const groupingActive  = similarityToggleOn && !narrowingFilterActive;
+                const showGroupBadge  = groupingActive && isRepresentative && restCount > 0;
                 const presignedThumb  = presignedUrls.get(photo.id)?.url;
 
                 cells.push(
@@ -887,7 +984,8 @@ export default function GalleryPageClient() {
                     showGroupBadge={showGroupBadge}
                     groupId={group?.id}
                     restCount={restCount}
-                    isGroupExpanded={!!group && expandedGroups.has(group.id)}
+                    isGroupExpanded={groupingActive && !!group && expandedGroups.has(group.id)}
+                    inExpandedGroup={groupingActive && !!group && expandedGroups.has(group.id)}
                     presignedThumb={presignedThumb}
                     thumbQueue={thumbQueue}
                     viewerQueryString={viewerQueryString}
