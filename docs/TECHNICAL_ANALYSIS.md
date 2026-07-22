@@ -69,18 +69,17 @@ Frontend                        Backend
 ### 이미지 처리 설정값
 
 ```python
-# 원본 처리 (upload.py)
-THUMB_MAX_SIZE = 300        # 갤러리 썸네일 (OPT-01: 400→300)
+# 원본 / 보정본 공통 (upload.py) — 동일한 사이즈·품질 기준
+THUMB_MAX_SIZE = 300        # 갤러리 썸네일
 THUMB_JPEG_QUALITY = 75
-PREVIEW_MAX_SIZE = 1200     # 뷰어 미리보기
+PREVIEW_MAX_SIZE = 1200     # 뷰어 미리보기 / 보정본 full
 PREVIEW_JPEG_QUALITY = 82
 
-# 보정본 처리 (upload.py)
-VERSION_MAX_SIZE = 1500
-VERSION_JPEG_QUALITY = 85
-VERSION_MAX_BYTES = 2_000_000  # 2MB 상한, 초과 시 품질 자동 조정 (85%→60%)
-VERSION_THUMB_MAX_SIZE = 400
-VERSION_THUMB_JPEG_QUALITY = 78
+# 보정본 전용 (upload.py)
+VERSION_MAX_SIZE = 1200     # PREVIEW_MAX_SIZE와 동일
+VERSION_JPEG_QUALITY = 82   # 고정 품질 (품질 자동 하향 루프 없음)
+VERSION_THUMB_MAX_SIZE = 300
+VERSION_THUMB_JPEG_QUALITY = 75
 
 # 동시성
 UPLOAD_PHOTOS_CONCURRENCY = 5   # 환경변수로 조정 가능
@@ -90,15 +89,10 @@ IMAGE_EXECUTOR_MAX_WORKERS = 8  # ThreadPoolExecutor
 ### 브라우저 압축 설정값
 
 ```ts
-// 원본 업로드 (upload-client-compress.ts 기본값)
-maxEdge = 2560        // 최장변
+// 원본·보정본 공통 (upload-client-compress.ts 기본값)
+maxEdge = 2560
 jpegQuality = 0.82
 skipBelowBytes = 600KB  // 이하 파일은 압축 스킵
-
-// 보정본 업로드 (UploadVersionsPanel.tsx — 서버 설정과 동일하게 맞춤)
-maxEdge = 1500        // 서버 VERSION_MAX_SIZE와 동일
-jpegQuality = 0.85    // 서버 VERSION_JPEG_QUALITY와 동일
-skipBelowBytes = 600KB  // 기본값 유지
 ```
 
 ---
