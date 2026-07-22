@@ -375,7 +375,7 @@ sequenceDiagram
 
 ## 10. 사진 업로드, 저장, 조회 및 썸네일 처리 흐름
 
-1. **선택/사전 압축(브라우저)**: `src/lib/upload-client-compress.ts`에서 최대 2560px, JPEG q=0.82로 리사이즈(600KB 미만 파일은 스킵).
+1. **선택/사전 압축(브라우저)**: `src/lib/upload-client-compress.ts`에서 최대 3200px, JPEG q=0.82로 리사이즈(600KB 미만 파일은 스킵).
 2. **배치 전송**: PC 8장×동시5, 모바일 3장×동시2 배치로 `XMLHttpRequest` 멀티파트 전송, `Authorization: Bearer <Supabase access_token>` 포함.
 3. **전송 대상**: 우선 `NEXT_PUBLIC_API_URL` (FastAPI) 직접 호출 → 네트워크/CORS 오류 시 Next API 프록시(`/api/photographer/upload/photos`)로 폴백.
 4. **백엔드 처리(`photo-selection-be/app/routers/upload.py`)**:

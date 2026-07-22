@@ -3,7 +3,7 @@
  * 디코드 실패·결과가 원본보다 크면 원본 File을 그대로 반환합니다.
  */
 
-const DEFAULT_MAX_EDGE = 2560;
+const DEFAULT_MAX_EDGE = 3200;
 const DEFAULT_JPEG_QUALITY = 0.82;
 /** 이보다 작은 파일은 디코딩·재인코딩 생략 */
 const DEFAULT_SKIP_BELOW_BYTES = 600 * 1024;

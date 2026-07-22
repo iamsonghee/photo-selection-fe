@@ -90,7 +90,7 @@ IMAGE_EXECUTOR_MAX_WORKERS = 8  # ThreadPoolExecutor
 
 ```ts
 // 원본·보정본 공통 (upload-client-compress.ts 기본값)
-maxEdge = 2560
+maxEdge = 3200
 jpegQuality = 0.82
 skipBelowBytes = 600KB  // 이하 파일은 압축 스킵
 ```
