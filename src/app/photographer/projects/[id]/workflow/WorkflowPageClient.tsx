@@ -11,6 +11,7 @@ import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHead
 import UploadVersionsPanel, {
   type UploadPanelTarget,
 } from "@/components/photographer/UploadVersionsPanel";
+import DeliveryUploadPanel from "@/components/photographer/DeliveryUploadPanel";
 import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -854,6 +855,7 @@ export default function WorkflowPageClient() {
   const reviewHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const [deliveryPanelOpen, setDeliveryPanelOpen] = useState(false);
 
   const getVersionUrl = useCallback(
     (url: string, photoId: string, version: 1 | 2) => {
@@ -1794,9 +1796,13 @@ export default function WorkflowPageClient() {
             ) : null}
           </div>
           {project.status === "delivered" ? (
-            <span className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <CheckCircle2 size={15} />납품 완료
-            </span>
+            <button
+              type="button"
+              onClick={() => setDeliveryPanelOpen(true)}
+              className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 transition-colors"
+            >
+              <CheckCircle2 size={15} />납품 파일 업로드
+            </button>
           ) : isConfirmed ? (
             <button
               onClick={handleStartEditing}
@@ -1865,6 +1871,13 @@ export default function WorkflowPageClient() {
         targets={panelVersion === 2 ? v2Targets : v1Targets}
         existingVersionCount={existingVersionCount}
         onDelivered={handleDelivered}
+      />
+
+      {/* ── Delivery file upload panel ── */}
+      <DeliveryUploadPanel
+        isOpen={deliveryPanelOpen}
+        onClose={() => setDeliveryPanelOpen(false)}
+        projectId={id}
       />
 
       {confirmDialog ? (

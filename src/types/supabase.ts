@@ -254,6 +254,44 @@ export interface Database {
           created_at?: string;
         };
       };
+      delivery_files: {
+        Row: {
+          id: string;
+          project_id: string;
+          r2_url: string;
+          original_filename: string;
+          delivery_filename: string;
+          file_size: number;
+          compressed: boolean;
+          original_file_size: number | null;
+          mime_type: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          r2_url: string;
+          original_filename: string;
+          delivery_filename: string;
+          file_size: number;
+          compressed?: boolean;
+          original_file_size?: number | null;
+          mime_type: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          r2_url?: string;
+          original_filename?: string;
+          delivery_filename?: string;
+          file_size?: number;
+          compressed?: boolean;
+          original_file_size?: number | null;
+          mime_type?: string;
+          created_at?: string;
+        };
+      };
       version_reviews: {
         Row: {
           id: string;
