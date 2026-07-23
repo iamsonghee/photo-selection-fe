@@ -172,6 +172,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `photo_versions` | `id, photo_id, version(1\|2), r2_url, r2_thumb_url, file_size, filename, created_at` | `(photo_id, version)` conflict로 upsert. |
 | `version_reviews` | `photo_version_id, photo_id, status("approved"\|"revision_requested"), customer_comment, reviewed_at` | `photo_version_id` unique(conflict 대상). 보정본 재업로드 시 관련 행 삭제됨. |
 | `project_logs` | `id, project_id, photographer_id, action, created_at` | 상태 변경 이력. |
+| `delivery_files` | `id, project_id, r2_url, original_filename, delivery_filename, file_size, compressed, original_file_size, mime_type, created_at` | `delivered` 상태 프로젝트의 납품 파일. `compressed=true`면 20MB 초과로 자동 압축 발생, `original_file_size`에 압축 전 크기 저장. `mime_type`은 항상 `image/jpeg`(PNG/HEIC/WebP도 변환 후 저장). |
 | `pin_attempts` | `project_token, ip_address, attempted_at` | PIN 시도 rate-limit(1분 내 5회)용. |
 | `photo_groups` | `id, project_id, representative_photo_id, photo_count` | CLIP 유사도 그룹. `src/types/supabase.ts` 생성 타입에는 **없음**(수동 캐스팅으로 접근). 사진 삭제 시 `delete_photo_and_resolve_group` RPC(`supabase/migrations/20260720_delete_photo_group_cleanup.sql`)가 대표컷 재지정/`photo_count` 갱신/그룹 해체를 원자적으로 처리 — `insert_photos_with_numbers`와 동일한 이유(PostgREST 다중 호출의 비원자성 방지)로 RPC화됨. |
 | `deleted_photographers` | `id, deleted_at, project_count, join_month` | 계정 삭제 시 익명화 통계로 남김. |
@@ -289,6 +290,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | POST | `/api/upload/photos` | Supabase JWT | 원본 업로드+썸네일/프리뷰 생성+R2 업로드+DB insert(베타 최대 3000장/프로젝트) |
 | POST | `/api/upload/profile-image` | Supabase JWT | 프로필 이미지 업로드(400px) |
 | POST | `/api/upload/versions` | Supabase JWT | 보정본 업로드(1500px/2MB 상한, 베타 최대 2라운드) |
+| POST | `/api/upload/originals` | Supabase JWT | 납품 파일 업로드(`delivered` 상태 전용). JPEG/PNG/HEIC/WebP 지원, 20MB 상한(초과 시 2단계 자동 압축: 품질 하향 → 해상도 축소, 3200px/85%에서도 초과하면 거부). PNG/HEIC/WebP → JPEG 자동 변환. `delivery_files` 테이블 INSERT. |
 | POST | `/api/storage/delete` | **없음** | R2 키 목록 삭제 — §12 위험 항목 |
 | POST | `/api/storage/presign` | 정적 시크릿(`INTERNAL_PRESIGN_SECRET`) | R2 키 목록 presigned GET URL 발급 |
 
@@ -311,6 +313,7 @@ FE가 FastAPI(`NEXT_PUBLIC_API_URL`/`API_URL`/`BACKEND_URL`)를 호출하는 지
 |---|---|---|
 | 원본 사진 업로드 | **브라우저 → FastAPI 직접**(멀티파트+Bearer JWT), CORS/네트워크 실패(`TypeError`) 시 **Next API 프록시**(`api/photographer/upload/photos`)로 폴백 | `POST /api/upload/photos` |
 | 보정본 업로드(V1/V2) | 브라우저 → FastAPI 직접 (프록시 라우트도 존재하지만 업로드 페이지들은 직접 호출을 우선 사용) | `POST /api/upload/versions` |
+| 납품 파일 업로드 | 브라우저 → FastAPI 직접(`DeliveryUploadPanel.tsx`) — `delivered` 상태 전용, 파일 크기별 동적 배치(≤5MB→6장, 5–15MB→3장, >15MB→2장) | `POST /api/upload/originals` |
 | 프로필 이미지 업로드 | 브라우저 → FastAPI 직접 | `POST /api/upload/profile-image` |
 | R2 파일 삭제(프로젝트/사진/보정본 삭제 시) | Next API 라우트(서버) → FastAPI | `POST /api/storage/delete`, `DELETE /api/projects/{id}/r2` |
 | 고객 뷰어/썸네일 presigned URL | Next API 라우트(서버, `src/lib/presign-server.ts`) → FastAPI, 서비스 시크릿 사용 | `POST /api/storage/presign` |
@@ -381,7 +384,7 @@ sequenceDiagram
 4. **백엔드 처리(`photo-selection-be/app/routers/upload.py`)**:
    - Content-Type 미확인 시 확장자로 추론.
    - EXIF 방향 보정 → 썸네일(300px, JPEG 75%) + 프리뷰(1200px, JPEG 82%) 생성(Pillow, 4000px 초과 이미지는 draft 모드로 사전 축소).
-   - R2에 병렬 업로드(`photos/{photographer_id}/{project_id}/{photo_id}_(thumb|preview).jpg`), `Cache-Control: public, max-age=31536000, immutable` 적용.
+   - R2에 병렬 업로드(`photos/{photographer_id}/{project_id}/{photo_id}_(thumb|preview).jpg`), `Cache-Control: public, max-age=31536000, immutable` 적용. 납품 파일은 `originals/{project_id}/{uuid}_{safe_filename}.jpg`로 저장(캐싱 헤더 없음).
    - `insert_photos_with_numbers` RPC로 `photos.number`를 원자적으로 할당하며 DB insert(경쟁 조건 방지).
    - `projects.photo_count` 갱신.
    - 베타 한도: 프로젝트당 최대 3000장(`BETA_MAX_PHOTOS_PER_PROJECT`).

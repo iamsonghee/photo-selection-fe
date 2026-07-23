@@ -298,7 +298,30 @@
 
 ---
 
-## 8. 프로젝트 상태 변경
+## 8. 납품 파일 업로드
+
+- **시작 조건**: `status === "delivered"` — 고객이 보정본을 최종 승인해 프로젝트가 완료된 상태.
+- **사용자가 수행하는 단계**: `/workflow` 하단 "납품 파일 업로드" 버튼 클릭 → `DeliveryUploadPanel` 슬라이드오버 열림 → 파일 드래그앤드롭 또는 클릭 선택(JPEG/PNG/WebP/HEIC) → "납품 파일 업로드 (N장)" 클릭 → 진행률 확인 → 완료 리포트 확인.
+- **프론트엔드 라우트**: `/photographer/projects/[id]/workflow` (`WorkflowPageClient.tsx` + `DeliveryUploadPanel.tsx`).
+- **호출되는 API**: `POST {API_URL}/api/upload/originals`(FastAPI 직접, Bearer JWT) — 파일 크기에 따라 동적 배치(≤5MB→6장, 5–15MB→3장, >15MB→2장). 응답: `{ uploaded, compressed, rejected: [{filename, reason}] }`.
+- **성공 시 기대 결과**:
+  - R2에 `originals/{project_id}/{uuid}_{safe_filename}.jpg`로 저장.
+  - `delivery_files` 테이블에 INSERT(원본 파일명, 저장 파일명, 크기, 압축 여부 기록).
+  - 완료 패널에 3분류 리포트 표시: "업로드 완료 N장 / 자동 최적화 N장 / 실패 N장".
+- **자동 압축 동작**:
+  - PNG/HEIC/WebP는 JPEG으로 자동 변환(포맷 변환만이면 `compressed=false`).
+  - 20MB 초과 시 1단계: 품질 하향(90%→85%→80%→75%, 해상도 유지) → 2단계: 품질 85% 고정 + 최장변 점진 축소(6000→5000→4000→3200px). 3200px/85%에서도 20MB 초과 시 거부(`compressed=true`인 경우 `original_file_size`에 압축 전 크기 기록).
+- **실패 및 경계 상황**:
+  - `status !== "delivered"` 프로젝트로 요청 시 FastAPI가 403 반환.
+  - RAW 파일 등 지원하지 않는 포맷은 클라이언트 측 필터링 후 rejected 처리.
+  - 3200px/85%에서도 20MB 초과 → "파일이 20MB 상한을 초과하여 자동 압축 후에도 저장할 수 없습니다" 메시지와 함께 거부, 나머지 파일은 정상 처리.
+  - 고객 다운로드 UI는 미구현(베타 이후 예정).
+- **관련 권한/인증 조건**: 로그인 세션(Supabase JWT), FastAPI가 `photographer_id`로 프로젝트 소유권 + `delivered` 상태 재검증.
+- **QA에서 확인해야 할 항목**: 20MB 근접 파일 업로드 시 자동 압축 발생 여부 및 완료 리포트 정확성, PNG 파일 업로드 시 JPEG 변환 후 저장 여부(DB `mime_type = "image/jpeg"`), 동시 배치 중 일부 실패 시 성공한 파일은 정상 저장되는지, `delivered` 외 상태 프로젝트에서 패널 접근이 불가한지(버튼 자체가 `delivered`에서만 표시됨).
+
+---
+
+## 9. 프로젝트 상태 변경
 
 - **시작 조건**: 각 상태 전이 조건 충족 시(§`docs/architecture.md` 5.1 상태 머신 참고).
 - **사용자가 수행하는 단계**: 각 화면의 전용 버튼 클릭(초대 링크 활성화/보정 시작/고객에게 전달 등). 상태를 임의로 건너뛰는 UI는 제공되지 않음.
