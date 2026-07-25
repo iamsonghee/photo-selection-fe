@@ -1409,8 +1409,8 @@ export default function ProjectDetailPage() {
         const inFlightIds = new Set(inFlight.map((p) => p.tempId));
         // XHR 시작 전 스피너 강제 렌더 (iOS WKWebView scheduler 우회)
         flushSync(() => setUploadingPhotos((prev) => [...prev, ...inFlight]));
-        // WKWebView가 실제로 paint할 시간 확보 (concurrency=1이므로 여기서 대기해도 안전)
-        await new Promise<void>((r) => requestAnimationFrame(() => r()));
+        // macrotask 경계 생성 — rAF는 백그라운드 탭에서 멈추므로 setTimeout 사용
+        await new Promise<void>((r) => setTimeout(r, 0));
         try {
           if (abortReason) {
             allFailed.push(...batch);
@@ -1493,8 +1493,8 @@ export default function ProjectDetailPage() {
                 setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
                 setPendingPhotos((prev) => [...prev, ...inFlight]);
               });
-              // WKWebView paint 기회 확보 (concurrency=1이므로 다음 batch 시작 전 실제로 화면 갱신됨)
-              await new Promise<void>((r) => requestAnimationFrame(() => r()));
+              // macrotask 경계 생성 — rAF는 백그라운드 탭에서 멈추므로 setTimeout 사용
+              await new Promise<void>((r) => setTimeout(r, 0));
               uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
               pendingBlobsRef.current.push(...inFlight.map((p) => p.blobUrl));
             }
