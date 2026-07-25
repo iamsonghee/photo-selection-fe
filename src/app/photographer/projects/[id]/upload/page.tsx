@@ -332,6 +332,7 @@ function PhotoThumb({
   groupBadge,
   onGroupBadgeClick,
   inExpandedGroup,
+  isCompressing,
 }: {
   photo: Photo;
   index: number;
@@ -347,6 +348,8 @@ function PhotoThumb({
   onGroupBadgeClick?: (e: React.MouseEvent, groupId: string) => void;
   /** 펼쳐진 그룹(대표컷+멤버 전체)에 속함 — 그룹 경계를 테두리로 시각 구분 */
   inExpandedGroup?: boolean;
+  /** 현재 압축 중인 사진 — 펄싱 오버레이 표시 */
+  isCompressing?: boolean;
 }) {
   const [loaded, setLoaded] = useState(false);
   const deleting = deletingId === photo.id;
@@ -367,7 +370,9 @@ function PhotoThumb({
       style={{
         background: "var(--background)",
         border: photo.isPending
-          ? "1px solid rgba(var(--accent-rgb), 0.55)"
+          ? isCompressing
+            ? `2px solid ${ACCENT}`
+            : "1px solid rgba(var(--accent-rgb), 0.4)"
           : inExpandedGroup
           ? `2px solid ${ACCENT}`
           : `1px solid ${BORDER}`,
@@ -400,6 +405,12 @@ function PhotoThumb({
         {/* XHR 전송 중 스피너 */}
         {photo.isUploading && (
           <div style={{ position: "absolute", top: 5, right: 5, zIndex: 10, width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(var(--accent-rgb), 0.25)", borderTopColor: "rgba(var(--accent-rgb), 0.85)", animation: "spin 0.9s linear infinite" }} />
+        )}
+        {/* 현재 압축 중 오버레이 */}
+        {isCompressing && (
+          <div className="prj-compressing-overlay">
+            <Loader2 size={16} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} />
+          </div>
         )}
         {/* filename overlay */}
         <div
@@ -520,6 +531,7 @@ const GRID_FILENAME_H = 0; // filename is overlayed on image
 function UploadTile({
   isUploading,
   uploadProgress,
+  overallProgress,
   showServerWorking,
   hasPhotos,
   isPreparing,
@@ -527,6 +539,7 @@ function UploadTile({
 }: {
   isUploading: boolean;
   uploadProgress: number;
+  overallProgress: number;
   showServerWorking: boolean;
   hasPhotos: boolean;
   isPreparing: boolean;
@@ -537,7 +550,7 @@ function UploadTile({
     : isUploading
       ? showServerWorking
         ? "처리 중..."
-        : `${uploadProgress}%`
+        : `${overallProgress}%`
       : hasPhotos
         ? "+ 사진 추가"
         : "사진 선택";
@@ -631,6 +644,7 @@ function VirtualizedPhotoGrid({
   similarityToggleOn,
   expandedGroups,
   onGroupBadgeClick,
+  compressingTempId,
 }: {
   scrollRef: React.RefObject<HTMLDivElement | null>;
   photos: Photo[];
@@ -647,6 +661,8 @@ function VirtualizedPhotoGrid({
   similarityToggleOn?: boolean;
   expandedGroups?: Set<string>;
   onGroupBadgeClick?: (e: React.MouseEvent, groupId: string) => void;
+  /** 현재 압축 중인 사진 tempId — 해당 셀에 하이라이트 오버레이 표시 */
+  compressingTempId?: string | null;
 }) {
   const [layout, setLayout] = useState(() => {
     const cw = GRID_MIN_CELL;
@@ -737,6 +753,7 @@ function VirtualizedPhotoGrid({
                 groupBadge={groupBadge}
                 onGroupBadgeClick={onGroupBadgeClick}
                 inExpandedGroup={!!group && isExpanded}
+                isCompressing={compressingTempId === photo.id}
               />,
             );
           }
@@ -985,6 +1002,13 @@ export default function ProjectDetailPage() {
   /** XHR 전송 중인 사진 (스피너 표시) */
   const [uploadingPhotos, setUploadingPhotos] = useState<Array<{ tempId: string; blobUrl: string; filename: string }>>([]);
   const uploadingBlobsRef = useRef<string[]>([]);
+  /** 업로드 시작 즉시 표시할 전체 미리보기 (압축·전송 전 큐 상태) */
+  const [queuedPreviews, setQueuedPreviews] = useState<Array<{ tempId: string; blobUrl: string; filename: string }>>([]);
+  const queuedBlobsRef = useRef<string[]>([]);
+  /** 현재 압축 중인 파일의 queuedPreviews 인덱스 (-1이면 압축 중 아님) */
+  const [compressingIndex, setCompressingIndex] = useState(-1);
+  /** 현재 업로드 배치의 전체 파일 수 */
+  const [totalUploadCount, setTotalUploadCount] = useState(0);
 
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -1059,18 +1083,35 @@ export default function ProjectDetailPage() {
     if (project?.clipAnalysisStatus) setClipAnalysisStatus(project.clipAnalysisStatus);
   }, [project?.clipAnalysisStatus]);
 
-  /** 기존 photos + 배치 완료(pending) + 전송 중(uploading) 합산 — early return 이전에 선언해야 Rules of Hooks 준수 */
+  const overallProgress = useMemo(() => {
+    if (uploadPhase === "idle" || uploadPhase === "done") return 0;
+    if (uploadPhase === "processing") return Math.round(uploadProgress * 0.35);
+    if (uploadPhase === "sending") {
+      const n = Math.max(0, uploadProgress - 3) / 87;
+      return Math.round(35 + n * 55);
+    }
+    return 90;
+  }, [uploadPhase, uploadProgress]);
+
+  /** 기존 photos + 배치 완료(pending) + 전송 중(uploading) + 큐(queued) 합산 — early return 이전에 선언해야 Rules of Hooks 준수 */
   const displayPhotos = useMemo(() => {
     const confirmedNames = new Set(photos.map((p) => p.originalFilename));
+    const activeNames = new Set([
+      ...pendingPhotos.map((p) => p.filename),
+      ...uploadingPhotos.map((p) => p.filename),
+    ]);
     const pendingAsPhotos: Photo[] = pendingPhotos
       .filter((p) => !confirmedNames.has(p.filename))
       .map((p) => ({ id: p.tempId, projectId: id, orderIndex: 99999, url: p.blobUrl, originalFilename: p.filename, isPending: true, isUploading: false }));
     const uploadingAsPhotos: Photo[] = uploadingPhotos
       .filter((p) => !confirmedNames.has(p.filename))
       .map((p) => ({ id: p.tempId, projectId: id, orderIndex: 99999, url: p.blobUrl, originalFilename: p.filename, isPending: true, isUploading: true }));
-    if (pendingAsPhotos.length === 0 && uploadingAsPhotos.length === 0) return photos;
-    return [...photos, ...pendingAsPhotos, ...uploadingAsPhotos];
-  }, [photos, pendingPhotos, uploadingPhotos, id]);
+    const queuedAsPhotos: Photo[] = queuedPreviews
+      .filter((p) => !confirmedNames.has(p.filename) && !activeNames.has(p.filename))
+      .map((p) => ({ id: p.tempId, projectId: id, orderIndex: 99999, url: p.blobUrl, originalFilename: p.filename, isPending: true, isUploading: false }));
+    if (pendingAsPhotos.length === 0 && uploadingAsPhotos.length === 0 && queuedAsPhotos.length === 0) return photos;
+    return [...photos, ...pendingAsPhotos, ...uploadingAsPhotos, ...queuedAsPhotos];
+  }, [photos, pendingPhotos, uploadingPhotos, queuedPreviews, id]);
 
   /** ── AI 유사컷 그룹 — 대표이미지 토글. 키보드 네비/라이트박스보다 먼저 선언해야
    *  groupedDisplayPhotos를 그 효과들에서 참조할 수 있다 (선언 순서 = 평가 순서). ── */
@@ -1266,6 +1307,10 @@ export default function ProjectDetailPage() {
     setSendingSourceSnap({ done: 0, total: 0 });
     setUploadPhase("processing");
     setUploadProgress(0);
+    setCompressingIndex(-1);
+    setQueuedPreviews([]);
+    queuedBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
+    queuedBlobsRef.current = [];
     stopRequestedRef.current = false;
     useProxyRef.current = false;
 
@@ -1276,6 +1321,16 @@ export default function ProjectDetailPage() {
     if (userError || !user) { setUploadError("로그인 인증을 확인할 수 없습니다."); setUploadPhase("idle"); return; }
     if (!token) { setUploadError("로그인이 필요합니다."); setUploadPhase("idle"); return; }
 
+    // 업로드 확인 모달 닫힘 즉시 전체 사진을 그리드에 표시 (압축 전 큐 상태)
+    setTotalUploadCount(uploadFiles.length);
+    const queuedTs = Date.now();
+    const initialQueued = uploadFiles.map((file, fi) => {
+      const blobUrl = URL.createObjectURL(file);
+      queuedBlobsRef.current.push(blobUrl);
+      return { tempId: `queued-${queuedTs}-${fi}`, blobUrl, filename: file.name };
+    });
+    setQueuedPreviews(initialQueued);
+
     let currentToken = token;
     let filesToUpload = uploadFiles;
 
@@ -1283,10 +1338,18 @@ export default function ProjectDetailPage() {
     // B Plan: 항상 압축본을 서버로 전송 (include_original 여부 무관). 원본은 presigned PUT으로 R2에 직접 전송.
     const compressed: File[] = [];
     for (let i = 0; i < uploadFiles.length; i++) {
-      if (stopRequestedRef.current) { setUploadPhase("idle"); setUploadProgress(0); await loadPhotos(); return; }
+      if (stopRequestedRef.current) {
+        setCompressingIndex(-1);
+        setQueuedPreviews([]);
+        queuedBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
+        queuedBlobsRef.current = [];
+        setUploadPhase("idle"); setUploadProgress(0); await loadPhotos(); return;
+      }
+      setCompressingIndex(i);
       compressed.push(await compressImageForUpload(uploadFiles[i]));
       setUploadProgress(Math.round(((i + 1) / uploadFiles.length) * 100));
     }
+    setCompressingIndex(-1);
     filesToUpload = compressed;
 
     setUploadPhase("sending");
@@ -1486,12 +1549,16 @@ export default function ProjectDetailPage() {
       setUploadingPhotos([]);
       uploadingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
       uploadingBlobsRef.current = [];
+      setQueuedPreviews([]);
+      queuedBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      queuedBlobsRef.current = [];
       return;
     }
 
-    if (abortReason === "betaLimit") { setAwaitingServerFinalize(false); setUploadError(abortMessage); setUploadPhase("idle"); setUploadProgress(0); return; }
-    if (abortReason === "network") { setAwaitingServerFinalize(false); setUploadError("업로드에 실패했습니다. 인터넷 연결을 확인해 주세요."); setUploadPhase("idle"); setUploadProgress(0); return; }
-    if (abortReason === "auth") { setAwaitingServerFinalize(false); setUploadError(`업로드에 실패했습니다. (${abortMessage})`); setUploadPhase("idle"); setUploadProgress(0); return; }
+    const cleanupQueued = () => { setQueuedPreviews([]); queuedBlobsRef.current.forEach((u) => URL.revokeObjectURL(u)); queuedBlobsRef.current = []; };
+    if (abortReason === "betaLimit") { setAwaitingServerFinalize(false); setUploadError(abortMessage); setUploadPhase("idle"); setUploadProgress(0); cleanupQueued(); return; }
+    if (abortReason === "network") { setAwaitingServerFinalize(false); setUploadError("업로드에 실패했습니다. 인터넷 연결을 확인해 주세요."); setUploadPhase("idle"); setUploadProgress(0); cleanupQueued(); return; }
+    if (abortReason === "auth") { setAwaitingServerFinalize(false); setUploadError(`업로드에 실패했습니다. (${abortMessage})`); setUploadPhase("idle"); setUploadProgress(0); cleanupQueued(); return; }
 
     setAwaitingServerFinalize(false);
     setUploadProgress(100);
@@ -1521,11 +1588,14 @@ export default function ProjectDetailPage() {
       pendingBlobsRef.current = [];
       uploadingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
       uploadingBlobsRef.current = [];
+      queuedBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      queuedBlobsRef.current = [];
       // 단일 렌더로 DB 사진 표시 + 임시 프리뷰 동시 제거 (중간 프레임 없음)
       flushSync(() => {
         setPhotos(freshPhotos);
         setPendingPhotos([]);
         setUploadingPhotos([]);
+        setQueuedPreviews([]);
         setPhotosLoading(false);
       });
       router.refresh();
@@ -1845,6 +1915,8 @@ export default function ProjectDetailPage() {
         @keyframes prj-bar-scan { 0% { transform: translateX(-100%); } 100% { transform: translateX(500%); } }
         @keyframes prj-bar-indeterminate-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
         @keyframes prj-bar-indet-sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
+        @keyframes prj-compress-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.85; } }
+        .prj-compressing-overlay { position: absolute; inset: 0; z-index: 11; background: rgba(var(--accent-rgb), 0.15); display: flex; align-items: center; justify-content: center; animation: prj-compress-pulse 0.9s ease-in-out infinite; }
         .prj-tech-label { font-family: 'Space Mono', 'JetBrains Mono', 'Noto Sans KR', sans-serif; font-size: 0.63rem; letter-spacing: 0.15em; text-transform: uppercase; }
         .prj-scroll::-webkit-scrollbar { width: 4px; }
         .prj-scroll::-webkit-scrollbar-track { background: ${SURFACE_2}; }
@@ -1996,7 +2068,7 @@ export default function ProjectDetailPage() {
                 <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.35)", width: "35%", animation: "prj-bar-indet-sweep 1.1s linear infinite" }} />
               </div>
             ) : isUploading ? (
-              <div style={{ width: `${uploadProgress}%`, height: "100%", background: ACCENT, transition: "width 0.3s" }} />
+              <div style={{ width: `${overallProgress}%`, height: "100%", background: ACCENT, transition: "width 0.3s" }} />
             ) : null}
           </div>
           {uploadError && (
@@ -2323,6 +2395,34 @@ export default function ProjectDetailPage() {
             </div>
           )}
 
+          {/* ── 업로드 진행 배너 (압축·전송 단계 레이블 + 장수 카운터 + 역주행 없는 진행률) ── */}
+          {isUploading && (
+            <div style={{ flexShrink: 0, padding: "7px 16px", background: SURFACE_1, borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, letterSpacing: "0.1em", minWidth: 52 }}>
+                {uploadPhase === "processing" ? "압축 중" : "업로드 중"}
+              </span>
+              {totalUploadCount > 0 && (
+                <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT_MUTED, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+                  {uploadPhase === "processing"
+                    ? (compressingIndex >= 0 ? compressingIndex + 1 : 0)
+                    : pendingPhotos.length} / {totalUploadCount}장
+                </span>
+              )}
+              <div style={{ flex: 1, height: 2, background: "var(--border)", overflow: "hidden" }}>
+                {showServerWorking ? (
+                  <div style={{ width: "100%", height: "100%", background: ACCENT, animation: "prj-bar-indeterminate-pulse 1.4s ease-in-out infinite", position: "relative", overflow: "hidden" }}>
+                    <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.35)", width: "35%", animation: "prj-bar-indet-sweep 1.1s linear infinite" }} />
+                  </div>
+                ) : (
+                  <div style={{ width: `${overallProgress}%`, height: "100%", background: ACCENT, transition: "width 0.3s" }} />
+                )}
+              </div>
+              <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT_BRIGHT, minWidth: 32, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                {showServerWorking ? "…" : `${overallProgress}%`}
+              </span>
+            </div>
+          )}
+
           {/* photo grid — 가상 스크롤로 보이는 행만 마운트·이미지 로드 */}
           <div
             ref={photoScrollRef}
@@ -2397,11 +2497,13 @@ export default function ProjectDetailPage() {
                 similarityToggleOn={similarityToggleOn && qualityFilter.size === 0}
                 expandedGroups={expandedGroups}
                 onGroupBadgeClick={handleGroupBadgeClick}
+                compressingTempId={compressingIndex >= 0 && queuedPreviews[compressingIndex] ? queuedPreviews[compressingIndex].tempId : null}
                 leadingUploadCell={
                   uploadAllowed ? (
                     <UploadTile
                       isUploading={isUploading}
                       uploadProgress={uploadProgress}
+                      overallProgress={overallProgress}
                       showServerWorking={showServerWorking}
                       hasPhotos={displayPhotos.length > 0}
                       isPreparing={isPreparingFiles}
