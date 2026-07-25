@@ -1555,10 +1555,32 @@ export default function ProjectDetailPage() {
       return;
     }
 
-    const cleanupQueued = () => { setQueuedPreviews([]); queuedBlobsRef.current.forEach((u) => URL.revokeObjectURL(u)); queuedBlobsRef.current = []; };
-    if (abortReason === "betaLimit") { setAwaitingServerFinalize(false); setUploadError(abortMessage); setUploadPhase("idle"); setUploadProgress(0); cleanupQueued(); return; }
-    if (abortReason === "network") { setAwaitingServerFinalize(false); setUploadError("업로드에 실패했습니다. 인터넷 연결을 확인해 주세요."); setUploadPhase("idle"); setUploadProgress(0); cleanupQueued(); return; }
-    if (abortReason === "auth") { setAwaitingServerFinalize(false); setUploadError(`업로드에 실패했습니다. (${abortMessage})`); setUploadPhase("idle"); setUploadProgress(0); cleanupQueued(); return; }
+    // abort 시 모든 임시 상태 제거 + DB 재조회로 그리드를 실제 상태로 복원
+    const cleanupAllTempStates = async () => {
+      pendingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      pendingBlobsRef.current = [];
+      uploadingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      uploadingBlobsRef.current = [];
+      queuedBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      queuedBlobsRef.current = [];
+      let freshPhotos: Photo[] = [];
+      try { freshPhotos = await getPhotosByProjectId(id); } catch {}
+      flushSync(() => {
+        setPhotos(freshPhotos);
+        setPendingPhotos([]);
+        setUploadingPhotos([]);
+        setQueuedPreviews([]);
+        setPhotosLoading(false);
+      });
+    };
+    const formatAuthError = (detail: string) =>
+      /not yet valid|iat/i.test(detail)
+        ? "인증 오류로 업로드할 수 없습니다. 기기의 날짜/시간이 자동 설정인지 확인 후 새로고침해 주세요."
+        : `업로드에 실패했습니다. (${detail})`;
+
+    if (abortReason === "betaLimit") { setAwaitingServerFinalize(false); setUploadError(abortMessage); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); return; }
+    if (abortReason === "network") { setAwaitingServerFinalize(false); setUploadError("업로드에 실패했습니다. 인터넷 연결을 확인해 주세요."); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); return; }
+    if (abortReason === "auth") { setAwaitingServerFinalize(false); setUploadError(formatAuthError(abortMessage)); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); return; }
 
     setAwaitingServerFinalize(false);
     setUploadProgress(100);
