@@ -91,6 +91,43 @@ export async function POST(
   }
 }
 
+/** DELETE /api/photographer/projects/[id]/clip-analysis — AI 유사컷 분석 취소 */
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: projectId } = await params;
+  if (!projectId) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  if (!CLIP_SERVICE_URL || !CLIP_INTERNAL_TOKEN) {
+    return NextResponse.json({ error: "분석 서비스가 설정되지 않았습니다." }, { status: 503 });
+  }
+
+  try {
+    const photographerId = await getPhotographerIdFromSession();
+    if (!photographerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const owns = await assertProjectOwnership(projectId, photographerId);
+    if (!owns) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    const res = await fetch(`${CLIP_SERVICE_URL}/analyze/${projectId}`, {
+      method: "DELETE",
+      headers: { "X-Internal-Token": CLIP_INTERNAL_TOKEN },
+    });
+
+    const text = await res.text();
+    return new NextResponse(text, {
+      status: res.status,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    console.error("[DELETE clip-analysis]", e);
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Failed" },
+      { status: 500 }
+    );
+  }
+}
+
 /** GET /api/photographer/projects/[id]/clip-analysis — 분석 진행 상태 조회 */
 export async function GET(
   _req: NextRequest,

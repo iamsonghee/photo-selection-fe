@@ -1919,6 +1919,23 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleCancelClipAnalysis = async () => {
+    setClipAnalysisTriggering(true);
+    try {
+      const res = await fetch(`/api/photographer/projects/${id}/clip-analysis`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setToast((data as { error?: string }).error ?? "분석 중단에 실패했습니다.");
+        return;
+      }
+      setClipAnalysisStatus(null);
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : "분석 중단에 실패했습니다.");
+    } finally {
+      setClipAnalysisTriggering(false);
+    }
+  };
+
   if (loading) return <PageLoader variant="full" />;
   if (!project) return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", background: SURFACE_0 }}><span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, letterSpacing: "0.15em" }}>PROJECT_NOT_FOUND</span></div>;
 
@@ -2599,30 +2616,49 @@ export default function ProjectDetailPage() {
                 : "연속 촬영된 유사컷을 자동으로 찾아 묶어드립니다"}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleStartClipAnalysis}
-            disabled={clipAnalysisTriggering || clipAnalysisStatus === "processing"}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "8px 16px",
-              background: "transparent",
-              border: `1px solid ${BORDER_MID}`,
-              borderRadius: 8,
-              color: TEXT_NORMAL,
-              fontSize: 12, fontWeight: 500,
-              cursor: clipAnalysisTriggering || clipAnalysisStatus === "processing" ? "not-allowed" : "pointer",
-              fontFamily: MONO,
-              opacity: clipAnalysisTriggering || clipAnalysisStatus === "processing" ? 0.6 : 1,
-            }}
-          >
-            <Sparkles size={14} />
-            {clipAnalysisStatus === "processing"
-              ? "분석 중…"
-              : clipAnalysisStatus === "completed"
-              ? "새 사진 분석"
-              : "AI 유사컷 분석 시작"}
-          </button>
+          {clipAnalysisStatus === "processing" ? (
+            <button
+              type="button"
+              onClick={handleCancelClipAnalysis}
+              disabled={clipAnalysisTriggering}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "8px 16px",
+                background: "transparent",
+                border: "1px solid rgba(255,80,80,0.4)",
+                borderRadius: 8,
+                color: "rgba(255,100,100,0.9)",
+                fontSize: 12, fontWeight: 500,
+                cursor: clipAnalysisTriggering ? "not-allowed" : "pointer",
+                fontFamily: MONO,
+                opacity: clipAnalysisTriggering ? 0.6 : 1,
+              }}
+            >
+              <X size={14} />
+              분석 중단
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleStartClipAnalysis}
+              disabled={clipAnalysisTriggering}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "8px 16px",
+                background: "transparent",
+                border: `1px solid ${BORDER_MID}`,
+                borderRadius: 8,
+                color: TEXT_NORMAL,
+                fontSize: 12, fontWeight: 500,
+                cursor: clipAnalysisTriggering ? "not-allowed" : "pointer",
+                fontFamily: MONO,
+                opacity: clipAnalysisTriggering ? 0.6 : 1,
+              }}
+            >
+              <Sparkles size={14} />
+              {clipAnalysisStatus === "completed" ? "새 사진 분석" : "AI 유사컷 분석 시작"}
+            </button>
+          )}
         </div>
       )}
 
