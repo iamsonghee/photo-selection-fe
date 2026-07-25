@@ -193,6 +193,18 @@ test.describe("Phase A — middleware redirect", () => {
     expect(page.url()).not.toContain("/pin");
     await ctx.close();
   });
+
+  // regression: middleware가 pin redirect의 "from" 파라미터를 pathname만으로 구성해
+  // 원래 URL의 쿼리스트링(예: 뷰어의 ?grouped=1, 필터 파라미터)을 유실시키던 버그.
+  // PIN 없는 프로젝트라 /pin → auto-verify를 거쳐 쿠키 발급 후 원래 URL로 복귀하는데,
+  // 이 왕복 과정에서 쿼리스트링이 최종 URL까지 보존되는지 확인한다.
+  test("M3: 쿠키 없이 쿼리스트링이 붙은 URL 접근 → 최종 복귀 URL에 쿼리스트링 보존", async ({ browser }) => {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await page.goto(`/c/${project.accessToken}/gallery?rating=5`, { waitUntil: "networkidle" });
+    expect(page.url()).toContain("rating=5");
+    await ctx.close();
+  });
 });
 
 // ─── PIN 폼 UI 흐름 (regression: 인증 직후 목적지 렌더링) ────────────────────

@@ -13,6 +13,7 @@ import {
   getFilteredPhotos,
   getPhotoDisplayName,
 } from "@/lib/gallery-filter";
+import { buildGroupsById, buildMembersByGroup, buildPhotoIdSet, filterToRepresentatives } from "@/lib/photo-groups";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import {
   viewerImageBlockDownloadHandlers,
@@ -139,7 +140,7 @@ export default function ViewerPage() {
   const searchParams = useSearchParams();
   const token = (params?.token as string) ?? "";
   const photoId = (params?.photoId as string) ?? "";
-  const { project, photos: contextPhotos, selectedIds, Y, toggle, photoStates, updatePhotoState } = useSelection();
+  const { project, photos: contextPhotos, photoGroups, selectedIds, Y, toggle, photoStates, updatePhotoState } = useSelection();
 
   // 로컬 state로 현재 사진 관리 — router.push 없이 전환해 컴포넌트 재마운트 방지
   const [activePhotoId, setActivePhotoId] = useState(photoId);
@@ -159,14 +160,57 @@ export default function ViewerPage() {
   }, [token, activePhotoId]);
 
   const filterState = useMemo(() => parseFilterFromSearchParams(searchParams), [searchParams]);
-  const filteredPhotos = useMemo(
+  const filteredPhotosRaw = useMemo(
     () => getFilteredPhotos(contextPhotos ?? [], selectedIds, photoStates, filterState),
     [contextPhotos, selectedIds, photoStates, filterState]
   );
+
+  /* ── AI 유사컷 그룹: 갤러리의 "유사컷 대표이미지 적용" 토글이 ?grouped=1로 전달되면
+   *  대표컷 단위로만 이동(그룹 skip)하고, 나머지 멤버는 힌트→펼침으로만 보여준다. */
+  const narrowingFilterActive = filterState.nameFilter.trim().length > 0 || filterState.qualityFilter.length > 0;
+  const groupingActive = filterState.groupedView && !narrowingFilterActive;
+  const groupsById = useMemo(() => buildGroupsById(photoGroups), [photoGroups]);
+  const photoIdSet = useMemo(() => buildPhotoIdSet(contextPhotos ?? []), [contextPhotos]);
+  const membersByGroup = useMemo(() => buildMembersByGroup(filteredPhotosRaw), [filteredPhotosRaw]);
+  const filteredPhotos = useMemo(
+    () => (groupingActive ? filterToRepresentatives(filteredPhotosRaw, groupsById, photoIdSet) : filteredPhotosRaw),
+    [filteredPhotosRaw, groupingActive, groupsById, photoIdSet]
+  );
+
   const currentIndex = filteredPhotos.findIndex((p) => p.id === activePhotoId);
   const current = currentIndex >= 0
     ? filteredPhotos[currentIndex]
     : (contextPhotos ?? []).find((p) => p.id === activePhotoId) ?? null;
+
+  /** 그룹 펼침 상태(힌트 pill/PC 미니 스트립/모바일 바텀시트 공용).
+   *  비대표 멤버를 직접 보고 있으면(딥링크 진입 또는 펼침에서 멤버 클릭) 항상 열려 있고,
+   *  다른 그룹·대표컷·미소속 사진으로 이동하면 자동으로 닫힌다. */
+  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!current || !groupingActive) { setExpandedGroupId(null); return; }
+    const groupId = current.similarityGroupId ?? null;
+    const group = groupId ? groupsById.get(groupId) : undefined;
+    if (groupId && group && group.representativePhotoId !== current.id) {
+      setExpandedGroupId(groupId);
+      return;
+    }
+    setExpandedGroupId((prev) => (prev && prev !== groupId ? null : prev));
+  }, [current, groupingActive, groupsById]);
+
+  /** prev/next 기준 인덱스 — 비대표 멤버를 미리보기 중이면(filteredPhotos엔 대표컷만 있어 currentIndex가 -1)
+   *  그 그룹 대표컷의 위치를 앵커로 사용해 "다음/이전"이 항상 대표컷 단위(그룹 skip)로 동작한다. */
+  const navAnchorIndex = useMemo(() => {
+    if (currentIndex >= 0) return currentIndex;
+    if (!current || !groupingActive) return currentIndex;
+    const groupId = current.similarityGroupId;
+    const group = groupId ? groupsById.get(groupId) : undefined;
+    if (!group || !photoIdSet.has(group.representativePhotoId)) return currentIndex;
+    return filteredPhotos.findIndex((p) => p.id === group.representativePhotoId);
+  }, [currentIndex, current, groupingActive, groupsById, photoIdSet, filteredPhotos]);
+
+  const currentGroupId = current?.similarityGroupId ?? null;
+  const currentGroup = currentGroupId ? groupsById.get(currentGroupId) : undefined;
+  const showGroupHint = groupingActive && !!currentGroup && currentGroup.photoCount > 1;
 
   const star  = current ? photoStates[current.id]?.rating : undefined;
   const color = current ? photoStates[current.id]?.color  : undefined;
@@ -235,12 +279,14 @@ export default function ViewerPage() {
     const THUMB_W = 150;
     const GAP     = 16;
     const step    = THUMB_W + GAP;
-    const target  = currentIndex * step - container.clientWidth / 2 + THUMB_W / 2;
+    // 비대표 멤버를 미리보기 중이면 메인 필름스트립엔 없으므로(navAnchorIndex) 그룹 대표컷 위치로 스크롤
+    const anchor  = navAnchorIndex >= 0 ? navAnchorIndex : 0;
+    const target  = anchor * step - container.clientWidth / 2 + THUMB_W / 2;
     // 첫 마운트(갤러리→뷰어 진입)는 instant, 이후 사진 전환은 smooth
     const behavior = filmstripSeenRef.current ? "smooth" : "instant";
     filmstripSeenRef.current = true;
     container.scrollTo({ left: Math.max(0, target), behavior });
-  }, [currentIndex]);
+  }, [navAnchorIndex]);
 
   useEffect(() => {
     if (current?.id) setDraftComment(photoStates[current.id]?.comment ?? "");
@@ -282,25 +328,32 @@ export default function ViewerPage() {
     window.history.replaceState(null, "", `/c/${token}/viewer/${id}${queryString}`);
   }, [token, queryString]);
 
+  // 그룹핑 활성 시 filteredPhotos엔 대표컷만 남아있어, navAnchorIndex 기준 이동은 자동으로 그룹을 건너뛴다.
   const goPrev = useCallback(() => {
-    if (currentIndex <= 0) return;
-    navigateTo(filteredPhotos[currentIndex - 1].id);
-  }, [currentIndex, filteredPhotos, navigateTo]);
+    if (navAnchorIndex <= 0) return;
+    navigateTo(filteredPhotos[navAnchorIndex - 1].id);
+  }, [navAnchorIndex, filteredPhotos, navigateTo]);
 
   const goNext = useCallback(() => {
-    if (currentIndex >= filteredPhotos.length - 1) return;
-    navigateTo(filteredPhotos[currentIndex + 1].id);
-  }, [currentIndex, filteredPhotos, navigateTo]);
+    if (navAnchorIndex < 0 || navAnchorIndex >= filteredPhotos.length - 1) return;
+    navigateTo(filteredPhotos[navAnchorIndex + 1].id);
+  }, [navAnchorIndex, filteredPhotos, navigateTo]);
 
+  // 그룹핑 활성 시에는 대표컷 경계에서 멈춰야 하므로(순간이동 wrap 금지) goPrev/goNext에 위임한다.
+  // 그룹핑 비활성(기존 낱장 순회) 상태의 wrap 동작은 이번 기능과 무관한 기존 동작이라 그대로 유지한다.
   const goPrevWrap = useCallback(() => {
+    if (groupingActive) { goPrev(); return; }
     if (!filteredPhotos.length) return;
-    navigateTo(filteredPhotos[(currentIndex - 1 + filteredPhotos.length) % filteredPhotos.length].id);
-  }, [currentIndex, filteredPhotos, navigateTo]);
+    const anchor = navAnchorIndex >= 0 ? navAnchorIndex : 0;
+    navigateTo(filteredPhotos[(anchor - 1 + filteredPhotos.length) % filteredPhotos.length].id);
+  }, [groupingActive, goPrev, navAnchorIndex, filteredPhotos, navigateTo]);
 
   const goNextWrap = useCallback(() => {
+    if (groupingActive) { goNext(); return; }
     if (!filteredPhotos.length) return;
-    navigateTo(filteredPhotos[(currentIndex + 1) % filteredPhotos.length].id);
-  }, [currentIndex, filteredPhotos, navigateTo]);
+    const anchor = navAnchorIndex >= 0 ? navAnchorIndex : 0;
+    navigateTo(filteredPhotos[(anchor + 1) % filteredPhotos.length].id);
+  }, [groupingActive, goNext, navAnchorIndex, filteredPhotos, navigateTo]);
 
   // ── Touch swipe ───────────────────────────────────────────────────────────
 
@@ -429,6 +482,41 @@ export default function ViewerPage() {
         .fs-comment-input:focus { border-color: rgba(var(--accent-rgb), 0.4); }
         .fs-star { cursor: pointer; transition: transform 0.1s; }
         .fs-star:hover { transform: scale(1.2); }
+
+        /* ── 유사컷 그룹 힌트/펼침 (PC) ── */
+        .fs-group-hint {
+          display: flex; align-items: center; gap: 6px;
+          height: 32px; padding: 0 12px; flex-shrink: 0;
+          background: rgba(0,0,0,0.4); border: 1px solid #FF4D00; color: #FF4D00;
+          font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 11px; font-weight: 700;
+          cursor: pointer; transition: all 0.15s ease;
+        }
+        .fs-group-hint:hover { background: #FF4D00; color: #000; }
+        .fs-mini-strip-wrap {
+          flex-shrink: 0; background: rgba(255,77,0,0.06);
+          border-top: 1px solid rgba(255,77,0,0.25); border-bottom: 1px solid rgba(255,77,0,0.25);
+          padding: 10px 28px;
+        }
+        .fs-mini-strip-label {
+          font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 10px;
+          color: #FF4D00; letter-spacing: 0.06em; margin-bottom: 8px;
+        }
+        .fs-mini-strip { display: flex; gap: 10px; overflow-x: auto; }
+        .fs-mini-thumb {
+          height: 64px; width: 96px; flex-shrink: 0; position: relative;
+          border: 1px solid var(--border-subtle); cursor: pointer; overflow: hidden;
+          filter: grayscale(1); opacity: 0.6; transition: all 0.2s ease;
+        }
+        .fs-mini-thumb:hover { opacity: 0.85; filter: grayscale(0.3); }
+        .fs-mini-thumb.active { filter: grayscale(0); opacity: 1; border-color: var(--accent); }
+        .fs-mini-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .fs-rep-label {
+          position: absolute; top: 3px; left: 3px;
+          background: #FF4D00; color: #000; font-family: 'Space Mono', monospace;
+          font-size: 8px; font-weight: 700; padding: 1px 4px; line-height: 1.4;
+        }
+        /* 메인 필름스트립: 펼쳐진 그룹의 대표컷에 오렌지 링(.active의 border/transform과 레이어 분리) */
+        .fs-thumb.group-expanded { box-shadow: 0 0 0 2px #FF4D00; }
       `}</style>
 
       {/* Grid background */}
@@ -502,7 +590,7 @@ export default function ViewerPage() {
           <PrevNextButton
             direction="prev"
             onClick={goPrev}
-            disabled={currentIndex === 0}
+            disabled={navAnchorIndex <= 0}
             size="lg"
             align="edge"
             style={{ zIndex: 20 }}
@@ -510,7 +598,7 @@ export default function ViewerPage() {
           <PrevNextButton
             direction="next"
             onClick={goNext}
-            disabled={currentIndex === filteredPhotos.length - 1}
+            disabled={navAnchorIndex < 0 || navAnchorIndex === filteredPhotos.length - 1}
             size="lg"
             align="edge"
             style={{ zIndex: 20 }}
@@ -652,6 +740,19 @@ export default function ViewerPage() {
                   );
                 })}
               </div>
+
+              {showGroupHint && currentGroup && (
+                <>
+                  <div style={{ width: 1, height: 28, background: "var(--border)", flexShrink: 0 }} />
+                  <button
+                    type="button"
+                    className="fs-group-hint"
+                    onClick={() => setExpandedGroupId((prev) => (prev === currentGroup.id ? null : currentGroup.id))}
+                  >
+                    ◧ 유사컷 {currentGroup.photoCount - 1}장 {expandedGroupId === currentGroup.id ? "접기 ▴" : "▾"}
+                  </button>
+                </>
+              )}
             </div>
 
             <div style={{ flex: "1 1 240px", display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
@@ -684,6 +785,31 @@ export default function ViewerPage() {
           </div>
         </section>
 
+        {/* 유사컷 미니 스트립 (PC 펼침) */}
+        {groupingActive && expandedGroupId && (
+          <div className="fs-mini-strip-wrap">
+            <div className="fs-mini-strip-label">
+              이 그룹의 유사컷 ({(membersByGroup.get(expandedGroupId) ?? []).length}장)
+            </div>
+            <div className="fs-mini-strip">
+              {(membersByGroup.get(expandedGroupId) ?? []).map((member) => {
+                const isMemberActive = member.id === current.id;
+                const isRep = groupsById.get(expandedGroupId)?.representativePhotoId === member.id;
+                return (
+                  <div
+                    key={member.id}
+                    className={`fs-mini-thumb${isMemberActive ? " active" : ""}`}
+                    onClick={() => navigateTo(member.id)}
+                  >
+                    <img src={member.url} alt={getPhotoDisplayName(member)} loading="lazy" decoding="async" />
+                    {isRep && <span className="fs-rep-label">대표</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Filmstrip footer */}
         <footer style={{
           height: 160, background: "rgba(0,0,0,0.85)", borderTop: "1px solid rgba(255,255,255,0.08)",
@@ -696,15 +822,16 @@ export default function ViewerPage() {
             style={{ display: "flex", gap: 16, overflowX: "auto", width: "100%", padding: "16px 0", alignItems: "center" }}
           >
             {filteredPhotos.map((photo, i) => {
-              const isActive  = i === currentIndex;
+              const isActive  = i === navAnchorIndex;
               const thumbSrc  = photo.url; // r2_thumb_url — 필름스트립은 썸네일로 충분
               const thumbName = getPhotoDisplayName(photo);
               const isSelected = selectedIds.has(photo.id);
+              const photoGroup = photo.similarityGroupId ? groupsById.get(photo.similarityGroupId) : undefined;
+              const showExpandRing = groupingActive && !!photoGroup && expandedGroupId === photoGroup.id;
               return (
                 <div
                   key={photo.id}
-
-                  className={`fs-thumb${isActive ? " active" : ""}`}
+                  className={`fs-thumb${isActive ? " active" : ""}${showExpandRing ? " group-expanded" : ""}`}
                   onClick={() => navigateTo(photo.id)}
                 >
                   <img
@@ -788,7 +915,7 @@ export default function ViewerPage() {
               {filename}
             </span>
             <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", color: "var(--accent)", flexShrink: 0 }}>
-              {currentIndex + 1} / {filteredPhotos.length}
+              {(navAnchorIndex >= 0 ? navAnchorIndex : 0) + 1} / {filteredPhotos.length}
             </span>
           </div>
         </div>
@@ -806,9 +933,93 @@ export default function ViewerPage() {
             )
             : <div style={{ color: "var(--muted-foreground)", padding: 16 }}>사진 없음</div>
           }
-          <PrevNextButton direction="prev" onClick={goPrevWrap} size="sm" />
-          <PrevNextButton direction="next" onClick={goNextWrap} size="sm" />
+          <PrevNextButton direction="prev" onClick={goPrevWrap} disabled={groupingActive && navAnchorIndex <= 0} size="sm" />
+          <PrevNextButton direction="next" onClick={goNextWrap} disabled={groupingActive && (navAnchorIndex < 0 || navAnchorIndex === filteredPhotos.length - 1)} size="sm" />
+
+          {showGroupHint && currentGroup && (
+            <button
+              type="button"
+              onClick={() => setExpandedGroupId((prev) => (prev === currentGroup.id ? null : currentGroup.id))}
+              style={{
+                position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)",
+                display: "flex", alignItems: "center", gap: 6,
+                height: 30, padding: "0 14px", zIndex: 15,
+                background: "rgba(0,0,0,0.7)", border: "1px solid #FF4D00", color: "#FF4D00",
+                fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              ◧ 유사컷 {currentGroup.photoCount - 1}장 {expandedGroupId === currentGroup.id ? "닫기 ✕" : "▾"}
+            </button>
+          )}
+
+          {/* 시트가 열려 있는 동안 이미지 영역만 시각적으로 딤 처리(하단 액션바는 가리지 않음) */}
+          {groupingActive && expandedGroupId && (
+            <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", pointerEvents: "none", zIndex: 10 }} />
+          )}
         </div>
+
+        {/* 유사컷 바텀시트 (모바일 펼침) — 문서 흐름 안의 일반 flex 자식으로 배치해 하단 액션바(별점/코멘트) 위를
+         *  덮지 않고 그 위에 별도 패널로 쌓인다(예전엔 position:fixed 오버레이였는데, 뷰포트 전체를 덮어 액션바를
+         *  가려버리는 문제가 있었음). 스와이프/이전·다음 버튼은 이 패널 밖(이미지 영역)에 있으므로 계속 동작한다. */}
+        {groupingActive && expandedGroupId && current && (
+          <div
+            style={{
+              flexShrink: 0, zIndex: 25, background: "rgba(10,10,11,0.97)", backdropFilter: "blur(12px)",
+              borderTop: "1px solid #FF4D00", maxHeight: "34vh", overflow: "hidden",
+              padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10,
+            }}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#FF4D00", letterSpacing: "0.06em" }}>
+                이 사진과 유사한 사진 ({(membersByGroup.get(expandedGroupId) ?? []).length}장)
+              </span>
+              <button
+                type="button"
+                onClick={() => setExpandedGroupId(null)}
+                style={{ background: "none", border: "none", color: "var(--muted-foreground)", padding: 4, cursor: "pointer" }}
+              >
+                <X style={{ width: 14, height: 14 }} />
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: 8, overflowX: "auto" }}>
+              {(membersByGroup.get(expandedGroupId) ?? []).map((member) => {
+                const isMemberActive = member.id === current.id;
+                const isRep = groupsById.get(expandedGroupId)?.representativePhotoId === member.id;
+                return (
+                  <div
+                    key={member.id}
+                    onClick={() => navigateTo(member.id)}
+                    style={{
+                      position: "relative", width: 88, height: 66, flexShrink: 0, overflow: "hidden",
+                      border: isMemberActive ? "2px solid var(--accent)" : "1px solid rgba(255,255,255,0.15)",
+                      opacity: isMemberActive ? 1 : 0.75,
+                    }}
+                  >
+                    <img
+                      src={member.url}
+                      alt={getPhotoDisplayName(member)}
+                      loading="lazy"
+                      decoding="async"
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                    {isRep && (
+                      <span style={{
+                        position: "absolute", top: 2, left: 2,
+                        background: "#FF4D00", color: "#000",
+                        fontFamily: "'Space Mono', monospace", fontSize: 8, fontWeight: 700, padding: "1px 4px",
+                      }}>
+                        대표
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Bottom action bar */}
         <div style={{
@@ -887,6 +1098,7 @@ export default function ViewerPage() {
             </button>
           </div>
         </div>
+
       </div>
 
       {/* Keyboard shortcuts modal */}

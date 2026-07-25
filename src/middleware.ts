@@ -70,7 +70,9 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
 
   if (!cookieValue || !(await verifyPinCookieEdge(token, cookieValue))) {
     const pinUrl = new URL(`/c/${token}/pin`, req.url);
-    pinUrl.searchParams.set("from", pathname);
+    // pathname만 넘기면 원래 URL의 쿼리스트링(예: 뷰어의 ?grouped=1, 필터 파라미터)이
+    // PIN 인증 후 복귀 시 유실된다 — search까지 함께 보존한다.
+    pinUrl.searchParams.set("from", pathname + req.nextUrl.search);
     return NextResponse.redirect(pinUrl);
   }
 

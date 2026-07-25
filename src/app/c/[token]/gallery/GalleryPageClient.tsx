@@ -18,8 +18,10 @@ import {
   GALLERY_FOCUS_PARAM,
   GALLERY_SCROLL_PARAM,
   getFilteredPhotos,
+  parseFilterFromSearchParams,
 } from "@/lib/gallery-filter";
 import type { GalleryFilterState } from "@/lib/gallery-filter";
+import { buildGroupsById, buildMembersByGroup, buildPhotoIdSet, filterToRepresentatives } from "@/lib/photo-groups";
 import type { StarRating, ColorTag, SortOrder } from "@/types";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
@@ -53,20 +55,25 @@ export default function GalleryPageClient() {
   const { project, photos, photoGroups, Y, N, toggle, selectedIds, photoStates, loading, updatePhotoState } = useSelection();
   const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
 
-  const [tabFilter,     setTabFilter]     = useState<TabFilter>("all");
-  const [starFilter,    setStarFilter]    = useState<number>(0);
-  const [colorFilter,   setColorFilter]   = useState<ColorTag[]>([]);
-  const [sortOrder,     setSortOrder]     = useState<SortOrder>("filename");
+  /* 새로고침/뒤로가기 시 필터가 초기화되지 않도록, 마운트 시 1회 URL에서 필터 상태를 복원한다.
+   * 이후로는 로컬 state가 진실 소스이고, 아래 URL 동기화 effect가 반대 방향(state→URL)으로만 반영한다
+   * (뷰어가 쓰는 parseFilterFromSearchParams/buildFilterQueryString과 동일한 GalleryFilterState 포맷 재사용). */
+  const [initialFilterState] = useState(() => parseFilterFromSearchParams(searchParams));
+
+  const [tabFilter,     setTabFilter]     = useState<TabFilter>(initialFilterState.selectedFilter === "selected" ? "selected" : "all");
+  const [starFilter,    setStarFilter]    = useState<number>(initialFilterState.starFilter === "all" ? 0 : initialFilterState.starFilter);
+  const [colorFilter,   setColorFilter]   = useState<ColorTag[]>(Array.isArray(initialFilterState.colorFilter) ? initialFilterState.colorFilter : []);
+  const [sortOrder,     setSortOrder]     = useState<SortOrder>(initialFilterState.sortOrder);
   const [hoverStar,     setHoverStar]     = useState(0);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirming,       setConfirming]       = useState(false);
   const [confirmError,     setConfirmError]     = useState<string | null>(null);
-  const [similarityToggleOn, setSimilarityToggleOn] = useState(false);
+  const [similarityToggleOn, setSimilarityToggleOn] = useState(initialFilterState.groupedView);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   /** 파일명 검색(필터) — 쉼표/공백으로 구분해 여러 파일명을 한 번에 LIKE 검색 */
-  const [searchValue, setSearchValue] = useState("");
+  const [searchValue, setSearchValue] = useState(initialFilterState.nameFilter);
   /** 흔들림/눈감음 경고 필터 — 켜진 조건 중 하나라도 해당하면 표시(OR) */
-  const [qualityFilter, setQualityFilter] = useState<Set<"blurry" | "eyesClosed">>(new Set());
+  const [qualityFilter, setQualityFilter] = useState<Set<"blurry" | "eyesClosed">>(new Set(initialFilterState.qualityFilter));
 
   // ── Presigned thumb 관리 ──────────────────────────────────────────────────
   const gridRef        = useRef<HTMLDivElement>(null);
@@ -126,35 +133,19 @@ export default function GalleryPageClient() {
     sortOrder,
     nameFilter: searchValue,
     qualityFilter: Array.from(qualityFilter),
-  }), [tabFilter, starFilter, colorFilter, sortOrder, searchValue, qualityFilter]);
+    groupedView: similarityToggleOn,
+  }), [tabFilter, starFilter, colorFilter, sortOrder, searchValue, qualityFilter, similarityToggleOn]);
 
   const filteredPhotos = useMemo(() => {
     return getFilteredPhotos(photos, selectedIds, photoStates, filterState);
   }, [photos, selectedIds, photoStates, filterState]);
 
-  /* ── AI 유사컷 그룹 ── */
-  const groupsById = useMemo(() => {
-    const map = new Map<string, (typeof photoGroups)[number]>();
-    for (const g of photoGroups) map.set(g.id, g);
-    return map;
-  }, [photoGroups]);
-
-  const membersByGroup = useMemo(() => {
-    const map = new Map<string, typeof filteredPhotos>();
-    for (const p of filteredPhotos) {
-      if (!p.similarityGroupId) continue;
-      const arr = map.get(p.similarityGroupId) ?? [];
-      arr.push(p);
-      map.set(p.similarityGroupId, arr);
-    }
-    return map;
-  }, [filteredPhotos]);
+  /* ── AI 유사컷 그룹 (갤러리·뷰어 공용 헬퍼: src/lib/photo-groups.ts) ── */
+  const groupsById = useMemo(() => buildGroupsById(photoGroups), [photoGroups]);
+  const membersByGroup = useMemo(() => buildMembersByGroup(filteredPhotos), [filteredPhotos]);
+  const photoIdSet = useMemo(() => buildPhotoIdSet(photos), [photos]);
 
   const showSimilarityToggle = project?.clipAnalysisStatus === "completed" && photoGroups.length > 0;
-
-  /** 작가가 대표컷을 삭제한 직후 photoGroups가 아직 갱신되지 않은 경우(방어 폴백) 대비 —
-   *  대표컷이 현재 photos 목록에 없는 그룹은 없는 것처럼 취급해 멤버가 전부 누락되는 걸 막는다. */
-  const photoIdSet = useMemo(() => new Set(photos.map((p) => p.id)), [photos]);
 
   const hasBlurryPhotos = useMemo(() => photos.some((p) => p.isBlurry === true), [photos]);
   const hasEyesClosedPhotos = useMemo(
@@ -180,23 +171,37 @@ export default function GalleryPageClient() {
   const displayPhotos = useMemo(() => {
     if (narrowingFilterActive) return filteredPhotos;
     if (!similarityToggleOn) return filteredPhotos;
+    const representatives = filterToRepresentatives(filteredPhotos, groupsById, photoIdSet);
     const result: typeof filteredPhotos = [];
-    for (const photo of filteredPhotos) {
-      const groupId = photo.similarityGroupId;
-      if (!groupId) { result.push(photo); continue; }
-      const group = groupsById.get(groupId);
-      if (!group || !photoIdSet.has(group.representativePhotoId)) { result.push(photo); continue; }
-      if (photo.id !== group.representativePhotoId) continue;
+    for (const photo of representatives) {
       result.push(photo);
-      if (expandedGroups.has(groupId)) {
+      const groupId = photo.similarityGroupId;
+      if (groupId && expandedGroups.has(groupId)) {
         const members = membersByGroup.get(groupId) ?? [];
-        result.push(...members.filter((p) => p.id !== group.representativePhotoId));
+        result.push(...members.filter((p) => p.id !== photo.id));
       }
     }
     return result;
   }, [filteredPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup, photoIdSet, narrowingFilterActive]);
 
   const viewerQueryString = useMemo(() => buildFilterQueryString(filterState), [filterState]);
+
+  /* 필터 상태를 URL에 반영해 새로고침/뒤로가기 후에도 유지되게 한다.
+   * gs/gf(스크롤·포커스 복원 파라미터)는 별도 effect가 관리하므로, 여기서는 searchParams를
+   * 구독하지 않고 window.location에서 직접 읽어와 그대로 보존한다 — 두 effect가 서로의 URL
+   * 갱신에 반응해 계속 되돌리는 순환을 막기 위함. filterState가 실제로 바뀔 때만 동작한다. */
+  useEffect(() => {
+    if (typeof window === "undefined" || !token) return;
+    const qs = buildFilterQueryString(filterState);
+    const params = new URLSearchParams(qs.startsWith("?") ? qs.slice(1) : "");
+    const current = new URLSearchParams(window.location.search);
+    const gs = current.get(GALLERY_SCROLL_PARAM);
+    const gf = current.get(GALLERY_FOCUS_PARAM);
+    if (gs != null) params.set(GALLERY_SCROLL_PARAM, gs);
+    if (gf != null) params.set(GALLERY_FOCUS_PARAM, gf);
+    const nextQs = params.toString();
+    router.replace(`/c/${token}/gallery${nextQs ? `?${nextQs}` : ""}`, { scroll: false });
+  }, [filterState, token, router]);
 
   // presigned URL 일괄 적용. 4,000장 갤러리를 끝까지 스크롤해도 Map이 무한히 커지지
   // 않도록 오래된 항목부터 정리한다 — pendingIdsRef도 같은 id를 같이 제거해야

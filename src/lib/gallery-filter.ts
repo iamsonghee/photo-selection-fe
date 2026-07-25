@@ -40,6 +40,7 @@ export const FILTER_PARAM = {
   selected: "selected",
   name: "name",
   quality: "quality",
+  grouped: "grouped",
 } as const;
 
 export type QualityFilterFlag = "blurry" | "eyesClosed";
@@ -145,6 +146,8 @@ export type GalleryFilterState = {
   nameFilter: string;
   /** 흔들림/눈감음 경고 필터 (OR) */
   qualityFilter: QualityFilterFlag[];
+  /** 갤러리의 "유사컷 대표이미지 적용" 토글 상태 — 뷰어에 전달해 대표컷 단위 내비게이션에 사용 */
+  groupedView: boolean;
 };
 
 const VALID_STARS: StarRating[] = [1, 2, 3, 4, 5];
@@ -188,8 +191,9 @@ export function parseFilterFromSearchParams(
   const qualityFilter: QualityFilterFlag[] = (quality ?? "")
     .split(",")
     .filter((v): v is QualityFilterFlag => v === "blurry" || v === "eyesClosed");
+  const groupedView = searchParams.get(FILTER_PARAM.grouped) === "1";
 
-  return { starFilter, colorFilter, selectedFilter, sortOrder, nameFilter, qualityFilter };
+  return { starFilter, colorFilter, selectedFilter, sortOrder, nameFilter, qualityFilter, groupedView };
 }
 
 /** 현재 필터 상태로 URL 쿼리 문자열 생성 (기본값은 생략) */
@@ -205,6 +209,7 @@ export function buildFilterQueryString(state: GalleryFilterState): string {
   if (state.selectedFilter !== "all") params.set(FILTER_PARAM.selected, state.selectedFilter);
   if (state.nameFilter.trim()) params.set(FILTER_PARAM.name, state.nameFilter.trim());
   if (state.qualityFilter.length > 0) params.set(FILTER_PARAM.quality, state.qualityFilter.join(","));
+  if (state.groupedView) params.set(FILTER_PARAM.grouped, "1");
   const qs = params.toString();
   return qs ? `?${qs}` : "";
 }

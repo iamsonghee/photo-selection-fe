@@ -142,7 +142,7 @@ clip-service/          완전히 독립된 FastAPI 앱 (별도 배포 단위)
 - **가상 스크롤**: `@tanstack/react-virtual` (대량 사진 갤러리 렌더링용, 정확한 사용처는 갤러리 페이지로 추정 — 상세 코드 라인은 `확인 필요`).
 - **로컬 실행**: `npm run dev` → `next dev -p 3001` (포트 3001 고정). `dev:no-turbopack` 대안 스크립트 존재.
 - **인증 클라이언트**: `@supabase/ssr` — 서버(`src/lib/supabase/server.ts`, 쿠키 기반 `createServerClient`)와 브라우저(`src/lib/supabase/client.ts`, `createBrowserClient`) 두 종류의 클라이언트를 분리해 사용. 별도로 서비스 롤 키를 쓰는 관리자 클라이언트(`src/lib/supabase-admin.ts`)가 API 라우트 내부에서 사용됨.
-- **미들웨어**: `src/middleware.ts` — matcher가 `/c/:token/:path+` 하나뿐이라 **`/photographer/**` 경로는 미들웨어 보호 대상이 아님** (§11에서 상세).
+- **미들웨어**: `src/middleware.ts` — matcher가 `/c/:token/:path+` 하나뿐이라 **`/photographer/**` 경로는 미들웨어 보호 대상이 아님** (§11에서 상세). PIN 미인증 시 `/pin?from=<pathname+search>`로 리다이렉트하며 원래 URL의 쿼리스트링까지 보존한다(`pathname + req.nextUrl.search`) — PIN 인증 완료 후 `PinForm`이 `from`으로 복귀하므로, 쿼리 파라미터가 붙은 딥링크(예: 뷰어의 `?grouped=1`)로 최초 접근해도 인증 왕복 후 그대로 유지된다.
 
 ---
 
@@ -226,8 +226,8 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `/c/[token]` | 진입점. 서버에서 `delivered` 여부·PIN 쿠키 존재 여부 우선 확인 후 클라이언트에서 상태별 재분기 |
 | `/c/[token]/pin` | PIN 입력 폼 (PIN 없는 프로젝트는 `/api/c/auto-verify`로 자동 통과) |
 | `/c/[token]/about` | 고객 온보딩/도움말 |
-| `/c/[token]/gallery` | 사진 선택 그리드. 흔들림/눈감음 의심 사진에 경고 배지 표시(정보성, 선택/확정 차단 없음). 유사도분석이 완료된 프로젝트는 "유사컷 대표이미지 적용" 토글도 노출(기본 OFF) — 켜면 그룹별 대표컷만 보이고 나머지 멤버는 "+N" 배지를 눌러야 펼쳐짐. 가시성에 직접 영향을 주는 기능 |
-| `/c/[token]/viewer/[photoId]` | 선택 단계 전체화면 뷰어(별점/색상/코멘트/선택) |
+| `/c/[token]/gallery` | 사진 선택 그리드. 흔들림/눈감음 의심 사진에 경고 배지 표시(정보성, 선택/확정 차단 없음). 유사도분석이 완료된 프로젝트는 "유사컷 대표이미지 적용" 토글도 노출(기본 OFF) — 켜면 그룹별 대표컷만 보이고 나머지 멤버는 "+N" 배지를 눌러야 펼쳐짐. 가시성에 직접 영향을 주는 기능. 이 토글 상태는 사진 클릭 시 뷰어에 `?grouped=1`로 전달됨(`GalleryFilterState.groupedView`, `src/lib/gallery-filter.ts`). **필터 상태 전체(선택됨 탭/별점/색상/정렬/파일명 검색/품질/그룹핑)가 URL 쿼리와 동기화**되어 새로고침·뒤로가기 후에도 유지됨 — 마운트 시 1회 복원, 이후 `router.replace`로 반영(히스토리 미증가) |
+| `/c/[token]/viewer/[photoId]` | 선택 단계 전체화면 뷰어(별점/색상/코멘트/선택). `?grouped=1`이면 필름스트립/좌우 이동/스와이프가 대표컷 단위로만 동작(그룹 멤버 skip) — 대표컷 하단 힌트(PC: pill+미니 스트립, 모바일: 플로팅 pill+바텀시트)를 펼쳐야 그룹 멤버를 볼 수 있음. 그룹 조회 로직은 갤러리와 `src/lib/photo-groups.ts`를 공용(§6-1 user-flow.md 참고) |
 | `/c/[token]/confirmed` | 확정 직후 화면, 확정 취소(최대 3회) |
 | `/c/[token]/locked` | 보정 중(`editing`/`editing_v2`) 등 읽기 전용 상태 화면 |
 | `/c/[token]/review` | 보정본 검토 갤러리(모바일) / 영수증형(재보정 0회) / 데스크톱은 `/review/[photoId]`로 리다이렉트 |
