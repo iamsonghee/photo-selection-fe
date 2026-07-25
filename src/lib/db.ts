@@ -43,6 +43,7 @@ function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Pr
     clipAnalysisStatus:
       (row as { clip_analysis_status?: "processing" | "completed" | "failed" | null })
         .clip_analysis_status ?? null,
+    includeOriginal: (row as any).include_original ?? false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -73,6 +74,7 @@ function mapPhotoRow(
     isBlurry: (row as { is_blurry?: boolean | null }).is_blurry ?? null,
     faceDetected: (row as { face_detected?: boolean | null }).face_detected ?? null,
     eyesClosed: (row as { eyes_closed?: boolean | null }).eyes_closed ?? null,
+    originalStatus: row.original_status ?? null,
   };
 }
 
@@ -223,6 +225,7 @@ export async function createProject(params: {
   access_pin?: string | null;
   max_revision_count?: 0 | 1 | 2;
   location?: string | null;
+  include_original?: boolean;
 }): Promise<string> {
   const accessToken = crypto.randomUUID();
   const { data, error } = await supabase
@@ -243,6 +246,7 @@ export async function createProject(params: {
       ...(params.customer_phone       ? { customer_phone: params.customer_phone } : {}),
       ...(params.access_pin           ? { access_pin: params.access_pin } : {}),
       ...(params.location             ? { location: params.location } : {}),
+      ...(params.include_original != null ? { include_original: params.include_original } : {}),
     })
     .select("id")
     .single();
@@ -286,7 +290,7 @@ export async function getPhotosByProjectId(projectId: string): Promise<Photo[]> 
   // BETA_MAX=3000이므로 3페이지를 처음부터 병렬 요청 — count 왕복 없음.
   const PAGE = 1000;
   const COLS =
-    "id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, similarity_group_id, is_blurry, face_detected, eyes_closed";
+    "id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, similarity_group_id, is_blurry, face_detected, eyes_closed, original_status";
 
   const results = await Promise.all(
     [0, 1, 2].map((i) =>

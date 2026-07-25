@@ -182,6 +182,125 @@ function isNetworkFailure(e: unknown) {
   return false;
 }
 
+type OriginalPresignedItem = {
+  job_id: string;
+  url: string;
+  source_key: string;
+  content_type: string;
+  expires_at: string;
+};
+
+type PendingOriginalItem = {
+  id: string;
+  original_filename: string | null;
+  original_file_size: number | null;
+  original_last_modified: number | null;
+  created_at: string;
+};
+
+function isHeicFile(file: File): boolean {
+  const type = file.type.toLowerCase();
+  if (type === "image/heic" || type === "image/heif") return true;
+  const dot = file.name.lastIndexOf(".");
+  if (dot < 0) return false;
+  const ext = file.name.slice(dot).toLowerCase();
+  return ext === ".heic" || ext === ".heif";
+}
+
+function estimateUploadMinutes(fileCount: number, withOriginal: boolean, isMobile: boolean): number {
+  const compressSec = fileCount * 0.15;
+  const fastApiSec = (fileCount * 3 * 8) / 100;
+  const r2Sec = withOriginal ? (fileCount * 10 * 8) / 100 : 0;
+  const total = (compressSec + fastApiSec + r2Sec) * (isMobile ? 1.5 : 1);
+  return Math.max(1, Math.round(total / 60));
+}
+
+function confirmOriginalUploadUrl(): string {
+  const base = (process.env.NEXT_PUBLIC_API_URL ?? "").trim().replace(/\/$/, "");
+  if (base) return `${base}/api/upload/originals/confirm`;
+  return "/api/photographer/upload/originals/confirm";
+}
+
+async function putOriginalToR2(
+  presigned: OriginalPresignedItem,
+  file: File,
+  token?: string,
+): Promise<boolean> {
+  const res = await fetch(presigned.url, {
+    method: "PUT",
+    body: file,
+    headers: { "Content-Type": presigned.content_type },
+  });
+  if (res.ok) return true;
+  // 403: 현재 세션 내 URL 만료 → /recover로 즉시 새 URL 발급 후 재시도 (파일 재선택 불필요)
+  if (res.status === 403 && token) {
+    try {
+      const result = await recoverOriginalJob(presigned.job_id, token);
+      if (result.status === "confirmed") return true; // recover 측에서 R2 HEAD → 이미 confirm 완료
+      if (result.status === "needs_upload") {
+        const res2 = await fetch(result.url, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": result.content_type },
+        });
+        return res2.ok;
+      }
+    } catch {
+      // 자동 재시도 실패 — 24h sweep에서 복구
+    }
+  }
+  return false; // non-fatal: 24h sweep 복구
+}
+
+async function confirmOriginalUpload(jobId: string, token: string): Promise<void> {
+  const url = confirmOriginalUploadUrl();
+  const form = new FormData();
+  form.append("job_id", jobId);
+  await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+}
+
+async function fetchPendingOriginals(projectId: string, token: string): Promise<PendingOriginalItem[]> {
+  try {
+    const res = await fetch(`/api/photographer/upload/originals/pending?project_id=${encodeURIComponent(projectId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
+    const body = await res.json().catch(() => ({ jobs: [] })) as { jobs: PendingOriginalItem[] };
+    return body.jobs || [];
+  } catch {
+    return [];
+  }
+}
+
+type RecoverResult =
+  | { status: "confirmed" }
+  | { status: "needs_upload"; url: string; source_key: string; content_type: string };
+
+async function recoverOriginalJob(jobId: string, token: string): Promise<RecoverResult> {
+  const form = new FormData();
+  form.append("job_id", jobId);
+  const res = await fetch("/api/photographer/upload/originals/recover", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  return await res.json() as RecoverResult;
+}
+
+async function abandonOriginalJob(jobId: string, token: string): Promise<void> {
+  const form = new FormData();
+  form.append("job_id", jobId);
+  await fetch("/api/photographer/upload/originals/abandon", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+}
+
 async function readDetail(res: { json: () => Promise<unknown> }): Promise<string | null> {
   try {
     const body = (await res.json().catch(() => ({}))) as { detail?: unknown };
@@ -873,6 +992,21 @@ export default function ProjectDetailPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   /** 네트워크 전송은 끝났고 서버(썸네일·저장) 응답 대기 중 — 99% 정지로 오해하지 않도록 별도 표시 */
   const [awaitingServerFinalize, setAwaitingServerFinalize] = useState(false);
+  /** 원본 파일을 R2로 직접 PUT 중인 배치가 있는지 (동시 배치 카운터 기반) */
+  const sendingSourceRef = useRef(0);          // 현재 진행 중인 R2 PUT 수 (카운터)
+  const sendingSourceDoneRef = useRef(0);       // 완료된 R2 PUT 수
+  const sendingSourceTotalRef = useRef(0);      // presigned URL 발급 수 (= 실제 시도 예정)
+  const [sendingSourcePhase, setSendingSourcePhase] = useState(false);
+  const [sendingSourceSnap, setSendingSourceSnap] = useState({ done: 0, total: 0 });
+  /** 모든 R2 PUT 시도 완료 — worker로 넘어간 상태 */
+  const [allSourceAttempted, setAllSourceAttempted] = useState(false);
+  /** 업로드 미완료(awaiting_upload) 원본 job — 복구 배너 표시용 */
+  const [pendingRecovery, setPendingRecovery] = useState<PendingOriginalItem[]>([]);
+  const [showRecoveryBanner, setShowRecoveryBanner] = useState(false);
+  const recoveryFileInputRef = useRef<HTMLInputElement>(null);
+  const retryRecoveryFileInputRef = useRef<HTMLInputElement>(null);
+  /** filename+size+lastModified 매칭 실패한 job 목록 */
+  const [unmatchedJobs, setUnmatchedJobs] = useState<PendingOriginalItem[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   /** selecting 상태에서 추가 업로드 시도 시 1회 안내 모달 */
@@ -887,7 +1021,7 @@ export default function ProjectDetailPage() {
   const [clipAnalysisTriggering, setClipAnalysisTriggering] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pickerPendingRef = useRef(false);
+
   const photoScrollRef = useRef<HTMLDivElement>(null);
   const stopRequestedRef = useRef(false);
   const useProxyRef = useRef(false);
@@ -1112,11 +1246,24 @@ export default function ProjectDetailPage() {
     return () => document.removeEventListener("visibilitychange", handler);
   }, [uploadPhase]);
 
+  // 원본 R2 PUT 중 페이지 이탈 시 beforeunload 경고 (PUT 완료 전에 닫으면 job이 awaiting_upload에 멈춤)
+  useEffect(() => {
+    if (!sendingSourcePhase) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [sendingSourcePhase]);
+
   // ── upload ──
   const startUpload = useCallback(async (uploadFiles: File[]) => {
     if (!uploadFiles.length) return;
+    const inclOrig = project?.includeOriginal ?? false;
     setUploadError(null);
     setAwaitingServerFinalize(false);
+    setAllSourceAttempted(false);
+    sendingSourceDoneRef.current = 0;
+    sendingSourceTotalRef.current = 0;
+    setSendingSourceSnap({ done: 0, total: 0 });
     setUploadPhase("processing");
     setUploadProgress(0);
     stopRequestedRef.current = false;
@@ -1132,6 +1279,8 @@ export default function ProjectDetailPage() {
     let currentToken = token;
     let filesToUpload = uploadFiles;
 
+    // HEIC 정책: include_original=true여도 HEIC는 원본 PUT 없이 썸네일만 업로드 (rawFile=undefined로 presigned 분기 스킵)
+    // B Plan: 항상 압축본을 서버로 전송 (include_original 여부 무관). 원본은 presigned PUT으로 R2에 직접 전송.
     const compressed: File[] = [];
     for (let i = 0; i < uploadFiles.length; i++) {
       if (stopRequestedRef.current) { setUploadPhase("idle"); setUploadProgress(0); await loadPhotos(); return; }
@@ -1144,7 +1293,8 @@ export default function ProjectDetailPage() {
     setUploadProgress(3);
     if (photoScrollRef.current) photoScrollRef.current.scrollTop = photoScrollRef.current.scrollHeight;
 
-    const effectiveBatch = isPhoneLikeClient() ? MOBILE_BATCH_SIZE : BATCH_SIZE;
+    // 원본 포함 시 1장/배치로 서버 메모리·타임아웃 부담 최소화
+    const effectiveBatch = inclOrig ? 1 : (isPhoneLikeClient() ? MOBILE_BATCH_SIZE : BATCH_SIZE);
     const batches: File[][] = [];
     for (let i = 0; i < filesToUpload.length; i += effectiveBatch) batches.push(filesToUpload.slice(i, i + effectiveBatch));
 
@@ -1166,7 +1316,9 @@ export default function ProjectDetailPage() {
     let abortReason: "betaLimit" | "network" | "auth" | null = null;
     let abortMessage = "";
     let firstFailDetail: string | null = null;
-    const concurrency = isPhoneLikeClient() ? MOBILE_CONCURRENCY : PC_CONCURRENCY;
+    const concurrency = inclOrig
+      ? (isPhoneLikeClient() ? 1 : 3)
+      : (isPhoneLikeClient() ? MOBILE_CONCURRENCY : PC_CONCURRENCY);
 
     for (let chunkStart = 0; chunkStart < batches.length; chunkStart += concurrency) {
       if (stopRequestedRef.current || abortReason) break;
@@ -1205,7 +1357,21 @@ export default function ProjectDetailPage() {
             return;
           }
           const globalIdx = chunkStart + chunkOffset;
-          const buildForm = () => { const f = new FormData(); f.append("project_id", id); batch.forEach((file) => f.append("files", file)); return f; };
+          // B Plan: rawFile은 브라우저 원본 파일 (effectiveBatch=1이므로 globalIdx가 uploadFiles와 1:1 대응). HEIC는 원본 PUT 불가 → undefined.
+          const rawFile = (inclOrig && !isHeicFile(uploadFiles[globalIdx])) ? uploadFiles[globalIdx] : undefined;
+          const buildForm = () => {
+            const f = new FormData();
+            f.append("project_id", id);
+            f.append("include_original", (inclOrig && !!rawFile) ? "true" : "false");
+            batch.forEach((file) => f.append("files", file));
+            if (inclOrig && rawFile) {
+              f.append("original_filenames", rawFile.name);
+              f.append("original_file_sizes", String(rawFile.size));
+              f.append("original_last_modifieds", String(rawFile.lastModified));
+              f.append("original_content_types", rawFile.type || "image/jpeg");
+            }
+            return f;
+          };
           try {
             let res = await postPhotosUpload(
               buildForm,
@@ -1231,10 +1397,33 @@ export default function ProjectDetailPage() {
             if (batchSizes[globalIdx] > 0) applyProgress(globalIdx, batchSizes[globalIdx]);
             // BUG-01: 성공 응답에서 서버 거부 파일 목록 수집
             if (res.ok) {
-              try {
-                const okBody = await res.json().catch(() => ({})) as { rejected?: string[] };
-                if (okBody.rejected?.length) backendRejected.push(...okBody.rejected);
-              } catch {}
+              type UploadOkBody = { rejected?: string[]; original_presigned?: OriginalPresignedItem[] };
+              let okBody: UploadOkBody = {};
+              try { okBody = await res.json().catch(() => ({})) as UploadOkBody; } catch {}
+              if (okBody.rejected?.length) backendRejected.push(...okBody.rejected);
+
+              // presigned PUT: 원본 파일(rawFile)을 R2에 직접 업로드 후 서버에 confirm
+              // batch[pi]는 압축본이므로 사용 금지 — rawFile이 브라우저 원본
+              if (inclOrig && rawFile && okBody.original_presigned?.length) {
+                // presigned URL 수신 수 = 실제 R2 PUT 시도 예정 건수
+                sendingSourceTotalRef.current += okBody.original_presigned.length;
+                for (const p of okBody.original_presigned) {
+                  try {
+                    sendingSourceRef.current++;
+                    if (sendingSourceRef.current > 0) setSendingSourcePhase(true);
+                    const putOk = await putOriginalToR2(p, rawFile, currentToken);
+                    if (putOk) await confirmOriginalUpload(p.job_id, currentToken);
+                  } catch (presignErr) {
+                    console.warn("presigned PUT/confirm failed (non-fatal):", presignErr);
+                  } finally {
+                    sendingSourceRef.current--;
+                    sendingSourceDoneRef.current++;
+                    setSendingSourceSnap({ done: sendingSourceDoneRef.current, total: sendingSourceTotalRef.current });
+                    if (sendingSourceRef.current <= 0) setSendingSourcePhase(false);
+                  }
+                }
+              }
+
               // 배치 성공: blob URL 프리뷰로 즉시 갱신 (추가 네트워크 요청 없음)
               // iOS에서 업로드 XHR과 동시에 DB 조회하면 연결 한도 초과 → blob URL 사용
               flushSync(() => {
@@ -1306,6 +1495,7 @@ export default function ProjectDetailPage() {
 
     setAwaitingServerFinalize(false);
     setUploadProgress(100);
+    if (inclOrig && sendingSourceTotalRef.current > 0) setAllSourceAttempted(true);
     setUploadPhase("done");
     fetch("/api/photographer/project-logs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: id, action: "uploaded" }) }).catch(() => {});
     setTimeout(async () => {
@@ -1340,11 +1530,71 @@ export default function ProjectDetailPage() {
       });
       router.refresh();
     }, 600);
-  }, [id, loadProject, loadPhotos, router]);
+  }, [id, loadProject, loadPhotos, router, project?.includeOriginal]);
+
+  // 페이지 로드 시 awaiting_upload 상태 job 확인 → 복구 배너 (project가 로드된 후 1회)
+  useEffect(() => {
+    if (!project?.id || !id) return;
+    const check = async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+      const jobs = await fetchPendingOriginals(id, token);
+      if (jobs.length > 0) {
+        setPendingRecovery(jobs);
+        setShowRecoveryBanner(true);
+      }
+    };
+    check();
+  }, [project?.id, id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 복구: filename+size+lastModified 매칭 후 재업로드. 매칭 실패 job은 unmatchedJobs로 표시.
+  const recoverOriginalFiles = useCallback(async (selectedFiles: File[]) => {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return;
+
+    const newUnmatched: PendingOriginalItem[] = [];
+
+    for (const job of pendingRecovery) {
+      const match = selectedFiles.find(
+        (f) =>
+          f.name === job.original_filename &&
+          f.size === job.original_file_size &&
+          f.lastModified === job.original_last_modified,
+      );
+      if (!match) {
+        newUnmatched.push(job);
+        continue;
+      }
+      try {
+        const result = await recoverOriginalJob(job.id, token);
+        if (result.status === "needs_upload") {
+          const presignedItem: OriginalPresignedItem = {
+            job_id: job.id, url: result.url,
+            source_key: result.source_key, content_type: result.content_type, expires_at: "",
+          };
+          const putOk = await putOriginalToR2(presignedItem, match);
+          if (putOk) await confirmOriginalUpload(job.id, token);
+          else newUnmatched.push(job); // PUT 실패도 미완료 처리
+        }
+        // result.status === "confirmed" → 이미 처리됨, 성공으로 간주
+      } catch (err) {
+        console.warn("recovery failed for job", job.id, err);
+        newUnmatched.push(job);
+      }
+    }
+
+    setUnmatchedJobs(newUnmatched);
+
+    const remaining = await fetchPendingOriginals(id, token);
+    setPendingRecovery(remaining);
+    if (remaining.length === 0 && newUnmatched.length === 0) setShowRecoveryBanner(false);
+  }, [id, pendingRecovery]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    pickerPendingRef.current = false;
-    setIsPreparingFiles(false);
     const chosen = e.target.files;
     if (!chosen?.length) return;
     let list = Array.from(chosen).filter((f) => f.type.startsWith("image/") || f.type === "");
@@ -1392,16 +1642,11 @@ export default function ProjectDetailPage() {
   }, [project, photos.length]);
 
   const onDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(true); }, []);
-  const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(false); }, []);
+  const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false); }, []);
 
   /** 파일 picker 진입 단일 통로: preparing → 즉시, selecting → 안내 모달 후, 그 외 → noop */
   const openFilePicker = useCallback(() => {
     fileInputRef.current?.click();
-    pickerPendingRef.current = true;
-    const onFocus = () => {
-      if (pickerPendingRef.current) setIsPreparingFiles(true);
-    };
-    window.addEventListener("focus", onFocus, { once: true });
   }, []);
 
   const requestOpenFilePicker = useCallback(() => {
@@ -1717,6 +1962,20 @@ export default function ProjectDetailPage() {
           { label: "업로드", value: `${displayPhotos.length}장` },
           { label: "고객 셀렉", value: `${N}장`, accent: displayPhotos.length >= N && N > 0 },
         ]}
+        actions={
+          <span style={{
+            fontFamily: "var(--font-mono, monospace)",
+            fontSize: 10,
+            letterSpacing: "0.05em",
+            padding: "3px 9px",
+            border: `1px solid ${project.includeOriginal ? "rgba(var(--accent-rgb),0.4)" : "rgba(150,150,150,0.3)"}`,
+            color: project.includeOriginal ? "var(--accent)" : "var(--muted-foreground)",
+            background: project.includeOriginal ? "rgba(var(--accent-rgb),0.08)" : "transparent",
+            whiteSpace: "nowrap",
+          }}>
+            {project.includeOriginal ? "납품용 원본 포함" : "썸네일만"}
+          </span>
+        }
       />
 
       {/* 모바일: 헤더 바로 아래 전체 너비 진행 라인 (업로드·에러 시; 종료 시 200ms 페이드) */}
@@ -1745,6 +2004,135 @@ export default function ProjectDetailPage() {
               {uploadError}
             </p>
           )}
+          {/* ── 원본 R2 PUT 진행 중 — 페이지 이탈 경고 포함 ── */}
+          {sendingSourcePhase && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 14px", background: "rgba(59,130,246,0.08)", borderBottom: `1px solid rgba(59,130,246,0.25)`, flexShrink: 0 }}>
+              <Loader2 size={12} style={{ color: "#3B82F6", flexShrink: 0, animation: "spin 1s linear infinite" }} />
+              <span style={{ fontFamily: MONO, fontSize: 10, color: "#1D4ED8", flex: 1 }}>
+                원본 업로드 중 {sendingSourceSnap.done}/{sendingSourceSnap.total} — 페이지를 닫거나 새로고침하면 중단됩니다
+              </span>
+            </div>
+          )}
+          {/* ── 원본 R2 PUT 완료 → worker 처리 중 안내 ── */}
+          {allSourceAttempted && !sendingSourcePhase && !isUploading && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 14px", background: "rgba(16,185,129,0.08)", borderBottom: `1px solid rgba(16,185,129,0.25)`, flexShrink: 0 }}>
+              <CheckCircle2 size={12} style={{ color: "#10B981", flexShrink: 0 }} />
+              <span style={{ fontFamily: MONO, fontSize: 10, color: "#065F46", flex: 1 }}>
+                원본 업로드 완료 — 서버에서 납품용 파일 처리 중 (이제 페이지를 닫아도 됩니다)
+              </span>
+              <button type="button" onClick={() => setAllSourceAttempted(false)} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 0, display: "flex" }}>
+                <X size={12} />
+              </button>
+            </div>
+          )}
+          {/* ── 이어 업로드 복구 배너 ── */}
+          {showRecoveryBanner && pendingRecovery.length > 0 && uploadPhase === "idle" && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 14px", background: "rgba(245,158,11,0.1)", borderBottom: `1px solid rgba(245,158,11,0.3)`, flexShrink: 0 }}>
+              <AlertTriangle size={12} style={{ color: "#F59E0B", flexShrink: 0 }} />
+              <span style={{ fontFamily: MONO, fontSize: 10, color: "#B45309", flex: 1 }}>
+                원본 업로드 미완료 {pendingRecovery.length}개 — 파일을 선택해 이어 업로드할 수 있습니다
+              </span>
+              <label style={{ cursor: "pointer" }}>
+                <input
+                  ref={recoveryFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (recoveryFileInputRef.current) recoveryFileInputRef.current.value = "";
+                    if (files.length > 0) recoverOriginalFiles(files);
+                  }}
+                />
+                <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}>
+                  이어 업로드
+                </span>
+              </label>
+              <button type="button" onClick={() => setShowRecoveryBanner(false)} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 0, display: "flex" }}>
+                <X size={12} />
+              </button>
+            </div>
+          )}
+          {/* ── 복구 매칭 실패 — 즉시 표시 ── */}
+          {unmatchedJobs.length > 0 && (
+            <div style={{ padding: "8px 14px", background: "rgba(239,68,68,0.06)", borderBottom: `1px solid rgba(239,68,68,0.2)`, flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <AlertTriangle size={12} style={{ color: "#EF4444", flexShrink: 0 }} />
+                <span style={{ fontFamily: MONO, fontSize: 10, color: "#B91C1C", fontWeight: 600 }}>
+                  원본 파일을 찾지 못했습니다 ({unmatchedJobs.length}개)
+                </span>
+                <button type="button" onClick={() => setUnmatchedJobs([])} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 0, display: "flex", marginLeft: "auto" }}>
+                  <X size={12} />
+                </button>
+              </div>
+              <div style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED, marginBottom: 6, lineHeight: 1.6 }}>
+                파일명이 변경되었거나 다른 파일을 선택했을 수 있습니다. 원본 파일명 그대로 다시 선택해 주세요.
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
+                {unmatchedJobs.map((j) => (
+                  <span key={j.id} style={{ fontFamily: MONO, fontSize: 9, background: "rgba(239,68,68,0.1)", color: "#B91C1C", padding: "1px 6px", borderRadius: 3 }}>
+                    {j.original_filename ?? "(파일명 없음)"}
+                  </span>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <label style={{ cursor: "pointer" }}>
+                  <input
+                    ref={retryRecoveryFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      if (retryRecoveryFileInputRef.current) retryRecoveryFileInputRef.current.value = "";
+                      if (files.length > 0) {
+                        // 매칭 실패 job을 pendingRecovery에 넣고 재시도
+                        setPendingRecovery(unmatchedJobs);
+                        setUnmatchedJobs([]);
+                        recoverOriginalFiles(files);
+                      }
+                    }}
+                  />
+                  <span style={{ fontFamily: MONO, fontSize: 9, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}>
+                    다시 파일 선택
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  style={{ fontFamily: MONO, fontSize: 9, color: "#EF4444", border: "1px solid rgba(239,68,68,0.4)", background: "none", padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}
+                  onClick={async () => {
+                    const supabase = createClient();
+                    const { data: { session } } = await supabase.auth.getSession();
+                    const token = session?.access_token;
+                    if (!token) return;
+                    for (const j of unmatchedJobs) {
+                      try { await abandonOriginalJob(j.id, token); } catch {}
+                    }
+                    setUnmatchedJobs([]);
+                    setPendingRecovery((prev) => prev.filter((p) => !unmatchedJobs.some((u) => u.id === p.id)));
+                  }}
+                >
+                  원본 업로드 포기
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 데스크톱 업로드 오류 표시 (모바일 오류는 mobileProgressBarMounted 블록 내에 표시됨) */}
+      {uploadError && (
+        <div
+          className="prj-desktop-toolbar"
+          style={{ padding: "7px 16px", background: "rgba(255,51,51,0.07)", borderBottom: "1px solid rgba(255,51,51,0.25)", flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}
+        >
+          <AlertTriangle size={12} color="#FF3333" style={{ flexShrink: 0 }} />
+          <p style={{ margin: 0, fontFamily: MONO, fontSize: 10, color: "#FF3333" }}>{uploadError}</p>
+          <button type="button" onClick={() => setUploadError(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#FF3333", padding: 0, display: "flex" }}>
+            <X size={12} />
+          </button>
         </div>
       )}
 
@@ -1837,8 +2225,8 @@ export default function ProjectDetailPage() {
             </div>
           )}
 
-          {/* ── 모바일 툴바 (장수 + 전체삭제) ── */}
-          {displayPhotos.length > 0 && (
+          {/* ── 모바일 툴바 (장수 + 원본포함 토글 + 전체삭제) ── */}
+          {(displayPhotos.length > 0 || uploadAllowed) && (
             <div
               className="prj-mobile-toolbar"
               style={{
@@ -1856,7 +2244,9 @@ export default function ProjectDetailPage() {
                 rowGap: 4,
               }}
             >
-              <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED }}>{displayPhotos.length.toLocaleString()}장</span>
+              {displayPhotos.length > 0 && (
+                <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED }}>{displayPhotos.length.toLocaleString()}장</span>
+              )}
               {canFlushAll && (
                 <button
                   type="button"
@@ -1937,8 +2327,26 @@ export default function ProjectDetailPage() {
           <div
             ref={photoScrollRef}
             className="prj-scroll prj-photo-scroll-mobile-pad"
-            style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "rgba(3,3,3,0.4)" }}
+            style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "rgba(3,3,3,0.4)", position: "relative" }}
+            onDrop={!isPhoneLikeClient() && uploadAllowed && uploadPhase === "idle" ? onDrop : undefined}
+            onDragOver={!isPhoneLikeClient() && uploadAllowed && uploadPhase === "idle" ? onDragOver : undefined}
+            onDragLeave={!isPhoneLikeClient() && uploadAllowed && uploadPhase === "idle" ? onDragLeave : undefined}
           >
+            {dragOver && !isPhoneLikeClient() && uploadAllowed && (
+              <div style={{
+                position: "absolute", inset: 0, zIndex: 40, pointerEvents: "none",
+                background: "rgba(var(--accent-rgb), 0.10)",
+                border: `2px dashed ${ACCENT}`,
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12,
+              }}>
+                <div style={{ width: 56, height: 56, borderRadius: "50%", border: `1px solid ${ACCENT}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Upload size={22} color={ACCENT} />
+                </div>
+                <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 15, color: ACCENT }}>
+                  여기에 파일을 놓으세요
+                </p>
+              </div>
+            )}
             {photosLoading ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", gap: 8 }}>
                 <span className="prj-tech-label" style={{ color: TEXT_MUTED }}>불러오는 중...</span>
@@ -2359,43 +2767,82 @@ export default function ProjectDetailPage() {
       )}
 
       {/* ── 업로드 확인 모달 ── */}
-      {pendingFiles.length > 0 && (
-        <div className="prj-modal-overlay">
-          <div className="prj-modal-box" style={{ maxWidth: 380 }}>
-            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 6, height: 6, background: ACCENT }} />
-              <span className="prj-tech-label" style={{ color: ACCENT }}>업로드 확인</span>
-            </div>
-            <div style={{ padding: 24 }}>
-              <p style={{ fontSize: 15, fontWeight: 600, color: TEXT_BRIGHT, marginBottom: 8 }}>
-                {pendingFiles.length.toLocaleString()}장을 업로드할까요?
-              </p>
-              <p style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, lineHeight: 1.7, marginBottom: 24 }}>
-                업로드 후에도 삭제·추가 업로드 가능합니다.
-              </p>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => setPendingFiles([])}
-                  className="prj-btn-secondary"
-                  style={{ flex: 1, padding: "10px 0" }}
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { const f = pendingFiles; setPendingFiles([]); startUpload(f); }}
-                  className="prj-btn-primary"
-                  style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-                >
-                  <Upload size={12} />
-                  업로드
-                </button>
+      {pendingFiles.length > 0 && (() => {
+        const heicCount = pendingFiles.filter(isHeicFile).length;
+        const isMob = isPhoneLikeClient();
+        const inclOrig = project.includeOriginal;
+        const estMin = estimateUploadMinutes(pendingFiles.length, inclOrig, isMob);
+        const closeModal = () => setPendingFiles([]);
+        return (
+          <div className="prj-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+            <div className="prj-modal-box" style={{ maxWidth: 400 }}>
+              <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 6, height: 6, background: ACCENT }} />
+                <span className="prj-tech-label" style={{ color: ACCENT }}>업로드 확인</span>
+              </div>
+              <div style={{ padding: 24 }}>
+                <p style={{ fontSize: 15, fontWeight: 600, color: TEXT_BRIGHT, marginBottom: 4 }}>
+                  {pendingFiles.length.toLocaleString()}장을 업로드합니다
+                </p>
+                <p style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, marginBottom: 16 }}>
+                  약 {estMin}분 예상 · 네트워크 환경에 따라 다를 수 있습니다
+                </p>
+
+                {/* 프로젝트 납품 설정 표시 */}
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "6px 10px", marginBottom: heicCount > 0 && inclOrig ? 10 : 20,
+                  border: `1px solid ${inclOrig ? "rgba(var(--accent-rgb),0.35)" : BORDER}`,
+                  background: inclOrig ? ACCENT_DIM : SURFACE_1,
+                }}>
+                  <span style={{ fontFamily: MONO, fontSize: 10, color: inclOrig ? ACCENT : TEXT_MUTED }}>
+                    {inclOrig ? "납품용 원본 포함" : "썸네일만"}
+                  </span>
+                  <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED }}>— 프로젝트 설정</span>
+                </div>
+
+                {/* HEIC 경고 */}
+                {heicCount > 0 && inclOrig && (
+                  <div style={{
+                    display: "flex", gap: 8, alignItems: "flex-start",
+                    padding: "10px 12px", background: "rgba(255,180,0,0.08)",
+                    border: "1px solid rgba(255,180,0,0.3)", marginBottom: 20,
+                  }}>
+                    <AlertTriangle size={13} color="#FFB800" style={{ flexShrink: 0, marginTop: 1 }} />
+                    <p style={{ fontFamily: MONO, fontSize: 10, color: TEXT_NORMAL, lineHeight: 1.6 }}>
+                      HEIC 파일 {heicCount}개는 원본 포함 불가 — 해당 파일은 썸네일만 업로드됩니다
+                    </p>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="prj-btn-secondary"
+                    style={{ flex: 1, padding: "10px 0" }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const f = pendingFiles;
+                      setPendingFiles([]);
+                      startUpload(f);
+                    }}
+                    className="prj-btn-primary"
+                    style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                  >
+                    <Upload size={12} />
+                    업로드 시작
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── PIN MODAL ── */}
       {showPinModal && (

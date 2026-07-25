@@ -180,6 +180,7 @@ export function ProjectNexusPageClient() {
   const [editDeadline, setEditDeadline] = useState("");
   const [editRequiredCount, setEditRequiredCount] = useState(0);
   const [editMaxRevisionCount, setEditMaxRevisionCount] = useState<0 | 1 | 2>(2);
+  const [editIncludeOriginal, setEditIncludeOriginal] = useState(false);
   const [editCustomerPhone, setEditCustomerPhone] = useState("");
   const [editShootType, setEditShootType] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -274,6 +275,7 @@ export function ProjectNexusPageClient() {
           deadline: editDeadline,
           required_count: newN,
           max_revision_count: editMaxRevisionCount,
+          include_original: editIncludeOriginal,
           customer_phone: editCustomerPhone || null,
           shoot_type: editShootType,
         }),
@@ -288,6 +290,7 @@ export function ProjectNexusPageClient() {
         deadline: editDeadline,
         requiredCount: newN,
         maxRevisionCount: editMaxRevisionCount,
+        includeOriginal: editIncludeOriginal,
         customerPhone: editCustomerPhone || null,
         shootType: editShootType,
       });
@@ -369,6 +372,7 @@ export function ProjectNexusPageClient() {
     setEditDeadline(project.deadline);
     setEditRequiredCount(project.requiredCount);
     setEditMaxRevisionCount(project.maxRevisionCount);
+    setEditIncludeOriginal(project.includeOriginal ?? false);
     setEditCustomerPhone(project.customerPhone ?? "");
     setEditShootType(project.shootType ?? null);
     setSaveError("");
@@ -1164,6 +1168,45 @@ export function ProjectNexusPageClient() {
                 );
               })}
             </div>
+          </div>
+
+          <div>
+            <FieldLabel
+              label="납품 파일"
+              info="업로드된 사진이 있으면 변경 불가"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  { value: false, label: "원본 없이", desc: "셀렉용 이미지만 업로드" },
+                  { value: true,  label: "원본 포함", desc: "납품용 원본 파일 함께 업로드" },
+                ] as const
+              ).map(({ value, label, desc }) => {
+                const active = editIncludeOriginal === value;
+                const disabled = project.photoCount > 0;
+                return (
+                  <button
+                    key={String(value)}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => !disabled && setEditIncludeOriginal(value)}
+                    className={`flex flex-col items-center gap-1 px-3 py-3 rounded-xl border transition-colors ${
+                      disabled
+                        ? "opacity-40 cursor-not-allowed border-border-subtle text-subtle-foreground"
+                        : active
+                          ? "bg-accent/8 border-accent/40 text-accent"
+                          : "bg-transparent border-border-subtle text-subtle-foreground hover:border-border-strong hover:text-muted-foreground"
+                    }`}
+                  >
+                    <span className="text-sm font-bold">{label}</span>
+                    <span className="text-[10px]">{desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {project.photoCount > 0 && (
+              <p className="text-[10px] text-disabled-foreground mt-1.5">업로드된 사진이 있어 변경할 수 없습니다.</p>
+            )}
           </div>
 
         </div>

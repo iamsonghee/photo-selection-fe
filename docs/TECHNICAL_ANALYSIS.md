@@ -1,8 +1,8 @@
 # Photo-Selection 기술 분석 & 개선 로드맵
 
 > 최초 작성: 2026-05-14  
-> 최종 업데이트: 2026-05-14 (Sprint 1 + Sprint 2 + Sprint 3 완료)  
-> 버전: v1.1
+> 최종 업데이트: 2026-07-23 (원본 통합 업로드 — 별도 납품 패널 제거, 초기 업로드 CTA에 원본 포함 토글 통합)  
+> 버전: v1.2
 
 ---
 
@@ -51,19 +51,35 @@ Frontend                        Backend
 ### 데이터 흐름
 
 ```
-[작가] 파일 선택
+[작가] 원본 사진 업로드
   → 프론트: ACCEPT_TYPES = "image/*,image/heic,image/heif" 필터
   → 프론트: 모바일이면 압축 먼저 (compressImageFileForMobileIfNeeded)
   → XHR Batch (PC: 8장×동시5 / 모바일: 3장×동시2)
   → 백엔드: Content-Type 검증 (없으면 파일명으로 추론)
   → 백엔드: EXIF 회전 → 썸네일(300px/75%) + 미리보기(1200px/82%)
-  → R2 병렬 업로드 → DB INSERT
+  → R2 병렬 업로드 → photos DB INSERT
 
 [고객] 갤러리 접근
   → /c/[token]/gallery → SelectionContext 로드
   → TanStack Virtual 가상 스크롤
   → 뷰어: previewUrl(1200px) 사용
   → 선택 확정 → status: "confirmed"
+
+[작가] 원본(납품) 업로드 — 초기 업로드 CTA 동시 처리
+  → 프론트: upload/page.tsx의 "원본 포함" 토글 (기본 ON)
+      ON:  브라우저 압축 완전 스킵, 1장/배치, PC concurrency=3, 모바일 concurrency=1
+      OFF: 기존 압축 흐름 동일 (PC: 8장/배치×동시5, 모바일: 3장/배치×동시2)
+  → POST /api/upload/photos (FormData: project_id + files + include_original)
+  → 백엔드: include_original=true 시 썸네일·미리보기 생성과 동시에 원본 처리
+  → 원본 처리 (_process_original_sync):
+      JPEG ≤20MB → 그대로 저장
+      PNG/HEIC/WebP → quality=95 JPEG 변환
+      20MB 초과 시 2단계 자동 압축:
+        1단계: 원해상도 유지, quality 90→85→80→75%
+        2단계: quality=90 고정, 최장변 6000→5000→4000→3200→2400→1600px
+        1600px에서도 초과 → 최선 결과 그대로 저장 (업로드는 항상 성공)
+  → R2 저장: originals/{project_id}/{photo_id}.jpg
+  → photos 테이블: r2_original_url, original_uploaded_at 컬럼에 저장
 ```
 
 ### 이미지 처리 설정값
@@ -81,6 +97,16 @@ VERSION_JPEG_QUALITY = 82   # 고정 품질 (품질 자동 하향 루프 없음)
 VERSION_THUMB_MAX_SIZE = 300
 VERSION_THUMB_JPEG_QUALITY = 75
 
+# 원본(납품) 전용 (upload.py) — include_original=true 시 적용
+ORIGINAL_MAX_BYTES = 20 * 1024 * 1024      # 20MB 상한
+UPLOAD_WITH_ORIGINAL_CONCURRENCY = 3       # 환경변수로 조정 가능 (기본 3)
+# 2단계 자동 압축 (20MB 초과 시에만 적용)
+#   PNG/HEIC/WebP: quality=95 JPEG 변환 먼저
+#   1단계: 원해상도 유지, quality 순서: 90 → 85 → 80 → 75
+#   2단계: quality=90 고정, 최장변(px) 순서: 6000 → 5000 → 4000 → 3200 → 2400 → 1600
+#   1600px에서도 초과 → 최선 결과 그대로 저장 (항상 성공, 크기 상한 없음)
+# R2 key: originals/{project_id}/{photo_id}.jpg  (photo_id = uuid4().hex, 32자 HEX)
+
 # 동시성
 UPLOAD_PHOTOS_CONCURRENCY = 5   # 환경변수로 조정 가능
 IMAGE_EXECUTOR_MAX_WORKERS = 8  # ThreadPoolExecutor
@@ -93,6 +119,10 @@ IMAGE_EXECUTOR_MAX_WORKERS = 8  # ThreadPoolExecutor
 maxEdge = 3200
 jpegQuality = 0.82
 skipBelowBytes = 600KB  // 이하 파일은 압축 스킵
+
+// 원본(납품) 포함 시: 브라우저 압축 완전 우회 (include_original=true)
+// → compressImageForUpload 스킵, 원본 바이트 그대로 서버 전송
+// → 서버 측 _process_original_sync 에서 ORIGINAL_MAX_BYTES 기준 2단계 압축 적용
 ```
 
 ---
@@ -118,9 +148,9 @@ skipBelowBytes = 600KB  // 이하 파일은 압축 스킵
 | U2 | PNG 업로드 | 성공 | 정상 | - | ⬜ |
 | U3 | HEIC 업로드 | 성공 | 정상 | - | ⬜ |
 | U4 | WebP 업로드 | 성공 | 정상 | - | ⬜ |
-| U5 | **CR3 업로드** | **거부 + 에러 메시지** | 오류 | ⚠️ BUG-01 | ⬜ |
-| U6 | **대문자 확장자** (.JPG, .HEIC) | 성공 | 엣지 | ⚠️ BUG-02 | ⬜ |
-| U7 | **특수문자 파일명** (#, &, 공백) | 성공 (이스케이프) | 엣지 | ⚠️ BUG-03 | ⬜ |
+| U5 | **CR3 업로드** | **거부 + 에러 메시지** | 오류 | ⚠️ BUG-01 | ✅ 2026-05-14 |
+| U6 | **대문자 확장자** (.JPG, .HEIC) | 성공 | 엣지 | ⚠️ BUG-02 | ✅ 2026-05-14 |
+| U7 | **특수문자 파일명** (#, &, 공백) | 성공 (이스케이프) | 엣지 | ⚠️ BUG-03 | ✅ 2026-05-14 |
 | U8 | 20MB 초과 파일 | 에러 안내 | 오류 | - | ⬜ |
 | U9 | 500장 연속 업로드 | 배치 처리, 진행률 | 엣지 | - | ⬜ |
 | U10 | 업로드 중 네트워크 끊김 | 재시도 or 에러 | 엣지 | - | ⬜ |
@@ -151,6 +181,24 @@ skipBelowBytes = 600KB  // 이하 파일은 압축 스킵
 | R4 | V2 재보정 교체 후 CTA 활성 | 교체 후 활성화 | 정상 | ⬜ |
 | R5 | 2MB 초과 보정본 | 자동 품질 조정 | 엣지 | ⬜ |
 | R6 | 재보정 한도 초과 시도 | 403 안내 | 오류 | ⬜ |
+
+### 2-5. 원본(납품) 통합 업로드
+
+> 진입 조건: 프로젝트 status = `preparing`, 진입점: `/photographer/projects/[id]/upload`  
+> 업로드 CTA와 동시에 썸네일·미리보기·원본이 한 번에 업로드됨
+
+| ID | 시나리오 | 기대 결과 | 케이스 | 상태 |
+|----|---------|---------|-------|------|
+| D1 | 업로드 페이지 진입 — "원본 포함" 토글 기본 ON 확인 | 데스크톱·모바일 툴바에 토글 표시, 기본 ON | 정상 | ✅ 2026-07-23 |
+| D2 | 토글 ON → OFF → ON 전환 | 시각 상태 즉시 반영 | 정상 | ✅ 2026-07-23 |
+| D3 | 토글 ON + JPEG 업로드 | `include_original=true` 전송, photos.r2_original_url 저장 | 정상 | ✅ 2026-07-23 |
+| D4 | 토글 OFF + JPEG 업로드 | `include_original=false` 전송, photos.r2_original_url=null | 정상 | ✅ 2026-07-23 |
+| D5 | 토글 ON + PNG 업로드 | 서버에서 JPEG 변환 후 originals/ 저장 | 정상 | ⬜ |
+| D6 | 토글 ON + HEIC 업로드 | JPEG 변환 후 originals/ 저장 | 정상 | ⬜ |
+| D7 | 토글 ON + 20MB 초과 파일 | 2단계 압축 후 저장 또는 rejected 처리 | 엣지 | ⬜ |
+| D8 | 업로드 중 토글 클릭 시도 | 토글 비활성(disabled) | 경계 | ⬜ |
+| D9 | 0장 프로젝트 — 모바일 토글 노출 | photos 없어도 모바일 툴바에 토글 표시 | 경계 | ✅ 2026-07-23 |
+| D10 | workflow 페이지 delivered 상태 | "납품 파일 업로드" 버튼 없음, 정적 "납품 완료" 텍스트 표시 | 경계 | ✅ 2026-07-23 |
 
 ---
 
@@ -314,6 +362,24 @@ skipBelowBytes = 600KB  // 이하 파일은 압축 스킵
 | 업로드 E2E 테스트 | tests/e2e/upload.spec.ts | 1d | ✅ 2026-05-14 |
 | 고객 셀렉 E2E 테스트 | tests/e2e/gallery.spec.ts | 1d | ✅ 2026-05-14 |
 | 파일 타입 경계 케이스 | tests/e2e/upload.spec.ts | 0.5d | ✅ 2026-05-14 |
+
+### Sprint 4 — 원본(납품) 통합 업로드
+
+> 기존 별도 패널(`DeliveryUploadPanel`) 방식을 제거하고, 초기 업로드 CTA에 "원본 포함" 토글을 통합함
+
+| 작업 | 대상 | 예상 공수 | 상태 |
+|-----|------|---------|------|
+| `DeliveryUploadPanel.tsx` 제거 | components/photographer/ | 0.5d | ✅ 2026-07-23 |
+| `POST /api/upload/originals` 엔드포인트 제거 | upload.py | 0.5d | ✅ 2026-07-23 |
+| `delivery_files` 테이블 DROP, `photos` 테이블에 `r2_original_url` / `original_uploaded_at` 추가 | Supabase migration | 0.5d | ✅ 2026-07-23 |
+| `_process_original_sync` + `include_original` 파라미터 | upload.py | 1d | ✅ 2026-07-23 |
+| R2 key 패턴 `originals/{project_id}/{hex32}.jpg` 로 변경 | storage.py | 0.5d | ✅ 2026-07-23 |
+| "원본 포함" 토글 UI (데스크톱·모바일), 배치/동시성 분기 | upload/page.tsx | 1d | ✅ 2026-07-23 |
+| `supabase.ts` `delivery_files` 제거, `photos` 타입 컬럼 추가 | types/supabase.ts | 0.5d | ✅ 2026-07-23 |
+| WorkflowPageClient 납품 진입점 → 정적 텍스트로 변경 | workflow/WorkflowPageClient.tsx | 0.5d | ✅ 2026-07-23 |
+| 고객 다운로드 페이지 (presigned URL) | — | — | ⬜ 베타 이후 |
+| R2 TTL lifecycle rule (30일 삭제) | — | — | ⬜ 고객 다운로드 완성 후 |
+| ZIP 묶음 다운로드 | — | — | ⬜ 베타 이후 |
 
 ---
 

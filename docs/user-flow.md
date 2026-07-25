@@ -234,13 +234,14 @@
 ## 4. 사진 업로드
 
 - **시작 조건**: `status`가 `preparing` 또는 `selecting`(`UPLOADABLE_STATUSES`).
-- **사용자가 수행하는 단계**: 파일 선택(드래그앤드롭 또는 파일 다이얼로그) → 자동 압축 → 업로드 진행률 확인 → (N장 이상 업로드 완료 시) "초대 링크 활성화" 버튼 클릭.
+- **사용자가 수행하는 단계**: 파일 선택(드래그앤드롭 또는 파일 다이얼로그) → 업로드 확인 모달에서 "원본 포함" / "썸네일만" 선택(예상 시간 안내 포함) → 자동 압축 → 업로드 진행률 확인 → (N장 이상 업로드 완료 시) "초대 링크 활성화" 버튼 클릭. 모달에서 선택한 `include_original` 값이 업로드에 적용됨. HEIC 파일이 포함된 상태에서 "원본 포함"을 선택하면 HEIC 건수 경고가 모달 내에 표시되고 해당 파일은 썸네일만 업로드됨. 드래그앤드롭은 데스크톱에서만 활성화(모바일 비활성화).
 - **프론트엔드 라우트**: `/photographer/projects/[id]/upload`.
 - **호출되는 API**:
-  1. 클라이언트 압축(`compressImageForUpload`, 서버 호출 아님).
+  1. 클라이언트 압축(`compressImageForUpload`, 서버 호출 아님). `include_original=true`일 때는 raw bytes 그대로 전송(압축 미적용).
   2. `POST {NEXT_PUBLIC_API_URL}/api/upload/photos`(FastAPI, Bearer JWT) — 실패 시 `POST /api/photographer/upload/photos`(Next 프록시)로 폴백.
-  3. N장 이상 업로드 완료 후 수동으로 `PATCH /api/photographer/projects/{id}/status` `{status:"selecting"}` 호출("초대 링크 활성화" 버튼) — **자동 전환이 아니라 작가가 직접 눌러야 하는 수동 액션**입니다(기존 문서의 "자동 활성화" 서술과 달리 확인됨).
-- **성공 시 기대 결과**: 업로드된 사진이 그리드에 표시(썸네일/프리뷰는 FastAPI가 생성), `projects.photo_count` 증가. N장 이상이면 "초대 링크 활성화" 버튼이 활성화되고, 클릭 시 `status: "selecting"`으로 전환 + 공유 모달 표시. 작가가 "유사컷 분석"을 실행하면(clip-service `/analyze`) 유사컷 그룹핑과 함께 흔들림/눈감음 의심 사진에 경고 배지(카드 좌상단)가 자동으로 표시됨 — 정보성 참고용이며 업로드/삭제를 막지 않음. AI 유사컷 분석 트리거는 `preparing`/`selecting` 두 상태 모두에서 노출되어(원본 추가 업로드가 허용되는 상태와 동일 조건), 초대 링크 활성화 이후 추가로 올린 사진도 재분석할 수 있다. 이미 분석을 완료한 프로젝트에서는 버튼이 "새 사진 분석"으로 표시되며, 직전 분석 이후 새로 추가된 사진만 증분으로 분석한다(전체 재분석 아님).
+  3. `include_original=true`일 때 응답의 `original_presigned`를 파싱 → R2에 presigned PUT(브라우저→R2 직접) → `POST /api/photographer/upload/originals/confirm`(`job_id`) 순서로 처리(각 파일별 순차, 오류는 non-fatal로 경고만).
+  4. N장 이상 업로드 완료 후 수동으로 `PATCH /api/photographer/projects/{id}/status` `{status:"selecting"}` 호출("초대 링크 활성화" 버튼) — **자동 전환이 아니라 작가가 직접 눌러야 하는 수동 액션**입니다(기존 문서의 "자동 활성화" 서술과 달리 확인됨).
+- **성공 시 기대 결과**: 업로드된 사진이 그리드에 표시(썸네일/프리뷰는 FastAPI가 생성), `projects.photo_count` 증가. N장 이상이면 "초대 링크 활성화" 버튼이 활성화되고, 클릭 시 `status: "selecting"`으로 전환 + 공유 모달 표시. `include_original=true` 업로드 시 워크플로우 화면의 원본 카드에 `original_status` 배지(`원본 처리 중`/`원본 완료`/`원본 실패`)가 표시됨. 압축은 서버 background worker가 비동기로 처리하므로 즉시 반영되지 않고 수분~수십분 후 완료됨. 작가가 "유사컷 분석"을 실행하면(clip-service `/analyze`) 유사컷 그룹핑과 함께 흔들림/눈감음 의심 사진에 경고 배지(카드 좌상단)가 자동으로 표시됨 — 정보성 참고용이며 업로드/삭제를 막지 않음. AI 유사컷 분석 트리거는 `preparing`/`selecting` 두 상태 모두에서 노출되어(원본 추가 업로드가 허용되는 상태와 동일 조건), 초대 링크 활성화 이후 추가로 올린 사진도 재분석할 수 있다. 이미 분석을 완료한 프로젝트에서는 버튼이 "새 사진 분석"으로 표시되며, 직전 분석 이후 새로 추가된 사진만 증분으로 분석한다(전체 재분석 아님).
 - **실패 및 경계 상황**:
   - CR3/RAW 등 지원하지 않는 형식: 과거 "조용한 실패"(BUG-01, `TECHNICAL_ANALYSIS.md`) 이슈가 기록되어 있고 수정 완료(✅)로 표시되어 있으나, **현재 코드에서 실제로 실패 목록이 사용자에게 노출되는지는 이번 조사에서 재검증하지 않음 — 확인 필요**. 관련 회귀 테스트: `tests/e2e/photographer/upload.spec.ts`(U5, CR3 거부).
   - 대문자 확장자(`.JPG`, `.HEIC`) 처리: 회귀 테스트 U6 존재.

@@ -104,6 +104,9 @@ export interface Database {
           original_filename: string | null;
           memo: string | null;
           file_size: number | null;
+          r2_original_url: string | null;
+          original_ready_at: string | null;
+          original_status: 'awaiting_upload' | 'pending' | 'processing' | 'completed' | 'failed' | null;
           created_at: string;
         };
         Insert: {
@@ -115,6 +118,9 @@ export interface Database {
           original_filename?: string | null;
           memo?: string | null;
           file_size?: number | null;
+          r2_original_url?: string | null;
+          original_ready_at?: string | null;
+          original_status?: 'awaiting_upload' | 'pending' | 'processing' | 'completed' | 'failed' | null;
           created_at?: string;
         };
         Update: {
@@ -126,6 +132,9 @@ export interface Database {
           original_filename?: string | null;
           memo?: string | null;
           file_size?: number | null;
+          r2_original_url?: string | null;
+          original_ready_at?: string | null;
+          original_status?: 'awaiting_upload' | 'pending' | 'processing' | 'completed' | 'failed' | null;
           created_at?: string;
         };
       };
@@ -251,44 +260,6 @@ export interface Database {
           filename?: string | null;
           photographer_memo?: string | null;
           file_size?: number | null;
-          created_at?: string;
-        };
-      };
-      delivery_files: {
-        Row: {
-          id: string;
-          project_id: string;
-          r2_url: string;
-          original_filename: string;
-          delivery_filename: string;
-          file_size: number;
-          compressed: boolean;
-          original_file_size: number | null;
-          mime_type: string;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          project_id: string;
-          r2_url: string;
-          original_filename: string;
-          delivery_filename: string;
-          file_size: number;
-          compressed?: boolean;
-          original_file_size?: number | null;
-          mime_type: string;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          project_id?: string;
-          r2_url?: string;
-          original_filename?: string;
-          delivery_filename?: string;
-          file_size?: number;
-          compressed?: boolean;
-          original_file_size?: number | null;
-          mime_type?: string;
           created_at?: string;
         };
       };

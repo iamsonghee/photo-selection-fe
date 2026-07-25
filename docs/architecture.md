@@ -167,7 +167,8 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 |---|---|---|
 | `photographers` | `id, auth_id, email, name, profile_image_url, bio, instagram_url, portfolio_url, contact_phone, created_at` | `auth_id`는 Supabase Auth의 `user.id`. 회원가입 시 자동 생성(`src/app/auth/callback/route.ts`). |
 | `projects` | `id, photographer_id, name, customer_name, shoot_date, deadline, required_count, photo_count, status, access_token, access_pin, confirmed_at, delivered_at, customer_cancel_count, max_revision_count, revision_round, review_deadline, shoot_type, customer_phone, clip_analysis_status, display_id, created_at, updated_at` | `status`는 8가지 값의 상태 머신(§9). `access_token`이 고객 링크의 토큰, `access_pin`이 4자리 PIN(nullable). |
-| `photos` | `id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, memo, similarity_group_id, blur_variance, is_blurry, face_detected, eyes_closed, created_at` | `number`는 `insert_photos_with_numbers` RPC로 원자적 할당(경쟁 조건 방지, `photo-selection-be/app/routers/upload.py`). `blur_variance/is_blurry/face_detected/eyes_closed`는 `clip-service/migration_002_quality_flags.sql`에서 추가된 흔들림/눈감음 경고 배지 전용 컬럼(정보성, 자동 삭제/제외 없음) — §176 아래 콜아웃 참고. |
+| `photos` | `id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, memo, similarity_group_id, blur_variance, is_blurry, face_detected, eyes_closed, r2_original_url, original_ready_at, original_status, created_at` | `number`는 `insert_photos_with_numbers` RPC로 원자적 할당. `blur_variance/is_blurry/face_detected/eyes_closed`는 흔들림/눈감음 경고 배지 전용 컬럼. `original_status`(`awaiting_upload`→`pending`→`processing`→`completed`/`failed`)는 원본 파일 비동기 압축 상태 — `include_original=true` 업로드 시에만 설정됨. `r2_original_url`은 압축 완료 후 공개 CDN URL. `original_ready_at`은 완료 시각. |
+| `original_jobs` | `id, photo_id, project_id, job_type, r2_source_key, source_content_type, original_filename, original_file_size, original_last_modified, original_content_type, status, attempts, max_attempts, last_error, next_attempt_at, processing_started_at, completed_at, created_at` | 원본 압축 비동기 job queue. `(photo_id, job_type)` UNIQUE 제약. 5상태(`awaiting_upload/pending/processing/completed/failed`). `SELECT FOR UPDATE SKIP LOCKED`로 worker가 원자적 클레임. `r2_source_key`에 브라우저가 직접 PUT한 미압축 원본 R2 key(`originals/source/{project_id}/{hex32}.{ext}`) 저장. `original_filename/original_file_size/original_last_modified/original_content_type`는 브라우저 원본 파일 메타데이터(복구 매칭용: filename+size+lastModified 조합). 압축 완료 후 source 파일 즉시 삭제(best effort). `supabase/migrations/20260724_original_jobs_and_photos_status.sql`. |
 | `selections` | `project_id, photo_id, rating, color_tag, comment, is_selected` | `(project_id, photo_id)` unique 제약으로 upsert. |
 | `photo_versions` | `id, photo_id, version(1\|2), r2_url, r2_thumb_url, file_size, filename, created_at` | `(photo_id, version)` conflict로 upsert. |
 | `version_reviews` | `photo_version_id, photo_id, status("approved"\|"revision_requested"), customer_comment, reviewed_at` | `photo_version_id` unique(conflict 대상). 보정본 재업로드 시 관련 행 삭제됨. |
@@ -287,10 +288,13 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | GET/POST | `/api/projects` | Supabase JWT | 작가 프로젝트 목록/생성(베타 최대 10개) |
 | GET | `/api/projects/{id}` | Supabase JWT+소유권 | 프로젝트 단건 조회 |
 | DELETE | `/api/projects/{id}/r2` | Supabase JWT+소유권 | R2 객체 일괄 삭제 |
-| POST | `/api/upload/photos` | Supabase JWT | 원본 업로드+썸네일/프리뷰 생성+R2 업로드+DB insert(베타 최대 3000장/프로젝트) |
+| POST | `/api/upload/photos` | Supabase JWT | 원본 업로드+썸네일/프리뷰 생성+R2 업로드+DB insert(베타 최대 3000장/프로젝트; `include_original=true` 시 500장까지 기본 검증, 1000장 이상 및 3000장은 성능·복구 검증 필요) |
 | POST | `/api/upload/profile-image` | Supabase JWT | 프로필 이미지 업로드(400px) |
 | POST | `/api/upload/versions` | Supabase JWT | 보정본 업로드(1500px/2MB 상한, 베타 최대 2라운드) |
 | POST | `/api/upload/originals` | Supabase JWT | 납품 파일 업로드(`delivered` 상태 전용). JPEG/PNG/HEIC/WebP 지원, 20MB 상한(초과 시 2단계 자동 압축: 품질 하향 → 해상도 축소, 3200px/85%에서도 초과하면 거부). PNG/HEIC/WebP → JPEG 자동 변환. `delivery_files` 테이블 INSERT. |
+| POST | `/api/upload/originals/confirm` | Supabase JWT | presigned PUT 완료 통지. 소유권 확인 + R2 HEAD 검증 + 조건부 UPDATE(`awaiting_upload`→`pending`). 이미 `pending/processing/completed`이면 200 반환(멱등). |
+| GET | `/api/upload/originals/pending` | Supabase JWT | `?project_id=` 파라미터로 `awaiting_upload` job 목록 조회. 복구 배너용 — `last_error` 등 내부 필드 비노출. |
+| POST | `/api/upload/originals/recover` | Supabase JWT | `job_id` 전달 시 R2 HEAD 확인: 파일 존재하면 confirm 처리, 없으면 새 presigned PUT URL 발급. |
 | POST | `/api/storage/delete` | **없음** | R2 키 목록 삭제 — §12 위험 항목 |
 | POST | `/api/storage/presign` | 정적 시크릿(`INTERNAL_PRESIGN_SECRET`) | R2 키 목록 presigned GET URL 발급 |
 
@@ -378,16 +382,26 @@ sequenceDiagram
 
 ## 10. 사진 업로드, 저장, 조회 및 썸네일 처리 흐름
 
-1. **선택/사전 압축(브라우저)**: `src/lib/upload-client-compress.ts`에서 최대 3200px, JPEG q=0.82로 리사이즈(600KB 미만 파일은 스킵).
-2. **배치 전송**: PC 8장×동시5, 모바일 3장×동시2 배치로 `XMLHttpRequest` 멀티파트 전송, `Authorization: Bearer <Supabase access_token>` 포함.
+1. **선택/사전 압축(브라우저)**: `src/lib/upload-client-compress.ts`에서 최대 3200px, JPEG q=0.82로 리사이즈(600KB 미만 파일은 스킵). `include_original=true`일 때도 항상 압축본을 서버로 전송(B Plan: 원본은 presigned PUT으로 R2 직접 전송). HEIC 파일은 `include_original=true` 시 베타 정책상 거부됨(JPEG/PNG/WebP만 허용).
+2. **배치 전송**: PC 8장×동시5, 모바일 3장×동시2 배치로 `XMLHttpRequest` 멀티파트 전송, `Authorization: Bearer <Supabase access_token>` 포함. `include_original=true`일 때는 1장×동시3(PC)/1장×동시1(모바일)으로 배치 크기 축소.
 3. **전송 대상**: 우선 `NEXT_PUBLIC_API_URL` (FastAPI) 직접 호출 → 네트워크/CORS 오류 시 Next API 프록시(`/api/photographer/upload/photos`)로 폴백.
 4. **백엔드 처리(`photo-selection-be/app/routers/upload.py`)**:
    - Content-Type 미확인 시 확장자로 추론.
    - EXIF 방향 보정 → 썸네일(300px, JPEG 75%) + 프리뷰(1200px, JPEG 82%) 생성(Pillow, 4000px 초과 이미지는 draft 모드로 사전 축소).
-   - R2에 병렬 업로드(`photos/{photographer_id}/{project_id}/{photo_id}_(thumb|preview).jpg`), `Cache-Control: public, max-age=31536000, immutable` 적용. 납품 파일은 `originals/{project_id}/{uuid}_{safe_filename}.jpg`로 저장(캐싱 헤더 없음).
+   - R2에 병렬 업로드(`photos/{photographer_id}/{project_id}/{photo_id}_(thumb|preview).jpg`), `Cache-Control: public, max-age=31536000, immutable` 적용.
    - `insert_photos_with_numbers` RPC로 `photos.number`를 원자적으로 할당하며 DB insert(경쟁 조건 방지).
    - `projects.photo_count` 갱신.
    - 베타 한도: 프로젝트당 최대 3000장(`BETA_MAX_PHOTOS_PER_PROJECT`).
+   - **`include_original=true`일 때 추가 흐름(B Plan 원본 비동기 압축)**:
+     - FormData에 `original_filenames/original_file_sizes/original_last_modifieds/original_content_types` 포함(복구 매칭용 원본 파일 메타).
+     - 서버: presigned PUT URL(`originals/source/{project_id}/{hex32}.{ext}`) 생성 + `original_jobs` INSERT(`status='awaiting_upload'`, 4개 원본 메타 포함) + `photos.original_status='awaiting_upload'` 설정.
+     - 응답에 `original_presigned: [{job_id, url, source_key, content_type, expires_at}]` 포함.
+     - 브라우저가 presigned URL로 R2에 **원본(raw) 파일** 직접 PUT → `POST /api/upload/originals/confirm`(`job_id` 전달) → confirm 서버에서 소유권 확인 + R2 HEAD 검증 후 조건부 UPDATE → `pending`으로 전이.
+     - worker(`original_compress_worker`, 서버 lifespan에서 `asyncio.create_task`)가 polling하며 JPEG 압축(최대 20MB) 후 `originals/{project_id}/{hex32}.jpg`에 업로드 → `photos.r2_original_url`, `original_ready_at`, `original_status='completed'` 갱신 → source 파일 즉시 삭제(best effort).
+     - `stuck_job_sweep_worker`(30분 주기): `processing` 15분 초과 → `pending` 초기화, `awaiting_upload` 24시간 초과 → R2 HEAD 확인 후 `pending` 또는 `failed`.
+     - 재시도 정책: R2 source 404·Pillow 오류 → 즉시 `failed`. R2 업로드 실패·DB 오류 → linear backoff(`attempts=1`→+5분, `attempts=2`→+30분, `max_attempts=3`).
+     - **복구 흐름**: 브라우저 종료/네트워크 단절로 presigned PUT이 미완료된 경우, 페이지 재방문 시 `GET /api/upload/originals/pending`으로 `awaiting_upload` job 목록을 조회해 복구 배너 표시. 사용자가 파일 선택 시 `POST /api/upload/originals/recover`로 R2 HEAD 확인 후 이미 있으면 confirm, 없으면 새 presigned URL 발급해 재업로드.
+     - **⚠️ Railway Sleep — 비동기 처리의 운영 필수 조건**: Railway Starter 플랜은 HTTP 요청이 5분간 없으면 인스턴스를 Sleep시키며 `asyncio` worker task가 모두 파괴된다. `pending` 상태 job은 DB에 보존되지만 압축 처리가 중단된다. 다음 HTTP 요청이 도착하면 서버가 재기동하면서 새 worker task가 생성되고 pending job이 재개된다. 따라서 작가가 업로드 후 confirm까지 완료하고 브라우저를 닫은 상태에서 5분 이내에 다른 HTTP 요청(작가/고객 어느 쪽이든)이 없으면 pending job 처리가 무기한 중단될 수 있다. **Railway Hobby 플랜($5/월)은 Sleep 없이 상시 가동**되므로, 원본 비동기 압축 기능의 안정적인 운영을 위해서는 Starter가 아닌 Hobby 플랜이 필수다(성능 개선이 아닌 기능적 요구사항).
 5. **조회(고객 갤러리)**: `SelectionContext`가 `/api/c/photos`(Next.js, Supabase 직접 조회)를 호출해 `r2_thumb_url`/`r2_preview_url`을 그대로 사용. 별도로 뷰어의 대형 프리뷰는 `GET /api/c/presign-preview`(Next → FastAPI `/api/storage/presign` 프록시)로 서명 URL을 받아 사용하는 경로도 존재.
 6. **보정본(V1/V2) 업로드**: 동일하게 브라우저 → FastAPI 직접(`/api/upload/versions`), 1500px/최대 2MB(품질 85%→60% 단계적 하향)로 리사이즈 + 400px 썸네일. `versions/{project_id}/v{version}/{photo_id}_{filename}` 키로 저장. `photo_versions` upsert 후 해당 사진의 기존 `version_reviews` 삭제(재검토 유도).
    - **파일-사진 매칭 우선순위**(`src/lib/version-mapping.ts`, `src/lib/retouch-clip-match.ts`, `UploadVersionsPanel.tsx`의 `runClipMatchPass`): ① `exact`(확장자 제외 파일명 완전 일치) → ② `fuzzy`(편집 툴 접미사·1~2자리 버전 번호 제거 후 stem 일치, 2026-07-13부터 3자리 이상 원본 순번은 보존하도록 수정 — BUG-02 참고) → ③ `clip`/`clip_low`(clip-service 이미지 유사도, 임계값 0.85/0.60) → ④ `order`(2026-07-13 추가: 위 세 단계 모두 실패한 잔여 타깃과 잔여 파일을 순서대로 짝짓는 최후 폴백). ④는 매칭 근거가 없으므로 UI에 항상 별도의 "순서" 배지(호박색, exact/fuzzy/AI의 초록·에메랄드와 구분)로 표시되어 작가가 "변경"으로 재지정할 수 있다.
@@ -475,7 +489,7 @@ sequenceDiagram
 ### 14.3 빌드/배포
 
 - FE: `next build`/`next start`. `next.config.ts`에 별도 `output` 모드 없음. 레포에 `vercel.json`이 없어 Vercel 표준 자동 감지 방식을 쓰는 것으로 추정(**확인 필요**, 근거: `src/app/api/photographer/upload/photos/route.ts`의 `maxDuration = 60` 주석이 "Vercel Hobby 플랜 최대 60초"를 명시).
-- BE: `Dockerfile` + `Procfile` + `nixpacks.toml` 모두 존재, Railway 배포로 기존 문서(`ACUT_OVERVIEW.md`)와 코드 정황(nixpacks 우선) 모두 일치.
+- BE: `Dockerfile` + `Procfile` + `nixpacks.toml` 모두 존재, Railway 배포로 기존 문서(`ACUT_OVERVIEW.md`)와 코드 정황(nixpacks 우선) 모두 일치. **⚠️ 원본 비동기 압축(`original_compress_worker`)을 안정적으로 운영하려면 Hobby 플랜($5/월) 이상 필수** — Starter 플랜은 5분 비활성 시 Sleep하여 worker가 중단됨(§10 B Plan 복구 흐름 참고).
 - CLIP 서비스: `clip-service/README.md`에 따르면 Railway에 **별도 서비스**(Root Directory=`clip-service`)로 배포 — 실제 배포/가동 여부는 **확인 필요**.
 - CORS 허용 목록(`app/main.py`): `localhost:3000/3001`, `127.0.0.1:3000/3001`, `https://acut.vercel.app`, `ALLOWED_ORIGINS` 환경변수의 추가 origin, 그리고 정규식 `https://*.vercel.app`(모든 Vercel 프리뷰 배포 허용, `allow_credentials=True`와 결합).
 

@@ -61,6 +61,8 @@ export interface Photo {
   faceDetected?: boolean | null;
   /** AI 눈 감음 의심 여부 (faceDetected가 true일 때만 유효) */
   eyesClosed?: boolean | null;
+  /** 원본 압축 처리 상태 (include_original=true 업로드 시에만 설정) */
+  originalStatus?: 'awaiting_upload' | 'pending' | 'processing' | 'completed' | 'failed' | null;
 }
 
 /** AI 유사컷 그룹 정보 (photo_groups 테이블) */
@@ -119,6 +121,8 @@ export interface Project {
   reviewDeadline?: string | null;
   /** AI 유사컷(burst shot) 분석 상태 (clip-service가 기록) */
   clipAnalysisStatus?: "processing" | "completed" | "failed" | null;
+  /** 납품용 원본 파일 포함 여부 (프로젝트 생성 시 설정) */
+  includeOriginal: boolean;
   /** 런타임 전용 — photos 테이블에서 조회한 첫 번째 사진 썸네일 URL */
   thumbnailUrl?: string | null;
   createdAt: string;

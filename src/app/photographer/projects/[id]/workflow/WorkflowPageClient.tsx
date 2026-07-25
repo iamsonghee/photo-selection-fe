@@ -11,7 +11,6 @@ import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHead
 import UploadVersionsPanel, {
   type UploadPanelTarget,
 } from "@/components/photographer/UploadVersionsPanel";
-import DeliveryUploadPanel from "@/components/photographer/DeliveryUploadPanel";
 import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -361,6 +360,21 @@ function OriginalCard({
       <div className="text-[11px] font-mono text-muted-foreground truncate mb-1.5" title={filename}>
         {filename}
       </div>
+      {row.photo.originalStatus && (
+        <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide mb-1.5 ${
+          row.photo.originalStatus === "completed"
+            ? "bg-emerald-500/15 text-emerald-500"
+            : row.photo.originalStatus === "failed"
+              ? "bg-red-500/15 text-red-500"
+              : "bg-amber-500/15 text-amber-500"
+        }`}>
+          {row.photo.originalStatus === "completed"
+            ? "원본 완료"
+            : row.photo.originalStatus === "failed"
+              ? "원본 실패"
+              : "원본 처리 중"}
+        </div>
+      )}
       {row.photo.comment ? (
         <div className="bg-background border border-border-subtle rounded-lg p-2 text-[11px] text-muted-foreground leading-relaxed">
           <div className="text-[9px] text-accent font-semibold uppercase tracking-wide mb-1 flex items-center gap-1">
@@ -855,7 +869,6 @@ export default function WorkflowPageClient() {
   const reviewHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
-  const [deliveryPanelOpen, setDeliveryPanelOpen] = useState(false);
 
   const getVersionUrl = useCallback(
     (url: string, photoId: string, version: 1 | 2) => {
@@ -1796,13 +1809,9 @@ export default function WorkflowPageClient() {
             ) : null}
           </div>
           {project.status === "delivered" ? (
-            <button
-              type="button"
-              onClick={() => setDeliveryPanelOpen(true)}
-              className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 transition-colors"
-            >
-              <CheckCircle2 size={15} />납품 파일 업로드
-            </button>
+            <span className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <CheckCircle2 size={15} />납품 완료
+            </span>
           ) : isConfirmed ? (
             <button
               onClick={handleStartEditing}
@@ -1871,13 +1880,6 @@ export default function WorkflowPageClient() {
         targets={panelVersion === 2 ? v2Targets : v1Targets}
         existingVersionCount={existingVersionCount}
         onDelivered={handleDelivered}
-      />
-
-      {/* ── Delivery file upload panel ── */}
-      <DeliveryUploadPanel
-        isOpen={deliveryPanelOpen}
-        onClose={() => setDeliveryPanelOpen(false)}
-        projectId={id}
       />
 
       {confirmDialog ? (

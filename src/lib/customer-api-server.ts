@@ -41,6 +41,7 @@ function mapProjectRow(row: ProjectsRow): Project {
     clipAnalysisStatus:
       (row as { clip_analysis_status?: "processing" | "completed" | "failed" | null })
         .clip_analysis_status ?? null,
+    includeOriginal: (row as any).include_original ?? false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

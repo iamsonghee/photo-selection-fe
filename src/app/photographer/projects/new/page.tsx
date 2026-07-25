@@ -108,6 +108,7 @@ export default function NewProjectPage() {
   const [location,      setLocation]      = useState("");
   const [accessPin,     setAccessPin]     = useState("");
   const [maxRevisionCount, setMaxRevisionCount] = useState<0 | 1 | 2>(2);
+  const [includeOriginal, setIncludeOriginal] = useState(false);
   const [submitting,    setSubmitting]    = useState(false);
   const [error,         setError]         = useState<string | null>(null);
   const [fieldErrors,   setFieldErrors]   = useState<Record<string, string>>({});
@@ -180,6 +181,7 @@ const isValid =
         access_pin: accessPin || null,
         max_revision_count: maxRevisionCount,
         location: location.trim() || null,
+        include_original: includeOriginal,
       });
       await fetch("/api/photographer/project-logs", {
         method: "POST",
@@ -521,6 +523,31 @@ const isValid =
                     >
                       {label}
                       <span className="text-[10px] font-normal" style={{ color: maxRevisionCount === value ? "rgba(var(--accent-rgb),0.6)" : "var(--border-strong)" }}>{desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </Field>
+
+              {/* 납품 원본 */}
+              <Field label="납품 파일">
+                <div className="flex gap-2">
+                  {([
+                    { value: false, label: "원본 없이", desc: "셀렉용 이미지만 업로드" },
+                    { value: true,  label: "원본 포함", desc: "납품용 원본 파일 함께 업로드" },
+                  ] as const).map(({ value, label, desc }) => (
+                    <button
+                      key={String(value)}
+                      type="button"
+                      onClick={() => setIncludeOriginal(value)}
+                      className="flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-semibold transition-colors"
+                      style={{
+                        background: includeOriginal === value ? "rgba(var(--accent-rgb),0.08)" : "transparent",
+                        borderColor: includeOriginal === value ? "rgba(var(--accent-rgb),0.5)" : "var(--border)",
+                        color: includeOriginal === value ? "var(--accent)" : "var(--subtle-foreground)",
+                      }}
+                    >
+                      {label}
+                      <span className="text-[10px] font-normal" style={{ color: includeOriginal === value ? "rgba(var(--accent-rgb),0.6)" : "var(--border-strong)" }}>{desc}</span>
                     </button>
                   ))}
                 </div>

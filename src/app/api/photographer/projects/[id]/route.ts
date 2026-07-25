@@ -139,6 +139,17 @@ export async function PATCH(
     if (typeof body.max_revision_count === 'number' && [0, 1, 2].includes(body.max_revision_count)) {
       payload.max_revision_count = body.max_revision_count;
     }
+    if ('include_original' in body && typeof body.include_original === 'boolean') {
+      const photoCount = (project as { photo_count: number | null }).photo_count ?? 0;
+      const projectStatus = (project as { status: string }).status;
+      if (projectStatus !== 'preparing' || photoCount > 0) {
+        return NextResponse.json(
+          { error: '업로드된 사진이 있거나 preparing 상태가 아니면 납품 설정을 변경할 수 없습니다.' },
+          { status: 400 }
+        );
+      }
+      payload.include_original = body.include_original;
+    }
     if ('review_deadline' in body) {
       payload.review_deadline = body.review_deadline ?? null;
     }
