@@ -1085,12 +1085,7 @@ export default function ProjectDetailPage() {
 
   const overallProgress = useMemo(() => {
     if (uploadPhase === "idle" || uploadPhase === "done") return 0;
-    if (uploadPhase === "processing") return Math.round(uploadProgress * 0.35);
-    if (uploadPhase === "sending") {
-      const n = Math.max(0, uploadProgress - 3) / 87;
-      return Math.round(35 + n * 55);
-    }
-    return 90;
+    return uploadProgress; // 분할처리 파이프라인: 단일 processing 페이즈에서 0→90 단조 증가
   }, [uploadPhase, uploadProgress]);
 
   /** 기존 photos + 배치 완료(pending) + 전송 중(uploading) + 큐(queued) 합산 — early return 이전에 선언해야 Rules of Hooks 준수 */
@@ -1271,7 +1266,7 @@ export default function ProjectDetailPage() {
 
   // iOS에서 업로드 중 앱 전환/화면 잠금 감지 → 복귀 시 경고
   useEffect(() => {
-    if (uploadPhase !== "sending" || !isPhoneLikeClient()) return;
+    if (uploadPhase !== "processing" || !isPhoneLikeClient()) return;
     let hiddenAt: number | null = null;
     const handler = () => {
       if (document.visibilityState === "hidden") {
@@ -1321,54 +1316,30 @@ export default function ProjectDetailPage() {
     if (userError || !user) { setUploadError("로그인 인증을 확인할 수 없습니다."); setUploadPhase("idle"); return; }
     if (!token) { setUploadError("로그인이 필요합니다."); setUploadPhase("idle"); return; }
 
-    // 업로드 확인 모달 닫힘 즉시 전체 사진을 그리드에 표시 (압축 전 큐 상태)
     setTotalUploadCount(uploadFiles.length);
-    const queuedTs = Date.now();
-    const initialQueued = uploadFiles.map((file, fi) => {
-      const blobUrl = URL.createObjectURL(file);
-      queuedBlobsRef.current.push(blobUrl);
-      return { tempId: `queued-${queuedTs}-${fi}`, blobUrl, filename: file.name };
-    });
-    setQueuedPreviews(initialQueued);
-
     let currentToken = token;
-    let filesToUpload = uploadFiles;
+    const totalFiles = uploadFiles.length;
 
-    // HEIC 정책: include_original=true여도 HEIC는 원본 PUT 없이 썸네일만 업로드 (rawFile=undefined로 presigned 분기 스킵)
-    // B Plan: 항상 압축본을 서버로 전송 (include_original 여부 무관). 원본은 presigned PUT으로 R2에 직접 전송.
-    const compressed: File[] = [];
-    for (let i = 0; i < uploadFiles.length; i++) {
-      if (stopRequestedRef.current) {
-        setCompressingIndex(-1);
-        setQueuedPreviews([]);
-        queuedBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
-        queuedBlobsRef.current = [];
-        setUploadPhase("idle"); setUploadProgress(0); await loadPhotos(); return;
-      }
-      setCompressingIndex(i);
-      compressed.push(await compressImageForUpload(uploadFiles[i]));
-      setUploadProgress(Math.round(((i + 1) / uploadFiles.length) * 100));
-    }
-    setCompressingIndex(-1);
-    filesToUpload = compressed;
-
-    setUploadPhase("sending");
-    setUploadProgress(3);
-    if (photoScrollRef.current) photoScrollRef.current.scrollTop = photoScrollRef.current.scrollHeight;
-
-    // 원본 포함 시 1장/배치로 서버 메모리·타임아웃 부담 최소화
+    // 분할처리: 라운드별 압축→전송 파이프라인. 전체 압축 후 전체 전송이 아닌 한 라운드씩 처리.
+    // HEIC: include_original=true여도 HEIC는 원본 PUT 없이 썸네일만 업로드 (rawFile=undefined 분기)
+    // B Plan: 압축본을 서버로 전송 + 원본은 presigned PUT으로 R2에 직접 전송
     const effectiveBatch = inclOrig ? 1 : (isPhoneLikeClient() ? MOBILE_BATCH_SIZE : BATCH_SIZE);
-    const batches: File[][] = [];
-    for (let i = 0; i < filesToUpload.length; i += effectiveBatch) batches.push(filesToUpload.slice(i, i + effectiveBatch));
+    const concurrency = inclOrig
+      ? (isPhoneLikeClient() ? 1 : 3)
+      : (isPhoneLikeClient() ? MOBILE_CONCURRENCY : PC_CONCURRENCY);
+    const totalBatches = Math.ceil(totalFiles / effectiveBatch);
 
-    const batchSizes = batches.map((b) => b.reduce((s, f) => s + f.size, 0));
-    const totalBytes = Math.max(1, batchSizes.reduce((a, b) => a + b, 0));
-    const loadedPerBatch = new Array<number>(batches.length).fill(0);
-
+    // XHR 진행률 추적용 근사 배치 사이즈 (원본 파일 기준 — 압축본은 더 작지만 비율 유지됨)
+    const approxBatchSizes = Array.from({ length: totalBatches }, (_, i) => {
+      const b = uploadFiles.slice(i * effectiveBatch, (i + 1) * effectiveBatch);
+      return b.reduce((s, f) => s + f.size, 0);
+    });
+    const totalBytes = Math.max(1, approxBatchSizes.reduce((a, b) => a + b, 0));
+    const loadedPerBatch = new Array<number>(totalBatches).fill(0);
     const applyProgress = (idx: number, loaded: number) => {
-      const cap = batchSizes[idx] ?? 0;
+      const cap = approxBatchSizes[idx] ?? 0;
       loadedPerBatch[idx] = cap > 0 ? Math.min(cap, loaded) : loaded;
-      let sum = 0; for (let i = 0; i < batches.length; i++) sum += loadedPerBatch[i];
+      let sum = 0; for (let i = 0; i < totalBatches; i++) sum += loadedPerBatch[i];
       // 상한 90%: 전송 완료 후 서버 처리 구간은 awaitingServerFinalize UI로 표시 (99% 장시간 정지 방지)
       setUploadProgress(Math.min(90, Math.round((sum / totalBytes) * 100)));
     };
@@ -1379,11 +1350,8 @@ export default function ProjectDetailPage() {
     let abortReason: "betaLimit" | "network" | "auth" | null = null;
     let abortMessage = "";
     let firstFailDetail: string | null = null;
-    const concurrency = inclOrig
-      ? (isPhoneLikeClient() ? 1 : 3)
-      : (isPhoneLikeClient() ? MOBILE_CONCURRENCY : PC_CONCURRENCY);
 
-    for (let chunkStart = 0; chunkStart < batches.length; chunkStart += concurrency) {
+    for (let chunkStart = 0; chunkStart < totalBatches; chunkStart += concurrency) {
       if (stopRequestedRef.current || abortReason) break;
       // BUG-04: PC도 30배치(약 240장)마다 토큰 갱신 (대용량 업로드 중 만료 방지)
       const refreshInterval = isPhoneLikeClient() ? 20 : 30;
@@ -1392,7 +1360,58 @@ export default function ProjectDetailPage() {
         const { data: { session: fresh } } = await supabase.auth.getSession();
         if (fresh?.access_token) currentToken = fresh.access_token;
       }
-      const chunk = batches.slice(chunkStart, Math.min(chunkStart + concurrency, batches.length));
+
+      // ── STEP 1: 이번 라운드의 raw 파일 배치 구성 ──
+      const rawChunk: File[][] = [];
+      for (let bi = 0; bi < concurrency && chunkStart + bi < totalBatches; bi++) {
+        const start = (chunkStart + bi) * effectiveBatch;
+        rawChunk.push(uploadFiles.slice(start, Math.min(start + effectiveBatch, totalFiles)));
+      }
+
+      // ── STEP 2: 이 라운드 파일만 queuedPreviews에 표시 (최대 concurrency×effectiveBatch장) ──
+      const chunkTs = Date.now();
+      const allRawInChunk = rawChunk.flat();
+      const chunkQueued = allRawInChunk.map((file, i) => {
+        const blobUrl = URL.createObjectURL(file);
+        queuedBlobsRef.current.push(blobUrl);
+        return { tempId: `queued-${chunkTs}-${chunkStart}-${i}`, blobUrl, filename: file.name };
+      });
+      setQueuedPreviews(chunkQueued);
+
+      // ── STEP 3: 이 라운드 압축 (파일별 순서대로, 하이라이트 포함) ──
+      const compressedChunk: File[][] = [];
+      let roundFileIdx = 0;
+      let stopped = false;
+      outerBatch: for (let bi = 0; bi < rawChunk.length; bi++) {
+        const compressedBatch: File[] = [];
+        for (let fi = 0; fi < rawChunk[bi].length; fi++) {
+          if (stopRequestedRef.current) {
+            setCompressingIndex(-1);
+            setQueuedPreviews([]);
+            chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
+            queuedBlobsRef.current = queuedBlobsRef.current.filter(
+              (u) => !chunkQueued.some((q) => q.blobUrl === u)
+            );
+            stopped = true;
+            break outerBatch;
+          }
+          setCompressingIndex(roundFileIdx);
+          compressedBatch.push(await compressImageForUpload(rawChunk[bi][fi]));
+          roundFileIdx++;
+        }
+        compressedChunk.push(compressedBatch);
+      }
+      if (stopped) break;
+      setCompressingIndex(-1);
+
+      // ── STEP 4: queuedPreviews 해제 (XHR 시작 시 uploadingPhotos로 전환됨) ──
+      setQueuedPreviews([]);
+      chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
+      queuedBlobsRef.current = queuedBlobsRef.current.filter(
+        (u) => !chunkQueued.some((q) => q.blobUrl === u)
+      );
+
+      const chunk = compressedChunk;
       const bodySent: boolean[] = chunk.map(() => false);
       const reqDone: boolean[] = chunk.map(() => false);
       const syncAwaitingServer = () => {
@@ -1457,7 +1476,7 @@ export default function ProjectDetailPage() {
                 );
               }
             }
-            if (batchSizes[globalIdx] > 0) applyProgress(globalIdx, batchSizes[globalIdx]);
+            if (approxBatchSizes[globalIdx] > 0) applyProgress(globalIdx, approxBatchSizes[globalIdx]);
             // BUG-01: 성공 응답에서 서버 거부 파일 목록 수집
             if (res.ok) {
               type UploadOkBody = { rejected?: string[]; original_presigned?: OriginalPresignedItem[] };
@@ -1522,7 +1541,7 @@ export default function ProjectDetailPage() {
             allFailed.push(...batch);
           }
           completedBatches++;
-          setUploadProgress(Math.min(90, Math.round((completedBatches / batches.length) * 100)));
+          setUploadProgress(Math.min(90, Math.round((completedBatches / totalBatches) * 100)));
         } finally {
           // 실패·중단 케이스에서 uploading 상태 잔류 방지
           setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
@@ -1909,7 +1928,7 @@ export default function ProjectDetailPage() {
   const isInviteActive = project.status !== "preparing";
   const progressPct = N > 0 ? Math.min(100, Math.round((displayPhotos.length / N) * 100)) : 0;
   const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
-  const showServerWorking = uploadPhase === "sending" && awaitingServerFinalize;
+  const showServerWorking = uploadPhase === "processing" && awaitingServerFinalize;
   const uploadAllowed = canUploadOriginals(project.status);
   const canFlushAll =
     project.status === "preparing" &&
@@ -2421,13 +2440,11 @@ export default function ProjectDetailPage() {
           {isUploading && (
             <div style={{ flexShrink: 0, padding: "7px 16px", background: SURFACE_1, borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, letterSpacing: "0.1em", minWidth: 52 }}>
-                {uploadPhase === "processing" ? "압축 중" : "업로드 중"}
+                {compressingIndex >= 0 ? "압축 중" : "업로드 중"}
               </span>
               {totalUploadCount > 0 && (
                 <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT_MUTED, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
-                  {uploadPhase === "processing"
-                    ? (compressingIndex >= 0 ? compressingIndex + 1 : 0)
-                    : pendingPhotos.length} / {totalUploadCount}장
+                  {pendingPhotos.length} / {totalUploadCount}장
                 </span>
               )}
               <div style={{ flex: 1, height: 2, background: "var(--border)", overflow: "hidden" }}>
