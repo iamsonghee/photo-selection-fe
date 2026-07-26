@@ -1374,6 +1374,12 @@ export default function WorkflowPageClient() {
         const data = await res.json().catch(() => ({}));
         throw new Error((data as { error?: string }).error ?? "상태 변경 실패");
       }
+      // 로그 기록(실패해도 무시)
+      fetch("/api/photographer/project-logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: id, action: nextStatus }),
+      }).catch(() => {});
       // status만 변경 — rows(사진/보정본)는 그대로이므로 loadData() 불필요
       setProject((prev) => prev ? { ...prev, status: nextStatus } : null);
       // 성공 시 같은 모달을 공유 단계로 전환 (작가가 직접 링크 공유)

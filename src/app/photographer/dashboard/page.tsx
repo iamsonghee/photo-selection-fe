@@ -8,7 +8,7 @@ import Link from "next/link";
 import {
   Plus, AlertCircle, ChevronRight, Clock, Activity, Layers, Zap, CheckCircle2,
 } from "lucide-react";
-import { BETA_MAX_PROJECTS_TOTAL } from "@/lib/beta-limits";
+import { DEFAULT_BETA_MAX_PROJECTS_TOTAL } from "@/lib/beta-limits";
 import { getProjectsByPhotographerId } from "@/lib/db";
 import type { Project, ProjectStatus } from "@/types";
 import type { ProjectLogItem } from "@/lib/db";
@@ -195,6 +195,7 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [logs, setLogs]         = useState<ProjectLogItem[]>([]);
   const [dashFilter, setDashFilter] = useState<"all" | "active" | "completed">("all");
+  const [betaMaxProjectsTotal, setBetaMaxProjectsTotal] = useState(DEFAULT_BETA_MAX_PROJECTS_TOTAL);
 
   const userName =
     profile?.name?.trim() ||
@@ -222,6 +223,15 @@ export default function DashboardPage() {
     }
     load();
   }, [profile, profileLoading]);
+
+  useEffect(() => {
+    fetch("/api/limits")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.betaMaxProjectsTotal) setBetaMaxProjectsTotal(data.betaMaxProjectsTotal);
+      })
+      .catch(() => {});
+  }, []);
 
   if (profileLoading || loading) {
     return <PageLoader variant="full" />;
@@ -275,7 +285,7 @@ export default function DashboardPage() {
   };
 
   const betaCount = projects.length;
-  const betaPct   = Math.min(100, Math.round((betaCount / BETA_MAX_PROJECTS_TOTAL) * 100));
+  const betaPct   = Math.min(100, Math.round((betaCount / betaMaxProjectsTotal) * 100));
 
   return (
     <div className="min-h-screen bg-background text-foreground" style={{ fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif" }}>
@@ -373,7 +383,7 @@ export default function DashboardPage() {
                 <span className="text-sm font-semibold text-foreground">프로젝트</span>
                 <div className="text-sm font-mono">
                   <span className="text-foreground font-bold">{betaCount}</span>
-                  <span className="text-disabled-foreground"> / {BETA_MAX_PROJECTS_TOTAL}</span>
+                  <span className="text-disabled-foreground"> / {betaMaxProjectsTotal}</span>
                 </div>
               </div>
               <div className="w-full h-1.5 bg-border-subtle rounded-full overflow-hidden">
@@ -387,7 +397,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {betaCount >= BETA_MAX_PROJECTS_TOTAL ? (
+            {betaCount >= betaMaxProjectsTotal ? (
               <div className="flex items-start gap-2 bg-red-500/5 border border-red-500/20 rounded-xl p-3">
                 <AlertCircle size={13} color={RED} className="shrink-0 mt-0.5" />
                 <div>
@@ -395,7 +405,7 @@ export default function DashboardPage() {
                   <div className="text-xs text-subtle-foreground leading-relaxed">베타 프로젝트 한도에 도달했습니다.</div>
                 </div>
               </div>
-            ) : betaCount >= BETA_MAX_PROJECTS_TOTAL - 2 ? (
+            ) : betaCount >= betaMaxProjectsTotal - 2 ? (
               <div className="bg-border-subtle rounded-xl p-3">
                 <div className="text-[10px] text-subtle-foreground font-bold uppercase tracking-wide mb-1">한도 근접</div>
                 <div className="text-xs text-disabled-foreground leading-relaxed">프로젝트 생성 한도에 근접했습니다.</div>

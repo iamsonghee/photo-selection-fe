@@ -1,6 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import { isAdminEmail } from "@/lib/admin-emails";
 
 const COOKIE_TTL_SECONDS = 86400;
+
+/**
+ * /admin/** 접근 제어를 미들웨어(Edge, 렌더링 시작 전)에서 수행한다.
+ * App Router에서 layout과 그 자식 page는 병렬로 렌더링될 수 있어, layout의 redirect()만으로는
+ * 자식 page의 데이터 페칭이 이미 시작돼 RSC 스트림에 실려 나가는 것을 막지 못한다(실측 확인됨 —
+ * 인증 없이 /admin/projects를 raw HTTP로 요청하면 200 + 실제 프로젝트/이메일 데이터가 응답 본문에
+ * 포함됨. 실제 브라우저는 클라이언트 라우터가 이 데이터를 받은 후 곧바로 "/"로 다시 이동시켜
+ * 화면에는 안 보이지만, 그 사이 데이터는 이미 네트워크로 전송된 뒤다). 미들웨어는 React 렌더링
+ * 자체를 시작하기 전에 진짜 HTTP 리다이렉트를 보내므로 이 문제가 원천적으로 발생하지 않는다.
+ * (`src/app/admin/layout.tsx`의 getAdminUser() 체크는 이메일 표시 등 UI 편의 목적으로 유지한다.)
+ */
+async function handleAdminGate(req: NextRequest): Promise<NextResponse> {
+  let response = NextResponse.next({ request: req });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return req.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value));
+          response = NextResponse.next({ request: req });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
+  // getSession()이 아니라 getUser()를 써야 한다 — getUser()는 Supabase Auth 서버에 재검증을
+  // 요청해 쿠키 위조를 막는다(공식 권장 패턴).
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.redirect(new URL("/", req.url));
+  }
+  if (!isAdminEmail(user.email)) {
+    return NextResponse.redirect(new URL("/photographer/dashboard", req.url));
+  }
+
+  return response;
+}
 
 function base64urlToBuffer(s: string): ArrayBuffer {
   const base64 = s.replace(/-/g, "+").replace(/_/g, "/");
@@ -53,6 +103,10 @@ async function verifyPinCookieEdge(
 export async function middleware(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
 
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    return handleAdminGate(req);
+  }
+
   // Extract token from /c/[token]/...
   const match = pathname.match(/^\/c\/([^/]+)\/(.+)$/);
   if (!match) return NextResponse.next();
@@ -80,5 +134,5 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  matcher: ["/c/:token/:path+"],
+  matcher: ["/c/:token/:path+", "/admin", "/admin/:path*"],
 };

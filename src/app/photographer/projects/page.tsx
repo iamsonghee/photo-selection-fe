@@ -294,6 +294,15 @@ export default function ProjectsPage() {
       .finally(() => setLoading(false));
   }, [profile?.id, profileLoading]);
 
+  const [quota, setQuota] = useState<{ current: number; max: number | null } | null>(null);
+  useEffect(() => {
+    if (!profile?.id) return;
+    fetch("/api/photographer/quota")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setQuota(data))
+      .catch(() => setQuota(null));
+  }, [profile?.id]);
+
   const resetFilters = useCallback(() => {
     setSearchQuery("");
     const from = new Date();
@@ -413,6 +422,13 @@ export default function ProjectsPage() {
           </div>
         )}
 
+        {/* 이용 한도 */}
+        {quota && (
+          <div className="px-5 pb-3 text-xs text-subtle-foreground">
+            프로젝트 한도 {quota.max === null ? "무제한" : `${quota.current}/${quota.max}`}
+          </div>
+        )}
+
         {/* cards list */}
         <div className="px-5 pb-6 flex flex-col gap-4">
           {loading ? (
@@ -462,6 +478,7 @@ export default function ProjectsPage() {
         stats={[
           { label: "전체",  value: projects.length },
           { label: "진행중", value: tabCounts.active, accent: true },
+          ...(quota ? [{ label: "한도", value: quota.max === null ? "무제한" : `${quota.current}/${quota.max}` }] : []),
         ]}
       />
 

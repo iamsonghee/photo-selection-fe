@@ -104,4 +104,17 @@ test.describe("작가 — 프로젝트 관리", () => {
     await page.keyboard.press("Escape");
     await page.waitForTimeout(300);
   });
+
+  test("P7: 이용 한도 조회 실패 시 생성 폼을 열어주지 않는다 (fail-open 회귀 방지)", async ({ page }) => {
+    // GET /api/photographer/quota를 강제로 실패시켜, 한도 확인이 안 된 상태에서
+    // 생성 폼이 노출되지 않는지(무제한으로 잘못 간주하지 않는지) 검증한다.
+    await page.route("**/api/photographer/quota", (route) => route.abort("failed"));
+
+    await page.goto("/photographer/projects/new");
+
+    // 에러 상태(다시 시도)가 노출되어야 하고, 생성 폼(이름 입력)은 보이면 안 된다.
+    await expect(page.getByRole("button", { name: "다시 시도" })).toBeVisible({ timeout: 8000 });
+    const nameInput = page.locator("input[placeholder*='촬영']").or(page.locator("input[placeholder*='프로젝트']")).first();
+    await expect(nameInput).not.toBeVisible();
+  });
 });

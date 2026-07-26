@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { getPolicyForPhotographer, type BetaStatus } from "@/lib/beta-policy";
+import { getAppSettings } from "@/lib/app-settings";
 
 async function getPhotographerFromSession(): Promise<{
   id: string;
@@ -42,11 +43,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const policy = getPolicyForPhotographer({
-      email: photographer.email,
-      betaStatus: photographer.betaStatus,
-      betaEndDate: photographer.betaEndDate,
-    });
+    const settings = await getAppSettings();
+    const policy = getPolicyForPhotographer(
+      {
+        email: photographer.email,
+        betaStatus: photographer.betaStatus,
+        betaEndDate: photographer.betaEndDate,
+      },
+      settings
+    );
 
     const admin = getAdminClient();
 

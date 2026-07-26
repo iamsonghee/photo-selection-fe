@@ -165,14 +165,18 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 
 | 테이블 | 코드에서 확인된 주요 컬럼 | 비고 |
 |---|---|---|
-| `photographers` | `id, auth_id, email, name, profile_image_url, bio, instagram_url, portfolio_url, contact_phone, created_at` | `auth_id`는 Supabase Auth의 `user.id`. 회원가입 시 자동 생성(`src/app/auth/callback/route.ts`). |
+| `photographers` | `id, auth_id, email, name, profile_image_url, bio, instagram_url, portfolio_url, contact_phone, created_at, beta_status("not_invited"\|"active"\|"ended"\|"suspended"), beta_start_date, beta_end_date, admin_note, total_projects_created` | `auth_id`는 Supabase Auth의 `user.id`. 회원가입 시 자동 생성(`src/app/auth/callback/route.ts`). 등급(관리자/베타/일반) 컬럼은 2026-07-26 베타 등급 시스템에서 추가(`supabase/migrations/20260726_beta_tier_system.sql`) — 기존 가입자도 그랜드파더링 없이 `beta_status='not_invited'`(일반)로 시작. `total_projects_created`는 삭제해도 감소하지 않는 누적 생성 카운터로 설계됐으나, 2026-07-26 정책 변경(커밋 `2b2e241`/`818affc`)으로 일반 사용자 한도 판정이 "현재 보유 수" 기준으로 바뀌면서 **더 이상 어떤 검증 로직에서도 읽히지 않는 컬럼**이 됐다(계속 +1은 되지만 사용처 없음) — §6.3, §13 참고. |
 | `projects` | `id, photographer_id, name, customer_name, shoot_date, deadline, required_count, photo_count, status, access_token, access_pin, confirmed_at, delivered_at, customer_cancel_count, max_revision_count, revision_round, review_deadline, shoot_type, customer_phone, clip_analysis_status, display_id, created_at, updated_at` | `status`는 8가지 값의 상태 머신(§9). `access_token`이 고객 링크의 토큰, `access_pin`이 4자리 PIN(nullable). |
 | `photos` | `id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, memo, similarity_group_id, blur_variance, is_blurry, face_detected, eyes_closed, r2_original_url, original_ready_at, original_status, created_at` | `number`는 `insert_photos_with_numbers` RPC로 원자적 할당. `blur_variance/is_blurry/face_detected/eyes_closed`는 흔들림/눈감음 경고 배지 전용 컬럼. `original_status`(`awaiting_upload`→`pending`→`processing`→`completed`/`failed`)는 원본 파일 비동기 압축 상태 — `include_original=true` 업로드 시에만 설정됨. `r2_original_url`은 압축 완료 후 공개 CDN URL. `original_ready_at`은 완료 시각. |
 | `original_jobs` | `id, photo_id, project_id, job_type, r2_source_key, source_content_type, original_filename, original_file_size, original_last_modified, original_content_type, status, attempts, max_attempts, last_error, next_attempt_at, processing_started_at, completed_at, created_at` | 원본 압축 비동기 job queue. `(photo_id, job_type)` UNIQUE 제약. 5상태(`awaiting_upload/pending/processing/completed/failed`). `SELECT FOR UPDATE SKIP LOCKED`로 worker가 원자적 클레임. `r2_source_key`에 브라우저가 직접 PUT한 미압축 원본 R2 key(`originals/source/{project_id}/{hex32}.{ext}`) 저장. `original_filename/original_file_size/original_last_modified/original_content_type`는 브라우저 원본 파일 메타데이터(복구 매칭용: filename+size+lastModified 조합). 압축 완료 후 source 파일 즉시 삭제(best effort). `supabase/migrations/20260724_original_jobs_and_photos_status.sql`. |
 | `selections` | `project_id, photo_id, rating, color_tag, comment, is_selected` | `(project_id, photo_id)` unique 제약으로 upsert. |
 | `photo_versions` | `id, photo_id, version(1\|2), r2_url, r2_thumb_url, file_size, filename, created_at` | `(photo_id, version)` conflict로 upsert. |
 | `version_reviews` | `photo_version_id, photo_id, status("approved"\|"revision_requested"), customer_comment, reviewed_at` | `photo_version_id` unique(conflict 대상). 보정본 재업로드 시 관련 행 삭제됨. |
-| `project_logs` | `id, project_id, photographer_id, action, created_at` | 상태 변경 이력. |
+| `project_logs` | `id, project_id, photographer_id, action, created_at` | 상태 변경 이력. `action` CHECK 제약이 8개 상태 전이 전부(`created/uploaded/selecting/confirmed/editing/reviewing_v1/editing_v2/reviewing_v2/delivered`)를 허용(`supabase/migrations/20260726_project_logs_expand_actions.sql`, 2026-07-26 이전엔 5개만 허용됐음). |
+| `feedback` | `id, reporter_type("photographer"\|"customer"), photographer_id, project_id, category("bug"\|"suggestion"), message, page_url, status("new"\|"reviewing"\|"resolved"), created_at` | 베타 운영 피드백(신규, `supabase/migrations/20260726_feedback.sql`). 현재는 작가만 제출(§6.3). RLS 활성화, 정책 없음 — 서버(service role/세션 검증 라우트)만 접근. |
+| `beta_invitations` | `id, email(unique), invited_at, consumed_at, admin_note` | 가입 전 이메일 사전 등록(신규, `20260726_beta_tier_system.sql`). `consumed_at IS NULL`이면 대기 중 — 해당 이메일로 가입하면 `src/app/auth/callback/route.ts`가 자동으로 베타를 부여하고 `consumed_at`을 채운다. |
+| `admin_audit_logs` | `id, photographer_id, actor("admin"\|"system"), action, detail(jsonb), created_at` | 베타 부여/종료/중지/기간변경(관리자 행위) + 프로젝트/업로드 제한 발생(시스템 이벤트) 감사 로그(신규, `20260726_beta_tier_system.sql`). `project_logs`는 `project_id NOT NULL`이라 프로젝트와 무관한 사용자 단위 이벤트를 담을 수 없어 별도 테이블로 분리. |
+| `app_settings` | `id(=1 고정, 싱글턴), general_max_projects, general_max_photos_per_project, beta_max_projects_total, beta_max_photos_per_project, beta_max_revision_count, beta_default_duration_days, updated_at, updated_by` | 관리자 설정(`/admin/settings`)에서 실시간 편집 가능한 이용 한도 값(신규, `20260726_app_settings.sql`). 항상 `id=1` 행 하나만 존재. `ADMIN_EMAILS`는 여기 포함하지 않고 계속 코드 하드코딩 유지(§6.3). RLS 활성화, 정책 없음 — service-role 클라이언트만 접근. |
 | `delivery_files` | `id, project_id, r2_url, original_filename, delivery_filename, file_size, compressed, original_file_size, mime_type, created_at` | `delivered` 상태 프로젝트의 납품 파일. `compressed=true`면 20MB 초과로 자동 압축 발생, `original_file_size`에 압축 전 크기 저장. `mime_type`은 항상 `image/jpeg`(PNG/HEIC/WebP도 변환 후 저장). |
 | `pin_attempts` | `project_token, ip_address, attempted_at` | PIN 시도 rate-limit(1분 내 5회)용. |
 | `photo_groups` | `id, project_id, representative_photo_id, photo_count` | CLIP 유사도 그룹. `src/types/supabase.ts` 생성 타입에는 **없음**(수동 캐스팅으로 접근). 사진 삭제 시 `delete_photo_and_resolve_group` RPC(`supabase/migrations/20260720_delete_photo_group_cleanup.sql`)가 대표컷 재지정/`photo_count` 갱신/그룹 해체를 원자적으로 처리 — `insert_photos_with_numbers`와 동일한 이유(PostgREST 다중 호출의 비원자성 방지)로 RPC화됨. |
@@ -180,7 +184,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `photos.clip_embedding` | (컬럼) | `clip-service/migration.sql`에서 추가. CLIP 임베딩 저장. |
 | `photos.blur_variance` / `is_blurry` / `face_detected` / `eyes_closed` | (컬럼) | `clip-service/migration_002_quality_flags.sql`에서 추가. 흔들림/눈감음 경고 배지용 — §6.4 참고. |
 
-`src/types/supabase.ts` 생성 타입에 등록된 테이블은 8개(`projects, pin_attempts, photos, selections, project_logs, photographers, photo_versions, version_reviews`)뿐이며, `photo_groups`·`deleted_photographers`·`clip_analysis_*`·흔들림/눈감음 품질 컬럼들은 타입 생성 이후 추가된 것으로 보입니다(타입 재생성 여부 `확인 필요`) — FE 코드는 이 컬럼들을 전부 수동 `as {...}` 캐스팅으로 접근합니다(`src/lib/db.ts`, `src/lib/customer-api-server.ts`).
+`src/types/supabase.ts` 생성 타입에 등록된 테이블은 9개(`projects, pin_attempts, photos, selections, project_logs, photographers, feedback, photo_versions, version_reviews`)뿐이며, `photo_groups`·`deleted_photographers`·`clip_analysis_*`·흔들림/눈감음 품질 컬럼들은 타입 생성 이후 추가된 것으로 보입니다(타입 재생성 여부 `확인 필요`) — FE 코드는 이 컬럼들을 전부 수동 `as {...}` 캐스팅으로 접근합니다(`src/lib/db.ts`, `src/lib/customer-api-server.ts`).
 
 ### 5.1 프로젝트 상태 머신
 
@@ -234,11 +238,38 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `/c/[token]/review/[photoId]` | 개별 보정본 승인/재보정 요청 뷰어 |
 | `/c/[token]/delivered` | 납품 완료 화면 |
 
-### 6.3 백엔드(FastAPI)
+### 6.3 관리자(`/admin/**`, `ADMIN_EMAILS`에 등록된 운영자 계정 전용 베타 운영 백오피스)
+
+| 라우트 | 파일 | 설명 |
+|---|---|---|
+| `/admin` | `src/app/admin/page.tsx` | Dashboard — 상태별 프로젝트 분포, 작가 수/이번 주 신규가입, 마감 임박·지연 프로젝트 목록 |
+| `/admin/users` | `src/app/admin/users/page.tsx` | Beta Users — 전체 작가 목록(가입일·프로젝트 수·마지막 활동일·등급 배지), 베타 사전 초대 등록(`AdminBetaInvitations.tsx`) |
+| `/admin/users/[id]` | `src/app/admin/users/[id]/page.tsx` | 작가 상세 — 보유 프로젝트 목록, 베타 상태/기간/메모 관리(`AdminBetaControl.tsx`), 관리 이력(`admin_audit_logs`) |
+| `/admin/projects` | `src/app/admin/projects/page.tsx` | Projects — 전체 작가의 전체 프로젝트 목록(상태/사진·셀렉 수/기한) |
+| `/admin/projects/[id]` | `src/app/admin/projects/[id]/page.tsx` | 프로젝트 상세 — 필드 전체 조회, PIN 재설정/제거(`AdminPinControl.tsx`), 활동 로그 타임라인 |
+| `/admin/feedback` | `src/app/admin/feedback/page.tsx` | Feedback — 작가가 제출한 버그 제보/기능 제안 목록, 상태 변경(`AdminFeedbackStatusControl.tsx`) |
+| `/admin/logs` | `src/app/admin/logs/page.tsx` | Activity Logs — 전체 작가 대상 `project_logs` 조회 |
+| `/admin/settings` | `src/app/admin/settings/page.tsx` + `AdminSettingsForm.tsx` | Settings — 등급별(일반/베타) 이용 한도를 편집 가능한 폼으로 제공(신규, 2026-07-26). `PATCH /api/admin/settings`로 `app_settings` 테이블을 갱신하며, 재배포 없이 즉시 반영된다(§6.3). 관리자 계정(`ADMIN_EMAILS`)은 여전히 읽기 전용 표시(하드코딩 유지). |
+
+- 레이아웃 `src/app/admin/layout.tsx`(서버 컴포넌트)에서 `src/lib/admin-auth.ts`의 `getAdminUser()`로 접근 제어를 수행한다. 비로그인은 `/`로, 로그인했지만 허용 이메일(`ADMIN_EMAILS`, 코드 상수 하드코딩)이 아니면 `/photographer/dashboard`로 리다이렉트한다. 별도의 관리자 회원/역할·권한 테이블은 없다.
+- 셸/사이드바는 `src/components/admin/AdminShell.tsx`, `AdminSidebar.tsx`, 메뉴 배열은 `src/lib/admin-nav.ts`. `/photographer/**`의 접기형 사이드바와 달리 데스크톱 전용 고정폭 사이드바로 단순화했다. `metadata.robots.index = false`로 검색엔진 노출 차단.
+- **조회 전용 화면**(Dashboard/Beta Users/Projects 목록·상세/Activity Logs/Feedback 목록)은 전부 `src/lib/admin-db.ts`의 서버 전용 함수가 `getAdminClient()`(service role, RLS 우회)로 직접 조회한다 — 별도 API 라우트 없음.
+- **개입(쓰기) 동작**만 `/api/admin/**` Route Handler로 분리되어 있고, 각 라우트가 자체적으로 `getAdminUser()`를 다시 호출해 인가를 검증한다(레이아웃의 서버 가드는 페이지 렌더링에만 적용되고 API 라우트에는 자동 적용되지 않으므로): `PATCH /api/admin/projects/[id]/pin`(PIN 재설정/제거), `PATCH /api/admin/feedback/[id]`(피드백 상태 변경), `PATCH /api/admin/users/[id]/beta`(베타 상태/기간/메모 변경 + `admin_audit_logs` 기록), `POST /api/admin/beta-invitations` / `DELETE /api/admin/beta-invitations/[id]`(사전 초대 등록/취소).
+- **작가용 피드백 제출**: `POST /api/feedback`(세션 기반, `src/lib/db.ts`류 패턴과 동일하게 `photographer_id`를 세션에서 조회해 저장). 제출 UI는 `src/components/photographer/FeedbackModal.tsx`(`FeedbackButton`)이며 `Sidebar.tsx` 하단(로그아웃 버튼 위)에 "문의하기"로 노출된다.
+- **`feedback` 테이블**(신규, `supabase/migrations/20260726_feedback.sql`): `reporter_type`(photographer/customer, 현재는 photographer만 사용) · `photographer_id` · `project_id`(nullable) · `category`(bug/suggestion) · `message` · `page_url` · `status`(new/reviewing/resolved). RLS는 활성화되어 있으나 정책이 없어 anon/authenticated 롤의 직접 접근은 차단되고, 모든 접근은 서버(service role 또는 세션 검증된 API 라우트)를 통해서만 이뤄진다.
+- **`project_logs` 액션 커버리지 확장**(`supabase/migrations/20260726_project_logs_expand_actions.sql`): 기존 5개(`created/uploaded/selecting/confirmed/editing`)에 `reviewing_v1/editing_v2/reviewing_v2/delivered` 4개를 추가해 CHECK 제약을 8개 상태 전이 전부로 확장했다. 기록 지점: `reviewing_v1`/`reviewing_v2`는 작가가 `WorkflowPageClient.tsx`에서 고객 검토를 시작할 때(`POST /api/photographer/project-logs`), `editing_v2`/`delivered`는 고객이 `POST /api/c/review-submit`으로 검토 결과를 제출할 때 서버에서 직접 기록한다(둘 다 실패해도 상태 전환 자체는 막지 않음).
+- **베타 등급/이용량 제한 시스템**(2026-07-26, `supabase/migrations/20260726_beta_tier_system.sql`): 등급은 관리자(`ADMIN_EMAILS` 이메일 일치, 무제한) / 베타(`photographers.beta_status='active'` AND 기간 유효) / 일반(그 외 전부) 3단계이며, 사용자별 override 없이 전원 동일한 정책이 적용된다. 프로젝트 10개·사진 2000장(베타), 프로젝트 1개·사진 500장(일반) 등 구체적인 한도 값은 **더 이상 코드 상수가 아니라 `app_settings` DB 테이블(id=1 싱글턴)에서 읽는다** — `/admin/settings`에서 관리자가 값을 바꾸면 재배포 없이 즉시 반영된다(2026-07-26, `20260726_app_settings.sql`). 판정 로직은 FE `src/lib/beta-policy.ts`(순수 함수, DB에서 읽은 `AppSettings`를 인자로 받음) + `src/lib/app-settings.ts`(`getAppSettings()`, DB 조회 실패 시 `src/lib/beta-limits.ts`의 `DEFAULT_*` 상수로 폴백), BE `app/beta_policy.py`(`_get_settings()`가 동일한 `app_settings` 테이블 조회, 실패 시 `DEFAULT_*` 상수 폴백)에 각각 단일 소스로 모아뒀다(런타임이 둘이라 코드 공유 불가 — `ADMIN_EMAILS`는 이번 실시간화 범위에서 제외해 계속 두 언어에 하드코딩 중복). 표시용 화면(대시보드 진행바, 재보정 패널, 업로드 사전 경고)도 신규 공개 `GET /api/limits`로 같은 값을 실시간 조회한다.
+  - **프로젝트 생성**: 기존엔 `src/lib/db.ts`의 `createProject()`가 브라우저에서 Supabase에 직접 INSERT해 서버 검증이 전혀 없었다. 신규 `POST /api/photographer/projects`로 옮기고 여기서 등급별 한도를 검증한 뒤 생성한다(`new/page.tsx`가 이 API를 호출하도록 변경). **모든 등급이 `COUNT(*) FROM projects`(현재 보유 수) 기준으로 판정한다** — 일반 사용자도 프로젝트를 삭제하면 즉시 슬롯이 다시 확보된다(2026-07-26 커밋 `2b2e241`/`818affc`에서 결정됨). 처음 설계 단계에서는 "삭제 후 재생성 우회 방지"를 위해 일반 사용자만 `photographers.total_projects_created`(누적, 삭제해도 감소 안 함)로 판정하도록 만들었으나, 이후 정책이 단순화되어 두 등급 모두 동일하게 현재 보유 수 기준을 쓴다 — `total_projects_created` 컬럼은 남아있지만 더 이상 읽히지 않는다.
+  - **사진 업로드**: `FastAPI POST /api/upload/photos`가 기존 전역 상수 대신 `app/beta_policy.get_max_photos_per_project()`로 요청자의 등급별 한도를 조회해 검증한다.
+  - **가입 전 사전 초대**: `beta_invitations` 테이블에 이메일을 등록해두면, 그 이메일로 가입하는 순간(`src/app/auth/callback/route.ts`) 자동으로 `beta_status='active'`가 부여되고 초대가 소진 처리된다. 이미 가입된 이메일은 초대 등록 자체가 거부된다(관리자가 상세 화면에서 직접 부여해야 함).
+  - **그랜드파더링 없음**: 이 마이그레이션 시점에 이미 가입된 작가도 `beta_status`/`total_projects_created` 모두 컬럼 기본값(`not_invited`/0)에서 시작한다 — 기존 데이터(프로젝트 등)는 전혀 건드리지 않고, "추가 생성"만 새 정책의 적용을 받는다.
+  - 사용자 안내 문구(예: "무료 체험에서는 프로젝트 1개까지 생성할 수 있습니다.")는 `src/lib/beta-limits.ts`의 `parseBetaLimitError()` 계약(`{error:"beta_limit_exceeded", limit_type, current, max, message}`)을 그대로 재사용 — 업로드 페이지가 이미 이 계약으로 서버 메시지를 표시하던 기존 경로를 그대로 탄다.
+
+### 6.4 백엔드(FastAPI)
 
 `/health`, `/health/db`, `/api/projects`, `/api/projects/{id}`, `/api/projects/{id}/r2`(DELETE), `/api/upload/photos`, `/api/upload/profile-image`, `/api/upload/versions`, `/api/storage/delete`, `/api/storage/presign` — 상세는 §7 참고.
 
-### 6.4 CLIP 서비스
+### 6.5 CLIP 서비스
 
 `/health`, `/analyze`, `/analyze/{project_id}/status`, `/match-retouch` — 모두 `X-Internal-Token` 헤더(`CLIP_INTERNAL_TOKEN`)로 보호(단 `/health` 제외).
 
@@ -266,6 +297,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/c/photographer` | GET | 없음 | 토큰으로 작가 공개 프로필 조회 |
 | `api/photographer/profile` | GET/PATCH | 세션 | 작가 프로필 CRUD |
 | `api/photographer/account` | DELETE | 세션 | 계정 삭제(통계 익명화 후 Auth 사용자 삭제) |
+| `api/photographer/projects` | POST | 세션 | 프로젝트 생성 — 등급별 한도(§6.3 베타 등급 시스템) 서버 검증 후 INSERT. 기존 클라이언트 직접 INSERT(`src/lib/db.ts`의 `createProject()`)를 대체 |
 | `api/photographer/projects/[id]` | PATCH/DELETE | 세션+소유권 | 프로젝트 수정(상태 전이 포함)/삭제(+FastAPI R2 정리 호출) |
 | `api/photographer/projects/[id]/status` | PATCH | 세션+소유권 | 상태 전이 전용(제한적) |
 | `api/photographer/projects/[id]/photos` | GET/DELETE | 세션+소유권 | 사진 목록/일괄 삭제(`preparing`만) |
@@ -278,6 +310,15 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/photographer/photos/[photoId]/memo` | PATCH | 세션+소유권 | 작가 메모 저장 |
 | `api/photographer/upload/photos` | POST | 클라이언트 Bearer 전달(자체 검증 없음) | FastAPI 업로드 프록시(CORS 우회용). 보정본용 프록시(`api/photographer/upload-versions`)는 호출하는 곳이 없어 2026-07-13 삭제됨 — 실제 보정본 업로드는 `UploadVersionsPanel.tsx`가 FastAPI를 직접 호출 |
 | `api/projects/[id]` | PATCH | **없음** | 레거시 엔드포인트, §12 위험 항목 참고 |
+| `api/photographer/quota` | GET | 세션 | 로그인한 작가 본인의 등급/사용량/한도 조회(사용자 안내용, `/photographer/projects`·`/projects/new`에서 사용) |
+| `api/limits` | GET | 없음(민감 정보 아님) | 현재 유효한 이용 한도 값(`app_settings` 조회) — 대시보드/재보정 패널/업로드 페이지 등 표시용 화면이 실시간 값 반영에 사용 |
+| `api/feedback` | POST | 세션 | 작가 피드백(버그/제안) 제출 → `feedback` 테이블 insert |
+| `api/admin/projects/[id]/pin` | PATCH | `getAdminUser()` | 관리자용 PIN 재설정/제거(값 검증은 작가용과 동일한 `/^\d{4}$/`) |
+| `api/admin/feedback/[id]` | PATCH | `getAdminUser()` | 관리자용 피드백 상태 변경(new/reviewing/resolved) |
+| `api/admin/users/[id]/beta` | PATCH | `getAdminUser()` | 관리자용 베타 상태/기간/메모 변경. 변경 diff에 따라 `admin_audit_logs`에 `beta_granted`/`beta_ended`/`beta_suspended`/`beta_period_changed` 기록(메모만 변경 시 로그 없음) |
+| `api/admin/beta-invitations` | POST | `getAdminUser()` | 가입 전 이메일 사전 등록(이미 가입된 이메일이면 400) |
+| `api/admin/beta-invitations/[id]` | DELETE | `getAdminUser()` | 대기 중인 사전 초대 취소 |
+| `api/admin/settings` | PATCH | `getAdminUser()` | 이용 한도 6개 값(일반/베타 프로젝트·사진·재보정 한도, 베타 기본 기간) 갱신 — 모두 1 이상 정수 검증, `updated_at`/`updated_by` 기록. 재배포 없이 즉시 반영(§6.3) |
 
 ### 7.2 FastAPI 백엔드 (`photo-selection-be/app`)
 
@@ -285,10 +326,10 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 |---|---|---|---|
 | GET | `/health` | 없음 | 생존 확인 |
 | GET | `/health/db` | 없음 | DB 연결 확인(응답에 `photographers` 샘플 1행 포함 — §12) |
-| GET/POST | `/api/projects` | Supabase JWT | 작가 프로젝트 목록/생성(베타 최대 10개) |
+| GET/POST | `/api/projects` | Supabase JWT | 작가 프로젝트 목록/생성. **POST는 어떤 FE 코드에서도 호출되지 않는 죽은 코드**(실제 생성은 §7.1의 `api/photographer/projects`가 담당) — `name`만 받고 나머지 필수 필드를 채우지 않아 애초에 완전한 생성 흐름도 아니었음 |
 | GET | `/api/projects/{id}` | Supabase JWT+소유권 | 프로젝트 단건 조회 |
 | DELETE | `/api/projects/{id}/r2` | Supabase JWT+소유권 | R2 객체 일괄 삭제 |
-| POST | `/api/upload/photos` | Supabase JWT | 원본 업로드+썸네일/프리뷰 생성+R2 업로드+DB insert(베타 최대 3000장/프로젝트; `include_original=true` 시 500장까지 기본 검증, 1000장 이상 및 3000장은 성능·복구 검증 필요) |
+| POST | `/api/upload/photos` | Supabase JWT | 원본 업로드+썸네일/프리뷰 생성+R2 업로드+DB insert. 프로젝트당 사진 수 한도는 요청자 등급별로 다름(`app/beta_policy.get_max_photos_per_project()`: 관리자 무제한, 베타/일반은 `app_settings` DB 값 조회 — §6.3, 기본값 베타 2000장·일반 500장); `include_original=true` 시 500장까지 기본 검증, 1000장 이상은 성능·복구 검증 필요 |
 | POST | `/api/upload/profile-image` | Supabase JWT | 프로필 이미지 업로드(400px) |
 | POST | `/api/upload/versions` | Supabase JWT | 보정본 업로드(1500px/2MB 상한, 베타 최대 2라운드) |
 | POST | `/api/upload/originals` | Supabase JWT | 납품 파일 업로드(`delivered` 상태 전용). JPEG/PNG/HEIC/WebP 지원, 20MB 상한(초과 시 2단계 자동 압축: 품질 하향 → 해상도 축소, 3200px/85%에서도 초과하면 거부). PNG/HEIC/WebP → JPEG 자동 변환. `delivery_files` 테이블 INSERT. |
@@ -465,8 +506,10 @@ sequenceDiagram
 
 - **작가 데이터 격리**: 거의 모든 작가용 API 라우트가 "세션에서 `auth_id` 추출 → `photographers.id` 조회 → 대상 리소스의 `photographer_id`와 일치 확인" 패턴을 반복 구현합니다(공용 미들웨어/헬퍼로 통합되어 있지 않고 각 라우트 파일에 개별 구현).
 - **`/photographer/**` 페이지 자체는 미들웨어로 보호되지 않습니다.** `src/middleware.ts`의 matcher가 `/c/:token/:path+` 하나뿐이므로, 인증되지 않은 사용자도 페이지 셸은 렌더링될 수 있고, 실제 데이터는 각 API 호출이 401을 반환할 때 비로소 막힙니다(레이아웃 자체의 렌더 타임 인증 체크는 없음).
+- **`/admin/**`는 이와 반대로 레이아웃(서버 컴포넌트) 렌더 타임에 접근 제어됩니다.** `src/app/admin/layout.tsx`가 매 요청마다 `getAdminUser()`(`src/lib/admin-auth.ts`)로 세션 이메일을 확인해, 허용 목록(`ADMIN_EMAILS`)에 없으면 페이지 셸이 렌더링되기 전에 리다이렉트합니다. 미들웨어는 사용하지 않으며(matcher에 `/admin`을 추가하지 않음), 역할/권한 테이블 없이 이메일 하드코딩만으로 판별하는 단일 계정 전용 구조입니다. **레이아웃 가드는 페이지 렌더링에만 적용되고 API 라우트에는 자동 적용되지 않으므로**, `/api/admin/**`(PIN 재설정, 피드백 상태 변경)의 각 Route Handler는 자체적으로 `getAdminUser()`를 다시 호출해 인가를 재검증합니다(§6.3).
 - **레거시 미인증 라우트**: `src/app/api/projects/[id]/route.ts`(PATCH)는 세션/소유권 확인이 전혀 없이 `src/lib/db.ts`의 `updateProject()`를 직접 호출합니다. 같은 기능을 하는 `src/app/api/photographer/projects/[id]/route.ts`는 세션+소유권 검증을 하므로, 이 레거시 경로는 사용되지 않는 것으로 보이나 **엔드포인트 자체는 살아있어 확인 필요**합니다.
 - **FastAPI `/api/storage/delete`는 인증 의존성이 전혀 없습니다.** 요청 가능한 누구나 임의의 R2 키 목록을 삭제 요청할 수 있는 구조입니다(코드상 사실이며, 실제 배포 환경에서 네트워크 격리 등으로 외부 접근이 막혀 있는지는 `확인 필요`).
+- **이용량 등급(관리자/베타/일반) 판정은 요청마다 실시간 계산됩니다.** 배치/크론으로 상태를 미리 갱신해두지 않고, 매 프로젝트 생성·사진 업로드 요청 시점에 `photographers.beta_status`/`beta_end_date`를 조회해 그 순간 유효한지 판정합니다(§6.3). 그래서 베타 기간이 지나거나 관리자가 상태를 바꾸면 다음 요청부터 즉시 반영되고, 별도 만료 처리 로직이 없습니다. 기존 데이터(이미 생성된 프로젝트/사진)는 이 판정과 무관하게 항상 그대로 조회·진행 가능합니다 — 한도 검사는 오직 "새로 생성/업로드하는 시점"에만 개입합니다.
 - **고객 데이터 격리**: 고객은 `access_token` 단위로만 접근하며, 모든 고객 API가 `checkPinAuth` + `validateTokenAndProject`(토큰과 `project_id`가 실제로 같은 행을 가리키는지)를 확인합니다. 다만 `access_token` 자체가 노출되면(예: URL 공유) 그 프로젝트에는 PIN이 없거나 PIN을 아는 사람은 완전히 접근 가능합니다 — 이는 설계상 의도된 동작으로 보입니다.
 - **Postgres RLS**: `AUTH_SETUP.md`가 "RLS 정책이 없으면 INSERT가 실패한다"고 언급하고 있어 RLS가 활성화되어 있을 가능성이 있으나, 정책 원문은 Supabase 대시보드에만 있고 레포지토리 코드에는 없어 **`확인 필요`**입니다. 프론트엔드 일부 클라이언트 읽기(`src/lib/db.ts`의 anon 클라이언트 사용)는 이 RLS에 의존하는 구조로 보입니다.
 

@@ -175,14 +175,32 @@ export interface Database {
           id: string;
           project_id: string;
           photographer_id: string;
-          action: "created" | "uploaded" | "selecting" | "confirmed" | "editing";
+          action:
+            | "created"
+            | "uploaded"
+            | "selecting"
+            | "confirmed"
+            | "editing"
+            | "reviewing_v1"
+            | "editing_v2"
+            | "reviewing_v2"
+            | "delivered";
           created_at: string;
         };
         Insert: {
           id?: string;
           project_id: string;
           photographer_id: string;
-          action: "created" | "uploaded" | "selecting" | "confirmed" | "editing";
+          action:
+            | "created"
+            | "uploaded"
+            | "selecting"
+            | "confirmed"
+            | "editing"
+            | "reviewing_v1"
+            | "editing_v2"
+            | "reviewing_v2"
+            | "delivered";
           created_at?: string;
         };
         Update: {
@@ -204,6 +222,11 @@ export interface Database {
           instagram_url: string | null;
           portfolio_url: string | null;
           created_at: string;
+          beta_status: "not_invited" | "active" | "ended" | "suspended";
+          beta_start_date: string | null;
+          beta_end_date: string | null;
+          admin_note: string | null;
+          total_projects_created: number;
         };
         Insert: {
           id?: string;
@@ -215,6 +238,11 @@ export interface Database {
           instagram_url?: string | null;
           portfolio_url?: string | null;
           created_at?: string;
+          beta_status?: "not_invited" | "active" | "ended" | "suspended";
+          beta_start_date?: string | null;
+          beta_end_date?: string | null;
+          admin_note?: string | null;
+          total_projects_created?: number;
         };
         Update: {
           id?: string;
@@ -225,6 +253,148 @@ export interface Database {
           bio?: string | null;
           instagram_url?: string | null;
           portfolio_url?: string | null;
+          created_at?: string;
+          beta_status?: "not_invited" | "active" | "ended" | "suspended";
+          beta_start_date?: string | null;
+          beta_end_date?: string | null;
+          admin_note?: string | null;
+          total_projects_created?: number;
+        };
+      };
+      beta_invitations: {
+        Row: {
+          id: string;
+          email: string;
+          invited_at: string;
+          consumed_at: string | null;
+          admin_note: string | null;
+        };
+        Insert: {
+          id?: string;
+          email: string;
+          invited_at?: string;
+          consumed_at?: string | null;
+          admin_note?: string | null;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          invited_at?: string;
+          consumed_at?: string | null;
+          admin_note?: string | null;
+        };
+      };
+      admin_audit_logs: {
+        Row: {
+          id: string;
+          photographer_id: string;
+          actor: "admin" | "system";
+          action:
+            | "beta_granted"
+            | "beta_ended"
+            | "beta_suspended"
+            | "beta_period_changed"
+            | "project_limit_hit"
+            | "photo_limit_hit";
+          detail: Record<string, unknown> | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          photographer_id: string;
+          actor: "admin" | "system";
+          action:
+            | "beta_granted"
+            | "beta_ended"
+            | "beta_suspended"
+            | "beta_period_changed"
+            | "project_limit_hit"
+            | "photo_limit_hit";
+          detail?: Record<string, unknown> | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          photographer_id?: string;
+          actor?: "admin" | "system";
+          action?:
+            | "beta_granted"
+            | "beta_ended"
+            | "beta_suspended"
+            | "beta_period_changed"
+            | "project_limit_hit"
+            | "photo_limit_hit";
+          detail?: Record<string, unknown> | null;
+          created_at?: string;
+        };
+      };
+      app_settings: {
+        Row: {
+          id: number;
+          general_max_projects: number;
+          general_max_photos_per_project: number;
+          beta_max_projects_total: number;
+          beta_max_photos_per_project: number;
+          beta_max_revision_count: number;
+          beta_default_duration_days: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          id?: number;
+          general_max_projects?: number;
+          general_max_photos_per_project?: number;
+          beta_max_projects_total?: number;
+          beta_max_photos_per_project?: number;
+          beta_max_revision_count?: number;
+          beta_default_duration_days?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          id?: number;
+          general_max_projects?: number;
+          general_max_photos_per_project?: number;
+          beta_max_projects_total?: number;
+          beta_max_photos_per_project?: number;
+          beta_max_revision_count?: number;
+          beta_default_duration_days?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+      };
+      feedback: {
+        Row: {
+          id: string;
+          reporter_type: "photographer" | "customer";
+          photographer_id: string | null;
+          project_id: string | null;
+          category: "bug" | "suggestion";
+          message: string;
+          page_url: string | null;
+          status: "new" | "reviewing" | "resolved";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          reporter_type: "photographer" | "customer";
+          photographer_id?: string | null;
+          project_id?: string | null;
+          category: "bug" | "suggestion";
+          message: string;
+          page_url?: string | null;
+          status?: "new" | "reviewing" | "resolved";
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          reporter_type?: "photographer" | "customer";
+          photographer_id?: string | null;
+          project_id?: string | null;
+          category?: "bug" | "suggestion";
+          message?: string;
+          page_url?: string | null;
+          status?: "new" | "reviewing" | "resolved";
           created_at?: string;
         };
       };

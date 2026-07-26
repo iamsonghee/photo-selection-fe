@@ -2,7 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 
-const ACTIONS = ["created", "uploaded", "selecting", "confirmed", "editing"] as const;
+const ACTIONS = [
+  "created",
+  "uploaded",
+  "selecting",
+  "confirmed",
+  "editing",
+  "reviewing_v1",
+  "editing_v2",
+  "reviewing_v2",
+  "delivered",
+] as const;
 
 export type ProjectLogAction = (typeof ACTIONS)[number];
 

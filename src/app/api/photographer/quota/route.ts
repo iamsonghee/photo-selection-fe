@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { getPolicyForPhotographer, type BetaStatus } from "@/lib/beta-policy";
+import { getAppSettings } from "@/lib/app-settings";
 
 /** GET: 로그인한 작가 본인의 현재 등급/사용량/한도 */
 export async function GET() {
@@ -26,12 +27,16 @@ export async function GET() {
       return NextResponse.json({ error: "Photographer not found" }, { status: 404 });
     }
 
+    const settings = await getAppSettings();
     const betaStatus = data.beta_status as BetaStatus;
-    const policy = getPolicyForPhotographer({
-      email: data.email,
-      betaStatus,
-      betaEndDate: data.beta_end_date,
-    });
+    const policy = getPolicyForPhotographer(
+      {
+        email: data.email,
+        betaStatus,
+        betaEndDate: data.beta_end_date,
+      },
+      settings
+    );
 
     let current: number;
     if (policy.tier === "admin") {
@@ -48,6 +53,8 @@ export async function GET() {
       tier: policy.tier,
       current,
       max: policy.maxProjects,
+      maxPhotosPerProject: policy.maxPhotosPerProject,
+      maxRevisionCount: policy.maxRevisionCount,
       betaStatus,
       betaEndDate: data.beta_end_date,
     });

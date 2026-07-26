@@ -62,6 +62,10 @@ function logActionLabel(action: string): string {
     case "selecting":    return "셀렉 단계로 전환되었습니다";
     case "confirmed":    return "고객 셀렉이 확정되었습니다";
     case "editing":      return "보정 단계가 시작되었습니다";
+    case "reviewing_v1": return "고객에게 v1 검토가 요청되었습니다";
+    case "editing_v2":   return "v2 재보정이 시작되었습니다";
+    case "reviewing_v2": return "고객에게 v2 검토가 요청되었습니다";
+    case "delivered":    return "최종 납품이 완료되었습니다";
     default:             return `이벤트: ${action}`;
   }
 }

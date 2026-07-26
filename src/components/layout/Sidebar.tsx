@@ -6,6 +6,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PHOTOGRAPHER_NAV_ITEMS } from "@/lib/photographer-nav";
+import { FeedbackButton } from "@/components/photographer/FeedbackModal";
 import { useProfile } from "@/contexts/ProfileContext";
 import { getProfileImageUrl } from "@/lib/photographer";
 import styles from "@/components/layout/Sidebar.module.css";
@@ -212,6 +213,11 @@ export function Sidebar({
       </nav>
 
       <div className={styles.sidebarFooter}>
+        <FeedbackButton
+          triggerClassName={[styles.navItem, collapsed ? styles.navItemCollapsed : ""].filter(Boolean).join(" ")}
+          iconClassName={[styles.navIcon, collapsed ? styles.navIconCollapsed : ""].filter(Boolean).join(" ")}
+          textClassName={[styles.navText, collapsed ? styles.navTextCollapsed : ""].filter(Boolean).join(" ")}
+        />
         <button
           type="button"
           className={[

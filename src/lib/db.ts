@@ -9,7 +9,7 @@ type PhotoVersionRow = Database["public"]["Tables"]["photo_versions"]["Row"];
 type VersionReviewRow = Database["public"]["Tables"]["version_reviews"]["Row"];
 
 /** DB projects row → app Project */
-function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Project {
+export function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row"]): Project {
   const ext = row as Database["public"]["Tables"]["projects"]["Row"] & {
     shoot_type?: string | null;
     customer_phone?: string | null;
@@ -93,7 +93,16 @@ export async function getPhotographerIdByAuthId(authId: string): Promise<string 
   return data?.id ?? null;
 }
 
-export type ProjectLogAction = "created" | "uploaded" | "selecting" | "confirmed" | "editing";
+export type ProjectLogAction =
+  | "created"
+  | "uploaded"
+  | "selecting"
+  | "confirmed"
+  | "editing"
+  | "reviewing_v1"
+  | "editing_v2"
+  | "reviewing_v2"
+  | "delivered";
 
 export interface ProjectLogItem {
   id: string;

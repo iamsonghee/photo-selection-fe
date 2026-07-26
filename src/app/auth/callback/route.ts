@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { NextResponse } from "next/server";
+import { getAppSettings } from "@/lib/app-settings";
 
 /**
  * OAuth 콜백 Route Handler
@@ -34,11 +35,54 @@ export async function GET(request: Request) {
         .limit(1)
         .single();
       if (!existing) {
-        await admin.from("photographers").insert({
-          id: crypto.randomUUID(),
-          auth_id: user.id,
-          email: user.email ?? null,
-        });
+        const newId = crypto.randomUUID();
+        const email = user.email ?? null;
+
+        // 가입 전 사전 등록된 초대 이메일이면 자동으로 베타 부여
+        let invitation: { id: string } | null = null;
+        if (email) {
+          const { data: inv } = await admin
+            .from("beta_invitations")
+            .select("id")
+            .eq("email", email.toLowerCase())
+            .is("consumed_at", null)
+            .limit(1)
+            .maybeSingle();
+          invitation = inv ?? null;
+        }
+
+        if (invitation) {
+          const settings = await getAppSettings();
+          const today = new Date();
+          const endDate = new Date(today);
+          endDate.setDate(endDate.getDate() + settings.betaDefaultDurationDays);
+          const toIsoDate = (d: Date) => d.toISOString().slice(0, 10);
+
+          await admin.from("photographers").insert({
+            id: newId,
+            auth_id: user.id,
+            email,
+            beta_status: "active",
+            beta_start_date: toIsoDate(today),
+            beta_end_date: toIsoDate(endDate),
+          });
+          await admin
+            .from("beta_invitations")
+            .update({ consumed_at: new Date().toISOString() })
+            .eq("id", invitation.id);
+          await admin.from("admin_audit_logs").insert({
+            photographer_id: newId,
+            actor: "system",
+            action: "beta_granted",
+            detail: { via: "invitation", email },
+          });
+        } else {
+          await admin.from("photographers").insert({
+            id: newId,
+            auth_id: user.id,
+            email,
+          });
+        }
       }
     } catch (e) {
       // photographer 행 생성 실패 시에도 로그인 리다이렉트는 계속 진행

@@ -31,7 +31,7 @@ import { PrevNextButton } from "@/components/PrevNextButton";
 import { getProjectById, getPhotosByProjectId } from "@/lib/db";
 import { getStatusLabel } from "@/lib/project-status";
 import { createClient } from "@/lib/supabase/client";
-import { parseBetaLimitError, BETA_MAX_PHOTOS_PER_PROJECT } from "@/lib/beta-limits";
+import { parseBetaLimitError, DEFAULT_BETA_MAX_PHOTOS_PER_PROJECT } from "@/lib/beta-limits";
 import { compressImageForUpload } from "@/lib/upload-client-compress";
 import { createThumbLoadQueue, useQueuedThumbSrc, type ThumbLoadQueue } from "@/lib/thumb-load-queue";
 import type { Project, ProjectStatus, Photo, PhotoGroupInfo } from "@/types";
@@ -975,6 +975,16 @@ export default function ProjectDetailPage() {
   const [copied, setCopied] = useState(false);
   // 그리드/리스트 뷰는 동시에 하나만 마운트되므로 큐 하나를 공유해도 무방하다.
   const [thumbQueue] = useState(() => createThumbLoadQueue(12));
+  const [betaMaxPhotosPerProject, setBetaMaxPhotosPerProject] = useState(DEFAULT_BETA_MAX_PHOTOS_PER_PROJECT);
+
+  useEffect(() => {
+    fetch("/api/limits")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.betaMaxPhotosPerProject) setBetaMaxPhotosPerProject(data.betaMaxPhotosPerProject);
+      })
+      .catch(() => {});
+  }, []);
 
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinInput, setPinInput] = useState("");
@@ -1714,9 +1724,9 @@ export default function ProjectDetailPage() {
     list = list.filter((f) => !isRawFile(f));
     if (rawCount > 0) setUploadError(`RAW 파일은 지원하지 않습니다 (${rawCount}개 제외). JPEG/PNG/WebP/HEIC로 내보내기 후 업로드해주세요.`);
     if (!list.length) return;
-    const remaining = Math.max(0, BETA_MAX_PHOTOS_PER_PROJECT - photos.length);
+    const remaining = Math.max(0, betaMaxPhotosPerProject - photos.length);
     if (list.length > remaining) {
-      setUploadError(`최대 ${BETA_MAX_PHOTOS_PER_PROJECT}장까지 업로드 가능합니다. ${list.length - remaining}장이 제외됩니다.`);
+      setUploadError(`최대 ${betaMaxPhotosPerProject}장까지 업로드 가능합니다. ${list.length - remaining}장이 제외됩니다.`);
       list = list.slice(0, remaining);
       if (!list.length) return;
     } else if (isPhoneLikeClient() && list.length >= 100) {
@@ -1740,9 +1750,9 @@ export default function ProjectDetailPage() {
       pendingDropFilesRef.current = list;
       return;
     }
-    const remaining = Math.max(0, BETA_MAX_PHOTOS_PER_PROJECT - photos.length);
+    const remaining = Math.max(0, betaMaxPhotosPerProject - photos.length);
     if (list.length > remaining) {
-      setUploadError(`최대 ${BETA_MAX_PHOTOS_PER_PROJECT}장까지 업로드 가능합니다. ${list.length - remaining}장이 제외됩니다.`);
+      setUploadError(`최대 ${betaMaxPhotosPerProject}장까지 업로드 가능합니다. ${list.length - remaining}장이 제외됩니다.`);
       list = list.slice(0, remaining);
       if (!list.length) return;
     } else if (isPhoneLikeClient() && list.length >= 100) {

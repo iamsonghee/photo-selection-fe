@@ -42,6 +42,14 @@ export async function POST(req: NextRequest) {
           { status: 500 }
         );
       }
+      // 로그 기록(실패해도 상태 전환 자체는 이미 완료됐으므로 무시)
+      await admin
+        .from("project_logs")
+        .insert({ project_id: project.id, photographer_id: project.photographerId, action: newStatus })
+        .then(
+          () => {},
+          () => {}
+        );
       return NextResponse.json({ ok: true, status: newStatus });
     }
 

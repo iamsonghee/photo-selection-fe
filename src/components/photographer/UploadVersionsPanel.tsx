@@ -22,7 +22,7 @@ import {
   type MappingType,
 } from "@/lib/version-mapping";
 import { applyClipMatches, matchRetouchByClip } from "@/lib/retouch-clip-match";
-import { BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
+import { DEFAULT_BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
 import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
 import { compressImageForUpload } from "@/lib/upload-client-compress";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
@@ -96,6 +96,16 @@ export default function UploadVersionsPanel({
   const [totalBytes, setTotalBytes] = useState(0);
   const [serverProcessing, setServerProcessing] = useState(false);
   const [clipMatching, setClipMatching] = useState(false);
+  const [betaMaxRevisionCount, setBetaMaxRevisionCount] = useState(DEFAULT_BETA_MAX_REVISION_COUNT);
+
+  useEffect(() => {
+    fetch("/api/limits")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.betaMaxRevisionCount) setBetaMaxRevisionCount(data.betaMaxRevisionCount);
+      })
+      .catch(() => {});
+  }, []);
 
   // submitting이 false가 되면 진행률 초기화
   useEffect(() => {
@@ -232,7 +242,7 @@ export default function UploadVersionsPanel({
 
   // BE(upload.py)와 동일: 이미 존재하는 단계(v1/v2)의 교체 업로드는 허용한다.
   // existingVersionCount 가 2(V1+V2)인 것만으로 차단하면, V2 매핑 수정을 위해 패널을 다시 열 때도 막힌다.
-  const overBetaLimit = version > BETA_MAX_REVISION_COUNT;
+  const overBetaLimit = version > betaMaxRevisionCount;
 
   const canDeliver = useMemo(() => {
     if (overBetaLimit) return false;
@@ -516,10 +526,10 @@ export default function UploadVersionsPanel({
             <div className="rounded-2xl bg-rose-500/5 border border-rose-500/30 px-5 py-5 mb-5 flex flex-col items-center gap-2 text-center">
               <AlertCircle size={20} className="text-rose-400" />
               <div className="text-sm text-rose-300 font-semibold">
-                베타 기간 최대 보정 횟수({BETA_MAX_REVISION_COUNT}회)에 도달했습니다.
+                베타 기간 최대 보정 횟수({betaMaxRevisionCount}회)에 도달했습니다.
               </div>
               <div className="text-[11px] text-subtle-foreground">
-                현재 {existingVersionCount} / {BETA_MAX_REVISION_COUNT}회 사용 중
+                현재 {existingVersionCount} / {betaMaxRevisionCount}회 사용 중
               </div>
             </div>
           ) : targets.length === 0 ? (
