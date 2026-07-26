@@ -228,13 +228,13 @@
 ## 2. 프로젝트 생성
 
 - **시작 조건**: 로그인 완료, `/photographer/projects` 목록 화면.
-- **사용자가 수행하는 단계**: "새 프로젝트" 진입 → 프로젝트명, 고객명, 촬영일, 셀렉 기한, 필요 선택 장수(N), 촬영 종류, 고객 연락처(선택), PIN(선택), 재보정 허용 횟수 입력 → 생성.
+- **사용자가 수행하는 단계**: "새 프로젝트" 진입 → 등급별 한도를 이미 다 썼으면 입력 폼 대신 안내 화면이 즉시 뜬다(§9-1 참고, 사전에 `GET /api/photographer/quota`로 확인). 아니면 프로젝트명, 고객명, 촬영일, 셀렉 기한, 필요 선택 장수(N), 촬영 종류, 고객 연락처(선택), PIN(선택), 재보정 허용 횟수 입력 → 생성.
 - **프론트엔드 라우트**: `/photographer/projects/new`.
-- **호출되는 API**: `확인 필요` — 조사 과정에서 이 폼이 최종적으로 POST하는 정확한 엔드포인트(예: `/api/photographer/projects` 존재 여부, 또는 FastAPI `/api/projects` 직접 호출 여부)를 명시적으로 확인하지 못했습니다. 폼 상태에 `access_pin`, `max_revision_count` 등이 포함되는 것은 확인했습니다(`src/app/photographer/projects/new/page.tsx`).
-- **성공 시 기대 결과**: `status: "preparing"`인 새 프로젝트 생성, `access_token`은 서버(DB 트리거 또는 API)가 발급 — 발급 주체는 **확인 필요**.
-- **실패 및 경계 상황**: 필수 필드(셀렉 기한 등) 누락 시 클라이언트 유효성 검사 에러 표시. 베타 한도(계정당 최대 10개 프로젝트)는 FastAPI `POST /api/projects`(`BETA_MAX_PROJECTS_TOTAL=10`)에서 강제되는 것으로 확인되나, 이 생성 폼이 실제로 FastAPI를 호출하는지 Next API를 호출하는지는 위와 같이 **확인 필요**.
-- **관련 권한/인증 조건**: 로그인 세션 필요.
-- **QA에서 확인해야 할 항목**: 11번째 프로젝트 생성 시도 시 정확한 에러 문구, PIN을 생성 시점에 설정하지 않고 나중에 추가하는 경로(§5)와의 동작 일치 여부.
+- **호출되는 API**: `POST /api/photographer/projects`(2026-07-26부터 — 이전에는 `src/lib/db.ts`의 `createProject()`가 브라우저에서 Supabase에 직접 INSERT했으나, 서버 검증이 전혀 없어 등급별 한도를 강제할 수 없었기 때문에 이 API로 옮김). `access_pin`, `max_revision_count` 등 폼 상태 전체를 그대로 body로 전송(`src/app/photographer/projects/new/page.tsx`).
+- **성공 시 기대 결과**: `status: "preparing"`인 새 프로젝트 생성, `access_token`은 이 API가 `crypto.randomUUID()`로 발급. 성공 시 `photographers.total_projects_created`를 +1하고 `project_logs`에 `created` 액션을 함께 기록(이전에는 클라이언트가 생성 직후 별도로 `project-logs` API를 한 번 더 호출했으나 이 API로 통합됨). 생성 직후 `/photographer/projects/[id]/upload`로 바로 이동한다(이전에는 `/photographer/projects/[id]`로 이동 후 업로드 화면에 별도 진입했으나, 불필요한 중간 단계를 제거하여 바로 업로드로 이어지도록 변경).
+- **실패 및 경계 상황**: 필수 필드(셀렉 기한 등) 누락 시 클라이언트 유효성 검사 에러 표시. 등급별 한도 초과 시 403 + `{error:"beta_limit_exceeded", limit_type, current, max, message}`(§9-1) — 관리자는 무제한, 베타는 현재 보유 10개, 일반(Trial)은 누적 생성 1개까지.
+- **관련 권한/인증 조건**: 로그인 세션 필요. 한도 검증은 세션에서 조회한 `photographer_id` 기준으로만 이뤄지며 클라이언트가 보낸 값은 신뢰하지 않는다.
+- **QA에서 확인해야 할 항목**: 일반 사용자가 한도(1개) 도달 후 그 프로젝트를 삭제하고 다시 생성해도 여전히 차단되는지(누적 카운터 기준이라 삭제로 우회 안 됨 — §9-1), PIN을 생성 시점에 설정하지 않고 나중에 추가하는 경로(§5)와의 동작 일치 여부.
 
 ---
 
@@ -352,6 +352,64 @@
 - **실패 및 경계 상황**: 허용되지 않는 전이(예: `preparing → confirmed` 건너뛰기) 요청 시 400. 고객이 확정을 취소(`confirmed → selecting`, 최대 3회)한 직후 작가가 이미 "보정 시작"을 누르려던 경우의 경쟁 조건은 **확인 필요**(둘 다 서버에서 상태를 재확인하므로 이론상 안전하나 UX 상 혼란 가능).
 - **관련 권한/인증 조건**: 로그인 세션 + 소유권. `/api/photographer/projects/{id}/status`가 `/api/photographer/projects/{id}`(PATCH)와 별도로 존재하는 이유(권한 범위 차이 등)는 **확인 필요**.
 - **QA에서 확인해야 할 항목**: 두 브라우저 탭(작가/고객)을 동시에 열어 상태를 양쪽에서 바꾸는 경쟁 조건, `project_logs` 액션 목록(`created`/`uploaded`/`selecting`/`confirmed`/`editing`)이 실제 모든 전이를 빠짐없이 기록하는지(`reviewing_v1` 이후 전이는 로그 액션 화이트리스트에 없어 기록되지 않을 가능성 — `src/app/api/photographer/project-logs/route.ts` 확인 필요).
+
+---
+
+## 9-1. 이용량 등급 및 한도(2026-07-26 추가)
+
+- **시작 조건**: 프로젝트 생성(§2) 또는 사진 업로드(§4) 시도.
+- **등급 3단계**: 관리자(`ADMIN_EMAILS`, 무제한) / 베타(관리자가 부여, 프로젝트 10개·사진 2000장/프로젝트) / 일반(Trial, 그 외 전부 — 누적 프로젝트 1개·사진 30장/프로젝트). 판정은 매 요청마다 실시간(`photographers.beta_status`+`beta_end_date`)으로 이뤄지고, 별도 만료 배치는 없다.
+- **일반(Trial) 사용자의 프로젝트 한도는 "누적 생성 수" 기준**이다(현재 보유 수가 아님) — `photographers.total_projects_created`가 프로젝트 생성마다 +1 되고 삭제해도 줄지 않는다. 즉 1개 만들고 지운 뒤 다시 만들려 해도 차단된다(우회 방지). 베타 사용자는 반대로 "현재 보유 수" 기준이라 테스트 중 삭제·재생성이 자유롭다.
+- **호출되는 API**: `GET /api/photographer/quota`(사전 확인/사용량 표시용), `POST /api/photographer/projects`·`POST /api/upload/photos`(실제 강제 지점).
+- **성공 시 기대 결과**: 한도 내면 정상 생성/업로드. `/photographer/projects` 목록 헤더와 `/photographer/projects/new` 진입 시 "N/M" 형태로 현재 사용량이 표시된다(가능한 경우).
+- **실패 및 경계 상황**:
+  - 일반 사용자가 1개 한도 도달 → "무료 체험에서는 프로젝트 1개까지 생성할 수 있습니다."
+  - 베타였다가 관리자가 종료/중지 처리 → "베타 이용 기간이 종료되었습니다." 이 시점 이후로는 일반 한도(`total_projects_created` 기준)가 적용되며, 베타 기간에 만든 프로젝트들도 이미 누적에 포함돼 있어 보통 즉시 다시 막힌다.
+  - **기존 프로젝트/사진은 한도와 무관하게 항상 그대로 조회·진행 가능** — 한도는 오직 "새로 생성/업로드"할 때만 개입한다. 베타 종료 후에도 이미 만든 프로젝트가 사라지거나 잠기지 않는다.
+  - 이 기능이 배포된 시점에 이미 가입해 있던 작가도 그랜드파더링 없이 `beta_status='not_invited'`(일반)로 시작한다 — 필요하면 관리자가 개별적으로 베타를 부여해야 한다.
+- **관련 권한/인증 조건**: 로그인 세션. 등급 판정에 이메일(관리자 여부)과 `photographers` 행의 베타 컬럼을 사용.
+- **QA에서 확인해야 할 항목**: 위 "삭제 후 재생성 우회 안 됨" 시나리오, 베타 부여/회수 직후 한도가 즉시 반영되는지, 관리자 계정으로는 어떤 한도에도 걸리지 않는지.
+
+---
+
+## 10. 관리자(운영자) 백오피스 접근
+
+- **시작 조건**: 베타 운영을 위한 내부 전용 화면(`/admin`). 2026-07-26 2단계에서 Dashboard/Beta Users/Projects/Feedback/Activity Logs/Settings 6개 메뉴가 구현됨(P0 범위, 조회 위주 + PIN 재설정/피드백 상태 변경 개입 기능).
+- **사용자가 수행하는 단계**: 운영자 본인 계정(`realsong88@gmail.com`)으로 로그인한 상태에서 주소창에 직접 `/admin` 입력(사이드바/메뉴 등에 별도 진입 링크는 아직 없음) → 좌측 사이드바로 메뉴 간 이동.
+- **프론트엔드 라우트**: `/admin`(Dashboard), `/admin/users`(+`/[id]`), `/admin/projects`(+`/[id]`), `/admin/feedback`, `/admin/logs`, `/admin/settings`. 상세는 `docs/architecture.md` §6.3.
+- **호출되는 API**: 조회 화면은 서버 컴포넌트가 직접 DB를 조회(API 없음). 개입 동작만 API 호출: PIN 재설정/제거는 `PATCH /api/admin/projects/[id]/pin`, 피드백 상태 변경은 `PATCH /api/admin/feedback/[id]`.
+- **성공 시 기대 결과**: 각 메뉴가 실제 베타 운영 데이터(작가/프로젝트/활동 로그/피드백)를 표시. Projects 상세에서 PIN을 재설정·제거하면 즉시 반영(`router.refresh()`). Feedback 목록에서 상태를 드롭다운으로 변경하면 즉시 반영.
+- **실패 및 경계 상황**:
+  - 비로그인 상태로 `/admin` 접근 → `/`(랜딩)로 리다이렉트.
+  - 로그인은 되어 있으나 허용 이메일이 아닌 계정(다른 작가 등) → `/photographer/dashboard`로 리다이렉트. 별도의 "접근 권한 없음" 안내 문구는 표시하지 않음(조용한 리다이렉트로 결정됨).
+  - PIN 재설정 시 4자리 숫자가 아니면 `PATCH /api/admin/projects/[id]/pin`이 400을 반환하고 입력값은 저장되지 않음.
+- **관련 권한/인증 조건**: 기존 로그인 시스템 재사용, 별도 관리자 회원가입/역할 테이블 없음. 허용 이메일은 `src/lib/admin-auth.ts`의 `ADMIN_EMAILS` 상수 하드코딩(현재 1개 계정만). `/api/admin/**` 라우트는 각자 `getAdminUser()`를 재검증(레이아웃 가드가 API에는 자동 적용되지 않음).
+- **QA에서 확인해야 할 항목**: 로그아웃 상태/타 계정 상태에서 `/admin` 직접 접근 시 리다이렉트, PIN 재설정 후 실제 고객 로그인 화면(`/c/[token]/pin`)에서 새 PIN이 정상 동작하는지, Activity Logs에서 `reviewing_v1/editing_v2/reviewing_v2/delivered` 전이가 실제로 기록되는지(마이그레이션 적용 이후에만 정상 동작 — §11 참고).
+
+---
+
+## 10-1. 베타 사용자 관리(2026-07-26 추가)
+
+- **시작 조건**: `/admin/users`(목록) 또는 `/admin/users/[id]`(상세) 화면.
+- **사용자가 수행하는 단계 — 이미 가입한 작가에게 부여**: 상세 화면의 "베타 관리" 폼에서 베타 상태(미참여/참여중/종료/중지) 드롭다운 + 시작일/종료일 + 관리자 메모 입력 → 저장.
+- **사용자가 수행하는 단계 — 가입 전 이메일 사전 등록**: 목록 화면 상단 "베타 사전 초대" 섹션에 이메일 입력 → 등록. 그 이메일로 실제 가입하면(§Part 2-1 로그인/가입) 자동으로 베타가 부여되고 목록에서 사라진다(소진 처리).
+- **프론트엔드 라우트/컴포넌트**: `src/components/admin/AdminBetaControl.tsx`(상태/기간/메모), `AdminBetaInvitations.tsx`(사전 초대).
+- **호출되는 API**: `PATCH /api/admin/users/[id]/beta`, `POST /api/admin/beta-invitations`, `DELETE /api/admin/beta-invitations/[id]`.
+- **성공 시 기대 결과**: 저장 즉시 반영(`router.refresh()`). 상태 변경 내용에 따라 "관리 이력"(작가 상세 화면 하단)에 `admin_audit_logs` 항목이 남는다 — 메모만 바꾼 경우는 이력에 남지 않는다.
+- **실패 및 경계 상황**: 이미 가입된 이메일을 사전 초대로 등록하려 하면 "이미 가입된 사용자입니다. 사용자 상세에서 직접 베타를 부여해주세요" 오류로 거부되고, 상세 화면에서 수동으로 부여해야 한다.
+- **관련 권한/인증 조건**: `getAdminUser()` — 관리자 전용.
+- **QA에서 확인해야 할 항목**: 베타 부여 직후 해당 작가 계정으로 프로젝트를 추가 생성할 수 있는지(§9-1), 종료/중지 처리 후 다시 막히는지, 사전 초대 등록 → 그 이메일로 신규 가입 → 자동 베타 부여까지 이어지는지.
+
+## 11. 작가 피드백(버그 제보·기능 제안) 제출
+
+- **시작 조건**: 로그인한 작가가 `/photographer/**` 어느 화면에서든 사이드바 하단 "문의하기" 클릭.
+- **사용자가 수행하는 단계**: 모달에서 유형(버그/제안) 선택 → 내용 입력 → "보내기".
+- **프론트엔드 컴포넌트**: `src/components/photographer/FeedbackModal.tsx`(`FeedbackButton`), `Sidebar.tsx` 하단(로그아웃 버튼 위)에 배치.
+- **호출되는 API**: `POST /api/feedback` — 세션에서 `photographer_id` 조회 후 `feedback` 테이블에 `category`, `message`, 제출 당시 `page_url`(현재 경로)을 저장. 현재 경로가 `/photographer/projects/[id]/**`(허브/업로드/워크플로우/결과) 형태면 경로에서 프로젝트 id를 추출해 `project_id`도 함께 저장 — 관리자 Feedback 목록에 프로젝트명이 함께 표시됨(`/photographer/projects`, `/photographer/projects/new` 등 프로젝트 스코프가 아닌 화면은 `project_id`가 비워짐).
+- **성공 시 기대 결과**: "전달되었습니다" 안내 후 모달 닫힘. 관리자는 `/admin/feedback`에서 즉시 확인 가능(작가 이름, 프로젝트명(있는 경우), 페이지 경로, 원문 표시).
+- **실패 및 경계 상황**: 내용이 비어 있으면 클라이언트에서 제출을 막음. 서버 저장 실패 시 "전송에 실패했습니다" 표시, 재시도 가능(입력값 유지).
+- **관련 권한/인증 조건**: 로그인 세션 필요(비로그인 작가 화면은 어차피 대부분 접근 불가). 고객(`/c/[token]/**`)용 제보 버튼은 이번 범위에 포함되지 않음(스팸/어뷰징 처리 필요 — 후속 단계 결정 사항).
+- **QA에서 확인해야 할 항목**: 여러 프로젝트를 오가며 제출한 피드백의 `page_url`이 실제 제출 시점 경로와 일치하는지, 관리자 화면에서 상태(신규→확인중→해결됨) 변경이 즉시 반영되는지.
 
 ---
 

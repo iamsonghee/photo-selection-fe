@@ -13,9 +13,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Lock, RefreshCw, AlertCircle, AlertTriangle, ChevronRight } from "lucide-react";
 import { addDays, format } from "date-fns";
-import { createProject, getProjectsByPhotographerId } from "@/lib/db";
 import { useProfile } from "@/contexts/ProfileContext";
-import { BETA_MAX_PROJECTS_TOTAL } from "@/lib/beta-limits";
+import { parseBetaLimitError } from "@/lib/beta-limits";
 import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 
@@ -112,21 +111,34 @@ export default function NewProjectPage() {
   const [submitting,    setSubmitting]    = useState(false);
   const [error,         setError]         = useState<string | null>(null);
   const [fieldErrors,   setFieldErrors]   = useState<Record<string, string>>({});
-  const [projectCount,  setProjectCount]  = useState<number | null>(null);
+  const [quota, setQuota] = useState<{
+    tier: "admin" | "beta" | "general";
+    current: number;
+    max: number | null;
+    betaStatus: "not_invited" | "active" | "ended" | "suspended";
+  } | null>(null);
+  const [quotaError, setQuotaError] = useState(false);
+  const [quotaRetryTick, setQuotaRetryTick] = useState(0);
 
   useEffect(() => {
     if (!profile?.id) return;
     let cancelled = false;
+    setQuotaError(false);
     (async () => {
       try {
-        const projects = await getProjectsByPhotographerId(profile.id);
-        if (!cancelled) setProjectCount(projects.length);
+        const res = await fetch("/api/photographer/quota");
+        const data = await res.json();
+        if (cancelled) return;
+        if (res.ok) setQuota(data);
+        else setQuotaError(true);
       } catch {
-        if (!cancelled) setProjectCount(0);
+        // 조회 실패 시 "무제한"으로 잘못 간주하지 않는다 — 서버가 최종 검증하긴 하지만,
+        // 이미 한도를 다 쓴 사용자가 폼을 전부 채운 뒤에야 막히는 걸 방지하기 위해 명시적 에러 상태로 남긴다.
+        if (!cancelled) setQuotaError(true);
       }
     })();
     return () => { cancelled = true; };
-  }, [profile?.id]);
+  }, [profile?.id, quotaRetryTick]);
 
   const handleQuickDays = (days: number) => {
     setQuickDays(days);
@@ -169,26 +181,30 @@ const isValid =
     setSubmitting(true);
     try {
       if (!profile?.id) throw new Error("로그인이 필요합니다.");
-      const id = await createProject({
-        name: name.trim(),
-        customer_name: customerName.trim(),
-        shoot_date: shootDate,
-        deadline,
-        required_count: Number(requiredCount),
-        photographer_id: profile.id,
-        shoot_type: shootType || null,
-        customer_phone: customerPhone.trim() || null,
-        access_pin: accessPin || null,
-        max_revision_count: maxRevisionCount,
-        location: location.trim() || null,
-        include_original: includeOriginal,
-      });
-      await fetch("/api/photographer/project-logs", {
+      const res = await fetch("/api/photographer/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: id, action: "created" }),
-      }).catch(() => {});
-      router.push(`/photographer/projects/${id}`);
+        body: JSON.stringify({
+          name: name.trim(),
+          customer_name: customerName.trim(),
+          shoot_date: shootDate,
+          deadline,
+          required_count: Number(requiredCount),
+          shoot_type: shootType || null,
+          customer_phone: customerPhone.trim() || null,
+          access_pin: accessPin || null,
+          max_revision_count: maxRevisionCount,
+          location: location.trim() || null,
+          include_original: includeOriginal,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const betaErr = parseBetaLimitError(data);
+        if (betaErr) throw new Error(betaErr.message);
+        throw new Error((data as { error?: string }).error ?? "프로젝트 생성에 실패했습니다.");
+      }
+      router.push(`/photographer/projects/${data.id}/upload`);
     } catch (e) {
       setError(getErrorMessage(e));
     } finally {
@@ -196,8 +212,26 @@ const isValid =
     }
   };
 
+  // 한도 확인 실패 — "무제한"으로 잘못 간주해 폼을 열어주지 않는다(폼을 다 채운 뒤에야 막히는 UX 방지)
+  if (quotaError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <p className="text-sm text-muted-foreground">이용 한도를 확인하지 못했습니다. 네트워크 상태를 확인해주세요.</p>
+          <button
+            type="button"
+            onClick={() => setQuotaRetryTick((t) => t + 1)}
+            className="px-5 py-2 bg-surface border border-border-subtle text-foreground text-sm font-semibold rounded-xl hover:border-accent/40 transition-colors"
+          >
+            다시 시도
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // 로딩 중 — 한도 확인 전에는 폼을 렌더하지 않음
-  if (projectCount === null) {
+  if (quota === null) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-6 h-6 rounded-full border-2 border-accent/20 border-t-accent" style={{ animation: "spin 0.9s linear infinite" }} />
@@ -206,8 +240,17 @@ const isValid =
     );
   }
 
-  // 한도 초과 — 폼 대신 안내 화면 바로 표시
-  if (projectCount >= BETA_MAX_PROJECTS_TOTAL) {
+  const atLimit = quota.max !== null && quota.current >= quota.max;
+  const wasBetaBeforeGeneral = quota.betaStatus === "ended" || quota.betaStatus === "suspended";
+
+  // 한도 초과 — 폼 대신 안내 화면 바로 표시(서버도 동일하게 검증하지만, 폼을 채우기 전에 미리 안내)
+  if (atLimit) {
+    const heading = quota.tier === "beta" ? "베타 프로젝트 한도 도달" : wasBetaBeforeGeneral ? "베타 이용 기간 종료" : "무료 체험 한도 도달";
+    const desc = quota.tier === "beta"
+      ? <>베타 기간 중 최대 {quota.max}개의 프로젝트를 생성할 수 있습니다.<br />현재 <strong className="text-foreground">{quota.current} / {quota.max}개</strong> 사용 중입니다.</>
+      : wasBetaBeforeGeneral
+        ? <>베타 이용 기간이 종료되었습니다.<br />기존 프로젝트는 계속 이용하실 수 있습니다.</>
+        : <>무료 체험에서는 프로젝트 {quota.max}개까지 생성할 수 있습니다.<br />더 이용하시려면 베타 참여를 문의해주세요.</>;
     return (
       <div
         className="min-h-screen bg-background text-foreground"
@@ -225,11 +268,8 @@ const isValid =
             <AlertCircle size={28} color="#ef4444" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-foreground mb-2">베타 기간 프로젝트 한도 도달</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              베타 기간 중 최대 {BETA_MAX_PROJECTS_TOTAL}개의 프로젝트를 생성할 수 있습니다.<br />
-              현재 <strong className="text-foreground">{projectCount} / {BETA_MAX_PROJECTS_TOTAL}개</strong> 사용 중입니다.
-            </p>
+            <h2 className="text-xl font-bold text-foreground mb-2">{heading}</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
           </div>
           <button
             type="button"
@@ -275,12 +315,12 @@ const isValid =
       {/* ── 메인 ── */}
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-20">
 
-        {/* 베타 한도 임박 (잔여 1개) */}
-        {projectCount === BETA_MAX_PROJECTS_TOTAL - 1 && (
+        {/* 한도 임박 (잔여 1개) */}
+        {quota.max !== null && quota.current === quota.max - 1 && (
           <div className="flex items-center gap-2 bg-yellow-500/5 border border-yellow-500/20 rounded-xl px-4 py-2.5 mb-4">
             <AlertTriangle size={13} color="#eab308" />
             <span className="text-xs text-yellow-500/80">
-              잔여 1개 · 베타 기간 중 최대 {BETA_MAX_PROJECTS_TOTAL}개까지 생성 가능합니다.
+              잔여 1개 · {quota.tier === "beta" ? "베타 기간 중" : "무료 체험은"} 최대 {quota.max}개까지 생성 가능합니다.
             </span>
           </div>
         )}
