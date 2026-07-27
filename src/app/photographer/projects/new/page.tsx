@@ -204,7 +204,7 @@ const isValid =
         if (betaErr) throw new Error(betaErr.message);
         throw new Error((data as { error?: string }).error ?? "프로젝트 생성에 실패했습니다.");
       }
-      router.push(`/photographer/projects/${data.id}/upload`);
+      router.push(`/photographer/projects/${data.id}`);
     } catch (e) {
       setError(getErrorMessage(e));
     } finally {
@@ -603,14 +603,7 @@ const isValid =
             )}
 
             {/* 액션 버튼 */}
-            <div className="flex items-center justify-between gap-4 pt-2">
-              <button
-                type="button"
-                onClick={() => router.push("/photographer/projects")}
-                className="flex items-center gap-2 px-5 py-2.5 text-sm text-subtle-foreground hover:text-muted-foreground border border-border hover:border-border-strong rounded-xl transition-colors"
-              >
-                ← 뒤로
-              </button>
+            <div className="flex items-center justify-end gap-4 pt-2">
               <button
                 type="button"
                 onClick={handleSubmit}
@@ -620,7 +613,7 @@ const isValid =
                 {submitting ? (
                   <><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> 생성 중...</>
                 ) : (
-                  <>다음: 사진 업로드 <ChevronRight size={14} /></>
+                  <>생성완료</>
                 )}
               </button>
             </div>
