@@ -213,12 +213,13 @@
 
 - **시작 조건**: 미인증 상태에서 `/landing` 등 마케팅 페이지 방문.
 - **사용자가 수행하는 단계**: "Google로 계속하기" 또는 "카카오로 계속하기" 클릭 → OAuth 동의 화면 → 콜백 후 대시보드 진입.
+- **이미 로그인된 상태로 `/landing` 재방문(2026-07-27 추가)**: 이전에는 로그인 여부와 무관하게 항상 "Login"/"무료로 시작하기" CTA가 뜨고 클릭 시 `AuthModal`이 다시 열려, 세션이 멀쩡한데도 매번 OAuth 재동의 화면을 거쳐야 하는 불편이 있었다. `LandingPage`가 마운트 시 `supabase.auth.getUser()`로 세션 여부를 확인해(`src/app/landing/page.tsx`), 로그인된 상태면 모든 CTA 라벨이 "대시보드로 이동"(헤더는 "대시보드")으로 바뀌고 클릭 시 `AuthModal` 없이 곧바로 `router.push("/photographer/dashboard")`로 이동한다.
 - **프론트엔드 라우트**: 로그인 트리거는 `AuthModal` 컴포넌트(랜딩 페이지 등에서 열림), 콜백은 `GET /auth/callback`. (`/auth` 페이지 자체는 사용되지 않는 no-op 리다이렉트였으며 2026-07-13 삭제됨)
 - **호출되는 API**: `supabase.auth.signInWithOAuth({ provider: "google"|"kakao", options: { redirectTo: origin + "/auth/callback" } })` (Supabase Auth, 자체 API 라우트 아님) → 콜백에서 `supabase.auth.exchangeCodeForSession(code)`.
 - **성공 시 기대 결과**: 콜백이 `photographers` 테이블에 해당 `auth_id`가 없으면 자동 생성 후 기본적으로 `/photographer/dashboard`로 리다이렉트.
 - **실패 및 경계 상황**:
   - OAuth 동의 거부/실패 시 처리 로직은 이번 조사에서 확인하지 못함 — **확인 필요**.
-  - Kakao 로그인 버튼은 코드상 존재하나, Supabase 대시보드에서 Kakao 프로바이더가 실제로 켜져 있는지는 **확인 필요**(기존 문서 `ACUT_OVERVIEW.md`는 "카카오 미구현"이라고 기록되어 있어 코드와 문서가 불일치 — 반드시 실제 동작 확인 후 문서 정리 필요).
+  - Kakao 로그인은 **실제로 활성화되어 정상 동작함을 확인함**(2026-07-27, `auth.users`를 직접 조회해 `provider: "kakao"`인 실제 계정과 정상 이메일을 확인 — 기존 `ACUT_OVERVIEW.md`의 "카카오 미구현" 기록은 오래된 정보로 보임).
   - 테스트 전용 이메일/비밀번호 로그인(`/api/auth/test-login`)은 `ENABLE_TEST_LOGIN=true`일 때만 동작하며 실제 사용자 흐름이 아님.
 - **관련 권한/인증 조건**: 없음(로그인 자체는 누구나 시도 가능, 이후 모든 작가 기능은 세션 필요).
 - **QA에서 확인해야 할 항목**: 최초 로그인 시 `photographers` 행이 정말 자동 생성되는지, 로그아웃 후 재로그인 시 중복 생성되지 않는지, 로그인 세션이 만료된 상태에서 작가 페이지 접근 시 어떤 화면이 뜨는지(미들웨어가 `/photographer/**`를 보호하지 않으므로 페이지 셸은 보일 수 있음 — `docs/architecture.md` §13 참고).
@@ -361,7 +362,7 @@
 - **등급 3단계**: 관리자(`ADMIN_EMAILS`, 무제한) / 베타(관리자가 부여, 기본값 프로젝트 10개·사진 2000장/프로젝트) / 일반(Trial, 그 외 전부 — 기본값 프로젝트 1개·사진 500장/프로젝트). 판정은 매 요청마다 실시간(`photographers.beta_status`+`beta_end_date`)으로 이뤄지고, 별도 만료 배치는 없다. **구체적인 한도 값은 `/admin/settings`(§10-2)에서 관리자가 실시간으로 바꿀 수 있다** — 위 값은 초기 기본값이며 코드 재배포 없이 언제든 바뀔 수 있다.
 - **프로젝트 한도는 등급과 무관하게 항상 "현재 보유 수"(`COUNT(*) FROM projects`) 기준**이다 — 일반 사용자도 프로젝트를 삭제하면 즉시 새 프로젝트를 만들 수 있다. (최초 설계 단계에서는 일반 사용자만 "삭제해도 줄지 않는 누적 생성 수"(`photographers.total_projects_created`)로 판정해 삭제 후 재생성으로 우회하지 못하게 했으나, 2026-07-26 정책 변경(커밋 `2b2e241`/`818affc`)으로 두 등급 모두 현재 보유 수 기준으로 단순화됐다. `total_projects_created` 컬럼 자체는 남아 계속 증가하지만 어떤 검증 로직에서도 더 이상 읽지 않는다.)
 - **호출되는 API**: `GET /api/photographer/quota`(사전 확인/사용량 표시용), `POST /api/photographer/projects`·`POST /api/upload/photos`(실제 강제 지점).
-- **성공 시 기대 결과**: 한도 내면 정상 생성/업로드. `/photographer/projects` 목록 헤더와 `/photographer/projects/new` 진입 시 "N/M" 형태로 현재 사용량이 표시된다(가능한 경우).
+- **성공 시 기대 결과**: 한도 내면 정상 생성/업로드. `/photographer/projects` 목록 헤더와 `/photographer/projects/new` 진입 시 "N/M" 형태로 현재 사용량이 표시된다(가능한 경우). **(2026-07-27 추가)** `/photographer/dashboard` 사용량 패널은 `tier === "beta"`일 때 "베타 이용중" 배지를 함께 보여준다 — 이전에는 작가 본인이 자신이 베타/일반 중 어느 등급인지 화면에서 확인할 방법이 전혀 없었다(관리자 화면에서만 조회 가능했음).
 - **실패 및 경계 상황**:
   - 일반 사용자가 1개 한도 도달(현재 보유 1개) → "무료 체험에서는 프로젝트 1개까지 생성할 수 있습니다." 그 프로젝트를 삭제하면 즉시 다시 생성 가능해진다.
   - 베타였다가 관리자가 종료/중지 처리 → "베타 이용 기간이 종료되었습니다." 이후 일반 한도(현재 보유 수 기준)가 적용된다.
@@ -426,14 +427,100 @@
 
 ---
 
+## 12. 클로즈드 베타 신청 및 관리자 심사(2026-07-26 추가, 2026-07-27 로그인 정책 변경)
+
+`plan/beta-system.md`의 1~4단계 구현. 기존 "베타 등급"(§9-1 이용량 등급) 부여와는 별개로, 잠재 사용자를 모집·심사하기 위한 신청서 접수와 관리자 검토 화면이다.
+
+### 12-1. 신청자(2026-07-27부터 로그인 필수)
+
+- **시작 조건**: 랜딩페이지(`/landing`)의 베타 신청 CTA 또는 `/beta/apply` 직접 접근. **URL 자체는 로그인 여부와 무관하게 공개**이지만, 로그인 안 된 상태면 폼 대신 로그인 안내가 뜬다.
+- **사용자가 수행하는 단계(로그인 안 된 경우)**: "로그인하고 신청하기" 클릭 → `AuthModal` 팝업(페이지 이동 없음)에서 구글/카카오 로그인(신규면 가입까지 한 번에 처리) → 완료되면 자동으로 다시 `/beta/apply`로 돌아와 이번엔 신청서 폼이 보인다.
+- **사용자가 수행하는 단계(로그인된 경우)**: 이메일은 세션 값이 읽기 전용으로 이미 채워져 있고, 이름/휴대폰번호/촬영 장르/월평균 촬영 건수/프로젝트당 평균 전달 사진 수/현재 전달 방식/사용 희망 이유 입력 + 개인정보·연락 동의 체크 → "베타 신청하기".
+- **프론트엔드 컴포넌트**: `src/app/beta/apply/page.tsx`(서버, 세션 이메일을 `BetaApplyForm`에 전달) + `src/components/beta/BetaApplyForm.tsx`(클라이언트 — `prefillEmail`이 없으면 로그인 안내 카드, 있으면 신청서 폼을 렌더).
+- **로그인 후 원래 페이지로 복귀하는 방식**: `AuthModal`의 `redirectTo` URL에 `?next=...`를 붙이는 방법은 **Supabase의 Redirect URLs 허용 목록과 정확히 일치해야 해서 실제로 OAuth 콜백이 거부되는 문제가 있었다**(로컬 테스트에서 실측 — 에러와 함께 랜딩페이지로 튕김). 대신 로그인 시작 전 `sessionStorage`에 돌아갈 경로를 저장해두고(`src/lib/post-login-redirect.ts`), 로그인은 항상 기존 기본 목적지(`/photographer/dashboard`)로 완료된 뒤 그 페이지의 `useEffect`가 저장된 경로로 다시 이동시킨다. Supabase 프로젝트 설정은 전혀 건드리지 않는다. **대시보드 화면 깜빡임 방지(2026-07-27 추가)**: `/photographer/dashboard`는 대기 중인 리다이렉트가 있으면 첫 렌더부터(이펙트를 기다리지 않고) 실제 대시보드 콘텐츠 대신 로딩 화면만 보여줘, 이동 중 대시보드가 잠깐 스쳐 보이는 현상이 없다.
+- **호출되는 API**: `POST /api/beta/applications` — **2026-07-27부터 세션 필수**(없으면 401). 휴대폰번호는 `src/lib/phone.ts`로 정규화 후 저장, 서버가 중복 여부를 조회해 이미 등록된 번호면 409로 거부한다. 이메일/`matched_photographer_id`는 항상 서버가 세션에서 가져온 값 — 클라이언트가 이메일을 보내는 경로 자체가 없다.
+- **성공 시 기대 결과**: `/beta/apply/complete`로 이동, "신청이 접수되었습니다" 안내. `matched_photographer_id`는 제출 즉시 채워져 있다(별도 매칭 단계 불필요).
+- **실패 및 경계 상황**: 필수 항목 누락/형식 오류는 클라이언트에서 우선 차단, 서버도 동일 항목을 재검증한다. 같은 번호로 재신청 시 신규 레코드를 만들지 않고 안내 문구를 표시한다(레이스 컨디션은 `phone` 컬럼의 `UNIQUE` 제약이 최종 방어).
+- **관련 권한/인증 조건**: 페이지 라우팅 자체는 게이트 없음(`middleware.ts`의 matcher가 `/beta/**`를 포함하지 않음) — 대신 화면 렌더링과 제출 API가 각자 세션 유무로 분기한다.
+- **QA에서 확인해야 할 항목**: 로그인 상태에서 제출 시 이메일이 실제로 세션 값으로 저장되는지(실 데이터로 확인 완료), 신규 OAuth 가입(브랜드뉴 계정)을 통한 라운드트립은 실제 신규 계정이 없어 코드 리뷰 수준으로만 확인(기존 계정 재로그인 경로는 실측 완료).
+
+### 12-2. 관리자(`/admin/beta-applications`)
+
+- **시작 조건**: 관리자 계정으로 로그인 후 사이드바 "Beta Applications" 메뉴 진입(`admin-nav.ts`).
+- **사용자가 수행하는 단계**: 목록에서 상태 필터(`?status=`)/이름·번호 검색(`?q=`, GET 쿼리스트링 기반) → 신청자 클릭 → 상세에서 상태(신청완료→검토중→승인/보류/거절) 변경, 연락완료 체크, 관리자 메모 저장.
+- **프론트엔드 컴포넌트**: `src/app/admin/beta-applications/page.tsx`(목록), `src/app/admin/beta-applications/[id]/page.tsx`(상세) + `src/components/admin/AdminBetaApplicationControl.tsx`(상태/메모/연락완료 저장, 기존 `AdminFeedbackStatusControl`/`AdminBetaControl` 패턴과 동일하게 `fetch` PATCH 후 `router.refresh()`).
+- **호출되는 API**: `PATCH /api/admin/beta-applications/[id]` — `getAdminUser()` 재검증 후 상태/메모/연락완료를 부분 업데이트.
+- **성공 시 기대 결과**: 변경 즉시 반영(페이지 refresh). 신청이 로그인 필수가 되면서 `matched_photographer_id`는 항상 채워져 있으므로 상세 화면 상단에 "이미 가입된 계정과 매칭됨" 배지가 항상 표시되고 `/admin/users/[id]`로 링크된다.
+- **실패 및 경계 상황**: 승인 상태로 바꿔도 `photographers.beta_status` 변경은 자동으로 일어나지 않는다(의도된 설계 — §9-1과 별개 축, plan/beta-system.md §4 참고) — 대신 아래 12-3의 "베타 부여" 버튼으로 명시적으로 처리한다.
+- **관련 권한/인증 조건**: `middleware.ts`의 `/admin`, `/admin/:path*` matcher가 이미 이 라우트를 포함하므로 별도 인증 코드를 추가하지 않았다 — 비관리자 계정으로 접근하면 `/photographer/dashboard`로 리다이렉트됨을 실제로 확인함.
+- **QA에서 확인해야 할 항목**: 상태 필터/검색이 여러 항목을 동시에 조합했을 때도 정확한지, 신청자 수가 늘어난 뒤에도 목록 페이지 성능이 괜찮은지(현재는 페이지네이션 없이 전체 조회).
+
+### 12-3. 승인 사용자·가입 연결(2026-07-26 초안, 2026-07-27 재설계)
+
+신청이 로그인 선행 조건이 되면서(§12-1) `matched_photographer_id`가 항상 이미 채워져 있다 — "가입 전 이메일 사전등록"(`beta_invitations`) 방식은 신청자가 이미 가입돼 있는 상황과 안 맞아(호출하면 항상 "이미 가입된 사용자입니다" 거부) 폐기하고, 이미 존재하는 계정에 직접 베타를 부여하는 단순한 흐름으로 다시 설계했다.
+
+- **시작 조건**: 신청 상태를 `approved`로 바꾼 뒤, 매칭된 계정이 아직 베타가 아니면(`beta_status !== 'active'`) 상세 화면에 "가입 연결" 카드와 "베타 부여" 버튼이 노출됨.
+- **사용자가 수행하는 단계**: "베타 부여" 클릭 → 기존 `PATCH /api/admin/users/[id]/beta`를 그대로 재사용해 `{beta_status:'active'}`만 전송. 날짜를 직접 보내지 않으면 서버가 `app_settings.beta_default_duration_days`만큼(기본값 30일) 오늘부터 자동으로 `beta_start_date`/`beta_end_date`를 채운다(2026-07-27부터, 이전에는 날짜를 비워둬 무기한 유효로 처리했음). 다른 기간을 쓰려면 이후 `/admin/users/[id]`의 `AdminBetaControl.tsx`에서 명시적으로 날짜를 지정해 재저장하면 된다(날짜를 직접 보내는 요청은 자동 채움 대상이 아니라 그대로 저장됨).
+- **프론트엔드 컴포넌트**: `src/components/admin/AdminBetaApplicationControl.tsx` — "이메일로 수동 매칭" 입력창은 완전히 제거됨(2026-07-27, 신청 시점에 항상 자동 매칭되므로 더 이상 필요 없다고 판단, 예외 상황용 폴백도 의도적으로 남기지 않음).
+- **성공 시 기대 결과**: `router.refresh()` 후 버튼이 사라지고(이미 베타 상태이므로), `/admin/users/[id]`에서도 베타 상태 변경이 확인된다.
+- **실패 및 경계 상황**: `matched_photographer_id`가 비어 있는 경우(정상 흐름에서는 로그인 필수라 발생하지 않음 — 이 정책 이전의 레거시 데이터 등 예외 상황에서만 가능)는 버튼 대신 "매칭된 계정이 없습니다" 경고 문구만 표시하고, 관리자가 Supabase 대시보드에서 직접 확인해야 한다(별도 UI 미제공).
+- **관련 권한/인증 조건**: `PATCH /api/admin/users/[id]/beta`는 `getAdminUser()` 재검증.
+- **QA에서 확인해야 할 항목**: "베타 부여" 버튼 클릭 → `photographers.beta_status`가 실제로 `active`로 바뀌는지 실 데이터로 확인 완료(테스트 후 원래 상태로 복구함). 신규 가입(브랜드뉴 OAuth 계정 생성)을 통한 §12-1의 "가입 시점 자동 매칭" 백필 로직만 실제 신규 계정이 없어 코드 리뷰 수준으로만 확인했다.
+
+### 12-4. 핵심 사용 행동 집계(2026-07-27 추가)
+
+- **시작 조건**: 없음(자동) — 신청자가 실제로 가입하거나, 그 작가의 고객이 링크에 접속하는 시점에 자동으로 기록된다. 관리자가 직접 트리거하는 동작이 아니다.
+- **사용자가 수행하는 단계**: 없음. (a) 신규 사용자가 OAuth로 가입, (b) 로그인(신규/기존 모두), (c) 고객이 `/c/[token]` 링크를 클릭 — 3가지 자연스러운 행동이 곧 트리거다.
+- **기록 지점**: `src/app/auth/callback/route.ts`에서 `signup_completed`(신규 가입 시 1회)와 `first_login`(신규/기존 가입 모두, 작가당 최초 1회)을, `src/app/c/[token]/layout.tsx`(인덱스 `page.tsx`가 아니라 모든 하위 경로를 감싸는 layout — `/gallery` 등 딥링크 진입도 놓치지 않기 위해)에서 `customer_link_visited`(프로젝트당 최초 1회)를 기록한다. 셋 다 `src/lib/beta-usage-events.ts`의 `recordBetaUsageEvent()`를 공유하며 이 함수는 절대 throw하지 않는다 — 이벤트 기록 실패가 로그인/고객 접속 자체를 막지 않는다.
+- **성공 시 기대 결과**: `/admin/beta-applications/[id]`에서 매칭된 계정이 있으면 "사용 현황" 섹션(첫 로그인 시각/생성한 프로젝트 수/고객이 접속한 프로젝트 수)이 노출된다. 프로젝트 생성 수는 기존 `projects` 테이블을 그대로 카운트하는 것이라 별도 이벤트 기록이 필요 없다(plan/beta-system.md §6.1에서 이미 "이미 확보 가능"으로 분류됨).
+- **실패 및 경계 상황**: 같은 작가가 여러 번 로그인해도 `first_login`은 부분 유니크 인덱스(`photographer_id, event_type WHERE project_id IS NULL`)로 1건만 남는다. 같은 고객이 링크를 여러 번 열어도 `customer_link_visited`는 프로젝트당 1건만 남는다(`project_id, event_type WHERE project_id IS NOT NULL`). 두 경우 모두 두 번째 이후 insert는 유니크 위반(23505)으로 조용히 무시되므로 매번 "이미 기록됐는지" 조회하지 않는다.
+- **관련 권한/인증 조건**: 없음(로그인/고객 접속 경로에 자동으로 끼워짐). 관리자 화면 표시만 `getAdminUser()` 보호 대상.
+- **QA에서 확인해야 할 항목**: 신규 OAuth 가입을 통한 `signup_completed`/`first_login` 기록은 §12-3과 동일한 이유로 아직 실측하지 못했다(코드 리뷰 수준) — 다음에 실제 신규 계정 가입이 발생하면 확인 필요. `customer_link_visited`는 2026-07-27 마이그레이션 적용 후 실제 고객 링크(`/c/[token]/gallery` 딥링크 포함)로 검증 완료 — 최초 방문 시 정확히 1건 기록되고, 같은 링크 재방문(새로고침) 시에도 중복 없이 1건만 유지됨을 확인했다. 관리자 상세 화면의 "사용 현황"(생성한 프로젝트 수·고객 접속 프로젝트 수)도 실 데이터와 정확히 일치함을 확인했다.
+
+### 12-5. 베타 설문 — ②첫 프로젝트 납품 완료 후(2026-07-27 추가, 5단계)
+
+- **시작 조건**: 작가가 `/photographer/dashboard`에 진입했고(프로젝트가 1개 이상 있어야 함), 그 작가의 **첫 생성 프로젝트**(생성일 기준, 납품일 기준 아님)가 `status='delivered'`인 상태.
+- **사용자가 수행하는 단계**: 별도 수행 없이 조건 충족 시 대시보드에 모달이 뜬다(`BetaSurveyModal`). 5문항(①실제 고객 사용 여부(예/아니오) ②시간 절감 체감(1~5점) ③가장 도움이 된 기능(복수선택+기타) ④가장 불편했던 점(자유서술) ⑤다음 프로젝트에서도 사용할 계획(1~5점, 조기 이탈 예측) — 2026-07-27 재설계, plan/beta-system.md §7.1a) 응답 후 "제출", 또는 "나중에"(24시간 뒤 재노출), 또는 "다시 묻지 않기"(영구 재노출 안 함) 중 하나를 선택한다.
+- **컴포넌트/API**: `src/app/photographer/dashboard/page.tsx`가 마운트 후 `GET /api/photographer/beta-survey/status`로 노출 여부를 확인(트리거 판정은 서버가 `projects` 테이블에서 `photographer_id`의 최초 생성 프로젝트 status를 직접 조회 — `delivered_at` 컬럼은 일부 경로에서 안 채워질 수 있어 신뢰하지 않음). 응답/나중에는 `POST /api/photographer/beta-survey`, 건너뛰기는 `POST /api/photographer/beta-survey/skip`이 처리하며 `beta_survey_responses` 테이블(`photographer_id, survey_type` 유니크)에 upsert된다.
+- **성공 시 기대 결과**: 제출/건너뛰기 후에는 몇 번을 재방문해도 다시 뜨지 않는다. "나중에" 후에는 24시간 동안만 재노출이 억제되고 이후 다시 뜬다. "노출" 자체는 별도로 기록하지 않으므로, 세 시각(`later_until`/`skipped_at`/`submitted_at`) 중 아무것도 없는 상태에서 조건이 계속 켜져 있으면 대시보드 방문마다 다시 뜬다(설계상 의도 — §7.2 "1회 노출"은 "영구 1회"가 아니라 "이번 방문에 1회").
+- **실패 및 경계 상황**: 이미 제출된 설문에 다시 제출 요청이 오면(중복 클릭 등) 서버가 멱등 처리(`alreadySubmitted:true`, DB 재기록 없음). 복수선택 문항(③가장 도움이 된 기능)에서 "기타"를 골랐는데 텍스트를 안 채우면 클라이언트/서버 양쪽에서 막고, 최소 1개 선택도 서버가 강제한다. 빈 대시보드(`projects.length === 0`)에서는 트리거 자체가 구조적으로 성립할 수 없어 이 상태를 위한 별도 분기는 없다.
+- **관련 권한/인증 조건**: `api/photographer/beta-survey/*` 세 엔드포인트 모두 세션 필요(401 없으면). `admin_audit_logs`에는 기록하지 않는다 — 그 테이블은 관리자/시스템 행위 전용이고(§10-1), 작가가 자발적으로 제출하는 설문은 기존 `feedback` 제출과 동일하게 감사 로그 대상이 아니다.
+- **범위 밖**: ①"셀렉 링크 전달 후" 설문은 문항이 아직 확정되지 않아(plan/beta-system.md §7.1, §13) 트리거·문항을 구현하지 않았다. `src/lib/beta-survey.ts`의 `SurveyType`에 식별자(`link_sent`)만 미리 선언해뒀고, `IMPLEMENTED_SURVEY_TYPES`에는 아직 넣지 않았다.
+- **QA에서 확인해야 할 항목**: `tests/e2e/photographer/beta-survey.spec.ts`에서 트리거 미충족 시 미노출/충족 시 노출/나중에 24h 정책/건너뛰기 영구 억제/제출 후 영구 억제/미인증 401을 다룬다. `src/app/api/auth/test-setup/route.ts`에 테스트 전용 액션(`first_project_status`/`set_project_status`/`reset_beta_survey`/`backdate_survey_later`)을 추가해 실제 촬영→선택→납품 워크플로우를 거치지 않고도 상태를 직접 조작해 검증할 수 있게 했다(`ENABLE_TEST_LOGIN=true`일 때만 동작, 기존 `create_project` 등과 동일한 안전장치). DB 마이그레이션(`20260727_beta_survey_responses.sql`) 적용 후 실 브라우저(Playwright)로 6개 시나리오 모두 통과 확인 완료(2026-07-27).
+
+### 12-6. 베타 설문 — ③두 번째 프로젝트 납품 완료 후(2026-07-27 추가, 6단계)
+
+- **시작 조건**: 작가가 `/photographer/dashboard`에 진입했고, **생성 순서 기준 두 번째 프로젝트**(완료 순서 아님, plan/beta-system.md §6.1)가 `status='delivered'`인 상태. ②와 마찬가지로 이미 제출/건너뛰기했으면 트리거되지 않는다.
+- **사용자가 수행하는 단계**: 조건 충족 시 대시보드에 모달이 뜬다. 8문항(①계속 사용 의향(1~5점) ②추천 의향 NPS(0~10) ③서비스가 없어진다면 얼마나 아쉬울지(1~5점, PMF/Sean Ellis 문항) ④적정 가격(구간 선택) ⑤유료 출시 시에도 계속 사용할 의향(1~5점) ⑥추가되었으면 하는 기능(자유서술) ⑦기타 의견(자유서술) ⑧정식 출시 안내 희망 여부(체크박스) — 2026-07-27 재설계, plan/beta-system.md §7.1a) 응답 후 "제출", 또는 "나중에", 또는 "다시 묻지 않기" 중 하나를 선택 — 노출/재노출 정책은 ②와 완전히 동일(§7.2).
+- **컴포넌트/API**: ②와 동일한 인프라를 그대로 재사용 — `GET .../beta-survey/status`가 `IMPLEMENTED_SURVEY_TYPES`(생애주기 순서로 5개 타입 등록, §12-7 참고)를 순서대로 검사해 먼저 트리거된 것을 반환하고(모든 설문은 `(photographer_id, survey_type)`별로 완전히 독립적으로 상태 관리됨), `BetaSurveyModal`은 `surveyType` 값에 따라 문항 블록만 분기한다. 트리거 판정은 ②와 동일하게 `projects.status`를 직접 조회(두 번째로 생성된 행을 `ORDER BY created_at ASC` + `range(1,1)`로 특정) — `project_logs.action='delivered'`는 신뢰하지 않는다(②와 동일 이유, §12-5).
+- **"적정 가격" 문항 형식**: 문서(plan/beta-system.md §7.1)에 "주관식/구간 선택" 둘 다 언급돼 있어 확정이 필요했음 — 사용자 확인 후 **구간 선택**으로 결정. 최초 구현("무료가 아니면 안 씀/1만원 미만/1만원~3만원/3만원~5만원/5만원 이상")은 같은 날 문항 재설계에서 "무료 아니면 안 씀"이 너무 공격적이라는 피드백을 받아 **월 5천원 미만/5천원~1만원/1만원~3만원/3만원~5만원/5만원 이상/현재로서는 유료 이용 의향 없음**(마지막으로 이동)으로 최종 확정했다. 구간 경계값은 하드코딩이라 나중에 바꾸려면 `src/lib/beta-survey.ts`/`BetaSurveyModal.tsx`/API 검증 로직 3곳을 함께 수정해야 한다.
+- **성공 시 기대 결과 / 실패 및 경계 상황 / 권한**: §12-5와 동일 — 멱등 제출, 세션 필수(401), `admin_audit_logs` 미기록.
+- **QA에서 확인해야 할 항목**: `tests/e2e/photographer/beta-survey.spec.ts`의 두 번째 `describe` 블록(CS1~CS5)에서 트리거 미충족/충족/나중에 24h/건너뛰기 영구 억제/NPS·가격 구간·체크박스 포함 제출까지 실 브라우저로 검증 완료(2026-07-27). 테스트 계정에 두 번째 프로젝트가 없으면 `test-setup`의 `second_project_status` 액션이 테스트용으로 하나 생성하고, 테스트 종료 후 새로 만든 경우에 한해 삭제한다(`tests/helpers/setup.ts`의 `getSecondProjectStatus`/`deleteTestProject`) — 기존에 있던 프로젝트를 건드린 경우는 원래 status로 복원만 한다.
+
+### 12-7. 베타 설문 — 첫 프로젝트 진행 중 마이크로 설문 3종(2026-07-27 추가)
+
+- **배경**: ②③가 프로젝트가 "끝난 후"에만 몰려 있어 실사용 중 막히는 지점을 실시간으로 파악하기 어렵다는 문제 제기 — 상태 전이마다 설문을 넣으면 응답률이 떨어지므로, 첫 프로젝트 진행 중 딱 3개 지점에만 1~2문항짜리 마이크로 설문을 추가했다. "10초 안에 답할 수 있는" 것이 핵심 제약이며, 인프라(테이블/모달 셸/API 3종/노출정책)는 ②③와 100% 동일하게 재사용한다.
+- **시작 조건 3종**:
+  - `project_created`: 작가의 첫 프로젝트가 존재하는 시점(사실상 대시보드가 빈 상태를 벗어나는 시점).
+  - `original_uploaded`: 첫 프로젝트에 `project_logs.action='uploaded'` 이벤트가 최소 1건 존재하는 시점(`src/app/photographer/projects/[id]/upload/page.tsx`에서 업로드 배치가 끝날 때마다 기록 — 여러 번 있을 수 있어 "최소 1건"으로 판단).
+  - `selection_received`: 첫 프로젝트에 `project_logs.action='confirmed'` 이벤트가 존재하는 시점(`src/app/api/c/confirm/route.ts`에서 고객이 선택 확정 시 기록). ②③와 달리 `projects.status`가 아니라 **로그 존재 여부**로 판단한다 — 고객이 이후 `cancel-confirm`으로 확정을 취소하면 status는 `selecting`으로 되돌아가지만, "회신받았다"는 사실 자체는 이미 일어난 이벤트이기 때문이다.
+- **사용자가 수행하는 단계**: 조건 충족 시 대시보드에 모달이 뜬다. 문항(§7.1a): 생성 후(1문항, 생성 과정 난이도 1~5점), 원본 업로드 후(2문항, 업로드 수월함 1~5점 + 불편한 점 자유서술), 셀렉 회신받았을 때(2문항, 확인 과정 편리함 1~5점 + 고객 피드백 자유서술). "제출"/"나중에"/"다시 묻지 않기" 3가지 액션은 ②③와 동일(선택 즉시 자동제출 아님 — 사용자 확정).
+- **컴포넌트/API**: `IMPLEMENTED_SURVEY_TYPES`가 생애주기 순서로 `["project_created","original_uploaded","selection_received","first_delivery","second_delivery"]`로 확장돼, 여러 개가 동시에 조건 충족돼도 가장 이른 것부터 노출된다. 세 타입 모두 첫 프로젝트를 `project_id` 컨텍스트로 저장(기존 `getFirstProjectId` 재사용).
+- **DB 마이그레이션**: `20260727b_beta_survey_responses_add_micro_types.sql` — `survey_type` CHECK 제약을 6개 값으로 확장. 적용 완료(2026-07-27).
+- **⚠️ 재노출 관련 중요 차이점**: ②③의 트리거는 `projects.status`(복원 가능한 필드)에 의존하지만, 이 3종의 트리거는 "프로젝트 존재"·"로그 존재"라는 **되돌릴 수 없는 사실**에 의존한다. 즉 한 번 트리거되면(프로젝트 1개만 있어도) 사용자가 직접 응답하거나 "다시 묻지 않기"를 누르기 전까지 대시보드 방문마다 계속 노출된다(§7.2 설계상 의도 — "나중에"는 24시간만 억제). E2E 테스트에서 이 특성 때문에 `beta_survey_responses` 행을 삭제(reset)하는 정리 방식이 다른 e2e 스펙(`dashboard.spec.ts`)의 대시보드 클릭을 실제로 가로막는 회귀를 일으켰다 — 테스트 종료 후에는 삭제 대신 영구 skip으로 남기도록 수정했다.
+- **실패 및 경계 상황 / 권한**: §12-5와 동일 — 멱등 제출, 세션 필수(401), `admin_audit_logs` 미기록.
+- **QA에서 확인해야 할 항목**: `tests/e2e/photographer/beta-survey.spec.ts`의 3개 신규 `describe` 블록(PS1, US1~US2, SS1~SS2)에서 노출·문항 렌더·제출·나중에·다시 묻지 않기를 검증 완료(2026-07-27). `test-setup`의 `insert_project_log` 액션으로 실제 업로드/셀렉 확정 플로우 없이 이벤트를 직접 삽입해 트리거를 테스트한다. **"트리거 미충족 → 미노출" 부정 케이스는 검증하지 않았다** — 이 계정의 첫 프로젝트엔 이미 실사용/QA 이력이 쌓여 있어 project_logs가 append-only라 지울 수 없고, 안전하게 "로그 없음" 상태를 재현할 수 없기 때문(②③의 BS1/CS1과 다른 점).
+
+---
+
 ## 부록: 이번 조사에서 흐름별로 남은 `확인 필요` 요약
 
 - 프로젝트 생성 폼이 최종적으로 호출하는 정확한 API(엔드포인트, FastAPI 직접 여부).
 - `access_token` 발급 주체(DB 기본값/트리거 vs 애플리케이션 코드).
 - 결과 페이지(`results/page.tsx`)가 사진/선택 데이터를 가져오는 정확한 API 경로.
-- 로그인 실패(OAuth 거부 등) 시 사용자에게 보이는 화면.
-- Kakao OAuth의 실제 활성화 여부(Supabase 대시보드 설정).
+- 로그인 실패(OAuth 거부 등) 시 사용자에게 보이는 화면(단, `exchangeCodeForSession` 에러는 `/?error=...`로 리다이렉트됨을 §12-1에서 실측 확인함).
 - `preparing` 상태 고객 링크에 접근했을 때의 정확한 화면.
 - 별점/코멘트 저장의 정확한 트리거 시점(디바운스 여부).
 - `photo_versions` 업로드가 2MB 상한을 끝내 못 맞췄을 때의 동작.
+- `beta_applications`(§12)/`beta_usage_events`(§12-4) 테이블 모두 마이그레이션이 실제로 적용되어 실 데이터로 전체 흐름을 검증 완료(2026-07-27).
 - `reviewing_v1`/`reviewing_v2` 이후 상태 전이가 `project_logs`에 기록되는지 여부.

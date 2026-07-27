@@ -3,10 +3,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { GOOGLE_OAUTH_QUERY_PARAMS } from "@/lib/google-oauth";
+import { setPostLoginRedirect } from "@/lib/post-login-redirect";
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** 로그인 완료 후 돌아올 경로. 생략 시 기존과 동일하게 /photographer/dashboard로 이동. */
+  redirectPath?: string;
 }
 
 function isKakaoInAppBrowser(): boolean {
@@ -14,7 +17,7 @@ function isKakaoInAppBrowser(): boolean {
   return /KAKAOTALK/i.test(navigator.userAgent);
 }
 
-export function AuthModal({ isOpen, onClose }: AuthModalProps) {
+export function AuthModal({ isOpen, onClose, redirectPath }: AuthModalProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
@@ -77,6 +80,15 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   }, [isOpen]);
 
   // ── Auth handlers (identical logic to /auth page) ────────────────────────
+  // redirectTo URL 자체는 절대 바꾸지 않는다 — Supabase의 Redirect URLs 허용 목록과 정확히
+  // 일치해야 하는데, 쿼리스트링을 붙이면 그 목록과 달라져 콜백이 거부될 수 있다(대시보드 설정
+  // 변경이 필요한 외부 의존성이 생김). 대신 "로그인 후 어디로 갈지"는 sessionStorage에 남겨두고
+  // 항상 도착하는 기본 목적지(/photographer/dashboard)에서 소비한다(src/lib/post-login-redirect.ts).
+  function buildRedirectTo(): string | undefined {
+    if (typeof window === "undefined") return undefined;
+    return `${window.location.origin}/auth/callback`;
+  }
+
   const handleGoogleLogin = async () => {
     setError(null);
     setLoading("google");
@@ -89,12 +101,12 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       setLoading(null);
       return;
     }
+    if (redirectPath) setPostLoginRedirect(redirectPath);
     try {
       const { data, error: err } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo:
-            typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
+          redirectTo: buildRedirectTo(),
           queryParams: GOOGLE_OAUTH_QUERY_PARAMS,
         },
       });
@@ -127,12 +139,12 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       setLoading(null);
       return;
     }
+    if (redirectPath) setPostLoginRedirect(redirectPath);
     try {
       const { data, error: err } = await supabase.auth.signInWithOAuth({
         provider: "kakao",
         options: {
-          redirectTo:
-            typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
+          redirectTo: buildRedirectTo(),
           scopes: "profile_nickname profile_image",
         },
       });

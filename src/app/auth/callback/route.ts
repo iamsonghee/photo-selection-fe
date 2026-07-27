@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { NextResponse } from "next/server";
 import { getAppSettings } from "@/lib/app-settings";
+import { recordBetaUsageEvent } from "@/lib/beta-usage-events";
 
 /**
  * OAuth 콜백 Route Handler
@@ -34,8 +35,10 @@ export async function GET(request: Request) {
         .eq("auth_id", user.id)
         .limit(1)
         .single();
+      const photographerId = existing?.id ?? crypto.randomUUID();
+
       if (!existing) {
-        const newId = crypto.randomUUID();
+        const newId = photographerId;
         const email = user.email ?? null;
 
         // 가입 전 사전 등록된 초대 이메일이면 자동으로 베타 부여
@@ -83,7 +86,25 @@ export async function GET(request: Request) {
             email,
           });
         }
+
+        // 가입 전 같은 이메일로 베타 신청서를 낸 적이 있으면, 아직 매칭되지 않은 신청 건을
+        // 새로 생성된 계정과 연결한다(plan/beta-system.md §12-3 "가입 시점" 매칭 — 신청 시점
+        // 매칭은 POST /api/beta/applications에서 이미 처리됨).
+        if (email) {
+          await admin
+            .from("beta_applications")
+            .update({ matched_photographer_id: newId, updated_at: new Date().toISOString() })
+            .eq("email", email.toLowerCase())
+            .is("matched_photographer_id", null);
+        }
+
+        await recordBetaUsageEvent(admin, { eventType: "signup_completed", photographerId: newId });
       }
+
+      // 첫 로그인 — 신규/기존 계정 모두 여기서 시도한다. 유니크 인덱스가 작가당 1건만 허용해
+      // 이미 기록됐으면 조용히 무시되므로(recordBetaUsageEvent 참고) 매 로그인마다 별도 조회 없이
+      // 그냥 insert를 시도해도 안전하다.
+      await recordBetaUsageEvent(admin, { eventType: "first_login", photographerId });
     } catch (e) {
       // photographer 행 생성 실패 시에도 로그인 리다이렉트는 계속 진행
       console.error("[Auth Callback] photographer upsert failed:", e);

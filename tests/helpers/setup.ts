@@ -81,3 +81,66 @@ export async function setupFullProject(page: Page, photoCount = 5): Promise<Test
   await loginAsPhotographer(page);
   return createFullProject(page, photoCount);
 }
+
+// ── 베타 설문(5단계, plan/beta-system.md §7) E2E 헬퍼 ──────────────────────
+
+/** 로그인한 작가의 첫 생성 프로젝트 id/status 조회(② 설문 트리거 확인용) */
+export async function getFirstProjectStatus(page: Page): Promise<{ projectId: string | null; status: string | null }> {
+  const res = await page.request.post("/api/auth/test-setup", {
+    data: { action: "first_project_status" },
+  });
+  if (!res.ok()) throw new Error(`getFirstProjectStatus failed (${res.status()}): ${await res.text()}`);
+  return res.json();
+}
+
+/**
+ * 로그인한 작가의 생성 순서 기준 두 번째 프로젝트 id/status 조회(③ 설문 트리거 확인용).
+ * 두 번째 프로젝트가 없으면 테스트용으로 하나 새로 생성한다 — `created:true`면
+ * 테스트 종료 후 `deleteTestProject`로 정리해야 한다(계정에 영구히 남지 않도록).
+ */
+export async function getSecondProjectStatus(
+  page: Page
+): Promise<{ projectId: string; status: string; created: boolean }> {
+  const res = await page.request.post("/api/auth/test-setup", {
+    data: { action: "second_project_status" },
+  });
+  if (!res.ok()) throw new Error(`getSecondProjectStatus failed (${res.status()}): ${await res.text()}`);
+  return res.json();
+}
+
+/** 프로젝트 status 직접 변경(실제 워크플로우 없이 delivered 등으로 강제 전환) */
+export async function setProjectStatus(page: Page, projectId: string, status: string): Promise<void> {
+  const res = await page.request.post("/api/auth/test-setup", {
+    data: { action: "set_project_status", projectId, status },
+  });
+  if (!res.ok()) throw new Error(`setProjectStatus failed (${res.status()}): ${await res.text()}`);
+}
+
+/** beta_survey_responses 행 삭제(테스트 케이스 간 노출 상태 초기화) */
+export async function resetBetaSurvey(page: Page, surveyType: string): Promise<void> {
+  await page.request.post("/api/auth/test-setup", { data: { action: "reset_beta_survey", surveyType } });
+}
+
+/** "나중에" 24시간 쿨다운을 과거로 당겨 재노출 조건을 즉시 통과시킴 */
+export async function backdateSurveyLater(page: Page, surveyType: string): Promise<void> {
+  const res = await page.request.post("/api/auth/test-setup", {
+    data: { action: "backdate_survey_later", surveyType },
+  });
+  if (!res.ok()) throw new Error(`backdateSurveyLater failed (${res.status()}): ${await res.text()}`);
+}
+
+/**
+ * project_logs에 이벤트를 직접 삽입(실제 업로드/셀렉 확정 플로우를 거치지 않고
+ * 원본 업로드 후/셀렉 회신받았을 때 마이크로 설문 트리거를 테스트하기 위함).
+ */
+export async function insertProjectLog(page: Page, projectId: string, logAction: string): Promise<void> {
+  const res = await page.request.post("/api/auth/test-setup", {
+    data: { action: "insert_project_log", projectId, logAction },
+  });
+  if (!res.ok()) throw new Error(`insertProjectLog failed (${res.status()}): ${await res.text()}`);
+}
+
+/** 설문 "다시 묻지 않기"(영구 건너뛰기) — 다른 survey_type을 미리 억제해 특정 타입만 노출시킬 때 사용 */
+export async function skipBetaSurvey(page: Page, surveyType: string): Promise<void> {
+  await page.request.post("/api/photographer/beta-survey/skip", { data: { surveyType } });
+}

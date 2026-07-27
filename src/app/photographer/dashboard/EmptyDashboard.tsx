@@ -5,9 +5,15 @@ import { Plus } from "lucide-react";
 export default function EmptyDashboard({
   userName,
   onCreateProject,
+  tier,
+  maxProjects,
+  maxPhotosPerProject,
 }: {
   userName: string;
   onCreateProject: () => void;
+  tier: "admin" | "beta" | "general" | null;
+  maxProjects: number;
+  maxPhotosPerProject: number;
 }) {
   return (
     <>
@@ -238,7 +244,7 @@ export default function EmptyDashboard({
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
-            프로젝트 10개, 사진 1,500장까지 베타 기간 무료
+            프로젝트 {maxProjects}개, 사진 {maxPhotosPerProject.toLocaleString()}장까지 {tier === "beta" ? "베타 기간 무료" : "무료 체험"}
           </div>
         </main>
       </div>

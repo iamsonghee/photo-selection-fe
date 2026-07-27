@@ -177,6 +177,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `beta_invitations` | `id, email(unique), invited_at, consumed_at, admin_note` | 가입 전 이메일 사전 등록(신규, `20260726_beta_tier_system.sql`). `consumed_at IS NULL`이면 대기 중 — 해당 이메일로 가입하면 `src/app/auth/callback/route.ts`가 자동으로 베타를 부여하고 `consumed_at`을 채운다. |
 | `admin_audit_logs` | `id, photographer_id, actor("admin"\|"system"), action, detail(jsonb), created_at` | 베타 부여/종료/중지/기간변경(관리자 행위) + 프로젝트/업로드 제한 발생(시스템 이벤트) 감사 로그(신규, `20260726_beta_tier_system.sql`). `project_logs`는 `project_id NOT NULL`이라 프로젝트와 무관한 사용자 단위 이벤트를 담을 수 없어 별도 테이블로 분리. |
 | `app_settings` | `id(=1 고정, 싱글턴), general_max_projects, general_max_photos_per_project, beta_max_projects_total, beta_max_photos_per_project, beta_max_revision_count, beta_default_duration_days, updated_at, updated_by` | 관리자 설정(`/admin/settings`)에서 실시간 편집 가능한 이용 한도 값(신규, `20260726_app_settings.sql`). 항상 `id=1` 행 하나만 존재. `ADMIN_EMAILS`는 여기 포함하지 않고 계속 코드 하드코딩 유지(§6.3). RLS 활성화, 정책 없음 — service-role 클라이언트만 접근. |
+| `beta_survey_responses` | `id, photographer_id, project_id, survey_type("link_sent"\|"project_created"\|"original_uploaded"\|"selection_received"\|"first_delivery"\|"second_delivery"), answers(jsonb), later_until, skipped_at, submitted_at, created_at, updated_at` | 베타 5·6단계(신규, `20260727_beta_survey_responses.sql` + `20260727b_beta_survey_responses_add_micro_types.sql`로 `survey_type` CHECK 확장, plan/beta-system.md §7). `(photographer_id, survey_type)` UNIQUE — 설문 시점별 1행. 트리거·문항이 실제로 구현된 값은 `project_created`·`original_uploaded`·`selection_received`·`first_delivery`·`second_delivery` 5개(①`link_sent`만 문항 미확정이라 §13 보류). 상태는 별도 컬럼 없이 `later_until`(나중에, 24h 후 재노출)/`skipped_at`(영구 건너뛰기)/`submitted_at`(제출 완료) 세 시각의 존재 여부로 판단. RLS 활성화, 정책 없음 — service-role만 접근. |
 | `delivery_files` | `id, project_id, r2_url, original_filename, delivery_filename, file_size, compressed, original_file_size, mime_type, created_at` | `delivered` 상태 프로젝트의 납품 파일. `compressed=true`면 20MB 초과로 자동 압축 발생, `original_file_size`에 압축 전 크기 저장. `mime_type`은 항상 `image/jpeg`(PNG/HEIC/WebP도 변환 후 저장). |
 | `pin_attempts` | `project_token, ip_address, attempted_at` | PIN 시도 rate-limit(1분 내 5회)용. |
 | `photo_groups` | `id, project_id, representative_photo_id, photo_count` | CLIP 유사도 그룹. `src/types/supabase.ts` 생성 타입에는 **없음**(수동 캐스팅으로 접근). 사진 삭제 시 `delete_photo_and_resolve_group` RPC(`supabase/migrations/20260720_delete_photo_group_cleanup.sql`)가 대표컷 재지정/`photo_count` 갱신/그룹 해체를 원자적으로 처리 — `insert_photos_with_numbers`와 동일한 이유(PostgREST 다중 호출의 비원자성 방지)로 RPC화됨. |
@@ -211,7 +212,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 
 | 라우트 | 파일 | 설명 |
 |---|---|---|
-| `/photographer/dashboard` | `src/app/photographer/dashboard/page.tsx` | 대시보드 요약 |
+| `/photographer/dashboard` | `src/app/photographer/dashboard/page.tsx` | 대시보드 요약. 프로젝트가 1개 이상 있고 5개 설문 트리거 중 하나라도 충족되면 베타 설문 모달(`BetaSurveyModal`, §7.1 목록의 `api/photographer/beta-survey/*`) 조건부 노출(§6.1b 베타 설문 참고) |
 | `/photographer/projects` | `src/app/photographer/projects/page.tsx` | 프로젝트 목록/검색/필터 |
 | `/photographer/projects/new` | `src/app/photographer/projects/new/page.tsx` | 프로젝트 생성 폼 (PIN·재보정 횟수 포함) |
 | `/photographer/projects/[id]` | `ProjectNexusPageClient.tsx` | 프로젝트 상세 허브 (상태, 초대 링크, PIN, 삭제) |
@@ -222,6 +223,26 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `/auth/callback` | `src/app/auth/callback/route.ts` | OAuth 콜백, `photographers` 행 자동 생성 |
 
 **삭제된 레거시 라우트(2026-07-13)**: `/auth`(no-op 리다이렉트), `/photographer/projects/[id]/upload_backup`, `/photographer/projects/[id]/edit/start`, `/photographer/projects/[id]/edit/progress`, `/photographer/projects/[id]/upload-versions`, `/photographer/projects/[id]/upload-versions/v2`, `api/photographer/upload-versions`(프록시). 전부 코드베이스 전체 grep으로 들어오는 링크가 0건임을 확인 후 삭제했으며, `/upload-versions` 계열은 `results/page.tsx`의 버튼 3곳이 `/workflow`로 가도록 함께 수정했다. `upload/page.tsx`의 관련 미사용 변수(`editVersionsPath` 등)도 함께 정리.
+
+### 6.1a 베타 신청(`/beta/**`, 라우트는 공개지만 제출은 로그인 필수)
+
+| 라우트 | 파일 | 설명 |
+|---|---|---|
+| `/beta/apply` | `src/app/beta/apply/page.tsx` + `src/components/beta/BetaApplyForm.tsx` | 클로즈드 베타 신청 폼(신규, 2026-07-26). **URL 자체는 로그인 여부와 무관하게 공개**이지만, 세션이 없으면 폼 대신 "구글/카카오로 로그인하고 신청하기" 안내 카드를 렌더링한다(2026-07-27부터 — 페이지 접근을 막는 게 아니라 화면 내용만 조건부). 로그인돼 있으면 세션 이메일을 읽기 전용 텍스트로 표시(입력 불가, 더 이상 `<input>`이 아님) |
+| `/beta/apply/complete` | `src/app/beta/apply/complete/page.tsx` | 신청 완료 안내(정적) |
+
+가입(`/photographer/dashboard` 등 기존 서비스 이용)과는 별개의 개념이다 — 신청 화면에 진입하는 것 자체는 가입의 필수 관문이 아니며, 승인/거절과 무관하게 누구나 기존처럼 즉시 가입해 "일반(Trial)" 등급으로 서비스를 쓸 수 있다(§6.3의 베타 등급 시스템과는 목적이 다른 별도 테이블, 상세는 아래 §6.3 안 "베타 신청서" 항목 참고). 다만 **"베타 신청서 제출" 그 자체는 2026-07-27부터 로그인이 선행 조건**이다 — 이메일을 신청자가 직접 입력하거나 관리자가 나중에 수동으로 매칭해야 하는 번거로움·오류 위험을 없애기 위해서다.
+
+**OAuth 로그인 후 원래 페이지로 복귀시키는 방법(2026-07-27 추가, `src/lib/post-login-redirect.ts`)**: `/beta/apply`에서 로그인하면 완료 후 다시 `/beta/apply`로 돌아와야 하는데, Supabase의 `redirectTo` URL에 `?next=...` 쿼리스트링을 붙이는 방식은 **Supabase 프로젝트의 Redirect URLs 허용 목록과 정확히 일치해야 하므로 위험하다**(로컬 테스트에서 실제로 OAuth 콜백이 거부되고 에러 쿼리와 함께 `/`로 리다이렉트되는 문제가 발생함). 대신 로그인 시작 전에 돌아갈 경로를 `sessionStorage`에 저장해두고(`setPostLoginRedirect()`), `redirectTo` URL 자체는 항상 기존과 동일하게 유지한다. 로그인은 항상 기본 목적지(`/photographer/dashboard`)로 완료되고, 그 페이지의 `useEffect`가 저장된 경로를 소비(`consumePostLoginRedirect()`)해 `router.replace()`로 한 번 더 클라이언트 사이드 이동한다. `AuthModal`은 이제 `redirectPath?: string` prop을 받으며, 생략 시(기존 5개 호출부) 동작은 전혀 바뀌지 않는다. **대시보드 실제 콘텐츠가 잠깐 보였다 사라지는 깜빡임 방지(2026-07-27 추가)**: `DashboardPage`는 `useState(() => peekPostLoginRedirect())`로 첫 렌더 시점에 동기적으로(이펙트를 기다리지 않고) 대기 중인 리다이렉트 여부를 읽어, 있으면 실제 대시보드 트리 대신 기존 로딩 가드(`if (profileLoading || loading) return <PageLoader variant="full" />`)에 조건을 하나 추가해 `<PageLoader>`만 렌더한다. 실제 소비(제거)는 여전히 `useEffect` 안의 `consumePostLoginRedirect()`가 담당 — `peek`은 읽기 전용이라 두 번 읽어도 안전하다.
+
+### 6.1b 베타 설문(별도 라우트 아님, `/photographer/dashboard`에 조건부 임베드)
+
+`plan/beta-system.md` §7·§12(5·6단계). `BetaSurveyModal`(`src/components/photographer/BetaSurveyModal.tsx`)이 `PhotographerModal` 위에 올라가는 형태로, 대시보드에서 조건 충족 시에만 렌더된다. `src/lib/beta-survey.ts`의 `IMPLEMENTED_SURVEY_TYPES`가 생애주기 순서로 5개 타입을 등록하며(여러 개 동시 충족 시 가장 이른 것부터 노출), 현재 구현된 설문은:
+- **마이크로 3종**(2026-07-27 추가, 각 1~2문항, "10초 안에" 답할 수 있는 것이 목표): `project_created`(첫 프로젝트 존재 시점, 1문항: 생성 과정 난이도 1~5점), `original_uploaded`(첫 프로젝트에 `project_logs.action='uploaded'` 존재, 2문항: 업로드 수월함 1~5점 + 불편한 점 자유서술), `selection_received`(첫 프로젝트에 `project_logs.action='confirmed'` 존재, 2문항: 확인 과정 편리함 1~5점 + 고객 피드백 자유서술). 뒤의 두 개는 ②③와 달리 `projects.status`가 아니라 **project_logs 존재 여부**로 트리거를 판단한다 — 고객이 `cancel-confirm`으로 확정을 취소해도 status만 되돌아갈 뿐 "이벤트가 있었다"는 사실은 남기 때문. 이 특성(되돌릴 수 없는 트리거) 때문에 한 번 트리거되면 사용자가 응답/건너뛰기 전까지 대시보드 방문마다 계속 노출된다(설계상 의도).
+- ②"첫 프로젝트 납품 완료 후"(`survey_type='first_delivery'`) — 트리거는 photographer의 **첫 생성 프로젝트**(생성일 기준, 납품일 기준 아님)가 `status='delivered'`가 된 것. 문항(5개, 2026-07-27 재설계, plan/beta-system.md §7.1a): 실제 고객 사용 여부(예/아니오)·시간 절감 체감(1~5점)·가장 도움이 된 기능(복수선택+기타)·가장 불편했던 점(자유서술)·다음 프로젝트 사용 계획(1~5점, 조기 이탈 예측).
+- ③"두 번째 프로젝트 납품 완료 후"(`survey_type='second_delivery'`) — 트리거는 **생성 순서 기준 두 번째 프로젝트**(완료 순서 아님, §6.1)가 `status='delivered'`가 된 것. 문항(8개, §7.1a): 계속 사용 의향(1~5점)·NPS(0~10)·"없어진다면 얼마나 아쉬울지"(1~5점, PMF/Sean Ellis test)·적정 가격(구간 선택)·유료 출시 시 구독 의향(1~5점)·추가 희망 기능(자유서술)·기타 의견(자유서술)·"정식 출시 시 먼저 안내받고 싶은지"(체크박스, 마지막 문항, 구매 의향 검증용). 5점 척도 문항은 전부 `FivePointScale`(1~5 숫자, 극성 통일)로 저장.
+
+②③는 `projects.status`를 직접 확인해 트리거를 판별하고(`project_logs.action='delivered'`는 review-submit 라우트에서 best-effort로 기록돼 누락 가능성이 있어 신뢰하지 않음), 마이크로 3종 중 뒤 두 개는 반대로 `project_logs` 존재 여부로 판별한다(위 설명 참고 — 되돌릴 수 없는 이벤트라 로그가 더 정확). 노출 정책(§7.2): 조건이 켜져 있는 한 방문마다 노출(영구 1회 아님) → "나중에"는 24시간 재노출 억제 → "다시 묻지 않기"(건너뛰기)·"제출"은 영구 재노출 안 함. 5개 설문 모두 `(photographer_id, survey_type)`별로 완전히 독립적으로 상태가 관리된다. 상태는 `beta_survey_responses` 테이블(§5)에 저장되며 별도 노출 로그는 남기지 않는다. ①"셀렉 링크 전달 후"는 문항이 아직 미확정이라(§7.1, §13) 인프라만 범용으로 만들어 두고 트리거는 구현하지 않았다(`src/lib/beta-survey.ts`의 `IMPLEMENTED_SURVEY_TYPES`).
 
 ### 6.2 고객(`/c/[token]/**`, 모두 PIN 게이트 대상)
 
@@ -247,6 +268,8 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `/admin/users/[id]` | `src/app/admin/users/[id]/page.tsx` | 작가 상세 — 보유 프로젝트 목록, 베타 상태/기간/메모 관리(`AdminBetaControl.tsx`), 관리 이력(`admin_audit_logs`) |
 | `/admin/projects` | `src/app/admin/projects/page.tsx` | Projects — 전체 작가의 전체 프로젝트 목록(상태/사진·셀렉 수/기한) |
 | `/admin/projects/[id]` | `src/app/admin/projects/[id]/page.tsx` | 프로젝트 상세 — 필드 전체 조회, PIN 재설정/제거(`AdminPinControl.tsx`), 활동 로그 타임라인 |
+| `/admin/beta-applications` | `src/app/admin/beta-applications/page.tsx` | Beta Applications — 클로즈드 베타 신청 목록(신규, 2026-07-26). 상태 필터(`?status=`)/이름·번호 검색(`?q=`)은 GET 쿼리스트링 기반 |
+| `/admin/beta-applications/[id]` | `src/app/admin/beta-applications/[id]/page.tsx` | 신청자 상세 — 입력 항목 전체 조회, 상태(신청완료→검토중→승인/보류/거절)·연락완료·메모 변경(`AdminBetaApplicationControl.tsx`), 매칭된 가입 계정이 있으면 배지로 표시 |
 | `/admin/feedback` | `src/app/admin/feedback/page.tsx` | Feedback — 작가가 제출한 버그 제보/기능 제안 목록, 상태 변경(`AdminFeedbackStatusControl.tsx`) |
 | `/admin/logs` | `src/app/admin/logs/page.tsx` | Activity Logs — 전체 작가 대상 `project_logs` 조회 |
 | `/admin/settings` | `src/app/admin/settings/page.tsx` + `AdminSettingsForm.tsx` | Settings — 등급별(일반/베타) 이용 한도를 편집 가능한 폼으로 제공(신규, 2026-07-26). `PATCH /api/admin/settings`로 `app_settings` 테이블을 갱신하며, 재배포 없이 즉시 반영된다(§6.3). 관리자 계정(`ADMIN_EMAILS`)은 여전히 읽기 전용 표시(하드코딩 유지). |
@@ -256,9 +279,17 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 - **조회 전용 화면**(Dashboard/Beta Users/Projects 목록·상세/Activity Logs/Feedback 목록)은 전부 `src/lib/admin-db.ts`의 서버 전용 함수가 `getAdminClient()`(service role, RLS 우회)로 직접 조회한다 — 별도 API 라우트 없음.
 - **개입(쓰기) 동작**만 `/api/admin/**` Route Handler로 분리되어 있고, 각 라우트가 자체적으로 `getAdminUser()`를 다시 호출해 인가를 검증한다(레이아웃의 서버 가드는 페이지 렌더링에만 적용되고 API 라우트에는 자동 적용되지 않으므로): `PATCH /api/admin/projects/[id]/pin`(PIN 재설정/제거), `PATCH /api/admin/feedback/[id]`(피드백 상태 변경), `PATCH /api/admin/users/[id]/beta`(베타 상태/기간/메모 변경 + `admin_audit_logs` 기록), `POST /api/admin/beta-invitations` / `DELETE /api/admin/beta-invitations/[id]`(사전 초대 등록/취소).
 - **작가용 피드백 제출**: `POST /api/feedback`(세션 기반, `src/lib/db.ts`류 패턴과 동일하게 `photographer_id`를 세션에서 조회해 저장). 제출 UI는 `src/components/photographer/FeedbackModal.tsx`(`FeedbackButton`)이며 `Sidebar.tsx` 하단(로그아웃 버튼 위)에 "문의하기"로 노출된다.
+- **베타 신청서(`beta_applications` 테이블, 신규, 2026-07-26, `supabase/migrations/20260726_beta_applications.sql`)**: `plan/beta-system.md`의 1~4단계 구현. `name`/`phone`(UNIQUE, 신청자 식별 키)/`email`/`genre`/`monthly_shoot_count`/`avg_photos_per_project`/`current_workflow`/`reason`/`privacy_consent_at`/`contact_consent_at`/`status`(applied→reviewing→approved/on_hold/rejected)/`admin_note`/`contacted`/`matched_photographer_id`(FK, `ON DELETE SET NULL`). **§6.3의 베타 등급 시스템(`photographers.beta_status`)과는 완전히 별개** — 신청 승인이 `beta_status`를 자동으로 바꾸지 않는다. **제출은 로그인 필수**(`POST /api/beta/applications`, 세션 없으면 401, 2026-07-27부터 — 상세는 §6.1a)이며, 이메일과 `matched_photographer_id`는 항상 서버가 세션에서 가져온 값이라 제출 즉시 100% 매칭된다(클라이언트가 이메일을 보내는 경로 자체가 없음). 전화번호는 `src/lib/phone.ts`로 정규화(숫자만) 후 저장하며, 같은 번호 재신청은 신규 레코드를 만들지 않고 409로 거부한다. 이메일은 `beta_invitations`와 동일하게 소문자로 정규화해 저장한다. RLS는 활성화되어 있으나 정책이 없어(feedback 테이블과 동일 컨벤션) anon/authenticated 직접 접근은 차단된다. `email`/`matched_photographer_id` 컬럼 자체는 여전히 nullable(2026-07-27 정책 도입 이전의 레거시 행 1건이 이미 존재해 NOT NULL로 조이지 않음).
+  - **가입 시점 매칭(2026-07-26 추가, `src/app/auth/callback/route.ts`)**: 신청은 이제 항상 로그인 후에 일어나 정상 흐름에서는 실행될 일이 거의 없지만, 레거시 데이터 등 예외 상황을 위한 방어 코드로 그대로 남겨뒀다. 같은 이메일로 신규 가입하면 `photographers` 행 생성 직후 `matched_photographer_id IS NULL`인 신청 레코드를 찾아 새 계정과 연결한다. 기존 `photographer` 행 생성과 같은 try/catch로 감싸여 있어 실패해도 로그인 자체는 막히지 않는다.
+  - **관리자 승인→가입 연결 UI(2026-07-26 추가, 2026-07-27 재작성, `AdminBetaApplicationControl.tsx`)**: 상태가 `approved`이고 매칭된 계정이 아직 베타가 아닐 때만 노출. **"베타 초대 등록"(가입 전 이메일 사전등록) 버튼은 폐기** — 신청자가 이미 가입돼 있는 지금 구조에서는 호출할 때마다 "이미 가입된 사용자입니다" 오류만 반환하기 때문. 대신 **"베타 부여" 버튼**이 기존 `PATCH /api/admin/users/[id]/beta`를 그대로 호출해 `{beta_status:'active'}`만 전송한다(날짜 없이 무기한 부여 — `beta-policy.ts`의 `isBetaActive()`가 `betaEndDate` null을 "무기한 유효"로 처리). **"계정 매칭"(이메일로 수동 검색) 입력창은 완전히 제거**됐다 — 신청 시점에 항상 자동 매칭되므로 더 이상 필요 없다고 판단(사용자 확인, 예외 상황용 폴백도 남기지 않기로 함). `matched_photographer_id`가 비어 있는 예외 상황(정상 흐름에서는 발생 안 함)은 경고 문구만 표시.
+- **핵심 사용 행동 집계(`beta_usage_events` 테이블, 신규, 2026-07-27, `supabase/migrations/20260727_beta_usage_events.sql`)**: `project_logs`가 커버 못하는 프로젝트 비종속 이벤트(`signup_completed`/`first_login`) + 조회성 이벤트(`customer_link_visited`) 3종만 기록한다 — 프로젝트 생성/사진업로드/셀렉완료/납품완료 등은 이미 `project_logs`/`projects`로 확인 가능해 여기 다시 담지 않는다. `photographer_id`/`project_id` 둘 다 nullable, 어느 한쪽만 채워짐. 기록은 `src/lib/beta-usage-events.ts`의 `recordBetaUsageEvent()`(never-throw, best-effort) 하나로 통일:
+  - `signup_completed`: `auth/callback/route.ts`의 신규 가입(`!existing`) 분기에서만 기록.
+  - `first_login`: 같은 라우트에서 신규/기존 가입 여부와 무관하게 매 로그인마다 insert를 시도 — 작가당 1건만 허용하는 부분 유니크 인덱스(`photographer_id, event_type WHERE project_id IS NULL`)가 있어 이미 기록됐으면 23505로 걸러지고 조용히 무시된다(매번 별도 SELECT 없이 insert-and-ignore 방식).
+  - `customer_link_visited`: **`src/app/c/[token]/page.tsx`(인덱스)가 아니라 `src/app/c/[token]/layout.tsx`에서 기록한다.** 처음에는 인덱스 페이지에 뒀으나, PIN 인증 후 딥링크(예: 북마크된 `/c/[token]/gallery`로 직접 진입)는 인덱스를 거치지 않아 놓친다는 걸 실제 링크로 검증하다 발견해 모든 하위 경로를 감싸는 layout으로 옮겼다. App Router는 같은 동적 세그먼트 하위의 클라이언트 내비게이션에서 layout을 재실행하지 않으므로(사진 클릭 등 내부 이동마다 다시 도는 게 아니라 최초 진입 시 1회) 고객 트래픽 부하 우려도 크지 않다. 프로젝트당 1건만 허용하는 유니크 인덱스(`project_id, event_type WHERE project_id IS NOT NULL`)로 멱등 처리 — 고객이 여러 번 재접속해도 "최초 접속" 1건만 남는다(실제 링크로 재방문시켜 중복 없이 1건만 유지됨을 확인). 서버리스 환경에서는 응답 종료 후 백그라운드 실행이 보장되지 않아 `await`한다(인덱스 조회 1회 수준의 지연).
+  - 관리자 화면 반영: `/admin/beta-applications/[id]`에 "사용 현황" 섹션(매칭된 계정이 있을 때만 노출) — 첫 로그인 시각(`beta_usage_events`), 생성한 프로젝트 수(`projects` 테이블 카운트, 기존 데이터 재사용), 고객이 접속한 프로젝트 수(`beta_usage_events` 카운트).
 - **`feedback` 테이블**(신규, `supabase/migrations/20260726_feedback.sql`): `reporter_type`(photographer/customer, 현재는 photographer만 사용) · `photographer_id` · `project_id`(nullable) · `category`(bug/suggestion) · `message` · `page_url` · `status`(new/reviewing/resolved). RLS는 활성화되어 있으나 정책이 없어 anon/authenticated 롤의 직접 접근은 차단되고, 모든 접근은 서버(service role 또는 세션 검증된 API 라우트)를 통해서만 이뤄진다.
 - **`project_logs` 액션 커버리지 확장**(`supabase/migrations/20260726_project_logs_expand_actions.sql`): 기존 5개(`created/uploaded/selecting/confirmed/editing`)에 `reviewing_v1/editing_v2/reviewing_v2/delivered` 4개를 추가해 CHECK 제약을 8개 상태 전이 전부로 확장했다. 기록 지점: `reviewing_v1`/`reviewing_v2`는 작가가 `WorkflowPageClient.tsx`에서 고객 검토를 시작할 때(`POST /api/photographer/project-logs`), `editing_v2`/`delivered`는 고객이 `POST /api/c/review-submit`으로 검토 결과를 제출할 때 서버에서 직접 기록한다(둘 다 실패해도 상태 전환 자체는 막지 않음).
-- **베타 등급/이용량 제한 시스템**(2026-07-26, `supabase/migrations/20260726_beta_tier_system.sql`): 등급은 관리자(`ADMIN_EMAILS` 이메일 일치, 무제한) / 베타(`photographers.beta_status='active'` AND 기간 유효) / 일반(그 외 전부) 3단계이며, 사용자별 override 없이 전원 동일한 정책이 적용된다. 프로젝트 10개·사진 2000장(베타), 프로젝트 1개·사진 500장(일반) 등 구체적인 한도 값은 **더 이상 코드 상수가 아니라 `app_settings` DB 테이블(id=1 싱글턴)에서 읽는다** — `/admin/settings`에서 관리자가 값을 바꾸면 재배포 없이 즉시 반영된다(2026-07-26, `20260726_app_settings.sql`). 판정 로직은 FE `src/lib/beta-policy.ts`(순수 함수, DB에서 읽은 `AppSettings`를 인자로 받음) + `src/lib/app-settings.ts`(`getAppSettings()`, DB 조회 실패 시 `src/lib/beta-limits.ts`의 `DEFAULT_*` 상수로 폴백), BE `app/beta_policy.py`(`_get_settings()`가 동일한 `app_settings` 테이블 조회, 실패 시 `DEFAULT_*` 상수 폴백)에 각각 단일 소스로 모아뒀다(런타임이 둘이라 코드 공유 불가 — `ADMIN_EMAILS`는 이번 실시간화 범위에서 제외해 계속 두 언어에 하드코딩 중복). 표시용 화면(대시보드 진행바, 재보정 패널, 업로드 사전 경고)도 신규 공개 `GET /api/limits`로 같은 값을 실시간 조회한다.
+- **베타 등급/이용량 제한 시스템**(2026-07-26, `supabase/migrations/20260726_beta_tier_system.sql`): 등급은 관리자(`ADMIN_EMAILS` 이메일 일치, 무제한) / 베타(`photographers.beta_status='active'` AND 기간 유효) / 일반(그 외 전부) 3단계이며, 사용자별 override 없이 전원 동일한 정책이 적용된다. 프로젝트 10개·사진 2000장(베타), 프로젝트 1개·사진 500장(일반) 등 구체적인 한도 값은 **더 이상 코드 상수가 아니라 `app_settings` DB 테이블(id=1 싱글턴)에서 읽는다** — `/admin/settings`에서 관리자가 값을 바꾸면 재배포 없이 즉시 반영된다(2026-07-26, `20260726_app_settings.sql`). 판정 로직은 FE `src/lib/beta-policy.ts`(순수 함수, DB에서 읽은 `AppSettings`를 인자로 받음) + `src/lib/app-settings.ts`(`getAppSettings()`, DB 조회 실패 시 `src/lib/beta-limits.ts`의 `DEFAULT_*` 상수로 폴백), BE `app/beta_policy.py`(`_get_settings()`가 동일한 `app_settings` 테이블 조회, 실패 시 `DEFAULT_*` 상수 폴백)에 각각 단일 소스로 모아뒀다(런타임이 둘이라 코드 공유 불가 — `ADMIN_EMAILS`는 이번 실시간화 범위에서 제외해 계속 두 언어에 하드코딩 중복). 표시용 화면(대시보드 진행바, 재보정 패널, 업로드 사전 경고)도 신규 공개 `GET /api/limits`로 같은 값을 실시간 조회한다. **"베타 이용중" 배지(2026-07-27 추가)**: 대시보드 우측 사용량 패널이 `GET /api/photographer/quota`의 `tier` 필드를 조회해 `tier === "beta"`일 때만 "사용량" 라벨 옆에 배지를 표시한다(`src/app/photographer/dashboard/page.tsx`) — 그 전까지는 작가 본인이 자신의 등급(관리자/베타/일반)을 화면 어디서도 확인할 방법이 없었다.
   - **프로젝트 생성**: 기존엔 `src/lib/db.ts`의 `createProject()`가 브라우저에서 Supabase에 직접 INSERT해 서버 검증이 전혀 없었다. 신규 `POST /api/photographer/projects`로 옮기고 여기서 등급별 한도를 검증한 뒤 생성한다(`new/page.tsx`가 이 API를 호출하도록 변경). **모든 등급이 `COUNT(*) FROM projects`(현재 보유 수) 기준으로 판정한다** — 일반 사용자도 프로젝트를 삭제하면 즉시 슬롯이 다시 확보된다(2026-07-26 커밋 `2b2e241`/`818affc`에서 결정됨). 처음 설계 단계에서는 "삭제 후 재생성 우회 방지"를 위해 일반 사용자만 `photographers.total_projects_created`(누적, 삭제해도 감소 안 함)로 판정하도록 만들었으나, 이후 정책이 단순화되어 두 등급 모두 동일하게 현재 보유 수 기준을 쓴다 — `total_projects_created` 컬럼은 남아있지만 더 이상 읽히지 않는다.
   - **사진 업로드**: `FastAPI POST /api/upload/photos`가 기존 전역 상수 대신 `app/beta_policy.get_max_photos_per_project()`로 요청자의 등급별 한도를 조회해 검증한다.
   - **가입 전 사전 초대**: `beta_invitations` 테이블에 이메일을 등록해두면, 그 이메일로 가입하는 순간(`src/app/auth/callback/route.ts`) 자동으로 `beta_status='active'`가 부여되고 초대가 소진 처리된다. 이미 가입된 이메일은 초대 등록 자체가 거부된다(관리자가 상세 화면에서 직접 부여해야 함).
@@ -313,12 +344,17 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/photographer/quota` | GET | 세션 | 로그인한 작가 본인의 등급/사용량/한도 조회(사용자 안내용, `/photographer/projects`·`/projects/new`에서 사용) |
 | `api/limits` | GET | 없음(민감 정보 아님) | 현재 유효한 이용 한도 값(`app_settings` 조회) — 대시보드/재보정 패널/업로드 페이지 등 표시용 화면이 실시간 값 반영에 사용 |
 | `api/feedback` | POST | 세션 | 작가 피드백(버그/제안) 제출 → `feedback` 테이블 insert |
+| `api/beta/applications` | POST | 세션(2026-07-27부터 필수, 없으면 401) | 클로즈드 베타 신청서 제출. 이메일/`photographer_id`는 항상 세션에서 조회(클라이언트 입력 없음). 휴대폰번호 중복 시 409 |
+| `api/admin/beta-applications/[id]` | PATCH | `getAdminUser()` | 관리자용 베타 신청 상태/메모/연락완료 변경. (2026-07-27) `match_email` 수동 매칭 필드는 제거됨 — 신청이 로그인 필수가 되며 불필요해짐 |
 | `api/admin/projects/[id]/pin` | PATCH | `getAdminUser()` | 관리자용 PIN 재설정/제거(값 검증은 작가용과 동일한 `/^\d{4}$/`) |
 | `api/admin/feedback/[id]` | PATCH | `getAdminUser()` | 관리자용 피드백 상태 변경(new/reviewing/resolved) |
 | `api/admin/users/[id]/beta` | PATCH | `getAdminUser()` | 관리자용 베타 상태/기간/메모 변경. 변경 diff에 따라 `admin_audit_logs`에 `beta_granted`/`beta_ended`/`beta_suspended`/`beta_period_changed` 기록(메모만 변경 시 로그 없음) |
 | `api/admin/beta-invitations` | POST | `getAdminUser()` | 가입 전 이메일 사전 등록(이미 가입된 이메일이면 400) |
 | `api/admin/beta-invitations/[id]` | DELETE | `getAdminUser()` | 대기 중인 사전 초대 취소 |
 | `api/admin/settings` | PATCH | `getAdminUser()` | 이용 한도 6개 값(일반/베타 프로젝트·사진·재보정 한도, 베타 기본 기간) 갱신 — 모두 1 이상 정수 검증, `updated_at`/`updated_by` 기록. 재배포 없이 즉시 반영(§6.3) |
+| `api/photographer/beta-survey/status` | GET | 세션 | 지금 노출해야 할 설문 타입 조회(`{surveyType}`, 없으면 `null`) — §6.1b |
+| `api/photographer/beta-survey` | POST | 세션 | 설문 제출(`action:"submit"`) 또는 "나중에" 기록(`action:"later"`, 24h 재노출 억제). 이미 제출된 설문은 재기록 없이 `alreadySubmitted:true` 반환(멱등) |
+| `api/photographer/beta-survey/skip` | POST | 세션 | 설문 "다시 묻지 않기"(영구 건너뛰기) 기록 |
 
 ### 7.2 FastAPI 백엔드 (`photo-selection-be/app`)
 
@@ -432,7 +468,7 @@ sequenceDiagram
    - R2에 병렬 업로드(`photos/{photographer_id}/{project_id}/{photo_id}_(thumb|preview).jpg`), `Cache-Control: public, max-age=31536000, immutable` 적용.
    - `insert_photos_with_numbers` RPC로 `photos.number`를 원자적으로 할당하며 DB insert(경쟁 조건 방지).
    - `projects.photo_count` 갱신.
-   - 베타 한도: 프로젝트당 최대 3000장(`BETA_MAX_PHOTOS_PER_PROJECT`).
+   - 베타 한도: 프로젝트당 최대 `app_settings.beta_max_photos_per_project`장(기본값 2000, `DEFAULT_BETA_MAX_PHOTOS_PER_PROJECT`).
    - **`include_original=true`일 때 추가 흐름(B Plan 원본 비동기 압축)**:
      - FormData에 `original_filenames/original_file_sizes/original_last_modifieds/original_content_types` 포함(복구 매칭용 원본 파일 메타).
      - 서버: presigned PUT URL(`originals/source/{project_id}/{hex32}.{ext}`) 생성 + `original_jobs` INSERT(`status='awaiting_upload'`, 4개 원본 메타 포함) + `photos.original_status='awaiting_upload'` 설정.
@@ -498,7 +534,7 @@ sequenceDiagram
 | CLIP(OpenAI ViT-B-32) | 버스트샷 그룹핑, 보정본-원본 매칭 | `clip-service/` (별도 배포) |
 | OpenCV | 블러/노출 기반 대표컷 자동 선정 | `clip-service/app/quality.py` |
 
-**주의**: `AUTH_SETUP.md`(기존 문서)는 "Google 로그인"만 안내하지만, 현재 `AuthModal.tsx` 코드는 `provider: "google" | "kakao"` 두 가지를 모두 지원합니다. 다만 Kakao 프로바이더가 Supabase 대시보드에서 실제로 활성화되어 있는지는 코드로 확인할 수 없어 **`확인 필요`**입니다(기존 `ACUT_OVERVIEW.md`에는 "카카오 미구현"이라고 적혀 있어 문서 간에도 서로 불일치 — 최신 코드 기준으로 재확인 필요).
+**주의**: `AUTH_SETUP.md`(기존 문서)는 "Google 로그인"만 안내하지만, 현재 `AuthModal.tsx` 코드는 `provider: "google" | "kakao"` 두 가지를 모두 지원합니다. **Kakao 프로바이더는 실제로 활성화되어 있고 정상 작동합니다**(2026-07-27, Supabase Admin API로 `auth.users`를 직접 조회해 `app_metadata.provider: "kakao"`인 실제 가입 계정과 유효한 이메일을 확인함 — 기존 `ACUT_OVERVIEW.md`의 "카카오 미구현" 기술은 오래된 정보였던 것으로 보임, 문서 갱신 필요). `handleKakaoLogin`이 요청하는 `scopes: "profile_nickname profile_image"`에 이메일이 명시적으로 없는데도 이메일이 정상 수신되는 것으로 보아, 이 프로젝트의 카카오 앱 설정에서 이메일이 기본 동의 항목으로 등록되어 있는 것으로 추정됩니다.
 
 ---
 

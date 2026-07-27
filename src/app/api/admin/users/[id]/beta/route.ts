@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminUser } from "@/lib/admin-auth";
 import { getAdminClient } from "@/lib/supabase-admin";
+import { getAppSettings } from "@/lib/app-settings";
 import type { AuditAction } from "@/lib/admin-db";
 
 const STATUSES = ["not_invited", "active", "ended", "suspended"] as const;
@@ -18,10 +19,24 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
-  const { beta_status: nextStatus, beta_start_date: nextStart, beta_end_date: nextEnd, admin_note: nextNote } = body ?? {};
+  let { beta_start_date: nextStart, beta_end_date: nextEnd } = body ?? {};
+  const { beta_status: nextStatus, admin_note: nextNote } = body ?? {};
 
   if (nextStatus !== undefined && !STATUSES.includes(nextStatus)) {
     return NextResponse.json({ error: "invalid beta_status" }, { status: 400 });
+  }
+
+  // 날짜 없이 상태만 "active"로 보내는 요청(예: 베타 신청 승인 화면의 "베타 부여" 버튼)은
+  // 기간을 지정할 의도가 없었던 것이므로, app_settings의 기본 베타 기간만큼 자동으로 채운다.
+  // 날짜를 명시적으로 보낸 요청(관리자 상세의 수동 기간 설정)은 그대로 존중한다.
+  if (nextStatus === "active" && nextStart === undefined && nextEnd === undefined) {
+    const settings = await getAppSettings();
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(endDate.getDate() + settings.betaDefaultDurationDays);
+    const toIsoDate = (d: Date) => d.toISOString().slice(0, 10);
+    nextStart = toIsoDate(today);
+    nextEnd = toIsoDate(endDate);
   }
 
   const admin = getAdminClient();

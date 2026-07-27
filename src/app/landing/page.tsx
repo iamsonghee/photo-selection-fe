@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AuthModal } from "@/components/AuthModal";
+import { createClient } from "@/lib/supabase/client";
 
 // ─── Shared utilities ────────────────────────────────────────────────────────
 
@@ -55,7 +57,7 @@ function Clock() {
 
 // ─── Header ──────────────────────────────────────────────────────────────────
 
-function Header({ onAuthOpen }: { onAuthOpen: () => void }) {
+function Header({ onAuthOpen, isLoggedIn }: { onAuthOpen: () => void; isLoggedIn: boolean }) {
   return (
     <>
       <header className="fixed landing-header-left z-50 hidden lg:flex items-center gap-6 lg:gap-12">
@@ -68,7 +70,9 @@ function Header({ onAuthOpen }: { onAuthOpen: () => void }) {
         <nav className="hidden lg:flex items-center gap-8 landing-mono text-[11px] tracking-widest text-subtle-foreground uppercase">
           <a href="#services" className="hover:text-foreground transition">Services</a>
           <a href="#testimonials" className="hover:text-foreground transition">Reviews</a>
-          <button type="button" onClick={onAuthOpen} className="hover:text-foreground transition">Login</button>
+          <button type="button" onClick={onAuthOpen} className="hover:text-foreground transition">
+            {isLoggedIn ? "대시보드" : "Login"}
+          </button>
         </nav>
       </header>
       <div className="fixed landing-header-right z-50 hidden lg:flex items-center gap-4">
@@ -97,7 +101,7 @@ const PHASES = [
   { active: [false, true, false, false], counter: "SELECTED: 01", sync: "25%" },
 ];
 
-function HeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
+function HeroSection({ onAuthOpen, isLoggedIn }: { onAuthOpen: () => void; isLoggedIn: boolean }) {
   const [phase, setPhase] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setPhase((p) => (p + 1) % 4), 2500);
@@ -139,7 +143,7 @@ function HeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
             onClick={onAuthOpen}
             className="landing-btn-primary gap-4 px-10 py-5 text-black font-bold text-xl uppercase tracking-tight"
           >
-            무료로 시작하기
+            {isLoggedIn ? "대시보드로 이동" : "무료로 시작하기"}
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
@@ -244,7 +248,7 @@ const MOBILE_PHASES = [
   { active: [false, true, false, false], counter: "SELECTED: 01", sync: "25%" },
 ] as const;
 
-function MobileHeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
+function MobileHeroSection({ onAuthOpen, isLoggedIn }: { onAuthOpen: () => void; isLoggedIn: boolean }) {
   const [phase, setPhase] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setPhase((p) => (p + 1) % 4), 3000);
@@ -301,7 +305,7 @@ function MobileHeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
             className="landing-btn-primary flex items-center justify-center gap-3 text-black font-bold text-base uppercase tracking-tight mb-4"
             style={{ padding: "16px 24px", width: "100%" }}
           >
-            무료로 시작하기
+            {isLoggedIn ? "대시보드로 이동" : "무료로 시작하기"}
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
@@ -377,7 +381,9 @@ function MobileHeroSection({ onAuthOpen }: { onAuthOpen: () => void }) {
         <nav className="pt-8 border-t border-border-subtle flex flex-wrap gap-x-8 gap-y-4 landing-mono text-[10px] tracking-widest text-subtle-foreground uppercase justify-center">
           <a href="#services" className="hover:text-foreground transition">Selection</a>
           <a href="#testimonials" className="hover:text-foreground transition">Reviews</a>
-          <button type="button" onClick={onAuthOpen} className="hover:text-foreground transition">Login</button>
+          <button type="button" onClick={onAuthOpen} className="hover:text-foreground transition">
+            {isLoggedIn ? "대시보드" : "Login"}
+          </button>
         </nav>
       </div>
     </div>
@@ -410,7 +416,7 @@ const PROBLEMS = [
   },
 ];
 
-function ProblemSection({ onAuthOpen }: { onAuthOpen: () => void }) {
+function ProblemSection({ onAuthOpen, isLoggedIn }: { onAuthOpen: () => void; isLoggedIn: boolean }) {
   return (
     <section className="relative z-10 w-full" style={{ background: "var(--background)" }}>
       {/* Intro */}
@@ -483,7 +489,7 @@ function ProblemSection({ onAuthOpen }: { onAuthOpen: () => void }) {
             onClick={onAuthOpen}
             className="landing-btn-primary gap-4 px-16 py-6 text-black font-bold text-xl uppercase"
           >
-            지금 바로 효율 높이기
+            {isLoggedIn ? "대시보드로 이동" : "지금 바로 효율 높이기"}
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
@@ -768,7 +774,7 @@ function TestimonialsSection() {
 
 // ─── CTA Section ─────────────────────────────────────────────────────────────
 
-function CTASection({ onAuthOpen }: { onAuthOpen: () => void }) {
+function CTASection({ onAuthOpen, isLoggedIn }: { onAuthOpen: () => void; isLoggedIn: boolean }) {
   return (
     <section className="relative z-10 w-full overflow-hidden" style={{ background: "var(--background)", minHeight: "60vh" }}>
       <div className="landing-cta-noise" />
@@ -781,15 +787,19 @@ function CTASection({ onAuthOpen }: { onAuthOpen: () => void }) {
             다음 촬영부터<br /><span className="text-accent">바로 써보세요</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base lg:text-lg leading-relaxed max-w-xl mx-auto mb-12 landing-break">
-            지금 가입하면 베타 기간 동안 무료로 사용할 수 있습니다.<br />
-            프로젝트 10개, 사진 1,500장까지 제한 없이 테스트해보세요.
+            일반 무료 체험<br />
+            프로젝트 1개 · 프로젝트당 최대 500장<br /><br />
+            더 많은 프로젝트와 사진 업로드가 필요하다면<br />
+            <Link href="/beta/apply" className="text-accent underline underline-offset-2 hover:text-accent/80">
+              클로즈드 베타를 신청하세요.
+            </Link>
           </p>
           <button
             type="button"
             onClick={onAuthOpen}
             className="landing-btn-primary gap-3 px-8 sm:px-16 py-4 sm:py-6 text-black font-bold text-base sm:text-xl uppercase w-full sm:w-auto"
           >
-            무료로 시작하기
+            {isLoggedIn ? "대시보드로 이동" : "무료로 시작하기"}
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
@@ -814,6 +824,22 @@ function CTASection({ onAuthOpen }: { onAuthOpen: () => void }) {
 
 export default function LandingPage() {
   const [authOpen, setAuthOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const router = useRouter();
+
+  // 이미 로그인된 세션이면 CTA가 로그인 모달을 다시 띄우지 않고 대시보드로 바로 이동한다
+  // (랜딩페이지는 로그인 상태와 무관하게 항상 같은 화면을 보여주던 것을 보완).
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setIsLoggedIn(true);
+    });
+  }, []);
+
+  const handleCta = () => {
+    if (isLoggedIn) router.push("/photographer/dashboard");
+    else setAuthOpen(true);
+  };
 
   return (
     <div className="landing-root">
@@ -827,21 +853,21 @@ export default function LandingPage() {
 
       {/* Mobile hero (lg 미만에서만 표시) */}
       <div className="block lg:hidden">
-        <MobileHeroSection onAuthOpen={() => setAuthOpen(true)} />
+        <MobileHeroSection onAuthOpen={handleCta} isLoggedIn={isLoggedIn} />
       </div>
 
       {/* Desktop header (lg 이상에서만 표시) */}
-      <Header onAuthOpen={() => setAuthOpen(true)} />
+      <Header onAuthOpen={handleCta} isLoggedIn={isLoggedIn} />
 
       <main>
         {/* Desktop hero (lg 이상에서만 표시) */}
         <div className="hidden lg:block">
-          <HeroSection onAuthOpen={() => setAuthOpen(true)} />
+          <HeroSection onAuthOpen={handleCta} isLoggedIn={isLoggedIn} />
         </div>
-        <ProblemSection onAuthOpen={() => setAuthOpen(true)} />
+        <ProblemSection onAuthOpen={handleCta} isLoggedIn={isLoggedIn} />
         <ServicesSection />
         <TestimonialsSection />
-        <CTASection onAuthOpen={() => setAuthOpen(true)} />
+        <CTASection onAuthOpen={handleCta} isLoggedIn={isLoggedIn} />
       </main>
 
       <footer className="landing-footer relative z-10 border-t border-border-subtle py-8 bg-background">

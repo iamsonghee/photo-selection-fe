@@ -8,16 +8,23 @@ import Link from "next/link";
 import {
   Plus, AlertCircle, ChevronRight, Clock, Activity, Layers, Zap, CheckCircle2,
 } from "lucide-react";
-import { DEFAULT_BETA_MAX_PROJECTS_TOTAL } from "@/lib/beta-limits";
+import {
+  DEFAULT_BETA_MAX_PROJECTS_TOTAL,
+  DEFAULT_GENERAL_MAX_PROJECTS,
+  DEFAULT_GENERAL_MAX_PHOTOS_PER_PROJECT,
+} from "@/lib/beta-limits";
 import { getProjectsByPhotographerId } from "@/lib/db";
 import type { Project, ProjectStatus } from "@/types";
 import type { ProjectLogItem } from "@/lib/db";
 import { useProfile } from "@/contexts/ProfileContext";
 import EmptyDashboard from "./EmptyDashboard";
+import { BetaSurveyModal } from "@/components/photographer/BetaSurveyModal";
+import type { SurveyType } from "@/lib/beta-survey";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { ProjectPipelineMiniBar, getPipelineStepLabel } from "@/components/photographer/ProjectPipelineMiniBar";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { getActiveDeadline } from "@/lib/project-deadline";
+import { consumePostLoginRedirect, peekPostLoginRedirect } from "@/lib/post-login-redirect";
 
 const ACCENT = "var(--accent)";
 const RED    = "#EF4444";
@@ -196,11 +203,28 @@ export default function DashboardPage() {
   const [logs, setLogs]         = useState<ProjectLogItem[]>([]);
   const [dashFilter, setDashFilter] = useState<"all" | "active" | "completed">("all");
   const [betaMaxProjectsTotal, setBetaMaxProjectsTotal] = useState(DEFAULT_BETA_MAX_PROJECTS_TOTAL);
+  const [tier, setTier] = useState<"admin" | "beta" | "general" | null>(null);
+  const [maxProjects, setMaxProjects] = useState(DEFAULT_GENERAL_MAX_PROJECTS);
+  const [maxPhotosPerProject, setMaxPhotosPerProject] = useState(DEFAULT_GENERAL_MAX_PHOTOS_PER_PROJECT);
+  const [surveyToShow, setSurveyToShow] = useState<SurveyType | null>(null);
+  // 첫 렌더에서(이펙트를 기다리지 않고) 곧바로 읽는다 — 그래야 대시보드 실제 콘텐츠가 한 프레임도
+  // 그려지지 않고 바로 로딩 화면으로 대체된다. 실제 소비(제거)는 아래 이펙트가 담당.
+  const [pendingRedirect] = useState(() =>
+    typeof window === "undefined" ? null : peekPostLoginRedirect()
+  );
 
   const userName =
     profile?.name?.trim() ||
     profile?.email?.split("@")[0] ||
     "사용자";
+
+  // 로그인은 항상 여기로 도착한다(auth/callback 기본 목적지) — /beta/apply처럼 로그인 후 다른
+  // 페이지로 되돌아가야 하는 흐름은 AuthModal이 로그인 전에 남겨둔 목적지를 여기서 소비한다
+  // (src/lib/post-login-redirect.ts). 콜백 URL 자체에 쿼리스트링을 붙이지 않기 위한 우회.
+  useEffect(() => {
+    const redirectPath = consumePostLoginRedirect();
+    if (redirectPath) router.replace(redirectPath);
+  }, [router]);
 
   useEffect(() => {
     if (profileLoading) return;
@@ -225,6 +249,17 @@ export default function DashboardPage() {
   }, [profile, profileLoading]);
 
   useEffect(() => {
+    fetch("/api/photographer/quota")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.tier) setTier(data.tier);
+        if (data?.max) setMaxProjects(data.max);
+        if (data?.maxPhotosPerProject) setMaxPhotosPerProject(data.maxPhotosPerProject);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     fetch("/api/limits")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
@@ -233,7 +268,19 @@ export default function DashboardPage() {
       .catch(() => {});
   }, []);
 
-  if (profileLoading || loading) {
+  // 베타 설문(plan/beta-system.md §7) — 프로젝트가 하나도 없는 빈 대시보드 상태에서는
+  // 트리거 조건(첫 생성 프로젝트 delivered)이 구조적으로 성립할 수 없으므로 로드 완료 후에만 확인
+  useEffect(() => {
+    if (loading || projects.length === 0) return;
+    fetch("/api/photographer/beta-survey/status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.surveyType) setSurveyToShow(data.surveyType);
+      })
+      .catch(() => {});
+  }, [loading, projects.length]);
+
+  if (pendingRedirect || profileLoading || loading) {
     return <PageLoader variant="full" />;
   }
 
@@ -256,6 +303,9 @@ export default function DashboardPage() {
       <EmptyDashboard
         userName={userName}
         onCreateProject={() => router.push("/photographer/projects/new")}
+        tier={tier}
+        maxProjects={maxProjects}
+        maxPhotosPerProject={maxPhotosPerProject}
       />
     );
   }
@@ -376,6 +426,11 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2 pb-3 border-b border-border-subtle">
               <Activity size={12} className="text-subtle-foreground" />
               <span className="text-[10px] text-subtle-foreground uppercase tracking-wider font-semibold">사용량</span>
+              {tier === "beta" && (
+                <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-accent/15 text-accent">
+                  베타 이용중
+                </span>
+              )}
             </div>
 
             <div className="flex flex-col gap-2">
@@ -488,6 +543,10 @@ export default function DashboardPage() {
       >
         <Plus size={24} strokeWidth={2} />
       </button>
+
+      {surveyToShow && (
+        <BetaSurveyModal surveyType={surveyToShow} onDone={() => setSurveyToShow(null)} />
+      )}
     </div>
   );
 }

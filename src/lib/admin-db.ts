@@ -355,6 +355,130 @@ export async function getAuditLogsForPhotographer(photographerId: string): Promi
   }));
 }
 
+export type BetaApplicationStatus = "applied" | "reviewing" | "on_hold" | "approved" | "rejected";
+
+export const BETA_APPLICATION_STATUS_LABELS: Record<BetaApplicationStatus, string> = {
+  applied: "신청완료",
+  reviewing: "검토중",
+  on_hold: "보류",
+  approved: "승인",
+  rejected: "거절",
+};
+
+export type AdminBetaApplicationSummary = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  genre: string;
+  monthlyShootCount: number;
+  status: BetaApplicationStatus;
+  createdAt: string;
+  matchedPhotographerId: string | null;
+};
+
+export type AdminBetaApplicationDetail = AdminBetaApplicationSummary & {
+  avgPhotosPerProject: number;
+  currentWorkflow: string;
+  reason: string;
+  adminNote: string | null;
+  contacted: boolean;
+  matchedPhotographerName: string | null;
+  matchedPhotographerEmail: string | null;
+  matchedPhotographerBetaStatus: BetaStatus | null;
+  /** 매칭된 계정 기준 사용 현황(§12 4단계) — 매칭 전에는 전부 null/0 */
+  firstLoginAt: string | null;
+  projectCount: number;
+  customerLinkVisitedCount: number;
+};
+
+type BetaApplicationRow = Database["public"]["Tables"]["beta_applications"]["Row"];
+
+function mapBetaApplicationSummary(row: BetaApplicationRow): AdminBetaApplicationSummary {
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    email: row.email,
+    genre: row.genre,
+    monthlyShootCount: row.monthly_shoot_count,
+    status: row.status,
+    createdAt: row.created_at,
+    matchedPhotographerId: row.matched_photographer_id,
+  };
+}
+
+/** 관리자용 — 전체 베타 신청 목록 */
+export async function getAllBetaApplicationsForAdmin(): Promise<AdminBetaApplicationSummary[]> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from("beta_applications")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as BetaApplicationRow[]).map(mapBetaApplicationSummary);
+}
+
+/** 관리자용 — 베타 신청 상세(매칭된 작가 정보 포함) */
+export async function getBetaApplicationForAdmin(id: string): Promise<AdminBetaApplicationDetail | null> {
+  const admin = getAdminClient();
+  const { data, error } = await admin.from("beta_applications").select("*").eq("id", id).maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+
+  const row = data as BetaApplicationRow;
+  let matchedPhotographerName: string | null = null;
+  let matchedPhotographerEmail: string | null = null;
+  let matchedPhotographerBetaStatus: BetaStatus | null = null;
+  let firstLoginAt: string | null = null;
+  let projectCount = 0;
+  let customerLinkVisitedCount = 0;
+
+  if (row.matched_photographer_id) {
+    const matchedId = row.matched_photographer_id;
+    const [{ data: pRow }, { data: loginRow }, { count: projCount }, { count: visitCount }] = await Promise.all([
+      admin.from("photographers").select("name, email, beta_status").eq("id", matchedId).maybeSingle(),
+      admin
+        .from("beta_usage_events")
+        .select("occurred_at")
+        .eq("photographer_id", matchedId)
+        .eq("event_type", "first_login")
+        .maybeSingle(),
+      admin.from("projects").select("*", { count: "exact", head: true }).eq("photographer_id", matchedId),
+      admin
+        .from("beta_usage_events")
+        .select("*", { count: "exact", head: true })
+        .eq("photographer_id", matchedId)
+        .eq("event_type", "customer_link_visited"),
+    ]);
+    if (pRow) {
+      matchedPhotographerName = pRow.name ?? null;
+      matchedPhotographerEmail = pRow.email ?? null;
+      matchedPhotographerBetaStatus = pRow.beta_status as BetaStatus;
+    }
+    firstLoginAt = loginRow?.occurred_at ?? null;
+    projectCount = projCount ?? 0;
+    customerLinkVisitedCount = visitCount ?? 0;
+  }
+
+  return {
+    ...mapBetaApplicationSummary(row),
+    avgPhotosPerProject: row.avg_photos_per_project,
+    currentWorkflow: row.current_workflow,
+    reason: row.reason,
+    adminNote: row.admin_note,
+    contacted: row.contacted,
+    matchedPhotographerName,
+    matchedPhotographerEmail,
+    matchedPhotographerBetaStatus,
+    firstLoginAt,
+    projectCount,
+    customerLinkVisitedCount,
+  };
+}
+
 export type AdminBetaInvitation = {
   id: string;
   email: string;
