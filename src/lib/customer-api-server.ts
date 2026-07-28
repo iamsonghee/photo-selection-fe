@@ -87,51 +87,32 @@ export async function getProjectByToken(
   return mapProjectRow(data as ProjectsRow);
 }
 
-/** 프로젝트의 사진 + selections + AI 유사컷 그룹 (admin). */
-export async function getPhotosWithSelectionsAdmin(
+// Supabase PostgREST 기본 limit=1000 우회(src/lib/db.ts와 동일 패턴) — BETA_MAX=3000이므로
+// photos/selections는 3페이지를 병렬 요청한다. 안 하면 1000장 넘는 프로젝트에서 고객 갤러리/
+// 뷰어의 전체 장수·뒷 순번 사진들이 통째로 잘려서 안 보이는 문제가 생긴다.
+const PAGE = 1000;
+
+async function fetchSelectionsAdmin(
   admin: SupabaseClient,
   projectId: string
-): Promise<{
-  photos: Photo[];
+): Promise<SelectionsRow[]> {
+  const selectionPages = await Promise.all(
+    [0, 1, 2].map((i) =>
+      admin
+        .from("selections")
+        .select("*")
+        .eq("project_id", projectId)
+        .range(i * PAGE, (i + 1) * PAGE - 1)
+    )
+  );
+  for (const s of selectionPages) if (s.error) throw new Error(s.error.message);
+  return selectionPages.flatMap((s) => (s.data ?? []) as SelectionsRow[]);
+}
+
+function buildSelectionState(selections: SelectionsRow[]): {
   selectedIds: Set<string>;
   photoStates: Record<string, PhotoState>;
-  photoGroups: PhotoGroupInfo[];
-}> {
-  // Supabase PostgREST 기본 limit=1000 우회(src/lib/db.ts와 동일 패턴) — BETA_MAX=3000이므로
-  // photos/selections는 3페이지를 병렬 요청한다. 안 하면 1000장 넘는 프로젝트에서 고객 갤러리/
-  // 뷰어의 전체 장수·뒷 순번 사진들이 통째로 잘려서 안 보이는 문제가 생긴다.
-  const PAGE = 1000;
-  const [photoPages, selectionPages, groupsRes] = await Promise.all([
-    Promise.all(
-      [0, 1, 2].map((i) =>
-        admin
-          .from("photos")
-          .select("*")
-          .eq("project_id", projectId)
-          .order("number", { ascending: true })
-          .range(i * PAGE, (i + 1) * PAGE - 1)
-      )
-    ),
-    Promise.all(
-      [0, 1, 2].map((i) =>
-        admin
-          .from("selections")
-          .select("*")
-          .eq("project_id", projectId)
-          .range(i * PAGE, (i + 1) * PAGE - 1)
-      )
-    ),
-    admin
-      .from("photo_groups")
-      .select("id, representative_photo_id, photo_count")
-      .eq("project_id", projectId),
-  ]);
-  for (const p of photoPages) if (p.error) throw new Error(p.error.message);
-  for (const s of selectionPages) if (s.error) throw new Error(s.error.message);
-  if (groupsRes.error) throw new Error(groupsRes.error.message);
-
-  const rows = photoPages.flatMap((p) => (p.data ?? []) as PhotosRow[]);
-  const selections = selectionPages.flatMap((s) => (s.data ?? []) as SelectionsRow[]);
+} {
   // is_selected로 명시적으로 선택된 사진만 카운트한다.
   // 별점/컬러태그/코멘트만 남긴 행은 selections 테이블에 존재하지만 "선택"은 아니다.
   const selectedIds = new Set(
@@ -146,6 +127,49 @@ export async function getPhotosWithSelectionsAdmin(
       comment: s.comment ?? undefined,
     };
   }
+  return { selectedIds, photoStates };
+}
+
+/** selections만 조회(사진/그룹 제외) — 폴링 등 경량 재조회용. */
+export async function getSelectionsOnlyAdmin(
+  admin: SupabaseClient,
+  projectId: string
+): Promise<{ selectedIds: Set<string>; photoStates: Record<string, PhotoState> }> {
+  return buildSelectionState(await fetchSelectionsAdmin(admin, projectId));
+}
+
+/** 프로젝트의 사진 + selections + AI 유사컷 그룹 (admin). */
+export async function getPhotosWithSelectionsAdmin(
+  admin: SupabaseClient,
+  projectId: string
+): Promise<{
+  photos: Photo[];
+  selectedIds: Set<string>;
+  photoStates: Record<string, PhotoState>;
+  photoGroups: PhotoGroupInfo[];
+}> {
+  const [photoPages, selections, groupsRes] = await Promise.all([
+    Promise.all(
+      [0, 1, 2].map((i) =>
+        admin
+          .from("photos")
+          .select("*")
+          .eq("project_id", projectId)
+          .order("number", { ascending: true })
+          .range(i * PAGE, (i + 1) * PAGE - 1)
+      )
+    ),
+    fetchSelectionsAdmin(admin, projectId),
+    admin
+      .from("photo_groups")
+      .select("id, representative_photo_id, photo_count")
+      .eq("project_id", projectId),
+  ]);
+  for (const p of photoPages) if (p.error) throw new Error(p.error.message);
+  if (groupsRes.error) throw new Error(groupsRes.error.message);
+
+  const rows = photoPages.flatMap((p) => (p.data ?? []) as PhotosRow[]);
+  const { selectedIds, photoStates } = buildSelectionState(selections);
   const photos = rows.map((row) => mapPhotoRow(row, selectedIds, photoStates));
   const groupRows = (groupsRes.data ?? []) as {
     id: string;
@@ -165,20 +189,26 @@ export async function upsertSelectionAdmin(
   params: {
     project_id: string;
     photo_id: string;
+    /** 생략 시(undefined) 기존 값을 그대로 둔다. null이면 명시적으로 지운다. */
     rating?: number | null;
+    /** 생략 시(undefined) 기존 값을 그대로 둔다. null이면 명시적으로 지운다. */
     color_tag?: string | null;
+    /** 생략 시(undefined) 기존 값을 그대로 둔다. null이면 명시적으로 지운다. */
     comment?: string | null;
     /** 생략 시 기존 선택 상태를 그대로 둔다 (별점/코멘트만 남기는 경우 등). */
     is_selected?: boolean;
   }
 ): Promise<void> {
+  // 제공되지 않은 필드는 payload에서 아예 제외한다 — PostgREST upsert는
+  // payload에 실제로 있는 컬럼만 DO UPDATE SET에 반영하므로, 이렇게 해야
+  // 다른 세션이 그 사이 저장한 다른 필드 값을 덮어쓰지 않는다.
   const payload: Record<string, unknown> = {
     project_id: params.project_id,
     photo_id: params.photo_id,
-    rating: params.rating ?? null,
-    color_tag: params.color_tag ?? null,
-    comment: params.comment ?? null,
   };
+  if (params.rating !== undefined) payload.rating = params.rating;
+  if (params.color_tag !== undefined) payload.color_tag = params.color_tag;
+  if (params.comment !== undefined) payload.comment = params.comment;
   if (params.is_selected !== undefined) {
     payload.is_selected = params.is_selected;
   }

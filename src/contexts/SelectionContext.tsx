@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -17,6 +18,18 @@ async function fetchCustomerPhotos(token: string) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error ?? "Failed to load");
   }
+  return res.json();
+}
+
+/** 다른 세션이 저장한 selections 변경을 반영하기 위한 경량 폴링 조회. */
+async function fetchSelectionsPoll(
+  token: string,
+  projectId: string
+): Promise<{ selectedIds: string[]; photoStates: Record<string, PhotoState> } | null> {
+  const res = await fetch(
+    `/api/c/selections?token=${encodeURIComponent(token)}&project_id=${encodeURIComponent(projectId)}`
+  );
+  if (!res.ok) return null;
   return res.json();
 }
 
@@ -46,6 +59,23 @@ async function upsertSelectionApi(
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error ?? "Failed");
   }
+}
+
+/**
+ * patch에 실제로 존재하는 키만 API payload로 변환한다 — 로컬 캐시 전체를
+ * 재전송하면 다른 세션이 그 사이 저장한 값(예: 별점)을 덮어쓰게 되므로,
+ * 이번에 바뀐 필드만 서버로 보낸다.
+ */
+function patchToApiPayload(patch: Partial<PhotoState>): {
+  rating?: number | null;
+  color_tag?: string | null;
+  comment?: string | null;
+} {
+  const payload: { rating?: number | null; color_tag?: string | null; comment?: string | null } = {};
+  if ("rating" in patch) payload.rating = patch.rating ?? null;
+  if ("color" in patch) payload.color_tag = serializeColorTags(patch.color);
+  if ("comment" in patch) payload.comment = patch.comment ?? null;
+  return payload;
 }
 
 async function confirmProjectApi(token: string, projectId: string) {
@@ -108,6 +138,19 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [photoStates, setPhotoStates] = useState<Record<string, PhotoState>>({});
   const [loading, setLoading] = useState(true);
+  // photoId별로 왕복 중인 저장 요청 수를 센다. 0보다 크면 그 사진은 폴링 응답으로
+  // 덮어쓰지 않고 로컬 값을 우선한다(방금 로컬에서 바꾼 값을 폴링이 되돌리는 것 방지).
+  const pendingWritesRef = useRef<Map<string, number>>(new Map());
+  const beginWrite = useCallback((photoId: string) => {
+    const m = pendingWritesRef.current;
+    m.set(photoId, (m.get(photoId) ?? 0) + 1);
+  }, []);
+  const endWrite = useCallback((photoId: string) => {
+    const m = pendingWritesRef.current;
+    const next = (m.get(photoId) ?? 1) - 1;
+    if (next <= 0) m.delete(photoId);
+    else m.set(photoId, next);
+  }, []);
 
   useEffect(() => {
     if (!token) {
@@ -119,6 +162,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       return;
     }
+    pendingWritesRef.current = new Map();
     let cancelled = false;
     setLoading(true);
     fetchCustomerPhotos(token)
@@ -144,9 +188,8 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   const updatePhotoState = useCallback(
     (photoId: string, patch: Partial<PhotoState>) => {
       // setState 업데이터는 React가 순수성 검증을 위해 두 번 호출할 수 있으므로(Strict Mode 등),
-      // 그 안에서 직접 fetch를 실행하면 매번 API가 2번씩 나간다. 업데이터는 상태 계산만 하고,
-      // 실제로 저장할 값은 바깥 변수에 담아뒀다가 setState 호출이 끝난 뒤 한 번만 호출한다.
-      let mergedForApi: PhotoState | null = null;
+      // 그 안에서 직접 fetch를 실행하면 매번 API가 2번씩 나간다. 업데이터는 로컬 표시용 상태
+      // 계산만 하고, 실제 서버 저장은 바뀐 필드(patch)만 골라 setState 호출이 끝난 뒤 한 번만 보낸다.
       setPhotoStates((prev) => {
         const prevPhoto = prev[photoId] ?? {};
         const merged: PhotoState = { ...prevPhoto, ...patch };
@@ -154,19 +197,20 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         if ("rating" in patch && patch.rating === undefined) {
           delete merged.rating;
         }
-        mergedForApi = merged;
         return { ...prev, [photoId]: merged };
       });
-      if (project?.id && token && mergedForApi) {
-        const state: PhotoState = mergedForApi;
-        upsertSelectionApi(token, project.id, photoId, {
-          rating: state.rating ?? null,
-          color_tag: serializeColorTags(state.color),
-          comment: state.comment ?? null,
-        }).catch(console.error);
+      if (project?.id && token) {
+        const projectId = project.id;
+        // 다른 세션이 그 사이 저장한 값을 덮어쓰지 않도록, 로컬 캐시 전체가 아니라
+        // 이번에 실제로 바뀐 필드만 서버로 보낸다.
+        const apiPayload = patchToApiPayload(patch);
+        beginWrite(photoId);
+        upsertSelectionApi(token, projectId, photoId, apiPayload)
+          .catch(console.error)
+          .finally(() => endWrite(photoId));
       }
     },
-    [project?.id, token]
+    [project?.id, token, beginWrite, endWrite]
   );
 
   const toggle = useCallback(
@@ -194,16 +238,19 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         return next;
       });
       if (changed) {
-        // is_selected만 명시적으로 바꾼다 — 별점/코멘트는 건드리지 않고 그대로 유지.
-        upsertSelectionApi(token, project.id, photoId, {
-          rating: photoStates[photoId]?.rating ?? null,
-          color_tag: serializeColorTags(photoStates[photoId]?.color),
-          comment: photoStates[photoId]?.comment ?? null,
+        // is_selected만 명시적으로 바꾼다 — 별점/코멘트/색상은 건드리지 않고 그대로 유지한다.
+        // (과거엔 로컬 캐시의 rating/color_tag/comment까지 재전송해서, 다른 세션이 그 사이
+        // 저장한 값을 덮어쓰는 문제가 있었다.)
+        const projectId = project.id;
+        beginWrite(photoId);
+        upsertSelectionApi(token, projectId, photoId, {
           is_selected: nextIsSelected,
-        }).catch(console.error);
+        })
+          .catch(console.error)
+          .finally(() => endWrite(photoId));
       }
     },
-    [project?.id, project?.requiredCount, token, photoStates]
+    [project?.id, project?.requiredCount, token, beginWrite, endWrite]
   );
 
   const isSelected = useCallback(
@@ -215,6 +262,47 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   const N = project?.requiredCount ?? 0;
   const projectId = project?.id ?? null;
   const projectStatus = project?.status ?? null;
+
+  // 다른 세션이 저장한 변경사항을 반영하기 위한 폴링. 아직 결과를 기다리는 중인
+  // 저장 요청이 있는 사진(pendingWritesRef)만 로컬 값을 유지하고, 나머지는 서버 최신값으로 교체한다.
+  useEffect(() => {
+    if (!token || !projectId) return;
+    if (projectStatus !== "selecting" && projectStatus !== "preparing") return;
+    let cancelled = false;
+    const POLL_MS = 5000;
+    const poll = async () => {
+      if (cancelled || document.hidden) return;
+      const data = await fetchSelectionsPoll(token, projectId);
+      if (cancelled || !data) return;
+      const pending = pendingWritesRef.current;
+      setSelectedIds((prev) => {
+        const next = new Set(data.selectedIds);
+        for (const photoId of pending.keys()) {
+          if (prev.has(photoId)) next.add(photoId);
+          else next.delete(photoId);
+        }
+        return next;
+      });
+      setPhotoStates((prev) => {
+        const next = { ...data.photoStates };
+        for (const photoId of pending.keys()) {
+          if (prev[photoId] !== undefined) next[photoId] = prev[photoId];
+          else delete next[photoId];
+        }
+        return next;
+      });
+    };
+    const intervalId = setInterval(poll, POLL_MS);
+    const onVisible = () => {
+      if (!document.hidden) poll();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [token, projectId, projectStatus]);
 
   const value = useMemo<SelectionContextValue>(
     () => ({

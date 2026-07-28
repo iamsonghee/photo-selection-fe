@@ -129,7 +129,19 @@ clip-service/          완전히 독립된 FastAPI 앱 (별도 배포 단위)
     quality.py             OpenCV 블러/노출 점수로 대표컷 선정
     matcher.py              보정본 파일 ↔ 원본 사진 CLIP 유사도 매칭
     analyzer.py             전체 파이프라인 오케스트레이션
+    gemini_client.py        (2026-07-28 추가) Gemini 멀티모달 임베딩 API 래퍼 — POC 전용
+    gemini_analyzer.py       (2026-07-28 추가) Gemini 파이프라인 오케스트레이션 + threshold 재계산
+    gemini_embeddings_store.py (2026-07-28 추가) gemini_embeddings 테이블 CRUD
+    gemini_state.py           (2026-07-28 추가) Gemini 전용 in-flight 가드 (OpenCLIP과 별도)
+    gemini_quality_client.py     (2026-07-28 추가) Gemini Flash 품질 판정 API 래퍼 — POC 전용
+    gemini_quality_analyzer.py    (2026-07-28 추가) Flash 품질 판정 파이프라인
+    gemini_quality_store.py        (2026-07-28 추가) gemini_quality_assessments 테이블 CRUD
+    gemini_quality_state.py          (2026-07-28 추가) Flash 품질 판정 전용 in-flight 가드(3번째 독립 세트)
   migration.sql        수동 실행용 DDL (photo_groups 테이블 등, ORM/마이그레이션 도구 미사용)
+  migration_002_quality_flags.sql  흔들림/눈감음 경고 배지용 컬럼
+  migration_003_gemini_poc.sql     (2026-07-28 추가) Gemini Embedding POC 전용 신규 테이블 2개, 기존 스키마 무변경
+  migration_004_gemini_quality_poc.sql  (2026-07-28 추가) Gemini Flash 품질 판정 POC 전용 신규 테이블 2개
+  migration_005_gemini_embedding_cache_fields.sql  (2026-07-28 추가, 베타 전환) gemini_embeddings에 embedding_version/source_object_key 컬럼 추가, UNIQUE 제약을 (project_id, photo_id, embedding_model, dimension, embedding_version)로 재정의
 ```
 
 ---
@@ -155,6 +167,7 @@ clip-service/          완전히 독립된 FastAPI 앱 (별도 배포 단위)
 - **스토리지 클라이언트**: `boto3` S3 호환 클라이언트로 Cloudflare R2 접근(`app/storage.py`). GCS 관련 코드도 존재하나 어떤 라우터에서도 호출되지 않는 것으로 확인됨(죽은 코드로 추정).
 - **DB 접근**: ORM 없음. 공식 `supabase` Python 클라이언트(PostgREST 기반)로만 접근. `app/models/`는 빈 패키지.
 - **CLIP 서비스**: `clip-service/`는 메인 앱과 완전히 분리된 별도 FastAPI 앱(자체 `Dockerfile`, `requirements.txt`에 `torch`/`torchvision`/`open_clip_torch`/`opencv-python-headless` 포함). 메인 백엔드 코드(`app/`)는 어디에서도 `clip-service`를 호출하지 않음 — **프론트엔드가 `CLIP_SERVICE_URL`로 clip-service를 직접 호출**한다.
+- **Gemini Embedding — 베타 유사컷 분석 엔진** (2026-07-28 도입, 같은 날 베타 전환): 같은 `clip-service` 프로세스 안에 OpenCLIP 파이프라인과 완전히 독립된 `/analyze/gemini*` 엔드포인트로 추가됨(별도 서비스 아님). 최초에는 관리자 전용 POC(OpenCLIP과 결과 비교 목적)로 도입됐으나, 같은 날 **베타 공개 시점에 작가 업로드 화면의 `[AI 유사도 분석]` 버튼이 호출하는 대상 자체가 OpenCLIP(`/analyze`)에서 Gemini(`/analyze/gemini`)로 전환**되어 지금은 모든 베타 사용자가 쓰는 실사용 엔진이다. `google-genai` SDK로 `gemini-embedding-2` 멀티모달 모델을 호출해 이미지 임베딩을 생성하고, 그룹핑 알고리즘(`grouping.py`)은 OpenCLIP과 동일하게 재사용한다. 임베딩 자체는 신규 테이블(`gemini_analysis_runs`, `gemini_embeddings`)에만 저장하지만, 계산된 그룹 결과는 `sync_groups_to_db()`가 **기존 운영 스키마(`photo_groups`/`photos.similarity_group_id`)에 그대로 반영(persist)**한다 — 작가 업로드 화면과 고객 갤러리의 "유사컷 대표이미지 적용" 관련 코드는 엔진이 무엇이든 동일한 스키마를 읽으므로 전혀 수정할 필요가 없었다. 흔들림/눈감음 품질 판정(OpenCV/MediaPipe)은 이 전환에 포함되지 않으며 베타 흐름에서 완전히 빠졌다(§6.4/§6.6 참고, 향후 재도입 시에는 §6.7의 Gemini Flash를 쓴다). §6.6, §7.4 참고.
 - **테스트**: 백엔드에는 자동화 테스트가 전혀 없음 (`app/`, `clip-service/` 어디에도 test 파일 없음, pytest 등 의존성 없음).
 
 ---
@@ -167,7 +180,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 |---|---|---|
 | `photographers` | `id, auth_id, email, name, profile_image_url, bio, instagram_url, portfolio_url, contact_phone, created_at, beta_status("not_invited"\|"active"\|"ended"\|"suspended"), beta_start_date, beta_end_date, admin_note, total_projects_created` | `auth_id`는 Supabase Auth의 `user.id`. 회원가입 시 자동 생성(`src/app/auth/callback/route.ts`). 등급(관리자/베타/일반) 컬럼은 2026-07-26 베타 등급 시스템에서 추가(`supabase/migrations/20260726_beta_tier_system.sql`) — 기존 가입자도 그랜드파더링 없이 `beta_status='not_invited'`(일반)로 시작. `total_projects_created`는 삭제해도 감소하지 않는 누적 생성 카운터로 설계됐으나, 2026-07-26 정책 변경(커밋 `2b2e241`/`818affc`)으로 일반 사용자 한도 판정이 "현재 보유 수" 기준으로 바뀌면서 **더 이상 어떤 검증 로직에서도 읽히지 않는 컬럼**이 됐다(계속 +1은 되지만 사용처 없음) — §6.3, §13 참고. |
 | `projects` | `id, photographer_id, name, customer_name, shoot_date, deadline, required_count, photo_count, status, access_token, access_pin, confirmed_at, delivered_at, customer_cancel_count, max_revision_count, revision_round, review_deadline, shoot_type, customer_phone, clip_analysis_status, display_id, created_at, updated_at` | `status`는 8가지 값의 상태 머신(§9). `access_token`이 고객 링크의 토큰, `access_pin`이 4자리 PIN(nullable). |
-| `photos` | `id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, memo, similarity_group_id, blur_variance, is_blurry, face_detected, eyes_closed, r2_original_url, original_ready_at, original_status, created_at` | `number`는 `insert_photos_with_numbers` RPC로 원자적 할당. `blur_variance/is_blurry/face_detected/eyes_closed`는 흔들림/눈감음 경고 배지 전용 컬럼. `original_status`(`awaiting_upload`→`pending`→`processing`→`completed`/`failed`)는 원본 파일 비동기 압축 상태 — `include_original=true` 업로드 시에만 설정됨. `r2_original_url`은 압축 완료 후 공개 CDN URL. `original_ready_at`은 완료 시각. |
+| `photos` | `id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, memo, similarity_group_id, blur_variance, is_blurry, face_detected, eyes_closed, r2_original_url, original_ready_at, original_status, created_at` | `number`는 `insert_photos_with_numbers` RPC로 원자적 할당. `similarity_group_id`는 이제 Gemini(`sync_groups_to_db`)가 채우는 살아있는 컬럼(§6.6). `blur_variance/is_blurry/face_detected/eyes_closed`는 원래 OpenCLIP 파이프라인(`analyzer.py`)이 채우던 흔들림/눈감음 경고 배지 전용 컬럼인데, **베타 버튼이 Gemini로 전환(2026-07-28)되며 더 이상 어떤 실행에서도 채워지지 않는다** — 과거 OpenCLIP으로 분석된 프로젝트에 한해 값이 남아있을 뿐 신규 분석 대상은 아님(§6.5/§13). `original_status`(`awaiting_upload`→`pending`→`processing`→`completed`/`failed`)는 원본 파일 비동기 압축 상태 — `include_original=true` 업로드 시에만 설정됨. `r2_original_url`은 압축 완료 후 공개 CDN URL. `original_ready_at`은 완료 시각. |
 | `original_jobs` | `id, photo_id, project_id, job_type, r2_source_key, source_content_type, original_filename, original_file_size, original_last_modified, original_content_type, status, attempts, max_attempts, last_error, next_attempt_at, processing_started_at, completed_at, created_at` | 원본 압축 비동기 job queue. `(photo_id, job_type)` UNIQUE 제약. 5상태(`awaiting_upload/pending/processing/completed/failed`). `SELECT FOR UPDATE SKIP LOCKED`로 worker가 원자적 클레임. `r2_source_key`에 브라우저가 직접 PUT한 미압축 원본 R2 key(`originals/source/{project_id}/{hex32}.{ext}`) 저장. `original_filename/original_file_size/original_last_modified/original_content_type`는 브라우저 원본 파일 메타데이터(복구 매칭용: filename+size+lastModified 조합). 압축 완료 후 source 파일 즉시 삭제(best effort). `supabase/migrations/20260724_original_jobs_and_photos_status.sql`. |
 | `selections` | `project_id, photo_id, rating, color_tag, comment, is_selected` | `(project_id, photo_id)` unique 제약으로 upsert. |
 | `photo_versions` | `id, photo_id, version(1\|2), r2_url, r2_thumb_url, file_size, filename, created_at` | `(photo_id, version)` conflict로 upsert. |
@@ -180,10 +193,14 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `beta_survey_responses` | `id, photographer_id, project_id, survey_type("link_sent"\|"project_created"\|"original_uploaded"\|"selection_received"\|"first_delivery"\|"second_delivery"), answers(jsonb), later_until, skipped_at, submitted_at, created_at, updated_at` | 베타 5·6단계(신규, `20260727_beta_survey_responses.sql` + `20260727b_beta_survey_responses_add_micro_types.sql`로 `survey_type` CHECK 확장, plan/beta-system.md §7). `(photographer_id, survey_type)` UNIQUE — 설문 시점별 1행. 트리거·문항이 실제로 구현된 값은 `project_created`·`original_uploaded`·`selection_received`·`first_delivery`·`second_delivery` 5개(①`link_sent`만 문항 미확정이라 §13 보류). 상태는 별도 컬럼 없이 `later_until`(나중에, 24h 후 재노출)/`skipped_at`(영구 건너뛰기)/`submitted_at`(제출 완료) 세 시각의 존재 여부로 판단. RLS 활성화, 정책 없음 — service-role만 접근. |
 | `delivery_files` | `id, project_id, r2_url, original_filename, delivery_filename, file_size, compressed, original_file_size, mime_type, created_at` | `delivered` 상태 프로젝트의 납품 파일. `compressed=true`면 20MB 초과로 자동 압축 발생, `original_file_size`에 압축 전 크기 저장. `mime_type`은 항상 `image/jpeg`(PNG/HEIC/WebP도 변환 후 저장). |
 | `pin_attempts` | `project_token, ip_address, attempted_at` | PIN 시도 rate-limit(1분 내 5회)용. |
-| `photo_groups` | `id, project_id, representative_photo_id, photo_count` | CLIP 유사도 그룹. `src/types/supabase.ts` 생성 타입에는 **없음**(수동 캐스팅으로 접근). 사진 삭제 시 `delete_photo_and_resolve_group` RPC(`supabase/migrations/20260720_delete_photo_group_cleanup.sql`)가 대표컷 재지정/`photo_count` 갱신/그룹 해체를 원자적으로 처리 — `insert_photos_with_numbers`와 동일한 이유(PostgREST 다중 호출의 비원자성 방지)로 RPC화됨. |
+| `photo_groups` | `id, project_id, representative_photo_id, photo_count` | 유사컷 그룹 — 엔진에 무관한 범용 스키마(테이블 자체에 OpenCLIP/Gemini 전용 컬럼 없음). 2026-07-28 베타 전환 이전에는 OpenCLIP `analyzer.py`가 채웠고, 이후에는 **Gemini의 `sync_groups_to_db()`가 매 실행마다 프로젝트 단위로 전체 삭제 후 재삽입**한다(§6.6). `src/types/supabase.ts` 생성 타입에는 **없음**(수동 캐스팅으로 접근). 사진 1건 삭제 시 `delete_photo_and_resolve_group` RPC(`supabase/migrations/20260720_delete_photo_group_cleanup.sql`, OpenCLIP 시절 그대로, 수정 없음)가 대표컷 재지정/`photo_count` 갱신/그룹 해체를 원자적으로 처리한 뒤, Gemini 사용 프로젝트라면 곧이어 clip-service의 `sync-groups`가 best-effort로 재정합화한다(§6.6). 프로젝트 전체 사진 삭제("전체삭제") 시에는 `api/photographer/projects/[id]/photos`가 이 테이블 행을 직접 정리한다. |
 | `deleted_photographers` | `id, deleted_at, project_count, join_month` | 계정 삭제 시 익명화 통계로 남김. |
 | `photos.clip_embedding` | (컬럼) | `clip-service/migration.sql`에서 추가. CLIP 임베딩 저장. |
 | `photos.blur_variance` / `is_blurry` / `face_detected` / `eyes_closed` | (컬럼) | `clip-service/migration_002_quality_flags.sql`에서 추가. 흔들림/눈감음 경고 배지용 — §6.4 참고. |
+| `gemini_analysis_runs` | `id, project_id, status, requested_image_limit, embedding_model, embedding_dimension, similarity_threshold, image_count, processed_count, failed_count, estimated_cost_usd, usage_metadata(jsonb), error, started_at, completed_at, duration_ms` | (2026-07-28 추가, `clip-service/migration_003_gemini_poc.sql`) Gemini 실행(run) 단위 메타데이터 — 도입 당시엔 POC 전용이었으나 베타 전환 이후 실사용 실행 기록도 여기 쌓인다. `projects` 테이블에는 컬럼을 추가하지 않음 — 진행 상태는 이 테이블의 최신 행으로만 조회. |
+| `gemini_embeddings` | `id, project_id, photo_id, embedding_model, embedding(double precision[]), dimension, embedding_version, source_object_key, created_at`, UNIQUE(`project_id, photo_id, embedding_model, dimension, embedding_version`) | (2026-07-28 추가, 베타 전환 시 `migration_005`로 `embedding_version`/`source_object_key` 추가 + UNIQUE 재정의) `photos.clip_embedding`과 완전히 분리된 저장소. **이미지 단위 캐시**: `(project_id, photo_id, embedding_model, dimension, embedding_version)`이 모두 일치하면 재호출을 스킵 — dimension/model 변경은 새 조합이라 upsert 충돌 없이 별도 행이 쌓인다. `source_object_key`는 `r2_thumb_url`에서 `R2_PUBLIC_URL` 접두사를 제거한 R2 객체 key(URL 자체보다 안정적인 캐시 식별자, 값이 있으면 캐시 판정 시 함께 대조). threshold를 바꿔가며 재그룹핑할 때도 Gemini API를 재호출하지 않기 위한 캐시 역할을 겸함(`GET /analyze/gemini/{id}/groups?threshold=`). |
+| `gemini_quality_runs` | `id, project_id, status, requested_image_limit, model, prompt_version, image_count, processed_count, failed_count, reused_count, estimated_cost_usd, usage_metadata(jsonb), error, started_at, completed_at, duration_ms` | (2026-07-28 추가, `clip-service/migration_004_gemini_quality_poc.sql`) Gemini Flash 품질 판정 실행(run) 단위 메타데이터. Embedding용 `gemini_analysis_runs`와 완전히 별개(§6.7). |
+| `gemini_quality_assessments` | `id, project_id, photo_id, model, prompt_version, eyes_closed, blur_or_shake, focus_issue, face_occluded (각 ok\|possible\|likely\|unknown), primary_subject_detected, notes, raw_response(jsonb), created_at`, UNIQUE(`project_id, photo_id, model, prompt_version`) | (2026-07-28 추가) 사진별 Gemini Flash 품질 판정. `prompt_version`이 UNIQUE 키에 포함되어 프롬프트 변경 시 기존 결과를 덮어쓰지 않고 새 버전으로 쌓임(버전 관리). |
 
 `src/types/supabase.ts` 생성 타입에 등록된 테이블은 9개(`projects, pin_attempts, photos, selections, project_logs, photographers, feedback, photo_versions, version_reviews`)뿐이며, `photo_groups`·`deleted_photographers`·`clip_analysis_*`·흔들림/눈감음 품질 컬럼들은 타입 생성 이후 추가된 것으로 보입니다(타입 재생성 여부 `확인 필요`) — FE 코드는 이 컬럼들을 전부 수동 `as {...}` 캐스팅으로 접근합니다(`src/lib/db.ts`, `src/lib/customer-api-server.ts`).
 
@@ -216,7 +233,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `/photographer/projects` | `src/app/photographer/projects/page.tsx` | 프로젝트 목록/검색/필터 |
 | `/photographer/projects/new` | `src/app/photographer/projects/new/page.tsx` | 프로젝트 생성 폼 (PIN·재보정 횟수 포함) |
 | `/photographer/projects/[id]` | `ProjectNexusPageClient.tsx` | 프로젝트 상세 허브 (상태, 초대 링크, PIN, 삭제) |
-| `/photographer/projects/[id]/upload` | `upload/page.tsx` | 원본 사진 업로드/관리 (메인 업로드 UI). CLIP 분석 완료 후 흔들림/눈감음 의심 사진에 경고 배지 표시(정보성, 셀렉/업로드 차단 없음) — `src/lib/photo-quality.ts`. AI 유사컷 분석 트리거는 `preparing`/`selecting` 상태 모두에서 노출(`canUploadOriginals`) — 초대 링크 활성화 이후 추가 업로드된 사진도 재분석 가능. 완료 후에는 버튼이 "새 사진 분석"으로 바뀌며 직전 분석 이후 신규 사진만 증분 분석 |
+| `/photographer/projects/[id]/upload` | `upload/page.tsx` | 원본 사진 업로드/관리 (메인 업로드 UI). **(2026-07-28 베타 전환)** `[AI 유사도 분석]` 버튼의 호출 대상이 OpenCLIP(`clip-analysis`)에서 Gemini Embedding(`gemini-analysis`)으로 바뀌었다 — 변수/함수명(`clipAnalysisStatus`, `handleStartClipAnalysis` 등)은 그대로 두고 내부 호출 대상만 바꿨다(레거시 네이밍, 최소 diff 목적). 흔들림/눈감음 경고 배지·필터 UI는 이 전환과 함께 **완전히 제거**됨(OpenCV/MediaPipe가 더 이상 실행되지 않아 신규 데이터가 없으므로) — `src/lib/photo-quality.ts` 관련 배지 참고는 더 이상 이 페이지에 해당하지 않음. 버튼 상태는 5단계 머신(최초 분석 필요/신규 이미지 분석 필요/일부 분석 실패/분석 중/전체 완료)으로 계산되며 "전체 완료" 상태 클릭 시에는 API 재호출 없이 토글만 켠다(이미 DB에 최신 결과가 있으므로). AI 유사컷 분석 트리거는 `preparing`/`selecting` 상태 모두에서 노출(`canUploadOriginals`) — 초대 링크 활성화 이후 추가 업로드된 사진도 이미지 단위로 재분석 가능(캐시 히트한 기존 사진은 Gemini API 재호출 없음, §6.6). 사진 삭제(1건/전체) 시 `photo_groups`가 Gemini 기준으로 재동기화된다. 관리자 등급에게만 같은 페이지 하단에 `GeminiAnalysisPanel`(`src/components/photographer/GeminiAnalysisPanel.tsx`) "Gemini 분석 (POC)" 바가 별도로 노출됨 — threshold 실험과 Gemini Flash 품질 판정(관리자 전용) 비교용, §6.6/§6.7 참고 |
 | `/photographer/projects/[id]/workflow` | `WorkflowPageClient.tsx` | **보정본 V1/V2 업로드·전달을 포함한 실사용 통합 화면.** 실제 업로드 UI는 하위 컴포넌트 `src/components/photographer/UploadVersionsPanel.tsx`가 담당하며, `src/lib/version-mapping.ts`(파일-사진 매칭)와 `src/lib/retouch-clip-match.ts`(CLIP 폴백 매칭)를 사용한다. `ProjectNexusPageClient.tsx`의 모든 보정 관련 버튼은 이 라우트로만 연결된다. |
 | `/photographer/projects/[id]/results` | `results/page.tsx` | 최종 납품 결과 화면(CSV/TXT 내보내기). `confirmed`/`editing` 상태에서는 "보정 시작하기"/"보정본 업로드" 버튼과 진행단계 사이드바가 `/workflow`로 이동시킨다(2026-07-13부터 — 이전에는 `/upload-versions`로 이동했음, 아래 삭제 이력 참고). |
 | `/photographer/settings` | `settings/page.tsx` | 프로필 설정, 프로필 이미지 업로드, 계정 삭제 |
@@ -251,7 +268,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `/c/[token]` | 진입점. 서버에서 `delivered` 여부·PIN 쿠키 존재 여부 우선 확인 후 클라이언트에서 상태별 재분기 |
 | `/c/[token]/pin` | PIN 입력 폼 (PIN 없는 프로젝트는 `/api/c/auto-verify`로 자동 통과) |
 | `/c/[token]/about` | 고객 온보딩/도움말 |
-| `/c/[token]/gallery` | 사진 선택 그리드. 흔들림/눈감음 의심 사진에 경고 배지 표시(정보성, 선택/확정 차단 없음). 유사도분석이 완료된 프로젝트는 "유사컷 대표이미지 적용" 토글도 노출(기본 OFF) — 켜면 그룹별 대표컷만 보이고 나머지 멤버는 "+N" 배지를 눌러야 펼쳐짐. 가시성에 직접 영향을 주는 기능. 이 토글 상태는 사진 클릭 시 뷰어에 `?grouped=1`로 전달됨(`GalleryFilterState.groupedView`, `src/lib/gallery-filter.ts`). **필터 상태 전체(선택됨 탭/별점/색상/정렬/파일명 검색/품질/그룹핑)가 URL 쿼리와 동기화**되어 새로고침·뒤로가기 후에도 유지됨 — 마운트 시 1회 복원, 이후 `router.replace`로 반영(히스토리 미증가) |
+| `/c/[token]/gallery` | 사진 선택 그리드. 흔들림/눈감음 의심 사진에 경고 배지 표시(정보성, 선택/확정 차단 없음) — 이 배지 UI 코드는 그대로 남아있지만, **베타 전환(2026-07-28) 이후 신규 분석에서는 관련 컬럼(`blur_variance` 등)이 더 이상 채워지지 않아** 과거 OpenCLIP으로 분석된 레거시 프로젝트에서만 실제로 보인다(§5, §6.5). 유사도분석이 완료된 프로젝트는 "유사컷 대표이미지 적용" 토글도 노출(기본 OFF) — 켜면 그룹별 대표컷만 보이고 나머지 멤버는 "+N" 배지를 눌러야 펼쳐짐. 이 토글은 엔진 무관하게 `photo_groups`/`similarity_group_id`를 그대로 읽으므로, 베타 전환 이후에는 Gemini가 채운 결과로 동일하게 동작한다(코드 변경 없음, §6.6). 가시성에 직접 영향을 주는 기능. 이 토글 상태는 사진 클릭 시 뷰어에 `?grouped=1`로 전달됨(`GalleryFilterState.groupedView`, `src/lib/gallery-filter.ts`). **필터 상태 전체(선택됨 탭/별점/색상/정렬/파일명 검색/품질/그룹핑)가 URL 쿼리와 동기화**되어 새로고침·뒤로가기 후에도 유지됨 — 마운트 시 1회 복원, 이후 `router.replace`로 반영(히스토리 미증가) |
 | `/c/[token]/viewer/[photoId]` | 선택 단계 전체화면 뷰어(별점/색상/코멘트/선택). `?grouped=1`이면 필름스트립/좌우 이동/스와이프가 대표컷 단위로만 동작(그룹 멤버 skip) — 대표컷 하단 힌트(PC: pill+미니 스트립, 모바일: 플로팅 pill+바텀시트)를 펼쳐야 그룹 멤버를 볼 수 있음. 그룹 조회 로직은 갤러리와 `src/lib/photo-groups.ts`를 공용(§6-1 user-flow.md 참고) |
 | `/c/[token]/confirmed` | 확정 직후 화면, 확정 취소(최대 3회) |
 | `/c/[token]/locked` | 보정 중(`editing`/`editing_v2`) 등 읽기 전용 상태 화면 |
@@ -300,13 +317,46 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 
 `/health`, `/health/db`, `/api/projects`, `/api/projects/{id}`, `/api/projects/{id}/r2`(DELETE), `/api/upload/photos`, `/api/upload/profile-image`, `/api/upload/versions`, `/api/storage/delete`, `/api/storage/presign` — 상세는 §7 참고.
 
-### 6.5 CLIP 서비스
+### 6.5 CLIP 서비스 (OpenCLIP — 2026-07-28부터 베타 흐름에서 미사용, 코드는 보존)
 
 `/health`, `/analyze`, `/analyze/{project_id}/status`, `/match-retouch` — 모두 `X-Internal-Token` 헤더(`CLIP_INTERNAL_TOKEN`)로 보호(단 `/health` 제외).
 
-`/analyze`의 백그라운드 파이프라인(`app/analyzer.py`)은 CLIP 유사컷 그룹핑 외에, 분석 대상이 된 모든 사진(그룹 여부 무관)에 대해 흔들림(`app/quality.py`의 절대 Laplacian 분산 임계값)과 눈감음(`app/eyes.py`, mediapipe Face Mesh 기반 Eye Aspect Ratio) 경고 플래그를 계산해 `photos.blur_variance/is_blurry/face_detected/eyes_closed`에 저장한다. 요청/응답 스펙 변경은 없음 — 결과는 기존 `photos` 조회 경로로 FE에 전달된다. 정보성 배지 전용이며 자동 삭제/제외는 하지 않는다.
+**2026-07-28 베타 전환 이후 `/analyze`(및 이를 호출하던 FE `clip-analysis` 프록시 라우트)는 어떤 FE 화면에서도 더 이상 호출되지 않는다** — 작가 업로드 화면의 `[AI 유사도 분석]` 버튼이 §6.6의 Gemini 엔드포인트를 호출하도록 바뀌었기 때문이다. `/analyze`의 백그라운드 파이프라인(`app/analyzer.py`)은 CLIP 유사컷 그룹핑 외에, 분석 대상이 된 모든 사진(그룹 여부 무관)에 대해 흔들림(`app/quality.py`의 절대 Laplacian 분산 임계값)과 눈감음(`app/eyes.py`, mediapipe Face Mesh 기반 Eye Aspect Ratio) 경고 플래그를 계산해 `photos.blur_variance/is_blurry/face_detected/eyes_closed`에 저장했었다 — 이 경로가 더 이상 호출되지 않으므로 신규 사진에는 값이 채워지지 않는다(과거 분석 데이터는 DB에 그대로 남아 있음, §5). 코드(`clip_model.py`/`analyzer.py`/`quality.py`/`eyes.py`)와 관련 Python 패키지(`torch`/`torchvision`/`open_clip_torch`/`opencv-python-headless`/`mediapipe`)는 이번 전환에서 **삭제하지 않고 보존**한다 — `matcher.py`(보정본↔원본 매칭, §6.4 언급)가 `photos.clip_embedding`이 없을 때 OpenCLIP으로 즉석 계산하는 폴백으로 여전히 의존하기 때문이다. 향후 흔들림/눈감음 같은 품질 기능을 다시 낸다면 OpenCV/MediaPipe가 아니라 §6.7의 Gemini Flash를 사용하는 방향으로 정리하기로 했다(패키지/파일 삭제는 영향 범위·롤백 가능성 검토 후 별도 승인 필요, §13).
 
 **증분 분석의 배치 경계 스티칭**: 증분 분석(신규 사진끼리만 비교)은 원래 직전 배치의 마지막 사진(경계)을 비교 대상에서 제외해, 배치 경계를 넘는 연속 촬영본이 영구히 그룹화되지 않는 한계가 있었다. 이제 경계 사진의 저장된 임베딩(`photos.clip_embedding`, 재다운로드/재계산 없음)을 이번 배치 임베딩 배열 맨 앞에 포함해 함께 그룹핑한 뒤, 경계가 포함된 연결 요소만 따로 처리한다: 경계 사진이 이미 기존 그룹의 멤버였으면 신규 연결된 사진들을 그 그룹에 편입(대표컷 유지, `photo_count`만 증가), 경계 사진이 그룹에 속한 적 없었으면 경계 사진을 포함한 신규 그룹을 생성한다(이 경우에 한해 경계 사진 썸네일을 온디맨드로 1장 다운로드해 대표컷 화질 점수를 계산). `grouping.py`의 인접 비교+union-find 로직 자체는 변경 없음.
+
+### 6.6 Gemini Embedding — 베타 유사컷 분석 엔진 (2026-07-28 도입, 같은 날 베타 전환)
+
+원래는 OpenCLIP 방식(§6.5)과 그룹핑 품질을 비교하기 위한 관리자 전용 실험 기능으로 `clip-service` 프로세스 안에 완전히 독립된 모듈로 추가됐다. **같은 날 베타 공개 시점에 작가 업로드 화면의 `[AI 유사도 분석]` 버튼 자체가 이 엔드포인트를 호출하도록 바뀌면서 지금은 모든 베타 사용자의 실사용 엔진이다.** OpenCLIP 파이프라인·엔드포인트·DB 스키마는 전혀 수정하지 않았다(공존).
+
+- **엔드포인트**: `/analyze/gemini`(POST), `/analyze/gemini/{project_id}/status`(GET), `/analyze/gemini/{project_id}`(DELETE), `/analyze/gemini/{project_id}/groups?threshold=&include_quality=`(GET), `/analyze/gemini/{project_id}/sync-groups`(POST, 2026-07-28 베타 전환 시 추가) — 모두 `X-Internal-Token` 필요. §7.4 참고.
+- **베타 전환 시 추가된 persist 단계(`sync_groups_to_db`)**: Gemini 임베딩 파이프라인 자체는 여전히 `gemini_analysis_runs`/`gemini_embeddings`에만 쓰지만, 실행이 끝날 때마다(또는 사진 삭제 시) `sync_groups_to_db(project_id)`가 **저장된 임베딩으로 그룹을 전부 다시 계산해 `photo_groups`/`photos.similarity_group_id`(운영 스키마)를 통째로 교체**한다 — OpenCLIP처럼 배치 경계를 넘나드는 증분 스티칭이 필요 없을 만큼 Gemini 재계산이 가볍기 때문에 채택한 방식. 교체 직전 해당 프로젝트의 `similarity_group_id`를 전부 NULL 처리한 뒤 새로 채워, 과거 OpenCLIP 그룹이 섞이지 않게 한다. `gemini_embeddings`가 프로젝트에 하나도 없으면(=이 프로젝트에서 Gemini를 아직 한 번도 안 돌림) 아무것도 하지 않고 종료해, OpenCLIP 전용 레거시 프로젝트의 `photo_groups`를 실수로 지우지 않는다. 이 설계 덕분에 작가 업로드 화면(`membersByGroup` 등)과 고객 갤러리는 엔진이 바뀐 것을 전혀 모른 채 기존 코드 그대로 동작한다.
+- **이미지 단위 캐시(2026-07-28 베타 전환 시 정비)**: `(project_id, photo_id, embedding_model, dimension, embedding_version)`이 모두 일치하는 임베딩이 이미 있으면 그 사진은 재분석 대상에서 제외한다 — 새로 추가된 사진만 Gemini API를 호출한다. `GET /status` 응답에 `active_photo_count`/`already_analyzed_count`/`pending_count`가 포함되어(2026-07-28 추가) FE 버튼이 "최초 분석 필요"/"신규 이미지 분석 필요"/"전체 완료" 등 5단계 상태를 판단하는 근거가 된다(§6.1 upload 라우트 설명). 그룹 계산(`compute_groups`)은 이 캐시 판별/API 호출 경로와 완전히 분리되어 있어 **threshold 변경이나 사진 삭제는 Gemini API를 다시 호출하지 않는다**.
+- **모델/SDK**: `google-genai` SDK, `gemini-embedding-2`(이미지 입력을 지원하는 Google 멀티모달 임베딩 모델, `gemini-embedding-001`은 텍스트 전용이라 사용 불가). 이미지 1장당 1회 `embed_content` 호출, 출력 차원 기본 3072(env `GEMINI_EMBEDDING_DIMENSION`로 조정 가능, Matryoshka 절단이라 응답을 정규화 후 저장).
+- **입력 이미지**: OpenCLIP과 동일하게 `photos.r2_thumb_url`(300px 썸네일)을 재사용 — 새 이미지 생성/리사이징/추가 R2 업로드 없음.
+- **그룹핑**: OpenCLIP과 동일한 `grouping.py`의 인접 코사인 유사도 + union-find를 재사용하되, threshold는 별도 env(`GEMINI_SIMILARITY_THRESHOLD`, 기본 0.96 — 실사용 테스트로 확인된 값)를 쓴다 — 두 임베딩 방식의 점수 분포가 달라 OpenCLIP의 0.92를 그대로 적용하지 않는다. `GET /analyze/gemini/{id}/groups?threshold=`는 **Gemini API를 재호출하지 않고** 저장된 임베딩(`gemini_embeddings`)만으로 그룹핑을 재계산하므로, threshold 실험은 추가 비용이 발생하지 않는다.
+- **대표 이미지**: 그룹 내 다른 사진들과 평균 코사인 유사도가 가장 높은 실제 사진을 medoid로 선정(`gemini_analyzer.py`의 `_avg_similarity_per_index`/구 `_medoid_index`, 2026-07-28 추가) — 화질 평가가 아니라 임베딩상 그룹을 가장 잘 대표하는 사진을 고르는 순수 통계적 선택. `representative_photo_id` 필드, API 응답 구조 변경 없음.
+- **저장**: 진행 상태/처리·실패 건수/소요시간/예상비용은 `gemini_analysis_runs`(실행 단위), 임베딩은 `gemini_embeddings`(사진 단위)에 저장된다. `projects.clip_analysis_*` 컬럼은 여전히 무변경(Gemini는 이 컬럼을 쓰지 않음)이지만, **`photos.similarity_group_id`/`photo_groups`는 베타 전환 이후 위 `sync_groups_to_db`가 실제로 갱신하는 운영 스키마다**(2026-07-28 이전 설명과 달라진 부분 — 도입 초기 POC 단계에서는 정말로 무변경이었음).
+- **동시성/안정성**: 이미지별 임베딩 호출에 `GEMINI_CONCURRENCY`(기본 4) 세마포어, 실패 시 제한된 재시도(`GEMINI_MAX_RETRIES`, exponential backoff) + timeout(`GEMINI_TIMEOUT_SECONDS`). 프로젝트 단위 동시 실행 가드(`app/gemini_state.py`)는 OpenCLIP의 `app/state.py`와 완전히 분리된 별도 세트 — 두 분석은 서로를 막지 않는다. 동일 사진에 대한 임베딩은 `gemini_embeddings`에 이미 있으면 재호출을 스킵(POST body `force=true`로 강제 재계산 가능).
+- **비용 확인**: `GEMINI_IMAGE_PRICE_USD` 1곳에서만 단가를 관리하고 `image_count * price`로 예상 비용을 계산해 `gemini_analysis_runs.estimated_cost_usd`에 기록. SDK 응답에 실제 usage 정보가 있으면 `usage_metadata`(jsonb)에 함께 남긴다.
+- **접근 제어(2026-07-28 베타 전환으로 변경됨)**: `api/photographer/projects/[id]/gemini-analysis`(POST/GET/DELETE, 분석 트리거/폴링/취소)는 이제 모든 베타 사용자의 실사용 경로이므로 **일반 세션+프로젝트 소유권만 검증한다**(관리자 제한 없음 — `clip-analysis`와 동일한 검증 수준). 도입 초기에는 이 라우트도 `isAdminEmail()`로 막혀 있었으나, 업로드 화면 버튼이 이 엔드포인트를 직접 호출하도록 바뀌면서 일반 등급도 통과해야 정상 동작하므로 함께 풀었다. **관리자 전용으로 남은 것은 품질(Flash) 데이터가 섞여 나오는 `api/photographer/projects/[id]/gemini-analysis/groups?include_quality=true` 하나뿐**이다 — 이 라우트만 세션의 `session.user.email`을 `isAdminEmail()`로 재검증하고, `include_quality`는 클라이언트 입력을 신뢰하지 않고 서버가 직접 `true`로 고정한다(§6.7). `GeminiAnalysisPanel`(threshold 실험 + Flash 품질 POC 패널) 자체는 여전히 `GET /api/photographer/quota`의 `tier === "admin"`일 때만 렌더링(UI 편의용, §6.1 표 참고). clip-service 자체는 기존과 동일하게 `X-Internal-Token`으로만 보호(요청자 등급 판단은 전부 Next.js 라우트 계층 책임).
+
+### 6.7 Gemini Flash 사진 품질 판정 — 관리자 전용 POC로 계속 유지 (2026-07-28 추가)
+
+§6.6이 베타 실사용 엔진으로 전환된 것과 달리 **이 기능은 계속 관리자 전용 POC로만 남는다** — 사진별 품질(눈감음/흔들림/초점/얼굴판정)을 Gemini Flash로 판정해 유사컷 그룹 안에서 "품질 이슈가 적으면서 그룹을 잘 대표하는 사진"을 추천한다. **자동 삭제·숨김 기능이 아니며, 품질 이슈가 있는 사진도 그룹에서 제외되지 않는다** — 그룹 멤버 구성(`grouping.py`)은 전혀 건드리지 않고, 그룹이 정해진 뒤 "어떤 사진을 먼저 보여줄지"에만 관여한다. **베타 사용자의 대표컷 선정에는 절대 영향을 주지 않는다**: `compute_groups()`에 `include_quality: bool = False`(기본값)가 있어, 베타 경로(`sync_groups_to_db`, 버튼이 호출하는 일반 `/groups` 조회)는 이 값을 넘기지 않으므로 Flash 데이터를 아예 조회하지 않는다 — `include_quality=true`는 관리자 전용 `.../gemini-analysis/groups` 라우트가 서버에서 직접 고정하는 값이며, 클라이언트가 임의로 켤 수 없다(§6.6 접근 제어 문단).
+
+- **엔드포인트**: `/analyze/gemini/quality`(POST), `/analyze/gemini/quality/{project_id}/status`(GET), `/analyze/gemini/quality/{project_id}`(DELETE) — Embedding 분석과 독립적으로 트리거/취소/재사용된다. 그룹 반영 결과는 §6.6의 `GET /analyze/gemini/{project_id}/groups`에 `recommended_photo_id`/`recommendation_tier`/`recommendation_reason`/`quality_by_photo`로 결합되어 응답한다(품질 분석이 없으면 `recommended_photo_id`는 기존 medoid `representative_photo_id`와 동일하게 나와 회귀 없음). **(2026-07-28 추가) `GET /analyze/gemini/quality/{project_id}/overview`**는 유사컷 그룹 소속 여부와 무관하게 **프로젝트 전체 사진**의 품질 판정을 반환한다 — Flash는 그룹핑과 무관하게 프로젝트 전체를 분석하는데, 그룹 API는 union-find로 묶인(2장 이상) 사진만 대상으로 하므로 싱글톤(그룹 미형성) 사진의 결과가 기존 방식으로는 화면에 노출되지 않던 문제를 해결하기 위함(`gemini_quality_analyzer.py`의 `compute_quality_overview`). 이 엔드포인트도 저장된 결과만 읽어 Gemini API를 재호출하지 않는다.
+- **모델/SDK**: 같은 `google-genai` 클라이언트(`gemini_client.get_client()` 공유)로 `client.aio.models.generate_content()` 호출. 모델은 `gemini-3.5-flash-lite`(env `GEMINI_FLASH_MODEL`) — 2026-10-16 종료 예정인 2.5 계열을 피하고 현재 GA인 3.5 계열 중 가장 비용 효율적인 모델 채택. `response_schema`(Pydantic `PhotoQualityAssessment`)로 구조화된 JSON을 강제하고 `temperature=0`으로 판정 일관성을 확보한다.
+- **판정 스키마**: `eyes_closed`/`blur_or_shake`/`focus_issue`/`face_occluded` 4축을 각각 `ok`/`possible`/`likely`/`unknown` 4단계로 판정(`unknown`="판정하기 어려움", 불량으로 단정하지 않음), `primary_subject_detected`(주요 인물 특정 가능 여부)와 `notes`(선택) 포함. 프롬프트는 "주요 인물(가장 크게/중앙에 나온 인물)" 기준 판단과 의도적 아웃포커싱·패닝 등은 문제로 보지 말라는 지침을 포함한다.
+- **입력 이미지**: `photos.r2_preview_url`(1200px, 이미 존재하는 자산)을 사용 — Embedding이 쓰는 300px 썸네일보다 해상도가 높을수록 눈감음/흔들림/초점 같은 미묘한 신호의 판정 정확도가 오르기 때문(§7.4). 기존 OpenCV/MediaPipe(300px 기준)와 해상도가 다르므로 비교 시 UI에 caveat로 명시한다.
+- **추천 로직(단계형/tiered)**: 그룹 내 각 후보를 신뢰도 버킷(0=검증된 이상없음 > 1=경미한 의심 > 2=판정불가/미분석 > 3=명확한 의심)으로 먼저 나누고, 같은 버킷 안에서만 issue_count → medoid 유사도(그룹 대표성) → number 순으로 결정적으로 tie-break한다(`gemini_analyzer.py`의 `_recommend_with_quality`, `_confidence_bucket`). "판정불가/미분석"을 "이상없음"과 별도 버킷으로 분리한 이유는 UNKNOWN이거나 분석 자체가 없는 사진이 우연히 뽑혀도 "품질 이슈 없음"으로 오인되지 않게 하기 위함(2026-07-28 수정 — 최초 구현은 UNKNOWN/미분석을 이상없음과 동점 처리해 이 오분류가 가능했음). 승자의 버킷에 따라 `recommendation_tier`(`clean`/`minor`/`unknown`/`major`/`unavailable`)와 안내 문구가 정해진다 — 점수 가중합 방식 대신 단계형을 택한 이유는 각 단계가 검증·설명하기 쉽기 때문.
+- **저장/버전 관리**: `gemini_quality_runs`(실행 단위), `gemini_quality_assessments`(사진별 판정, `UNIQUE(project_id, photo_id, model, prompt_version)`) — `photos`/`gemini_embeddings`와 완전히 분리된 신규 테이블. `GEMINI_QUALITY_PROMPT_VERSION` 상수를 올리면 기존 판정을 덮어쓰지 않고 새 버전으로 나란히 쌓인다. 동일 model+prompt_version 재요청은 자동 스킵(재사용, API 재호출 없음).
+- **비용**: `generate_content` 응답의 실제 `usage_metadata`(prompt/candidates 토큰)로 정확한 비용을 계산(추정치 아님) — `GEMINI_FLASH_INPUT_PRICE_PER_1M`/`GEMINI_FLASH_OUTPUT_PRICE_PER_1M` 두 상수로만 단가 관리.
+- **동시성/안정성**: `GEMINI_QUALITY_CONCURRENCY`/`GEMINI_QUALITY_MAX_RETRIES`/`GEMINI_QUALITY_TIMEOUT_SECONDS`(Embedding과 별도 env). in-flight 가드(`app/gemini_quality_state.py`)는 OpenCLIP `state.py`, Embedding `gemini_state.py`와 완전히 분리된 세 번째 독립 세트 — 세 파이프라인은 서로를 막지 않는다.
+- **화면**: `GeminiAnalysisPanel.tsx`에 두 번째 CTA "이미지 품질 확인 (POC)" 추가(같은 이미지 수 선택 재사용, 독립 폴링). 결과 모달은 **탭 2개**로 구성된다(2026-07-28 추가):
+  - **"유사컷 그룹" 탭**: 그룹 대표 이미지(medoid, 보라 배지)와 별개로 품질 반영 추천 이미지(청록 "AI 추천" 배지)를 표시해 둘이 달라졌는지 한눈에 보이게 하고, 각 썸네일에 품질 요약 태그 + 툴팁(Gemini 판정과 기존 OpenCV/MediaPipe 판정 비교, 해상도 차이 명시)을 붙인다.
+  - **"품질 확인" 탭**(기본 진입 탭): 유사컷 그룹 소속 여부와 무관하게 **프로젝트 전체 사진**(`/analyze/gemini/quality/{id}/overview` 조회)을 대상으로 필터 6종(전체/눈감음의심/흔들림의심/초점확인필요/얼굴판정어려움/품질분석실패·미분석) + 필터별 사진 수 배지를 제공한다. 한 사진이 여러 축에서 의심되면 해당하는 모든 필터에 중복으로 나타난다("possible"/"likely" 둘 다 "의심" 필터에 포함, "unknown"은 해당 축 필터에는 포함되지 않고 전축 UNKNOWN이거나 미분석인 사진만 "미분석" 필터에 잡힘 — `has_signal` 플래그 기준). 사진 클릭 시 원본 URL을 새 탭으로 열고, 필터 선택/사진 열람 두 지점에 `logQualityInteraction()` 훅을 남겨 향후 베타 지표 연동 시 이 지점만 실제 로깅 대상(예: `project_logs` 또는 신규 analytics 테이블)에 연결하면 되도록 구조만 마련해뒀다(현재는 콘솔 로그만).
+  - "대표컷"/"확정" 대신 "의심"/"확인 필요"/"AI 추천" 문구만 사용 — 자동 삭제·제외가 아니라 검토 후보 표시라는 점을 UI 문구로도 명시.
 
 ---
 
@@ -319,7 +369,8 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/c/verify-pin` | POST | 없음(엔드포인트 자체가 인증 발급) | PIN 검증, rate limit(1분 5회), 서명 쿠키 발급 |
 | `api/c/auto-verify` | GET | 없음 | PIN 없는 프로젝트에 쿠키 자동 발급 |
 | `api/c/photos` | GET | PIN 쿠키 | 갤러리용 프로젝트+사진+선택+그룹 조회 |
-| `api/c/selections` | POST | PIN 쿠키 | 별점/색상/코멘트/선택 upsert (`selecting`/`preparing` 상태만 허용) |
+| `api/c/selections` | POST | PIN 쿠키 | 별점/색상/코멘트/선택 upsert (`selecting`/`preparing` 상태만 허용). body에 키가 없는 필드는 건드리지 않고(undefined=미변경), `null`이면 명시적으로 지움 — 부분 업데이트 시맨틱 |
+| `api/c/selections` | GET | PIN 쿠키 | `?token=&project_id=`로 `selectedIds`/`photoStates`만 경량 조회(다른 세션의 변경사항 반영용 5초 폴링 전용, 사진/그룹은 포함 안 함) |
 | `api/c/confirm` | POST | PIN 쿠키 | 선택 확정 → `confirmed`. `selected_photo_ids.length === required_count` 서버 재검증 |
 | `api/c/cancel-confirm` | POST | PIN 쿠키 | `confirmed → selecting`, `customer_cancel_count` +1(최대 3) |
 | `api/c/review`, `api/c/review-result` | GET | PIN 쿠키(review-result는 `확인 필요`, 코드 인용 부족) | 보정본 검토 데이터/결과 조회 |
@@ -331,13 +382,17 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/photographer/projects` | POST | 세션 | 프로젝트 생성 — 등급별 한도(§6.3 베타 등급 시스템) 서버 검증 후 INSERT. 기존 클라이언트 직접 INSERT(`src/lib/db.ts`의 `createProject()`)를 대체 |
 | `api/photographer/projects/[id]` | PATCH/DELETE | 세션+소유권 | 프로젝트 수정(상태 전이 포함)/삭제(+FastAPI R2 정리 호출) |
 | `api/photographer/projects/[id]/status` | PATCH | 세션+소유권 | 상태 전이 전용(제한적) |
-| `api/photographer/projects/[id]/photos` | GET/DELETE | 세션+소유권 | 사진 목록/일괄 삭제(`preparing`만) |
-| `api/photographer/projects/[id]/photo-groups` | GET | 세션+소유권 | CLIP 유사 그룹 조회 |
+| `api/photographer/projects/[id]/photos` | GET/DELETE | 세션+소유권 | 사진 목록 조회 / 전체 삭제("전체삭제", `preparing`만). (2026-07-28 베타 전환 추가) 전체 삭제 시 사진이 모두 사라져 `photo_groups`도 전부 무의미해지므로 이 라우트가 직접 해당 프로젝트의 `photo_groups` 행을 정리한다(clip-service sync-groups 호출은 이 경우 의미 없음 — 임베딩도 함께 CASCADE 삭제되어 조기 종료하므로, §6.6) |
+| `api/photographer/projects/[id]/photo-groups` | GET | 세션+소유권 | 유사컷 그룹 조회(`photo_groups`, 엔진 무관 — 2026-07-28부터 Gemini가 채움, §6.6) |
 | `api/photographer/projects/[id]/versions` | GET | 세션+소유권 | 보정본+리뷰 조회 |
 | `api/photographer/projects/[id]/versions/[versionId]` | DELETE | 세션+소유권 | 보정본 1건 삭제 |
-| `api/photographer/projects/[id]/clip-analysis` | POST/GET | 세션+소유권 | CLIP 분석 트리거/폴링(clip-service 프록시) |
+| `api/photographer/projects/[id]/clip-analysis` | POST/GET/DELETE | 세션+소유권 | OpenCLIP 분석 트리거/폴링/취소(clip-service 프록시). **2026-07-28 베타 전환 이후 FE 어디에서도 더 이상 호출되지 않음**(라우트/clip-service 엔드포인트 자체는 삭제하지 않고 보존, §6.5) |
+| `api/photographer/projects/[id]/gemini-analysis` | POST/GET/DELETE | 세션+소유권 | (2026-07-28 추가, 같은 날 접근 제어 변경) 작가 업로드 화면의 `[AI 유사도 분석]` 버튼이 호출하는 실사용 경로(clip-service `/analyze/gemini*` 프록시). **도입 당시엔 관리자 이메일 검증이 있었으나 베타 전환으로 모든 사용자가 호출해야 해서 제거함** — 일반 세션+소유권만 검증(clip-analysis와 동일 수준). 관리자 전용 `GeminiAnalysisPanel`도 같은 엔드포인트를 재사용한다 |
+| `api/photographer/projects/[id]/gemini-analysis/groups` | GET | 세션+소유권+**관리자 이메일**(`isAdminEmail`) | (2026-07-28 추가) 저장된 Gemini 임베딩으로 threshold만 바꿔 그룹핑 재계산(clip-service 프록시, API 재호출 없음). `include_quality=true`를 서버가 직접 고정해 요청 — Flash 품질 데이터가 섞여 나오는 유일한 조회 경로라 관리자만 접근 가능(§6.7) |
+| `api/photographer/projects/[id]/gemini-quality` | POST/GET/DELETE | 세션+소유권+관리자 이메일 | (2026-07-28 추가) Gemini Flash 품질 판정 트리거/폴링/취소(clip-service `/analyze/gemini/quality*` 프록시) |
+| `api/photographer/projects/[id]/gemini-quality/overview` | GET | 세션+소유권+관리자 이메일 | (2026-07-28 추가) 유사컷 그룹 소속 무관 프로젝트 전체 사진의 품질 판정 조회(clip-service `/overview` 프록시) |
 | `api/photographer/projects/[id]/retouch-match` | POST | 세션+소유권 | 보정본↔원본 CLIP 매칭(clip-service 프록시) |
-| `api/photographer/photos/[photoId]` | DELETE | 세션+소유권 | 사진 1건 삭제(`preparing`만). RPC `delete_photo_and_resolve_group`을 호출해 소속 유사컷 그룹도 원자적으로 정리 — 대표컷 삭제 시 `blur_variance` 기준 근사치로 재지정, 멤버가 1명 이하로 줄면 그룹 해체 |
+| `api/photographer/photos/[photoId]` | DELETE | 세션+소유권 | 사진 1건 삭제(`preparing`만). RPC `delete_photo_and_resolve_group`을 호출해 소속 유사컷 그룹도 원자적으로 정리(OpenCLIP 시절 로직 그대로, `blur_variance` 기준 근사치로 대표컷 재지정) — RPC 성공 뒤 (2026-07-28 베타 전환 추가) clip-service `POST /analyze/gemini/{id}/sync-groups`를 best-effort로 추가 호출해 Gemini 기준으로 재정합화한다(실패해도 삭제 응답에는 영향 없음, §6.6) |
 | `api/photographer/photos/[photoId]/memo` | PATCH | 세션+소유권 | 작가 메모 저장 |
 | `api/photographer/upload/photos` | POST | 클라이언트 Bearer 전달(자체 검증 없음) | FastAPI 업로드 프록시(CORS 우회용). 보정본용 프록시(`api/photographer/upload-versions`)는 호출하는 곳이 없어 2026-07-13 삭제됨 — 실제 보정본 업로드는 `UploadVersionsPanel.tsx`가 FastAPI를 직접 호출 |
 | `api/projects/[id]` | PATCH | **없음** | 레거시 엔드포인트, §12 위험 항목 참고 |
@@ -382,7 +437,27 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | GET | `/health` | 없음 | 생존 확인 |
 | POST | `/analyze` | `X-Internal-Token` | 프로젝트 CLIP 유사도 분석(백그라운드 작업, 202 응답) |
 | GET | `/analyze/{project_id}/status` | `X-Internal-Token` | 분석 상태 폴링 |
+| DELETE | `/analyze/{project_id}` | `X-Internal-Token` | 분석 취소 |
 | POST | `/match-retouch` | `X-Internal-Token` | 보정본 파일↔원본 CLIP 매칭 |
+
+### 7.4 Gemini Embedding — 베타 유사컷 분석 엔진 (2026-07-28 도입, 같은 날 베타 전환, clip-service 내부, §6.6 참고)
+
+| 메서드 | 경로 | 인증 | 설명 |
+|---|---|---|---|
+| POST | `/analyze/gemini` | `X-Internal-Token` | body `{project_id, limit?, force?}`. Gemini 임베딩 분석(백그라운드, 202 응답) — 성공 시 파이프라인 끝에서 자동으로 `sync_groups_to_db`도 호출한다(신규 대상 0건이어도 정합화를 위해 항상 호출). `limit`은 number 순 앞 N장만(비용 통제), `force`는 캐시(이미지 단위, `dimension`+`embedding_version` 포함)를 무시하고 저장된 임베딩도 재계산 |
+| GET | `/analyze/gemini/{project_id}/status` | `X-Internal-Token` | 가장 최근 실행(run)의 상태/처리량/실패수/예상비용 + (2026-07-28 베타 전환 추가) `active_photo_count`/`already_analyzed_count`/`pending_count` — FE 버튼 상태 머신(§6.1)이 이 값으로 최초/증분/완료 여부를 판단 |
+| DELETE | `/analyze/gemini/{project_id}` | `X-Internal-Token` | 분석 취소 |
+| GET | `/analyze/gemini/{project_id}/groups?threshold=&include_quality=` | `X-Internal-Token` | 저장된 임베딩으로 그룹핑만 재계산(Gemini API 재호출 없음). `include_quality`(기본 false)가 true일 때만 Flash 품질 판정 결과를 `quality_by_photo`/`recommended_photo_id`로 함께 응답 — 베타 대표컷 선정에는 절대 영향 없음(§6.7). FE에서는 관리자 전용 라우트만 이 값을 true로 보낸다 |
+| POST | `/analyze/gemini/{project_id}/sync-groups` | `X-Internal-Token` | (2026-07-28 베타 전환 추가) Gemini API를 호출하지 않고 저장된 임베딩만으로 그룹을 재계산해 `photo_groups`/`photos.similarity_group_id`를 통째로 교체(§6.6). 사진 삭제 후 정합화 목적으로 FE 삭제 라우트가 best-effort로 호출 |
+
+### 7.5 Gemini Flash 품질 판정 POC (2026-07-28 추가, clip-service 내부, §6.7 참고)
+
+| 메서드 | 경로 | 인증 | 설명 |
+|---|---|---|---|
+| POST | `/analyze/gemini/quality` | `X-Internal-Token` | body `{project_id, limit?, force?}`. Flash 품질 판정(백그라운드, 202 응답). 같은 model+prompt_version으로 이미 판정된 사진은 자동 재사용 |
+| GET | `/analyze/gemini/quality/{project_id}/status` | `X-Internal-Token` | 가장 최근 실행의 상태/처리량/실패수/재사용수/실사용 토큰 기반 예상비용 |
+| DELETE | `/analyze/gemini/quality/{project_id}` | `X-Internal-Token` | 분석 취소 |
+| GET | `/analyze/gemini/quality/{project_id}/overview` | `X-Internal-Token` | (2026-07-28 추가) 유사컷 그룹 소속 여부와 무관하게 **프로젝트 전체 사진**의 품질 판정 조회(`compute_quality_overview`). 저장된 결과만 읽어 Gemini API 재호출 없음 |
 
 ---
 
@@ -490,10 +565,12 @@ sequenceDiagram
 
 - 클라이언트 상태는 `SelectionContext`(`src/contexts/SelectionContext.tsx`)가 전역으로 관리하며, `/api/c/photos`로 최초 로드합니다.
 - **선택 토글**(`toggle()`): 클라이언트에서 `requiredCount(N)` 초과 선택을 막습니다(이미 N장을 채운 상태에서 새 사진 선택 시도는 무시). 별점/색상/코멘트는 건드리지 않고 `is_selected`만 전송합니다.
-- **별점/색상/코멘트 저장**(`updatePhotoState()`): 사진 상태가 바뀔 때마다 fire-and-forget으로 `/api/c/selections`에 POST(낙관적 UI, 실패해도 화면은 즉시 반영되고 콘솔에만 에러 로그).
-- **서버 측**(`/api/c/selections`): `checkPinAuth`로 PIN 쿠키 검증 → `validateTokenAndProject`로 토큰/프로젝트 일치 확인 → `status`가 `selecting` 또는 `preparing`일 때만 허용 → `selections` 테이블에 `(project_id, photo_id)` 기준 upsert. **N장 초과 선택에 대한 서버 측 카운트 검증은 이 엔드포인트에는 없고**, 최종 확정 시점(`/api/c/confirm`)에서만 `selected_photo_ids.length === required_count`를 강제합니다.
+- **별점/색상/코멘트 저장**(`updatePhotoState()`): 사진 상태가 바뀔 때마다 fire-and-forget으로 `/api/c/selections`에 POST — **바뀐 필드만** 전송합니다(낙관적 UI, 실패해도 화면은 즉시 반영되고 콘솔에만 에러 로그).
+- **서버 측**(`/api/c/selections` POST): `checkPinAuth`로 PIN 쿠키 검증 → `validateTokenAndProject`로 토큰/프로젝트 일치 확인 → `status`가 `selecting` 또는 `preparing`일 때만 허용 → `selections` 테이블에 `(project_id, photo_id)` 기준 upsert. **N장 초과 선택에 대한 서버 측 카운트 검증은 이 엔드포인트에는 없고**, 최종 확정 시점(`/api/c/confirm`)에서만 `selected_photo_ids.length === required_count`를 강제합니다. upsert payload는 요청 body에 실제로 존재하는 필드만 포함하므로(`rating`/`color_tag`/`comment` 각각 undefined=제외, null=명시적 삭제), 한 필드만 바뀐 요청이 다른 필드를 덮어쓰지 않습니다.
 - **확정**(`/api/c/confirm`): PIN 인증 + `status === "selecting"` 확인 + 개수 일치 확인 후, DB에 남아있는 선택 중 UI가 보낸 목록에 없는 것만 삭제(별점/코멘트가 남아있는 다른 선택은 보존) → `projects.status = "confirmed"` → `project_logs` 기록.
 - **확정 취소**(`/api/c/cancel-confirm`): `status === "confirmed"`일 때만, `customer_cancel_count < 3`일 때만 허용, `confirmed → selecting` 되돌리고 카운트 +1.
+- **동시 세션 동기화(폴링)**: 같은 고객 링크(token)를 여러 브라우저/기기에서 동시에 열어도 실시간 푸시(WebSocket/SSE/Realtime)는 없습니다. 대신 `SelectionContext`가 `status`가 `selecting`/`preparing`인 동안 5초 간격으로 `GET /api/c/selections?token=&project_id=`를 폴링해 `selectedIds`/`photoStates`만 갱신합니다(사진/그룹은 재조회하지 않음 — 가상화 리스트 재렌더 비용 회피). 탭이 백그라운드(`document.hidden`)면 폴링을 건너뛰고, 포그라운드 복귀 시 즉시 1회 재조회합니다. 로컬에서 방금 저장 요청을 보낸 사진(왕복 완료 전)은 폴링 응답 대신 로컬 값을 우선해, 내가 입력 중인 값이 아직 서버에 반영되지 않은 폴링 결과로 되돌아가지 않도록 합니다. 다른 세션의 변경은 최대 폴링 주기(5초, 백그라운드 탭 제외)만큼 지연되어 반영됩니다.
+  - (과거 버그, 수정됨) 이 부분 수정 전에는 `updatePhotoState()`/`toggle()`이 매번 로컬 캐시 전체(별점+색상+코멘트)를 재전송했고, 서버도 생략된 필드를 `null`로 강제했습니다. 그 결과 동일 토큰을 동시에 연 두 세션이 서로 다른 필드를 편집하면(예: A가 별점, B가 색상칩) 나중 요청이 먼저 저장된 값을 지워버리는 데이터 유실이 있었습니다. 파이프라인 전 구간에서 "생략=미변경"을 관철해 근본 수정했습니다.
 
 ### 11.1 사진 셀렉 저장 시퀀스
 
@@ -506,10 +583,11 @@ sequenceDiagram
 
     C->>C: 사진 클릭 → toggle(photoId)
     C->>C: 클라이언트에서 N장 초과 여부 확인
-    C->>Sel: POST {token, project_id, photo_id, is_selected, rating?, color_tag?, comment?}
+    C->>Sel: POST {token, project_id, photo_id, is_selected} (rating/color_tag/comment는 이번에 안 바뀌면 생략)
     Sel->>DB: checkPinAuth + status in (selecting, preparing) 확인
-    Sel->>DB: upsert selections (project_id, photo_id) 충돌 시 갱신
+    Sel->>DB: upsert selections (project_id, photo_id) — body에 있는 필드만 갱신, 생략된 필드는 기존값 유지
     Sel-->>C: 200 {ok:true} (fire-and-forget, UI는 이미 갱신됨)
+    Note over C,Sel: 5초 간격 GET /api/c/selections 폴링으로 다른 세션의 변경사항도 반영
 
     Note over C: N장을 모두 채우면 "확정" 버튼 활성화
     C->>Conf: POST {token, project_id, selected_photo_ids}
@@ -531,8 +609,9 @@ sequenceDiagram
 | Supabase Postgres | 전체 도메인 데이터 저장 | FE: `@supabase/supabase-js`(anon/service role); BE: `supabase`(Python, service role) |
 | Cloudflare R2 | 원본 썸네일/프리뷰, 보정본 파일, 프로필 이미지 저장 | BE: `boto3` S3 호환 클라이언트(`app/storage.py`) |
 | Google Cloud Storage | 코드상 클라이언트는 존재하나 호출부 없음 | `app/storage.py` — 사용 여부 `확인 필요`(죽은 코드로 추정) |
-| CLIP(OpenAI ViT-B-32) | 버스트샷 그룹핑, 보정본-원본 매칭 | `clip-service/` (별도 배포) |
-| OpenCV | 블러/노출 기반 대표컷 자동 선정 | `clip-service/app/quality.py` |
+| CLIP(OpenAI ViT-B-32) | 보정본-원본 매칭(`matcher.py` 폴백)에 계속 사용. 베스트샷 그룹핑 용도는 2026-07-28 베타 전환으로 미사용(패키지는 이 이유로 보존, §6.5) | `clip-service/` (별도 배포) |
+| OpenCV / mediapipe | 블러/눈감음 기반 배지·대표컷 판정 — 2026-07-28 베타 전환 이후 신규 실행 없음, 패키지도 아직 미삭제(§6.5, §13) | `clip-service/app/quality.py`, `app/eyes.py` |
+| Gemini(`google-genai`) | 베타 유사컷 그룹핑(`gemini-embedding-2`) + 관리자 전용 품질 판정 POC(`gemini-3.5-flash-lite`) | `clip-service/app/gemini_*.py` (§6.6, §6.7) |
 
 **주의**: `AUTH_SETUP.md`(기존 문서)는 "Google 로그인"만 안내하지만, 현재 `AuthModal.tsx` 코드는 `provider: "google" | "kakao"` 두 가지를 모두 지원합니다. **Kakao 프로바이더는 실제로 활성화되어 있고 정상 작동합니다**(2026-07-27, Supabase Admin API로 `auth.users`를 직접 조회해 `app_metadata.provider: "kakao"`인 실제 가입 계정과 유효한 이메일을 확인함 — 기존 `ACUT_OVERVIEW.md`의 "카카오 미구현" 기술은 오래된 정보였던 것으로 보임, 문서 갱신 필요). `handleKakaoLogin`이 요청하는 `scopes: "profile_nickname profile_image"`에 이메일이 명시적으로 없는데도 이메일이 정상 수신되는 것으로 보아, 이 프로젝트의 카카오 앱 설정에서 이메일이 기본 동의 항목으로 등록되어 있는 것으로 추정됩니다.
 
@@ -579,6 +658,8 @@ sequenceDiagram
 | Supabase | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | `SUPABASE_URL`(+`NEXT_PUBLIC_SUPABASE_URL` fallback), `SUPABASE_SERVICE_ROLE_KEY`(+`SUPABASE_SECRET_KEY`/`SUPABASE_PUBLISHABLE_KEY` fallback) |
 | 백엔드 연동 | `NEXT_PUBLIC_API_URL`, `API_URL`, `BACKEND_URL` | — |
 | CLIP | `CLIP_SERVICE_URL`, `CLIP_INTERNAL_TOKEN` | `CLIP_INTERNAL_TOKEN`, `CLIP_SIMILARITY_THRESHOLD`, `CLIP_MODEL_NAME`, `CLIP_MODEL_PRETRAINED`, `DOWNLOAD_CONCURRENCY`, `EMBEDDING_BATCH_SIZE`, `MAX_CONCURRENT_PROJECTS` |
+| Gemini Embedding — 베타 유사컷 분석 엔진 (2026-07-28 도입, 같은 날 베타 전환) | (FE는 `CLIP_SERVICE_URL`/`CLIP_INTERNAL_TOKEN` 재사용, 별도 FE 전용 값 없음) | `GEMINI_API_KEY`, `GEMINI_EMBEDDING_MODEL`, `GEMINI_EMBEDDING_DIMENSION`, `GEMINI_EMBEDDING_VERSION`(베타 전환 시 추가, 기본 `v1` — 캐시 키에 포함되어 올리면 기존 임베딩과 충돌 없이 새로 계산됨), `GEMINI_SIMILARITY_THRESHOLD`, `GEMINI_CONCURRENCY`, `GEMINI_MAX_RETRIES`, `GEMINI_TIMEOUT_SECONDS`, `GEMINI_IMAGE_PRICE_USD` |
+| Gemini Flash 품질 판정 POC (2026-07-28 추가) | (위와 동일, 별도 FE 전용 값 없음) | `GEMINI_FLASH_MODEL`, `GEMINI_QUALITY_PROMPT_VERSION`, `GEMINI_QUALITY_CONCURRENCY`, `GEMINI_QUALITY_MAX_RETRIES`, `GEMINI_QUALITY_TIMEOUT_SECONDS`, `GEMINI_FLASH_INPUT_PRICE_PER_1M`, `GEMINI_FLASH_OUTPUT_PRICE_PER_1M` |
 | PIN 인증 | `PIN_COOKIE_SECRET` | — |
 | 스토리지 | `R2_HOST`(URL 파싱 화이트리스트) | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`, `GCS_CREDENTIALS_JSON`, `GCS_BUCKET_NAME`(미사용 추정) |
 | 서비스 간 시크릿 | `INTERNAL_PRESIGN_SECRET` | `INTERNAL_PRESIGN_SECRET` |
@@ -604,6 +685,8 @@ sequenceDiagram
 11. **백엔드/CLIP 서비스 모두 자동화 테스트가 전혀 없음** — 회귀는 FE의 Playwright E2E(주로 Supabase 직접 경로)로만 일부 커버됩니다. 업로드/삭제/presign 등 FastAPI 로직 자체를 검증하는 테스트는 없습니다.
 12. **`GalleryPageClient`/뷰어 등 고객 UI 상세 코드는 이번 조사에서 표면적으로만 확인**했습니다 — 가상 스크롤 구현 세부사항, 무한 스크롤 여부 등은 §16 참고.
 13. ~~레거시 페이지 `/photographer/projects/[id]/upload-versions`, `.../upload-versions/v2`~~ — 2026-07-13 삭제됨(§6.1 삭제 이력 참고). 해당 페이지 고유의 매칭 렌더링 버그도 코드와 함께 제거되어 더 이상 해당 없음.
+14. ~~같은 고객 링크(token)를 두 세션이 동시에 열어 서로 다른 필드(별점/색상/코멘트)를 편집하면, 나중 요청이 로컬 캐시 전체를 재전송해 먼저 저장된 값을 지우는 데이터 유실~~ — 2026-07-28 수정됨(§11 참고). `updatePhotoState()`/`toggle()`이 바뀐 필드만 전송하도록, `upsertSelectionAdmin`이 생략된 필드는 건드리지 않도록 파이프라인 전 구간을 수정. 동시 세션 간 실시간 미반영(새로고침 전까지 안 보임) 문제도 5초 폴링으로 함께 개선(완전한 실시간은 아님 — 최대 폴링 주기만큼 지연 가능).
+15. **베타 AI 전환(2026-07-28) 이후 OpenCLIP/OpenCV/mediapipe 코드·패키지가 미사용 상태로 남아있음(의도적 보류)** — `clip_model.py`/`analyzer.py`/`quality.py`/`eyes.py`와 `torch`/`torchvision`/`open_clip_torch`/`opencv-python-headless`/`mediapipe` 패키지, Dockerfile의 `libgl1`/`libglib2.0-0`. `clip_model.py`는 `matcher.py`(보정본 매칭)가 계속 의존해 삭제 불가하지만, `quality.py`/`eyes.py`(그리고 관련 OpenCV/mediapipe 패키지)는 다른 사용처가 없어 삭제 가능한 상태 — 다만 영향 범위·롤백 가능성 검토 후 별도 승인을 받기로 하고 이번 라운드에서는 삭제하지 않았다(§6.5).
 
 ---
 
