@@ -20,7 +20,6 @@ import {
   buildPhotoIdSet,
   filterToGroupFrontPhotos,
   getGroupFrontPhotoId,
-  isGroupAutoExpanded,
 } from "@/lib/photo-groups";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import {
@@ -173,8 +172,8 @@ export default function ViewerPage() {
     [contextPhotos, selectedIds, photoStates, filterState]
   );
 
-  /* ── AI 유사컷 그룹: 갤러리의 "유사컷 대표이미지 적용" 토글이 ?grouped=1로 전달되면
-   *  대표컷 단위로만 이동(그룹 skip)하고, 나머지 멤버는 힌트→펼침으로만 보여준다. */
+  /* ── AI 유사컷 그룹: 갤러리의 "유사컷 묶어보기" 토글이 ?grouped=1로 전달되면
+   *  표지(front) 사진 단위로만 이동(그룹 skip)하고, 나머지 멤버는 힌트→펼침으로만 보여준다. */
   const narrowingFilterActive = filterState.nameFilter.trim().length > 0 || filterState.qualityFilter.length > 0;
   const groupingActive = filterState.groupedView && !narrowingFilterActive;
   const groupsById = useMemo(() => buildGroupsById(photoGroups), [photoGroups]);
@@ -199,21 +198,44 @@ export default function ViewerPage() {
     : (contextPhotos ?? []).find((p) => p.id === activePhotoId) ?? null;
 
   /** 그룹 펼침 상태(힌트 pill/PC 미니 스트립/모바일 바텀시트 공용).
-   *  비대표 멤버를 직접 보고 있으면(딥링크 진입 또는 펼침에서 멤버 클릭) 항상 열려 있고,
-   *  다른 그룹·대표컷·미소속 사진으로 이동하면 자동으로 닫힌다. */
+   *  groupId별로 "마지막 펼침 여부"를 기억한다(그룹핑이 켜져 있는 동안 세션 내내 유지) —
+   *  최초로 그 그룹에 진입할 때만 "지금 보는 사진이 표지가 아니면 1회 자동으로 편다"를 판단하고,
+   *  이후로는(다른 그룹/미소속 사진에 갔다 돌아와도) 사용자의 마지막 의도(수동 조작이든 최초
+   *  자동판단 결과든)를 그대로 유지한다 — 셀렉/표지 변경이 펼침 상태에 영향을 주면 안 되기 때문.
+   *  그룹핑 토글을 껐다 다시 켜면 전부 초기화되어 "새 진입"으로 취급된다. */
+  const groupExpandStateRef = useRef<Map<string, boolean>>(new Map());
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
+
+  /** 사용자가 펼치기/접기 버튼을 직접 눌렀을 때 쓰는 공용 setter — 상태(expandedGroupId)뿐 아니라
+   *  groupExpandStateRef에도 기록해야 재진입 시 이 선택이 유지된다. */
+  const setGroupExpanded = useCallback((groupId: string, expand: boolean) => {
+    groupExpandStateRef.current.set(groupId, expand);
+    setExpandedGroupId(expand ? groupId : null);
+  }, []);
+
   useEffect(() => {
-    if (!current || !groupingActive) { setExpandedGroupId(null); return; }
-    const groupId = current.similarityGroupId ?? null;
-    const group = groupId ? groupsById.get(groupId) : undefined;
-    const info = groupId ? groupSelectionInfo.get(groupId) : undefined;
-    // 지금 보는 사진이 이 그룹의 "앞자리"가 아니거나(대표컷이든 셀렉된 사진이든), 그룹 내 셀렉이
-    // 2장 이상이면(뷰어의 "자동 펼침" 대응 — 미니스트립을 열어 셀렉된 사진들이 항상 보이게 함) 연다.
-    if (groupId && group && (getGroupFrontPhotoId(group, info) !== current.id || isGroupAutoExpanded(info))) {
-      setExpandedGroupId(groupId);
+    if (!current || !groupingActive) {
+      setExpandedGroupId(null);
+      groupExpandStateRef.current = new Map(); // 그룹핑을 껐다 켜면 모든 그룹을 "새 진입"으로 취급
       return;
     }
-    setExpandedGroupId((prev) => (prev && prev !== groupId ? null : prev));
+    const groupId = current.similarityGroupId ?? null;
+    if (!groupId) {
+      setExpandedGroupId((prev) => (prev !== null ? null : prev));
+      return;
+    }
+    if (groupExpandStateRef.current.has(groupId)) {
+      // 이미 방문한 적 있는 그룹 — 마지막 상태(수동 조작이든 최초 자동판단 결과든) 그대로 적용,
+      // 다시 판단하지 않는다(셀렉/표지 변경으로 인한 재평가 차단).
+      setExpandedGroupId(groupExpandStateRef.current.get(groupId) ? groupId : null);
+      return;
+    }
+    // 이 그룹에 처음 진입 — 지금 보는 사진이 표지가 아니면 1회만 자동으로 편다.
+    const group = groupsById.get(groupId);
+    const info = groupSelectionInfo.get(groupId);
+    const shouldExpand = !!group && getGroupFrontPhotoId(group, info) !== current.id;
+    groupExpandStateRef.current.set(groupId, shouldExpand);
+    setExpandedGroupId(shouldExpand ? groupId : null);
   }, [current, groupingActive, groupsById, groupSelectionInfo]);
 
   /** prev/next 기준 인덱스 — 앞자리가 아닌 멤버를 미리보기 중이면(filteredPhotos엔 앞자리만 있어
@@ -233,10 +255,6 @@ export default function ViewerPage() {
   const currentGroupId = current?.similarityGroupId ?? null;
   const currentGroup = currentGroupId ? groupsById.get(currentGroupId) : undefined;
   const showGroupHint = groupingActive && !!currentGroup && currentGroup.photoCount > 1;
-  /** 현재 그룹 내 셀렉이 2장 이상이라 미니스트립이 자동으로 열린 상태 — 접기 버튼을 비활성화한다 */
-  const currentGroupAutoExpanded = isGroupAutoExpanded(
-    currentGroupId ? groupSelectionInfo.get(currentGroupId) : undefined
-  );
 
   const star  = current ? photoStates[current.id]?.rating : undefined;
   const color = current ? photoStates[current.id]?.color  : undefined;
@@ -537,12 +555,7 @@ export default function ViewerPage() {
         .fs-mini-thumb:hover { opacity: 0.85; filter: grayscale(0.3); }
         .fs-mini-thumb.active { filter: grayscale(0); opacity: 1; border-color: var(--accent); }
         .fs-mini-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .fs-rep-label {
-          position: absolute; top: 3px; left: 3px;
-          background: #FF4D00; color: #000; font-family: 'Space Mono', monospace;
-          font-size: 8px; font-weight: 700; padding: 1px 4px; line-height: 1.4;
-        }
-        /* 메인 필름스트립: 펼쳐진 그룹의 대표컷에 오렌지 링(.active의 border/transform과 레이어 분리) */
+        /* 메인 필름스트립: 펼쳐진 그룹의 표지(front) 사진에 오렌지 링(.active의 border/transform과 레이어 분리) */
         .fs-thumb.group-expanded { box-shadow: 0 0 0 2px #FF4D00; }
       `}</style>
 
@@ -774,17 +787,9 @@ export default function ViewerPage() {
                   <button
                     type="button"
                     className="fs-group-hint"
-                    disabled={currentGroupAutoExpanded}
-                    aria-label={
-                      currentGroupAutoExpanded
-                        ? `선택한 사진 모두 표시 중 (총 ${currentGroup.photoCount}장)`
-                        : undefined
-                    }
-                    onClick={() => setExpandedGroupId((prev) => (prev === currentGroup.id ? null : currentGroup.id))}
+                    onClick={() => setGroupExpanded(currentGroup.id, expandedGroupId !== currentGroup.id)}
                   >
-                    {currentGroupAutoExpanded
-                      ? `◧ 선택한 사진 모두 표시 중 (${currentGroup.photoCount}장)`
-                      : `◧ 유사컷 ${currentGroup.photoCount - 1}장 ${expandedGroupId === currentGroup.id ? "접기 ▴" : "▾"}`}
+                    ◧ 유사컷 {currentGroup.photoCount - 1}장 {expandedGroupId === currentGroup.id ? "접기 ▴" : "▾"}
                   </button>
                 </>
               )}
@@ -829,7 +834,6 @@ export default function ViewerPage() {
             <div className="fs-mini-strip">
               {(membersByGroup.get(expandedGroupId) ?? []).map((member) => {
                 const isMemberActive = member.id === current.id;
-                const isRep = groupsById.get(expandedGroupId)?.representativePhotoId === member.id;
                 const isMemberSelected = selectedIds.has(member.id);
                 return (
                   <div
@@ -838,7 +842,6 @@ export default function ViewerPage() {
                     onClick={() => navigateTo(member.id)}
                   >
                     <img src={member.url} alt={getPhotoDisplayName(member)} loading="lazy" decoding="async" />
-                    {isRep && <span className="fs-rep-label">대표</span>}
                     {isMemberSelected && (
                       <div style={{
                         position: "absolute", top: 4, left: 4, width: 14, height: 14,
@@ -983,22 +986,19 @@ export default function ViewerPage() {
           {showGroupHint && currentGroup && (
             <button
               type="button"
-              disabled={currentGroupAutoExpanded}
-              onClick={() => setExpandedGroupId((prev) => (prev === currentGroup.id ? null : currentGroup.id))}
+              onClick={() => setGroupExpanded(currentGroup.id, expandedGroupId !== currentGroup.id)}
               style={{
                 position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)",
                 display: "flex", alignItems: "center", gap: 6,
                 height: 30, padding: "0 14px", zIndex: 15,
                 background: "rgba(0,0,0,0.7)",
-                border: `1px solid ${currentGroupAutoExpanded ? "rgba(255,77,0,0.4)" : "#FF4D00"}`,
-                color: currentGroupAutoExpanded ? "rgba(255,77,0,0.75)" : "#FF4D00",
+                border: "1px solid #FF4D00",
+                color: "#FF4D00",
                 fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, fontWeight: 700,
-                cursor: currentGroupAutoExpanded ? "default" : "pointer",
+                cursor: "pointer",
               }}
             >
-              {currentGroupAutoExpanded
-                ? `◧ 선택한 사진 모두 표시 중 (${currentGroup.photoCount}장)`
-                : `◧ 유사컷 ${currentGroup.photoCount - 1}장 ${expandedGroupId === currentGroup.id ? "닫기 ✕" : "▾"}`}
+              ◧ 유사컷 {currentGroup.photoCount - 1}장 {expandedGroupId === currentGroup.id ? "닫기 ✕" : "▾"}
             </button>
           )}
 
@@ -1025,10 +1025,10 @@ export default function ViewerPage() {
               <span style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#FF4D00", letterSpacing: "0.06em" }}>
                 이 사진과 유사한 사진 ({(membersByGroup.get(expandedGroupId) ?? []).length}장)
               </span>
-              {!currentGroupAutoExpanded && (
+              {currentGroup && (
                 <button
                   type="button"
-                  onClick={() => setExpandedGroupId(null)}
+                  onClick={() => setGroupExpanded(currentGroup.id, false)}
                   style={{ background: "none", border: "none", color: "var(--muted-foreground)", padding: 4, cursor: "pointer" }}
                 >
                   <X style={{ width: 14, height: 14 }} />
@@ -1038,7 +1038,6 @@ export default function ViewerPage() {
             <div style={{ display: "flex", gap: 8, overflowX: "auto" }}>
               {(membersByGroup.get(expandedGroupId) ?? []).map((member) => {
                 const isMemberActive = member.id === current.id;
-                const isRep = groupsById.get(expandedGroupId)?.representativePhotoId === member.id;
                 const isMemberSelected = selectedIds.has(member.id);
                 return (
                   <div
@@ -1057,15 +1056,6 @@ export default function ViewerPage() {
                       decoding="async"
                       style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                     />
-                    {isRep && (
-                      <span style={{
-                        position: "absolute", top: 2, left: 2,
-                        background: "#FF4D00", color: "#000",
-                        fontFamily: "'Space Mono', monospace", fontSize: 8, fontWeight: 700, padding: "1px 4px",
-                      }}>
-                        대표
-                      </span>
-                    )}
                     {isMemberSelected && (
                       <div style={{
                         position: "absolute", top: 2, right: 2, width: 14, height: 14,

@@ -17,9 +17,14 @@ type GalleryPhotoCardProps = {
   colorTags?: ColorTag[];
   showGroupBadge: boolean;
   groupId?: string;
+  /** 표지 외에 접혀서 숨겨진 사진 수 — 항상 totalCount - 1, 셀렉 개수와 무관하게 고정 */
   restCount: number;
+  /** 그룹 전체 사진 수 */
+  totalCount: number;
+  /** 그룹 내 셀렉 수 — 0이면 배지에 표시하지 않고 기존 +N만 노출 */
+  selectedCount: number;
   isGroupExpanded: boolean;
-  /** 펼쳐진 그룹(대표컷+멤버 전체)에 속함 — 그룹 경계를 테두리로 시각 구분 */
+  /** 펼쳐진 그룹(표지+멤버 전체)에 속함 — 그룹 경계를 테두리로 시각 구분 */
   inExpandedGroup?: boolean;
   presignedThumb?: string;
   thumbQueue: ThumbLoadQueue;
@@ -40,6 +45,8 @@ function GalleryPhotoCardImpl({
   showGroupBadge,
   groupId,
   restCount,
+  totalCount,
+  selectedCount,
   isGroupExpanded,
   inExpandedGroup,
   presignedThumb,
@@ -120,10 +127,18 @@ function GalleryPhotoCardImpl({
         <button
           type="button"
           onClick={(e) => onGroupBadgeClick(e, groupId)}
-          aria-label={`유사컷 ${restCount}장 ${isGroupExpanded ? "접기" : "펼치기"}`}
+          aria-label={
+            selectedCount > 0
+              ? `유사컷 ${totalCount}장 중 ${selectedCount}장 선택됨, ${isGroupExpanded ? "접기" : "펼치기"}`
+              : `유사컷 ${restCount}장 ${isGroupExpanded ? "접기" : "펼치기"}`
+          }
           className="gl-group-badge"
         >
-          {isGroupExpanded ? `${restCount + 1}장 −` : `+${restCount}`}
+          {isGroupExpanded
+            ? `${totalCount}장 −`
+            : selectedCount > 0
+              ? `+${restCount} · ${selectedCount}/${totalCount} 선택`
+              : `+${restCount}`}
         </button>
       )}
 

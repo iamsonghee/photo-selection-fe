@@ -21,7 +21,14 @@ import {
   parseFilterFromSearchParams,
 } from "@/lib/gallery-filter";
 import type { GalleryFilterState } from "@/lib/gallery-filter";
-import { buildGroupsById, buildMembersByGroup, buildPhotoIdSet, filterToRepresentatives } from "@/lib/photo-groups";
+import {
+  buildGroupSelectionInfo,
+  buildGroupsById,
+  buildMembersByGroup,
+  buildPhotoIdSet,
+  filterToGroupFrontPhotos,
+  getGroupFrontPhotoId,
+} from "@/lib/photo-groups";
 import type { StarRating, ColorTag, SortOrder } from "@/types";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
@@ -144,8 +151,16 @@ export default function GalleryPageClient() {
   const groupsById = useMemo(() => buildGroupsById(photoGroups), [photoGroups]);
   const membersByGroup = useMemo(() => buildMembersByGroup(filteredPhotos), [filteredPhotos]);
   const photoIdSet = useMemo(() => buildPhotoIdSet(photos), [photos]);
+  /** 그룹별 셀렉 수/단일 셀렉 id를 selectedIds가 바뀔 때 한 번만 파생 — 카드마다 반복 계산 방지 */
+  const groupSelectionInfo = useMemo(
+    () => buildGroupSelectionInfo(membersByGroup, selectedIds),
+    [membersByGroup, selectedIds]
+  );
 
-  const showSimilarityToggle = project?.clipAnalysisStatus === "completed" && photoGroups.length > 0;
+  // photo_groups는 엔진(OpenCLIP/Gemini) 무관하게 그룹이 실제로 있을 때만 채워지므로
+  // 이 값 하나로 충분하다 — project.clipAnalysisStatus(projects.clip_analysis_status)는
+  // OpenCLIP 전용 컬럼이라 Gemini 분석에서는 계속 null로 남아 예전 조건대로면 토글이 영영 안 뜬다.
+  const showSimilarityToggle = photoGroups.length > 0;
 
   const hasBlurryPhotos = useMemo(() => photos.some((p) => p.isBlurry === true), [photos]);
   const hasEyesClosedPhotos = useMemo(
@@ -166,23 +181,46 @@ export default function GalleryPageClient() {
    *  실제 필터링 자체는 filterState를 통해 getFilteredPhotos(공유 로직, 뷰어와 동일)가 수행한다. */
   const narrowingFilterActive = searchValue.trim().length > 0 || qualityFilter.size > 0;
 
-  /* 토글 ON: 대표컷 + 미분류 사진만, 펼쳐진 그룹은 대표컷 바로 뒤에 나머지 인라인 삽입.
+  /* 토글 ON: 표지(front) + 미분류 사진만, 펼쳐진 그룹은 orderIndex 원래 순서 그대로 인라인 삽입.
+   *  셀렉/표지 변경과 무관하게 항상 원래 순서를 유지해야 하므로, 표지를 맨 앞으로 옮기지 않고
+   *  membersByGroup(이미 orderIndex 정렬됨)을 그대로 push한다.
    *  파일명/품질 필터가 켜져 있으면 그룹 접기보다 우선 — 검색·필터된 사진을 그룹 속에 숨기지 않는다. */
   const displayPhotos = useMemo(() => {
     if (narrowingFilterActive) return filteredPhotos;
     if (!similarityToggleOn) return filteredPhotos;
-    const representatives = filterToRepresentatives(filteredPhotos, groupsById, photoIdSet);
+    const fronts = filterToGroupFrontPhotos(filteredPhotos, groupsById, photoIdSet, groupSelectionInfo);
     const result: typeof filteredPhotos = [];
-    for (const photo of representatives) {
-      result.push(photo);
+    // 대표컷이 photos 목록에서 사라진 방어 폴백(filterToGroupFrontPhotos 참고)이 발동하면
+    // 같은 groupId의 멤버 여러 장이 fronts에 남을 수 있다 — 그룹당 한 번만 처리해 멤버 중복
+    // push를 막는다(정상 케이스에선 그룹당 fronts 1장이라 이 가드가 아무 영향을 주지 않는다).
+    const emittedGroups = new Set<string>();
+    for (const photo of fronts) {
       const groupId = photo.similarityGroupId;
-      if (groupId && expandedGroups.has(groupId)) {
-        const members = membersByGroup.get(groupId) ?? [];
-        result.push(...members.filter((p) => p.id !== photo.id));
+      if (!groupId) {
+        result.push(photo);
+        continue;
+      }
+      if (emittedGroups.has(groupId)) continue;
+      emittedGroups.add(groupId);
+      const expanded = expandedGroups.has(groupId);
+      if (expanded) {
+        const members = membersByGroup.get(groupId) ?? [photo];
+        result.push(...members);
+      } else {
+        result.push(photo);
       }
     }
     return result;
-  }, [filteredPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup, photoIdSet, narrowingFilterActive]);
+  }, [
+    filteredPhotos,
+    similarityToggleOn,
+    expandedGroups,
+    groupsById,
+    membersByGroup,
+    photoIdSet,
+    narrowingFilterActive,
+    groupSelectionInfo,
+  ]);
 
   const viewerQueryString = useMemo(() => buildFilterQueryString(filterState), [filterState]);
 
@@ -580,7 +618,7 @@ export default function GalleryPageClient() {
           min-width: 22px; height: 20px; padding: 0 6px;
           background: rgba(0,0,0,0.7); border: 1px solid #FF4D00;
           color: #FF4D00; font-family: 'Space Mono', monospace;
-          font-size: 10px; font-weight: 700;
+          font-size: 10px; font-weight: 700; white-space: nowrap;
           display: flex; align-items: center; justify-content: center;
           z-index: 20; cursor: pointer; transition: all 0.15s ease;
         }
@@ -836,7 +874,7 @@ export default function GalleryPageClient() {
                           </svg>
                         )}
                       </span>
-                      유사컷 대표이미지 적용
+                      유사컷 묶어보기
                     </button>
                   </>
                 )}
@@ -972,10 +1010,16 @@ export default function GalleryPageClient() {
                 const rating          = state?.rating;
                 const colorTags       = state?.color;
                 const group           = photo.similarityGroupId ? groupsById.get(photo.similarityGroupId) : undefined;
-                const isRepresentative = !!group && group.representativePhotoId === photo.id;
-                const restCount       = group ? group.photoCount - 1 : 0;
+                const selInfo          = group ? groupSelectionInfo.get(group.id) : undefined;
+                // isRepresentative: "AI 대표컷"이 아니라 "이 그룹의 현재 표지(front) 사진"이라는 뜻 —
+                // 그룹 내 셀렉이 1장 이상이면 그중 원래 순서가 가장 앞선 사진, 없으면 내부 기본 표지.
+                const isRepresentative = !!group && getGroupFrontPhotoId(group, selInfo) === photo.id;
+                const totalCount      = group ? group.photoCount : 0;
+                const restCount       = group ? group.photoCount - 1 : 0; // 표지 외에 접혀서 숨겨진 사진 수 — 셀렉 개수와 무관하게 고정
+                const selectedCount   = selInfo?.selectedCount ?? 0;
                 const groupingActive  = similarityToggleOn && !narrowingFilterActive;
                 const showGroupBadge  = groupingActive && isRepresentative && restCount > 0;
+                const groupExpanded   = groupingActive && !!group && expandedGroups.has(group.id);
                 const presignedThumb  = presignedUrls.get(photo.id)?.url;
 
                 cells.push(
@@ -989,8 +1033,10 @@ export default function GalleryPageClient() {
                     showGroupBadge={showGroupBadge}
                     groupId={group?.id}
                     restCount={restCount}
-                    isGroupExpanded={groupingActive && !!group && expandedGroups.has(group.id)}
-                    inExpandedGroup={groupingActive && !!group && expandedGroups.has(group.id)}
+                    totalCount={totalCount}
+                    selectedCount={selectedCount}
+                    isGroupExpanded={groupExpanded}
+                    inExpandedGroup={groupExpanded}
                     presignedThumb={presignedThumb}
                     thumbQueue={thumbQueue}
                     viewerQueryString={viewerQueryString}
