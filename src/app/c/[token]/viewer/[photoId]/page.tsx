@@ -400,7 +400,10 @@ export default function ViewerPage() {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "TEXTAREA" || tag === "INPUT") return;
       if (showConfirmModal) return;
-      if (e.code === "Space") { e.preventDefault(); e.stopPropagation(); toggleSelect(); }
+      // keyup은 브라우저가 repeat을 설정하지 않지만(누르고 있는 동안은 keydown만 반복),
+      // 방어적으로 가드를 남겨둔다 — 실제 겹친 요청 방지는 SelectionContext의
+      // photoId별 저장 큐(flushSelection)가 담당한다.
+      if (e.code === "Space" && !e.repeat) { e.preventDefault(); e.stopPropagation(); toggleSelect(); }
     };
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     window.addEventListener("keyup", handleKeyUp, { capture: true });

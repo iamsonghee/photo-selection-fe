@@ -7,6 +7,9 @@ import {
 import { getAdminClient } from "@/lib/supabase-admin";
 import { checkPinAuth } from "@/lib/customer-auth-server";
 
+// 폴링(GET)이 어떤 계층(브라우저/CDN/Next)에서도 캐시되어 오래된 값을 돌려주지 않도록 강제한다.
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -68,10 +71,13 @@ export async function GET(req: NextRequest) {
     }
     const admin = getAdminClient();
     const { selectedIds, photoStates } = await getSelectionsOnlyAdmin(admin, projectId);
-    return NextResponse.json({
-      selectedIds: Array.from(selectedIds),
-      photoStates,
-    });
+    return NextResponse.json(
+      {
+        selectedIds: Array.from(selectedIds),
+        photoStates,
+      },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (e) {
     console.error("[api/c/selections GET]", e);
     return NextResponse.json(
