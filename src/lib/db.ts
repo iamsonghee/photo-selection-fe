@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import type { Project, Photo, ProjectStatus } from "@/types";
-import { parseColorTags } from "@/types";
+import type { Project, Photo, ProjectStatus, ColorTag } from "@/types";
 import type { PhotoState } from "@/contexts/SelectionContext";
 import type { Database } from "@/types/supabase";
 
@@ -355,11 +354,11 @@ export async function getPhotosWithSelections(
   const selections = selectionsData ?? [];
   const selectedIds = new Set(selections.map((s: { photo_id: string }) => s.photo_id));
   const photoStates: Record<string, PhotoState> = {};
-  for (const s of selections as Array<{ photo_id: string; rating: number | null; color_tag: string | null; comment: string | null }>) {
-    const parsedColor = parseColorTags(s.color_tag);
+  for (const s of selections as Array<{ photo_id: string; rating: number | null; color_tags: ColorTag[] | null; comment: string | null }>) {
+    const colorTags = s.color_tags ?? [];
     photoStates[s.photo_id] = {
       rating: (s.rating as 1 | 2 | 3 | 4 | 5) ?? undefined,
-      color: parsedColor.length ? parsedColor : undefined,
+      color: colorTags.length ? colorTags : undefined,
       comment: s.comment ?? undefined,
     };
   }

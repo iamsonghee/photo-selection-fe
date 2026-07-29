@@ -10,20 +10,6 @@ export interface PhotoTag {
   color?: ColorTag[];
 }
 
-const VALID_COLOR_TAGS: ColorTag[] = ["red", "yellow", "green", "blue", "purple"];
-
-/** DB color_tag 문자열("red,blue") → ColorTag 배열 */
-export function parseColorTags(raw: string | null | undefined): ColorTag[] {
-  if (!raw) return [];
-  return raw.split(",").filter((v): v is ColorTag => VALID_COLOR_TAGS.includes(v as ColorTag));
-}
-
-/** ColorTag 배열 → DB 저장용 문자열("red,blue"). 빈 배열이면 null */
-export function serializeColorTags(colors: ColorTag[] | undefined): string | null {
-  if (!colors?.length) return null;
-  return colors.join(",");
-}
-
 export interface Comment {
   id: string;
   photoId: string;

@@ -145,6 +145,7 @@ export interface Database {
           photo_id: string;
           rating: number | null;
           color_tag: ColorTagDb | null;
+          color_tags: ColorTagDb[];
           comment: string | null;
           is_selected: boolean;
           created_at: string;
@@ -155,6 +156,7 @@ export interface Database {
           photo_id: string;
           rating?: number | null;
           color_tag?: ColorTagDb | null;
+          color_tags?: ColorTagDb[];
           comment?: string | null;
           is_selected?: boolean;
           created_at?: string;
@@ -165,6 +167,7 @@ export interface Database {
           photo_id?: string;
           rating?: number | null;
           color_tag?: ColorTagDb | null;
+          color_tags?: ColorTagDb[];
           comment?: string | null;
           is_selected?: boolean;
           created_at?: string;

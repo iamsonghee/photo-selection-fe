@@ -13,7 +13,15 @@ import {
   getFilteredPhotos,
   getPhotoDisplayName,
 } from "@/lib/gallery-filter";
-import { buildGroupsById, buildMembersByGroup, buildPhotoIdSet, filterToRepresentatives } from "@/lib/photo-groups";
+import {
+  buildGroupSelectionInfo,
+  buildGroupsById,
+  buildMembersByGroup,
+  buildPhotoIdSet,
+  filterToGroupFrontPhotos,
+  getGroupFrontPhotoId,
+  isGroupAutoExpanded,
+} from "@/lib/photo-groups";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import {
   viewerImageBlockDownloadHandlers,
@@ -140,7 +148,7 @@ export default function ViewerPage() {
   const searchParams = useSearchParams();
   const token = (params?.token as string) ?? "";
   const photoId = (params?.photoId as string) ?? "";
-  const { project, photos: contextPhotos, photoGroups, selectedIds, Y, toggle, photoStates, updatePhotoState } = useSelection();
+  const { project, photos: contextPhotos, photoGroups, selectedIds, Y, toggle, photoStates, updatePhotoState, toggleColor } = useSelection();
 
   // 로컬 state로 현재 사진 관리 — router.push 없이 전환해 컴포넌트 재마운트 방지
   const [activePhotoId, setActivePhotoId] = useState(photoId);
@@ -172,9 +180,17 @@ export default function ViewerPage() {
   const groupsById = useMemo(() => buildGroupsById(photoGroups), [photoGroups]);
   const photoIdSet = useMemo(() => buildPhotoIdSet(contextPhotos ?? []), [contextPhotos]);
   const membersByGroup = useMemo(() => buildMembersByGroup(filteredPhotosRaw), [filteredPhotosRaw]);
+  /** 그룹별 셀렉 수/단일 셀렉 id를 selectedIds가 바뀔 때 한 번만 파생 — 갤러리와 동일한 패턴 */
+  const groupSelectionInfo = useMemo(
+    () => buildGroupSelectionInfo(membersByGroup, selectedIds),
+    [membersByGroup, selectedIds]
+  );
   const filteredPhotos = useMemo(
-    () => (groupingActive ? filterToRepresentatives(filteredPhotosRaw, groupsById, photoIdSet) : filteredPhotosRaw),
-    [filteredPhotosRaw, groupingActive, groupsById, photoIdSet]
+    () =>
+      groupingActive
+        ? filterToGroupFrontPhotos(filteredPhotosRaw, groupsById, photoIdSet, groupSelectionInfo)
+        : filteredPhotosRaw,
+    [filteredPhotosRaw, groupingActive, groupsById, photoIdSet, groupSelectionInfo]
   );
 
   const currentIndex = filteredPhotos.findIndex((p) => p.id === activePhotoId);
@@ -190,27 +206,37 @@ export default function ViewerPage() {
     if (!current || !groupingActive) { setExpandedGroupId(null); return; }
     const groupId = current.similarityGroupId ?? null;
     const group = groupId ? groupsById.get(groupId) : undefined;
-    if (groupId && group && group.representativePhotoId !== current.id) {
+    const info = groupId ? groupSelectionInfo.get(groupId) : undefined;
+    // 지금 보는 사진이 이 그룹의 "앞자리"가 아니거나(대표컷이든 셀렉된 사진이든), 그룹 내 셀렉이
+    // 2장 이상이면(뷰어의 "자동 펼침" 대응 — 미니스트립을 열어 셀렉된 사진들이 항상 보이게 함) 연다.
+    if (groupId && group && (getGroupFrontPhotoId(group, info) !== current.id || isGroupAutoExpanded(info))) {
       setExpandedGroupId(groupId);
       return;
     }
     setExpandedGroupId((prev) => (prev && prev !== groupId ? null : prev));
-  }, [current, groupingActive, groupsById]);
+  }, [current, groupingActive, groupsById, groupSelectionInfo]);
 
-  /** prev/next 기준 인덱스 — 비대표 멤버를 미리보기 중이면(filteredPhotos엔 대표컷만 있어 currentIndex가 -1)
-   *  그 그룹 대표컷의 위치를 앵커로 사용해 "다음/이전"이 항상 대표컷 단위(그룹 skip)로 동작한다. */
+  /** prev/next 기준 인덱스 — 앞자리가 아닌 멤버를 미리보기 중이면(filteredPhotos엔 앞자리만 있어
+   *  currentIndex가 -1) 그 그룹 앞자리 사진의 위치를 앵커로 사용해 "다음/이전"이 항상 그룹 단위로
+   *  동작한다(앞자리는 대표컷이거나, 그룹 내 셀렉이 정확히 1장이면 그 셀렉된 사진). */
   const navAnchorIndex = useMemo(() => {
     if (currentIndex >= 0) return currentIndex;
     if (!current || !groupingActive) return currentIndex;
     const groupId = current.similarityGroupId;
     const group = groupId ? groupsById.get(groupId) : undefined;
-    if (!group || !photoIdSet.has(group.representativePhotoId)) return currentIndex;
-    return filteredPhotos.findIndex((p) => p.id === group.representativePhotoId);
-  }, [currentIndex, current, groupingActive, groupsById, photoIdSet, filteredPhotos]);
+    if (!group) return currentIndex;
+    const frontId = getGroupFrontPhotoId(group, groupId ? groupSelectionInfo.get(groupId) : undefined);
+    if (!photoIdSet.has(frontId)) return currentIndex;
+    return filteredPhotos.findIndex((p) => p.id === frontId);
+  }, [currentIndex, current, groupingActive, groupsById, photoIdSet, filteredPhotos, groupSelectionInfo]);
 
   const currentGroupId = current?.similarityGroupId ?? null;
   const currentGroup = currentGroupId ? groupsById.get(currentGroupId) : undefined;
   const showGroupHint = groupingActive && !!currentGroup && currentGroup.photoCount > 1;
+  /** 현재 그룹 내 셀렉이 2장 이상이라 미니스트립이 자동으로 열린 상태 — 접기 버튼을 비활성화한다 */
+  const currentGroupAutoExpanded = isGroupAutoExpanded(
+    currentGroupId ? groupSelectionInfo.get(currentGroupId) : undefined
+  );
 
   const star  = current ? photoStates[current.id]?.rating : undefined;
   const color = current ? photoStates[current.id]?.color  : undefined;
@@ -306,10 +332,8 @@ export default function ViewerPage() {
 
   const setColor = useCallback((c: ColorTag) => {
     if (!current) return;
-    const cur = photoStates[current.id]?.color ?? [];
-    const next = cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c];
-    updatePhotoState(current.id, { color: next.length ? next : undefined });
-  }, [current, photoStates, updatePhotoState]);
+    toggleColor(current.id, c);
+  }, [current, toggleColor]);
 
   const saveComment = useCallback(() => {
     if (!current) return;
@@ -750,9 +774,17 @@ export default function ViewerPage() {
                   <button
                     type="button"
                     className="fs-group-hint"
+                    disabled={currentGroupAutoExpanded}
+                    aria-label={
+                      currentGroupAutoExpanded
+                        ? `선택한 사진 모두 표시 중 (총 ${currentGroup.photoCount}장)`
+                        : undefined
+                    }
                     onClick={() => setExpandedGroupId((prev) => (prev === currentGroup.id ? null : currentGroup.id))}
                   >
-                    ◧ 유사컷 {currentGroup.photoCount - 1}장 {expandedGroupId === currentGroup.id ? "접기 ▴" : "▾"}
+                    {currentGroupAutoExpanded
+                      ? `◧ 선택한 사진 모두 표시 중 (${currentGroup.photoCount}장)`
+                      : `◧ 유사컷 ${currentGroup.photoCount - 1}장 ${expandedGroupId === currentGroup.id ? "접기 ▴" : "▾"}`}
                   </button>
                 </>
               )}
@@ -798,6 +830,7 @@ export default function ViewerPage() {
               {(membersByGroup.get(expandedGroupId) ?? []).map((member) => {
                 const isMemberActive = member.id === current.id;
                 const isRep = groupsById.get(expandedGroupId)?.representativePhotoId === member.id;
+                const isMemberSelected = selectedIds.has(member.id);
                 return (
                   <div
                     key={member.id}
@@ -806,6 +839,14 @@ export default function ViewerPage() {
                   >
                     <img src={member.url} alt={getPhotoDisplayName(member)} loading="lazy" decoding="async" />
                     {isRep && <span className="fs-rep-label">대표</span>}
+                    {isMemberSelected && (
+                      <div style={{
+                        position: "absolute", top: 4, left: 4, width: 14, height: 14,
+                        background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <Check style={{ width: 8, height: 8, color: "black" }} strokeWidth={4} />
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -942,17 +983,22 @@ export default function ViewerPage() {
           {showGroupHint && currentGroup && (
             <button
               type="button"
+              disabled={currentGroupAutoExpanded}
               onClick={() => setExpandedGroupId((prev) => (prev === currentGroup.id ? null : currentGroup.id))}
               style={{
                 position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)",
                 display: "flex", alignItems: "center", gap: 6,
                 height: 30, padding: "0 14px", zIndex: 15,
-                background: "rgba(0,0,0,0.7)", border: "1px solid #FF4D00", color: "#FF4D00",
+                background: "rgba(0,0,0,0.7)",
+                border: `1px solid ${currentGroupAutoExpanded ? "rgba(255,77,0,0.4)" : "#FF4D00"}`,
+                color: currentGroupAutoExpanded ? "rgba(255,77,0,0.75)" : "#FF4D00",
                 fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, fontWeight: 700,
-                cursor: "pointer",
+                cursor: currentGroupAutoExpanded ? "default" : "pointer",
               }}
             >
-              ◧ 유사컷 {currentGroup.photoCount - 1}장 {expandedGroupId === currentGroup.id ? "닫기 ✕" : "▾"}
+              {currentGroupAutoExpanded
+                ? `◧ 선택한 사진 모두 표시 중 (${currentGroup.photoCount}장)`
+                : `◧ 유사컷 ${currentGroup.photoCount - 1}장 ${expandedGroupId === currentGroup.id ? "닫기 ✕" : "▾"}`}
             </button>
           )}
 
@@ -979,18 +1025,21 @@ export default function ViewerPage() {
               <span style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#FF4D00", letterSpacing: "0.06em" }}>
                 이 사진과 유사한 사진 ({(membersByGroup.get(expandedGroupId) ?? []).length}장)
               </span>
-              <button
-                type="button"
-                onClick={() => setExpandedGroupId(null)}
-                style={{ background: "none", border: "none", color: "var(--muted-foreground)", padding: 4, cursor: "pointer" }}
-              >
-                <X style={{ width: 14, height: 14 }} />
-              </button>
+              {!currentGroupAutoExpanded && (
+                <button
+                  type="button"
+                  onClick={() => setExpandedGroupId(null)}
+                  style={{ background: "none", border: "none", color: "var(--muted-foreground)", padding: 4, cursor: "pointer" }}
+                >
+                  <X style={{ width: 14, height: 14 }} />
+                </button>
+              )}
             </div>
             <div style={{ display: "flex", gap: 8, overflowX: "auto" }}>
               {(membersByGroup.get(expandedGroupId) ?? []).map((member) => {
                 const isMemberActive = member.id === current.id;
                 const isRep = groupsById.get(expandedGroupId)?.representativePhotoId === member.id;
+                const isMemberSelected = selectedIds.has(member.id);
                 return (
                   <div
                     key={member.id}
@@ -1016,6 +1065,14 @@ export default function ViewerPage() {
                       }}>
                         대표
                       </span>
+                    )}
+                    {isMemberSelected && (
+                      <div style={{
+                        position: "absolute", top: 2, right: 2, width: 14, height: 14,
+                        background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <Check style={{ width: 8, height: 8, color: "black" }} strokeWidth={4} />
+                      </div>
                     )}
                   </div>
                 );

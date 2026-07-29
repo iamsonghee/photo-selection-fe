@@ -4,8 +4,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminClient } from "@/lib/supabase-admin";
-import type { Project, Photo, PhotoGroupInfo, ProjectStatus } from "@/types";
-import { parseColorTags } from "@/types";
+import type { Project, Photo, PhotoGroupInfo, ProjectStatus, ColorTag } from "@/types";
 import type { PhotoState } from "@/contexts/SelectionContext";
 import type { Database } from "@/types/supabase";
 
@@ -120,10 +119,10 @@ function buildSelectionState(selections: SelectionsRow[]): {
   );
   const photoStates: Record<string, PhotoState> = {};
   for (const s of selections) {
-    const parsedColor = parseColorTags(s.color_tag as string | null);
+    const colorTags = ((s as { color_tags?: ColorTag[] | null }).color_tags ?? []) as ColorTag[];
     photoStates[s.photo_id] = {
       rating: (s.rating as 1 | 2 | 3 | 4 | 5) ?? undefined,
-      color: parsedColor.length ? parsedColor : undefined,
+      color: colorTags.length ? colorTags : undefined,
       comment: s.comment ?? undefined,
     };
   }
@@ -218,6 +217,50 @@ export async function upsertSelectionAdmin(
   if (error) throw new Error(error.message);
 }
 
+/**
+ * photo_id가 실제로 project_id 소속인지 검증한다. 기존에는 token→project만 확인하고
+ * photo_id는 검증하지 않아, 유효한 고객 링크만 있으면 요청 본문의 photo_id를 다른
+ * 프로젝트 사진으로 바꿔 그 프로젝트의 선택 상태/별점/코멘트/색상을 저장할 수 있는
+ * 접근 통제 결함이 있었다 — is_selected/rating/comment/color 전부 공통으로 이 검증을 거친다.
+ */
+export async function assertPhotoBelongsToProject(
+  admin: SupabaseClient,
+  photoId: string,
+  projectId: string
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("photos")
+    .select("id")
+    .eq("id", photoId)
+    .eq("project_id", projectId)
+    .maybeSingle();
+  return !error && !!data;
+}
+
+const VALID_COLORS: readonly ColorTag[] = ["red", "yellow", "green", "blue", "purple"];
+
+/**
+ * 색상 하나를 원자적으로 add/remove하는 RPC 호출. 클라이언트가 전체 배열을 계산해서
+ * 통째로 교체(UPSERT)하던 기존 방식은 두 세션이 동시에 서로 다른 색을 추가하면 한쪽이
+ * 완전히 유실되는 lost-update가 있었다 — DB의 array_append/array_remove를 단일
+ * INSERT...ON CONFLICT...DO UPDATE 안에서 실행해 행 단위 잠금으로 원자성을 보장한다.
+ */
+export async function toggleSelectionColorAdmin(
+  admin: SupabaseClient,
+  params: { project_id: string; photo_id: string; color: ColorTag; add: boolean }
+): Promise<ColorTag[]> {
+  if (!VALID_COLORS.includes(params.color)) {
+    throw new Error(`invalid color: ${params.color}`);
+  }
+  const { data, error } = await admin.rpc("toggle_selection_color", {
+    p_project_id: params.project_id,
+    p_photo_id: params.photo_id,
+    p_color: params.color,
+    p_add: params.add,
+  });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ColorTag[];
+}
 
 export async function confirmProjectAdmin(admin: SupabaseClient, projectId: string): Promise<void> {
   const { error } = await admin

@@ -40,7 +40,6 @@ async function upsertSelectionApi(
   photoId: string,
   state: {
     rating?: number | null;
-    color_tag?: string | null;
     comment?: string | null;
     /** 생략하면 서버가 기존 선택 상태를 그대로 유지한다 (별점/코멘트만 저장할 때). */
     is_selected?: boolean;
@@ -63,18 +62,48 @@ async function upsertSelectionApi(
 }
 
 /**
+ * 색상 하나를 원자적으로 add/remove하는 RPC를 호출한다. 색상은 다중 선택 배열
+ * 필드라, 전체 배열을 통째로 재전송하는 방식은 두 세션이 동시에 다른 색을 추가하면
+ * 한쪽이 완전히 유실되는 lost-update가 있다 — 서버가 현재 DB 값 기준으로 원자적으로
+ * 병합한 최신 배열을 돌려주고, 그 값을 그대로 신뢰한다.
+ */
+async function toggleColorApi(
+  token: string,
+  projectId: string,
+  photoId: string,
+  color: ColorTag,
+  add: boolean
+): Promise<ColorTag[]> {
+  const res = await fetch("/api/c/selections", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      token,
+      project_id: projectId,
+      photo_id: photoId,
+      color_op: { color, add },
+    }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error ?? "Failed");
+  }
+  const data = await res.json();
+  return (data.colorTags ?? []) as ColorTag[];
+}
+
+/**
  * patch에 실제로 존재하는 키만 API payload로 변환한다 — 로컬 캐시 전체를
  * 재전송하면 다른 세션이 그 사이 저장한 값(예: 별점)을 덮어쓰게 되므로,
- * 이번에 바뀐 필드만 서버로 보낸다.
+ * 이번에 바뀐 필드만 서버로 보낸다. color는 toggleColorApi(원자적 add/remove)로만
+ * 저장하므로 여기서는 다루지 않는다.
  */
-function patchToApiPayload(patch: Partial<PhotoState>): {
+function patchToApiPayload(patch: Partial<Omit<PhotoState, "color">>): {
   rating?: number | null;
-  color_tag?: string | null;
   comment?: string | null;
 } {
-  const payload: { rating?: number | null; color_tag?: string | null; comment?: string | null } = {};
+  const payload: { rating?: number | null; comment?: string | null } = {};
   if ("rating" in patch) payload.rating = patch.rating ?? null;
-  if ("color" in patch) payload.color_tag = serializeColorTags(patch.color);
   if ("comment" in patch) payload.comment = patch.comment ?? null;
   return payload;
 }
@@ -92,7 +121,8 @@ async function confirmProjectApi(token: string, projectId: string) {
   }
 }
 import type { StarRating, ColorTag, PhotoGroupInfo } from "@/types";
-import { serializeColorTags } from "@/types";
+
+const ALL_COLORS: readonly ColorTag[] = ["red", "yellow", "green", "blue", "purple"];
 
 export type PhotoState = {
   rating?: StarRating;
@@ -110,7 +140,8 @@ type SelectionContextValue = {
   N: number;
   toggle: (photoId: string) => void;
   isSelected: (photoId: string) => boolean;
-  updatePhotoState: (photoId: string, patch: Partial<PhotoState>) => void;
+  updatePhotoState: (photoId: string, patch: Partial<Omit<PhotoState, "color">>) => void;
+  toggleColor: (photoId: string, color: ColorTag) => void;
   projectId: string | null;
   projectStatus: string | null;
   loading: boolean;
@@ -140,6 +171,13 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   const [photoStates, setPhotoStates] = useState<Record<string, PhotoState>>({});
   const [loading, setLoading] = useState(true);
 
+  // toggleColor()가 리렌더 사이클보다 빠른 연속 클릭에서도 항상 최신 색상 상태를 기준으로
+  // 다음 값을 계산하도록, React state와 별개로 동기 ref를 둔다(selectedIdsRef와 동일한 이유).
+  const photoStatesRef = useRef<Record<string, PhotoState>>({});
+  useEffect(() => {
+    photoStatesRef.current = photoStates;
+  }, [photoStates]);
+
   // toggle()이 리렌더 사이클보다 빠른 연속 클릭에서도 항상 "지금까지의 모든 호출을 반영한"
   // 진짜 최신 상태를 기준으로 다음 값을 계산하도록, React state와 별개로 동기 ref를 둔다.
   // hydration/poll 병합/리셋 등 다른 경로로 selectedIds가 바뀌는 경우를 위해 아래 effect로도 동기화한다.
@@ -148,14 +186,17 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     selectedIdsRef.current = selectedIds;
   }, [selectedIds]);
 
-  type FieldKey = "selected" | "rating" | "color" | "comment";
+  // color는 다중 선택 배열 필드라 "color" 단일 키로는 서로 다른 색상의 dirty 상태를
+  // 구분할 수 없다 — (photoId, color) 조합별로 관리하기 위해 `color:${ColorTag}` 형태의
+  // 동적 키를 함께 쓴다(예: 초록만 이 세션에서 dirty이고 노랑은 다른 세션이 바꾼 경우를 구분).
+  type FieldKey = "selected" | "rating" | "comment" | `color:${ColorTag}`;
   // photoId -> 필드별 로컬 변경 횟수(모노토닉 증가). poll이 시작된 시점과 응답을 적용하는
   // 시점 사이에 그 필드가 새로 바뀌었는지 판단하는 기준선이 된다.
-  const fieldVersionRef = useRef<Map<string, Record<FieldKey, number>>>(new Map());
+  const fieldVersionRef = useRef<Map<string, Partial<Record<FieldKey, number>>>>(new Map());
   const bumpVersion = useCallback((photoId: string, field: FieldKey) => {
     const m = fieldVersionRef.current;
-    const cur = m.get(photoId) ?? { selected: 0, rating: 0, color: 0, comment: 0 };
-    m.set(photoId, { ...cur, [field]: cur[field] + 1 });
+    const cur = m.get(photoId) ?? {};
+    m.set(photoId, { ...cur, [field]: (cur[field] ?? 0) + 1 });
   }, []);
   const getVersion = useCallback((photoId: string, field: FieldKey): number => {
     return fieldVersionRef.current.get(photoId)?.[field] ?? 0;
@@ -256,6 +297,135 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     [project?.id, token]
   );
 
+  /**
+   * 색상(컬러칩) 저장 큐. color는 다중 선택 배열 필드라 (photoId, color)별 독립 큐로
+   * 만들면 같은 사진의 서로 다른 색상 요청이 병렬로 나가 응답 순서가 뒤바뀔 수 있으므로,
+   * photoId 하나당 in-flight 요청을 최대 1개로 제한해 대기 중인 모든 색상 의도를
+   * 순서대로(직렬로) 처리한다. desiredColorRef에 항목이 남아있다는 사실 자체가 곧
+   * 그 (photoId,color)가 아직 서버에 확정 반영되지 않은 dirty 상태라는 뜻이다.
+   */
+  const desiredColorRef = useRef<Map<string, Map<ColorTag, boolean>>>(new Map());
+  const colorFlushingRef = useRef<Set<string>>(new Set());
+
+  const flushColor = useCallback(
+    async (photoId: string) => {
+      if (colorFlushingRef.current.has(photoId)) return;
+      if (!project?.id || !token) return;
+      const projectId = project.id;
+      colorFlushingRef.current.add(photoId);
+      try {
+        for (;;) {
+          const pending = desiredColorRef.current.get(photoId);
+          if (!pending || pending.size === 0) break;
+          // 처리할 색 하나를 "확인"만 하고 아직 큐에서 지우지 않는다 — 요청이 진행되는
+          // 동안에도 이 (photoId,color)는 계속 dirty로 남아 폴링이 되돌리지 못하게 한다.
+          const [color, target] = pending.entries().next().value as [ColorTag, boolean];
+
+          let serverArray: ColorTag[] | null = null;
+          let ok = true;
+          try {
+            serverArray = await toggleColorApi(token, projectId, photoId, color, target);
+          } catch (e) {
+            console.error(e);
+            ok = false;
+          }
+
+          // 이 요청을 보낸 뒤에도 이 색에 대한 의도가 그대로면(재클릭 없었으면) true.
+          const stillLatest = desiredColorRef.current.get(photoId)?.get(color) === target;
+
+          if (ok && serverArray) {
+            // 서버 배열은 "방금 처리한 이 색 하나"에 대해서만 권위 있다. 이 사진에 대해
+            // 아직 큐에 남아있는(=아직 안 보낸) 다른 색 의도들을 그 위에 다시 얹어 병합해야,
+            // 아직 전송 전인 다른 색 변경이 이번 응답 적용으로 사라지지 않는다. 재클릭으로
+            // stillLatest가 false라면 이 색 자체도 서버값 대신 최신 의도를 반영한다.
+            const merged = new Set(serverArray);
+            if (!stillLatest) {
+              const latestForThisColor = desiredColorRef.current.get(photoId)?.get(color);
+              if (latestForThisColor !== undefined) {
+                if (latestForThisColor) merged.add(color);
+                else merged.delete(color);
+              }
+            }
+            for (const [c, on] of desiredColorRef.current.get(photoId)?.entries() ?? []) {
+              if (c === color) continue; // 이 색은 위에서 이미 반영함
+              if (on) merged.add(c);
+              else merged.delete(c);
+            }
+            const arr = Array.from(merged);
+            const colorValue = arr.length ? arr : undefined;
+            // ref/실제 state 모두 "color 필드만" 병합 갱신 — 동시에 진행 중일 수 있는
+            // rating/comment 갱신(updatePhotoState)을 덮어쓰지 않도록 prev를 기준으로 병합한다.
+            photoStatesRef.current = {
+              ...photoStatesRef.current,
+              [photoId]: { ...photoStatesRef.current[photoId], color: colorValue },
+            };
+            setPhotoStates((prev) => ({
+              ...prev,
+              [photoId]: { ...prev[photoId], color: colorValue },
+            }));
+          }
+
+          if (stillLatest) {
+            desiredColorRef.current.get(photoId)?.delete(color);
+            if (!ok) {
+              // 실패했고 그 이후 새 의도가 없었다면, 이번 시도 자체가 무효이므로
+              // 로컬 낙관적 상태를 시도 이전으로 되돌린다.
+              const cur = photoStatesRef.current[photoId]?.color ?? [];
+              const reverted = target ? cur.filter((c) => c !== color) : [...cur, color];
+              const revertedValue = reverted.length ? reverted : undefined;
+              photoStatesRef.current = {
+                ...photoStatesRef.current,
+                [photoId]: { ...photoStatesRef.current[photoId], color: revertedValue },
+              };
+              setPhotoStates((prev) => ({
+                ...prev,
+                [photoId]: { ...prev[photoId], color: revertedValue },
+              }));
+            }
+          }
+          // stillLatest가 false면 큐에 그대로 남겨둔 채(dirty 유지) 루프 계속
+          // -> 다음 iteration에서 최신 의도를 재시도한다.
+        }
+      } finally {
+        colorFlushingRef.current.delete(photoId);
+      }
+    },
+    [project?.id, token]
+  );
+
+  const toggleColor = useCallback(
+    (photoId: string, color: ColorTag) => {
+      if (!project?.id || !token) return;
+      // photoStatesRef(동기 ref) 기준으로 판단 — React state 클로저 대신,
+      // 렌더 전 연속 클릭에도 항상 직전 클릭의 결과를 보고 판단한다.
+      const cur = photoStatesRef.current[photoId]?.color ?? [];
+      const nextOn = !cur.includes(color);
+      const nextColors = nextOn
+        ? [...cur.filter((c) => c !== color), color]
+        : cur.filter((c) => c !== color);
+      const colorValue = nextColors.length ? nextColors : undefined;
+
+      // 다음 클릭(리렌더 전이라도)이 이 결과를 즉시 보게 한다. rating/comment 등 다른 필드는
+      // 건드리지 않고 color 필드만 병합 갱신한다(동시 진행 중인 updatePhotoState와 충돌 방지).
+      photoStatesRef.current = {
+        ...photoStatesRef.current,
+        [photoId]: { ...photoStatesRef.current[photoId], color: colorValue },
+      };
+      // 낙관적 UI 변경보다 먼저 버전/큐를 갱신 — poll의 dirty 스냅샷이 이 순간을 놓치지 않도록.
+      bumpVersion(photoId, `color:${color}`);
+      const m = desiredColorRef.current.get(photoId) ?? new Map<ColorTag, boolean>();
+      m.set(color, nextOn);
+      desiredColorRef.current.set(photoId, m);
+
+      setPhotoStates((prev) => ({
+        ...prev,
+        [photoId]: { ...prev[photoId], color: colorValue },
+      }));
+      flushColor(photoId);
+    },
+    [project?.id, token, flushColor, bumpVersion]
+  );
+
   useEffect(() => {
     if (!token) {
       setProject(null);
@@ -270,10 +440,13 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     selectionFlushingRef.current = new Set();
     desiredPatchRef.current = new Map();
     patchFlushingRef.current = new Set();
+    desiredColorRef.current = new Map();
+    colorFlushingRef.current = new Set();
     fieldVersionRef.current = new Map();
     pollSeqRef.current = 0;
     appliedPollSeqRef.current = 0;
     selectedIdsRef.current = new Set();
+    photoStatesRef.current = {};
     let cancelled = false;
     setLoading(true);
     fetchCustomerPhotos(token)
@@ -284,6 +457,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         setPhotoGroups(data.photoGroups ?? []);
         setSelectedIds(new Set(data.selectedIds ?? []));
         setPhotoStates(data.photoStates ?? {});
+        photoStatesRef.current = data.photoStates ?? {};
       })
       .catch((e) => {
         if (!cancelled) console.error(e);
@@ -297,9 +471,9 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   }, [token]);
 
   const updatePhotoState = useCallback(
-    (photoId: string, patch: Partial<PhotoState>) => {
+    (photoId: string, patch: Partial<Omit<PhotoState, "color">>) => {
       // 낙관적 UI 변경보다 먼저 버전/큐를 갱신 — poll의 dirty 스냅샷이 이 순간을 놓치지 않도록.
-      (Object.keys(patch) as Array<"rating" | "color" | "comment">).forEach((key) =>
+      (Object.keys(patch) as Array<"rating" | "comment">).forEach((key) =>
         bumpVersion(photoId, key)
       );
       if (project?.id && token) {
@@ -319,6 +493,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         if ("rating" in patch && patch.rating === undefined) {
           delete merged.rating;
         }
+        photoStatesRef.current = { ...photoStatesRef.current, [photoId]: merged };
         return { ...prev, [photoId]: merged };
       });
 
@@ -382,10 +557,12 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     const POLL_MS = 5000;
 
     const isSelectedDirty = (photoId: string) => desiredSelectedRef.current.has(photoId);
-    const isPatchFieldDirty = (photoId: string, field: "rating" | "color" | "comment") => {
+    const isPatchFieldDirty = (photoId: string, field: "rating" | "comment") => {
       const p = desiredPatchRef.current.get(photoId);
       return !!p && field in p;
     };
+    const isColorDirty = (photoId: string, color: ColorTag) =>
+      desiredColorRef.current.get(photoId)?.has(color) ?? false;
 
     const poll = async () => {
       if (cancelled || document.hidden) return;
@@ -397,6 +574,9 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       const dirtySnapshotSelected = new Set(desiredSelectedRef.current.keys());
       const dirtySnapshotPatch = new Map(
         Array.from(desiredPatchRef.current.entries()).map(([id, p]) => [id, new Set(Object.keys(p))])
+      );
+      const dirtySnapshotColor = new Map(
+        Array.from(desiredColorRef.current.entries()).map(([id, m]) => [id, new Set(m.keys())])
       );
 
       const data = await fetchSelectionsPoll(token, projectId);
@@ -425,7 +605,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         const next = { ...prev };
         for (const photoId of new Set([...Object.keys(serverStates), ...Object.keys(prev)])) {
           const local: PhotoState = { ...(next[photoId] ?? {}) };
-          (["rating", "color", "comment"] as const).forEach((field) => {
+          (["rating", "comment"] as const).forEach((field) => {
             const versionOk =
               getVersion(photoId, field) === (versionSnapshot.get(photoId)?.[field] ?? 0);
             const dirtyAtStart = dirtySnapshotPatch.get(photoId)?.has(field) ?? false;
@@ -438,6 +618,26 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
               delete (local as Record<string, unknown>)[field];
             }
           });
+
+          // color는 다중 선택 배열 필드라 색상 하나 단위로 병합한다 — 이 세션이 방금 바꿨거나
+          // 바꾸는 중인 색만 로컬 값을 유지하고, 나머지 색은 서버가 돌려준 최신 배열을 그대로
+          // 반영한다(다른 세션이 그 사이 추가/제거한 색을 놓치지 않으면서, 이 세션의 아직 저장
+          // 되지 않은 변경은 폴링이 되돌리지 않는다).
+          const nextColors = new Set(local.color ?? []);
+          ALL_COLORS.forEach((color) => {
+            const key: FieldKey = `color:${color}`;
+            const versionOk =
+              getVersion(photoId, key) === (versionSnapshot.get(photoId)?.[key] ?? 0);
+            const dirtyAtStart = dirtySnapshotColor.get(photoId)?.has(color) ?? false;
+            const dirtyNow = isColorDirty(photoId, color);
+            if (!versionOk || dirtyAtStart || dirtyNow) return; // 이 색상만 로컬값 유지
+            const serverHasColor = serverStates[photoId]?.color?.includes(color) ?? false;
+            if (serverHasColor) nextColors.add(color);
+            else nextColors.delete(color);
+          });
+          if (nextColors.size > 0) local.color = Array.from(nextColors);
+          else delete local.color;
+
           if (Object.keys(local).length > 0) next[photoId] = local;
           else delete next[photoId];
         }
@@ -468,6 +668,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       toggle,
       isSelected,
       updatePhotoState,
+      toggleColor,
       projectId,
       projectStatus,
       loading,
@@ -483,6 +684,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       toggle,
       isSelected,
       updatePhotoState,
+      toggleColor,
       projectId,
       projectStatus,
       loading,
