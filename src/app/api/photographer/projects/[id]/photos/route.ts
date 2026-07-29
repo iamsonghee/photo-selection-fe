@@ -134,6 +134,12 @@ export async function DELETE(
     const deletedCount = photos?.length ?? 0;
     const { error: delErr } = await admin.from("photos").delete().eq("project_id", id);
     if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
+
+    // 사진 전체 삭제로 photo_groups가 전부 무의미해짐 — clip-service sync는
+    // gemini_embeddings도 이미 CASCADE 삭제되어 0건이라 조기 종료(정리 안 됨)하므로
+    // 여기서 직접 정리한다. OpenCLIP 레거시 그룹도 함께 정리됨(어차피 사진이 없어 무의미).
+    await admin.from("photo_groups").delete().eq("project_id", id);
+
     const { error: upErr } = await admin
       .from("projects")
       .update({ photo_count: 0, updated_at: new Date().toISOString() })

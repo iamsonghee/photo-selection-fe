@@ -10,7 +10,6 @@ import { differenceInDays } from "date-fns";
 import {
   Link2,
   Eye,
-  EyeOff,
   ChevronRight,
   Trash2,
   Lock,
@@ -37,6 +36,7 @@ import { createThumbLoadQueue, useQueuedThumbSrc, type ThumbLoadQueue } from "@/
 import type { Project, ProjectStatus, Photo, PhotoGroupInfo } from "@/types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
+import GeminiAnalysisPanel from "@/components/photographer/GeminiAnalysisPanel";
 
 // ---------- constants ----------
 const ACCENT = "var(--accent)";
@@ -353,8 +353,6 @@ function PhotoThumb({
 }) {
   const [loaded, setLoaded] = useState(false);
   const deleting = deletingId === photo.id;
-  const isBlurry = photo.isBlurry === true;
-  const isEyesClosed = photo.faceDetected === true && photo.eyesClosed === true;
   // blob URL(isPending)은 큐를 건너뛰고 즉시 로드 — 로컬 메모리라 네트워크 요청이 없다.
   const { cellRef, imgRef, shouldLoad, handleLoad, handleError } = useQueuedThumbSrc(photo.url, {
     queue: thumbQueue,
@@ -385,23 +383,6 @@ function PhotoThumb({
       {/* square thumb */}
       <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: "var(--background)" }}>
         <div className="prj-overlay" />
-        {/* AI 흔들림/눈감음 경고 배지 — 정보성, 카드 클릭/삭제 등 기존 인터랙션을 가로채지 않음.
-            둘 다 해당하면 나란히 표시 — 원인이 다르므로 하나로 합치지 않는다. */}
-        {isBlurry && (
-          <div className="prj-quality-badge prj-quality-badge-blur" title="흔들림 의심" aria-label="흔들림 의심">
-            <AlertTriangle size={10} />
-          </div>
-        )}
-        {isEyesClosed && (
-          <div
-            className="prj-quality-badge prj-quality-badge-eyes"
-            style={{ left: isBlurry ? 26 : 4 }}
-            title="눈 감음 의심"
-            aria-label="눈 감음 의심"
-          >
-            <EyeOff size={10} />
-          </div>
-        )}
         {/* XHR 전송 중 스피너 */}
         {photo.isUploading && (
           <div style={{ position: "absolute", top: 5, right: 5, zIndex: 10, width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(var(--accent-rgb), 0.25)", borderTopColor: "rgba(var(--accent-rgb), 0.85)", animation: "spin 0.9s linear infinite" }} />
@@ -999,8 +980,6 @@ export default function ProjectDetailPage() {
   const [photoGroups, setPhotoGroups] = useState<PhotoGroupInfo[]>([]);
   const [similarityToggleOn, setSimilarityToggleOn] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  /** 흔들림/눈감음 경고 필터 — 켜진 조건 중 하나라도 해당하면 표시(OR), 켜져 있으면 그룹 접기보다 우선 */
-  const [qualityFilter, setQualityFilter] = useState<Set<"blurry" | "eyesClosed">>(new Set());
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isMobile, setIsMobile] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -1048,11 +1027,23 @@ export default function ProjectDetailPage() {
   const [showFlushAllConfirm, setShowFlushAllConfirm] = useState(false);
   const [isPreparingFiles, setIsPreparingFiles] = useState(false);
 
-  /** AI 유사컷 분석 — 업로드와 별개의 명시적 트리거 (초대 링크 활성화와 무관) */
+  /** AI 유사도 분석 — 업로드와 별개의 명시적 트리거 (초대 링크 활성화와 무관).
+   * 변수/함수 이름은 과거 OpenCLIP 시절 그대로 유지하지만(레거시 네이밍), 실제로는
+   * Gemini Embedding 기반 유사컷 그룹핑(`/api/photographer/projects/[id]/gemini-analysis`)을
+   * 호출한다 — 베타 전환(2026-07-28) 이후 OpenCLIP/OpenCV/MediaPipe는 이 흐름에서 호출되지 않는다. */
   const [clipAnalysisStatus, setClipAnalysisStatus] = useState<
     "processing" | "completed" | "failed" | null
   >(null);
   const [clipAnalysisTriggering, setClipAnalysisTriggering] = useState(false);
+  /** 마지막 분석 run의 실패 건수(있으면) — "분석 재개" 문구 판단용 */
+  const [clipLastRunFailedCount, setClipLastRunFailedCount] = useState(0);
+  /** 현재 활성 사진 수/이미 분석된 수/대기 중인 수 — 버튼 문구(최초/신규/완료)를 결정 */
+  const [clipPending, setClipPending] = useState<{
+    active: number; alreadyAnalyzed: number; pending: number;
+  } | null>(null);
+
+  /** Gemini 분석 POC — 관리자 전용 노출 여부 판단용 (실제 접근 제어는 API route에서도 재검증됨) */
+  const [isAdminTier, setIsAdminTier] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1084,14 +1075,40 @@ export default function ProjectDetailPage() {
     } catch {}
   }, [id]);
 
+  /** Gemini 기반 분석 상태 + pending count 조회 — 마운트 시 시드, processing 중 폴링에 재사용 */
+  const loadClipAnalysisStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/photographer/projects/${id}/gemini-analysis`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.gemini_analysis_status !== undefined) setClipAnalysisStatus(data.gemini_analysis_status);
+      if (data.run) setClipLastRunFailedCount(data.run.failed_count ?? 0);
+      if (data.active_photo_count !== undefined) {
+        setClipPending({
+          active: data.active_photo_count,
+          alreadyAnalyzed: data.already_analyzed_count,
+          pending: data.pending_count,
+        });
+      }
+    } catch {}
+  }, [id]);
+
   useEffect(() => {
     loadProject().then((p) => { if (p) { loadPhotos(); loadPhotoGroups(); } });
   }, [id, loadProject, loadPhotos, loadPhotoGroups]);
 
   /** 마운트/재진입 시 로컬 분석 상태를 서버 상태로 시드 — processing이면 아래 폴링 이펙트가 자동 재개된다 */
   useEffect(() => {
-    if (project?.clipAnalysisStatus) setClipAnalysisStatus(project.clipAnalysisStatus);
-  }, [project?.clipAnalysisStatus]);
+    loadClipAnalysisStatus();
+  }, [loadClipAnalysisStatus]);
+
+  /** Gemini 분석 POC 노출 여부 — 관리자 등급만 (실 요금이 발생하는 실험 기능이라 접근 범위를 제한) */
+  useEffect(() => {
+    fetch("/api/photographer/quota")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data?.tier === "admin") setIsAdminTier(true); })
+      .catch(() => {});
+  }, []);
 
   const overallProgress = useMemo(() => {
     if (uploadPhase === "idle" || uploadPhase === "done") return 0;
@@ -1141,12 +1158,33 @@ export default function ProjectDetailPage() {
    *  대표컷이 현재 photos 목록에 없는 그룹은 없는 것처럼 취급해 멤버가 전부 누락되는 걸 막는다. */
   const photoIdSet = useMemo(() => new Set(photos.map((p) => p.id)), [photos]);
 
-  const showSimilarityToggle = project?.clipAnalysisStatus === "completed" && photoGroups.length > 0;
-  const hasBlurryPhotos = useMemo(() => photos.some((p) => p.isBlurry === true), [photos]);
-  const hasEyesClosedPhotos = useMemo(
-    () => photos.some((p) => p.faceDetected === true && p.eyesClosed === true),
-    [photos]
-  );
+  const showSimilarityToggle = clipAnalysisStatus === "completed" && photoGroups.length > 0;
+
+  /** 버튼 문구/동작을 pending count + 마지막 run 상태로 결정 — 사용자에게는 "Gemini" 같은
+   *  구현 기술을 노출하지 않고 기존 OpenCLIP 시절과 동일한 어휘("유사컷 분석")를 그대로 쓴다. */
+  const analysisButtonState = useMemo(() => {
+    if (clipAnalysisStatus === "processing") {
+      return { subtitle: "분석 중… 잠시 후 완료됩니다", buttonLabel: "" };
+    }
+    const pending = clipPending?.pending ?? null;
+    const alreadyAnalyzed = clipPending?.alreadyAnalyzed ?? 0;
+    if (pending === 0 && alreadyAnalyzed > 0) {
+      return { subtitle: "모든 사진 분석이 완료됐습니다", buttonLabel: "분석 결과 보기" };
+    }
+    if (pending !== null && pending > 0 && clipLastRunFailedCount > 0) {
+      return { subtitle: "일부 사진 분석에 실패했습니다. 다시 시도해주세요", buttonLabel: "분석 재개" };
+    }
+    if (pending !== null && pending > 0 && alreadyAnalyzed > 0) {
+      return {
+        subtitle: "기존 분석 결과는 유지하고 새로 추가된 사진만 분석합니다",
+        buttonLabel: "새 사진 분석",
+      };
+    }
+    return {
+      subtitle: "연속 촬영된 유사컷을 자동으로 찾아 묶어드립니다",
+      buttonLabel: "AI 유사컷 분석 시작",
+    };
+  }, [clipAnalysisStatus, clipPending, clipLastRunFailedCount]);
 
   const handleGroupBadgeClick = useCallback((e: React.MouseEvent, groupId: string) => {
     e.preventDefault();
@@ -1159,29 +1197,8 @@ export default function ProjectDetailPage() {
     });
   }, []);
 
-  const toggleQualityFilter = useCallback((key: "blurry" | "eyesClosed") => {
-    setQualityFilter((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }, []);
-
-  /** 흔들림/눈감음 필터로 걸러낸 목록 — 켜진 조건이 없으면 원본 그대로 */
-  const qualityFilteredPhotos = useMemo(() => {
-    if (qualityFilter.size === 0) return displayPhotos;
-    return displayPhotos.filter(
-      (p) =>
-        (qualityFilter.has("blurry") && p.isBlurry === true) ||
-        (qualityFilter.has("eyesClosed") && p.faceDetected === true && p.eyesClosed === true)
-    );
-  }, [displayPhotos, qualityFilter]);
-
-  /** 토글 OFF면 displayPhotos 그대로, ON이면 대표컷+미분류만 (펼친 그룹은 대표컷 뒤에 나머지 인라인).
-   *  품질 필터가 켜져 있으면 그룹 접기보다 우선 — 문제 사진을 그룹 속에 숨기지 않고 그대로 보여준다. */
+  /** 토글 OFF면 displayPhotos 그대로, ON이면 대표컷+미분류만 (펼친 그룹은 대표컷 뒤에 나머지 인라인). */
   const groupedDisplayPhotos = useMemo(() => {
-    if (qualityFilter.size > 0) return qualityFilteredPhotos;
     if (!similarityToggleOn) return displayPhotos;
     const result: Photo[] = [];
     for (const photo of displayPhotos) {
@@ -1197,38 +1214,33 @@ export default function ProjectDetailPage() {
       }
     }
     return result;
-  }, [displayPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup, photoIdSet, qualityFilter, qualityFilteredPhotos]);
+  }, [displayPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup, photoIdSet]);
 
   useEffect(() => {
     if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); }
   }, [toast]);
 
-  /** AI 유사컷 분석 상태 polling — 처리 중일 때만 짧은 간격으로 조회 */
+  /** AI 유사도 분석 상태 polling — 처리 중일 때만 짧은 간격으로 조회 */
   useEffect(() => {
     if (clipAnalysisStatus !== "processing") return;
     const t = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/photographer/projects/${id}/clip-analysis`);
-        if (!res.ok) return;
-        const data = (await res.json()) as { clip_analysis_status?: "processing" | "completed" | "failed" | null };
-        if (data.clip_analysis_status && data.clip_analysis_status !== "processing") {
-          setClipAnalysisStatus(data.clip_analysis_status);
-          // 체크박스가 보는 project.clipAnalysisStatus / photoGroups는 마운트 시 1회만 로드되므로,
-          // 완료 시점에 다시 불러와야 새로고침 없이 체크박스가 나타난다. 또한 분석 완료 시
-          // 토글을 자동으로 켜서 대표컷 묶음 표시가 즉시 보이도록 한다 (수동 클릭 불필요).
-          if (data.clip_analysis_status === "completed") {
-            loadProject();
-            loadPhotoGroups();
-            // 흔들림/눈감음 경고 배지는 photos 행에 저장되므로, 그룹/프로젝트만 새로고침하면
-            // 새로고침 없이는 배지가 보이지 않는다.
-            loadPhotos();
-            setSimilarityToggleOn(true);
-          }
-        }
-      } catch {}
+      await loadClipAnalysisStatus();
     }, 4000);
     return () => clearInterval(t);
-  }, [clipAnalysisStatus, id, loadProject, loadPhotoGroups, loadPhotos]);
+  }, [clipAnalysisStatus, loadClipAnalysisStatus]);
+
+  /** 분석이 방금 완료로 바뀌면 그룹/사진(=새 similarityGroupId 반영)을 다시 불러오고
+   *  토글을 자동으로 켜서 대표컷 묶음 표시가 즉시 보이도록 한다(수동 클릭 불필요). */
+  const prevClipAnalysisStatusRef = useRef(clipAnalysisStatus);
+  useEffect(() => {
+    const prev = prevClipAnalysisStatusRef.current;
+    prevClipAnalysisStatusRef.current = clipAnalysisStatus;
+    if (prev === "processing" && clipAnalysisStatus === "completed") {
+      loadPhotoGroups();
+      loadPhotos();
+      setSimilarityToggleOn(true);
+    }
+  }, [clipAnalysisStatus, loadPhotoGroups, loadPhotos]);
 
 
   useEffect(() => {
@@ -1913,9 +1925,20 @@ export default function ProjectDetailPage() {
   };
 
   const handleStartClipAnalysis = async () => {
+    // 대기 중인 사진이 없으면(이미 전체 분석 완료) API를 다시 부르지 않고 결과만 보여준다 —
+    // 저장된 임베딩·그룹이 이미 최신 상태이므로 그대로 토글만 켠다.
+    if (clipPending && clipPending.pending === 0 && clipPending.alreadyAnalyzed > 0) {
+      setSimilarityToggleOn(true);
+      setToast("이미 최신 분석 결과입니다.");
+      return;
+    }
     setClipAnalysisTriggering(true);
     try {
-      const res = await fetch(`/api/photographer/projects/${id}/clip-analysis`, { method: "POST" });
+      const res = await fetch(`/api/photographer/projects/${id}/gemini-analysis`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setToast((data as { error?: string; detail?: string }).error ?? (data as { detail?: string }).detail ?? "분석 시작에 실패했습니다.");
@@ -1932,13 +1955,13 @@ export default function ProjectDetailPage() {
   const handleCancelClipAnalysis = async () => {
     setClipAnalysisTriggering(true);
     try {
-      const res = await fetch(`/api/photographer/projects/${id}/clip-analysis`, { method: "DELETE" });
+      const res = await fetch(`/api/photographer/projects/${id}/gemini-analysis`, { method: "DELETE" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setToast((data as { error?: string }).error ?? "분석 중단에 실패했습니다.");
         return;
       }
-      setClipAnalysisStatus(null);
+      await loadClipAnalysisStatus();
     } catch (e) {
       setToast(e instanceof Error ? e.message : "분석 중단에 실패했습니다.");
     } finally {
@@ -2010,17 +2033,6 @@ export default function ProjectDetailPage() {
           z-index: 10; cursor: pointer; transition: all 0.15s ease;
         }
         .prj-group-badge:hover { background: ${ACCENT}; color: #000; }
-        .prj-quality-badge {
-          position: absolute; top: 4px; left: 4px;
-          width: 18px; height: 18px;
-          background: rgba(0,0,0,0.75); border: 1px solid #FFB800;
-          color: #FFB800;
-          display: flex; align-items: center; justify-content: center;
-          z-index: 10; pointer-events: none;
-        }
-        .prj-quality-badge-eyes {
-          border-color: #4DA3FF; color: #4DA3FF;
-        }
         .prj-group-badge-inline {
           flex-shrink: 0; min-width: 20px; height: 18px; padding: 0 5px;
           background: transparent; border: 1px solid ${ACCENT};
@@ -2315,40 +2327,6 @@ export default function ProjectDetailPage() {
                     유사컷 대표이미지 적용
                   </button>
                 )}
-                {hasBlurryPhotos && (
-                  <button
-                    type="button"
-                    onClick={() => toggleQualityFilter("blurry")}
-                    className={`prj-similarity-toggle${qualityFilter.has("blurry") ? " prj-similarity-on" : ""}`}
-                    style={{ color: qualityFilter.has("blurry") ? "#FFB800" : TEXT_MUTED }}
-                  >
-                    <span className="prj-similarity-checkbox" style={{ borderColor: qualityFilter.has("blurry") ? "#FFB800" : undefined, background: qualityFilter.has("blurry") ? "#FFB800" : undefined }}>
-                      {qualityFilter.has("blurry") && (
-                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </span>
-                    흔들림만
-                  </button>
-                )}
-                {hasEyesClosedPhotos && (
-                  <button
-                    type="button"
-                    onClick={() => toggleQualityFilter("eyesClosed")}
-                    className={`prj-similarity-toggle${qualityFilter.has("eyesClosed") ? " prj-similarity-on" : ""}`}
-                    style={{ color: qualityFilter.has("eyesClosed") ? "#4DA3FF" : TEXT_MUTED }}
-                  >
-                    <span className="prj-similarity-checkbox" style={{ borderColor: qualityFilter.has("eyesClosed") ? "#4DA3FF" : undefined, background: qualityFilter.has("eyesClosed") ? "#4DA3FF" : undefined }}>
-                      {qualityFilter.has("eyesClosed") && (
-                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </span>
-                    눈감음만
-                  </button>
-                )}
               </div>
               <div style={{ display: "flex", background: SURFACE_2, border: `1px solid ${BORDER}`, padding: 2, gap: 1 }}>
                 {([["grid", <LayoutGrid key="g" size={13} />, "갤러리"] as const, ["list", <List key="l" size={13} />, "파일명"] as const]).map(([mode, icon, label]) => (
@@ -2424,40 +2402,6 @@ export default function ProjectDetailPage() {
                     )}
                   </span>
                   유사컷 적용
-                </button>
-              )}
-              {hasBlurryPhotos && (
-                <button
-                  type="button"
-                  onClick={() => toggleQualityFilter("blurry")}
-                  className={`prj-similarity-toggle${qualityFilter.has("blurry") ? " prj-similarity-on" : ""}`}
-                  style={{ color: qualityFilter.has("blurry") ? "#FFB800" : TEXT_MUTED }}
-                >
-                  <span className="prj-similarity-checkbox" style={{ borderColor: qualityFilter.has("blurry") ? "#FFB800" : undefined, background: qualityFilter.has("blurry") ? "#FFB800" : undefined }}>
-                    {qualityFilter.has("blurry") && (
-                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </span>
-                  흔들림
-                </button>
-              )}
-              {hasEyesClosedPhotos && (
-                <button
-                  type="button"
-                  onClick={() => toggleQualityFilter("eyesClosed")}
-                  className={`prj-similarity-toggle${qualityFilter.has("eyesClosed") ? " prj-similarity-on" : ""}`}
-                  style={{ color: qualityFilter.has("eyesClosed") ? "#4DA3FF" : TEXT_MUTED }}
-                >
-                  <span className="prj-similarity-checkbox" style={{ borderColor: qualityFilter.has("eyesClosed") ? "#4DA3FF" : undefined, background: qualityFilter.has("eyesClosed") ? "#4DA3FF" : undefined }}>
-                    {qualityFilter.has("eyesClosed") && (
-                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </span>
-                  눈감음
                 </button>
               )}
             </div>
@@ -2560,7 +2504,7 @@ export default function ProjectDetailPage() {
                 thumbQueue={thumbQueue}
                 onPhotoClick={setLightboxIndex}
                 groupsById={groupsById}
-                similarityToggleOn={similarityToggleOn && qualityFilter.size === 0}
+                similarityToggleOn={similarityToggleOn}
                 expandedGroups={expandedGroups}
                 onGroupBadgeClick={handleGroupBadgeClick}
                 compressingTempId={compressingIndex >= 0 && queuedPreviews[compressingIndex] ? queuedPreviews[compressingIndex].tempId : null}
@@ -2588,7 +2532,7 @@ export default function ProjectDetailPage() {
                 thumbQueue={thumbQueue}
                 onPhotoClick={setLightboxIndex}
                 groupsById={groupsById}
-                similarityToggleOn={similarityToggleOn && qualityFilter.size === 0}
+                similarityToggleOn={similarityToggleOn}
                 expandedGroups={expandedGroups}
                 onGroupBadgeClick={handleGroupBadgeClick}
               />
@@ -2617,13 +2561,7 @@ export default function ProjectDetailPage() {
               AI 유사컷 분석
             </div>
             <div style={{ fontSize: 11, color: TEXT_MUTED }}>
-              {clipAnalysisStatus === "processing"
-                ? "분석 중… 잠시 후 완료됩니다"
-                : clipAnalysisStatus === "completed"
-                ? "지난 분석 이후 추가된 사진만 분석합니다"
-                : clipAnalysisStatus === "failed"
-                ? "분석에 실패했습니다. 다시 시도해주세요"
-                : "연속 촬영된 유사컷을 자동으로 찾아 묶어드립니다"}
+              {analysisButtonState.subtitle}
             </div>
           </div>
           {clipAnalysisStatus === "processing" ? (
@@ -2666,10 +2604,15 @@ export default function ProjectDetailPage() {
               }}
             >
               <Sparkles size={14} />
-              {clipAnalysisStatus === "completed" ? "새 사진 분석" : "AI 유사컷 분석 시작"}
+              {analysisButtonState.buttonLabel}
             </button>
           )}
         </div>
+      )}
+
+      {/* ── Gemini 유사컷 그룹핑 POC — 관리자 전용, OpenCLIP 분석과 완전히 독립된 실험 기능 ── */}
+      {isAdminTier && canUploadOriginals(project.status) && displayPhotos.length > 0 && (
+        <GeminiAnalysisPanel projectId={id} photos={photos} />
       )}
 
       {/* ── 고객 초대 하단 고정 바 ── */}

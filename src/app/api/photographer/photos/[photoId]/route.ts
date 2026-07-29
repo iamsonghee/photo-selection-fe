@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 
+const CLIP_SERVICE_URL = process.env.CLIP_SERVICE_URL ?? "";
+const CLIP_INTERNAL_TOKEN = process.env.CLIP_INTERNAL_TOKEN ?? "";
+
+/** 삭제된 사진이 Gemini 그룹에 속해 있었을 수 있으므로 photo_groups/similarity_group_id를
+ * 최신화한다 — Gemini API 재호출 없이 저장된 임베딩만으로 재계산(clip-service 내부에서 처리).
+ * 실패해도 삭제 자체는 이미 성공 처리된 뒤이므로 best-effort로만 시도하고 응답에 영향을 주지 않는다.
+ * Gemini를 쓴 적 없는 프로젝트에서는 clip-service 쪽에서 안전하게 아무것도 하지 않는다. */
+async function bestEffortSyncGeminiGroups(projectId: string): Promise<void> {
+  if (!CLIP_SERVICE_URL || !CLIP_INTERNAL_TOKEN) return;
+  try {
+    await fetch(`${CLIP_SERVICE_URL}/analyze/gemini/${projectId}/sync-groups`, {
+      method: "POST",
+      headers: { "X-Internal-Token": CLIP_INTERNAL_TOKEN },
+    });
+  } catch (e) {
+    console.error("[DELETE photo] gemini sync-groups best-effort failed", e);
+  }
+}
+
 async function getPhotographerIdFromSession(): Promise<string | null> {
   const supabase = await createClient();
   const {
@@ -78,6 +97,8 @@ export async function DELETE(
       { p_photo_id: photoId }
     );
     if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
+
+    await bestEffortSyncGeminiGroups(projectId);
 
     const { count } = await admin
       .from("photos")
