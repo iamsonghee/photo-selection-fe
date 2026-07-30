@@ -9,7 +9,6 @@ import {
   Plus, AlertCircle, ChevronRight, Clock, Activity, Layers, Zap, CheckCircle2,
 } from "lucide-react";
 import {
-  DEFAULT_BETA_MAX_PROJECTS_TOTAL,
   DEFAULT_GENERAL_MAX_PROJECTS,
   DEFAULT_GENERAL_MAX_PHOTOS_PER_PROJECT,
 } from "@/lib/beta-limits";
@@ -202,7 +201,6 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [logs, setLogs]         = useState<ProjectLogItem[]>([]);
   const [dashFilter, setDashFilter] = useState<"all" | "active" | "completed">("all");
-  const [betaMaxProjectsTotal, setBetaMaxProjectsTotal] = useState(DEFAULT_BETA_MAX_PROJECTS_TOTAL);
   const [tier, setTier] = useState<"admin" | "beta" | "general" | null>(null);
   const [maxProjects, setMaxProjects] = useState(DEFAULT_GENERAL_MAX_PROJECTS);
   const [maxPhotosPerProject, setMaxPhotosPerProject] = useState(DEFAULT_GENERAL_MAX_PHOTOS_PER_PROJECT);
@@ -255,15 +253,6 @@ export default function DashboardPage() {
         if (data?.tier) setTier(data.tier);
         if (data?.max) setMaxProjects(data.max);
         if (data?.maxPhotosPerProject) setMaxPhotosPerProject(data.maxPhotosPerProject);
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/limits")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.betaMaxProjectsTotal) setBetaMaxProjectsTotal(data.betaMaxProjectsTotal);
       })
       .catch(() => {});
   }, []);
@@ -334,8 +323,8 @@ export default function DashboardPage() {
     completed: projects.filter((p) => p.status === "delivered").length,
   };
 
-  const betaCount = projects.length;
-  const betaPct   = Math.min(100, Math.round((betaCount / betaMaxProjectsTotal) * 100));
+  const usageCount = projects.length;
+  const usagePct   = Math.min(100, Math.round((usageCount / maxProjects) * 100));
 
   return (
     <div className="min-h-screen bg-background text-foreground" style={{ fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif" }}>
@@ -437,30 +426,30 @@ export default function DashboardPage() {
               <div className="flex justify-between items-end">
                 <span className="text-sm font-semibold text-foreground">프로젝트</span>
                 <div className="text-sm font-mono">
-                  <span className="text-foreground font-bold">{betaCount}</span>
-                  <span className="text-disabled-foreground"> / {betaMaxProjectsTotal}</span>
+                  <span className="text-foreground font-bold">{usageCount}</span>
+                  <span className="text-disabled-foreground"> / {maxProjects}</span>
                 </div>
               </div>
               <div className="w-full h-1.5 bg-border-subtle rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
                   style={{
-                    width: `${betaPct}%`,
-                    background: betaPct >= 100 ? RED : betaPct >= 80 ? ACCENT : "var(--foreground)",
+                    width: `${usagePct}%`,
+                    background: usagePct >= 100 ? RED : usagePct >= 80 ? ACCENT : "var(--foreground)",
                   }}
                 />
               </div>
             </div>
 
-            {betaCount >= betaMaxProjectsTotal ? (
+            {usageCount >= maxProjects ? (
               <div className="flex items-start gap-2 bg-red-500/5 border border-red-500/20 rounded-xl p-3">
                 <AlertCircle size={13} color={RED} className="shrink-0 mt-0.5" />
                 <div>
                   <div className="text-[10px] text-red-400 font-bold uppercase tracking-wide mb-1">한도 초과</div>
-                  <div className="text-xs text-subtle-foreground leading-relaxed">베타 프로젝트 한도에 도달했습니다.</div>
+                  <div className="text-xs text-subtle-foreground leading-relaxed">프로젝트 한도에 도달했습니다.</div>
                 </div>
               </div>
-            ) : betaCount >= betaMaxProjectsTotal - 2 ? (
+            ) : usageCount >= maxProjects - 2 ? (
               <div className="bg-border-subtle rounded-xl p-3">
                 <div className="text-[10px] text-subtle-foreground font-bold uppercase tracking-wide mb-1">한도 근접</div>
                 <div className="text-xs text-disabled-foreground leading-relaxed">프로젝트 생성 한도에 근접했습니다.</div>
