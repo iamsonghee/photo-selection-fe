@@ -21,7 +21,7 @@ import {
   type MappingResult,
   type MappingType,
 } from "@/lib/version-mapping";
-import { applyClipMatches, matchRetouchByClip } from "@/lib/retouch-clip-match";
+import { applyGeminiMatches, matchRetouchByGemini } from "@/lib/retouch-gemini-match";
 import { DEFAULT_BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
 import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
 import { compressImageForUpload } from "@/lib/upload-client-compress";
@@ -95,7 +95,7 @@ export default function UploadVersionsPanel({
   const [uploadedBytes, setUploadedBytes] = useState(0);
   const [totalBytes, setTotalBytes] = useState(0);
   const [serverProcessing, setServerProcessing] = useState(false);
-  const [clipMatching, setClipMatching] = useState(false);
+  const [geminiMatching, setGeminiMatching] = useState(false);
   const [betaMaxRevisionCount, setBetaMaxRevisionCount] = useState(DEFAULT_BETA_MAX_REVISION_COUNT);
 
   useEffect(() => {
@@ -128,7 +128,7 @@ export default function UploadVersionsPanel({
       setUploadedBytes(0);
       setTotalBytes(0);
       setServerProcessing(false);
-      setClipMatching(false);
+      setGeminiMatching(false);
     }
   }, [isOpen]);
 
@@ -153,30 +153,31 @@ export default function UploadVersionsPanel({
     mappingRef.current = mapping;
   }, [mapping]);
 
-  // exact/fuzzy 매칭에 실패한 잔여 항목(type "none")에 대해 CLIP 유사도 매칭을 시도하고,
-  // 그래도 남은 항목은 순서대로 짝지어 "order"(순서 배지)로 표시한다 — 매칭 근거가 없는
-  // 최후 폴백이므로 항상 시각적으로 구분되고, 작가가 "변경"으로 언제든 재지정할 수 있다.
-  // matchRetouchByClip은 실패해도 절대 throw하지 않는다(내부에서 보장).
-  const runClipMatchPass = useCallback(
+  // exact/fuzzy 매칭에 실패한 잔여 항목(type "none")에 대해 Gemini 임베딩 유사도 매칭을
+  // 시도하고(2026-07-30부터 OpenCLIP 대체), 그래도 남은 항목은 순서대로 짝지어 "order"(순서
+  // 배지)로 표시한다 — 매칭 근거가 없는 최후 폴백이므로 항상 시각적으로 구분되고, 작가가
+  // "변경"으로 언제든 재지정할 수 있다.
+  // matchRetouchByGemini는 실패해도 절대 throw하지 않는다(내부에서 보장).
+  const runGeminiMatchPass = useCallback(
     async (files: File[], rows: MappingResult<UploadPanelTarget>[]) => {
       const claimed = new Set(rows.map((r) => r.file).filter((f): f is File => f != null));
       const leftoverFiles = files.filter((f) => !claimed.has(f));
       const leftoverPhotoIds = rows.filter((r) => r.type === "none").map((r) => r.target.id);
       if (leftoverFiles.length === 0 || leftoverPhotoIds.length === 0) return;
 
-      setClipMatching(true);
+      setGeminiMatching(true);
       try {
-        const matches = await matchRetouchByClip(projectId, leftoverPhotoIds, leftoverFiles, {
+        const matches = await matchRetouchByGemini(projectId, leftoverPhotoIds, leftoverFiles, {
           signal: AbortSignal.timeout(20000),
         });
         setMapping((prev) => {
-          const afterClip = matches.length > 0 ? applyClipMatches(prev, leftoverFiles, matches) : prev;
-          const stillClaimed = new Set(afterClip.map((r) => r.file).filter((f): f is File => f != null));
+          const afterGemini = matches.length > 0 ? applyGeminiMatches(prev, leftoverFiles, matches) : prev;
+          const stillClaimed = new Set(afterGemini.map((r) => r.file).filter((f): f is File => f != null));
           const stillLeftoverFiles = leftoverFiles.filter((f) => !stillClaimed.has(f));
-          return applySequentialFallback(afterClip, stillLeftoverFiles);
+          return applySequentialFallback(afterGemini, stillLeftoverFiles);
         });
       } finally {
-        setClipMatching(false);
+        setGeminiMatching(false);
       }
     },
     [projectId],
@@ -199,8 +200,8 @@ export default function UploadVersionsPanel({
     }
     const initial = mergeServerPlaceholders(buildVersionMapping(files, targets));
     setMapping(initial);
-    void runClipMatchPass(files, initial);
-  }, [isOpen, targets, runClipMatchPass]);
+    void runGeminiMatchPass(files, initial);
+  }, [isOpen, targets, runGeminiMatchPass]);
 
   const localPreviewMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -225,19 +226,19 @@ export default function UploadVersionsPanel({
   const stats = useMemo(() => {
     let exact = 0;
     let fuzzy = 0;
-    let clip = 0;
-    let clipLow = 0;
+    let gemini = 0;
+    let geminiLow = 0;
     let order = 0;
     let server = 0;
     mapping.forEach((m) => {
       if (m.type === "exact") exact++;
       else if (m.type === "fuzzy") fuzzy++;
-      else if (m.type === "clip") clip++;
-      else if (m.type === "clip_low") clipLow++;
+      else if (m.type === "gemini") gemini++;
+      else if (m.type === "gemini_low") geminiLow++;
       else if (m.type === "order") order++;
       else if (m.type === "server") server++;
     });
-    return { exact, fuzzy, clip, clipLow, order, server };
+    return { exact, fuzzy, gemini, geminiLow, order, server };
   }, [mapping]);
 
   // BE(upload.py)와 동일: 이미 존재하는 단계(v1/v2)의 교체 업로드는 허용한다.
@@ -260,9 +261,9 @@ export default function UploadVersionsPanel({
       setUploadedFiles(filtered);
       const initial = mergeServerPlaceholders(buildVersionMapping(filtered, targets));
       setMapping(initial);
-      void runClipMatchPass(filtered, initial);
+      void runGeminiMatchPass(filtered, initial);
     },
-    [targets, runClipMatchPass],
+    [targets, runGeminiMatchPass],
   );
 
   const handleClearFile = useCallback((targetId: string) => {
@@ -601,7 +602,7 @@ export default function UploadVersionsPanel({
                   <Info size={12} strokeWidth={2} />
                   <span>파일명 일치 시 자동 매핑 · 불일치 시 AI 이미지 유사도로 매칭 · 그래도 안 되면 직접 선택</span>
                 </div>
-                {clipMatching && (
+                {geminiMatching && (
                   <div className="flex items-center gap-1.5 mt-2 pl-1 text-[11px] text-accent">
                     <span
                       aria-hidden
@@ -619,8 +620,8 @@ export default function UploadVersionsPanel({
                   <div className="flex items-end justify-between border-b border-border pb-2.5 mb-3.5 flex-wrap gap-3">
                     <h3 className="text-sm font-semibold text-foreground m-0">매핑 결과</h3>
                     {(stats.exact > 0 ||
-                      stats.clip > 0 ||
-                      stats.clipLow > 0 ||
+                      stats.gemini > 0 ||
+                      stats.geminiLow > 0 ||
                       stats.order > 0 ||
                       stats.server > 0) && (
                       <div className="flex items-center gap-3 text-[11px]">
@@ -630,11 +631,11 @@ export default function UploadVersionsPanel({
                         {stats.fuzzy > 0 && (
                           <StatChip dotColor="bg-teal-500" textColor="text-teal-400" label={`유사 ${stats.fuzzy}`} />
                         )}
-                        {stats.clip > 0 && (
-                          <StatChip dotColor="bg-emerald-500" textColor="text-emerald-400" label={`AI ${stats.clip}`} />
+                        {stats.gemini > 0 && (
+                          <StatChip dotColor="bg-emerald-500" textColor="text-emerald-400" label={`AI ${stats.gemini}`} />
                         )}
-                        {stats.clipLow > 0 && (
-                          <StatChip dotColor="bg-amber-500" textColor="text-amber-400" label={`AI 추정 ${stats.clipLow}`} />
+                        {stats.geminiLow > 0 && (
+                          <StatChip dotColor="bg-amber-500" textColor="text-amber-400" label={`AI 추정 ${stats.geminiLow}`} />
                         )}
                         {stats.order > 0 && (
                           <StatChip dotColor="bg-amber-500" textColor="text-amber-400" label={`순서 ${stats.order}`} />
@@ -814,10 +815,10 @@ function PanelMappingRow({
   const [v1Err, setV1Err] = useState(false);
   const [retouchErr, setRetouchErr] = useState(false);
   const state =
-    type === "exact" || type === "fuzzy" || type === "clip"
+    type === "exact" || type === "fuzzy" || type === "gemini"
       ? "matched"
-      : type === "clip_low"
-        ? "clip_low"
+      : type === "gemini_low"
+        ? "gemini_low"
         : type === "order"
           ? "ordered"
           : type === "server"
@@ -826,7 +827,7 @@ function PanelMappingRow({
   const borderClass =
     state === "matched"
       ? "border-emerald-500/30"
-      : state === "clip_low"
+      : state === "gemini_low"
         ? "border-amber-400/40"
         : state === "ordered"
           ? "border-amber-500/30"
@@ -976,12 +977,12 @@ function PanelMappingRow({
               자동
             </span>
           )}
-          {type === "clip" && (
+          {type === "gemini" && (
             <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold tracking-wide text-emerald-400 bg-emerald-500/10 border border-emerald-500/30">
               AI
             </span>
           )}
-          {type === "clip_low" && (
+          {type === "gemini_low" && (
             <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold tracking-wide text-amber-400 bg-amber-500/10 border border-amber-500/30">
               AI {similarity != null ? `${Math.round(similarity * 100)}%` : ""}
             </span>
