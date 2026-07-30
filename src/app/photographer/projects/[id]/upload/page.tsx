@@ -1666,7 +1666,7 @@ export default function ProjectDetailPage() {
       });
       router.refresh();
     }, 600);
-  }, [id, loadProject, loadPhotos, router, project?.includeOriginal]);
+  }, [id, loadProject, loadPhotos, router, project?.includeOriginal, loadClipAnalysisStatus]);
 
   // 페이지 로드 시 awaiting_upload 상태 job 확인 → 복구 배너 (project가 로드된 후 1회)
   useEffect(() => {
