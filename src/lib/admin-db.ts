@@ -5,6 +5,7 @@ import type { Project, ProjectStatus } from "@/types";
 import type { Database } from "@/types/supabase";
 import { getEffectiveTier, type BetaStatus, type PhotographerTier } from "@/lib/beta-policy";
 import type { BetaAdditionalAnswers } from "@/lib/beta-application";
+import type { SurveyType } from "@/lib/beta-survey";
 
 export type AdminProjectSummary = Project & {
   photographerName: string;
@@ -309,6 +310,61 @@ export async function getAllFeedbackForAdmin(): Promise<AdminFeedbackItem[]> {
     pageUrl: row.page_url,
     status: row.status,
     createdAt: row.created_at,
+  }));
+}
+
+export type AdminSurveyResponseStatus = "submitted" | "skipped" | "later";
+
+export type AdminSurveyResponseItem = {
+  id: string;
+  photographerName: string;
+  photographerEmail: string | null;
+  projectName: string | null;
+  surveyType: SurveyType;
+  status: AdminSurveyResponseStatus;
+  submittedAt: string | null;
+  skippedAt: string | null;
+  laterUntil: string | null;
+  createdAt: string;
+  answers: unknown;
+};
+
+type SurveyResponseRow = {
+  id: string;
+  survey_type: SurveyType;
+  answers: unknown;
+  submitted_at: string | null;
+  skipped_at: string | null;
+  later_until: string | null;
+  created_at: string;
+  photographers: { name: string | null; email: string | null } | null;
+  projects: { name: string } | null;
+};
+
+/** 관리자용 — 전체 베타 설문 응답 목록(제출/건너뜀/나중에 전부 포함, §문제5 admin 조회 신규 구현) */
+export async function getAllSurveyResponsesForAdmin(): Promise<AdminSurveyResponseItem[]> {
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from("beta_survey_responses")
+    .select(
+      "id, survey_type, answers, submitted_at, skipped_at, later_until, created_at, photographers(name, email), projects(name)"
+    )
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as unknown as SurveyResponseRow[]).map((row) => ({
+    id: row.id,
+    photographerName: row.photographers?.name ?? "(알 수 없음)",
+    photographerEmail: row.photographers?.email ?? null,
+    projectName: row.projects?.name ?? null,
+    surveyType: row.survey_type,
+    status: row.submitted_at ? "submitted" : row.skipped_at ? "skipped" : "later",
+    submittedAt: row.submitted_at,
+    skippedAt: row.skipped_at,
+    laterUntil: row.later_until,
+    createdAt: row.created_at,
+    answers: row.answers,
   }));
 }
 

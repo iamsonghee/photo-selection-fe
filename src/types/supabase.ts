@@ -375,6 +375,44 @@ export interface Database {
           meta?: Record<string, unknown> | null;
         };
       };
+      beta_survey_responses: {
+        Row: {
+          id: string;
+          photographer_id: string | null;
+          project_id: string | null;
+          survey_type: "link_sent" | "project_created" | "original_uploaded" | "selection_received" | "first_delivery" | "second_delivery";
+          answers: Json | null;
+          later_until: string | null;
+          skipped_at: string | null;
+          submitted_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          photographer_id?: string | null;
+          project_id?: string | null;
+          survey_type: "link_sent" | "project_created" | "original_uploaded" | "selection_received" | "first_delivery" | "second_delivery";
+          answers?: Json | null;
+          later_until?: string | null;
+          skipped_at?: string | null;
+          submitted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          photographer_id?: string | null;
+          project_id?: string | null;
+          survey_type?: "link_sent" | "project_created" | "original_uploaded" | "selection_received" | "first_delivery" | "second_delivery";
+          answers?: Json | null;
+          later_until?: string | null;
+          skipped_at?: string | null;
+          submitted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       admin_audit_logs: {
         Row: {
           id: string;

@@ -99,3 +99,85 @@ export interface SecondDeliverySurveyAnswers {
 export interface BetaSurveyStatusResponse {
   surveyType: SurveyType | null;
 }
+
+// ── admin 화면 표시용 라벨 변환 (읽기 전용 — BetaSurveyModal의 입력 UI 라벨과는 별개) ──────
+
+export const SURVEY_TYPE_LABELS: Record<SurveyType, string> = {
+  link_sent: "셀렉 링크 전달 후",
+  project_created: "프로젝트 생성 후",
+  original_uploaded: "원본 업로드 후",
+  selection_received: "고객 셀렉 회신 후",
+  first_delivery: "첫 프로젝트 납품 후",
+  second_delivery: "두 번째 프로젝트 납품 후",
+};
+
+const HELPFUL_FEATURE_LABELS: Record<HelpfulFeature, string> = {
+  select_link: "셀렉 링크",
+  compare_original_edited: "원본·보정본 비교",
+  retouch_request: "보정 요청",
+  customer_convenience: "고객 사용 편의성",
+  other: "기타",
+};
+
+const PRICE_RANGE_LABELS: Record<PriceRange, string> = {
+  under_5k: "월 5천원 미만",
+  "5k_10k": "5천원~1만원",
+  "10k_30k": "1만원~3만원",
+  "30k_50k": "3만원~5만원",
+  over_50k: "5만원 이상",
+  no_paid_intent: "현재로서는 유료 이용 의향 없음",
+};
+
+/** admin 화면에서 answers(jsonb)를 사람이 읽을 수 있는 라벨/값 목록으로 변환 */
+export function formatSurveyAnswers(
+  surveyType: SurveyType,
+  answers: unknown
+): { label: string; value: string }[] {
+  if (!answers || typeof answers !== "object") return [];
+  const a = answers as Record<string, unknown>;
+  const scale = (v: unknown) => (typeof v === "number" ? `${v} / 5` : "-");
+  const text = (v: unknown) => (typeof v === "string" && v.trim() ? v : "-");
+  const bool = (v: unknown) => (v === true ? "예" : v === false ? "아니오" : "-");
+
+  switch (surveyType) {
+    case "project_created":
+      return [{ label: "생성 과정 난이도", value: scale(a.easeScale) }];
+    case "original_uploaded":
+      return [
+        { label: "업로드 수월함", value: scale(a.uploadEaseScale) },
+        { label: "불편했던 점", value: text(a.inconvenience) },
+      ];
+    case "selection_received":
+      return [
+        { label: "결과 확인 편의성", value: scale(a.reviewEaseScale) },
+        { label: "고객 피드백", value: text(a.customerFeedback) },
+      ];
+    case "first_delivery":
+      return [
+        { label: "실제 고객 사용 여부", value: bool(a.usedWithRealCustomer) },
+        { label: "시간 절감 체감", value: scale(a.timeSavedScale) },
+        {
+          label: "가장 도움된 기능",
+          value: Array.isArray(a.helpfulFeatures)
+            ? (a.helpfulFeatures as HelpfulFeature[]).map((f) => HELPFUL_FEATURE_LABELS[f] ?? f).join(", ") || "-"
+            : "-",
+        },
+        { label: "기타 기능 설명", value: text(a.helpfulFeaturesOther) },
+        { label: "가장 불편했던 점", value: text(a.biggestInconvenience) },
+        { label: "다음 프로젝트도 사용할 계획", value: scale(a.willUseNextProject) },
+      ];
+    case "second_delivery":
+      return [
+        { label: "계속 사용 의향", value: scale(a.continueUsingIntent) },
+        { label: "추천 의향(NPS)", value: typeof a.npsScore === "number" ? `${a.npsScore} / 10` : "-" },
+        { label: "사라지면 아쉬움 정도", value: scale(a.painIfGone) },
+        { label: "적정 가격대", value: PRICE_RANGE_LABELS[a.priceRange as PriceRange] ?? "-" },
+        { label: "유료 전환 시 구독 의향", value: scale(a.subscribeIntentIfPaid) },
+        { label: "추가되었으면 하는 기능", value: text(a.desiredFeature) },
+        { label: "기타 의견", value: text(a.otherFeedback) },
+        { label: "정식 출시 안내 희망", value: bool(a.wantsLaunchNotice) },
+      ];
+    default:
+      return [];
+  }
+}
