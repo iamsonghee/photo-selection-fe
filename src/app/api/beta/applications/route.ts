@@ -2,9 +2,33 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { isValidKoreanPhone, normalizePhone } from "@/lib/phone";
-import { BETA_APPLICATION_GENRES } from "@/lib/beta-application";
+import {
+  BETA_GENRE_OPTIONS,
+  BETA_MONTHLY_PROJECT_OPTIONS,
+  BETA_AVG_PHOTOS_OPTIONS,
+  BETA_WORKFLOW_OPTIONS,
+  BETA_DESIRED_FEATURE_OPTIONS,
+  BETA_PAIN_POINT_OPTIONS,
+  BETA_USAGE_INTENT_OPTIONS,
+  BETA_CONTACT_CHANNEL_OPTIONS,
+  genreLabel,
+  workflowLabel,
+  monthlyProjectRepValue,
+  avgPhotosRepValue,
+  type BetaAdditionalAnswers,
+} from "@/lib/beta-application";
 
 const DUPLICATE_MESSAGE = "이미 등록된 번호입니다. 검토 후 연락드리겠습니다.";
+
+function isValidKeySet(values: unknown, options: readonly { key: string }[]): values is string[] {
+  if (!Array.isArray(values) || values.length === 0) return false;
+  const validKeys = new Set(options.map((o) => o.key));
+  return values.every((v) => typeof v === "string" && validKeys.has(v));
+}
+
+function isValidKey(value: unknown, options: readonly { key: string }[]): value is string {
+  return typeof value === "string" && options.some((o) => o.key === value);
+}
 
 async function getSessionPhotographer(): Promise<{ id: string; email: string | null } | null> {
   const supabase = await createClient();
@@ -29,6 +53,10 @@ async function getSessionPhotographer(): Promise<{ id: string; email: string | n
  * 로그인(구글/카카오) 필수 — 이메일/matched_photographer_id는 항상 서버 세션에서 가져온다
  * (관리자가 이메일을 수동으로 입력/매칭할 필요를 없애기 위한 정책, plan/beta-system.md §3.1 참고).
  * 클라이언트는 이메일을 보내지 않으며, 보내더라도 무시한다.
+ *
+ * 모든 선택형 값은 key로 검증·저장한다(additional_answers). 기존 genre/monthly_shoot_count/
+ * avg_photos_per_project/current_workflow 컬럼은 레거시 호환을 위해 대표값을 함께 채운다
+ * (컬럼 타입은 그대로 — plan 문서 "문제 3" 참고).
  */
 export async function POST(req: NextRequest) {
   try {
@@ -47,11 +75,18 @@ export async function POST(req: NextRequest) {
     const {
       name,
       phone,
-      genre,
-      monthly_shoot_count: monthlyShootCount,
-      avg_photos_per_project: avgPhotosPerProject,
-      current_workflow: currentWorkflow,
-      reason,
+      genres,
+      genre_other: genreOther,
+      monthly_project_range: monthlyProjectRange,
+      avg_photos_range: avgPhotosRange,
+      workflow_methods: workflowMethods,
+      workflow_other: workflowOther,
+      desired_features: desiredFeatures,
+      desired_features_other: desiredFeaturesOther,
+      pain_point: painPoint,
+      usage_intent: usageIntent,
+      contact_channels: contactChannels,
+      expectation,
       privacy_consent: privacyConsent,
       contact_consent: contactConsent,
     } = body ?? {};
@@ -62,28 +97,44 @@ export async function POST(req: NextRequest) {
     if (typeof phone !== "string" || !isValidKoreanPhone(phone)) {
       return NextResponse.json({ error: "휴대폰번호 형식이 올바르지 않습니다." }, { status: 400 });
     }
-    if (typeof genre !== "string" || !BETA_APPLICATION_GENRES.includes(genre as (typeof BETA_APPLICATION_GENRES)[number])) {
-      return NextResponse.json({ error: "촬영 장르를 선택해주세요." }, { status: 400 });
+    if (!isValidKeySet(genres, BETA_GENRE_OPTIONS)) {
+      return NextResponse.json({ error: "주 촬영 분야를 선택해주세요." }, { status: 400 });
     }
-    const monthlyShootCountNum = Number(monthlyShootCount);
-    if (!Number.isFinite(monthlyShootCountNum) || monthlyShootCountNum < 0) {
-      return NextResponse.json({ error: "월평균 촬영 건수를 확인해주세요." }, { status: 400 });
+    if (genres.includes("other") && (typeof genreOther !== "string" || !genreOther.trim())) {
+      return NextResponse.json({ error: "기타 촬영 분야를 입력해주세요." }, { status: 400 });
     }
-    const avgPhotosNum = Number(avgPhotosPerProject);
-    if (!Number.isFinite(avgPhotosNum) || avgPhotosNum < 0) {
-      return NextResponse.json({ error: "프로젝트당 평균 전달 사진 수를 확인해주세요." }, { status: 400 });
+    if (!isValidKey(monthlyProjectRange, BETA_MONTHLY_PROJECT_OPTIONS)) {
+      return NextResponse.json({ error: "월평균 프로젝트 수를 선택해주세요." }, { status: 400 });
     }
-    if (typeof currentWorkflow !== "string" || !currentWorkflow.trim()) {
-      return NextResponse.json(
-        { error: "현재 셀렉·보정 요청 전달 방식을 입력해주세요." },
-        { status: 400 }
-      );
+    if (!isValidKey(avgPhotosRange, BETA_AVG_PHOTOS_OPTIONS)) {
+      return NextResponse.json({ error: "프로젝트당 평균 사진 수를 선택해주세요." }, { status: 400 });
     }
-    if (typeof reason !== "string" || !reason.trim()) {
-      return NextResponse.json(
-        { error: "A-CUT을 사용해보고 싶은 이유를 입력해주세요." },
-        { status: 400 }
-      );
+    if (!isValidKeySet(workflowMethods, BETA_WORKFLOW_OPTIONS)) {
+      return NextResponse.json({ error: "현재 고객 셀렉 방식을 선택해주세요." }, { status: 400 });
+    }
+    if (workflowMethods.includes("other") && (typeof workflowOther !== "string" || !workflowOther.trim())) {
+      return NextResponse.json({ error: "기타 셀렉 방식을 입력해주세요." }, { status: 400 });
+    }
+    if (!isValidKeySet(desiredFeatures, BETA_DESIRED_FEATURE_OPTIONS)) {
+      return NextResponse.json({ error: "베타에서 사용해보고 싶은 기능을 선택해주세요." }, { status: 400 });
+    }
+    if (
+      desiredFeatures.includes("other") &&
+      (typeof desiredFeaturesOther !== "string" || !desiredFeaturesOther.trim())
+    ) {
+      return NextResponse.json({ error: "기타 희망 기능을 입력해주세요." }, { status: 400 });
+    }
+    if (painPoint !== undefined && !isValidKey(painPoint, BETA_PAIN_POINT_OPTIONS)) {
+      return NextResponse.json({ error: "가장 불편한 단계 값이 올바르지 않습니다." }, { status: 400 });
+    }
+    if (usageIntent !== undefined && !isValidKey(usageIntent, BETA_USAGE_INTENT_OPTIONS)) {
+      return NextResponse.json({ error: "월 사용 의향 값이 올바르지 않습니다." }, { status: 400 });
+    }
+    if (contactChannels !== undefined && !isValidKeySet(contactChannels, BETA_CONTACT_CHANNEL_OPTIONS)) {
+      return NextResponse.json({ error: "연락 가능 채널 값이 올바르지 않습니다." }, { status: 400 });
+    }
+    if (expectation !== undefined && typeof expectation !== "string") {
+      return NextResponse.json({ error: "A-CUT에 기대하는 점 값이 올바르지 않습니다." }, { status: 400 });
     }
     if (privacyConsent !== true) {
       return NextResponse.json({ error: "개인정보 수집·이용에 동의해주세요." }, { status: 400 });
@@ -111,15 +162,36 @@ export async function POST(req: NextRequest) {
 
     const now = new Date().toISOString();
 
+    // 레거시 컬럼 대표값: genre는 사용자가 첫 번째로 선택한 장르(기타만 선택했다면 "기타"),
+    // current_workflow는 선택한 방식들의 라벨을 이어붙인 요약 텍스트.
+    const genreRepresentative = genreLabel(genres[0]);
+    const workflowSummary = workflowMethods.map((k: string) => workflowLabel(k)).join(", ");
+
+    const additionalAnswers: BetaAdditionalAnswers = {
+      genres,
+      ...(genreOther?.trim() ? { genre_other: genreOther.trim() } : {}),
+      monthly_project_range: monthlyProjectRange,
+      avg_photos_range: avgPhotosRange,
+      workflow_methods: workflowMethods,
+      ...(workflowOther?.trim() ? { workflow_other: workflowOther.trim() } : {}),
+      desired_features: desiredFeatures,
+      ...(desiredFeaturesOther?.trim() ? { desired_features_other: desiredFeaturesOther.trim() } : {}),
+      ...(painPoint ? { pain_point: painPoint } : {}),
+      ...(usageIntent ? { usage_intent: usageIntent } : {}),
+      ...(contactChannels?.length ? { contact_channels: contactChannels } : {}),
+      ...(expectation?.trim() ? { expectation: expectation.trim() } : {}),
+    };
+
     const { error } = await admin.from("beta_applications").insert({
       name: name.trim(),
       phone: normalizedPhone,
       email: sessionPhotographer.email.toLowerCase(),
-      genre,
-      monthly_shoot_count: Math.round(monthlyShootCountNum),
-      avg_photos_per_project: Math.round(avgPhotosNum),
-      current_workflow: currentWorkflow.trim(),
-      reason: reason.trim(),
+      genre: genreRepresentative,
+      monthly_shoot_count: monthlyProjectRepValue(monthlyProjectRange),
+      avg_photos_per_project: avgPhotosRepValue(avgPhotosRange),
+      current_workflow: workflowSummary,
+      reason: expectation?.trim() || null,
+      additional_answers: additionalAnswers,
       privacy_consent_at: now,
       contact_consent_at: now,
       matched_photographer_id: sessionPhotographer.id,

@@ -4,7 +4,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input, Textarea, Button, Card } from "@/components/ui";
 import { AuthModal } from "@/components/AuthModal";
-import { BETA_APPLICATION_GENRES } from "@/lib/beta-application";
+import {
+  BETA_GENRE_OPTIONS,
+  BETA_MONTHLY_PROJECT_OPTIONS,
+  BETA_AVG_PHOTOS_OPTIONS,
+  BETA_WORKFLOW_OPTIONS,
+  BETA_DESIRED_FEATURE_OPTIONS,
+  BETA_PAIN_POINT_OPTIONS,
+  BETA_USAGE_INTENT_OPTIONS,
+  BETA_CONTACT_CHANNEL_OPTIONS,
+  type BetaOption,
+} from "@/lib/beta-application";
 
 /** 로그인 안 된 상태에서 /beta/apply에 접근했을 때 노출 — 로그인 후에만 신청서를 받는다(§3.1). */
 function BetaApplySignInPrompt() {
@@ -31,16 +41,125 @@ export function BetaApplyForm({ prefillEmail }: { prefillEmail: string | null })
   return <BetaApplyFormFields email={prefillEmail} />;
 }
 
+// ── 선택형 UI 프리미티브 ─────────────────────────────────────────────────────
+
+function OptionChip({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`h-10 px-4 rounded-lg border text-sm font-medium transition-colors ${
+        selected
+          ? "border-primary bg-primary/10 text-primary"
+          : "border-border bg-surface-raised text-foreground hover:bg-border-strong"
+      }`}
+      aria-pressed={selected}
+    >
+      {label}
+    </button>
+  );
+}
+
+function MultiSelectField({
+  label,
+  hint,
+  options,
+  values,
+  onChange,
+  otherKey = "other",
+  otherValue,
+  onOtherChange,
+}: {
+  label: string;
+  hint?: string;
+  options: readonly BetaOption[];
+  values: string[];
+  onChange: (next: string[]) => void;
+  otherKey?: string;
+  otherValue?: string;
+  onOtherChange?: (v: string) => void;
+}) {
+  const toggle = (key: string) => {
+    onChange(values.includes(key) ? values.filter((v) => v !== key) : [...values, key]);
+  };
+  const hasOther = options.some((o) => o.key === otherKey);
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-medium text-foreground">{label}</label>
+      {hint && <p className="mb-2 text-xs text-muted-foreground">{hint}</p>}
+      <div className="flex flex-wrap gap-2">
+        {options.map((o) => (
+          <OptionChip key={o.key} label={o.label} selected={values.includes(o.key)} onClick={() => toggle(o.key)} />
+        ))}
+      </div>
+      {hasOther && values.includes(otherKey) && onOtherChange && (
+        <Input
+          className="mt-2"
+          value={otherValue ?? ""}
+          onChange={(e) => onOtherChange(e.target.value)}
+          placeholder="기타 내용을 입력해주세요"
+        />
+      )}
+    </div>
+  );
+}
+
+function SingleSelectField({
+  label,
+  hint,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  options: readonly BetaOption[];
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-medium text-foreground">{label}</label>
+      {hint && <p className="mb-2 text-xs text-muted-foreground">{hint}</p>}
+      <div className="flex flex-wrap gap-2">
+        {options.map((o) => (
+          <OptionChip key={o.key} label={o.label} selected={value === o.key} onClick={() => onChange(o.key)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── 메인 폼 ──────────────────────────────────────────────────────────────────
+
 function BetaApplyFormFields({ email }: { email: string }) {
   const router = useRouter();
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [genre, setGenre] = useState<string>("");
-  const [monthlyShootCount, setMonthlyShootCount] = useState("");
-  const [avgPhotosPerProject, setAvgPhotosPerProject] = useState("");
-  const [currentWorkflow, setCurrentWorkflow] = useState("");
-  const [reason, setReason] = useState("");
+
+  const [genres, setGenres] = useState<string[]>([]);
+  const [genreOther, setGenreOther] = useState("");
+  const [monthlyProjectRange, setMonthlyProjectRange] = useState("");
+  const [avgPhotosRange, setAvgPhotosRange] = useState("");
+  const [workflowMethods, setWorkflowMethods] = useState<string[]>([]);
+  const [workflowOther, setWorkflowOther] = useState("");
+  const [desiredFeatures, setDesiredFeatures] = useState<string[]>([]);
+  const [desiredFeaturesOther, setDesiredFeaturesOther] = useState("");
+
+  const [painPoint, setPainPoint] = useState("");
+  const [usageIntent, setUsageIntent] = useState("");
+  const [contactChannels, setContactChannels] = useState<string[]>([]);
+  const [expectation, setExpectation] = useState("");
+
   const [privacyConsent, setPrivacyConsent] = useState(false);
   const [contactConsent, setContactConsent] = useState(false);
 
@@ -50,12 +169,15 @@ function BetaApplyFormFields({ email }: { email: string }) {
   function validate(): string | null {
     if (!name.trim()) return "이름을 입력해주세요.";
     if (!/^01[016789]-?\d{3,4}-?\d{4}$/.test(phone.trim())) return "휴대폰번호 형식이 올바르지 않습니다.";
-    if (!genre) return "촬영 장르를 선택해주세요.";
-    if (!monthlyShootCount.trim() || Number(monthlyShootCount) < 0) return "월평균 촬영 건수를 확인해주세요.";
-    if (!avgPhotosPerProject.trim() || Number(avgPhotosPerProject) < 0)
-      return "프로젝트당 평균 전달 사진 수를 확인해주세요.";
-    if (!currentWorkflow.trim()) return "현재 셀렉·보정 요청 전달 방식을 입력해주세요.";
-    if (!reason.trim()) return "A-CUT을 사용해보고 싶은 이유를 입력해주세요.";
+    if (genres.length === 0) return "주 촬영 분야를 선택해주세요.";
+    if (genres.includes("other") && !genreOther.trim()) return "기타 촬영 분야를 입력해주세요.";
+    if (!monthlyProjectRange) return "월평균 프로젝트 수를 선택해주세요.";
+    if (!avgPhotosRange) return "프로젝트당 평균 사진 수를 선택해주세요.";
+    if (workflowMethods.length === 0) return "현재 고객 셀렉 방식을 선택해주세요.";
+    if (workflowMethods.includes("other") && !workflowOther.trim()) return "기타 셀렉 방식을 입력해주세요.";
+    if (desiredFeatures.length === 0) return "베타에서 사용해보고 싶은 기능을 선택해주세요.";
+    if (desiredFeatures.includes("other") && !desiredFeaturesOther.trim())
+      return "기타 희망 기능을 입력해주세요.";
     if (!privacyConsent) return "개인정보 수집·이용에 동의해주세요.";
     if (!contactConsent) return "베타 운영 관련 연락에 동의해주세요.";
     return null;
@@ -77,11 +199,18 @@ function BetaApplyFormFields({ email }: { email: string }) {
         body: JSON.stringify({
           name: name.trim(),
           phone: phone.trim(),
-          genre,
-          monthly_shoot_count: Number(monthlyShootCount),
-          avg_photos_per_project: Number(avgPhotosPerProject),
-          current_workflow: currentWorkflow.trim(),
-          reason: reason.trim(),
+          genres,
+          genre_other: genreOther.trim() || undefined,
+          monthly_project_range: monthlyProjectRange,
+          avg_photos_range: avgPhotosRange,
+          workflow_methods: workflowMethods,
+          workflow_other: workflowOther.trim() || undefined,
+          desired_features: desiredFeatures,
+          desired_features_other: desiredFeaturesOther.trim() || undefined,
+          pain_point: painPoint || undefined,
+          usage_intent: usageIntent || undefined,
+          contact_channels: contactChannels.length > 0 ? contactChannels : undefined,
+          expectation: expectation.trim() || undefined,
           privacy_consent: privacyConsent,
           contact_consent: contactConsent,
         }),
@@ -101,11 +230,11 @@ function BetaApplyFormFields({ email }: { email: string }) {
   }
 
   return (
-    <Card className="flex flex-col gap-5">
+    <Card className="flex flex-col gap-6">
       <div>
         <h1 className="text-xl font-semibold text-foreground">A-CUT 클로즈드 베타 신청</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          신청서를 검토한 뒤 입력하신 번호로 직접 연락드립니다.
+          약 1~2분이면 끝나요. 신청서를 검토한 뒤 입력하신 번호로 직접 연락드립니다.
         </p>
       </div>
 
@@ -123,50 +252,77 @@ function BetaApplyFormFields({ email }: { email: string }) {
         inputMode="tel"
       />
 
-      <div>
-        <label className="mb-1.5 block text-sm font-medium text-foreground">촬영 장르 *</label>
-        <select
-          value={genre}
-          onChange={(e) => setGenre(e.target.value)}
-          className="h-11 w-full rounded-lg border border-border bg-surface-raised px-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          <option value="">선택해주세요</option>
-          {BETA_APPLICATION_GENRES.map((g) => (
-            <option key={g} value={g}>
-              {g}
-            </option>
-          ))}
-        </select>
-      </div>
+      <MultiSelectField
+        label="주 촬영 분야 * (복수선택 가능)"
+        options={BETA_GENRE_OPTIONS}
+        values={genres}
+        onChange={setGenres}
+        otherValue={genreOther}
+        onOtherChange={setGenreOther}
+      />
 
-      <Input
-        label="월평균 촬영 건수 *"
-        type="number"
-        min={0}
-        value={monthlyShootCount}
-        onChange={(e) => setMonthlyShootCount(e.target.value)}
-        placeholder="예: 4"
+      <SingleSelectField
+        label="월평균 프로젝트 수 *"
+        options={BETA_MONTHLY_PROJECT_OPTIONS}
+        value={monthlyProjectRange}
+        onChange={setMonthlyProjectRange}
       />
-      <Input
-        label="프로젝트당 평균 전달 사진 수 *"
-        type="number"
-        min={0}
-        value={avgPhotosPerProject}
-        onChange={(e) => setAvgPhotosPerProject(e.target.value)}
-        placeholder="예: 350"
+
+      <SingleSelectField
+        label="프로젝트당 평균 사진 수 *"
+        options={BETA_AVG_PHOTOS_OPTIONS}
+        value={avgPhotosRange}
+        onChange={setAvgPhotosRange}
       />
+
+      <MultiSelectField
+        label="현재 고객 셀렉 방식은 어떻게 진행하시나요? * (복수선택 가능)"
+        options={BETA_WORKFLOW_OPTIONS}
+        values={workflowMethods}
+        onChange={setWorkflowMethods}
+        otherValue={workflowOther}
+        onOtherChange={setWorkflowOther}
+      />
+
+      <MultiSelectField
+        label="베타에서 사용해보고 싶은 기능은? * (복수선택 가능)"
+        options={BETA_DESIRED_FEATURE_OPTIONS}
+        values={desiredFeatures}
+        onChange={setDesiredFeatures}
+        otherValue={desiredFeaturesOther}
+        onOtherChange={setDesiredFeaturesOther}
+      />
+
+      <div className="h-px bg-border" />
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">선택 입력</p>
+
+      <SingleSelectField
+        label="가장 불편한 단계"
+        options={BETA_PAIN_POINT_OPTIONS}
+        value={painPoint}
+        onChange={setPainPoint}
+      />
+
+      <SingleSelectField
+        label="월 사용 의향"
+        options={BETA_USAGE_INTENT_OPTIONS}
+        value={usageIntent}
+        onChange={setUsageIntent}
+      />
+
+      <MultiSelectField
+        label="연락 가능 채널 (복수선택 가능)"
+        options={BETA_CONTACT_CHANNEL_OPTIONS}
+        values={contactChannels}
+        onChange={setContactChannels}
+      />
+
       <Textarea
-        label="현재 셀렉·보정 요청은 어떻게 진행하시나요? *"
-        value={currentWorkflow}
-        onChange={(e) => setCurrentWorkflow(e.target.value)}
-        placeholder="예: 구글드라이브 링크 + 카톡으로 회신"
+        label="A-CUT에 기대하는 점을 알려주세요"
+        value={expectation}
+        onChange={(e) => setExpectation(e.target.value)}
         rows={3}
-      />
-      <Textarea
-        label="A-CUT을 써보고 싶은 이유를 알려주세요 *"
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
-        rows={4}
+        placeholder="선택 입력"
       />
 
       <label className="flex items-start gap-2 text-sm text-foreground">

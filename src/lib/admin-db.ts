@@ -4,6 +4,7 @@ import type { ProjectLogAction } from "@/lib/db";
 import type { Project, ProjectStatus } from "@/types";
 import type { Database } from "@/types/supabase";
 import { getEffectiveTier, type BetaStatus, type PhotographerTier } from "@/lib/beta-policy";
+import type { BetaAdditionalAnswers } from "@/lib/beta-application";
 
 export type AdminProjectSummary = Project & {
   photographerName: string;
@@ -380,7 +381,9 @@ export type AdminBetaApplicationSummary = {
 export type AdminBetaApplicationDetail = AdminBetaApplicationSummary & {
   avgPhotosPerProject: number;
   currentWorkflow: string;
-  reason: string;
+  reason: string | null;
+  /** 신규(선택형) 신청서 전용 구조화 응답 — 구버전 신청은 null */
+  additionalAnswers: BetaAdditionalAnswers | null;
   adminNote: string | null;
   contacted: boolean;
   matchedPhotographerName: string | null;
@@ -468,6 +471,7 @@ export async function getBetaApplicationForAdmin(id: string): Promise<AdminBetaA
     avgPhotosPerProject: row.avg_photos_per_project,
     currentWorkflow: row.current_workflow,
     reason: row.reason,
+    additionalAnswers: (row.additional_answers as BetaAdditionalAnswers | null) ?? null,
     adminNote: row.admin_note,
     contacted: row.contacted,
     matchedPhotographerName,

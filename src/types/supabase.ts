@@ -297,7 +297,8 @@ export interface Database {
           monthly_shoot_count: number;
           avg_photos_per_project: number;
           current_workflow: string;
-          reason: string;
+          reason: string | null;
+          additional_answers: Json | null;
           privacy_consent_at: string;
           contact_consent_at: string;
           status: "applied" | "reviewing" | "on_hold" | "approved" | "rejected";
@@ -316,7 +317,8 @@ export interface Database {
           monthly_shoot_count: number;
           avg_photos_per_project: number;
           current_workflow: string;
-          reason: string;
+          reason?: string | null;
+          additional_answers?: Json | null;
           privacy_consent_at: string;
           contact_consent_at: string;
           status?: "applied" | "reviewing" | "on_hold" | "approved" | "rejected";
@@ -335,7 +337,8 @@ export interface Database {
           monthly_shoot_count?: number;
           avg_photos_per_project?: number;
           current_workflow?: string;
-          reason?: string;
+          reason?: string | null;
+          additional_answers?: Json | null;
           privacy_consent_at?: string;
           contact_consent_at?: string;
           status?: "applied" | "reviewing" | "on_hold" | "approved" | "rejected";
