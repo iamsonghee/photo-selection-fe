@@ -523,7 +523,7 @@ export default function GalleryPageClient() {
       console.error(e);
       setConfirming(false);
     }
-  }, [project?.id, token, router]);
+  }, [project?.id, token, router, selectedIds]);
 
   /* ── Loading / error states ── */
   if (loading) {
