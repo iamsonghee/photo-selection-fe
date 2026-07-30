@@ -23,6 +23,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { ProjectPipelineMiniBar, getPipelineStepLabel } from "@/components/photographer/ProjectPipelineMiniBar";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { getActiveDeadline } from "@/lib/project-deadline";
+import { BetaApprovalBanner, type BetaApplicationStatus } from "@/components/photographer/BetaApprovalBanner";
 import { consumePostLoginRedirect, peekPostLoginRedirect } from "@/lib/post-login-redirect";
 
 const ACCENT = "var(--accent)";
@@ -204,6 +205,7 @@ export default function DashboardPage() {
   const [tier, setTier] = useState<"admin" | "beta" | "general" | null>(null);
   const [maxProjects, setMaxProjects] = useState(DEFAULT_GENERAL_MAX_PROJECTS);
   const [maxPhotosPerProject, setMaxPhotosPerProject] = useState(DEFAULT_GENERAL_MAX_PHOTOS_PER_PROJECT);
+  const [betaApplicationStatus, setBetaApplicationStatus] = useState<BetaApplicationStatus>(null);
   const [surveyToShow, setSurveyToShow] = useState<SurveyType | null>(null);
   // 첫 렌더에서(이펙트를 기다리지 않고) 곧바로 읽는다 — 그래야 대시보드 실제 콘텐츠가 한 프레임도
   // 그려지지 않고 바로 로딩 화면으로 대체된다. 실제 소비(제거)는 아래 이펙트가 담당.
@@ -253,6 +255,7 @@ export default function DashboardPage() {
         if (data?.tier) setTier(data.tier);
         if (data?.max) setMaxProjects(data.max);
         if (data?.maxPhotosPerProject) setMaxPhotosPerProject(data.maxPhotosPerProject);
+        if (data?.betaApplicationStatus !== undefined) setBetaApplicationStatus(data.betaApplicationStatus);
       })
       .catch(() => {});
   }, []);
@@ -337,6 +340,13 @@ export default function DashboardPage() {
 
         {/* ── 메인 좌측 ── */}
         <div className="flex-1 min-w-0 flex flex-col gap-6">
+
+          <BetaApprovalBanner
+            tier={tier}
+            betaApplicationStatus={betaApplicationStatus}
+            maxProjects={maxProjects}
+            maxPhotosPerProject={maxPhotosPerProject}
+          />
 
           {/* 1. 프로젝트 요약 카드 */}
           <div className="grid grid-cols-3 gap-4 items-stretch">

@@ -17,6 +17,7 @@ import { useProfile } from "@/contexts/ProfileContext";
 import { parseBetaLimitError } from "@/lib/beta-limits";
 import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
+import { BetaApprovalBanner, type BetaApplicationStatus } from "@/components/photographer/BetaApprovalBanner";
 
 const QUICK_DAYS = [3, 5, 7, 14, 30];
 
@@ -115,7 +116,9 @@ export default function NewProjectPage() {
     tier: "admin" | "beta" | "general";
     current: number;
     max: number | null;
+    maxPhotosPerProject: number | null;
     betaStatus: "not_invited" | "active" | "ended" | "suspended";
+    betaApplicationStatus: BetaApplicationStatus;
   } | null>(null);
   const [quotaError, setQuotaError] = useState(false);
   const [quotaRetryTick, setQuotaRetryTick] = useState(0);
@@ -314,6 +317,20 @@ const isValid =
 
       {/* ── 메인 ── */}
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-20">
+
+        {quota.tier === "general" &&
+          quota.betaApplicationStatus !== null &&
+          quota.betaApplicationStatus !== "rejected" && (
+            <div className="mb-4">
+              <BetaApprovalBanner
+                tier={quota.tier}
+                betaApplicationStatus={quota.betaApplicationStatus}
+                maxProjects={quota.max ?? 0}
+                maxPhotosPerProject={quota.maxPhotosPerProject ?? 0}
+                variant="compact"
+              />
+            </div>
+          )}
 
         {/* 한도 임박 (잔여 1개) */}
         {quota.max !== null && quota.current === quota.max - 1 && (

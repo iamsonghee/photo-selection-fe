@@ -49,6 +49,17 @@ export async function GET() {
       current = count ?? 0;
     }
 
+    // 가입 전 신청 심사 상태(축 A) — 승인 대기 배너 노출 판단용. 관리자는 조회하지 않는다(불필요).
+    let betaApplicationStatus: "applied" | "reviewing" | "on_hold" | "approved" | "rejected" | null = null;
+    if (policy.tier !== "admin") {
+      const { data: applicationRow } = await admin
+        .from("beta_applications")
+        .select("status")
+        .eq("matched_photographer_id", data.id)
+        .maybeSingle();
+      betaApplicationStatus = applicationRow?.status ?? null;
+    }
+
     return NextResponse.json({
       tier: policy.tier,
       current,
@@ -57,6 +68,7 @@ export async function GET() {
       maxRevisionCount: policy.maxRevisionCount,
       betaStatus,
       betaEndDate: data.beta_end_date,
+      betaApplicationStatus,
     });
   } catch (e) {
     console.error("[GET photographer/quota]", e);
