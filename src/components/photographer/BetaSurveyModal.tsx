@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
+import { QuestionHeader, PointScaleField, RadioListField, ChipMultiSelectField, Textarea } from "@/components/ui";
 import type {
   ProjectCreatedSurveyAnswers,
   OriginalUploadedSurveyAnswers,
@@ -13,8 +14,6 @@ import type {
   PriceRange,
   SurveyType,
 } from "@/lib/beta-survey";
-
-const FIVE_POINT_VALUES: FivePointScale[] = [1, 2, 3, 4, 5];
 
 const EASE_LABELS: Record<FivePointScale, string> = {
   1: "많이 헤맸다",
@@ -67,6 +66,11 @@ const PRICE_RANGE_OPTIONS: { value: PriceRange; label: string }[] = [
 
 const NPS_SCORES = Array.from({ length: 11 }, (_, i) => i); // 0~10
 
+const USED_WITH_REAL_CUSTOMER_OPTIONS: { value: boolean; label: string }[] = [
+  { value: true, label: "예" },
+  { value: false, label: "아니오" },
+];
+
 const TITLES: Record<SurveyType, string> = {
   link_sent: "",
   project_created: "프로젝트를 만드셨네요!",
@@ -76,44 +80,12 @@ const TITLES: Record<SurveyType, string> = {
   second_delivery: "두 번째 프로젝트도 완료하셨네요! 🎉",
 };
 
-const toggleBtnCls = (active: boolean) =>
-  `flex-1 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-    active
-      ? "border-accent bg-accent/10 text-foreground"
-      : "border-border text-muted-foreground hover:text-foreground"
-  }`;
-
 const npsBtnCls = (active: boolean) =>
   `h-9 w-9 rounded-lg border text-sm transition-colors ${
     active
       ? "border-accent bg-accent/10 text-foreground"
       : "border-border text-muted-foreground hover:text-foreground"
   }`;
-
-function FivePointRow({
-  labels,
-  value,
-  onChange,
-}: {
-  labels: Record<FivePointScale, string>;
-  value: FivePointScale | null;
-  onChange: (v: FivePointScale) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {FIVE_POINT_VALUES.map((n) => (
-        <button
-          key={n}
-          type="button"
-          onClick={() => onChange(n)}
-          className={toggleBtnCls(value === n)}
-        >
-          {labels[n]}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 type Answers =
   | ProjectCreatedSurveyAnswers
@@ -175,10 +147,6 @@ export function BetaSurveyModal({
   const [pending, setPending] = useState<null | "submit" | "later" | "skip">(null);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
-
-  function toggleHelpfulFeature(v: HelpfulFeature) {
-    setHelpfulFeatures((prev) => (prev.includes(v) ? prev.filter((f) => f !== v) : [...prev, v]));
-  }
 
   async function postAction(action: "submit" | "later", answers?: Answers) {
     const res = await fetch("/api/photographer/beta-survey", {
@@ -357,27 +325,30 @@ export function BetaSurveyModal({
         <div className="flex flex-col gap-6">
           {surveyType === "project_created" && (
             <div>
-              <p className="mb-2 text-sm font-medium text-foreground">
-                A-CUT 프로젝트 생성 과정, 어렵지 않으셨나요?
-              </p>
-              <FivePointRow labels={EASE_LABELS} value={easeScale} onChange={setEaseScale} />
+              <QuestionHeader title="A-CUT 프로젝트 생성 과정, 어렵지 않으셨나요?" />
+              <PointScaleField name="easeScale" labels={EASE_LABELS} value={easeScale} onChange={setEaseScale} />
             </div>
           )}
 
           {surveyType === "original_uploaded" && (
             <>
               <div>
-                <p className="mb-2 text-sm font-medium text-foreground">원본 사진 업로드 과정이 수월하셨나요?</p>
-                <FivePointRow labels={EASE_LABELS} value={uploadEaseScale} onChange={setUploadEaseScale} />
+                <QuestionHeader title="원본 사진 업로드 과정이 수월하셨나요?" />
+                <PointScaleField
+                  name="uploadEaseScale"
+                  labels={EASE_LABELS}
+                  value={uploadEaseScale}
+                  onChange={setUploadEaseScale}
+                />
               </div>
               <div>
-                <p className="mb-2 text-sm font-medium text-foreground">혹시 불편했던 점이 있다면 알려주세요</p>
-                <textarea
+                <QuestionHeader title="혹시 불편했던 점이 있다면 알려주세요" />
+                <Textarea
                   value={uploadInconvenience}
                   onChange={(e) => setUploadInconvenience(e.target.value)}
                   rows={2}
                   placeholder="선택 입력"
-                  className="w-full resize-none rounded-lg border border-border bg-background p-2.5 text-sm text-foreground placeholder:text-placeholder-foreground"
+                  className="min-h-0 resize-none [word-break:keep-all]"
                 />
               </div>
             </>
@@ -386,21 +357,22 @@ export function BetaSurveyModal({
           {surveyType === "selection_received" && (
             <>
               <div>
-                <p className="mb-2 text-sm font-medium text-foreground">
-                  고객의 셀렉 결과를 확인하는 과정이 편리했나요?
-                </p>
-                <FivePointRow labels={EASE_LABELS} value={reviewEaseScale} onChange={setReviewEaseScale} />
+                <QuestionHeader title="고객의 셀렉 결과를 확인하는 과정이 편리했나요?" />
+                <PointScaleField
+                  name="reviewEaseScale"
+                  labels={EASE_LABELS}
+                  value={reviewEaseScale}
+                  onChange={setReviewEaseScale}
+                />
               </div>
               <div>
-                <p className="mb-2 text-sm font-medium text-foreground">
-                  고객에게 들은 의견이나 불편사항이 있다면 알려주세요
-                </p>
-                <textarea
+                <QuestionHeader title="고객에게 들은 의견이나 불편사항이 있다면 알려주세요" />
+                <Textarea
                   value={customerFeedback}
                   onChange={(e) => setCustomerFeedback(e.target.value)}
                   rows={2}
                   placeholder="선택 입력"
-                  className="w-full resize-none rounded-lg border border-border bg-background p-2.5 text-sm text-foreground placeholder:text-placeholder-foreground"
+                  className="min-h-0 resize-none [word-break:keep-all]"
                 />
               </div>
             </>
@@ -409,75 +381,57 @@ export function BetaSurveyModal({
           {surveyType === "first_delivery" && (
             <>
               <div>
-                <p className="mb-2 text-sm font-medium text-foreground">
-                  이번 프로젝트에 A-CUT을 실제 고객에게 사용하셨나요?
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setUsedWithRealCustomer(true)}
-                    className={toggleBtnCls(usedWithRealCustomer === true)}
-                  >
-                    예
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setUsedWithRealCustomer(false)}
-                    className={toggleBtnCls(usedWithRealCustomer === false)}
-                  >
-                    아니오
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <p className="mb-2 text-sm font-medium text-foreground">
-                  기존 방식보다 작업 시간이 얼마나 줄었다고 느끼셨나요?
-                </p>
-                <FivePointRow labels={TIME_SAVED_LABELS} value={timeSavedScale} onChange={setTimeSavedScale} />
-              </div>
-
-              <div>
-                <p className="mb-2 text-sm font-medium text-foreground">가장 도움이 되었던 기능은 무엇인가요?</p>
-                <div className="flex flex-wrap gap-2">
-                  {HELPFUL_FEATURE_OPTIONS.map((o) => (
-                    <button
-                      key={o.value}
-                      type="button"
-                      onClick={() => toggleHelpfulFeature(o.value)}
-                      className={toggleBtnCls(helpfulFeatures.includes(o.value))}
-                    >
-                      {o.label}
-                    </button>
-                  ))}
-                </div>
-                {helpfulFeatures.includes("other") && (
-                  <input
-                    type="text"
-                    value={helpfulFeaturesOther}
-                    onChange={(e) => setHelpfulFeaturesOther(e.target.value)}
-                    placeholder="어떤 기능이었나요?"
-                    className="mt-2 w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground placeholder:text-placeholder-foreground"
-                  />
-                )}
-              </div>
-
-              <div>
-                <p className="mb-2 text-sm font-medium text-foreground">사용하면서 가장 불편했던 점은 무엇이었나요?</p>
-                <textarea
-                  value={biggestInconvenience}
-                  onChange={(e) => setBiggestInconvenience(e.target.value)}
-                  rows={3}
-                  placeholder="선택 입력"
-                  className="w-full resize-none rounded-lg border border-border bg-background p-2.5 text-sm text-foreground placeholder:text-placeholder-foreground"
+                <QuestionHeader title="이번 프로젝트에 A-CUT을 실제 고객에게 사용하셨나요?" />
+                <RadioListField
+                  name="usedWithRealCustomer"
+                  options={USED_WITH_REAL_CUSTOMER_OPTIONS}
+                  value={usedWithRealCustomer}
+                  onChange={setUsedWithRealCustomer}
                 />
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium text-foreground">
-                  다음 프로젝트에서도 A-CUT을 사용할 계획이 있으신가요?
-                </p>
-                <FivePointRow labels={INTENT_LABELS} value={willUseNextProject} onChange={setWillUseNextProject} />
+                <QuestionHeader title="기존 방식보다 작업 시간이 얼마나 줄었다고 느끼셨나요?" />
+                <PointScaleField
+                  name="timeSavedScale"
+                  labels={TIME_SAVED_LABELS}
+                  value={timeSavedScale}
+                  onChange={setTimeSavedScale}
+                />
+              </div>
+
+              <div>
+                <QuestionHeader title="가장 도움이 되었던 기능은 무엇인가요?" />
+                <ChipMultiSelectField
+                  options={HELPFUL_FEATURE_OPTIONS}
+                  values={helpfulFeatures}
+                  onChange={setHelpfulFeatures}
+                  otherOptionValue="other"
+                  otherValue={helpfulFeaturesOther}
+                  onOtherChange={setHelpfulFeaturesOther}
+                  otherPlaceholder="어떤 기능이었나요?"
+                />
+              </div>
+
+              <div>
+                <QuestionHeader title="사용하면서 가장 불편했던 점은 무엇이었나요?" />
+                <Textarea
+                  value={biggestInconvenience}
+                  onChange={(e) => setBiggestInconvenience(e.target.value)}
+                  rows={3}
+                  placeholder="선택 입력"
+                  className="min-h-0 resize-none [word-break:keep-all]"
+                />
+              </div>
+
+              <div>
+                <QuestionHeader title="다음 프로젝트에서도 A-CUT을 사용할 계획이 있으신가요?" />
+                <PointScaleField
+                  name="willUseNextProject"
+                  labels={INTENT_LABELS}
+                  value={willUseNextProject}
+                  onChange={setWillUseNextProject}
+                />
               </div>
             </>
           )}
@@ -485,22 +439,27 @@ export function BetaSurveyModal({
           {surveyType === "second_delivery" && (
             <>
               <div>
-                <p className="mb-2 text-sm font-medium text-foreground">
-                  앞으로도 A-CUT을 계속 사용할 의향이 있으신가요?
-                </p>
-                <FivePointRow labels={INTENT_LABELS} value={continueUsingIntent} onChange={setContinueUsingIntent} />
+                <QuestionHeader title="앞으로도 A-CUT을 계속 사용할 의향이 있으신가요?" />
+                <PointScaleField
+                  name="continueUsingIntent"
+                  labels={INTENT_LABELS}
+                  value={continueUsingIntent}
+                  onChange={setContinueUsingIntent}
+                />
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium text-foreground">
-                  동료 작가에게 추천할 가능성은 얼마나 되나요? (0=전혀 아니다, 10=매우 그렇다)
-                </p>
+                <QuestionHeader
+                  title="동료 작가에게 추천할 가능성은 얼마나 되나요?"
+                  hint="0 = 전혀 아니다, 10 = 매우 그렇다"
+                />
                 <div className="flex flex-wrap gap-1.5">
                   {NPS_SCORES.map((n) => (
                     <button
                       key={n}
                       type="button"
                       onClick={() => setNpsScore(n)}
+                      aria-pressed={npsScore === n}
                       className={npsBtnCls(npsScore === n)}
                     >
                       {n}
@@ -510,35 +469,29 @@ export function BetaSurveyModal({
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium text-foreground">
-                  A-CUT이 없어진다면 얼마나 아쉬울 것 같나요?
-                </p>
-                <FivePointRow labels={PAIN_IF_GONE_LABELS} value={painIfGone} onChange={setPainIfGone} />
+                <QuestionHeader title="A-CUT이 없어진다면 얼마나 아쉬울 것 같나요?" />
+                <PointScaleField
+                  name="painIfGone"
+                  labels={PAIN_IF_GONE_LABELS}
+                  value={painIfGone}
+                  onChange={setPainIfGone}
+                />
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium text-foreground">
-                  정식 출시 시 적정한 월 이용료는 얼마라고 생각하시나요?
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {PRICE_RANGE_OPTIONS.map((o) => (
-                    <button
-                      key={o.value}
-                      type="button"
-                      onClick={() => setPriceRange(o.value)}
-                      className={toggleBtnCls(priceRange === o.value)}
-                    >
-                      {o.label}
-                    </button>
-                  ))}
-                </div>
+                <QuestionHeader title="정식 출시 시 적정한 월 이용료는 얼마라고 생각하시나요?" />
+                <RadioListField
+                  name="priceRange"
+                  options={PRICE_RANGE_OPTIONS}
+                  value={priceRange}
+                  onChange={setPriceRange}
+                />
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium text-foreground">
-                  유료로 출시되어도 계속 사용할 의향이 있으신가요?
-                </p>
-                <FivePointRow
+                <QuestionHeader title="유료로 출시되어도 계속 사용할 의향이 있으신가요?" />
+                <PointScaleField
+                  name="subscribeIntentIfPaid"
                   labels={INTENT_LABELS}
                   value={subscribeIntentIfPaid}
                   onChange={setSubscribeIntentIfPaid}
@@ -546,35 +499,35 @@ export function BetaSurveyModal({
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium text-foreground">가장 추가되었으면 하는 기능이 있다면?</p>
-                <textarea
+                <QuestionHeader title="가장 추가되었으면 하는 기능이 있다면?" />
+                <Textarea
                   value={desiredFeature}
                   onChange={(e) => setDesiredFeature(e.target.value)}
                   rows={2}
                   placeholder="선택 입력"
-                  className="w-full resize-none rounded-lg border border-border bg-background p-2.5 text-sm text-foreground placeholder:text-placeholder-foreground"
+                  className="min-h-0 resize-none [word-break:keep-all]"
                 />
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium text-foreground">기타 의견</p>
-                <textarea
+                <QuestionHeader title="기타 의견" />
+                <Textarea
                   value={otherFeedback}
                   onChange={(e) => setOtherFeedback(e.target.value)}
                   rows={2}
                   placeholder="선택 입력"
-                  className="w-full resize-none rounded-lg border border-border bg-background p-2.5 text-sm text-foreground placeholder:text-placeholder-foreground"
+                  className="min-h-0 resize-none [word-break:keep-all]"
                 />
               </div>
 
-              <label className="flex items-start gap-2 text-sm text-foreground">
+              <label className="flex items-start gap-2.5 rounded-lg border border-border px-3.5 py-3 text-sm text-foreground has-[:checked]:border-accent has-[:checked]:bg-accent/10 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={wantsLaunchNotice}
                   onChange={(e) => setWantsLaunchNotice(e.target.checked)}
-                  className="mt-0.5"
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]"
                 />
-                정식 출시 시 먼저 안내받고 싶으신가요?
+                <span className="[word-break:keep-all] leading-relaxed">정식 출시 시 먼저 안내받고 싶으신가요?</span>
               </label>
             </>
           )}
