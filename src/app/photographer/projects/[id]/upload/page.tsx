@@ -1644,6 +1644,9 @@ export default function ProjectDetailPage() {
       const totalFail = allFailed.length + backendRejected.length;
       setToast(totalFail === 0 ? "업로드 완료!" : `${totalFail}개 파일 처리 실패`);
       await loadProject();
+      // 새로 업로드된 사진이 clipPending 캐시에 반영되지 않으면 이미 분석된 것으로
+      // 오인해 재분석 버튼이 조용히 무시된다 — 업로드 완료 시마다 상태를 다시 읽는다.
+      loadClipAnalysisStatus();
       let freshPhotos: Photo[] = [];
       try { freshPhotos = await getPhotosByProjectId(id); } catch {}
       // blob URL 먼저 해제
@@ -1663,7 +1666,7 @@ export default function ProjectDetailPage() {
       });
       router.refresh();
     }, 600);
-  }, [id, loadProject, loadPhotos, router, project?.includeOriginal]);
+  }, [id, loadProject, loadPhotos, router, project?.includeOriginal, loadClipAnalysisStatus]);
 
   // 페이지 로드 시 awaiting_upload 상태 job 확인 → 복구 배너 (project가 로드된 후 1회)
   useEffect(() => {
@@ -1859,6 +1862,8 @@ export default function ProjectDetailPage() {
       }
 
       setToast("삭제되었습니다.");
+      // 삭제로 사진 집합이 바뀌면 이전에 캐시된 clipPending(분석 완료 판정)이 stale해진다.
+      loadClipAnalysisStatus();
     } catch (e) { setToast(e instanceof Error ? e.message : "삭제 실패"); }
     finally { setDeletingId(null); }
   };
@@ -1883,6 +1888,9 @@ export default function ProjectDetailPage() {
         setUploadProgress(0);
         setAwaitingServerFinalize(false);
         setToast("전체 삭제됨");
+        // 전체 삭제 후 clipPending이 이전(분석 완료) 값 그대로 남아있으면 신규 업로드 후에도
+        // "이미 최신 분석 결과입니다"로 오판해 재분석 API 호출을 건너뛴다.
+        loadClipAnalysisStatus();
       } else {
         const d = await res.json().catch(() => ({}));
         setToast((d as { error?: string }).error ?? "삭제 실패");

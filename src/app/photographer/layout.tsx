@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { PhotographerDesktopShell } from "@/components/layout/PhotographerDesktopShell";
 import { ProfileProvider } from "@/contexts/ProfileContext";
 import { PhotographerModalProvider } from "@/contexts/PhotographerModalContext";
+import { BetaSurveyGate } from "@/components/photographer/BetaSurveyGate";
 import "./photographer.css";
 
 const inter = Inter({
@@ -41,6 +42,7 @@ export default function PhotographerLayout({
             <div className="absolute right-[-15%] top-[35%] h-64 w-64 rounded-full bg-violet-500/10 blur-[90px]" />
           </div>
           <PhotographerDesktopShell>{children}</PhotographerDesktopShell>
+          <BetaSurveyGate />
         </div>
       </PhotographerModalProvider>
     </ProfileProvider>

@@ -9,7 +9,6 @@ import {
   Plus, AlertCircle, ChevronRight, Clock, Activity, Layers, Zap, CheckCircle2,
 } from "lucide-react";
 import {
-  DEFAULT_BETA_MAX_PROJECTS_TOTAL,
   DEFAULT_GENERAL_MAX_PROJECTS,
   DEFAULT_GENERAL_MAX_PHOTOS_PER_PROJECT,
 } from "@/lib/beta-limits";
@@ -18,12 +17,11 @@ import type { Project, ProjectStatus } from "@/types";
 import type { ProjectLogItem } from "@/lib/db";
 import { useProfile } from "@/contexts/ProfileContext";
 import EmptyDashboard from "./EmptyDashboard";
-import { BetaSurveyModal } from "@/components/photographer/BetaSurveyModal";
-import type { SurveyType } from "@/lib/beta-survey";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { ProjectPipelineMiniBar, getPipelineStepLabel } from "@/components/photographer/ProjectPipelineMiniBar";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { getActiveDeadline } from "@/lib/project-deadline";
+import { BetaApprovalBanner, type BetaApplicationStatus } from "@/components/photographer/BetaApprovalBanner";
 import { consumePostLoginRedirect, peekPostLoginRedirect } from "@/lib/post-login-redirect";
 
 const ACCENT = "var(--accent)";
@@ -202,11 +200,10 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [logs, setLogs]         = useState<ProjectLogItem[]>([]);
   const [dashFilter, setDashFilter] = useState<"all" | "active" | "completed">("all");
-  const [betaMaxProjectsTotal, setBetaMaxProjectsTotal] = useState(DEFAULT_BETA_MAX_PROJECTS_TOTAL);
   const [tier, setTier] = useState<"admin" | "beta" | "general" | null>(null);
   const [maxProjects, setMaxProjects] = useState(DEFAULT_GENERAL_MAX_PROJECTS);
   const [maxPhotosPerProject, setMaxPhotosPerProject] = useState(DEFAULT_GENERAL_MAX_PHOTOS_PER_PROJECT);
-  const [surveyToShow, setSurveyToShow] = useState<SurveyType | null>(null);
+  const [betaApplicationStatus, setBetaApplicationStatus] = useState<BetaApplicationStatus>(null);
   // 첫 렌더에서(이펙트를 기다리지 않고) 곧바로 읽는다 — 그래야 대시보드 실제 콘텐츠가 한 프레임도
   // 그려지지 않고 바로 로딩 화면으로 대체된다. 실제 소비(제거)는 아래 이펙트가 담당.
   const [pendingRedirect] = useState(() =>
@@ -255,30 +252,10 @@ export default function DashboardPage() {
         if (data?.tier) setTier(data.tier);
         if (data?.max) setMaxProjects(data.max);
         if (data?.maxPhotosPerProject) setMaxPhotosPerProject(data.maxPhotosPerProject);
+        if (data?.betaApplicationStatus !== undefined) setBetaApplicationStatus(data.betaApplicationStatus);
       })
       .catch(() => {});
   }, []);
-
-  useEffect(() => {
-    fetch("/api/limits")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.betaMaxProjectsTotal) setBetaMaxProjectsTotal(data.betaMaxProjectsTotal);
-      })
-      .catch(() => {});
-  }, []);
-
-  // 베타 설문(plan/beta-system.md §7) — 프로젝트가 하나도 없는 빈 대시보드 상태에서는
-  // 트리거 조건(첫 생성 프로젝트 delivered)이 구조적으로 성립할 수 없으므로 로드 완료 후에만 확인
-  useEffect(() => {
-    if (loading || projects.length === 0) return;
-    fetch("/api/photographer/beta-survey/status")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.surveyType) setSurveyToShow(data.surveyType);
-      })
-      .catch(() => {});
-  }, [loading, projects.length]);
 
   if (pendingRedirect || profileLoading || loading) {
     return <PageLoader variant="full" />;
@@ -334,8 +311,8 @@ export default function DashboardPage() {
     completed: projects.filter((p) => p.status === "delivered").length,
   };
 
-  const betaCount = projects.length;
-  const betaPct   = Math.min(100, Math.round((betaCount / betaMaxProjectsTotal) * 100));
+  const usageCount = projects.length;
+  const usagePct   = Math.min(100, Math.round((usageCount / maxProjects) * 100));
 
   return (
     <div className="min-h-screen bg-background text-foreground" style={{ fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif" }}>
@@ -348,6 +325,13 @@ export default function DashboardPage() {
 
         {/* ── 메인 좌측 ── */}
         <div className="flex-1 min-w-0 flex flex-col gap-6">
+
+          <BetaApprovalBanner
+            tier={tier}
+            betaApplicationStatus={betaApplicationStatus}
+            maxProjects={maxProjects}
+            maxPhotosPerProject={maxPhotosPerProject}
+          />
 
           {/* 1. 프로젝트 요약 카드 */}
           <div className="grid grid-cols-3 gap-4 items-stretch">
@@ -437,30 +421,30 @@ export default function DashboardPage() {
               <div className="flex justify-between items-end">
                 <span className="text-sm font-semibold text-foreground">프로젝트</span>
                 <div className="text-sm font-mono">
-                  <span className="text-foreground font-bold">{betaCount}</span>
-                  <span className="text-disabled-foreground"> / {betaMaxProjectsTotal}</span>
+                  <span className="text-foreground font-bold">{usageCount}</span>
+                  <span className="text-disabled-foreground"> / {maxProjects}</span>
                 </div>
               </div>
               <div className="w-full h-1.5 bg-border-subtle rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
                   style={{
-                    width: `${betaPct}%`,
-                    background: betaPct >= 100 ? RED : betaPct >= 80 ? ACCENT : "var(--foreground)",
+                    width: `${usagePct}%`,
+                    background: usagePct >= 100 ? RED : usagePct >= 80 ? ACCENT : "var(--foreground)",
                   }}
                 />
               </div>
             </div>
 
-            {betaCount >= betaMaxProjectsTotal ? (
+            {usageCount >= maxProjects ? (
               <div className="flex items-start gap-2 bg-red-500/5 border border-red-500/20 rounded-xl p-3">
                 <AlertCircle size={13} color={RED} className="shrink-0 mt-0.5" />
                 <div>
                   <div className="text-[10px] text-red-400 font-bold uppercase tracking-wide mb-1">한도 초과</div>
-                  <div className="text-xs text-subtle-foreground leading-relaxed">베타 프로젝트 한도에 도달했습니다.</div>
+                  <div className="text-xs text-subtle-foreground leading-relaxed">프로젝트 한도에 도달했습니다.</div>
                 </div>
               </div>
-            ) : betaCount >= betaMaxProjectsTotal - 2 ? (
+            ) : usageCount >= maxProjects - 2 ? (
               <div className="bg-border-subtle rounded-xl p-3">
                 <div className="text-[10px] text-subtle-foreground font-bold uppercase tracking-wide mb-1">한도 근접</div>
                 <div className="text-xs text-disabled-foreground leading-relaxed">프로젝트 생성 한도에 근접했습니다.</div>
@@ -543,10 +527,6 @@ export default function DashboardPage() {
       >
         <Plus size={24} strokeWidth={2} />
       </button>
-
-      {surveyToShow && (
-        <BetaSurveyModal surveyType={surveyToShow} onDone={() => setSurveyToShow(null)} />
-      )}
     </div>
   );
 }

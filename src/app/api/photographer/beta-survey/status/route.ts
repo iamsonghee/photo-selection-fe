@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { IMPLEMENTED_SURVEY_TYPES, type SurveyType } from "@/lib/beta-survey";
+import { getEffectiveTier } from "@/lib/beta-policy";
 
-async function getPhotographerIdFromSession(): Promise<string | null> {
+/** 베타 설문은 tier==='beta'인 사용자에게만 노출한다(general/admin 제외). */
+async function getBetaPhotographerId(): Promise<string | null> {
   const supabase = await createClient();
   const {
     data: { session },
@@ -11,11 +13,17 @@ async function getPhotographerIdFromSession(): Promise<string | null> {
   if (!session?.user?.id) return null;
   const { data } = await supabase
     .from("photographers")
-    .select("id")
+    .select("id, email, beta_status, beta_end_date")
     .eq("auth_id", session.user.id)
     .limit(1)
     .single();
-  return data?.id ?? null;
+  if (!data) return null;
+  const tier = getEffectiveTier({
+    email: data.email,
+    betaStatus: data.beta_status,
+    betaEndDate: data.beta_end_date,
+  });
+  return tier === "beta" ? data.id : null;
 }
 
 /** 첫 프로젝트 id 조회(마이크로 설문 3종의 공통 컨텍스트) */
@@ -102,12 +110,17 @@ async function isSecondDeliveryTriggered(photographerId: string): Promise<boolea
   return data?.[0]?.status === "delivered";
 }
 
+/** 납품 완료 후에는 오래된 미시 설문(생성/업로드/셀렉회신)을 더 이상 묻지 않는다 — 이미 다 끝난
+ *  프로젝트의 초반 단계를 뒤늦게 물으면 맥락 없이 느껴진다는 문제(운영 QA 발견)를 막기 위함.
+ *  first_delivery가 트리거된 시점에 아직 미응답인 미시 설문 3종을 영구 스킵 처리한다. */
+const STALE_ON_DELIVERY: SurveyType[] = ["project_created", "original_uploaded", "selection_received"];
+
 /** GET: 대시보드 진입 시 지금 노출해야 할 설문이 있는지 확인(§7.2) */
 export async function GET() {
   try {
-    const photographerId = await getPhotographerIdFromSession();
+    const photographerId = await getBetaPhotographerId();
     if (!photographerId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ surveyType: null });
     }
 
     const admin = getAdminClient();
@@ -126,6 +139,23 @@ export async function GET() {
         })
         .map((r) => r.survey_type)
     );
+
+    if (await isFirstDeliveryTriggered(photographerId)) {
+      const toSkip = STALE_ON_DELIVERY.filter((t) => !suppressed.has(t));
+      if (toSkip.length > 0) {
+        const nowIso = now.toISOString();
+        await admin.from("beta_survey_responses").upsert(
+          toSkip.map((surveyType) => ({
+            photographer_id: photographerId,
+            survey_type: surveyType,
+            skipped_at: nowIso,
+            updated_at: nowIso,
+          })),
+          { onConflict: "photographer_id,survey_type" }
+        );
+        toSkip.forEach((t) => suppressed.add(t));
+      }
+    }
 
     let surveyType: SurveyType | null = null;
     for (const type of IMPLEMENTED_SURVEY_TYPES) {

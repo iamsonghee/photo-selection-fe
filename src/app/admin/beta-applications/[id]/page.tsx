@@ -4,6 +4,16 @@ import { getBetaApplicationForAdmin } from "@/lib/admin-db";
 import { formatAdminDateTime } from "@/lib/admin-format";
 import { formatPhone } from "@/lib/phone";
 import { AdminBetaApplicationControl } from "@/components/admin/AdminBetaApplicationControl";
+import {
+  genreLabel,
+  monthlyProjectLabel,
+  avgPhotosLabel,
+  workflowLabel,
+  desiredFeatureLabel,
+  painPointLabel,
+  usageIntentLabel,
+  contactChannelLabel,
+} from "@/lib/beta-application";
 
 export default async function AdminBetaApplicationDetailPage({
   params,
@@ -64,9 +74,80 @@ export default async function AdminBetaApplicationDetailPage({
           <dd className="mt-1 whitespace-pre-wrap text-sm text-foreground">{application.currentWorkflow}</dd>
         </div>
         <div className="mt-4">
-          <dt className="text-xs uppercase tracking-wide text-muted-foreground">사용 희망 이유</dt>
-          <dd className="mt-1 whitespace-pre-wrap text-sm text-foreground">{application.reason}</dd>
+          <dt className="text-xs uppercase tracking-wide text-muted-foreground">A-CUT에 기대하는 점</dt>
+          <dd className="mt-1 whitespace-pre-wrap text-sm text-foreground">{application.reason ?? "(입력 안 함)"}</dd>
         </div>
+      </div>
+
+      <h3 className="mt-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        선택형 응답
+      </h3>
+      <div className="mt-3 rounded-xl border border-border bg-surface p-5">
+        {application.additionalAnswers ? (
+          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">주 촬영 분야</dt>
+              <dd className="mt-1 text-sm text-foreground">
+                {application.additionalAnswers.genres.map(genreLabel).join(", ")}
+                {application.additionalAnswers.genre_other && ` (기타: ${application.additionalAnswers.genre_other})`}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">현재 고객 셀렉 방식</dt>
+              <dd className="mt-1 text-sm text-foreground">
+                {application.additionalAnswers.workflow_methods.map(workflowLabel).join(", ")}
+                {application.additionalAnswers.workflow_other &&
+                  ` (기타: ${application.additionalAnswers.workflow_other})`}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">월평균 프로젝트 수</dt>
+              <dd className="mt-1 text-sm text-foreground">
+                {monthlyProjectLabel(application.additionalAnswers.monthly_project_range)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">프로젝트당 평균 사진 수</dt>
+              <dd className="mt-1 text-sm text-foreground">
+                {avgPhotosLabel(application.additionalAnswers.avg_photos_range)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">베타에서 사용해보고 싶은 기능</dt>
+              <dd className="mt-1 text-sm text-foreground">
+                {application.additionalAnswers.desired_features.map(desiredFeatureLabel).join(", ")}
+                {application.additionalAnswers.desired_features_other &&
+                  ` (기타: ${application.additionalAnswers.desired_features_other})`}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">가장 불편한 단계</dt>
+              <dd className="mt-1 text-sm text-foreground">
+                {application.additionalAnswers.pain_point
+                  ? painPointLabel(application.additionalAnswers.pain_point)
+                  : "(선택 안 함)"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">월 사용 의향</dt>
+              <dd className="mt-1 text-sm text-foreground">
+                {application.additionalAnswers.usage_intent
+                  ? usageIntentLabel(application.additionalAnswers.usage_intent)
+                  : "(선택 안 함)"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">연락 가능 채널</dt>
+              <dd className="mt-1 text-sm text-foreground">
+                {application.additionalAnswers.contact_channels?.length
+                  ? application.additionalAnswers.contact_channels.map(contactChannelLabel).join(", ")
+                  : "(선택 안 함)"}
+              </dd>
+            </div>
+          </dl>
+        ) : (
+          <p className="text-sm text-muted-foreground">미입력(구버전 신청)</p>
+        )}
       </div>
 
       {application.matchedPhotographerId && (
