@@ -35,7 +35,8 @@ async function assertProjectOwnership(
 
 /**
  * POST /api/photographer/projects/[id]/retouch-match
- * exact/fuzzy 매칭에 실패한 보정본을 CLIP 유사도로 매칭 — clip-service에 multipart proxy.
+ * exact/fuzzy 매칭에 실패한 보정본을 Gemini 임베딩 유사도로 매칭(2026-07-30부터
+ * OpenCLIP 대체) — clip-service(서비스명 자체는 유지)에 multipart proxy.
  */
 export async function POST(
   req: NextRequest,

@@ -1,4 +1,4 @@
-export type MappingType = "exact" | "fuzzy" | "clip" | "clip_low" | "order" | "none" | "server";
+export type MappingType = "exact" | "fuzzy" | "gemini" | "gemini_low" | "order" | "none" | "server";
 
 export type MappingTarget = {
   id: string;
@@ -10,7 +10,7 @@ export type MappingResult<T extends MappingTarget> = {
   file: File | null;
   type: MappingType;
   orderIndex?: number;
-  /** CLIP 유사도 매칭 결과 (0~1). type이 "clip" | "clip_low"일 때만 설정됨 */
+  /** Gemini 임베딩 유사도 매칭 결과 (0~1). type이 "gemini" | "gemini_low"일 때만 설정됨 */
   similarity?: number;
 };
 
@@ -72,8 +72,8 @@ export function buildVersionMapping<T extends MappingTarget>(
       return { target, file, type: "fuzzy" };
     }
 
-    // 3단계(CLIP 유사도 매칭)는 비동기라 여기선 처리할 수 없음 — 호출부에서
-    // type "none"인 행과 미점유 파일을 모아 matchRetouchByClip으로 넘긴다.
+    // 3단계(Gemini 임베딩 유사도 매칭)는 비동기라 여기선 처리할 수 없음 — 호출부에서
+    // type "none"인 행과 미점유 파일을 모아 matchRetouchByGemini로 넘긴다.
     return { target, file: null, type: "none" };
   });
 }
@@ -101,7 +101,7 @@ export function buildServerPlaceholderMapping<T extends MappingTarget & { server
 }
 
 /**
- * exact/fuzzy/CLIP 매칭에도 실패한 잔여 항목("none")을 잔여 파일과 순서대로 짝짓는
+ * exact/fuzzy/Gemini 매칭에도 실패한 잔여 항목("none")을 잔여 파일과 순서대로 짝짓는
  * 최후 폴백. 매칭 근거가 없으므로 반드시 "order" 타입(순서 배지)으로 표시해
  * 작가가 확인 후 필요 시 "변경"으로 재지정할 수 있게 한다.
  */
