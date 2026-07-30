@@ -297,7 +297,7 @@ export default function ViewerPage() {
       const res = await fetch("/api/c/confirm", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ token, project_id: project.id }),
+        body:    JSON.stringify({ token, project_id: project.id, selected_photo_ids: [...selectedIds] }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -312,7 +312,7 @@ export default function ViewerPage() {
       setConfirming(false);
       setConfirmError("네트워크 오류가 발생했습니다");
     }
-  }, [project?.id, token]);
+  }, [project?.id, token, selectedIds]);
 
   const filmstripRef     = useRef<HTMLDivElement>(null);
   const filmstripSeenRef = useRef(false); // 마운트 후 첫 실행 여부 추적
