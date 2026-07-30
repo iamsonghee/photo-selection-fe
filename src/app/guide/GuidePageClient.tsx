@@ -137,7 +137,7 @@ function Divider() {
 
 // ── Tab content ───────────────────────────────────────────────────────────────
 
-function PhotographerContent() {
+function PhotographerContent({ betaMaxProjectsTotal }: { betaMaxProjectsTotal: number }) {
   return (
     <>
       {/* Index */}
@@ -219,7 +219,7 @@ function PhotographerContent() {
           <ul style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: 6 }}>
             <li>셀렉 기한은 프로젝트 생성 후에도 수정할 수 있어요.</li>
             <li>PIN을 설정했다면 링크와 비밀번호를 <strong style={{ color: "var(--foreground)" }}>함께</strong> 고객에게 전달해야 합니다.</li>
-            <li>베타 기간 중 프로젝트는 최대 <strong style={{ color: "var(--foreground)" }}>10개</strong>까지 생성 가능합니다.</li>
+            <li>베타 기간 중 프로젝트는 최대 <strong style={{ color: "var(--foreground)" }}>{betaMaxProjectsTotal}개</strong>까지 생성 가능합니다.</li>
           </ul>
         </TipBox>
       </section>
@@ -318,7 +318,12 @@ function PhotographerContent() {
       <Divider />
 
       {/* Photographer FAQ */}
-      <FaqSection items={PHOTOGRAPHER_FAQ} />
+      <FaqSection
+        items={PHOTOGRAPHER_FAQ.map((item) => ({
+          ...item,
+          a: item.a.replace("{{betaMax}}", String(betaMaxProjectsTotal)),
+        }))}
+      />
     </>
   );
 }
@@ -443,7 +448,7 @@ const PHOTOGRAPHER_FAQ = [
   },
   {
     q: "프로젝트를 몇 개까지 만들 수 있나요?",
-    a: "베타 기간 중에는 최대 10개까지 가능합니다. 한도에 가까워지면 대시보드 우측 사용량 패널에 알림이 표시됩니다.",
+    a: "베타 기간 중에는 최대 {{betaMax}}개까지 가능합니다. 한도에 가까워지면 대시보드 우측 사용량 패널에 알림이 표시됩니다.",
   },
   {
     q: "어떤 사진 파일 형식을 올릴 수 있나요?",
@@ -517,7 +522,7 @@ function FaqSection({ items }: { items: { q: string; a: string }[] }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function GuidePageClient() {
+export default function GuidePageClient({ betaMaxProjectsTotal }: { betaMaxProjectsTotal: number }) {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -605,7 +610,9 @@ export default function GuidePageClient() {
 
       {/* Main content */}
       <main style={{ maxWidth: 760, margin: "0 auto", padding: "0 24px" }}>
-        {activeTab === "photographer" ? <PhotographerContent /> : <ClientContent />}
+        {activeTab === "photographer"
+          ? <PhotographerContent betaMaxProjectsTotal={betaMaxProjectsTotal} />
+          : <ClientContent />}
 
         {/* Bottom CTA */}
         <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 64, paddingBottom: 100, textAlign: "center" }}>
