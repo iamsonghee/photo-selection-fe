@@ -431,7 +431,7 @@ const isValid =
                   <span className="text-[10px] text-disabled-foreground">알림 기능 연동 시 사용됩니다</span>
                 </Field>
                 <div id="field-requiredCount">
-                  <Field label="셀렉 갯수 (N)" required>
+                  <Field label="셀렉 갯수" required>
                     <div className="flex items-center gap-2">
                       <input
                         className="np-input text-right flex-1"
@@ -445,7 +445,6 @@ const isValid =
                           setRequiredCount(v);
                           setFieldErrors((p) => ({ ...p, requiredCount: "" }));
                         }}
-                        placeholder="5"
                         style={{ borderColor: fieldErrors.requiredCount ? "rgba(239,68,68,0.7)" : requiredCount ? "rgba(var(--accent-rgb),0.3)" : undefined }}
                       />
                       <span className="text-sm text-subtle-foreground shrink-0">장</span>
