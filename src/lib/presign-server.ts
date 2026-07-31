@@ -14,9 +14,12 @@ export type PresignResult = {
 
 /**
  * FastAPI /api/storage/presign 를 호출해 R2 key → presigned URL 배치 변환.
- * keys는 최대 200개.
+ * keys는 최대 200개. dispositions를 넘기면 해당 key의 다운로드 파일명(Content-Disposition)을 지정한다.
  */
-export async function callPresignApi(keys: string[]): Promise<PresignResult> {
+export async function callPresignApi(
+  keys: string[],
+  dispositions?: Record<string, string>
+): Promise<PresignResult> {
   if (!INTERNAL_PRESIGN_SECRET) {
     throw new Error("INTERNAL_PRESIGN_SECRET is not set");
   }
@@ -30,7 +33,7 @@ export async function callPresignApi(keys: string[]): Promise<PresignResult> {
       "Content-Type": "application/json",
       Authorization: `Bearer ${INTERNAL_PRESIGN_SECRET}`,
     },
-    body: JSON.stringify({ keys }),
+    body: JSON.stringify({ keys, dispositions }),
   });
 
   if (!res.ok) {

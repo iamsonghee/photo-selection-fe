@@ -43,6 +43,11 @@ export function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row
       (row as { clip_analysis_status?: "processing" | "completed" | "failed" | null })
         .clip_analysis_status ?? null,
     includeOriginal: (row as any).include_original ?? false,
+    originalArchiveStatus:
+      (row as { original_archive_status?: "pending" | "processing" | "ready" | "failed" | null })
+        .original_archive_status ?? null,
+    originalDownloadStartedAt:
+      (row as { original_download_started_at?: string | null }).original_download_started_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

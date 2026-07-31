@@ -67,7 +67,7 @@ export async function DELETE(
     const projectId = (photo as { project_id: string }).project_id;
     const { data: project, error: projErr } = await admin
       .from("projects")
-      .select("id, photographer_id, status")
+      .select("id, photographer_id, status, original_archive_status")
       .eq("id", projectId)
       .single();
     if (projErr || !project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
@@ -76,6 +76,21 @@ export async function DELETE(
     }
     if ((project as { status: string }).status !== "preparing") {
       return NextResponse.json({ error: "preparing 상태에서만 삭제할 수 있습니다." }, { status: 403 });
+    }
+    // 납품용 원본 아카이브가 생성 대상으로 확정된(enqueue 이후) 프로젝트에서는, 원본이 있는
+    // 사진을 삭제하면 이미 만들어졌거나 만들어지는 중인 ZIP과 실제 사진 구성이 어긋나므로 금지한다.
+    if ((project as { original_archive_status: string | null }).original_archive_status) {
+      const { data: photoStatus } = await admin
+        .from("photos")
+        .select("original_status")
+        .eq("id", photoId)
+        .single();
+      if ((photoStatus as { original_status: string | null } | null)?.original_status) {
+        return NextResponse.json(
+          { error: "납품용 원본 정리가 시작된 이후에는 원본이 포함된 사진을 삭제할 수 없습니다." },
+          { status: 403 }
+        );
+      }
     }
 
     const key = urlToR2Key((photo as { r2_thumb_url: string }).r2_thumb_url);

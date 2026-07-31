@@ -337,26 +337,28 @@
 
 ---
 
-## 8. 납품 파일 업로드
+## 8. 납품용 원본 업로드 및 고객 다운로드
 
-- **시작 조건**: `status === "delivered"` — 고객이 보정본을 최종 승인해 프로젝트가 완료된 상태.
-- **사용자가 수행하는 단계**: `/workflow` 하단 "납품 파일 업로드" 버튼 클릭 → `DeliveryUploadPanel` 슬라이드오버 열림 → 파일 드래그앤드롭 또는 클릭 선택(JPEG/PNG/WebP/HEIC) → "납품 파일 업로드 (N장)" 클릭 → 진행률 확인 → 완료 리포트 확인.
-- **프론트엔드 라우트**: `/photographer/projects/[id]/workflow` (`WorkflowPageClient.tsx` + `DeliveryUploadPanel.tsx`).
-- **호출되는 API**: `POST {API_URL}/api/upload/originals`(FastAPI 직접, Bearer JWT) — 파일 크기에 따라 동적 배치(≤5MB→6장, 5–15MB→3장, >15MB→2장). 응답: `{ uploaded, compressed, rejected: [{filename, reason}] }`.
-- **성공 시 기대 결과**:
-  - R2에 `originals/{project_id}/{uuid}_{safe_filename}.jpg`로 저장.
-  - `delivery_files` 테이블에 INSERT(원본 파일명, 저장 파일명, 크기, 압축 여부 기록).
-  - 완료 패널에 3분류 리포트 표시: "업로드 완료 N장 / 자동 최적화 N장 / 실패 N장".
-- **자동 압축 동작**:
-  - PNG/HEIC/WebP는 JPEG으로 자동 변환(포맷 변환만이면 `compressed=false`).
-  - 20MB 초과 시 1단계: 품질 하향(90%→85%→80%→75%, 해상도 유지) → 2단계: 품질 85% 고정 + 최장변 점진 축소(6000→5000→4000→3200px). 3200px/85%에서도 20MB 초과 시 거부(`compressed=true`인 경우 `original_file_size`에 압축 전 크기 기록).
-- **실패 및 경계 상황**:
-  - `status !== "delivered"` 프로젝트로 요청 시 FastAPI가 403 반환.
-  - RAW 파일 등 지원하지 않는 포맷은 클라이언트 측 필터링 후 rejected 처리.
-  - 3200px/85%에서도 20MB 초과 → "파일이 20MB 상한을 초과하여 자동 압축 후에도 저장할 수 없습니다" 메시지와 함께 거부, 나머지 파일은 정상 처리.
-  - 고객 다운로드 UI는 미구현(베타 이후 예정).
-- **관련 권한/인증 조건**: 로그인 세션(Supabase JWT), FastAPI가 `photographer_id`로 프로젝트 소유권 + `delivered` 상태 재검증.
-- **QA에서 확인해야 할 항목**: 20MB 근접 파일 업로드 시 자동 압축 발생 여부 및 완료 리포트 정확성, PNG 파일 업로드 시 JPEG 변환 후 저장 여부(DB `mime_type = "image/jpeg"`), 동시 배치 중 일부 실패 시 성공한 파일은 정상 저장되는지, `delivered` 외 상태 프로젝트에서 패널 접근이 불가한지(버튼 자체가 `delivered`에서만 표시됨).
+> **정정(2026-07-31)**: 이 섹션은 과거 `delivered` 상태 이후 별도로 원본을 업로드하던 `delivery_files`/`DeliveryUploadPanel` 방식을 기술하고 있었으나, 그 방식은 2026-07-23에 완전히 제거되었다(`DROP TABLE delivery_files`, 관련 컴포넌트/엔드포인트 삭제). 아래는 현재 코드 기준 실제 흐름이다.
+
+### 8.1 원본 업로드 (작가)
+
+- **시작 조건**: 프로젝트 생성 시 "원본 포함" 옵션(`include_original=true`)을 선택 — `preparing` 상태이고 아직 사진을 한 장도 올리지 않은 경우에만 이후에 옵션을 바꿀 수 있다.
+- **사용자가 수행하는 단계**: `/photographer/projects/[id]/upload`에서 셀렉용 이미지와 원본을 함께 업로드(같은 파일 선택 동작 — 별도의 "납품 파일 업로드" 화면은 없음).
+- **호출되는 API**: `POST /api/upload/photos`(FastAPI, `include_original=true`) — 썸네일/프리뷰는 즉시 R2 업로드, 원본은 브라우저가 presigned PUT으로 R2에 직접 올린 뒤 `POST /api/upload/originals/confirm`으로 확인. 압축은 `original_jobs` 비동기 큐(`original_compress_worker`)가 처리(20MB 목표, Pillow 단계적 품질/해상도 하향). 완료 시 `photos.r2_original_url`/`original_status='completed'`/`original_compressed_size`(2026-07-31 추가, 압축 후 실제 바이트 크기) 갱신.
+- **실패 및 경계 상황**: `include_original=true` 재업로드는 프로젝트가 `preparing`을 벗어나면(초대 링크 활성화 이후) FastAPI가 403으로 거부(§8.3 스냅샷 고정 정책).
+
+### 8.2 납품용 원본 다운로드 ZIP 아카이브 (신규, 2026-07-31)
+
+- **시작 조건**: `include_original=true` 프로젝트에서, 원본이 필요한 사진 **전부**가 `original_status='completed'`인 경우(실패한 사진이 하나라도 있으면 생성되지 않음).
+- **흐름**: 원본 전체 완료 → BE가 자동으로 `projects.original_archive_status`를 `NULL→pending`으로 전환(`enqueue_original_archive_build` RPC, 원자적 조건확인+전환) → 백그라운드 워커(`app/archive.py`의 `original_archive_worker`)가 완료된 원본을 용량 기준(기본 500MB, `ARCHIVE_PART_MAX_BYTES`)으로 그룹핑해 `original_archive_parts` 행을 생성하고, 그룹별로 R2에서 원본을 1장씩 받아 로컬 임시 ZIP에 담아(`ZIP_STORED`, 무압축 저장 — JPEG는 재압축 이득이 거의 없음을 실측 확인) R2에 업로드 → 전체 파트 완료 시 `original_archive_status='ready'`.
+- **초대 링크 활성화 조건 추가**: `include_original=true` 프로젝트는 `original_archive_status==='ready'`여야만 `preparing→selecting` 전환(=초대 링크 활성화)이 허용된다(`/api/photographer/projects/[id]/status`). 아카이브가 `pending`/`processing`이면 업로드 화면에 진행 안내, `failed`면 실패 안내 + 재시도 버튼(`retry_archive_build` RPC — 기존 실패 파트만 되돌리며 전체를 다시 만들지 않음)이 표시된다.
+- **다운로드 30일 기한**: 초대 링크가 최초로 활성화된 시각(`projects.original_download_started_at`, 최초 1회만 기록)부터 30일. 링크를 다시 복사/재전달해도 초기화되지 않는다(상태 전이 자체가 1회성이라 자연히 보장). 만료 37일차(30일+7일 유예)에 R2의 ZIP이 자동 삭제된다(원본 파일 자체의 보관 정책은 변경되지 않음).
+- **활성화 후 변경 금지**: 아카이브가 enqueue된 이후에는 원본이 포함된 사진의 추가/삭제가 API 레벨에서 모두 거부된다(고객에게 전달된 ZIP 구성이 항상 스냅샷과 일치하도록 보장).
+- **고객 화면**: `/c/[token]/**`(핀 인증 전/뷰어/온보딩 제외) 전 페이지에 공통 마운트된 접이식 진입점(`OriginalDownloadEntry.tsx`, `CustomerLayoutClient.tsx`에서 1회만 마운트)이 파일 수/총 용량/만료일을 보여주고, 만료 전에만 각 파트의 presigned ZIP URL을 발급한다(`GET /api/c/original-download`). 원본 R2 key/URL은 응답에 절대 노출되지 않으며, presigned URL은 짧은 TTL(1시간)로 매 요청 시 새로 발급된다.
+- **모바일 UX**: 다운로드 액션 클릭 시 "PC + 안정적인 Wi-Fi 권장" 안내를 먼저 보여주고 "그래도 계속"으로 진행 가능(완전 차단은 아님).
+- **기존 프로젝트**: 이 기능 배포 이전에 이미 활성화된 프로젝트는 `original_download_started_at`/`original_archive_status`가 `NULL`로 유지되어 소급 노출되지 않는다(신규 활성화 프로젝트부터만 적용).
+- **최종 보정본과의 관계**: 완전히 별개 — 최종 보정본은 기존대로 `delivered` 상태 이후 작가가 개별적으로 전달한다(이 기능이 다루는 것은 셀렉 이전에 미리 받아둔 "납품용 원본"이며, 보정된 최종본이 아니다).
 
 ---
 
