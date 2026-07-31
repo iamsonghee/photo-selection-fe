@@ -85,7 +85,7 @@ export async function DELETE(
     const admin = getAdminClient();
     const { data: project, error: projErr } = await admin
       .from("projects")
-      .select("id, photographer_id, status")
+      .select("id, photographer_id, status, original_archive_status")
       .eq("id", id)
       .single();
     if (projErr || !project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
@@ -94,6 +94,14 @@ export async function DELETE(
     }
     if ((project as { status: string }).status !== "preparing") {
       return NextResponse.json({ error: "preparing 상태에서만 삭제할 수 있습니다." }, { status: 403 });
+    }
+    // 납품용 원본 아카이브가 enqueue된 이후에는 전체 삭제를 금지 — 이미 만들어졌거나 만들어지는
+    // 중인 ZIP과 실제 사진 구성이 어긋나는 것을 막는다(§2 스냅샷 고정 정책).
+    if ((project as { original_archive_status: string | null }).original_archive_status) {
+      return NextResponse.json(
+        { error: "납품용 원본 정리가 시작된 이후에는 사진을 전체 삭제할 수 없습니다." },
+        { status: 403 }
+      );
     }
 
     // BETA_MAX=3000이므로 3페이지 병렬 — PostgREST 1000행 limit 우회

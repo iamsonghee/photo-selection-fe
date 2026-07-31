@@ -38,12 +38,20 @@ export async function PATCH(
     const admin = getAdminClient();
     const { data: project, error: projErr } = await admin
       .from("projects")
-      .select("id, photographer_id, status, max_revision_count, revision_round")
+      .select("id, photographer_id, status, max_revision_count, revision_round, include_original, original_archive_status, original_download_started_at")
       .eq("id", projectId)
       .single();
 
     if (projErr || !project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
-    const proj = project as { photographer_id: string; status: string; max_revision_count: number; revision_round: number };
+    const proj = project as {
+      photographer_id: string;
+      status: string;
+      max_revision_count: number;
+      revision_round: number;
+      include_original: boolean;
+      original_archive_status: string | null;
+      original_download_started_at: string | null;
+    };
     if (proj.photographer_id !== photographerId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -63,7 +71,29 @@ export async function PATCH(
       );
     }
 
+    // preparing→selecting(초대 링크 활성화)은 include_original=true인 프로젝트에 한해
+    // 납품용 원본 아카이브가 ready 상태여야만 허용 — 원본 미완료/아카이브 생성 중·실패 상태에서
+    // 링크를 활성화하면 30일 다운로드 기산이 원본 없는 채로 시작돼버리는 문제를 막는다.
+    if (proj.status === "preparing" && status === "selecting" && proj.include_original) {
+      if (proj.original_archive_status !== "ready") {
+        return NextResponse.json(
+          {
+            error:
+              proj.original_archive_status === "failed"
+                ? "납품용 원본 처리에 실패한 파일이 있습니다. 재시도 후 다시 시도해주세요."
+                : "납품용 원본을 정리하는 중입니다. 완료 후 다시 시도해주세요.",
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     const updatePayload: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
+
+    // 초대 링크 활성화 시점 = 다운로드 30일 기산 시작 — 최초 1회만 기록(재전달로 초기화 안 됨)
+    if (proj.status === "preparing" && status === "selecting" && !proj.original_download_started_at) {
+      updatePayload.original_download_started_at = new Date().toISOString();
+    }
 
     // editing_v2로 전환 시(고객 재보정 요청 처리 경로가 아닌 작가 업로드→검토 전송)
     // revision_round는 고객 제출 API에서 증가하므로 여기선 건드리지 않음

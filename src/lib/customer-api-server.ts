@@ -7,6 +7,10 @@ import { getAdminClient } from "@/lib/supabase-admin";
 import type { Project, Photo, PhotoGroupInfo, ProjectStatus, ColorTag } from "@/types";
 import type { PhotoState } from "@/contexts/SelectionContext";
 import type { Database } from "@/types/supabase";
+import { callPresignApi } from "@/lib/presign-server";
+import { buildContentDisposition } from "@/lib/content-disposition-server";
+
+const ORIGINAL_DOWNLOAD_WINDOW_DAYS = 30;
 
 type ProjectsRow = Database["public"]["Tables"]["projects"]["Row"];
 type PhotosRow = Database["public"]["Tables"]["photos"]["Row"];
@@ -41,6 +45,11 @@ function mapProjectRow(row: ProjectsRow): Project {
       (row as { clip_analysis_status?: "processing" | "completed" | "failed" | null })
         .clip_analysis_status ?? null,
     includeOriginal: (row as any).include_original ?? false,
+    originalArchiveStatus:
+      (row as { original_archive_status?: "pending" | "processing" | "ready" | "failed" | null })
+        .original_archive_status ?? null,
+    originalDownloadStartedAt:
+      (row as { original_download_started_at?: string | null }).original_download_started_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -403,4 +412,111 @@ export async function getReviewDataByToken(
   photos.sort((a, b) => a.orderIndex - b.orderIndex);
 
   return { project, photos };
+}
+
+// ---------- 납품용 원본 다운로드 (GET /api/c/original-download) ----------
+
+export interface OriginalDownloadFile {
+  partNumber: number;
+  url: string;
+  fileCount: number;
+  byteSize: number;
+}
+
+export interface OriginalDownloadInfo {
+  /** 다운로드 가능(활성 + 미만료) 여부 — false면 배너 자체를 숨긴다 */
+  visible: boolean;
+  available: boolean;
+  expired: boolean;
+  fileCount: number;
+  totalBytes: number;
+  expiresAt: string | null;
+  files: OriginalDownloadFile[];
+}
+
+/**
+ * access_token으로 납품용 원본 다운로드 정보를 조회한다.
+ * include_original=false이거나 아카이브가 아직 준비되지 않았으면 visible=false(배너 미노출).
+ * 30일 만료 후에는 presign 자체를 수행하지 않고 파일 수/총 용량만 반환한다(다운로드 불가 안내용).
+ */
+export async function getOriginalDownloadInfo(
+  admin: SupabaseClient,
+  token: string
+): Promise<OriginalDownloadInfo | null> {
+  const project = await getProjectByToken(admin, token);
+  if (!project) return null;
+
+  if (
+    !project.includeOriginal ||
+    project.originalArchiveStatus !== "ready" ||
+    !project.originalDownloadStartedAt
+  ) {
+    return {
+      visible: false,
+      available: false,
+      expired: false,
+      fileCount: 0,
+      totalBytes: 0,
+      expiresAt: null,
+      files: [],
+    };
+  }
+
+  const startedAt = new Date(project.originalDownloadStartedAt);
+  const expiresAt = new Date(startedAt.getTime() + ORIGINAL_DOWNLOAD_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const expired = Date.now() > expiresAt.getTime();
+
+  const { data: partsRaw, error } = await admin
+    .from("original_archive_parts")
+    .select("part_number, r2_key, file_count, byte_size")
+    .eq("project_id", project.id)
+    .eq("status", "completed")
+    .is("deleted_at", null)
+    .order("part_number", { ascending: true });
+  if (error) throw new Error(error.message);
+
+  type PartRow = { part_number: number; r2_key: string; file_count: number; byte_size: number };
+  const parts = (partsRaw ?? []) as PartRow[];
+  const fileCount = parts.reduce((sum, p) => sum + p.file_count, 0);
+  const totalBytes = parts.reduce((sum, p) => sum + p.byte_size, 0);
+
+  if (expired || parts.length === 0) {
+    return {
+      visible: true,
+      available: false,
+      expired,
+      fileCount,
+      totalBytes,
+      expiresAt: expiresAt.toISOString(),
+      files: [],
+    };
+  }
+
+  const keys = parts.map((p) => p.r2_key);
+  const dispositions: Record<string, string> = {};
+  for (const p of parts) {
+    dispositions[p.r2_key] = buildContentDisposition(
+      `${project.name}_전체원본_${p.part_number}.zip`
+    );
+  }
+  const { urls } = await callPresignApi(keys, dispositions);
+
+  const files: OriginalDownloadFile[] = parts
+    .filter((p) => !!urls[p.r2_key])
+    .map((p) => ({
+      partNumber: p.part_number,
+      url: urls[p.r2_key],
+      fileCount: p.file_count,
+      byteSize: p.byte_size,
+    }));
+
+  return {
+    visible: true,
+    available: files.length > 0,
+    expired: false,
+    fileCount,
+    totalBytes,
+    expiresAt: expiresAt.toISOString(),
+    files,
+  };
 }

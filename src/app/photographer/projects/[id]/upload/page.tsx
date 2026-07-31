@@ -1229,6 +1229,15 @@ export default function ProjectDetailPage() {
     return () => clearInterval(t);
   }, [clipAnalysisStatus, loadClipAnalysisStatus]);
 
+  /** 납품용 원본 아카이브 상태 polling — pending/processing 중일 때만(백그라운드 워커가 비동기로 생성) */
+  useEffect(() => {
+    if (!project?.includeOriginal) return;
+    const s = project.originalArchiveStatus;
+    if (s !== "pending" && s !== "processing") return;
+    const t = setInterval(() => { loadProject(); }, 5000);
+    return () => clearInterval(t);
+  }, [project?.includeOriginal, project?.originalArchiveStatus, loadProject]);
+
   /** 분석이 방금 완료로 바뀌면 그룹/사진(=새 similarityGroupId 반영)을 다시 불러오고
    *  토글을 자동으로 켜서 대표컷 묶음 표시가 즉시 보이도록 한다(수동 클릭 불필요). */
   const prevClipAnalysisStatusRef = useRef(clipAnalysisStatus);
@@ -1905,6 +1914,7 @@ export default function ProjectDetailPage() {
     const m = project.photoCount;
     const n = project.requiredCount;
     if (project.status !== "preparing" || m < n) return;
+    if (project.includeOriginal && project.originalArchiveStatus !== "ready") return;
     setInviteActivating(true);
     try {
       const res = await fetch(`/api/photographer/projects/${id}/status`, {
@@ -1927,6 +1937,25 @@ export default function ProjectDetailPage() {
       router.refresh();
     } catch (e) {
       setToast(e instanceof Error ? e.message : "초대 링크 활성화에 실패했습니다.");
+    } finally {
+      setInviteActivating(false);
+    }
+  };
+
+  const handleRetryArchive = async () => {
+    if (!project) return;
+    setInviteActivating(true);
+    try {
+      const res = await fetch(`/api/photographer/projects/${id}/retry-archive`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setToast((data as { error?: string }).error ?? "재시도에 실패했습니다.");
+        return;
+      }
+      await loadProject();
+      setToast("납품용 원본 정리를 다시 시작합니다.");
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : "재시도에 실패했습니다.");
     } finally {
       setInviteActivating(false);
     }
@@ -1984,6 +2013,10 @@ export default function ProjectDetailPage() {
   const M = project.photoCount;
   const daysLeft = differenceInDays(new Date(project.deadline), new Date());
   const isInviteActive = project.status !== "preparing";
+  // 납품용 원본 아카이브 상태 — include_original 프로젝트는 이게 'ready'여야만 링크 활성화 가능
+  const archiveStatus = project.includeOriginal ? project.originalArchiveStatus ?? "pending" : null;
+  const archiveBlocking = !!archiveStatus && archiveStatus !== "ready";
+  const failedOriginalCount = photos.filter((p) => p.originalStatus === "failed").length;
   const progressPct = N > 0 ? Math.min(100, Math.round((displayPhotos.length / N) * 100)) : 0;
   const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
   const showServerWorking = uploadPhase === "processing" && awaitingServerFinalize;
@@ -2680,32 +2713,42 @@ export default function ProjectDetailPage() {
                   : "고객 초대 준비"}
               </div>
               <div className="prj-invite-sub" style={{ fontSize: 11, color: TEXT_MUTED }}>
-                {displayPhotos.length >= N && N > 0
-                  ? `${displayPhotos.length}장 업로드 완료 · 초대 링크를 활성화할 수 있습니다`
-                  : `${displayPhotos.length}장 업로드됨 · ${N}장 이상 업로드 후 활성화 가능합니다`}
+                {M < N
+                  ? `${displayPhotos.length}장 업로드됨 · ${N}장 이상 업로드 후 활성화 가능합니다`
+                  : archiveStatus === "failed"
+                    ? `납품용 원본 처리 실패 ${failedOriginalCount}장 — 재시도가 필요합니다`
+                    : archiveBlocking
+                      ? "납품용 원본을 정리하는 중입니다 · 완료 후 활성화 가능합니다"
+                      : `${displayPhotos.length}장 업로드 완료 · 초대 링크를 활성화할 수 있습니다`}
               </div>
             </div>
             <button
               type="button"
               className="prj-invite-btn"
-              onClick={handleEnableClientAccess}
-              disabled={inviteActivating || M < N}
+              onClick={archiveStatus === "failed" ? handleRetryArchive : handleEnableClientAccess}
+              disabled={inviteActivating || M < N || (archiveBlocking && archiveStatus !== "failed")}
               style={{
                 display: "flex", alignItems: "center", gap: 4,
                 padding: "9px 20px",
-                background: displayPhotos.length >= N ? ACCENT : "rgba(var(--accent-rgb), 0.15)",
+                background: M >= N && !archiveBlocking ? ACCENT : "rgba(var(--accent-rgb), 0.15)",
                 border: "none", borderRadius: 8,
-                color: displayPhotos.length >= N ? "#000" : ACCENT,
+                color: M >= N && !archiveBlocking ? "#000" : ACCENT,
                 fontSize: 13, fontWeight: 600,
-                cursor: displayPhotos.length >= N && !inviteActivating ? "pointer" : "not-allowed",
+                cursor: M >= N && !inviteActivating && (!archiveBlocking || archiveStatus === "failed") ? "pointer" : "not-allowed",
                 fontFamily: MONO,
                 opacity: inviteActivating ? 0.75 : 1,
-                boxShadow: displayPhotos.length >= N ? `0 0 16px ${ACCENT_GLOW}` : "none",
+                boxShadow: M >= N && !archiveBlocking ? `0 0 16px ${ACCENT_GLOW}` : "none",
                 transition: "all 0.2s",
               }}
             >
-              {inviteActivating ? "활성화 중…" : isMobile ? "초대링크 활성화" : "고객 초대 링크 활성화"}
-              {!inviteActivating && M >= N && !isMobile && <ChevronRight size={14} />}
+              {inviteActivating
+                ? "처리 중…"
+                : archiveStatus === "failed"
+                  ? "재시도"
+                  : archiveBlocking
+                    ? "정리 중…"
+                    : isMobile ? "초대링크 활성화" : "고객 초대 링크 활성화"}
+              {!inviteActivating && M >= N && !archiveBlocking && !isMobile && <ChevronRight size={14} />}
             </button>
           </>
         )}
