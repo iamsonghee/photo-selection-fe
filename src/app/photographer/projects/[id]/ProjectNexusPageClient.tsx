@@ -26,19 +26,10 @@ import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { FieldInfoTip } from "@/components/ui/FieldInfoTip";
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
+import { PhoneInput } from "@/components/ui/PhoneInput";
+import { isValidKoreanPhone } from "@/lib/phone";
 
 // ── helpers ────────────────────────────────────────────────────────────────
-
-function formatPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "").slice(0, 11);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
-  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-}
-
-function isValidPhone(v: string): boolean {
-  return v === "" || /^010-\d{4}-\d{4}$/.test(v);
-}
 
 function getInitial(name: string): string {
   return name.trim().charAt(0);
@@ -263,7 +254,7 @@ export function ProjectNexusPageClient() {
       setSaveError(`업로드된 사진 수(${project.photoCount}장) 이하로 설정해주세요.`);
       return;
     }
-    if (!isValidPhone(editCustomerPhone)) {
+    if (editCustomerPhone.trim() && !isValidKoreanPhone(editCustomerPhone)) {
       setSaveError("연락처는 010-XXXX-XXXX 형식으로 입력해주세요.");
       return;
     }
@@ -1095,13 +1086,10 @@ export function ProjectNexusPageClient() {
               />
             </ModalField>
             <ModalField label="연락처" optional info="010-XXXX-XXXX · 알림용">
-              <input
-                type="text"
-                inputMode="numeric"
+              <PhoneInput
                 value={editCustomerPhone}
-                onChange={(e) => setEditCustomerPhone(formatPhone(e.target.value))}
+                onChange={setEditCustomerPhone}
                 className={MODAL_INPUT_CLS}
-                placeholder="010-0000-0000"
               />
             </ModalField>
             <ModalField label="촬영 일자" required>

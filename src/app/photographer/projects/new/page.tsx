@@ -18,15 +18,10 @@ import { parseBetaLimitError } from "@/lib/beta-limits";
 import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { BetaApprovalBanner, type BetaApplicationStatus } from "@/components/photographer/BetaApprovalBanner";
+import { PhoneInput } from "@/components/ui/PhoneInput";
+import { isValidKoreanPhone } from "@/lib/phone";
 
 const QUICK_DAYS = [3, 5, 7, 14, 30];
-
-function formatPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "").slice(0, 11);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
-  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-}
 
 function getErrorMessage(e: unknown): string {
   if (e instanceof Error && e.message) return e.message;
@@ -171,6 +166,8 @@ const isValid =
     if (!customerName.trim())      errors.customerName  = "고객 이름을 입력해주세요.";
     if (Number(requiredCount) < 1) errors.requiredCount = "셀렉 갯수를 1 이상으로 입력해주세요.";
     if (!deadline)                 errors.deadline      = "셀렉 기한을 선택해주세요.";
+    if (customerPhone.trim() && !isValidKoreanPhone(customerPhone))
+      errors.customerPhone = "연락처는 010-0000-0000 형식으로 입력해주세요.";
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -420,16 +417,18 @@ const isValid =
 
               {/* 2열: 연락처 + 셀렉 갯수 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="연락처" hint="선택사항">
-                  <input
-                    className="np-input"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(formatPhone(e.target.value))}
-                    placeholder="010-0000-0000"
-                    inputMode="numeric"
-                  />
-                  <span className="text-[10px] text-disabled-foreground">알림 기능 연동 시 사용됩니다</span>
-                </Field>
+                <div id="field-customerPhone">
+                  <Field label="연락처" hint="선택사항">
+                    <PhoneInput
+                      className="np-input"
+                      value={customerPhone}
+                      onChange={(v) => { setCustomerPhone(v); setFieldErrors((p) => ({ ...p, customerPhone: "" })); }}
+                      style={{ borderColor: fieldErrors.customerPhone ? "rgba(239,68,68,0.7)" : customerPhone ? "rgba(var(--accent-rgb),0.3)" : undefined }}
+                    />
+                    <span className="text-[10px] text-disabled-foreground">알림 기능 연동 시 사용됩니다</span>
+                  </Field>
+                  {fieldErrors.customerPhone && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.customerPhone}</p>}
+                </div>
                 <div id="field-requiredCount">
                   <Field label="셀렉 갯수" required>
                     <div className="flex items-center gap-2">

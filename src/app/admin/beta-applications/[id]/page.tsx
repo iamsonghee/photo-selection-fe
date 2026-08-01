@@ -11,8 +11,6 @@ import {
   workflowLabel,
   desiredFeatureLabel,
   painPointLabel,
-  usageIntentLabel,
-  contactChannelLabel,
 } from "@/lib/beta-application";
 
 export default async function AdminBetaApplicationDetailPage({
@@ -64,7 +62,7 @@ export default async function AdminBetaApplicationDetailPage({
             <dd className="mt-1 text-sm text-foreground">{application.monthlyShootCount}건</dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-muted-foreground">프로젝트당 평균 전달 사진 수</dt>
+            <dt className="text-xs uppercase tracking-wide text-muted-foreground">촬영당 평균 전달 사진 수</dt>
             <dd className="mt-1 text-sm text-foreground">{application.avgPhotosPerProject}장</dd>
           </div>
         </dl>
@@ -89,25 +87,28 @@ export default async function AdminBetaApplicationDetailPage({
               <dt className="text-xs uppercase tracking-wide text-muted-foreground">주 촬영 분야</dt>
               <dd className="mt-1 text-sm text-foreground">
                 {application.additionalAnswers.genres.map(genreLabel).join(", ")}
-                {application.additionalAnswers.genre_other && ` (기타: ${application.additionalAnswers.genre_other})`}
+                {application.additionalAnswers.genres.includes("other") &&
+                  application.additionalAnswers.genre_other &&
+                  ` (기타: ${application.additionalAnswers.genre_other})`}
               </dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-muted-foreground">현재 고객 셀렉 방식</dt>
               <dd className="mt-1 text-sm text-foreground">
                 {application.additionalAnswers.workflow_methods.map(workflowLabel).join(", ")}
-                {application.additionalAnswers.workflow_other &&
+                {application.additionalAnswers.workflow_methods.includes("other") &&
+                  application.additionalAnswers.workflow_other &&
                   ` (기타: ${application.additionalAnswers.workflow_other})`}
               </dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">월평균 프로젝트 수</dt>
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">월평균 촬영 수</dt>
               <dd className="mt-1 text-sm text-foreground">
                 {monthlyProjectLabel(application.additionalAnswers.monthly_project_range)}
               </dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">프로젝트당 평균 사진 수</dt>
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">촬영당 평균 사진 수</dt>
               <dd className="mt-1 text-sm text-foreground">
                 {avgPhotosLabel(application.additionalAnswers.avg_photos_range)}
               </dd>
@@ -116,7 +117,8 @@ export default async function AdminBetaApplicationDetailPage({
               <dt className="text-xs uppercase tracking-wide text-muted-foreground">베타에서 사용해보고 싶은 기능</dt>
               <dd className="mt-1 text-sm text-foreground">
                 {application.additionalAnswers.desired_features.map(desiredFeatureLabel).join(", ")}
-                {application.additionalAnswers.desired_features_other &&
+                {application.additionalAnswers.desired_features.includes("other") &&
+                  application.additionalAnswers.desired_features_other &&
                   ` (기타: ${application.additionalAnswers.desired_features_other})`}
               </dd>
             </div>
@@ -125,22 +127,6 @@ export default async function AdminBetaApplicationDetailPage({
               <dd className="mt-1 text-sm text-foreground">
                 {application.additionalAnswers.pain_point
                   ? painPointLabel(application.additionalAnswers.pain_point)
-                  : "(선택 안 함)"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">월 사용 의향</dt>
-              <dd className="mt-1 text-sm text-foreground">
-                {application.additionalAnswers.usage_intent
-                  ? usageIntentLabel(application.additionalAnswers.usage_intent)
-                  : "(선택 안 함)"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">연락 가능 채널</dt>
-              <dd className="mt-1 text-sm text-foreground">
-                {application.additionalAnswers.contact_channels?.length
-                  ? application.additionalAnswers.contact_channels.map(contactChannelLabel).join(", ")
                   : "(선택 안 함)"}
               </dd>
             </div>

@@ -94,4 +94,33 @@ test.describe("작가 — 파일 업로드", () => {
     const countAfter = await page.locator("text=/\\d+장/").first().textContent({ timeout: 2000 }).catch(() => countBefore);
     expect(!successToast || countAfter === countBefore).toBeTruthy();
   });
+
+  test("U13: 업로드 시작 빠른 연속 클릭 → 같은 파일을 중복 전송하지 않음", async ({ page }) => {
+    let requestCount = 0;
+    await page.route("**/api/upload/photos", async (route) => {
+      requestCount++;
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "test upload unavailable" }),
+      });
+    });
+
+    await page.goto(project.uploadUrl);
+    await page.waitForLoadState("networkidle");
+    await page.locator('input[type="file"]').setInputFiles(path.join(FIXTURES, "sample.jpg"));
+
+    const startButton = page.getByRole("button", { name: "업로드 시작" });
+    await expect(startButton).toBeVisible();
+    // 첫 클릭이 모달을 즉시 닫으므로, 렌더 전 같은 이벤트 루프에서 두 번 누른
+    // 실제 빠른 클릭을 동기 이벤트로 재현한다.
+    await startButton.evaluate((button: HTMLButtonElement) => {
+      button.click();
+      button.click();
+    });
+
+    await expect(page.getByText("1개 파일 처리 실패")).toBeVisible({ timeout: 15_000 });
+    // 503은 업로드 1회당 최대 3번 재시도한다. 두 번의 시작 클릭이 6회가 되면 중복 실행이다.
+    expect(requestCount).toBe(3);
+  });
 });

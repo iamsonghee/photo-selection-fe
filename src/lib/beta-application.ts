@@ -21,7 +21,7 @@ export const BETA_GENRE_OPTIONS: readonly BetaOption[] = [
   { key: "other", label: "기타" },
 ] as const;
 
-/** 월평균 프로젝트 수 — 단일선택. key는 legacy monthly_shoot_count(정수) 컬럼에도 대표값으로 병행 기록. */
+/** 월평균 촬영 수 — 단일선택. key는 legacy monthly_shoot_count(정수) 컬럼에도 대표값으로 병행 기록. */
 export const BETA_MONTHLY_PROJECT_OPTIONS: readonly (BetaOption & { repValue: number })[] = [
   { key: "under_1", label: "1건 미만", repValue: 0 },
   { key: "1_3", label: "1~3건", repValue: 2 },
@@ -30,7 +30,7 @@ export const BETA_MONTHLY_PROJECT_OPTIONS: readonly (BetaOption & { repValue: nu
   { key: "over_21", label: "21건 이상", repValue: 21 },
 ] as const;
 
-/** 프로젝트당 평균 사진 수 — 단일선택. key는 legacy avg_photos_per_project(정수) 컬럼에도 대표값으로 병행 기록. */
+/** 촬영당 평균 사진 수 — 단일선택. key는 legacy avg_photos_per_project(정수) 컬럼에도 대표값으로 병행 기록. */
 export const BETA_AVG_PHOTOS_OPTIONS: readonly (BetaOption & { repValue: number })[] = [
   { key: "under_500", label: "500장 미만", repValue: 300 },
   { key: "500_999", label: "500~999장", repValue: 750 },
@@ -72,22 +72,6 @@ export const BETA_PAIN_POINT_OPTIONS: readonly BetaOption[] = [
   { key: "none", label: "특별히 없음" },
 ] as const;
 
-/** 월 사용 의향 — 단일선택, 선택 입력. */
-export const BETA_USAGE_INTENT_OPTIONS: readonly BetaOption[] = [
-  { key: "immediate_use", label: "바로 업무에 사용 가능" },
-  { key: "partial_test", label: "일부 프로젝트에서 테스트" },
-  { key: "decide_after_check", label: "기능 확인 후 결정" },
-  { key: "trial_only", label: "단순 체험 목적" },
-] as const;
-
-/** 연락 가능 채널 — 복수선택, 선택 입력. */
-export const BETA_CONTACT_CHANNEL_OPTIONS: readonly BetaOption[] = [
-  { key: "phone", label: "전화" },
-  { key: "sms", label: "문자" },
-  { key: "kakao", label: "카카오톡" },
-  { key: "email", label: "이메일" },
-] as const;
-
 function labelOf(options: readonly BetaOption[], key: string): string {
   return options.find((o) => o.key === key)?.label ?? key;
 }
@@ -110,12 +94,6 @@ export function desiredFeatureLabel(key: string): string {
 export function painPointLabel(key: string): string {
   return labelOf(BETA_PAIN_POINT_OPTIONS, key);
 }
-export function usageIntentLabel(key: string): string {
-  return labelOf(BETA_USAGE_INTENT_OPTIONS, key);
-}
-export function contactChannelLabel(key: string): string {
-  return labelOf(BETA_CONTACT_CHANNEL_OPTIONS, key);
-}
 
 export function monthlyProjectRepValue(key: string): number {
   return BETA_MONTHLY_PROJECT_OPTIONS.find((o) => o.key === key)?.repValue ?? 0;
@@ -135,7 +113,5 @@ export interface BetaAdditionalAnswers {
   desired_features: string[];
   desired_features_other?: string;
   pain_point?: string;
-  usage_intent?: string;
-  contact_channels?: string[];
   expectation?: string;
 }
