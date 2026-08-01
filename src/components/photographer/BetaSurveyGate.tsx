@@ -21,10 +21,12 @@ import type { SurveyType } from "@/lib/beta-survey";
 export function BetaSurveyGate() {
   const pathname = usePathname();
   const [surveyType, setSurveyType] = useState<SurveyType | null>(null);
+  const [shownThisSession, setShownThisSession] = useState(false);
   const isAnyModalOpen = usePhotographerModalChromeHidden();
 
   useEffect(() => {
     if (surveyType) return;
+    if (shownThisSession) return;
     if (isAnyModalOpen) return;
     let cancelled = false;
     fetch("/api/photographer/beta-survey/status")
@@ -37,9 +39,9 @@ export function BetaSurveyGate() {
     return () => {
       cancelled = true;
     };
-  }, [pathname, isAnyModalOpen, surveyType]);
+  }, [pathname, isAnyModalOpen, surveyType, shownThisSession]);
 
   if (!surveyType) return null;
 
-  return <BetaSurveyModal surveyType={surveyType} onDone={() => setSurveyType(null)} />;
+  return <BetaSurveyModal surveyType={surveyType} onDone={() => { setSurveyType(null); setShownThisSession(true); }} />;
 }

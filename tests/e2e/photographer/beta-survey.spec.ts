@@ -103,19 +103,14 @@ test.describe("작가 — 베타 설문(② 첫 프로젝트 납품 완료 후)"
     await expect(dialog.getByText(MODAL_TITLE)).toBeVisible({ timeout: 10_000 });
   });
 
-  test("BS4: '다시 묻지 않기' → 영구 미노출", async ({ page }) => {
+  test("BS4: 영구 건너뛰기 버튼은 노출하지 않는다", async ({ page }) => {
     await setProjectStatus(page, projectId!, "delivered");
     await page.goto("/photographer/dashboard");
     await page.waitForLoadState("networkidle");
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(MODAL_TITLE)).toBeVisible({ timeout: 10_000 });
 
-    await dialog.getByRole("button", { name: "다시 묻지 않기" }).click();
-    await expect(dialog.getByText(MODAL_TITLE)).not.toBeVisible();
-
-    await page.reload();
-    await page.waitForLoadState("networkidle");
-    await expect(page.getByText(MODAL_TITLE)).not.toBeVisible({ timeout: 5000 });
+    await expect(dialog.getByRole("button", { name: "다시 묻지 않기" })).not.toBeVisible();
   });
 
   test("BS5: 문항 응답 후 제출 → 감사 메시지 → 영구 미노출", async ({ page }) => {
@@ -247,19 +242,14 @@ test.describe("작가 — 베타 설문(③ 두 번째 프로젝트 납품 완�
     await expect(dialog.getByText(MODAL_TITLE_2)).toBeVisible({ timeout: 10_000 });
   });
 
-  test("CS4: '다시 묻지 않기' → 영구 미노출", async ({ page }) => {
+  test("CS4: 영구 건너뛰기 버튼은 노출하지 않는다", async ({ page }) => {
     await setProjectStatus(page, secondProjectId!, "delivered");
     await page.goto("/photographer/dashboard");
     await page.waitForLoadState("networkidle");
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(MODAL_TITLE_2)).toBeVisible({ timeout: 10_000 });
 
-    await dialog.getByRole("button", { name: "다시 묻지 않기" }).click();
-    await expect(dialog.getByText(MODAL_TITLE_2)).not.toBeVisible();
-
-    await page.reload();
-    await page.waitForLoadState("networkidle");
-    await expect(page.getByText(MODAL_TITLE_2)).not.toBeVisible({ timeout: 5000 });
+    await expect(dialog.getByRole("button", { name: "다시 묻지 않기" })).not.toBeVisible();
   });
 
   test("CS5: 문항 응답(NPS·가격 구간·체크박스 포함) 후 제출 → 감사 메시지 → 영구 미노출", async ({ page }) => {
@@ -414,14 +404,13 @@ test.describe("작가 — 베타 설문(셀렉 회신받았을 때 마이크로 
     await expect(page.getByText(TITLE)).not.toBeVisible({ timeout: 5000 });
   });
 
-  test("SS2: '다시 묻지 않기' → 영구 미노출", async ({ page }) => {
+  test("SS2: 영구 건너뛰기 버튼은 노출하지 않는다", async ({ page }) => {
     await page.goto("/photographer/dashboard");
     await page.waitForLoadState("networkidle");
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(TITLE)).toBeVisible({ timeout: 10_000 });
 
-    await dialog.getByRole("button", { name: "다시 묻지 않기" }).click();
-    await expect(dialog.getByText(TITLE)).not.toBeVisible();
+    await expect(dialog.getByRole("button", { name: "다시 묻지 않기" })).not.toBeVisible();
 
     await page.reload();
     await page.waitForLoadState("networkidle");

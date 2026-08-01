@@ -169,23 +169,6 @@ export function BetaSurveyModal({
     }
   }
 
-  async function handleSkip() {
-    setPending("skip");
-    setError("");
-    try {
-      const res = await fetch("/api/photographer/beta-survey/skip", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ surveyType }),
-      });
-      if (!res.ok) throw new Error();
-      onDone();
-    } catch {
-      setError("처리에 실패했습니다. 다시 시도해주세요.");
-      setPending(null);
-    }
-  }
-
   async function handleSubmitProjectCreated() {
     if (!easeScale) {
       setError("문항에 응답해주세요.");
@@ -534,15 +517,7 @@ export function BetaSurveyModal({
 
           {error && <p className="text-xs text-danger">{error}</p>}
 
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={handleSkip}
-              disabled={pending !== null}
-              className="text-xs text-disabled-foreground underline underline-offset-2 hover:text-muted-foreground disabled:opacity-50"
-            >
-              다시 묻지 않기
-            </button>
+          <div className="flex justify-end">
             <div className="flex gap-2">
               <button
                 type="button"

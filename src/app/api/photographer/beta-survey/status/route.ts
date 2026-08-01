@@ -5,25 +5,25 @@ import { IMPLEMENTED_SURVEY_TYPES, type SurveyType } from "@/lib/beta-survey";
 import { getEffectiveTier } from "@/lib/beta-policy";
 
 /** 베타 설문은 tier==='beta'인 사용자에게만 노출한다(general/admin 제외). */
-async function getBetaPhotographerId(): Promise<string | null> {
+async function getBetaPhotographerId(): Promise<{ photographerId: string | null; authenticated: boolean }> {
   const supabase = await createClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  if (!session?.user?.id) return null;
+  if (!session?.user?.id) return { photographerId: null, authenticated: false };
   const { data } = await supabase
     .from("photographers")
     .select("id, email, beta_status, beta_end_date")
     .eq("auth_id", session.user.id)
     .limit(1)
     .single();
-  if (!data) return null;
+  if (!data) return { photographerId: null, authenticated: true };
   const tier = getEffectiveTier({
     email: data.email,
     betaStatus: data.beta_status,
     betaEndDate: data.beta_end_date,
   });
-  return tier === "beta" ? data.id : null;
+  return { photographerId: tier === "beta" ? data.id : null, authenticated: true };
 }
 
 /** 첫 프로젝트 id 조회(마이크로 설문 3종의 공통 컨텍스트) */
@@ -118,7 +118,8 @@ const STALE_ON_DELIVERY: SurveyType[] = ["project_created", "original_uploaded",
 /** GET: 대시보드 진입 시 지금 노출해야 할 설문이 있는지 확인(§7.2) */
 export async function GET() {
   try {
-    const photographerId = await getBetaPhotographerId();
+    const { photographerId, authenticated } = await getBetaPhotographerId();
+    if (!authenticated) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!photographerId) {
       return NextResponse.json({ surveyType: null });
     }
