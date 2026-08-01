@@ -809,7 +809,7 @@ function PlanComparisonCards({
         <p className="text-xs text-subtle-foreground">베타 종료 후 정책이 달라질 수 있습니다.</p>
         <Link
           href="/beta/apply"
-          className="text-accent underline underline-offset-2 hover:text-accent/80 text-sm font-semibold"
+          className="self-center text-accent underline underline-offset-2 hover:text-accent/80 text-sm font-semibold"
         >
           클로즈드 베타 신청 →
         </Link>
@@ -851,14 +851,14 @@ function CTASection({
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
           </button>
-          <div className="flex items-center gap-4 mt-6 landing-mono text-[11px] text-disabled-foreground">
+          <div className="flex items-center justify-center gap-4 mt-6 landing-mono text-[11px] text-disabled-foreground">
             <span>베타 기간 무료</span>
             <div className="w-1 h-1 bg-accent" />
             <span>설치 없음</span>
             <div className="w-1 h-1 bg-accent" />
             <span>신용카드 불필요</span>
           </div>
-          <p className="mt-24 landing-mono text-[11px] text-disabled-foreground italic max-w-sm">
+          <p className="mt-24 mx-auto max-w-sm text-center landing-mono text-sm sm:text-base leading-relaxed text-muted-foreground italic">
             사진 찍는 일에만 집중할 수 있도록.<br />나머지는 A컷이 합니다.
           </p>
         </Reveal>
