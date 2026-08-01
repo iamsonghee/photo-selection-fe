@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Plus, AlertCircle, ChevronRight, Clock, Activity, Layers, Zap, CheckCircle2,
+  Plus, AlertCircle, ChevronRight, Clock, Activity, Layers, Zap, CheckCircle2, Sparkles,
 } from "lucide-react";
 import {
   DEFAULT_GENERAL_MAX_PROJECTS,
@@ -23,6 +23,7 @@ import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHead
 import { getActiveDeadline } from "@/lib/project-deadline";
 import { BetaApprovalBanner, type BetaApplicationStatus } from "@/components/photographer/BetaApprovalBanner";
 import { consumePostLoginRedirect, peekPostLoginRedirect } from "@/lib/post-login-redirect";
+import { PhotographerModal } from "@/components/ui/PhotographerModal";
 
 const ACCENT = "var(--accent)";
 const RED    = "#EF4444";
@@ -30,6 +31,33 @@ const RED    = "#EF4444";
 const ACTIVE_STATUSES: ProjectStatus[] = [
   "selecting", "confirmed", "editing", "reviewing_v1", "editing_v2", "reviewing_v2",
 ];
+
+function BetaWelcomeModal({ open, onClose, userName }: { open: boolean; onClose: () => void; userName: string }) {
+  return (
+    <PhotographerModal
+      open={open}
+      onClose={onClose}
+      title={<span className="flex items-center gap-2"><Sparkles size={17} className="text-accent" />베타 서비스 시작</span>}
+      maxWidth={440}
+      footer={
+        <button type="button" onClick={onClose} className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-bold text-black hover:bg-accent/90">
+          시작하기
+        </button>
+      }
+    >
+      <div className="py-3 text-center">
+        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-accent/30 bg-accent/10">
+          <Sparkles size={26} className="text-accent" />
+        </div>
+        <p className="text-lg font-bold text-foreground">{userName}님, 환영합니다! 🎉</p>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          베타 서비스가 시작되었습니다.<br />
+          사진 셀렉부터 납품까지 더 편하게 진행해 보세요.
+        </p>
+      </div>
+    </PhotographerModal>
+  );
+}
 
 function dday(deadline: string): { text: string; warn: boolean } {
   const diff = Math.ceil(
@@ -204,6 +232,7 @@ export default function DashboardPage() {
   const [maxProjects, setMaxProjects] = useState(DEFAULT_GENERAL_MAX_PROJECTS);
   const [maxPhotosPerProject, setMaxPhotosPerProject] = useState(DEFAULT_GENERAL_MAX_PHOTOS_PER_PROJECT);
   const [betaApplicationStatus, setBetaApplicationStatus] = useState<BetaApplicationStatus>(null);
+  const [showBetaWelcome, setShowBetaWelcome] = useState(false);
   // 첫 렌더에서(이펙트를 기다리지 않고) 곧바로 읽는다 — 그래야 대시보드 실제 콘텐츠가 한 프레임도
   // 그려지지 않고 바로 로딩 화면으로 대체된다. 실제 소비(제거)는 아래 이펙트가 담당.
   const [pendingRedirect] = useState(() =>
@@ -257,6 +286,14 @@ export default function DashboardPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (tier !== "beta" || !profile?.id || typeof window === "undefined") return;
+    const key = `acut:beta-welcome:${profile.id}`;
+    if (window.localStorage.getItem(key)) return;
+    window.localStorage.setItem(key, "shown");
+    setShowBetaWelcome(true);
+  }, [tier, profile?.id]);
+
   if (pendingRedirect || profileLoading || loading) {
     return <PageLoader variant="full" />;
   }
@@ -277,13 +314,16 @@ export default function DashboardPage() {
 
   if (projects.length === 0) {
     return (
-      <EmptyDashboard
-        userName={userName}
-        onCreateProject={() => router.push("/photographer/projects/new")}
-        tier={tier}
-        maxProjects={maxProjects}
-        maxPhotosPerProject={maxPhotosPerProject}
-      />
+      <>
+        <EmptyDashboard
+          userName={userName}
+          onCreateProject={() => router.push("/photographer/projects/new")}
+          tier={tier}
+          maxProjects={maxProjects}
+          maxPhotosPerProject={maxPhotosPerProject}
+        />
+        <BetaWelcomeModal open={showBetaWelcome} onClose={() => setShowBetaWelcome(false)} userName={userName} />
+      </>
     );
   }
 
@@ -316,6 +356,8 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground" style={{ fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif" }}>
+
+      <BetaWelcomeModal open={showBetaWelcome} onClose={() => setShowBetaWelcome(false)} userName={userName} />
 
       {/* ── 헤더 ── */}
       <PhotographerPageHeader crumbs={[{ label: "대시보드" }]} title="대시보드" />
