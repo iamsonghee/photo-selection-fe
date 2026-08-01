@@ -1,5 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { setupFullProject, deleteTestProject, type TestProject } from "../../helpers/setup";
+import {
+  setupFullProject,
+  deleteTestProject,
+  mockCustomerThumbPresigning,
+  type TestProject,
+} from "../../helpers/setup";
 import { loginAsPhotographer } from "../../helpers/auth";
 
 let project: TestProject;
@@ -19,9 +24,14 @@ test.afterAll(async ({ browser }) => {
 });
 
 test.describe("고객 — 갤러리 (사진 선택)", () => {
-  test("S1: 갤러리 로드 → 사진 목록 표시", async ({ page }) => {
+  async function openGallery(page: import("@playwright/test").Page) {
+    await mockCustomerThumbPresigning(page);
     await page.goto(project.galleryUrl);
     await page.waitForLoadState("networkidle");
+  }
+
+  test("S1: 갤러리 로드 → 사진 목록 표시", async ({ page }) => {
+    await openGallery(page);
     await expect(page).toHaveURL(/\/gallery/);
     // 더미 이미지 5장 렌더링 확인
     const photos = page.locator("img[loading='lazy']");
@@ -30,16 +40,12 @@ test.describe("고객 — 갤러리 (사진 선택)", () => {
   });
 
   test("S2: 사진 클릭 → 선택 카운트 증가", async ({ page }) => {
-    await page.goto(project.galleryUrl);
-    await page.waitForLoadState("networkidle");
+    await openGallery(page);
     // SELECTED 카운트 초기값 읽기
     const counterBefore = await page.locator(".gl-header-selected-count").textContent({ timeout: 3000 }).catch(() => "0");
-    // 첫 번째 사진 컨테이너 클릭 (img 부모 요소)
-    const photoCard = page.locator(".gl-photo-card, [class*='photo'], [class*='thumb']").first();
-    const clickTarget = await photoCard.isVisible({ timeout: 2000 }).catch(() => false)
-      ? photoCard
-      : page.locator("img[loading='lazy']").first();
-    await clickTarget.click();
+    const selectionButtons = page.getByRole("button", { name: "선택", exact: true });
+    await expect(selectionButtons).not.toHaveCount(0);
+    await selectionButtons.first().click();
     await page.waitForTimeout(800);
     // 카운트 변경 또는 선택 표시 확인
     const counterAfter = await page.locator(".gl-header-selected-count").textContent({ timeout: 2000 }).catch(() => "");
@@ -49,12 +55,11 @@ test.describe("고객 — 갤러리 (사진 선택)", () => {
   });
 
   test("S3: 사진 선택 후 재클릭 → 선택 해제", async ({ page }) => {
-    await page.goto(project.galleryUrl);
-    await page.waitForLoadState("networkidle");
-    const photo = page.locator("img[loading='lazy']").first();
-    await photo.click();
+    await openGallery(page);
+    const selectButton = page.getByRole("button", { name: "선택", exact: true }).first();
+    await selectButton.click();
     await page.waitForTimeout(400);
-    await photo.click();
+    await page.getByRole("button", { name: "선택 해제", exact: true }).first().click();
     await page.waitForTimeout(400);
     // 선택 수가 0으로 돌아가야 함 → 확정 버튼 비활성
     const confirmBtn = page.getByRole("button", { name: /보정 의뢰|확정/i });
@@ -64,8 +69,7 @@ test.describe("고객 — 갤러리 (사진 선택)", () => {
   });
 
   test("S4: 필터 탭 — '선택됨' 전환", async ({ page }) => {
-    await page.goto(project.galleryUrl);
-    await page.waitForLoadState("networkidle");
+    await openGallery(page);
     const selectedTab = page.getByRole("button", { name: "선택됨" });
     await expect(selectedTab).toBeVisible({ timeout: 5000 });
     await selectedTab.click();
@@ -76,14 +80,14 @@ test.describe("고객 — 갤러리 (사진 선택)", () => {
   });
 
   test("S5: N장 선택 완료 → 확정 버튼 활성화", async ({ page }) => {
-    await page.goto(project.galleryUrl);
-    await page.waitForLoadState("networkidle");
-    const photos = page.locator("img[loading='lazy']");
+    await openGallery(page);
+    const selectionButtons = page.getByRole("button", { name: "선택", exact: true });
     const N = project.requiredCount ?? 3;
-    const total = await photos.count();
+    const total = await selectionButtons.count();
     // N장 선택
     for (let i = 0; i < Math.min(N, total); i++) {
-      await photos.nth(i).click();
+      // 선택한 버튼은 즉시 "선택 해제"로 이름이 바뀌므로, 매번 남은 첫 선택 버튼을 누른다.
+      await selectionButtons.first().click();
       await page.waitForTimeout(500);
     }
     // 확정 버튼 활성화 확인 (SelectionConfirmFooter 고정 하단)

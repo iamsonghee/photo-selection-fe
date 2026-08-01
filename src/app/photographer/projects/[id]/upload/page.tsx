@@ -1049,6 +1049,9 @@ export default function ProjectDetailPage() {
 
   const photoScrollRef = useRef<HTMLDivElement>(null);
   const stopRequestedRef = useRef(false);
+  // React state updates are not synchronous, so a ref is required to block two
+  // clicks that land before the upload phase re-renders.
+  const uploadInProgressRef = useRef(false);
   const useProxyRef = useRef(false);
   /** selecting 안내 모달 확인 시 pending으로 넘길 드래그 파일 임시 보관 */
   const pendingDropFilesRef = useRef<File[] | null>(null);
@@ -1323,7 +1326,8 @@ export default function ProjectDetailPage() {
 
   // ── upload ──
   const startUpload = useCallback(async (uploadFiles: File[]) => {
-    if (!uploadFiles.length) return;
+    if (!uploadFiles.length || uploadInProgressRef.current) return;
+    uploadInProgressRef.current = true;
     const inclOrig = project?.includeOriginal ?? false;
     setUploadError(null);
     setAwaitingServerFinalize(false);
@@ -1344,8 +1348,8 @@ export default function ProjectDetailPage() {
     const { data: { session } } = await supabase.auth.getSession();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     const token = session?.access_token;
-    if (userError || !user) { setUploadError("로그인 인증을 확인할 수 없습니다."); setUploadPhase("idle"); return; }
-    if (!token) { setUploadError("로그인이 필요합니다."); setUploadPhase("idle"); return; }
+    if (userError || !user) { setUploadError("로그인 인증을 확인할 수 없습니다."); setUploadPhase("idle"); uploadInProgressRef.current = false; return; }
+    if (!token) { setUploadError("로그인이 필요합니다."); setUploadPhase("idle"); uploadInProgressRef.current = false; return; }
 
     setTotalUploadCount(uploadFiles.length);
     let currentToken = token;
@@ -1602,6 +1606,7 @@ export default function ProjectDetailPage() {
       setQueuedPreviews([]);
       queuedBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
       queuedBlobsRef.current = [];
+      uploadInProgressRef.current = false;
       return;
     }
 
@@ -1628,9 +1633,9 @@ export default function ProjectDetailPage() {
         ? "인증 오류로 업로드할 수 없습니다. 기기의 날짜/시간이 자동 설정인지 확인 후 새로고침해 주세요."
         : `업로드에 실패했습니다. (${detail})`;
 
-    if (abortReason === "betaLimit") { setAwaitingServerFinalize(false); setUploadError(abortMessage); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); return; }
-    if (abortReason === "network") { setAwaitingServerFinalize(false); setUploadError("업로드에 실패했습니다. 인터넷 연결을 확인해 주세요."); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); return; }
-    if (abortReason === "auth") { setAwaitingServerFinalize(false); setUploadError(formatAuthError(abortMessage)); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); return; }
+    if (abortReason === "betaLimit") { setAwaitingServerFinalize(false); setUploadError(abortMessage); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); uploadInProgressRef.current = false; return; }
+    if (abortReason === "network") { setAwaitingServerFinalize(false); setUploadError("업로드에 실패했습니다. 인터넷 연결을 확인해 주세요."); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); uploadInProgressRef.current = false; return; }
+    if (abortReason === "auth") { setAwaitingServerFinalize(false); setUploadError(formatAuthError(abortMessage)); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); uploadInProgressRef.current = false; return; }
 
     setAwaitingServerFinalize(false);
     setUploadProgress(100);
@@ -1640,6 +1645,7 @@ export default function ProjectDetailPage() {
     setTimeout(async () => {
       setAwaitingServerFinalize(false);
       setUploadPhase("idle"); setUploadProgress(0);
+      uploadInProgressRef.current = false;
       if (allFailed.length > 0) {
         setUploadError(firstFailDetail
           ? `${allFailed.length}장 실패: ${firstFailDetail}`
@@ -3012,8 +3018,9 @@ export default function ProjectDetailPage() {
                       setPendingFiles([]);
                       startUpload(f);
                     }}
+                    disabled={uploadPhase !== "idle"}
                     className="prj-btn-primary"
-                    style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                    style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, opacity: uploadPhase !== "idle" ? 0.55 : 1 }}
                   >
                     <Upload size={12} />
                     업로드 시작

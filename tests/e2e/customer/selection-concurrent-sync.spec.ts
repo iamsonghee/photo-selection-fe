@@ -111,3 +111,48 @@ test("C2: 코멘트를 남긴 뒤 다른 세션이 선택 토글을 해도 코�
   await ctxA.close();
   await ctxB.close();
 });
+
+test("C3: 다른 탭의 코멘트가 5초 폴링 후 현재 뷰어 입력창에 반영된다", async ({ browser }) => {
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const pageA = await ctxA.newPage();
+  const pageB = await ctxB.newPage();
+  const remoteComment = "다른 탭 코멘트 동기화 ✨";
+
+  await pageA.goto(viewerUrl, { waitUntil: "networkidle" });
+  await pageB.goto(viewerUrl, { waitUntil: "networkidle" });
+
+  const commentA = pageA.locator('input[placeholder="코멘트..."]:visible').first();
+  const commentB = pageB.locator('input[placeholder="코멘트..."]:visible').first();
+  await commentB.fill(remoteComment);
+  await commentB.blur();
+
+  await expect(commentA).toHaveValue(remoteComment, { timeout: 8_000 });
+  await ctxA.close();
+  await ctxB.close();
+});
+
+test("C4: 코멘트 저장 실패 → 오류를 알리고 서버 값으로 복원한다", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto(viewerUrl, { waitUntil: "networkidle" });
+  await page.request.post("/api/c/selections", {
+    data: { token: project.accessToken, project_id: project.projectId, photo_id: photoId, comment: null },
+  });
+  await page.route("**/api/c/selections", async (route) => {
+    if (route.request().method() === "POST") {
+      await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "temporary failure" }) });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.reload({ waitUntil: "networkidle" });
+  const comment = page.locator('input[placeholder="코멘트..."]:visible').first();
+  await comment.fill("저장 실패 테스트");
+  await comment.blur();
+
+  await expect(page.getByText("저장에 실패했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.")).toBeVisible();
+  await expect(comment).toHaveValue("");
+  await ctx.close();
+});

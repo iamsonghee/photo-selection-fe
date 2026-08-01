@@ -157,29 +157,34 @@ export function Sidebar({
         </Link>
       </div>
 
-      {/* Profile section */}
-      {!collapsed && (
+      {/* Profile section — 클릭 시 설정으로 이동 */}
+      <Link
+        href="/photographer/settings"
+        title="설정"
+        aria-label={collapsed ? "설정" : undefined}
+        className={`flex items-center border-b hover:bg-[var(--surface)] transition-colors ${
+          collapsed ? "justify-center px-0 py-4" : "gap-3 px-6 py-4"
+        }`}
+        style={{ borderColor: "var(--acb-border)" }}
+      >
         <div
-          className="px-6 py-4 border-b flex items-center gap-3"
-          style={{ borderColor: "var(--acb-border)" }}
+          className="w-10 h-10 rounded-full overflow-hidden border flex-shrink-0 flex items-center justify-center text-sm font-bold text-foreground"
+          style={{ borderColor: "var(--acb-border)", background: "var(--surface)" }}
         >
-          <div
-            className="w-10 h-10 rounded-full overflow-hidden border flex-shrink-0 flex items-center justify-center text-sm font-bold text-foreground"
-            style={{ borderColor: "var(--acb-border)", background: "var(--surface)" }}
-          >
-            {profile?.profileImageUrl ? (
-              <img
-                src={getProfileImageUrl(profile.profileImageUrl)}
-                alt=""
-                className="w-full h-full object-cover"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-              />
-            ) : (
-              <span style={{ fontFamily: "var(--acb-sidebar-sans)" }}>
-                {displayName.charAt(0).toUpperCase()}
-              </span>
-            )}
-          </div>
+          {profile?.profileImageUrl ? (
+            <img
+              src={getProfileImageUrl(profile.profileImageUrl)}
+              alt=""
+              className="w-full h-full object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+          ) : (
+            <span style={{ fontFamily: "var(--acb-sidebar-sans)" }}>
+              {displayName.charAt(0).toUpperCase()}
+            </span>
+          )}
+        </div>
+        {!collapsed && (
           <div className="overflow-hidden min-w-0">
             <p
               className="text-sm font-semibold text-foreground truncate"
@@ -197,8 +202,8 @@ export function Sidebar({
               </p>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Link>
 
       <nav className={styles.navContainer}>
         <div

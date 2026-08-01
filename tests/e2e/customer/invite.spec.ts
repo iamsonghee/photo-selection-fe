@@ -1,5 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { setupFullProject, deleteTestProject, type TestProject } from "../../helpers/setup";
+import {
+  setupFullProject,
+  deleteTestProject,
+  mockCustomerThumbPresigning,
+  type TestProject,
+} from "../../helpers/setup";
 import { loginAsPhotographer } from "../../helpers/auth";
 
 let project: TestProject;
@@ -19,10 +24,12 @@ test.afterAll(async ({ browser }) => {
 });
 
 test.describe("고객 — 초대 링크", () => {
-  test("I1: 유효한 초대 링크 → 갤러리 화면", async ({ page }) => {
+  test("I1: 유효한 초대 링크 → 안내 화면에서 갤러리 진입", async ({ page }) => {
+    await mockCustomerThumbPresigning(page);
     await page.goto(`/c/${project.accessToken}`);
     await page.waitForLoadState("networkidle");
-    // selecting 상태이므로 갤러리로 리디렉션
+    await expect(page.getByRole("button", { name: /사진 보러 가기/ })).toBeVisible();
+    await page.getByRole("button", { name: /사진 보러 가기/ }).click();
     await expect(page).toHaveURL(/\/gallery/, { timeout: 20_000 });
   });
 
@@ -35,6 +42,7 @@ test.describe("고객 — 초대 링크", () => {
   });
 
   test("I3: 갤러리 직접 접근 → 사진 목록", async ({ page }) => {
+    await mockCustomerThumbPresigning(page);
     await page.goto(`/c/${project.accessToken}/gallery`);
     await page.waitForLoadState("networkidle");
     await expect(page).toHaveURL(/\/gallery/);

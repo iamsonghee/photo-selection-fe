@@ -82,6 +82,36 @@ export async function setupFullProject(page: Page, photoCount = 5): Promise<Test
   return createFullProject(page, photoCount);
 }
 
+/**
+ * 고객 갤러리 E2E용 썸네일 presign 응답.
+ *
+ * 실제 갤러리는 R2 객체 키에서 발급한 단기 URL만 렌더링한다. 테스트 픽스처는 R2에
+ * 업로드하지 않는 공개 더미 URL을 쓰므로, 이 경계만 모킹해 갤러리 UI와 선택 흐름을
+ * 실제와 동일하게 검증한다.
+ */
+export async function mockCustomerThumbPresigning(page: Page): Promise<void> {
+  await page.route("**/api/c/presign-thumbs?*", async (route) => {
+    const requestUrl = new URL(route.request().url());
+    const photoIds = (requestUrl.searchParams.get("photoIds") ?? "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const expiresAt = Date.now() + 60_000;
+    const presignedUrls = Object.fromEntries(
+      photoIds.map((id) => [
+        id,
+        { url: `https://picsum.photos/seed/e2e-${encodeURIComponent(id)}/400/400`, expiresAt },
+      ])
+    );
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ presignedUrls }),
+    });
+  });
+}
+
 // ── 베타 설문(5단계, plan/beta-system.md §7) E2E 헬퍼 ──────────────────────
 
 /** 로그인한 작가의 첫 생성 프로젝트 id/status 조회(② 설문 트리거 확인용) */

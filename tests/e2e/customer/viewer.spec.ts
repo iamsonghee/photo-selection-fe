@@ -65,13 +65,7 @@ test.describe("고객 — 뷰어 (사진 크게 보기)", () => {
     await page.goto(href);
     await page.waitForLoadState("networkidle");
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(500);
-    // 갤러리로 이동하거나 갤러리 링크 표시
-    await page.waitForTimeout(500);
-    const isGallery = page.url().includes("/gallery");
-    const hasGalleryLink = await page.getByRole("link", { name: /갤러리/i }).first().isVisible({ timeout: 2000 }).catch(() => false);
-    const hasBackText  = await page.locator("text=← 갤러리").isVisible({ timeout: 1000 }).catch(() => false);
-    expect(isGallery || hasGalleryLink || hasBackText).toBeTruthy();
+    await expect(page).toHaveURL(/\/gallery/, { timeout: 3000 });
   });
 
   test("V4: 뷰어에서 사진 선택/해제 (Space 키)", async ({ page }) => {
@@ -90,5 +84,12 @@ test.describe("고객 — 뷰어 (사진 크게 보기)", () => {
     await page.waitForTimeout(400);
     // 뷰어 URL 유지 확인
     await expect(page).toHaveURL(/\/viewer\//);
+  });
+
+  test("V5: 존재하지 않는 사진 주소 → 안내와 갤러리 복귀 링크", async ({ page }) => {
+    await page.goto(`${project.galleryUrl.replace(/\/gallery$/, "")}/viewer/not-a-real-photo-id`);
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByRole("heading", { name: "사진을 찾을 수 없습니다" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "갤러리로 돌아가기" })).toHaveAttribute("href", /\/gallery/);
   });
 });

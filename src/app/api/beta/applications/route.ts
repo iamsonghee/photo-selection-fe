@@ -9,8 +9,6 @@ import {
   BETA_WORKFLOW_OPTIONS,
   BETA_DESIRED_FEATURE_OPTIONS,
   BETA_PAIN_POINT_OPTIONS,
-  BETA_USAGE_INTENT_OPTIONS,
-  BETA_CONTACT_CHANNEL_OPTIONS,
   genreLabel,
   workflowLabel,
   monthlyProjectRepValue,
@@ -84,8 +82,6 @@ export async function POST(req: NextRequest) {
       desired_features: desiredFeatures,
       desired_features_other: desiredFeaturesOther,
       pain_point: painPoint,
-      usage_intent: usageIntent,
-      contact_channels: contactChannels,
       expectation,
       privacy_consent: privacyConsent,
       contact_consent: contactConsent,
@@ -104,10 +100,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "기타 촬영 분야를 입력해주세요." }, { status: 400 });
     }
     if (!isValidKey(monthlyProjectRange, BETA_MONTHLY_PROJECT_OPTIONS)) {
-      return NextResponse.json({ error: "월평균 프로젝트 수를 선택해주세요." }, { status: 400 });
+      return NextResponse.json({ error: "월평균 촬영 수를 선택해주세요." }, { status: 400 });
     }
     if (!isValidKey(avgPhotosRange, BETA_AVG_PHOTOS_OPTIONS)) {
-      return NextResponse.json({ error: "프로젝트당 평균 사진 수를 선택해주세요." }, { status: 400 });
+      return NextResponse.json({ error: "촬영당 평균 사진 수를 선택해주세요." }, { status: 400 });
     }
     if (!isValidKeySet(workflowMethods, BETA_WORKFLOW_OPTIONS)) {
       return NextResponse.json({ error: "현재 고객 셀렉 방식을 선택해주세요." }, { status: 400 });
@@ -126,12 +122,6 @@ export async function POST(req: NextRequest) {
     }
     if (painPoint !== undefined && !isValidKey(painPoint, BETA_PAIN_POINT_OPTIONS)) {
       return NextResponse.json({ error: "가장 불편한 단계 값이 올바르지 않습니다." }, { status: 400 });
-    }
-    if (usageIntent !== undefined && !isValidKey(usageIntent, BETA_USAGE_INTENT_OPTIONS)) {
-      return NextResponse.json({ error: "월 사용 의향 값이 올바르지 않습니다." }, { status: 400 });
-    }
-    if (contactChannels !== undefined && !isValidKeySet(contactChannels, BETA_CONTACT_CHANNEL_OPTIONS)) {
-      return NextResponse.json({ error: "연락 가능 채널 값이 올바르지 않습니다." }, { status: 400 });
     }
     if (expectation !== undefined && typeof expectation !== "string") {
       return NextResponse.json({ error: "A-CUT에 기대하는 점 값이 올바르지 않습니다." }, { status: 400 });
@@ -169,16 +159,18 @@ export async function POST(req: NextRequest) {
 
     const additionalAnswers: BetaAdditionalAnswers = {
       genres,
-      ...(genreOther?.trim() ? { genre_other: genreOther.trim() } : {}),
+      ...(genres.includes("other") && genreOther?.trim() ? { genre_other: genreOther.trim() } : {}),
       monthly_project_range: monthlyProjectRange,
       avg_photos_range: avgPhotosRange,
       workflow_methods: workflowMethods,
-      ...(workflowOther?.trim() ? { workflow_other: workflowOther.trim() } : {}),
+      ...(workflowMethods.includes("other") && workflowOther?.trim()
+        ? { workflow_other: workflowOther.trim() }
+        : {}),
       desired_features: desiredFeatures,
-      ...(desiredFeaturesOther?.trim() ? { desired_features_other: desiredFeaturesOther.trim() } : {}),
+      ...(desiredFeatures.includes("other") && desiredFeaturesOther?.trim()
+        ? { desired_features_other: desiredFeaturesOther.trim() }
+        : {}),
       ...(painPoint ? { pain_point: painPoint } : {}),
-      ...(usageIntent ? { usage_intent: usageIntent } : {}),
-      ...(contactChannels?.length ? { contact_channels: contactChannels } : {}),
       ...(expectation?.trim() ? { expectation: expectation.trim() } : {}),
     };
 

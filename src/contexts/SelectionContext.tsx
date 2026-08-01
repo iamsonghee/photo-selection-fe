@@ -145,6 +145,8 @@ type SelectionContextValue = {
   projectId: string | null;
   projectStatus: string | null;
   loading: boolean;
+  saveError: string | null;
+  clearSaveError: () => void;
 };
 
 const SelectionContext = createContext<SelectionContextValue | null>(null);
@@ -170,6 +172,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [photoStates, setPhotoStates] = useState<Record<string, PhotoState>>({});
   const [loading, setLoading] = useState(true);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // toggleColor()가 리렌더 사이클보다 빠른 연속 클릭에서도 항상 최신 색상 상태를 기준으로
   // 다음 값을 계산하도록, React state와 별개로 동기 ref를 둔다(selectedIdsRef와 동일한 이유).
@@ -282,6 +285,22 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
             await upsertSelectionApi(token, projectId, photoId, apiPayload);
           } catch (e) {
             console.error(e);
+            // A failed optimistic write must not look saved.  Remove this
+            // exact pending patch so the next poll can restore server truth,
+            // and let the customer know the change needs to be retried.
+            if (desiredPatchRef.current.get(photoId) === patch) {
+              desiredPatchRef.current.delete(photoId);
+              setSaveError("저장에 실패했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.");
+              const server = await fetchSelectionsPoll(token, projectId);
+              if (server) {
+                setPhotoStates((prev) => ({ ...prev, [photoId]: { ...(server.photoStates[photoId] ?? {}) } }));
+                photoStatesRef.current = {
+                  ...photoStatesRef.current,
+                  [photoId]: { ...(server.photoStates[photoId] ?? {}) },
+                };
+              }
+              break;
+            }
           }
           // 참조 동일성으로 "이 요청을 보낸 뒤 새 병합이 있었는지" 판단한다 —
           // updatePhotoState가 매번 새 객체를 만들어 넣으므로, 그대로면 그 사이 변경 없음.
@@ -476,6 +495,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       (Object.keys(patch) as Array<"rating" | "comment">).forEach((key) =>
         bumpVersion(photoId, key)
       );
+      setSaveError(null);
       if (project?.id && token) {
         // 병렬로 새 요청을 쏘지 않고 큐에 병합만 해둔다 — flushPatch가 in-flight 요청이
         // 끝난 뒤 최신 병합본을 다시 확인해 필요하면 한 번 더 보낸다(직렬화/coalescing).
@@ -672,6 +692,8 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       projectId,
       projectStatus,
       loading,
+      saveError,
+      clearSaveError: () => setSaveError(null),
     }),
     [
       project,
@@ -688,6 +710,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       projectId,
       projectStatus,
       loading,
+      saveError,
     ]
   );
 
@@ -710,10 +733,10 @@ export function SelectionConfirmBar() {
   const status = ctx.project?.status;
   if (status !== "selecting" && status !== "preparing") return null;
 
-  const { project, Y, N, projectId } = ctx;
+  const { Y, N, projectId } = ctx;
   const canConfirm = Y === N;
 
-  const handleFinalConfirm = useCallback(async () => {
+  const handleFinalConfirm = async () => {
     console.log("[확정] 버튼 클릭됨");
     if (!projectId || !token) return;
     try {
@@ -754,7 +777,7 @@ export function SelectionConfirmBar() {
         }
       }
     }
-  }, [token, projectId, router]);
+  };
 
   return (
     <>

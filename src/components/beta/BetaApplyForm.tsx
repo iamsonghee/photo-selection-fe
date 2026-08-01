@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Input, Textarea, Button, Card } from "@/components/ui";
+import { Input, PhoneInput, Textarea, Button, Card } from "@/components/ui";
 import { AuthModal } from "@/components/AuthModal";
+import { isValidKoreanPhone } from "@/lib/phone";
 import {
   BETA_GENRE_OPTIONS,
   BETA_MONTHLY_PROJECT_OPTIONS,
@@ -11,14 +12,16 @@ import {
   BETA_WORKFLOW_OPTIONS,
   BETA_DESIRED_FEATURE_OPTIONS,
   BETA_PAIN_POINT_OPTIONS,
-  BETA_USAGE_INTENT_OPTIONS,
-  BETA_CONTACT_CHANNEL_OPTIONS,
   type BetaOption,
 } from "@/lib/beta-application";
 
-/** 로그인 안 된 상태에서 /beta/apply에 접근했을 때 노출 — 로그인 후에만 신청서를 받는다(§3.1). */
+/**
+ * 로그인 안 된 상태에서 /beta/apply에 접근했을 때 노출 — 로그인 후에만 신청서를 받는다(§3.1).
+ * 클릭을 한 번 줄이기 위해 진입 시 로그인 모달이 처음부터 열려 있다 — 안내 카드는 그대로 뒤에
+ * 남겨둬서, 모달을 닫아도 맥락 없이 빈 화면이 되지 않고 다시 열 수 있는 버튼이 있게 한다.
+ */
 function BetaApplySignInPrompt() {
-  const [authOpen, setAuthOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(true);
 
   return (
     <Card className="flex flex-col items-center gap-4 text-center">
@@ -88,12 +91,14 @@ function MultiSelectField({
   onOtherChange?: (v: string) => void;
 }) {
   const toggle = (key: string) => {
-    onChange(values.includes(key) ? values.filter((v) => v !== key) : [...values, key]);
+    const isRemoving = values.includes(key);
+    onChange(isRemoving ? values.filter((v) => v !== key) : [...values, key]);
+    if (isRemoving && key === otherKey) onOtherChange?.("");
   };
   const hasOther = options.some((o) => o.key === otherKey);
   return (
-    <div>
-      <label className="mb-1.5 block text-sm font-medium text-foreground">{label}</label>
+    <fieldset>
+      <legend className="mb-1.5 block text-sm font-medium text-foreground">{label}</legend>
       {hint && <p className="mb-2 text-xs text-muted-foreground">{hint}</p>}
       <div className="flex flex-wrap gap-2">
         {options.map((o) => (
@@ -108,32 +113,47 @@ function MultiSelectField({
           placeholder="기타 내용을 입력해주세요"
         />
       )}
-    </div>
+    </fieldset>
   );
 }
 
-function SingleSelectField({
+function SelectField({
   label,
-  hint,
   options,
   value,
   onChange,
+  placeholder = "선택해주세요",
+  allowClear = false,
 }: {
   label: string;
-  hint?: string;
   options: readonly BetaOption[];
   value: string;
   onChange: (next: string) => void;
+  placeholder?: string;
+  allowClear?: boolean;
 }) {
+  const selectId = useId();
+
   return (
-    <div>
-      <label className="mb-1.5 block text-sm font-medium text-foreground">{label}</label>
-      {hint && <p className="mb-2 text-xs text-muted-foreground">{hint}</p>}
-      <div className="flex flex-wrap gap-2">
+    <div className="w-full">
+      <label htmlFor={selectId} className="mb-1.5 block text-sm font-medium text-foreground">
+        {label}
+      </label>
+      <select
+        id={selectId}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full h-11 px-4 rounded-lg bg-surface-raised border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+      >
+        <option value="" disabled={!allowClear}>
+          {placeholder}
+        </option>
         {options.map((o) => (
-          <OptionChip key={o.key} label={o.label} selected={value === o.key} onClick={() => onChange(o.key)} />
+          <option key={o.key} value={o.key}>
+            {o.label}
+          </option>
         ))}
-      </div>
+      </select>
     </div>
   );
 }
@@ -142,9 +162,11 @@ function SingleSelectField({
 
 function BetaApplyFormFields({ email }: { email: string }) {
   const router = useRouter();
+  const submittingRef = useRef(false);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
   const [genres, setGenres] = useState<string[]>([]);
   const [genreOther, setGenreOther] = useState("");
@@ -156,8 +178,6 @@ function BetaApplyFormFields({ email }: { email: string }) {
   const [desiredFeaturesOther, setDesiredFeaturesOther] = useState("");
 
   const [painPoint, setPainPoint] = useState("");
-  const [usageIntent, setUsageIntent] = useState("");
-  const [contactChannels, setContactChannels] = useState<string[]>([]);
   const [expectation, setExpectation] = useState("");
 
   const [privacyConsent, setPrivacyConsent] = useState(false);
@@ -168,11 +188,11 @@ function BetaApplyFormFields({ email }: { email: string }) {
 
   function validate(): string | null {
     if (!name.trim()) return "이름을 입력해주세요.";
-    if (!/^01[016789]-?\d{3,4}-?\d{4}$/.test(phone.trim())) return "휴대폰번호 형식이 올바르지 않습니다.";
+    if (!isValidKoreanPhone(phone)) return "휴대폰번호 형식이 올바르지 않습니다. (예: 010-1234-5678)";
     if (genres.length === 0) return "주 촬영 분야를 선택해주세요.";
     if (genres.includes("other") && !genreOther.trim()) return "기타 촬영 분야를 입력해주세요.";
-    if (!monthlyProjectRange) return "월평균 프로젝트 수를 선택해주세요.";
-    if (!avgPhotosRange) return "프로젝트당 평균 사진 수를 선택해주세요.";
+    if (!monthlyProjectRange) return "월평균 촬영 수를 선택해주세요.";
+    if (!avgPhotosRange) return "촬영당 평균 사진 수를 선택해주세요.";
     if (workflowMethods.length === 0) return "현재 고객 셀렉 방식을 선택해주세요.";
     if (workflowMethods.includes("other") && !workflowOther.trim()) return "기타 셀렉 방식을 입력해주세요.";
     if (desiredFeatures.length === 0) return "베타에서 사용해보고 싶은 기능을 선택해주세요.";
@@ -184,12 +204,15 @@ function BetaApplyFormFields({ email }: { email: string }) {
   }
 
   async function submit() {
+    if (submittingRef.current) return;
+
     const validationError = validate();
     if (validationError) {
       setError(validationError);
       return;
     }
 
+    submittingRef.current = true;
     setSubmitting(true);
     setError("");
     try {
@@ -200,16 +223,16 @@ function BetaApplyFormFields({ email }: { email: string }) {
           name: name.trim(),
           phone: phone.trim(),
           genres,
-          genre_other: genreOther.trim() || undefined,
+          genre_other: genres.includes("other") ? genreOther.trim() || undefined : undefined,
           monthly_project_range: monthlyProjectRange,
           avg_photos_range: avgPhotosRange,
           workflow_methods: workflowMethods,
-          workflow_other: workflowOther.trim() || undefined,
+          workflow_other: workflowMethods.includes("other") ? workflowOther.trim() || undefined : undefined,
           desired_features: desiredFeatures,
-          desired_features_other: desiredFeaturesOther.trim() || undefined,
+          desired_features_other: desiredFeatures.includes("other")
+            ? desiredFeaturesOther.trim() || undefined
+            : undefined,
           pain_point: painPoint || undefined,
-          usage_intent: usageIntent || undefined,
-          contact_channels: contactChannels.length > 0 ? contactChannels : undefined,
           expectation: expectation.trim() || undefined,
           privacy_consent: privacyConsent,
           contact_consent: contactConsent,
@@ -225,6 +248,7 @@ function BetaApplyFormFields({ email }: { email: string }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "신청에 실패했습니다. 다시 시도해주세요.");
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
@@ -244,12 +268,12 @@ function BetaApplyFormFields({ email }: { email: string }) {
       </div>
 
       <Input label="이름 *" value={name} onChange={(e) => setName(e.target.value)} placeholder="홍길동" />
-      <Input
+      <PhoneInput
         label="휴대폰번호 *"
         value={phone}
-        onChange={(e) => setPhone(e.target.value)}
-        placeholder="010-1234-5678"
-        inputMode="tel"
+        onChange={setPhone}
+        onBlur={() => setPhoneError(phone && !isValidKoreanPhone(phone) ? "010-0000-0000 형식으로 입력해주세요." : "")}
+        error={phoneError}
       />
 
       <MultiSelectField
@@ -261,15 +285,14 @@ function BetaApplyFormFields({ email }: { email: string }) {
         onOtherChange={setGenreOther}
       />
 
-      <SingleSelectField
-        label="월평균 프로젝트 수 *"
+      <SelectField
+        label="월평균 촬영 수 *"
         options={BETA_MONTHLY_PROJECT_OPTIONS}
         value={monthlyProjectRange}
         onChange={setMonthlyProjectRange}
       />
-
-      <SingleSelectField
-        label="프로젝트당 평균 사진 수 *"
+      <SelectField
+        label="촬영당 평균 사진 수 *"
         options={BETA_AVG_PHOTOS_OPTIONS}
         value={avgPhotosRange}
         onChange={setAvgPhotosRange}
@@ -296,25 +319,12 @@ function BetaApplyFormFields({ email }: { email: string }) {
       <div className="h-px bg-border" />
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">선택 입력</p>
 
-      <SingleSelectField
+      <SelectField
         label="가장 불편한 단계"
         options={BETA_PAIN_POINT_OPTIONS}
         value={painPoint}
         onChange={setPainPoint}
-      />
-
-      <SingleSelectField
-        label="월 사용 의향"
-        options={BETA_USAGE_INTENT_OPTIONS}
-        value={usageIntent}
-        onChange={setUsageIntent}
-      />
-
-      <MultiSelectField
-        label="연락 가능 채널 (복수선택 가능)"
-        options={BETA_CONTACT_CHANNEL_OPTIONS}
-        values={contactChannels}
-        onChange={setContactChannels}
+        allowClear
       />
 
       <Textarea
@@ -341,7 +351,7 @@ function BetaApplyFormFields({ email }: { email: string }) {
           onChange={(e) => setContactConsent(e.target.checked)}
           className="mt-0.5"
         />
-        베타 운영 관련 연락(전화/문자)에 동의합니다 (필수)
+        베타 운영 관련 연락에 동의합니다 (필수)
       </label>
 
       {error && <p className="text-sm text-danger">{error}</p>}

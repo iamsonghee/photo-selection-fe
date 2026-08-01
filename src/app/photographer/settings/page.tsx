@@ -21,6 +21,8 @@ import { ko } from "date-fns/locale";
 import { useProfile } from "@/contexts/ProfileContext";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { compressImageForUpload } from "@/lib/upload-client-compress";
+import { PhoneInput } from "@/components/ui/PhoneInput";
+import { isValidKoreanPhone } from "@/lib/phone";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const ACCEPT_IMAGE = "image/jpeg,image/png,image/webp";
@@ -91,6 +93,10 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     if (!profile) return;
+    if (editPhone.trim() && !isValidKoreanPhone(editPhone)) {
+      setFormError("연락처는 010-0000-0000 형식으로 입력해주세요.");
+      return;
+    }
     setSaving(true);
     setFormError(null);
     try {
@@ -367,11 +373,10 @@ export default function SettingsPage() {
 
               <div>
                 <label className="text-sm font-semibold text-muted-foreground block mb-2">연락처</label>
-                <input
+                <PhoneInput
                   className={INPUT_CLS}
                   value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  placeholder="010-0000-0000"
+                  onChange={setEditPhone}
                 />
                 <p className="text-[11px] text-disabled-foreground mt-1.5">알림 연동 시 사용됩니다 (선택).</p>
               </div>

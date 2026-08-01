@@ -110,12 +110,14 @@ function ViewerPhotoWithBadge({ src, alt, showBadge }: { src: string; alt: strin
   }, []);
 
   useEffect(() => {
-    measureBadge();
+    const frame = requestAnimationFrame(measureBadge);
     const el = containerRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
+    if (!el || typeof ResizeObserver === "undefined") {
+      return () => cancelAnimationFrame(frame);
+    }
     const ro = new ResizeObserver(() => measureBadge());
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => { cancelAnimationFrame(frame); ro.disconnect(); };
   }, [measureBadge, src]);
 
   useEffect(() => {
@@ -147,7 +149,7 @@ export default function ViewerPage() {
   const searchParams = useSearchParams();
   const token = (params?.token as string) ?? "";
   const photoId = (params?.photoId as string) ?? "";
-  const { project, photos: contextPhotos, photoGroups, selectedIds, Y, toggle, photoStates, updatePhotoState, toggleColor } = useSelection();
+  const { project, photos: contextPhotos, photoGroups, selectedIds, Y, toggle, photoStates, updatePhotoState, toggleColor, saveError, clearSaveError } = useSelection();
 
   // 로컬 state로 현재 사진 관리 — router.push 없이 전환해 컴포넌트 재마운트 방지
   const [activePhotoId, setActivePhotoId] = useState(photoId);
@@ -279,6 +281,7 @@ export default function ViewerPage() {
   const [starPressRing,  setStarPressRing]  = useState<number | null>(null);
   const [colorPressRing, setColorPressRing] = useState<ColorTag | null>(null);
   const [draftComment,   setDraftComment]   = useState("");
+  const [isCommentEditing, setIsCommentEditing] = useState(false);
   const [showShortcuts,  setShowShortcuts]  = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirming,       setConfirming]       = useState(false);
@@ -333,9 +336,12 @@ export default function ViewerPage() {
   }, [navAnchorIndex]);
 
   useEffect(() => {
-    if (current?.id) setDraftComment(photoStates[current.id]?.comment ?? "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.id]);
+    // Do not overwrite text currently being composed, but do reflect the
+    // latest server state from another customer tab once editing ends.
+    if (current?.id && !isCommentEditing) {
+      setDraftComment(photoStates[current.id]?.comment ?? "");
+    }
+  }, [current?.id, photoStates, isCommentEditing]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -420,7 +426,10 @@ export default function ViewerPage() {
       return;
     }
     if (e.key === "?" || (e.shiftKey && e.key === "/")) { setShowShortcuts(s => !s); return; }
-    if (e.key === "Escape") { setShowShortcuts(false); return; }
+    if (e.key === "Escape") {
+      router.push(buildGalleryHrefWithFocus(token, searchParams, activePhotoId));
+      return;
+    }
     switch (e.code) {
       case "Digit1": setStar(1); setStarPressRing(1); setTimeout(() => setStarPressRing(null), 200); break;
       case "Digit2": setStar(2); setStarPressRing(2); setTimeout(() => setStarPressRing(null), 200); break;
@@ -435,7 +444,7 @@ export default function ViewerPage() {
       case "ArrowLeft":  e.preventDefault(); goPrevWrap(); break;
       case "ArrowRight": e.preventDefault(); goNextWrap(); break;
     }
-  }, [setStar, setColor, goPrevWrap, goNextWrap, showConfirmModal, confirming]);
+  }, [setStar, setColor, goPrevWrap, goNextWrap, showConfirmModal, confirming, router, token, searchParams, activePhotoId]);
 
   useEffect(() => {
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -460,7 +469,21 @@ export default function ViewerPage() {
     if (project.status === "confirmed" || project.status === "editing") router.replace(`/c/${token}/locked`);
   }, [project?.status, project, token, router]);
 
-  if (!project || !current) return null;
+  if (!project) return null;
+  if (!current) {
+    const galleryHref = buildGalleryHrefWithFocus(token, searchParams, activePhotoId);
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-black px-6 text-center text-white">
+        <div>
+          <h1 className="text-lg font-bold">사진을 찾을 수 없습니다</h1>
+          <p className="mt-2 text-sm text-white/65">사진이 삭제되었거나 올바르지 않은 주소입니다.</p>
+          <Link href={galleryHref} className="mt-6 inline-flex rounded-md bg-white px-4 py-2 text-sm font-semibold text-black">
+            갤러리로 돌아가기
+          </Link>
+        </div>
+      </main>
+    );
+  }
   if (project.status === "confirmed" || project.status === "editing") return null;
 
   const displayRating      = hoverStar || star || 0;
@@ -800,8 +823,9 @@ export default function ViewerPage() {
                 type="text"
                 className="fs-comment-input"
                 value={draftComment}
+                onFocus={() => { setIsCommentEditing(true); clearSaveError(); }}
                 onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
-                onBlur={saveComment}
+                onBlur={() => { setIsCommentEditing(false); saveComment(); }}
                 onKeyDown={(e) => {
                   if (e.nativeEvent.isComposing) return;
                   if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -809,6 +833,7 @@ export default function ViewerPage() {
                 placeholder="코멘트..."
                 style={{ flex: 1, padding: "0 14px", height: 38, borderRadius: 8, minWidth: 0 }}
               />
+              {saveError && <p role="alert" className="mt-1 text-xs text-red-400">{saveError}</p>}
             </div>
 
             <button
@@ -1119,8 +1144,9 @@ export default function ViewerPage() {
             <input
               type="text"
               value={draftComment}
+              onFocus={() => { setIsCommentEditing(true); clearSaveError(); }}
               onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
-              onBlur={saveComment}
+              onBlur={() => { setIsCommentEditing(false); saveComment(); }}
               onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
               placeholder="코멘트..."
               style={{
