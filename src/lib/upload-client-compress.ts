@@ -15,6 +15,33 @@ export type UploadCompressOptions = {
   skipBelowBytes?: number;
 };
 
+let compressionWorker: Worker | null = null;
+let compressionRequestId = 0;
+const pendingWorkerRequests = new Map<number, (blob: Blob | null) => void>();
+
+function getCompressionWorker(): Worker | null {
+  if (typeof Worker === "undefined" || typeof OffscreenCanvas === "undefined") return null;
+  if (compressionWorker) return compressionWorker;
+  try {
+    compressionWorker = new Worker(new URL("../workers/upload-compress.worker.ts", import.meta.url));
+    compressionWorker.onmessage = (event: MessageEvent<{ id: number; blob: Blob | null }>) => {
+      const resolve = pendingWorkerRequests.get(event.data.id);
+      if (!resolve) return;
+      pendingWorkerRequests.delete(event.data.id);
+      resolve(event.data.blob);
+    };
+    compressionWorker.onerror = () => {
+      compressionWorker?.terminate();
+      compressionWorker = null;
+      pendingWorkerRequests.forEach((resolve) => resolve(null));
+      pendingWorkerRequests.clear();
+    };
+    return compressionWorker;
+  } catch {
+    return null;
+  }
+}
+
 function baseNameFromFilename(name: string): string {
   const i = name.lastIndexOf(".");
   return i > 0 ? name.slice(0, i) : name;
@@ -63,6 +90,22 @@ export async function compressImageForUpload(
 
   const mime = (file.type || "").toLowerCase();
   if (!mime.startsWith("image/")) return file;
+
+  const worker = getCompressionWorker();
+  if (worker) {
+    const id = ++compressionRequestId;
+    const blob = await new Promise<Blob | null>((resolve) => {
+      pendingWorkerRequests.set(id, resolve);
+      worker.postMessage({ id, file, maxEdge, jpegQuality });
+    });
+    if (blob && blob.size > 0 && blob.size < file.size * 0.98) {
+      return new File([blob], `${baseNameFromFilename(file.name) || "photo"}.jpg`, {
+        type: "image/jpeg",
+        lastModified: Date.now(),
+      });
+    }
+    if (blob) return file;
+  }
 
   let cleanup: (() => void) | undefined;
   try {

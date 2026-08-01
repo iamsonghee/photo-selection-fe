@@ -57,6 +57,9 @@ const UPLOAD_PHOTOS_PATH = "/api/photographer/upload/photos";
 const UPLOAD_MAX_ATTEMPTS = 3;
 const BATCH_SIZE = 8;
 const PC_CONCURRENCY = 5;
+// 원본 포함 업로드는 압축본 전송 뒤 R2 PUT까지 같은 슬롯을 점유한다.
+// 데스크톱은 4개 병렬로 원본 대기 시간을 줄이고, 모바일은 기존 1개를 유지한다.
+const ORIGINAL_PC_CONCURRENCY = 4;
 const MOBILE_BATCH_SIZE = 3;
 const MOBILE_CONCURRENCY = 1;
 const ACCEPT_TYPES = "image/*,image/heic,image/heif";
@@ -89,6 +92,13 @@ function isPhoneLikeClient(): boolean {
   if (/iPhone|iPod/i.test(ua)) return true;
   if (/Android/i.test(ua) && /Mobile/i.test(ua)) return true;
   return false;
+}
+
+function getDesktopUploadConcurrency(includeOriginal: boolean): number {
+  const connection = (navigator as Navigator & { connection?: { effectiveType?: string; saveData?: boolean } }).connection;
+  if (connection?.saveData || connection?.effectiveType === "slow-2g" || connection?.effectiveType === "2g") return 2;
+  if (connection?.effectiveType === "3g") return includeOriginal ? 3 : 4;
+  return includeOriginal ? ORIGINAL_PC_CONCURRENCY : PC_CONCURRENCY + 1;
 }
 
 function shouldRetryStatus(status: number) {
@@ -1360,8 +1370,8 @@ export default function ProjectDetailPage() {
     // B Plan: 압축본을 서버로 전송 + 원본은 presigned PUT으로 R2에 직접 전송
     const effectiveBatch = inclOrig ? 1 : (isPhoneLikeClient() ? MOBILE_BATCH_SIZE : BATCH_SIZE);
     const concurrency = inclOrig
-      ? (isPhoneLikeClient() ? 1 : 3)
-      : (isPhoneLikeClient() ? MOBILE_CONCURRENCY : PC_CONCURRENCY);
+      ? (isPhoneLikeClient() ? 1 : getDesktopUploadConcurrency(true))
+      : (isPhoneLikeClient() ? MOBILE_CONCURRENCY : getDesktopUploadConcurrency(false));
     const totalBatches = Math.ceil(totalFiles / effectiveBatch);
 
     // XHR 진행률 추적용 근사 배치 사이즈 (원본 파일 기준 — 압축본은 더 작지만 비율 유지됨)
