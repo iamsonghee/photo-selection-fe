@@ -1123,7 +1123,6 @@ export default function ProjectDetailPage() {
   // 점유 중이던 워커를 즉시 교체시킨다(다음 세션이 기다리지 않도록, upload-client-compress.ts 참고).
   const compressAbortControllerRef = useRef<AbortController | null>(null);
   const useProxyRef = useRef(false);
-  const previousArchiveStatusRef = useRef<Project["originalArchiveStatus"] | undefined>(undefined);
   /** selecting 안내 모달 확인 시 pending으로 넘길 드래그 파일 임시 보관 */
   const pendingDropFilesRef = useRef<File[] | null>(null);
 
@@ -1170,32 +1169,6 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     loadProject().then((p) => { if (p) { loadPhotos(); loadPhotoGroups(); } });
   }, [id, loadProject, loadPhotos, loadPhotoGroups]);
-
-  // 원본 ZIP은 백그라운드 워커가 준비한다. 업로드 직후에는 pending/processing으로
-  // 시작하지만, 프로젝트를 다시 열지 않아도 완료 상태를 받아 버튼을 활성화해야 한다.
-  useEffect(() => {
-    // enqueue 전의 NULL도 "아직 준비 중"이다. UI는 이미 pending으로 표시하고 있는데
-    // 여기서 제외하면 워커가 ready로 바꿔도 새로고침 전에는 CTA가 갱신되지 않는다.
-    const archiveStatus = project?.includeOriginal
-      ? project.originalArchiveStatus ?? "pending"
-      : null;
-    if (!project?.includeOriginal || (archiveStatus !== "pending" && archiveStatus !== "processing")) return;
-
-    const timer = window.setInterval(() => { void loadProject(); }, 5000);
-    return () => window.clearInterval(timer);
-  }, [project?.includeOriginal, project?.originalArchiveStatus, loadProject]);
-
-  // 자동 확인으로 준비가 끝나면 버튼만 바뀌는 데서 끝내지 않고, 바로 다음 행동을 안내한다.
-  useEffect(() => {
-    const previous = previousArchiveStatusRef.current;
-    const current = project?.includeOriginal
-      ? project.originalArchiveStatus ?? "pending"
-      : null;
-    if ((previous === "pending" || previous === "processing") && current === "ready") {
-      setToast("원본 준비가 완료되었습니다. 이제 고객을 초대할 수 있어요.");
-    }
-    previousArchiveStatusRef.current = current;
-  }, [project?.includeOriginal, project?.originalArchiveStatus]);
 
   /** 마운트/재진입 시 로컬 분석 상태를 서버 상태로 시드 — processing이면 아래 폴링 이펙트가 자동 재개된다 */
   useEffect(() => {
@@ -1328,15 +1301,6 @@ export default function ProjectDetailPage() {
     }, 4000);
     return () => clearInterval(t);
   }, [clipAnalysisStatus, loadClipAnalysisStatus]);
-
-  /** 납품용 원본 아카이브 상태 polling — pending/processing 중일 때만(백그라운드 워커가 비동기로 생성) */
-  useEffect(() => {
-    if (!project?.includeOriginal) return;
-    const s = project.originalArchiveStatus;
-    if (s !== "pending" && s !== "processing") return;
-    const t = setInterval(() => { loadProject(); }, 5000);
-    return () => clearInterval(t);
-  }, [project?.includeOriginal, project?.originalArchiveStatus, loadProject]);
 
   /** 분석이 방금 완료로 바뀌면 그룹/사진(=새 similarityGroupId 반영)을 다시 불러오고
    *  토글을 자동으로 켜서 대표컷 묶음 표시가 즉시 보이도록 한다(수동 클릭 불필요). */
@@ -2107,25 +2071,6 @@ export default function ProjectDetailPage() {
     }
   };
 
-  const handleRetryArchive = async () => {
-    if (!project) return;
-    setInviteActivating(true);
-    try {
-      const res = await fetch(`/api/photographer/projects/${id}/retry-archive`, { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setToast((data as { error?: string }).error ?? "재시도에 실패했습니다.");
-        return;
-      }
-      await loadProject();
-      setToast("납품용 원본 정리를 다시 시작합니다.");
-    } catch (e) {
-      setToast(e instanceof Error ? e.message : "재시도에 실패했습니다.");
-    } finally {
-      setInviteActivating(false);
-    }
-  };
-
   const handleStartClipAnalysis = async () => {
     // 대기 중인 사진이 없으면(이미 전체 분석 완료) API를 다시 부르지 않고 결과만 보여준다 —
     // 저장된 임베딩·그룹이 이미 최신 상태이므로 그대로 토글만 켠다.
@@ -2178,12 +2123,6 @@ export default function ProjectDetailPage() {
   const M = project.photoCount;
   const daysLeft = differenceInDays(new Date(project.deadline), new Date());
   const isInviteActive = project.status !== "preparing";
-  // 납품용 원본 아카이브 상태. 갤러리 링크는 ZIP 준비와 분리하고, 고객 다운로드만 ready까지 대기한다.
-  const archiveStatus = project.includeOriginal ? project.originalArchiveStatus ?? "pending" : null;
-  // 사진이 없으면 초대 조건은 사진 수로 이미 막힌다. 이때 과거/진행 중인 아카이브
-  // 상태를 우선 표시하면 "정리 중"으로 보이는 문제가 생기므로 실제 사진이 있을 때만 막는다.
-  const archiveBlocking = M > 0 && !!archiveStatus && archiveStatus !== "ready";
-  const failedOriginalCount = photos.filter((p) => p.originalStatus === "failed").length;
   const progressPct = N > 0 ? Math.min(100, Math.round((displayPhotos.length / N) * 100)) : 0;
   const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
   // 갤러리 업로드, 클라이언트 압축, 서버 최종 저장, 원본 R2 PUT 중 하나라도 남아 있으면
@@ -2869,13 +2808,7 @@ export default function ProjectDetailPage() {
                 {inviteUrl.replace(/^https?:\/\//, "")}
               </div>
               {project.includeOriginal && (
-                <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: project.originalArchiveStatus === "failed" ? "#ff8a8a" : TEXT_MUTED }}>
-                  {project.originalArchiveStatus === "ready"
-                    ? "납품용 원본 다운로드 준비 완료"
-                    : project.originalArchiveStatus === "failed"
-                      ? "납품용 원본 준비 실패 · 다시 준비가 필요합니다"
-                      : <><Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> 납품용 원본 다운로드 준비 중</>}
-                </div>
+                <div style={{ fontSize: 11, color: TEXT_MUTED }}>납품용 원본은 고객 링크에서 파일별로 바로 다운로드할 수 있습니다.</div>
               )}
             </div>
             <button
@@ -2912,22 +2845,8 @@ export default function ProjectDetailPage() {
                   ? "사진을 모두 업로드하고 있어요. 완료되면 고객 링크를 활성화할 수 있습니다."
                   : M < N
                   ? `${displayPhotos.length}장 업로드됨 · ${N}장 이상 업로드 후 활성화 가능합니다`
-                  : archiveStatus === "failed"
-                    ? `갤러리는 지금 공유할 수 있어요 · 납품용 원본 처리 실패 ${failedOriginalCount}장`
-                    : archiveBlocking
-                      ? "갤러리는 지금 공유할 수 있어요 · 납품용 원본은 백그라운드에서 준비 중입니다."
-                      : `${displayPhotos.length}장 업로드 완료 · 초대 링크를 활성화할 수 있습니다`}
+                  : `${displayPhotos.length}장 업로드 완료 · 초대 링크를 활성화할 수 있습니다`}
               </div>
-              {archiveStatus === "failed" && (
-                <button
-                  type="button"
-                  onClick={handleRetryArchive}
-                  disabled={inviteActivating}
-                  style={{ alignSelf: "flex-start", marginTop: 4, padding: 0, background: "none", border: "none", color: ACCENT, fontSize: 11, cursor: inviteActivating ? "not-allowed" : "pointer" }}
-                >
-                  납품 원본 다시 준비
-                </button>
-              )}
             </div>
             <button
               type="button"

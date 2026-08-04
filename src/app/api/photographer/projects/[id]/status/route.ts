@@ -73,13 +73,11 @@ export async function PATCH(
 
     const updatePayload: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
 
-    // 고객 링크는 갤러리가 완성되면 원본 ZIP 준비 중에도 열 수 있다. 다운로드 30일 기산은
-    // 실제 ZIP이 준비된 시점에만 시작한다(준비 중 링크 활성화 시에는 archive 완료 RPC가 기록).
+    // 원본은 ZIP이 아니라 R2 객체를 직접 제공한다. 고객 링크를 여는 순간부터 30일을 계산한다.
     if (
       proj.status === "preparing" &&
       status === "selecting" &&
-      !proj.original_download_started_at &&
-      (!proj.include_original || proj.original_archive_status === "ready")
+      !proj.original_download_started_at
     ) {
       updatePayload.original_download_started_at = new Date().toISOString();
     }
@@ -94,6 +92,15 @@ export async function PATCH(
 
     if (updateErr) {
       return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    }
+
+    // 고객 링크는 즉시 열되, 원본 ZIP은 그 뒤 백그라운드에서 준비한다.
+    // RPC는 원본이 모두 완료된 경우에만 NULL → pending으로 원자적으로 전환한다.
+    if (proj.status === "preparing" && status === "selecting" && proj.include_original) {
+      const { error: archiveErr } = await admin.rpc("enqueue_original_archive_build", {
+        p_project_id: projectId,
+      });
+      if (archiveErr) console.error("[PATCH project status] archive enqueue failed", archiveErr);
     }
 
     return NextResponse.json({ status });

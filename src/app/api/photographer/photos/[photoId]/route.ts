@@ -37,6 +37,7 @@ async function getPhotographerIdFromSession(): Promise<string | null> {
 }
 
 function urlToR2Key(url: string): string {
+  if (url.startsWith("originals/")) return url;
   try {
     const pathname = new URL(url).pathname;
     return pathname.startsWith("/") ? pathname.slice(1) : pathname;
@@ -59,7 +60,7 @@ export async function DELETE(
     const admin = getAdminClient();
     const { data: photo, error: photoErr } = await admin
       .from("photos")
-      .select("id, project_id, r2_thumb_url")
+      .select("id, project_id, r2_thumb_url, r2_preview_url, r2_original_url")
       .eq("id", photoId)
       .single();
     if (photoErr || !photo) return NextResponse.json({ error: "Photo not found" }, { status: 404 });
@@ -77,29 +78,24 @@ export async function DELETE(
     if ((project as { status: string }).status !== "preparing") {
       return NextResponse.json({ error: "preparing 상태에서만 삭제할 수 있습니다." }, { status: 403 });
     }
-    // 납품용 원본 아카이브가 생성 대상으로 확정된(enqueue 이후) 프로젝트에서는, 원본이 있는
-    // 사진을 삭제하면 이미 만들어졌거나 만들어지는 중인 ZIP과 실제 사진 구성이 어긋나므로 금지한다.
-    if ((project as { original_archive_status: string | null }).original_archive_status) {
-      const { data: photoStatus } = await admin
-        .from("photos")
-        .select("original_status")
-        .eq("id", photoId)
-        .single();
-      if ((photoStatus as { original_status: string | null } | null)?.original_status) {
-        return NextResponse.json(
-          { error: "납품용 원본 정리가 시작된 이후에는 원본이 포함된 사진을 삭제할 수 없습니다." },
-          { status: 403 }
-        );
-      }
-    }
-
-    const key = urlToR2Key((photo as { r2_thumb_url: string }).r2_thumb_url);
-    if (key) {
+    // 원본은 ZIP이 아니라 개별 R2 객체를 직접 제공하므로, preparing 단계에서는 사진 구성
+    // 변경이 가능하다. 썸네일·미리보기·원본을 함께 지워 저장 비용과 접근 가능성을 없앤다.
+    const { data: originalJob } = await admin
+      .from("original_jobs")
+      .select("r2_source_key")
+      .eq("photo_id", photoId)
+      .maybeSingle();
+    const photoRow = photo as { r2_thumb_url: string; r2_preview_url: string | null; r2_original_url: string | null };
+    const keys = [photoRow.r2_thumb_url, photoRow.r2_preview_url, photoRow.r2_original_url]
+      .flatMap((ref) => ref ? [urlToR2Key(ref)] : [])
+      .concat((originalJob as { r2_source_key?: string } | null)?.r2_source_key ?? "")
+      .filter(Boolean);
+    if (keys.length) {
       const backendUrl = process.env.BACKEND_URL ?? process.env.API_URL ?? "http://localhost:8000";
       const res = await fetch(`${backendUrl}/api/storage/delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keys: [key] }),
+        body: JSON.stringify({ keys }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
