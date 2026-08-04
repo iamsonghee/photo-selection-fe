@@ -138,16 +138,24 @@ function HeroSection({ onAuthOpen, isLoggedIn }: { onAuthOpen: () => void; isLog
         </div>
 
         <div className="flex flex-col gap-4 items-start">
-          <button
-            type="button"
-            onClick={onAuthOpen}
-            className="landing-btn-primary gap-4 px-10 py-5 text-black font-bold text-xl uppercase tracking-tight"
-          >
-            {isLoggedIn ? "대시보드로 이동" : "무료로 시작하기"}
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-              <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={onAuthOpen}
+              className="landing-btn-primary gap-4 px-10 py-5 text-black font-bold text-xl uppercase tracking-tight"
+            >
+              {isLoggedIn ? "대시보드로 이동" : "무료로 시작하기"}
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </button>
+            <Link
+              href="/beta/apply"
+              className="inline-flex items-center justify-center px-7 py-5 border border-accent/60 text-accent font-bold text-base uppercase tracking-tight hover:bg-accent/10 transition-colors"
+            >
+              베타 신청하기 →
+            </Link>
+          </div>
           <div className="flex items-center gap-3 text-[12px] landing-mono text-subtle-foreground">
             <span className="flex items-center gap-1">
               <div className="w-1 h-1 bg-accent" /> 베타 기간 무료
@@ -299,17 +307,22 @@ function MobileHeroSection({ onAuthOpen, isLoggedIn }: { onAuthOpen: () => void;
               <span className="text-foreground">모든 워크플로우를 자동화하세요.</span>
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onAuthOpen}
-            className="landing-btn-primary flex items-center justify-center gap-3 text-black font-bold text-base uppercase tracking-tight mb-4"
-            style={{ padding: "16px 24px", width: "100%" }}
-          >
-            {isLoggedIn ? "대시보드로 이동" : "무료로 시작하기"}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-              <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
-          </button>
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <button
+              type="button"
+              onClick={onAuthOpen}
+              className="landing-btn-primary flex items-center justify-center gap-2 text-black font-bold text-sm uppercase tracking-tight"
+              style={{ padding: "16px 12px" }}
+            >
+              {isLoggedIn ? "대시보드" : "무료 시작"}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </button>
+            <Link href="/beta/apply" className="flex items-center justify-center border border-accent/60 text-accent font-bold text-sm uppercase tracking-tight hover:bg-accent/10 transition-colors">
+              베타 신청 →
+            </Link>
+          </div>
           <div className="flex items-center gap-4 text-[9px] landing-mono text-subtle-foreground justify-center">
             <span className="flex items-center gap-1">
               <div className="w-1 h-1 bg-accent" /> BETA FREE
@@ -807,12 +820,6 @@ function PlanComparisonCards({
           <li>비슷한 사진을 묶어 비교를 돕는 AI 유사컷 분석</li>
         </ul>
         <p className="text-xs text-subtle-foreground">베타 종료 후 정책이 달라질 수 있습니다.</p>
-        <Link
-          href="/beta/apply"
-          className="self-center text-accent underline underline-offset-2 hover:text-accent/80 text-sm font-semibold"
-        >
-          클로즈드 베타 신청 →
-        </Link>
       </div>
     </div>
   );
