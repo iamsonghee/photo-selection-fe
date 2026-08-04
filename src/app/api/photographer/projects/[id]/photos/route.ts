@@ -110,7 +110,7 @@ export async function DELETE(
     // 고객 링크 활성화 전(preparing)에는 작가가 전체를 비우고 다시 업로드할 수 있다.
     // 이미 시작된 원본 ZIP 작업은 DB 스냅샷과 R2 원본/ZIP을 함께 폐기해 다음 업로드가
     // 이전 아카이브 상태를 이어받지 않게 한다. photos 삭제는 original_jobs를 CASCADE 삭제한다.
-    const [originalJobPages, archivePartsResult] = await Promise.all([
+    const [originalJobPages, archivePartsResult, stagingPartsResult] = await Promise.all([
       Promise.all(
         [0, 1, 2].map((i) =>
           admin
@@ -124,11 +124,18 @@ export async function DELETE(
         .from("original_archive_parts")
         .select("r2_key")
         .eq("project_id", id),
+      admin
+        .from("original_archive_staging_parts")
+        .select("r2_key")
+        .eq("project_id", id),
     ]);
     const originalJobsError = originalJobPages.find(({ error }) => error)?.error;
     if (originalJobsError) return NextResponse.json({ error: originalJobsError.message }, { status: 500 });
     if (archivePartsResult.error) {
       return NextResponse.json({ error: archivePartsResult.error.message }, { status: 500 });
+    }
+    if (stagingPartsResult.error) {
+      return NextResponse.json({ error: stagingPartsResult.error.message }, { status: 500 });
     }
     const originalKeys = originalJobPages
       .flatMap(({ data }) => data ?? [])
@@ -137,12 +144,15 @@ export async function DELETE(
     const archiveKeys = (archivePartsResult.data ?? [])
       .map((part: { r2_key: string }) => part.r2_key)
       .filter(Boolean);
+    const stagingKeys = (stagingPartsResult.data ?? [])
+      .map((part: { r2_key: string }) => part.r2_key)
+      .filter(Boolean);
     const keys = photos
       .flatMap((p: { r2_thumb_url: string; r2_preview_url: string | null }) => [
         urlToR2Key(p.r2_thumb_url),
         p.r2_preview_url ? urlToR2Key(p.r2_preview_url) : "",
       ])
-      .concat(originalKeys, archiveKeys)
+      .concat(originalKeys, archiveKeys, stagingKeys)
       .filter(Boolean);
     if (keys.length > 0) {
       const backendUrl = process.env.BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? "http://localhost:8000";
@@ -168,6 +178,11 @@ export async function DELETE(
       .delete()
       .eq("project_id", id);
     if (archiveDeleteErr) return NextResponse.json({ error: archiveDeleteErr.message }, { status: 500 });
+    const { error: stagingDeleteErr } = await admin
+      .from("original_archive_staging_parts")
+      .delete()
+      .eq("project_id", id);
+    if (stagingDeleteErr) return NextResponse.json({ error: stagingDeleteErr.message }, { status: 500 });
 
     const deletedCount = photos?.length ?? 0;
     const { error: delErr } = await admin.from("photos").delete().eq("project_id", id);
