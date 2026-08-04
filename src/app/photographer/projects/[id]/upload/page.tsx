@@ -2107,12 +2107,6 @@ export default function ProjectDetailPage() {
   // 상태를 우선 표시하면 "정리 중"으로 보이는 문제가 생기므로 실제 사진이 있을 때만 막는다.
   const archiveBlocking = M > 0 && !!archiveStatus && archiveStatus !== "ready";
   const failedOriginalCount = photos.filter((p) => p.originalStatus === "failed").length;
-  const completedOriginalCount = photos.filter((p) => p.originalStatus === "completed").length;
-  const archivePreparingLabel = archiveStatus === "pending" ? "원본 파일 준비 중" : "고객용 원본 파일 준비 중";
-  const archivePreparingDetail = archiveStatus === "pending"
-    ? `원본 ${completedOriginalCount || M}/${M}장 확인 완료 · 다운로드 파일 준비를 시작하고 있어요`
-    : `원본 ${completedOriginalCount || M}/${M}장 확인 완료 · 고객용 다운로드 파일을 만들고 있어요`;
-  const archiveButtonLabel = isMobile ? "원본 준비 중" : archivePreparingLabel;
   const progressPct = N > 0 ? Math.min(100, Math.round((displayPhotos.length / N) * 100)) : 0;
   const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
   const showServerWorking = uploadPhase === "processing" && awaitingServerFinalize;
@@ -2810,7 +2804,7 @@ export default function ProjectDetailPage() {
                   : archiveStatus === "failed"
                     ? `납품용 원본 처리 실패 ${failedOriginalCount}장 — 재시도가 필요합니다`
                     : archiveBlocking
-                      ? archivePreparingDetail
+                      ? "고객 초대 링크를 활성화하기 위해 원본 사진을 준비하고 있어요."
                       : `${displayPhotos.length}장 업로드 완료 · 초대 링크를 활성화할 수 있습니다`}
                 {archiveBlocking && archiveStatus !== "failed" && (
                   <button
@@ -2854,9 +2848,10 @@ export default function ProjectDetailPage() {
                   ? "사진 업로드 필요"
                 : archiveStatus === "failed"
                   ? "재시도"
-                  : archiveBlocking
-                    ? archiveButtonLabel
-                    : isMobile ? "초대링크 활성화" : "고객 초대 링크 활성화"}
+                  : isMobile ? "초대링크 활성화" : "고객 초대 링크 활성화"}
+              {!inviteActivating && archiveBlocking && archiveStatus !== "failed" && (
+                <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />
+              )}
               {!inviteActivating && M >= N && !archiveBlocking && !isMobile && <ChevronRight size={14} />}
             </button>
           </>
