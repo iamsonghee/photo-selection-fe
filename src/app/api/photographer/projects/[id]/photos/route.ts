@@ -95,15 +95,6 @@ export async function DELETE(
     if ((project as { status: string }).status !== "preparing") {
       return NextResponse.json({ error: "preparing 상태에서만 삭제할 수 있습니다." }, { status: 403 });
     }
-    // 납품용 원본 아카이브가 enqueue된 이후에는 전체 삭제를 금지 — 이미 만들어졌거나 만들어지는
-    // 중인 ZIP과 실제 사진 구성이 어긋나는 것을 막는다(§2 스냅샷 고정 정책).
-    if ((project as { original_archive_status: string | null }).original_archive_status) {
-      return NextResponse.json(
-        { error: "납품용 원본 정리가 시작된 이후에는 사진을 전체 삭제할 수 없습니다." },
-        { status: 403 }
-      );
-    }
-
     // BETA_MAX=3000이므로 3페이지 병렬 — PostgREST 1000행 limit 우회
     const photoPages = await Promise.all(
       [0, 1, 2].map((i) =>
@@ -116,11 +107,42 @@ export async function DELETE(
       )
     );
     const photos = photoPages.flatMap(({ data }) => data ?? []);
+    // 고객 링크 활성화 전(preparing)에는 작가가 전체를 비우고 다시 업로드할 수 있다.
+    // 이미 시작된 원본 ZIP 작업은 DB 스냅샷과 R2 원본/ZIP을 함께 폐기해 다음 업로드가
+    // 이전 아카이브 상태를 이어받지 않게 한다. photos 삭제는 original_jobs를 CASCADE 삭제한다.
+    const [originalJobPages, archivePartsResult] = await Promise.all([
+      Promise.all(
+        [0, 1, 2].map((i) =>
+          admin
+            .from("original_jobs")
+            .select("r2_source_key")
+            .eq("project_id", id)
+            .range(i * 1000, (i + 1) * 1000 - 1)
+        )
+      ),
+      admin
+        .from("original_archive_parts")
+        .select("r2_key")
+        .eq("project_id", id),
+    ]);
+    const originalJobsError = originalJobPages.find(({ error }) => error)?.error;
+    if (originalJobsError) return NextResponse.json({ error: originalJobsError.message }, { status: 500 });
+    if (archivePartsResult.error) {
+      return NextResponse.json({ error: archivePartsResult.error.message }, { status: 500 });
+    }
+    const originalKeys = originalJobPages
+      .flatMap(({ data }) => data ?? [])
+      .map((job: { r2_source_key: string }) => job.r2_source_key)
+      .filter(Boolean);
+    const archiveKeys = (archivePartsResult.data ?? [])
+      .map((part: { r2_key: string }) => part.r2_key)
+      .filter(Boolean);
     const keys = photos
       .flatMap((p: { r2_thumb_url: string; r2_preview_url: string | null }) => [
         urlToR2Key(p.r2_thumb_url),
         p.r2_preview_url ? urlToR2Key(p.r2_preview_url) : "",
       ])
+      .concat(originalKeys, archiveKeys)
       .filter(Boolean);
     if (keys.length > 0) {
       const backendUrl = process.env.BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? "http://localhost:8000";
@@ -139,6 +161,14 @@ export async function DELETE(
       }
     }
 
+    // 진행 중인 아카이브 파트를 먼저 없애 워커 완료 결과가 프로젝트를 다시 ready로
+    // 바꾸지 못하게 한다. 워커 측에서도 취소된 part는 업로드 직전에 중단한다.
+    const { error: archiveDeleteErr } = await admin
+      .from("original_archive_parts")
+      .delete()
+      .eq("project_id", id);
+    if (archiveDeleteErr) return NextResponse.json({ error: archiveDeleteErr.message }, { status: 500 });
+
     const deletedCount = photos?.length ?? 0;
     const { error: delErr } = await admin.from("photos").delete().eq("project_id", id);
     if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
@@ -150,7 +180,13 @@ export async function DELETE(
 
     const { error: upErr } = await admin
       .from("projects")
-      .update({ photo_count: 0, updated_at: new Date().toISOString() })
+      .update({
+        photo_count: 0,
+        original_archive_status: null,
+        original_archive_processing_started_at: null,
+        original_download_started_at: null,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", id);
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
 
