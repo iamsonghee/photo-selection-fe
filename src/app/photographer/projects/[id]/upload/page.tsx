@@ -277,15 +277,27 @@ async function putOriginalToR2(
   return false; // non-fatal: 24h sweep 복구
 }
 
-async function confirmOriginalUpload(jobId: string, token: string): Promise<void> {
+async function confirmOriginalUpload(jobId: string, token: string): Promise<boolean> {
   const url = confirmOriginalUploadUrl();
-  const form = new FormData();
-  form.append("job_id", jobId);
-  await fetch(url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
-  });
+  // R2 PUT은 성공했는데 완료 확인 요청만 일시 실패하면, 실제 원본이 있어도
+  // awaiting_upload에 남아 고객 링크 준비가 영구히 멈출 수 있다. 짧게 재시도한다.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const form = new FormData();
+      form.append("job_id", jobId);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      if (res.ok) return true;
+      if (!shouldRetryStatus(res.status)) return false;
+    } catch {
+      // 네트워크 일시 단절은 다음 재시도로 복구를 시도한다.
+    }
+    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+  }
+  return false;
 }
 
 async function fetchPendingOriginals(projectId: string, token: string): Promise<PendingOriginalItem[]> {
@@ -314,6 +326,35 @@ async function recoverOriginalJob(jobId: string, token: string): Promise<Recover
     body: form,
   });
   return await res.json() as RecoverResult;
+}
+
+/** PUT은 성공했지만 confirm 응답이 유실된 경우, R2 HEAD 기반 recover로 완료를 확정한다. */
+async function confirmOrRecoverOriginalUpload(jobId: string, token: string): Promise<boolean> {
+  if (await confirmOriginalUpload(jobId, token)) return true;
+  try {
+    return (await recoverOriginalJob(jobId, token)).status === "confirmed";
+  } catch {
+    return false;
+  }
+}
+
+/** 새로고침·일시 네트워크 오류 뒤에도 이미 R2에 있는 원본은 재선택 없이 자동 복구한다.
+ * 대량 중단 상황에서 R2 HEAD 요청이 한꺼번에 몰리지 않게 첫 50건만, 3개씩 확인한다. */
+async function autoConfirmUploadedOriginals(jobs: PendingOriginalItem[], token: string): Promise<number> {
+  const candidates = jobs.slice(0, 50);
+  let nextIndex = 0;
+  let recovered = 0;
+  await Promise.all(Array.from({ length: Math.min(3, candidates.length) }, async () => {
+    while (nextIndex < candidates.length) {
+      const job = candidates[nextIndex++];
+      try {
+        if ((await recoverOriginalJob(job.id, token)).status === "confirmed") recovered++;
+      } catch {
+        // 실제로 업로드되지 않은 파일은 기존 복구 배너에서 파일 재선택으로 처리한다.
+      }
+    }
+  }));
+  return recovered;
 }
 
 async function abandonOriginalJob(jobId: string, token: string): Promise<void> {
@@ -1389,7 +1430,10 @@ export default function ProjectDetailPage() {
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
     if (!token) return;
-    const jobs = await fetchPendingOriginals(id, token);
+    let jobs = await fetchPendingOriginals(id, token);
+    if (jobs.length > 0 && await autoConfirmUploadedOriginals(jobs, token)) {
+      jobs = await fetchPendingOriginals(id, token);
+    }
     if (jobs.length > 0) {
       setPendingRecovery(jobs);
       setShowRecoveryBanner(true);
@@ -1630,7 +1674,7 @@ export default function ProjectDetailPage() {
                     sendingSourceRef.current++;
                     if (sendingSourceRef.current > 0) setSendingSourcePhase(true);
                     const putOk = await putOriginalToR2(p, rawFile, currentToken);
-                    if (putOk) await confirmOriginalUpload(p.job_id, currentToken);
+                    if (putOk) await confirmOrRecoverOriginalUpload(p.job_id, currentToken);
                   } catch (presignErr) {
                     console.warn("presigned PUT/confirm failed (non-fatal):", presignErr);
                   } finally {
@@ -1831,8 +1875,11 @@ export default function ProjectDetailPage() {
             source_key: result.source_key, content_type: result.content_type, expires_at: "",
           };
           const putOk = await putOriginalToR2(presignedItem, match);
-          if (putOk) await confirmOriginalUpload(job.id, token);
-          else newUnmatched.push(job); // PUT 실패도 미완료 처리
+          if (putOk && await confirmOrRecoverOriginalUpload(job.id, token)) {
+            // R2 PUT과 완료 확인까지 복구됨
+          } else {
+            newUnmatched.push(job); // PUT/확인 실패는 미완료 처리
+          }
         }
         // result.status === "confirmed" → 이미 처리됨, 성공으로 간주
       } catch (err) {
