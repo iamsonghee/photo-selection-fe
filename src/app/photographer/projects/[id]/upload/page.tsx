@@ -1118,7 +1118,11 @@ export default function ProjectDetailPage() {
   // 원본 ZIP은 백그라운드 워커가 준비한다. 업로드 직후에는 pending/processing으로
   // 시작하지만, 프로젝트를 다시 열지 않아도 완료 상태를 받아 버튼을 활성화해야 한다.
   useEffect(() => {
-    const archiveStatus = project?.originalArchiveStatus;
+    // enqueue 전의 NULL도 "아직 준비 중"이다. UI는 이미 pending으로 표시하고 있는데
+    // 여기서 제외하면 워커가 ready로 바꿔도 새로고침 전에는 CTA가 갱신되지 않는다.
+    const archiveStatus = project?.includeOriginal
+      ? project.originalArchiveStatus ?? "pending"
+      : null;
     if (!project?.includeOriginal || (archiveStatus !== "pending" && archiveStatus !== "processing")) return;
 
     const timer = window.setInterval(() => { void loadProject(); }, 5000);
@@ -1128,12 +1132,14 @@ export default function ProjectDetailPage() {
   // 자동 확인으로 준비가 끝나면 버튼만 바뀌는 데서 끝내지 않고, 바로 다음 행동을 안내한다.
   useEffect(() => {
     const previous = previousArchiveStatusRef.current;
-    const current = project?.originalArchiveStatus;
+    const current = project?.includeOriginal
+      ? project.originalArchiveStatus ?? "pending"
+      : null;
     if ((previous === "pending" || previous === "processing") && current === "ready") {
       setToast("원본 준비가 완료되었습니다. 이제 고객을 초대할 수 있어요.");
     }
     previousArchiveStatusRef.current = current;
-  }, [project?.originalArchiveStatus]);
+  }, [project?.includeOriginal, project?.originalArchiveStatus]);
 
   /** 마운트/재진입 시 로컬 분석 상태를 서버 상태로 시드 — processing이면 아래 폴링 이펙트가 자동 재개된다 */
   useEffect(() => {
@@ -1818,6 +1824,11 @@ export default function ProjectDetailPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const chosen = e.target.files;
+    // 초대 링크 활성화 후에는 파일 입력이 남아 있더라도 추가 업로드를 시작하지 않는다.
+    if (project?.status !== "preparing") {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     if (!chosen?.length) return;
     let list = Array.from(chosen).filter((f) => f.type.startsWith("image/") || f.type === "");
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -1838,19 +1849,12 @@ export default function ProjectDetailPage() {
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setDragOver(false);
-    if (!project || !canUploadOriginals(project.status)) return;
+    if (!project || project.status !== "preparing") return;
     let list = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/") || f.type === "");
     const rawCount = list.filter(isRawFile).length;
     list = list.filter((f) => !isRawFile(f));
     if (rawCount > 0) setUploadError(`RAW 파일은 지원하지 않습니다 (${rawCount}개 제외). JPEG/PNG/WebP/HEIC로 내보내기 후 업로드해주세요.`);
     if (!list.length) return;
-    if (project.status === "selecting") {
-      // 셀렉 중에는 안내 모달 → 확인 시 pending으로 넘어가게 임시 보관
-      setPendingFiles([]);
-      setShowSelectingWarn(true);
-      pendingDropFilesRef.current = list;
-      return;
-    }
     const remaining = Math.max(0, betaMaxPhotosPerProject - photos.length);
     if (list.length > remaining) {
       setUploadError(`최대 ${betaMaxPhotosPerProject}장까지 업로드 가능합니다. ${list.length - remaining}장이 제외됩니다.`);
@@ -1866,7 +1870,7 @@ export default function ProjectDetailPage() {
   const onDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(true); }, []);
   const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false); }, []);
 
-  /** 파일 picker 진입 단일 통로: preparing → 즉시, selecting → 안내 모달 후, 그 외 → noop */
+  /** 사진 추가는 고객 링크를 열기 전(preparing)에만 가능하다. */
   const openFilePicker = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
@@ -1874,16 +1878,9 @@ export default function ProjectDetailPage() {
   const requestOpenFilePicker = useCallback(() => {
     if (!project) return;
     if (uploadPhase === "sending" || uploadPhase === "processing") return;
-    if (project.status === "preparing") {
-      pendingDropFilesRef.current = null;
-      openFilePicker();
-      return;
-    }
-    if (project.status === "selecting") {
-      pendingDropFilesRef.current = null;
-      setShowSelectingWarn(true);
-      return;
-    }
+    if (project.status !== "preparing") return;
+    pendingDropFilesRef.current = null;
+    openFilePicker();
   }, [project, uploadPhase]);
 
   /** selecting 안내 모달 확인: 드롭 파일이 있었으면 pending으로 넘기고, 없으면 picker 오픈 */
@@ -2119,7 +2116,7 @@ export default function ProjectDetailPage() {
   const progressPct = N > 0 ? Math.min(100, Math.round((displayPhotos.length / N) * 100)) : 0;
   const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
   const showServerWorking = uploadPhase === "processing" && awaitingServerFinalize;
-  const uploadAllowed = canUploadOriginals(project.status);
+  const photoUploadAllowed = project.status === "preparing";
   const canFlushAll =
     project.status === "preparing" &&
     displayPhotos.length > 0 &&
@@ -2484,7 +2481,7 @@ export default function ProjectDetailPage() {
           )}
 
           {/* ── 모바일 툴바 (장수 + 원본포함 토글 + 전체삭제) ── */}
-          {(displayPhotos.length > 0 || uploadAllowed) && (
+          {(displayPhotos.length > 0 || photoUploadAllowed) && (
             <div
               className="prj-mobile-toolbar"
               style={{
@@ -2578,11 +2575,11 @@ export default function ProjectDetailPage() {
             ref={photoScrollRef}
             className="prj-scroll prj-photo-scroll-mobile-pad"
             style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "rgba(3,3,3,0.4)", position: "relative" }}
-            onDrop={!isPhoneLikeClient() && uploadAllowed && uploadPhase === "idle" ? onDrop : undefined}
-            onDragOver={!isPhoneLikeClient() && uploadAllowed && uploadPhase === "idle" ? onDragOver : undefined}
-            onDragLeave={!isPhoneLikeClient() && uploadAllowed && uploadPhase === "idle" ? onDragLeave : undefined}
+            onDrop={!isPhoneLikeClient() && photoUploadAllowed && uploadPhase === "idle" ? onDrop : undefined}
+            onDragOver={!isPhoneLikeClient() && photoUploadAllowed && uploadPhase === "idle" ? onDragOver : undefined}
+            onDragLeave={!isPhoneLikeClient() && photoUploadAllowed && uploadPhase === "idle" ? onDragLeave : undefined}
           >
-            {dragOver && !isPhoneLikeClient() && uploadAllowed && (
+            {dragOver && !isPhoneLikeClient() && photoUploadAllowed && (
               <div style={{
                 position: "absolute", inset: 0, zIndex: 40, pointerEvents: "none",
                 background: "rgba(var(--accent-rgb), 0.10)",
@@ -2601,39 +2598,33 @@ export default function ProjectDetailPage() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", gap: 8 }}>
                 <span className="prj-tech-label" style={{ color: TEXT_MUTED }}>불러오는 중...</span>
               </div>
-            ) : displayPhotos.length === 0 && !uploadAllowed ? (
+            ) : displayPhotos.length === 0 && !photoUploadAllowed ? (
               <div
-                onClick={() => !isUploading && uploadAllowed && requestOpenFilePicker()}
-                onDrop={uploadAllowed ? onDrop : undefined}
-                onDragOver={uploadAllowed ? onDragOver : undefined}
-                onDragLeave={uploadAllowed ? onDragLeave : undefined}
+                onClick={undefined}
                 style={{
                   display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                   height: "100%", gap: 16,
-                  cursor: isUploading ? "not-allowed" : uploadAllowed ? "pointer" : "not-allowed",
+                  cursor: "default",
                   background: dragOver ? ACCENT_DIM : "transparent",
                   border: `2px dashed ${dragOver ? ACCENT : BORDER_MID}`,
                   margin: 24,
                   transition: "all 0.2s",
-                  opacity: uploadAllowed ? 1 : 0.5,
+                  opacity: 0.7,
                 }}
               >
                 <div style={{ width: 64, height: 64, borderRadius: "50%", border: `1px solid ${dragOver ? ACCENT : "var(--border)"}`, display: "flex", alignItems: "center", justifyContent: "center", transition: "border-color 0.2s" }}>
-                  {isUploading
-                    ? <Loader2 size={24} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} />
-                    : <Upload size={24} color={dragOver ? ACCENT : "var(--subtle-foreground)"} />
-                  }
+                  <Lock size={22} color="var(--subtle-foreground)" />
                 </div>
                 <div style={{ textAlign: "center" }}>
                   <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 15, color: dragOver ? ACCENT : "var(--muted-foreground)", marginBottom: 6 }}>
-                    {isUploading ? "업로드 중..." : "사진을 드래그하거나 클릭해서 업로드"}
+                    {project.status === "selecting" ? "고객이 사진을 선택 중입니다" : "사진을 추가할 수 없는 프로젝트입니다"}
                   </p>
                   <p style={{ fontFamily: MONO, fontSize: 10, color: "var(--subtle-foreground)" }}>
-                    JPG · PNG · HEIC 지원
+                    고객 초대 전까지 사진을 추가할 수 있습니다
                   </p>
                 </div>
               </div>
-            ) : viewMode === "grid" || (displayPhotos.length === 0 && uploadAllowed) ? (
+            ) : viewMode === "grid" || (displayPhotos.length === 0 && photoUploadAllowed) ? (
               <VirtualizedPhotoGrid
                 scrollRef={photoScrollRef}
                 photos={groupedDisplayPhotos}
@@ -2651,7 +2642,7 @@ export default function ProjectDetailPage() {
                 // 더 이상 의미 없음(모바일은 풀 크기 1이라 기존과 동일하게 단일 하이라이트 유지)
                 compressingTempId={isMobile && compressingIndex >= 0 && queuedPreviews[compressingIndex] ? queuedPreviews[compressingIndex].tempId : null}
                 leadingUploadCell={
-                  uploadAllowed ? (
+                  photoUploadAllowed ? (
                     <UploadTile
                       isUploading={isUploading}
                       uploadProgress={uploadProgress}
