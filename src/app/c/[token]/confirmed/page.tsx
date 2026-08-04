@@ -11,6 +11,7 @@ import { getProfileImageUrl } from "@/lib/photographer";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { CustomerHeader } from "@/components/customer/CustomerHeader";
 import { CustomerFooter } from "@/components/customer/CustomerFooter";
+import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
 
 const CUSTOMER_CANCEL_MAX = 3;
 const MONO = "'JetBrains Mono', 'Courier New', Courier, monospace";
@@ -400,6 +401,7 @@ export default function ConfirmedPage() {
             선택한 사진 보기
             <span className="cf-arrow">→</span>
           </Link>
+          <OriginalDownloadEntry token={token} variant="inline" />
 
           {/* 작가 카드 */}
           <div className="cf-photographer-card">

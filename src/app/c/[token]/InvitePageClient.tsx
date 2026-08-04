@@ -250,6 +250,7 @@ export default function InvitePageClient() {
                   보정본 검토하기 <span className="cp-btn-arrow">→</span>
                 </button>
               </Link>
+              <OriginalDownloadEntry token={token} variant="inline" />
             </div>
 
             <div className="cp-photographer-card">

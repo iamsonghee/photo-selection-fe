@@ -11,6 +11,7 @@ import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { CustomerHeader } from "@/components/customer/CustomerHeader";
 import { CustomerFooter } from "@/components/customer/CustomerFooter";
+import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
 import type { ReviewResultPhoto } from "@/app/api/c/review-result/route";
 
 const CUSTOMER_CANCEL_MAX = 3;
@@ -261,6 +262,12 @@ export default function LockedPage() {
             </>
           )}
           {confirmedDate && <span className="hidden sm:inline text-subtle-foreground">{confirmedDate}</span>}
+        </div>
+      </div>
+
+      <div className="px-4 pt-4">
+        <div className="mx-auto w-full max-w-md">
+          <OriginalDownloadEntry token={token} variant="inline" />
         </div>
       </div>
 

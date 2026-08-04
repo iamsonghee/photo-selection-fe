@@ -9,6 +9,7 @@ import styles from "./delivered.module.css";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { CustomerHeader } from "@/components/customer/CustomerHeader";
 import { CustomerFooter } from "@/components/customer/CustomerFooter";
+import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 
@@ -116,6 +117,10 @@ export default function DeliveredPage() {
             )}
 
             <div className={styles.message}>소중한 순간을 함께해서 영광이었습니다. 감사합니다</div>
+
+            <div className={styles.ctaRow}>
+              <OriginalDownloadEntry token={token} variant="inline" />
+            </div>
           </div>
         </section>
       </main>
