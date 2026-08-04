@@ -2868,6 +2868,15 @@ export default function ProjectDetailPage() {
               <div className="prj-invite-sub" style={{ fontSize: 11, color: TEXT_MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {inviteUrl.replace(/^https?:\/\//, "")}
               </div>
+              {project.includeOriginal && (
+                <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: project.originalArchiveStatus === "failed" ? "#ff8a8a" : TEXT_MUTED }}>
+                  {project.originalArchiveStatus === "ready"
+                    ? "납품용 원본 다운로드 준비 완료"
+                    : project.originalArchiveStatus === "failed"
+                      ? "납품용 원본 준비 실패 · 다시 준비가 필요합니다"
+                      : <><Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> 납품용 원본 다운로드 준비 중</>}
+                </div>
+              )}
             </div>
             <button
               type="button"
