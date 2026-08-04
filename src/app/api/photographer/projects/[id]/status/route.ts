@@ -71,27 +71,16 @@ export async function PATCH(
       );
     }
 
-    // preparing→selecting(초대 링크 활성화)은 include_original=true인 프로젝트에 한해
-    // 납품용 원본 아카이브가 ready 상태여야만 허용 — 원본 미완료/아카이브 생성 중·실패 상태에서
-    // 링크를 활성화하면 30일 다운로드 기산이 원본 없는 채로 시작돼버리는 문제를 막는다.
-    if (proj.status === "preparing" && status === "selecting" && proj.include_original) {
-      if (proj.original_archive_status !== "ready") {
-        return NextResponse.json(
-          {
-            error:
-              proj.original_archive_status === "failed"
-                ? "납품용 원본 처리에 실패한 파일이 있습니다. 재시도 후 다시 시도해주세요."
-                : "납품용 원본을 정리하는 중입니다. 완료 후 다시 시도해주세요.",
-          },
-          { status: 409 }
-        );
-      }
-    }
-
     const updatePayload: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
 
-    // 초대 링크 활성화 시점 = 다운로드 30일 기산 시작 — 최초 1회만 기록(재전달로 초기화 안 됨)
-    if (proj.status === "preparing" && status === "selecting" && !proj.original_download_started_at) {
+    // 고객 링크는 갤러리가 완성되면 원본 ZIP 준비 중에도 열 수 있다. 다운로드 30일 기산은
+    // 실제 ZIP이 준비된 시점에만 시작한다(준비 중 링크 활성화 시에는 archive 완료 RPC가 기록).
+    if (
+      proj.status === "preparing" &&
+      status === "selecting" &&
+      !proj.original_download_started_at &&
+      (!proj.include_original || proj.original_archive_status === "ready")
+    ) {
       updatePayload.original_download_started_at = new Date().toISOString();
     }
 

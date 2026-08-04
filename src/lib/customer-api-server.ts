@@ -424,10 +424,12 @@ export interface OriginalDownloadFile {
 }
 
 export interface OriginalDownloadInfo {
-  /** 다운로드 가능(활성 + 미만료) 여부 — false면 배너 자체를 숨긴다 */
+  /** 원본 포함 프로젝트라면 ZIP 준비 중에도 진입점을 노출한다. */
   visible: boolean;
   available: boolean;
   expired: boolean;
+  preparing: boolean;
+  failed: boolean;
   fileCount: number;
   totalBytes: number;
   expiresAt: string | null;
@@ -436,7 +438,7 @@ export interface OriginalDownloadInfo {
 
 /**
  * access_token으로 납품용 원본 다운로드 정보를 조회한다.
- * include_original=false이거나 아카이브가 아직 준비되지 않았으면 visible=false(배너 미노출).
+ * include_original=false면 숨기고, 아카이브가 아직 준비되지 않았으면 준비 상태를 노출한다.
  * 30일 만료 후에는 presign 자체를 수행하지 않고 파일 수/총 용량만 반환한다(다운로드 불가 안내용).
  */
 export async function getOriginalDownloadInfo(
@@ -446,15 +448,27 @@ export async function getOriginalDownloadInfo(
   const project = await getProjectByToken(admin, token);
   if (!project) return null;
 
-  if (
-    !project.includeOriginal ||
-    project.originalArchiveStatus !== "ready" ||
-    !project.originalDownloadStartedAt
-  ) {
+  if (!project.includeOriginal) {
     return {
       visible: false,
       available: false,
       expired: false,
+      preparing: false,
+      failed: false,
+      fileCount: 0,
+      totalBytes: 0,
+      expiresAt: null,
+      files: [],
+    };
+  }
+
+  if (project.originalArchiveStatus !== "ready" || !project.originalDownloadStartedAt) {
+    return {
+      visible: true,
+      available: false,
+      expired: false,
+      preparing: project.originalArchiveStatus !== "failed",
+      failed: project.originalArchiveStatus === "failed",
       fileCount: 0,
       totalBytes: 0,
       expiresAt: null,
@@ -485,6 +499,8 @@ export async function getOriginalDownloadInfo(
       visible: true,
       available: false,
       expired,
+      preparing: false,
+      failed: false,
       fileCount,
       totalBytes,
       expiresAt: expiresAt.toISOString(),
@@ -514,6 +530,8 @@ export async function getOriginalDownloadInfo(
     visible: true,
     available: files.length > 0,
     expired: false,
+    preparing: false,
+    failed: false,
     fileCount,
     totalBytes,
     expiresAt: expiresAt.toISOString(),

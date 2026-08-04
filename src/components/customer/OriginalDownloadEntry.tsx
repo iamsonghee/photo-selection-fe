@@ -15,6 +15,8 @@ interface OriginalDownloadInfo {
   visible: boolean;
   available: boolean;
   expired: boolean;
+  preparing: boolean;
+  failed: boolean;
   fileCount: number;
   totalBytes: number;
   expiresAt: string | null;
@@ -44,18 +46,25 @@ export default function OriginalDownloadEntry({ token }: { token: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/c/original-download?token=${encodeURIComponent(token)}`)
-      .then((res) => (res.ok ? (res.json() as Promise<OriginalDownloadInfo>) : null))
-      .then((data) => {
-        if (!cancelled && data) setInfo(data);
-      })
-      .catch(() => {
-        // 조용히 무시 — 진입점은 선택적 기능이라 실패해도 나머지 화면에 영향 없음
-      });
+    const load = () => {
+      fetch(`/api/c/original-download?token=${encodeURIComponent(token)}`)
+        .then((res) => (res.ok ? (res.json() as Promise<OriginalDownloadInfo>) : null))
+        .then((data) => {
+          if (!cancelled && data) setInfo(data);
+        })
+        .catch(() => {
+          // 조용히 무시 — 진입점은 선택적 기능이라 실패해도 나머지 화면에 영향 없음
+        });
+    };
+    load();
+    const timer = window.setInterval(() => {
+      if (info?.preparing) load();
+    }, 10000);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
     };
-  }, [token]);
+  }, [token, info?.preparing]);
 
   if (!info || !info.visible) return null;
 
@@ -152,15 +161,15 @@ export default function OriginalDownloadEntry({ token }: { token: string }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
               <div>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em" }}>파일 수</div>
-                <div style={{ fontSize: 14, color: "#fff", fontWeight: 600 }}>{info.fileCount.toLocaleString()}장</div>
+                <div style={{ fontSize: 14, color: "#fff", fontWeight: 600 }}>{info.preparing ? "준비 중" : `${info.fileCount.toLocaleString()}장`}</div>
               </div>
               <div>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em" }}>총 용량</div>
-                <div style={{ fontSize: 14, color: "#fff", fontWeight: 600 }}>{formatStoredFileSizeBytes(info.totalBytes)}</div>
+                <div style={{ fontSize: 14, color: "#fff", fontWeight: 600 }}>{info.preparing ? "준비 중" : formatStoredFileSizeBytes(info.totalBytes)}</div>
               </div>
               <div>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em" }}>만료일</div>
-                <div style={{ fontSize: 14, color: "#fff", fontWeight: 600 }}>{formatExpiry(info.expiresAt)}</div>
+                <div style={{ fontSize: 14, color: "#fff", fontWeight: 600 }}>{info.preparing ? "준비 후 안내" : formatExpiry(info.expiresAt)}</div>
               </div>
             </div>
 
@@ -175,7 +184,11 @@ export default function OriginalDownloadEntry({ token }: { token: string }) {
                   textAlign: "center",
                 }}
               >
-                다운로드 기간이 종료되었습니다.
+                {info.preparing
+                  ? "작가가 납품용 원본 파일을 준비하고 있습니다. 준비가 완료되면 이 화면에서 바로 다운로드할 수 있어요."
+                  : info.failed
+                    ? "납품용 원본 파일을 준비하는 중 문제가 발생했습니다. 작가가 다시 준비하면 다운로드할 수 있어요."
+                    : "다운로드 기간이 종료되었습니다."}
               </div>
             ) : mobileNotice ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
