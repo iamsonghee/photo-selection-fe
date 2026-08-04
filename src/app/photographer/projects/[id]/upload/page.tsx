@@ -2004,6 +2004,20 @@ export default function ProjectDetailPage() {
     const m = project.photoCount;
     const n = project.requiredCount;
     if (project.status !== "preparing" || m < n) return;
+    // DB에 먼저 반영된 사진 수만으로 링크를 열면, 같은 화면에서 아직 전송/압축 중인
+    // 나머지 사진이 고객 갤러리에서 빠질 수 있다. 현재 업로드 세션이 완전히 끝날 때까지 막는다.
+    const uploadStillActive =
+      uploadPhase === "sending" ||
+      uploadPhase === "processing" ||
+      isPreparingFiles ||
+      awaitingServerFinalize ||
+      uploadingPhotos.length > 0 ||
+      queuedPreviews.length > 0 ||
+      sendingSourcePhase;
+    if (uploadStillActive) {
+      setToast("사진 업로드가 모두 완료된 뒤 고객 링크를 활성화할 수 있습니다.");
+      return;
+    }
     if (project.includeOriginal && project.originalArchiveStatus !== "ready") return;
     setInviteActivating(true);
     try {
@@ -2111,6 +2125,15 @@ export default function ProjectDetailPage() {
   const failedOriginalCount = photos.filter((p) => p.originalStatus === "failed").length;
   const progressPct = N > 0 ? Math.min(100, Math.round((displayPhotos.length / N) * 100)) : 0;
   const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
+  // 갤러리 업로드, 클라이언트 압축, 서버 최종 저장, 원본 R2 PUT 중 하나라도 남아 있으면
+  // 고객 링크를 열지 않는다. pendingPhotos는 완료 직후 잠깐 남는 낙관적 표시이므로 제외한다.
+  const uploadBlockingInvite =
+    isUploading ||
+    isPreparingFiles ||
+    awaitingServerFinalize ||
+    uploadingPhotos.length > 0 ||
+    queuedPreviews.length > 0 ||
+    sendingSourcePhase;
   const showServerWorking = uploadPhase === "processing" && awaitingServerFinalize;
   const photoUploadAllowed = project.status === "preparing";
   const canFlushAll =
@@ -2815,7 +2838,9 @@ export default function ProjectDetailPage() {
                   : "고객 초대 준비"}
               </div>
               <div className="prj-invite-sub" style={{ fontSize: 11, color: TEXT_MUTED }}>
-                {M < N
+                {uploadBlockingInvite
+                  ? "사진을 모두 업로드하고 있어요. 완료되면 고객 링크를 활성화할 수 있습니다."
+                  : M < N
                   ? `${displayPhotos.length}장 업로드됨 · ${N}장 이상 업로드 후 활성화 가능합니다`
                   : archiveStatus === "failed"
                     ? `납품용 원본 처리 실패 ${failedOriginalCount}장 — 재시도가 필요합니다`
@@ -2828,32 +2853,34 @@ export default function ProjectDetailPage() {
               type="button"
               className="prj-invite-btn"
               onClick={archiveStatus === "failed" ? handleRetryArchive : handleEnableClientAccess}
-              disabled={inviteActivating || M < N || (archiveBlocking && archiveStatus !== "failed")}
+              disabled={inviteActivating || uploadBlockingInvite || M < N || (archiveBlocking && archiveStatus !== "failed")}
               style={{
                 display: "flex", alignItems: "center", gap: 4,
                 padding: "9px 20px",
-                background: M >= N && !archiveBlocking ? ACCENT : "rgba(var(--accent-rgb), 0.15)",
+                background: M >= N && !archiveBlocking && !uploadBlockingInvite ? ACCENT : "rgba(var(--accent-rgb), 0.15)",
                 border: "none", borderRadius: 8,
-                color: M >= N && !archiveBlocking ? "#000" : ACCENT,
+                color: M >= N && !archiveBlocking && !uploadBlockingInvite ? "#000" : ACCENT,
                 fontSize: 13, fontWeight: 600,
-                cursor: M >= N && !inviteActivating && (!archiveBlocking || archiveStatus === "failed") ? "pointer" : "not-allowed",
+                cursor: M >= N && !inviteActivating && !uploadBlockingInvite && (!archiveBlocking || archiveStatus === "failed") ? "pointer" : "not-allowed",
                 fontFamily: MONO,
                 opacity: inviteActivating ? 0.75 : 1,
-                boxShadow: M >= N && !archiveBlocking ? `0 0 16px ${ACCENT_GLOW}` : "none",
+                boxShadow: M >= N && !archiveBlocking && !uploadBlockingInvite ? `0 0 16px ${ACCENT_GLOW}` : "none",
                 transition: "all 0.2s",
               }}
             >
               {inviteActivating
                 ? "처리 중…"
+                : uploadBlockingInvite
+                  ? "사진 업로드 중…"
                 : M < N
                   ? "사진 업로드 필요"
                 : archiveStatus === "failed"
                   ? "재시도"
                   : isMobile ? "초대링크 활성화" : "고객 초대 링크 활성화"}
-              {!inviteActivating && archiveBlocking && archiveStatus !== "failed" && (
+              {!inviteActivating && (uploadBlockingInvite || (archiveBlocking && archiveStatus !== "failed")) && (
                 <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />
               )}
-              {!inviteActivating && M >= N && !archiveBlocking && !isMobile && <ChevronRight size={14} />}
+              {!inviteActivating && M >= N && !archiveBlocking && !uploadBlockingInvite && !isMobile && <ChevronRight size={14} />}
             </button>
           </>
         )}
