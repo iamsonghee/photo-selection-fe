@@ -42,7 +42,7 @@ function formatExpiry(iso: string | null): string {
  * CustomerLayoutClient에서 1회만 마운트된다. include_original=false이거나 아카이브가 준비되지
  * 않은 프로젝트에서는 아무것도 렌더하지 않는다.
  */
-export default function OriginalDownloadEntry({ token }: { token: string }) {
+export default function OriginalDownloadEntry({ token, variant = "floating" }: { token: string; variant?: "floating" | "inline" }) {
   const [info, setInfo] = useState<OriginalDownloadInfo | null>(null);
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -116,6 +116,7 @@ export default function OriginalDownloadEntry({ token }: { token: string }) {
   const visibleFiles = info.files
     .map((file, index) => ({ file, index }))
     .filter(({ file }) => file.filename.toLowerCase().includes(query.trim().toLowerCase()));
+  const triggerLabel = info.expiresAt ? `원본 다운로드 · ${formatExpiry(info.expiresAt)}까지` : "원본 다운로드";
 
   return (
     <>
@@ -123,7 +124,22 @@ export default function OriginalDownloadEntry({ token }: { token: string }) {
         type="button"
         onClick={openDownloadModal}
         aria-label="납품용 원본 다운로드"
-        style={{
+        className={variant === "inline" ? "cp-btn-download" : undefined}
+        style={variant === "inline" ? {
+          width: "100%",
+          minHeight: 42,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 7,
+          borderRadius: 8,
+          border: "1px solid rgba(var(--accent-rgb),0.5)",
+          background: "rgba(var(--accent-rgb),0.06)",
+          color: "var(--foreground)",
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: "pointer",
+        } : {
           position: "fixed",
           right: 16,
           bottom: 84,
@@ -144,7 +160,7 @@ export default function OriginalDownloadEntry({ token }: { token: string }) {
         }}
       >
         <PackageOpen size={16} />
-        원본 다운로드
+        {triggerLabel}
       </button>
 
       {open && (

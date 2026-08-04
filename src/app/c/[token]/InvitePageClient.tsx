@@ -13,6 +13,7 @@ import { BrandLogoBar } from "@/components/BrandLogo";
 import { PageLoader } from "@/components/ui/PageLoader";
 import { CustomerHeader } from "@/components/customer/CustomerHeader";
 import { CustomerFooter } from "@/components/customer/CustomerFooter";
+import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 
@@ -544,6 +545,7 @@ export default function InvitePageClient() {
                 업로드 중... <span className="cp-btn-arrow">→</span>
               </button>
             )}
+            {ready && <OriginalDownloadEntry token={token} variant="inline" />}
             <Link href={`/c/${token}/about`} className="cp-btn-sub">
               A컷이 처음이세요? 어떻게 사용하나요 →
             </Link>
