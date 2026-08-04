@@ -1334,6 +1334,22 @@ export default function ProjectDetailPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [sendingSourcePhase]);
 
+  // awaiting_upload 상태 job 확인 → 복구 배너. 페이지 최초 로드 시 1회 + 업로드 배치 종료 직후
+  // 재확인(원본 presigned PUT이 조용히 실패해도 non-fatal로 삼켜지므로, 업로드 "완료" 시점에
+  // 다시 확인하지 않으면 방금 실패한 job이 24h sweep 전까지 UI 어디에도 드러나지 않는다).
+  const checkPendingOriginals = useCallback(async () => {
+    if (!id) return;
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return;
+    const jobs = await fetchPendingOriginals(id, token);
+    if (jobs.length > 0) {
+      setPendingRecovery(jobs);
+      setShowRecoveryBanner(true);
+    }
+  }, [id]);
+
   // ── upload ──
   const startUpload = useCallback(async (uploadFiles: File[]) => {
     if (!uploadFiles.length || uploadInProgressRef.current) return;
@@ -1672,6 +1688,10 @@ export default function ProjectDetailPage() {
       // 새로 업로드된 사진이 clipPending 캐시에 반영되지 않으면 이미 분석된 것으로
       // 오인해 재분석 버튼이 조용히 무시된다 — 업로드 완료 시마다 상태를 다시 읽는다.
       loadClipAnalysisStatus();
+      // 원본 presigned PUT은 실패해도 non-fatal로 삼켜지므로(24h sweep 복구 전제), 업로드
+      // "완료" 시점에 다시 확인하지 않으면 방금 실패한 job이 초대 링크 활성화 버튼을
+      // "정리 중…"에 영구히 멈춰 세운 채 복구 배너 없이는 원인을 알 수 없게 된다.
+      if (inclOrig) checkPendingOriginals();
       let freshPhotos: Photo[] = [];
       try { freshPhotos = await getPhotosByProjectId(id); } catch {}
       // blob URL 먼저 해제
@@ -1691,23 +1711,11 @@ export default function ProjectDetailPage() {
       });
       router.refresh();
     }, 600);
-  }, [id, loadProject, loadPhotos, router, project?.includeOriginal, loadClipAnalysisStatus]);
+  }, [id, loadProject, loadPhotos, router, project?.includeOriginal, loadClipAnalysisStatus, checkPendingOriginals]);
 
-  // 페이지 로드 시 awaiting_upload 상태 job 확인 → 복구 배너 (project가 로드된 후 1회)
   useEffect(() => {
     if (!project?.id || !id) return;
-    const check = async () => {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) return;
-      const jobs = await fetchPendingOriginals(id, token);
-      if (jobs.length > 0) {
-        setPendingRecovery(jobs);
-        setShowRecoveryBanner(true);
-      }
-    };
-    check();
+    checkPendingOriginals();
   }, [project?.id, id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 복구: filename+size+lastModified 매칭 후 재업로드. 매칭 실패 job은 unmatchedJobs로 표시.
