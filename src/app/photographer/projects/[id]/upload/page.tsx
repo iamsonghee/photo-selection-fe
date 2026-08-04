@@ -1013,6 +1013,7 @@ export default function ProjectDetailPage() {
   const [dragOver, setDragOver] = useState(false);
   const [uploadPhase, setUploadPhase] = useState<"idle" | "sending" | "processing" | "done">("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStopRequested, setUploadStopRequested] = useState(false);
   /** 네트워크 전송은 끝났고 서버(썸네일·저장) 응답 대기 중 — 99% 정지로 오해하지 않도록 별도 표시 */
   const [awaitingServerFinalize, setAwaitingServerFinalize] = useState(false);
   /** 원본 파일을 R2로 직접 PUT 중인 배치가 있는지 (동시 배치 카운터 기반) */
@@ -1398,6 +1399,7 @@ export default function ProjectDetailPage() {
     queuedBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
     queuedBlobsRef.current = [];
     stopRequestedRef.current = false;
+    setUploadStopRequested(false);
     useProxyRef.current = false;
     compressAbortControllerRef.current = new AbortController();
 
@@ -1690,6 +1692,7 @@ export default function ProjectDetailPage() {
       setQueuedPreviews([]);
       queuedBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
       queuedBlobsRef.current = [];
+      setUploadStopRequested(false);
       uploadInProgressRef.current = false;
       return;
     }
@@ -1770,6 +1773,15 @@ export default function ProjectDetailPage() {
       router.refresh();
     }, 600);
   }, [id, loadProject, loadPhotos, router, project?.includeOriginal, loadClipAnalysisStatus, checkPendingOriginals]);
+
+  const handleStopUpload = useCallback(() => {
+    if (stopRequestedRef.current) return;
+    // 현재 진행 중인 서버 요청/원본 PUT은 완료시켜 서버·R2 상태를 일관되게 유지하고,
+    // 아직 시작하지 않은 압축·다음 배치만 중단한다.
+    stopRequestedRef.current = true;
+    compressAbortControllerRef.current?.abort();
+    setUploadStopRequested(true);
+  }, []);
 
   useEffect(() => {
     if (!project?.id || !id) return;
@@ -2532,7 +2544,7 @@ export default function ProjectDetailPage() {
           {isUploading && (
             <div style={{ flexShrink: 0, padding: "7px 16px", background: SURFACE_1, borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, letterSpacing: "0.1em", minWidth: 52 }}>
-                {compressingIndex >= 0 ? "압축 중" : "업로드 중"}
+                {uploadStopRequested ? "중단 중" : compressingIndex >= 0 ? "압축 중" : "업로드 중"}
               </span>
               {totalUploadCount > 0 && (
                 <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT_MUTED, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
@@ -2551,6 +2563,20 @@ export default function ProjectDetailPage() {
               <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT_BRIGHT, minWidth: 32, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
                 {showServerWorking ? "…" : `${overallProgress}%`}
               </span>
+              <button
+                type="button"
+                onClick={handleStopUpload}
+                disabled={uploadStopRequested}
+                style={{
+                  flexShrink: 0, padding: "5px 9px", borderRadius: 6,
+                  border: "1px solid rgba(255,255,255,0.2)", background: "transparent",
+                  color: TEXT_NORMAL, fontFamily: MONO, fontSize: 10,
+                  cursor: uploadStopRequested ? "wait" : "pointer",
+                  opacity: uploadStopRequested ? 0.55 : 1,
+                }}
+              >
+                {uploadStopRequested ? "중단 중…" : "업로드 중단"}
+              </button>
             </div>
           )}
 
