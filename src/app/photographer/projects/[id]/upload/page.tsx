@@ -58,8 +58,9 @@ const UPLOAD_MAX_ATTEMPTS = 3;
 const BATCH_SIZE = 8;
 const PC_CONCURRENCY = 5;
 // 원본 포함 업로드는 압축본 전송 뒤 R2 PUT까지 같은 슬롯을 점유한다.
-// 데스크톱은 4개 병렬로 원본 대기 시간을 줄이고, 모바일은 기존 1개를 유지한다.
+// 일반 데스크톱은 4개, CPU·메모리·회선 힌트가 충분한 경우에만 6개까지 올린다.
 const ORIGINAL_PC_CONCURRENCY = 4;
+const ORIGINAL_PC_CONCURRENCY_FAST = 6;
 const MOBILE_BATCH_SIZE = 3;
 const MOBILE_CONCURRENCY = 1;
 const ACCEPT_TYPES = "image/*,image/heic,image/heif";
@@ -95,10 +96,24 @@ function isPhoneLikeClient(): boolean {
 }
 
 function getDesktopUploadConcurrency(includeOriginal: boolean): number {
-  const connection = (navigator as Navigator & { connection?: { effectiveType?: string; saveData?: boolean } }).connection;
+  const device = navigator as Navigator & {
+    connection?: { effectiveType?: string; saveData?: boolean; downlink?: number };
+    deviceMemory?: number;
+  };
+  const connection = device.connection;
   if (connection?.saveData || connection?.effectiveType === "slow-2g" || connection?.effectiveType === "2g") return 2;
   if (connection?.effectiveType === "3g") return includeOriginal ? 3 : 4;
-  return includeOriginal ? ORIGINAL_PC_CONCURRENCY : PC_CONCURRENCY + 1;
+  if (!includeOriginal) return PC_CONCURRENCY + 1;
+
+  // Network Information API의 downlink는 업로드 속도 자체는 아니지만 회선 품질의 힌트다.
+  // 원본은 압축본과 함께 메모리에 머물므로, 고사양 데스크톱에서만 동시 PUT을 늘린다.
+  const cores = navigator.hardwareConcurrency ?? 4;
+  const memoryGiB = device.deviceMemory ?? 4;
+  const hasFastHardware = cores >= 8 && memoryGiB >= 8;
+  const hasGoodNetworkHint = connection?.downlink === undefined || connection.downlink >= 10;
+  return hasFastHardware && hasGoodNetworkHint
+    ? ORIGINAL_PC_CONCURRENCY_FAST
+    : ORIGINAL_PC_CONCURRENCY;
 }
 
 function shouldRetryStatus(status: number) {
