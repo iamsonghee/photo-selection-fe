@@ -1,7 +1,7 @@
 # 업로드 플로우
 
 > 코드 기준: `upload/page.tsx`, `upload.py`, `upload-client-compress.ts`  
-> 마지막 업데이트: 2026-07-24
+> 마지막 업데이트: 2026-08-04
 
 ---
 
@@ -20,7 +20,7 @@
 
 1. 파일 선택 → `startUpload()` 호출
 2. `include_original=true`이면 HEIC 파일 전체 차단 (FE 선행 검증)
-3. **모든 파일**을 `compressImageForUpload()`로 브라우저에서 압축 — `include_original` 여부와 무관하게 항상 실행
+3. **모든 파일**을 브라우저에서 압축(`include_original` 여부와 무관하게 항상 실행) — 업로드 화면(`upload/page.tsx`)은 워커 풀 기반 `compressImagesInParallel()`로 한 라운드의 파일을 동시에 압축(데스크톱 2 workers / 모바일 1 worker, 2026-07-27 이후). 그 외 화면(설정 프로필 이미지, 보정본 업로드 등)은 기존 싱글턴 워커 기반 `compressImageForUpload()`를 그대로 사용 — 두 경로 모두 실제 압축 로직은 `compressWithWorker()`를 공유한다.
 4. 압축 결과를 FormData에 담아 FastAPI로 POST
 5. `include_original=true`이면 응답의 `original_presigned`를 받아 브라우저 원본(`rawFile`)을 R2에 직접 PUT
 6. PUT 완료 후 서버에 confirm 통지 (`POST /originals/confirm`)
@@ -186,7 +186,7 @@ Browser                    FastAPI                    R2                   DB   
 
 ---
 
-## 브라우저 압축 (`compressImageForUpload`)
+## 브라우저 압축 (`upload-client-compress.ts`)
 
 서버 전송량 최적화 목적. `include_original` 여부와 무관하게 항상 실행된다.
 
@@ -200,6 +200,11 @@ Browser                    FastAPI                    R2                   DB   
 | lastModified | 압축 시점의 `Date.now()` (원본과 다름) |
 
 HEIC/PNG/WebP → JPEG로 변환된다. `rawFile`(원본)과 `compressed`(압축본)는 분리 보관된다.
+
+**두 진입점(2026-07-27 이후)**:
+- `compressImageForUpload(file)` — 파일 1개, 싱글턴 워커. 기존 호출부(설정 프로필 이미지, `WorkflowPageClient.tsx` 보정본 단일 파일, `UploadVersionsPanel.tsx`/`retouch-gemini-match.ts` 보정본 여러 파일) 동작을 그대로 유지.
+- `compressImagesInParallel(files, signal, poolSize)` — 업로드 화면 전용. 워커 풀(acquire/release, 워커당 동시 작업 최대 1개)로 한 라운드의 파일을 동시에 압축한다. `AbortSignal`로 취소하면 부분 결과 없이 AbortError를 던지고, 그 시점에 busy하던 워커는 즉시 교체해 다음 세션이 기다리지 않게 한다. 풀 크기는 데스크톱 2 / 모바일 1(메모리 안정성 우선 — 사진 디코딩 메모리가 파일 크기보다 훨씬 커서 처음부터 크게 잡지 않음). 실측(30장, 합성 이미지, 원본 포함 업로드 기준) 압축 소요 시간이 순차 대비 약 절반으로 감소.
+- 실제 압축 처리(워커 호출 + canvas 폴백)는 `compressWithWorker()`로 공유 — 두 진입점 모두 동일 로직.
 
 ---
 

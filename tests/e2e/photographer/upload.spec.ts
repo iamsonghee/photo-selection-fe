@@ -32,7 +32,7 @@ async function doUpload(page: import("@playwright/test").Page, filename: string)
   const fileInput = page.locator('input[type="file"]');
   await fileInput.setInputFiles(path.join(FIXTURES, filename));
   const uploadBtn = page.getByRole("button", { name: /업로드/i }).last();
-  if (await uploadBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+  if (await uploadBtn.isEnabled({ timeout: 3000 }).catch(() => false)) {
     await uploadBtn.click();
   }
 }
@@ -63,7 +63,7 @@ test.describe("작가 — 파일 업로드", () => {
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(path.join(FIXTURES, "fake.cr3"));
     const uploadBtn = page.getByRole("button", { name: /업로드/i }).last();
-    if (await uploadBtn.isVisible({ timeout: 3000 }).catch(() => false)) await uploadBtn.click();
+    if (await uploadBtn.isEnabled({ timeout: 3000 }).catch(() => false)) await uploadBtn.click();
     await page.waitForTimeout(8000);
     // 거부 메시지 또는 사진 수 동일 확인 (둘 중 하나)
     const errorVisible = await page.locator("text=지원하지 않는 형식").isVisible().catch(() => false);
@@ -87,7 +87,7 @@ test.describe("작가 — 파일 업로드", () => {
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(path.join(FIXTURES, "empty.jpg"));
     const uploadBtn = page.getByRole("button", { name: /업로드/i }).last();
-    if (await uploadBtn.isVisible({ timeout: 3000 }).catch(() => false)) await uploadBtn.click();
+    if (await uploadBtn.isEnabled({ timeout: 3000 }).catch(() => false)) await uploadBtn.click();
     await page.waitForTimeout(8000);
     // "업로드 완료!"가 아닌 실패 메시지거나, 사진 수가 동일해야 함
     const successToast = await page.locator("text=업로드 완료!").isVisible().catch(() => false);

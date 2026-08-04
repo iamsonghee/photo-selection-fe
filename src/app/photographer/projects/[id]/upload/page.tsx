@@ -31,7 +31,7 @@ import { getProjectById, getPhotosByProjectId } from "@/lib/db";
 import { getStatusLabel } from "@/lib/project-status";
 import { createClient } from "@/lib/supabase/client";
 import { parseBetaLimitError, DEFAULT_BETA_MAX_PHOTOS_PER_PROJECT } from "@/lib/beta-limits";
-import { compressImageForUpload } from "@/lib/upload-client-compress";
+import { compressImagesInParallel } from "@/lib/upload-client-compress";
 import { createThumbLoadQueue, useQueuedThumbSrc, type ThumbLoadQueue } from "@/lib/thumb-load-queue";
 import type { Project, ProjectStatus, Photo, PhotoGroupInfo } from "@/types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
@@ -1062,6 +1062,9 @@ export default function ProjectDetailPage() {
   // React state updates are not synchronous, so a ref is required to block two
   // clicks that land before the upload phase re-renders.
   const uploadInProgressRef = useRef(false);
+  // 압축 워커 풀 취소용 — 업로드 세션마다 새로 만들고, 중단 시 abort()해서 그 세션이
+  // 점유 중이던 워커를 즉시 교체시킨다(다음 세션이 기다리지 않도록, upload-client-compress.ts 참고).
+  const compressAbortControllerRef = useRef<AbortController | null>(null);
   const useProxyRef = useRef(false);
   /** selecting 안내 모달 확인 시 pending으로 넘길 드래그 파일 임시 보관 */
   const pendingDropFilesRef = useRef<File[] | null>(null);
@@ -1109,6 +1112,7 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     loadProject().then((p) => { if (p) { loadPhotos(); loadPhotoGroups(); } });
   }, [id, loadProject, loadPhotos, loadPhotoGroups]);
+
   // 원본 ZIP은 백그라운드 워커가 준비한다. 업로드 직후에는 pending/processing으로
   // 시작하지만, 프로젝트를 다시 열지 않아도 완료 상태를 받아 버튼을 활성화해야 한다.
   useEffect(() => {
@@ -1118,7 +1122,6 @@ export default function ProjectDetailPage() {
     const timer = window.setInterval(() => { void loadProject(); }, 5000);
     return () => window.clearInterval(timer);
   }, [project?.includeOriginal, project?.originalArchiveStatus, loadProject]);
-
 
   /** 마운트/재진입 시 로컬 분석 상태를 서버 상태로 시드 — processing이면 아래 폴링 이펙트가 자동 재개된다 */
   useEffect(() => {
@@ -1379,6 +1382,7 @@ export default function ProjectDetailPage() {
     queuedBlobsRef.current = [];
     stopRequestedRef.current = false;
     useProxyRef.current = false;
+    compressAbortControllerRef.current = new AbortController();
 
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
@@ -1449,30 +1453,57 @@ export default function ProjectDetailPage() {
       });
       setQueuedPreviews(chunkQueued);
 
-      // ── STEP 3: 이 라운드 압축 (파일별 순서대로, 하이라이트 포함) ──
-      const compressedChunk: File[][] = [];
-      let roundFileIdx = 0;
-      let stopped = false;
-      outerBatch: for (let bi = 0; bi < rawChunk.length; bi++) {
-        const compressedBatch: File[] = [];
-        for (let fi = 0; fi < rawChunk[bi].length; fi++) {
-          if (stopRequestedRef.current) {
-            setCompressingIndex(-1);
-            setQueuedPreviews([]);
-            chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
-            queuedBlobsRef.current = queuedBlobsRef.current.filter(
-              (u) => !chunkQueued.some((q) => q.blobUrl === u)
-            );
-            stopped = true;
-            break outerBatch;
-          }
-          setCompressingIndex(roundFileIdx);
-          compressedBatch.push(await compressImageForUpload(rawChunk[bi][fi]));
-          roundFileIdx++;
-        }
-        compressedChunk.push(compressedBatch);
+      // ── STEP 3: 이 라운드 압축(워커 풀로 여러 장 동시 처리 — 데스크톱 2 / 모바일 1) ──
+      if (stopRequestedRef.current) {
+        setQueuedPreviews([]);
+        chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
+        queuedBlobsRef.current = queuedBlobsRef.current.filter(
+          (u) => !chunkQueued.some((q) => q.blobUrl === u)
+        );
+        break;
       }
-      if (stopped) break;
+      setCompressingIndex(0);
+      let flatCompressed: File[];
+      try {
+        flatCompressed = await compressImagesInParallel(
+          allRawInChunk,
+          compressAbortControllerRef.current!.signal,
+          isPhoneLikeClient() ? 1 : 2,
+          undefined,
+          () => setCompressingIndex((prev) => prev + 1),
+        );
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") {
+          setCompressingIndex(-1);
+          setQueuedPreviews([]);
+          chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
+          queuedBlobsRef.current = queuedBlobsRef.current.filter(
+            (u) => !chunkQueued.some((q) => q.blobUrl === u)
+          );
+          break;
+        }
+        // 예외를 다시 던지면 이벤트 핸들러에서 Promise가 끊겨 업로드 잠금(ref)이
+        // 해제되지 않는다. 압축 실패는 안전하게 현재 세션만 종료하고 재시도를 허용한다.
+        setCompressingIndex(-1);
+        setQueuedPreviews([]);
+        chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
+        queuedBlobsRef.current = queuedBlobsRef.current.filter(
+          (u) => !chunkQueued.some((q) => q.blobUrl === u)
+        );
+        setUploadError("사진 압축을 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+        setUploadPhase("idle");
+        uploadInProgressRef.current = false;
+        return;
+      }
+      // rawChunk(배치별)와 동일한 크기로 재분할 — 이후 STEP 4/업로드는 배치 단위로 동작
+      const compressedChunk: File[][] = [];
+      {
+        let cursor = 0;
+        for (const batch of rawChunk) {
+          compressedChunk.push(flatCompressed.slice(cursor, cursor + batch.length));
+          cursor += batch.length;
+        }
+      }
       setCompressingIndex(-1);
 
       // ── STEP 4: queuedPreviews 해제 (XHR 시작 시 uploadingPhotos로 전환됨) ──
@@ -1919,6 +1950,7 @@ export default function ProjectDetailPage() {
     setShowFlushAllConfirm(false);
     setDeletingId("__all__");
     stopRequestedRef.current = true;
+    compressAbortControllerRef.current?.abort();
     try {
       const res = await fetch(`/api/photographer/projects/${id}/photos`, { method: "DELETE" });
       if (res.ok) {
@@ -2588,7 +2620,9 @@ export default function ProjectDetailPage() {
                 similarityToggleOn={similarityToggleOn}
                 expandedGroups={expandedGroups}
                 onGroupBadgeClick={handleGroupBadgeClick}
-                compressingTempId={compressingIndex >= 0 && queuedPreviews[compressingIndex] ? queuedPreviews[compressingIndex].tempId : null}
+                // 데스크톱은 워커 풀로 여러 장을 동시에 압축해 "지금 압축 중인 파일 1장" 하이라이트가
+                // 더 이상 의미 없음(모바일은 풀 크기 1이라 기존과 동일하게 단일 하이라이트 유지)
+                compressingTempId={isMobile && compressingIndex >= 0 && queuedPreviews[compressingIndex] ? queuedPreviews[compressingIndex].tempId : null}
                 leadingUploadCell={
                   uploadAllowed ? (
                     <UploadTile
