@@ -983,6 +983,7 @@ export default function ProjectDetailPage() {
   const [pinSaving, setPinSaving] = useState(false);
   const [pinError, setPinError] = useState("");
   const [inviteActivating, setInviteActivating] = useState(false);
+  const [archiveRefreshing, setArchiveRefreshing] = useState(false);
   const [inviteShareModalOpen, setInviteShareModalOpen] = useState(false);
 
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -1066,6 +1067,7 @@ export default function ProjectDetailPage() {
   // 점유 중이던 워커를 즉시 교체시킨다(다음 세션이 기다리지 않도록, upload-client-compress.ts 참고).
   const compressAbortControllerRef = useRef<AbortController | null>(null);
   const useProxyRef = useRef(false);
+  const previousArchiveStatusRef = useRef<Project["originalArchiveStatus"] | undefined>(undefined);
   /** selecting 안내 모달 확인 시 pending으로 넘길 드래그 파일 임시 보관 */
   const pendingDropFilesRef = useRef<File[] | null>(null);
 
@@ -1122,6 +1124,16 @@ export default function ProjectDetailPage() {
     const timer = window.setInterval(() => { void loadProject(); }, 5000);
     return () => window.clearInterval(timer);
   }, [project?.includeOriginal, project?.originalArchiveStatus, loadProject]);
+
+  // 자동 확인으로 준비가 끝나면 버튼만 바뀌는 데서 끝내지 않고, 바로 다음 행동을 안내한다.
+  useEffect(() => {
+    const previous = previousArchiveStatusRef.current;
+    const current = project?.originalArchiveStatus;
+    if ((previous === "pending" || previous === "processing") && current === "ready") {
+      setToast("원본 준비가 완료되었습니다. 이제 고객을 초대할 수 있어요.");
+    }
+    previousArchiveStatusRef.current = current;
+  }, [project?.originalArchiveStatus]);
 
   /** 마운트/재진입 시 로컬 분석 상태를 서버 상태로 시드 — processing이면 아래 폴링 이펙트가 자동 재개된다 */
   useEffect(() => {
@@ -2031,6 +2043,15 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleRefreshArchiveStatus = async () => {
+    setArchiveRefreshing(true);
+    try {
+      await loadProject();
+    } finally {
+      setArchiveRefreshing(false);
+    }
+  };
+
   const handleStartClipAnalysis = async () => {
     // 대기 중인 사진이 없으면(이미 전체 분석 완료) API를 다시 부르지 않고 결과만 보여준다 —
     // 저장된 임베딩·그룹이 이미 최신 상태이므로 그대로 토글만 켠다.
@@ -2089,6 +2110,12 @@ export default function ProjectDetailPage() {
   // 상태를 우선 표시하면 "정리 중"으로 보이는 문제가 생기므로 실제 사진이 있을 때만 막는다.
   const archiveBlocking = M > 0 && !!archiveStatus && archiveStatus !== "ready";
   const failedOriginalCount = photos.filter((p) => p.originalStatus === "failed").length;
+  const completedOriginalCount = photos.filter((p) => p.originalStatus === "completed").length;
+  const archivePreparingLabel = archiveStatus === "pending" ? "원본 파일 준비 중" : "고객용 원본 파일 준비 중";
+  const archivePreparingDetail = archiveStatus === "pending"
+    ? `원본 ${completedOriginalCount || M}/${M}장 확인 완료 · 다운로드 파일 준비를 시작하고 있어요`
+    : `원본 ${completedOriginalCount || M}/${M}장 확인 완료 · 고객용 다운로드 파일을 만들고 있어요`;
+  const archiveButtonLabel = isMobile ? "원본 준비 중" : archivePreparingLabel;
   const progressPct = N > 0 ? Math.min(100, Math.round((displayPhotos.length / N) * 100)) : 0;
   const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
   const showServerWorking = uploadPhase === "processing" && awaitingServerFinalize;
@@ -2792,8 +2819,23 @@ export default function ProjectDetailPage() {
                   : archiveStatus === "failed"
                     ? `납품용 원본 처리 실패 ${failedOriginalCount}장 — 재시도가 필요합니다`
                     : archiveBlocking
-                      ? "납품용 원본을 정리하는 중입니다 · 완료 후 활성화 가능합니다"
+                      ? archivePreparingDetail
                       : `${displayPhotos.length}장 업로드 완료 · 초대 링크를 활성화할 수 있습니다`}
+                {archiveBlocking && archiveStatus !== "failed" && (
+                  <button
+                    type="button"
+                    onClick={() => { void handleRefreshArchiveStatus(); }}
+                    disabled={archiveRefreshing}
+                    style={{
+                      alignSelf: "flex-start", marginTop: 4, padding: 0,
+                      color: ACCENT, background: "transparent", border: "none",
+                      fontFamily: MONO, fontSize: 11, cursor: archiveRefreshing ? "wait" : "pointer",
+                      opacity: archiveRefreshing ? 0.65 : 1,
+                    }}
+                  >
+                    {archiveRefreshing ? "상태 확인 중…" : "상태 다시 확인"}
+                  </button>
+                )}
               </div>
             </div>
             <button
@@ -2822,7 +2864,7 @@ export default function ProjectDetailPage() {
                 : archiveStatus === "failed"
                   ? "재시도"
                   : archiveBlocking
-                    ? "정리 중…"
+                    ? archiveButtonLabel
                     : isMobile ? "초대링크 활성화" : "고객 초대 링크 활성화"}
               {!inviteActivating && M >= N && !archiveBlocking && !isMobile && <ChevronRight size={14} />}
             </button>
