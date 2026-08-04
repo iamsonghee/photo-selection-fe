@@ -983,7 +983,6 @@ export default function ProjectDetailPage() {
   const [pinSaving, setPinSaving] = useState(false);
   const [pinError, setPinError] = useState("");
   const [inviteActivating, setInviteActivating] = useState(false);
-  const [archiveRefreshing, setArchiveRefreshing] = useState(false);
   const [inviteShareModalOpen, setInviteShareModalOpen] = useState(false);
 
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -2040,15 +2039,6 @@ export default function ProjectDetailPage() {
     }
   };
 
-  const handleRefreshArchiveStatus = async () => {
-    setArchiveRefreshing(true);
-    try {
-      await loadProject();
-    } finally {
-      setArchiveRefreshing(false);
-    }
-  };
-
   const handleStartClipAnalysis = async () => {
     // 대기 중인 사진이 없으면(이미 전체 분석 완료) API를 다시 부르지 않고 결과만 보여준다 —
     // 저장된 임베딩·그룹이 이미 최신 상태이므로 그대로 토글만 켠다.
@@ -2806,21 +2796,6 @@ export default function ProjectDetailPage() {
                     : archiveBlocking
                       ? "고객 초대 링크를 활성화하기 위해 원본 사진을 준비하고 있어요."
                       : `${displayPhotos.length}장 업로드 완료 · 초대 링크를 활성화할 수 있습니다`}
-                {archiveBlocking && archiveStatus !== "failed" && (
-                  <button
-                    type="button"
-                    onClick={() => { void handleRefreshArchiveStatus(); }}
-                    disabled={archiveRefreshing}
-                    style={{
-                      alignSelf: "flex-start", marginTop: 4, padding: 0,
-                      color: ACCENT, background: "transparent", border: "none",
-                      fontFamily: MONO, fontSize: 11, cursor: archiveRefreshing ? "wait" : "pointer",
-                      opacity: archiveRefreshing ? 0.65 : 1,
-                    }}
-                  >
-                    {archiveRefreshing ? "상태 확인 중…" : "상태 다시 확인"}
-                  </button>
-                )}
               </div>
             </div>
             <button
