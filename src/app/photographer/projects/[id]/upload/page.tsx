@@ -1109,6 +1109,16 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     loadProject().then((p) => { if (p) { loadPhotos(); loadPhotoGroups(); } });
   }, [id, loadProject, loadPhotos, loadPhotoGroups]);
+  // 원본 ZIP은 백그라운드 워커가 준비한다. 업로드 직후에는 pending/processing으로
+  // 시작하지만, 프로젝트를 다시 열지 않아도 완료 상태를 받아 버튼을 활성화해야 한다.
+  useEffect(() => {
+    const archiveStatus = project?.originalArchiveStatus;
+    if (!project?.includeOriginal || (archiveStatus !== "pending" && archiveStatus !== "processing")) return;
+
+    const timer = window.setInterval(() => { void loadProject(); }, 5000);
+    return () => window.clearInterval(timer);
+  }, [project?.includeOriginal, project?.originalArchiveStatus, loadProject]);
+
 
   /** 마운트/재진입 시 로컬 분석 상태를 서버 상태로 시드 — processing이면 아래 폴링 이펙트가 자동 재개된다 */
   useEffect(() => {
@@ -1897,6 +1907,9 @@ export default function ProjectDetailPage() {
       setToast("삭제되었습니다.");
       // 삭제로 사진 집합이 바뀌면 이전에 캐시된 clipPending(분석 완료 판정)이 stale해진다.
       loadClipAnalysisStatus();
+      // 삭제 직전/직후 원본 아카이브 워커가 상태를 바꾼 경우에도 하단 초대 버튼이
+      // 이전 "정리 중" 상태를 계속 보지 않도록 프로젝트 메타데이터를 다시 읽는다.
+      await loadProject();
     } catch (e) { setToast(e instanceof Error ? e.message : "삭제 실패"); }
     finally { setDeletingId(null); }
   };
@@ -1924,6 +1937,7 @@ export default function ProjectDetailPage() {
         // 전체 삭제 후 clipPending이 이전(분석 완료) 값 그대로 남아있으면 신규 업로드 후에도
         // "이미 최신 분석 결과입니다"로 오판해 재분석 API 호출을 건너뛴다.
         loadClipAnalysisStatus();
+        await loadProject();
       } else {
         const d = await res.json().catch(() => ({}));
         setToast((d as { error?: string }).error ?? "삭제 실패");
@@ -2039,7 +2053,9 @@ export default function ProjectDetailPage() {
   const isInviteActive = project.status !== "preparing";
   // 납품용 원본 아카이브 상태 — include_original 프로젝트는 이게 'ready'여야만 링크 활성화 가능
   const archiveStatus = project.includeOriginal ? project.originalArchiveStatus ?? "pending" : null;
-  const archiveBlocking = !!archiveStatus && archiveStatus !== "ready";
+  // 사진이 없으면 초대 조건은 사진 수로 이미 막힌다. 이때 과거/진행 중인 아카이브
+  // 상태를 우선 표시하면 "정리 중"으로 보이는 문제가 생기므로 실제 사진이 있을 때만 막는다.
+  const archiveBlocking = M > 0 && !!archiveStatus && archiveStatus !== "ready";
   const failedOriginalCount = photos.filter((p) => p.originalStatus === "failed").length;
   const progressPct = N > 0 ? Math.min(100, Math.round((displayPhotos.length / N) * 100)) : 0;
   const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
@@ -2767,6 +2783,8 @@ export default function ProjectDetailPage() {
             >
               {inviteActivating
                 ? "처리 중…"
+                : M < N
+                  ? "사진 업로드 필요"
                 : archiveStatus === "failed"
                   ? "재시도"
                   : archiveBlocking
