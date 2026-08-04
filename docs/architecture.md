@@ -163,7 +163,10 @@ clip-service/          완전히 독립된 FastAPI 앱 (별도 배포 단위)
 - **프레임워크**: FastAPI (버전 미고정, `requirements.txt`에 버전 핀 없음), `uvicorn`으로 구동.
 - **Python**: 3.11 (`runtime.txt`, `Dockerfile`).
 - **실행 명령**: `Procfile` — `uvicorn app.main:app --host 0.0.0.0 --port $PORT`. Railway는 `nixpacks.toml`을 사용(Dockerfile은 대안 빌드 경로로 존재).
-- **이미지 처리**: `Pillow` + `pillow-heif`(HEIC/HEIF), `ThreadPoolExecutor`(기본 8 워커, 환경변수로 조정)로 CPU 바운드 리사이즈를 비동기 이벤트 루프에서 오프로드.
+- **이미지 처리**: `Pillow` + `pillow-heif`(HEIC/HEIF), `ThreadPoolExecutor` 3개로 CPU/I/O 작업을 비동기 이벤트 루프에서 오프로드.
+  - `_executor`(`IMAGE_EXECUTOR_MAX_WORKERS`, 기본 8): `/api/upload/photos`(썸네일/프리뷰 생성) 외 나머지 전체 — 보정본 리사이즈+R2 업로드, 원본 압축(`/originals/*`), 프로필 이미지 리사이즈+업로드, R2 head/get/delete가 공용으로 사용. 변경 없음.
+  - `_cpu_executor`(`PILLOW_EXECUTOR_MAX_WORKERS`, 기본 4) / `_r2_executor`(`R2_EXECUTOR_MAX_WORKERS`, 기본 6): `/api/upload/photos`의 `_process_one`(썸네일/프리뷰 Pillow 생성 → R2 PUT 2건) 전용으로 분리. 단일 요청 실측에서는 큐 대기 ~0ms로 차이가 없었지만, **동시 2요청** 실측에서 공유 `_executor` 경쟁으로 Pillow/R2 큐 대기가 수백 ms까지 증가하는 것을 확인해 분리함 — R2 큐 대기 -78~87%, 전체 처리시간 -9%(2026-08-04, `app/routers/upload.py`).
+  - 스레드 상한 총합은 8 → 8(공용, 변경 없음)+4(CPU)+6(R2)=18로 늘었지만, **CPU 바운드(대형 이미지 디코드/리사이즈로 메모리를 실제로 점유하는 작업)의 동시 실행 수는 오히려 5(기존 `UPLOAD_PHOTOS_CONCURRENCY` 세마포어 상한)에서 4로 더 타이트해짐** — R2 풀(6)은 압축된 JPEG 바이트(수십~수백 KB)만 들고 네트워크를 기다리는 순수 I/O라 스레드 수 증가가 메모리 위험으로 이어지지 않음. 실측(로컬, macOS): fresh 프로세스 기준 25장/요청 1건 처리 후 peak RSS 12MP(4000x3000) 약 640MB(기준 152MB, +488MB), 24MP(6000x4000, draft 디코드 경로) 약 578MB(기준 233MB, +345MB) — 두 경우 모두 에러/OOM 없음. `IMAGE_EXECUTOR_MAX_WORKERS` 자체는 이번에 조정하지 않음.
 - **스토리지 클라이언트**: `boto3` S3 호환 클라이언트로 Cloudflare R2 접근(`app/storage.py`). GCS 관련 코드도 존재하나 어떤 라우터에서도 호출되지 않는 것으로 확인됨(죽은 코드로 추정).
 - **DB 접근**: ORM 없음. 공식 `supabase` Python 클라이언트(PostgREST 기반)로만 접근. `app/models/`는 빈 패키지.
 - **CLIP 서비스**: `clip-service/`는 메인 앱과 완전히 분리된 별도 FastAPI 앱(자체 `Dockerfile`, `requirements.txt`에 `torch`/`torchvision`/`open_clip_torch`/`opencv-python-headless` 포함). 메인 백엔드 코드(`app/`)는 어디에서도 `clip-service`를 호출하지 않음 — **프론트엔드가 `CLIP_SERVICE_URL`로 clip-service를 직접 호출**한다.
@@ -669,7 +672,7 @@ sequenceDiagram
 | 스토리지 | `R2_HOST`(URL 파싱 화이트리스트) | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`, `GCS_CREDENTIALS_JSON`, `GCS_BUCKET_NAME`(미사용 추정) |
 | 서비스 간 시크릿 | `INTERNAL_PRESIGN_SECRET` | `INTERNAL_PRESIGN_SECRET` |
 | 테스트 | `ENABLE_TEST_LOGIN`, `TEST_PHOTOGRAPHER_EMAIL`, `TEST_PHOTOGRAPHER_PASSWORD` | — |
-| 기타 | `NODE_ENV`, `NEXT_PUBLIC_BLOCK_VIEWER_IMAGE_DOWNLOAD` | `ALLOWED_ORIGINS`, `UPLOAD_PHOTOS_CONCURRENCY`, `VERSION_UPLOAD_CONCURRENCY`, `IMAGE_EXECUTOR_MAX_WORKERS`, `PORT` |
+| 기타 | `NODE_ENV`, `NEXT_PUBLIC_BLOCK_VIEWER_IMAGE_DOWNLOAD` | `ALLOWED_ORIGINS`, `UPLOAD_PHOTOS_CONCURRENCY`, `VERSION_UPLOAD_CONCURRENCY`, `IMAGE_EXECUTOR_MAX_WORKERS`, `PILLOW_EXECUTOR_MAX_WORKERS`, `R2_EXECUTOR_MAX_WORKERS`, `UPLOAD_MEM_LOG`, `PORT` |
 
 ---
 
