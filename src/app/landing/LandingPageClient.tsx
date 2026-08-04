@@ -88,10 +88,10 @@ function Header({ onAuthOpen, isLoggedIn }: { onAuthOpen: () => void; isLoggedIn
 const COMPARE_EXAMPLE_SRC = "/landing/compare-wedding.jpg";
 
 const PHOTOS = [
-  { src: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=800&auto=format&fit=crop", filename: "IMG_8421.RAW" },
-  { src: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=800&auto=format&fit=crop", filename: "IMG_8422.RAW" },
-  { src: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?q=80&w=800&auto=format&fit=crop", filename: "IMG_8423.RAW" },
-  { src: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=800&auto=format&fit=crop", filename: "IMG_8424.RAW" },
+  { src: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=800&auto=format&fit=crop", filename: "IMG_8421.JPG" },
+  { src: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=800&auto=format&fit=crop", filename: "IMG_8422.JPG" },
+  { src: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?q=80&w=800&auto=format&fit=crop", filename: "IMG_8423.JPG" },
+  { src: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=800&auto=format&fit=crop", filename: "IMG_8424.JPG" },
 ];
 
 const PHASES = [
