@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isTestLoginEnabled } from "@/lib/test-env-guard";
 
-/** 테스트 전용 이메일 로그인 — ENABLE_TEST_LOGIN=true 일 때만 동작 */
+/** 테스트 전용 이메일 로그인 — ENABLE_TEST_LOGIN=true 일 때만 동작 (production에서는 항상 비활성) */
 export async function POST(req: Request) {
-  if (process.env.ENABLE_TEST_LOGIN !== "true") {
+  if (!isTestLoginEnabled()) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

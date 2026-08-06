@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { createClient } from "@/lib/supabase/server";
 import { IMPLEMENTED_SURVEY_TYPES, type SurveyType } from "@/lib/beta-survey";
+import { isTestLoginEnabled } from "@/lib/test-env-guard";
 import type { ProjectStatus } from "@/types";
 
 // 테스트용 더미 이미지 URLs (공개 CDN, 실제 렌더링 가능)
@@ -23,9 +24,9 @@ type Action =
   | "backdate_survey_later"
   | "insert_project_log";
 
-/** 테스트 전용 데이터 세팅 — ENABLE_TEST_LOGIN=true 일 때만 동작 */
+/** 테스트 전용 데이터 세팅 — ENABLE_TEST_LOGIN=true 일 때만 동작 (production에서는 항상 비활성) */
 export async function POST(req: Request) {
-  if (process.env.ENABLE_TEST_LOGIN !== "true") {
+  if (!isTestLoginEnabled()) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -218,7 +219,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  if (process.env.ENABLE_TEST_LOGIN !== "true") {
+  if (!isTestLoginEnabled()) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

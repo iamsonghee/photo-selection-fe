@@ -653,6 +653,7 @@ sequenceDiagram
 - BE: `uvicorn app.main:app --reload`로 추정되나 로컬 실행 스크립트가 레포에 명시되어 있지 않음(**확인 필요** — `Procfile`은 배포용 커맨드만 정의).
 - CLIP 서비스: 로컬 실행 방법은 `clip-service/README.md`에 근거하나 본 조사에서 실행 커맨드 원문은 확인하지 않음(**확인 필요**).
 - FE→BE 연동을 로컬에서 테스트하려면 `NEXT_PUBLIC_API_URL`/`BACKEND_URL`을 `http://localhost:8000`으로(기본값), CORS 허용 목록(`app/main.py`)에 `localhost:3001`이 이미 포함되어 있음.
+- **⚠️ 현재 `photo-selection-fe/.env.local`과 `photo-selection-be/.env`는 별도 로컬/개발용 Supabase·R2가 아니라 실제 production Supabase/R2를 그대로 가리킨다.** 즉 로컬에서 BE를 띄우면 백그라운드 워커(`original_compress_worker` 등)도 production 테이블/버킷을 대상으로 동작한다. staging 환경 분리 전까지는 로컬에서 대량 benchmark나 destructive QA(대량 생성/삭제, 부하 테스트 등)를 실행하지 않는다 — 소규모 테스트가 필요하면 반드시 전용 테스트 프로젝트를 만들고 실제 삭제 API로 cleanup한다.
 
 ### 14.2 테스트
 
