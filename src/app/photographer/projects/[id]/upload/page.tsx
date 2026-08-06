@@ -2986,8 +2986,8 @@ export default function ProjectDetailPage() {
             <button
               type="button"
               className="prj-invite-btn"
-              onClick={uploadBlockingInvite ? handleStopUpload : handleEnableClientAccess}
-              disabled={inviteActivating || (uploadBlockingInvite ? uploadStopRequested : M < N)}
+              onClick={handleEnableClientAccess}
+              disabled={inviteActivating || uploadBlockingInvite || M < N}
               style={{
                 display: "flex", alignItems: "center", gap: 4,
                 padding: "9px 20px",
@@ -2995,11 +2995,9 @@ export default function ProjectDetailPage() {
                 border: "none", borderRadius: 8,
                 color: M >= N && !uploadBlockingInvite ? "#000" : ACCENT,
                 fontSize: 13, fontWeight: 600,
-                cursor: uploadBlockingInvite
-                  ? (uploadStopRequested ? "wait" : "pointer")
-                  : (M >= N && !inviteActivating ? "pointer" : "not-allowed"),
+                cursor: M >= N && !inviteActivating && !uploadBlockingInvite ? "pointer" : "not-allowed",
                 fontFamily: MONO,
-                opacity: inviteActivating ? 0.75 : uploadBlockingInvite && uploadStopRequested ? 0.55 : 1,
+                opacity: inviteActivating ? 0.75 : 1,
                 boxShadow: M >= N && !uploadBlockingInvite ? `0 0 16px ${ACCENT_GLOW}` : "none",
                 transition: "all 0.2s",
               }}
@@ -3007,11 +3005,11 @@ export default function ProjectDetailPage() {
               {inviteActivating
                 ? "처리 중…"
                 : uploadBlockingInvite
-                  ? (uploadStopRequested ? "중단 중…" : "업로드 중지")
+                  ? "사진 업로드 중…"
                 : M < N
                   ? "사진 업로드 필요"
                 : isMobile ? "초대링크 활성화" : "고객 초대 링크 활성화"}
-              {!inviteActivating && uploadBlockingInvite && !uploadStopRequested && (
+              {!inviteActivating && uploadBlockingInvite && (
                 <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />
               )}
               {!inviteActivating && M >= N && !uploadBlockingInvite && !isMobile && <ChevronRight size={14} />}
