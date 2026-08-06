@@ -545,10 +545,10 @@ sequenceDiagram
 
 ## 10. 사진 업로드, 저장, 조회 및 썸네일 처리 흐름
 
-> 원본 사진(셀렉용) 업로드의 라운드/배치/barrier 구조, progress 산정 기준, 화면 표시(blob URL vs 서버 썸네일) 등 세부는 `docs/upload-flow.md`에 더 자세히 정리되어 있다. 아래는 요약.
+> 원본 사진(셀렉용) 업로드의 배치/동시성/파이프라인(desktop) 및 round barrier(모바일·`include_original=true`) 구조, progress 산정 기준, 화면 표시(blob URL vs 서버 썸네일) 등 세부는 `docs/upload-flow.md`에 더 자세히 정리되어 있다. 아래는 요약.
 
 1. **선택/사전 압축(브라우저)**: 업로드 화면(`upload/page.tsx`) 전용 `compressImagesInParallel()`(워커 풀, PC 2 / 모바일 1)이 최대 3200px, JPEG q=0.82로 리사이즈(600KB 미만 파일은 스킵). `include_original` 값과 무관하게 **모든 파일**을 압축해 `/api/upload/photos`로 보낸다 — `include_original=true`일 때는 이와 별개로 **압축하지 않은 브라우저 원본**(`rawFile`)을 R2에 직접 PUT한다(즉 같은 사진이 두 번 전송됨). HEIC 파일은 `include_original=true` 시 베타 정책상 거부됨(JPEG/PNG/WebP만 허용).
-2. **배치/라운드 전송**: PC 비원본은 8장/배치, 동시 배치 수는 회선 상태에 따라 2~6(기본 6, `getDesktopUploadConcurrency()` — 느린 회선일수록 낮춤). 모바일 비원본은 3장/배치, 동시 배치 수 1(`MOBILE_CONCURRENCY`). `include_original=true`는 배치 크기 1장으로 축소, 동시 배치 수 PC 4(고사양 기기+회선이면 6, `ORIGINAL_PC_CONCURRENCY`/`_FAST`) / 모바일 1. **라운드 barrier**: "동시 배치 수 × 배치 크기"만큼(PC 비원본 기준 최대 6×8=48장)을 한 라운드로 묶어 그 라운드 전체의 압축이 끝나야 해당 라운드의 배치 전송이 시작된다 — 압축이 끝난 파일부터 바로 전송을 시작하는 구조가 아니다. 라운드끼리는 순차, 라운드 내부의 배치 전송은 병렬(`Promise.all`). `XMLHttpRequest` 멀티파트 전송, `Authorization: Bearer <Supabase access_token>` 포함.
+2. **배치 전송**: PC 비원본은 8장/배치, 동시 배치 수는 회선 상태에 따라 2~6(기본 6, `getDesktopUploadConcurrency()` — 느린 회선일수록 낮춤). 모바일 비원본은 3장/배치, 동시 배치 수 1(`MOBILE_CONCURRENCY`). `include_original=true`는 배치 크기 1장으로 축소, 동시 배치 수 PC 4(고사양 기기+회선이면 6, `ORIGINAL_PC_CONCURRENCY`/`_FAST`) / 모바일 1. **(2026-08-06, OPT-ROUND-01)** desktop+`include_original=false`는 batch 압축이 끝나는 즉시 bounded producer-consumer 파이프라인(용량=concurrency)으로 전송을 시작하고 다음 batch 압축을 곧바로 이어간다 — 이전에는 "동시 배치 수 × 배치 크기"(PC 비원본 기준 최대 6×8=48장)를 한 라운드로 묶어 그 라운드 전체 압축이 끝나야 전송을 시작하는 barrier가 있었으나 이 경로에서 제거했다. **모바일 전체 및 `include_original=true`는 이 barrier 구조를 그대로 유지**한다(라운드끼리 순차, 라운드 내부 배치 전송은 병렬 `Promise.all`) — 세부는 `docs/upload-flow.md` §FE 배치·동시성·파이프라인 구조 참고. `XMLHttpRequest` 멀티파트 전송, `Authorization: Bearer <Supabase access_token>` 포함.
 3. **전송 대상**: 우선 `NEXT_PUBLIC_API_URL` (FastAPI) 직접 호출 → 네트워크/CORS 오류(`TypeError`) 시 Next API 프록시(`/api/photographer/upload/photos`)로 폴백. 프록시 라우트는 `await req.formData()`로 전체 바디를 버퍼링한 뒤 다시 전송하는 방식이라 스트리밍이 아니다.
 4. **백엔드 처리(`photo-selection-be/app/routers/upload.py`)** — `POST /api/upload/photos`는 아래를 **전부 동기로 끝내야 응답**한다(즉 이 처리 시간은 FE progress bar에 반영되지 않고, 완료 여부만 이 응답으로 판가름남):
    - Content-Type 미확인 시 확장자로 추론.

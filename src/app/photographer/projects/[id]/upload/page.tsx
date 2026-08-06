@@ -1437,7 +1437,16 @@ export default function ProjectDetailPage() {
     let currentToken = token;
     const totalFiles = uploadFiles.length;
 
-    // 분할처리: 라운드별 압축→전송 파이프라인. 전체 압축 후 전체 전송이 아닌 한 라운드씩 처리.
+    // 압축→전송 처리. 두 가지 모드가 있다:
+    // - pipelineMode(desktop && !include_original): 압축(producer)과 XHR 전송(consumer lane)을
+    //   bounded async channel로 연결한 producer-consumer 파이프라인. round barrier(=concurrency×
+    //   effectiveBatch장 전체 압축 완료 후에만 전송 시작) 제거 실험 — OPT-ROUND-01(2026-08-06).
+    //   batch(=effectiveBatch장, 압축/XHR 단위)는 그대로, "여러 batch를 하나의 round로 묶어
+    //   전량 압축 후 한꺼번에 전송"하던 상위 묶음만 제거한다. compression worker 수(2)/upload
+    //   concurrency/batch size/리사이즈 파라미터는 전부 기존 값 그대로 — barrier만 없앤다.
+    // - 그 외(모바일 또는 include_original=true): 기존 round 기반 루프를 그대로 유지한다 — iOS
+    //   macrotask paint 보장, presigned PUT 배치=1장 흐름 등 이 경로 전용 로직을 건드리지 않기
+    //   위해 이번 실험 범위에서 제외했다(§upload-flow.md 참고).
     // HEIC: include_original=true여도 HEIC는 원본 PUT 없이 썸네일만 업로드 (rawFile=undefined 분기)
     // B Plan: 압축본을 서버로 전송 + 원본은 presigned PUT으로 R2에 직접 전송
     const effectiveBatch = inclOrig ? 1 : (isPhoneLikeClient() ? MOBILE_BATCH_SIZE : BATCH_SIZE);
@@ -1445,12 +1454,12 @@ export default function ProjectDetailPage() {
       ? (isPhoneLikeClient() ? 1 : getDesktopUploadConcurrency(true))
       : (isPhoneLikeClient() ? MOBILE_CONCURRENCY : getDesktopUploadConcurrency(false));
     const totalBatches = Math.ceil(totalFiles / effectiveBatch);
+    const rawBatches: File[][] = Array.from({ length: totalBatches }, (_, i) =>
+      uploadFiles.slice(i * effectiveBatch, Math.min((i + 1) * effectiveBatch, totalFiles))
+    );
 
     // XHR 진행률 추적용 근사 배치 사이즈 (원본 파일 기준 — 압축본은 더 작지만 비율 유지됨)
-    const approxBatchSizes = Array.from({ length: totalBatches }, (_, i) => {
-      const b = uploadFiles.slice(i * effectiveBatch, (i + 1) * effectiveBatch);
-      return b.reduce((s, f) => s + f.size, 0);
-    });
+    const approxBatchSizes = rawBatches.map((b) => b.reduce((s, f) => s + f.size, 0));
     const totalBytes = Math.max(1, approxBatchSizes.reduce((a, b) => a + b, 0));
     const loadedPerBatch = new Array<number>(totalBatches).fill(0);
     const applyProgress = (idx: number, loaded: number) => {
@@ -1464,59 +1473,291 @@ export default function ProjectDetailPage() {
     const allFailed: File[] = [];
     const backendRejected: string[] = []; // BUG-01: 서버에서 거부된 파일명 (CR3 등 미지원 형식)
     let completedBatches = 0;
-    let abortReason: "betaLimit" | "network" | "auth" | null = null;
+    // "compressSetup": pipelineMode 전용 — 압축 자체가 시작 불가한 예외(워커/canvas 폴백 모두 실패).
+    // legacy 경로는 이 값을 쓰지 않고 기존과 동일하게 즉시 return한다(§아래 legacy 분기).
+    let abortReason: "betaLimit" | "network" | "auth" | "compressSetup" | null = null;
     let abortMessage = "";
     let firstFailDetail: string | null = null;
+    // BUG-04: PC도 30배치(약 240장)마다 토큰 갱신 (대용량 업로드 중 만료 방지)
+    const refreshInterval = isPhoneLikeClient() ? 20 : 30;
 
-    for (let chunkStart = 0; chunkStart < totalBatches; chunkStart += concurrency) {
-      if (stopRequestedRef.current || abortReason) break;
-      // BUG-04: PC도 30배치(약 240장)마다 토큰 갱신 (대용량 업로드 중 만료 방지)
-      const refreshInterval = isPhoneLikeClient() ? 20 : 30;
-      if (chunkStart > 0 && chunkStart % refreshInterval === 0) {
-        await supabase.auth.refreshSession();
-        const { data: { session: fresh } } = await supabase.auth.getSession();
-        if (fresh?.access_token) currentToken = fresh.access_token;
-      }
+    // batchIndex 단위로 공유하는 "서버 처리 중" 배너 상태 — round/파이프라인 어느 쪽이든 동일하게 쓴다.
+    const bodySentMap = new Map<number, boolean>();
+    const reqDoneMap = new Map<number, boolean>();
+    const syncAwaitingServer = () => {
+      let anyPending = false;
+      bodySentMap.forEach((sent, idx) => { if (sent && !reqDoneMap.get(idx)) anyPending = true; });
+      setAwaitingServerFinalize(anyPending);
+    };
 
-      // ── STEP 1: 이번 라운드의 raw 파일 배치 구성 ──
-      const rawChunk: File[][] = [];
-      for (let bi = 0; bi < concurrency && chunkStart + bi < totalBatches; bi++) {
-        const start = (chunkStart + bi) * effectiveBatch;
-        rawChunk.push(uploadFiles.slice(start, Math.min(start + effectiveBatch, totalFiles)));
-      }
-
-      // ── STEP 2: 이 라운드 파일만 queuedPreviews에 표시 (최대 concurrency×effectiveBatch장) ──
-      const chunkTs = Date.now();
-      const allRawInChunk = rawChunk.flat();
-      const chunkQueued = allRawInChunk.map((file, i) => {
+    // 압축된 배치 1개를 업로드(XHR)한다 — round 루프와 파이프라인 루프가 공유하는 로직(순수 추출,
+    // 동작 변경 없음). batchIndex는 전역 배치 인덱스(0..totalBatches-1) — effectiveBatch=1인
+    // include_original=true에서는 uploadFiles와 1:1 대응.
+    const uploadOneBatch = async (batch: File[], batchIndex: number) => {
+      // XHR 전 blob URL 생성 → uploadingPhotos(스피너)에 추가
+      const inFlightNow = Date.now();
+      const inFlight = batch.map((file, fi) => {
         const blobUrl = URL.createObjectURL(file);
-        queuedBlobsRef.current.push(blobUrl);
-        return { tempId: `queued-${chunkTs}-${chunkStart}-${i}`, blobUrl, filename: file.name };
+        uploadingBlobsRef.current.push(blobUrl);
+        return { tempId: `uploading-${inFlightNow}-${batchIndex}-${fi}`, blobUrl, filename: file.name };
       });
-      setQueuedPreviews(chunkQueued);
-
-      // ── STEP 3: 이 라운드 압축(워커 풀로 여러 장 동시 처리 — 데스크톱 2 / 모바일 1) ──
-      if (stopRequestedRef.current) {
-        setQueuedPreviews([]);
-        chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
-        queuedBlobsRef.current = queuedBlobsRef.current.filter(
-          (u) => !chunkQueued.some((q) => q.blobUrl === u)
-        );
-        break;
-      }
-      setCompressingIndex(0);
-      let flatCompressed: File[];
+      const inFlightIds = new Set(inFlight.map((p) => p.tempId));
+      // XHR 시작 전 스피너 강제 렌더 (iOS WKWebView scheduler 우회)
+      flushSync(() => setUploadingPhotos((prev) => [...prev, ...inFlight]));
+      // macrotask 경계 생성 — rAF는 백그라운드 탭에서 멈추므로 setTimeout 사용
+      await new Promise<void>((r) => setTimeout(r, 0));
       try {
-        flatCompressed = await compressImagesInParallel(
-          allRawInChunk,
-          compressAbortControllerRef.current!.signal,
-          isPhoneLikeClient() ? 1 : 2,
-          undefined,
-          () => setCompressingIndex((prev) => prev + 1),
-        );
-      } catch (e) {
-        if (e instanceof DOMException && e.name === "AbortError") {
+        if (abortReason) {
+          allFailed.push(...batch);
+          setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
+          inFlight.forEach((p) => URL.revokeObjectURL(p.blobUrl));
+          uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
+          return;
+        }
+        const globalIdx = batchIndex;
+        // B Plan: rawFile은 브라우저 원본 파일 (effectiveBatch=1이므로 globalIdx가 uploadFiles와 1:1 대응). HEIC는 원본 PUT 불가 → undefined.
+        const rawFile = (inclOrig && !isHeicFile(uploadFiles[globalIdx])) ? uploadFiles[globalIdx] : undefined;
+        const buildForm = () => {
+          const f = new FormData();
+          f.append("project_id", id);
+          f.append("include_original", (inclOrig && !!rawFile) ? "true" : "false");
+          batch.forEach((file) => f.append("files", file));
+          if (inclOrig && rawFile) {
+            f.append("original_filenames", rawFile.name);
+            f.append("original_file_sizes", String(rawFile.size));
+            f.append("original_last_modifieds", String(rawFile.lastModified));
+            f.append("original_content_types", rawFile.type || "image/jpeg");
+          }
+          return f;
+        };
+        try {
+          let res = await postPhotosUpload(
+            buildForm,
+            currentToken,
+            useProxyRef,
+            (loaded) => applyProgress(globalIdx, loaded),
+            { onRequestBodySent: () => { bodySentMap.set(batchIndex, true); syncAwaitingServer(); } },
+          );
+          if (res.status === 401) {
+            await supabase.auth.refreshSession();
+            const { data: { session: after } } = await supabase.auth.getSession();
+            if (after?.access_token) {
+              currentToken = after.access_token;
+              res = await postPhotosUpload(
+                buildForm,
+                currentToken,
+                useProxyRef,
+                (loaded) => applyProgress(globalIdx, loaded),
+                { onRequestBodySent: () => { bodySentMap.set(batchIndex, true); syncAwaitingServer(); } },
+              );
+            }
+          }
+          if (approxBatchSizes[globalIdx] > 0) applyProgress(globalIdx, approxBatchSizes[globalIdx]);
+          // BUG-01: 성공 응답에서 서버 거부 파일 목록 수집
+          if (res.ok) {
+            type UploadOkBody = { rejected?: string[]; original_presigned?: OriginalPresignedItem[] };
+            let okBody: UploadOkBody = {};
+            try { okBody = await res.json().catch(() => ({})) as UploadOkBody; } catch {}
+            if (okBody.rejected?.length) backendRejected.push(...okBody.rejected);
+
+            // presigned PUT: 원본 파일(rawFile)을 R2에 직접 업로드 후 서버에 confirm
+            // batch[pi]는 압축본이므로 사용 금지 — rawFile이 브라우저 원본
+            if (inclOrig && rawFile && okBody.original_presigned?.length) {
+              // presigned URL 수신 수 = 실제 R2 PUT 시도 예정 건수
+              sendingSourceTotalRef.current += okBody.original_presigned.length;
+              for (const p of okBody.original_presigned) {
+                try {
+                  sendingSourceRef.current++;
+                  if (sendingSourceRef.current > 0) setSendingSourcePhase(true);
+                  const putOk = await putOriginalToR2(p, rawFile, currentToken);
+                  if (putOk) await confirmOrRecoverOriginalUpload(p.job_id, currentToken);
+                } catch (presignErr) {
+                  console.warn("presigned PUT/confirm failed (non-fatal):", presignErr);
+                } finally {
+                  sendingSourceRef.current--;
+                  sendingSourceDoneRef.current++;
+                  setSendingSourceSnap({ done: sendingSourceDoneRef.current, total: sendingSourceTotalRef.current });
+                  if (sendingSourceRef.current <= 0) setSendingSourcePhase(false);
+                }
+              }
+            }
+
+            // 배치 성공: blob URL 프리뷰로 즉시 갱신 (추가 네트워크 요청 없음)
+            // iOS에서 업로드 XHR과 동시에 DB 조회하면 연결 한도 초과 → blob URL 사용
+            flushSync(() => {
+              setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
+              setPendingPhotos((prev) => [...prev, ...inFlight]);
+            });
+            // macrotask 경계 생성 — rAF는 백그라운드 탭에서 멈추므로 setTimeout 사용
+            await new Promise<void>((r) => setTimeout(r, 0));
+            uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
+            pendingBlobsRef.current.push(...inFlight.map((p) => p.blobUrl));
+          }
+          if (!res.ok) {
+            let body: unknown = {};
+            try { body = await res.json().catch(() => ({})); } catch {}
+            try {
+              const betaErr = parseBetaLimitError(body);
+              if (betaErr) { abortReason = "betaLimit"; abortMessage = betaErr.message; return; }
+            } catch {}
+            const detail = (body && typeof (body as { detail?: unknown }).detail === "string")
+              ? ((body as { detail: string }).detail)
+              : null;
+            const authLike = isAuthLikeStatus(res.status) || (res.status === 503 && isAuthLikeDetail(detail));
+            if (authLike) {
+              abortReason = "auth";
+              abortMessage = detail ?? "인증 오류로 업로드를 진행할 수 없습니다.";
+              return;
+            }
+            if (!firstFailDetail && detail) firstFailDetail = detail;
+            allFailed.push(...batch);
+          }
+        } catch (e) {
+          if (isNetworkFailure(e)) { abortReason = "network"; return; }
+          allFailed.push(...batch);
+        }
+        completedBatches++;
+        setUploadProgress(Math.min(90, Math.round((completedBatches / totalBatches) * 100)));
+      } finally {
+        // 실패·중단 케이스에서 uploading 상태 잔류 방지
+        setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
+        uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
+        reqDoneMap.set(batchIndex, true);
+        syncAwaitingServer();
+      }
+    };
+
+    const pipelineMode = !isPhoneLikeClient() && !inclOrig;
+
+    if (pipelineMode) {
+      // ── producer-consumer 파이프라인 (desktop, include_original=false 전용) ──
+      // bounded channel 용량 = concurrency(기존 round 하나가 담던 batch 수와 동일 상한) —
+      // "무제한 큐"를 명시적으로 피한다. compression worker(2)는 compressImagesInParallel 내부에서
+      // 그대로 유지, batch를 순서대로 하나씩만 이 함수에 넘긴다(동시 호출 없음 — 워커 풀 내부
+      // busy-slot 추적이 호출 1건 단위로 설계돼 있어 동시 호출 시 경합 위험이 있기 때문).
+      type CompressedBatch = { batchIndex: number; files: File[] };
+      const channelBuffer: CompressedBatch[] = [];
+      let channelClosed = false;
+      const pushWaiters: Array<() => void> = [];
+      const popWaiters: Array<() => void> = [];
+      const channelPush = async (item: CompressedBatch) => {
+        while (channelBuffer.length >= concurrency) {
+          await new Promise<void>((resolve) => pushWaiters.push(resolve));
+        }
+        channelBuffer.push(item);
+        const w = popWaiters.shift();
+        if (w) w();
+      };
+      const channelPop = async (): Promise<CompressedBatch | undefined> => {
+        while (channelBuffer.length === 0) {
+          if (channelClosed) return undefined;
+          await new Promise<void>((resolve) => popWaiters.push(resolve));
+        }
+        const item = channelBuffer.shift()!;
+        const w = pushWaiters.shift();
+        if (w) w();
+        return item;
+      };
+      const channelClose = () => {
+        channelClosed = true;
+        const waiters = popWaiters.splice(0, popWaiters.length);
+        waiters.forEach((w) => w());
+      };
+
+      const producer = (async () => {
+        for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+          if (stopRequestedRef.current || abortReason) break;
+          if (batchIndex > 0 && batchIndex % refreshInterval === 0) {
+            await supabase.auth.refreshSession();
+            const { data: { session: fresh } } = await supabase.auth.getSession();
+            if (fresh?.access_token) currentToken = fresh.access_token;
+          }
+
+          const rawBatch = rawBatches[batchIndex];
+          const chunkTs = Date.now();
+          const chunkQueued = rawBatch.map((file, i) => {
+            const blobUrl = URL.createObjectURL(file);
+            queuedBlobsRef.current.push(blobUrl);
+            return { tempId: `queued-${chunkTs}-${batchIndex}-${i}`, blobUrl, filename: file.name };
+          });
+          setQueuedPreviews(chunkQueued);
+
+          if (stopRequestedRef.current) {
+            setQueuedPreviews([]);
+            chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
+            queuedBlobsRef.current = queuedBlobsRef.current.filter((u) => !chunkQueued.some((q) => q.blobUrl === u));
+            break;
+          }
+
+          setCompressingIndex(0);
+          let compressed: File[];
+          try {
+            compressed = await compressImagesInParallel(
+              rawBatch,
+              compressAbortControllerRef.current!.signal,
+              2, // pipelineMode는 desktop 전용이므로 항상 데스크톱 풀 크기
+              undefined,
+              () => setCompressingIndex((prev) => prev + 1),
+            );
+          } catch (e) {
+            setCompressingIndex(-1);
+            setQueuedPreviews([]);
+            chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
+            queuedBlobsRef.current = queuedBlobsRef.current.filter((u) => !chunkQueued.some((q) => q.blobUrl === u));
+            if (!(e instanceof DOMException && e.name === "AbortError")) {
+              // 압축 자체가 시작 불가한 예외 — 이후 tail 처리(cleanupAllTempStates)에서 정리하고 에러 표시.
+              abortReason = "compressSetup";
+              abortMessage = "사진 압축을 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.";
+            }
+            break;
+          }
           setCompressingIndex(-1);
+          setQueuedPreviews([]);
+          chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
+          queuedBlobsRef.current = queuedBlobsRef.current.filter((u) => !chunkQueued.some((q) => q.blobUrl === u));
+
+          await channelPush({ batchIndex, files: compressed });
+        }
+        channelClose();
+      })();
+
+      const runLane = async () => {
+        for (;;) {
+          const item = await channelPop();
+          if (!item) return;
+          await uploadOneBatch(item.files, item.batchIndex);
+        }
+      };
+      const lanes = Array.from({ length: Math.max(1, concurrency) }, () => runLane());
+      await Promise.all([producer, ...lanes]);
+    } else {
+      // ── 기존 round 기반 루프 (모바일 전체 / include_original=true) — 동작 변경 없음 ──
+      for (let chunkStart = 0; chunkStart < totalBatches; chunkStart += concurrency) {
+        if (stopRequestedRef.current || abortReason) break;
+        if (chunkStart > 0 && chunkStart % refreshInterval === 0) {
+          await supabase.auth.refreshSession();
+          const { data: { session: fresh } } = await supabase.auth.getSession();
+          if (fresh?.access_token) currentToken = fresh.access_token;
+        }
+
+        // ── STEP 1: 이번 라운드의 raw 파일 배치 구성 ──
+        const rawChunk: File[][] = [];
+        for (let bi = 0; bi < concurrency && chunkStart + bi < totalBatches; bi++) {
+          rawChunk.push(rawBatches[chunkStart + bi]);
+        }
+
+        // ── STEP 2: 이 라운드 파일만 queuedPreviews에 표시 (최대 concurrency×effectiveBatch장) ──
+        const chunkTs = Date.now();
+        const allRawInChunk = rawChunk.flat();
+        const chunkQueued = allRawInChunk.map((file, i) => {
+          const blobUrl = URL.createObjectURL(file);
+          queuedBlobsRef.current.push(blobUrl);
+          return { tempId: `queued-${chunkTs}-${chunkStart}-${i}`, blobUrl, filename: file.name };
+        });
+        setQueuedPreviews(chunkQueued);
+
+        // ── STEP 3: 이 라운드 압축(워커 풀로 여러 장 동시 처리 — 데스크톱 2 / 모바일 1) ──
+        if (stopRequestedRef.current) {
           setQueuedPreviews([]);
           chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
           queuedBlobsRef.current = queuedBlobsRef.current.filter(
@@ -1524,180 +1765,64 @@ export default function ProjectDetailPage() {
           );
           break;
         }
-        // 예외를 다시 던지면 이벤트 핸들러에서 Promise가 끊겨 업로드 잠금(ref)이
-        // 해제되지 않는다. 압축 실패는 안전하게 현재 세션만 종료하고 재시도를 허용한다.
+        setCompressingIndex(0);
+        let flatCompressed: File[];
+        try {
+          flatCompressed = await compressImagesInParallel(
+            allRawInChunk,
+            compressAbortControllerRef.current!.signal,
+            isPhoneLikeClient() ? 1 : 2,
+            undefined,
+            () => setCompressingIndex((prev) => prev + 1),
+          );
+        } catch (e) {
+          if (e instanceof DOMException && e.name === "AbortError") {
+            setCompressingIndex(-1);
+            setQueuedPreviews([]);
+            chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
+            queuedBlobsRef.current = queuedBlobsRef.current.filter(
+              (u) => !chunkQueued.some((q) => q.blobUrl === u)
+            );
+            break;
+          }
+          // 예외를 다시 던지면 이벤트 핸들러에서 Promise가 끊겨 업로드 잠금(ref)이
+          // 해제되지 않는다. 압축 실패는 안전하게 현재 세션만 종료하고 재시도를 허용한다.
+          setCompressingIndex(-1);
+          setQueuedPreviews([]);
+          chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
+          queuedBlobsRef.current = queuedBlobsRef.current.filter(
+            (u) => !chunkQueued.some((q) => q.blobUrl === u)
+          );
+          setUploadError("사진 압축을 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+          setUploadPhase("idle");
+          uploadInProgressRef.current = false;
+          return;
+        }
+        // rawChunk(배치별)와 동일한 크기로 재분할 — 이후 STEP 4/업로드는 배치 단위로 동작
+        const compressedChunk: File[][] = [];
+        {
+          let cursor = 0;
+          for (const batch of rawChunk) {
+            compressedChunk.push(flatCompressed.slice(cursor, cursor + batch.length));
+            cursor += batch.length;
+          }
+        }
         setCompressingIndex(-1);
+
+        // ── STEP 4: queuedPreviews 해제 (XHR 시작 시 uploadingPhotos로 전환됨) ──
         setQueuedPreviews([]);
         chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
         queuedBlobsRef.current = queuedBlobsRef.current.filter(
           (u) => !chunkQueued.some((q) => q.blobUrl === u)
         );
-        setUploadError("사진 압축을 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.");
-        setUploadPhase("idle");
-        uploadInProgressRef.current = false;
-        return;
-      }
-      // rawChunk(배치별)와 동일한 크기로 재분할 — 이후 STEP 4/업로드는 배치 단위로 동작
-      const compressedChunk: File[][] = [];
-      {
-        let cursor = 0;
-        for (const batch of rawChunk) {
-          compressedChunk.push(flatCompressed.slice(cursor, cursor + batch.length));
-          cursor += batch.length;
+
+        const chunk = compressedChunk;
+        await Promise.all(chunk.map((batch, chunkOffset) => uploadOneBatch(batch, chunkStart + chunkOffset)));
+        // batch 간 macrotask 경계 생성: iOS WKWebView는 macrotask 사이에서만 paint
+        // 이 시점에 이전 batch blob preview가 DOM에 있고 다음 XHR이 아직 시작 안 됨 → paint 보장
+        if (isPhoneLikeClient()) {
+          await new Promise<void>((r) => setTimeout(r, 0));
         }
-      }
-      setCompressingIndex(-1);
-
-      // ── STEP 4: queuedPreviews 해제 (XHR 시작 시 uploadingPhotos로 전환됨) ──
-      setQueuedPreviews([]);
-      chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
-      queuedBlobsRef.current = queuedBlobsRef.current.filter(
-        (u) => !chunkQueued.some((q) => q.blobUrl === u)
-      );
-
-      const chunk = compressedChunk;
-      const bodySent: boolean[] = chunk.map(() => false);
-      const reqDone: boolean[] = chunk.map(() => false);
-      const syncAwaitingServer = () => {
-        setAwaitingServerFinalize(chunk.some((_, j) => bodySent[j] && !reqDone[j]));
-      };
-      await Promise.all(chunk.map(async (batch, chunkOffset) => {
-        // XHR 전 blob URL 생성 → uploadingPhotos(스피너)에 추가
-        const inFlightNow = Date.now();
-        const inFlight = batch.map((file, fi) => {
-          const blobUrl = URL.createObjectURL(file);
-          uploadingBlobsRef.current.push(blobUrl);
-          return { tempId: `uploading-${inFlightNow}-${chunkStart}-${chunkOffset}-${fi}`, blobUrl, filename: file.name };
-        });
-        const inFlightIds = new Set(inFlight.map((p) => p.tempId));
-        // XHR 시작 전 스피너 강제 렌더 (iOS WKWebView scheduler 우회)
-        flushSync(() => setUploadingPhotos((prev) => [...prev, ...inFlight]));
-        // macrotask 경계 생성 — rAF는 백그라운드 탭에서 멈추므로 setTimeout 사용
-        await new Promise<void>((r) => setTimeout(r, 0));
-        try {
-          if (abortReason) {
-            allFailed.push(...batch);
-            setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
-            inFlight.forEach((p) => URL.revokeObjectURL(p.blobUrl));
-            uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
-            return;
-          }
-          const globalIdx = chunkStart + chunkOffset;
-          // B Plan: rawFile은 브라우저 원본 파일 (effectiveBatch=1이므로 globalIdx가 uploadFiles와 1:1 대응). HEIC는 원본 PUT 불가 → undefined.
-          const rawFile = (inclOrig && !isHeicFile(uploadFiles[globalIdx])) ? uploadFiles[globalIdx] : undefined;
-          const buildForm = () => {
-            const f = new FormData();
-            f.append("project_id", id);
-            f.append("include_original", (inclOrig && !!rawFile) ? "true" : "false");
-            batch.forEach((file) => f.append("files", file));
-            if (inclOrig && rawFile) {
-              f.append("original_filenames", rawFile.name);
-              f.append("original_file_sizes", String(rawFile.size));
-              f.append("original_last_modifieds", String(rawFile.lastModified));
-              f.append("original_content_types", rawFile.type || "image/jpeg");
-            }
-            return f;
-          };
-          try {
-            let res = await postPhotosUpload(
-              buildForm,
-              currentToken,
-              useProxyRef,
-              (loaded) => applyProgress(globalIdx, loaded),
-              { onRequestBodySent: () => { bodySent[chunkOffset] = true; syncAwaitingServer(); } },
-            );
-            if (res.status === 401) {
-              await supabase.auth.refreshSession();
-              const { data: { session: after } } = await supabase.auth.getSession();
-              if (after?.access_token) {
-                currentToken = after.access_token;
-                res = await postPhotosUpload(
-                  buildForm,
-                  currentToken,
-                  useProxyRef,
-                  (loaded) => applyProgress(globalIdx, loaded),
-                  { onRequestBodySent: () => { bodySent[chunkOffset] = true; syncAwaitingServer(); } },
-                );
-              }
-            }
-            if (approxBatchSizes[globalIdx] > 0) applyProgress(globalIdx, approxBatchSizes[globalIdx]);
-            // BUG-01: 성공 응답에서 서버 거부 파일 목록 수집
-            if (res.ok) {
-              type UploadOkBody = { rejected?: string[]; original_presigned?: OriginalPresignedItem[] };
-              let okBody: UploadOkBody = {};
-              try { okBody = await res.json().catch(() => ({})) as UploadOkBody; } catch {}
-              if (okBody.rejected?.length) backendRejected.push(...okBody.rejected);
-
-              // presigned PUT: 원본 파일(rawFile)을 R2에 직접 업로드 후 서버에 confirm
-              // batch[pi]는 압축본이므로 사용 금지 — rawFile이 브라우저 원본
-              if (inclOrig && rawFile && okBody.original_presigned?.length) {
-                // presigned URL 수신 수 = 실제 R2 PUT 시도 예정 건수
-                sendingSourceTotalRef.current += okBody.original_presigned.length;
-                for (const p of okBody.original_presigned) {
-                  try {
-                    sendingSourceRef.current++;
-                    if (sendingSourceRef.current > 0) setSendingSourcePhase(true);
-                    const putOk = await putOriginalToR2(p, rawFile, currentToken);
-                    if (putOk) await confirmOrRecoverOriginalUpload(p.job_id, currentToken);
-                  } catch (presignErr) {
-                    console.warn("presigned PUT/confirm failed (non-fatal):", presignErr);
-                  } finally {
-                    sendingSourceRef.current--;
-                    sendingSourceDoneRef.current++;
-                    setSendingSourceSnap({ done: sendingSourceDoneRef.current, total: sendingSourceTotalRef.current });
-                    if (sendingSourceRef.current <= 0) setSendingSourcePhase(false);
-                  }
-                }
-              }
-
-              // 배치 성공: blob URL 프리뷰로 즉시 갱신 (추가 네트워크 요청 없음)
-              // iOS에서 업로드 XHR과 동시에 DB 조회하면 연결 한도 초과 → blob URL 사용
-              flushSync(() => {
-                setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
-                setPendingPhotos((prev) => [...prev, ...inFlight]);
-              });
-              // macrotask 경계 생성 — rAF는 백그라운드 탭에서 멈추므로 setTimeout 사용
-              await new Promise<void>((r) => setTimeout(r, 0));
-              uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
-              pendingBlobsRef.current.push(...inFlight.map((p) => p.blobUrl));
-            }
-            if (!res.ok) {
-              let body: unknown = {};
-              try { body = await res.json().catch(() => ({})); } catch {}
-              try {
-                const betaErr = parseBetaLimitError(body);
-                if (betaErr) { abortReason = "betaLimit"; abortMessage = betaErr.message; return; }
-              } catch {}
-              const detail = (body && typeof (body as { detail?: unknown }).detail === "string")
-                ? ((body as { detail: string }).detail)
-                : null;
-              const authLike = isAuthLikeStatus(res.status) || (res.status === 503 && isAuthLikeDetail(detail));
-              if (authLike) {
-                abortReason = "auth";
-                abortMessage = detail ?? "인증 오류로 업로드를 진행할 수 없습니다.";
-                return;
-              }
-              if (!firstFailDetail && detail) firstFailDetail = detail;
-              allFailed.push(...batch);
-            }
-          } catch (e) {
-            if (isNetworkFailure(e)) { abortReason = "network"; return; }
-            allFailed.push(...batch);
-          }
-          completedBatches++;
-          setUploadProgress(Math.min(90, Math.round((completedBatches / totalBatches) * 100)));
-        } finally {
-          // 실패·중단 케이스에서 uploading 상태 잔류 방지
-          setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
-          uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
-          reqDone[chunkOffset] = true;
-          syncAwaitingServer();
-        }
-      }));
-      // batch 간 macrotask 경계 생성: iOS WKWebView는 macrotask 사이에서만 paint
-      // 이 시점에 이전 batch blob preview가 DOM에 있고 다음 XHR이 아직 시작 안 됨 → paint 보장
-      if (isPhoneLikeClient()) {
-        await new Promise<void>((r) => setTimeout(r, 0));
       }
     }
 
@@ -1743,6 +1868,7 @@ export default function ProjectDetailPage() {
         ? "인증 오류로 업로드할 수 없습니다. 기기의 날짜/시간이 자동 설정인지 확인 후 새로고침해 주세요."
         : `업로드에 실패했습니다. (${detail})`;
 
+    if (abortReason === "compressSetup") { setAwaitingServerFinalize(false); setUploadError(abortMessage); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); uploadInProgressRef.current = false; return; }
     if (abortReason === "betaLimit") { setAwaitingServerFinalize(false); setUploadError(abortMessage); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); uploadInProgressRef.current = false; return; }
     if (abortReason === "network") { setAwaitingServerFinalize(false); setUploadError("업로드에 실패했습니다. 인터넷 연결을 확인해 주세요."); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); uploadInProgressRef.current = false; return; }
     if (abortReason === "auth") { setAwaitingServerFinalize(false); setUploadError(formatAuthError(abortMessage)); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); uploadInProgressRef.current = false; return; }

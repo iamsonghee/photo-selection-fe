@@ -1,7 +1,7 @@
 # 업로드 플로우
 
 > 코드 기준: `upload/page.tsx`, `upload-client-compress.ts`, `upload-compress.worker.ts`, `upload.py`, `storage.py`
-> 마지막 업데이트: 2026-08-06 (코드 전수 재검증 후 재작성 — 이전 버전은 원본 처리 worker 흐름이 실제 코드와 크게 달랐음, §9 참고)
+> 마지막 업데이트: 2026-08-06 — desktop+`include_original=false` 경로에 producer-consumer 파이프라인(OPT-ROUND-01) 적용, round barrier 제거를 반영해 §FE 배치·동시성·파이프라인 구조 전면 수정. 이전 개정 사유: 원본 처리 worker 흐름이 실제 코드와 크게 달랐음(§9 참고).
 
 ---
 
@@ -22,7 +22,7 @@
 
 1. 파일 선택 → `startUpload()` 호출.
 2. `include_original=true`이면 HEIC 파일 전체 차단(FE 선행 검증, BE도 동일하게 거부).
-3. **모든 파일**을 브라우저에서 압축(`include_original` 여부와 무관하게 항상 실행). 업로드 화면 전용 `compressImagesInParallel()`이 워커 풀(PC 2 / 모바일 1, §5)로 한 라운드의 파일을 동시에 압축한다. 그 외 화면(설정 프로필 이미지, 보정본 업로드 등)은 싱글턴 워커 기반 `compressImageForUpload()`를 그대로 사용 — 두 진입점 모두 실제 압축 로직은 `compressWithWorker()`를 공유한다.
+3. **모든 파일**을 브라우저에서 압축(`include_original` 여부와 무관하게 항상 실행). 업로드 화면 전용 `compressImagesInParallel()`이 워커 풀(PC 2 / 모바일 1)로, 넘겨받은 파일 묶음(batch)을 동시에 압축한다 — desktop+`include_original=false`는 batch(8장) 단위로, 그 외(모바일/`include_original=true`)는 round(=batch를 여러 개 묶은 단위) 단위로 호출한다(§FE 배치·동시성·파이프라인 구조 참고). 그 외 화면(설정 프로필 이미지, 보정본 업로드 등)은 싱글턴 워커 기반 `compressImageForUpload()`를 그대로 사용 — 두 진입점 모두 실제 압축 로직은 `compressWithWorker()`를 공유한다.
 4. 압축 결과를 FormData에 담아 FastAPI `POST /api/upload/photos`.
 5. `include_original=true`이면, 같은 배치 처리 안에서 압축하지 않은 브라우저 원본(`rawFile`)을 응답의 `original_presigned` URL로 R2에 직접 PUT — 이 PUT과 다음 단계 confirm이 끝나야 그 배치가 완료 처리된다(§7 진행률 참고).
 6. PUT 완료 후 서버에 confirm 통지(`POST /originals/confirm`).
@@ -83,16 +83,19 @@ awaiting_upload → pending → processing → completed
 
 ## 전체 플로우 다이어그램
 
-### include_original=false (셀렉 전용)
+### include_original=false, desktop (파이프라인 — OPT-ROUND-01 적용)
+
+batch(8장) 압축이 끝나는 즉시 그 batch를 업로드 큐로 보내고, 동시에 다음 batch 압축을 이어서 진행한다(§FE 배치·동시성·파이프라인 구조 참고). 아래는 batch 하나의 처리 흐름 — 여러 batch가 동시에(최대 concurrency개) 이 흐름을 병렬로 돈다.
 
 ```
 Browser                    FastAPI                    R2                    DB
   │                           │                        │                    │
-  ├─ [1] 파일 선택(라운드 단위) │                        │                    │
-  │   compressImagesInParallel()│                       │                    │
-  │   max 3200px / quality 0.82│  (라운드 전체 압축 완료 후에만 다음 단계, §5) │
+  ├─ [1] batch(8장) 압축 완료 → 즉시 업로드 큐로 전달     │                    │
+  │   compressImagesInParallel() (다음 batch 압축은     │                    │
+  │   이 batch의 전송을 기다리지 않고 곧바로 이어서 진행) │                    │
   │                           │                        │                    │
-  ├─ [2] POST /upload/photos (배치, 최대 8장)           │                    │
+  ├─ [2] POST /upload/photos (batch, 8장) — 업로드 큐에서│                    │
+  │   consumer(최대 concurrency개)가 꺼내 즉시 전송      │                    │
   │   FormData: compressed    │                        │                    │
   │──────────────────────────▶│                        │                    │
   │                           ├─ [3] thumb(300px/q75) →│                    │
@@ -111,6 +114,10 @@ Browser                    FastAPI                    R2                    DB
   │  (이 응답까지가 progress 90%│                        │                    │
   │   구간 이후의 "서버 처리")  │                        │                    │
 ```
+
+### include_original=false, 모바일 (round 구조 — 기존 유지)
+
+모바일은 이번 파이프라인 적용 대상이 아니다(§FE 배치·동시성·파이프라인 구조 참고). round(=concurrency×batch size장) 전체 압축이 끝나야 그 round의 batch들이 전송을 시작하는 기존 구조 그대로다 — 위 파이프라인 다이어그램의 [1]이 "round 전체 압축 완료 후에만 [2]"로 바뀐다고 이해하면 된다.
 
 ### include_original=true (셀렉 + 납품 원본)
 
@@ -211,7 +218,7 @@ HEIC/PNG/WebP → JPEG로 변환된다. `include_original=true`일 때는 이 �
 
 ---
 
-## FE 배치 · 라운드 · 동시성
+## FE 배치 · 동시성 · 파이프라인 구조
 
 | 모드 | 배치 크기 | 동시 배치 수(concurrency) | 상수/근거 |
 |---|---|---|---|
@@ -220,16 +227,28 @@ HEIC/PNG/WebP → JPEG로 변환된다. `include_original=true`일 때는 이 �
 | `include_original=true`, PC | **1장/배치** | 4(기본), 고사양 기기+빠른 회선이면 6 | `ORIGINAL_PC_CONCURRENCY=4`, `ORIGINAL_PC_CONCURRENCY_FAST=6` |
 | `include_original=true`, Mobile | **1장/배치** | 1 | `getDesktopUploadConcurrency` 미적용, 고정 1 |
 
-`include_original=true`일 때 배치 크기를 1로 고정하는 이유: 서버가 1장에 presigned URL 1개를 발급하고, 브라우저가 즉시 PUT하는 사이클을 유지하기 위함.
+`include_original=true`일 때 배치 크기를 1로 고정하는 이유: 서버가 1장에 presigned URL 1개를 발급하고, 브라우저가 즉시 PUT하는 사이클을 유지하기 위함. 위 배치 크기·동시성 값 자체는 이번 파이프라인 적용 전후로 **변경되지 않았다** — 아래에서 바뀐 것은 이 값들을 소비하는 오케스트레이션 구조뿐이다.
 
-**라운드(round)와 압축 barrier**: 파일 전체를 "동시 배치 수 × 배치 크기" 단위(=한 라운드)로 나눠 처리한다. 예를 들어 PC 비원본 기준 최대 6×8=**48장**이 한 라운드다.
+### desktop + `include_original=false`: producer-consumer 파이프라인 (2026-08-06, OPT-ROUND-01)
 
-1. 그 라운드에 속한 파일 전부(최대 48장)를 `compressImagesInParallel()`에 한 번에 넘긴다.
-2. 압축은 워커 풀(PC 2 / 모바일 1)로 처리되므로, 48장이라도 워커 2개가 순차로 소진한다.
-3. **라운드 전체 압축이 끝나야** 그 라운드의 배치들(최대 6개)이 `Promise.all`로 동시에 전송을 시작한다 — 압축이 먼저 끝난 개별 파일부터 바로 전송을 시작하는 구조가 아니다.
+`pipelineMode = !isPhoneLikeClient() && !inclOrig`일 때만 적용된다. 압축(producer)과 XHR 전송(consumer)을 **bounded async channel**로 연결해, batch 압축이 끝나는 즉시 전송을 시작하고 동시에 다음 batch 압축을 이어간다 — "round 전체(=concurrency×batch size장) 압축 완료 후에만 전송 시작"하던 이전 barrier 구조를 제거했다.
+
+- **producer**: batch(8장)를 파일 순서대로 하나씩 `compressImagesInParallel()`에 넘겨 압축(워커 풀은 그대로 PC 2개 — 동시 호출은 하지 않음, 워커 풀 내부 busy-slot 추적이 호출 1건 단위로 설계돼 있어 동시 호출 시 경합 위험이 있기 때문). 압축이 끝난 batch는 즉시 channel에 push하고, 곧바로 다음 batch 압축을 시작한다 — 전송 완료를 기다리지 않는다.
+- **channel**: 용량 = `concurrency`(기본 6, 기존 round 하나가 담던 batch 수와 동일 상한) — **무제한 큐가 아니다**. 이미 압축됐지만 아직 전송되지 않은 batch가 `concurrency`개에 도달하면 producer가 push를 멈추고(backpressure) consumer가 하나를 꺼내 갈 때까지 대기한다.
+- **consumer**: `concurrency`개의 lane이 channel에서 batch를 꺼내 즉시 XHR 전송(`uploadOneBatch`, 기존 배치 업로드 로직을 그대로 추출해 재사용 — 로직 자체는 변경 없음).
+- **FE 압축과 network 업로드가 overlap**된다 — 압축 워커가 다음 batch를 압축하는 동안 이미 압축된 batch들이 동시에 네트워크로 전송 중일 수 있다. 이전 round 구조에서는 "압축 워커가 놀며 전송을 기다리는 구간"과 "전송이 다음 round 압축을 기다리는 구간"이 번갈아 발생했는데, 이 유휴 구간이 사라진 것이 개선의 핵심이다.
+- 실측(로컬, 100/500장, 12~17MP급 실사진, 2026-08-06): 첫 업로드 시작(T_first_xhr_start)이 약 5~7.5배 빨라지고, 전체 소요시간(T_done)이 약 26~35% 단축됨을 확인 — 채택 결정.
+
+### 그 외(모바일 전체 / `include_original=true`): 기존 round 구조 유지
+
+파이프라인 적용 대상이 아니다 — iOS WKWebView의 macrotask paint 보장, presigned PUT 배치=1장 흐름 등 이 경로 전용 로직을 건드리지 않기 위해 이번 변경 범위에서 명시적으로 제외했다. **라운드(round)와 압축 barrier**: 파일 전체를 "동시 배치 수 × 배치 크기" 단위(=한 라운드)로 나눠 처리한다.
+
+1. 그 라운드에 속한 파일 전부를 `compressImagesInParallel()`에 한 번에 넘긴다.
+2. 압축은 워커 풀(모바일 1)로 처리된다.
+3. **라운드 전체 압축이 끝나야** 그 라운드의 배치들이 `Promise.all`로 동시에 전송을 시작한다 — 압축이 먼저 끝난 개별 파일부터 바로 전송을 시작하는 구조가 아니다.
 4. 라운드의 모든 배치 응답(및 `include_original=true`면 원본 PUT+confirm까지)이 끝나야 다음 라운드로 넘어간다. **라운드끼리는 순차**, 라운드 내부의 배치 전송은 **병렬**.
 
-FastAPI 서버 측 동시성(요청 1건 안에서 파일별 처리):
+FastAPI 서버 측 동시성(요청 1건 안에서 파일별 처리) — 파이프라인 적용 여부와 무관하게 동일:
 - `include_original=false`: `UPLOAD_PHOTOS_CONCURRENCY`(기본 5)
 - `include_original=true`: `UPLOAD_WITH_ORIGINAL_CONCURRENCY`(기본 3)
 - Pillow decode/리사이즈 전용 스레드풀: `_cpu_executor`, `PILLOW_EXECUTOR_MAX_WORKERS`(기본 4)
@@ -250,7 +269,7 @@ FastAPI 서버 측 동시성(요청 1건 안에서 파일별 처리):
 | 배치 응답 성공 직후 | `pendingPhotos` | 위와 같은 압축본 blob URL 유지(서버가 반환한 thumb_url을 쓰지 않음 — iOS에서 업로드 XHR과 동시에 DB 조회하면 연결 한도를 초과하는 문제 회피) |
 | **전체 업로드 세션 종료 후, 딱 1회** | `photos`(DB) | `getPhotosByProjectId()` 재조회 → 이때 처음으로 실제 `r2_thumb_url` 사용 |
 
-즉 라운드가 여러 번 반복되어도 세션 도중에는 서버 썸네일 URL을 한 번도 참조하지 않는다. 이 구조 때문에, 만약 향후 썸네일/프리뷰 생성을 비동기로 지연시키더라도 **업로드 세션 진행 중 화면 표시 자체는 깨지지 않는다** — 다만 다음 두 지점은 현재 코드가 "생성이 항상 동기로 끝나 있다"를 전제로 하고 있어 영향을 받는다:
+즉 batch/라운드가 여러 번 반복되어도(desktop 파이프라인은 batch 단위, 모바일/`include_original=true`는 round 단위) 세션 도중에는 서버 썸네일 URL을 한 번도 참조하지 않는다. 이 구조 때문에, 만약 향후 썸네일/프리뷰 생성을 비동기로 지연시키더라도 **업로드 세션 진행 중 화면 표시 자체는 깨지지 않는다** — 다만 다음 두 지점은 현재 코드가 "생성이 항상 동기로 끝나 있다"를 전제로 하고 있어 영향을 받는다:
 - `insert_photos_with_numbers` 시점에 `r2_thumb_url`이 이미 있어야 한다(현재 photos row는 thumb_url 없이 존재할 수 없음).
 - 세션 종료 직후 1회 호출되는 `getPhotosByProjectId()` 응답에 `r2_thumb_url`이 없으면 그 순간 그리드가 비어 보일 수 있다.
 
@@ -264,14 +283,14 @@ FastAPI 서버 측 동시성(요청 1건 안에서 파일별 처리):
 
 | | `include_original=false` | `include_original=true` |
 |---|---|---|
-| FE 압축(라운드 barrier) | 대기 | 대기 |
+| FE 압축 | 대기(desktop은 파이프라인 lane들이 모두 빌 때까지, 모바일은 round barrier까지) | 대기(round barrier) |
 | `/api/upload/photos` 응답(=썸네일/프리뷰 생성+R2 PUT+DB INSERT 전부 포함) | **대기** | 대기 |
 | 원본 R2 presigned PUT(Browser→R2) | 해당 없음 | **대기** |
 | `/originals/confirm` 응답 | 해당 없음 | **대기** |
 | worker의 원본 R2 HEAD 검증(`processing→completed`) | 해당 없음 | **대기 안 함** — 완전 비동기 |
 | 다운로드 ZIP 아카이브 빌드 | 해당 없음 | **대기 안 함** — 완전 비동기(`user-flow.md` §8.2) |
 
-모든 라운드가 끝나면 `uploadProgress=100` → `uploadPhase="done"` → 토스트, 600ms 뒤 DB 재조회(위 섹션).
+모든 batch(desktop 파이프라인) 또는 라운드(모바일/`include_original=true`)가 끝나면 `uploadProgress=100` → `uploadPhase="done"` → 토스트, 600ms 뒤 DB 재조회(위 섹션).
 
 **UI phase**: 코드에 정의된 값은 `idle`/`processing`/`done`(과 실패 시 `idle`로 복귀)뿐이다. `uploadPhase === "sending"`을 조건으로 쓰는 UI 코드가 일부 있으나, 실제로 `setUploadPhase("sending")`을 호출하는 지점은 없다 — 즉 `sending`은 현재 코드 경로상 도달하지 않는 상태다(압축과 전송 모두 `processing` 상태로 표시됨).
 
