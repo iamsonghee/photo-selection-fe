@@ -87,11 +87,16 @@ function uploadPhotosUrl(): string {
   return UPLOAD_PHOTOS_PATH;
 }
 
-function isPhoneLikeClient(): boolean {
+/**
+ * 업로드 리소스 상한을 적용할 모바일 기기 판별.
+ * iPadOS 13+ Safari는 데스크톱처럼 `Macintosh` UA를 보내므로 터치 포인트도 함께 확인한다.
+ */
+function isMobileUploadClient(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent;
-  if (/iPhone|iPod/i.test(ua)) return true;
-  if (/Android/i.test(ua) && /Mobile/i.test(ua)) return true;
+  if (/iPhone|iPod|iPad/i.test(ua)) return true;
+  if (/Android/i.test(ua)) return true;
+  if (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1) return true;
   return false;
 }
 
@@ -1161,8 +1166,6 @@ export default function ProjectDetailPage() {
   const sendingSourceTotalRef = useRef(0);      // presigned URL 발급 수 (= 실제 시도 예정)
   const [sendingSourcePhase, setSendingSourcePhase] = useState(false);
   const [sendingSourceSnap, setSendingSourceSnap] = useState({ done: 0, total: 0 });
-  /** 모든 R2 PUT 시도 완료 — worker로 넘어간 상태 */
-  const [allSourceAttempted, setAllSourceAttempted] = useState(false);
   /** 업로드 미완료(awaiting_upload) 원본 job — 복구 배너 표시용 */
   const [pendingRecovery, setPendingRecovery] = useState<PendingOriginalItem[]>([]);
   const [showRecoveryBanner, setShowRecoveryBanner] = useState(false);
@@ -1450,7 +1453,7 @@ export default function ProjectDetailPage() {
 
   // iOS에서 업로드 중 앱 전환/화면 잠금 감지 → 복귀 시 경고
   useEffect(() => {
-    if (uploadPhase !== "processing" || !isPhoneLikeClient()) return;
+    if (uploadPhase !== "processing" || !isMobileUploadClient()) return;
     let hiddenAt: number | null = null;
     const handler = () => {
       if (document.visibilityState === "hidden") {
@@ -1500,7 +1503,6 @@ export default function ProjectDetailPage() {
     const inclOrig = project?.includeOriginal ?? false;
     setUploadError(null);
     setAwaitingServerFinalize(false);
-    setAllSourceAttempted(false);
     sendingSourceDoneRef.current = 0;
     sendingSourceTotalRef.current = 0;
     setSendingSourceSnap({ done: 0, total: 0 });
@@ -1527,28 +1529,30 @@ export default function ProjectDetailPage() {
     let currentToken = token;
     const totalFiles = uploadFiles.length;
 
-    // 압축→전송 처리. 두 가지 모드가 있다:
-    // - pipelineMode(desktop 전체, include_original 여부 무관): 압축(producer)과 XHR 전송
+    // 압축→전송 처리. 현재 활성 경로는 모든 기기에서 같은 pipelineMode다:
+    // - pipelineMode(PC + 모바일, include_original 여부 무관): 압축(producer)과 XHR 전송
     //   (consumer lane)을 bounded async channel로 연결한 producer-consumer 파이프라인.
     //   round barrier(=concurrency×effectiveBatch장 전체 완료 후에만 다음 압축 시작) 제거.
     //   desktop+include_original=false는 OPT-ROUND-01(2026-08-06), desktop+include_original=true는
     //   OPT-ROUND-02(2026-08-06) — 코드는 완전히 동일한 채널/lane 구조를 공유하며, inclOrig=true는
     //   effectiveBatch=1이므로 channel item(batch)이 자연히 파일 1장 단위가 된다. batch(=effectiveBatch장,
     //   압축/XHR 단위) 자체는 그대로, "여러 batch를 하나의 round로 묶어 전량 완료 후 한꺼번에 다음
-    //   압축 시작"하던 상위 묶음(barrier)만 제거한다. compression worker 수(2)/upload concurrency/
+    //   압축 시작"하던 상위 묶음(barrier)만 제거한다. 압축 worker 수(PC 2 / 모바일 1), upload concurrency,
     //   batch size(effectiveBatch=1 포함)/리사이즈 파라미터/presigned PUT/confirm 방식은 전부 기존
     //   값 그대로 — barrier만 없앤다. photo_number 순서 안전성: RPC(insert_photos_with_numbers)는
     //   /photos 요청이 서버에 도달한 순서로 번호를 매기며(배치 시작 순서가 아님), 이는 round
     //   구조에서도 이미 존재하던 특성이다 — 파이프라인은 in-flight 배치 수 상한(=concurrency)을
     //   그대로 유지하므로 이 순서 특성 자체를 악화시키지 않는다(조사 근거는 upload-flow.md 참고).
-    // - 그 외(모바일): 기존 round 기반 루프를 그대로 유지한다 — iOS macrotask paint 보장 등
-    //   모바일 전용 로직을 건드리지 않기 위해 이번 변경 범위에서 제외했다(§upload-flow.md 참고).
+    //   모바일도 같은 구조를 쓰되 MOBILE_CONCURRENCY=1, 압축 워커=1을 유지한다. 따라서
+    //   동시 네트워크/R2 PUT 수나 메모리 상한은 올리지 않고, 현재 전송 중일 때 다음 batch
+    //   압축만 겹친다. uploadOneBatch() 내부의 setTimeout(0)은 iOS의 batch 간 paint 양보를
+    //   계속 보장한다(§upload-flow.md 참고).
     // HEIC: include_original=true여도 HEIC는 원본 PUT 없이 썸네일만 업로드 (rawFile=undefined 분기)
     // B Plan: 압축본을 서버로 전송 + 원본은 presigned PUT으로 R2에 직접 전송
-    const effectiveBatch = inclOrig ? 1 : (isPhoneLikeClient() ? MOBILE_BATCH_SIZE : BATCH_SIZE);
+    const effectiveBatch = inclOrig ? 1 : (isMobileUploadClient() ? MOBILE_BATCH_SIZE : BATCH_SIZE);
     const concurrency = inclOrig
-      ? (isPhoneLikeClient() ? 1 : getDesktopUploadConcurrency(true))
-      : (isPhoneLikeClient() ? MOBILE_CONCURRENCY : getDesktopUploadConcurrency(false));
+      ? (isMobileUploadClient() ? 1 : getDesktopUploadConcurrency(true))
+      : (isMobileUploadClient() ? MOBILE_CONCURRENCY : getDesktopUploadConcurrency(false));
     const totalBatches = Math.ceil(totalFiles / effectiveBatch);
     const rawBatches: File[][] = Array.from({ length: totalBatches }, (_, i) =>
       uploadFiles.slice(i * effectiveBatch, Math.min((i + 1) * effectiveBatch, totalFiles))
@@ -1575,7 +1579,7 @@ export default function ProjectDetailPage() {
     let abortMessage = "";
     let firstFailDetail: string | null = null;
     // BUG-04: PC도 30배치(약 240장)마다 토큰 갱신 (대용량 업로드 중 만료 방지)
-    const refreshInterval = isPhoneLikeClient() ? 20 : 30;
+    const refreshInterval = isMobileUploadClient() ? 20 : 30;
 
     // batchIndex 단위로 공유하는 "서버 처리 중" 배너 상태 — round/파이프라인 어느 쪽이든 동일하게 쓴다.
     const bodySentMap = new Map<number, boolean>();
@@ -1747,14 +1751,16 @@ export default function ProjectDetailPage() {
       }
     };
 
-    const pipelineMode = !isPhoneLikeClient();
+    // PC와 모바일 모두 bounded producer-consumer 파이프라인을 사용한다. 아래 round 구현은
+    // 배포 중 빠른 원인 분리를 위해 남겨둔 비활성 레거시 경로이며, 현재 조건에서는 진입하지 않는다.
+    const pipelineMode = true;
 
     if (pipelineMode) {
-      // ── producer-consumer 파이프라인 (desktop 전체 — include_original=false/true 공용) ──
+      // ── producer-consumer 파이프라인 (모든 기기 — include_original=false/true 공용) ──
       // bounded channel 용량 = concurrency(기존 round 하나가 담던 batch 수와 동일 상한) —
-      // "무제한 큐"를 명시적으로 피한다. compression worker(2)는 compressImagesInParallel 내부에서
-      // 그대로 유지, batch를 순서대로 하나씩만 이 함수에 넘긴다(동시 호출 없음 — 워커 풀 내부
-      // busy-slot 추적이 호출 1건 단위로 설계돼 있어 동시 호출 시 경합 위험이 있기 때문).
+      // "무제한 큐"를 명시적으로 피한다. compression worker(PC 2 / 모바일 1)는
+      // compressImagesInParallel 내부에서 유지하고, batch를 순서대로 하나씩만 이 함수에 넘긴다.
+      // 워커 풀의 busy-slot 추적이 호출 1건 단위라 동시 호출하면 경합 위험이 있기 때문이다.
       // include_original=true는 effectiveBatch=1이므로 channel item 하나 = 파일 한 장 —
       // uploadOneBatch 내부에서 기존과 동일하게 /photos → original PUT → confirm을 순차 수행하고,
       // 그 배치가 완전히 끝나야 해당 lane이 channel에서 다음 item을 꺼낸다(§lane 점유 방식 동일).
@@ -1781,6 +1787,14 @@ export default function ProjectDetailPage() {
         if (w) w();
         return item;
       };
+      // 모바일은 전송 중인 batch 외에 "다음 batch"까지만 압축한다. channelPush()에서만
+      // backpressure를 걸면 이미 한 batch를 더 압축한 뒤에야 대기하게 되어, 고해상도
+      // 사진 여러 장의 blob/canvas가 iOS 메모리에 겹칠 수 있다.
+      const waitForPhoneChannelCapacity = async () => {
+        while (channelBuffer.length >= concurrency) {
+          await new Promise<void>((resolve) => pushWaiters.push(resolve));
+        }
+      };
       const channelClose = () => {
         channelClosed = true;
         const waiters = popWaiters.splice(0, popWaiters.length);
@@ -1789,6 +1803,10 @@ export default function ProjectDetailPage() {
 
       const producer = (async () => {
         for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+          if (stopRequestedRef.current || abortReason) break;
+          // 모바일은 queue가 찬 상태에서 다음 batch를 압축하지 않는다. PC의 기존 처리량
+          // 특성은 유지하고, 모바일에서만 bounded queue를 메모리 상한으로도 사용한다.
+          if (isMobileUploadClient()) await waitForPhoneChannelCapacity();
           if (stopRequestedRef.current || abortReason) break;
           if (batchIndex > 0 && batchIndex % refreshInterval === 0) {
             await supabase.auth.refreshSession();
@@ -1823,7 +1841,7 @@ export default function ProjectDetailPage() {
             compressed = await compressImagesInParallel(
               rawBatch,
               compressAbortControllerRef.current!.signal,
-              2, // pipelineMode는 desktop 전용이므로 항상 데스크톱 풀 크기
+              isMobileUploadClient() ? 1 : 2,
               undefined,
               () => setCompressingIndex((prev) => prev + 1),
             );
@@ -1901,7 +1919,7 @@ export default function ProjectDetailPage() {
           flatCompressed = await compressImagesInParallel(
             allRawInChunk,
             compressAbortControllerRef.current!.signal,
-            isPhoneLikeClient() ? 1 : 2,
+            isMobileUploadClient() ? 1 : 2,
             undefined,
             () => setCompressingIndex((prev) => prev + 1),
           );
@@ -1945,7 +1963,7 @@ export default function ProjectDetailPage() {
         await Promise.all(chunk.map((batch, chunkOffset) => uploadOneBatch(batch, chunkStart + chunkOffset)));
         // batch 간 macrotask 경계 생성: iOS WKWebView는 macrotask 사이에서만 paint
         // 이 시점에 이전 batch blob preview가 DOM에 있고 다음 XHR이 아직 시작 안 됨 → paint 보장
-        if (isPhoneLikeClient()) {
+        if (isMobileUploadClient()) {
           await new Promise<void>((r) => setTimeout(r, 0));
         }
       }
@@ -2005,7 +2023,6 @@ export default function ProjectDetailPage() {
 
     setAwaitingServerFinalize(false);
     setUploadProgress(100);
-    if (inclOrig && sendingSourceTotalRef.current > 0) setAllSourceAttempted(true);
     setUploadPhase("done");
     fetch("/api/photographer/project-logs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: id, action: "uploaded" }) }).catch(() => {});
     setTimeout(async () => {
@@ -2135,7 +2152,7 @@ export default function ProjectDetailPage() {
       setUploadError(`최대 ${betaMaxPhotosPerProject}장까지 업로드 가능합니다. ${list.length - remaining}장이 제외됩니다.`);
       list = list.slice(0, remaining);
       if (!list.length) return;
-    } else if (isPhoneLikeClient() && list.length >= 100) {
+    } else if (isMobileUploadClient() && list.length >= 100) {
       setUploadError("모바일에서 100장 이상 업로드 시 시간이 오래 걸릴 수 있습니다. PC 사용을 권장합니다.");
     }
     setPendingFiles(list);
@@ -2154,7 +2171,7 @@ export default function ProjectDetailPage() {
       setUploadError(`최대 ${betaMaxPhotosPerProject}장까지 업로드 가능합니다. ${list.length - remaining}장이 제외됩니다.`);
       list = list.slice(0, remaining);
       if (!list.length) return;
-    } else if (isPhoneLikeClient() && list.length >= 100) {
+    } else if (isMobileUploadClient() && list.length >= 100) {
       setUploadError("모바일에서 100장 이상 업로드 시 시간이 오래 걸릴 수 있습니다. PC 사용을 권장합니다.");
     }
     setPendingFiles(list);
@@ -2564,31 +2581,30 @@ export default function ProjectDetailPage() {
               <div style={{ width: `${overallProgress}%`, height: "100%", background: ACCENT, transition: "width 0.3s" }} />
             ) : null}
           </div>
+          {isUploading && (
+            <div style={{ minHeight: 38, padding: "0 14px", display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, letterSpacing: "0.06em", whiteSpace: "nowrap" }}>
+                {uploadStopRequested ? "중단 중" : sendingSourcePhase ? "원본 전송" : compressingIndex >= 0 ? "압축 중" : "업로드 중"}
+              </span>
+              <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT_MUTED, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {sendingSourcePhase
+                  ? `${sendingSourceSnap.done}/${sendingSourceSnap.total} · 화면을 닫지 마세요`
+                  : `${pendingPhotos.length}/${totalUploadCount}장 · ${showServerWorking ? "서버 처리 중" : `${overallProgress}%`}`}
+              </span>
+              <button
+                type="button"
+                onClick={handleStopUpload}
+                disabled={uploadStopRequested}
+                style={{ flexShrink: 0, padding: "4px 8px", borderRadius: 5, border: "1px solid rgba(255,255,255,0.2)", background: "transparent", color: TEXT_NORMAL, fontFamily: MONO, fontSize: 10, cursor: uploadStopRequested ? "wait" : "pointer", opacity: uploadStopRequested ? 0.55 : 1 }}
+              >
+                {uploadStopRequested ? "중단 중" : "중단"}
+              </button>
+            </div>
+          )}
           {uploadError && (
             <p style={{ margin: 0, padding: "6px 16px", fontFamily: MONO, fontSize: 10, color: "#FF3333", borderBottom: `1px solid ${BORDER}` }}>
               {uploadError}
             </p>
-          )}
-          {/* ── 원본 R2 PUT 진행 중 — 페이지 이탈 경고 포함 ── */}
-          {sendingSourcePhase && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 14px", background: "rgba(59,130,246,0.08)", borderBottom: `1px solid rgba(59,130,246,0.25)`, flexShrink: 0 }}>
-              <Loader2 size={12} style={{ color: "#3B82F6", flexShrink: 0, animation: "spin 1s linear infinite" }} />
-              <span style={{ fontFamily: MONO, fontSize: 10, color: "#1D4ED8", flex: 1 }}>
-                원본 업로드 중 {sendingSourceSnap.done}/{sendingSourceSnap.total} — 페이지를 닫거나 새로고침하면 중단됩니다
-              </span>
-            </div>
-          )}
-          {/* ── 원본 R2 PUT 완료 → worker 처리 중 안내 ── */}
-          {allSourceAttempted && !sendingSourcePhase && !isUploading && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 14px", background: "rgba(16,185,129,0.08)", borderBottom: `1px solid rgba(16,185,129,0.25)`, flexShrink: 0 }}>
-              <CheckCircle2 size={12} style={{ color: "#10B981", flexShrink: 0 }} />
-              <span style={{ fontFamily: MONO, fontSize: 10, color: "#065F46", flex: 1 }}>
-                원본 업로드 완료 — 서버에서 납품용 파일 처리 중 (이제 페이지를 닫아도 됩니다)
-              </span>
-              <button type="button" onClick={() => setAllSourceAttempted(false)} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 0, display: "flex" }}>
-                <X size={12} />
-              </button>
-            </div>
           )}
           {/* ── 이어 업로드 복구 배너 ── */}
           {showRecoveryBanner && pendingRecovery.length > 0 && uploadPhase === "idle" && (
@@ -2822,7 +2838,7 @@ export default function ProjectDetailPage() {
 
           {/* ── 업로드 진행 배너 (압축·전송 단계 레이블 + 장수 카운터 + 역주행 없는 진행률) ── */}
           {isUploading && (
-            <div style={{ flexShrink: 0, padding: "7px 16px", background: SURFACE_1, borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="prj-desktop-toolbar" style={{ flexShrink: 0, padding: "7px 16px", background: SURFACE_1, borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, letterSpacing: "0.1em", minWidth: 52 }}>
                 {uploadStopRequested ? "중단 중" : compressingIndex >= 0 ? "압축 중" : "업로드 중"}
               </span>
@@ -2865,11 +2881,11 @@ export default function ProjectDetailPage() {
             ref={photoScrollRef}
             className="prj-scroll prj-photo-scroll-mobile-pad"
             style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "rgba(3,3,3,0.4)", position: "relative" }}
-            onDrop={!isPhoneLikeClient() && photoUploadAllowed && uploadPhase === "idle" ? onDrop : undefined}
-            onDragOver={!isPhoneLikeClient() && photoUploadAllowed && uploadPhase === "idle" ? onDragOver : undefined}
-            onDragLeave={!isPhoneLikeClient() && photoUploadAllowed && uploadPhase === "idle" ? onDragLeave : undefined}
+            onDrop={!isMobileUploadClient() && photoUploadAllowed && uploadPhase === "idle" ? onDrop : undefined}
+            onDragOver={!isMobileUploadClient() && photoUploadAllowed && uploadPhase === "idle" ? onDragOver : undefined}
+            onDragLeave={!isMobileUploadClient() && photoUploadAllowed && uploadPhase === "idle" ? onDragLeave : undefined}
           >
-            {dragOver && !isPhoneLikeClient() && photoUploadAllowed && (
+            {dragOver && !isMobileUploadClient() && photoUploadAllowed && (
               <div style={{
                 position: "absolute", inset: 0, zIndex: 40, pointerEvents: "none",
                 background: "rgba(var(--accent-rgb), 0.10)",
@@ -3092,18 +3108,20 @@ export default function ProjectDetailPage() {
             <div className="prj-invite-meta" style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
               <div className="prj-invite-title" style={{ fontSize: 13, fontWeight: 500, color: TEXT_BRIGHT }}>
                 {isMobile
-                  ? (N > 0
+                  ? (uploadBlockingInvite
+                      ? "고객 초대"
+                      : N > 0
                       ? (displayPhotos.length >= N ? `${displayPhotos.length}/${N}장 · 활성화 가능` : `${displayPhotos.length}/${N}장`)
                       : `${displayPhotos.length}장 · 셀렉 미정`)
                   : "고객 초대 준비"}
               </div>
-              <div className="prj-invite-sub" style={{ fontSize: 11, color: TEXT_MUTED }}>
-                {uploadBlockingInvite
-                  ? "사진을 모두 업로드하고 있어요. 완료되면 고객 링크를 활성화할 수 있습니다."
-                  : M < N
-                  ? `${displayPhotos.length}장 업로드됨 · ${N}장 이상 업로드 후 활성화 가능합니다`
-                  : `${displayPhotos.length}장 업로드 완료 · 초대 링크를 활성화할 수 있습니다`}
-              </div>
+              {(!isMobile || !uploadBlockingInvite) && (
+                <div className="prj-invite-sub" style={{ fontSize: 11, color: TEXT_MUTED }}>
+                  {M < N
+                    ? `${displayPhotos.length}장 업로드됨 · ${N}장 이상 업로드 후 활성화 가능합니다`
+                    : `${displayPhotos.length}장 업로드 완료 · 초대 링크를 활성화할 수 있습니다`}
+                </div>
+              )}
             </div>
             <button
               type="button"
@@ -3127,7 +3145,7 @@ export default function ProjectDetailPage() {
               {inviteActivating
                 ? "처리 중…"
                 : uploadBlockingInvite
-                  ? "사진 업로드 중…"
+                  ? (isMobile ? "업로드 중" : "사진 업로드 중…")
                 : M < N
                   ? "사진 업로드 필요"
                 : isMobile ? "초대링크 활성화" : "고객 초대 링크 활성화"}
@@ -3336,7 +3354,7 @@ export default function ProjectDetailPage() {
       {/* ── 업로드 확인 모달 ── */}
       {pendingFiles.length > 0 && (() => {
         const heicCount = pendingFiles.filter(isHeicFile).length;
-        const isMob = isPhoneLikeClient();
+        const isMob = isMobileUploadClient();
         const inclOrig = project.includeOriginal;
         const estMin = estimateUploadMinutes(pendingFiles.length, inclOrig, isMob);
         const closeModal = () => setPendingFiles([]);
@@ -3351,22 +3369,26 @@ export default function ProjectDetailPage() {
                 <p style={{ fontSize: 15, fontWeight: 600, color: TEXT_BRIGHT, marginBottom: 4 }}>
                   {pendingFiles.length.toLocaleString()}장을 업로드합니다
                 </p>
-                <p style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, marginBottom: 16 }}>
-                  약 {estMin}분 예상 · 네트워크 환경에 따라 다를 수 있습니다
-                </p>
+                {!isMob && (
+                  <p style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, marginBottom: 16 }}>
+                    약 {estMin}분 예상 · 네트워크 환경에 따라 다를 수 있습니다
+                  </p>
+                )}
 
                 {/* 프로젝트 납품 설정 표시 */}
-                <div style={{
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  padding: "6px 10px", marginBottom: heicCount > 0 && inclOrig ? 10 : 20,
-                  border: `1px solid ${inclOrig ? "rgba(var(--accent-rgb),0.35)" : BORDER}`,
-                  background: inclOrig ? ACCENT_DIM : SURFACE_1,
-                }}>
-                  <span style={{ fontFamily: MONO, fontSize: 10, color: inclOrig ? ACCENT : TEXT_MUTED }}>
-                    {inclOrig ? "납품용 원본 포함" : "썸네일만"}
-                  </span>
-                  <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED }}>— 프로젝트 설정</span>
-                </div>
+                {(!isMob || inclOrig) && (
+                  <div style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    padding: "6px 10px", marginBottom: heicCount > 0 && inclOrig ? 10 : 20,
+                    border: `1px solid ${inclOrig ? "rgba(var(--accent-rgb),0.35)" : BORDER}`,
+                    background: inclOrig ? ACCENT_DIM : SURFACE_1,
+                  }}>
+                    <span style={{ fontFamily: MONO, fontSize: 10, color: inclOrig ? ACCENT : TEXT_MUTED }}>
+                      {inclOrig ? "납품용 원본 포함" : "썸네일만"}
+                    </span>
+                    {!isMob && <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED }}>— 프로젝트 설정</span>}
+                  </div>
+                )}
 
                 {/* HEIC 경고 */}
                 {heicCount > 0 && inclOrig && (
