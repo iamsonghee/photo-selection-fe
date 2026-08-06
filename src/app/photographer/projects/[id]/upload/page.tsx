@@ -225,8 +225,9 @@ type PendingOriginalItem = {
 
 /**
  * 업로드 세션 동안 사진 카드의 정체성을 유지하는 로컬 미리보기.
- * queued → uploading → pending으로 상태가 바뀌어도 tempId/blobUrl을 바꾸지 않아
- * React 카드 재마운트와 이미지 재디코드로 인한 깜박임을 막는다.
+ * queued → uploading → pending으로 상태가 바뀌어도 tempId/sourceIndex를 유지해
+ * React 카드 재마운트와 그리드 재정렬을 막는다. blobUrl은 단계별로 표시 가능한
+ * 이미지(큐: 원본, 전송/완료: 압축 JPEG)로 교체한다.
  */
 type UploadPreview = {
   tempId: string;
@@ -1521,31 +1522,36 @@ export default function ProjectDetailPage() {
     // 동작 변경 없음). batchIndex는 전역 배치 인덱스(0..totalBatches-1) — effectiveBatch=1인
     // include_original=true에서는 uploadFiles와 1:1 대응.
     const uploadOneBatch = async (batch: File[], batchIndex: number) => {
-      // queued 단계에서 만든 원본 blob URL·tempId를 그대로 인계한다. 압축본으로 새 blob URL을
-      // 만들면 카드가 재마운트되고 placeholder가 다시 보이는 문제가 있어, 전송 상태만 바꾼다.
+      // 카드 식별자·위치는 queued 단계에서 만든 값을 인계하되, 표시 이미지는 압축본으로 바꾼다.
+      // 원본 blob은 고해상도/HEIC일 수 있어 브라우저가 해독하는 동안 카드가 검게 보일 수 있다.
       const inFlightNow = Date.now();
+      const queuedUrlsToRevoke: string[] = [];
       const inFlight = batch.map((file, fi) => {
         const sourceIndex = batchIndex * effectiveBatch + fi;
         const queuedPreview = queuedPreviewBySourceIndexRef.current.get(sourceIndex);
         if (queuedPreview) {
           queuedPreviewBySourceIndexRef.current.delete(sourceIndex);
-          return queuedPreview;
+          queuedUrlsToRevoke.push(queuedPreview.blobUrl);
+          return {
+            ...queuedPreview,
+            // 압축 함수가 JPEG를 돌려준 경우에만 이 URL은 작고 즉시 표시 가능한 JPEG다.
+            blobUrl: URL.createObjectURL(file),
+          };
         }
-        // 중단/복구 등으로 큐 미리보기가 없을 때만 기존처럼 압축본 blob URL로 폴백한다.
+        // 중단/복구 등으로 큐 미리보기가 없을 때도 압축본 미리보기를 만든다.
         const blobUrl = URL.createObjectURL(file);
-        uploadingBlobsRef.current.push(blobUrl);
         return { tempId: `uploading-${inFlightNow}-${batchIndex}-${fi}`, blobUrl, filename: file.name, sourceIndex };
       });
       const inFlightIds = new Set(inFlight.map((p) => p.tempId));
-      const inFlightUrls = new Set(inFlight.map((p) => p.blobUrl));
       let previewRetained = false;
-      // 같은 React key/blob URL을 유지한 채 queued → uploading으로 한 번에 인계한다.
-      // XHR 시작 전 스피너 렌더는 보장하되 중간에 카드가 사라지는 프레임은 만들지 않는다.
+      // 같은 React key를 유지한 채 queued → uploading으로 한 번에 인계한다.
+      // XHR 시작 전 스피너 렌더는 보장하되 카드가 사라지거나 순서가 바뀌지 않는다.
       flushSync(() => {
         setQueuedPreviews((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
         setUploadingPhotos((prev) => [...prev, ...inFlight]);
       });
-      queuedBlobsRef.current = queuedBlobsRef.current.filter((url) => !inFlightUrls.has(url));
+      queuedBlobsRef.current = queuedBlobsRef.current.filter((url) => !queuedUrlsToRevoke.includes(url));
+      queuedUrlsToRevoke.forEach((url) => URL.revokeObjectURL(url));
       for (const preview of inFlight) {
         if (!uploadingBlobsRef.current.includes(preview.blobUrl)) uploadingBlobsRef.current.push(preview.blobUrl);
       }
@@ -1881,7 +1887,10 @@ export default function ProjectDetailPage() {
       setAwaitingServerFinalize(false);
       setUploadPhase("idle");
       setUploadProgress(0);
-      await loadPhotos();
+      // 중단 전에 이미 완료된 배치는 서버에서 projects.photo_count까지 갱신된다.
+      // 사진 목록만 다시 읽으면 초대 CTA가 이전 project.photoCount를 계속 참조하므로,
+      // 두 데이터를 함께 새로고침해 업로드 완료분을 바로 활성화 조건에 반영한다.
+      await Promise.all([loadPhotos(), loadProject()]);
       setPendingPhotos([]);
       pendingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
       pendingBlobsRef.current = [];
