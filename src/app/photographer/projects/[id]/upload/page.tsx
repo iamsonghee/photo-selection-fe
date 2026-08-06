@@ -1438,15 +1438,21 @@ export default function ProjectDetailPage() {
     const totalFiles = uploadFiles.length;
 
     // 압축→전송 처리. 두 가지 모드가 있다:
-    // - pipelineMode(desktop && !include_original): 압축(producer)과 XHR 전송(consumer lane)을
-    //   bounded async channel로 연결한 producer-consumer 파이프라인. round barrier(=concurrency×
-    //   effectiveBatch장 전체 압축 완료 후에만 전송 시작) 제거 실험 — OPT-ROUND-01(2026-08-06).
-    //   batch(=effectiveBatch장, 압축/XHR 단위)는 그대로, "여러 batch를 하나의 round로 묶어
-    //   전량 압축 후 한꺼번에 전송"하던 상위 묶음만 제거한다. compression worker 수(2)/upload
-    //   concurrency/batch size/리사이즈 파라미터는 전부 기존 값 그대로 — barrier만 없앤다.
-    // - 그 외(모바일 또는 include_original=true): 기존 round 기반 루프를 그대로 유지한다 — iOS
-    //   macrotask paint 보장, presigned PUT 배치=1장 흐름 등 이 경로 전용 로직을 건드리지 않기
-    //   위해 이번 실험 범위에서 제외했다(§upload-flow.md 참고).
+    // - pipelineMode(desktop 전체, include_original 여부 무관): 압축(producer)과 XHR 전송
+    //   (consumer lane)을 bounded async channel로 연결한 producer-consumer 파이프라인.
+    //   round barrier(=concurrency×effectiveBatch장 전체 완료 후에만 다음 압축 시작) 제거.
+    //   desktop+include_original=false는 OPT-ROUND-01(2026-08-06), desktop+include_original=true는
+    //   OPT-ROUND-02(2026-08-06) — 코드는 완전히 동일한 채널/lane 구조를 공유하며, inclOrig=true는
+    //   effectiveBatch=1이므로 channel item(batch)이 자연히 파일 1장 단위가 된다. batch(=effectiveBatch장,
+    //   압축/XHR 단위) 자체는 그대로, "여러 batch를 하나의 round로 묶어 전량 완료 후 한꺼번에 다음
+    //   압축 시작"하던 상위 묶음(barrier)만 제거한다. compression worker 수(2)/upload concurrency/
+    //   batch size(effectiveBatch=1 포함)/리사이즈 파라미터/presigned PUT/confirm 방식은 전부 기존
+    //   값 그대로 — barrier만 없앤다. photo_number 순서 안전성: RPC(insert_photos_with_numbers)는
+    //   /photos 요청이 서버에 도달한 순서로 번호를 매기며(배치 시작 순서가 아님), 이는 round
+    //   구조에서도 이미 존재하던 특성이다 — 파이프라인은 in-flight 배치 수 상한(=concurrency)을
+    //   그대로 유지하므로 이 순서 특성 자체를 악화시키지 않는다(조사 근거는 upload-flow.md 참고).
+    // - 그 외(모바일): 기존 round 기반 루프를 그대로 유지한다 — iOS macrotask paint 보장 등
+    //   모바일 전용 로직을 건드리지 않기 위해 이번 변경 범위에서 제외했다(§upload-flow.md 참고).
     // HEIC: include_original=true여도 HEIC는 원본 PUT 없이 썸네일만 업로드 (rawFile=undefined 분기)
     // B Plan: 압축본을 서버로 전송 + 원본은 presigned PUT으로 R2에 직접 전송
     const effectiveBatch = inclOrig ? 1 : (isPhoneLikeClient() ? MOBILE_BATCH_SIZE : BATCH_SIZE);
@@ -1627,14 +1633,17 @@ export default function ProjectDetailPage() {
       }
     };
 
-    const pipelineMode = !isPhoneLikeClient() && !inclOrig;
+    const pipelineMode = !isPhoneLikeClient();
 
     if (pipelineMode) {
-      // ── producer-consumer 파이프라인 (desktop, include_original=false 전용) ──
+      // ── producer-consumer 파이프라인 (desktop 전체 — include_original=false/true 공용) ──
       // bounded channel 용량 = concurrency(기존 round 하나가 담던 batch 수와 동일 상한) —
       // "무제한 큐"를 명시적으로 피한다. compression worker(2)는 compressImagesInParallel 내부에서
       // 그대로 유지, batch를 순서대로 하나씩만 이 함수에 넘긴다(동시 호출 없음 — 워커 풀 내부
       // busy-slot 추적이 호출 1건 단위로 설계돼 있어 동시 호출 시 경합 위험이 있기 때문).
+      // include_original=true는 effectiveBatch=1이므로 channel item 하나 = 파일 한 장 —
+      // uploadOneBatch 내부에서 기존과 동일하게 /photos → original PUT → confirm을 순차 수행하고,
+      // 그 배치가 완전히 끝나야 해당 lane이 channel에서 다음 item을 꺼낸다(§lane 점유 방식 동일).
       type CompressedBatch = { batchIndex: number; files: File[] };
       const channelBuffer: CompressedBatch[] = [];
       let channelClosed = false;
@@ -1731,7 +1740,7 @@ export default function ProjectDetailPage() {
       const lanes = Array.from({ length: Math.max(1, concurrency) }, () => runLane());
       await Promise.all([producer, ...lanes]);
     } else {
-      // ── 기존 round 기반 루프 (모바일 전체 / include_original=true) — 동작 변경 없음 ──
+      // ── 기존 round 기반 루프 (모바일 전체) — 동작 변경 없음 ──
       for (let chunkStart = 0; chunkStart < totalBatches; chunkStart += concurrency) {
         if (stopRequestedRef.current || abortReason) break;
         if (chunkStart > 0 && chunkStart % refreshInterval === 0) {
