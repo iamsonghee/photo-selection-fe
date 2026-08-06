@@ -130,6 +130,8 @@ export type PhotoState = {
   comment?: string;
 };
 
+export type CommentSaveStatus = "idle" | "saving" | "saved" | "error";
+
 type SelectionContextValue = {
   project: import("@/types").Project | null;
   photos: import("@/types").Photo[];
@@ -145,6 +147,7 @@ type SelectionContextValue = {
   projectId: string | null;
   projectStatus: string | null;
   loading: boolean;
+  commentSaveStates: Record<string, CommentSaveStatus>;
   saveError: string | null;
   clearSaveError: () => void;
 };
@@ -173,6 +176,24 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   const [photoStates, setPhotoStates] = useState<Record<string, PhotoState>>({});
   const [loading, setLoading] = useState(true);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [commentSaveStates, setCommentSaveStates] = useState<Record<string, CommentSaveStatus>>({});
+  const commentSavedTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const setCommentSaveStatus = useCallback((photoId: string, status: CommentSaveStatus) => {
+    const existingTimer = commentSavedTimersRef.current.get(photoId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      commentSavedTimersRef.current.delete(photoId);
+    }
+    setCommentSaveStates((prev) => ({ ...prev, [photoId]: status }));
+    if (status === "saved") {
+      const timer = setTimeout(() => {
+        commentSavedTimersRef.current.delete(photoId);
+        setCommentSaveStates((prev) => prev[photoId] === "saved" ? { ...prev, [photoId]: "idle" } : prev);
+      }, 2000);
+      commentSavedTimersRef.current.set(photoId, timer);
+    }
+  }, []);
 
   // toggleColor()가 리렌더 사이클보다 빠른 연속 클릭에서도 항상 최신 색상 상태를 기준으로
   // 다음 값을 계산하도록, React state와 별개로 동기 ref를 둔다(selectedIdsRef와 동일한 이유).
@@ -291,6 +312,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
             if (desiredPatchRef.current.get(photoId) === patch) {
               desiredPatchRef.current.delete(photoId);
               setSaveError("저장에 실패했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.");
+              if ("comment" in patch) setCommentSaveStatus(photoId, "error");
               const server = await fetchSelectionsPoll(token, projectId);
               if (server) {
                 setPhotoStates((prev) => ({ ...prev, [photoId]: { ...(server.photoStates[photoId] ?? {}) } }));
@@ -304,7 +326,10 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
           }
           // 참조 동일성으로 "이 요청을 보낸 뒤 새 병합이 있었는지" 판단한다 —
           // updatePhotoState가 매번 새 객체를 만들어 넣으므로, 그대로면 그 사이 변경 없음.
-          if (desiredPatchRef.current.get(photoId) === patch) {
+          const latestPatch = desiredPatchRef.current.get(photoId);
+          const hasNewerComment = latestPatch !== patch && !!latestPatch && "comment" in latestPatch;
+          if ("comment" in patch && !hasNewerComment) setCommentSaveStatus(photoId, "saved");
+          if (latestPatch === patch) {
             desiredPatchRef.current.delete(photoId);
             break;
           }
@@ -313,7 +338,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         patchFlushingRef.current.delete(photoId);
       }
     },
-    [project?.id, token]
+    [project?.id, token, setCommentSaveStatus]
   );
 
   /**
@@ -452,6 +477,9 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       setPhotoGroups([]);
       setSelectedIds(new Set());
       setPhotoStates({});
+      commentSavedTimersRef.current.forEach((timer) => clearTimeout(timer));
+      commentSavedTimersRef.current.clear();
+      setCommentSaveStates({});
       setLoading(false);
       return;
     }
@@ -466,6 +494,9 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     appliedPollSeqRef.current = 0;
     selectedIdsRef.current = new Set();
     photoStatesRef.current = {};
+    commentSavedTimersRef.current.forEach((timer) => clearTimeout(timer));
+    commentSavedTimersRef.current.clear();
+    setCommentSaveStates({});
     let cancelled = false;
     setLoading(true);
     fetchCustomerPhotos(token)
@@ -496,6 +527,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         bumpVersion(photoId, key)
       );
       setSaveError(null);
+      if ("comment" in patch) setCommentSaveStatus(photoId, "saving");
       if (project?.id && token) {
         // 병렬로 새 요청을 쏘지 않고 큐에 병합만 해둔다 — flushPatch가 in-flight 요청이
         // 끝난 뒤 최신 병합본을 다시 확인해 필요하면 한 번 더 보낸다(직렬화/coalescing).
@@ -519,7 +551,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
 
       if (project?.id && token) flushPatch(photoId);
     },
-    [project?.id, token, flushPatch, bumpVersion]
+    [project?.id, token, flushPatch, bumpVersion, setCommentSaveStatus]
   );
 
   const toggle = useCallback(
@@ -692,6 +724,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       projectId,
       projectStatus,
       loading,
+      commentSaveStates,
       saveError,
       clearSaveError: () => setSaveError(null),
     }),
@@ -710,6 +743,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       projectId,
       projectStatus,
       loading,
+      commentSaveStates,
       saveError,
     ]
   );

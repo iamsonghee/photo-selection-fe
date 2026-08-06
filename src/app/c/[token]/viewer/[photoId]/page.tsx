@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Check, X } from "lucide-react";
-import { useSelection } from "@/contexts/SelectionContext";
+import { useSelection, type CommentSaveStatus } from "@/contexts/SelectionContext";
 import { PrevNextButton } from "@/components/PrevNextButton";
 import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
 import {
@@ -79,6 +79,19 @@ const SELECT_BASE_MOBILE = {
   fontSize: 12,
 };
 
+function CommentSaveIndicator({ status, onRetry }: { status: CommentSaveStatus; onRetry: () => void }) {
+  if (status === "saving") {
+    return <span role="status" aria-live="polite" style={{ color: "rgba(255,255,255,0.55)", fontSize: 11 }}>저장 중…</span>;
+  }
+  if (status === "saved") {
+    return <span role="status" aria-live="polite" style={{ color: "#4ade80", fontSize: 11 }}>✓ 저장됨</span>;
+  }
+  if (status === "error") {
+    return <span role="alert" style={{ color: "#f87171", fontSize: 11 }}>저장 실패 · <button type="button" onClick={onRetry} style={{ padding: 0, border: 0, background: "none", color: "inherit", fontSize: "inherit", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>다시 시도</button></span>;
+  }
+  return <span style={{ color: "rgba(255,255,255,0.38)", fontSize: 11 }}>자동 저장</span>;
+}
+
 function getObjectFitContainOffset(
   containerW: number, containerH: number,
   naturalW: number, naturalH: number
@@ -149,7 +162,7 @@ export default function ViewerPage() {
   const searchParams = useSearchParams();
   const token = (params?.token as string) ?? "";
   const photoId = (params?.photoId as string) ?? "";
-  const { project, photos: contextPhotos, photoGroups, selectedIds, Y, toggle, photoStates, updatePhotoState, toggleColor, saveError, clearSaveError } = useSelection();
+  const { project, photos: contextPhotos, photoGroups, selectedIds, Y, toggle, photoStates, updatePhotoState, toggleColor, commentSaveStates } = useSelection();
 
   // 로컬 state로 현재 사진 관리 — router.push 없이 전환해 컴포넌트 재마운트 방지
   const [activePhotoId, setActivePhotoId] = useState(photoId);
@@ -198,6 +211,7 @@ export default function ViewerPage() {
   const current = currentIndex >= 0
     ? filteredPhotos[currentIndex]
     : (contextPhotos ?? []).find((p) => p.id === activePhotoId) ?? null;
+  const commentSaveStatus = current ? (commentSaveStates[current.id] ?? "idle") : "idle";
 
   /** 그룹 펼침 상태(힌트 pill/PC 미니 스트립/모바일 바텀시트 공용).
    *  groupId별로 "마지막 펼침 여부"를 기억한다(그룹핑이 켜져 있는 동안 세션 내내 유지) —
@@ -253,6 +267,12 @@ export default function ViewerPage() {
     if (!photoIdSet.has(frontId)) return currentIndex;
     return filteredPhotos.findIndex((p) => p.id === frontId);
   }, [currentIndex, current, groupingActive, groupsById, photoIdSet, filteredPhotos, groupSelectionInfo]);
+
+  const totalVisiblePhotos = filteredPhotos.length;
+  const currentPhotoOrdinal = totalVisiblePhotos > 0 ? Math.max(1, navAnchorIndex + 1) : 0;
+  const viewerProgressPercent = totalVisiblePhotos > 0
+    ? Math.round((currentPhotoOrdinal / totalVisiblePhotos) * 100)
+    : 0;
 
   const currentGroupId = current?.similarityGroupId ?? null;
   const currentGroup = currentGroupId ? groupsById.get(currentGroupId) : undefined;
@@ -338,10 +358,10 @@ export default function ViewerPage() {
   useEffect(() => {
     // Do not overwrite text currently being composed, but do reflect the
     // latest server state from another customer tab once editing ends.
-    if (current?.id && !isCommentEditing) {
+    if (current?.id && !isCommentEditing && commentSaveStatus !== "error") {
       setDraftComment(photoStates[current.id]?.comment ?? "");
     }
-  }, [current?.id, photoStates, isCommentEditing]);
+  }, [current?.id, photoStates, isCommentEditing, commentSaveStatus]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -366,15 +386,24 @@ export default function ViewerPage() {
     updatePhotoState(current.id, { comment: trimmed });
   }, [current, draftComment, photoStates, updatePhotoState]);
 
+  useEffect(() => {
+    if (!current?.id || !isCommentEditing) return;
+    if (draftComment.trim() === (photoStates[current.id]?.comment ?? "")) return;
+    const timer = window.setTimeout(saveComment, 600);
+    return () => window.clearTimeout(timer);
+  }, [current?.id, draftComment, isCommentEditing, photoStates, saveComment]);
+
   const toggleSelect = useCallback(() => { if (current) toggle(current.id); }, [current, toggle]);
 
   // ── Navigation ───────────────────────────────────────────────────────────
 
   // router.push 대신 history.replaceState 사용 → 컴포넌트 재마운트 없이 URL만 갱신
   const navigateTo = useCallback((id: string) => {
+    saveComment();
+    setIsCommentEditing(false);
     setActivePhotoId(id);
     window.history.replaceState(null, "", `/c/${token}/viewer/${id}${queryString}`);
-  }, [token, queryString]);
+  }, [token, queryString, saveComment]);
 
   // 그룹핑 활성 시 filteredPhotos엔 대표컷만 남아있어, navAnchorIndex 기준 이동은 자동으로 그룹을 건너뛴다.
   const goPrev = useCallback(() => {
@@ -550,7 +579,11 @@ export default function ViewerPage() {
         .fs-comment-input:focus { border-color: rgba(var(--accent-rgb), 0.4); }
         .fs-star { cursor: pointer; transition: transform 0.1s; }
         .fs-star:hover { transform: scale(1.2); }
-
+        @keyframes fs-selection-pop {
+          0% { opacity: 0; transform: scale(0.86); }
+          70% { transform: scale(1.06); }
+          100% { opacity: 1; transform: scale(1); }
+        }
         /* ── 유사컷 그룹 힌트/펼침 (PC) ── */
         .fs-group-hint {
           display: flex; align-items: center; gap: 6px;
@@ -644,6 +677,15 @@ export default function ViewerPage() {
                 {project?.name ?? "PROJECT"}
               </p>
             </div>
+
+            <div style={{ width: 128, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 7 }}>
+              <span style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", color: "var(--accent)", fontSize: 12, fontWeight: 700, letterSpacing: "0.03em" }}>
+                {currentPhotoOrdinal}번째 · {totalVisiblePhotos}장
+              </span>
+              <div aria-hidden style={{ width: "100%", height: 3, background: "rgba(255,255,255,0.12)", overflow: "hidden" }}>
+                <div style={{ width: `${viewerProgressPercent}%`, height: "100%", background: "var(--accent)", transition: "width 0.2s ease" }} />
+              </div>
+            </div>
           </div>
         </header>
 
@@ -689,7 +731,7 @@ export default function ViewerPage() {
             ) : (
               <div style={{ color: "var(--muted-foreground)", padding: 16 }}>사진 없음</div>
             )}
-            {/* 필름스트립과 동일: 선택 시 좌상단 오렌지 체크 */}
+            {/* 갤러리와 동일한 선택 체크 디자인 */}
             {isCurrentSelected && viewerSrc ? (
               <div
                 style={{
@@ -738,11 +780,10 @@ export default function ViewerPage() {
           <div
             style={{
               display: "flex",
-              alignItems: "center",
-              gap: 20,
-              flexWrap: "wrap",
+              flexDirection: "column",
+              alignItems: "stretch",
+              gap: 10,
               width: "100%",
-              justifyContent: "space-between",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
@@ -818,35 +859,42 @@ export default function ViewerPage() {
               )}
             </div>
 
-            <div style={{ flex: "1 1 240px", display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-              <input
-                type="text"
-                className="fs-comment-input"
-                value={draftComment}
-                onFocus={() => { setIsCommentEditing(true); clearSaveError(); }}
-                onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
-                onBlur={() => { setIsCommentEditing(false); saveComment(); }}
-                onKeyDown={(e) => {
-                  if (e.nativeEvent.isComposing) return;
-                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                }}
-                placeholder="코멘트..."
-                style={{ flex: 1, padding: "0 14px", height: 38, borderRadius: 8, minWidth: 0 }}
-              />
-              {saveError && <p role="alert" className="mt-1 text-xs text-red-400">{saveError}</p>}
-            </div>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 12, minWidth: 0 }}>
+              <div style={{ flex: "1 1 240px", display: "flex", flexDirection: "column", alignItems: "stretch", gap: 4, minWidth: 0 }}>
+                <div style={{ minHeight: 14, display: "flex", alignItems: "center" }}>
+                  <CommentSaveIndicator status={commentSaveStatus} onRetry={saveComment} />
+                </div>
+                <input
+                  type="text"
+                  className="fs-comment-input"
+                  value={draftComment}
+                  onFocus={() => setIsCommentEditing(true)}
+                  onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
+                  onBlur={() => { setIsCommentEditing(false); saveComment(); }}
+                  onKeyDown={(e) => {
+                    if (e.nativeEvent.isComposing) return;
+                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                  }}
+                  placeholder="코멘트 입력…"
+                  style={{ flex: 1, padding: "0 14px", height: 38, borderRadius: 8, minWidth: 0 }}
+                />
+              </div>
 
-            <button
-              type="button"
-              onClick={toggleSelect}
-              style={{
-                ...SELECT_BASE,
-                ...(isCurrentSelected ? SELECT_ACTIVE : SELECT_INACTIVE),
-              }}
-            >
-              <Check style={{ width: 14, height: 14 }} strokeWidth={3} />
-              <span>{isCurrentSelected ? `선택됨 ${Y}/${N}` : "선택"}</span>
-            </button>
+              <button
+                type="button"
+                onClick={toggleSelect}
+                aria-label={isCurrentSelected ? "사진 선택 해제" : "사진 선택"}
+                aria-pressed={isCurrentSelected}
+                style={{
+                  ...SELECT_BASE,
+                  ...(isCurrentSelected ? SELECT_ACTIVE : SELECT_INACTIVE),
+                  animation: isCurrentSelected ? "fs-selection-pop 0.2s ease-out" : undefined,
+                }}
+              >
+                {isCurrentSelected && <Check style={{ width: 14, height: 14 }} strokeWidth={3} />}
+                <span>{isCurrentSelected ? `선택됨 · ${Y} / ${N}` : `선택 ${Y} / ${N}`}</span>
+              </button>
+            </div>
           </div>
         </section>
 
@@ -983,12 +1031,18 @@ export default function ViewerPage() {
               style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", borderRadius: 10, color: "var(--foreground)", fontSize: 14, fontWeight: 600, textDecoration: "none", flexShrink: 0 }}>
               ← 갤러리
             </Link>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)", flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 4px" }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--subtle-foreground)", flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 4px" }}>
               {filename}
             </span>
-            <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", color: "var(--accent)", flexShrink: 0 }}>
-              {(navAnchorIndex >= 0 ? navAnchorIndex : 0) + 1} / {filteredPhotos.length}
-            </span>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", color: "var(--accent)" }}>
+                {currentPhotoOrdinal}번째
+              </span>
+              <span style={{ fontSize: 10, fontWeight: 600, color: "var(--muted-foreground)" }}>전체 {totalVisiblePhotos}장</span>
+            </div>
+          </div>
+          <div aria-hidden style={{ height: 2, background: "rgba(255,255,255,0.1)" }}>
+            <div style={{ width: `${viewerProgressPercent}%`, height: "100%", background: "var(--accent)", transition: "width 0.2s ease" }} />
           </div>
         </div>
 
@@ -1139,16 +1193,20 @@ export default function ViewerPage() {
             <div style={{ flex: 1 }} />
           </div>
 
+          <div style={{ minHeight: 14, display: "flex", alignItems: "center" }}>
+            <CommentSaveIndicator status={commentSaveStatus} onRetry={saveComment} />
+          </div>
+
           {/* Row 2: Comment */}
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <input
               type="text"
               value={draftComment}
-              onFocus={() => { setIsCommentEditing(true); clearSaveError(); }}
+              onFocus={() => setIsCommentEditing(true)}
               onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
               onBlur={() => { setIsCommentEditing(false); saveComment(); }}
               onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-              placeholder="코멘트..."
+              placeholder="코멘트 입력…"
               style={{
                 flex: 1, height: 38, padding: "0 12px",
                 background: "rgba(29, 30, 35, 0.6)", border: "1px solid rgba(255,255,255,0.08)",
@@ -1161,15 +1219,18 @@ export default function ViewerPage() {
             <button
               type="button"
               onClick={toggleSelect}
+              aria-label={isCurrentSelected ? "사진 선택 해제" : "사진 선택"}
+              aria-pressed={isCurrentSelected}
               style={{
                 ...SELECT_BASE_MOBILE,
                 ...(isCurrentSelected ? SELECT_ACTIVE : SELECT_INACTIVE),
                 height: 38,
+                animation: isCurrentSelected ? "fs-selection-pop 0.2s ease-out" : undefined,
               }}
             >
               {isCurrentSelected
-                ? <><Check style={{ width: 12, height: 12, flexShrink: 0 }} strokeWidth={3} /><span>선택됨 {Y}/{N}</span></>
-                : <span>선택 {Y}/{N}</span>
+                ? <><Check style={{ width: 12, height: 12, flexShrink: 0 }} strokeWidth={3} /><span>선택됨 · {Y} / {N}</span></>
+                : <span>선택 {Y} / {N}</span>
               }
             </button>
           </div>

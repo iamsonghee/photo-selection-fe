@@ -732,7 +732,9 @@ export default function GalleryPageClient() {
             overflow-x: auto !important;
             overflow-y: hidden !important;
             flex-wrap: nowrap !important;
+            scrollbar-width: none;
           }
+          .gl-header-filter::-webkit-scrollbar { display: none; }
           .gl-filter-right {
             flex-shrink: 0;
             gap: 8px !important;

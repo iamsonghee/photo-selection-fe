@@ -223,6 +223,18 @@ type PendingOriginalItem = {
   created_at: string;
 };
 
+/**
+ * 업로드 세션 동안 사진 카드의 정체성을 유지하는 로컬 미리보기.
+ * queued → uploading → pending으로 상태가 바뀌어도 tempId/blobUrl을 바꾸지 않아
+ * React 카드 재마운트와 이미지 재디코드로 인한 깜박임을 막는다.
+ */
+type UploadPreview = {
+  tempId: string;
+  blobUrl: string;
+  filename: string;
+  sourceIndex: number;
+};
+
 function isHeicFile(file: File): boolean {
   const type = file.type.toLowerCase();
   if (type === "image/heic" || type === "image/heif") return true;
@@ -1052,14 +1064,16 @@ export default function ProjectDetailPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   /** 배치 업로드 완료 직후 blob URL로 즉시 표시되는 낙관적 사진 */
-  const [pendingPhotos, setPendingPhotos] = useState<Array<{ tempId: string; blobUrl: string; filename: string }>>([]);
+  const [pendingPhotos, setPendingPhotos] = useState<UploadPreview[]>([]);
   const pendingBlobsRef = useRef<string[]>([]);
   /** XHR 전송 중인 사진 (스피너 표시) */
-  const [uploadingPhotos, setUploadingPhotos] = useState<Array<{ tempId: string; blobUrl: string; filename: string }>>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState<UploadPreview[]>([]);
   const uploadingBlobsRef = useRef<string[]>([]);
   /** 업로드 시작 즉시 표시할 전체 미리보기 (압축·전송 전 큐 상태) */
-  const [queuedPreviews, setQueuedPreviews] = useState<Array<{ tempId: string; blobUrl: string; filename: string }>>([]);
+  const [queuedPreviews, setQueuedPreviews] = useState<UploadPreview[]>([]);
   const queuedBlobsRef = useRef<string[]>([]);
+  /** 압축 완료 후 XHR 전송 단계가 같은 카드로 인계받을 수 있도록, 원본 파일 순서별 미리보기 보관 */
+  const queuedPreviewBySourceIndexRef = useRef<Map<number, UploadPreview>>(new Map());
   /** 현재 압축 중인 파일의 queuedPreviews 인덱스 (-1이면 압축 중 아님) */
   const [compressingIndex, setCompressingIndex] = useState(-1);
   /** 현재 업로드 배치의 전체 파일 수 */
@@ -1191,21 +1205,27 @@ export default function ProjectDetailPage() {
   /** 기존 photos + 배치 완료(pending) + 전송 중(uploading) + 큐(queued) 합산 — early return 이전에 선언해야 Rules of Hooks 준수 */
   const displayPhotos = useMemo(() => {
     const confirmedNames = new Set(photos.map((p) => p.originalFilename));
-    const activeNames = new Set([
-      ...pendingPhotos.map((p) => p.filename),
-      ...uploadingPhotos.map((p) => p.filename),
-    ]);
-    const pendingAsPhotos: Photo[] = pendingPhotos
+    const uploadingIds = new Set(uploadingPhotos.map((p) => p.tempId));
+    // 카드가 완료 순서에 따라 pending/uploading/queued 묶음 사이를 오가면 위치가 바뀐다.
+    // tempId별로 하나만 남기고 원래 파일 순서(sourceIndex)로 정렬해, 상태만 바뀌게 한다.
+    const previewsById = new Map<string, UploadPreview>();
+    for (const preview of [...queuedPreviews, ...uploadingPhotos, ...pendingPhotos]) {
+      previewsById.set(preview.tempId, preview);
+    }
+    const optimisticPhotos: Photo[] = [...previewsById.values()]
       .filter((p) => !confirmedNames.has(p.filename))
-      .map((p) => ({ id: p.tempId, projectId: id, orderIndex: 99999, url: p.blobUrl, originalFilename: p.filename, isPending: true, isUploading: false }));
-    const uploadingAsPhotos: Photo[] = uploadingPhotos
-      .filter((p) => !confirmedNames.has(p.filename))
-      .map((p) => ({ id: p.tempId, projectId: id, orderIndex: 99999, url: p.blobUrl, originalFilename: p.filename, isPending: true, isUploading: true }));
-    const queuedAsPhotos: Photo[] = queuedPreviews
-      .filter((p) => !confirmedNames.has(p.filename) && !activeNames.has(p.filename))
-      .map((p) => ({ id: p.tempId, projectId: id, orderIndex: 99999, url: p.blobUrl, originalFilename: p.filename, isPending: true, isUploading: false }));
-    if (pendingAsPhotos.length === 0 && uploadingAsPhotos.length === 0 && queuedAsPhotos.length === 0) return photos;
-    return [...photos, ...pendingAsPhotos, ...uploadingAsPhotos, ...queuedAsPhotos];
+      .sort((a, b) => a.sourceIndex - b.sourceIndex)
+      .map((p) => ({
+        id: p.tempId,
+        projectId: id,
+        orderIndex: 99999,
+        url: p.blobUrl,
+        originalFilename: p.filename,
+        isPending: true,
+        isUploading: uploadingIds.has(p.tempId),
+      }));
+    if (optimisticPhotos.length === 0) return photos;
+    return [...photos, ...optimisticPhotos];
   }, [photos, pendingPhotos, uploadingPhotos, queuedPreviews, id]);
 
   /** ── AI 유사컷 그룹 — 대표이미지 토글. 키보드 네비/라이트박스보다 먼저 선언해야
@@ -1421,6 +1441,7 @@ export default function ProjectDetailPage() {
     setQueuedPreviews([]);
     queuedBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
     queuedBlobsRef.current = [];
+    queuedPreviewBySourceIndexRef.current.clear();
     stopRequestedRef.current = false;
     setUploadStopRequested(false);
     useProxyRef.current = false;
@@ -1500,23 +1521,40 @@ export default function ProjectDetailPage() {
     // 동작 변경 없음). batchIndex는 전역 배치 인덱스(0..totalBatches-1) — effectiveBatch=1인
     // include_original=true에서는 uploadFiles와 1:1 대응.
     const uploadOneBatch = async (batch: File[], batchIndex: number) => {
-      // XHR 전 blob URL 생성 → uploadingPhotos(스피너)에 추가
+      // queued 단계에서 만든 원본 blob URL·tempId를 그대로 인계한다. 압축본으로 새 blob URL을
+      // 만들면 카드가 재마운트되고 placeholder가 다시 보이는 문제가 있어, 전송 상태만 바꾼다.
       const inFlightNow = Date.now();
       const inFlight = batch.map((file, fi) => {
+        const sourceIndex = batchIndex * effectiveBatch + fi;
+        const queuedPreview = queuedPreviewBySourceIndexRef.current.get(sourceIndex);
+        if (queuedPreview) {
+          queuedPreviewBySourceIndexRef.current.delete(sourceIndex);
+          return queuedPreview;
+        }
+        // 중단/복구 등으로 큐 미리보기가 없을 때만 기존처럼 압축본 blob URL로 폴백한다.
         const blobUrl = URL.createObjectURL(file);
         uploadingBlobsRef.current.push(blobUrl);
-        return { tempId: `uploading-${inFlightNow}-${batchIndex}-${fi}`, blobUrl, filename: file.name };
+        return { tempId: `uploading-${inFlightNow}-${batchIndex}-${fi}`, blobUrl, filename: file.name, sourceIndex };
       });
       const inFlightIds = new Set(inFlight.map((p) => p.tempId));
-      // XHR 시작 전 스피너 강제 렌더 (iOS WKWebView scheduler 우회)
-      flushSync(() => setUploadingPhotos((prev) => [...prev, ...inFlight]));
+      const inFlightUrls = new Set(inFlight.map((p) => p.blobUrl));
+      let previewRetained = false;
+      // 같은 React key/blob URL을 유지한 채 queued → uploading으로 한 번에 인계한다.
+      // XHR 시작 전 스피너 렌더는 보장하되 중간에 카드가 사라지는 프레임은 만들지 않는다.
+      flushSync(() => {
+        setQueuedPreviews((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
+        setUploadingPhotos((prev) => [...prev, ...inFlight]);
+      });
+      queuedBlobsRef.current = queuedBlobsRef.current.filter((url) => !inFlightUrls.has(url));
+      for (const preview of inFlight) {
+        if (!uploadingBlobsRef.current.includes(preview.blobUrl)) uploadingBlobsRef.current.push(preview.blobUrl);
+      }
       // macrotask 경계 생성 — rAF는 백그라운드 탭에서 멈추므로 setTimeout 사용
       await new Promise<void>((r) => setTimeout(r, 0));
       try {
         if (abortReason) {
           allFailed.push(...batch);
           setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
-          inFlight.forEach((p) => URL.revokeObjectURL(p.blobUrl));
           uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
           return;
         }
@@ -1598,6 +1636,7 @@ export default function ProjectDetailPage() {
             await new Promise<void>((r) => setTimeout(r, 0));
             uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
             pendingBlobsRef.current.push(...inFlight.map((p) => p.blobUrl));
+            previewRetained = true;
           }
           if (!res.ok) {
             let body: unknown = {};
@@ -1628,6 +1667,7 @@ export default function ProjectDetailPage() {
         // 실패·중단 케이스에서 uploading 상태 잔류 방지
         setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
         uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
+        if (!previewRetained) inFlight.forEach((p) => URL.revokeObjectURL(p.blobUrl));
         reqDoneMap.set(batchIndex, true);
         syncAwaitingServer();
       }
@@ -1686,10 +1726,15 @@ export default function ProjectDetailPage() {
           const chunkTs = Date.now();
           const chunkQueued = rawBatch.map((file, i) => {
             const blobUrl = URL.createObjectURL(file);
+            const sourceIndex = batchIndex * effectiveBatch + i;
+            const preview = { tempId: `upload-${chunkTs}-${sourceIndex}`, blobUrl, filename: file.name, sourceIndex };
             queuedBlobsRef.current.push(blobUrl);
-            return { tempId: `queued-${chunkTs}-${batchIndex}-${i}`, blobUrl, filename: file.name };
+            queuedPreviewBySourceIndexRef.current.set(sourceIndex, preview);
+            return preview;
           });
-          setQueuedPreviews(chunkQueued);
+          // 이미 압축되어 전송 대기 중인 카드도 유지한다. 새 batch로 통째로 교체하면
+          // 이전 카드가 업로드를 시작할 때까지 화면에서 사라져 깜박임처럼 보인다.
+          setQueuedPreviews((prev) => [...prev, ...chunkQueued]);
 
           if (stopRequestedRef.current) {
             setQueuedPreviews([]);
@@ -1721,9 +1766,8 @@ export default function ProjectDetailPage() {
             break;
           }
           setCompressingIndex(-1);
-          setQueuedPreviews([]);
-          chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
-          queuedBlobsRef.current = queuedBlobsRef.current.filter((u) => !chunkQueued.some((q) => q.blobUrl === u));
+          // 큐 미리보기는 uploadOneBatch()가 같은 tempId/blobUrl로 전송 상태에 인계한다.
+          // 여기서 제거하면 카드가 잠시 사라졌다가 다시 나타난다.
 
           await channelPush({ batchIndex, files: compressed });
         }
@@ -1760,8 +1804,11 @@ export default function ProjectDetailPage() {
         const allRawInChunk = rawChunk.flat();
         const chunkQueued = allRawInChunk.map((file, i) => {
           const blobUrl = URL.createObjectURL(file);
+          const sourceIndex = chunkStart * effectiveBatch + i;
+          const preview = { tempId: `upload-${chunkTs}-${sourceIndex}`, blobUrl, filename: file.name, sourceIndex };
           queuedBlobsRef.current.push(blobUrl);
-          return { tempId: `queued-${chunkTs}-${chunkStart}-${i}`, blobUrl, filename: file.name };
+          queuedPreviewBySourceIndexRef.current.set(sourceIndex, preview);
+          return preview;
         });
         setQueuedPreviews(chunkQueued);
 
@@ -1818,12 +1865,7 @@ export default function ProjectDetailPage() {
         }
         setCompressingIndex(-1);
 
-        // ── STEP 4: queuedPreviews 해제 (XHR 시작 시 uploadingPhotos로 전환됨) ──
-        setQueuedPreviews([]);
-        chunkQueued.forEach((q) => URL.revokeObjectURL(q.blobUrl));
-        queuedBlobsRef.current = queuedBlobsRef.current.filter(
-          (u) => !chunkQueued.some((q) => q.blobUrl === u)
-        );
+        // ── STEP 4: XHR 시작 시 각 카드가 같은 tempId/blobUrl로 uploading 상태에 인계된다. ──
 
         const chunk = compressedChunk;
         await Promise.all(chunk.map((batch, chunkOffset) => uploadOneBatch(batch, chunkStart + chunkOffset)));
@@ -1849,6 +1891,7 @@ export default function ProjectDetailPage() {
       setQueuedPreviews([]);
       queuedBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
       queuedBlobsRef.current = [];
+      queuedPreviewBySourceIndexRef.current.clear();
       setUploadStopRequested(false);
       uploadInProgressRef.current = false;
       return;
@@ -1862,6 +1905,7 @@ export default function ProjectDetailPage() {
       uploadingBlobsRef.current = [];
       queuedBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
       queuedBlobsRef.current = [];
+      queuedPreviewBySourceIndexRef.current.clear();
       let freshPhotos: Photo[] = [];
       try { freshPhotos = await getPhotosByProjectId(id); } catch {}
       flushSync(() => {
@@ -1920,6 +1964,7 @@ export default function ProjectDetailPage() {
       uploadingBlobsRef.current = [];
       queuedBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
       queuedBlobsRef.current = [];
+      queuedPreviewBySourceIndexRef.current.clear();
       // 단일 렌더로 DB 사진 표시 + 임시 프리뷰 동시 제거 (중간 프레임 없음)
       flushSync(() => {
         setPhotos(freshPhotos);
