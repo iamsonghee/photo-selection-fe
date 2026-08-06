@@ -17,5 +17,13 @@ export function sanitizeFilenameComponent(raw: string): string {
 export function buildContentDisposition(displayName: string): string {
   const safe = sanitizeFilenameComponent(displayName);
   const encoded = encodeURIComponent(safe);
-  return `attachment; filename="download.zip"; filename*=UTF-8''${encoded}`;
+  // 일부 모바일 브라우저는 UTF-8 filename*보다 ASCII filename을 우선한다. 원본 사진에
+  // download.zip을 넣으면 JPEG도 ZIP으로 저장되므로, ASCII fallback에도 원래 확장자를 남긴다.
+  const extension = safe.match(/\.[A-Za-z0-9]{1,10}$/)?.[0] ?? "";
+  const asciiBase = safe.slice(0, safe.length - extension.length)
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const fallback = asciiBase ? `${asciiBase}${extension}` : `download${extension}`;
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 }

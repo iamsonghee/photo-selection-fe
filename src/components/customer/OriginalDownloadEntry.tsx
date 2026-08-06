@@ -31,6 +31,43 @@ interface OriginalDownloadInfo {
   archiveFiles: OriginalArchiveDownloadFile[];
 }
 
+const MOBILE_SHARE_FILE_LIMIT = 5;
+
+function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    || (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent));
+}
+
+function downloadFiles(files: OriginalDownloadFile[]) {
+  files.forEach((file, index) => {
+    window.setTimeout(() => {
+      const link = document.createElement("a");
+      link.href = file.url;
+      link.rel = "noopener";
+      link.download = file.filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }, index * 250);
+  });
+}
+
+async function shareFiles(files: OriginalDownloadFile[]): Promise<boolean> {
+  if (!navigator.canShare || !navigator.share) return false;
+
+  const shareable = await Promise.all(files.map(async (file) => {
+    const response = await fetch(file.url);
+    if (!response.ok) throw new Error(`${file.filename}을(를) 가져오지 못했습니다.`);
+    const blob = await response.blob();
+    return new File([blob], file.filename, { type: blob.type || "image/jpeg" });
+  }));
+  if (!navigator.canShare({ files: shareable })) return false;
+
+  await navigator.share({ files: shareable, title: "A-CUT 원본 사진" });
+  return true;
+}
+
 function formatExpiry(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -48,6 +85,9 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [mode, setMode] = useState<"archive" | "files">("archive");
   const [query, setQuery] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,12 +111,17 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
     };
   }, [token, info?.preparing, info?.archivePreparing]);
 
+  useEffect(() => {
+    setIsMobile(isMobileDevice());
+  }, []);
+
   if (!info || !info.visible) return null;
 
   const openDownloadModal = () => {
     setSelected(new Set());
     setMode("archive");
     setQuery("");
+    setDownloadError(null);
     setOpen(true);
   };
   const toggleFile = (index: number) => setSelected((current) => {
@@ -87,19 +132,34 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
   const toggleAll = () => setSelected((current) =>
     current.size === info.files.length ? new Set() : new Set(info.files.map((_, index) => index))
   );
-  const downloadSelected = () => {
-    [...selected].sort((a, b) => a - b).forEach((index, order) => {
-      const file = info.files[index];
-      window.setTimeout(() => {
-        const link = document.createElement("a");
-        link.href = file.url;
-        link.rel = "noopener";
-        link.download = file.filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      }, order * 250);
-    });
+  const downloadSelected = async () => {
+    const files = [...selected].sort((a, b) => a - b).map((index) => info.files[index]);
+    if (files.length === 0) return;
+
+    setDownloadError(null);
+    if (!isMobileDevice()) {
+      downloadFiles(files);
+      return;
+    }
+    if (files.length > MOBILE_SHARE_FILE_LIMIT) {
+      setDownloadError(`모바일 사진 저장은 한 번에 ${MOBILE_SHARE_FILE_LIMIT}장까지 가능합니다.`);
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      const shared = await shareFiles(files);
+      if (!shared) {
+        downloadFiles(files);
+        setDownloadError("이 브라우저에서는 사진 앱 저장을 지원하지 않아 파일 다운로드로 전환했습니다.");
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      downloadFiles(files);
+      setDownloadError("사진 앱으로 저장할 수 없어 파일 다운로드로 전환했습니다.");
+    } finally {
+      setIsDownloading(false);
+    }
   };
   const downloadArchives = () => {
     info.archiveFiles.forEach((file, index) => {
@@ -283,12 +343,16 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
                       <Download size={15} style={{ flexShrink: 0 }} />
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{file.filename}</span>
                       <span style={{ color: "rgba(255,255,255,0.5)", flexShrink: 0 }}>{formatStoredFileSizeBytes(file.byteSize)}</span>
-                      <a href={file.url} rel="noopener" download={file.filename} style={{ color: "var(--accent, #91b1ff)", fontSize: 12, textDecoration: "none", flexShrink: 0 }}>다운로드</a>
                     </div>
                   ))}
                 </div>
-                <button type="button" onClick={downloadSelected} disabled={selected.size === 0} style={{ width: "100%", marginTop: 16, padding: "13px", border: "none", borderRadius: 10, background: selected.size ? "var(--accent, #4f7eff)" : "rgba(255,255,255,0.1)", color: selected.size ? "#000" : "rgba(255,255,255,0.35)", fontSize: 14, fontWeight: 700, cursor: selected.size ? "pointer" : "not-allowed" }}>
-                  선택한 파일 다운로드 ({selected.size.toLocaleString()})
+                {downloadError && <p role="status" style={{ margin: "12px 0 0", color: "rgba(255,255,255,0.68)", fontSize: 12, textAlign: "center" }}>{downloadError}</p>}
+                <button type="button" onClick={downloadSelected} disabled={selected.size === 0 || isDownloading} style={{ width: "100%", marginTop: 16, padding: "13px", border: "none", borderRadius: 10, background: selected.size && !isDownloading ? "var(--accent, #4f7eff)" : "rgba(255,255,255,0.1)", color: selected.size && !isDownloading ? "#000" : "rgba(255,255,255,0.35)", fontSize: 14, fontWeight: 700, cursor: selected.size && !isDownloading ? "pointer" : "not-allowed" }}>
+                  {isDownloading
+                    ? "사진 준비 중..."
+                    : isMobile
+                      ? `선택한 사진 저장 (${selected.size.toLocaleString()})`
+                      : `선택한 파일 다운로드 (${selected.size.toLocaleString()})`}
                 </button>
               </>
             )}

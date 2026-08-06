@@ -356,8 +356,7 @@
 - **다운로드 30일 기한**: 초대 링크가 최초로 활성화된 시각(`projects.original_download_started_at`, 최초 1회만 기록)부터 30일. 링크를 다시 복사/재전달해도 초기화되지 않는다(상태 전이 자체가 1회성이라 자연히 보장). 만료 37일차(30일+7일 유예)에 R2의 ZIP이 자동 삭제된다(원본 파일 자체의 보관 정책은 변경되지 않음).
 - **활성화 후 변경 금지**: 아카이브가 enqueue된 이후에는 원본이 포함된 사진의 추가/삭제가 API 레벨에서 모두 거부된다(고객에게 전달된 ZIP 구성이 항상 스냅샷과 일치하도록 보장).
 - **stuck 복구**: `archive_sweep_worker`(`app/archive.py`, 서버 lifespan에서 `original_archive_worker`와 함께 기동)가 주기적으로 `recover_stuck_original_archive_builds`/`recover_stuck_original_archive_parts` RPC(15분 초과 `processing` 복구)를 호출해 archive 빌드가 영구히 멈추지 않게 한다 — `original_jobs`의 `stuck_job_sweep_worker`와 같은 패턴을 archive 큐에도 적용한 것.
-- **고객 화면**: `/c/[token]/**`(핀 인증 전/뷰어/온보딩 제외) 전 페이지에 공통 마운트된 접이식 진입점(`OriginalDownloadEntry.tsx`, `CustomerLayoutClient.tsx`에서 1회만 마운트)이 파일 수/총 용량/만료일을 보여주고, 만료 전에만 각 파트의 presigned ZIP URL을 발급한다(`GET /api/c/original-download`). 원본 R2 key/URL은 응답에 절대 노출되지 않으며, presigned URL은 짧은 TTL(1시간)로 매 요청 시 새로 발급된다.
-- **모바일 UX**: 다운로드 액션 클릭 시 "PC + 안정적인 Wi-Fi 권장" 안내를 먼저 보여주고 "그래도 계속"으로 진행 가능(완전 차단은 아님).
+- **고객 화면**: `/c/[token]/**`(핀 인증 전/뷰어/온보딩 제외) 전 페이지에 공통 마운트된 접이식 진입점(`OriginalDownloadEntry.tsx`, `CustomerLayoutClient.tsx`에서 1회만 마운트)이 파일 수/총 용량/만료일을 보여주고, 만료 전에만 각 파트의 presigned ZIP URL을 발급한다(`GET /api/c/original-download`). 개별 원본은 행별 직접 다운로드가 아니라 선택 후 하단 버튼으로 받는다. PC에서는 파일 다운로드를 시작하고, 모바일에서는 최대 5장(`MOBILE_SHARE_FILE_LIMIT`, `OriginalDownloadEntry.tsx`)을 네이티브 공유 시트로 열어 사용자가 사진 앱에 저장할 수 있다. 공유가 지원되지 않거나 실패하면 일반 파일 다운로드로 전환한다. 원본 R2 key/URL은 응답에 절대 노출되지 않으며, presigned URL은 짧은 TTL(1시간)로 매 요청 시 새로 발급된다.
 - **기존 프로젝트**: 이 기능 배포 이전에 이미 활성화된 프로젝트는 `original_download_started_at`/`original_archive_status`가 `NULL`로 유지되어 소급 노출되지 않는다(신규 활성화 프로젝트부터만 적용).
 - **최종 보정본과의 관계**: 완전히 별개 — 최종 보정본은 기존대로 `delivered` 상태 이후 작가가 개별적으로 전달한다(이 기능이 다루는 것은 셀렉 이전에 미리 받아둔 "납품용 원본"이며, 보정된 최종본이 아니다).
 
