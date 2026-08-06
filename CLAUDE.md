@@ -1,12 +1,8 @@
 # A-CUT Claude Code Project Rules
 
-## Project Scope
+이 문서는 **Claude Code 전용** 지침이다. Claude/Codex 공통 프로젝트 규칙(Source of Truth 원칙, 문서 동기화 조건, 안전한 구현 절차 등)은 `docs/agent-guidelines.md`에 있다.
 
-이 프로젝트는 frontend 저장소에서 실행되지만,
-`../photo-selection-be`까지 포함한 하나의 서비스로 분석하고 작업한다.
-
-기능 구현, 버그 수정, 성능 분석, QA 수행 시
-frontend와 backend를 함께 조사하여 원인을 찾는다.
+**작업을 시작하기 전에 `docs/agent-guidelines.md`를 읽고, 그 안의 공통 프로젝트 규칙(Project Scope, Source of Truth, Documentation sync, Documentation impact check, Safe implementation, Documentation quality)을 반드시 따른다.** 아래는 그 공통 규칙 위에 Claude Code에서만 쓰는 QA 절차·서브에이전트 운용 규칙을 추가한 것이다 — 공통 규칙 내용을 여기서 다시 복사하지 않는다.
 
 ---
 
@@ -173,80 +169,6 @@ qa-explorer는 다음 경우에만 사용한다.
 
 ---
 
-# 프로젝트 참고 문서
-
-작업 전 항상 아래 문서를 확인한다.
-
-- docs/architecture.md
-- docs/user-flow.md
-- docs/upload-flow.md (업로드/원본 처리/썸네일·프리뷰 관련 작업 시)
-
-규칙
-
-- 문서보다 실제 코드를 우선한다.
-- 문서가 오래되었다고 판단되면 함께 수정한다.
-- 문서와 코드가 다르면 원인을 조사한다.
-
----
-
-# Documentation Rules
-
-## 핵심 원칙
-
-- **코드를 Source of Truth로 본다.** 문서는 코드 상태를 설명하는 부산물이며, 코드가 항상 우선한다.
-- **구현 변경이 문서화된 구조·흐름에 영향을 주면, 같은 작업(같은 PR/커밋 단위) 안에서 관련 문서도 반드시 함께 갱신한다.** "나중에 문서화"로 미루지 않는다.
-- **코드와 문서가 충돌하는 것을 발견하면, 코드를 직접 확인해서 문서를 코드에 맞게 고친다.** 문서를 근거로 코드 쪽을 의심하지 않는다(단, 코드가 명백한 버그로 보이면 별도로 보고하고 문서는 "현재 코드 기준 사실"만 담는다 — 버그 수정은 별도 승인 후).
-- **작업 완료 전에 documentation impact(문서 영향 범위)를 검토한다.** "영향 없음"으로 결론 내리더라도, 실제로 구조/흐름 변경이 없었는지 확인한 뒤에만 그렇게 판단한다 — 확인하지 않고 "영향 없음"이라고 보고하지 않는다.
-
-## 문서 갱신이 필요한 변경 (최소 기준)
-
-아래에 해당하면 관련 문서(`docs/architecture.md`, `docs/user-flow.md`, `docs/upload-flow.md`, 그 외 영향받는 문서)를 같은 작업에서 함께 수정한다.
-
-- API 흐름 (새 엔드포인트, 요청/응답 계약 변경, 인증 방식 변경)
-- DB schema / 상태값 (테이블·컬럼 추가/삭제, 상태 머신 전이 변경)
-- 주요 데이터 흐름 (업로드/다운로드, 셀렉, 보정본 전달 등 핵심 파이프라인)
-- R2/storage 구조 (key 패턴, presigned URL 사용 여부, 저장 주체 변경)
-- background worker (신규/삭제/폴링 주기·동작 변경)
-- upload/download architecture (배치·동시성·barrier 구조, 압축/리사이즈 파라미터)
-- 주요 사용자 flow (화면 이동, 버튼 동작, 진행률/완료 조건)
-- batch/concurrency 방식 (배치 크기, 동시 처리 수, 세마포어/스레드풀 상수)
-- 외부 서비스 연동 (Supabase, R2, Railway, clip-service, Gemini 등 연동 방식 변경)
-- 신규 핵심 기능 또는 기존 핵심 기능의 동작 변경
-
-**아래는 문서 수정 대상이 아니다** — 매 사소한 변경마다 문서를 고치지 않는다.
-
-- 버튼 색상 등 단순 스타일 변경
-- 문서가 설명하는 의미(흐름·계약)가 바뀌지 않는 내부 리팩터링
-- 변수/함수명 변경(동작 동일)
-- 로그·주석 정리
-
-## 숫자를 문서에 적을 때
-
-배치 크기, 동시성, 타임아웃, 픽셀/품질 값 등 숫자를 문서에 적을 때는 숫자만 적지 말고 **관련 상수명·환경변수명과 코드 위치도 함께 명시**한다.
-
-예: "PC 배치 크기 8장(`BATCH_SIZE=8`, `upload/page.tsx`)", "Pillow 스레드풀 4개(`PILLOW_EXECUTOR_MAX_WORKERS`, 기본값, `upload.py`)".
-
-숫자만 적으면 기본값이 바뀌었을 때 문서가 다시 조용히 stale해진다 — 상수명을 같이 적어두면 다음에 코드에서 값을 grep 한 번으로 재검증할 수 있다.
-
-## 미사용/legacy 코드를 문서화할 때
-
-문서 서술과 실제 코드가 어긋나는 원인이 "현재 아무도 호출하지 않는 함수/경로"인 경우:
-
-- 문서에는 **현재 active flow만** 사실로 서술한다. 미사용 코드를 마치 실행되는 것처럼 설명하지 않는다.
-- 미사용 코드 자체는 문서에 "정의는 있으나 호출부 없음"으로 짧게 남겨 향후 오해를 막되, **이 작업에서 임의로 삭제하지 않는다.**
-- 삭제 후보로 보이면 최종 보고에 별도로 명시하고, 실제 삭제는 별도 승인 후 진행한다.
-
-## 작업 완료 전 체크리스트
-
-□ architecture.md 수정 필요 여부
-□ user-flow.md 수정 필요 여부
-□ upload-flow.md 수정 필요 여부 (업로드/원본/썸네일·프리뷰 관련 작업일 때)
-□ 그 외 영향받는 문서 존재 여부
-
-문서 영향이 있다면 반드시 함께 수정한 후 완료한다.
-
----
-
 # 최종 보고
 
 최종 보고에는 반드시 포함한다.
@@ -263,29 +185,9 @@ qa-explorer는 다음 경우에만 사용한다.
 - 브라우저 검증 여부
 - 남아있는 위험
 - 테스트하지 못한 범위
-- **Documentation impact** (아래 형식 그대로 포함, 구현 작업 완료 보고마다 필수)
+- **Documentation impact** — `docs/agent-guidelines.md`의 "Documentation impact check" 형식 그대로 포함(구현 작업 완료 보고마다 필수)
 
-```
-Documentation impact:
-- architecture.md: updated / not affected
-- upload-flow.md: updated / not affected
-- user-flow.md: updated / not affected
-- 기타 관련 문서: updated / not affected
-```
-
-`not affected`로 적을 때도 실제로 아키텍처/흐름 변경이 없었는지 확인한 뒤에 적는다 — 확인 없이 관습적으로 "not affected"를 채우지 않는다. `updated`인 경우 어떤 문서의 어느 부분을 고쳤는지 한 줄로 덧붙인다.
-
-
-# Code Modification Principle
-
-기존 코드를 수정하기 전에
-
-1. 관련 코드를 충분히 조사한다.
-2. 기존 구현 의도를 이해한다.
-3. 추측으로 수정하지 않는다.
-4. 동일 기능을 구현한 기존 코드를 먼저 찾는다.
-5. 중복 구현하지 않는다.
-6. 수정 범위를 최소화한다.
+---
 
 # 신규 기능 기획
 
