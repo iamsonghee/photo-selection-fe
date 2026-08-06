@@ -100,7 +100,17 @@ export async function PATCH(
       const { error: archiveErr } = await admin.rpc("enqueue_original_archive_build", {
         p_project_id: projectId,
       });
-      if (archiveErr) console.error("[PATCH project status] archive enqueue failed", archiveErr);
+      if (archiveErr) {
+        // 고객 링크와 개별 원본 다운로드는 계속 열어 두되, ZIP 작업을 조용히 '준비 중'으로
+        // 남기지 않는다. 고객·작가 화면에서 실패 상태를 안내하고 재시도할 수 있게 한다.
+        console.error("[PATCH project status] archive enqueue failed", archiveErr);
+        const { error: archiveStatusErr } = await admin
+          .from("projects")
+          .update({ original_archive_status: "failed" })
+          .eq("id", projectId)
+          .is("original_archive_status", null);
+        if (archiveStatusErr) console.error("[PATCH project status] archive failure status update failed", archiveStatusErr);
+      }
     }
 
     return NextResponse.json({ status });
