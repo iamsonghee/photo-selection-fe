@@ -273,7 +273,7 @@ FastAPI 서버 측 동시성(요청 1건 안에서 파일별 처리) — 파이�
 | 배치 응답 성공 직후 | `pendingPhotos` | 위와 같은 압축본 blob URL 유지(서버가 반환한 thumb_url을 쓰지 않음 — iOS에서 업로드 XHR과 동시에 DB 조회하면 연결 한도를 초과하는 문제 회피) |
 | **전체 업로드 세션 종료 후, 딱 1회** | `photos`(DB) | `getPhotosByProjectId()` 재조회 → 이때 처음으로 실제 `r2_thumb_url` 사용 |
 
-각 파일은 큐에 들어올 때 만든 `tempId`와 `sourceIndex`를 `queuedPreviews → uploadingPhotos → pendingPhotos` 사이에서 그대로 인계받고, `sourceIndex` 순서로 렌더한다. 따라서 상태가 바뀌어도 카드의 React key·그리드 위치가 유지되며, 업로드 완료 순서가 달라도 재마운트·재정렬되지 않는다. 다만 큐의 원본(raw) blob URL은 전송 시작 때 해제하고, 브라우저가 표시하기 적합한 압축본 blob URL로 교체한다. 이는 대용량 원본이나 브라우저가 직접 해독하지 못하는 HEIC 원본 때문에 업로드 카드가 검게 보이는 것을 피하기 위함이다. 각 blob URL은 세션 종료/실패/중단 때 즉시 revoke한다.
+각 파일은 큐에 들어올 때 만든 `tempId`와 `sourceIndex`를 `queuedPreviews → uploadingPhotos → pendingPhotos` 사이에서 그대로 인계받고, `sourceIndex` 순서로 렌더한다. 따라서 상태가 바뀌어도 카드의 React key·그리드 위치가 유지되며, 업로드 완료 순서가 달라도 재마운트·재정렬되지 않는다. 전송 시작 시 큐 원본(raw) blob URL은 압축본 blob URL로 바뀌지만, 카드 컴포넌트는 압축본을 투명 상태로 먼저 해독한 뒤에만 180ms 페이드로 교체한다. 따라서 대용량 원본이나 브라우저가 직접 해독하지 못하는 HEIC 원본 때문에 검은 프레임이 보이거나, URL 교체 때문에 카드가 깜빡이는 것을 피한다. 각 blob URL은 세션 종료/실패/중단 때 즉시 revoke한다.
 
 즉 batch/라운드가 여러 번 반복되어도(desktop은 `include_original` 값과 무관하게 파이프라인의 batch 단위, 모바일은 round 단위) 세션 도중에는 서버 썸네일 URL을 한 번도 참조하지 않는다. 이 구조 때문에, 만약 향후 썸네일/프리뷰 생성을 비동기로 지연시키더라도 **업로드 세션 진행 중 화면 표시 자체는 깨지지 않는다** — 다만 다음 두 지점은 현재 코드가 "생성이 항상 동기로 끝나 있다"를 전제로 하고 있어 영향을 받는다:
 - `insert_photos_with_numbers` 시점에 `r2_thumb_url`이 이미 있어야 한다(현재 photos row는 thumb_url 없이 존재할 수 없음).

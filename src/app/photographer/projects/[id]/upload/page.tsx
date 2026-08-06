@@ -430,10 +430,39 @@ function PhotoThumb({
   /** 현재 압축 중인 사진 — 펄싱 오버레이 표시 */
   isCompressing?: boolean;
 }) {
-  const [loaded, setLoaded] = useState(false);
+  // 업로드 카드의 raw → 압축본 URL 교체는 기존 이미지를 지우지 않고 새 URL을 먼저
+  // 해독한 뒤 겹쳐서 전환한다. 이미지가 없거나 검게 보이는 프레임을 만들지 않는다.
+  const [preview, setPreview] = useState<{
+    displayedUrl: string;
+    loadedUrl: string | undefined;
+    transitionUrl: string | null;
+    transitionReady: boolean;
+  }>({ displayedUrl: photo.url, loadedUrl: undefined, transitionUrl: null, transitionReady: false });
+  const transitionTimerRef = useRef<number | null>(null);
+  const { displayedUrl, loadedUrl, transitionUrl, transitionReady } = preview;
+  const displayedLoaded = loadedUrl === displayedUrl;
   const deleting = deletingId === photo.id;
+
+  // DB 사진은 기존 큐 로딩 동작을 유지하고, 로컬 업로드 프리뷰의 URL 교체만 전환 상태로 잡는다.
+  // 이전 props를 비교해 렌더 중 한 번만 상태를 맞추는 React 권장 패턴이다.
+  if (!photo.isPending && (displayedUrl !== photo.url || transitionUrl !== null || transitionReady)) {
+    setPreview({ displayedUrl: photo.url, loadedUrl, transitionUrl: null, transitionReady: false });
+  } else if (photo.isPending && photo.url !== displayedUrl && photo.url !== transitionUrl) {
+    setPreview((prev) => ({ ...prev, transitionUrl: photo.url, transitionReady: false }));
+  }
+
+  useEffect(() => {
+    if (photo.isPending || transitionTimerRef.current === null) return;
+    window.clearTimeout(transitionTimerRef.current);
+    transitionTimerRef.current = null;
+  }, [photo.isPending]);
+
+  useEffect(() => () => {
+    if (transitionTimerRef.current !== null) window.clearTimeout(transitionTimerRef.current);
+  }, []);
+
   // blob URL(isPending)은 큐를 건너뛰고 즉시 로드 — 로컬 메모리라 네트워크 요청이 없다.
-  const { cellRef, imgRef, shouldLoad, handleLoad, handleError } = useQueuedThumbSrc(photo.url, {
+  const { cellRef, imgRef, shouldLoad, handleLoad, handleError } = useQueuedThumbSrc(displayedUrl, {
     queue: thumbQueue,
     rootRef: scrollRootRef,
     bypass: !scrollRootRef || !!photo.isPending,
@@ -500,7 +529,7 @@ function PhotoThumb({
             inset: 0,
             background: "var(--background)",
             transition: "opacity 0.25s",
-            opacity: loaded ? 0 : 1,
+            opacity: displayedLoaded || transitionReady ? 0 : 1,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -513,13 +542,12 @@ function PhotoThumb({
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             ref={imgRef}
-            src={photo.url}
+            src={displayedUrl}
             alt=""
             loading={photo.isPending ? "eager" : "lazy"}
             decoding="async"
-            onLoad={(e) => {
-              setLoaded(true);
-              (e.currentTarget as HTMLImageElement).style.opacity = "1";
+            onLoad={() => {
+              setPreview((prev) => ({ ...prev, loadedUrl: displayedUrl }));
               handleLoad();
             }}
             onError={handleError}
@@ -530,8 +558,48 @@ function PhotoThumb({
               height: "100%",
               objectFit: "cover",
               display: "block",
-              opacity: 0,
+              opacity: displayedLoaded && !transitionReady ? 1 : 0,
               transition: "opacity 0.25s",
+            }}
+          />
+        )}
+        {/* 다음 로컬 미리보기는 투명 상태로 먼저 해독하고, 성공했을 때만 현재 사진 위로 페이드한다. */}
+        {photo.isPending && transitionUrl && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={transitionUrl}
+            alt=""
+            loading="eager"
+            decoding="async"
+            onLoad={() => {
+              if (transitionReady) return;
+              setPreview((prev) => ({ ...prev, transitionReady: true }));
+              transitionTimerRef.current = window.setTimeout(() => {
+                setPreview((prev) => ({
+                  ...prev,
+                  displayedUrl: transitionUrl,
+                  loadedUrl: transitionUrl,
+                  transitionUrl: null,
+                  transitionReady: false,
+                }));
+                transitionTimerRef.current = null;
+              }, 180);
+            }}
+            onError={() => {
+              // 새 미리보기를 표시할 수 없으면 이미 보이던 원본을 그대로 유지한다.
+              setPreview((prev) => ({ ...prev, transitionUrl: null, transitionReady: false }));
+            }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 1,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: "block",
+              opacity: transitionReady ? 1 : 0,
+              transition: "opacity 0.18s ease-out",
+              pointerEvents: "none",
             }}
           />
         )}
