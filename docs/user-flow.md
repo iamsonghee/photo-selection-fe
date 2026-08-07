@@ -242,19 +242,19 @@
 - **사용자가 수행하는 단계**: "새 프로젝트" 진입 → 등급별 한도를 이미 다 썼으면 입력 폼 대신 안내 화면이 즉시 뜬다(§9-1 참고, 사전에 `GET /api/photographer/quota`로 확인). 아니면 프로젝트명, 고객명, 촬영일, 셀렉 기한, 필요 선택 장수(N), 촬영 종류, 고객 연락처(선택), PIN(선택), 재보정 허용 횟수 입력 → 생성.
 - **프론트엔드 라우트**: `/photographer/projects/new`.
 - **호출되는 API**: `POST /api/photographer/projects`(2026-07-26부터 — 이전에는 `src/lib/db.ts`의 `createProject()`가 브라우저에서 Supabase에 직접 INSERT했으나, 서버 검증이 전혀 없어 등급별 한도를 강제할 수 없었기 때문에 이 API로 옮김). `access_pin`, `max_revision_count` 등 폼 상태 전체를 그대로 body로 전송(`src/app/photographer/projects/new/page.tsx`).
-- **성공 시 기대 결과**: `status: "preparing"`인 새 프로젝트 생성, `access_token`은 이 API가 `crypto.randomUUID()`로 발급. 성공 시 `photographers.total_projects_created`를 +1하고(현재는 어떤 검증 로직도 이 값을 읽지 않음 — §9-1) `project_logs`에 `created` 액션을 함께 기록(이전에는 클라이언트가 생성 직후 별도로 `project-logs` API를 한 번 더 호출했으나 이 API로 통합됨). 생성 직후 `/photographer/projects/[id]/upload`로 바로 이동한다(이전에는 `/photographer/projects/[id]`로 이동 후 업로드 화면에 별도 진입했으나, 불필요한 중간 단계를 제거하여 바로 업로드로 이어지도록 변경).
+- **성공 시 기대 결과**: `status: "preparing"`인 새 프로젝트 생성, `access_token`은 이 API가 `crypto.randomUUID()`로 발급. 성공 시 `photographers.total_projects_created`를 +1하고(현재는 어떤 검증 로직도 이 값을 읽지 않음 — §9-1) `project_logs`에 `created` 액션을 함께 기록(이전에는 클라이언트가 생성 직후 별도로 `project-logs` API를 한 번 더 호출했으나 이 API로 통합됨). 생성 직후 `/photographer/projects/[id]` 상세 허브로 이동하며, 화면 최상단의 "다음 단계" 카드가 원본 업로드 시작으로 안내한다.
 - **실패 및 경계 상황**: 필수 필드(셀렉 기한 등) 누락 시 클라이언트 유효성 검사 에러 표시. 등급별 한도 초과 시 403 + `{error:"beta_limit_exceeded", limit_type, current, max, message}`(§9-1) — 관리자는 무제한, 베타는 현재 보유 10개, 일반(Trial)은 현재 보유 1개까지(둘 다 "현재 보유 수" 기준 — 삭제하면 슬롯이 다시 확보됨).
 - **관련 권한/인증 조건**: 로그인 세션 필요. 한도 검증은 세션에서 조회한 `photographer_id` 기준으로만 이뤄지며 클라이언트가 보낸 값은 신뢰하지 않는다.
 - **QA에서 확인해야 할 항목**: 일반 사용자가 한도(1개) 도달 후 그 프로젝트를 삭제하면 다시 생성할 수 있는지(현재 보유 수 기준이라 정상 동작 — §9-1), PIN을 생성 시점에 설정하지 않고 나중에 추가하는 경로(§5)와의 동작 일치 여부.
 
 ---
 
-## 3. 고객 프로젝트 설정
+## 3. 프로젝트 상세 허브 및 고객 프로젝트 설정
 
 - **시작 조건**: 프로젝트 생성 완료, `/photographer/projects/[id]` 진입.
-- **사용자가 수행하는 단계**: 프로젝트명·고객명·촬영일·셀렉 기한·필요 장수(N)·촬영 종류·고객 연락처·재보정 횟수 등을 수정.
+- **사용자가 수행하는 단계**: 화면 최상단의 "현재 작업" 패널에서 현재 상태에 맞는 작업으로 이동하고, 그 아래의 공통 프로젝트 상세 정보에서 프로젝트명·고객명·촬영일·셀렉 기한·필요 장수(N)·촬영 종류·고객 연락처·재보정 횟수·납품 파일 설정을 확인하거나 수정한다. 작업 패널은 `preparing + photo_count=0`이면 원본 업로드 시작, `preparing + photo_count>0`이면 업로드 현황, `selecting`이면 셀렉 현황, 보정 상태면 워크플로우, 검토 상태면 보정본 현황, `delivered`이면 프로젝트 결과로 안내한다.
 - **프론트엔드 라우트**: `/photographer/projects/[id]` (`ProjectNexusPageClient.tsx`, 편집 모드 토글).
-- **호출되는 API**: `PATCH /api/photographer/projects/{id}` — 세션+소유권 확인 후 필드 갱신.
+- **호출되는 API**: 상세 데이터 조회 및 로그 조회 외에, 정보 수정 시 `PATCH /api/photographer/projects/{id}` — 세션+소유권 확인 후 필드 갱신. "현재 작업" 패널은 상태를 변경하지 않고 기존 업로드·워크플로우·결과 화면으로 이동만 한다.
 - **성공 시 기대 결과**: 화면에 즉시 반영("프로젝트 정보가 저장되었습니다" 토스트).
 - **실패 및 경계 상황**: 필요 장수(N)는 `["preparing", "selecting"].includes(status)`일 때만 수정 가능(`canEditN`) — 확정 이후에는 수정 불가로 보임. 저장 실패 시 에러 메시지 표시.
 - **관련 권한/인증 조건**: 로그인 세션 + `project.photographer_id` 일치.

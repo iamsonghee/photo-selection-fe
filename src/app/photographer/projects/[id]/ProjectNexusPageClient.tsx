@@ -6,34 +6,25 @@ import { format, isToday, isYesterday, parseISO } from "date-fns";
 import {
   AlertTriangle,
   Check,
-  ChevronRight,
   Copy,
   Eye,
   EyeOff,
-  Flag,
-  ListChecks,
-  Lock,
-  PenLine,
   RefreshCw,
   Trash2,
-  Upload,
-  X,
 } from "lucide-react";
 import { getProjectById } from "@/lib/db";
-import type { Project, ProjectStatus } from "@/types";
+import type { Project } from "@/types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { SHOOT_TYPES } from "@/lib/project-shoot-types";
-import { StatusPill } from "@/components/ui/StatusPill";
 import { FieldInfoTip } from "@/components/ui/FieldInfoTip";
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { isValidKoreanPhone } from "@/lib/phone";
+import { ProjectInformationCard } from "@/components/photographer/project-detail/ProjectInformationCard";
+import { ProjectWorkPanel } from "@/components/photographer/project-detail/ProjectWorkPanel";
+import { ProjectProgressCard } from "@/components/photographer/project-detail/ProjectProgressCard";
 
 // ── helpers ────────────────────────────────────────────────────────────────
-
-function getInitial(name: string): string {
-  return name.trim().charAt(0);
-}
 
 function formatLogTime(iso: string): string {
   try {
@@ -62,15 +53,6 @@ function logActionLabel(action: string): string {
 }
 
 type LogRow = { id: string; action: string; createdAt: string };
-type FlowVisual = "done" | "active" | "locked";
-type FlowStepItem = {
-  label: string;
-  desc: string;
-  icon?: React.ReactNode;
-  state: FlowVisual;
-  badge?: string | null;
-  onClick?: () => void;
-};
 
 const MONO_FONT = "var(--font-mono, monospace)";
 
@@ -95,29 +77,6 @@ function FieldLabel({
       {info && <FieldInfoTip text={info} />}
       {required && <span className="text-[10px] text-accent font-medium">필수</span>}
       {optional && <span className="text-[10px] text-disabled-foreground">선택</span>}
-    </div>
-  );
-}
-
-function MetaItem({
-  label,
-  required,
-  optional,
-  info,
-  children,
-  fullSpan,
-}: {
-  label: string;
-  required?: boolean;
-  optional?: boolean;
-  info?: string;
-  children: React.ReactNode;
-  fullSpan?: boolean;
-}) {
-  return (
-    <div className={fullSpan ? "col-span-2" : undefined}>
-      <FieldLabel label={label} required={required} optional={optional} info={info} />
-      <div className="text-base text-foreground">{children}</div>
     </div>
   );
 }
@@ -418,10 +377,6 @@ export function ProjectNexusPageClient() {
   const N = project.requiredCount;
   const M = project.photoCount;
   const isInviteActive = project.status !== "preparing";
-  const canViewSelections = project.status !== "preparing";
-  const canEditVersions = ["confirmed", "editing", "editing_v2", "reviewing_v1", "reviewing_v2", "delivered"].includes(
-    project.status,
-  );
 
   const shootDisplay = (() => {
     try {
@@ -448,117 +403,6 @@ export function ProjectNexusPageClient() {
     }
   })();
 
-  const uploadDone = project.status !== "preparing";
-  const selectingActive = project.status === "selecting";
-  const preparing = project.status === "preparing";
-  const selecting = project.status === "selecting";
-  const delivered = project.status === "delivered";
-
-  const f1: FlowVisual = !uploadDone ? "active" : "done";
-  const f2: FlowVisual = !canViewSelections ? "locked" : selectingActive ? "active" : "done";
-
-  const inV2Phase = ["editing_v2", "reviewing_v2", "delivered"].includes(project.status);
-  const useFiveSteps = project.maxRevisionCount > 0 && inV2Phase;
-
-  const f3combined: FlowVisual =
-    preparing || selecting ? "locked" : delivered ? "done" : "active";
-
-  const f5r: FlowVisual =
-    project.status === "delivered"
-      ? "done"
-      : ["editing_v2", "reviewing_v2"].includes(project.status)
-      ? "active"
-      : "locked";
-
-  const fDeliver: FlowVisual = delivered ? "done" : "locked";
-
-  const ICON_COLOR = "currentColor";
-  const actionFlowSteps: FlowStepItem[] = useFiveSteps
-    ? [
-        {
-          label: "원본 업로드",
-          desc: "완료",
-          icon: <Upload size={18} color={ICON_COLOR} />,
-          state: f1,
-          onClick: () => router.push(`/photographer/projects/${id}/upload`),
-        },
-        {
-          label: "셀렉 결과 확인",
-          desc: f2 === "active" ? "고객 셀렉 중" : "완료",
-          icon: <ListChecks size={18} color={ICON_COLOR} />,
-          state: f2,
-          badge: f2 === "active" ? "LIVE" : null,
-          onClick: canViewSelections
-            ? () => router.push(`/photographer/projects/${id}/workflow?stage=original`)
-            : undefined,
-        },
-        {
-          label: "보정본 v1",
-          desc: "고객 검토 완료",
-          icon: <PenLine size={18} color={ICON_COLOR} />,
-          state: "done",
-          onClick: () => router.push(`/photographer/projects/${id}/workflow`),
-        },
-        {
-          label: "재보정 v2",
-          desc:
-            project.status === "editing_v2"
-              ? "업로드 진행 중"
-              : project.status === "reviewing_v2"
-              ? "고객 검토 중"
-              : "완료",
-          badge: project.status === "editing_v2" ? "LIVE" : null,
-          icon: <PenLine size={18} color={ICON_COLOR} />,
-          state: f5r,
-          onClick: f5r !== "locked" ? () => router.push(`/photographer/projects/${id}/workflow`) : undefined,
-        },
-        {
-          label: "납품 완료",
-          desc: delivered ? "완료" : "최종 목표",
-          icon: <Flag size={18} color={ICON_COLOR} />,
-          state: fDeliver,
-        },
-      ]
-    : [
-        {
-          label: "원본 업로드",
-          desc: f1 === "done" ? "완료" : "진행 중",
-          icon: <Upload size={18} color={ICON_COLOR} />,
-          state: f1,
-          onClick: () => router.push(`/photographer/projects/${id}/upload`),
-        },
-        {
-          label: "셀렉 결과 확인",
-          desc: f2 === "done" ? "완료" : f2 === "active" ? "고객 셀렉 중" : "이전 단계 완료 후 가능",
-          icon: <ListChecks size={18} color={ICON_COLOR} />,
-          state: f2,
-          badge: f2 === "active" ? "LIVE" : null,
-          onClick: canViewSelections
-            ? () => router.push(`/photographer/projects/${id}/workflow?stage=original`)
-            : undefined,
-        },
-        {
-          label: "보정본",
-          desc: delivered
-            ? "완료"
-            : project.status === "reviewing_v1"
-            ? "고객 검토 중"
-            : f3combined === "active"
-            ? "업로드 진행 중"
-            : "이전 단계 완료 후 가능",
-          badge: project.status === "reviewing_v1" ? "LIVE" : null,
-          icon: <PenLine size={18} color={ICON_COLOR} />,
-          state: f3combined,
-          onClick: canEditVersions ? () => router.push(`/photographer/projects/${id}/workflow`) : undefined,
-        },
-        {
-          label: "납품 완료",
-          desc: delivered ? "완료" : "최종 목표",
-          icon: <Flag size={18} color={ICON_COLOR} />,
-          state: fDeliver,
-        },
-      ];
-
   const cardCls = "bg-surface border border-border-subtle rounded-2xl";
 
   // ── render ────────────────────────────────────────────────────────────
@@ -576,160 +420,36 @@ export function ProjectNexusPageClient() {
         title={project.name}
         stats={[
           { label: "업로드", value: `${M}장` },
-          { label: "목표", value: `${N}장`, accent: true },
+          { label: "고객 셀렉", value: `${N}장`, accent: true },
         ]}
       />
 
-      <main className="p-4 md:p-8 max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-6">
-        {/* ── Left column ────────────────────────────────── */}
-        <div className="flex flex-col gap-6 min-w-0">
-          {/* Project info card */}
-          <section className={`${cardCls} p-6`}>
-            <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <span
-                    className="text-[11px] text-subtle-foreground bg-background px-1.5 py-0.5 rounded border border-border-subtle"
-                    style={{ fontFamily: MONO_FONT }}
-                  >
-                    {project.displayId ?? id.slice(0, 12).toUpperCase()}
-                  </span>
-                  <StatusPill status={project.status} photoCount={M} requiredCount={N} />
-                </div>
-                <h2 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
-                  {project.name}
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={openEdit}
-                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-raised hover:bg-border-strong text-muted-foreground transition-colors"
-              >
-                <PenLine size={12} /> 정보 수정
-              </button>
-            </div>
+      <main className="mx-auto flex max-w-[1600px] flex-col gap-6 p-4 md:p-8">
+        <ProjectWorkPanel
+          project={project}
+          deadlineDisplay={deadlineDisplay}
+          reviewDeadlineDisplay={reviewDeadlineDisplay}
+          onUpload={() => router.push(`/photographer/projects/${id}/upload`)}
+          onSelection={() => router.push(`/photographer/projects/${id}/workflow?stage=original`)}
+          onWorkflow={() => router.push(`/photographer/projects/${id}/workflow`)}
+          onResults={() => router.push(`/photographer/projects/${id}/results`)}
+        />
 
-            <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-              <div className="col-span-2">
-                <FieldLabel
-                  label="촬영 유형"
-                  optional
-                  info="목록 분류용 (웨딩, 가족 등)"
-                />
-                {project.shootType ? (() => {
-                  const found = SHOOT_TYPES.find((t) => t.value === project.shootType);
-                  const Icon = found?.icon;
-                  return (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium bg-accent/8 border border-accent/40 text-accent">
-                      {Icon && <Icon size={13} />}
-                      {found?.label ?? project.shootType}
-                    </span>
-                  );
-                })() : (
-                  <span className="text-sm text-disabled-foreground">—</span>
-                )}
-              </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+          {/* ── Left column ────────────────────────────────── */}
+          <div className="flex min-w-0 flex-col gap-6">
 
-              <MetaItem
-                label="촬영 일자"
-                required
-                info="실제 촬영일"
-              >
-                <span style={{ fontFamily: MONO_FONT }}>{shootDisplay}</span>
-              </MetaItem>
-
-              <MetaItem
-                label="셀렉 기한"
-                required
-                info="고객 셀렉 마감일"
-              >
-                <span style={{ fontFamily: MONO_FONT }}>{deadlineDisplay}</span>
-              </MetaItem>
-
-              {reviewDeadlineDisplay && (
-                <MetaItem
-                  label="검토 기한"
-                  info="보정본 검토 마감일"
-                >
-                  <span style={{ fontFamily: MONO_FONT }}>{reviewDeadlineDisplay}</span>
-                </MetaItem>
-              )}
-
-              <MetaItem
-                label="고객 이름"
-                required
-                info="고객 화면·알림에 표시"
-              >
-                <span className="inline-flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-surface-raised flex items-center justify-center text-[10px] font-bold text-foreground">
-                    {getInitial(project.customerName || "?")}
-                  </span>
-                  <span>{project.customerName || "—"}</span>
-                </span>
-              </MetaItem>
-
-              <MetaItem
-                label="연락처"
-                optional
-                info="알림 발송용 (선택)"
-              >
-                <span style={{ fontFamily: MONO_FONT }}>
-                  {project.customerPhone?.trim() || "—"}
-                </span>
-              </MetaItem>
-
-              <MetaItem
-                label="셀렉 갯수 (N)"
-                required
-                info="고객이 고를 최종 장수"
-              >
-                <span>
-                  <span
-                    className="text-2xl font-bold text-accent leading-none"
-                    style={{ fontFamily: MONO_FONT }}
-                  >
-                    {N}
-                  </span>
-                  <span className="text-sm text-subtle-foreground ml-1.5">장</span>
-                </span>
-              </MetaItem>
-
-              <MetaItem
-                label="업로드 사진 수"
-                info="업로드된 원본 장수"
-              >
-                <span>
-                  <span
-                    className="text-2xl font-bold text-foreground leading-none"
-                    style={{ fontFamily: MONO_FONT }}
-                  >
-                    {M}
-                  </span>
-                  <span className="text-sm text-subtle-foreground ml-1.5">장</span>
-                </span>
-              </MetaItem>
-
-              <div className="col-span-2 pt-4 border-t border-border-subtle">
-                <FieldLabel
-                  label="재보정 허용 횟수"
-                  info="검토 후 재보정 허용 (0=없음)"
-                />
-                <span
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border ${
-                    project.maxRevisionCount > 0
-                      ? "bg-accent/10 border-accent/40 text-accent"
-                      : "bg-border-subtle border-surface-raised text-subtle-foreground"
-                  }`}
-                >
-                  <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: project.maxRevisionCount > 0 ? "var(--accent)" : "var(--border-strong)" }}
-                  />
-                  {project.maxRevisionCount === 0 ? "재보정 없음" : `최대 ${project.maxRevisionCount}회`}
-                </span>
-              </div>
-            </div>
-          </section>
+          <ProjectInformationCard
+            project={project}
+            shootDisplay={shootDisplay}
+            deadlineDisplay={deadlineDisplay}
+            reviewDeadlineDisplay={reviewDeadlineDisplay}
+            onEdit={openEdit}
+            onDelete={() => {
+              setDeleteError("");
+              setShowDeleteModal(true);
+            }}
+          />
 
           {/* Customer link card */}
           <section className={`${cardCls} p-6`}>
@@ -832,101 +552,12 @@ export function ProjectNexusPageClient() {
 
         {/* ── Right column ─────────────────────────────── */}
         <aside className="flex flex-col gap-6 min-w-0">
-          {/* Action flow */}
-          <section className={`${cardCls} p-5`}>
-            <h3 className="text-base font-bold text-foreground mb-4">진행 단계</h3>
-            <div className="flex flex-col gap-2">
-              {actionFlowSteps.map((step, i) => {
-                const isDone = step.state === "done";
-                const isActive = step.state === "active";
-                const isLocked = step.state === "locked";
-                const clickable = !!step.onClick;
-
-                const cardStateCls = isActive
-                  ? "bg-accent/5 border-accent/40"
-                  : isDone
-                  ? "bg-background/50 border-border-subtle"
-                  : "bg-transparent border border-dashed border-border-subtle opacity-60";
-
-                const cursorCls = clickable
-                  ? "hover:border-accent/50 cursor-pointer"
-                  : isLocked
-                  ? "cursor-not-allowed"
-                  : "cursor-default";
-
-                const numCls = isActive
-                  ? "text-accent"
-                  : isDone
-                  ? "text-emerald-500"
-                  : "text-disabled-foreground";
-
-                const iconBoxCls = isActive
-                  ? "bg-accent/15 border-accent/40 text-accent"
-                  : isDone
-                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                  : "bg-surface-raised border-border-subtle text-subtle-foreground";
-
-                const labelCls = isActive
-                  ? "text-foreground"
-                  : isDone
-                  ? "text-muted-foreground"
-                  : "text-subtle-foreground";
-
-                const descCls = isActive
-                  ? "text-accent"
-                  : isDone
-                  ? "text-disabled-foreground"
-                  : "text-disabled-foreground";
-
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    disabled={!clickable}
-                    onClick={step.onClick}
-                    className={`group rounded-xl border p-3 flex items-center gap-3 text-left transition-colors ${cardStateCls} ${cursorCls}`}
-                  >
-                    <span
-                      className={`text-[10px] font-bold shrink-0 w-5 ${numCls}`}
-                      style={{ fontFamily: MONO_FONT }}
-                    >
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <span className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center border ${iconBoxCls}`}>
-                      {isDone ? (
-                        <Check size={16} strokeWidth={2.5} />
-                      ) : isLocked ? (
-                        <Lock size={14} />
-                      ) : (
-                        step.icon ?? null
-                      )}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className={`text-sm font-bold truncate ${labelCls}`}>
-                          {step.label}
-                        </span>
-                        {step.badge && (
-                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/30">
-                            {step.badge}
-                          </span>
-                        )}
-                      </div>
-                      <span className={`text-[11px] mt-0.5 block truncate ${descCls}`}>
-                        {step.desc}
-                      </span>
-                    </div>
-                    {clickable && (
-                      <ChevronRight
-                        size={16}
-                        className="text-subtle-foreground shrink-0 group-hover:text-accent transition-colors"
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
+          <ProjectProgressCard
+            project={project}
+            onUpload={() => router.push(`/photographer/projects/${id}/upload`)}
+            onSelection={() => router.push(`/photographer/projects/${id}/workflow?stage=original`)}
+            onWorkflow={() => router.push(`/photographer/projects/${id}/workflow`)}
+          />
 
           {/* Recent activity */}
           <section className={`${cardCls} p-5 hidden md:block`}>
@@ -969,26 +600,9 @@ export function ProjectNexusPageClient() {
             )}
           </section>
 
-          {/* Danger zone */}
-          <section className={`${cardCls} p-5`}>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-rose-500 mb-2 flex items-center gap-1.5">
-              <AlertTriangle size={12} /> 위험 영역
-            </h3>
-            <p className="text-xs text-subtle-foreground mb-3 leading-relaxed">
-              삭제 시 모든 사진과 셀렉·보정 데이터가 함께 사라지며 되돌릴 수 없습니다.
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                setDeleteError("");
-                setShowDeleteModal(true);
-              }}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/30 hover:border-rose-500/50 text-rose-400 text-sm font-semibold transition-colors"
-            >
-              <Trash2 size={14} /> 프로젝트 삭제
-            </button>
-          </section>
         </aside>
+        </div>
+
       </main>
 
       {/* Toast */}
