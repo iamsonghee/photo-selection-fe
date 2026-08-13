@@ -73,6 +73,70 @@ export async function PATCH(
 
     const updatePayload: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
 
+    // 원본 포함 프로젝트는 상태 전환과 archive pending 전환을 한 DB 트랜잭션으로 묶는다.
+    // 원본 한 장이라도 미완료면 링크를 열지 않아 고객 화면이 영구 "ZIP 준비 중"이 되지 않는다.
+    if (proj.status === "preparing" && status === "selecting" && proj.include_original) {
+      const { data: activated, error: activateErr } = await admin.rpc("activate_project_with_original_archive", {
+        p_project_id: projectId,
+      });
+      if (activateErr) {
+        console.error("[PATCH project status] atomic activation failed", activateErr);
+        return NextResponse.json({ error: "원본 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요." }, { status: 500 });
+      }
+      if (!activated) {
+        const [incompleteResult, processingResult] = await Promise.all([
+          admin
+            .from("photos")
+            .select("id", { count: "exact", head: true })
+            .eq("project_id", projectId)
+            .or("original_status.is.null,original_status.neq.completed"),
+          admin
+            .from("photos")
+            .select("id", { count: "exact", head: true })
+            .eq("project_id", projectId)
+            .in("original_status", ["pending", "processing"]),
+        ]);
+        if (incompleteResult.error || processingResult.error) {
+          console.error(
+            "[PATCH project status] original state classification failed",
+            incompleteResult.error ?? processingResult.error,
+          );
+          return NextResponse.json(
+            { error: "원본 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요." },
+            { status: 500 },
+          );
+        }
+
+        const incompleteCount = incompleteResult.count ?? 0;
+        const processingCount = processingResult.count ?? 0;
+        const recoveryCount = Math.max(0, incompleteCount - processingCount);
+
+        // PUT/confirm까지 끝난 pending·processing은 worker의 다음 폴링에서 자동 완료된다.
+        // 실제 재업로드가 필요한 awaiting_upload/failed/null과 같은 복구 문구를 보여주지 않는다.
+        if (incompleteCount > 0 && recoveryCount === 0) {
+          return NextResponse.json(
+            {
+              error: `원본 ${processingCount}장의 상태를 확인 중입니다. 확인이 끝나면 자동으로 고객 링크를 활성화합니다.`,
+              code: "originals_processing",
+              processingCount,
+              retryAfterMs: 1000,
+            },
+            { status: 409 },
+          );
+        }
+
+        return NextResponse.json(
+          {
+            error: `원본 업로드 미완료 ${recoveryCount || incompleteCount || 1}장을 먼저 복구해주세요. 고객 링크는 모든 원본이 완료된 뒤 활성화할 수 있습니다.`,
+            code: "originals_incomplete",
+            incompleteCount: recoveryCount || incompleteCount || null,
+          },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json({ status });
+    }
+
     // 원본은 ZIP이 아니라 R2 객체를 직접 제공한다. 고객 링크를 여는 순간부터 30일을 계산한다.
     if (
       proj.status === "preparing" &&
@@ -92,25 +156,6 @@ export async function PATCH(
 
     if (updateErr) {
       return NextResponse.json({ error: updateErr.message }, { status: 500 });
-    }
-
-    // 고객 링크는 즉시 열되, 원본 ZIP은 그 뒤 백그라운드에서 준비한다.
-    // RPC는 원본이 모두 완료된 경우에만 NULL → pending으로 원자적으로 전환한다.
-    if (proj.status === "preparing" && status === "selecting" && proj.include_original) {
-      const { error: archiveErr } = await admin.rpc("enqueue_original_archive_build", {
-        p_project_id: projectId,
-      });
-      if (archiveErr) {
-        // 고객 링크와 개별 원본 다운로드는 계속 열어 두되, ZIP 작업을 조용히 '준비 중'으로
-        // 남기지 않는다. 고객·작가 화면에서 실패 상태를 안내하고 재시도할 수 있게 한다.
-        console.error("[PATCH project status] archive enqueue failed", archiveErr);
-        const { error: archiveStatusErr } = await admin
-          .from("projects")
-          .update({ original_archive_status: "failed" })
-          .eq("id", projectId)
-          .is("original_archive_status", null);
-        if (archiveStatusErr) console.error("[PATCH project status] archive failure status update failed", archiveStatusErr);
-      }
     }
 
     return NextResponse.json({ status });

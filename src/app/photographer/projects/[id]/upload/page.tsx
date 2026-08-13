@@ -63,6 +63,8 @@ const ORIGINAL_PC_CONCURRENCY = 4;
 const ORIGINAL_PC_CONCURRENCY_FAST = 6;
 const MOBILE_BATCH_SIZE = 3;
 const MOBILE_CONCURRENCY = 1;
+const INVITE_ORIGINAL_PROCESSING_MAX_ATTEMPTS = 15;
+const INVITE_ORIGINAL_PROCESSING_RETRY_MS = 1000;
 const ACCEPT_TYPES = "image/*,image/heic,image/heif";
 const RAW_EXTENSIONS = new Set([
   ".cr2", ".cr3", ".nef", ".nrw", ".arw", ".srf", ".sr2",
@@ -264,35 +266,46 @@ function confirmOriginalUploadUrl(): string {
   return "/api/photographer/upload/originals/confirm";
 }
 
+function finalizeOriginalUploadUrl(): string {
+  const base = (process.env.NEXT_PUBLIC_API_URL ?? "").trim().replace(/\/$/, "");
+  if (base) return `${base}/api/upload/originals/finalize`;
+  return "/api/photographer/upload/originals/finalize";
+}
+
 async function putOriginalToR2(
   presigned: OriginalPresignedItem,
   file: File,
   token?: string,
 ): Promise<boolean> {
-  const res = await fetch(presigned.url, {
-    method: "PUT",
-    body: file,
-    headers: { "Content-Type": presigned.content_type },
-  });
-  if (res.ok) return true;
-  // 403: 현재 세션 내 URL 만료 → /recover로 즉시 새 URL 발급 후 재시도 (파일 재선택 불필요)
-  if (res.status === 403 && token) {
+  let url = presigned.url;
+  let contentType = presigned.content_type;
+  // 정상 경로는 1회 PUT로 끝난다. 네트워크/5xx/만료처럼 복구 가능한 실패에만 최대 2회 더 시도한다.
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const result = await recoverOriginalJob(presigned.job_id, token);
-      if (result.status === "confirmed") return true; // recover 측에서 R2 HEAD → 이미 confirm 완료
-      if (result.status === "needs_upload") {
-        const res2 = await fetch(result.url, {
-          method: "PUT",
-          body: file,
-          headers: { "Content-Type": result.content_type },
-        });
-        return res2.ok;
-      }
+      const res = await fetch(url, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": contentType },
+      });
+      if (res.ok) return true;
+      if (!shouldRetryStatus(res.status) && res.status !== 403) return false;
     } catch {
-      // 자동 재시도 실패 — 24h sweep에서 복구
+      // 응답 유실이면 객체가 이미 저장됐을 수 있으므로 아래 recover의 HEAD로 먼저 확인한다.
     }
+
+    if (token) {
+      try {
+        const result = await recoverOriginalJob(presigned.job_id, token);
+        if (result.status === "confirmed") return true;
+        url = result.url;
+        contentType = result.content_type;
+      } catch {
+        // recover 자체가 일시 실패해도 남은 횟수에서 기존 URL로 재시도한다.
+      }
+    }
+    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
   }
-  return false; // non-fatal: 24h sweep 복구
+  return false;
 }
 
 async function confirmOriginalUpload(jobId: string, token: string): Promise<boolean> {
@@ -353,6 +366,31 @@ async function confirmOrRecoverOriginalUpload(jobId: string, token: string): Pro
     return (await recoverOriginalJob(jobId, token)).status === "confirmed";
   } catch {
     return false;
+  }
+}
+
+type OriginalFinalizeResult = {
+  ok: boolean;
+  total: number;
+  accepted: number;
+  completed: number;
+  incomplete: number;
+  missing_jobs: number;
+};
+
+async function finalizeOriginalUpload(projectId: string, token: string): Promise<OriginalFinalizeResult | null> {
+  try {
+    const form = new FormData();
+    form.append("project_id", projectId);
+    const res = await fetch(finalizeOriginalUploadUrl(), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    if (!res.ok) return null;
+    return await res.json() as OriginalFinalizeResult;
+  } catch {
+    return null;
   }
 }
 
@@ -1125,6 +1163,7 @@ export default function ProjectDetailPage() {
   const [pinSaving, setPinSaving] = useState(false);
   const [pinError, setPinError] = useState("");
   const [inviteActivating, setInviteActivating] = useState(false);
+  const [inviteOriginalsProcessing, setInviteOriginalsProcessing] = useState(false);
   const [inviteShareModalOpen, setInviteShareModalOpen] = useState(false);
 
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -1164,8 +1203,9 @@ export default function ProjectDetailPage() {
   const sendingSourceRef = useRef(0);          // 현재 진행 중인 R2 PUT 수 (카운터)
   const sendingSourceDoneRef = useRef(0);       // 완료된 R2 PUT 수
   const sendingSourceTotalRef = useRef(0);      // presigned URL 발급 수 (= 실제 시도 예정)
+  const sendingSourceFailedRef = useRef(0);     // PUT/confirm까지 끝내지 못한 원본 수
   const [sendingSourcePhase, setSendingSourcePhase] = useState(false);
-  const [sendingSourceSnap, setSendingSourceSnap] = useState({ done: 0, total: 0 });
+  const [sendingSourceSnap, setSendingSourceSnap] = useState({ done: 0, total: 0, failed: 0 });
   /** 업로드 미완료(awaiting_upload) 원본 job — 복구 배너 표시용 */
   const [pendingRecovery, setPendingRecovery] = useState<PendingOriginalItem[]>([]);
   const [showRecoveryBanner, setShowRecoveryBanner] = useState(false);
@@ -1505,7 +1545,8 @@ export default function ProjectDetailPage() {
     setAwaitingServerFinalize(false);
     sendingSourceDoneRef.current = 0;
     sendingSourceTotalRef.current = 0;
-    setSendingSourceSnap({ done: 0, total: 0 });
+    sendingSourceFailedRef.current = 0;
+    setSendingSourceSnap({ done: 0, total: 0, failed: 0 });
     setUploadPhase("processing");
     setUploadProgress(0);
     setCompressingIndex(-1);
@@ -1692,16 +1733,22 @@ export default function ProjectDetailPage() {
                   sendingSourceRef.current++;
                   if (sendingSourceRef.current > 0) setSendingSourcePhase(true);
                   const putOk = await putOriginalToR2(p, rawFile, currentToken);
-                  if (putOk) await confirmOrRecoverOriginalUpload(p.job_id, currentToken);
+                  const confirmed = putOk && await confirmOrRecoverOriginalUpload(p.job_id, currentToken);
+                  if (!confirmed) sendingSourceFailedRef.current++;
                 } catch (presignErr) {
-                  console.warn("presigned PUT/confirm failed (non-fatal):", presignErr);
+                  sendingSourceFailedRef.current++;
+                  console.warn("presigned PUT/confirm failed:", presignErr);
                 } finally {
                   sendingSourceRef.current--;
                   sendingSourceDoneRef.current++;
-                  setSendingSourceSnap({ done: sendingSourceDoneRef.current, total: sendingSourceTotalRef.current });
+                  setSendingSourceSnap({ done: sendingSourceDoneRef.current, total: sendingSourceTotalRef.current, failed: sendingSourceFailedRef.current });
                   if (sendingSourceRef.current <= 0) setSendingSourcePhase(false);
                 }
               }
+            } else if (inclOrig && rawFile) {
+              // 사진 row는 생성됐지만 presigned 발급이 누락된 경우도 완료로 숨기지 않는다.
+              sendingSourceFailedRef.current++;
+              setSendingSourceSnap({ done: sendingSourceDoneRef.current, total: sendingSourceTotalRef.current, failed: sendingSourceFailedRef.current });
             }
 
             // 배치 성공: blob URL 프리뷰로 즉시 갱신 (추가 네트워크 요청 없음)
@@ -2021,6 +2068,12 @@ export default function ProjectDetailPage() {
     if (abortReason === "network") { setAwaitingServerFinalize(false); setUploadError("업로드에 실패했습니다. 인터넷 연결을 확인해 주세요."); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); uploadInProgressRef.current = false; return; }
     if (abortReason === "auth") { setAwaitingServerFinalize(false); setUploadError(formatAuthError(abortMessage)); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); uploadInProgressRef.current = false; return; }
 
+    let originalFinalize: OriginalFinalizeResult | null = null;
+    if (inclOrig) originalFinalize = await finalizeOriginalUpload(id, currentToken);
+    const originalIncomplete = inclOrig && (
+      sendingSourceFailedRef.current > 0 || !originalFinalize?.ok
+    );
+
     setAwaitingServerFinalize(false);
     setUploadProgress(100);
     setUploadPhase("done");
@@ -2040,14 +2093,24 @@ export default function ProjectDetailPage() {
         );
       }
       const totalFail = allFailed.length + backendRejected.length;
-      setToast(totalFail === 0 ? "업로드 완료!" : `${totalFail}개 파일 처리 실패`);
+      if (originalIncomplete) {
+        const incompleteCount = Math.max(
+          sendingSourceFailedRef.current,
+          originalFinalize?.incomplete ?? 0,
+          originalFinalize?.missing_jobs ?? 0,
+        );
+        setUploadError(originalFinalize
+          ? `사진 업로드는 완료됐지만 원본 ${incompleteCount}장이 완료되지 않았습니다. 아래에서 원본을 복구해 주세요.`
+          : "사진 업로드는 완료됐지만 원본 상태를 확인하지 못했습니다. 아래 복구 상태를 확인해 주세요.");
+        setToast("원본 업로드 확인 필요");
+      } else {
+        setToast(totalFail === 0 ? "업로드 완료!" : `${totalFail}개 파일 처리 실패`);
+      }
       await loadProject();
       // 새로 업로드된 사진이 clipPending 캐시에 반영되지 않으면 이미 분석된 것으로
       // 오인해 재분석 버튼이 조용히 무시된다 — 업로드 완료 시마다 상태를 다시 읽는다.
       loadClipAnalysisStatus();
-      // 원본 presigned PUT은 실패해도 non-fatal로 삼켜지므로(24h sweep 복구 전제), 업로드
-      // "완료" 시점에 다시 확인하지 않으면 방금 실패한 job이 초대 링크 활성화 버튼을
-      // "정리 중…"에 영구히 멈춰 세운 채 복구 배너 없이는 원인을 알 수 없게 된다.
+      // finalize는 DB 상태만 집계한다. 미완료 job의 R2 HEAD 자동 복구와 배너 갱신은 여기서 수행한다.
       if (inclOrig) checkPendingOriginals();
       let freshPhotos: Photo[] = [];
       try { freshPhotos = await getPhotosByProjectId(id); } catch {}
@@ -2098,8 +2161,8 @@ export default function ProjectDetailPage() {
       const match = selectedFiles.find(
         (f) =>
           f.name === job.original_filename &&
-          f.size === job.original_file_size &&
-          f.lastModified === job.original_last_modified,
+          (job.original_file_size === null || f.size === job.original_file_size) &&
+          (job.original_last_modified === null || f.lastModified === job.original_last_modified),
       );
       if (!match) {
         newUnmatched.push(job);
@@ -2319,29 +2382,51 @@ export default function ProjectDetailPage() {
       return;
     }
     setInviteActivating(true);
+    setInviteOriginalsProcessing(false);
     try {
-      const res = await fetch(`/api/photographer/projects/${id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "selecting" satisfies ProjectStatus }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setToast((data as { error?: string }).error ?? "초대 링크 활성화에 실패했습니다.");
-        return;
+      for (let attempt = 0; attempt < INVITE_ORIGINAL_PROCESSING_MAX_ATTEMPTS; attempt++) {
+        const res = await fetch(`/api/photographer/projects/${id}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "selecting" satisfies ProjectStatus }),
+        });
+        const data = await res.json().catch(() => ({})) as {
+          error?: string;
+          code?: string;
+          processingCount?: number;
+          retryAfterMs?: number;
+        };
+        if (res.ok) {
+          fetch("/api/photographer/project-logs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ project_id: id, action: "selecting" }),
+          }).catch(() => {});
+          setProject({ ...project, status: "selecting" });
+          setInviteShareModalOpen(true);
+          router.refresh();
+          return;
+        }
+
+        if (data.code !== "originals_processing") {
+          setToast(data.error ?? "초대 링크 활성화에 실패했습니다.");
+          return;
+        }
+
+        setInviteOriginalsProcessing(true);
+        if (attempt === INVITE_ORIGINAL_PROCESSING_MAX_ATTEMPTS - 1) {
+          setToast("원본 확인이 지연되고 있습니다. 잠시 후 다시 활성화해 주세요.");
+          return;
+        }
+        setToast(data.error ?? "원본 상태를 확인 중입니다. 완료되면 자동으로 활성화합니다.");
+        const retryMs = Math.max(500, Math.min(data.retryAfterMs ?? INVITE_ORIGINAL_PROCESSING_RETRY_MS, 3000));
+        await new Promise((resolve) => setTimeout(resolve, retryMs));
       }
-      fetch("/api/photographer/project-logs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: id, action: "selecting" }),
-      }).catch(() => {});
-      setProject({ ...project, status: "selecting" });
-      setInviteShareModalOpen(true);
-      router.refresh();
     } catch (e) {
       setToast(e instanceof Error ? e.message : "초대 링크 활성화에 실패했습니다.");
     } finally {
       setInviteActivating(false);
+      setInviteOriginalsProcessing(false);
     }
   };
 
@@ -2588,7 +2673,7 @@ export default function ProjectDetailPage() {
               </span>
               <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT_MUTED, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {sendingSourcePhase
-                  ? `${sendingSourceSnap.done}/${sendingSourceSnap.total} · 화면을 닫지 마세요`
+                  ? `${sendingSourceSnap.done}/${sendingSourceSnap.total}${sendingSourceSnap.failed > 0 ? ` · 실패 ${sendingSourceSnap.failed}` : ""} · 화면을 닫지 마세요`
                   : `${pendingPhotos.length}/${totalUploadCount}장 · ${showServerWorking ? "서버 처리 중" : `${overallProgress}%`}`}
               </span>
               <button
@@ -3143,7 +3228,7 @@ export default function ProjectDetailPage() {
               }}
             >
               {inviteActivating
-                ? "처리 중…"
+                ? (inviteOriginalsProcessing ? "원본 확인 중…" : "처리 중…")
                 : uploadBlockingInvite
                   ? (isMobile ? "업로드 중" : "사진 업로드 중…")
                 : M < N

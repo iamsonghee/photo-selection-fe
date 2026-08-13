@@ -33,8 +33,8 @@
 
 1. FormData에서 압축본 파일을 받아 Pillow로 EXIF 보정 → 썸네일(300px/q75) 생성 → **같은 decode 결과에서** 프리뷰(1200px/q82) 생성(순차). 이 압축본 bytes는 썸네일/프리뷰 생성 입력으로만 쓰이고 처리 후 즉시 버려진다 — R2에 별도로 저장되지 않는다(§4).
 2. 썸네일 + 프리뷰를 R2에 **병렬** 업로드(`asyncio.gather`).
-3. 요청에 포함된 모든 파일 처리가 끝난 뒤 `photos` 테이블에 일괄 INSERT(`r2_thumb_url`/`r2_preview_url` 포함, `insert_photos_with_numbers` RPC로 번호까지 원자 할당).
-4. `include_original=true`이면 `original_jobs` INSERT + presigned PUT URL을 생성해 응답에 포함.
+3. 요청에 포함된 모든 파일 처리가 끝난 뒤 `insert_photos_with_numbers` RPC가 `photos` 행과, `include_original=true`인 경우 대응하는 `original_jobs` 행을 **한 DB 트랜잭션**에서 생성한다. 번호 할당·사진·job 생성 중 하나라도 실패하면 전체가 롤백되어 `photos.original_status='awaiting_upload'`이지만 job이 없는 고아 행을 막는다.
+4. FastAPI가 생성된 `original_jobs`를 재조회해 presigned PUT URL을 응답에 포함한다. DB 마이그레이션보다 BE가 먼저 배포된 짧은 구간에만 기존 별도 job INSERT 폴백을 사용한다.
 5. confirm 요청(`/originals/confirm`) 수신 시 R2 HEAD 확인 → job 상태를 `awaiting_upload → pending`으로 전이.
 
 ### R2 저장 경로
@@ -279,10 +279,15 @@ FastAPI 서버 측 동시성(요청 1건 안에서 파일별 처리) — 파이�
 | `/api/upload/photos` 응답(=썸네일/프리뷰 생성+R2 PUT+DB INSERT 전부 포함) | **대기** | 대기 |
 | 원본 R2 presigned PUT(Browser→R2) | 해당 없음 | **대기** |
 | `/originals/confirm` 응답 | 해당 없음 | **대기** |
+| `/originals/finalize` DB 집계 | 해당 없음 | **대기** — R2 조회 없이 `pending/processing/completed` 수만 확인 |
 | worker의 원본 R2 HEAD 검증(`processing→completed`) | 해당 없음 | **대기 안 함** — 완전 비동기 |
 | 다운로드 ZIP 아카이브 빌드 | 해당 없음 | **대기 안 함** — 완전 비동기(`user-flow.md` §8.2) |
 
-모든 pipeline batch(`include_original` 값·기기 종류와 무관)가 끝나면 `uploadProgress=100` → `uploadPhase="done"` → 토스트, 600ms 뒤 DB 재조회(위 섹션).
+모든 pipeline batch(`include_original` 값·기기 종류와 무관)가 끝나면, 원본 포함 세션은 `POST /originals/finalize`를 한 번 호출해 DB 상태를 집계한 뒤 `uploadProgress=100` → `uploadPhase="done"` → 토스트, 600ms 뒤 DB 재조회(위 섹션). finalize는 R2 HEAD·ZIP 생성·worker 완료 대기를 수행하지 않으며 confirm을 통과한 `pending/processing/completed`를 정상으로 인정한다. 따라서 성공 경로의 추가 비용은 작은 DB count 조회 1회뿐이다.
+
+업로드 직후 고객 링크 활성화가 worker보다 먼저 실행될 수 있다. 상태 API는 이때 `pending/processing`만 남아 있으면 `originals_processing`을 반환하고, 업로드 화면은 최대 15초 동안 1초 간격으로 활성화를 자동 재시도한다. 버튼에는 `원본 확인 중…`을 표시한다. `awaiting_upload`/`failed`/`NULL` 등 실제 재업로드가 필요한 상태가 섞여 있을 때만 `originals_incomplete`와 복구 안내를 반환한다.
+
+원본 PUT은 첫 요청이 성공하면 추가 대기 없이 끝난다. 네트워크 오류, 408/429/5xx, presigned URL 403에만 `/originals/recover`로 R2 존재 여부를 확인하고 최대 3회(초기 1회+재시도 2회, 500ms/1000ms backoff) PUT한다. PUT 또는 confirm이 끝내 실패하거나 presigned 응답이 누락되면 별도 원본 실패 수로 집계하며, finalize 결과와 함께 "업로드 완료" 대신 "원본 업로드 확인 필요"를 표시하고 복구 배너를 갱신한다. 셀렉용 사진 업로드 성공 자체는 되돌리지 않으므로 사용자는 누락 원본만 다시 선택해 복구한다.
 
 **UI phase**: 코드에 정의된 값은 `idle`/`processing`/`done`(과 실패 시 `idle`로 복귀)뿐이다. `uploadPhase === "sending"`을 조건으로 쓰는 UI 코드가 일부 있으나, 실제로 `setUploadPhase("sending")`을 호출하는 지점은 없다 — 즉 `sending`은 현재 코드 경로상 도달하지 않는 상태다(압축과 전송 모두 `processing` 상태로 표시됨).
 
@@ -342,9 +347,9 @@ Railway Starter 플랜은 HTTP 요청이 5분간 없으면 인스턴스가 Sleep
 
 `photos.file_size`에 저장되는 값은 썸네일 + 프리뷰 바이트 합산이다. 원본 파일 크기나 브라우저 압축본 크기가 아니다.
 
-**`photos.original_compressed_size`는 현재 항상 NULL**
+**`photos.original_compressed_size`는 현재 원본 객체 크기**
 
-재압축 단계가 사라지면서 이 컬럼을 채우는 코드가 없다. `app/archive.py`(아카이브 파트 용량 산정)와 `src/lib/customer-api-server.ts`(고객 다운로드 "총 용량" 표시)는 모두 고정 추정치(`_FALLBACK_PHOTO_BYTES`)로 대체 계산한다.
+컬럼명은 과거 재압축 결과를 저장하던 때의 이름을 유지하지만, 현재 `original_compress_worker`는 R2 HEAD에서 확인한 압축하지 않은 원본 바이트 크기를 `complete_original_job(p_file_size)`로 전달해 이 컬럼에 저장한다. 과거 행 등 값이 NULL인 경우에만 `app/archive.py`가 고정 추정치 20MiB(`_FALLBACK_PHOTO_BYTES`)를 사용한다.
 
 **HEIC + include_original=true**
 

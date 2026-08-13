@@ -184,8 +184,8 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 |---|---|---|
 | `photographers` | `id, auth_id, email, name, profile_image_url, bio, instagram_url, portfolio_url, contact_phone, created_at, beta_status("not_invited"\|"active"\|"ended"\|"suspended"), beta_start_date, beta_end_date, admin_note, total_projects_created` | `auth_id`는 Supabase Auth의 `user.id`. 회원가입 시 자동 생성(`src/app/auth/callback/route.ts`). 등급(관리자/베타/일반) 컬럼은 2026-07-26 베타 등급 시스템에서 추가(`supabase/migrations/20260726_beta_tier_system.sql`) — 기존 가입자도 그랜드파더링 없이 `beta_status='not_invited'`(일반)로 시작. `total_projects_created`는 삭제해도 감소하지 않는 누적 생성 카운터로 설계됐으나, 2026-07-26 정책 변경(커밋 `2b2e241`/`818affc`)으로 일반 사용자 한도 판정이 "현재 보유 수" 기준으로 바뀌면서 **더 이상 어떤 검증 로직에서도 읽히지 않는 컬럼**이 됐다(계속 +1은 되지만 사용처 없음) — §6.3, §13 참고. |
 | `projects` | `id, photographer_id, name, customer_name, shoot_date, deadline, required_count, photo_count, status, access_token, access_pin, confirmed_at, delivered_at, customer_cancel_count, max_revision_count, revision_round, review_deadline, shoot_type, customer_phone, clip_analysis_status, display_id, include_original, original_archive_status, original_download_started_at, original_archive_processing_started_at, created_at, updated_at` | `status`는 8가지 값의 상태 머신(§9). `access_token`이 고객 링크의 토큰, `access_pin`이 4자리 PIN(nullable). `original_archive_status`(신규, `20260731_original_archive_download.sql`, `NULL/pending/processing/ready/failed`)는 납품용 원본 다운로드 ZIP 아카이브 생성 상태 — `include_original=true`이고 `original_download_started_at`(신규, 초대 링크 최초 활성화 시각, 재전달로 초기화 안 됨)가 있어야 고객 화면에 다운로드가 노출된다. 아카이브 생성 흐름은 `user-flow.md` §8.2 참고. |
-| `photos` | `id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, memo, similarity_group_id, blur_variance, is_blurry, face_detected, eyes_closed, r2_original_url, original_ready_at, original_status, original_compressed_size, created_at` | `number`는 `insert_photos_with_numbers` RPC로 원자적 할당. `similarity_group_id`는 이제 Gemini(`sync_groups_to_db`)가 채우는 살아있는 컬럼(§6.6). `blur_variance/is_blurry/face_detected/eyes_closed`는 원래 OpenCLIP 파이프라인(`analyzer.py`)이 채우던 흔들림/눈감음 경고 배지 전용 컬럼인데, **베타 버튼이 Gemini로 전환(2026-07-28)되며 더 이상 어떤 실행에서도 채워지지 않는다** — 과거 OpenCLIP으로 분석된 프로젝트에 한해 값이 남아있을 뿐 신규 분석 대상은 아님(§6.5/§13). `original_status`(`awaiting_upload`→`pending`→`processing`→`completed`/`failed`)는 원본 파일 비동기 검증 상태 — `include_original=true` 업로드 시에만 설정됨. **(2026-08-06 정정)** `original_compress_worker`는 재압축을 하지 않으므로 `r2_original_url`은 브라우저가 presigned PUT으로 올린 `originals/source/{project_id}/{hex}.{ext}` 키를 그대로 가리킨다(별도 압축 사본이 아님). `original_ready_at`은 검증 완료 시각. `original_compressed_size`(2026-07-31 추가)는 재압축 단계가 있던 시절 그 결과 바이트 크기를 저장하던 컬럼인데, 재압축이 제거된 지금은 **어떤 업로드에서도 채워지지 않아 항상 NULL** — 이 값을 쓰던 화면(고객 다운로드 "총 용량", `app/archive.py` 아카이브 파트 용량 산정)은 고정 추정치(`_FALLBACK_PHOTO_BYTES`)로 계산한다. 기존 `file_size`는 여전히 썸네일+프리뷰 바이트 합계로 별개 용도다. 상세: `docs/upload-flow.md`. |
-| `original_jobs` | `id, photo_id, project_id, job_type, r2_source_key, source_content_type, original_filename, original_file_size, original_last_modified, original_content_type, status, attempts, max_attempts, last_error, next_attempt_at, processing_started_at, completed_at, created_at` | 원본 압축 비동기 job queue. `(photo_id, job_type)` UNIQUE 제약. 5상태(`awaiting_upload/pending/processing/completed/failed`). `SELECT FOR UPDATE SKIP LOCKED`로 worker가 원자적 클레임. `r2_source_key`에 브라우저가 직접 PUT한 미압축 원본 R2 key(`originals/source/{project_id}/{hex32}.{ext}`) 저장. `original_filename/original_file_size/original_last_modified/original_content_type`는 브라우저 원본 파일 메타데이터(복구 매칭용: filename+size+lastModified 조합). **(2026-08-06 정정)** worker는 이 `r2_source_key` 객체를 재압축·재업로드하지 않고 그대로 납품 원본으로 확정하므로, source 파일은 삭제되지 않고 계속 보존된다(과거 "압축 완료 후 source 삭제" 서술은 재압축 로직이 있던 시절 기준으로 현재 코드와 다름). `supabase/migrations/20260724_original_jobs_and_photos_status.sql`. |
+| `photos` | `id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, memo, similarity_group_id, blur_variance, is_blurry, face_detected, eyes_closed, r2_original_url, original_ready_at, original_status, original_compressed_size, created_at` | `number`는 `insert_photos_with_numbers` RPC로 원자적 할당. `similarity_group_id`는 Gemini(`sync_groups_to_db`)가 채우며, `blur_variance/is_blurry/face_detected/eyes_closed`는 과거 OpenCLIP 분석 데이터에만 남아 있다(§6.5/§6.6). `original_status`(`awaiting_upload`→`pending`→`processing`→`completed`/`failed`)는 `include_original=true` 업로드의 원본 검증 상태다. `original_compress_worker`는 재압축 없이 `originals/source/{project_id}/{hex}.{ext}` 키를 `r2_original_url`로 확정하고, R2 HEAD에서 확인한 실제 원본 바이트 크기를 기존 컬럼 `original_compressed_size`에 저장한다. 컬럼명과 달리 현재 값은 재압축 결과가 아니다. 과거 행 등 NULL인 경우에만 아카이브 파트 산정이 20MiB(`_FALLBACK_PHOTO_BYTES`)를 사용한다. `file_size`는 썸네일+프리뷰 바이트 합계로 별개 용도다. 상세: `docs/upload-flow.md`. |
+| `original_jobs` | `id, photo_id, project_id, job_type, r2_source_key, source_content_type, original_filename, original_file_size, original_last_modified, original_content_type, status, attempts, max_attempts, last_error, next_attempt_at, processing_started_at, completed_at, created_at` | 원본 검증 비동기 job queue. `(photo_id, job_type)` UNIQUE. `insert_photos_with_numbers` RPC가 `photos` 행과 해당 job을 한 트랜잭션에서 생성해 고아 `awaiting_upload` 사진을 방지한다(`20260813_harden_original_archive_activation.sql`). 과거 고아 행은 마이그레이션이 파일명 기반 `failed` job으로 복구하며, size/lastModified가 없으므로 FE가 파일명으로만 매칭한다. 5상태(`awaiting_upload/pending/processing/completed/failed`), `SELECT FOR UPDATE SKIP LOCKED` 클레임. `r2_source_key`는 브라우저가 직접 PUT한 미압축 원본 R2 key이며 worker는 재압축·재업로드 없이 그대로 납품 원본으로 확정한다. |
 | `selections` | `project_id, photo_id, rating, color_tag, comment, is_selected` | `(project_id, photo_id)` unique 제약으로 upsert. |
 | `photo_versions` | `id, photo_id, version(1\|2), r2_url, r2_thumb_url, file_size, filename, created_at` | `(photo_id, version)` conflict로 upsert. |
 | `version_reviews` | `photo_version_id, photo_id, status("approved"\|"revision_requested"), customer_comment, reviewed_at` | `photo_version_id` unique(conflict 대상). 보정본 재업로드 시 관련 행 삭제됨. |
@@ -281,7 +281,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `/c/[token]/review/[photoId]` | 개별 보정본 승인/재보정 요청 뷰어 |
 | `/c/[token]/delivered` | 납품 완료 화면 |
 
-**납품용 원본 다운로드 진입점(신규, 2026-07-31)**: 개별 라우트가 아니라 `CustomerLayoutClient.tsx`(위 모든 `/c/[token]/**` 하위 페이지를 감싸는 공용 클라이언트 셸)에 `OriginalDownloadEntry.tsx`가 1회만 마운트되며, `pin`/`viewer/*`/`about` 서브경로에서만 숨겨지고 그 외에는 항상 노출된다(신규 라우트가 추가돼도 기본 노출). `include_original=false`이거나 아카이브가 `ready` 상태가 아니면 컴포넌트 자체가 아무것도 렌더링하지 않는다. §9 참고.
+**납품용 원본 다운로드 진입점**: `OriginalDownloadEntry.tsx`는 고객 페이지의 inline 진입점으로 마운트된다. `include_original=false`면 숨기고, 초대 링크 활성화 후 ZIP이 아직 `ready`가 아니어도 진입점과 개별 원본 다운로드는 노출하며 ZIP 탭에는 준비 중 상태를 표시한다. 개별 파일 탭은 전체 ZIP과 역할이 겹치지 않도록 PC·모바일 모두 전체 선택을 노출하지 않는다. PC Chrome/Edge는 `showDirectoryPicker()`로 사용자가 고른 폴더에 presigned 원본을 한 파일씩 스트리밍해, 반복 `<a>.click()`이 Chrome의 자동 다중 다운로드 권한에 막히는 문제를 피한다. 이 API가 없는 데스크톱 브라우저만 기존 anchor 다운로드로 폴백한다. 모바일은 Web Share 전에 원본을 전부 Blob/File로 메모리에 적재하므로 최대 10장(`MOBILE_MAX_FILE_COUNT=10`)과 선택 원본 합계 100MiB(`MOBILE_MAX_TOTAL_BYTES=100 * 1024 * 1024`)를 선택 시점과 저장 직전에 모두 검사한다. §8.2 `user-flow.md` 참고.
 
 ### 6.3 관리자(`/admin/**`, `ADMIN_EMAILS`에 등록된 운영자 계정 전용 베타 운영 백오피스)
 
@@ -322,7 +322,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 
 ### 6.4 백엔드(FastAPI)
 
-`/health`, `/health/db`, `/api/projects`, `/api/projects/{id}`, `/api/projects/{id}/r2`(DELETE), `/api/upload/photos`, `/api/upload/profile-image`, `/api/upload/versions`, `/api/storage/delete`, `/api/storage/presign` — 상세는 §7 참고.
+`/health`, `/health/db`, `/api/projects`, `/api/projects/{id}`, `/api/projects/{id}/r2`(DELETE), `/api/upload/photos`, `/api/upload/originals/finalize`(원본 세션 종료 DB 집계; R2 조회 없음), `/api/upload/profile-image`, `/api/upload/versions`, `/api/storage/delete`, `/api/storage/presign` — 상세는 §7 참고.
 
 ### 6.5 CLIP 서비스 (OpenCLIP — 2026-07-28부터 베타 흐름에서 미사용, 코드는 보존)
 
@@ -378,6 +378,9 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/c/photos` | GET | PIN 쿠키 | 갤러리용 프로젝트+사진+선택+그룹 조회 (반환된 `r2_thumb_url`/`r2_preview_url`은 그리드/뷰어가 직접 렌더링에 쓰지 않음 — 아래 두 presign 라우트로 다시 서명받아 사용, §10) |
 | `api/c/presign-thumbs` | GET | PIN 쿠키 | `?token=&photoIds=`(최대 200장)로 갤러리 카드 썸네일 presigned GET URL 배치 발급(FastAPI `/api/storage/presign` 프록시, R2 key는 응답에 노출 안 함, 2026-08-06 문서화) |
 | `api/c/presign-preview` | GET | PIN 쿠키 | 뷰어 대형 프리뷰용 presigned GET URL 발급(FastAPI `/api/storage/presign` 프록시) |
+| `api/c/original-download` | GET | PIN 쿠키 | 원본 다운로드 상태·파일 메타데이터 조회. 폴링 전용으로 presign을 수행하지 않음 |
+| `api/c/original-download/archive` | GET | PIN 쿠키 | ZIP 다운로드 클릭 시 완료 파트 presigned URL 발급 |
+| `api/c/original-download/files` | POST | PIN 쿠키 | 선택한 `photoIds`(1~3,000개)의 개별 원본 presigned URL만 발급 |
 | `api/c/selections` | POST | PIN 쿠키 | 별점/색상/코멘트/선택 upsert (`selecting`/`preparing` 상태만 허용). body에 키가 없는 필드는 건드리지 않고(undefined=미변경), `null`이면 명시적으로 지움 — 부분 업데이트 시맨틱 |
 | `api/c/selections` | GET | PIN 쿠키 | `?token=&project_id=`로 `selectedIds`/`photoStates`만 경량 조회(다른 세션의 변경사항 반영용 5초 폴링 전용, 사진/그룹은 포함 안 함) |
 | `api/c/confirm` | POST | PIN 쿠키 | 선택 확정 → `confirmed`. `selected_photo_ids.length === required_count` 서버 재검증 |
@@ -390,7 +393,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/photographer/account` | DELETE | 세션 | 계정 삭제(통계 익명화 후 Auth 사용자 삭제) |
 | `api/photographer/projects` | POST | 세션 | 프로젝트 생성 — 등급별 한도(§6.3 베타 등급 시스템) 서버 검증 후 INSERT. 기존 클라이언트 직접 INSERT(`src/lib/db.ts`의 `createProject()`)를 대체 |
 | `api/photographer/projects/[id]` | PATCH/DELETE | 세션+소유권 | 프로젝트 수정(상태 전이 포함)/삭제(+FastAPI R2 정리 호출) |
-| `api/photographer/projects/[id]/status` | PATCH | 세션+소유권 | 상태 전이 전용(제한적) |
+| `api/photographer/projects/[id]/status` | PATCH | 세션+소유권 | 상태 전이 전용(제한적). 원본 포함 프로젝트 활성화 시 `pending/processing`은 자동 재시도 가능한 `originals_processing`, 실제 누락·실패는 `originals_incomplete`(409)로 구분 |
 | `api/photographer/projects/[id]/photos` | GET/DELETE | 세션+소유권 | 사진 목록 조회 / 전체 삭제("전체삭제", `preparing`만). (2026-07-28 베타 전환 추가) 전체 삭제 시 사진이 모두 사라져 `photo_groups`도 전부 무의미해지므로 이 라우트가 직접 해당 프로젝트의 `photo_groups` 행을 정리한다(clip-service sync-groups 호출은 이 경우 의미 없음 — 임베딩도 함께 CASCADE 삭제되어 조기 종료하므로, §6.6) |
 | `api/photographer/projects/[id]/photo-groups` | GET | 세션+소유권 | 유사컷 그룹 조회(`photo_groups`, 엔진 무관 — 2026-07-28부터 Gemini가 채움, §6.6) |
 | `api/photographer/projects/[id]/versions` | GET | 세션+소유권 | 보정본+리뷰 조회 |
@@ -404,6 +407,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/photographer/photos/[photoId]` | DELETE | 세션+소유권 | 사진 1건 삭제(`preparing`만). RPC `delete_photo_and_resolve_group`을 호출해 소속 유사컷 그룹도 원자적으로 정리(OpenCLIP 시절 로직 그대로, `blur_variance` 기준 근사치로 대표컷 재지정) — RPC 성공 뒤 (2026-07-28 베타 전환 추가) clip-service `POST /analyze/gemini/{id}/sync-groups`를 best-effort로 추가 호출해 Gemini 기준으로 재정합화한다(실패해도 삭제 응답에는 영향 없음, §6.6) |
 | `api/photographer/photos/[photoId]/memo` | PATCH | 세션+소유권 | 작가 메모 저장 |
 | `api/photographer/upload/photos` | POST | 클라이언트 Bearer 전달(자체 검증 없음) | FastAPI 업로드 프록시(CORS 우회용). 보정본용 프록시(`api/photographer/upload-versions`)는 호출하는 곳이 없어 2026-07-13 삭제됨 — 실제 보정본 업로드는 `UploadVersionsPanel.tsx`가 FastAPI를 직접 호출 |
+| `api/photographer/upload/originals/finalize` | POST | 클라이언트 Bearer 전달(FastAPI에서 세션+소유권 검증) | 원본 포함 업로드 세션 종료 시 FastAPI `/api/upload/originals/finalize` 프록시. R2 HEAD/ZIP/worker를 기다리지 않고 DB의 전체 사진 수와 `pending/processing/completed` 수를 집계해 원본 누락을 완료 토스트 전에 검출 |
 | `api/projects/[id]` | PATCH | **없음** | 레거시 엔드포인트, §12 위험 항목 참고 |
 | `api/photographer/quota` | GET | 세션 | 로그인한 작가 본인의 등급/사용량/한도 조회(사용자 안내용, `/photographer/projects`·`/projects/new`에서 사용) |
 | `api/limits` | GET | 없음(민감 정보 아님) | 현재 유효한 이용 한도 값(`app_settings` 조회) — 대시보드/재보정 패널/업로드 페이지 등 표시용 화면이 실시간 값 반영에 사용 |
@@ -480,7 +484,7 @@ FE가 FastAPI(`NEXT_PUBLIC_API_URL`/`API_URL`/`BACKEND_URL`)를 호출하는 지
 |---|---|---|
 | 원본 사진 업로드 | **브라우저 → FastAPI 직접**(멀티파트+Bearer JWT), CORS/네트워크 실패(`TypeError`) 시 **Next API 프록시**(`api/photographer/upload/photos`)로 폴백 | `POST /api/upload/photos` |
 | 보정본 업로드(V1/V2) | 브라우저 → FastAPI 직접 (프록시 라우트도 존재하지만 업로드 페이지들은 직접 호출을 우선 사용) | `POST /api/upload/versions` |
-| 납품용 원본 다운로드 ZIP 아카이브 presign | Next API 라우트(서버, `api/c/original-download`) → FastAPI | `POST /api/storage/presign`(`dispositions` 포함) |
+| 납품용 원본/ZIP 다운로드 presign | Next API 라우트(서버, `api/c/original-download/archive`, `api/c/original-download/files`) → FastAPI | `POST /api/storage/presign`(`dispositions` 포함). 상태 폴링 `api/c/original-download`는 FastAPI를 호출하지 않음 |
 | 프로필 이미지 업로드 | 브라우저 → FastAPI 직접 | `POST /api/upload/profile-image` |
 | R2 파일 삭제(프로젝트/사진/보정본 삭제 시) | Next API 라우트(서버) → FastAPI | `POST /api/storage/delete`, `DELETE /api/projects/{id}/r2` |
 | 고객 뷰어/썸네일 presigned URL | Next API 라우트(서버, `src/lib/presign-server.ts`) → FastAPI, 서비스 시크릿 사용 | `POST /api/storage/presign` |
@@ -555,7 +559,7 @@ sequenceDiagram
    - 파일마다 하나의 Pillow decode에서 EXIF 방향 보정(`ImageOps.exif_transpose`) → 썸네일(300px, JPEG quality 75, `THUMB_MAX_SIZE`/`THUMB_JPEG_QUALITY`) **생성 후** 프리뷰(1200px, JPEG quality 82, `PREVIEW_MAX_SIZE`/`PREVIEW_JPEG_QUALITY`)를 같은 decode 결과에서 생성(4000px 초과 이미지는 draft 모드로 사전 축소) — **생성 자체는 순차**, 그 뒤 R2 PUT 2건은 `asyncio.gather`로 **병렬**.
    - 요청 하나(최대 8장, 원본 포함 시 1장)당 파일별 처리는 세마포어로 동시성 제한 — `UPLOAD_PHOTOS_CONCURRENCY`(기본 5, 원본 포함 시 `UPLOAD_WITH_ORIGINAL_CONCURRENCY` 기본 3). Pillow decode/리사이즈는 전용 스레드풀 `_cpu_executor`(`PILLOW_EXECUTOR_MAX_WORKERS`, 기본 4), R2 PUT은 전용 스레드풀 `_r2_executor`(`R2_EXECUTOR_MAX_WORKERS`, 기본 6) — 둘 다 `/photos` 전용이며 다른 업로드 엔드포인트(보정본, 원본 압축이었던 경로, 프로필 이미지, R2 head/get/delete)는 별도의 공용 풀 `_executor`(`IMAGE_EXECUTOR_MAX_WORKERS`, 기본 8)를 그대로 쓴다.
    - R2 key: `photos/{photographer_id}/{project_id}/{photo_id}_(thumb|preview).jpg`(매 업로드마다 새 UUID라 key 재사용 없음), `Cache-Control: public, max-age=31536000, immutable` 적용.
-   - 요청에 포함된 모든 파일의 처리가 끝난 뒤 `insert_photos_with_numbers` RPC로 `photos.number`를 원자적으로 할당하며 일괄 INSERT(경쟁 조건 방지) — 이 시점에 `r2_thumb_url`/`r2_preview_url`이 이미 확정돼 있어야 한다.
+   - 요청에 포함된 모든 파일의 처리가 끝난 뒤 `insert_photos_with_numbers` RPC가 `photos.number` 할당, `photos` INSERT, 원본 포함 시 `original_jobs` INSERT를 한 트랜잭션에서 수행한다.
    - `projects.photo_count` 갱신.
    - 업로드 한도: 프로젝트당 최대 `app_settings.beta_max_photos_per_project`장(관리자는 무제한, §6.3).
    - **`include_original=true`일 때 추가 흐름**:
@@ -567,7 +571,7 @@ sequenceDiagram
      - `stuck_job_sweep_worker`(30분 주기): `processing` 15분 초과 → `pending` 초기화, `awaiting_upload` 24시간 초과 → R2 HEAD 확인 후 `pending` 또는 `failed`.
      - 재시도 정책: R2 source 404 → 즉시 `failed`. R2 HEAD/DB 오류 → linear backoff(`attempts=1`→+5분, `attempts=2`→+30분, `max_attempts=3`).
      - **복구 흐름**: 브라우저 종료/네트워크 단절로 presigned PUT이 미완료된 경우, 페이지 재방문 시 `GET /api/upload/originals/pending`으로 `awaiting_upload`/`failed` job 목록을 조회해 복구 배너 표시. 사용자가 파일 선택 시 `POST /api/upload/originals/recover`로 R2 HEAD 확인 후 이미 있으면 confirm, 없으면 새 presigned URL 발급해 재업로드.
-     - **원본이 전부 `completed`되면** BE가 `enqueue_original_archive_build` RPC로 `projects.original_archive_status`를 `NULL→pending`으로 전환해 다운로드용 ZIP 아카이브 빌드를 큐에 넣는다 — 이 과정도 업로드 완료 토스트와 무관한 별도 비동기 처리다(상세: `user-flow.md` §8.2).
+     - 초대 링크가 `preparing→selecting`으로 활성화된 후에만 `enqueue_original_archive_build` RPC가 ZIP 아카이브 빌드를 큐에 넣는다. 활성화 시점에 원본 처리가 남아 있으면 마지막 `complete_original_job`이 다시 enqueue한다. 활성화 전 사진 추가·삭제 가능성 때문에 ZIP 사전 생성은 하지 않는다(상세: `user-flow.md` §8.2).
      - **⚠️ Railway Sleep**: Railway Starter 플랜은 HTTP 요청이 5분간 없으면 인스턴스를 Sleep시키며 `asyncio` worker task가 모두 파괴된다. `pending`/`awaiting_upload` 상태 job은 DB에 보존되지만 처리가 중단되고, 다음 HTTP 요청이 도착해야 worker가 재생성되어 재개된다. **Railway Hobby 플랜($5/월)은 Sleep 없이 상시 가동**되므로 안정적 운영을 위해 Starter가 아닌 Hobby 플랜이 필수다.
 5. **조회(고객 갤러리)**: `SelectionContext`가 `/api/c/photos`(Next.js, Supabase 직접 조회)를 호출해 사진 메타(포함 `r2_thumb_url`/`r2_preview_url` 원문 URL)를 가져오지만, **(2026-08-06 정정)** 그리드 카드는 이 URL을 직접 쓰지 않는다 — `GET /api/c/presign-thumbs?token=...&photoIds=...`(최대 200장/요청)로 `r2_thumb_url`에서 R2 key를 추출해 FastAPI `/api/storage/presign`으로 발급받은 presigned GET URL을 렌더링에 사용한다(R2 key는 응답에 노출 안 됨). 뷰어의 대형 프리뷰도 동일하게 `GET /api/c/presign-preview`(Next → FastAPI `/api/storage/presign` 프록시)로 서명 URL을 받아 사용한다. 두 경로 모두 R2 버킷이 비공개라는 전제이며, "`r2_thumb_url`을 그대로 사용"이라는 과거 서술은 부정확했다.
 6. **보정본(V1/V2) 업로드**: 동일하게 브라우저 → FastAPI 직접(`/api/upload/versions`), 1500px/최대 2MB(품질 85%→60% 단계적 하향)로 리사이즈 + 400px 썸네일. `versions/{project_id}/v{version}/{photo_id}_{filename}` 키로 저장. `photo_versions` upsert 후 해당 사진의 기존 `version_reviews` 삭제(재검토 유도).

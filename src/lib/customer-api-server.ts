@@ -34,7 +34,7 @@ function mapProjectRow(row: ProjectsRow): Project {
     photoCount: row.photo_count ?? 0,
     status: row.status as ProjectStatus,
     accessToken: row.access_token,
-    accessPin: (row as any).access_pin ?? null,
+    accessPin: (row as { access_pin?: string | null }).access_pin ?? null,
     confirmedAt: row.confirmed_at ?? undefined,
     deliveredAt: (row as { delivered_at?: string | null }).delivered_at ?? undefined,
     customerCancelCount: r.customer_cancel_count ?? 0,
@@ -44,7 +44,7 @@ function mapProjectRow(row: ProjectsRow): Project {
     clipAnalysisStatus:
       (row as { clip_analysis_status?: "processing" | "completed" | "failed" | null })
         .clip_analysis_status ?? null,
-    includeOriginal: (row as any).include_original ?? false,
+    includeOriginal: (row as { include_original?: boolean | null }).include_original ?? false,
     originalArchiveStatus:
       (row as { original_archive_status?: "pending" | "processing" | "ready" | "failed" | null })
         .original_archive_status ?? null,
@@ -417,16 +417,23 @@ export async function getReviewDataByToken(
 // ---------- 납품용 원본 다운로드 (GET /api/c/original-download) ----------
 
 export interface OriginalDownloadFile {
+  photoId: string;
   filename: string;
-  url: string;
   byteSize: number;
 }
 
 export interface OriginalArchiveDownloadFile {
   partNumber: number;
-  url: string;
   fileCount: number;
   byteSize: number;
+}
+
+export interface PresignedOriginalDownloadFile extends OriginalDownloadFile {
+  url: string;
+}
+
+export interface PresignedOriginalArchiveDownloadFile extends OriginalArchiveDownloadFile {
+  url: string;
 }
 
 export interface OriginalDownloadInfo {
@@ -442,13 +449,15 @@ export interface OriginalDownloadInfo {
   files: OriginalDownloadFile[];
   archivePreparing: boolean;
   archiveFailed: boolean;
+  archiveBlocked: boolean;
+  incompleteOriginalCount: number;
   archiveFiles: OriginalArchiveDownloadFile[];
 }
 
 /**
- * access_token으로 납품용 원본 다운로드 정보를 조회한다.
- * include_original=false면 숨긴다. ZIP을 만들지 않고 R2의 원본 객체를 직접 내려준다.
- * 30일 만료 후에는 presign 자체를 수행하지 않고 파일 수/총 용량만 반환한다.
+ * access_token으로 납품용 원본 다운로드 상태와 파일 메타데이터를 조회한다.
+ * 이 경로에서는 presign을 수행하지 않는다. 개별 원본과 ZIP URL은 사용자가
+ * 실제 다운로드할 때 getOriginalFileDownloadUrls/getOriginalArchiveDownloadUrls로 발급한다.
  */
 export async function getOriginalDownloadInfo(
   admin: SupabaseClient,
@@ -470,6 +479,8 @@ export async function getOriginalDownloadInfo(
       files: [],
       archivePreparing: false,
       archiveFailed: false,
+      archiveBlocked: false,
+      incompleteOriginalCount: 0,
       archiveFiles: [],
     };
   }
@@ -487,6 +498,8 @@ export async function getOriginalDownloadInfo(
       files: [],
       archivePreparing: false,
       archiveFailed: false,
+      archiveBlocked: false,
+      incompleteOriginalCount: 0,
       archiveFiles: [],
     };
   }
@@ -498,17 +511,19 @@ export async function getOriginalDownloadInfo(
   // PostgREST의 기본 1,000행 제한을 넘길 수 있어 최대 베타 한도(3,000장)까지 나눈다.
   const pages = await Promise.all([0, 1, 2].map((i) =>
     admin.from("photos")
-      .select("r2_original_url, original_filename, original_compressed_size")
+      .select("id, original_filename, original_compressed_size, original_status")
       .eq("project_id", project.id)
-      .eq("original_status", "completed")
       .order("number", { ascending: true })
       .range(i * 1000, (i + 1) * 1000 - 1)
   ));
   for (const page of pages) if (page.error) throw new Error(page.error.message);
-  type OriginalRow = { r2_original_url: string | null; original_filename: string | null; original_compressed_size: number | null };
-  const originals = pages.flatMap((page) => page.data ?? []) as OriginalRow[];
+  type OriginalRow = { id: string; original_filename: string | null; original_compressed_size: number | null; original_status: string | null };
+  const allOriginals = pages.flatMap((page) => page.data ?? []) as OriginalRow[];
+  const originals = allOriginals.filter((file) => file.original_status === "completed");
+  const incompleteOriginalCount = allOriginals.length - originals.length;
   const fileCount = originals.length;
   const totalBytes = originals.reduce((sum, file) => sum + (file.original_compressed_size ?? 0), 0);
+  const archiveBlocked = project.originalArchiveStatus === null && incompleteOriginalCount > 0;
 
   if (expired || originals.length === 0) {
     return {
@@ -523,54 +538,35 @@ export async function getOriginalDownloadInfo(
       files: [],
       archivePreparing: false,
       archiveFailed: false,
+      archiveBlocked,
+      incompleteOriginalCount,
       archiveFiles: [],
     };
   }
 
-  const dispositions: Record<string, string> = {};
-  const keys = originals.flatMap((file) => file.r2_original_url ? [file.r2_original_url] : []);
-  for (const file of originals) {
-    if (file.r2_original_url) {
-      dispositions[file.r2_original_url] = buildContentDisposition(file.original_filename || "photo");
-    }
-  }
-  // 내부 presign API의 요청 상한(200개)을 지킨다.
-  const batches = await Promise.all(Array.from({ length: Math.ceil(keys.length / 200) }, (_, i) =>
-    callPresignApi(keys.slice(i * 200, (i + 1) * 200), dispositions)
-  ));
-  const urls = Object.assign({}, ...batches.map((batch) => batch.urls)) as Record<string, string>;
-
   const files: OriginalDownloadFile[] = originals
-    .filter((file) => !!file.r2_original_url && !!urls[file.r2_original_url])
     .map((file) => ({
+      photoId: file.id,
       filename: file.original_filename || "photo",
-      url: urls[file.r2_original_url!],
       byteSize: file.original_compressed_size ?? 0,
     }));
 
-  const archivePreparing = project.originalArchiveStatus !== "ready" && project.originalArchiveStatus !== "failed";
+  const archivePreparing = !archiveBlocked && project.originalArchiveStatus !== "ready" && project.originalArchiveStatus !== "failed";
   const archiveFailed = project.originalArchiveStatus === "failed";
   let archiveFiles: OriginalArchiveDownloadFile[] = [];
   if (!archivePreparing && !archiveFailed) {
     const { data: partsRaw, error: partsError } = await admin
       .from("original_archive_parts")
-      .select("part_number, r2_key, file_count, byte_size")
+      .select("part_number, file_count, byte_size")
       .eq("project_id", project.id)
       .eq("status", "completed")
       .is("deleted_at", null)
       .order("part_number", { ascending: true });
     if (partsError) throw new Error(partsError.message);
-    type PartRow = { part_number: number; r2_key: string; file_count: number; byte_size: number };
+    type PartRow = { part_number: number; file_count: number; byte_size: number };
     const parts = (partsRaw ?? []) as PartRow[];
-    const archiveDispositions: Record<string, string> = {};
-    for (const part of parts) archiveDispositions[part.r2_key] = buildContentDisposition(`${project.name}_전체원본_${part.part_number}.zip`);
-    const archiveBatches = await Promise.all(Array.from({ length: Math.ceil(parts.length / 200) }, (_, i) =>
-      callPresignApi(parts.slice(i * 200, (i + 1) * 200).map((part) => part.r2_key), archiveDispositions)
-    ));
-    const archiveUrls = Object.assign({}, ...archiveBatches.map((batch) => batch.urls)) as Record<string, string>;
-    archiveFiles = parts.filter((part) => !!archiveUrls[part.r2_key]).map((part) => ({
+    archiveFiles = parts.map((part) => ({
       partNumber: part.part_number,
-      url: archiveUrls[part.r2_key],
       fileCount: part.file_count,
       byteSize: part.byte_size,
     }));
@@ -588,6 +584,106 @@ export async function getOriginalDownloadInfo(
     files,
     archivePreparing,
     archiveFailed,
+    archiveBlocked,
+    incompleteOriginalCount,
     archiveFiles,
   };
+}
+
+function isOriginalDownloadExpired(startedAt: string): boolean {
+  return Date.now() > new Date(startedAt).getTime() + ORIGINAL_DOWNLOAD_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+}
+
+/** 사용자가 선택한 개별 원본에 대해서만 1시간 presigned URL을 발급한다. */
+export async function getOriginalFileDownloadUrls(
+  admin: SupabaseClient,
+  token: string,
+  requestedPhotoIds: string[]
+): Promise<PresignedOriginalDownloadFile[] | null> {
+  const project = await getProjectByToken(admin, token);
+  if (!project?.includeOriginal || !project.originalDownloadStartedAt) return null;
+  if (isOriginalDownloadExpired(project.originalDownloadStartedAt)) return [];
+
+  const photoIds = [...new Set(requestedPhotoIds.filter((id) => typeof id === "string" && id.trim()))].slice(0, 3000);
+  if (photoIds.length === 0) return [];
+
+  type OriginalRow = {
+    id: string;
+    r2_original_url: string | null;
+    original_filename: string | null;
+    original_compressed_size: number | null;
+  };
+  const pages = await Promise.all(Array.from({ length: Math.ceil(photoIds.length / 200) }, (_, i) =>
+    admin.from("photos")
+      .select("id, r2_original_url, original_filename, original_compressed_size")
+      .eq("project_id", project.id)
+      .eq("original_status", "completed")
+      .in("id", photoIds.slice(i * 200, (i + 1) * 200))
+  ));
+  for (const page of pages) if (page.error) throw new Error(page.error.message);
+  const byId = new Map((pages.flatMap((page) => page.data ?? []) as OriginalRow[]).map((row) => [row.id, row]));
+  const originals = photoIds.flatMap((id) => {
+    const row = byId.get(id);
+    return row?.r2_original_url ? [row] : [];
+  });
+
+  const dispositions: Record<string, string> = {};
+  for (const file of originals) {
+    dispositions[file.r2_original_url!] = buildContentDisposition(file.original_filename || "photo");
+  }
+  const presignBatches = await Promise.all(Array.from({ length: Math.ceil(originals.length / 200) }, (_, i) => {
+    const batch = originals.slice(i * 200, (i + 1) * 200);
+    return callPresignApi(batch.map((file) => file.r2_original_url!), dispositions);
+  }));
+  const urls = Object.assign({}, ...presignBatches.map((batch) => batch.urls)) as Record<string, string>;
+
+  return originals.flatMap((file) => {
+    const url = urls[file.r2_original_url!];
+    return url ? [{
+      photoId: file.id,
+      filename: file.original_filename || "photo",
+      byteSize: file.original_compressed_size ?? 0,
+      url,
+    }] : [];
+  });
+}
+
+/** ZIP이 ready인 시점에 완료된 파트에 대해서만 1시간 presigned URL을 발급한다. */
+export async function getOriginalArchiveDownloadUrls(
+  admin: SupabaseClient,
+  token: string
+): Promise<PresignedOriginalArchiveDownloadFile[] | null> {
+  const project = await getProjectByToken(admin, token);
+  if (!project?.includeOriginal || !project.originalDownloadStartedAt) return null;
+  if (isOriginalDownloadExpired(project.originalDownloadStartedAt) || project.originalArchiveStatus !== "ready") return [];
+
+  const { data: partsRaw, error } = await admin
+    .from("original_archive_parts")
+    .select("part_number, r2_key, file_count, byte_size")
+    .eq("project_id", project.id)
+    .eq("status", "completed")
+    .is("deleted_at", null)
+    .order("part_number", { ascending: true });
+  if (error) throw new Error(error.message);
+  type PartRow = { part_number: number; r2_key: string; file_count: number; byte_size: number };
+  const parts = (partsRaw ?? []) as PartRow[];
+  const dispositions: Record<string, string> = {};
+  for (const part of parts) {
+    dispositions[part.r2_key] = buildContentDisposition(`${project.name}_전체원본_${part.part_number}.zip`);
+  }
+  const presignBatches = await Promise.all(Array.from({ length: Math.ceil(parts.length / 200) }, (_, i) => {
+    const batch = parts.slice(i * 200, (i + 1) * 200);
+    return callPresignApi(batch.map((part) => part.r2_key), dispositions);
+  }));
+  const urls = Object.assign({}, ...presignBatches.map((batch) => batch.urls)) as Record<string, string>;
+
+  return parts.flatMap((part) => {
+    const url = urls[part.r2_key];
+    return url ? [{
+      partNumber: part.part_number,
+      fileCount: part.file_count,
+      byteSize: part.byte_size,
+      url,
+    }] : [];
+  });
 }
