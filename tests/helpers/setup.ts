@@ -41,9 +41,13 @@ export async function createFullProject(page: Page, photoCount = 5): Promise<Tes
 }
 
 /** editing 상태 프로젝트 생성 (보정본 업로드 테스트용) */
-export async function createEditingProject(page: Page, photoCount = 5): Promise<TestProject> {
+export async function createEditingProject(
+  page: Page,
+  photoCount = 5,
+  includeOriginal = true,
+): Promise<TestProject> {
   const res = await page.request.post("/api/auth/test-setup", {
-    data: { action: "create_editing_project", photoCount },
+    data: { action: "create_editing_project", photoCount, includeOriginal },
   });
   if (!res.ok()) throw new Error(`createEditingProject failed (${res.status()}): ${await res.text()}`);
   const data = await res.json() as { projectId: string; accessToken: string; photoCount: number; requiredCount: number };

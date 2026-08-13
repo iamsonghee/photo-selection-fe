@@ -34,6 +34,7 @@ export async function POST(req: Request) {
     action: Action;
     projectId?: string;
     photoCount?: number;
+    includeOriginal?: boolean;
     status?: ProjectStatus;
     surveyType?: SurveyType;
     logAction?: string;
@@ -93,6 +94,7 @@ export async function POST(req: Request) {
   if (action === "create_editing_project") {
     const photoCount = body.photoCount ?? 5;
     const requiredCount = Math.min(3, photoCount);
+    const includeOriginal = body.includeOriginal ?? true;
 
     const project = await _createProject(admin, photographer.id, requiredCount, "preparing");
 
@@ -103,6 +105,11 @@ export async function POST(req: Request) {
       r2_preview_url: `${DUMMY_PREVIEW}?n=${i}`,
       original_filename: `E2E_TEST_${String(i + 1).padStart(3, "0")}.jpg`,
       file_size: 12345,
+      ...(includeOriginal ? {
+        r2_original_url: `e2e/originals/${project.id}/E2E_TEST_${String(i + 1).padStart(3, "0")}.jpg`,
+        original_compressed_size: 12345,
+        original_status: "completed",
+      } : {}),
     }));
     const { data: insertedPhotos } = await admin.from("photos").insert(photos).select("id");
 
@@ -111,6 +118,7 @@ export async function POST(req: Request) {
       const selections = insertedPhotos.slice(0, requiredCount).map((p: { id: string }) => ({
         project_id: project.id,
         photo_id: p.id,
+        is_selected: true,
       }));
       await admin.from("selections").insert(selections);
     }
@@ -119,6 +127,7 @@ export async function POST(req: Request) {
     await admin.from("projects").update({
       photo_count: photoCount,
       status: "editing",
+      include_original: includeOriginal,
     }).eq("id", project.id);
 
     return NextResponse.json({

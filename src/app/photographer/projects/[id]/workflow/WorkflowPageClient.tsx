@@ -35,6 +35,7 @@ import {
 import styles from "./Workflow.module.css";
 import { normalizeReviewDeadlineYmd } from "@/lib/format-review-deadline";
 import { compressImageForUpload } from "@/lib/upload-client-compress";
+import { getDirectoryPicker, saveFilesToDirectory } from "@/lib/directory-download-client";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -57,6 +58,13 @@ type WorkflowRow = {
 
 type FilterTab = "all" | "approved" | "revision" | "v1_pending" | "v2_pending";
 type StageTab = "original" | "v1" | "v2";
+
+type SelectedOriginalDownloadFile = {
+  photoId: string;
+  filename: string;
+  byteSize: number;
+  url: string;
+};
 
 function addDays(n: number): string {
   const d = new Date();
@@ -869,6 +877,14 @@ export default function WorkflowPageClient() {
   const reviewHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const [originalDownloadProgress, setOriginalDownloadProgress] = useState<{
+    completed: number;
+    total: number;
+  } | null>(null);
+  const [exportMessage, setExportMessage] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const getVersionUrl = useCallback(
     (url: string, photoId: string, version: 1 | 2) => {
@@ -1073,6 +1089,70 @@ export default function WorkflowPageClient() {
     setShowExportMenu(false);
   }, [rows, stageTab, project?.name]);
 
+  const handleDownloadSelectedOriginals = useCallback(async () => {
+    setExportMessage(null);
+    const requestedDownloadLabel = project?.includeOriginal ? "셀렉 원본" : "셀렉 프리뷰";
+    const showDirectoryPicker = getDirectoryPicker();
+    if (!showDirectoryPicker) {
+      setShowExportMenu(false);
+      setExportMessage({
+        tone: "error",
+        text: `${requestedDownloadLabel} 폴더 저장은 PC용 Chrome 또는 Edge에서 이용해 주세요.`,
+      });
+      return;
+    }
+
+    let directory;
+    try {
+      // 사용자 클릭의 transient activation이 사라지기 전에 폴더 선택기를 먼저 연다.
+      directory = await showDirectoryPicker.call(window, {
+        // File System Access 명세상 picker id는 최대 32자다. 프로젝트 UUID를 붙이면
+        // Chrome이 폴더 창을 열기 전에 TypeError를 발생시키므로 짧은 고정값을 사용한다.
+        id: "acut-selected-originals",
+        mode: "readwrite",
+        startIn: "downloads",
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setExportMessage({ tone: "error", text: "저장할 폴더를 열 수 없습니다. 다시 시도해 주세요." });
+      return;
+    }
+
+    setShowExportMenu(false);
+    setOriginalDownloadProgress({ completed: 0, total: rows.length });
+    try {
+      const response = await fetch(`/api/photographer/projects/${id}/selected-originals`, {
+        method: "POST",
+      });
+      const data = await response.json().catch(() => ({})) as {
+        error?: string;
+        files?: SelectedOriginalDownloadFile[];
+        downloadKind?: "original" | "preview";
+      };
+      if (!response.ok) {
+        throw new Error(data.error || "셀렉 원본 다운로드를 준비하지 못했습니다.");
+      }
+      const files = data.files ?? [];
+      if (files.length === 0) throw new Error(`다운로드할 ${requestedDownloadLabel}가 없습니다.`);
+
+      setOriginalDownloadProgress({ completed: 0, total: files.length });
+      await saveFilesToDirectory(directory, files, (completed, total) => {
+        setOriginalDownloadProgress({ completed, total });
+      });
+      setExportMessage({
+        tone: "success",
+        text: `${data.downloadKind === "preview" ? "셀렉 프리뷰" : "셀렉 원본"} ${files.length.toLocaleString()}개를 선택한 폴더에 저장했습니다.`,
+      });
+    } catch (error) {
+      setExportMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "셀렉 원본 다운로드에 실패했습니다.",
+      });
+    } finally {
+      setOriginalDownloadProgress(null);
+    }
+  }, [id, project?.includeOriginal, rows.length]);
+
   function openViewer(idx: number, tab: StageTab) {
     setViewerIdx(idx);
     setViewerTab(tab);
@@ -1232,6 +1312,12 @@ export default function WorkflowPageClient() {
   const canStartV1Review = isEditing && counts.total > 0 && counts.v1Uploaded === counts.total;
   // V2: 업로드 완료 + 재보정 요청 사진이 모두 교체됐을 때만 활성화
   const canStartV2Review = isEditingV2 && v2Total > 0 && counts.v2Uploaded === v2Total && v2RevisionPending === 0;
+  const selectionIsFinal = !["preparing", "selecting"].includes(project.status);
+  const canDownloadSelectedOriginals = selectionIsFinal;
+  const selectedOriginalDisabledReason = !selectionIsFinal
+    ? "고객 셀렉 확정 후 이용 가능"
+    : null;
+  const selectedDownloadLabel = project.includeOriginal ? "셀렉 원본" : "셀렉 프리뷰";
 
   const FILTER_TABS: { key: FilterTab; label: string; count: number }[] = [
     { key: "all", label: "전체", count: counts.total },
@@ -1519,14 +1605,17 @@ export default function WorkflowPageClient() {
                 {showExportMenu && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
-                    <div className="absolute right-0 top-full mt-1 z-20 bg-surface border border-border-subtle rounded-xl shadow-xl overflow-hidden min-w-[148px]">
+                    <div className="absolute right-0 top-full mt-1 z-20 bg-surface border border-border-subtle rounded-xl shadow-xl overflow-hidden min-w-[232px]">
+                      <div className="px-4 pt-3 pb-1 text-[9px] font-mono tracking-[0.14em] text-disabled-foreground">
+                        목록 내보내기
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleDownloadReview(false)}
                         className="w-full flex items-center gap-2 px-4 py-2.5 text-[11px] text-muted-foreground hover:bg-surface-raised hover:text-foreground transition-colors text-left"
                       >
                         <Download size={11} className="text-subtle-foreground shrink-0" />
-                        파일명만
+                        파일명 목록 (.csv)
                       </button>
                       <button
                         type="button"
@@ -1534,7 +1623,31 @@ export default function WorkflowPageClient() {
                         className="w-full flex items-center gap-2 px-4 py-2.5 text-[11px] text-muted-foreground hover:bg-surface-raised hover:text-foreground transition-colors text-left"
                       >
                         <Download size={11} className="text-accent shrink-0" />
-                        코멘트 포함
+                        코멘트 포함 (.csv)
+                      </button>
+                      <div className="h-px bg-border-subtle mx-3" />
+                      <button
+                        type="button"
+                        onClick={() => void handleDownloadSelectedOriginals()}
+                        disabled={!canDownloadSelectedOriginals || originalDownloadProgress !== null}
+                        className="w-full flex items-start gap-2 px-4 py-3 text-left transition-colors enabled:hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Download size={12} className="text-accent shrink-0 mt-0.5" />
+                        <span className="min-w-0">
+                          <span className="block text-[11px] font-medium text-foreground">
+                            {originalDownloadProgress ? `${selectedDownloadLabel} 저장 중` : `${selectedDownloadLabel} 다운로드`}
+                          </span>
+                          <span className="block mt-0.5 text-[9px] leading-4 text-subtle-foreground">
+                            {selectedOriginalDisabledReason ?? (project.includeOriginal
+                              ? `선택된 ${rows.length.toLocaleString()}장 · 업로드 원본 그대로`
+                              : `선택된 ${rows.length.toLocaleString()}장 · 확인용 최대 1200px JPEG`)}
+                          </span>
+                          {!selectedOriginalDisabledReason && !project.includeOriginal && (
+                            <span className="block text-[9px] leading-4 text-disabled-foreground">
+                              보정·납품용으로는 해상도가 부족할 수 있어요.
+                            </span>
+                          )}
+                        </span>
                       </button>
                     </div>
                   </>
@@ -1553,6 +1666,44 @@ export default function WorkflowPageClient() {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {(originalDownloadProgress || exportMessage) && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`fixed right-5 bottom-5 z-[80] max-w-sm rounded-xl border px-4 py-3 shadow-2xl ${
+            exportMessage?.tone === "error"
+              ? "border-red-500/30 bg-red-950/95 text-red-100"
+              : "border-border-strong bg-surface text-foreground"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <Download size={15} className="mt-0.5 shrink-0 text-accent" />
+            <div className="min-w-0">
+              <p className="text-xs font-medium">
+                {originalDownloadProgress
+                  ? `${selectedDownloadLabel} 저장 중 · ${originalDownloadProgress.completed.toLocaleString()} / ${originalDownloadProgress.total.toLocaleString()}`
+                  : exportMessage?.text}
+              </p>
+              {originalDownloadProgress && (
+                <p className="mt-1 text-[10px] text-subtle-foreground">
+                  창을 닫지 마세요. 파일을 한 장씩 선택한 폴더에 저장하고 있어요.
+                </p>
+              )}
+            </div>
+            {!originalDownloadProgress && exportMessage && (
+              <button
+                type="button"
+                onClick={() => setExportMessage(null)}
+                aria-label="알림 닫기"
+                className="text-subtle-foreground hover:text-foreground"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
         </div>
       )}

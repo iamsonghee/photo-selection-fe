@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, PackageOpen } from "lucide-react";
 import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
+import {
+  getDirectoryPicker,
+  saveFilesToDirectory,
+  type WritableDirectoryHandle,
+} from "@/lib/directory-download-client";
 
 interface OriginalDownloadFile {
   photoId: string;
@@ -21,21 +26,6 @@ interface PresignedOriginalDownloadFile extends OriginalDownloadFile {
 interface PresignedOriginalArchiveDownloadFile extends OriginalArchiveDownloadFile {
   url: string;
 }
-
-type WritableFileStream = WritableStream<Uint8Array> & {
-  write(data: Blob): Promise<void>;
-  close(): Promise<void>;
-  abort(reason?: unknown): Promise<void>;
-};
-type WritableFileHandle = {
-  createWritable(): Promise<WritableFileStream>;
-};
-type WritableDirectoryHandle = {
-  getFileHandle(name: string, options?: { create?: boolean }): Promise<WritableFileHandle>;
-};
-type DirectoryPickerWindow = Window & {
-  showDirectoryPicker?: (options?: { id?: string; mode?: "read" | "readwrite"; startIn?: string }) => Promise<WritableDirectoryHandle>;
-};
 
 interface OriginalDownloadInfo {
   visible: boolean;
@@ -79,48 +69,6 @@ function downloadFiles(files: PresignedOriginalDownloadFile[]) {
       link.remove();
     }, index * 250);
   });
-}
-
-function safeDownloadFilename(filename: string): string {
-  return filename.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").trim() || "photo";
-}
-
-async function getNonConflictingFileHandle(directory: WritableDirectoryHandle, filename: string): Promise<WritableFileHandle> {
-  const safeName = safeDownloadFilename(filename);
-  const dot = safeName.lastIndexOf(".");
-  const base = dot > 0 ? safeName.slice(0, dot) : safeName;
-  const extension = dot > 0 ? safeName.slice(dot) : "";
-
-  for (let suffix = 0; suffix < 10_000; suffix++) {
-    const candidate = suffix === 0 ? safeName : `${base} (${suffix + 1})${extension}`;
-    try {
-      await directory.getFileHandle(candidate);
-    } catch (error) {
-      if (error instanceof DOMException && error.name !== "NotFoundError") throw error;
-      return directory.getFileHandle(candidate, { create: true });
-    }
-  }
-  throw new Error("저장할 파일명을 만들 수 없습니다.");
-}
-
-async function saveFilesToDirectory(directory: WritableDirectoryHandle, files: PresignedOriginalDownloadFile[]) {
-  for (const file of files) {
-    const response = await fetch(file.url);
-    if (!response.ok) throw new Error(`${file.filename}을(를) 가져오지 못했습니다.`);
-    const fileHandle = await getNonConflictingFileHandle(directory, file.filename);
-    const writable = await fileHandle.createWritable();
-    try {
-      if (response.body) {
-        await response.body.pipeTo(writable);
-      } else {
-        await writable.write(await response.blob());
-        await writable.close();
-      }
-    } catch (error) {
-      await writable.abort(error).catch(() => {});
-      throw error;
-    }
-  }
 }
 
 async function shareFiles(files: PresignedOriginalDownloadFile[]): Promise<boolean> {
@@ -258,7 +206,7 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
 
     let desktopDirectory: WritableDirectoryHandle | null = null;
     if (!isMobileDevice()) {
-      const showDirectoryPicker = (window as DirectoryPickerWindow).showDirectoryPicker;
+      const showDirectoryPicker = getDirectoryPicker();
       if (showDirectoryPicker) {
         try {
           // 폴더 선택은 사용자 클릭의 transient activation이 남아 있을 때 먼저 호출해야 한다.
