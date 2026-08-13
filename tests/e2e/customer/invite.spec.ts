@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, devices } from "@playwright/test";
 import {
   setupFullProject,
   deleteTestProject,
@@ -28,8 +28,8 @@ test.describe("고객 — 초대 링크", () => {
     await mockCustomerThumbPresigning(page);
     await page.goto(`/c/${project.accessToken}`);
     await page.waitForLoadState("networkidle");
-    await expect(page.getByRole("button", { name: /사진 보러 가기/ })).toBeVisible();
-    await page.getByRole("button", { name: /사진 보러 가기/ }).click();
+    await expect(page.getByRole("link", { name: /사진 선택 시작하기/ })).toBeVisible();
+    await page.getByRole("link", { name: /사진 선택 시작하기/ }).click();
     await expect(page).toHaveURL(/\/gallery/, { timeout: 20_000 });
   });
 
@@ -48,5 +48,26 @@ test.describe("고객 — 초대 링크", () => {
     await expect(page).toHaveURL(/\/gallery/);
     const photos = page.locator("img[loading='lazy']");
     await expect(photos.first()).toBeVisible({ timeout: 10_000 });
+  });
+});
+
+test.describe("고객 — 초대 링크 모바일", () => {
+  const mobileDevice = { ...devices["iPhone 13"] };
+  Reflect.deleteProperty(mobileDevice, "defaultBrowserType");
+  test.use(mobileDevice);
+
+  test("핵심 선택 정보와 CTA가 첫 화면에 노출된다", async ({ page }) => {
+    await page.goto(`/c/${project.accessToken}`);
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByText("SELECT", { exact: true })).toBeVisible();
+    await expect(page.getByText("TOTAL", { exact: true })).toBeVisible();
+    const startLink = page.getByRole("link", { name: /사진 선택 시작하기/ });
+    await expect(startLink).toBeVisible();
+    const box = await startLink.boundingBox();
+    const viewport = page.viewportSize();
+    expect(box).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(viewport!.height);
   });
 });

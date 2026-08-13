@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, X, PackageOpen } from "lucide-react";
+import { createPortal } from "react-dom";
+import { X, PackageOpen } from "lucide-react";
 import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
 
 interface OriginalDownloadFile {
@@ -184,6 +185,20 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
   useEffect(() => {
     setIsMobile(isMobileDevice());
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
 
   if (!info || !info.visible) return null;
 
@@ -381,49 +396,30 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
         {triggerLabel}
       </button>
 
-      {open && (
+      {open && typeof document !== "undefined" && createPortal(
         <div
           role="dialog"
           aria-modal="true"
           onClick={() => setOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 70,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(0,0,0,0.55)",
-            backdropFilter: "blur(4px)",
-            padding: 20,
-          }}
+          className="original-download-backdrop"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "min(960px, 100%)",
-              maxHeight: "calc(100vh - 40px)",
-              background: "#0f0f12",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: 20,
-              padding: "28px",
-              display: "flex",
-              flexDirection: "column",
-            }}
+            className="original-download-modal"
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <span style={{ fontSize: 22, fontWeight: 700, color: "#fff" }}>납품용 원본 다운로드</span>
+            <div className="original-download-header">
+              <span className="original-download-title">납품용 원본 다운로드</span>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="닫기"
-                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.6)", cursor: "pointer" }}
+                className="original-download-close"
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+            <div className="original-download-meta">
               <div>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em" }}>파일 수</div>
                 <div style={{ fontSize: 14, color: "#fff", fontWeight: 600 }}>{info.preparing ? "준비 중" : `${info.fileCount.toLocaleString()}장`}</div>
@@ -439,9 +435,9 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
             </div>
 
             {info.available && (
-              <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+              <div className="original-download-tabs" role="tablist" aria-label="원본 다운로드 방식">
                 {(["archive", "files"] as const).map((tab) => (
-                  <button key={tab} type="button" onClick={() => setMode(tab)} style={{ border: "none", borderRadius: 8, padding: "9px 12px", background: mode === tab ? "rgba(var(--accent-rgb),0.18)" : "rgba(255,255,255,0.06)", color: mode === tab ? "#fff" : "rgba(255,255,255,0.55)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                  <button key={tab} type="button" role="tab" aria-selected={mode === tab} onClick={() => setMode(tab)} style={{ border: "none", borderRadius: 8, padding: "9px 12px", background: mode === tab ? "rgba(var(--accent-rgb),0.18)" : "rgba(255,255,255,0.06)", color: mode === tab ? "#fff" : "rgba(255,255,255,0.55)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                     {tab === "archive" ? "전체 압축파일" : "개별 파일 선택"}
                   </button>
                 ))}
@@ -495,46 +491,201 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
                 특정 파일만 필요하면 <button type="button" onClick={() => setMode("files")} style={{ padding: 0, border: 0, background: "none", color: "var(--accent, #91b1ff)", fontSize: "inherit", cursor: "pointer" }}>개별 파일 선택</button>에서 받을 수 있습니다.
               </div>
             ) : (
-              <>
-                <p style={{ margin: "0 0 8px", color: "rgba(255,255,255,0.5)", fontSize: 12, lineHeight: 1.5 }}>
-                  필요한 원본만 선택해 다운로드할 수 있어요. 전체 원본은 &apos;전체 압축파일&apos;에서 다운로드해 주세요.
-                </p>
-                {isMobile && (
-                  <p style={{ margin: "0 0 10px", color: "rgba(255,255,255,0.5)", fontSize: 12, lineHeight: 1.5 }}>
-                    휴대폰에서 안정적으로 저장하려면 한 번에 {MOBILE_MAX_FILE_COUNT}장, 총 {MOBILE_MAX_TOTAL_LABEL} 이내로 나누어 저장해 주세요.
+              <div className="original-download-files-layout">
+                <div className="original-download-files-toolbar">
+                  <p style={{ margin: "0 0 6px", color: "rgba(255,255,255,0.5)", fontSize: 12, lineHeight: 1.5 }}>
+                    필요한 원본만 선택해 다운로드할 수 있어요. 전체 원본은 &apos;전체 압축파일&apos;에서 다운로드해 주세요.
                   </p>
-                )}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 10 }}>
-                  <span style={{ marginLeft: "auto", color: "rgba(255,255,255,0.5)", fontSize: 12 }}>
-                    {isMobile
-                      ? `${selected.size.toLocaleString()} / ${MOBILE_MAX_FILE_COUNT} · ${formatStoredFileSizeBytes(selectedTotalBytes)}`
-                      : `${selected.size.toLocaleString()}개 선택됨`}
-                  </span>
+                  {isMobile && (
+                    <p style={{ margin: "0 0 10px", color: "rgba(255,255,255,0.5)", fontSize: 12, lineHeight: 1.5 }}>
+                      휴대폰에서 안정적으로 저장하려면 한 번에 {MOBILE_MAX_FILE_COUNT}장, 총 {MOBILE_MAX_TOTAL_LABEL} 이내로 나누어 저장해 주세요.
+                    </p>
+                  )}
+                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="파일명 검색" className="original-download-search" />
                 </div>
-                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="파일명 검색" style={{ width: "100%", boxSizing: "border-box", marginBottom: 10, padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 13, outline: "none" }} />
-                <div style={{ minHeight: 0, maxHeight: "calc(100vh - 330px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 6, paddingRight: 4 }}>
+
+                <div className="original-download-file-list">
                   {visibleFiles.map(({ file, index }) => (
-                    <div key={`${file.filename}-${index}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.06)", color: "#fff", fontSize: 13 }}>
+                    <label key={`${file.filename}-${index}`} className="original-download-file-row">
                       <input type="checkbox" checked={selected.has(index)} onChange={() => toggleFile(index)} aria-label={`${file.filename} 선택`} />
-                      <Download size={15} style={{ flexShrink: 0 }} />
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{file.filename}</span>
                       <span style={{ color: "rgba(255,255,255,0.5)", flexShrink: 0 }}>{formatStoredFileSizeBytes(file.byteSize)}</span>
-                    </div>
+                    </label>
                   ))}
                 </div>
-                {downloadError && <p role="status" style={{ margin: "12px 0 0", color: "rgba(255,255,255,0.68)", fontSize: 12, textAlign: "center" }}>{downloadError}</p>}
-                <button type="button" onClick={downloadSelected} disabled={selected.size === 0 || isDownloading} style={{ width: "100%", marginTop: 16, padding: "13px", border: "none", borderRadius: 10, background: selected.size && !isDownloading ? "var(--accent, #4f7eff)" : "rgba(255,255,255,0.1)", color: selected.size && !isDownloading ? "#000" : "rgba(255,255,255,0.35)", fontSize: 14, fontWeight: 700, cursor: selected.size && !isDownloading ? "pointer" : "not-allowed" }}>
-                  {isDownloading
-                    ? "사진 준비 중..."
-                    : isMobile
-                      ? `선택한 사진 저장 (${selected.size.toLocaleString()})`
-                      : `선택한 파일 다운로드 (${selected.size.toLocaleString()})`}
-                </button>
-              </>
+
+                <div className="original-download-footer">
+                  {downloadError && <p role="status" className="original-download-status">{downloadError}</p>}
+                  <div className="original-download-footer-row">
+                    <span className="original-download-selection-summary">
+                      {isMobile
+                        ? `${selected.size.toLocaleString()} / ${MOBILE_MAX_FILE_COUNT} · ${formatStoredFileSizeBytes(selectedTotalBytes)}`
+                        : `${selected.size.toLocaleString()}개 선택 · ${formatStoredFileSizeBytes(selectedTotalBytes)}`}
+                    </span>
+                    <button type="button" onClick={downloadSelected} disabled={selected.size === 0 || isDownloading} className="original-download-submit">
+                      {isDownloading
+                        ? "사진 준비 중..."
+                        : isMobile
+                          ? `선택한 사진 저장 (${selected.size.toLocaleString()})`
+                          : `선택한 파일 다운로드 (${selected.size.toLocaleString()})`}
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
+      <style jsx>{`
+        .original-download-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 70;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+          background: rgba(0, 0, 0, 0.55);
+          backdrop-filter: blur(4px);
+        }
+        .original-download-modal {
+          width: min(960px, 100%);
+          height: min(820px, calc(100dvh - 40px));
+          max-height: calc(100dvh - 40px);
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          padding: 28px;
+          box-sizing: border-box;
+          background: #0f0f12;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 20px;
+        }
+        .original-download-header {
+          flex: 0 0 auto;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 14px;
+        }
+        .original-download-title { font-size: 22px; font-weight: 700; color: #fff; }
+        .original-download-close {
+          width: 36px;
+          height: 36px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex: 0 0 auto;
+          padding: 0;
+          background: none;
+          border: none;
+          border-radius: 8px;
+          color: rgba(255, 255, 255, 0.6);
+          cursor: pointer;
+        }
+        .original-download-close:hover { background: rgba(255,255,255,0.06); color: #fff; }
+        .original-download-meta {
+          flex: 0 0 auto;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+          margin-bottom: 16px;
+        }
+        .original-download-tabs { flex: 0 0 auto; display: flex; gap: 8px; margin-bottom: 16px; }
+        .original-download-files-layout { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+        .original-download-files-toolbar { flex: 0 0 auto; }
+        .original-download-search {
+          width: 100%;
+          box-sizing: border-box;
+          margin-bottom: 10px;
+          padding: 10px 12px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 8px;
+          outline: none;
+          background: rgba(255, 255, 255, 0.05);
+          color: #fff;
+          font-size: 13px;
+        }
+        .original-download-search:focus { border-color: rgba(var(--accent-rgb), 0.6); }
+        .original-download-file-list {
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow-y: auto;
+          overscroll-behavior: contain;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          padding-right: 4px;
+          scrollbar-gutter: stable;
+        }
+        .original-download-file-row {
+          min-height: 44px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex: 0 0 auto;
+          padding: 10px 12px;
+          box-sizing: border-box;
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.06);
+          color: #fff;
+          font-size: 13px;
+          cursor: pointer;
+        }
+        .original-download-file-row:hover { background: rgba(255, 255, 255, 0.09); }
+        .original-download-file-row:has(input:checked) { background: rgba(var(--accent-rgb), 0.12); }
+        .original-download-file-row input { width: 17px; height: 17px; flex: 0 0 auto; accent-color: var(--accent, #4f7eff); }
+        .original-download-footer {
+          flex: 0 0 auto;
+          margin-top: 10px;
+          padding-top: 12px;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          box-shadow: 0 -12px 24px rgba(15, 15, 18, 0.9);
+        }
+        .original-download-status { margin: 0 0 9px; color: rgba(255,255,255,0.72); font-size: 12px; text-align: center; }
+        .original-download-footer-row { display: flex; align-items: center; gap: 16px; }
+        .original-download-selection-summary { min-width: 150px; color: rgba(255,255,255,0.56); font-size: 12px; }
+        .original-download-submit {
+          flex: 1 1 auto;
+          min-height: 46px;
+          padding: 13px 18px;
+          border: none;
+          border-radius: 10px;
+          background: var(--accent, #4f7eff);
+          color: #000;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+        .original-download-submit:disabled {
+          background: rgba(255,255,255,0.1);
+          color: rgba(255,255,255,0.35);
+          cursor: not-allowed;
+        }
+        @media (max-width: 640px) {
+          .original-download-backdrop { align-items: stretch; padding: 0; }
+          .original-download-modal {
+            width: 100%;
+            height: 100dvh;
+            max-height: 100dvh;
+            padding: max(14px, env(safe-area-inset-top, 0px)) 16px max(12px, env(safe-area-inset-bottom, 0px));
+            border: 0;
+            border-radius: 0;
+          }
+          .original-download-header { margin-bottom: 10px; }
+          .original-download-title { font-size: 18px; }
+          .original-download-meta { margin-bottom: 12px; }
+          .original-download-tabs { margin-bottom: 12px; }
+          .original-download-files-toolbar p:first-child { display: none; }
+          .original-download-file-list { padding-right: 0; }
+          .original-download-file-row { min-height: 48px; padding: 11px 10px; }
+          .original-download-footer { margin-top: 8px; padding-top: 10px; }
+          .original-download-footer-row { flex-direction: column; align-items: stretch; gap: 8px; }
+          .original-download-selection-summary { min-width: 0; text-align: center; }
+          .original-download-submit { width: 100%; flex: 0 0 auto; }
+        }
+      `}</style>
     </>
   );
 }

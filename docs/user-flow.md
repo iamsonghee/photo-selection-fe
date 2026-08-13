@@ -24,7 +24,7 @@
 - **성공 시 기대 결과**:
   - `status === "delivered"` → `/c/[token]/delivered`로 즉시 이동.
   - PIN 쿠키가 없으면 → `/c/[token]/pin?from=/c/[token]`으로 이동(PIN 있으면 입력 폼, 없으면 자동 인증 후 원래 페이지 복귀).
-  - 인증 완료 후에는 `InvitePageClient`가 `project.status`를 다시 확인해 `editing`/`editing_v2` → `/locked`, `confirmed` → `/confirmed`로 재분기. 그 외(주로 `preparing`/`selecting`)에는 초대 소개 화면(3단계 안내: 갤러리 감상 → 사진 선택 → 확정&보정) 표시.
+  - 인증 완료 후에는 `InvitePageClient`가 `project.status`를 다시 확인해 `editing`/`editing_v2` → `/locked`, `confirmed` → `/confirmed`로 재분기. 그 외(주로 `preparing`/`selecting`)에는 고객명, 프로젝트명, 전체 사진 수, 필수 선택 수, 선택 마감일과 `사진 선택 시작하기` CTA를 표시한다. PC는 4개 핵심 정보를 한 줄로, 모바일은 2열로 압축해 핵심 정보와 CTA가 첫 화면에 들어오게 한다. 선택 마감일은 서버 차단 조건이 아니므로 이미 지난 경우에도 CTA를 막지 않고 "선택 권장일이 지났지만 지금도 사진을 선택할 수 있어요"라고 안내한다. 원본 포함 프로젝트는 같은 화면에서 별도 `원본 다운로드` 진입점을 제공한다.
 - **실패 및 경계 상황**:
   - 존재하지 않는 `access_token` → `project`가 `null` → "존재하지 않는 초대 링크입니다 / URL을 다시 확인해주세요" 화면(`InvitePageClient.tsx`).
   - `project.status === "preparing"`(작가가 아직 초대 링크를 활성화하지 않음)인 경우 정확히 어떤 화면이 보이는지는 코드상 명시적 분기가 없어 소개 화면이 그대로 노출될 것으로 보임 — 사진이 없는 상태에서의 UX는 **확인 필요**(직접 브라우저 확인 권장).

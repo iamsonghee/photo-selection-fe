@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
-import { format } from "date-fns";
+import { endOfDay, format, isBefore } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { getProfileImageUrl } from "@/lib/photographer";
@@ -284,14 +284,18 @@ export default function InvitePageClient() {
   const M     = project.photoCount;
   const N     = project.requiredCount;
   const ready = project.status === "selecting";
-  const deadlineFormatted = format(new Date(project.deadline), "yyyy.MM.dd", { locale: ko });
-  const prjIdShort = project.id.replace(/-/g, "").slice(0, 8).toUpperCase();
-  const photographerName = photographer?.name ?? "담당 작가";
+  const deadlineDate = new Date(project.deadline);
+  const deadlineFormatted = format(deadlineDate, "yyyy.MM.dd", { locale: ko });
+  const selectionDeadlinePassed = isBefore(endOfDay(deadlineDate), new Date());
+  const photographerName = photographer?.name?.trim() || "담당 작가";
+  const photographerSubject = photographer?.name?.trim()
+    ? `${photographer.name.trim()} 작가가`
+    : "담당 작가가";
 
   const MONO = "'JetBrains Mono', 'Courier New', Courier, monospace";
 
   return (
-    <div style={{ minHeight: "100vh", background: "#030303", color: "#fff", display: "flex", flexDirection: "column", position: "relative", overflowX: "hidden", fontFamily: "'Pretendard Variable','Pretendard',-apple-system,sans-serif" }}>
+    <div style={{ minHeight: "100dvh", background: "#030303", color: "#fff", display: "flex", flexDirection: "column", position: "relative", overflowX: "hidden", fontFamily: "'Pretendard Variable','Pretendard',-apple-system,sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
 
@@ -339,11 +343,11 @@ export default function InvitePageClient() {
         .cp-main {
           flex: 1; display: flex; flex-direction: column;
           align-items: center; justify-content: center;
-          padding: 40px 20px; position: relative; z-index: 10;
+          padding: 32px 20px; position: relative; z-index: 10;
         }
         .cp-portal-cmd {
           font-family: ${MONO}; font-size: 12px; color: var(--accent);
-          letter-spacing: 2px; margin-bottom: 24px; text-transform: uppercase;
+          letter-spacing: 1px; margin-bottom: 18px;
           display: flex; align-items: center; gap: 12px;
         }
         .cp-portal-cmd::before, .cp-portal-cmd::after {
@@ -351,10 +355,10 @@ export default function InvitePageClient() {
         }
 
         .cp-card {
-          width: 100%; max-width: 640px;
+          width: 100%; max-width: 760px;
           background: rgba(10,10,10,0.6);
           border: 1px solid var(--border);
-          padding: 56px 48px;
+          padding: 44px 46px 32px;
           position: relative;
           backdrop-filter: blur(4px);
         }
@@ -373,39 +377,41 @@ export default function InvitePageClient() {
           pointer-events: none;
         }
 
-        .cp-card-header { margin-bottom: 48px; text-align: center; }
+        .cp-card-header { margin-bottom: 30px; text-align: center; }
         .cp-h1 {
-          font-size: 42px; font-weight: 800; line-height: 1.2;
-          letter-spacing: -1px; margin-bottom: 16px; word-break: keep-all;
+          font-size: 38px; font-weight: 800; line-height: 1.2;
+          letter-spacing: -1px; margin-bottom: 14px; word-break: keep-all;
         }
         .cp-subtitle {
           font-size: 16px; line-height: 1.6; color: var(--muted-foreground);
-          max-width: 80%; margin: 0 auto; word-break: keep-all;
+          max-width: 620px; margin: 0 auto; word-break: keep-all;
         }
 
         .cp-data-grid {
-          display: grid; grid-template-columns: 1fr 1fr;
+          display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 1px; background: var(--border);
-          border: 1px solid var(--border); margin-bottom: 48px;
+          border: 1px solid var(--border); margin-bottom: 28px;
         }
         .cp-data-cell {
-          background: var(--background); padding: 20px 24px;
-          display: flex; flex-direction: column; gap: 8px;
+          min-width: 0; background: var(--background); padding: 16px 14px;
+          display: flex; flex-direction: column; gap: 7px;
         }
         .cp-data-label {
-          font-family: ${MONO}; font-size: 10px; color: var(--subtle-foreground);
-          text-transform: uppercase; letter-spacing: 1px;
+          font-family: ${MONO}; font-size: 11px; color: var(--subtle-foreground);
+          text-transform: uppercase; letter-spacing: 0.08em;
         }
-        .cp-data-value { font-size: 16px; font-weight: 600; color: var(--foreground); }
+        .cp-data-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 650; color: var(--foreground); }
+        .cp-data-value-accent { color: var(--accent); }
+        .cp-deadline-notice { margin: -16px 0 24px; color: #ffbd8f; font-size: 12px; line-height: 1.5; text-align: center; }
 
         .cp-action-area {
-          display: flex; flex-direction: column; align-items: center; gap: 24px;
+          display: flex; flex-direction: column; align-items: center; gap: 12px;
         }
         .cp-btn-primary {
           display: inline-flex; align-items: center; justify-content: center;
           width: 100%; background: var(--accent); color: #000;
-          font-size: 18px; font-weight: 700;
-          padding: 20px 32px; border: none; cursor: pointer;
+          min-height: 56px; box-sizing: border-box; font-size: 17px; font-weight: 700;
+          padding: 16px 28px; border: none; cursor: pointer;
           transition: background 0.2s; text-decoration: none;
           font-family: inherit;
         }
@@ -415,14 +421,14 @@ export default function InvitePageClient() {
         .cp-btn-primary:hover:not(:disabled) .cp-btn-arrow { transform: translateX(4px); }
 
         .cp-btn-sub {
-          font-family: ${MONO}; font-size: 12px; color: var(--muted-foreground);
+          font-size: 13px; color: var(--muted-foreground);
           text-decoration: none; display: flex; align-items: center; gap: 8px;
-          transition: color 0.2s; letter-spacing: 0.5px; background: none; border: none; cursor: pointer;
+          transition: color 0.2s; background: none; border: none; cursor: pointer;
         }
         .cp-btn-sub:hover { color: var(--foreground); }
 
         .cp-photographer-card {
-          margin-top: 48px; padding-top: 32px;
+          margin-top: 28px; padding-top: 20px;
           border-top: 1px dashed var(--border);
           display: flex; align-items: center; justify-content: space-between;
         }
@@ -434,12 +440,11 @@ export default function InvitePageClient() {
         }
         .cp-author-name { font-size: 15px; font-weight: 700; }
         .cp-author-role {
-          font-family: ${MONO}; font-size: 10px; color: var(--subtle-foreground);
-          text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;
+          font-size: 12px; color: var(--subtle-foreground); margin-top: 3px;
         }
         .cp-sys-tag {
-          font-family: ${MONO}; font-size: 10px; color: var(--accent);
-          letter-spacing: 1px; display: flex; align-items: center; gap: 6px;
+          font-size: 11px; color: var(--accent);
+          display: flex; align-items: center; gap: 6px;
         }
         .cp-sys-tag::before {
           content: ''; width: 4px; height: 4px; background: var(--accent);
@@ -459,17 +464,21 @@ export default function InvitePageClient() {
           .cp-header { padding: env(safe-area-inset-top, 16px) 20px 16px; }
           .cp-footer { padding: 16px 20px calc(16px + env(safe-area-inset-bottom)); }
           .cp-sys-info { display: none; }
-          .cp-card { padding: 28px 20px; }
-          .cp-card-header { margin-bottom: 28px; }
+          .cp-card { padding: 24px 18px; }
+          .cp-card-header { margin-bottom: 22px; }
           .cp-h1 { font-size: 28px; margin-bottom: 10px; }
           .cp-subtitle { font-size: 14px; max-width: 100%; }
-          .cp-data-grid { grid-template-columns: 1fr; margin-bottom: 28px; }
-          .cp-data-cell { padding: 12px 16px; }
+          .cp-data-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 22px; }
+          .cp-data-cell { padding: 12px; }
+          .cp-data-label { font-size: 11px; }
           .cp-data-value { font-size: 14px; }
-          .cp-btn-primary { font-size: 16px; padding: 16px 24px; }
-          .cp-photographer-card { margin-top: 28px; padding-top: 20px; }
+          .cp-deadline-notice { margin: -10px 0 18px; text-align: left; }
+          .cp-btn-primary { min-height: 52px; font-size: 16px; padding: 14px 20px; }
+          .cp-photographer-card { margin-top: 22px; padding-top: 16px; }
+          .cp-avatar-box { width: 42px; height: 42px; }
           .cp-bracket { display: none; }
-          .cp-main { padding: 20px 16px; overflow-y: auto; }
+          .cp-main { justify-content: flex-start; padding: 18px 16px 28px; }
+          .cp-portal-cmd { margin-bottom: 12px; }
         }
       `}</style>
 
@@ -490,7 +499,7 @@ export default function InvitePageClient() {
 
       {/* Main */}
       <main className="cp-main">
-        <div className="cp-portal-cmd">CMD :: SYS.CLIENT_INVITE</div>
+        <div className="cp-portal-cmd">CMD :: PHOTO_SELECTION</div>
 
         <div className="cp-card">
           <div className="cp-card-corner-tl" />
@@ -502,11 +511,11 @@ export default function InvitePageClient() {
               {project.customerName ? (
                 <>{project.customerName}님,<br /></>
               ) : null}
-              {ready ? "사진이 준비됐어요." : "사진이 곧 준비돼요."}
+              {ready ? "사진이 도착했어요." : "사진이 곧 준비돼요."}
             </h1>
             <p className="cp-subtitle">
               {ready
-                ? `${photographerName} 작가님이 촬영한 사진을 보내드렸어요. 마음에 드는 사진을 직접 골라주시면 됩니다.`
+                ? `${photographerSubject} 촬영한 ${M.toLocaleString()}장 중 마음에 드는 사진 ${N.toLocaleString()}장을 골라주세요.`
                 : "작가가 사진을 업로드하고 있어요. 잠시만 기다려주세요."}
             </p>
           </div>
@@ -514,32 +523,32 @@ export default function InvitePageClient() {
           {/* Data grid */}
           <div className="cp-data-grid">
             <div className="cp-data-cell">
-              <span className="cp-data-label">FIELD :: PROJECT_NAME</span>
+              <span className="cp-data-label">PROJECT</span>
               <span className="cp-data-value">{project.name}</span>
             </div>
             <div className="cp-data-cell">
-              <span className="cp-data-label">FIELD :: PHOTOGRAPHER</span>
-              <span className="cp-data-value">{photographerName}</span>
+              <span className="cp-data-label">SELECT</span>
+              <span className="cp-data-value cp-data-value-accent">{N.toLocaleString()}장 선택</span>
             </div>
             <div className="cp-data-cell">
-              <span className="cp-data-label">SYS :: DEADLINE</span>
-              <span className="cp-data-value">{deadlineFormatted} 까지</span>
+              <span className="cp-data-label">TOTAL</span>
+              <span className="cp-data-value">{M.toLocaleString()}장</span>
             </div>
             <div className="cp-data-cell">
-              <span className="cp-data-label">DATA :: SELECTION_QUOTA</span>
-              <span className="cp-data-value" style={{ fontFamily: MONO, fontSize: 18 }}>
-                <span style={{ color: "var(--accent)" }}>{N}</span> / {M} 장
-              </span>
+              <span className="cp-data-label">DEADLINE</span>
+              <span className="cp-data-value">{deadlineFormatted}</span>
             </div>
           </div>
+
+          {selectionDeadlinePassed && ready && (
+            <p className="cp-deadline-notice">선택 권장일이 지났지만 지금도 사진을 선택할 수 있어요.</p>
+          )}
 
           {/* Action area */}
           <div className="cp-action-area">
             {ready ? (
-              <Link href={`/c/${token}/gallery`} style={{ width: "100%" }}>
-                <button type="button" className="cp-btn-primary">
-                  사진 보러 가기 <span className="cp-btn-arrow">→</span>
-                </button>
+              <Link href={`/c/${token}/gallery`} className="cp-btn-primary">
+                사진 선택 시작하기 <span className="cp-btn-arrow">→</span>
               </Link>
             ) : (
               <button type="button" className="cp-btn-primary" disabled>
@@ -548,7 +557,7 @@ export default function InvitePageClient() {
             )}
             {ready && <OriginalDownloadEntry token={token} variant="inline" />}
             <Link href={`/c/${token}/about`} className="cp-btn-sub">
-              A컷이 처음이세요? 어떻게 사용하나요 →
+              A컷이 처음이신가요? 이용 가이드 →
             </Link>
           </div>
 

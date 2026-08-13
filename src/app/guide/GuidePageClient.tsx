@@ -362,7 +362,7 @@ function ClientContent() {
         <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
           <Step n={1} title="링크 열기">작가에게 받은 링크를 브라우저에서 엽니다.</Step>
           <Step n={2} title="비밀번호 입력 (설정된 경우)">작가가 PIN을 설정했다면 4자리 비밀번호 입력 화면이 나타납니다. 작가에게 받은 비밀번호를 입력합니다.</Step>
-          <Step n={3} title="갤러리 진입">작가 정보, 선택 갯수, 셀렉 기한을 확인한 뒤 <strong style={{ color: "var(--foreground)" }}>"사진 보러 가기"</strong> 버튼을 클릭합니다.</Step>
+          <Step n={3} title="갤러리 진입">고를 사진 수와 선택 마감일을 확인한 뒤 <strong style={{ color: "var(--foreground)" }}>&quot;사진 선택 시작하기&quot;</strong> 버튼을 클릭합니다.</Step>
         </ol>
         <TipBox>
           <ul style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: 6 }}>

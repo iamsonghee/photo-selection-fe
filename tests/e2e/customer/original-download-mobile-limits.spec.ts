@@ -47,6 +47,15 @@ async function openFileSelection(page: Page) {
   await page.getByRole("button", { name: "개별 파일 선택", exact: true }).first().click();
 }
 
+async function expectFullyInViewport(page: Page, locator: ReturnType<Page["getByRole"]>) {
+  const box = await locator.boundingBox();
+  const viewport = page.viewportSize();
+  expect(box).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(viewport!.height);
+}
+
 async function installDesktopDirectoryPicker(page: Page) {
   await page.addInitScript(() => {
     type DownloadTestWindow = typeof window & {
@@ -107,6 +116,7 @@ test.describe("고객 원본 개별 다운로드 — 모바일", () => {
 
     await expect(page.getByText("휴대폰에서 안정적으로 저장하려면 한 번에 10장, 총 100MB 이내로 나누어 저장해 주세요.")).toBeVisible();
     await expect(page.getByText("전체 선택", { exact: true })).toHaveCount(0);
+    await expectFullyInViewport(page, page.getByRole("button", { name: "선택한 사진 저장 (0)" }));
 
     for (let index = 1; index <= 10; index++) {
       await page.getByRole("checkbox", { name: `original-${index}.jpg 선택` }).check();
@@ -184,6 +194,7 @@ test.describe("고객 원본 개별 다운로드 — PC", () => {
 
       await expect(page.getByText("전체 선택", { exact: true })).toHaveCount(0);
       await expect(page.getByText(/필요한 원본만 선택해 다운로드할 수 있어요/)).toBeVisible();
+      await expectFullyInViewport(page, page.getByRole("button", { name: "선택한 파일 다운로드 (0)" }));
       for (let index = 1; index <= count; index++) {
         await page.getByRole("checkbox", { name: `original-${index}.jpg 선택` }).check();
       }
@@ -193,7 +204,7 @@ test.describe("고객 원본 개별 다운로드 — PC", () => {
       expect(audit.requestedIds).toEqual(files.slice(0, count).map((file) => file.photoId));
       expect(audit.responseCount).toBe(count);
       await expect(page.getByText(`${count}개 파일을 선택한 폴더에 저장했습니다.`)).toBeVisible();
-      await expect(page.getByText("0개 선택됨")).toBeVisible();
+      await expect(page.getByText("0개 선택 · 0 B")).toBeVisible();
     });
   }
 
