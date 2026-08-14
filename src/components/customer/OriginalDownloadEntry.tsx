@@ -106,6 +106,7 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
   const [isMobile, setIsMobile] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloadingPart, setDownloadingPart] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -269,29 +270,27 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
       setIsDownloading(false);
     }
   };
-  const downloadArchives = async () => {
+  // ZIP이 여러 개일 때 한 번의 클릭으로 전부 자동 트리거하면 브라우저의 "여러 파일 자동
+  // 다운로드 차단"에 걸려 일부만 받아지는 경우가 있어, 파트마다 실제 클릭을 받는다.
+  const downloadArchivePart = async (partNumber: number) => {
     setDownloadError(null);
-    setIsDownloading(true);
+    setDownloadingPart(partNumber);
     try {
       const response = await fetch(`/api/c/original-download/archive?token=${encodeURIComponent(token)}`, { cache: "no-store" });
       if (!response.ok) throw new Error("ZIP 다운로드 URL을 발급하지 못했습니다.");
       const data = await response.json() as { files?: PresignedOriginalArchiveDownloadFile[] };
-      const files = data.files ?? [];
-      if (files.length === 0) throw new Error("다운로드할 ZIP이 없습니다.");
-      files.forEach((file, index) => {
-        window.setTimeout(() => {
-          const link = document.createElement("a");
-          link.href = file.url;
-          link.rel = "noopener";
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-        }, index * 250);
-      });
+      const file = (data.files ?? []).find((f) => f.partNumber === partNumber);
+      if (!file) throw new Error("다운로드할 ZIP을 찾을 수 없습니다.");
+      const link = document.createElement("a");
+      link.href = file.url;
+      link.rel = "noopener";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
     } catch {
       setDownloadError("ZIP을 다운로드할 수 없습니다. 잠시 후 다시 시도해주세요.");
     } finally {
-      setIsDownloading(false);
+      setDownloadingPart(null);
     }
   };
   const visibleFiles = info.files
@@ -400,10 +399,32 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}><strong style={{ color: "#fff" }}>전체 압축파일을 준비하고 있습니다</strong><span style={{ color: "rgba(255,255,255,0.62)" }}>준비가 끝나면 이곳에서 한 번에 다운로드할 수 있습니다. 개별 파일은 지금 바로 받을 수 있어요.</span></div>
                 ) : info.archiveFailed ? (
                   <span style={{ color: "#ff9b9b" }}>전체 압축파일 준비에 실패했습니다. 개별 원본 다운로드는 계속 가능합니다.</span>
-                ) : info.archiveFiles.length > 0 ? (
+                ) : info.archiveFiles.length === 1 ? (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}><strong style={{ color: "#fff" }}>전체 압축파일 준비 완료</strong><span style={{ color: "rgba(255,255,255,0.6)" }}>{info.fileCount.toLocaleString()}장 · {formatStoredFileSizeBytes(info.totalBytes)}{info.archiveFiles.length > 1 ? ` · ${info.archiveFiles.length}개 ZIP` : ""}</span></div>
-                    <button type="button" onClick={downloadArchives} disabled={isDownloading} style={{ border: "none", borderRadius: 8, padding: "12px 15px", background: "var(--accent, #4f7eff)", color: "#000", fontSize: 13, fontWeight: 700, cursor: isDownloading ? "wait" : "pointer", flexShrink: 0 }}>{isDownloading ? "다운로드 준비 중..." : "전체 압축파일 다운로드"}</button>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}><strong style={{ color: "#fff" }}>전체 압축파일 준비 완료</strong><span style={{ color: "rgba(255,255,255,0.6)" }}>{info.fileCount.toLocaleString()}장 · {formatStoredFileSizeBytes(info.totalBytes)}</span></div>
+                    <button type="button" onClick={() => downloadArchivePart(info.archiveFiles[0].partNumber)} disabled={downloadingPart !== null} style={{ border: "none", borderRadius: 8, padding: "12px 15px", background: "var(--accent, #4f7eff)", color: "#000", fontSize: 13, fontWeight: 700, cursor: downloadingPart !== null ? "wait" : "pointer", flexShrink: 0 }}>{downloadingPart === info.archiveFiles[0].partNumber ? "다운로드 준비 중..." : "전체 압축파일 다운로드"}</button>
+                  </div>
+                ) : info.archiveFiles.length > 1 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <strong style={{ color: "#fff" }}>전체 압축파일 준비 완료</strong>
+                      <span style={{ color: "rgba(255,255,255,0.6)" }}>{info.fileCount.toLocaleString()}장 · {formatStoredFileSizeBytes(info.totalBytes)} · {info.archiveFiles.length}개 ZIP으로 나뉘어 있어요</span>
+                    </div>
+                    <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>브라우저가 여러 파일을 한 번에 막을 수 있어, 아래에서 하나씩 눌러 받아주세요.</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {info.archiveFiles.map((file) => (
+                        <button
+                          key={file.partNumber}
+                          type="button"
+                          onClick={() => downloadArchivePart(file.partNumber)}
+                          disabled={downloadingPart === file.partNumber}
+                          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, border: "none", borderRadius: 8, padding: "10px 14px", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: downloadingPart === file.partNumber ? "wait" : "pointer" }}
+                        >
+                          <span>파트 {file.partNumber} · {file.fileCount.toLocaleString()}장 · {formatStoredFileSizeBytes(file.byteSize)}</span>
+                          <span style={{ color: "var(--accent, #4f7eff)" }}>{downloadingPart === file.partNumber ? "다운로드 중..." : "다운로드"}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
                 {isMobile && info.archiveFiles.length > 0 && (
