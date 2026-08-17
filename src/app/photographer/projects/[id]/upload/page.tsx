@@ -222,6 +222,20 @@ type OriginalPresignedItem = {
   expires_at: string;
 };
 
+type FailedOriginalTransfer = {
+  presigned: OriginalPresignedItem;
+  file: File;
+};
+
+function createClientUploadId(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 type PendingOriginalItem = {
   id: string;
   original_filename: string | null;
@@ -417,6 +431,17 @@ async function abandonOriginalJob(jobId: string, token: string): Promise<void> {
   const form = new FormData();
   form.append("job_id", jobId);
   await fetch("/api/photographer/upload/originals/abandon", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+}
+
+async function reportOriginalUploadFailure(jobId: string, token: string): Promise<void> {
+  const form = new FormData();
+  form.append("job_id", jobId);
+  form.append("stage", "deferred_put_or_confirm");
+  await fetch("/api/photographer/upload/originals/report-failure", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: form,
@@ -1211,6 +1236,8 @@ export default function ProjectDetailPage() {
   const [showRecoveryBanner, setShowRecoveryBanner] = useState(false);
   const recoveryFileInputRef = useRef<HTMLInputElement>(null);
   const retryRecoveryFileInputRef = useRef<HTMLInputElement>(null);
+  const recoveryFileInputRefDesktop = useRef<HTMLInputElement>(null);
+  const retryRecoveryFileInputRefDesktop = useRef<HTMLInputElement>(null);
   /** filename+size+lastModified 매칭 실패한 job 목록 */
   const [unmatchedJobs, setUnmatchedJobs] = useState<PendingOriginalItem[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -1569,6 +1596,9 @@ export default function ProjectDetailPage() {
     setTotalUploadCount(uploadFiles.length);
     let currentToken = token;
     const totalFiles = uploadFiles.length;
+    // 같은 파일 전송의 XHR 재시도와 direct API -> Next proxy fallback 전체에서 재사용한다.
+    // 서버 UNIQUE(project_id, client_upload_id)가 응답 유실 후 중복 photo/job 생성을 막는다.
+    const clientUploadIds = uploadFiles.map(() => createClientUploadId());
 
     // 압축→전송 처리. 현재 활성 경로는 모든 기기에서 같은 pipelineMode다:
     // - pipelineMode(PC + 모바일, include_original 여부 무관): 압축(producer)과 XHR 전송
@@ -1613,6 +1643,7 @@ export default function ProjectDetailPage() {
 
     const allFailed: File[] = [];
     const backendRejected: string[] = []; // BUG-01: 서버에서 거부된 파일명 (CR3 등 미지원 형식)
+    const failedOriginalTransfers = new Map<string, FailedOriginalTransfer>();
     let completedBatches = 0;
     // "compressSetup": pipelineMode 전용 — 압축 자체가 시작 불가한 예외(워커/canvas 폴백 모두 실패).
     // legacy 경로는 이 값을 쓰지 않고 기존과 동일하게 즉시 return한다(§아래 legacy 분기).
@@ -1684,7 +1715,10 @@ export default function ProjectDetailPage() {
           const f = new FormData();
           f.append("project_id", id);
           f.append("include_original", (inclOrig && !!rawFile) ? "true" : "false");
-          batch.forEach((file) => f.append("files", file));
+          batch.forEach((file, fileIndex) => {
+            f.append("files", file);
+            f.append("client_upload_ids", clientUploadIds[batchIndex * effectiveBatch + fileIndex]);
+          });
           if (inclOrig && rawFile) {
             f.append("original_filenames", rawFile.name);
             f.append("original_file_sizes", String(rawFile.size));
@@ -1734,8 +1768,12 @@ export default function ProjectDetailPage() {
                   if (sendingSourceRef.current > 0) setSendingSourcePhase(true);
                   const putOk = await putOriginalToR2(p, rawFile, currentToken);
                   const confirmed = putOk && await confirmOrRecoverOriginalUpload(p.job_id, currentToken);
-                  if (!confirmed) sendingSourceFailedRef.current++;
+                  if (!confirmed) {
+                    failedOriginalTransfers.set(p.job_id, { presigned: p, file: rawFile });
+                    sendingSourceFailedRef.current++;
+                  }
                 } catch (presignErr) {
+                  failedOriginalTransfers.set(p.job_id, { presigned: p, file: rawFile });
                   sendingSourceFailedRef.current++;
                   console.warn("presigned PUT/confirm failed:", presignErr);
                 } finally {
@@ -2016,6 +2054,63 @@ export default function ProjectDetailPage() {
       }
     }
 
+    // 개별 PUT의 3회 재시도가 모두 실패해도 다른 사진을 계속 처리한 뒤 실패 항목만 한 번 더
+    // 전송한다. 정상 사진은 재전송하지 않으므로 일반 업로드 속도에는 영향이 없다.
+    if (!abortReason && !stopRequestedRef.current && failedOriginalTransfers.size > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+      const retryItems = Array.from(failedOriginalTransfers.values());
+      let nextRetryIndex = 0;
+      let retryFailed = 0;
+      sendingSourceFailedRef.current = 0;
+      setSendingSourcePhase(true);
+      setSendingSourceSnap({
+        done: sendingSourceDoneRef.current,
+        total: sendingSourceTotalRef.current,
+        failed: 0,
+      });
+
+      const retryLane = async () => {
+        while (nextRetryIndex < retryItems.length) {
+          const item = retryItems[nextRetryIndex++];
+          try {
+            const recovered = await recoverOriginalJob(item.presigned.job_id, currentToken);
+            if (recovered.status === "confirmed") continue;
+            const refreshedPresigned: OriginalPresignedItem = {
+              ...item.presigned,
+              url: recovered.url,
+              source_key: recovered.source_key,
+              content_type: recovered.content_type,
+            };
+            const putOk = await putOriginalToR2(refreshedPresigned, item.file, currentToken);
+            const confirmed = putOk && await confirmOrRecoverOriginalUpload(
+              refreshedPresigned.job_id,
+              currentToken,
+            );
+            if (!confirmed) {
+              retryFailed++;
+              await reportOriginalUploadFailure(refreshedPresigned.job_id, currentToken).catch(() => {});
+            }
+          } catch (error) {
+            retryFailed++;
+            console.warn("deferred original retry failed:", error);
+            await reportOriginalUploadFailure(item.presigned.job_id, currentToken).catch(() => {});
+          }
+          setSendingSourceSnap({
+            done: sendingSourceDoneRef.current,
+            total: sendingSourceTotalRef.current,
+            failed: retryFailed,
+          });
+        }
+      };
+
+      await Promise.all(Array.from(
+        { length: Math.min(2, retryItems.length) },
+        () => retryLane(),
+      ));
+      sendingSourceFailedRef.current = retryFailed;
+      setSendingSourcePhase(false);
+    }
+
     if (stopRequestedRef.current) {
       setAwaitingServerFinalize(false);
       setUploadPhase("idle");
@@ -2075,9 +2170,11 @@ export default function ProjectDetailPage() {
     );
 
     setAwaitingServerFinalize(false);
-    setUploadProgress(100);
-    setUploadPhase("done");
-    fetch("/api/photographer/project-logs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: id, action: "uploaded" }) }).catch(() => {});
+    setUploadProgress(originalIncomplete ? 99 : 100);
+    if (!originalIncomplete) {
+      setUploadPhase("done");
+      fetch("/api/photographer/project-logs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: id, action: "uploaded" }) }).catch(() => {});
+    }
     setTimeout(async () => {
       setAwaitingServerFinalize(false);
       setUploadPhase("idle"); setUploadProgress(0);
@@ -2492,7 +2589,8 @@ export default function ProjectDetailPage() {
     awaitingServerFinalize ||
     uploadingPhotos.length > 0 ||
     queuedPreviews.length > 0 ||
-    sendingSourcePhase;
+    sendingSourcePhase ||
+    pendingRecovery.length > 0;
   const showServerWorking = uploadPhase === "processing" && awaitingServerFinalize;
   const photoUploadAllowed = project.status === "preparing";
   const canFlushAll =
@@ -2673,7 +2771,7 @@ export default function ProjectDetailPage() {
               </span>
               <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT_MUTED, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {sendingSourcePhase
-                  ? `${sendingSourceSnap.done}/${sendingSourceSnap.total}${sendingSourceSnap.failed > 0 ? ` · 실패 ${sendingSourceSnap.failed}` : ""} · 화면을 닫지 마세요`
+                  ? `사진 ${pendingPhotos.length}/${totalUploadCount} · 원본 ${sendingSourceSnap.done}/${sendingSourceSnap.total}${sendingSourceSnap.failed > 0 ? ` · 재시도 ${sendingSourceSnap.failed}` : ""} · 화면을 닫지 마세요`
                   : `${pendingPhotos.length}/${totalUploadCount}장 · ${showServerWorking ? "서버 처리 중" : `${overallProgress}%`}`}
               </span>
               <button
@@ -2802,6 +2900,110 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
+      {/* 데스크톱 원본 복구 배너 (모바일 배너는 mobileProgressBarMounted 블록 내에 표시됨) */}
+      {showRecoveryBanner && pendingRecovery.length > 0 && uploadPhase === "idle" && (
+        <div className="prj-desktop-toolbar" style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 16px", background: "rgba(245,158,11,0.1)", borderBottom: `1px solid rgba(245,158,11,0.3)`, flexShrink: 0 }}>
+          <AlertTriangle size={12} style={{ color: "#F59E0B", flexShrink: 0 }} />
+          <span style={{ fontFamily: MONO, fontSize: 10, color: "#B45309", flex: 1 }}>
+            원본 업로드 미완료 {pendingRecovery.length}개 — 파일을 선택해 이어 업로드할 수 있습니다
+          </span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, maxWidth: 420 }}>
+            {pendingRecovery.slice(0, 8).map((j) => (
+              <span key={j.id} style={{ fontFamily: MONO, fontSize: 9, background: "rgba(245,158,11,0.12)", color: "#B45309", padding: "1px 6px", borderRadius: 3 }}>
+                {j.original_filename ?? "(파일명 없음)"}
+              </span>
+            ))}
+            {pendingRecovery.length > 8 && (
+              <span style={{ fontFamily: MONO, fontSize: 9, color: "#B45309" }}>외 {pendingRecovery.length - 8}개</span>
+            )}
+          </div>
+          <label style={{ cursor: "pointer" }}>
+            <input
+              ref={recoveryFileInputRefDesktop}
+              type="file"
+              accept="image/*"
+              multiple
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                if (recoveryFileInputRefDesktop.current) recoveryFileInputRefDesktop.current.value = "";
+                if (files.length > 0) recoverOriginalFiles(files);
+              }}
+            />
+            <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}>
+              이어 업로드
+            </span>
+          </label>
+          <button type="button" onClick={() => setShowRecoveryBanner(false)} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 0, display: "flex" }}>
+            <X size={12} />
+          </button>
+        </div>
+      )}
+      {/* 데스크톱 복구 매칭 실패 배너 */}
+      {unmatchedJobs.length > 0 && (
+        <div className="prj-desktop-toolbar" style={{ padding: "8px 16px", background: "rgba(239,68,68,0.06)", borderBottom: `1px solid rgba(239,68,68,0.2)`, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <AlertTriangle size={12} style={{ color: "#EF4444", flexShrink: 0 }} />
+            <span style={{ fontFamily: MONO, fontSize: 10, color: "#B91C1C", fontWeight: 600 }}>
+              원본 파일을 찾지 못했습니다 ({unmatchedJobs.length}개)
+            </span>
+            <button type="button" onClick={() => setUnmatchedJobs([])} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 0, display: "flex", marginLeft: "auto" }}>
+              <X size={12} />
+            </button>
+          </div>
+          <div style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED, marginBottom: 6, lineHeight: 1.6 }}>
+            파일명이 변경되었거나 다른 파일을 선택했을 수 있습니다. 원본 파일명 그대로 다시 선택해 주세요.
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
+            {unmatchedJobs.map((j) => (
+              <span key={j.id} style={{ fontFamily: MONO, fontSize: 9, background: "rgba(239,68,68,0.1)", color: "#B91C1C", padding: "1px 6px", borderRadius: 3 }}>
+                {j.original_filename ?? "(파일명 없음)"}
+              </span>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <label style={{ cursor: "pointer" }}>
+              <input
+                ref={retryRecoveryFileInputRefDesktop}
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (retryRecoveryFileInputRefDesktop.current) retryRecoveryFileInputRefDesktop.current.value = "";
+                  if (files.length > 0) {
+                    setPendingRecovery(unmatchedJobs);
+                    setUnmatchedJobs([]);
+                    recoverOriginalFiles(files);
+                  }
+                }}
+              />
+              <span style={{ fontFamily: MONO, fontSize: 9, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}>
+                다시 파일 선택
+              </span>
+            </label>
+            <button
+              type="button"
+              style={{ fontFamily: MONO, fontSize: 9, color: "#EF4444", border: "1px solid rgba(239,68,68,0.4)", background: "none", padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}
+              onClick={async () => {
+                const supabase = createClient();
+                const { data: { session } } = await supabase.auth.getSession();
+                const token = session?.access_token;
+                if (!token) return;
+                for (const j of unmatchedJobs) {
+                  try { await abandonOriginalJob(j.id, token); } catch {}
+                }
+                setUnmatchedJobs([]);
+                setPendingRecovery((prev) => prev.filter((p) => !unmatchedJobs.some((u) => u.id === p.id)));
+              }}
+            >
+              원본 업로드 포기
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* main */}
       <main style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden", zIndex: 10, position: "relative" }}>
 
@@ -2925,11 +3127,14 @@ export default function ProjectDetailPage() {
           {isUploading && (
             <div className="prj-desktop-toolbar" style={{ flexShrink: 0, padding: "7px 16px", background: SURFACE_1, borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, letterSpacing: "0.1em", minWidth: 52 }}>
-                {uploadStopRequested ? "중단 중" : compressingIndex >= 0 ? "압축 중" : "업로드 중"}
+                {uploadStopRequested ? "중단 중" : sendingSourcePhase ? "원본 전송" : compressingIndex >= 0 ? "압축 중" : "업로드 중"}
               </span>
               {totalUploadCount > 0 && (
                 <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT_MUTED, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
-                  {pendingPhotos.length} / {totalUploadCount}장
+                  사진 {pendingPhotos.length}/{totalUploadCount}
+                  {project.includeOriginal && sendingSourceSnap.total > 0
+                    ? ` · 원본 ${sendingSourceSnap.done}/${sendingSourceSnap.total}${sendingSourceSnap.failed > 0 ? ` · 재시도 ${sendingSourceSnap.failed}` : ""}`
+                    : ""}
                 </span>
               )}
               <div style={{ flex: 1, height: 2, background: "var(--border)", overflow: "hidden" }}>

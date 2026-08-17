@@ -107,6 +107,7 @@ export interface Database {
           r2_original_url: string | null;
           original_ready_at: string | null;
           original_status: 'awaiting_upload' | 'pending' | 'processing' | 'completed' | 'failed' | null;
+          client_upload_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -121,6 +122,7 @@ export interface Database {
           r2_original_url?: string | null;
           original_ready_at?: string | null;
           original_status?: 'awaiting_upload' | 'pending' | 'processing' | 'completed' | 'failed' | null;
+          client_upload_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -135,6 +137,7 @@ export interface Database {
           r2_original_url?: string | null;
           original_ready_at?: string | null;
           original_status?: 'awaiting_upload' | 'pending' | 'processing' | 'completed' | 'failed' | null;
+          client_upload_id?: string | null;
           created_at?: string;
         };
       };
@@ -424,7 +427,8 @@ export interface Database {
             | "beta_suspended"
             | "beta_period_changed"
             | "project_limit_hit"
-            | "photo_limit_hit";
+            | "photo_limit_hit"
+            | "upload_idempotency_replay";
           detail: Record<string, unknown> | null;
           created_at: string;
         };
@@ -438,7 +442,8 @@ export interface Database {
             | "beta_suspended"
             | "beta_period_changed"
             | "project_limit_hit"
-            | "photo_limit_hit";
+            | "photo_limit_hit"
+            | "upload_idempotency_replay";
           detail?: Record<string, unknown> | null;
           created_at?: string;
         };
@@ -452,7 +457,8 @@ export interface Database {
             | "beta_suspended"
             | "beta_period_changed"
             | "project_limit_hit"
-            | "photo_limit_hit";
+            | "photo_limit_hit"
+            | "upload_idempotency_replay";
           detail?: Record<string, unknown> | null;
           created_at?: string;
         };

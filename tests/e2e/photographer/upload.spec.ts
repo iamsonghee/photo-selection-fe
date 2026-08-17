@@ -97,8 +97,14 @@ test.describe("작가 — 파일 업로드", () => {
 
   test("U13: 업로드 시작 빠른 연속 클릭 → 같은 파일을 중복 전송하지 않음", async ({ page }) => {
     let requestCount = 0;
+    const clientUploadIds: string[] = [];
     await page.route("**/api/upload/photos", async (route) => {
       requestCount++;
+      const multipartBody = route.request().postDataBuffer()?.toString("utf8") ?? "";
+      const clientUploadId = multipartBody.match(
+        /name="client_upload_ids"\r\n\r\n([0-9a-f-]{36})/i,
+      )?.[1];
+      if (clientUploadId) clientUploadIds.push(clientUploadId);
       await route.fulfill({
         status: 503,
         contentType: "application/json",
@@ -122,5 +128,8 @@ test.describe("작가 — 파일 업로드", () => {
     await expect(page.getByText("1개 파일 처리 실패")).toBeVisible({ timeout: 15_000 });
     // 503은 업로드 1회당 최대 3번 재시도한다. 두 번의 시작 클릭이 6회가 되면 중복 실행이다.
     expect(requestCount).toBe(3);
+    // 응답 유실로 같은 multipart 요청을 재시도해도 서버가 동일 논리 사진으로 판별할 수 있어야 한다.
+    expect(clientUploadIds).toHaveLength(3);
+    expect(new Set(clientUploadIds).size).toBe(1);
   });
 });

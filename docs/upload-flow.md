@@ -24,7 +24,7 @@
 1. 파일 선택 → `startUpload()` 호출.
 2. `include_original=true`이면 HEIC 파일 전체 차단(FE 선행 검증, BE도 동일하게 거부).
 3. **모든 파일**을 브라우저에서 압축(`include_original` 여부와 무관하게 항상 실행). 업로드 화면 전용 `compressImagesInParallel()`이 워커 풀(PC 2 / 모바일 1)로, producer-consumer 파이프라인의 batch를 압축한다 — 비원본은 PC 8장/모바일 3장, 원본 포함은 모든 기기에서 1장 batch다(§FE 배치·동시성·파이프라인 구조 참고). 여기서 모바일은 iPhone/iPad와 Android 휴대폰·태블릿을 뜻한다. 그 외 화면(설정 프로필 이미지, 보정본 업로드 등)은 싱글턴 워커 기반 `compressImageForUpload()`를 그대로 사용 — 두 진입점 모두 실제 압축 로직은 `compressWithWorker()`를 공유한다.
-4. 압축 결과를 FormData에 담아 FastAPI `POST /api/upload/photos`.
+4. 파일 선택 시 각 파일에 세션 내 고정 UUID(`client_upload_id`)를 부여하고 압축 결과와 함께 FormData로 FastAPI `POST /api/upload/photos`에 보낸다. 직접 호출 재시도와 Next 프록시 fallback도 같은 UUID를 재사용한다.
 5. `include_original=true`이면, 같은 배치 처리 안에서 압축하지 않은 브라우저 원본(`rawFile`)을 응답의 `original_presigned` URL로 R2에 직접 PUT — 이 PUT과 다음 단계 confirm이 끝나야 그 배치가 완료 처리된다(§7 진행률 참고).
 6. PUT 완료 후 서버에 confirm 통지(`POST /originals/confirm`).
 
@@ -34,7 +34,7 @@
 
 1. FormData에서 압축본 파일을 받아 Pillow로 EXIF 보정 → 썸네일(300px/q75) 생성 → **같은 decode 결과에서** 프리뷰(1200px/q82) 생성(순차). 이 압축본 bytes는 썸네일/프리뷰 생성 입력으로만 쓰이고 처리 후 즉시 버려진다 — R2에 별도로 저장되지 않는다(§4).
 2. 썸네일 + 프리뷰를 R2에 **병렬** 업로드(`asyncio.gather`).
-3. 요청에 포함된 모든 파일 처리가 끝난 뒤 `insert_photos_with_numbers` RPC가 `photos` 행과, `include_original=true`인 경우 대응하는 `original_jobs` 행을 **한 DB 트랜잭션**에서 생성한다. 번호 할당·사진·job 생성 중 하나라도 실패하면 전체가 롤백되어 `photos.original_status='awaiting_upload'`이지만 job이 없는 고아 행을 막는다.
+3. 요청에 포함된 모든 파일 처리가 끝난 뒤 `insert_photos_with_numbers` RPC가 `photos` 행과, `include_original=true`인 경우 대응하는 `original_jobs` 행을 **한 DB 트랜잭션**에서 생성한다. `(project_id, client_upload_id)` UNIQUE 제약과 프로젝트 행 잠금을 함께 사용하므로 서버 처리는 성공했지만 브라우저가 응답을 받지 못해 같은 요청을 재전송해도 기존 photo/job을 반환하고 새 행을 만들지 않는다. 번호 할당·사진·job 생성 중 하나라도 실패하면 전체가 롤백된다.
 4. FastAPI가 생성된 `original_jobs`를 재조회해 presigned PUT URL을 응답에 포함한다. DB 마이그레이션보다 BE가 먼저 배포된 짧은 구간에만 기존 별도 job INSERT 폴백을 사용한다.
 5. confirm 요청(`/originals/confirm`) 수신 시 R2 HEAD 확인 → job 상태를 `awaiting_upload → pending`으로 전이.
 
@@ -42,9 +42,9 @@
 
 | 경로 | 내용 | 생성 주체 | 비고 |
 |---|---|---|---|
-| `photos/{photographer_id}/{project_id}/{hex}_thumb.jpg` | 갤러리 썸네일 (300px) | FastAPI | 매 업로드마다 새 UUID — key 재사용 없음, `Cache-Control: immutable` |
-| `photos/{photographer_id}/{project_id}/{hex}_preview.jpg` | 뷰어 프리뷰 (1200px) | FastAPI | 동일 |
-| `originals/source/{project_id}/{hex}.{ext}` | 브라우저가 PUT한 원본 raw — **이 키가 그대로 최종 납품 파일** | Browser(presigned PUT) | worker가 검증만 하고 삭제하지 않음(§6) |
+| `photos/{photographer_id}/{project_id}/{client_upload_id.hex}_thumb.jpg` | 갤러리 썸네일 (300px) | FastAPI | 논리 업로드 항목별 고정 key. 응답 유실 재시도만 같은 바이트로 덮어씀, `Cache-Control: immutable` |
+| `photos/{photographer_id}/{project_id}/{client_upload_id.hex}_preview.jpg` | 뷰어 프리뷰 (1200px) | FastAPI | 동일 |
+| `originals/source/{project_id}/{client_upload_id.hex}.{ext}` | 브라우저가 PUT한 원본 raw — **이 키가 그대로 최종 납품 파일** | Browser(presigned PUT) | 재시도 시 같은 key 사용, worker는 검증만 하고 삭제하지 않음(§6) |
 | `originals/{project_id}/{hex}.jpg` | (레거시) 과거 worker가 재압축본을 올리던 경로 | — | **현재 코드는 이 경로에 아무것도 쓰지 않는다.** `storage.py`의 R2 key 허용 패턴에는 과거 생성된 객체 검증용으로 남아 있을 뿐 |
 | `versions/{project_id}/delivery/v{1\|2}/{photo_id}_{hex}.{ext}` | 최종 납품용 보정본 원본(재인코딩 없음) | Browser(presigned PUT) | 파일당 최대 100MiB |
 | `versions/delivery-archives/{project_id}/{archive_id}/part-{n}.zip` | 검토 회차별 최종 보정본 후보 ZIP | FastAPI worker | 폐기 후보 또는 만료 후 삭제 |
@@ -298,7 +298,7 @@ FastAPI 서버 측 동시성(요청 1건 안에서 파일별 처리) — 파이�
 
 업로드 직후 고객 링크 활성화가 worker보다 먼저 실행될 수 있다. 상태 API는 이때 `pending/processing`만 남아 있으면 `originals_processing`을 반환하고, 업로드 화면은 최대 15초 동안 1초 간격으로 활성화를 자동 재시도한다. 버튼에는 `원본 확인 중…`을 표시한다. `awaiting_upload`/`failed`/`NULL` 등 실제 재업로드가 필요한 상태가 섞여 있을 때만 `originals_incomplete`와 복구 안내를 반환한다.
 
-원본 PUT은 첫 요청이 성공하면 추가 대기 없이 끝난다. 네트워크 오류, 408/429/5xx, presigned URL 403에만 `/originals/recover`로 R2 존재 여부를 확인하고 최대 3회(초기 1회+재시도 2회, 500ms/1000ms backoff) PUT한다. PUT 또는 confirm이 끝내 실패하거나 presigned 응답이 누락되면 별도 원본 실패 수로 집계하며, finalize 결과와 함께 "업로드 완료" 대신 "원본 업로드 확인 필요"를 표시하고 복구 배너를 갱신한다. 셀렉용 사진 업로드 성공 자체는 되돌리지 않으므로 사용자는 누락 원본만 다시 선택해 복구한다.
+원본 PUT은 첫 요청이 성공하면 추가 대기 없이 끝난다. 네트워크 오류, 408/429/5xx, presigned URL 403에만 `/originals/recover`로 R2 존재 여부를 확인하고 최대 3회(초기 1회+재시도 2회, 500ms/1000ms backoff) PUT한다. 그래도 실패한 항목은 다른 batch가 끝난 뒤 원본 `File` 객체를 유지한 채 동시 2개로 지연 재전송한다. 최종 실패만 `/originals/report-failure`로 `last_error`에 기록하고, finalize 결과와 함께 "업로드 완료" 대신 "원본 업로드 확인 필요"를 표시한다. 셀렉용 사진 업로드 성공 자체는 되돌리지 않으므로 사용자는 누락 원본만 다시 선택해 복구한다.
 
 **UI phase**: 코드에 정의된 값은 `idle`/`processing`/`done`(과 실패 시 `idle`로 복귀)뿐이다. `uploadPhase === "sending"`을 조건으로 쓰는 UI 코드가 일부 있으나, 실제로 `setUploadPhase("sending")`을 호출하는 지점은 없다 — 즉 `sending`은 현재 코드 경로상 도달하지 않는 상태다(압축과 전송 모두 `processing` 상태로 표시됨).
 
