@@ -35,6 +35,7 @@ import {
 import styles from "./Workflow.module.css";
 import { normalizeReviewDeadlineYmd } from "@/lib/format-review-deadline";
 import { compressImageForUpload } from "@/lib/upload-client-compress";
+import { abandonDeliveryVersions, uploadDeliveryVersions, type DeliveryVersionUpload } from "@/lib/delivery-version-upload";
 import { getDirectoryPicker, saveFilesToDirectory } from "@/lib/directory-download-client";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -1200,6 +1201,8 @@ export default function WorkflowPageClient() {
     if (replacingId) return;
     if (panelVersion !== null) return;
     setReplacingId(photoId);
+    let deliveryMetadata: DeliveryVersionUpload[] = [];
+    let uploadToken = "";
     try {
       const supabase = createClient();
       const {
@@ -1207,12 +1210,20 @@ export default function WorkflowPageClient() {
       } = await supabase.auth.getSession();
       const token = session?.access_token;
       if (!token) throw new Error("로그인이 필요합니다.");
+      uploadToken = token;
 
+      deliveryMetadata = await uploadDeliveryVersions({
+        projectId: id,
+        version,
+        token,
+        files: [{ photoId, file }],
+      });
       const compressed = await compressImageForUpload(file);
       const form = new FormData();
       form.append("project_id", id);
       form.append("version", String(version));
       form.append("photo_ids", photoId);
+      form.append("delivery_metadata", JSON.stringify(deliveryMetadata));
       form.append("files", compressed, compressed.name);
 
       const res = await fetch(`${API_BASE}/api/upload/versions`, {
@@ -1245,6 +1256,9 @@ export default function WorkflowPageClient() {
         })
       );
     } catch (e) {
+      if (deliveryMetadata.length > 0 && uploadToken) {
+        await abandonDeliveryVersions({ projectId: id, version, token: uploadToken, items: deliveryMetadata });
+      }
       alert(e instanceof Error ? e.message : "교체 실패");
     } finally {
       setReplacingId(null);

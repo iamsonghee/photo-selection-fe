@@ -26,6 +26,7 @@ import { DEFAULT_BETA_MAX_REVISION_COUNT } from "@/lib/beta-limits";
 import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
 import { compressImageForUpload } from "@/lib/upload-client-compress";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
+import { abandonDeliveryVersions, uploadDeliveryVersions, type DeliveryVersionUpload } from "@/lib/delivery-version-upload";
 import type { Photo } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -305,6 +306,8 @@ export default function UploadVersionsPanel({
     if (!canDeliver) return;
     setSubmitting(true);
     setError(null);
+    let deliveryMetadata: DeliveryVersionUpload[] = [];
+    let uploadToken = "";
     try {
       const supabase = createClient();
       const {
@@ -317,6 +320,7 @@ export default function UploadVersionsPanel({
       const token = session?.access_token;
       if (userError || !user) throw new Error("로그인 인증을 확인할 수 없습니다.");
       if (!token) throw new Error("로그인이 필요합니다.");
+      uploadToken = token;
 
       const changed = mapping.filter((m) => m.file != null) as Array<
         MappingResult<UploadPanelTarget> & { file: File }
@@ -326,11 +330,28 @@ export default function UploadVersionsPanel({
         return;
       }
 
+      deliveryMetadata = await uploadDeliveryVersions({
+        projectId,
+        version,
+        token,
+        files: changed.map((m) => ({ photoId: m.target.id, file: m.file })),
+        onProgress: (loaded, total) => {
+          setUploadedBytes(loaded);
+          setTotalBytes(total);
+          setUploadPct(total > 0 ? Math.round((loaded / total) * 70) : 0);
+        },
+      });
       const compressedFiles = await Promise.all(changed.map((m) => compressImageForUpload(m.file)));
+      const deliveryTotalBytes = changed.reduce((sum, item) => sum + item.file.size, 0);
+      const previewTotalBytes = compressedFiles.reduce((sum, file) => sum + file.size, 0);
+      const combinedTotalBytes = deliveryTotalBytes + previewTotalBytes;
+      setUploadedBytes(deliveryTotalBytes);
+      setTotalBytes(combinedTotalBytes);
       const form = new FormData();
       form.append("project_id", projectId);
       form.append("version", String(version));
       form.append("photo_ids", changed.map((m) => m.target.id).join(","));
+      form.append("delivery_metadata", JSON.stringify(deliveryMetadata));
       compressedFiles.forEach((f) => form.append("files", f));
 
       const uploadRes = await new Promise<{ ok: boolean; status: number; text: string }>(
@@ -341,12 +362,13 @@ export default function UploadVersionsPanel({
 
           xhr.upload.onprogress = (ev) => {
             if (ev.lengthComputable && ev.total > 0) {
-              setUploadedBytes(ev.loaded);
-              setTotalBytes(ev.total);
-              setUploadPct(Math.min(100, Math.round((ev.loaded / ev.total) * 100)));
+              const combinedLoaded = deliveryTotalBytes + ev.loaded;
+              setUploadedBytes(combinedLoaded);
+              setTotalBytes(combinedTotalBytes);
+              setUploadPct(Math.min(100, Math.round((combinedLoaded / combinedTotalBytes) * 100)));
               if (ev.loaded >= ev.total) setServerProcessing(true);
             } else if (ev.loaded > 0) {
-              setUploadedBytes(ev.loaded);
+              setUploadedBytes(deliveryTotalBytes + ev.loaded);
             }
           };
           xhr.upload.onload = () => setServerProcessing(true);
@@ -400,6 +422,9 @@ export default function UploadVersionsPanel({
 
       onDelivered(version);
     } catch (e) {
+      if (deliveryMetadata.length > 0 && uploadToken) {
+        await abandonDeliveryVersions({ projectId, version, token: uploadToken, items: deliveryMetadata });
+      }
       setError(e instanceof Error ? e.message : "업로드 실패");
     } finally {
       setSubmitting(false);
@@ -521,6 +546,10 @@ export default function UploadVersionsPanel({
               <span className="text-subtle-foreground"> / {targets.length}</span>
             </div>
           </div>
+          <p className="mb-5 text-xs leading-5 text-subtle-foreground">
+            선택한 파일은 검토용 미리보기와 최종 납품용 원본 크기 파일로 함께 업로드됩니다.
+            최종 확정 후 고객이 ZIP으로 다운로드할 수 있어요.
+          </p>
 
           {/* Beta limit warning */}
           {overBetaLimit ? (

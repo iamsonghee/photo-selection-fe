@@ -18,6 +18,7 @@ async function getPhotographerIdFromSession(): Promise<string | null> {
 }
 
 function urlToR2Key(url: string): string {
+  if (url.startsWith("versions/")) return url;
   try {
     const pathname = new URL(url).pathname;
     return pathname.startsWith("/") ? pathname.slice(1) : pathname;
@@ -62,7 +63,7 @@ export async function DELETE(
     // Fetch the version record
     const { data: version, error: vErr } = await admin
       .from("photo_versions")
-      .select("id, photo_id, version, r2_url")
+      .select("id, photo_id, version, r2_url, r2_thumb_url, r2_delivery_url")
       .eq("id", versionId)
       .single();
     if (vErr || !version) {
@@ -96,14 +97,16 @@ export async function DELETE(
     }
 
     // Delete R2 file via backend
-    const r2Url = (version as { r2_url: string }).r2_url;
-    const key = urlToR2Key(r2Url);
-    if (key) {
+    const versionFiles = version as { r2_url: string; r2_thumb_url?: string | null; r2_delivery_url?: string | null };
+    const keys = [versionFiles.r2_url, versionFiles.r2_thumb_url, versionFiles.r2_delivery_url]
+      .flatMap((value) => value ? [urlToR2Key(value)] : [])
+      .filter(Boolean);
+    if (keys.length > 0) {
       const backendUrl = process.env.BACKEND_URL ?? process.env.API_URL ?? "http://localhost:8000";
       const res = await fetch(`${backendUrl}/api/storage/delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keys: [key] }),
+        body: JSON.stringify({ keys }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

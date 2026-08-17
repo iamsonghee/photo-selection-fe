@@ -73,6 +73,28 @@ export async function PATCH(
 
     const updatePayload: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
 
+    // 보정 검토 시작 시 최종 납품 후보를 현재 보정본 구성으로 고정한다. RPC가 모든
+    // 셀렉 사진의 원본 크기 보정본 존재 여부와 상태 전환을 한 트랜잭션에서 처리한다.
+    if ((proj.status === "editing" && status === "reviewing_v1") ||
+        (proj.status === "editing_v2" && status === "reviewing_v2")) {
+      const version = status === "reviewing_v1" ? 1 : 2;
+      const { data: archiveId, error: archiveErr } = await admin.rpc("start_retouch_review_with_archive", {
+        p_project_id: projectId,
+        p_version: version,
+      });
+      if (archiveErr) {
+        console.error("[PATCH project status] final retouch archive snapshot failed", archiveErr);
+        const incomplete = /delivery_versions_incomplete/.test(archiveErr.message);
+        return NextResponse.json({
+          error: incomplete
+            ? "모든 셀렉 사진의 원본 크기 보정본을 업로드한 뒤 고객 검토를 시작해주세요."
+            : "최종 보정본 다운로드 준비를 시작하지 못했습니다. 잠시 후 다시 시도해주세요.",
+          code: incomplete ? "delivery_versions_incomplete" : "final_archive_start_failed",
+        }, { status: incomplete ? 409 : 500 });
+      }
+      return NextResponse.json({ status, finalDeliveryArchiveId: archiveId });
+    }
+
     // 원본 포함 프로젝트는 상태 전환과 archive pending 전환을 한 DB 트랜잭션으로 묶는다.
     // 원본 한 장이라도 미완료면 링크를 열지 않아 고객 화면이 영구 "ZIP 준비 중"이 되지 않는다.
     if (proj.status === "preparing" && status === "selecting" && proj.include_original) {

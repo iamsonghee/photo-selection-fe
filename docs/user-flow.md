@@ -207,7 +207,7 @@
   - (재보정 가능 프로젝트) 모바일: 갤러리에서 사진별 승인/재보정 요청 토글 후 전체 제출. 데스크톱: 사진별 상세 뷰어(`/review/[photoId]`)에서 원본/보정본 비교 후 `Y`(승인)/`R`(재보정 요청, 코멘트 최대 100자) 단축키로 처리 후 제출.
 - **프론트엔드 라우트**: `/c/[token]/review` (분기: `DeliveryReceiptView`/`MobileReviewGalleryView`/데스크톱은 `/review/[photoId]`로 자동 이동), `/c/[token]/review/[photoId]`.
 - **호출되는 API**: `GET /api/c/review`(보정본+기존 리뷰 로드) → 사진별 승인/재보정 상태를 모아 `POST /api/c/review/submit` `{ token, reviews: [{photo_version_id, photo_id, status, customer_comment?}] }`로 일괄 제출. (레거시 경로 `POST /api/c/review-submit`도 존재 — `photoVersionId`가 없을 때의 폴백으로 추정, **확인 필요**.)
-- **성공 시 기대 결과**: 서버가 `version_reviews`를 upsert하고, 재보정 요청이 하나라도 있고 `max_revision_count > 0`이며 아직 라운드 한도 내이면 `projects.status = "editing_v2"`(+`revision_round` 증가), 그렇지 않으면(전부 승인, 또는 재보정 한도 소진) `projects.status = "delivered"`. 응답의 `finalStatus`에 따라 `delivered → /delivered`, `editing_v2`/`editing` → `/locked`, 그 외 → `/confirmed`로 이동.
+- **성공 시 기대 결과**: 서버가 `version_reviews`를 upsert하고, 재보정 요청이 하나라도 있고 `max_revision_count > 0`이며 아직 라운드 한도 내이면 `projects.status = "editing_v2"`(+`revision_round` 증가)와 함께 현재 최종 ZIP 후보를 `obsolete`로 만든다. 그렇지 않으면(전부 승인, 또는 재보정 한도 소진) `projects.status = "delivered"`로 전환하고 현재 후보를 최종 납품 대상으로 유지한다. `delivered` 화면에서는 `GET /api/c/final-delivery`와 `/archive`를 통해 원본 크기 최종 보정본 ZIP을 내려받는다.
 - **실패 및 경계 상황**:
   - 제출한 `photo_version_id`가 해당 프로젝트 소속이 아니면 400 반환("일부 보정본 ID가 이 프로젝트와 일치하지 않습니다").
   - `reviews` 배열이 비어있으면 400.
@@ -327,11 +327,12 @@
 - **프론트엔드 라우트**: `/photographer/projects/[id]/workflow`(**실제 사용되는 유일한 V1/V2 업로드·전달 화면** — 프로젝트 상세 허브의 모든 보정 관련 버튼이 여기로 연결됨, `UploadVersionsPanel.tsx` 컴포넌트가 담당). (`/photographer/projects/[id]/edit/start`와 `/photographer/projects/[id]/upload-versions`, `.../upload-versions/v2`는 어디서도 링크되지 않던 레거시 페이지로 2026-07-13 삭제됨 — `/results` 페이지의 "보정 시작하기"/"보정본 업로드" 버튼도 이때 `/workflow`로 가도록 함께 수정됨)
 - **호출되는 API**:
   - `PATCH /api/photographer/projects/{id}` 또는 `.../status` `{status:"editing"}` (보정 시작).
-  - `POST {API_URL}/api/upload/versions`(FastAPI 직접, Bearer JWT) — 1500px/2MB 상한 리사이즈, `photo_versions` upsert, 기존 `version_reviews` 삭제.
+  - `POST {API_URL}/api/upload/versions/delivery/presign` → 보정 원본을 R2에 direct PUT → `POST {API_URL}/api/upload/versions`(FastAPI 직접, Bearer JWT) — delivery HEAD 검증, 검토용 1200px/82% + 300px/75% 생성, `photo_versions` upsert, 기존 `version_reviews` 삭제.
   - 매칭 보조: `POST /api/photographer/projects/{id}/retouch-match`(clip-service 프록시, 파일명 매칭 실패 시 유사도 기반 추천).
-  - 전달: `PATCH .../status` `{status:"reviewing_v1"|"reviewing_v2"}`.
-- **성공 시 기대 결과**: 고객 쪽 `/c/[token]/review`가 활성화되고, `/c/[token]/locked` 등에서도 "보정본이 도착했습니다" 안내가 노출(고객 흐름 §Part1-11).
-- **실패 및 경계 상황**: 재보정 횟수 한도(기본값 2회, `app_settings.beta_max_revision_count` — §9-1, 관리자가 실시간으로 변경 가능)를 넘는 버전 업로드는 FastAPI가 거부. 2MB를 넘는 보정본은 품질을 85%→60%까지 단계적으로 낮춰 자동으로 맞춤(그래도 못 맞추면 어떻게 되는지는 **확인 필요**). V1을 다시 업로드(교체)하면 해당 사진의 `version_reviews`가 삭제되어 고객이 재검토해야 함.
+  - 전달: `PATCH .../status` `{status:"reviewing_v1"|"reviewing_v2"}`가 `start_retouch_review_with_archive` RPC를 호출해 최종 납품 후보 스냅샷 생성과 상태 전환을 한 트랜잭션으로 처리한다.
+- **성공 시 기대 결과**: 고객 검토가 즉시 활성화되고 백그라운드에서 원본 크기 보정본 ZIP 후보가 생성된다. V2 회차는 사진별 최신 V2가 있으면 V2, 없으면 V1을 포함하므로 부분 재보정도 지원한다.
+- **실패 및 경계 상황**: 선택 사진 중 원본 크기 보정본이 하나라도 없으면 고객 검토 시작을 409로 차단한다. 파일당 100MiB를 초과하면 presign 전에 차단한다. 검토 중 교체는 막고, `editing`/`editing_v2`에서 교체하면 기존 `version_reviews`가 삭제된다.
+- **기존 보정본**: 마이그레이션 전에 저장된 `photo_versions`의 1200px 검토 이미지를 원본 크기 파일로 가장해 백필하지 않는다. 아직 `editing`/`editing_v2`인 프로젝트는 해당 보정본을 원본 파일로 다시 업로드해야 다음 검토를 시작할 수 있으며, 이미 `reviewing_*`/`delivered`인 프로젝트에는 최종 ZIP이 소급 생성되지 않는다.
 - **관련 권한/인증 조건**: 로그인 세션(Supabase JWT를 FastAPI에 직접 전달), 소유권.
 - **QA에서 확인해야 할 항목**: `canUploadV1`/`canUploadV2` 조건(`["editing","reviewing_v1"]`/`["editing_v2","reviewing_v2"]`) 밖의 상태에서 업로드 시도 시 UI 차단 여부, 파일명 매칭이 실패했을 때 CLIP 매칭 제안 UI의 정확도, 순차 폴백("순서" 배지)으로 잘못 매칭된 경우 "변경"으로 정상 재지정되는지.
 
@@ -358,7 +359,7 @@
 - **stuck 복구**: `archive_sweep_worker`(`app/archive.py`, 서버 lifespan에서 `original_archive_worker`와 함께 기동, 30분 주기)가 `recover_stuck_original_archive_builds` RPC(part 생성 전 프로젝트 claim, 15분 초과 `processing` 복구)와 `recover_stuck_original_archive_parts` RPC(ZIP 빌드+업로드 중인 part, 45분 초과 `processing` 복구 — part 크기가 클수록 처리 시간이 길어질 수 있어 build claim보다 여유를 둠)를 호출해 archive 빌드가 영구히 멈추지 않게 한다 — `original_jobs`의 `stuck_job_sweep_worker`와 같은 패턴을 archive 큐에도 적용한 것.
 - **고객 화면**: `GET /api/c/original-download`는 파일 수/총 용량/만료일/ZIP 상태와 URL이 없는 파일 메타데이터만 반환한다. 기존 활성 링크에 `original_archive_status=NULL`이면서 미완료 원본이 있는 레거시 상태는 `archiveBlocked=true`로 반환해 무한 "준비 중"이 아니라 미완료 장수와 작가 복구 필요를 안내한다. 실제 ZIP 준비 중일 때만 모달 닫힘 10초/열림 2초로 폴링한다. `GET /api/c/original-download/archive`는 ZIP 클릭 시, `POST /api/c/original-download/files`는 선택한 `photoIds` 다운로드 시에만 1시간 TTL presigned URL을 발급한다. 전체 원본은 ZIP 탭, 일부 원본은 개별 파일 탭으로 역할을 구분하고 개별 탭의 전체 선택은 PC·모바일 모두 숨긴다. PC Chrome/Edge는 CTA 클릭 직후 `showDirectoryPicker()`로 폴더를 먼저 선택하고, API가 선택 ID 수와 동일한 URL을 반환했는지 확인한 뒤 각 URL 응답 body를 `FileSystemWritableFileStream`에 순차적으로 pipe한다. 동일 파일명이 이미 있으면 `(2)`, `(3)` 접미사로 보존한다. 이 경로는 자동 다중 다운로드 권한에 의존하지 않으며 한 번에 전부 Blob 메모리에 올리지 않는다. File System Access API 미지원 데스크톱 브라우저만 기존 `<a download>` 반복 방식으로 폴백한다. 모바일은 API가 이미 제공한 숫자형 `byteSize` 합계를 사용해 10장(`MOBILE_MAX_FILE_COUNT=10`) 또는 총 100MiB(`MOBILE_MAX_TOTAL_BYTES=100 * 1024 * 1024`)를 먼저 초과하는 추가 선택을 즉시 차단하고 이유별 안내를 표시한다. 문구는 기기 성능을 단정하지 않고 “휴대폰에서 안정적으로 저장하기 위한 기준”으로 안내한다. CTA 직전에도 두 제한을 재검증한다. Web Share가 정상 반환되거나 파일 다운로드 폴백을 실행한 뒤에는 다음 묶음을 고를 수 있도록 선택을 초기화하되, OS 사진 앱의 실제 저장 성공을 브라우저가 확인할 수 없으므로 별도 "저장 완료" 메시지는 표시하지 않는다. 모바일의 전체 압축파일 준비 완료 화면에는 용량이 큰 경우 원활한 다운로드를 위해 PC 이용을 권장하는 보조 문구를 표시하되 다운로드 자체는 차단하지 않는다.
 - **기존 프로젝트**: 이 기능 배포 이전에 이미 활성화된 프로젝트는 `original_download_started_at`/`original_archive_status`가 `NULL`로 유지되어 소급 노출되지 않는다(신규 활성화 프로젝트부터만 적용).
-- **최종 보정본과의 관계**: 완전히 별개 — 최종 보정본은 기존대로 `delivered` 상태 이후 작가가 개별적으로 전달한다(이 기능이 다루는 것은 셀렉 이전에 미리 받아둔 "납품용 원본"이며, 보정된 최종본이 아니다).
+- **최종 보정본과의 관계**: `OriginalDownloadEntry`의 촬영 원본과 `FinalDeliveryDownloadEntry`의 최종 보정본은 별도 기능이다. 최종 보정본은 `include_original`과 무관하게 필수 업로드하며, `delivered` 화면에서 최종 확정 회차 ZIP을 `delivered_at`부터 30일 동안 다운로드한다. 재보정 요청 시 이전 후보 ZIP은 폐기되고 다음 검토 전송 때 다시 생성된다.
 
 ---
 

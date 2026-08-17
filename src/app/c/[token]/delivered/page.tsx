@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { PackageCheck } from "lucide-react";
@@ -10,8 +10,11 @@ import { BrandLogoBar } from "@/components/BrandLogo";
 import { CustomerHeader } from "@/components/customer/CustomerHeader";
 import { CustomerFooter } from "@/components/customer/CustomerFooter";
 import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
+import FinalDeliveryDownloadEntry from "@/components/customer/FinalDeliveryDownloadEntry";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
+
+const subscribeToHydration = () => () => {};
 
 export default function DeliveredPage() {
   const params = useParams();
@@ -20,10 +23,8 @@ export default function DeliveredPage() {
   const ctx = useSelectionOptional();
   const project = ctx?.project ?? null;
   const loading = ctx?.loading ?? true;
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
-
-  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -70,8 +71,6 @@ export default function DeliveredPage() {
 
   const photographerName = photographer?.name?.trim() || "작가";
   const invitePath = token ? `/c/${token}` : "/";
-  const galleryPath = token ? `/c/${token}/gallery` : "/";
-
   return (
     <div className={styles.root}>
       <div className={`${styles.viewportBracket} ${styles.bracketTl}`} aria-hidden />
@@ -92,7 +91,7 @@ export default function DeliveredPage() {
         <p className={styles.subtitle}>
           사진 선택과 보정 확인이 모두 끝났습니다.
           <br />
-          최종 사진 원본과 보정본은 {photographerName} 작가님을 통해 별도로 전달됩니다.
+          최종 사진 전달이 완료되었습니다.
         </p>
 
         <section className={styles.card} aria-label="완료 정보">
@@ -119,6 +118,7 @@ export default function DeliveredPage() {
             <div className={styles.message}>소중한 순간을 함께해서 영광이었습니다. 감사합니다</div>
 
             <div className={styles.ctaRow}>
+              <FinalDeliveryDownloadEntry token={token} />
               <OriginalDownloadEntry token={token} variant="inline" />
             </div>
           </div>

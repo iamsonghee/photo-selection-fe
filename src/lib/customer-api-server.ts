@@ -11,6 +11,7 @@ import { callPresignApi } from "@/lib/presign-server";
 import { buildContentDisposition } from "@/lib/content-disposition-server";
 
 const ORIGINAL_DOWNLOAD_WINDOW_DAYS = 30;
+const FINAL_DELIVERY_DOWNLOAD_WINDOW_DAYS = 30;
 
 type ProjectsRow = Database["public"]["Tables"]["projects"]["Row"];
 type PhotosRow = Database["public"]["Tables"]["photos"]["Row"];
@@ -686,4 +687,92 @@ export async function getOriginalArchiveDownloadUrls(
       url,
     }] : [];
   });
+}
+
+export type FinalDeliveryArchiveFile = {
+  partNumber: number;
+  fileCount: number;
+  byteSize: number;
+  url?: string;
+};
+
+export type FinalDeliveryDownloadInfo = {
+  visible: boolean;
+  expired: boolean;
+  preparing: boolean;
+  failed: boolean;
+  fileCount: number;
+  totalBytes: number;
+  expiresAt: string | null;
+  files: FinalDeliveryArchiveFile[];
+};
+
+/** 최종 확정된 검토 회차의 원본 크기 보정본 ZIP 상태. */
+export async function getFinalDeliveryDownloadInfo(
+  admin: SupabaseClient,
+  token: string,
+): Promise<FinalDeliveryDownloadInfo | null> {
+  const { data: project, error } = await admin.from("projects")
+    .select("id,status,delivered_at,active_final_delivery_archive_id")
+    .eq("access_token", token).single();
+  if (error || !project) return null;
+  const row = project as { id: string; status: string; delivered_at: string | null; active_final_delivery_archive_id: string | null };
+  if (row.status !== "delivered" || !row.delivered_at || !row.active_final_delivery_archive_id) {
+    return { visible: false, expired: false, preparing: false, failed: false, fileCount: 0, totalBytes: 0, expiresAt: null, files: [] };
+  }
+  const expiresAt = new Date(new Date(row.delivered_at).getTime() + FINAL_DELIVERY_DOWNLOAD_WINDOW_DAYS * 86400000);
+  const expired = Date.now() > expiresAt.getTime();
+  const { data: archive, error: archiveError } = await admin.from("final_delivery_archives")
+    .select("id,status,file_count,byte_size")
+    .eq("id", row.active_final_delivery_archive_id).eq("project_id", row.id).single();
+  if (archiveError || !archive) return { visible: false, expired, preparing: false, failed: false, fileCount: 0, totalBytes: 0, expiresAt: expiresAt.toISOString(), files: [] };
+  const a = archive as { id: string; status: string; file_count: number; byte_size: number };
+  let files: FinalDeliveryArchiveFile[] = [];
+  if (!expired && a.status === "ready") {
+    const { data: parts, error: partsError } = await admin.from("final_delivery_archive_parts")
+      .select("part_number,file_count,byte_size")
+      .eq("archive_id", a.id).eq("status", "completed").is("deleted_at", null)
+      .order("part_number", { ascending: true });
+    if (partsError) throw new Error(partsError.message);
+    files = (parts ?? []).map((part: { part_number: number; file_count: number; byte_size: number }) => ({
+      partNumber: part.part_number, fileCount: part.file_count, byteSize: part.byte_size,
+    }));
+  }
+  return {
+    visible: true, expired, preparing: !expired && (a.status === "pending" || a.status === "processing"),
+    failed: a.status === "failed", fileCount: a.file_count, totalBytes: a.byte_size,
+    expiresAt: expiresAt.toISOString(), files,
+  };
+}
+
+export async function getFinalDeliveryArchiveDownloadUrls(
+  admin: SupabaseClient,
+  token: string,
+): Promise<FinalDeliveryArchiveFile[] | null> {
+  const { data: project, error } = await admin.from("projects")
+    .select("id,name,status,delivered_at,active_final_delivery_archive_id")
+    .eq("access_token", token).single();
+  if (error || !project) return null;
+  const p = project as { id: string; name: string; status: string; delivered_at: string | null; active_final_delivery_archive_id: string | null };
+  if (p.status !== "delivered" || !p.delivered_at || !p.active_final_delivery_archive_id) return [];
+  if (Date.now() > new Date(p.delivered_at).getTime() + FINAL_DELIVERY_DOWNLOAD_WINDOW_DAYS * 86400000) return [];
+  const { data: archive } = await admin.from("final_delivery_archives").select("status")
+    .eq("id", p.active_final_delivery_archive_id).eq("project_id", p.id).single();
+  if (!archive || (archive as { status: string }).status !== "ready") return [];
+  const { data: parts, error: partsError } = await admin.from("final_delivery_archive_parts")
+    .select("part_number,r2_key,file_count,byte_size")
+    .eq("archive_id", p.active_final_delivery_archive_id).eq("status", "completed")
+    .is("deleted_at", null).order("part_number", { ascending: true });
+  if (partsError) throw new Error(partsError.message);
+  type Part = { part_number: number; r2_key: string; file_count: number; byte_size: number };
+  const rows = (parts ?? []) as Part[];
+  const dispositions: Record<string, string> = {};
+  for (const part of rows) dispositions[part.r2_key] = buildContentDisposition(
+    `${p.name}_최종보정본${rows.length > 1 ? `_part${part.part_number}` : ""}.zip`,
+  );
+  const signed = await callPresignApi(rows.map((part) => part.r2_key), dispositions);
+  return rows.flatMap((part) => signed.urls[part.r2_key] ? [{
+    partNumber: part.part_number, fileCount: part.file_count, byteSize: part.byte_size,
+    url: signed.urls[part.r2_key],
+  }] : []);
 }

@@ -11,6 +11,7 @@
 
 - **셀렉용**: 브라우저 압축본 → FastAPI 전송 → FastAPI가 썸네일/프리뷰 생성 → R2 (압축본 자체는 저장되지 않음, §4)
 - **납품 원본** (`include_original=true`일 때만): 압축하지 않은 브라우저 원본 → R2 presigned PUT 직접 전송 → 비동기 worker가 **재압축 없이** 존재만 검증 후 확정(§6)
+- **최종 보정본 원본** (`include_original`과 무관): 워크플로우 V1/V2 업로드 파일 → R2 presigned PUT 직접 전송 → 검토용 축소본과 함께 `photo_versions`에 연결 → 최종 확정 후 ZIP 납품(§7)
 
 이 둘은 같은 파일 선택에서 **동시에** 발생한다 — `include_original=true`이면 압축본은 FastAPI로, 압축하지 않은 원본은 R2로, 같은 사진이 두 경로로 각각 전송된다.
 
@@ -45,6 +46,16 @@
 | `photos/{photographer_id}/{project_id}/{hex}_preview.jpg` | 뷰어 프리뷰 (1200px) | FastAPI | 동일 |
 | `originals/source/{project_id}/{hex}.{ext}` | 브라우저가 PUT한 원본 raw — **이 키가 그대로 최종 납품 파일** | Browser(presigned PUT) | worker가 검증만 하고 삭제하지 않음(§6) |
 | `originals/{project_id}/{hex}.jpg` | (레거시) 과거 worker가 재압축본을 올리던 경로 | — | **현재 코드는 이 경로에 아무것도 쓰지 않는다.** `storage.py`의 R2 key 허용 패턴에는 과거 생성된 객체 검증용으로 남아 있을 뿐 |
+| `versions/{project_id}/delivery/v{1\|2}/{photo_id}_{hex}.{ext}` | 최종 납품용 보정본 원본(재인코딩 없음) | Browser(presigned PUT) | 파일당 최대 100MiB |
+| `versions/delivery-archives/{project_id}/{archive_id}/part-{n}.zip` | 검토 회차별 최종 보정본 후보 ZIP | FastAPI worker | 폐기 후보 또는 만료 후 삭제 |
+
+## 보정본 업로드와 최종 납품
+
+1. `UploadVersionsPanel`/단일 교체가 원본 파일 metadata로 `POST /api/upload/versions/delivery/presign`을 호출한다. 파일당 상한은 100MiB(`DELIVERY_VERSION_MAX_BYTES`), 브라우저 direct PUT 동시성은 3(`DIRECT_UPLOAD_CONCURRENCY`)이다.
+2. 브라우저가 원본 바이트를 R2에 직접 PUT한 뒤, 별도로 `compressImageForUpload()`한 검토용 파일과 `delivery_metadata`를 `POST /api/upload/versions`에 보낸다.
+3. FastAPI는 delivery key prefix와 R2 HEAD 실제 크기를 확인하고 검토용 1200px/82% JPEG와 300px/75% 썸네일을 만든 뒤 `photo_versions`를 upsert한다. 업로드/교체는 `editing`(V1) 또는 `editing_v2`(V2)에서만 가능하다.
+4. 작가가 고객 검토를 시작하면 `start_retouch_review_with_archive`가 모든 `selections.is_selected=true` 사진에 납품 자산이 있는지 검사한다. V1 검토는 V1, V2 검토는 각 사진의 V2 우선·없으면 V1을 선택해 immutable manifest를 만든다.
+5. `final_delivery_archive_worker`가 기존 `ARCHIVE_PART_MAX_BYTES`(기본 500MiB) 기준으로 ZIP을 만든다. 고객이 재보정을 요청하면 후보를 폐기하고 다음 검토 시작 시 다시 만든다. V1 또는 어느 V2 회차에서든 최종 확정되면 해당 회차 후보가 최종 ZIP이 된다.
 
 FE 압축본(브라우저에서 만든 3200px/q0.82 JPEG)은 R2에 전혀 닿지 않는다 — `/api/upload/photos` 요청 바디로만 존재하고 BE가 썸네일/프리뷰를 만드는 즉시 폐기된다.
 

@@ -69,6 +69,13 @@ export async function POST(req: NextRequest) {
     }
 
     const { status } = await submitVersionReviews(admin, project.id, reviews);
+    const { error: archiveError } = await admin.rpc("resolve_retouch_delivery_archive", {
+      p_project_id: project.id,
+      p_delivered: status === "delivered",
+    });
+    if (archiveError) {
+      console.error("[POST /api/c/review/submit] final delivery archive resolve failed", archiveError);
+    }
     return NextResponse.json({ ok: true, status });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
