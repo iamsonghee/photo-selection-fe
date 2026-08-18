@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, PackageOpen } from "lucide-react";
+import { X, PackageOpen, RotateCcw } from "lucide-react";
 import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
 import {
   getDirectoryPicker,
@@ -106,12 +106,12 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
   const [open, setOpen] = useState(false);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<"archive" | "files">("archive");
-  const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [query, setQuery] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadingPart, setDownloadingPart] = useState<number | null>(null);
+  const customerSelectionCheckboxRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,20 +154,30 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
     };
   }, [open]);
 
+  const customerSelectedFilesForState = info?.files.filter((file) => file.isSelected) ?? [];
+  const checkedCustomerSelectionCount = customerSelectedFilesForState.filter((file) => selectedPhotoIds.has(file.photoId)).length;
+  const allCustomerSelectionsChecked = customerSelectedFilesForState.length > 0
+    && checkedCustomerSelectionCount === customerSelectedFilesForState.length;
+  const someCustomerSelectionsChecked = checkedCustomerSelectionCount > 0 && !allCustomerSelectionsChecked;
+
+  useEffect(() => {
+    if (customerSelectionCheckboxRef.current) {
+      customerSelectionCheckboxRef.current.indeterminate = someCustomerSelectionsChecked;
+    }
+  }, [someCustomerSelectionsChecked]);
+
   if (!info || !info.visible) return null;
 
   const selectedFiles = info.files.filter((file) => selectedPhotoIds.has(file.photoId));
   const selectedTotalBytes = selectedFiles.reduce((total, file) => total + Math.max(0, file.byteSize), 0);
-  const customerSelectedFiles = info.files.filter((file) => file.isSelected);
+  const customerSelectedFiles = customerSelectedFilesForState;
   const normalizedQuery = query.trim().toLowerCase();
   const visibleFiles = info.files
-    .filter((file) => !showSelectedOnly || file.isSelected)
     .filter((file) => file.filename.toLowerCase().includes(normalizedQuery));
 
   const openDownloadModal = () => {
     setSelectedPhotoIds(new Set());
     setMode("archive");
-    setShowSelectedOnly(false);
     setQuery("");
     setDownloadError(null);
     setOpen(true);
@@ -197,6 +207,41 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
     }
 
     setSelectedPhotoIds((current) => new Set(current).add(file.photoId));
+    setDownloadError(null);
+  };
+  const toggleCustomerSelectedFiles = () => {
+    if (customerSelectedFiles.length === 0) return;
+
+    if (allCustomerSelectionsChecked) {
+      setSelectedPhotoIds((current) => {
+        const next = new Set(current);
+        customerSelectedFiles.forEach((file) => next.delete(file.photoId));
+        return next;
+      });
+      setDownloadError(null);
+      return;
+    }
+
+    const next = new Set(selectedPhotoIds);
+    customerSelectedFiles.forEach((file) => next.add(file.photoId));
+    if (isMobileDevice()) {
+      const nextFiles = info.files.filter((file) => next.has(file.photoId));
+      const nextTotalBytes = nextFiles.reduce((total, file) => total + Math.max(0, file.byteSize), 0);
+      if (nextFiles.length > MOBILE_MAX_FILE_COUNT) {
+        setDownloadError(MOBILE_COUNT_LIMIT_MESSAGE);
+        return;
+      }
+      if (nextTotalBytes > MOBILE_MAX_TOTAL_BYTES) {
+        setDownloadError(MOBILE_BYTES_LIMIT_MESSAGE);
+        return;
+      }
+    }
+
+    setSelectedPhotoIds(next);
+    setDownloadError(null);
+  };
+  const resetDownloadSelection = () => {
+    setSelectedPhotoIds(new Set());
     setDownloadError(null);
   };
   const downloadSelected = async () => {
@@ -479,14 +524,26 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
                   <div className="original-download-filter-row">
                     <label className={`original-download-selected-filter${customerSelectedFiles.length === 0 ? " is-disabled" : ""}`}>
                       <input
+                        ref={customerSelectionCheckboxRef}
                         type="checkbox"
-                        checked={showSelectedOnly}
-                        onChange={(event) => setShowSelectedOnly(event.target.checked)}
+                        checked={allCustomerSelectionsChecked}
+                        aria-checked={someCustomerSelectionsChecked ? "mixed" : allCustomerSelectionsChecked}
+                        onChange={toggleCustomerSelectedFiles}
                         disabled={customerSelectedFiles.length === 0}
                       />
-                      <span>선택된 사진만 보기</span>
-                      <span className="original-download-selected-count">{customerSelectedFiles.length.toLocaleString()}</span>
+                      <span>내가 선택한 사진 모두 체크</span>
+                      <span className="original-download-selected-count">{customerSelectedFiles.length.toLocaleString()}장</span>
                     </label>
+                    <button
+                      type="button"
+                      onClick={resetDownloadSelection}
+                      disabled={selectedFiles.length === 0}
+                      className="original-download-reset-selection"
+                      aria-label="다운로드 선택 초기화"
+                      title="다운로드 선택 초기화"
+                    >
+                      <RotateCcw size={14} />
+                    </button>
                   </div>
                   <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="파일명 검색" className="original-download-search" />
                 </div>
@@ -504,7 +561,7 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
                   ))}
                   {visibleFiles.length === 0 && (
                     <div className="original-download-empty">
-                      {showSelectedOnly ? "조건에 맞는 선택된 사진이 없습니다." : "검색 결과가 없습니다."}
+                      검색 결과가 없습니다.
                     </div>
                   )}
                 </div>
@@ -625,6 +682,26 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
           line-height: 1.4;
           text-align: center;
         }
+        .original-download-reset-selection {
+          width: 30px;
+          height: 30px;
+          flex: 0 0 auto;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.04);
+          color: rgba(255, 255, 255, 0.62);
+          cursor: pointer;
+        }
+        .original-download-reset-selection:hover:not(:disabled) {
+          border-color: rgba(255, 255, 255, 0.2);
+          background: rgba(255, 255, 255, 0.08);
+          color: #fff;
+        }
+        .original-download-reset-selection:disabled { opacity: 0.32; cursor: default; }
         .original-download-search {
           width: 100%;
           box-sizing: border-box;
