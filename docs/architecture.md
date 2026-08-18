@@ -381,7 +381,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/c/photos` | GET | PIN 쿠키 | 갤러리용 프로젝트+사진+선택+그룹 조회. 정상 이미지 경로는 아래 두 presign 라우트를 사용하며, 현재 공개 R2 전환 기간에는 뷰어만 presign 응답 전/실패 시 `r2_preview_url`을 폴백으로 사용(§10) |
 | `api/c/presign-thumbs` | GET | PIN 쿠키 | `?token=&photoIds=`(최대 200장)로 갤러리 카드 썸네일 presigned GET URL 배치 발급(FastAPI `/api/storage/presign` 프록시, R2 key는 응답에 노출 안 함, 2026-08-06 문서화) |
 | `api/c/presign-preview` | GET | PIN 쿠키 | 뷰어 대형 프리뷰용 presigned GET URL 배치 발급. `photoIds` 최대 5장(기존 `photoId` 단건 하위 호환), FastAPI `/api/storage/presign` 프록시. 클라이언트는 PC에서 이전 1장·다음 2장, 모바일에서 양옆 1장을 미리 발급·decode하고 URL을 만료 전까지 캐시한다 |
-| `api/c/original-download` | GET | PIN 쿠키 | 원본 다운로드 상태·파일 메타데이터 조회. 폴링 전용으로 presign을 수행하지 않음 |
+| `api/c/original-download` | GET | PIN 쿠키 | 원본 다운로드 상태·파일 메타데이터(`photoId`/파일명/용량/고객 셀렉 여부) 조회. 폴링 전용으로 presign을 수행하지 않음 |
 | `api/c/original-download/archive` | GET | PIN 쿠키 | ZIP 다운로드 클릭 시 완료 파트 presigned URL 발급 |
 | `api/c/final-delivery` | GET | PIN 쿠키 | 최종 보정본 ZIP 상태·수량·용량·만료일 조회 |
 | `api/c/final-delivery/archive` | GET | PIN 쿠키 | 최종 보정본 ZIP 클릭 시 presigned URL 발급 |

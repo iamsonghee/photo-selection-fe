@@ -421,6 +421,8 @@ export interface OriginalDownloadFile {
   photoId: string;
   filename: string;
   byteSize: number;
+  /** 고객 셀렉 단계에서 현재 선택된 사진인지 여부. 다운로드 체크 상태와는 별개다. */
+  isSelected: boolean;
 }
 
 export interface OriginalArchiveDownloadFile {
@@ -429,7 +431,10 @@ export interface OriginalArchiveDownloadFile {
   byteSize: number;
 }
 
-export interface PresignedOriginalDownloadFile extends OriginalDownloadFile {
+export interface PresignedOriginalDownloadFile {
+  photoId: string;
+  filename: string;
+  byteSize: number;
   url: string;
 }
 
@@ -510,16 +515,30 @@ export async function getOriginalDownloadInfo(
   const expired = Date.now() > expiresAt.getTime();
 
   // PostgREST의 기본 1,000행 제한을 넘길 수 있어 최대 베타 한도(3,000장)까지 나눈다.
-  const pages = await Promise.all([0, 1, 2].map((i) =>
-    admin.from("photos")
-      .select("id, original_filename, original_compressed_size, original_status")
-      .eq("project_id", project.id)
-      .order("number", { ascending: true })
-      .range(i * 1000, (i + 1) * 1000 - 1)
-  ));
+  const [pages, selectionPages] = await Promise.all([
+    Promise.all([0, 1, 2].map((i) =>
+      admin.from("photos")
+        .select("id, original_filename, original_compressed_size, original_status")
+        .eq("project_id", project.id)
+        .order("number", { ascending: true })
+        .range(i * 1000, (i + 1) * 1000 - 1)
+    )),
+    Promise.all([0, 1, 2].map((i) =>
+      admin.from("selections")
+        .select("photo_id")
+        .eq("project_id", project.id)
+        .eq("is_selected", true)
+        .range(i * 1000, (i + 1) * 1000 - 1)
+    )),
+  ]);
   for (const page of pages) if (page.error) throw new Error(page.error.message);
+  for (const page of selectionPages) if (page.error) throw new Error(page.error.message);
   type OriginalRow = { id: string; original_filename: string | null; original_compressed_size: number | null; original_status: string | null };
+  type SelectionRow = { photo_id: string };
   const allOriginals = pages.flatMap((page) => page.data ?? []) as OriginalRow[];
+  const selectedPhotoIds = new Set(
+    (selectionPages.flatMap((page) => page.data ?? []) as SelectionRow[]).map((selection) => selection.photo_id),
+  );
   const originals = allOriginals.filter((file) => file.original_status === "completed");
   const incompleteOriginalCount = allOriginals.length - originals.length;
   const fileCount = originals.length;
@@ -550,6 +569,7 @@ export async function getOriginalDownloadInfo(
       photoId: file.id,
       filename: file.original_filename || "photo",
       byteSize: file.original_compressed_size ?? 0,
+      isSelected: selectedPhotoIds.has(file.id),
     }));
 
   const archivePreparing = !archiveBlocked && project.originalArchiveStatus !== "ready" && project.originalArchiveStatus !== "failed";

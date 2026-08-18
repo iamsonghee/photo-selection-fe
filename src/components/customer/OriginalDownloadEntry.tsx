@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, PackageOpen } from "lucide-react";
 import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
@@ -14,13 +14,17 @@ interface OriginalDownloadFile {
   photoId: string;
   filename: string;
   byteSize: number;
+  isSelected: boolean;
 }
 interface OriginalArchiveDownloadFile {
   partNumber: number;
   fileCount: number;
   byteSize: number;
 }
-interface PresignedOriginalDownloadFile extends OriginalDownloadFile {
+interface PresignedOriginalDownloadFile {
+  photoId: string;
+  filename: string;
+  byteSize: number;
   url: string;
 }
 interface PresignedOriginalArchiveDownloadFile extends OriginalArchiveDownloadFile {
@@ -100,13 +104,15 @@ function formatExpiry(iso: string | null): string {
 export default function OriginalDownloadEntry({ token, variant = "floating" }: { token: string; variant?: "floating" | "inline" }) {
   const [info, setInfo] = useState<OriginalDownloadInfo | null>(null);
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<"archive" | "files">("archive");
+  const [fileScope, setFileScope] = useState<"selected" | "all">("all");
   const [query, setQuery] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadingPart, setDownloadingPart] = useState<number | null>(null);
+  const fileScopeTouchedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,7 +120,12 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
       fetch(`/api/c/original-download?token=${encodeURIComponent(token)}`, { cache: "no-store" })
         .then((res) => (res.ok ? (res.json() as Promise<OriginalDownloadInfo>) : null))
         .then((data) => {
-          if (!cancelled && data) setInfo(data);
+          if (!cancelled && data) {
+            setInfo(data);
+            if (open && !fileScopeTouchedRef.current) {
+              setFileScope(data.files.some((file) => file.isSelected) ? "selected" : "all");
+            }
+          }
         })
         .catch(() => {
           // 조용히 무시 — 진입점은 선택적 기능이라 실패해도 나머지 화면에 영향 없음
@@ -151,23 +162,24 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
 
   if (!info || !info.visible) return null;
 
-  const selectedFiles = [...selected]
-    .sort((a, b) => a - b)
-    .flatMap((index) => info.files[index] ? [info.files[index]] : []);
+  const selectedFiles = info.files.filter((file) => selectedPhotoIds.has(file.photoId));
   const selectedTotalBytes = selectedFiles.reduce((total, file) => total + Math.max(0, file.byteSize), 0);
+  const customerSelectedFiles = info.files.filter((file) => file.isSelected);
 
   const openDownloadModal = () => {
-    setSelected(new Set());
+    setSelectedPhotoIds(new Set());
     setMode("archive");
+    fileScopeTouchedRef.current = false;
+    setFileScope(customerSelectedFiles.length > 0 ? "selected" : "all");
     setQuery("");
     setDownloadError(null);
     setOpen(true);
   };
-  const toggleFile = (index: number) => {
-    if (selected.has(index)) {
-      setSelected((current) => {
+  const toggleFile = (file: OriginalDownloadFile) => {
+    if (selectedPhotoIds.has(file.photoId)) {
+      setSelectedPhotoIds((current) => {
         const next = new Set(current);
-        next.delete(index);
+        next.delete(file.photoId);
         return next;
       });
       setDownloadError(null);
@@ -175,8 +187,8 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
     }
 
     if (isMobileDevice()) {
-      const nextCount = selected.size + 1;
-      const nextTotalBytes = selectedTotalBytes + Math.max(0, info.files[index]?.byteSize ?? 0);
+      const nextCount = selectedFiles.length + 1;
+      const nextTotalBytes = selectedTotalBytes + Math.max(0, file.byteSize);
       if (nextCount > MOBILE_MAX_FILE_COUNT) {
         setDownloadError(MOBILE_COUNT_LIMIT_MESSAGE);
         return;
@@ -187,7 +199,15 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
       }
     }
 
-    setSelected((current) => new Set(current).add(index));
+    setSelectedPhotoIds((current) => new Set(current).add(file.photoId));
+    setDownloadError(null);
+  };
+  const selectAllCustomerSelections = () => {
+    setSelectedPhotoIds((current) => {
+      const next = new Set(current);
+      customerSelectedFiles.forEach((file) => next.add(file.photoId));
+      return next;
+    });
     setDownloadError(null);
   };
   const downloadSelected = async () => {
@@ -238,7 +258,7 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
       if (!isMobileDevice()) {
         if (desktopDirectory) {
           await saveFilesToDirectory(desktopDirectory, files);
-          setSelected(new Set());
+          setSelectedPhotoIds(new Set());
           setDownloadError(`${files.length.toLocaleString()}개 파일을 선택한 폴더에 저장했습니다.`);
         } else {
           // File System Access API 미지원 브라우저의 기존 폴백. Chrome/Edge에서는 위의
@@ -252,16 +272,16 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
         if (shared) {
           // Web Share promise가 정상 반환된 시점까지만 알 수 있다. Photos 앱 저장 성공을
           // 단정하지 않고 선택만 비워 다음 묶음을 바로 고를 수 있게 한다.
-          setSelected(new Set());
+          setSelectedPhotoIds(new Set());
           return;
         }
         downloadFiles(files);
-        setSelected(new Set());
+        setSelectedPhotoIds(new Set());
         setDownloadError("이 브라우저에서는 사진 앱 저장을 지원하지 않아 파일 다운로드로 전환했습니다.");
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
         downloadFiles(files);
-        setSelected(new Set());
+        setSelectedPhotoIds(new Set());
         setDownloadError("사진 앱으로 저장할 수 없어 파일 다운로드로 전환했습니다.");
       }
     } catch {
@@ -294,8 +314,8 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
     }
   };
   const visibleFiles = info.files
-    .map((file, index) => ({ file, index }))
-    .filter(({ file }) => file.filename.toLowerCase().includes(query.trim().toLowerCase()));
+    .filter((file) => fileScope === "all" || file.isSelected)
+    .filter((file) => file.filename.toLowerCase().includes(query.trim().toLowerCase()));
   const triggerLabel = info.expiresAt ? `원본 다운로드 · ${formatExpiry(info.expiresAt)}까지` : "원본 다운로드";
 
   return (
@@ -470,17 +490,63 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
                       휴대폰에서 안정적으로 저장하려면 한 번에 {MOBILE_MAX_FILE_COUNT}장, 총 {MOBILE_MAX_TOTAL_LABEL} 이내로 나누어 저장해 주세요.
                     </p>
                   )}
+                  <div className="original-download-scope-row">
+                    <div className="original-download-scope" role="group" aria-label="파일 표시 범위">
+                      {customerSelectedFiles.length > 0 && (
+                        <button
+                          type="button"
+                          aria-pressed={fileScope === "selected"}
+                          onClick={() => {
+                            fileScopeTouchedRef.current = true;
+                            setFileScope("selected");
+                          }}
+                          className={fileScope === "selected" ? "is-active" : undefined}
+                        >
+                          셀렉한 사진 {customerSelectedFiles.length.toLocaleString()}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        aria-pressed={fileScope === "all"}
+                        onClick={() => {
+                          fileScopeTouchedRef.current = true;
+                          setFileScope("all");
+                        }}
+                        className={fileScope === "all" ? "is-active" : undefined}
+                      >
+                        전체 사진 {info.files.length.toLocaleString()}
+                      </button>
+                    </div>
+                    {!isMobile && fileScope === "selected" && customerSelectedFiles.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={selectAllCustomerSelections}
+                        className="original-download-select-customer"
+                        disabled={customerSelectedFiles.every((file) => selectedPhotoIds.has(file.photoId))}
+                      >
+                        {customerSelectedFiles.every((file) => selectedPhotoIds.has(file.photoId))
+                          ? "셀렉 사진 선택 완료"
+                          : "셀렉 사진 전체 선택"}
+                      </button>
+                    )}
+                  </div>
                   <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="파일명 검색" className="original-download-search" />
                 </div>
 
                 <div className="original-download-file-list">
-                  {visibleFiles.map(({ file, index }) => (
-                    <label key={`${file.filename}-${index}`} className="original-download-file-row">
-                      <input type="checkbox" checked={selected.has(index)} onChange={() => toggleFile(index)} aria-label={`${file.filename} 선택`} />
+                  {visibleFiles.map((file) => (
+                    <label key={file.photoId} className="original-download-file-row">
+                      <input type="checkbox" checked={selectedPhotoIds.has(file.photoId)} onChange={() => toggleFile(file)} aria-label={`${file.filename} 선택`} />
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{file.filename}</span>
+                      {file.isSelected && <span className="original-download-selected-badge">셀렉</span>}
                       <span style={{ color: "rgba(255,255,255,0.5)", flexShrink: 0 }}>{formatStoredFileSizeBytes(file.byteSize)}</span>
                     </label>
                   ))}
+                  {visibleFiles.length === 0 && (
+                    <div className="original-download-empty">
+                      {fileScope === "selected" ? "셀렉한 사진이 없습니다." : "검색 결과가 없습니다."}
+                    </div>
+                  )}
                 </div>
 
                 <div className="original-download-footer">
@@ -488,15 +554,15 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
                   <div className="original-download-footer-row">
                     <span className="original-download-selection-summary">
                       {isMobile
-                        ? `${selected.size.toLocaleString()} / ${MOBILE_MAX_FILE_COUNT} · ${formatStoredFileSizeBytes(selectedTotalBytes)}`
-                        : `${selected.size.toLocaleString()}개 선택 · ${formatStoredFileSizeBytes(selectedTotalBytes)}`}
+                        ? `${selectedFiles.length.toLocaleString()} / ${MOBILE_MAX_FILE_COUNT} · ${formatStoredFileSizeBytes(selectedTotalBytes)}`
+                        : `다운로드 선택 ${selectedFiles.length.toLocaleString()}개 · ${formatStoredFileSizeBytes(selectedTotalBytes)}`}
                     </span>
-                    <button type="button" onClick={downloadSelected} disabled={selected.size === 0 || isDownloading} className="original-download-submit">
+                    <button type="button" onClick={downloadSelected} disabled={selectedFiles.length === 0 || isDownloading} className="original-download-submit">
                       {isDownloading
                         ? "사진 준비 중..."
                         : isMobile
-                          ? `선택한 사진 저장 (${selected.size.toLocaleString()})`
-                          : `선택한 파일 다운로드 (${selected.size.toLocaleString()})`}
+                          ? `선택한 사진 저장 (${selectedFiles.length.toLocaleString()})`
+                          : `선택한 파일 다운로드 (${selectedFiles.length.toLocaleString()})`}
                     </button>
                   </div>
                 </div>
@@ -564,6 +630,37 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
         .original-download-tabs { flex: 0 0 auto; display: flex; gap: 8px; margin-bottom: 16px; }
         .original-download-files-layout { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
         .original-download-files-toolbar { flex: 0 0 auto; }
+        .original-download-scope-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 10px;
+        }
+        .original-download-scope { display: flex; gap: 6px; min-width: 0; }
+        .original-download-scope button,
+        .original-download-select-customer {
+          min-height: 32px;
+          padding: 7px 10px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.04);
+          color: rgba(255, 255, 255, 0.58);
+          font-size: 12px;
+          font-weight: 600;
+          white-space: nowrap;
+          cursor: pointer;
+        }
+        .original-download-scope button.is-active {
+          border-color: rgba(var(--accent-rgb), 0.55);
+          background: rgba(var(--accent-rgb), 0.14);
+          color: #fff;
+        }
+        .original-download-select-customer {
+          border-radius: 8px;
+          color: var(--accent, #91b1ff);
+        }
+        .original-download-select-customer:disabled { opacity: 0.45; cursor: default; }
         .original-download-search {
           width: 100%;
           box-sizing: border-box;
@@ -605,6 +702,24 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
         .original-download-file-row:hover { background: rgba(255, 255, 255, 0.09); }
         .original-download-file-row:has(input:checked) { background: rgba(var(--accent-rgb), 0.12); }
         .original-download-file-row input { width: 17px; height: 17px; flex: 0 0 auto; accent-color: var(--accent, #4f7eff); }
+        .original-download-selected-badge {
+          flex: 0 0 auto;
+          padding: 2px 6px;
+          border: 1px solid rgba(var(--accent-rgb), 0.42);
+          border-radius: 999px;
+          background: rgba(var(--accent-rgb), 0.12);
+          color: var(--accent, #91b1ff);
+          font-size: 10px;
+          font-weight: 700;
+        }
+        .original-download-empty {
+          min-height: 96px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: rgba(255, 255, 255, 0.42);
+          font-size: 12px;
+        }
         .original-download-footer {
           flex: 0 0 auto;
           margin-top: 10px;
@@ -647,6 +762,9 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
           .original-download-meta { margin-bottom: 12px; }
           .original-download-tabs { margin-bottom: 12px; }
           .original-download-files-toolbar p:first-child { display: none; }
+          .original-download-scope-row { align-items: stretch; }
+          .original-download-scope { width: 100%; }
+          .original-download-scope button { flex: 1 1 0; }
           .original-download-file-list { padding-right: 0; }
           .original-download-file-row { min-height: 48px; padding: 11px 10px; }
           .original-download-footer { margin-top: 8px; padding-top: 10px; }
