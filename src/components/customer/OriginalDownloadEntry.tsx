@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, PackageOpen } from "lucide-react";
 import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
@@ -106,13 +106,12 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
   const [open, setOpen] = useState(false);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<"archive" | "files">("archive");
-  const [fileScope, setFileScope] = useState<"selected" | "all">("all");
+  const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [query, setQuery] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadingPart, setDownloadingPart] = useState<number | null>(null);
-  const fileScopeTouchedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,12 +119,7 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
       fetch(`/api/c/original-download?token=${encodeURIComponent(token)}`, { cache: "no-store" })
         .then((res) => (res.ok ? (res.json() as Promise<OriginalDownloadInfo>) : null))
         .then((data) => {
-          if (!cancelled && data) {
-            setInfo(data);
-            if (open && !fileScopeTouchedRef.current) {
-              setFileScope(data.files.some((file) => file.isSelected) ? "selected" : "all");
-            }
-          }
+          if (!cancelled && data) setInfo(data);
         })
         .catch(() => {
           // 조용히 무시 — 진입점은 선택적 기능이라 실패해도 나머지 화면에 영향 없음
@@ -165,12 +159,17 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
   const selectedFiles = info.files.filter((file) => selectedPhotoIds.has(file.photoId));
   const selectedTotalBytes = selectedFiles.reduce((total, file) => total + Math.max(0, file.byteSize), 0);
   const customerSelectedFiles = info.files.filter((file) => file.isSelected);
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleFiles = info.files
+    .filter((file) => !showSelectedOnly || file.isSelected)
+    .filter((file) => file.filename.toLowerCase().includes(normalizedQuery));
+  const allVisibleFilesSelected = visibleFiles.length > 0
+    && visibleFiles.every((file) => selectedPhotoIds.has(file.photoId));
 
   const openDownloadModal = () => {
     setSelectedPhotoIds(new Set());
     setMode("archive");
-    fileScopeTouchedRef.current = false;
-    setFileScope(customerSelectedFiles.length > 0 ? "selected" : "all");
+    setShowSelectedOnly(false);
     setQuery("");
     setDownloadError(null);
     setOpen(true);
@@ -202,10 +201,10 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
     setSelectedPhotoIds((current) => new Set(current).add(file.photoId));
     setDownloadError(null);
   };
-  const selectAllCustomerSelections = () => {
+  const selectAllVisibleFiles = () => {
     setSelectedPhotoIds((current) => {
       const next = new Set(current);
-      customerSelectedFiles.forEach((file) => next.add(file.photoId));
+      visibleFiles.forEach((file) => next.add(file.photoId));
       return next;
     });
     setDownloadError(null);
@@ -313,9 +312,6 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
       setDownloadingPart(null);
     }
   };
-  const visibleFiles = info.files
-    .filter((file) => fileScope === "all" || file.isSelected)
-    .filter((file) => file.filename.toLowerCase().includes(query.trim().toLowerCase()));
   const triggerLabel = info.expiresAt ? `원본 다운로드 · ${formatExpiry(info.expiresAt)}까지` : "원본 다운로드";
 
   return (
@@ -490,43 +486,25 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
                       휴대폰에서 안정적으로 저장하려면 한 번에 {MOBILE_MAX_FILE_COUNT}장, 총 {MOBILE_MAX_TOTAL_LABEL} 이내로 나누어 저장해 주세요.
                     </p>
                   )}
-                  <div className="original-download-scope-row">
-                    <div className="original-download-scope" role="group" aria-label="파일 표시 범위">
-                      {customerSelectedFiles.length > 0 && (
-                        <button
-                          type="button"
-                          aria-pressed={fileScope === "selected"}
-                          onClick={() => {
-                            fileScopeTouchedRef.current = true;
-                            setFileScope("selected");
-                          }}
-                          className={fileScope === "selected" ? "is-active" : undefined}
-                        >
-                          셀렉한 사진 {customerSelectedFiles.length.toLocaleString()}
-                        </button>
-                      )}
+                  <div className="original-download-filter-row">
+                    <label className={`original-download-selected-filter${customerSelectedFiles.length === 0 ? " is-disabled" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={showSelectedOnly}
+                        onChange={(event) => setShowSelectedOnly(event.target.checked)}
+                        disabled={customerSelectedFiles.length === 0}
+                      />
+                      <span>선택된 사진만 보기</span>
+                      <span className="original-download-selected-count">{customerSelectedFiles.length.toLocaleString()}</span>
+                    </label>
+                    {!isMobile && showSelectedOnly && visibleFiles.length > 0 && (
                       <button
                         type="button"
-                        aria-pressed={fileScope === "all"}
-                        onClick={() => {
-                          fileScopeTouchedRef.current = true;
-                          setFileScope("all");
-                        }}
-                        className={fileScope === "all" ? "is-active" : undefined}
-                      >
-                        전체 사진 {info.files.length.toLocaleString()}
-                      </button>
-                    </div>
-                    {!isMobile && fileScope === "selected" && customerSelectedFiles.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={selectAllCustomerSelections}
+                        onClick={selectAllVisibleFiles}
                         className="original-download-select-customer"
-                        disabled={customerSelectedFiles.every((file) => selectedPhotoIds.has(file.photoId))}
+                        disabled={allVisibleFilesSelected}
                       >
-                        {customerSelectedFiles.every((file) => selectedPhotoIds.has(file.photoId))
-                          ? "셀렉 사진 선택 완료"
-                          : "셀렉 사진 전체 선택"}
+                        {allVisibleFilesSelected ? "표시된 사진 선택 완료" : "표시된 사진 모두 선택"}
                       </button>
                     )}
                   </div>
@@ -537,14 +515,16 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
                   {visibleFiles.map((file) => (
                     <label key={file.photoId} className="original-download-file-row">
                       <input type="checkbox" checked={selectedPhotoIds.has(file.photoId)} onChange={() => toggleFile(file)} aria-label={`${file.filename} 선택`} />
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{file.filename}</span>
-                      {file.isSelected && <span className="original-download-selected-badge">셀렉</span>}
+                      <span className="original-download-file-identity">
+                        <span className="original-download-filename">{file.filename}</span>
+                        {file.isSelected && <span className="original-download-selected-badge">선택됨</span>}
+                      </span>
                       <span style={{ color: "rgba(255,255,255,0.5)", flexShrink: 0 }}>{formatStoredFileSizeBytes(file.byteSize)}</span>
                     </label>
                   ))}
                   {visibleFiles.length === 0 && (
                     <div className="original-download-empty">
-                      {fileScope === "selected" ? "셀렉한 사진이 없습니다." : "검색 결과가 없습니다."}
+                      {showSelectedOnly ? "조건에 맞는 선택된 사진이 없습니다." : "검색 결과가 없습니다."}
                     </div>
                   )}
                 </div>
@@ -630,35 +610,52 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
         .original-download-tabs { flex: 0 0 auto; display: flex; gap: 8px; margin-bottom: 16px; }
         .original-download-files-layout { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
         .original-download-files-toolbar { flex: 0 0 auto; }
-        .original-download-scope-row {
+        .original-download-filter-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 10px;
           margin-bottom: 10px;
         }
-        .original-download-scope { display: flex; gap: 6px; min-width: 0; }
-        .original-download-scope button,
+        .original-download-selected-filter {
+          min-width: 0;
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          color: rgba(255, 255, 255, 0.72);
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+        .original-download-selected-filter.is-disabled { opacity: 0.4; cursor: default; }
+        .original-download-selected-filter input {
+          width: 16px;
+          height: 16px;
+          margin: 0;
+          flex: 0 0 auto;
+          accent-color: var(--accent, #4f7eff);
+        }
+        .original-download-selected-count {
+          min-width: 20px;
+          padding: 2px 6px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.08);
+          color: rgba(255, 255, 255, 0.58);
+          font-size: 10px;
+          line-height: 1.4;
+          text-align: center;
+        }
         .original-download-select-customer {
           min-height: 32px;
           padding: 7px 10px;
           border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 999px;
+          border-radius: 8px;
           background: rgba(255, 255, 255, 0.04);
-          color: rgba(255, 255, 255, 0.58);
+          color: var(--accent, #91b1ff);
           font-size: 12px;
           font-weight: 600;
           white-space: nowrap;
           cursor: pointer;
-        }
-        .original-download-scope button.is-active {
-          border-color: rgba(var(--accent-rgb), 0.55);
-          background: rgba(var(--accent-rgb), 0.14);
-          color: #fff;
-        }
-        .original-download-select-customer {
-          border-radius: 8px;
-          color: var(--accent, #91b1ff);
         }
         .original-download-select-customer:disabled { opacity: 0.45; cursor: default; }
         .original-download-search {
@@ -702,6 +699,19 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
         .original-download-file-row:hover { background: rgba(255, 255, 255, 0.09); }
         .original-download-file-row:has(input:checked) { background: rgba(var(--accent-rgb), 0.12); }
         .original-download-file-row input { width: 17px; height: 17px; flex: 0 0 auto; accent-color: var(--accent, #4f7eff); }
+        .original-download-file-identity {
+          min-width: 0;
+          flex: 1 1 auto;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .original-download-filename {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
         .original-download-selected-badge {
           flex: 0 0 auto;
           padding: 2px 6px;
@@ -762,9 +772,7 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
           .original-download-meta { margin-bottom: 12px; }
           .original-download-tabs { margin-bottom: 12px; }
           .original-download-files-toolbar p:first-child { display: none; }
-          .original-download-scope-row { align-items: stretch; }
-          .original-download-scope { width: 100%; }
-          .original-download-scope button { flex: 1 1 0; }
+          .original-download-filter-row { min-height: 32px; }
           .original-download-file-list { padding-right: 0; }
           .original-download-file-row { min-height: 48px; padding: 11px 10px; }
           .original-download-footer { margin-top: 8px; padding-top: 10px; }

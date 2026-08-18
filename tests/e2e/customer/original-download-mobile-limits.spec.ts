@@ -148,17 +148,18 @@ test.describe("고객 원본 개별 다운로드 — 모바일", () => {
     await expect(page.getByText("8 / 10 · 96.0 MB")).toBeVisible();
   });
 
-  test("셀렉 사진 필터는 유지하되 모바일 일괄 선택은 제공하지 않는다", async ({ page }) => {
+  test("전체 사진을 기본으로 보여주고 선택된 사진 필터에는 모바일 일괄 선택을 제공하지 않는다", async ({ page }) => {
     await mockOriginalDownload(page, Array.from({ length: 12 }, () => 3 * MIB), [0, 2, 4, 6, 8, 10]);
     await openFileSelection(page);
 
-    await expect(page.getByRole("button", { name: "셀렉한 사진 6" })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByRole("checkbox")).toHaveCount(6);
-    await expect(page.getByText("셀렉", { exact: true })).toHaveCount(6);
-    await expect(page.getByRole("button", { name: "셀렉 사진 전체 선택" })).toHaveCount(0);
+    const selectedOnlyFilter = page.getByRole("checkbox", { name: "선택된 사진만 보기 6" });
+    await expect(selectedOnlyFilter).not.toBeChecked();
+    await expect(page.getByRole("checkbox", { name: /original-\d+\.jpg 선택/ })).toHaveCount(12);
+    await expect(page.getByText("선택됨", { exact: true })).toHaveCount(6);
+    await expect(page.getByRole("button", { name: "표시된 사진 모두 선택" })).toHaveCount(0);
 
-    await page.getByRole("button", { name: "전체 사진 12" }).click();
-    await expect(page.getByRole("checkbox")).toHaveCount(12);
+    await selectedOnlyFilter.check();
+    await expect(page.getByRole("checkbox", { name: /original-\d+\.jpg 선택/ })).toHaveCount(6);
   });
 
   test("Web Share가 정상 반환되면 완료를 단정하지 않고 선택만 초기화한다", async ({ page }) => {
@@ -222,20 +223,23 @@ test.describe("고객 원본 개별 다운로드 — PC", () => {
     });
   }
 
-  test("셀렉 사진을 기본 필터로 보여주고 PC에서 한 번에 다운로드 선택한다", async ({ page }) => {
+  test("전체 사진을 기본으로 보여주고 PC에서 필터 결과를 한 번에 다운로드 선택한다", async ({ page }) => {
     await installDesktopDirectoryPicker(page);
     const files = await mockOriginalDownload(page, Array.from({ length: 8 }, () => 4 * MIB), [0, 2, 5]);
     const audit = await mockSelectedFileDownloads(page, files);
     await openFileSelection(page);
 
-    await expect(page.getByRole("button", { name: "셀렉한 사진 3" })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByRole("checkbox")).toHaveCount(3);
-    await expect(page.getByText("셀렉", { exact: true })).toHaveCount(3);
+    const selectedOnlyFilter = page.getByRole("checkbox", { name: "선택된 사진만 보기 3" });
+    await expect(selectedOnlyFilter).not.toBeChecked();
+    await expect(page.getByRole("checkbox", { name: /original-\d+\.jpg 선택/ })).toHaveCount(8);
+    await expect(page.getByText("선택됨", { exact: true })).toHaveCount(3);
 
-    await page.getByRole("button", { name: "셀렉 사진 전체 선택" }).click();
+    await selectedOnlyFilter.check();
+    await expect(page.getByRole("checkbox", { name: /original-\d+\.jpg 선택/ })).toHaveCount(3);
+    await page.getByRole("button", { name: "표시된 사진 모두 선택" }).click();
     await expect(page.getByText("다운로드 선택 3개 · 12.0 MB")).toBeVisible();
-    await page.getByRole("button", { name: "전체 사진 8" }).click();
-    await expect(page.getByRole("checkbox")).toHaveCount(8);
+    await selectedOnlyFilter.uncheck();
+    await expect(page.getByRole("checkbox", { name: /original-\d+\.jpg 선택/ })).toHaveCount(8);
     await expect(page.getByRole("checkbox", { name: "original-1.jpg 선택" })).toBeChecked();
     await expect(page.getByRole("checkbox", { name: "original-3.jpg 선택" })).toBeChecked();
     await expect(page.getByRole("checkbox", { name: "original-6.jpg 선택" })).toBeChecked();
