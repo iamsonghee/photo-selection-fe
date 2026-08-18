@@ -223,7 +223,7 @@ test.describe("고객 원본 개별 다운로드 — PC", () => {
     });
   }
 
-  test("전체 사진을 기본으로 보여주고 PC에서 필터 결과를 한 번에 다운로드 선택한다", async ({ page }) => {
+  test("전체 사진을 기본으로 보여주고 PC에서도 필터 결과를 개별 선택한다", async ({ page }) => {
     await installDesktopDirectoryPicker(page);
     const files = await mockOriginalDownload(page, Array.from({ length: 8 }, () => 4 * MIB), [0, 2, 5]);
     const audit = await mockSelectedFileDownloads(page, files);
@@ -236,7 +236,10 @@ test.describe("고객 원본 개별 다운로드 — PC", () => {
 
     await selectedOnlyFilter.check();
     await expect(page.getByRole("checkbox", { name: /original-\d+\.jpg 선택/ })).toHaveCount(3);
-    await page.getByRole("button", { name: "표시된 사진 모두 선택" }).click();
+    await expect(page.getByRole("button", { name: /표시된 사진/ })).toHaveCount(0);
+    await page.getByRole("checkbox", { name: "original-1.jpg 선택" }).check();
+    await page.getByRole("checkbox", { name: "original-3.jpg 선택" }).check();
+    await page.getByRole("checkbox", { name: "original-6.jpg 선택" }).check();
     await expect(page.getByText("다운로드 선택 3개 · 12.0 MB")).toBeVisible();
     await selectedOnlyFilter.uncheck();
     await expect(page.getByRole("checkbox", { name: /original-\d+\.jpg 선택/ })).toHaveCount(8);

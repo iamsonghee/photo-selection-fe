@@ -163,8 +163,6 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
   const visibleFiles = info.files
     .filter((file) => !showSelectedOnly || file.isSelected)
     .filter((file) => file.filename.toLowerCase().includes(normalizedQuery));
-  const allVisibleFilesSelected = visibleFiles.length > 0
-    && visibleFiles.every((file) => selectedPhotoIds.has(file.photoId));
 
   const openDownloadModal = () => {
     setSelectedPhotoIds(new Set());
@@ -199,14 +197,6 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
     }
 
     setSelectedPhotoIds((current) => new Set(current).add(file.photoId));
-    setDownloadError(null);
-  };
-  const selectAllVisibleFiles = () => {
-    setSelectedPhotoIds((current) => {
-      const next = new Set(current);
-      visibleFiles.forEach((file) => next.add(file.photoId));
-      return next;
-    });
     setDownloadError(null);
   };
   const downloadSelected = async () => {
@@ -497,16 +487,6 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
                       <span>선택된 사진만 보기</span>
                       <span className="original-download-selected-count">{customerSelectedFiles.length.toLocaleString()}</span>
                     </label>
-                    {!isMobile && showSelectedOnly && visibleFiles.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={selectAllVisibleFiles}
-                        className="original-download-select-customer"
-                        disabled={allVisibleFilesSelected}
-                      >
-                        {allVisibleFilesSelected ? "표시된 사진 선택 완료" : "표시된 사진 모두 선택"}
-                      </button>
-                    )}
                   </div>
                   <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="파일명 검색" className="original-download-search" />
                 </div>
@@ -645,19 +625,6 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
           line-height: 1.4;
           text-align: center;
         }
-        .original-download-select-customer {
-          min-height: 32px;
-          padding: 7px 10px;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 8px;
-          background: rgba(255, 255, 255, 0.04);
-          color: var(--accent, #91b1ff);
-          font-size: 12px;
-          font-weight: 600;
-          white-space: nowrap;
-          cursor: pointer;
-        }
-        .original-download-select-customer:disabled { opacity: 0.45; cursor: default; }
         .original-download-search {
           width: 100%;
           box-sizing: border-box;

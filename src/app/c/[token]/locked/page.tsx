@@ -12,7 +12,9 @@ import { BrandLogoBar } from "@/components/BrandLogo";
 import { CustomerHeader } from "@/components/customer/CustomerHeader";
 import { CustomerFooter } from "@/components/customer/CustomerFooter";
 import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
+import { LockedPhotoViewer } from "@/components/customer/LockedPhotoViewer";
 import type { ReviewResultPhoto } from "@/app/api/c/review-result/route";
+import type { Photo } from "@/types";
 
 const CUSTOMER_CANCEL_MAX = 3;
 
@@ -78,10 +80,10 @@ function PhotoCard({ photo }: { photo: ReviewResultPhoto }) {
 }
 
 /* ── 선택 사진 카드 (검토 결과 없을 때) ── */
-function SimplePhotoCard({ photo }: { photo: import("@/types").Photo }) {
+function SimplePhotoCard({ photo, onOpen }: { photo: Photo; onOpen?: () => void }) {
   const filename = photo.originalFilename?.split("/").pop() ?? `#${photo.orderIndex}`;
   return (
-    <div className="bg-surface/70 border border-border-subtle rounded-xl p-2 flex flex-col gap-2">
+    <button type="button" onClick={onOpen} disabled={!onOpen} aria-label={onOpen ? `${filename} 상세보기` : undefined} className="w-full bg-surface/70 border border-border-subtle rounded-xl p-2 flex flex-col gap-2 text-left transition-colors enabled:cursor-pointer enabled:hover:border-accent/45 enabled:focus-visible:outline-none enabled:focus-visible:ring-2 enabled:focus-visible:ring-accent/70 disabled:cursor-default">
       <div className="w-full aspect-[4/3] bg-surface rounded-lg overflow-hidden border border-border-subtle relative">
         {photo.url ? (
           <img src={photo.url} alt={filename} className="w-full h-full object-cover" />
@@ -93,15 +95,15 @@ function SimplePhotoCard({ photo }: { photo: import("@/types").Photo }) {
         </div>
       </div>
       <p className="text-[11px] font-mono text-muted-foreground truncate" title={filename}>{filename}</p>
-    </div>
+    </button>
   );
 }
 
 /* ── 비선택 원본 카드 (선택하지 않은 사진) ── */
-function UnselectedPhotoCard({ photo }: { photo: import("@/types").Photo }) {
+function UnselectedPhotoCard({ photo, onOpen }: { photo: Photo; onOpen?: () => void }) {
   const filename = photo.originalFilename?.split("/").pop() ?? `#${photo.orderIndex}`;
   return (
-    <div className="bg-surface/40 border border-border-subtle rounded-xl p-2 flex flex-col gap-2">
+    <button type="button" onClick={onOpen} disabled={!onOpen} aria-label={onOpen ? `${filename} 상세보기` : undefined} className="w-full bg-surface/40 border border-border-subtle rounded-xl p-2 flex flex-col gap-2 text-left transition-colors enabled:cursor-pointer enabled:hover:border-border-strong enabled:focus-visible:outline-none enabled:focus-visible:ring-2 enabled:focus-visible:ring-accent/70 disabled:cursor-default">
       <div className="w-full aspect-[4/3] bg-surface rounded-lg overflow-hidden border border-border-subtle relative opacity-70 hover:opacity-100 transition-opacity">
         {photo.url ? (
           <img src={photo.url} alt={filename} className="w-full h-full object-cover" />
@@ -113,7 +115,7 @@ function UnselectedPhotoCard({ photo }: { photo: import("@/types").Photo }) {
         </div>
       </div>
       <p className="text-[11px] font-mono text-subtle-foreground truncate" title={filename}>{filename}</p>
-    </div>
+    </button>
   );
 }
 
@@ -137,43 +139,42 @@ export default function LockedPage() {
   const project = ctx?.project ?? null;
   const loading = ctx?.loading ?? true;
 
-  const [mounted,         setMounted]         = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelling,      setCancelling]      = useState(false);
   const [reviewResult,    setReviewResult]    = useState<ReviewResultPhoto[] | null>(null);
-
-  useEffect(() => { setMounted(true); }, []);
+  const [viewer, setViewer] = useState<{ photos: Photo[]; initialIndex: number; sectionLabel: string; selected: boolean } | null>(null);
 
   useEffect(() => {
     if (!project || !token) return;
     if (project.status === "selecting") router.replace(`/c/${token}/gallery`);
   }, [project, token, router]);
 
+  const projectStatus = project?.status;
   useEffect(() => {
-    if (!token || !project) return;
-    if (!["editing_v2", "reviewing_v2", "delivered"].includes(project.status)) return;
+    if (!token || !projectStatus) return;
+    if (!["editing_v2", "reviewing_v2", "delivered"].includes(projectStatus)) return;
     fetch(`/api/c/review-result?token=${encodeURIComponent(token)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => data?.photos && setReviewResult(data.photos))
       .catch(() => {});
-  }, [token, project?.status]);
+  }, [token, projectStatus]);
 
+  const contextPhotos = ctx?.photos;
+  const selectedIds = ctx?.selectedIds;
   const { photos, unselected, N } = useMemo(() => {
-    type P = import("@/types").Photo;
-    if (!project || !ctx?.photos?.length) {
-      return { photos: [] as P[], unselected: [] as P[], N: 0 };
+    if (!project || !contextPhotos?.length) {
+      return { photos: [] as Photo[], unselected: [] as Photo[], N: 0 };
     }
-    const sel: P[] = [];
-    const unsel: P[] = [];
-    const ids = ctx.selectedIds;
-    for (const p of ctx.photos) {
-      if (ids?.has(p.id)) sel.push(p);
+    const sel: Photo[] = [];
+    const unsel: Photo[] = [];
+    for (const p of contextPhotos) {
+      if (selectedIds?.has(p.id)) sel.push(p);
       else unsel.push(p);
     }
     sel.sort((a, b) => a.orderIndex - b.orderIndex);
     unsel.sort((a, b) => a.orderIndex - b.orderIndex);
     return { photos: sel, unselected: unsel, N: sel.length };
-  }, [project, ctx?.photos, ctx?.selectedIds]);
+  }, [project, contextPhotos, selectedIds]);
 
   const cancelCount      = project?.customerCancelCount ?? 0;
   const remainingCancels = Math.max(0, CUSTOMER_CANCEL_MAX - cancelCount);
@@ -195,7 +196,7 @@ export default function LockedPage() {
     } catch { setCancelling(false); }
   };
 
-  if (!mounted || loading) return <PageLoader variant="full" />;
+  if (loading) return <PageLoader variant="full" />;
   if (!project) return (
     <div className="flex min-h-dvh items-center justify-center bg-background text-subtle-foreground font-mono text-sm">
       존재하지 않는 초대 링크입니다.
@@ -211,6 +212,7 @@ export default function LockedPage() {
   const isConfirmed = project.status === "confirmed";
   const hasReview  = reviewResult && reviewResult.length > 0;
   const showUnselected = isConfirmed && !hasReview && unselected.length > 0;
+  const canViewOriginals = project.status === "confirmed" || project.status === "editing";
 
   const approved = hasReview ? reviewResult!.filter((p) => p.reviewStatus === "approved").length : 0;
   const revision = hasReview ? reviewResult!.filter((p) => p.reviewStatus === "revision_requested").length : 0;
@@ -284,8 +286,12 @@ export default function LockedPage() {
             <section>
               <SectionHeader label="선택된 원본" count={photos.length} tone="brand" />
               <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2">
-                {photos.map((photo) => (
-                  <SimplePhotoCard key={photo.id} photo={photo} />
+                {photos.map((photo, index) => (
+                  <SimplePhotoCard
+                    key={photo.id}
+                    photo={photo}
+                    onOpen={canViewOriginals ? () => setViewer({ photos, initialIndex: index, sectionLabel: "선택된 원본", selected: true }) : undefined}
+                  />
                 ))}
               </div>
             </section>
@@ -294,8 +300,12 @@ export default function LockedPage() {
               <section>
                 <SectionHeader label="선택하지 않은 원본" count={unselected.length} tone="muted" />
                 <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2">
-                  {unselected.map((photo) => (
-                    <UnselectedPhotoCard key={photo.id} photo={photo} />
+                  {unselected.map((photo, index) => (
+                    <UnselectedPhotoCard
+                      key={photo.id}
+                      photo={photo}
+                      onOpen={canViewOriginals ? () => setViewer({ photos: unselected, initialIndex: index, sectionLabel: "선택하지 않은 원본", selected: false }) : undefined}
+                    />
                   ))}
                 </div>
               </section>
@@ -357,6 +367,17 @@ export default function LockedPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {viewer && (
+        <LockedPhotoViewer
+          token={token}
+          photos={viewer.photos}
+          initialIndex={viewer.initialIndex}
+          sectionLabel={viewer.sectionLabel}
+          selected={viewer.selected}
+          onClose={() => setViewer(null)}
+        />
       )}
     </div>
   );
