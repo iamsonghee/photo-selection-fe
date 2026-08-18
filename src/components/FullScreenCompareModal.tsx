@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PrevNextButton } from "@/components/PrevNextButton";
+import { useAdjacentImagePreload } from "@/lib/use-adjacent-image-preload";
 
 type Side = "original" | "version";
 
@@ -34,6 +35,18 @@ export default function FullScreenCompareModal({
       ? { src: originalUrl, label: "원본" }
       : { src: versionUrl, label: versionLabel };
   }, [side, originalUrl, versionUrl, versionLabel]);
+  const preloadUrlGroups = useMemo(
+    () => [[originalUrl, versionUrl]],
+    [originalUrl, versionUrl],
+  );
+  useAdjacentImagePreload(preloadUrlGroups, open ? 0 : null, {
+    desktopBefore: 0,
+    desktopAfter: 0,
+    mobileBefore: 0,
+    mobileAfter: 0,
+    desktopMaxDecoded: 2,
+    mobileMaxDecoded: 2,
+  });
 
   const toggle = () => setSide((s) => (s === "original" ? "version" : "original"));
 
@@ -124,6 +137,8 @@ export default function FullScreenCompareModal({
             <img
               src={current.src}
               alt={current.label}
+              decoding="async"
+              fetchPriority="high"
               className="absolute inset-0 w-full h-full object-contain select-none"
               draggable={false}
             />
@@ -171,4 +186,3 @@ export default function FullScreenCompareModal({
     </div>
   );
 }
-

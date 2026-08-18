@@ -92,4 +92,77 @@ test.describe("고객 — 뷰어 (사진 크게 보기)", () => {
     await expect(page.getByRole("heading", { name: "사진을 찾을 수 없습니다" })).toBeVisible();
     await expect(page.getByRole("link", { name: "갤러리로 돌아가기" })).toHaveAttribute("href", /\/gallery/);
   });
+
+  test("V6: 현재·인접 프리뷰를 배치 발급하고 캐시된 사진은 다시 요청하지 않음", async ({ page }) => {
+    const requestedBatches: string[][] = [];
+    const transparentGif = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
+    await page.route("**/api/c/presign-preview?*", async (route) => {
+      const requestUrl = new URL(route.request().url());
+      const photoIds = (requestUrl.searchParams.get("photoIds") ?? "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
+      requestedBatches.push(photoIds);
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          presignedUrls: Object.fromEntries(photoIds.map((id) => [
+            id,
+            { url: `${transparentGif}#${id}`, expiresAt: Math.floor(Date.now() / 1000) + 3600 },
+          ])),
+        }),
+      });
+    });
+
+    await openGallery(page);
+    const href = await page.locator("a[href*='/viewer/']").first().getAttribute("href");
+    if (!href) { test.skip(true, "뷰어 URL 없음"); return; }
+    await page.goto(href);
+
+    await expect.poll(() => requestedBatches.length).toBe(1);
+    expect(requestedBatches[0]).toHaveLength(3); // 첫 사진 + 다음 2장
+
+    await page.keyboard.press("ArrowRight");
+    await expect.poll(() => requestedBatches.length).toBe(2);
+    expect(requestedBatches[1]).toHaveLength(1); // 앞서 받은 3장은 캐시, 새 다음 사진만 추가
+
+    const allRequestedIds = requestedBatches.flat();
+    expect(new Set(allRequestedIds).size).toBe(allRequestedIds.length);
+    expect(requestedBatches.every((batch) => batch.length <= 4)).toBeTruthy();
+  });
+
+  test("V7: 모바일은 현재 사진과 양옆 1장 범위만 선발급", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const requestedBatches: string[][] = [];
+    await page.route("**/api/c/presign-preview?*", async (route) => {
+      const requestUrl = new URL(route.request().url());
+      const photoIds = (requestUrl.searchParams.get("photoIds") ?? "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
+      requestedBatches.push(photoIds);
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          presignedUrls: Object.fromEntries(photoIds.map((id) => [
+            id,
+            {
+              url: `data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=#${id}`,
+              expiresAt: Math.floor(Date.now() / 1000) + 3600,
+            },
+          ])),
+        }),
+      });
+    });
+
+    await openGallery(page);
+    const href = await page.locator("a[href*='/viewer/']").first().getAttribute("href");
+    if (!href) { test.skip(true, "뷰어 URL 없음"); return; }
+    await page.goto(href);
+
+    await expect.poll(() => requestedBatches.length).toBe(1);
+    expect(requestedBatches[0]).toHaveLength(2); // 첫 사진 + 다음 1장 (이전 사진 없음)
+  });
 });

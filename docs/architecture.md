@@ -378,9 +378,9 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 |---|---|---|---|
 | `api/c/verify-pin` | POST | 없음(엔드포인트 자체가 인증 발급) | PIN 검증, rate limit(1분 5회), 서명 쿠키 발급 |
 | `api/c/auto-verify` | GET | 없음 | PIN 없는 프로젝트에 쿠키 자동 발급 |
-| `api/c/photos` | GET | PIN 쿠키 | 갤러리용 프로젝트+사진+선택+그룹 조회 (반환된 `r2_thumb_url`/`r2_preview_url`은 그리드/뷰어가 직접 렌더링에 쓰지 않음 — 아래 두 presign 라우트로 다시 서명받아 사용, §10) |
+| `api/c/photos` | GET | PIN 쿠키 | 갤러리용 프로젝트+사진+선택+그룹 조회. 정상 이미지 경로는 아래 두 presign 라우트를 사용하며, 현재 공개 R2 전환 기간에는 뷰어만 presign 응답 전/실패 시 `r2_preview_url`을 폴백으로 사용(§10) |
 | `api/c/presign-thumbs` | GET | PIN 쿠키 | `?token=&photoIds=`(최대 200장)로 갤러리 카드 썸네일 presigned GET URL 배치 발급(FastAPI `/api/storage/presign` 프록시, R2 key는 응답에 노출 안 함, 2026-08-06 문서화) |
-| `api/c/presign-preview` | GET | PIN 쿠키 | 뷰어 대형 프리뷰용 presigned GET URL 발급(FastAPI `/api/storage/presign` 프록시) |
+| `api/c/presign-preview` | GET | PIN 쿠키 | 뷰어 대형 프리뷰용 presigned GET URL 배치 발급. `photoIds` 최대 5장(기존 `photoId` 단건 하위 호환), FastAPI `/api/storage/presign` 프록시. 클라이언트는 PC에서 이전 1장·다음 2장, 모바일에서 양옆 1장을 미리 발급·decode하고 URL을 만료 전까지 캐시한다 |
 | `api/c/original-download` | GET | PIN 쿠키 | 원본 다운로드 상태·파일 메타데이터 조회. 폴링 전용으로 presign을 수행하지 않음 |
 | `api/c/original-download/archive` | GET | PIN 쿠키 | ZIP 다운로드 클릭 시 완료 파트 presigned URL 발급 |
 | `api/c/final-delivery` | GET | PIN 쿠키 | 최종 보정본 ZIP 상태·수량·용량·만료일 조회 |
@@ -581,9 +581,10 @@ sequenceDiagram
      - **복구 흐름**: 브라우저 종료/네트워크 단절로 presigned PUT이 미완료된 경우, 페이지 재방문 시 `GET /api/upload/originals/pending`으로 `awaiting_upload`/`failed` job 목록을 조회해 복구 배너 표시. 사용자가 파일 선택 시 `POST /api/upload/originals/recover`로 R2 HEAD 확인 후 이미 있으면 confirm, 없으면 새 presigned URL 발급해 재업로드.
      - 초대 링크가 `preparing→selecting`으로 활성화된 후에만 `enqueue_original_archive_build` RPC가 ZIP 아카이브 빌드를 큐에 넣는다. 활성화 시점에 원본 처리가 남아 있으면 마지막 `complete_original_job`이 다시 enqueue한다. 활성화 전 사진 추가·삭제 가능성 때문에 ZIP 사전 생성은 하지 않는다(상세: `user-flow.md` §8.2).
      - **⚠️ Railway Sleep**: Railway Starter 플랜은 HTTP 요청이 5분간 없으면 인스턴스를 Sleep시키며 `asyncio` worker task가 모두 파괴된다. `pending`/`awaiting_upload` 상태 job은 DB에 보존되지만 처리가 중단되고, 다음 HTTP 요청이 도착해야 worker가 재생성되어 재개된다. **Railway Hobby 플랜($5/월)은 Sleep 없이 상시 가동**되므로 안정적 운영을 위해 Starter가 아닌 Hobby 플랜이 필수다.
-5. **조회(고객 갤러리)**: `SelectionContext`가 `/api/c/photos`(Next.js, Supabase 직접 조회)를 호출해 사진 메타(포함 `r2_thumb_url`/`r2_preview_url` 원문 URL)를 가져오지만, **(2026-08-06 정정)** 그리드 카드는 이 URL을 직접 쓰지 않는다 — `GET /api/c/presign-thumbs?token=...&photoIds=...`(최대 200장/요청)로 `r2_thumb_url`에서 R2 key를 추출해 FastAPI `/api/storage/presign`으로 발급받은 presigned GET URL을 렌더링에 사용한다(R2 key는 응답에 노출 안 됨). 뷰어의 대형 프리뷰도 동일하게 `GET /api/c/presign-preview`(Next → FastAPI `/api/storage/presign` 프록시)로 서명 URL을 받아 사용한다. 두 경로 모두 R2 버킷이 비공개라는 전제이며, "`r2_thumb_url`을 그대로 사용"이라는 과거 서술은 부정확했다.
+5. **조회(고객 갤러리)**: `SelectionContext`가 `/api/c/photos`(Next.js, Supabase 직접 조회)를 호출해 사진 메타(포함 `r2_thumb_url`/`r2_preview_url` 원문 URL)를 가져오지만, **(2026-08-06 정정)** 그리드 카드는 이 URL을 직접 쓰지 않는다 — `GET /api/c/presign-thumbs?token=...&photoIds=...`(최대 200장/요청)로 `r2_thumb_url`에서 R2 key를 추출해 FastAPI `/api/storage/presign`으로 발급받은 presigned GET URL을 렌더링에 사용한다(R2 key는 응답에 노출 안 됨). 뷰어의 대형 프리뷰는 `GET /api/c/presign-preview?photoIds=...`로 현재·인접 사진을 최대 5장까지 한 번에 서명받는다. 클라이언트는 URL을 만료 60초 전까지 최대 100장 캐시하고, 실제 decode용 `Image` 객체는 최근 6장만 유지한다. PC는 이전 1장·다음 2장, 모바일은 이전·다음 각 1장을 선로딩하며 데이터 절약 모드에서는 현재 사진만 요청한다. 현재 공개 R2 전환 기간에는 서명 발급 전/실패 시 `r2_preview_url`을 즉시 표시하는 폴백이 남아 있다.
 6. **보정본(V1/V2) 업로드**: 브라우저가 `/api/upload/versions/delivery/presign`을 받아 원본을 `versions/{project_id}/delivery/v{version}/...`에 동시 3개(`DIRECT_UPLOAD_CONCURRENCY`)씩 direct PUT한다. 이후 `/api/upload/versions`가 HEAD 검증 후 검토용 1200px/82%와 300px/75% JPEG를 만들고 두 자산을 함께 upsert한다. 검토 중 교체는 서버에서 차단된다.
    - **파일-사진 매칭 우선순위**(`src/lib/version-mapping.ts`, `src/lib/retouch-clip-match.ts`, `UploadVersionsPanel.tsx`의 `runClipMatchPass`): ① `exact`(확장자 제외 파일명 완전 일치) → ② `fuzzy`(편집 툴 접미사·1~2자리 버전 번호 제거 후 stem 일치, 2026-07-13부터 3자리 이상 원본 순번은 보존하도록 수정 — BUG-02 참고) → ③ `clip`/`clip_low`(clip-service 이미지 유사도, 임계값 0.85/0.60) → ④ `order`(2026-07-13 추가: 위 세 단계 모두 실패한 잔여 타깃과 잔여 파일을 순서대로 짝짓는 최후 폴백). ④는 매칭 근거가 없으므로 UI에 항상 별도의 "순서" 배지(호박색, exact/fuzzy/AI의 초록·에메랄드와 구분)로 표시되어 작가가 "변경"으로 재지정할 수 있다.
+   - **사진 전환 선로딩**: `useAdjacentImagePreload`가 이미 화면 데이터에 포함된 표시용 URL만 사용해 인접 이미지를 다운로드하고 `Image.decode()`를 시작한다. 고객 보정본 수령/상세와 워크플로우 비교 뷰어는 현재 보기 탭에서 실제 필요한 원본·V1·V2 조합만 대상으로 하며, 업로드/셀렉 결과 라이트박스는 원본 파일이 아니라 기존 1200px 프리뷰만 대상으로 한다. 기본 범위는 PC 이전 1장·다음 2장(두 이미지를 동시에 쓰는 비교 모드는 양옆 1장), 모바일 양옆 1장이고, 유지하는 `Image` 객체는 화면별 최대 2~6개다. 브라우저 데이터 절약 모드에서는 현재 사진만 로드하며 `(max-width: 900px)` 변화도 즉시 반영한다. 이 최적화는 신규 API나 서버 재조회를 만들지 않는다.
 7. **삭제**: 프로젝트/사진/보정본 삭제 시 Next API가 FastAPI `POST /api/storage/delete`(§12: 인증 헤더 없음)를 호출해 R2 객체를 먼저 지운 뒤 DB 행을 삭제.
 
 ---

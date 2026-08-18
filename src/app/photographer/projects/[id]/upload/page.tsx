@@ -33,6 +33,7 @@ import { createClient } from "@/lib/supabase/client";
 import { parseBetaLimitError, DEFAULT_BETA_MAX_PHOTOS_PER_PROJECT } from "@/lib/beta-limits";
 import { compressImagesInParallel } from "@/lib/upload-client-compress";
 import { createThumbLoadQueue, useQueuedThumbSrc, type ThumbLoadQueue } from "@/lib/thumb-load-queue";
+import { useAdjacentImagePreload } from "@/lib/use-adjacent-image-preload";
 import type { Project, ProjectStatus, Photo, PhotoGroupInfo } from "@/types";
 import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
@@ -1447,6 +1448,17 @@ export default function ProjectDetailPage() {
     }
     return result;
   }, [displayPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup, photoIdSet]);
+  const lightboxPreloadUrlGroups = useMemo(
+    () => groupedDisplayPhotos.map((photo) => [photo.previewUrl ?? photo.url]),
+    [groupedDisplayPhotos],
+  );
+  useAdjacentImagePreload(lightboxPreloadUrlGroups, lightboxIndex, {
+    wrap: true,
+    desktopBefore: 1,
+    desktopAfter: 2,
+    desktopMaxDecoded: 6,
+    mobileMaxDecoded: 3,
+  });
 
   useEffect(() => {
     if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); }
@@ -3523,6 +3535,8 @@ export default function ProjectDetailPage() {
                   key={groupedDisplayPhotos[lightboxIndex].id}
                   src={groupedDisplayPhotos[lightboxIndex].previewUrl ?? groupedDisplayPhotos[lightboxIndex].url}
                   alt={groupedDisplayPhotos[lightboxIndex].originalFilename ?? ""}
+                  decoding="async"
+                  fetchPriority="high"
                   style={{ maxHeight: "80vh", maxWidth: "90vw", objectFit: "contain", borderRadius: 6, display: "block" }}
                 />
                 {groupedDisplayPhotos[lightboxIndex].originalFilename && (

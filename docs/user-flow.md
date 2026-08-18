@@ -103,9 +103,9 @@
 - **시작 조건**: 갤러리 진입 완료, `status === "selecting"`.
 - **사용자가 수행하는 단계**: 사진 클릭 → 전체화면 뷰어 진입 → 좌우 이동/ESC로 갤러리 복귀.
 - **프론트엔드 라우트**: `/c/[token]/viewer/[photoId]` (`src/app/c/[token]/viewer/[photoId]/page.tsx`).
-- **호출되는 API**: `SelectionContext`의 기존 데이터 사용(추가 목록 조회 없음) + 대형 프리뷰 이미지는 `GET /api/c/presign-preview?...`로 presigned URL을 받아 표시(FastAPI `/api/storage/presign` 경유).
+- **호출되는 API**: `SelectionContext`의 기존 데이터 사용(추가 목록 조회 없음) + 대형 프리뷰 이미지는 `GET /api/c/presign-preview?photoIds=...`로 현재·인접 사진의 presigned URL을 최대 5장까지 배치 발급받는다(FastAPI `/api/storage/presign` 경유). PC는 현재 기준 이전 1장·다음 2장, 모바일은 양옆 1장을 실제 이미지 decode까지 미리 시작하고, 발급 URL은 만료 전까지 재사용한다. 데이터 절약 모드에서는 현재 사진만 요청한다.
 - **성공 시 기대 결과**: 원본 대비 축소된 프리뷰(1200px) 표시, 별점/색상/코멘트/선택 토글 UI 노출. PC·모바일 헤더에는 파일명보다 탐색 맥락을 우선해 `11번째 · 전체 34장` 같은 현재 위치와 진행 바를 표시한다. 하단 액션 영역은 평가(별점·색상) → 코멘트 저장 상태 → 코멘트 입력·사진 선택 CTA의 3단 구조다.
-- **실패 및 경계 상황**: presign 호출 실패 시 이미지 표시 실패 가능성 — 폴백(예: `r2_preview_url` 직접 사용) 여부는 **확인 필요**. 존재하지 않는 `photoId` 접근 시 동작도 **확인 필요**.
+- **실패 및 경계 상황**: presign 호출이 실패하거나 아직 응답 전이면 현재 공개 R2 전환 기간에는 `r2_preview_url`(없으면 썸네일)을 즉시 표시한다. 존재하지 않는 `photoId`는 "사진을 찾을 수 없습니다" 안내와 갤러리 복귀 링크를 표시한다.
 - **관련 권한/인증 조건**: PIN 쿠키(미들웨어 보호 대상).
 - **QA에서 확인해야 할 항목**: 방향키/스와이프로 이전·다음 이동, 마지막/첫 사진에서 경계 동작, 이미지 우클릭/드래그 저장 방지(`NEXT_PUBLIC_BLOCK_VIEWER_IMAGE_DOWNLOAD` 옵션) 동작 여부.
 
@@ -207,6 +207,7 @@
   - (재보정 가능 프로젝트) 모바일: 갤러리에서 사진별 승인/재보정 요청 토글 후 전체 제출. 데스크톱: 사진별 상세 뷰어(`/review/[photoId]`)에서 원본/보정본 비교 후 `Y`(승인)/`R`(재보정 요청, 코멘트 최대 100자) 단축키로 처리 후 제출.
 - **프론트엔드 라우트**: `/c/[token]/review` (분기: `DeliveryReceiptView`/`MobileReviewGalleryView`/데스크톱은 `/review/[photoId]`로 자동 이동), `/c/[token]/review/[photoId]`.
 - **호출되는 API**: `GET /api/c/review`(보정본+기존 리뷰 로드) → 사진별 승인/재보정 상태를 모아 `POST /api/c/review/submit` `{ token, reviews: [{photo_version_id, photo_id, status, customer_comment?}] }`로 일괄 제출. (레거시 경로 `POST /api/c/review-submit`도 존재 — `photoVersionId`가 없을 때의 폴백으로 추정, **확인 필요**.)
+- **사진 전환 성능**: 리뷰 응답에 이미 포함된 원본 프리뷰·보정본 URL을 재사용해 현재 보기 모드에 필요한 인접 사진을 `useAdjacentImagePreload`로 미리 다운로드·decode한다. PC 비교 화면은 양옆 1장의 원본/보정본 쌍, 모바일 단일 화면은 양옆 1장의 활성 탭 이미지만 대상으로 하며 데이터 절약 모드에서는 현재 사진만 로드한다. 비활성 썸네일은 lazy/low priority로 내려 메인 이미지와의 네트워크 경합을 줄인다. 별도 API 호출은 없다.
 - **성공 시 기대 결과**: 서버가 `version_reviews`를 upsert하고, 재보정 요청이 하나라도 있고 `max_revision_count > 0`이며 아직 라운드 한도 내이면 `projects.status = "editing_v2"`(+`revision_round` 증가)와 함께 현재 최종 ZIP 후보를 `obsolete`로 만든다. 그렇지 않으면(전부 승인, 또는 재보정 한도 소진) `projects.status = "delivered"`로 전환하고 현재 후보를 최종 납품 대상으로 유지한다. `delivered` 화면에서는 `GET /api/c/final-delivery`와 `/archive`를 통해 원본 크기 최종 보정본 ZIP을 내려받는다.
 - **실패 및 경계 상황**:
   - 제출한 `photo_version_id`가 해당 프로젝트 소속이 아니면 400 반환("일부 보정본 ID가 이 프로젝트와 일치하지 않습니다").
@@ -311,6 +312,7 @@
 - **프론트엔드 라우트**: `/photographer/projects/[id]/results` (`results/page.tsx`), 워크플로우 화면에서도 진행 상태 요약 확인 가능(`workflow/WorkflowPageClient.tsx`).
 - **호출되는 API**: 워크플로우 기본 데이터는 `src/lib/db.ts` 조회와 `GET /api/photographer/projects/{id}/versions`를 사용한다. 셀렉 원본 다운로드는 `POST /api/photographer/projects/{id}/selected-originals`가 세션·소유권·`include_original`·확정 상태를 검증하고 `selections.is_selected=true`를 서버에서 다시 조회한 뒤 FastAPI presign을 호출한다(클라이언트가 photo id를 지정하지 않음).
 - **성공 시 기대 결과**: CSV(`파일명,코멘트`)와 TXT(파일명 목록) 다운로드, 클립보드 복사 시 토스트 표시. 셀렉 원본/프리뷰는 PC Chrome/Edge의 폴더 선택기를 먼저 열고 presigned 파일을 한 장씩 해당 폴더로 스트리밍하며 진행 장수와 완료 알림을 표시한다. 프리뷰는 실제 포맷에 맞게 원래 파일명의 stem 뒤에 `_preview.jpg`를 붙인다. 같은 파일명이 이미 있으면 덮어쓰지 않고 `(2)`, `(3)` 접미사를 붙인다.
+- **라이트박스 성능**: 결과 라이트박스가 열려 있을 때 `viewerImageUrl(photo)` 기준으로 PC는 이전 1장·다음 2장, 모바일은 양옆 1장의 1200px 프리뷰를 미리 다운로드·decode한다. 기존 그리드 썸네일 선로딩과 분리되어 있으며 원본 크기 파일은 대상이 아니다.
 - **실패 및 경계 상황**: 셀렉 파일 다운로드는 고객 확정 전(`preparing`/`selecting`)에 비활성화된다. 원본 포함 프로젝트에서 선택된 원본 중 `original_status !== completed`이거나 R2 원본 키가 없는 사진이 하나라도 있으면 프리뷰로 자동 대체하거나 일부만 저장하지 않고 누락 장수를 포함한 409로 중단한다. 원본 미포함 프로젝트는 최대 1200px JPEG가 보정·납품용으로 부족할 수 있음을 메뉴에 명시한다. File System Access API가 없는 브라우저에서는 불안정한 자동 다중 다운로드로 폴백하지 않고 PC용 Chrome/Edge 사용을 안내한다.
 - **관련 권한/인증 조건**: 로그인 세션 + 소유권.
 - **QA에서 확인해야 할 항목**: 코멘트에 쉼표/줄바꿈이 포함된 경우 CSV 이스케이프(`csvEscape` 함수 존재 확인됨)가 실제로 스프레드시트에서 깨지지 않는지, 특수문자 포함 파일명의 TXT 내보내기, 셀렉 원본의 서버 조회 수와 폴더 저장 수 일치, 사용자 폴더 선택 취소 시 오류 미표시, 중간 네트워크 실패 시 완료로 잘못 표시하지 않는지.
@@ -330,7 +332,7 @@
   - `POST {API_URL}/api/upload/versions/delivery/presign` → 보정 원본을 R2에 direct PUT → `POST {API_URL}/api/upload/versions`(FastAPI 직접, Bearer JWT) — delivery HEAD 검증, 검토용 1200px/82% + 300px/75% 생성, `photo_versions` upsert, 기존 `version_reviews` 삭제.
   - 매칭 보조: `POST /api/photographer/projects/{id}/retouch-match`(clip-service 프록시, 파일명 매칭 실패 시 유사도 기반 추천).
   - 전달: `PATCH .../status` `{status:"reviewing_v1"|"reviewing_v2"}`가 `start_retouch_review_with_archive` RPC를 호출해 최종 납품 후보 스냅샷 생성과 상태 전환을 한 트랜잭션으로 처리한다.
-- **성공 시 기대 결과**: 고객 검토가 즉시 활성화되고 백그라운드에서 원본 크기 보정본 ZIP 후보가 생성된다. V2 회차는 사진별 최신 V2가 있으면 V2, 없으면 V1을 포함하므로 부분 재보정도 지원한다.
+- **성공 시 기대 결과**: 고객 검토가 즉시 활성화되고 백그라운드에서 원본 크기 보정본 ZIP 후보가 생성된다. V2 회차는 사진별 최신 V2가 있으면 V2, 없으면 V1을 포함하므로 부분 재보정도 지원한다. 워크플로우 비교 뷰어는 현재 탭의 앞뒤 사진만 미리 다운로드·decode하고, 분할 비교에서는 다음 이동에 실제 필요한 두 버전만 대상으로 제한한다.
 - **실패 및 경계 상황**: 선택 사진 중 원본 크기 보정본이 하나라도 없으면 고객 검토 시작을 409로 차단한다. 파일당 100MiB를 초과하면 presign 전에 차단한다. 검토 중 교체는 막고, `editing`/`editing_v2`에서 교체하면 기존 `version_reviews`가 삭제된다.
 - **기존 보정본**: 마이그레이션 전에 저장된 `photo_versions`의 1200px 검토 이미지를 원본 크기 파일로 가장해 백필하지 않는다. 아직 `editing`/`editing_v2`인 프로젝트는 해당 보정본을 원본 파일로 다시 업로드해야 다음 검토를 시작할 수 있으며, 이미 `reviewing_*`/`delivered`인 프로젝트에는 최종 ZIP이 소급 생성되지 않는다.
 - **관련 권한/인증 조건**: 로그인 세션(Supabase JWT를 FastAPI에 직접 전달), 소유권.

@@ -25,6 +25,7 @@ import { ProjectActionFlow } from "@/components/photographer/ProjectActionFlow";
 import { buildCompactSteps } from "@/lib/project-flow-steps";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import { galleryThumbPriorityProps, usePriorityImagePreload } from "@/lib/gallery-filter";
+import { useAdjacentImagePreload } from "@/lib/use-adjacent-image-preload";
 
 /** 업로드 페이지(`upload/page.tsx`)와 동일 토큰 — 상단·좌측 레이아웃 정렬 */
 const ACCENT = "#FF5A1F";
@@ -129,6 +130,17 @@ export default function ResultsPage() {
 
   const photoUrls = useMemo(() => photos.map((p) => p.url), [photos]);
   usePriorityImagePreload(photoUrls, galleryThumbFocusIndex);
+  const lightboxPreloadUrlGroups = useMemo(
+    () => photos.map((photo) => [viewerImageUrl(photo)]),
+    [photos],
+  );
+  useAdjacentImagePreload(lightboxPreloadUrlGroups, lightboxIndex, {
+    wrap: true,
+    desktopBefore: 1,
+    desktopAfter: 2,
+    desktopMaxDecoded: 6,
+    mobileMaxDecoded: 3,
+  });
 
   const confirmedText = useMemo(() => {
     if (!project?.confirmedAt) return null;
@@ -982,6 +994,8 @@ function Lightbox({
           key={photo.id}
           src={viewerImageUrl(photo)}
           alt={filename}
+          decoding="async"
+          fetchPriority="high"
           style={{
             maxHeight: "75vh", maxWidth: "90vw",
             objectFit: "contain", borderRadius: 6,

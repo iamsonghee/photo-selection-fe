@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { MessageSquare, X } from "lucide-react";
 import { PrevNextButton } from "@/components/PrevNextButton";
+import { useAdjacentImagePreload } from "@/lib/use-adjacent-image-preload";
 
 type CompareItem = {
   original: { url: string; filename: string; comment?: string | null };
@@ -41,6 +42,31 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
     if (!isOpen || total === 0) return null;
     return photos[index] ?? null;
   }, [isOpen, photos, total, index]);
+
+  const preloadUrlGroups = useMemo(() => photos.map((photo) => {
+    const firstRetouched = photo.v1 ?? photo.retouched;
+    if (!splitMode) {
+      if (tab === "v2") return [photo.v2?.url ?? photo.original.url];
+      if (tab === "v1") return [firstRetouched?.url ?? photo.original.url];
+      return [photo.original.url];
+    }
+
+    if (tab === "v2") {
+      return [firstRetouched?.url ?? photo.original.url, photo.v2?.url ?? photo.original.url];
+    }
+    if (tab === "v1") {
+      return [photo.original.url, firstRetouched?.url ?? photo.original.url];
+    }
+    return [photo.original.url, firstRetouched?.url ?? photo.v2?.url ?? photo.original.url];
+  }), [photos, splitMode, tab]);
+  useAdjacentImagePreload(preloadUrlGroups, isOpen ? index : null, {
+    desktopBefore: 1,
+    desktopAfter: splitMode ? 1 : 2,
+    desktopMaxDecoded: 6,
+    mobileBefore: 1,
+    mobileAfter: 1,
+    mobileMaxDecoded: splitMode ? 4 : 3,
+  });
 
   // Navigation fallback: only downgrade tab if current photo lacks that version
   useEffect(() => {
@@ -205,6 +231,8 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
                   <img
                     src={activeImage.url}
                     alt=""
+                    decoding="async"
+                    fetchPriority="high"
                     className="max-h-full max-w-full cursor-zoom-in object-contain"
                     draggable={false}
                   />
@@ -218,6 +246,8 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
                     <img
                       src={splitLeft.url}
                       alt=""
+                      decoding="async"
+                      fetchPriority="high"
                       className="max-h-full max-w-full cursor-zoom-in object-contain"
                       draggable={false}
                     />
@@ -229,6 +259,8 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
                     <img
                       src={(splitRight ?? current.original).url}
                       alt=""
+                      decoding="async"
+                      fetchPriority="high"
                       className="max-h-full max-w-full cursor-zoom-in object-contain"
                       draggable={false}
                     />

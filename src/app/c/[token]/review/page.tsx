@@ -12,6 +12,7 @@ import { CustomerHeader } from "@/components/customer/CustomerHeader";
 import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
 import FullScreenCompareModal from "@/components/FullScreenCompareModal";
 import type { ReviewPhotoItem } from "@/lib/customer-api-server";
+import { useAdjacentImagePreload } from "@/lib/use-adjacent-image-preload";
 import type { Project } from "@/types";
 
 const MONO   = "'JetBrains Mono', 'Space Mono', monospace";
@@ -561,6 +562,20 @@ function DeliveryReceiptView({
 
   const showOriginal  = viewMode === "side-by-side" || viewMode === "single-original";
   const showRetouched = viewMode === "side-by-side" || viewMode === "single-retouched";
+  const preloadUrlGroups = useMemo(
+    () => photos.map((photo) => [
+      ...(showOriginal ? [photo.originalUrl] : []),
+      ...(showRetouched ? [photo.versionUrl] : []),
+    ]),
+    [photos, showOriginal, showRetouched],
+  );
+  useAdjacentImagePreload(preloadUrlGroups, canShowViewer ? activeIdx : null, {
+    wrap: true,
+    desktopBefore: 1,
+    desktopAfter: 1,
+    desktopMaxDecoded: 6,
+    mobileMaxDecoded: 4,
+  });
 
   const filename = useMemo(() => {
     if (!currentPhoto) return "";
@@ -720,6 +735,8 @@ function DeliveryReceiptView({
                   <img
                     src={currentPhoto.originalUrl}
                     alt="원본"
+                    decoding="async"
+                    fetchPriority="high"
                     style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }}
                   />
                 </div>
@@ -747,6 +764,8 @@ function DeliveryReceiptView({
                   <img
                     src={currentPhoto.versionUrl}
                     alt="보정본"
+                    decoding="async"
+                    fetchPriority="high"
                     style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }}
                   />
                 </div>
@@ -789,6 +808,9 @@ function DeliveryReceiptView({
                       <img
                         src={thumbSrc}
                         alt=""
+                        loading={isActive ? "eager" : "lazy"}
+                        decoding="async"
+                        fetchPriority={isActive ? "high" : "low"}
                         style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: isActive ? 1 : 0.7 }}
                       />
                     )}

@@ -10,6 +10,7 @@ import { PrevNextButton } from "@/components/PrevNextButton";
 import FullScreenCompareModal from "@/components/FullScreenCompareModal";
 import type { ReviewPhotoItem } from "@/lib/customer-api-server";
 import { normalizeReviewDeadlineYmd } from "@/lib/format-review-deadline";
+import { useAdjacentImagePreload } from "@/lib/use-adjacent-image-preload";
 
 /* ── design tokens ── */
 const BG_BASE    = "var(--background)";
@@ -241,6 +242,22 @@ export default function ReviewViewerPage() {
     window.location.replace(`/c/${token}/confirmed`);
   }, [allReviewed, token, revisionCount, photos, getReview, resetAll]);
 
+  const preloadUrlGroups = useMemo(
+    () => photos.map((photo) => {
+      if (viewMode === "single-original") return [photo.originalUrl];
+      if (viewMode === "single-retouched") return [photo.versionUrl];
+      return [photo.originalUrl, photo.versionUrl];
+    }),
+    [photos, viewMode],
+  );
+  useAdjacentImagePreload(preloadUrlGroups, currentIndex >= 0 ? currentIndex : null, {
+    wrap: true,
+    desktopBefore: 1,
+    desktopAfter: 1,
+    desktopMaxDecoded: 6,
+    mobileMaxDecoded: 4,
+  });
+
   /* ── guard states ── */
   if (selectionLoading || !project) {
     return (
@@ -338,11 +355,11 @@ export default function ReviewViewerPage() {
           onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
           {mobileTab === "retouched" ? (
             current.versionUrl
-              ? <img src={current.versionUrl} alt="보정본" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />
+              ? <img src={current.versionUrl} alt="보정본" decoding="async" fetchPriority="high" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />
               : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: DIM, fontFamily: MONO, fontSize: 11 }}>이미지 없음</div>
           ) : (
             current.originalUrl
-              ? <img src={current.originalUrl} alt="원본" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />
+              ? <img src={current.originalUrl} alt="원본" decoding="async" fetchPriority="high" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />
               : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: DIM, fontFamily: MONO, fontSize: 11 }}>이미지 없음</div>
           )}
           {/* 이전/다음 */}
@@ -782,6 +799,9 @@ export default function ReviewViewerPage() {
                       <img
                         src={thumbSrc}
                         alt=""
+                        loading={isActive ? "eager" : "lazy"}
+                        decoding="async"
+                        fetchPriority={isActive ? "high" : "low"}
                         style={{
                           position: "absolute",
                           inset: 0,
@@ -890,7 +910,7 @@ export default function ReviewViewerPage() {
                     <span style={{ background: BG_BASE, border: `1px solid ${BORDER}`, padding: "4px 8px", fontFamily: MONO, fontSize: 9, color: MUTED, letterSpacing: "0.05em", textTransform: "uppercase" }}>원본</span>
                   </div>
                   {current.originalUrl
-                    ? <img src={current.originalUrl} alt="원본" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "contain" }} />
+                    ? <img src={current.originalUrl} alt="원본" decoding="async" fetchPriority="high" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "contain" }} />
                     : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: DIM }}>NO_IMAGE</div>
                   }
                 </div>
@@ -904,7 +924,7 @@ export default function ReviewViewerPage() {
                     <span style={{ background: BG_BASE, border: `1px solid ${ACCENT}`, padding: "4px 8px", fontFamily: MONO, fontSize: 9, color: ACCENT, letterSpacing: "0.05em", textTransform: "uppercase" }}>{versionLabel}</span>
                   </div>
                   {current.versionUrl
-                    ? <img src={current.versionUrl} alt="보정본" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "contain" }} />
+                    ? <img src={current.versionUrl} alt="보정본" decoding="async" fetchPriority="high" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "contain" }} />
                     : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 10, color: DIM }}>NO_IMAGE</div>
                   }
                 </div>

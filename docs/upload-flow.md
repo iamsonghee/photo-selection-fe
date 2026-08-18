@@ -263,6 +263,8 @@ FastAPI 서버 측 동시성(요청 1건 안에서 파일별 처리) — 파이�
 
 업로드 세션 진행 중 화면에 표시되는 이미지는 **항상 브라우저 로컬 `URL.createObjectURL()` blob URL**이며, 서버가 만든 `r2_thumb_url`/`r2_preview_url`이 아니다.
 
+업로드가 끝나 DB에서 다시 불러온 사진의 라이트박스는 원본이 아니라 `r2_preview_url`(없으면 `r2_thumb_url`)을 사용한다. 라이트박스가 열려 있는 동안 `useAdjacentImagePreload`가 PC 이전 1장·다음 2장, 모바일 양옆 1장의 표시용 프리뷰만 미리 다운로드·decode하며, 데이터 절약 모드에서는 현재 사진만 대상으로 한다. 이 동작은 업로드 파이프라인이나 원본 R2 객체에는 접근하지 않는다.
+
 | 단계 | 상태 배열 | 이미지 소스 |
 |---|---|---|
 | 파일 선택 직후(압축 전) | `queuedPreviews` | **원본(raw) File**의 blob URL |
