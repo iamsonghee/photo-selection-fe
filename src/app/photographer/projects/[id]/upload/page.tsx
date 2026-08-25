@@ -56,6 +56,9 @@ const TEXT_BRIGHT = "var(--foreground)";
 // ---------- upload constants ----------
 const UPLOAD_PHOTOS_PATH = "/api/photographer/upload/photos";
 const UPLOAD_MAX_ATTEMPTS = 3;
+const ORIGINAL_TRANSFER_MAX_RETRIES = 4;
+const ORIGINAL_RETRY_BASE_DELAY_MS = 500;
+const ORIGINAL_RETRY_MAX_DELAY_MS = 4_000;
 const BATCH_SIZE = 8;
 const PC_CONCURRENCY = 5;
 // 원본 포함 업로드는 압축본 전송 뒤 R2 PUT까지 같은 슬롯을 점유한다.
@@ -126,6 +129,10 @@ function getDesktopUploadConcurrency(includeOriginal: boolean): number {
 
 function shouldRetryStatus(status: number) {
   return [408, 429, 502, 503, 504].includes(status);
+}
+
+function shouldRetryOriginalStatus(status: number) {
+  return status === 500 || shouldRetryStatus(status);
 }
 
 type XhrResult = { ok: boolean; status: number; json: () => Promise<unknown> };
@@ -223,10 +230,34 @@ type OriginalPresignedItem = {
   expires_at: string;
 };
 
-type FailedOriginalTransfer = {
-  presigned: OriginalPresignedItem;
-  file: File;
+type OriginalRetryBudget = {
+  retriesUsed: number;
+  readonly maxRetries: number;
 };
+
+function createOriginalRetryBudget(): OriginalRetryBudget {
+  return { retriesUsed: 0, maxRetries: ORIGINAL_TRANSFER_MAX_RETRIES };
+}
+
+/**
+ * 한 원본 파일의 PUT/confirm/후속 복구가 공유하는 유일한 재시도 예산이다.
+ * 정상 첫 요청은 지연하지 않고, 실패 뒤 재호출할 때만 예산을 소비한다.
+ */
+async function waitForOriginalRetry(budget: OriginalRetryBudget): Promise<boolean> {
+  if (budget.retriesUsed >= budget.maxRetries) return false;
+  const exponentialDelay = Math.min(
+    ORIGINAL_RETRY_BASE_DELAY_MS * (2 ** budget.retriesUsed),
+    ORIGINAL_RETRY_MAX_DELAY_MS,
+  );
+  budget.retriesUsed++;
+  // 여러 lane이 같은 순간 실패해도 재요청이 한꺼번에 몰리지 않게 ±25% jitter를 둔다.
+  const jitteredDelay = Math.min(
+    ORIGINAL_RETRY_MAX_DELAY_MS,
+    Math.round(exponentialDelay * (0.75 + Math.random() * 0.5)),
+  );
+  await new Promise<void>((resolve) => setTimeout(resolve, jitteredDelay));
+  return true;
+}
 
 function createClientUploadId(): string {
   if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
@@ -291,11 +322,11 @@ async function putOriginalToR2(
   presigned: OriginalPresignedItem,
   file: File,
   token?: string,
+  retryBudget: OriginalRetryBudget = createOriginalRetryBudget(),
 ): Promise<boolean> {
   let url = presigned.url;
   let contentType = presigned.content_type;
-  // 정상 경로는 1회 PUT로 끝난다. 네트워크/5xx/만료처럼 복구 가능한 실패에만 최대 2회 더 시도한다.
-  for (let attempt = 0; attempt < 3; attempt++) {
+  while (true) {
     try {
       const res = await fetch(url, {
         method: "PUT",
@@ -303,7 +334,7 @@ async function putOriginalToR2(
         headers: { "Content-Type": contentType },
       });
       if (res.ok) return true;
-      if (!shouldRetryStatus(res.status) && res.status !== 403) return false;
+      if (!shouldRetryOriginalStatus(res.status) && res.status !== 403) return false;
     } catch {
       // 응답 유실이면 객체가 이미 저장됐을 수 있으므로 아래 recover의 HEAD로 먼저 확인한다.
     }
@@ -315,19 +346,22 @@ async function putOriginalToR2(
         url = result.url;
         contentType = result.content_type;
       } catch {
-        // recover 자체가 일시 실패해도 남은 횟수에서 기존 URL로 재시도한다.
+        // recover 자체가 일시 실패해도 공유 예산이 남아 있으면 기존 URL로 재시도한다.
       }
     }
-    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+    if (!await waitForOriginalRetry(retryBudget)) return false;
   }
-  return false;
 }
 
-async function confirmOriginalUpload(jobId: string, token: string): Promise<boolean> {
+async function confirmOriginalUpload(
+  jobId: string,
+  token: string,
+  retryBudget: OriginalRetryBudget = createOriginalRetryBudget(),
+): Promise<boolean> {
   const url = confirmOriginalUploadUrl();
   // R2 PUT은 성공했는데 완료 확인 요청만 일시 실패하면, 실제 원본이 있어도
-  // awaiting_upload에 남아 고객 링크 준비가 영구히 멈출 수 있다. 짧게 재시도한다.
-  for (let attempt = 0; attempt < 3; attempt++) {
+  // awaiting_upload에 남아 고객 링크 준비가 영구히 멈출 수 있다. PUT과 같은 예산으로 재시도한다.
+  while (true) {
     try {
       const form = new FormData();
       form.append("job_id", jobId);
@@ -337,13 +371,12 @@ async function confirmOriginalUpload(jobId: string, token: string): Promise<bool
         body: form,
       });
       if (res.ok) return true;
-      if (!shouldRetryStatus(res.status)) return false;
+      if (!shouldRetryOriginalStatus(res.status)) return false;
     } catch {
       // 네트워크 일시 단절은 다음 재시도로 복구를 시도한다.
     }
-    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+    if (!await waitForOriginalRetry(retryBudget)) return false;
   }
-  return false;
 }
 
 async function fetchPendingOriginals(projectId: string, token: string): Promise<PendingOriginalItem[]> {
@@ -375,8 +408,12 @@ async function recoverOriginalJob(jobId: string, token: string): Promise<Recover
 }
 
 /** PUT은 성공했지만 confirm 응답이 유실된 경우, R2 HEAD 기반 recover로 완료를 확정한다. */
-async function confirmOrRecoverOriginalUpload(jobId: string, token: string): Promise<boolean> {
-  if (await confirmOriginalUpload(jobId, token)) return true;
+async function confirmOrRecoverOriginalUpload(
+  jobId: string,
+  token: string,
+  retryBudget: OriginalRetryBudget = createOriginalRetryBudget(),
+): Promise<boolean> {
+  if (await confirmOriginalUpload(jobId, token, retryBudget)) return true;
   try {
     return (await recoverOriginalJob(jobId, token)).status === "confirmed";
   } catch {
@@ -1655,7 +1692,7 @@ export default function ProjectDetailPage() {
 
     const allFailed: File[] = [];
     const backendRejected: string[] = []; // BUG-01: 서버에서 거부된 파일명 (CR3 등 미지원 형식)
-    const failedOriginalTransfers = new Map<string, FailedOriginalTransfer>();
+    const failedOriginalJobIds = new Set<string>();
     let completedBatches = 0;
     // "compressSetup": pipelineMode 전용 — 압축 자체가 시작 불가한 예외(워커/canvas 폴백 모두 실패).
     // legacy 경로는 이 값을 쓰지 않고 기존과 동일하게 즉시 return한다(§아래 legacy 분기).
@@ -1775,17 +1812,22 @@ export default function ProjectDetailPage() {
               // presigned URL 수신 수 = 실제 R2 PUT 시도 예정 건수
               sendingSourceTotalRef.current += okBody.original_presigned.length;
               for (const p of okBody.original_presigned) {
+                const retryBudget = createOriginalRetryBudget();
                 try {
                   sendingSourceRef.current++;
                   if (sendingSourceRef.current > 0) setSendingSourcePhase(true);
-                  const putOk = await putOriginalToR2(p, rawFile, currentToken);
-                  const confirmed = putOk && await confirmOrRecoverOriginalUpload(p.job_id, currentToken);
+                  const putOk = await putOriginalToR2(p, rawFile, currentToken, retryBudget);
+                  const confirmed = putOk && await confirmOrRecoverOriginalUpload(
+                    p.job_id,
+                    currentToken,
+                    retryBudget,
+                  );
                   if (!confirmed) {
-                    failedOriginalTransfers.set(p.job_id, { presigned: p, file: rawFile });
+                    failedOriginalJobIds.add(p.job_id);
                     sendingSourceFailedRef.current++;
                   }
                 } catch (presignErr) {
-                  failedOriginalTransfers.set(p.job_id, { presigned: p, file: rawFile });
+                  failedOriginalJobIds.add(p.job_id);
                   sendingSourceFailedRef.current++;
                   console.warn("presigned PUT/confirm failed:", presignErr);
                 } finally {
@@ -2066,61 +2108,21 @@ export default function ProjectDetailPage() {
       }
     }
 
-    // 개별 PUT의 3회 재시도가 모두 실패해도 다른 사진을 계속 처리한 뒤 실패 항목만 한 번 더
-    // 전송한다. 정상 사진은 재전송하지 않으므로 일반 업로드 속도에는 영향이 없다.
-    if (!abortReason && !stopRequestedRef.current && failedOriginalTransfers.size > 0) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 1000));
-      const retryItems = Array.from(failedOriginalTransfers.values());
-      let nextRetryIndex = 0;
-      let retryFailed = 0;
-      sendingSourceFailedRef.current = 0;
-      setSendingSourcePhase(true);
-      setSendingSourceSnap({
-        done: sendingSourceDoneRef.current,
-        total: sendingSourceTotalRef.current,
-        failed: 0,
-      });
-
-      const retryLane = async () => {
-        while (nextRetryIndex < retryItems.length) {
-          const item = retryItems[nextRetryIndex++];
-          try {
-            const recovered = await recoverOriginalJob(item.presigned.job_id, currentToken);
-            if (recovered.status === "confirmed") continue;
-            const refreshedPresigned: OriginalPresignedItem = {
-              ...item.presigned,
-              url: recovered.url,
-              source_key: recovered.source_key,
-              content_type: recovered.content_type,
-            };
-            const putOk = await putOriginalToR2(refreshedPresigned, item.file, currentToken);
-            const confirmed = putOk && await confirmOrRecoverOriginalUpload(
-              refreshedPresigned.job_id,
-              currentToken,
-            );
-            if (!confirmed) {
-              retryFailed++;
-              await reportOriginalUploadFailure(refreshedPresigned.job_id, currentToken).catch(() => {});
-            }
-          } catch (error) {
-            retryFailed++;
-            console.warn("deferred original retry failed:", error);
-            await reportOriginalUploadFailure(item.presigned.job_id, currentToken).catch(() => {});
-          }
-          setSendingSourceSnap({
-            done: sendingSourceDoneRef.current,
-            total: sendingSourceTotalRef.current,
-            failed: retryFailed,
-          });
+    // PUT과 confirm은 파일별 공유 예산 안에서 이미 모두 재시도했다. 여기서는 재전송을
+    // 중첩하지 않고 최종 실패만 기록해, 파일당 총 재시도 상한을 지킨다.
+    if (!abortReason && !stopRequestedRef.current && failedOriginalJobIds.size > 0) {
+      const failedJobIds = Array.from(failedOriginalJobIds);
+      let nextFailureReportIndex = 0;
+      const reportLane = async () => {
+        while (nextFailureReportIndex < failedJobIds.length) {
+          const jobId = failedJobIds[nextFailureReportIndex++];
+          await reportOriginalUploadFailure(jobId, currentToken).catch(() => {});
         }
       };
-
       await Promise.all(Array.from(
-        { length: Math.min(2, retryItems.length) },
-        () => retryLane(),
+        { length: Math.min(2, failedJobIds.length) },
+        () => reportLane(),
       ));
-      sendingSourceFailedRef.current = retryFailed;
-      setSendingSourcePhase(false);
     }
 
     if (stopRequestedRef.current) {
@@ -2278,14 +2280,15 @@ export default function ProjectDetailPage() {
         continue;
       }
       try {
+        const retryBudget = createOriginalRetryBudget();
         const result = await recoverOriginalJob(job.id, token);
         if (result.status === "needs_upload") {
           const presignedItem: OriginalPresignedItem = {
             job_id: job.id, url: result.url,
             source_key: result.source_key, content_type: result.content_type, expires_at: "",
           };
-          const putOk = await putOriginalToR2(presignedItem, match);
-          if (putOk && await confirmOrRecoverOriginalUpload(job.id, token)) {
+          const putOk = await putOriginalToR2(presignedItem, match, token, retryBudget);
+          if (putOk && await confirmOrRecoverOriginalUpload(job.id, token, retryBudget)) {
             // R2 PUT과 완료 확인까지 복구됨
           } else {
             newUnmatched.push(job); // PUT/확인 실패는 미완료 처리

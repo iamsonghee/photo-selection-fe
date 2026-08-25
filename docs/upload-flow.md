@@ -300,7 +300,7 @@ FastAPI 서버 측 동시성(요청 1건 안에서 파일별 처리) — 파이�
 
 업로드 직후 고객 링크 활성화가 worker보다 먼저 실행될 수 있다. 상태 API는 이때 `pending/processing`만 남아 있으면 `originals_processing`을 반환하고, 업로드 화면은 최대 15초 동안 1초 간격으로 활성화를 자동 재시도한다. 버튼에는 `원본 확인 중…`을 표시한다. `awaiting_upload`/`failed`/`NULL` 등 실제 재업로드가 필요한 상태가 섞여 있을 때만 `originals_incomplete`와 복구 안내를 반환한다.
 
-원본 PUT은 첫 요청이 성공하면 추가 대기 없이 끝난다. 네트워크 오류, 408/429/5xx, presigned URL 403에만 `/originals/recover`로 R2 존재 여부를 확인하고 최대 3회(초기 1회+재시도 2회, 500ms/1000ms backoff) PUT한다. 그래도 실패한 항목은 다른 batch가 끝난 뒤 원본 `File` 객체를 유지한 채 동시 2개로 지연 재전송한다. 최종 실패만 `/originals/report-failure`로 `last_error`에 기록하고, finalize 결과와 함께 "업로드 완료" 대신 "원본 업로드 확인 필요"를 표시한다. 셀렉용 사진 업로드 성공 자체는 되돌리지 않으므로 사용자는 누락 원본만 다시 선택해 복구한다.
+원본 PUT은 첫 요청이 성공하면 추가 대기 없이 끝난다. 각 원본 파일은 PUT과 confirm이 하나의 총 재시도 예산(`ORIGINAL_TRANSFER_MAX_RETRIES=4`, 최초 요청 제외)을 공유한다. 네트워크 오류, 408/429/500/502/503/504, presigned URL 403에만 `/originals/recover`로 R2 존재 여부를 먼저 확인하고, 남은 예산 안에서 500ms부터 최대 4초까지 지수 백오프(`ORIGINAL_RETRY_BASE_DELAY_MS`, `ORIGINAL_RETRY_MAX_DELAY_MS`)와 ±25% jitter를 적용한다. PUT·confirm 단계별 재시도와 업로드 종료 후 지연 재전송을 중첩하지 않으므로 한 파일의 PUT/confirm 재호출은 최초 요청 이후 합계 최대 4번이다(R2 존재 확인용 recover 호출은 별도). 최종 실패만 `/originals/report-failure`로 `last_error`에 기록하고, finalize 결과와 함께 "업로드 완료" 대신 "원본 업로드 확인 필요"를 표시한다. 셀렉용 사진 업로드 성공 자체는 되돌리지 않으므로 사용자는 누락 원본만 다시 선택해 복구한다.
 
 **UI phase**: 코드에 정의된 값은 `idle`/`processing`/`done`(과 실패 시 `idle`로 복귀)뿐이다. `uploadPhase === "sending"`을 조건으로 쓰는 UI 코드가 일부 있으나, 실제로 `setUploadPhase("sending")`을 호출하는 지점은 없다 — 즉 `sending`은 현재 코드 경로상 도달하지 않는 상태다(압축과 전송 모두 `processing` 상태로 표시됨).
 
