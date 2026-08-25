@@ -10,7 +10,7 @@ import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { getProfileImageUrl } from "@/lib/photographer";
 import { getReviewMockData } from "@/lib/mock-data";
 import { BrandLogoBar } from "@/components/BrandLogo";
-import { PageLoader } from "@/components/ui/PageLoader";
+import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { CustomerHeader } from "@/components/customer/CustomerHeader";
 import { CustomerFooter } from "@/components/customer/CustomerFooter";
 import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
@@ -52,7 +52,7 @@ function PageHeader({ inviteHref, right }: { inviteHref?: string; right?: React.
 
 /* ── Loading ── */
 function LoadingScreen() {
-  return <PageLoader variant="full" />;
+  return <SystemLoadingScreen />;
 }
 
 /* ══════════════════════════════════════════════════════════ */

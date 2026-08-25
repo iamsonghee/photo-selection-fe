@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
-import { PageLoader } from "@/components/ui/PageLoader";
+import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import styles from "./about.module.css";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 
 function LoadingScreen() {
-  return <PageLoader variant="full" />;
+  return <SystemLoadingScreen />;
 }
 
 export default function AboutPageClient() {

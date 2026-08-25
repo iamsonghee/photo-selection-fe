@@ -1,6 +1,6 @@
 "use client";
 
-import { PageLoader } from "@/components/ui/PageLoader";
+import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -71,7 +71,7 @@ export default function ReviewRedirectPage() {
   }, [selectionLoading, reviewPhotosLoading, project, reviewPhotos, token, router, isReceiptOnly, isMobile]);
 
   if (selectionLoading || reviewPhotosLoading || !project) {
-    return <PageLoader variant="full" />;
+    return <SystemLoadingScreen />;
   }
 
   if (isReceiptOnly) {
@@ -103,13 +103,7 @@ export default function ReviewRedirectPage() {
   }
 
   // 데스크탑: 위 useEffect가 redirect 처리. 임시 로딩 표시
-  return (
-    <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: BG_BASE }}>
-      <p style={{ fontFamily: MONO, fontSize: 11, color: "var(--subtle-foreground)", letterSpacing: "0.1em" }}>
-        LOADING_REVIEW...
-      </p>
-    </div>
-  );
+  return <SystemLoadingScreen />;
 }
 
 // ─────────────────────────────────────────────────────────────────────────

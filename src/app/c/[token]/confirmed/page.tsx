@@ -12,6 +12,7 @@ import { BrandLogoBar } from "@/components/BrandLogo";
 import { CustomerHeader } from "@/components/customer/CustomerHeader";
 import { CustomerFooter } from "@/components/customer/CustomerFooter";
 import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
+import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 
 const CUSTOMER_CANCEL_MAX = 3;
 const MONO = "'JetBrains Mono', 'Courier New', Courier, monospace";
@@ -100,12 +101,7 @@ export default function ConfirmedPage() {
   }, [project, token, router]);
 
   if (!mounted || loading) {
-    return (
-      <div style={{ display: "flex", minHeight: "100dvh", alignItems: "center", justifyContent: "center", background: "var(--background)" }}>
-        <div style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid rgba(var(--accent-rgb), 0.2)", borderTopColor: "var(--accent)", animation: "spin 0.9s linear infinite" }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
+    return <SystemLoadingScreen />;
   }
   if (!project) {
     return (
@@ -115,12 +111,7 @@ export default function ConfirmedPage() {
     );
   }
   if (project.status === "selecting" || project.status === "reviewing_v1" || project.status === "reviewing_v2") {
-    return (
-      <div style={{ display: "flex", minHeight: "100dvh", alignItems: "center", justifyContent: "center", background: "var(--background)" }}>
-        <div style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid rgba(var(--accent-rgb), 0.2)", borderTopColor: "var(--accent)", animation: "spin 0.9s linear infinite" }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
+    return <SystemLoadingScreen />;
   }
 
   const N = project.requiredCount ?? 0;

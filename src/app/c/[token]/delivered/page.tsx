@@ -11,6 +11,7 @@ import { CustomerHeader } from "@/components/customer/CustomerHeader";
 import { CustomerFooter } from "@/components/customer/CustomerFooter";
 import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
 import FinalDeliveryDownloadEntry from "@/components/customer/FinalDeliveryDownloadEntry";
+import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 
@@ -39,13 +40,7 @@ export default function DeliveredPage() {
   }, [project?.status, token, router]);
 
   if (!mounted || loading) {
-    return (
-      <div className={styles.root}>
-        <p style={{ margin: "auto", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--subtle-foreground)", letterSpacing: "0.12em" }}>
-          LOADING_DELIVERED…
-        </p>
-      </div>
-    );
+    return <SystemLoadingScreen />;
   }
   if (!project) {
     return (
@@ -60,13 +55,7 @@ export default function DeliveredPage() {
     );
   }
   if (project.status !== "delivered") {
-    return (
-      <div className={styles.root}>
-        <p style={{ margin: "auto", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--subtle-foreground)", letterSpacing: "0.12em" }}>
-          REDIRECTING…
-        </p>
-      </div>
-    );
+    return <SystemLoadingScreen />;
   }
 
   const photographerName = photographer?.name?.trim() || "작가";

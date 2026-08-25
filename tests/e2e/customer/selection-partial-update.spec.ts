@@ -21,7 +21,7 @@ let photoId: string;
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage();
   project = await setupFullProject(page, 3);
-  // PIN 없는 프로젝트는 갤러리 접근 시 auto-verify로 쿠키가 자동 발급된다.
+  // PIN 없는 프로젝트는 갤러리 최초 요청의 middleware에서 쿠키가 자동 발급된다.
   await page.goto(project.galleryUrl, { waitUntil: "networkidle" });
   const photosRes = await page.request.get(
     `/api/c/photos?token=${encodeURIComponent(project.accessToken)}`

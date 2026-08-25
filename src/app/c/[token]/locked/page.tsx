@@ -1,6 +1,6 @@
 "use client";
 
-import { PageLoader } from "@/components/ui/PageLoader";
+import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -196,7 +196,7 @@ export default function LockedPage() {
     } catch { setCancelling(false); }
   };
 
-  if (loading) return <PageLoader variant="full" />;
+  if (loading) return <SystemLoadingScreen />;
   if (!project) return (
     <div className="flex min-h-dvh items-center justify-center bg-background text-subtle-foreground font-mono text-sm">
       존재하지 않는 초대 링크입니다.

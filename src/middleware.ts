@@ -4,6 +4,10 @@ import { isAdminEmail } from "@/lib/admin-emails";
 
 const COOKIE_TTL_SECONDS = 86400;
 
+type CustomerPinLookup =
+  | { found: true; accessPin: string | null }
+  | { found: false };
+
 /**
  * /admin/** 접근 제어를 미들웨어(Edge, 렌더링 시작 전)에서 수행한다.
  * App Router에서 layout과 그 자식 page는 병렬로 렌더링될 수 있어, layout의 redirect()만으로는
@@ -100,6 +104,54 @@ async function verifyPinCookieEdge(
   }
 }
 
+async function signPinCookieEdge(token: string): Promise<string> {
+  const secret = process.env.PIN_COOKIE_SECRET;
+  if (!secret) throw new Error("PIN_COOKIE_SECRET is not set");
+
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    enc.encode(`${token}:${timestamp}`)
+  );
+  const base64url = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  return `${timestamp}.${base64url}`;
+}
+
+async function getCustomerPin(token: string): Promise<CustomerPinLookup> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) throw new Error("Supabase admin env is not set");
+
+  const endpoint = new URL("/rest/v1/projects", url);
+  endpoint.searchParams.set("select", "access_pin");
+  endpoint.searchParams.set("access_token", `eq.${token}`);
+  endpoint.searchParams.set("limit", "1");
+  const response = await fetch(endpoint, {
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+    },
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`customer PIN lookup failed: ${response.status}`);
+
+  const rows = (await response.json()) as Array<{ access_pin: string | null }>;
+  if (!rows[0]) return { found: false };
+  return { found: true, accessPin: rows[0].access_pin };
+}
+
 export async function middleware(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
 
@@ -107,12 +159,12 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     return handleAdminGate(req);
   }
 
-  // Extract token from /c/[token]/...
-  const match = pathname.match(/^\/c\/([^/]+)\/(.+)$/);
+  // Extract token from /c/[token] and all nested customer routes.
+  const match = pathname.match(/^\/c\/([^/]+)(?:\/(.*))?$/);
   if (!match) return NextResponse.next();
 
   const token = match[1];
-  const subpath = match[2];
+  const subpath = match[2] ?? "";
 
   // Allow access to the pin page itself
   if (subpath === "pin" || subpath.startsWith("pin?")) {
@@ -122,17 +174,47 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
   const cookieName = `pin_verified_${token}`;
   const cookieValue = req.cookies.get(cookieName)?.value;
 
-  if (!cookieValue || !(await verifyPinCookieEdge(token, cookieValue))) {
-    const pinUrl = new URL(`/c/${token}/pin`, req.url);
-    // pathname만 넘기면 원래 URL의 쿼리스트링(예: 뷰어의 ?grouped=1, 필터 파라미터)이
-    // PIN 인증 후 복귀 시 유실된다 — search까지 함께 보존한다.
-    pinUrl.searchParams.set("from", pathname + req.nextUrl.search);
-    return NextResponse.redirect(pinUrl);
+  if (cookieValue && (await verifyPinCookieEdge(token, cookieValue))) {
+    return NextResponse.next();
   }
 
-  return NextResponse.next();
+  try {
+    const project = await getCustomerPin(token);
+    if (project.found && project.accessPin === null) {
+      // PIN 없는 링크는 /pin → /api/c/auto-verify 왕복 없이 현재 요청에서 바로 인증한다.
+      const signedCookie = await signPinCookieEdge(token);
+      // 현재 Server Component 요청도 즉시 인증된 쿠키를 보도록 request/response 양쪽에 반영한다.
+      req.cookies.set(cookieName, signedCookie);
+      const response = NextResponse.next({ request: req });
+      response.cookies.set(cookieName, signedCookie, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: COOKIE_TTL_SECONDS,
+        path: "/",
+      });
+      return response;
+    }
+
+    // 존재하는 PIN 보호 프로젝트는 기존 입력 화면으로 보낸다.
+    if (project.found) {
+      const pinUrl = new URL(`/c/${token}/pin`, req.url);
+      pinUrl.searchParams.set("from", pathname + req.nextUrl.search);
+      return NextResponse.redirect(pinUrl);
+    }
+  } catch (error) {
+    // 인증 조회 장애 시 보호된 하위 경로를 열지 않는 기존 fail-closed 동작을 유지한다.
+    console.error("[middleware/customer-pin]", error);
+  }
+
+  // 유효하지 않은 루트 링크는 페이지의 기존 INVALID_TOKEN 화면이 처리한다.
+  if (subpath === "") return NextResponse.next();
+
+  const pinUrl = new URL(`/c/${token}/pin`, req.url);
+  pinUrl.searchParams.set("from", pathname + req.nextUrl.search);
+  return NextResponse.redirect(pinUrl);
 }
 
 export const config = {
-  matcher: ["/c/:token/:path+", "/admin", "/admin/:path*"],
+  matcher: ["/c/:token", "/c/:token/:path+", "/admin", "/admin/:path*"],
 };

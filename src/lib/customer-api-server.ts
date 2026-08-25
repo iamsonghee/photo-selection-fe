@@ -3,6 +3,7 @@
  * Service Role 클라이언트로 selections 등 RLS를 우회해 처리.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cache } from "react";
 import { getAdminClient } from "@/lib/supabase-admin";
 import type { Project, Photo, PhotoGroupInfo, ProjectStatus, ColorTag } from "@/types";
 import type { PhotoState } from "@/contexts/SelectionContext";
@@ -95,6 +96,11 @@ export async function getProjectByToken(
   if (error || !data) return null;
   return mapProjectRow(data as ProjectsRow);
 }
+
+/** 같은 RSC 요청 안에서 layout/page가 수행하는 동일 프로젝트 조회를 한 번으로 합친다. */
+export const getProjectByTokenCached = cache(async (token: string): Promise<Project | null> => {
+  return getProjectByToken(getAdminClient(), token);
+});
 
 // Supabase PostgREST 기본 limit=1000 우회(src/lib/db.ts와 동일 패턴) — BETA_MAX=3000이므로
 // photos/selections는 3페이지를 병렬 요청한다. 안 하면 1000장 넘는 프로젝트에서 고객 갤러리/

@@ -10,6 +10,7 @@ import { ko } from "date-fns/locale";
 import { useSelection } from "@/contexts/SelectionContext";
 import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
+import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import {
   appendGalleryScrollQuery,
@@ -238,6 +239,7 @@ export default function GalleryPageClient() {
     if (gs != null) params.set(GALLERY_SCROLL_PARAM, gs);
     if (gf != null) params.set(GALLERY_FOCUS_PARAM, gf);
     const nextQs = params.toString();
+    if (current.toString() === nextQs) return;
     router.replace(`/c/${token}/gallery${nextQs ? `?${nextQs}` : ""}`, { scroll: false });
   }, [filterState, token, router]);
 
@@ -527,13 +529,7 @@ export default function GalleryPageClient() {
 
   /* ── Loading / error states ── */
   if (loading) {
-    return (
-      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "var(--background)" }}>
-        <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "var(--subtle-foreground)", letterSpacing: "0.1em" }}>
-          LOADING_GALLERY...
-        </p>
-      </div>
-    );
+    return <SystemLoadingScreen />;
   }
   if (!project) {
     return (

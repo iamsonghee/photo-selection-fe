@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import { after } from "next/server";
 import CustomerLayoutClient from "./CustomerLayoutClient";
-import { getProjectByToken } from "@/lib/customer-api-server";
+import { getProjectByTokenCached } from "@/lib/customer-api-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { recordBetaUsageEvent } from "@/lib/beta-usage-events";
 import "./customer-shell.css";
@@ -29,16 +30,17 @@ export default async function CustomerTokenLayout({
   // (/c/[token])가 아니라 여기서 기록해야 딥링크(예: 북마크된 /gallery 직접 진입)도 놓치지 않는다.
   // App Router는 같은 동적 세그먼트 하위의 클라이언트 내비게이션에서 layout을 재실행하지 않으므로,
   // 사진 클릭 등 내부 이동마다 매번 실행되지는 않는다(레이아웃 최초 진입 시에만 실행).
-  // 서버리스 환경에서는 응답 종료 후 백그라운드 실행이 보장되지 않으므로 await한다 — 실패해도
-  // 절대 throw하지 않으므로(recordBetaUsageEvent 참고) 응답 지연은 인덱스 조회 1회 수준.
+  // Next after()가 응답 이후 실행을 보장하므로 최초 화면을 이벤트 insert 완료까지 막지 않는다.
   if (token) {
     const admin = getAdminClient();
-    const project = await getProjectByToken(admin, token);
+    const project = await getProjectByTokenCached(token);
     if (project) {
-      await recordBetaUsageEvent(admin, {
-        eventType: "customer_link_visited",
-        photographerId: project.photographerId,
-        projectId: project.id,
+      after(async () => {
+        await recordBetaUsageEvent(admin, {
+          eventType: "customer_link_visited",
+          photographerId: project.photographerId,
+          projectId: project.id,
+        });
       });
     }
   }

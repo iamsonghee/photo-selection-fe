@@ -150,7 +150,7 @@ test.describe("Phase A — PIN 쿠키 인증", () => {
 // ─── middleware redirect 확인 ─────────────────────────────────────────────
 
 test.describe("Phase A — middleware redirect", () => {
-  test("M1: 쿠키 없이 /c/TOKEN/gallery 접근 → middleware가 /pin으로 redirect", async ({ browser }) => {
+  test("M1: PIN 없는 /c/TOKEN/gallery 접근 → 현재 요청에서 쿠키를 발급하고 바로 진입", async ({ browser }) => {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
 
@@ -162,12 +162,12 @@ test.describe("Phase A — middleware redirect", () => {
       }
     });
 
-    // PIN 없는 프로젝트: middleware → /pin → auto-verify → (쿠키 발급) → /gallery 복귀
-    // 최종 URL은 다시 /gallery 가 될 수 있으므로 최종 URL이 아닌 redirect 체인으로 검증
-    await page.goto(`/c/${project.accessToken}/gallery`);
+    await page.goto(`/c/${project.accessToken}/gallery`, { waitUntil: "commit" });
 
-    // middleware 의 첫 redirect 목적지가 /pin 을 경유했는지 확인
-    expect(redirectedVia.some((url) => url.includes("/pin"))).toBe(true);
+    expect(redirectedVia.some((url) => url.includes("/pin"))).toBe(false);
+    expect(page.url()).toContain(`/c/${project.accessToken}/gallery`);
+    const issued = await ctx.cookies();
+    expect(issued.some((cookie) => cookie.name === cookieName(project.accessToken))).toBe(true);
     await ctx.close();
   });
 
@@ -196,8 +196,7 @@ test.describe("Phase A — middleware redirect", () => {
 
   // regression: middleware가 pin redirect의 "from" 파라미터를 pathname만으로 구성해
   // 원래 URL의 쿼리스트링(예: 뷰어의 ?grouped=1, 필터 파라미터)을 유실시키던 버그.
-  // PIN 없는 프로젝트라 /pin → auto-verify를 거쳐 쿠키 발급 후 원래 URL로 복귀하는데,
-  // 이 왕복 과정에서 쿼리스트링이 최종 URL까지 보존되는지 확인한다.
+  // PIN 없는 프로젝트의 최초 요청에서 쿠키를 발급해도 원래 쿼리스트링을 보존하는지 확인한다.
   test("M3: 쿠키 없이 쿼리스트링이 붙은 URL 접근 → 최종 복귀 URL에 쿼리스트링 보존", async ({ browser }) => {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();

@@ -1,16 +1,6 @@
-"use client";
-
-import dynamic from "next/dynamic";
 import { Suspense } from "react";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
-
-const GalleryPageClient = dynamic(
-  () => import("./GalleryPageClient").then((m) => m.default),
-  {
-    ssr: false,
-    loading: () => <SystemLoadingScreen />,
-  }
-);
+import GalleryPageClient from "./GalleryPageClient";
 
 export default function GalleryPageWrapper() {
   return (
