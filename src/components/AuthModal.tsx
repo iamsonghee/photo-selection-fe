@@ -3,7 +3,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { GOOGLE_OAUTH_QUERY_PARAMS } from "@/lib/google-oauth";
-import { setPostLoginRedirect } from "@/lib/post-login-redirect";
+import {
+  clearPostLoginRedirect,
+  DEFAULT_POST_LOGIN_PATH,
+  setPostLoginRedirect,
+} from "@/lib/post-login-redirect";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -87,6 +91,15 @@ export function AuthModal({ isOpen, onClose, redirectPath }: AuthModalProps) {
     return `${window.location.origin}/auth/callback`;
   }
 
+  function preparePostLoginRedirect(): void {
+    if (redirectPath && redirectPath !== DEFAULT_POST_LOGIN_PATH) {
+      setPostLoginRedirect(redirectPath);
+      return;
+    }
+    // 기본 로그인에서는 취소된 이전 시도의 복귀 경로가 재사용되지 않게 비운다.
+    clearPostLoginRedirect();
+  }
+
   const handleGoogleLogin = async () => {
     setError(null);
     setLoading("google");
@@ -99,7 +112,7 @@ export function AuthModal({ isOpen, onClose, redirectPath }: AuthModalProps) {
       setLoading(null);
       return;
     }
-    if (redirectPath) setPostLoginRedirect(redirectPath);
+    preparePostLoginRedirect();
     try {
       const { data, error: err } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -137,7 +150,7 @@ export function AuthModal({ isOpen, onClose, redirectPath }: AuthModalProps) {
       setLoading(null);
       return;
     }
-    if (redirectPath) setPostLoginRedirect(redirectPath);
+    preparePostLoginRedirect();
     try {
       const { data, error: err } = await supabase.auth.signInWithOAuth({
         provider: "kakao",

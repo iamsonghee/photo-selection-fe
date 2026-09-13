@@ -23,7 +23,11 @@ import { DashboardOverview } from "./DashboardOverview";
 
 
 import { BetaApprovalBanner, type BetaApplicationStatus } from "@/components/photographer/BetaApprovalBanner";
-import { consumePostLoginRedirect, peekPostLoginRedirect } from "@/lib/post-login-redirect";
+import {
+  consumePostLoginRedirect,
+  DEFAULT_POST_LOGIN_PATH,
+  peekPostLoginRedirect,
+} from "@/lib/post-login-redirect";
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { ProjectLimitModal } from "@/components/photographer/ProjectLimitModal";
@@ -80,9 +84,12 @@ export default function DashboardPage() {
   const [showBetaWelcome, setShowBetaWelcome] = useState(false);
   // 첫 렌더에서(이펙트를 기다리지 않고) 곧바로 읽는다 — 그래야 대시보드 실제 콘텐츠가 한 프레임도
   // 그려지지 않고 바로 로딩 화면으로 대체된다. 실제 소비(제거)는 아래 이펙트가 담당.
-  const [pendingRedirect] = useState(() =>
-    typeof window === "undefined" ? null : peekPostLoginRedirect()
-  );
+  const [pendingRedirect] = useState(() => {
+    if (typeof window === "undefined") return null;
+    const path = peekPostLoginRedirect();
+    // 기본 목적지는 현재 화면이므로 리다이렉트 대기로 취급하면 로딩 화면이 영구 유지된다.
+    return path === DEFAULT_POST_LOGIN_PATH ? null : path;
+  });
 
   const userName =
     profile?.name?.trim() ||
@@ -94,7 +101,9 @@ export default function DashboardPage() {
   // (src/lib/post-login-redirect.ts). 콜백 URL 자체에 쿼리스트링을 붙이지 않기 위한 우회.
   useEffect(() => {
     const redirectPath = consumePostLoginRedirect();
-    if (redirectPath) router.replace(redirectPath);
+    if (redirectPath && redirectPath !== DEFAULT_POST_LOGIN_PATH) {
+      router.replace(redirectPath);
+    }
   }, [router]);
 
   useEffect(() => {

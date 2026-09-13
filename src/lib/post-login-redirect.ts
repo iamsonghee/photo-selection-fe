@@ -9,11 +9,23 @@
  */
 const KEY = "acut_post_login_redirect";
 
+/** OAuth 콜백이 별도 복귀 경로가 없을 때 도착하는 기본 경로. */
+export const DEFAULT_POST_LOGIN_PATH = "/photographer/dashboard";
+
 export function setPostLoginRedirect(path: string): void {
   try {
     sessionStorage.setItem(KEY, path);
   } catch {
     // sessionStorage 접근 불가(프라이빗 모드 등) — 무시, 기본 목적지로 이동될 뿐
+  }
+}
+
+/** 이전 로그인 시도에서 남은 복귀 경로를 지운다. */
+export function clearPostLoginRedirect(): void {
+  try {
+    sessionStorage.removeItem(KEY);
+  } catch {
+    // sessionStorage 접근 불가 — 기본 목적지로 이동될 뿐
   }
 }
 
