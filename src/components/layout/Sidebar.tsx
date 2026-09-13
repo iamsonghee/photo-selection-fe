@@ -66,7 +66,7 @@ export function Sidebar({
   const isLightRoute = isPhotographerLightRoute(pathname);
   const { profile } = useProfile();
   const quota = usePhotographerQuota();
-  const displayName = profile?.name?.trim() || profile?.email?.split("@")[0] || "작가";
+  const displayName = profile?.name?.trim() || profile?.email?.split("@")[0] || "사용자";
   const tierLabel = quota ? TIER_LABEL[quota.tier] : null;
   const usagePct =
     quota && quota.max ? Math.min(100, Math.round((quota.current / quota.max) * 100)) : 0;

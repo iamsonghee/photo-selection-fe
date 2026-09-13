@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { BetaSurveyModal } from "@/components/photographer/BetaSurveyModal";
 import { usePhotographerModalChromeHidden } from "@/contexts/PhotographerModalContext";
+import { useProfile } from "@/contexts/ProfileContext";
 import type { SurveyType } from "@/lib/beta-survey";
 
 /**
@@ -20,6 +21,7 @@ import type { SurveyType } from "@/lib/beta-survey";
  */
 export function BetaSurveyGate() {
   const pathname = usePathname();
+  const { profile, loading: profileLoading } = useProfile();
   const [surveyType, setSurveyType] = useState<SurveyType | null>(null);
   const [shownThisSession, setShownThisSession] = useState(false);
   const isAnyModalOpen = usePhotographerModalChromeHidden();
@@ -28,6 +30,8 @@ export function BetaSurveyGate() {
     if (surveyType) return;
     if (shownThisSession) return;
     if (isAnyModalOpen) return;
+    // 로그인 확인 전이거나 미로그인이면 조회하지 않는다 — 어차피 401만 돌아온다.
+    if (profileLoading || !profile?.id) return;
     let cancelled = false;
     fetch("/api/photographer/beta-survey/status")
       .then((r) => (r.ok ? r.json() : null))
@@ -39,7 +43,7 @@ export function BetaSurveyGate() {
     return () => {
       cancelled = true;
     };
-  }, [pathname, isAnyModalOpen, surveyType, shownThisSession]);
+  }, [pathname, isAnyModalOpen, surveyType, shownThisSession, profileLoading, profile?.id]);
 
   if (!surveyType) return null;
 

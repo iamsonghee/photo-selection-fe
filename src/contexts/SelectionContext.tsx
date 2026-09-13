@@ -14,6 +14,11 @@ import { Button, ProgressBar } from "@/components/ui";
 /** 고객 플로우: API Route 호출 (Service Role로 selections 처리) */
 async function fetchCustomerPhotos(token: string) {
   const res = await fetch(`/api/c/photos?token=${encodeURIComponent(token)}`);
+  if (res.status === 401 || res.status === 404) {
+    // 유효하지 않은/접근 권한이 없는 링크 — 정상적인 상태 전이(호출부가 project: null로
+    // "이 링크는 사용할 수 없어요" 화면을 렌더한다)이므로 예외로 취급해 콘솔에 남기지 않는다.
+    return { project: null, photos: [], photoGroups: [], selectedIds: [], photoStates: {} };
+  }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error ?? "Failed to load");
