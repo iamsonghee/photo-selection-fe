@@ -1,4 +1,4 @@
-import { chromium } from "playwright";
+import { chromium, devices, webkit } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -75,7 +75,8 @@ try {
       const { width, height } = f.getBoundingClientRect();
       return { width, height, overflow: document.documentElement.scrollWidth > innerWidth,
         video: v ? { width: v.videoWidth, height: v.videoHeight, duration: v.duration, muted: v.muted,
-          controls: v.controls, loop: v.loop, playsInline: v.playsInline, fit: getComputedStyle(v).objectFit } : null };
+          controls: v.controls, loop: v.loop, playsInline: v.playsInline, fit: getComputedStyle(v).objectFit,
+          currentSrc: v.currentSrc, sourceOrder: [...v.querySelectorAll("source")].map(source => source.type) } : null };
     });
     assert(Math.abs(state.width / state.height - (scenario.startsWith("mobile") ? 4 / 5 : 1200 / 641)) < .001);
     assert.equal(state.overflow, false);
@@ -88,6 +89,11 @@ try {
       assert.equal(state.video.controls, false); assert.equal(state.video.muted, true);
       assert.equal(state.video.loop, true); assert.equal(state.video.playsInline, true);
       assert.equal(state.video.fit, "contain");
+      assert(state.video.currentSrc.endsWith(".mp4"));
+      assert.deepEqual(state.video.sourceOrder, ["video/mp4", "video/webm"]);
+    }
+    if (scenario.endsWith("autoplay-denied") || scenario.endsWith("media-error")) {
+      assert.equal(await page.getByRole("button", { name: "제품 시연 영상 재생" }).isVisible(), true);
     }
     await film.screenshot({ path: path.join(output, `${scenario}.png`) });
     if (["desktop", "mobile"].includes(scenario)) {
@@ -114,3 +120,34 @@ try {
   await writeFile(path.join(output, "results.json"), JSON.stringify(results, null, 2) + "\n");
   console.log(JSON.stringify(results, null, 2), `\nScreenshots: ${output}`);
 } finally { await browser.close(); }
+
+// Chromium 에뮬레이션만으로는 Safari의 source 선택과 inline autoplay를 검증할 수 없다.
+// 실제 iPhone과 같은 UA/viewport를 WebKit에 적용해 H.264 모바일 영상이 재생되는지 확인한다.
+const safari = await webkit.launch();
+try {
+  const context = await safari.newContext({ ...devices["iPhone 13"], reducedMotion: "no-preference" });
+  const page = await context.newPage();
+  await page.goto(`${origin}/landing`);
+  const film = page.locator(".ac-hero-film");
+  await film.scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => document.querySelector(".ac-hero-film")?.dataset.playing === "true");
+  const state = await page.locator(".ac-hero-film video").evaluate(video => ({
+    currentSrc: video.currentSrc,
+    paused: video.paused,
+    muted: video.muted,
+    playsInline: video.playsInline,
+    width: video.videoWidth,
+    height: video.videoHeight,
+  }));
+  assert(state.currentSrc.endsWith("acut-demo-mobile.mp4"));
+  assert.equal(state.paused, false);
+  assert.equal(state.muted, true);
+  assert.equal(state.playsInline, true);
+  assert.deepEqual([state.width, state.height], [960, 1200]);
+  results.iphoneWebKit = state;
+  await context.close();
+} finally {
+  await safari.close();
+}
+await writeFile(path.join(output, "results.json"), JSON.stringify(results, null, 2) + "\n");
+console.log("iPhone WebKit:", JSON.stringify(results.iphoneWebKit, null, 2));

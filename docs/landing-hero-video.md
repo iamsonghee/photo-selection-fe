@@ -60,7 +60,7 @@ PNG 프레임은 os.tmpdir()의 acut-hero-frames / acut-hero-mobile-frames에 �
 
 개발 전용 /landing/demo-capture에서 실제 GalleryPhotoCard, SelectionConfirmDialog, ProjectAssetTabs, OriginalPhotoGallery 등에 정적 샘플을 적용한다. production은 notFound()로 차단한다. 운영 API·고객 경로·외부 서비스 요청은 녹화 스크립트에서 차단하고 검사한다. 서비스 기능·DB·업로드 흐름은 변경하지 않는다. 주요 녹화 로직은 한국어 주석을 포함한다.
 
-HeroVideo는 autoPlay·muted·playsInline·loop·poster를 제공하고 컨트롤을 숨긴다. CSS로 비율을 예약해 레이아웃 이동을 방지한다. 첫 재생 전·자동 재생 거절·미디어 오류에는 poster를 유지한다. 최초 재생 후 waiting 또는 반복 경계에서는 poster로 되돌리지 않아 깜빡임을 방지한다. 움직임 축소 설정에서는 video를 마운트하지 않고 화면 폭에 맞는 poster만 표시한다.
+HeroVideo는 autoPlay·muted·playsInline·loop·poster를 제공하고 컨트롤을 숨긴다. iOS Safari가 지원이 불완전한 WebM을 먼저 선택하지 않도록 H.264 MP4를 첫 source로 제공하고, 소스 변경 후 `load()`와 `canplay` 시점 재시도로 inline 자동재생을 시작한다. 저전력 모드처럼 자동재생이 거절되면 poster 위에 작은 "영상 재생" 버튼을 표시해 사용자 동작으로 다시 시작할 수 있다. CSS로 비율을 예약해 레이아웃 이동을 방지한다. 첫 재생 전·자동 재생 거절·미디어 오류에는 poster를 유지한다. 최초 재생 후 waiting 또는 반복 경계에서는 poster로 되돌리지 않아 깜빡임을 방지한다. 움직임 축소 설정에서는 video를 마운트하지 않고 화면 폭에 맞는 poster만 표시한다.
 
 ## 검증 방법
 

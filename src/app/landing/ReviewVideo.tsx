@@ -30,7 +30,8 @@ export function ReviewVideo() {
       onPlaying={() => setPlaying(true)} onError={() => setPlaying(false)}
       // 마지막 장면에서 첫 장면으로 부드럽게 돌아온다. waiting은 오류로 취급하지 않는다.
       onTimeUpdate={event => setEnding(event.currentTarget.currentTime > 11.4)}>
-      <source src={`${BASE}.webm`} type="video/webm" /><source src={`${BASE}.mp4`} type="video/mp4" />
+      {/* iOS Safari 호환성이 높은 H.264 MP4를 우선 선택한다. */}
+      <source src={`${BASE}.mp4`} type="video/mp4" /><source src={`${BASE}.webm`} type="video/webm" />
     </video>}
   </div>;
 }
