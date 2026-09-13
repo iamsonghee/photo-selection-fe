@@ -1,0 +1,36 @@
+/* 사진 중심인 01·03과 구분되도록 상태와 다음 작업을 강조한 샘플 대시보드. */
+.po-shell{min-width:0;background:#fff;border:1px solid #e1e1e1;border-radius:12px;box-shadow:0 18px 45px #19191808;overflow:hidden;}
+.po-header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:#fafafa;border-bottom:1px solid #e8e8e8;font-size:12px;font-weight:700;}
+.po-header b{font-weight:500;margin-left:12px;color:#737373;}
+.po-header>small{font-size:10px;color:#888;font-weight:400;}
+.po-body{padding:22px;}
+.po-section-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:13px;font-size:12px;}
+.po-section-heading strong{font-weight:600;}
+.po-navigation{display:flex;align-items:center;gap:10px;font-size:11px;color:#737373;font-variant-numeric:tabular-nums;}
+.po-navigation button{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid #e5e5e5;background:white;border-radius:50%;color:#404040;}
+.po-navigation button:hover:not(:disabled){background:#fff4ef;border-color:#ff4d00;}
+.po-navigation button:disabled{opacity:.3;cursor:default;}
+.po-navigation button:focus-visible{outline:2px solid #ff4d00;outline-offset:3px;}
+.po-focus{border:1px solid #efd9cf;border-top:3px solid #ff4d00;border-radius:9px;padding:22px;background:linear-gradient(135deg,#fff8f4,#fff 70%);}
+.po-focus-label{display:flex;align-items:center;gap:6px;font-size:11px;color:#d94100;}
+.po-focus h3{font-size:22px;font-weight:650;letter-spacing:-.04em;margin:12px 0 8px;line-height:1.4;}
+.po-focus>p{font-size:12px;color:#737373;line-height:1.7;margin:0;min-height:41px;}
+.po-focus-detail{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;margin-top:16px;padding-block:16px;border-top:1px solid #eee2dc;}
+.po-focus-detail strong{font-size:12px;font-weight:600;display:block;}
+.po-focus-detail small{font-size:10px;color:#888;display:block;margin-top:5px;}
+.po-metric{text-align:right;}
+.po-metric b{display:block;font-size:25px;font-weight:650;color:#d94100;line-height:1.4;}
+.po-next{display:flex;gap:9px;align-items:center;font-size:11px;}
+.po-next>span{color:#888;}
+.po-next strong{font-weight:600;}
+.po-next svg{color:#d94100;}
+.po-recent-heading{margin-top:24px;}
+.po-recent-heading>span{font-size:11px;color:#888;}
+.po-recent{margin:0;padding:0;list-style:none;}
+.po-recent li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-top:1px solid #eee;}
+.po-recent strong{font-size:12px;font-weight:500;display:block;word-break:keep-all;}
+.po-recent small{display:block;font-size:10px;color:#999;margin-top:4px;}
+.po-status{display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#626262;white-space:nowrap;background:#f3f3f3;padding:4px 7px;border-radius:4px;}
+.po-status[data-complete=true]{background:transparent;color:#999;}
+@media(max-width:1000px){#projects-demo.as-split{grid-template-columns:1fr;gap:28px;}}
+@media(max-width:700px){.po-body{padding:16px;}.po-header{padding:14px 16px;}.po-focus{padding:17px;}.po-focus h3{font-size:20px;}.po-focus-detail{gap:12px;}.po-navigation button{width:36px;height:36px;}}

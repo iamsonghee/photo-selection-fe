@@ -15,19 +15,23 @@ const GEMINI_ERROR_MESSAGES: Record<number, string> = {
 const GEMINI_ERROR_FALLBACK = "분석 시작에 실패했습니다. 잠시 후 다시 시도해주세요.";
 
 /**
- * 실제 비용이 발생하는 관리자 전용 POC라 FE의 UI 숨김만으로는 부족하다 — 로그인 세션의
- * 이메일로 서버에서도 관리자 여부를 재검증한다(클라이언트 tier 체크를 우회해도 통과 못 함).
- * gemini-analysis/route.ts와 동일 패턴.
+ * 품질 판정(눈감음·흔들림)은 이제 모든 작가가 쓰는 기능이라 세션 + 소유권만 검증한다.
+ *
+ * 2026-09-12까지는 관리자 이메일까지 확인하는 POC 전용 경로였다. 품질 결과를 작가·고객 갤러리에
+ * 배지로 꺼내면서(§photo-quality) 일반 경로가 됐다 — 유사컷(`gemini-analysis`)이 베타 전환 때
+ * 밟은 것과 같은 전환이고, 검증 강도도 그쪽과 같아졌다.
+ *
+ * ⚠️ 호출마다 Gemini 비용이 발생한다. 관리자 게이트가 사라진 만큼 **한도는 등급 정책이 맡아야
+ * 한다** — 지금은 별도 한도가 없다(clip-service의 프로젝트 동시 실행 세마포어만 있다).
  */
 async function getAdminPhotographerIdFromSession(): Promise<
-  { photographerId: string } | { error: "unauthenticated" | "forbidden" }
+  { photographerId: string; isAdmin: boolean } | { error: "unauthenticated" | "forbidden" }
 > {
   const supabase = await createClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
   if (!session?.user?.id) return { error: "unauthenticated" };
-  if (!isAdminEmail(session.user.email)) return { error: "forbidden" };
   const { data } = await supabase
     .from("photographers")
     .select("id")
@@ -35,7 +39,8 @@ async function getAdminPhotographerIdFromSession(): Promise<
     .limit(1)
     .single();
   if (!data?.id) return { error: "unauthenticated" };
-  return { photographerId: data.id };
+  /* 관리자 여부는 접근 차단이 아니라 **`force` 허용 여부**에만 쓴다 — 분석 자체는 모든 작가가 한다 */
+  return { photographerId: data.id, isAdmin: isAdminEmail(session.user.email) };
 }
 
 async function assertProjectOwnership(
@@ -76,7 +81,11 @@ export async function POST(
 
     const body = await req.json().catch(() => ({}));
     const limit = typeof body?.limit === "number" ? body.limit : undefined;
-    const force = body?.force === true;
+    /* `force`는 저장된 판정 캐시(같은 model+prompt_version)를 무시하고 **전량 재판정**시키는
+     * 운영 스위치다. 캐시 덕분에 "사진 수 = 비용 상한"이 성립하는데 force는 그 상한을 없앤다 —
+     * 화면에는 없는 스위치지만 API가 본문에서 그대로 읽으므로 관리자에게만 허용한다
+     * (유사컷 `gemini-analysis` 라우트와 같은 규칙). */
+    const force = auth.isAdmin && body?.force === true;
 
     const res = await fetch(`${CLIP_SERVICE_URL}/analyze/gemini/quality`, {
       method: "POST",

@@ -1,0 +1,45 @@
+/* 상세와 수정 화면만 범위를 제한해 공통 폼과 다른 작업 화면에 영향을 주지 않는다. */
+.detailPage { max-width:1504px; margin-inline:auto; }
+.contentGrid { display:grid; grid-template-columns:minmax(0,1fr); gap:20px; align-items:start; }
+.informationColumn { min-width:0; }
+.workColumn { order:-1; display:flex; flex-direction:column; gap:20px; min-width:0; }
+.customerLink { padding:24px; border:1px solid var(--border-subtle); border-radius:12px; background:var(--surface); }
+.detailPage h1,.detailPage h2 { word-break:keep-all; overflow-wrap:anywhere; }
+/* 흰색 하단 바는 본문 전체 폭을 채우고, 입력·버튼 정렬은 내부 컨테이너가 담당한다. */
+.editPage { width:100%; }
+.editContainer { width:100%; max-width:1100px; margin-inline:auto; }
+.editSections { display:grid; grid-template-columns:minmax(0,1fr); align-items:start; gap:20px; }
+@media(min-width:1280px) {
+  .editSections { grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:24px; }
+}
+
+@media(min-width:768px) {
+  .detailPage>main { padding-top:24px; }
+  .contentGrid { grid-template-columns:minmax(0,1.65fr) minmax(290px,1fr); gap:24px; }
+  .informationColumn { grid-column:2; grid-row:1; }
+  .workColumn { grid-column:1; grid-row:1; }
+  .detailPage [data-project-work-panel] { padding:28px; border-top:3px solid var(--accent); }
+  .detailPage [data-project-work-panel][data-actor=customer] { border-top-color:var(--customer-foreground); }
+  .detailPage [data-project-work-panel][data-actor=completed] { border-top-color:var(--border-strong); }
+  .detailPage [data-project-work-panel] h2 { max-width:26ch; font-size:26px; line-height:1.4; letter-spacing:-.04em; }
+  .detailPage [data-project-work-panel]>button { align-self:flex-start; width:auto; min-width:180px; margin-top:24px; }
+  .detailPage [data-project-progress-card] { border:0; border-block:1px solid var(--border-subtle); border-radius:0; background:transparent; padding:12px 0; }
+  .detailPage [data-project-progress-grid] { grid-template-columns:repeat(6,minmax(0,1fr)); gap:4px; }
+  .detailPage [data-project-progress-grid]>button { min-height:58px; padding:6px; gap:8px; }
+  .detailPage [data-project-progress-grid]>button>span:nth-of-type(1) { width:26px; height:26px; font-size:12px; }
+  .detailPage [data-project-progress-grid]>button>span>span:first-child { font-size:13px; }
+  .detailPage [data-project-progress-grid]>button>span>span:nth-child(2) { display:none; }
+  .editPage [data-project-form-section] { border:1px solid var(--border-subtle); border-radius:12px; }
+  .editPage [data-project-form-section]>div:first-child { background:transparent; padding-bottom:18px; }
+  .editPage [data-project-form-section]>div:first-child>div>span { background:var(--surface-raised); color:var(--muted-foreground); border-radius:50%; }
+  .editPage [data-project-form-page-heading] { padding-bottom:24px; margin-bottom:24px; border-bottom:1px solid var(--border-subtle); }
+}
+@media(max-width:1000px) and (min-width:768px) {
+  .contentGrid { grid-template-columns:minmax(0,1fr); }
+  .informationColumn { grid-column:1; grid-row:2; }
+  .detailPage [data-project-progress-grid]>button { flex-direction:column; text-align:center; }
+}
+@media(max-width:767px) {
+  .customerLink { padding:16px; }
+  .contentGrid,.workColumn { gap:16px; }
+}

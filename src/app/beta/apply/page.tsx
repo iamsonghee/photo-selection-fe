@@ -8,7 +8,7 @@ export default async function BetaApplyPage() {
   } = await supabase.auth.getSession();
 
   return (
-    <div className="mx-auto min-h-screen max-w-xl px-6 py-16">
+    <div>
       <BetaApplyForm prefillEmail={session?.user?.email ?? null} />
     </div>
   );

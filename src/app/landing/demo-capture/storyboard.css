@@ -1,0 +1,70 @@
+/* 승인 전 정지 시안 전용. 기존 히어로 영상과 녹화 화면의 스타일은 바꾸지 않는다. */
+.film-storyboard .film-customer .gl-rating-row button {font-size:12px!important;}
+.film-storyboard .film-customer .film-detail {inset:62px 0 64px;}
+.film-storyboard .film-customer .film-detail>.story-detail-heading {height:38px;display:flex;align-items:center;gap:9px;padding:0 14px;font-size:12px;flex-shrink:0;}
+.story-detail-heading>span {margin-left:auto;display:flex;gap:3px;align-items:center;font-size:10px;color:#666;}
+.film-storyboard .film-customer .film-detail>.story-detail-photo {height:247px;background:#f6f6f4;text-align:center;}
+.film-storyboard .film-customer .film-detail img {height:247px;width:auto;max-width:100%;object-fit:contain;}
+.film-storyboard .film-customer .film-detail aside {padding:14px 16px;}
+.story-comment-label {display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.story-comment-label span {font-size:10px;color:#878780;}
+.film-storyboard .film-customer .film-detail label {margin:0;font-weight:600;}
+.film-storyboard .film-customer .film-comment {min-height:85px;border:1px solid #d9d9d4;font-size:15px;background:#fff;line-height:1.7;}
+.film-storyboard .film-customer .film-comment[data-editing="true"] {border-color:var(--accent);box-shadow:0 0 0 2px #ff4d000d;}
+.story-caret {display:inline-block;width:1px;height:16px;margin-left:2px;background:var(--accent);vertical-align:-3px;}
+.film-storyboard .film-customer .story-saved {display:flex;justify-content:flex-end;align-items:center;gap:4px;font-size:10px;margin-top:7px;}
+.story-sidebar {position:absolute;inset:0 auto 0 0;width:174px;background:#f7f7f5;border-right:1px solid #e6e6e1;padding:26px 18px;display:flex;flex-direction:column;gap:10px;}
+.story-sidebar>small {font-size:10px;letter-spacing:1px;color:#92928a;margin:38px 10px 7px;}
+.story-sidebar>span {display:flex;gap:10px;align-items:center;padding:12px 10px;font-size:14px;color:#6c6c66;}
+.story-sidebar .story-nav-active {background:#fff;border-radius:6px;color:#191918;font-weight:650;}
+.story-profile {margin-top:auto;font-size:13px;}
+.story-profile small {display:block;font-size:11px;color:#85857c;margin-top:6px;}
+.story-workspace {position:absolute;inset:0 0 0 174px;padding:0 28px;}
+.film-storyboard .film-writer header {height:57px;padding:0;border-bottom:1px solid #ecece7;justify-content:space-between;gap:10px;}
+.film-storyboard .film-writer header>span {font-size:12px;margin:0;}
+.film-storyboard .film-writer header>strong {font-size:12px;display:flex;align-items:center;gap:6px;}
+.story-project-heading {display:flex;justify-content:space-between;align-items:center;height:100px;}
+.story-project-heading small {font-size:12px;color:#87877e;}
+.story-project-heading h1 {font-size:27px;font-weight:650;margin:6px 0 0;}
+.story-project-heading>span {font-size:13px;color:#6c6c66;}
+.film-storyboard .film-writer-toolbar {padding:0;height:58px;border-bottom:1px solid #e6e6df;}
+.story-tools {display:flex;gap:8px;}
+.story-tools button {font-size:12px;}
+.story-list-toolbar {height:50px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#707069;}
+.story-list-toolbar>span {display:flex;align-items:center;gap:7px;}
+.story-workarea {display:grid;grid-template-columns:minmax(0,1fr) 255px;gap:24px;}
+.story-photo-list {height:330px;overflow:auto;}
+.story-inspector {border-left:1px solid #e6e6e1;padding-left:22px;}
+.story-inspector>small {display:block;font-size:11px;color:#85857d;margin-bottom:12px;}
+.story-inspector img {width:100%;height:142px;object-fit:contain;background:#f6f6f4;}
+.story-inspector h2 {font-size:14px;margin:10px 0 5px;}
+.story-rating {display:flex;gap:2px;color:var(--accent);margin-bottom:12px;}
+.story-inspector [data-viewer-comment-panel] {padding:12px;}
+.story-inspector [data-viewer-comment-panel] h2 {font-size:12px;}
+.story-inspector [data-viewer-comment-panel] p {font-size:13px;line-height:1.7;}
+.film-storyboard .film-writer footer {left:28px;right:28px;font-size:12px;padding:0;height:42px;color:#808079;}
+@media(max-width:700px) {
+ .film-storyboard .story-sidebar {display:none;}
+ .film-storyboard .story-workspace {left:0;padding:0 22px;}
+ .film-storyboard .story-workarea {grid-template-columns:1fr;}
+ .film-storyboard .story-photo-list {height:245px;}
+ .film-storyboard .story-inspector {display:grid;grid-template-columns:140px 1fr;gap:10px 18px;padding:14px 0 0;border-left:0;border-top:1px solid #e6e6df;}
+ .film-storyboard .story-inspector>small {grid-column:span 2;}
+ .film-storyboard .story-inspector>[data-photo-thumbnail-frame] {grid-row:span 3;}
+ .film-storyboard .story-inspector img {height:190px;}
+ .film-storyboard .story-inspector .story-rating {display:none;}
+ .film-storyboard .story-tools {display:none;}
+}
+
+.film-storyboard .story-detail-photo {display:flex;justify-content:center;}
+.film-storyboard .film-writer {--surface-raised:#f7f7f5;--muted-foreground:#686860;--subtle-foreground:#898980;--border-strong:#d9d9d2;--customer-foreground:#191918;}
+.film-storyboard [data-original-photo-list] {padding:0;}
+.film-storyboard [data-original-photo-list] [role="row"] {grid-template-columns:52px minmax(145px,1fr) minmax(160px,1.4fr);padding:0 14px;gap:12px;}
+.story-inspector [title] {font-size:13px;line-height:1.7;}
+.story-inspector [title] p {font-size:13px;line-height:1.7;}
+
+/* 최신 시안: 첫 사진을 상세 영역에 채우고 PC는 선택한 세 장의 갤러리로 표시한다. */
+.film-storyboard .film-customer .film-detail .story-detail-photo img {width:100%;height:100%;object-fit:cover;object-position:center;}
+.film-storyboard .story-workarea {grid-template-columns:minmax(0,1fr) 232px;gap:20px;}
+.film-storyboard .story-photo-list {height:330px;}
+.film-storyboard .story-inspector [title] p {word-break:keep-all;}

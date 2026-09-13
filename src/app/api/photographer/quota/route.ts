@@ -4,6 +4,17 @@ import { getAdminClient } from "@/lib/supabase-admin";
 import { getPolicyForPhotographer, type BetaStatus } from "@/lib/beta-policy";
 import { getAppSettings } from "@/lib/app-settings";
 
+export interface PhotographerQuota {
+  tier: "admin" | "beta" | "general";
+  current: number;
+  max: number | null;
+  maxPhotosPerProject: number | null;
+  maxRevisionCount: number | null;
+  betaStatus: BetaStatus;
+  betaEndDate: string | null;
+  betaApplicationStatus: "applied" | "reviewing" | "on_hold" | "approved" | "rejected" | null;
+}
+
 /** GET: 로그인한 작가 본인의 현재 등급/사용량/한도 */
 export async function GET() {
   try {

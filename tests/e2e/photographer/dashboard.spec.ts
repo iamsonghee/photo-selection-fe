@@ -54,4 +54,33 @@ test.describe("작가 — 대시보드", () => {
     await page.waitForTimeout(300);
     await expect(page).toHaveURL(/\/photographer\/dashboard/);
   });
+
+  test("D5: 모바일에서는 대시보드 대신 프로젝트 목록으로 진입", async ({ page }) => {
+    const welcomeButton = page.getByRole("button", { name: "시작하기" });
+    if (await welcomeButton.isVisible().catch(() => false)) await welcomeButton.click();
+
+    for (const width of [375, 390, 430]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto("/photographer/dashboard");
+      await expect(page).toHaveURL(/\/photographer\/projects$/);
+
+      const globalHeader = page.locator(".photographer-mobile-header");
+      const pageHeader = page.locator("[data-photographer-mobile-page-header]");
+      await expect(globalHeader).toBeVisible();
+      await expect(pageHeader).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "주요 메뉴" })).toHaveCount(0);
+      await expect(pageHeader.getByRole("heading", { name: "프로젝트" })).toBeVisible();
+
+      const globalBox = await globalHeader.boundingBox();
+      const pageBox = await pageHeader.boundingBox();
+      expect(globalBox).not.toBeNull();
+      expect(pageBox).not.toBeNull();
+      expect(pageBox!.y).toBeGreaterThanOrEqual(globalBox!.height - 1);
+
+      const pageHeaderPadding = await pageHeader.evaluate((element) => getComputedStyle(element).paddingLeft);
+      expect(pageHeaderPadding).toBe("20px");
+      const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+      expect(hasHorizontalOverflow).toBe(false);
+    }
+  });
 });

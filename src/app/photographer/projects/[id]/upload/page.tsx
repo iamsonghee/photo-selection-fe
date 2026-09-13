@@ -1,15 +1,12 @@
 "use client";
 
-import { PageLoader } from "@/components/ui/PageLoader";
+import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, cloneElement } from "react";
-import { createPortal, flushSync } from "react-dom";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { flushSync } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import { differenceInDays } from "date-fns";
 import {
-  Link2,
-  Eye,
+  ChevronLeft,
   ChevronRight,
   Trash2,
   Lock,
@@ -20,35 +17,48 @@ import {
   Upload,
   X,
   Loader2,
-  ImageIcon,
   ImagePlus,
-  Plus,
   Sparkles,
   AlertTriangle,
+  Search,
+  ChevronDown,
+  Check,
 } from "lucide-react";
-import { PrevNextButton } from "@/components/PrevNextButton";
 import { getProjectById, getPhotosByProjectId } from "@/lib/db";
-import { getStatusLabel } from "@/lib/project-status";
 import { createClient } from "@/lib/supabase/client";
 import { parseBetaLimitError, DEFAULT_BETA_MAX_PHOTOS_PER_PROJECT } from "@/lib/beta-limits";
-import { compressImagesInParallel } from "@/lib/upload-client-compress";
-import { createThumbLoadQueue, useQueuedThumbSrc, type ThumbLoadQueue } from "@/lib/thumb-load-queue";
-import { useAdjacentImagePreload } from "@/lib/use-adjacent-image-preload";
+import { SHOOT_TYPES } from "@/lib/project-shoot-types";
+import { compressImagesInParallel, type UploadSourceMetadata } from "@/lib/upload-client-compress";
+import { UploadTelemetry, UPLOAD_SAMPLE_MS, describeUpload, formatUploadBytes, type UploadSnapshot, type UploadStage } from "@/lib/upload-telemetry";
+import { AdaptiveUploadConcurrency, UploadWorkQueue, uploadDeferred, UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
+import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import type { Project, ProjectStatus, Photo, PhotoGroupInfo } from "@/types";
-import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
 import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
+import { CustomerSelectionRequestModal } from "@/components/photographer/CustomerSelectionRequestModal";
 import GeminiAnalysisPanel from "@/components/photographer/GeminiAnalysisPanel";
+import { PhotographerModal } from "@/components/ui/PhotographerModal";
+import { PhotographerConfirmDialog } from "@/components/ui/PhotographerConfirmDialog";
+import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { PhotographerFormActionBar } from "@/components/photographer/PhotographerFormActionBar";
+import { OriginalPhotoGallery } from "@/components/photographer/OriginalPhotoGallery";
+import { OriginalPhotoViewer } from "@/components/photographer/OriginalPhotoViewer";
+import { PhotoAnalysisFilterGroup } from "@/components/photographer/PhotoAnalysisFilterGroup";
+import {
+  PhotographerLightPageFrame,
+  PhotographerLightPageHeader,
+} from "@/components/layout/PhotographerLightPageHeader";
+import { useQuota } from "@/contexts/QuotaContext";
+import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAssetHeader";
+import themeStyles from "./UploadTheme.module.css";
 
 // ---------- constants ----------
 const ACCENT = "var(--accent)";
 const ACCENT_DIM = "rgba(var(--accent-rgb), 0.12)";
-const ACCENT_GLOW = "rgba(var(--accent-rgb), 0.4)";
 const BORDER = "var(--border)";
 const BORDER_MID = "var(--border-strong)";
 const SURFACE_0 = "var(--background)";
 const SURFACE_1 = "var(--surface-raised)";
 const SURFACE_2 = "var(--surface)";
-const MONO = "'Space Mono', 'JetBrains Mono', 'Noto Sans KR', sans-serif";
 const TEXT_MUTED = "var(--subtle-foreground)";
 const TEXT_NORMAL = "var(--muted-foreground)";
 const TEXT_BRIGHT = "var(--foreground)";
@@ -61,8 +71,8 @@ const ORIGINAL_RETRY_BASE_DELAY_MS = 500;
 const ORIGINAL_RETRY_MAX_DELAY_MS = 4_000;
 const BATCH_SIZE = 8;
 const PC_CONCURRENCY = 5;
-// 원본 포함 업로드는 압축본 전송 뒤 R2 PUT까지 같은 슬롯을 점유한다.
-// 일반 데스크톱은 4개, CPU·메모리·회선 힌트가 충분한 경우에만 6개까지 올린다.
+// 미리보기·원본 큐가 공유하는 전체 네트워크 요청 상한.
+// 일반 데스크톱은 4개, CPU·메모리·회선 힌트가 충분한 경우에만 6개까지 사용한다.
 const ORIGINAL_PC_CONCURRENCY = 4;
 const ORIGINAL_PC_CONCURRENCY_FAST = 6;
 const MOBILE_BATCH_SIZE = 3;
@@ -80,11 +90,15 @@ function isRawFile(file: File): boolean {
   return dot >= 0 && RAW_EXTENSIONS.has(file.name.slice(dot).toLowerCase());
 }
 
-/** 원본 사진을 추가 업로드할 수 있는 상태 — preparing은 자유, selecting은 경고 후 진행 */
-const UPLOADABLE_STATUSES: ReadonlyArray<ProjectStatus> = ["preparing", "selecting"];
+/** 원본 업로드 화면은 고객 초대 링크 활성화 전(preparing)에만 편집할 수 있다. */
+const UPLOADABLE_STATUSES: ReadonlyArray<ProjectStatus> = ["preparing"];
 function canUploadOriginals(status: ProjectStatus): boolean {
   return UPLOADABLE_STATUSES.includes(status);
 }
+
+type PhotoSort = "filename-asc" | "filename-desc" | "file-size-desc" | "resolution-desc" | "uploaded-desc";
+const LIST_HEADER_H = 48;
+const LIST_ROW_H = 58;
 
 // ---------- upload helpers ----------
 function uploadPhotosUrl(): string {
@@ -127,17 +141,34 @@ function getDesktopUploadConcurrency(includeOriginal: boolean): number {
     : ORIGINAL_PC_CONCURRENCY;
 }
 
-function shouldRetryStatus(status: number) {
-  return [408, 429, 502, 503, 504].includes(status);
+function getDesktopCompressionConcurrency(): number {
+  const device = navigator as Navigator & { deviceMemory?: number };
+  const cores = navigator.hardwareConcurrency ?? 4;
+  const memoryGiB = device.deviceMemory ?? 4;
+  if (cores >= 8 && memoryGiB >= 8) return 3;
+  return cores >= 4 && memoryGiB >= 4 ? 2 : 1;
 }
 
+/* 500도 재시도한다. 서버의 500은 대부분 **일시적 네트워크 오류**(Supabase 조회 중 읽기 실패
+ * 등)이고, `/api/upload/photos`는 `client_upload_id`로 멱등하게 설계돼 있어 같은 요청을 다시
+ * 보내도 사진이 중복 생성되지 않는다(서버가 기존 id를 조회해 건너뛴다).
+ *
+ * ⚠️ 예전에는 원본 경로(`shouldRetryOriginalStatus`)만 500을 재시도하고 사진 경로는 하지 않았다.
+ * 그래서 auth 조회 한 번이 일시적으로 실패하면 **그 사진이 그대로 유실**됐다 — 실제로 40장을
+ * 올렸는데 39장만 저장된 사례를 확인했다(2026-09-12). 원본은 재시도 덕분에 전부 완료됐고
+ * 사진만 1장 빠져, 비대칭적인 재시도 정책이 원인이라는 것이 드러났다. */
+function shouldRetryStatus(status: number) {
+  return [408, 429, 500, 502, 503, 504].includes(status);
+}
+
+/** 원본 경로도 같은 규칙을 쓴다 — 이름만 남겨 호출부를 건드리지 않는다 */
 function shouldRetryOriginalStatus(status: number) {
-  return status === 500 || shouldRetryStatus(status);
+  return shouldRetryStatus(status);
 }
 
 type XhrResult = { ok: boolean; status: number; json: () => Promise<unknown> };
 
-type XhrTransferOpts = { onRequestBodySent?: () => void };
+type XhrTransferOpts = { onRequestBodySent?: () => void; onAttempt?: () => void; onRetry?: () => void };
 
 async function xhrPostWithRetry(
   url: string,
@@ -151,6 +182,7 @@ async function xhrPostWithRetry(
   for (let attempt = 1; attempt <= UPLOAD_MAX_ATTEMPTS; attempt++) {
     try {
       const result = await new Promise<XhrResult>((resolve, reject) => {
+        transferOpts?.onAttempt?.();
         const xhr = new XMLHttpRequest();
         xhr.open("POST", url);
         xhr.setRequestHeader("Authorization", `Bearer ${token}`);
@@ -181,13 +213,13 @@ async function xhrPostWithRetry(
           if (isAuthLikeDetail(detail)) return result;
         }
         lastErr = new Error(`HTTP ${result.status}`);
-        if (attempt < UPLOAD_MAX_ATTEMPTS) { await new Promise<void>((r) => setTimeout(r, 800 * attempt)); continue; }
+        if (attempt < UPLOAD_MAX_ATTEMPTS) { transferOpts?.onRetry?.(); await new Promise<void>((r) => setTimeout(r, 800 * attempt)); continue; }
       }
       return result;
     } catch (e) {
       if (e instanceof TypeError && crossOrigin) throw e;
       lastErr = e;
-      if (attempt < UPLOAD_MAX_ATTEMPTS) { await new Promise<void>((r) => setTimeout(r, 800 * attempt)); continue; }
+      if (attempt < UPLOAD_MAX_ATTEMPTS) { transferOpts?.onRetry?.(); await new Promise<void>((r) => setTimeout(r, 800 * attempt)); continue; }
       throw e;
     }
   }
@@ -209,6 +241,7 @@ async function postPhotosUpload(
     return await xhrPostWithRetry(primary, buildForm, token, onProgress, transferOpts);
   } catch (e) {
     if (e instanceof TypeError) {
+      transferOpts?.onRetry?.();
       useProxyRef.current = true;
       return xhrPostWithRetry(UPLOAD_PHOTOS_PATH, buildForm, token, onProgress, transferOpts);
     }
@@ -230,9 +263,27 @@ type OriginalPresignedItem = {
   expires_at: string;
 };
 
+async function reserveOriginalUpload(projectId: string, clientId: string, file: File, token: string): Promise<OriginalPresignedItem | null> {
+  try {
+    const inferred = /\.png$/i.test(file.name) ? "image/png" : /\.webp$/i.test(file.name) ? "image/webp" : "image/jpeg";
+    const response = await fetch("/api/photographer/upload/originals/presign", {
+      method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId, client_upload_id: clientId, filename: file.name,
+        content_type: file.type === "image/jpg" ? "image/jpeg" : file.type || inferred,
+        file_size: file.size, last_modified: file.lastModified }),
+      signal: AbortSignal.timeout(9000),
+    });
+    if (!response.ok) return null; // Optional optimization; /photos still enforces authorization and quotas.
+    const item = await response.json();
+    return item.deferred || !item.url ? null : { ...item, job_id: "" };
+  } catch { return null; }
+}
+
 type OriginalRetryBudget = {
   retriesUsed: number;
   readonly maxRetries: number;
+  onRetry?: () => void;
+  onConfirmAttempt?: () => void;
 };
 
 function createOriginalRetryBudget(): OriginalRetryBudget {
@@ -250,6 +301,7 @@ async function waitForOriginalRetry(budget: OriginalRetryBudget): Promise<boolea
     ORIGINAL_RETRY_MAX_DELAY_MS,
   );
   budget.retriesUsed++;
+  budget.onRetry?.();
   // 여러 lane이 같은 순간 실패해도 재요청이 한꺼번에 몰리지 않게 ±25% jitter를 둔다.
   const jitteredDelay = Math.min(
     ORIGINAL_RETRY_MAX_DELAY_MS,
@@ -289,6 +341,95 @@ type UploadPreview = {
   sourceIndex: number;
 };
 
+type UploadFailure = {
+  /** 재시도에서도 같은 멱등 키를 사용해 응답 유실 뒤 중복 사진 생성을 막는다. */
+  clientUploadId: string;
+  file: File;
+  reason: string;
+};
+
+function formatUploadFailureSummary(failures: UploadFailure[]): string {
+  const names = failures.slice(0, 3).map(({ file }) => file.name).join(", ");
+  const rest = failures.length > 3 ? ` 외 ${failures.length - 3}장` : "";
+  const reason = failures[0]?.reason || "알 수 없는 오류";
+  return `${failures.length}장 업로드 실패: ${names}${rest} — ${reason}`;
+}
+
+function UploadFailureNotice({
+  message,
+  failures,
+  expanded,
+  retryDisabled,
+  onToggle,
+  onRetry,
+  onDismiss,
+}: {
+  message: string;
+  failures: UploadFailure[];
+  expanded: boolean;
+  retryDisabled: boolean;
+  onToggle: () => void;
+  onRetry: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div
+      role="alert"
+      style={{
+        padding: "8px 16px",
+        background: "rgba(220,46,47,0.07)",
+        borderBottom: "1px solid rgba(220,46,47,0.25)",
+        flexShrink: 0,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <AlertTriangle size={13} color="var(--danger)" style={{ flexShrink: 0 }} />
+        <p style={{ margin: 0, minWidth: 180, flex: 1, fontSize: 12, lineHeight: 1.5, color: "var(--danger)", wordBreak: "break-word" }}>
+          {message}
+        </p>
+        {failures.length > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded={expanded}
+              style={{ display: "inline-flex", alignItems: "center", gap: 3, border: "none", background: "none", padding: "3px 5px", color: "var(--danger)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}
+            >
+              파일 {expanded ? "접기" : "보기"}
+              <ChevronDown size={12} style={{ transform: expanded ? "rotate(180deg)" : undefined, transition: "transform 150ms ease" }} />
+            </button>
+            <button
+              type="button"
+              onClick={onRetry}
+              disabled={retryDisabled}
+              style={{ display: "inline-flex", alignItems: "center", gap: 4, border: "1px solid rgba(220,46,47,0.35)", borderRadius: 5, background: "rgba(220,46,47,0.08)", padding: "4px 8px", color: "var(--danger)", fontSize: 11, fontWeight: 600, cursor: retryDisabled ? "not-allowed" : "pointer", opacity: retryDisabled ? 0.5 : 1 }}
+            >
+              <RefreshCw size={11} />
+              실패 {failures.length}장 다시 시도
+            </button>
+          </>
+        )}
+        <button type="button" aria-label="업로드 오류 닫기" onClick={onDismiss} style={{ marginLeft: failures.length > 0 ? 0 : "auto", background: "none", border: "none", cursor: "pointer", color: "var(--danger)", padding: 2, display: "flex" }}>
+          <X size={13} />
+        </button>
+      </div>
+      {expanded && failures.length > 0 && (
+        <div style={{ maxHeight: 180, overflowY: "auto", marginTop: 8, borderRadius: 6, border: `1px solid ${BORDER}`, background: SURFACE_1 }}>
+          {failures.map(({ file, reason, clientUploadId }, index) => (
+            <div
+              key={clientUploadId}
+              style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(120px, 0.8fr)", gap: 12, padding: "7px 10px", borderBottom: index < failures.length - 1 ? `1px solid ${BORDER}` : "none", fontSize: 11, lineHeight: 1.45 }}
+            >
+              <span title={file.name} style={{ color: TEXT_BRIGHT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</span>
+              <span title={reason} style={{ color: TEXT_MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reason}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function isHeicFile(file: File): boolean {
   const type = file.type.toLowerCase();
   if (type === "image/heic" || type === "image/heif") return true;
@@ -296,14 +437,6 @@ function isHeicFile(file: File): boolean {
   if (dot < 0) return false;
   const ext = file.name.slice(dot).toLowerCase();
   return ext === ".heic" || ext === ".heif";
-}
-
-function estimateUploadMinutes(fileCount: number, withOriginal: boolean, isMobile: boolean): number {
-  const compressSec = fileCount * 0.15;
-  const fastApiSec = (fileCount * 3 * 8) / 100;
-  const r2Sec = withOriginal ? (fileCount * 10 * 8) / 100 : 0;
-  const total = (compressSec + fastApiSec + r2Sec) * (isMobile ? 1.5 : 1);
-  return Math.max(1, Math.round(total / 60));
 }
 
 function confirmOriginalUploadUrl(): string {
@@ -323,17 +456,24 @@ async function putOriginalToR2(
   file: File,
   token?: string,
   retryBudget: OriginalRetryBudget = createOriginalRetryBudget(),
+  observer?: { onProgress: (loaded: number) => void; onSending: () => void },
 ): Promise<boolean> {
   let url = presigned.url;
   let contentType = presigned.content_type;
   while (true) {
     try {
-      const res = await fetch(url, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": contentType },
+      observer?.onSending();
+      const res = await new Promise<{ ok: boolean; status: number }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", url);
+        xhr.setRequestHeader("Content-Type", contentType);
+        xhr.upload.onprogress = (event) => observer?.onProgress(event.loaded);
+        xhr.onload = () => resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status });
+        xhr.onerror = () => reject(new TypeError("NetworkError"));
+        xhr.onabort = () => reject(new DOMException("Aborted", "AbortError"));
+        xhr.send(file);
       });
-      if (res.ok) return true;
+      if (res.ok) { observer?.onProgress(file.size); return true; }
       if (!shouldRetryOriginalStatus(res.status) && res.status !== 403) return false;
     } catch {
       // 응답 유실이면 객체가 이미 저장됐을 수 있으므로 아래 recover의 HEAD로 먼저 확인한다.
@@ -342,7 +482,7 @@ async function putOriginalToR2(
     if (token) {
       try {
         const result = await recoverOriginalJob(presigned.job_id, token);
-        if (result.status === "confirmed") return true;
+        if (result.status === "confirmed") { observer?.onProgress(file.size); return true; }
         url = result.url;
         contentType = result.content_type;
       } catch {
@@ -363,6 +503,7 @@ async function confirmOriginalUpload(
   // awaiting_upload에 남아 고객 링크 준비가 영구히 멈출 수 있다. PUT과 같은 예산으로 재시도한다.
   while (true) {
     try {
+      retryBudget.onConfirmAttempt?.();
       const form = new FormData();
       form.append("job_id", jobId);
       const res = await fetch(url, {
@@ -379,16 +520,16 @@ async function confirmOriginalUpload(
   }
 }
 
-async function fetchPendingOriginals(projectId: string, token: string): Promise<PendingOriginalItem[]> {
+async function fetchPendingOriginals(projectId: string, token: string): Promise<PendingOriginalItem[] | null> {
   try {
     const res = await fetch(`/api/photographer/upload/originals/pending?project_id=${encodeURIComponent(projectId)}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) return [];
+    if (!res.ok) return null;
     const body = await res.json().catch(() => ({ jobs: [] })) as { jobs: PendingOriginalItem[] };
     return body.jobs || [];
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -504,259 +645,6 @@ function isAuthLikeDetail(detail: string | null) {
   return /인증|Token|Invalid token|JWKS|Unauthorized/i.test(detail);
 }
 
-// ---------- thumbnail (스크롤 루트 기준: 보이는 영역 근처에서만 src 로드) ----------
-function PhotoThumb({
-  photo,
-  index,
-  onDelete,
-  deletingId,
-  isEditMode,
-  scrollRootRef,
-  thumbQueue,
-  onPhotoClick,
-  groupBadge,
-  onGroupBadgeClick,
-  inExpandedGroup,
-  isCompressing,
-}: {
-  photo: Photo;
-  index: number;
-  onDelete: (id: string) => void;
-  deletingId: string | null;
-  isEditMode: boolean;
-  /** DATABANK 스크롤 박스 — 없으면 즉시 로드 */
-  scrollRootRef?: React.RefObject<HTMLElement | null>;
-  thumbQueue: ThumbLoadQueue;
-  onPhotoClick?: (index: number) => void;
-  /** AI 유사컷 대표컷 배지 — 토글 ON이고 이 사진이 대표컷이며 그룹원이 더 있을 때만 전달됨 */
-  groupBadge?: { groupId: string; restCount: number; isExpanded: boolean };
-  onGroupBadgeClick?: (e: React.MouseEvent, groupId: string) => void;
-  /** 펼쳐진 그룹(대표컷+멤버 전체)에 속함 — 그룹 경계를 테두리로 시각 구분 */
-  inExpandedGroup?: boolean;
-  /** 현재 압축 중인 사진 — 펄싱 오버레이 표시 */
-  isCompressing?: boolean;
-}) {
-  // 업로드 카드의 raw → 압축본 URL 교체는 기존 이미지를 지우지 않고 새 URL을 먼저
-  // 해독한 뒤 겹쳐서 전환한다. 이미지가 없거나 검게 보이는 프레임을 만들지 않는다.
-  const [preview, setPreview] = useState<{
-    displayedUrl: string;
-    loadedUrl: string | undefined;
-    transitionUrl: string | null;
-    transitionReady: boolean;
-  }>({ displayedUrl: photo.url, loadedUrl: undefined, transitionUrl: null, transitionReady: false });
-  const transitionTimerRef = useRef<number | null>(null);
-  const { displayedUrl, loadedUrl, transitionUrl, transitionReady } = preview;
-  const displayedLoaded = loadedUrl === displayedUrl;
-  const deleting = deletingId === photo.id;
-
-  // DB 사진은 기존 큐 로딩 동작을 유지하고, 로컬 업로드 프리뷰의 URL 교체만 전환 상태로 잡는다.
-  // 이전 props를 비교해 렌더 중 한 번만 상태를 맞추는 React 권장 패턴이다.
-  if (!photo.isPending && (displayedUrl !== photo.url || transitionUrl !== null || transitionReady)) {
-    setPreview({ displayedUrl: photo.url, loadedUrl, transitionUrl: null, transitionReady: false });
-  } else if (photo.isPending && photo.url !== displayedUrl && photo.url !== transitionUrl) {
-    setPreview((prev) => ({ ...prev, transitionUrl: photo.url, transitionReady: false }));
-  }
-
-  useEffect(() => {
-    if (photo.isPending || transitionTimerRef.current === null) return;
-    window.clearTimeout(transitionTimerRef.current);
-    transitionTimerRef.current = null;
-  }, [photo.isPending]);
-
-  useEffect(() => () => {
-    if (transitionTimerRef.current !== null) window.clearTimeout(transitionTimerRef.current);
-  }, []);
-
-  // blob URL(isPending)은 큐를 건너뛰고 즉시 로드 — 로컬 메모리라 네트워크 요청이 없다.
-  const { cellRef, imgRef, shouldLoad, handleLoad, handleError } = useQueuedThumbSrc(displayedUrl, {
-    queue: thumbQueue,
-    rootRef: scrollRootRef,
-    bypass: !scrollRootRef || !!photo.isPending,
-  });
-
-  return (
-    <div
-      ref={cellRef}
-      className="prj-data-cell"
-      onClick={() => !photo.isPending && onPhotoClick?.(index)}
-      style={{
-        background: "var(--background)",
-        border: photo.isPending
-          ? isCompressing
-            ? `2px solid ${ACCENT}`
-            : "1px solid rgba(var(--accent-rgb), 0.4)"
-          : inExpandedGroup
-          ? `2px solid ${ACCENT}`
-          : `1px solid ${BORDER}`,
-        overflow: "hidden",
-        position: "relative",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      {/* square thumb */}
-      <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: "var(--background)" }}>
-        <div className="prj-overlay" />
-        {/* XHR 전송 중 스피너 */}
-        {photo.isUploading && (
-          <div style={{ position: "absolute", top: 5, right: 5, zIndex: 10, width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(var(--accent-rgb), 0.25)", borderTopColor: "rgba(var(--accent-rgb), 0.85)", animation: "spin 0.9s linear infinite" }} />
-        )}
-        {/* 현재 압축 중 오버레이 */}
-        {isCompressing && (
-          <div className="prj-compressing-overlay">
-            <Loader2 size={16} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} />
-          </div>
-        )}
-        {/* filename overlay */}
-        <div
-          style={{
-            position: "absolute",
-            left: 6,
-            right: 6,
-            bottom: 6,
-            zIndex: 6,
-            background: "rgba(0,0,0,0.72)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            padding: "4px 6px",
-            fontFamily: MONO,
-            fontSize: 9,
-            color: "var(--subtle-foreground)",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-          title={photo.originalFilename ?? undefined}
-        >
-          {photo.originalFilename ?? `FRAME_${String(index + 1).padStart(4, "0")}`}
-        </div>
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "var(--background)",
-            transition: "opacity 0.25s",
-            opacity: displayedLoaded || transitionReady ? 0 : 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            pointerEvents: "none",
-          }}
-        >
-          <ImageIcon size={10} color="var(--subtle-foreground)" />
-        </div>
-        {shouldLoad && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            ref={imgRef}
-            src={displayedUrl}
-            alt=""
-            loading={photo.isPending ? "eager" : "lazy"}
-            decoding="async"
-            onLoad={() => {
-              setPreview((prev) => ({ ...prev, loadedUrl: displayedUrl }));
-              handleLoad();
-            }}
-            onError={handleError}
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              display: "block",
-              opacity: displayedLoaded && !transitionReady ? 1 : 0,
-              transition: "opacity 0.25s",
-            }}
-          />
-        )}
-        {/* 다음 로컬 미리보기는 투명 상태로 먼저 해독하고, 성공했을 때만 현재 사진 위로 페이드한다. */}
-        {photo.isPending && transitionUrl && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={transitionUrl}
-            alt=""
-            loading="eager"
-            decoding="async"
-            onLoad={() => {
-              if (transitionReady) return;
-              setPreview((prev) => ({ ...prev, transitionReady: true }));
-              transitionTimerRef.current = window.setTimeout(() => {
-                setPreview((prev) => ({
-                  ...prev,
-                  displayedUrl: transitionUrl,
-                  loadedUrl: transitionUrl,
-                  transitionUrl: null,
-                  transitionReady: false,
-                }));
-                transitionTimerRef.current = null;
-              }, 180);
-            }}
-            onError={() => {
-              // 새 미리보기를 표시할 수 없으면 이미 보이던 원본을 그대로 유지한다.
-              setPreview((prev) => ({ ...prev, transitionUrl: null, transitionReady: false }));
-            }}
-            style={{
-              position: "absolute",
-              inset: 0,
-              zIndex: 1,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              display: "block",
-              opacity: transitionReady ? 1 : 0,
-              transition: "opacity 0.18s ease-out",
-              pointerEvents: "none",
-            }}
-          />
-        )}
-        {isEditMode && (
-          <button
-            className="prj-del-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(photo.id);
-            }}
-            disabled={deleting}
-            style={{
-              position: "absolute",
-              top: 4,
-              right: 4,
-              width: 20,
-              height: 20,
-              background: "rgba(255,71,87,0.9)",
-              border: "none",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              zIndex: 10,
-            }}
-            aria-label="사진 삭제"
-          >
-            {deleting ? <Loader2 size={9} style={{ animation: "spin 1s linear infinite" }} /> : <X size={11} strokeWidth={2.5} color="var(--foreground)" />}
-          </button>
-        )}
-        {groupBadge && (
-          <button
-            type="button"
-            className="prj-group-badge"
-            onClick={(e) => onGroupBadgeClick?.(e, groupBadge.groupId)}
-            aria-label={`유사컷 ${groupBadge.restCount}장 ${groupBadge.isExpanded ? "접기" : "펼치기"}`}
-          >
-            {groupBadge.isExpanded ? `${groupBadge.restCount + 1}장 −` : `+${groupBadge.restCount}`}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** 그리드 최소 셀 너비 — `repeat(auto-fill, minmax(...))` 대체 시 가상 행 계산에 사용 */
-const GRID_MIN_CELL = 148;
-const GRID_GAP = 4;
-const GRID_PAD = 16;
-const GRID_FILENAME_H = 0; // filename is overlayed on image
-
 /**
  * 모바일 그리드 첫 셀 — 사진 추가 CTA.
  * 기존 prj-data-cell과 동일한 정사각 1px 보더 + paddingBottom 100% 형태를 유지하되,
@@ -764,7 +652,6 @@ const GRID_FILENAME_H = 0; // filename is overlayed on image
  */
 function UploadTile({
   isUploading,
-  uploadProgress,
   overallProgress,
   showServerWorking,
   hasPhotos,
@@ -772,7 +659,6 @@ function UploadTile({
   onClick,
 }: {
   isUploading: boolean;
-  uploadProgress: number;
   overallProgress: number;
   showServerWorking: boolean;
   hasPhotos: boolean;
@@ -812,7 +698,7 @@ function UploadTile({
         cursor: (isUploading || isPreparing) ? "wait" : "pointer",
         transition: "border-color 0.2s, background 0.2s",
       }}
-      aria-label={isUploading ? `업로드 중 ${uploadProgress}%` : "사진 추가하기"}
+      aria-label={isUploading ? `업로드 중 ${overallProgress}%` : "사진 추가하기"}
     >
       <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: (isUploading || isPreparing) ? ACCENT_DIM : "rgba(var(--accent-rgb), 0.04)" }}>
         <div
@@ -845,9 +731,8 @@ function UploadTile({
           </div>
           <span
             style={{
-              fontFamily: MONO,
-              fontSize: 10,
-              letterSpacing: "0.04em",
+              fontSize: 11,
+              fontWeight: 500,
               color: (isUploading || isPreparing) ? ACCENT : "var(--subtle-foreground)",
               textAlign: "center",
               whiteSpace: "nowrap",
@@ -864,334 +749,51 @@ function UploadTile({
   );
 }
 
-function VirtualizedPhotoGrid({
-  scrollRef,
-  photos,
-  onDelete,
-  deletingId,
-  isEditMode,
-  minCols = 1,
-  thumbQueue,
-  onPhotoClick,
-  leadingUploadCell,
-  groupsById,
-  similarityToggleOn,
-  expandedGroups,
-  onGroupBadgeClick,
-  compressingTempId,
-}: {
-  scrollRef: React.RefObject<HTMLDivElement | null>;
-  photos: Photo[];
-  onDelete: (id: string) => void;
-  deletingId: string | null;
-  isEditMode: boolean;
-  minCols?: number;
-  thumbQueue: ThumbLoadQueue;
-  onPhotoClick?: (index: number) => void;
-  /** 모바일 전용: 그리드 첫 셀(인덱스 0) 자리에 노출되는 업로드 CTA */
-  leadingUploadCell?: React.ReactNode;
-  /** AI 유사컷 그룹 정보 — 대표컷 배지 표시용 */
-  groupsById?: Map<string, PhotoGroupInfo>;
-  similarityToggleOn?: boolean;
-  expandedGroups?: Set<string>;
-  onGroupBadgeClick?: (e: React.MouseEvent, groupId: string) => void;
-  /** 현재 압축 중인 사진 tempId — 해당 셀에 하이라이트 오버레이 표시 */
-  compressingTempId?: string | null;
-}) {
-  const [layout, setLayout] = useState(() => {
-    const cw = GRID_MIN_CELL;
-    return { cols: 4, cellWidth: cw, rowHeight: Math.ceil(cw + GRID_FILENAME_H) + GRID_GAP };
-  });
-
-  useLayoutEffect(() => {
-    const root = scrollRef.current;
-    if (!root) return;
-
-    const update = () => {
-      const w = root.clientWidth - GRID_PAD * 2;
-      if (w <= 0) return;
-      const cols = Math.max(minCols, Math.floor((w + GRID_GAP) / (GRID_MIN_CELL + GRID_GAP)));
-      const cellWidth = (w - GRID_GAP * (cols - 1)) / cols;
-      const rowHeight = Math.ceil(cellWidth + GRID_FILENAME_H) + GRID_GAP;
-      setLayout((prev) =>
-        prev.cols !== cols || prev.rowHeight !== rowHeight ? { cols, cellWidth, rowHeight } : prev,
-      );
-    };
-
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(root);
-    return () => ro.disconnect();
-  }, [scrollRef, minCols]);
-
-  // 업로드 셀이 있으면 셀 인덱스 0에 끼워넣고, 사진은 1번 셀부터 표시
-  const hasUploadCell = !!leadingUploadCell;
-  const totalCells = photos.length + (hasUploadCell ? 1 : 0);
-  const rowCount = Math.ceil(totalCells / layout.cols);
-
-  const rowVirtualizer = useVirtualizer({
-    count: rowCount,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => layout.rowHeight,
-    overscan: 2,
-  });
-
-  // 사이드바 축소/확장 등으로 컨테이너 너비가 바뀌면 rowHeight도 바뀜.
-  // virtualizer는 함수 참조가 바뀌지 않으면 자동 remeasure를 하지 않으므로 명시 호출.
-  useEffect(() => {
-    rowVirtualizer.measure();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout.rowHeight]);
-
+// Figma #56069: 사진이 한 장도 없을 때(preparing, 0장)의 첫 화면 — 아이콘+안내문구+파일조건+버튼을
+// 담은 큰 드래그앤드롭 패널. 실제 드롭/드래그오버 처리는 이 컴포넌트를 감싸는 스크롤 컨테이너가 이미
+// 담당하므로(그 컨테이너의 dragOver 오버레이가 이 패널 위에 그대로 겹쳐 뜬다), 여기서는 클릭 시
+// 파일 선택창을 여는 것만 책임진다. 지원 파일 형식/최대 장수는 Figma 예시값이 아니라 실제 앱 값
+// (ACCEPT_TYPES, betaMaxPhotosPerProject)을 그대로 보여준다.
+function EmptyUploadPanel({ onBrowse, maxPhotos }: { onBrowse: () => void; maxPhotos: number }) {
   return (
-    <div style={{ padding: GRID_PAD }}>
+    // Figma #56069의 content inset은 desktop 40px이다. 좁은 화면에서는 공용 page gutter에
+    // 맞춰 16px로 줄이되, margin 대신 padding을 사용해 100% 높이에서 불필요한 스크롤을
+    // 만들지 않는다.
+    <div className={`box-border flex h-full p-4 md:p-8 ${themeStyles.emptyUpload}`}>
       <div
-        style={{
-          position: "relative",
-          width: "100%",
-          height: rowVirtualizer.getTotalSize(),
-        }}
+        className="flex min-h-[280px] flex-1 items-center justify-center rounded-xl border border-dashed border-border-strong bg-surface px-4 py-8 transition-colors hover:border-accent/40"
       >
-        {rowVirtualizer.getVirtualItems().map((vRow) => {
-          const start = vRow.index * layout.cols;
-          const cells: React.ReactNode[] = [];
-          for (let j = 0; j < layout.cols; j++) {
-            const cellIndex = start + j;
-            if (cellIndex >= totalCells) break;
-            if (hasUploadCell && cellIndex === 0) {
-              cells.push(cloneElement(leadingUploadCell as React.ReactElement, { key: "upload-cell" }));
-              continue;
-            }
-            const photoIndex = hasUploadCell ? cellIndex - 1 : cellIndex;
-            const photo = photos[photoIndex];
-            if (!photo) continue;
-            const group = photo.similarityGroupId ? groupsById?.get(photo.similarityGroupId) : undefined;
-            const isRepresentative = !!group && group.representativePhotoId === photo.id;
-            const restCount = group ? group.photoCount - 1 : 0;
-            const isExpanded = !!similarityToggleOn && !!group && !!expandedGroups?.has(group.id);
-            const groupBadge =
-              similarityToggleOn && isRepresentative && restCount > 0
-                ? { groupId: group!.id, restCount, isExpanded }
-                : undefined;
-            cells.push(
-              <PhotoThumb
-                key={photo.id}
-                photo={photo}
-                index={photoIndex}
-                onDelete={onDelete}
-                deletingId={deletingId}
-                isEditMode={isEditMode}
-                scrollRootRef={scrollRef}
-                thumbQueue={thumbQueue}
-                onPhotoClick={onPhotoClick}
-                groupBadge={groupBadge}
-                onGroupBadgeClick={onGroupBadgeClick}
-                inExpandedGroup={!!group && isExpanded}
-                isCompressing={compressingTempId === photo.id}
-              />,
-            );
-          }
-          return (
+        <div className="flex w-full max-w-[440px] flex-col items-center gap-6">
+          <div className="flex w-full flex-col items-center gap-5">
             <div
-              key={vRow.key}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: vRow.size,
-                transform: `translateY(${vRow.start}px)`,
-                display: "grid",
-                gridTemplateColumns: `repeat(${layout.cols}, 1fr)`,
-                gap: GRID_GAP,
-                boxSizing: "border-box",
-                alignItems: "start",
-                overflow: "hidden",
-              }}
+              className="flex size-[72px] shrink-0 items-center justify-center rounded-xl border border-border-subtle bg-surface-raised text-accent"
+              aria-hidden
             >
-              {cells}
+              <ImagePlus size={28} strokeWidth={1.8} />
             </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-const LIST_ROW_H = 64;
-const LIST_THUMB_W = 72;
-const LIST_THUMB_H = 48;
-
-function ListRowThumb({
-  url,
-  scrollRootRef,
-  thumbQueue,
-}: {
-  url: string;
-  scrollRootRef: React.RefObject<HTMLElement | null>;
-  thumbQueue: ThumbLoadQueue;
-}) {
-  const { cellRef, imgRef, shouldLoad, handleLoad, handleError } = useQueuedThumbSrc(url, {
-    queue: thumbQueue,
-    rootRef: scrollRootRef,
-  });
-  return (
-    <div ref={cellRef} style={{ width: "100%", height: "100%", background: "var(--background)" }}>
-      {shouldLoad && (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img ref={imgRef} src={url} alt="" loading="lazy" decoding="async" onLoad={handleLoad} onError={handleError} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-      )}
-    </div>
-  );
-}
-
-function VirtualizedPhotoList({
-  scrollRef,
-  photos,
-  onDelete,
-  deletingId,
-  isEditMode,
-  thumbQueue,
-  onPhotoClick,
-  groupsById,
-  similarityToggleOn,
-  expandedGroups,
-  onGroupBadgeClick,
-}: {
-  scrollRef: React.RefObject<HTMLDivElement | null>;
-  photos: Photo[];
-  onDelete: (id: string) => void;
-  deletingId: string | null;
-  isEditMode: boolean;
-  thumbQueue: ThumbLoadQueue;
-  onPhotoClick?: (index: number) => void;
-  groupsById?: Map<string, PhotoGroupInfo>;
-  similarityToggleOn?: boolean;
-  expandedGroups?: Set<string>;
-  onGroupBadgeClick?: (e: React.MouseEvent, groupId: string) => void;
-}) {
-  const listVirtualizer = useVirtualizer({
-    count: photos.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => LIST_ROW_H,
-    overscan: 6,
-  });
-
-  return (
-    <div style={{ padding: 16 }}>
-      <div style={{ position: "relative", width: "100%", height: listVirtualizer.getTotalSize() }}>
-        {listVirtualizer.getVirtualItems().map((v) => {
-          const photo = photos[v.index];
-          const i = v.index;
-          const deleting = deletingId === photo.id;
-          const group = photo.similarityGroupId ? groupsById?.get(photo.similarityGroupId) : undefined;
-          const isRepresentative = !!group && group.representativePhotoId === photo.id;
-          const restCount = group ? group.photoCount - 1 : 0;
-          const showGroupBadge = similarityToggleOn && isRepresentative && restCount > 0;
-          const isExpanded = !!similarityToggleOn && !!group && !!expandedGroups?.has(group.id);
-          const inExpandedGroup = !!group && isExpanded;
-          return (
-            <div
-              key={photo.id}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: v.size,
-                transform: `translateY(${v.start}px)`,
-                boxSizing: "border-box",
-                paddingBottom: 2,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "8px 10px",
-                  height: LIST_ROW_H - 2,
-                  border: inExpandedGroup ? `2px solid ${ACCENT}` : `1px solid ${BORDER}`,
-                  background: SURFACE_2,
-                  transition: "border-color 0.2s",
-                  boxSizing: "border-box",
-                  cursor: "pointer",
-                }}
-                onClick={() => onPhotoClick?.(i)}
-                onMouseEnter={(e) => { if (!inExpandedGroup) (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(var(--accent-rgb), 0.3)"; }}
-                onMouseLeave={(e) => { if (!inExpandedGroup) (e.currentTarget as HTMLDivElement).style.borderColor = BORDER; }}
-              >
-                <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, width: 36, flexShrink: 0, textAlign: "right" }}>
-                  {String(photo.orderIndex ?? i + 1).padStart(3, "0")}
-                </span>
-                <div
-                  style={{
-                    width: LIST_THUMB_W,
-                    height: LIST_THUMB_H,
-                    flexShrink: 0,
-                    overflow: "hidden",
-                    border: `1px solid ${BORDER}`,
-                  }}
-                >
-                  <ListRowThumb url={photo.url} scrollRootRef={scrollRef} thumbQueue={thumbQueue} />
-                </div>
-                <span style={{ fontSize: 13, color: TEXT_BRIGHT, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Pretendard Variable', sans-serif" }}>
-                  {photo.originalFilename ?? `FRAME_${String(i + 1).padStart(4, "0")}`}
-                </span>
-                {showGroupBadge && group && (
-                  <button
-                    type="button"
-                    className="prj-group-badge-inline"
-                    onClick={(e) => onGroupBadgeClick?.(e, group.id)}
-                    aria-label={`유사컷 ${restCount}장 ${isExpanded ? "접기" : "펼치기"}`}
-                  >
-                    {isExpanded ? `${restCount + 1}장 −` : `+${restCount}`}
-                  </button>
-                )}
-                {photo.fileSize && (
-                  <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, flexShrink: 0 }}>
-                    {(photo.fileSize / 1024).toFixed(0)}KB
-                  </span>
-                )}
-                {photo.createdAt && (
-                  <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, flexShrink: 0, whiteSpace: "nowrap" }}>
-                    {(() => {
-                      const d = new Date(photo.createdAt!);
-                      const mm = String(d.getMonth() + 1).padStart(2, "0");
-                      const dd = String(d.getDate()).padStart(2, "0");
-                      const hh = String(d.getHours()).padStart(2, "0");
-                      const min = String(d.getMinutes()).padStart(2, "0");
-                      return `${mm}/${dd} ${hh}:${min}`;
-                    })()}
-                  </span>
-                )}
-                {isEditMode && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); onDelete(photo.id); }}
-                    disabled={deleting}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: TEXT_MUTED,
-                      cursor: "pointer",
-                      padding: "3px 6px",
-                      flexShrink: 0,
-                      display: "flex",
-                      alignItems: "center",
-                      opacity: deleting ? 0.5 : 1,
-                      transition: "color 0.15s",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "#FF4757"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = TEXT_MUTED; }}
-                  >
-                    {deleting ? <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> : <X size={13} />}
-                  </button>
-                )}
-              </div>
+            <div className="w-full text-center">
+              <p className="m-0 text-[20px] font-semibold leading-8 tracking-[-0.8px] text-foreground md:text-[24px] md:leading-[48px] md:tracking-[-1.47px]">
+                <span className="hidden md:inline">셀렉할 원본 사진을 준비하세요</span>
+                <span className="md:hidden">원본 사진을 선택하세요</span>
+              </p>
+              <p className="mb-3 hidden text-[14px] leading-6 text-muted-foreground md:block">사진이나 폴더를 이곳에 끌어다 놓을 수 있어요.</p>
+              <p className="m-0 text-[12px] font-normal leading-[21px] text-muted-foreground">
+                JPEG · PNG · WebP · HEIC · 최대 {maxPhotos.toLocaleString()}장
+              </p>
             </div>
-          );
-        })}
+          </div>
+          {/* Dashboard·Project List·Project Create와 공유하는 PhotographerLightButton —
+              이 화면에서 유일하게 실행 가능한 Primary CTA. 하단의 셀렉 요청은 아직 실행할
+              수 없어 Secondary(Neutral)로 유지한다(design-system-light.md §6 Action Hierarchy). */}
+          <PhotographerLightButton
+            type="button"
+            variant="primary"
+            onClick={onBrowse}
+            className="h-10 w-[140px] px-5"
+          >
+            사진 선택하기
+          </PhotographerLightButton>
+        </div>
       </div>
     </div>
   );
@@ -1228,6 +830,7 @@ export default function ProjectDetailPage() {
   const [inviteActivating, setInviteActivating] = useState(false);
   const [inviteOriginalsProcessing, setInviteOriginalsProcessing] = useState(false);
   const [inviteShareModalOpen, setInviteShareModalOpen] = useState(false);
+  const [selectionRequestModalOpen, setSelectionRequestModalOpen] = useState(false);
 
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [photosLoading, setPhotosLoading] = useState(true);
@@ -1235,8 +838,18 @@ export default function ProjectDetailPage() {
   const [similarityToggleOn, setSimilarityToggleOn] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [photoSearch, setPhotoSearch] = useState("");
+  const [photoSort, setPhotoSort] = useState<PhotoSort>("filename-asc");
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
   const [isMobile, setIsMobile] = useState(false);
+  const [mobilePhotoManageMode, setMobilePhotoManageMode] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  /** 상세 뷰어의 유사컷 집중 보기. 별도 화면을 열지 않고 동일한 한 줄 filmstrip의
+   *  데이터만 전체 사진 ↔ 그룹 멤버로 전환한다. */
+  const [groupReviewGroupId, setGroupReviewGroupId] = useState<string | null>(null);
+  const [groupReviewIndex, setGroupReviewIndex] = useState(0);
+  const [groupActionPending, setGroupActionPending] = useState<"setRepresentative" | "remove" | null>(null);
+  const [coverSaving, setCoverSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   /** 배치 업로드 완료 직후 blob URL로 즉시 표시되는 낙관적 사진 */
@@ -1252,13 +865,13 @@ export default function ProjectDetailPage() {
   const queuedPreviewBySourceIndexRef = useRef<Map<number, UploadPreview>>(new Map());
   /** 현재 압축 중인 파일의 queuedPreviews 인덱스 (-1이면 압축 중 아님) */
   const [compressingIndex, setCompressingIndex] = useState(-1);
-  /** 현재 업로드 배치의 전체 파일 수 */
-  const [totalUploadCount, setTotalUploadCount] = useState(0);
 
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [uploadPhase, setUploadPhase] = useState<"idle" | "sending" | "processing" | "done">("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const uploadTelemetryRef = useRef<UploadTelemetry | null>(null);
+  const [uploadSnapshot, setUploadSnapshot] = useState<UploadSnapshot | null>(null);
   const [uploadStopRequested, setUploadStopRequested] = useState(false);
   /** 네트워크 전송은 끝났고 서버(썸네일·저장) 응답 대기 중 — 99% 정지로 오해하지 않도록 별도 표시 */
   const [awaitingServerFinalize, setAwaitingServerFinalize] = useState(false);
@@ -1268,8 +881,11 @@ export default function ProjectDetailPage() {
   const sendingSourceTotalRef = useRef(0);      // presigned URL 발급 수 (= 실제 시도 예정)
   const sendingSourceFailedRef = useRef(0);     // PUT/confirm까지 끝내지 못한 원본 수
   const [sendingSourcePhase, setSendingSourcePhase] = useState(false);
-  const [sendingSourceSnap, setSendingSourceSnap] = useState({ done: 0, total: 0, failed: 0 });
   /** 업로드 미완료(awaiting_upload) 원본 job — 복구 배너 표시용 */
+  const recoveryFilesRef = useRef(new Map<string, File>());
+  const recoveryBusyRef = useRef(false);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryCachedCount, setRecoveryCachedCount] = useState(0);
   const [pendingRecovery, setPendingRecovery] = useState<PendingOriginalItem[]>([]);
   const [showRecoveryBanner, setShowRecoveryBanner] = useState(false);
   const recoveryFileInputRef = useRef<HTMLInputElement>(null);
@@ -1279,10 +895,17 @@ export default function ProjectDetailPage() {
   /** filename+size+lastModified 매칭 실패한 job 목록 */
   const [unmatchedJobs, setUnmatchedJobs] = useState<PendingOriginalItem[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadFailures, setUploadFailures] = useState<UploadFailure[]>([]);
+  const [showUploadFailureDetails, setShowUploadFailureDetails] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   /** selecting 상태에서 추가 업로드 시도 시 1회 안내 모달 */
   const [showSelectingWarn, setShowSelectingWarn] = useState(false);
   const [showFlushAllConfirm, setShowFlushAllConfirm] = useState(false);
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<
+    | { kind: "selected"; count: number }
+    | { kind: "single"; photoId: string; filename: string }
+    | null
+  >(null);
   const [isPreparingFiles, setIsPreparingFiles] = useState(false);
 
   /** AI 유사도 분석 — 업로드와 별개의 명시적 트리거 (초대 링크 활성화와 무관).
@@ -1300,12 +923,44 @@ export default function ProjectDetailPage() {
     active: number; alreadyAnalyzed: number; pending: number;
   } | null>(null);
 
+  /** 품질 확인(눈감음·흐림) 상태 — 유사컷과 **완전히 독립**이다(별도 트리거·별도 폴링).
+   * 하나가 실패해도 다른 하나는 계속 진행되어야 하므로 상태를 합치지 않는다. */
+  const [qualityAnalysisStatus, setQualityAnalysisStatus] = useState<
+    "processing" | "completed" | "failed" | null
+  >(null);
+
+  /** 업로드 완료 직후 뜨는 AI 분석 제안 모달 */
+  const [aiPromptOpen, setAiPromptOpen] = useState(false);
+  /** 어디서 열렸는지 — 업로드 직후와 툴바 버튼은 안내 문구가 달라야 한다(후자는 방금 올린 게 없다) */
+  const [aiPromptSource, setAiPromptSource] = useState<"upload" | "manual">("upload");
+  /** 눈감음·흐림 필터 — 고객 갤러리와 같은 키(`blurry`/`eyesClosed`) */
+  const [qualityFilter, setQualityFilter] = useState<Set<"blurry" | "eyesClosed">>(new Set());
+  const toggleQualityFilter = useCallback((key: "blurry" | "eyesClosed") => {
+    setQualityFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
+  /* 기본값은 **둘 다 켜짐**이다. 비워 두면 대부분 그대로 닫아 지금(버튼을 못 찾는 상태)과
+   * 같아진다 — 켜 두면 "보이는 자동 실행 + 끌 수 있음"이 되어 작가의 통제권은 그대로다. */
+  const [aiWantSimilar, setAiWantSimilar] = useState(true);
+  const [aiWantQuality, setAiWantQuality] = useState(true);
+
   /** Gemini 분석 POC — 관리자 전용 노출 여부 판단용 (실제 접근 제어는 API route에서도 재검증됨) */
+  const { quota } = useQuota();
   const [isAdminTier, setIsAdminTier] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const photoScrollRef = useRef<HTMLDivElement>(null);
+  const {
+    compact: compactUploadHeader,
+    immersive: immersiveUploadHeader,
+    handleScroll: handlePhotoScroll,
+  } = useCollapsibleAssetHeaderController({ compactOnly: true });
+  const pendingOriginalCheckSeqRef = useRef(0);
+  const deleteConfirmSubmittingRef = useRef(false);
   const stopRequestedRef = useRef(false);
   // React state updates are not synchronous, so a ref is required to block two
   // clicks that land before the upload phase re-renders.
@@ -1326,9 +981,28 @@ export default function ProjectDetailPage() {
     finally { setLoading(false); }
   }, [id]);
 
+  /* 품질 판정(눈감음·흔들림)은 `photos` 테이블이 아니라 `gemini_quality_assessments`에 있고,
+   * 그 테이블은 RLS 때문에 브라우저에서 직접 못 읽는다 — 서버 라우트로 받아 사진에 얹는다.
+   * `Photo`의 품질 필드는 **항상 Gemini 값으로 덮어쓴다**: 예전 OpenCLIP 컬럼이 남아 있는
+   * 옛 사진(전체의 4%)과 새 사진이 서로 다른 출처로 섞여 보이면 안 된다(§photo-quality). */
   const loadPhotos = useCallback(async () => {
-    try { setPhotos(await getPhotosByProjectId(id)); }
-    catch {}
+    try {
+      const [list, qualityRes] = await Promise.all([
+        getPhotosByProjectId(id),
+        fetch(`/api/photographer/projects/${id}/photo-quality`)
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null),
+      ]);
+      const quality: Record<string, { isBlurry: boolean | null; faceDetected: boolean | null; eyesClosed: boolean | null }> =
+        qualityRes?.quality ?? {};
+      setPhotos(list.map((p) => ({
+        ...p,
+        isBlurry: quality[p.id]?.isBlurry ?? null,
+        faceDetected: quality[p.id]?.faceDetected ?? null,
+        eyesClosed: quality[p.id]?.eyesClosed ?? null,
+      })));
+    }
+    catch (error) { console.error("[upload] photo list refresh failed", error); }
     finally { setPhotosLoading(false); }
   }, [id]);
 
@@ -1357,27 +1031,72 @@ export default function ProjectDetailPage() {
     } catch {}
   }, [id]);
 
-  useEffect(() => {
-    loadProject().then((p) => { if (p) { loadPhotos(); loadPhotoGroups(); } });
-  }, [id, loadProject, loadPhotos, loadPhotoGroups]);
+  /* "건너뛰기"는 **이번 방문 동안만** 다시 묻지 않는다(새로고침하면 되살아난다).
+   *
+   * ⚠️ 처음에는 이걸 localStorage에 영구 저장했는데, 실제로 써 보니 치명적이었다:
+   *  - Escape·배경 클릭도 같은 핸들러(onClose)로 연결돼 있어서 **실수로 닫기만 해도 영구 차단**됐다
+   *  - 한 번 박히면 사진을 전부 지우고 다시 올려도 모달이 영영 안 떴다(실제 발생, 2026-09-12)
+   *  - 특히 품질 확인은 툴바에 진입점이 없어서, 모달을 잃으면 **기능 자체에 도달할 수 없다**
+   * 잔소리를 막자고 기능을 영구히 잠그는 건 균형이 맞지 않는다. 세션 한정이면 한 번 방문에서
+   * 배치를 여러 번 올려도 더 묻지 않으면서, 다음에 다시 들어오면 기회가 돌아온다. */
+  const aiPromptSkippedRef = useRef(false);
 
-  /** 마운트/재진입 시 로컬 분석 상태를 서버 상태로 시드 — processing이면 아래 폴링 이펙트가 자동 재개된다 */
+  /** 품질 확인 상태 조회 — 유사컷(`loadClipAnalysisStatus`)과 같은 모양의 독립 폴링 */
+  const loadQualityAnalysisStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/photographer/projects/${id}/gemini-quality`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.gemini_quality_status !== undefined) setQualityAnalysisStatus(data.gemini_quality_status);
+    } catch {}
+  }, [id]);
+
+  useEffect(() => {
+    loadProject().then((loadedProject) => {
+      if (!loadedProject) return;
+      if (loadedProject.status !== "preparing") {
+        router.replace(`/photographer/projects/${id}/assets/original`);
+        return;
+      }
+      loadPhotos();
+      loadPhotoGroups();
+    });
+  }, [id, loadProject, loadPhotos, loadPhotoGroups, router]);
+
+  /** 마운트/재진입 시 로컬 분석 상태를 서버 상태로 시드 — processing이면 아래 폴링 이펙트가 자동 재개된다.
+   *  품질도 같이 시드해야 새로고침 후에도 진행 중 표시와 완료 시 배지 갱신이 이어진다. */
   useEffect(() => {
     loadClipAnalysisStatus();
-  }, [loadClipAnalysisStatus]);
+    loadQualityAnalysisStatus();
+  }, [loadClipAnalysisStatus, loadQualityAnalysisStatus]);
 
   /** Gemini 분석 POC 노출 여부 — 관리자 등급만 (실 요금이 발생하는 실험 기능이라 접근 범위를 제한) */
   useEffect(() => {
-    fetch("/api/photographer/quota")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (data?.tier === "admin") setIsAdminTier(true); })
-      .catch(() => {});
-  }, []);
+    if (quota?.tier === "admin") setIsAdminTier(true);
+  }, [quota]);
 
-  const overallProgress = useMemo(() => {
-    if (uploadPhase === "idle" || uploadPhase === "done") return 0;
-    return uploadProgress; // 분할처리 파이프라인: 단일 processing 페이즈에서 0→90 단조 증가
-  }, [uploadPhase, uploadProgress]);
+  const overallProgress = uploadSnapshot?.percent ?? uploadProgress;
+  const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
+
+  useEffect(() => {
+    if (!isUploading) return;
+    const sample = () => {
+      const tracker = uploadTelemetryRef.current;
+      if (tracker) setUploadSnapshot(tracker.snapshot());
+    };
+    const timer = window.setInterval(sample, UPLOAD_SAMPLE_MS);
+    return () => {
+      window.clearInterval(timer);
+      const tracker = uploadTelemetryRef.current;
+      if (tracker) {
+        tracker.finish("interrupted"); // Preserves an outcome explicitly set by the upload flow.
+        const report = tracker.report();
+        console.info("[upload-performance]", report);
+        window.dispatchEvent(new CustomEvent("acut:upload-performance", { detail: report }));
+        uploadTelemetryRef.current = null;
+      }
+    };
+  }, [isUploading]);
 
   /** 기존 photos + 배치 완료(pending) + 전송 중(uploading) + 큐(queued) 합산 — early return 이전에 선언해야 Rules of Hooks 준수 */
   const displayPhotos = useMemo(() => {
@@ -1456,6 +1175,35 @@ export default function ProjectDetailPage() {
     };
   }, [clipAnalysisStatus, clipPending, clipLastRunFailedCount]);
 
+  /* 두 분석 중 하나라도 돌고 있으면 버튼은 "진행 중 · 누르면 중단"이 된다 — 유사컷과 품질이
+   * 따로 도는데 버튼이 하나뿐이라, 무엇이 도는지가 아니라 **지금 AI가 일하는 중인지**를 말한다. */
+  const aiBusy = clipAnalysisStatus === "processing" || qualityAnalysisStatus === "processing";
+  const aiControlLabel = aiBusy
+    ? (clipAnalysisStatus === "processing" && qualityAnalysisStatus === "processing"
+        ? "AI 분석 중"
+        : clipAnalysisStatus === "processing" ? "유사컷 분석 중" : "품질 확인 중")
+    : "AI 분석";
+
+  /** 툴바 AI 버튼으로 열 때 — 업로드 직후와 달리 **이미 끝난 항목은 꺼 둔 채** 연다.
+   *  다시 눌러도 캐시 때문에 비용은 안 들지만, 켜져 있으면 "또 돌리는 건가?"를 고민하게 된다. */
+  const openAiPromptManually = () => {
+    const similarDone = clipAnalysisStatus === "completed" && (clipPending?.pending ?? 0) === 0;
+    setAiWantSimilar(!similarDone);
+    setAiWantQuality(qualityAnalysisStatus !== "completed");
+    setAiPromptSource("manual");
+    setAiPromptOpen(true);
+  };
+
+  /** 진행 중인 것만 골라 중단한다 — 한쪽만 돌고 있을 수 있다 */
+  const handleCancelAiAnalysis = () => {
+    if (clipAnalysisStatus === "processing") void handleCancelClipAnalysis();
+    if (qualityAnalysisStatus === "processing") {
+      void fetch(`/api/photographer/projects/${id}/gemini-quality`, { method: "DELETE" })
+        .then(() => loadQualityAnalysisStatus())
+        .catch(() => {});
+    }
+  };
+
   const handleGroupBadgeClick = useCallback((e: React.MouseEvent, groupId: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1485,17 +1233,279 @@ export default function ProjectDetailPage() {
     }
     return result;
   }, [displayPhotos, similarityToggleOn, expandedGroups, groupsById, membersByGroup, photoIdSet]);
-  const lightboxPreloadUrlGroups = useMemo(
-    () => groupedDisplayPhotos.map((photo) => [photo.previewUrl ?? photo.url]),
-    [groupedDisplayPhotos],
+
+  /* AI가 찾은 것으로 좁혀 보는 필터. 켜진 조건 중 **하나라도** 해당하면 남긴다(OR) —
+   * 고객 갤러리(`gallery-filter.ts`)와 같은 규칙·같은 키 이름을 쓴다. */
+  const qualityCounts = useMemo(() => ({
+    blurry: photos.filter((p) => p.isBlurry === true).length,
+    eyesClosed: photos.filter((p) => p.faceDetected === true && p.eyesClosed === true).length,
+  }), [photos]);
+
+  const galleryPhotos = useMemo(() => {
+    const normalizedQuery = photoSearch.trim().toLocaleLowerCase();
+    const searched = normalizedQuery
+      ? groupedDisplayPhotos.filter((photo) =>
+          (photo.originalFilename ?? "").toLocaleLowerCase().includes(normalizedQuery),
+        )
+      : groupedDisplayPhotos;
+    const filtered = qualityFilter.size === 0
+      ? searched
+      : searched.filter((photo) =>
+          (qualityFilter.has("blurry") && photo.isBlurry === true) ||
+          (qualityFilter.has("eyesClosed") && photo.faceDetected === true && photo.eyesClosed === true));
+    return [...filtered].sort((a, b) => {
+      if (photoSort === "file-size-desc") {
+        return (b.sourceFileSize ?? -1) - (a.sourceFileSize ?? -1);
+      }
+      if (photoSort === "resolution-desc") {
+        const aPixels = a.sourceWidth && a.sourceHeight ? a.sourceWidth * a.sourceHeight : -1;
+        const bPixels = b.sourceWidth && b.sourceHeight ? b.sourceWidth * b.sourceHeight : -1;
+        return bPixels - aPixels;
+      }
+      if (photoSort === "uploaded-desc") {
+        return (Date.parse(b.createdAt ?? "") || 0) - (Date.parse(a.createdAt ?? "") || 0);
+      }
+      const result = (a.originalFilename ?? "").localeCompare(
+        b.originalFilename ?? "",
+        undefined,
+        { numeric: true, sensitivity: "base" },
+      );
+      return photoSort === "filename-asc" ? result : -result;
+    });
+  }, [groupedDisplayPhotos, photoSearch, photoSort, qualityFilter]);
+
+  /** 상세 뷰어의 전체 filmstrip에서는 그룹마다 대표 썸네일 하나만 남긴다.
+   * 검색/정렬 결과에 대표컷이 없으면 현재 결과의 첫 멤버를 대신 사용해 검색 맥락을 보존한다. */
+  const viewerOverviewPhotos = useMemo(() => {
+    const visibleById = new Map(galleryPhotos.map((photo) => [photo.id, photo]));
+    const seenGroups = new Set<string>();
+    const result: Photo[] = [];
+
+    for (const photo of galleryPhotos) {
+      const groupId = photo.similarityGroupId;
+      const group = groupId ? groupsById.get(groupId) : undefined;
+      if (!groupId || !group || group.photoCount < 2) {
+        result.push(photo);
+        continue;
+      }
+      if (seenGroups.has(groupId)) continue;
+      seenGroups.add(groupId);
+      result.push(visibleById.get(group.representativePhotoId) ?? photo);
+    }
+    return result;
+  }, [galleryPhotos, groupsById]);
+
+  /** ── 상세 뷰어 유사컷 집중 보기 파생값 ── */
+  const inGroupReview = groupReviewGroupId !== null;
+  const isPhotoViewerOpen = lightboxIndex !== null || inGroupReview;
+  const groupReviewGroup = groupReviewGroupId ? groupsById.get(groupReviewGroupId) : undefined;
+  const groupReviewMembers = useMemo(
+    () => (groupReviewGroupId ? membersByGroup.get(groupReviewGroupId) ?? [] : []),
+    [groupReviewGroupId, membersByGroup],
   );
-  useAdjacentImagePreload(lightboxPreloadUrlGroups, lightboxIndex, {
-    wrap: true,
-    desktopBefore: 1,
-    desktopAfter: 2,
-    desktopMaxDecoded: 6,
-    mobileMaxDecoded: 3,
-  });
+  const activePhoto = inGroupReview
+    ? groupReviewMembers[groupReviewIndex] ?? null
+    : (lightboxIndex !== null ? viewerOverviewPhotos[lightboxIndex] ?? null : null);
+  const activeOverviewGroup = !inGroupReview && activePhoto?.similarityGroupId
+    ? groupsById.get(activePhoto.similarityGroupId)
+    : undefined;
+  const canEnterActiveGroup = !!activeOverviewGroup
+    && (membersByGroup.get(activeOverviewGroup.id)?.length ?? activeOverviewGroup.photoCount) > 1;
+
+  /** 리뷰 도중 그룹이 2명 미만으로 줄거나 해체되면 집중 보기를 종료한다. */
+  useEffect(() => {
+    if (!groupReviewGroupId) return;
+    if (!groupReviewGroup || groupReviewMembers.length < 2) { setGroupReviewGroupId(null); return; }
+    setGroupReviewIndex((i) => Math.min(i, groupReviewMembers.length - 1));
+  }, [groupReviewGroupId, groupReviewGroup, groupReviewMembers.length]);
+
+  const handleEnterGroupReview = useCallback((photo?: Photo) => {
+    const targetPhoto = photo ?? activePhoto;
+    if (!targetPhoto?.similarityGroupId || !groupsById.has(targetPhoto.similarityGroupId)) return;
+    const groupId = targetPhoto.similarityGroupId;
+    const members = membersByGroup.get(groupId) ?? [];
+    const idx = members.findIndex((member) => member.id === targetPhoto.id);
+    if (idx < 0) return;
+    setGroupReviewGroupId(groupId);
+    setGroupReviewIndex(idx);
+  }, [activePhoto, groupsById, membersByGroup]);
+
+  /** 그룹 해체/검색 변경으로 전체 strip이 줄어도 현재 인덱스를 유효 범위에 둔다. */
+  useEffect(() => {
+    if (lightboxIndex === null || viewerOverviewPhotos.length === 0) return;
+    if (lightboxIndex >= viewerOverviewPhotos.length) setLightboxIndex(viewerOverviewPhotos.length - 1);
+  }, [lightboxIndex, viewerOverviewPhotos.length]);
+
+  const handleExitGroupReview = useCallback(() => setGroupReviewGroupId(null), []);
+
+  /** Grid/List의 실제 사진을 연다. 그룹 멤버라면 중간 CTA 없이 바로 같은 viewer의
+   * 유사컷 집중 보기로 진입하고, 전체 보기 복귀 위치는 해당 그룹 대표 썸네일로 맞춘다. */
+  const handleOpenPhotoViewer = useCallback((galleryIndex: number) => {
+    const photo = galleryPhotos[galleryIndex];
+    if (!photo) return;
+    const overviewIndex = viewerOverviewPhotos.findIndex((candidate) =>
+      photo.similarityGroupId
+        ? candidate.similarityGroupId === photo.similarityGroupId
+        : candidate.id === photo.id,
+    );
+    setLightboxIndex(Math.max(overviewIndex, 0));
+
+    const group = photo.similarityGroupId ? groupsById.get(photo.similarityGroupId) : undefined;
+    const members = photo.similarityGroupId ? membersByGroup.get(photo.similarityGroupId) ?? [] : [];
+    if (group && members.length > 1) {
+      setGroupReviewGroupId(group.id);
+      setGroupReviewIndex(Math.max(members.findIndex((member) => member.id === photo.id), 0));
+    } else {
+      setGroupReviewGroupId(null);
+    }
+  }, [galleryPhotos, viewerOverviewPhotos, groupsById, membersByGroup]);
+
+  /** 라이트박스를 완전히 닫는다 — 그룹 리뷰 모드 중이었다면 그것도 함께 초기화해야 한다.
+   *  lightboxIndex만 null로 바꾸면 groupReviewGroupId가 남아있어 포털 렌더 조건
+   *  (lightboxIndex !== null || inGroupReview)이 여전히 참이 되어 X/배경 클릭이 안 먹는 버그가 있었다. */
+  const handleCloseLightbox = useCallback(() => {
+    setLightboxIndex(null);
+    setGroupReviewGroupId(null);
+  }, []);
+
+  const handleGroupReviewPrev = useCallback(() => {
+    setGroupReviewIndex((i) => (i > 0 ? i - 1 : groupReviewMembers.length - 1));
+  }, [groupReviewMembers.length]);
+
+  const handleGroupReviewNext = useCallback(() => {
+    setGroupReviewIndex((i) => (i < groupReviewMembers.length - 1 ? i + 1 : 0));
+  }, [groupReviewMembers.length]);
+
+  const handleSetRepresentative = useCallback(async (photoId: string, groupId: string) => {
+    setGroupActionPending("setRepresentative");
+    try {
+      const res = await fetch(`/api/photographer/projects/${id}/photo-groups`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId, representativePhotoId: photoId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? "대표 사진 설정에 실패했습니다.");
+      const photoGroup = (data as { photoGroup?: PhotoGroupInfo }).photoGroup;
+      if (photoGroup) setPhotoGroups((prev) => prev.map((g) => (g.id === groupId ? photoGroup : g)));
+      setToast("대표 사진으로 설정했습니다.");
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : "대표 사진 설정에 실패했습니다.");
+    } finally {
+      setGroupActionPending(null);
+    }
+  }, [id]);
+
+  const handleSaveEntryCover = useCallback(async (photoId: string) => {
+    setCoverSaving(true);
+    try {
+      const res = await fetch(`/api/photographer/projects/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cover_photo_id: photoId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? "진입 대표 사진을 저장하지 못했습니다.");
+      setProject((current) => current ? { ...current, coverPhotoId: photoId } : current);
+      setToast("고객 진입 대표 사진을 저장했습니다.");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "진입 대표 사진을 저장하지 못했습니다.");
+    } finally {
+      setCoverSaving(false);
+    }
+  }, [id]);
+
+  const handleRemoveFromGroup = useCallback(async (photoId: string) => {
+    setGroupActionPending("remove");
+    try {
+      const res = await fetch(`/api/photographer/photos/${photoId}/group`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? "그룹에서 제외하지 못했습니다.");
+
+      setPhotos((prev) => prev.map((p) => (p.id === photoId ? { ...p, similarityGroupId: null } : p)));
+
+      const group = (data as {
+        group?: { groupId: string | null; action?: string; representativePhotoId?: string; photoCount?: number };
+      }).group;
+      if (group?.groupId) {
+        if (group.action === "disbanded") {
+          setPhotoGroups((prev) => prev.filter((g) => g.id !== group.groupId));
+        } else if (group.action === "reassigned" && group.representativePhotoId && typeof group.photoCount === "number") {
+          const { representativePhotoId, photoCount } = group;
+          setPhotoGroups((prev) => prev.map((g) => (g.id === group.groupId ? { ...g, representativePhotoId, photoCount } : g)));
+        } else if (group.action === "updated" && typeof group.photoCount === "number") {
+          const { photoCount } = group;
+          setPhotoGroups((prev) => prev.map((g) => (g.id === group.groupId ? { ...g, photoCount } : g)));
+        }
+      }
+      setToast("묶음에서 제외했습니다.");
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : "그룹에서 제외하지 못했습니다.");
+    } finally {
+      setGroupActionPending(null);
+    }
+  }, []);
+
+  const selectableGalleryIds = useMemo(
+    () => galleryPhotos.filter((photo) => !photo.isPending).map((photo) => photo.id),
+    [galleryPhotos],
+  );
+  const allVisibleSelected = selectableGalleryIds.length > 0
+    && selectableGalleryIds.every((photoId) => selectedPhotoIds.has(photoId));
+
+  const togglePhotoSelected = useCallback((photoId: string) => {
+    setSelectedPhotoIds((current) => {
+      const next = new Set(current);
+      if (next.has(photoId)) next.delete(photoId);
+      else next.add(photoId);
+      return next;
+    });
+    if (isMobile && mobilePhotoManageMode && typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate(10);
+    }
+  }, [isMobile, mobilePhotoManageMode]);
+
+  const enterMobilePhotoManageMode = useCallback((photoId?: string) => {
+    setMobilePhotoManageMode(true);
+    setSelectedPhotoIds((current) => {
+      if (!photoId || current.has(photoId)) return current;
+      const next = new Set(current);
+      next.add(photoId);
+      return next;
+    });
+    if (photoId && typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate(10);
+    }
+  }, []);
+
+  const exitMobilePhotoManageMode = useCallback(() => {
+    setMobilePhotoManageMode(false);
+    setSelectedPhotoIds(new Set());
+  }, []);
+
+  const toggleAllVisible = useCallback(() => {
+    setSelectedPhotoIds((current) => {
+      const next = new Set(current);
+      const shouldSelect = !selectableGalleryIds.every((photoId) => next.has(photoId));
+      for (const photoId of selectableGalleryIds) {
+        if (shouldSelect) next.add(photoId);
+        else next.delete(photoId);
+      }
+      return next;
+    });
+  }, [selectableGalleryIds]);
+
+  useEffect(() => {
+    const existingIds = new Set(photos.map((photo) => photo.id));
+    setSelectedPhotoIds((current) => {
+      const next = new Set([...current].filter((photoId) => existingIds.has(photoId)));
+      const unchanged = next.size === current.size && [...next].every((photoId) => current.has(photoId));
+      return unchanged ? current : next;
+    });
+  }, [photos]);
+
+  const viewerFilmstripPhotos = inGroupReview ? groupReviewMembers : viewerOverviewPhotos;
+  const viewerFilmstripIndex = inGroupReview ? groupReviewIndex : lightboxIndex;
 
   useEffect(() => {
     if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); }
@@ -1523,6 +1533,22 @@ export default function ProjectDetailPage() {
     }
   }, [clipAnalysisStatus, loadPhotoGroups, loadPhotos]);
 
+  /** 품질 확인 폴링 — 유사컷과 같은 주기, 서로 독립이라 한쪽이 끝나도 다른 쪽은 계속 돈다 */
+  useEffect(() => {
+    if (qualityAnalysisStatus !== "processing") return;
+    const t = setInterval(() => { void loadQualityAnalysisStatus(); }, 4000);
+    return () => clearInterval(t);
+  }, [qualityAnalysisStatus, loadQualityAnalysisStatus]);
+
+  /** 품질 확인이 끝나면 사진을 다시 불러온다 — 눈감음·흐림 배지는 `Photo`에 실려 오므로
+   *  다시 읽지 않으면 분석이 끝나도 화면에 아무 변화가 없다. */
+  const prevQualityStatusRef = useRef(qualityAnalysisStatus);
+  useEffect(() => {
+    const prev = prevQualityStatusRef.current;
+    prevQualityStatusRef.current = qualityAnalysisStatus;
+    if (prev === "processing" && qualityAnalysisStatus === "completed") loadPhotos();
+  }, [qualityAnalysisStatus, loadPhotos]);
+
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 768);
@@ -1531,11 +1557,33 @@ export default function ProjectDetailPage() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
+  useEffect(() => {
+    if (!isMobile) exitMobilePhotoManageMode();
+  }, [exitMobilePhotoManageMode, isMobile]);
+
+  useEffect(() => {
+    if (mobilePhotoManageMode && selectedPhotoIds.size === 0) {
+      setToast("삭제할 사진을 선택하세요.");
+    }
+  }, [mobilePhotoManageMode, selectedPhotoIds]);
+
+  useEffect(() => {
+    if (!isMobile || photosLoading || project?.status !== "preparing" || displayPhotos.length === 0) return;
+    const storageKey = "acut:mobile-original-photo-management-tip:v1";
+    try {
+      if (window.localStorage.getItem(storageKey)) return;
+      window.localStorage.setItem(storageKey, "seen");
+      setToast("사진을 길게 누르면 여러 장을 선택해 삭제할 수 있어요.");
+    } catch {
+      // 사생활 보호 모드처럼 localStorage를 사용할 수 없는 환경에서는 안내 없이 계속 진행한다.
+    }
+  }, [displayPhotos.length, isMobile, photosLoading, project?.status]);
+
   /** 모바일 헤더 아래 진행 라인: 업로드 종료 후 200ms 페이드아웃 */
   const [mobileProgressBarMounted, setMobileProgressBarMounted] = useState(false);
   useEffect(() => {
     const uploading = uploadPhase === "sending" || uploadPhase === "processing";
-    const active = isMobile && (uploading || !!uploadError);
+    const active = isMobile && (uploading || !!uploadError || showRecoveryBanner || recoveryBusy);
     if (active) {
       setMobileProgressBarMounted(true);
       return;
@@ -1546,18 +1594,7 @@ export default function ProjectDetailPage() {
     }
     const id = window.setTimeout(() => setMobileProgressBarMounted(false), 200);
     return () => window.clearTimeout(id);
-  }, [isMobile, uploadPhase, uploadError]);
-
-  useEffect(() => {
-    if (lightboxIndex === null) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setLightboxIndex(null);
-      if (e.key === "ArrowLeft") setLightboxIndex((i) => (i! > 0 ? i! - 1 : groupedDisplayPhotos.length - 1));
-      if (e.key === "ArrowRight") setLightboxIndex((i) => (i! < groupedDisplayPhotos.length - 1 ? i! + 1 : 0));
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [lightboxIndex, groupedDisplayPhotos.length]);
+  }, [isMobile, uploadPhase, uploadError, showRecoveryBanner, recoveryBusy]);
 
   useEffect(() => {
     const uploading = uploadPhase === "sending" || uploadPhase === "processing";
@@ -1598,31 +1635,46 @@ export default function ProjectDetailPage() {
   // 다시 확인하지 않으면 방금 실패한 job이 24h sweep 전까지 UI 어디에도 드러나지 않는다).
   const checkPendingOriginals = useCallback(async () => {
     if (!id) return;
+    const checkSequence = ++pendingOriginalCheckSeqRef.current;
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
     if (!token) return;
     let jobs = await fetchPendingOriginals(id, token);
+    if (jobs === null || checkSequence !== pendingOriginalCheckSeqRef.current) return;
     if (jobs.length > 0 && await autoConfirmUploadedOriginals(jobs, token)) {
       jobs = await fetchPendingOriginals(id, token);
     }
+    if (jobs === null || checkSequence !== pendingOriginalCheckSeqRef.current) return;
+    const pendingIds = new Set(jobs.map(job => job.id));
+    for (const jobId of recoveryFilesRef.current.keys()) if (!pendingIds.has(jobId)) recoveryFilesRef.current.delete(jobId);
+    setRecoveryCachedCount(recoveryFilesRef.current.size);
     if (jobs.length > 0) {
       setPendingRecovery(jobs);
       setShowRecoveryBanner(true);
+    } else {
+      // 자동 HEAD 복구 또는 정상 confirm으로 0건이 됐을 때 과거 배너 상태를 반드시 제거한다.
+      setPendingRecovery([]);
+      setUnmatchedJobs([]);
+      setShowRecoveryBanner(false);
     }
   }, [id]);
 
   // ── upload ──
-  const startUpload = useCallback(async (uploadFiles: File[]) => {
+  const startUpload = useCallback(async (uploadFiles: File[], retryClientUploadIds?: string[]) => {
     if (!uploadFiles.length || uploadInProgressRef.current) return;
     uploadInProgressRef.current = true;
     const inclOrig = project?.includeOriginal ?? false;
+    const telemetry = new UploadTelemetry(uploadFiles.map(file => file.size), inclOrig, isMobileUploadClient() ? "mobile" : "pc");
+    uploadTelemetryRef.current = telemetry;
+    setUploadSnapshot(telemetry.snapshot());
     setUploadError(null);
+    setUploadFailures([]);
+    setShowUploadFailureDetails(false);
     setAwaitingServerFinalize(false);
     sendingSourceDoneRef.current = 0;
     sendingSourceTotalRef.current = 0;
     sendingSourceFailedRef.current = 0;
-    setSendingSourceSnap({ done: 0, total: 0, failed: 0 });
     setUploadPhase("processing");
     setUploadProgress(0);
     setCompressingIndex(-1);
@@ -1639,68 +1691,186 @@ export default function ProjectDetailPage() {
     const { data: { session } } = await supabase.auth.getSession();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     const token = session?.access_token;
-    if (userError || !user) { setUploadError("로그인 인증을 확인할 수 없습니다."); setUploadPhase("idle"); uploadInProgressRef.current = false; return; }
-    if (!token) { setUploadError("로그인이 필요합니다."); setUploadPhase("idle"); uploadInProgressRef.current = false; return; }
+    if (userError || !user) { telemetry.finish("incomplete"); setUploadError("로그인 인증을 확인할 수 없습니다."); setUploadPhase("idle"); uploadInProgressRef.current = false; return; }
+    if (!token) { telemetry.finish("incomplete"); setUploadError("로그인이 필요합니다."); setUploadPhase("idle"); uploadInProgressRef.current = false; return; }
 
-    setTotalUploadCount(uploadFiles.length);
     let currentToken = token;
     const totalFiles = uploadFiles.length;
     // 같은 파일 전송의 XHR 재시도와 direct API -> Next proxy fallback 전체에서 재사용한다.
     // 서버 UNIQUE(project_id, client_upload_id)가 응답 유실 후 중복 photo/job 생성을 막는다.
-    const clientUploadIds = uploadFiles.map(() => createClientUploadId());
+    const clientUploadIds = uploadFiles.map((_, index) => retryClientUploadIds?.[index] ?? createClientUploadId());
 
-    // 압축→전송 처리. 현재 활성 경로는 모든 기기에서 같은 pipelineMode다:
-    // - pipelineMode(PC + 모바일, include_original 여부 무관): 압축(producer)과 XHR 전송
-    //   (consumer lane)을 bounded async channel로 연결한 producer-consumer 파이프라인.
-    //   round barrier(=concurrency×effectiveBatch장 전체 완료 후에만 다음 압축 시작) 제거.
-    //   desktop+include_original=false는 OPT-ROUND-01(2026-08-06), desktop+include_original=true는
-    //   OPT-ROUND-02(2026-08-06) — 코드는 완전히 동일한 채널/lane 구조를 공유하며, inclOrig=true는
-    //   effectiveBatch=1이므로 channel item(batch)이 자연히 파일 1장 단위가 된다. batch(=effectiveBatch장,
-    //   압축/XHR 단위) 자체는 그대로, "여러 batch를 하나의 round로 묶어 전량 완료 후 한꺼번에 다음
-    //   압축 시작"하던 상위 묶음(barrier)만 제거한다. 압축 worker 수(PC 2 / 모바일 1), upload concurrency,
-    //   batch size(effectiveBatch=1 포함)/리사이즈 파라미터/presigned PUT/confirm 방식은 전부 기존
-    //   값 그대로 — barrier만 없앤다. photo_number 순서 안전성: RPC(insert_photos_with_numbers)는
-    //   /photos 요청이 서버에 도달한 순서로 번호를 매기며(배치 시작 순서가 아님), 이는 round
-    //   구조에서도 이미 존재하던 특성이다 — 파이프라인은 in-flight 배치 수 상한(=concurrency)을
-    //   그대로 유지하므로 이 순서 특성 자체를 악화시키지 않는다(조사 근거는 upload-flow.md 참고).
-    //   모바일도 같은 구조를 쓰되 MOBILE_CONCURRENCY=1, 압축 워커=1을 유지한다. 따라서
-    //   동시 네트워크/R2 PUT 수나 메모리 상한은 올리지 않고, 현재 전송 중일 때 다음 batch
-    //   압축만 겹친다. uploadOneBatch() 내부의 setTimeout(0)은 iOS의 batch 간 paint 양보를
-    //   계속 보장한다(§upload-flow.md 참고).
-    // HEIC: include_original=true여도 HEIC는 원본 PUT 없이 썸네일만 업로드 (rawFile=undefined 분기)
-    // B Plan: 압축본을 서버로 전송 + 원본은 presigned PUT으로 R2에 직접 전송
-    const effectiveBatch = inclOrig ? 1 : (isMobileUploadClient() ? MOBILE_BATCH_SIZE : BATCH_SIZE);
+    // Compression producer + bounded preview channel; originals have their own FIFO queue.
+    // Original-inclusive previews stay one file per request so reservations/jobs are unambiguous.
+    // PC dedicates up to two preview lanes; all queues share the existing network cap.
+    // Mobile keeps one network request at a time while raw PUT can overlap local compression.
+    const mobileUploadClient = isMobileUploadClient();
+    const effectiveBatch = inclOrig ? 1 : (mobileUploadClient ? MOBILE_BATCH_SIZE : BATCH_SIZE);
     const concurrency = inclOrig
-      ? (isMobileUploadClient() ? 1 : getDesktopUploadConcurrency(true))
-      : (isMobileUploadClient() ? MOBILE_CONCURRENCY : getDesktopUploadConcurrency(false));
+      ? (mobileUploadClient ? 1 : getDesktopUploadConcurrency(true))
+      : (mobileUploadClient ? MOBILE_CONCURRENCY : getDesktopUploadConcurrency(false));
+    const requestSlots = new UploadWorkQueue(concurrency);
+    const originalConcurrencyMax = mobileUploadClient ? 1 : Math.max(1, concurrency - 1);
+    const originalConcurrencyInitial = mobileUploadClient ? 1 : Math.min(2, originalConcurrencyMax);
+    const originalQueue = new UploadWorkQueue(originalConcurrencyInitial);
+    const adaptiveOriginalConcurrency = inclOrig && !mobileUploadClient
+      ? new AdaptiveUploadConcurrency(originalConcurrencyInitial, 1, originalConcurrencyMax, next => {
+          originalQueue.setConcurrency(next);
+        })
+      : null;
+    if (adaptiveOriginalConcurrency) telemetry.setOriginalConcurrency(adaptiveOriginalConcurrency.report());
+    const previewConcurrency = inclOrig ? Math.min(2, concurrency) : concurrency;
+    const reservationPromises = new Map<number, Promise<OriginalPresignedItem | null>>();
+    const originalResults = uploadFiles.map(() => uploadDeferred<{ job: OriginalPresignedItem; token: string } | null>());
+    const originalTasks: Promise<void>[] = [];
     const totalBatches = Math.ceil(totalFiles / effectiveBatch);
     const rawBatches: File[][] = Array.from({ length: totalBatches }, (_, i) =>
       uploadFiles.slice(i * effectiveBatch, Math.min((i + 1) * effectiveBatch, totalFiles))
     );
 
-    // XHR 진행률 추적용 근사 배치 사이즈 (원본 파일 기준 — 압축본은 더 작지만 비율 유지됨)
-    const approxBatchSizes = rawBatches.map((b) => b.reduce((s, f) => s + f.size, 0));
-    const totalBytes = Math.max(1, approxBatchSizes.reduce((a, b) => a + b, 0));
-    const loadedPerBatch = new Array<number>(totalBatches).fill(0);
-    const applyProgress = (idx: number, loaded: number) => {
-      const cap = approxBatchSizes[idx] ?? 0;
-      loadedPerBatch[idx] = cap > 0 ? Math.min(cap, loaded) : loaded;
-      let sum = 0; for (let i = 0; i < totalBatches; i++) sum += loadedPerBatch[i];
-      // 상한 90%: 전송 완료 후 서버 처리 구간은 awaitingServerFinalize UI로 표시 (99% 장시간 정지 방지)
-      setUploadProgress(Math.min(90, Math.round((sum / totalBytes) * 100)));
+    const batchStage = (index: number, stage: UploadStage) => {
+      for (let i = index * effectiveBatch; i < Math.min((index + 1) * effectiveBatch, totalFiles); i++) telemetry.stage(i, stage);
+    };
+    const applyProgress = (index: number, loaded: number, total: number) => {
+      if (inclOrig || total <= 0) return;
+      // Selection-only sessions use source-size weights with measured compressed-body fractions.
+      for (let i = index * effectiveBatch; i < Math.min((index + 1) * effectiveBatch, totalFiles); i++) {
+        telemetry.progress(i, uploadFiles[i].size * Math.min(1, loaded / total));
+      }
     };
 
-    const allFailed: File[] = [];
+    const failureBySourceIndex = new Map<number, UploadFailure>();
+    const settledSourceIndexes = new Set<number>();
+    const recordBatchFailure = (batchIndex: number, reason: string) => {
+      const start = batchIndex * effectiveBatch;
+      const end = Math.min(start + effectiveBatch, uploadFiles.length);
+      for (let sourceIndex = start; sourceIndex < end; sourceIndex++) {
+        telemetry.stage(sourceIndex, "failed");
+        settledSourceIndexes.add(sourceIndex);
+        failureBySourceIndex.set(sourceIndex, {
+          clientUploadId: clientUploadIds[sourceIndex],
+          file: uploadFiles[sourceIndex],
+          reason,
+        });
+      }
+    };
+    const listFailuresInSelectionOrder = () => Array.from(failureBySourceIndex.entries())
+      .sort(([leftIndex], [rightIndex]) => leftIndex - rightIndex)
+      .map(([, failure]) => failure);
+    const collectUnsettledFailures = (reason: string): UploadFailure[] => {
+      for (let sourceIndex = 0; sourceIndex < uploadFiles.length; sourceIndex++) {
+        if (settledSourceIndexes.has(sourceIndex)) continue;
+        failureBySourceIndex.set(sourceIndex, {
+          clientUploadId: clientUploadIds[sourceIndex],
+          file: uploadFiles[sourceIndex],
+          reason,
+        });
+      }
+      return listFailuresInSelectionOrder();
+    };
     const backendRejected: string[] = []; // BUG-01: 서버에서 거부된 파일명 (CR3 등 미지원 형식)
     const failedOriginalJobIds = new Set<string>();
-    let completedBatches = 0;
+
     // "compressSetup": pipelineMode 전용 — 압축 자체가 시작 불가한 예외(워커/canvas 폴백 모두 실패).
     // legacy 경로는 이 값을 쓰지 않고 기존과 동일하게 즉시 return한다(§아래 legacy 분기).
     let abortReason: "betaLimit" | "network" | "auth" | "compressSetup" | null = null;
     let abortMessage = "";
-    let firstFailDetail: string | null = null;
     // BUG-04: PC도 30배치(약 240장)마다 토큰 갱신 (대용량 업로드 중 만료 방지)
-    const refreshInterval = isMobileUploadClient() ? 20 : 30;
+    const refreshInterval = mobileUploadClient ? 20 : 30;
+
+    const putOriginalMeasured = async (
+      presigned: OriginalPresignedItem,
+      file: File,
+      uploadToken: string | undefined,
+      retryBudget: OriginalRetryBudget,
+      observer: { onProgress: (loaded: number) => void; onSending: () => void },
+    ) => {
+      const startedAt = performance.now();
+      let succeeded = false;
+      try {
+        succeeded = await putOriginalToR2(presigned, file, uploadToken, retryBudget, observer);
+        return succeeded;
+      } finally {
+        adaptiveOriginalConcurrency?.record(file.size, performance.now() - startedAt, succeeded);
+        if (adaptiveOriginalConcurrency) telemetry.setOriginalConcurrency(adaptiveOriginalConcurrency.report());
+      }
+    };
+
+    const startOriginalTask = (index: number) => {
+      if (!inclOrig || reservationPromises.has(index)) return;
+      const file = uploadFiles[index];
+      const reservation = requestSlots.run(() => stopRequestedRef.current || abortReason
+        ? Promise.resolve(null) : reserveOriginalUpload(id, clientUploadIds[index], file, currentToken));
+      reservationPromises.set(index, reservation);
+      const task = originalQueue.run(async () => {
+        const early = await reservation;
+        // Only the first PUT may precede photo/job creation. Subsequent attempts use the
+        // established job recover/confirm path and its single shared retry budget.
+        let earlyOk: boolean | null = null;
+        const budget = createOriginalRetryBudget();
+        budget.onRetry = () => telemetry.originalStage(index, "retrying");
+        budget.onConfirmAttempt = () => telemetry.originalStage(index, "confirming");
+        const observer = {
+          onSending: () => telemetry.originalStage(index, "originalSending"),
+          onProgress: (loaded: number) => telemetry.progress(index, loaded),
+        };
+        if (early && Date.parse(early.expires_at) > Date.now() + 30_000 && !stopRequestedRef.current && !abortReason) {
+          earlyOk = await requestSlots.run(() => putOriginalMeasured(early, file, undefined, { retriesUsed: 0, maxRetries: 0 }, observer));
+          telemetry.originalStage(index, null);
+        }
+        const registered = await originalResults[index].promise;
+        if (!registered) { telemetry.originalStage(index, null); return; }
+        const { job } = registered;
+        let jobToken = registered.token;
+        if (stopRequestedRef.current && earlyOk !== true) {
+          telemetry.stage(index, "failed");
+          recoveryFilesRef.current.set(job.job_id, file);
+          setRecoveryCachedCount(recoveryFilesRef.current.size);
+          return;
+        }
+        sendingSourceTotalRef.current++;
+        sendingSourceRef.current++;
+        setSendingSourcePhase(true);
+        try {
+          // A long original backlog may outlive the token used by its preview request.
+          const { data: { session: latestSession } } = await supabase.auth.getSession();
+          jobToken = latestSession?.access_token ?? jobToken;
+          let putOk = earlyOk === true && early?.source_key === job.source_key;
+          if (!putOk) {
+            // Recover first: an early PUT can succeed even if its response was lost.
+            const recovered = await requestSlots.run(() => recoverOriginalJob(job.job_id, jobToken).catch(() => null));
+            if (recovered?.status === "confirmed") putOk = true;
+            else {
+              if (earlyOk !== null && !await waitForOriginalRetry(budget)) throw new Error("원본 재시도 한도 초과");
+              const target = recovered?.status === "needs_upload" ? { ...job, ...recovered } : job;
+              putOk = await requestSlots.run(() => putOriginalMeasured(target, file, jobToken, budget, observer));
+            }
+          }
+          telemetry.originalStage(index, "confirming");
+          const confirmed = putOk && await requestSlots.run(() => confirmOrRecoverOriginalUpload(job.job_id, jobToken, budget));
+          telemetry.originalStage(index, null);
+          telemetry.stage(index, confirmed ? "completed" : "failed");
+          if (!confirmed) {
+            failedOriginalJobIds.add(job.job_id);
+            recoveryFilesRef.current.set(job.job_id, file);
+            setRecoveryCachedCount(recoveryFilesRef.current.size);
+            sendingSourceFailedRef.current++;
+          } else recoveryFilesRef.current.delete(job.job_id);
+        } catch {
+          telemetry.originalStage(index, null);
+          telemetry.stage(index, "failed");
+          failedOriginalJobIds.add(job.job_id);
+          recoveryFilesRef.current.set(job.job_id, file);
+          setRecoveryCachedCount(recoveryFilesRef.current.size);
+          sendingSourceFailedRef.current++;
+        } finally {
+          sendingSourceRef.current--;
+          sendingSourceDoneRef.current++;
+          if (sendingSourceRef.current <= 0) setSendingSourcePhase(false);
+        }
+      });
+      originalTasks.push(task);
+    };
 
     // batchIndex 단위로 공유하는 "서버 처리 중" 배너 상태 — round/파이프라인 어느 쪽이든 동일하게 쓴다.
     const bodySentMap = new Map<number, boolean>();
@@ -1714,9 +1884,14 @@ export default function ProjectDetailPage() {
     // 압축된 배치 1개를 업로드(XHR)한다 — round 루프와 파이프라인 루프가 공유하는 로직(순수 추출,
     // 동작 변경 없음). batchIndex는 전역 배치 인덱스(0..totalBatches-1) — effectiveBatch=1인
     // include_original=true에서는 uploadFiles와 1:1 대응.
-    const uploadOneBatch = async (batch: File[], batchIndex: number) => {
+    const uploadOneBatch = async (
+      batch: File[],
+      batchIndex: number,
+      sourceMetadata: UploadSourceMetadata[] = [],
+    ) => {
       // 카드 식별자·위치는 queued 단계에서 만든 값을 인계하되, 표시 이미지는 압축본으로 바꾼다.
       // 원본 blob은 고해상도/HEIC일 수 있어 브라우저가 해독하는 동안 카드가 검게 보일 수 있다.
+      const earlyReservation = inclOrig ? await reservationPromises.get(batchIndex) : null;
       const inFlightNow = Date.now();
       const queuedUrlsToRevoke: string[] = [];
       const inFlight = batch.map((file, fi) => {
@@ -1752,7 +1927,6 @@ export default function ProjectDetailPage() {
       await new Promise<void>((r) => setTimeout(r, 0));
       try {
         if (abortReason) {
-          allFailed.push(...batch);
           setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
           uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
           return;
@@ -1764,83 +1938,79 @@ export default function ProjectDetailPage() {
           const f = new FormData();
           f.append("project_id", id);
           f.append("include_original", (inclOrig && !!rawFile) ? "true" : "false");
+          if (earlyReservation) f.append("early_original_upload", "true");
           batch.forEach((file, fileIndex) => {
+            const sourceIndex = batchIndex * effectiveBatch + fileIndex;
+            const sourceFile = uploadFiles[sourceIndex] ?? file;
+            const sourceInfo = sourceMetadata[fileIndex];
             f.append("files", file);
-            f.append("client_upload_ids", clientUploadIds[batchIndex * effectiveBatch + fileIndex]);
+            f.append("client_upload_ids", clientUploadIds[sourceIndex]);
+            // 원본 납품 여부와 무관하게 목록용 원본 메타데이터는 항상 보존한다.
+            // width/height=0은 기존 압축 단계에서 치수를 얻지 못한 경우이며,
+            // 서버가 썸네일 생성 시 이미 디코딩한 입력 치수로 채운다.
+            f.append("original_filenames", sourceFile.name);
+            f.append("original_file_sizes", String(sourceFile.size));
+            f.append("original_last_modifieds", String(sourceFile.lastModified));
+            f.append("original_content_types", sourceFile.type === "image/jpg" ? "image/jpeg" : sourceFile.type || "");
+            f.append("source_widths", String(sourceInfo?.width ?? 0));
+            f.append("source_heights", String(sourceInfo?.height ?? 0));
           });
-          if (inclOrig && rawFile) {
-            f.append("original_filenames", rawFile.name);
-            f.append("original_file_sizes", String(rawFile.size));
-            f.append("original_last_modifieds", String(rawFile.lastModified));
-            f.append("original_content_types", rawFile.type || "image/jpeg");
-          }
           return f;
         };
         try {
-          let res = await postPhotosUpload(
+          let res = await requestSlots.run(() => postPhotosUpload(
             buildForm,
             currentToken,
             useProxyRef,
-            (loaded) => applyProgress(globalIdx, loaded),
-            { onRequestBodySent: () => { bodySentMap.set(batchIndex, true); syncAwaitingServer(); } },
-          );
+            (loaded, total) => applyProgress(globalIdx, loaded, total),
+            {
+              onAttempt: () => batchStage(batchIndex, "previewSending"),
+              onRetry: () => batchStage(batchIndex, "retrying"),
+              onRequestBodySent: () => { batchStage(batchIndex, "previewProcessing"); bodySentMap.set(batchIndex, true); syncAwaitingServer(); },
+            },
+          ));
           if (res.status === 401) {
             await supabase.auth.refreshSession();
             const { data: { session: after } } = await supabase.auth.getSession();
             if (after?.access_token) {
               currentToken = after.access_token;
-              res = await postPhotosUpload(
+              res = await requestSlots.run(() => postPhotosUpload(
                 buildForm,
                 currentToken,
                 useProxyRef,
-                (loaded) => applyProgress(globalIdx, loaded),
-                { onRequestBodySent: () => { bodySentMap.set(batchIndex, true); syncAwaitingServer(); } },
-              );
+                (loaded, total) => applyProgress(globalIdx, loaded, total),
+                {
+                  onAttempt: () => batchStage(batchIndex, "previewSending"),
+                  onRetry: () => batchStage(batchIndex, "retrying"),
+                  onRequestBodySent: () => { batchStage(batchIndex, "previewProcessing"); bodySentMap.set(batchIndex, true); syncAwaitingServer(); },
+                },
+              ));
             }
           }
-          if (approxBatchSizes[globalIdx] > 0) applyProgress(globalIdx, approxBatchSizes[globalIdx]);
+          if (res.ok) applyProgress(globalIdx, 1, 1);
           // BUG-01: 성공 응답에서 서버 거부 파일 목록 수집
           if (res.ok) {
             type UploadOkBody = { rejected?: string[]; original_presigned?: OriginalPresignedItem[] };
             let okBody: UploadOkBody = {};
             try { okBody = await res.json().catch(() => ({})) as UploadOkBody; } catch {}
             if (okBody.rejected?.length) backendRejected.push(...okBody.rejected);
+            for (let sourceIndex = batchIndex * effectiveBatch; sourceIndex < Math.min((batchIndex + 1) * effectiveBatch, uploadFiles.length); sourceIndex++) {
+              settledSourceIndexes.add(sourceIndex);
+            }
 
-            // presigned PUT: 원본 파일(rawFile)을 R2에 직접 업로드 후 서버에 confirm
-            // batch[pi]는 압축본이므로 사용 금지 — rawFile이 브라우저 원본
-            if (inclOrig && rawFile && okBody.original_presigned?.length) {
-              // presigned URL 수신 수 = 실제 R2 PUT 시도 예정 건수
-              sendingSourceTotalRef.current += okBody.original_presigned.length;
-              for (const p of okBody.original_presigned) {
-                const retryBudget = createOriginalRetryBudget();
-                try {
-                  sendingSourceRef.current++;
-                  if (sendingSourceRef.current > 0) setSendingSourcePhase(true);
-                  const putOk = await putOriginalToR2(p, rawFile, currentToken, retryBudget);
-                  const confirmed = putOk && await confirmOrRecoverOriginalUpload(
-                    p.job_id,
-                    currentToken,
-                    retryBudget,
-                  );
-                  if (!confirmed) {
-                    failedOriginalJobIds.add(p.job_id);
-                    sendingSourceFailedRef.current++;
-                  }
-                } catch (presignErr) {
-                  failedOriginalJobIds.add(p.job_id);
-                  sendingSourceFailedRef.current++;
-                  console.warn("presigned PUT/confirm failed:", presignErr);
-                } finally {
-                  sendingSourceRef.current--;
-                  sendingSourceDoneRef.current++;
-                  setSendingSourceSnap({ done: sendingSourceDoneRef.current, total: sendingSourceTotalRef.current, failed: sendingSourceFailedRef.current });
-                  if (sendingSourceRef.current <= 0) setSendingSourcePhase(false);
-                }
+            if (inclOrig && rawFile) {
+              const job = okBody.original_presigned?.[0];
+              if (job) {
+                batchStage(batchIndex, "ready");
+                originalResults[batchIndex].resolve({ job, token: currentToken });
+              } else {
+                batchStage(batchIndex, "failed");
+                sendingSourceFailedRef.current++;
               }
-            } else if (inclOrig && rawFile) {
-              // 사진 row는 생성됐지만 presigned 발급이 누락된 경우도 완료로 숨기지 않는다.
-              sendingSourceFailedRef.current++;
-              setSendingSourceSnap({ done: sendingSourceDoneRef.current, total: sendingSourceTotalRef.current, failed: sendingSourceFailedRef.current });
+            } else {
+              for (let i = 0; i < batch.length; i++) {
+                telemetry.stage(batchIndex * effectiveBatch + i, okBody.rejected?.includes(batch[i].name) ? "failed" : "completed");
+              }
             }
 
             // 배치 성공: blob URL 프리뷰로 즉시 갱신 (추가 네트워크 요청 없음)
@@ -1862,25 +2032,44 @@ export default function ProjectDetailPage() {
               const betaErr = parseBetaLimitError(body);
               if (betaErr) { abortReason = "betaLimit"; abortMessage = betaErr.message; return; }
             } catch {}
-            const detail = (body && typeof (body as { detail?: unknown }).detail === "string")
-              ? ((body as { detail: string }).detail)
-              : null;
+            const rawDetail = (body as { detail?: unknown } | null)?.detail;
+            // no_valid_files 등 일부 400 응답은 detail이 문자열이 아니라 {error, message, rejected}
+            // 객체다 — 문자열만 인정하면 서버가 실제로 준 이유를 통째로 버리고 사용자에게
+            // "N장 업로드에 실패했습니다."만 뜨는 원인이 된다.
+            const detail = typeof rawDetail === "string"
+              ? rawDetail
+              : (rawDetail && typeof rawDetail === "object" && typeof (rawDetail as { message?: unknown }).message === "string")
+                ? (rawDetail as { message: string }).message
+                : null;
+            const rejected = rawDetail && typeof rawDetail === "object" && Array.isArray((rawDetail as { rejected?: unknown }).rejected)
+              ? (rawDetail as { rejected: unknown[] }).rejected.filter((value): value is string => typeof value === "string")
+              : [];
             const authLike = isAuthLikeStatus(res.status) || (res.status === 503 && isAuthLikeDetail(detail));
             if (authLike) {
               abortReason = "auth";
               abortMessage = detail ?? "인증 오류로 업로드를 진행할 수 없습니다.";
               return;
             }
-            if (!firstFailDetail && detail) firstFailDetail = detail;
-            allFailed.push(...batch);
+            if (rejected.length > 0 && (rawDetail as { error?: unknown }).error === "no_valid_files") {
+              backendRejected.push(...rejected);
+              batchStage(batchIndex, "failed");
+              for (let sourceIndex = batchIndex * effectiveBatch; sourceIndex < Math.min((batchIndex + 1) * effectiveBatch, uploadFiles.length); sourceIndex++) {
+                settledSourceIndexes.add(sourceIndex);
+              }
+            } else {
+              recordBatchFailure(batchIndex, detail ?? `HTTP ${res.status}`);
+            }
           }
         } catch (e) {
           if (isNetworkFailure(e)) { abortReason = "network"; return; }
-          allFailed.push(...batch);
+          // 재시도 소진 후 던져지는 Error("HTTP 503") 등 — 그동안 메시지를 버려서 사용자에게
+          // 아무 단서도 없이 "N장 업로드에 실패했습니다."만 보였다.
+          recordBatchFailure(batchIndex, e instanceof Error ? e.message : String(e));
         }
-        completedBatches++;
-        setUploadProgress(Math.min(90, Math.round((completedBatches / totalBatches) * 100)));
+
+        // Visible progress is sampled from telemetry; completed batches never overwrite byte progress.
       } finally {
+        if (inclOrig) originalResults[batchIndex].resolve(null);
         // 실패·중단 케이스에서 uploading 상태 잔류 방지
         setUploadingPhotos((prev) => prev.filter((p) => !inFlightIds.has(p.tempId)));
         uploadingBlobsRef.current = uploadingBlobsRef.current.filter((u) => !inFlight.some((p) => p.blobUrl === u));
@@ -1897,13 +2086,15 @@ export default function ProjectDetailPage() {
     if (pipelineMode) {
       // ── producer-consumer 파이프라인 (모든 기기 — include_original=false/true 공용) ──
       // bounded channel 용량 = concurrency(기존 round 하나가 담던 batch 수와 동일 상한) —
-      // "무제한 큐"를 명시적으로 피한다. compression worker(PC 2 / 모바일 1)는
-      // compressImagesInParallel 내부에서 유지하고, batch를 순서대로 하나씩만 이 함수에 넘긴다.
-      // 워커 풀의 busy-slot 추적이 호출 1건 단위라 동시 호출하면 경합 위험이 있기 때문이다.
-      // include_original=true는 effectiveBatch=1이므로 channel item 하나 = 파일 한 장 —
-      // uploadOneBatch 내부에서 기존과 동일하게 /photos → original PUT → confirm을 순차 수행하고,
-      // 그 배치가 완전히 끝나야 해당 lane이 channel에서 다음 item을 꺼낸다(§lane 점유 방식 동일).
-      type CompressedBatch = { batchIndex: number; files: File[] };
+      // "무제한 큐"를 명시적으로 피한다. 원본 포함 PC는 1장 batch 2~3개를 한 호출로 묶어
+      // 워커 풀을 실제 병렬 활용하고, 모바일과 셀렉 전용 흐름은 기존 batch 단위를 유지한다.
+      // Original-inclusive channel items contain one preview. The lane is released after
+      // /photos registration; originalQueue independently joins its raw PUT and confirmation.
+      type CompressedBatch = {
+        batchIndex: number;
+        files: File[];
+        sourceMetadata: UploadSourceMetadata[];
+      };
       const channelBuffer: CompressedBatch[] = [];
       let channelClosed = false;
       const pushWaiters: Array<() => void> = [];
@@ -1941,28 +2132,36 @@ export default function ProjectDetailPage() {
       };
 
       const producer = (async () => {
-        for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const compressionWorkers = mobileUploadClient ? 1 : (inclOrig ? getDesktopCompressionConcurrency() : 2);
+        const batchesPerCompressionRound = inclOrig && !mobileUploadClient ? compressionWorkers : 1;
+        let nextTokenRefreshAt = refreshInterval;
+        for (let groupStart = 0; groupStart < totalBatches; groupStart += batchesPerCompressionRound) {
           if (stopRequestedRef.current || abortReason) break;
-          // 모바일은 queue가 찬 상태에서 다음 batch를 압축하지 않는다. PC의 기존 처리량
-          // 특성은 유지하고, 모바일에서만 bounded queue를 메모리 상한으로도 사용한다.
-          if (isMobileUploadClient()) await waitForPhoneChannelCapacity();
+          // Mobile does not decode another image while its prepared-preview channel is full.
+          if (mobileUploadClient) await waitForPhoneChannelCapacity();
           if (stopRequestedRef.current || abortReason) break;
-          if (batchIndex > 0 && batchIndex % refreshInterval === 0) {
+          if (groupStart >= nextTokenRefreshAt) {
             await supabase.auth.refreshSession();
             const { data: { session: fresh } } = await supabase.auth.getSession();
             if (fresh?.access_token) currentToken = fresh.access_token;
+            while (nextTokenRefreshAt <= groupStart) nextTokenRefreshAt += refreshInterval;
           }
 
-          const rawBatch = rawBatches[batchIndex];
+          const batchIndexes = Array.from(
+            { length: Math.min(batchesPerCompressionRound, totalBatches - groupStart) },
+            (_, offset) => groupStart + offset,
+          );
+          batchIndexes.forEach(startOriginalTask);
+          const rawGroup = batchIndexes.flatMap(batchIndex => rawBatches[batchIndex]);
           const chunkTs = Date.now();
-          const chunkQueued = rawBatch.map((file, i) => {
+          const chunkQueued = batchIndexes.flatMap(batchIndex => rawBatches[batchIndex].map((file, i) => {
             const blobUrl = URL.createObjectURL(file);
             const sourceIndex = batchIndex * effectiveBatch + i;
             const preview = { tempId: `upload-${chunkTs}-${sourceIndex}`, blobUrl, filename: file.name, sourceIndex };
             queuedBlobsRef.current.push(blobUrl);
             queuedPreviewBySourceIndexRef.current.set(sourceIndex, preview);
             return preview;
-          });
+          }));
           // 이미 압축되어 전송 대기 중인 카드도 유지한다. 새 batch로 통째로 교체하면
           // 이전 카드가 업로드를 시작할 때까지 화면에서 사라져 깜박임처럼 보인다.
           setQueuedPreviews((prev) => [...prev, ...chunkQueued]);
@@ -1974,15 +2173,18 @@ export default function ProjectDetailPage() {
             break;
           }
 
+          batchIndexes.forEach(batchIndex => batchStage(batchIndex, "preparing"));
           setCompressingIndex(0);
           let compressed: File[];
+          const sourceMetadata: UploadSourceMetadata[] = [];
           try {
             compressed = await compressImagesInParallel(
-              rawBatch,
+              rawGroup,
               compressAbortControllerRef.current!.signal,
-              isMobileUploadClient() ? 1 : 2,
-              undefined,
+              compressionWorkers,
+              { maxEdge: UPLOAD_INTERMEDIATE_MAX_EDGE, jpegQuality: UPLOAD_INTERMEDIATE_JPEG_QUALITY },
               () => setCompressingIndex((prev) => prev + 1),
+              sourceMetadata,
             );
           } catch (e) {
             setCompressingIndex(-1);
@@ -2000,7 +2202,18 @@ export default function ProjectDetailPage() {
           // 큐 미리보기는 uploadOneBatch()가 같은 tempId/blobUrl로 전송 상태에 인계한다.
           // 여기서 제거하면 카드가 잠시 사라졌다가 다시 나타난다.
 
-          await channelPush({ batchIndex, files: compressed });
+          telemetry.addPreviewBytes(compressed.reduce((sum, file) => sum + file.size, 0));
+          let compressedOffset = 0;
+          for (const batchIndex of batchIndexes) {
+            const batchLength = rawBatches[batchIndex].length;
+            batchStage(batchIndex, "ready");
+            await channelPush({
+              batchIndex,
+              files: compressed.slice(compressedOffset, compressedOffset + batchLength),
+              sourceMetadata: sourceMetadata.slice(compressedOffset, compressedOffset + batchLength),
+            });
+            compressedOffset += batchLength;
+          }
         }
         channelClose();
       })();
@@ -2009,10 +2222,10 @@ export default function ProjectDetailPage() {
         for (;;) {
           const item = await channelPop();
           if (!item) return;
-          await uploadOneBatch(item.files, item.batchIndex);
+          await uploadOneBatch(item.files, item.batchIndex, item.sourceMetadata);
         }
       };
-      const lanes = Array.from({ length: Math.max(1, concurrency) }, () => runLane());
+      const lanes = Array.from({ length: Math.max(1, previewConcurrency) }, () => runLane());
       await Promise.all([producer, ...lanes]);
     } else {
       // ── 기존 round 기반 루프 (모바일 전체) — 동작 변경 없음 ──
@@ -2054,6 +2267,7 @@ export default function ProjectDetailPage() {
         }
         setCompressingIndex(0);
         let flatCompressed: File[];
+        const flatSourceMetadata: UploadSourceMetadata[] = [];
         try {
           flatCompressed = await compressImagesInParallel(
             allRawInChunk,
@@ -2061,6 +2275,7 @@ export default function ProjectDetailPage() {
             isMobileUploadClient() ? 1 : 2,
             undefined,
             () => setCompressingIndex((prev) => prev + 1),
+            flatSourceMetadata,
           );
         } catch (e) {
           if (e instanceof DOMException && e.name === "AbortError") {
@@ -2087,10 +2302,12 @@ export default function ProjectDetailPage() {
         }
         // rawChunk(배치별)와 동일한 크기로 재분할 — 이후 STEP 4/업로드는 배치 단위로 동작
         const compressedChunk: File[][] = [];
+        const metadataChunk: UploadSourceMetadata[][] = [];
         {
           let cursor = 0;
           for (const batch of rawChunk) {
             compressedChunk.push(flatCompressed.slice(cursor, cursor + batch.length));
+            metadataChunk.push(flatSourceMetadata.slice(cursor, cursor + batch.length));
             cursor += batch.length;
           }
         }
@@ -2099,7 +2316,9 @@ export default function ProjectDetailPage() {
         // ── STEP 4: XHR 시작 시 각 카드가 같은 tempId/blobUrl로 uploading 상태에 인계된다. ──
 
         const chunk = compressedChunk;
-        await Promise.all(chunk.map((batch, chunkOffset) => uploadOneBatch(batch, chunkStart + chunkOffset)));
+        await Promise.all(chunk.map((batch, chunkOffset) =>
+          uploadOneBatch(batch, chunkStart + chunkOffset, metadataChunk[chunkOffset]),
+        ));
         // batch 간 macrotask 경계 생성: iOS WKWebView는 macrotask 사이에서만 paint
         // 이 시점에 이전 batch blob preview가 DOM에 있고 다음 XHR이 아직 시작 안 됨 → paint 보장
         if (isMobileUploadClient()) {
@@ -2107,6 +2326,9 @@ export default function ProjectDetailPage() {
         }
       }
     }
+
+    originalResults.forEach(result => result.resolve(null));
+    await Promise.all(originalTasks);
 
     // PUT과 confirm은 파일별 공유 예산 안에서 이미 모두 재시도했다. 여기서는 재전송을
     // 중첩하지 않고 최종 실패만 기록해, 파일당 총 재시도 상한을 지킨다.
@@ -2126,6 +2348,7 @@ export default function ProjectDetailPage() {
     }
 
     if (stopRequestedRef.current) {
+      telemetry.finish("stopped");
       setAwaitingServerFinalize(false);
       setUploadPhase("idle");
       setUploadProgress(0);
@@ -2133,6 +2356,7 @@ export default function ProjectDetailPage() {
       // 사진 목록만 다시 읽으면 초대 CTA가 이전 project.photoCount를 계속 참조하므로,
       // 두 데이터를 함께 새로고침해 업로드 완료분을 바로 활성화 조건에 반영한다.
       await Promise.all([loadPhotos(), loadProject()]);
+      if (inclOrig) await checkPendingOriginals();
       setPendingPhotos([]);
       pendingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
       pendingBlobsRef.current = [];
@@ -2150,15 +2374,25 @@ export default function ProjectDetailPage() {
 
     // abort 시 모든 임시 상태 제거 + DB 재조회로 그리드를 실제 상태로 복원
     const cleanupAllTempStates = async () => {
-      pendingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
-      pendingBlobsRef.current = [];
+      let freshPhotos: Photo[] | null = null;
+      try { freshPhotos = await getPhotosByProjectId(id); }
+      catch (error) { console.error("[upload] cleanup photo list refresh failed", error); }
       uploadingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
       uploadingBlobsRef.current = [];
       queuedBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
       queuedBlobsRef.current = [];
       queuedPreviewBySourceIndexRef.current.clear();
-      let freshPhotos: Photo[] = [];
-      try { freshPhotos = await getPhotosByProjectId(id); } catch {}
+      if (!freshPhotos) {
+        // 완료된 batch의 pending preview는 목록 재조회에 성공할 때까지 유지한다.
+        flushSync(() => {
+          setUploadingPhotos([]);
+          setQueuedPreviews([]);
+          setPhotosLoading(false);
+        });
+        return;
+      }
+      pendingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      pendingBlobsRef.current = [];
       flushSync(() => {
         setPhotos(freshPhotos);
         setPendingPhotos([]);
@@ -2172,18 +2406,34 @@ export default function ProjectDetailPage() {
         ? "인증 오류로 업로드할 수 없습니다. 기기의 날짜/시간이 자동 설정인지 확인 후 새로고침해 주세요."
         : `업로드에 실패했습니다. (${detail})`;
 
-    if (abortReason === "compressSetup") { setAwaitingServerFinalize(false); setUploadError(abortMessage); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); uploadInProgressRef.current = false; return; }
+    if (abortReason) telemetry.finish("incomplete");
+    if (abortReason === "compressSetup") {
+      const failures = collectUnsettledFailures(abortMessage);
+      setAwaitingServerFinalize(false); setUploadFailures(failures); setUploadError(formatUploadFailureSummary(failures)); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); uploadInProgressRef.current = false; return;
+    }
     if (abortReason === "betaLimit") { setAwaitingServerFinalize(false); setUploadError(abortMessage); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); uploadInProgressRef.current = false; return; }
-    if (abortReason === "network") { setAwaitingServerFinalize(false); setUploadError("업로드에 실패했습니다. 인터넷 연결을 확인해 주세요."); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); uploadInProgressRef.current = false; return; }
-    if (abortReason === "auth") { setAwaitingServerFinalize(false); setUploadError(formatAuthError(abortMessage)); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); uploadInProgressRef.current = false; return; }
+    if (abortReason === "network") {
+      const failures = collectUnsettledFailures("인터넷 연결 오류");
+      setAwaitingServerFinalize(false); setUploadFailures(failures); setUploadError(formatUploadFailureSummary(failures)); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); uploadInProgressRef.current = false; return;
+    }
+    if (abortReason === "auth") {
+      const reason = formatAuthError(abortMessage);
+      const failures = collectUnsettledFailures(reason);
+      setAwaitingServerFinalize(false); setUploadFailures(failures); setUploadError(formatUploadFailureSummary(failures)); setUploadPhase("idle"); setUploadProgress(0); await cleanupAllTempStates(); uploadInProgressRef.current = false; return;
+    }
 
     let originalFinalize: OriginalFinalizeResult | null = null;
+    telemetry.finalizing = true;
+    const finalizeStarted = performance.now();
     if (inclOrig) originalFinalize = await finalizeOriginalUpload(id, currentToken);
+    telemetry.finalize(performance.now() - finalizeStarted);
     const originalIncomplete = inclOrig && (
       sendingSourceFailedRef.current > 0 || !originalFinalize?.ok
     );
 
     setAwaitingServerFinalize(false);
+    telemetry.finish(originalIncomplete || failureBySourceIndex.size > 0 || backendRejected.length > 0 ? "incomplete" : "completed");
+    setUploadSnapshot(telemetry.snapshot());
     setUploadProgress(originalIncomplete ? 99 : 100);
     if (!originalIncomplete) {
       setUploadPhase("done");
@@ -2193,17 +2443,16 @@ export default function ProjectDetailPage() {
       setAwaitingServerFinalize(false);
       setUploadPhase("idle"); setUploadProgress(0);
       uploadInProgressRef.current = false;
-      if (allFailed.length > 0) {
-        setUploadError(firstFailDetail
-          ? `${allFailed.length}장 실패: ${firstFailDetail}`
-          : `${allFailed.length}장 업로드에 실패했습니다.`);
+      const failures = listFailuresInSelectionOrder();
+      if (failures.length > 0) {
+        setUploadFailures(failures);
+        setUploadError(formatUploadFailureSummary(failures));
       }
       if (backendRejected.length > 0) {
-        setUploadError(
-          `${backendRejected.length}개 파일은 지원하지 않는 형식입니다 (JPEG/PNG/WebP/HEIC만 가능): ${backendRejected.slice(0, 3).join(", ")}${backendRejected.length > 3 ? ` 외 ${backendRejected.length - 3}개` : ""}`
-        );
+        const rejectedMessage = `${backendRejected.length}개 파일은 지원하지 않는 형식입니다 (JPEG/PNG/WebP/HEIC만 가능): ${backendRejected.slice(0, 3).join(", ")}${backendRejected.length > 3 ? ` 외 ${backendRejected.length - 3}개` : ""}`;
+        setUploadError(failures.length > 0 ? `${formatUploadFailureSummary(failures)} · ${rejectedMessage}` : rejectedMessage);
       }
-      const totalFail = allFailed.length + backendRejected.length;
+      const totalFail = failures.length + backendRejected.length;
       if (originalIncomplete) {
         const incompleteCount = Math.max(
           sendingSourceFailedRef.current,
@@ -2223,8 +2472,30 @@ export default function ProjectDetailPage() {
       loadClipAnalysisStatus();
       // finalize는 DB 상태만 집계한다. 미완료 job의 R2 HEAD 자동 복구와 배너 갱신은 여기서 수행한다.
       if (inclOrig) checkPendingOriginals();
-      let freshPhotos: Photo[] = [];
-      try { freshPhotos = await getPhotosByProjectId(id); } catch {}
+      let freshPhotos: Photo[] | null = null;
+      for (let attempt = 1; attempt <= 3 && !freshPhotos; attempt++) {
+        try {
+          freshPhotos = await getPhotosByProjectId(id);
+        } catch (error) {
+          console.error(`[upload] completed photo list refresh failed (${attempt}/3)`, error);
+          if (attempt < 3) await new Promise<void>((resolve) => setTimeout(resolve, 400 * attempt));
+        }
+      }
+      if (!freshPhotos) {
+        // DB 저장은 끝났으므로 낙관적 preview를 유지한다. 여기서 []로 바꾸면 사용자는
+        // 업로드가 사라진 것으로 오인하고 초기 dropzone이 다시 노출된다.
+        uploadingBlobsRef.current.forEach((url) => URL.revokeObjectURL(url));
+        uploadingBlobsRef.current = [];
+        queuedBlobsRef.current.forEach((url) => URL.revokeObjectURL(url));
+        queuedBlobsRef.current = [];
+        queuedPreviewBySourceIndexRef.current.clear();
+        setUploadError("업로드는 완료됐지만 사진 목록을 새로고침하지 못했습니다. 잠시 후 새로고침해 주세요.");
+        setUploadingPhotos([]);
+        setQueuedPreviews([]);
+        setPhotosLoading(false);
+        router.refresh();
+        return;
+      }
       // blob URL 먼저 해제
       pendingBlobsRef.current.forEach((u) => URL.revokeObjectURL(u));
       pendingBlobsRef.current = [];
@@ -2242,8 +2513,26 @@ export default function ProjectDetailPage() {
         setPhotosLoading(false);
       });
       router.refresh();
+
+      /* 업로드가 끝난 **바로 이 순간**이 AI 분석 의도가 가장 높은 지점이다 — 지금까지는
+       * 작가가 (a) 기능의 존재를 알아채고 (b) 정렬 드롭다운과 똑같이 생긴 버튼을 찾아
+       * (c) 눌러야만 했다. 다음 조건을 모두 만족할 때만 띄운다:
+       *  - 사진이 실제로 올라갔고(실패만 있는 업로드에서는 묻지 않는다)
+       *  - 이 프로젝트에서 "건너뛰기"를 누른 적이 없고
+       *  - 이미 분석이 돌고 있지 않다(중복 트리거 방지) */
+      if (
+        freshPhotos.length > 0 &&
+        !aiPromptSkippedRef.current &&
+        clipAnalysisStatus !== "processing" &&
+        qualityAnalysisStatus !== "processing"
+      ) {
+        setAiWantSimilar(true);
+        setAiWantQuality(true);
+        setAiPromptSource("upload");
+        setAiPromptOpen(true);
+      }
     }, 600);
-  }, [id, loadProject, loadPhotos, router, project?.includeOriginal, loadClipAnalysisStatus, checkPendingOriginals]);
+  }, [id, loadProject, loadPhotos, router, project?.includeOriginal, loadClipAnalysisStatus, checkPendingOriginals, clipAnalysisStatus, qualityAnalysisStatus]);
 
   const handleStopUpload = useCallback(() => {
     if (stopRequestedRef.current) return;
@@ -2261,61 +2550,67 @@ export default function ProjectDetailPage() {
 
   // 복구: filename+size+lastModified 매칭 후 재업로드. 매칭 실패 job은 unmatchedJobs로 표시.
   const recoverOriginalFiles = useCallback(async (selectedFiles: File[]) => {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (!token) return;
-
-    const newUnmatched: PendingOriginalItem[] = [];
-
-    for (const job of pendingRecovery) {
-      const match = selectedFiles.find(
-        (f) =>
-          f.name === job.original_filename &&
-          (job.original_file_size === null || f.size === job.original_file_size) &&
-          (job.original_last_modified === null || f.lastModified === job.original_last_modified),
-      );
-      if (!match) {
-        newUnmatched.push(job);
-        continue;
-      }
-      try {
-        const retryBudget = createOriginalRetryBudget();
-        const result = await recoverOriginalJob(job.id, token);
-        if (result.status === "needs_upload") {
-          const presignedItem: OriginalPresignedItem = {
-            job_id: job.id, url: result.url,
-            source_key: result.source_key, content_type: result.content_type, expires_at: "",
-          };
-          const putOk = await putOriginalToR2(presignedItem, match, token, retryBudget);
-          if (putOk && await confirmOrRecoverOriginalUpload(job.id, token, retryBudget)) {
-            // R2 PUT과 완료 확인까지 복구됨
-          } else {
-            newUnmatched.push(job); // PUT/확인 실패는 미완료 처리
+    if (recoveryBusyRef.current || uploadInProgressRef.current || project?.status !== "preparing") return;
+    recoveryBusyRef.current = true;
+    uploadInProgressRef.current = true;
+    setRecoveryBusy(true);
+    setSendingSourcePhase(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { setUploadError("로그인이 필요합니다."); return; }
+      const newUnmatched: PendingOriginalItem[] = [];
+      let failed = 0;
+      for (const job of pendingRecovery) {
+        const match = recoveryFilesRef.current.get(job.id) ?? selectedFiles.find(file =>
+          file.name === job.original_filename &&
+          (job.original_file_size === null || file.size === job.original_file_size) &&
+          (job.original_last_modified === null || file.lastModified === job.original_last_modified));
+        if (!match) { newUnmatched.push(job); continue; }
+        recoveryFilesRef.current.set(job.id, match);
+        try {
+          const budget = createOriginalRetryBudget();
+          const result = await recoverOriginalJob(job.id, token);
+          let restored = result.status === "confirmed";
+          if (result.status === "needs_upload") {
+            const item: OriginalPresignedItem = { job_id: job.id, ...result, expires_at: "" };
+            restored = await putOriginalToR2(item, match, token, budget)
+              && await confirmOrRecoverOriginalUpload(job.id, token, budget);
           }
-        }
-        // result.status === "confirmed" → 이미 처리됨, 성공으로 간주
-      } catch (err) {
-        console.warn("recovery failed for job", job.id, err);
-        newUnmatched.push(job);
+          if (restored) recoveryFilesRef.current.delete(job.id);
+          else failed++;
+        } catch { failed++; }
       }
+      setUnmatchedJobs(newUnmatched);
+      const remaining = await fetchPendingOriginals(id, token);
+      if (remaining !== null) {
+        setPendingRecovery(remaining);
+        const remainingIds = new Set(remaining.map(job => job.id));
+        for (const jobId of recoveryFilesRef.current.keys()) if (!remainingIds.has(jobId)) recoveryFilesRef.current.delete(jobId);
+        setShowRecoveryBanner(remaining.length > 0);
+        if (remaining.length === 0) { setUploadError(null); setToast("원본 업로드 복구 완료!"); }
+      }
+      if (failed) setUploadError(`원본 ${failed}장을 아직 저장하지 못했습니다. 실패한 원본만 다시 시도해주세요.`);
+    } finally {
+      setRecoveryCachedCount(recoveryFilesRef.current.size);
+      recoveryBusyRef.current = false;
+      uploadInProgressRef.current = false;
+      setRecoveryBusy(false);
+      setSendingSourcePhase(false);
     }
-
-    setUnmatchedJobs(newUnmatched);
-
-    const remaining = await fetchPendingOriginals(id, token);
-    setPendingRecovery(remaining);
-    if (remaining.length === 0 && newUnmatched.length === 0) setShowRecoveryBanner(false);
-  }, [id, pendingRecovery]);
+  }, [id, pendingRecovery, project?.status]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const chosen = e.target.files;
     // 초대 링크 활성화 후에는 파일 입력이 남아 있더라도 추가 업로드를 시작하지 않는다.
-    if (project?.status !== "preparing") {
+    if (project?.status !== "preparing" || recoveryBusyRef.current) {
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
     if (!chosen?.length) return;
+    setUploadFailures([]);
+    setShowUploadFailureDetails(false);
     let list = Array.from(chosen).filter((f) => f.type.startsWith("image/") || f.type === "");
     if (fileInputRef.current) fileInputRef.current.value = "";
     const rawCount = list.filter(isRawFile).length;
@@ -2335,7 +2630,9 @@ export default function ProjectDetailPage() {
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setDragOver(false);
-    if (!project || project.status !== "preparing") return;
+    if (!project || project.status !== "preparing" || recoveryBusyRef.current) return;
+    setUploadFailures([]);
+    setShowUploadFailureDetails(false);
     let list = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/") || f.type === "");
     const rawCount = list.filter(isRawFile).length;
     list = list.filter((f) => !isRawFile(f));
@@ -2440,6 +2737,54 @@ export default function ProjectDetailPage() {
     finally { setDeletingId(null); }
   };
 
+  const handleDeleteSelected = async () => {
+    const photoIds = [...selectedPhotoIds].filter((photoId) => photos.some((photo) => photo.id === photoId));
+    if (photoIds.length === 0) return;
+    setDeletingId("__selected__");
+    try {
+      const res = await fetch(`/api/photographer/projects/${id}/photos/selected`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photoIds }),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string; photoCount?: number };
+      if (!res.ok) throw new Error(data.error ?? "삭제 실패");
+
+      const deletedIds = new Set(photoIds);
+      setPhotos((current) => current.filter((photo) => !deletedIds.has(photo.id)));
+      setProject((current) => current
+        ? { ...current, photoCount: data.photoCount ?? Math.max(0, current.photoCount - photoIds.length) }
+        : current);
+      setSelectedPhotoIds(new Set());
+      setMobilePhotoManageMode(false);
+      setToast(`${photoIds.length.toLocaleString()}장을 삭제했습니다.`);
+      // 응답에는 DB 트랜잭션 결과가 이미 반영되어 있다. UI를 즉시 갱신한 뒤 그룹/분석 캐시는
+      // 백그라운드에서 한 번만 재조회해 삭제 버튼 대기 시간을 늘리지 않는다.
+      void Promise.all([loadPhotos(), loadPhotoGroups(), loadProject(), loadClipAnalysisStatus()]);
+    } catch (error) {
+      await Promise.all([loadPhotos(), loadPhotoGroups(), loadProject()]);
+      setToast(error instanceof Error ? error.message : "선택한 사진을 삭제하지 못했습니다.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleConfirmPhotoDelete = async () => {
+    const target = deleteConfirmTarget;
+    if (!target || deletingId || deleteConfirmSubmittingRef.current) return;
+    deleteConfirmSubmittingRef.current = true;
+    try {
+      if (target.kind === "selected") {
+        await handleDeleteSelected();
+      } else {
+        await handleDeletePhoto(target.photoId);
+      }
+      setDeleteConfirmTarget(null);
+    } finally {
+      deleteConfirmSubmittingRef.current = false;
+    }
+  };
+
   const handleFlushAll = async () => {
     if (!project || project.status !== "preparing") return;
     setShowFlushAllConfirm(false);
@@ -2474,7 +2819,7 @@ export default function ProjectDetailPage() {
     }
   };
 
-  const handleEnableClientAccess = async () => {
+  const handleEnableClientAccess = async (requestDeadline: string) => {
     if (!project) return;
     const m = project.photoCount;
     const n = project.requiredCount;
@@ -2496,6 +2841,20 @@ export default function ProjectDetailPage() {
     setInviteActivating(true);
     setInviteOriginalsProcessing(false);
     try {
+      if (requestDeadline !== project.deadline) {
+        const deadlineResponse = await fetch(`/api/photographer/projects/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deadline: requestDeadline }),
+        });
+        const deadlineData = await deadlineResponse.json().catch(() => ({})) as { error?: string };
+        if (!deadlineResponse.ok) {
+          setToast(deadlineData.error ?? "셀렉 마감일 저장에 실패했습니다.");
+          return;
+        }
+        setProject((current) => current ? { ...current, deadline: requestDeadline } : current);
+      }
+
       for (let attempt = 0; attempt < INVITE_ORIGINAL_PROCESSING_MAX_ATTEMPTS; attempt++) {
         const res = await fetch(`/api/photographer/projects/${id}/status`, {
           method: "PATCH",
@@ -2514,8 +2873,12 @@ export default function ProjectDetailPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ project_id: id, action: "selecting" }),
           }).catch(() => {});
-          setProject({ ...project, status: "selecting" });
+          setProject((current) => current
+            ? { ...current, deadline: requestDeadline, status: "selecting" }
+            : current);
+          setSelectionRequestModalOpen(false);
           setInviteShareModalOpen(true);
+          setToast("셀렉 요청을 시작했습니다.");
           router.refresh();
           return;
         }
@@ -2570,6 +2933,58 @@ export default function ProjectDetailPage() {
     }
   };
 
+  /** 업로드 완료 모달의 [분석 시작] — 체크한 것만 트리거하고 바로 닫는다.
+   * 둘은 서로 독립이라 한쪽이 실패해도 다른 쪽은 그대로 진행시킨다(`allSettled`). */
+  const handleStartAiFromPrompt = async () => {
+    setAiPromptOpen(false);
+    const jobs: Promise<unknown>[] = [];
+
+    if (aiWantSimilar) {
+      setClipAnalysisTriggering(true);
+      jobs.push(
+        fetch(`/api/photographer/projects/${id}/gemini-analysis`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        })
+          .then((res) => { if (res.ok) setClipAnalysisStatus("processing"); return res; })
+          .finally(() => setClipAnalysisTriggering(false))
+      );
+    }
+
+    if (aiWantQuality) {
+      jobs.push(
+        fetch(`/api/photographer/projects/${id}/gemini-quality`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        }).then((res) => { if (res.ok) setQualityAnalysisStatus("processing"); return res; })
+      );
+    }
+
+    const results = await Promise.allSettled(jobs);
+    const failed = results.filter((r) => r.status === "rejected" || (r.status === "fulfilled" && !(r.value as Response).ok));
+    if (failed.length === results.length && results.length > 0) {
+      setToast("분석 시작에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    } else if (failed.length > 0) {
+      setToast("일부 분석을 시작하지 못했습니다.");
+    } else if (results.length > 0) {
+      setToast("AI 분석을 시작했습니다. 완료되면 알려드릴게요.");
+    }
+  };
+
+  /** [건너뛰기] — 명시적 거절이므로 이번 방문 동안은 다시 묻지 않는다 */
+  const handleSkipAiPrompt = () => {
+    setAiPromptOpen(false);
+    aiPromptSkippedRef.current = true;
+  };
+
+  /** Escape·배경 클릭 — "지금은 닫기"일 뿐 거절이 아니다. 다음 업로드 때 다시 묻는다.
+   *  (둘을 같은 핸들러로 묶었다가 실수로 닫은 사용자가 기능을 영영 못 보게 된 적이 있다) */
+  const handleDismissAiPrompt = () => {
+    setAiPromptOpen(false);
+  };
+
   const handleCancelClipAnalysis = async () => {
     setClipAnalysisTriggering(true);
     try {
@@ -2587,15 +3002,22 @@ export default function ProjectDetailPage() {
     }
   };
 
-  if (loading) return <PageLoader variant="full" />;
-  if (!project) return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", background: SURFACE_0 }}><span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, letterSpacing: "0.15em" }}>PROJECT_NOT_FOUND</span></div>;
+  if (loading) return <SystemLoadingScreen />;
+  if (!project) return (
+    <div className={themeStyles.lightTheme} style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", background: SURFACE_0, fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif" }}>
+      <span style={{ fontSize: 13, color: TEXT_MUTED }}>프로젝트를 찾을 수 없습니다</span>
+    </div>
+  );
 
   const N = project.requiredCount;
   const M = project.photoCount;
-  const daysLeft = differenceInDays(new Date(project.deadline), new Date());
   const isInviteActive = project.status !== "preparing";
-  const progressPct = N > 0 ? Math.min(100, Math.round((displayPhotos.length / N) * 100)) : 0;
-  const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
+  // 프로젝트 코드는 바로 위 breadcrumb에 이미 노출되므로 부제에서는 반복하지 않는다.
+  const shootTypeLabel = SHOOT_TYPES.find((t) => t.value === project.shootType)?.label;
+  const headerSubtitle = [
+    shootTypeLabel,
+    project.customerName ? `${project.customerName} 고객` : null,
+  ].filter(Boolean).join(" | ");
   // 갤러리 업로드, 클라이언트 압축, 서버 최종 저장, 원본 R2 PUT 중 하나라도 남아 있으면
   // 고객 링크를 열지 않는다. pendingPhotos는 완료 직후 잠깐 남는 낙관적 표시이므로 제외한다.
   const uploadBlockingInvite =
@@ -2606,19 +3028,25 @@ export default function ProjectDetailPage() {
     queuedPreviews.length > 0 ||
     sendingSourcePhase ||
     pendingRecovery.length > 0;
-  const showServerWorking = uploadPhase === "processing" && awaitingServerFinalize;
-  const photoUploadAllowed = project.status === "preparing";
+  // 헤더 초대 버튼이 지금 실제로 눌러 실행할 수 있는 상태인지 — design-system.md §23:
+  // 실행 불가 상태는 Primary(orange fill)가 아니라 Secondary(Neutral Surface fill)로 표현한다.
+  const inviteButtonReady = isInviteActive || (M >= N && !uploadBlockingInvite);
+  const uploadCopy = uploadSnapshot ? describeUpload(uploadSnapshot, project.includeOriginal ?? false) : null;
+  const showServerWorking = uploadCopy?.checking ?? false;
+  const uploadStatusLabel = uploadStopRequested ? "업로드 중단 중" : uploadCopy?.label ?? "사진 준비 중";
+  const uploadEtaLabel = uploadCopy ? `${uploadCopy.transfer} · ${uploadCopy.eta}` : "남은 시간 계산 중";
+  const uploadSavedLabel = uploadCopy?.details;
+  const photoUploadAllowed = project.status === "preparing" && !recoveryBusy;
   const canFlushAll =
     project.status === "preparing" &&
     displayPhotos.length > 0 &&
     !isUploading &&
     deletingId !== "__all__";
 
-  const labelStyle: React.CSSProperties = { fontFamily: MONO, fontSize: "0.6rem", letterSpacing: "0.15em", textTransform: "uppercase", color: TEXT_MUTED, display: "block", marginBottom: 6 };
-
   return (
     <div
-      className="prj-root"
+      data-photographer-viewport-page
+      className={`prj-root ${themeStyles.lightTheme} ${themeStyles.workspace}`}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -2627,6 +3055,7 @@ export default function ProjectDetailPage() {
         overflow: "hidden",
         position: "relative",
         background: SURFACE_0,
+        fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif",
       }}
     >
       <style>{`
@@ -2636,48 +3065,106 @@ export default function ProjectDetailPage() {
         @keyframes prj-bar-indet-sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
         @keyframes prj-compress-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.85; } }
         .prj-compressing-overlay { position: absolute; inset: 0; z-index: 11; background: rgba(var(--accent-rgb), 0.15); display: flex; align-items: center; justify-content: center; animation: prj-compress-pulse 0.9s ease-in-out infinite; }
-        .prj-tech-label { font-family: 'Space Mono', 'JetBrains Mono', 'Noto Sans KR', sans-serif; font-size: 0.63rem; letter-spacing: 0.15em; text-transform: uppercase; }
         .prj-scroll::-webkit-scrollbar { width: 4px; }
         .prj-scroll::-webkit-scrollbar-track { background: ${SURFACE_2}; }
         .prj-scroll::-webkit-scrollbar-thumb { background: var(--border-strong); }
         .prj-scroll::-webkit-scrollbar-thumb:hover { background: ${ACCENT}; }
-        .prj-data-cell { position: relative; cursor: pointer; transition: border-color 0.2s; }
-        .prj-data-cell .prj-overlay { position: absolute; inset: 4px; border: 1px solid transparent; transition: all 0.3s; pointer-events: none; }
-        .prj-data-cell:hover .prj-overlay { border-color: rgba(var(--accent-rgb), 0.3); inset: 0px; }
-        .prj-data-cell:hover { border-color: rgba(var(--accent-rgb), 0.4) !important; }
+        .prj-data-cell { position: relative; cursor: default; transition: border-color 0.18s, background 0.18s, box-shadow 0.18s, transform 0.18s; }
+        .prj-photo-media[role="button"] { cursor: pointer; }
+        .prj-photo-media[role="button"]:focus-visible { outline: 2px solid rgba(var(--accent-rgb), 0.34); outline-offset: 2px; }
+        .prj-data-cell.is-selected { background: rgba(var(--accent-rgb), 0.045) !important; box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.10); }
+        .prj-data-cell.is-selected .prj-photo-media { box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.22); }
+        .prj-data-cell.is-selected .prj-photo-name-row { color: var(--foreground); font-weight: 600; }
+        .prj-data-cell .prj-overlay { position: absolute; inset: 0; border: 1px solid transparent; border-radius: 8px; transition: border-color 0.18s; pointer-events: none; z-index: 5; }
+        .prj-data-cell:hover .prj-overlay { border-color: rgba(var(--accent-rgb), 0.28); }
+        .prj-photo-name-row { height: 24px; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 0 3px; font-size: 13px; font-weight: 500; line-height: 20px; letter-spacing: -0.35px; color: var(--muted-foreground); }
+        .prj-photo-name-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: color-mix(in srgb, var(--foreground) 74%, transparent); }
+        .prj-data-cell.is-selected .prj-photo-name-row > span { color: var(--foreground); }
+        .prj-photo-select { width: 16px; height: 16px; flex: 0 0 16px; padding: 0; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--accent-foreground); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+        .prj-photo-select[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+        .prj-photo-select:focus-visible { outline: 2px solid rgba(var(--accent-rgb), 0.34); outline-offset: 2px; }
+        .prj-photo-media { aspect-ratio: 218.32 / 150.7; }
         .prj-upload-tile:hover { border-color: rgba(var(--accent-rgb), 0.45) !important; background: rgba(var(--accent-rgb), 0.04) !important; }
         .prj-upload-tile:active { border-color: rgba(var(--accent-rgb), 0.4) !important; }
         .prj-upload-tile:focus-visible { outline: none; border-color: ${ACCENT} !important; }
-        .prj-del-btn { opacity: 0; transition: opacity 0.15s; }
-        .prj-data-cell:hover .prj-del-btn { opacity: 1; }
-        @media (max-width: 768px) { .prj-del-btn { opacity: 1; } }
         .prj-group-badge {
-          position: absolute; bottom: 4px; right: 4px;
-          min-width: 20px; height: 18px; padding: 0 5px;
-          background: rgba(0,0,0,0.75); border: 1px solid ${ACCENT};
-          color: ${ACCENT}; font-family: ${MONO};
-          font-size: 9px; font-weight: 700;
-          display: flex; align-items: center; justify-content: center;
+          position: absolute; top: 8px; right: 8px;
+          min-width: 40px; height: 25px; padding: 0 9px;
+          background: rgba(0,0,0,0.52); border: 0;
+          border-radius: 4px; color: #fff;
+          font-size: 12px; font-weight: 600;
+          display: flex; align-items: center; justify-content: center; gap: 5px;
           z-index: 10; cursor: pointer; transition: all 0.15s ease;
         }
-        .prj-group-badge:hover { background: ${ACCENT}; color: #000; }
+        .prj-group-badge:hover { background: rgba(0,0,0,0.72); }
         .prj-group-badge-inline {
           flex-shrink: 0; min-width: 20px; height: 18px; padding: 0 5px;
           background: transparent; border: 1px solid ${ACCENT};
-          color: ${ACCENT}; font-family: ${MONO};
+          color: ${ACCENT};
           font-size: 9px; font-weight: 700;
           display: flex; align-items: center; justify-content: center;
           cursor: pointer; transition: all 0.15s ease;
         }
-        .prj-group-badge-inline:hover { background: ${ACCENT}; color: #000; }
+        .prj-group-badge-inline:hover { background: ${ACCENT}; color: var(--accent-foreground); }
+        .prj-list-table {
+          width: calc(100% - 80px); max-width: 1600px; min-width: 760px;
+          margin: 8px auto 96px; background: var(--surface);
+          border: 1px solid var(--border-subtle); border-radius: 8px 8px 0 0;
+          overflow: clip; box-sizing: border-box;
+        }
+        .prj-list-header, .prj-list-row {
+          display: grid;
+          grid-template-columns: 18px minmax(320px, 720px) 140px 180px minmax(0, 1fr);
+          column-gap: 20px; align-items: center; padding: 0 32px; box-sizing: border-box;
+        }
+        .prj-list-header {
+          position: sticky; top: 0; z-index: 12; height: ${LIST_HEADER_H}px;
+          border-bottom: 1px solid var(--border-subtle); background: var(--surface-raised);
+          color: var(--muted-foreground); font-size: 14px; font-weight: 600;
+          line-height: 24px; letter-spacing: -0.45px;
+        }
+        .prj-list-numeric { text-align: right; }
+        .prj-list-row {
+          height: ${LIST_ROW_H}px; border-bottom: 1px solid var(--border-subtle);
+          background: var(--surface); transition: background 160ms ease;
+        }
+        .prj-list-row:hover { background: color-mix(in srgb, var(--surface-raised) 46%, var(--surface)); }
+        .prj-list-row.is-selected { background: rgba(var(--accent-rgb), 0.075); }
+        .prj-list-row.is-selected:hover { background: rgba(var(--accent-rgb), 0.095); }
+        .prj-list-row.is-group-expanded:not(.is-selected) { background: var(--surface-raised); }
+        .prj-list-file { min-width: 0; display: flex; align-items: center; gap: 14px; }
+        .prj-list-thumbnail {
+          flex: 0 0 auto; overflow: hidden; padding: 0; border: 1px solid var(--border-subtle);
+          border-radius: 4px; background: var(--surface-raised); cursor: pointer;
+        }
+        .prj-list-thumbnail:focus-visible { outline: 2px solid rgba(var(--accent-rgb), 0.3); outline-offset: 2px; }
+        .prj-list-filename {
+          min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          color: var(--foreground); font-size: 14px; font-weight: 500;
+          line-height: 24px; letter-spacing: -0.45px;
+        }
+        .prj-list-value {
+          color: color-mix(in srgb, var(--foreground) 70%, transparent); text-align: right; white-space: nowrap;
+          font-size: 14px; font-weight: 450; line-height: 24px; letter-spacing: -0.2px;
+          font-variant-numeric: tabular-nums;
+        }
+        .prj-list-value.is-empty { color: var(--subtle-foreground); font-size: 13px; }
+        .prj-list-group-badge {
+          min-width: 41px; height: 24px; padding: 0 9px; border: 0; border-radius: 4px;
+          background: color-mix(in srgb, var(--foreground) 72%, transparent); color: var(--surface);
+          display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+          font-size: 14px; font-weight: 500; line-height: 19px; cursor: pointer;
+        }
+        .prj-list-group-badge:hover { background: var(--foreground); }
         .prj-similarity-toggle {
           display: flex; align-items: center; gap: 6px;
-          font-size: 11px; font-weight: 500; background: none; border: none;
-          cursor: pointer; white-space: nowrap; font-family: ${MONO}; padding: 4px 6px;
+          font-size: 12px; font-weight: 500; background: none; border: none;
+          cursor: pointer; white-space: nowrap; padding: 4px 6px;
         }
         .prj-similarity-checkbox {
-          width: 13px; height: 13px; flex-shrink: 0;
-          border: 1.5px solid rgba(255,255,255,0.3);
+          width: 14px; height: 14px; flex-shrink: 0;
+          border: 1.5px solid var(--border-strong);
+          border-radius: 3px;
           display: flex; align-items: center; justify-content: center;
           transition: all 0.15s ease;
         }
@@ -2687,133 +3174,199 @@ export default function ProjectDetailPage() {
         .prj-op-node { transition: all 0.2s; cursor: pointer; }
         .prj-op-node:hover { border-color: rgba(var(--accent-rgb), 0.4) !important; background: rgba(var(--accent-rgb), 0.04) !important; }
         .prj-op-node:hover .prj-op-arrow { color: ${ACCENT} !important; }
-        .prj-modal-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); padding: 16px; }
-        .prj-modal-box { background: var(--surface-raised); border: 1px solid ${BORDER_MID}; width: 100%; position: relative; }
-        .prj-modal-box::before { content: ''; position: absolute; top: -1px; left: -1px; width: 28px; height: 2px; background: ${ACCENT}; }
-        .prj-modal-box::after { content: ''; position: absolute; bottom: -1px; right: -1px; width: 28px; height: 2px; background: ${ACCENT}; }
-        .prj-btn-primary { background: ${ACCENT_DIM}; border: 1px solid rgba(var(--accent-rgb), 0.5); color: ${ACCENT}; cursor: pointer; font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
-        .prj-btn-primary:hover { background: ${ACCENT}; color: #000; }
-        .prj-btn-secondary { background: transparent; border: 1px solid ${BORDER_MID}; color: ${TEXT_MUTED}; cursor: pointer; font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
-        .prj-btn-secondary:hover { border-color: var(--border-strong); color: ${TEXT_BRIGHT}; }
-        .prj-btn-danger { background: transparent; border: 1px solid rgba(255,51,51,0.3); color: #FF3333; cursor: pointer; font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: all 0.15s; }
-        .prj-btn-danger:hover { background: rgba(255,51,51,0.1); }
         .prj-dropzone { border: 1px dashed var(--border); transition: all 0.2s; }
         .prj-dropzone-over { border-color: rgba(var(--accent-rgb), 0.5) !important; background: ${ACCENT_DIM} !important; }
+        .prj-gallery-toolbar { min-height: 72px; flex: 0 0 72px; box-sizing: border-box; padding: 14px 40px; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); background: var(--surface); }
+        .prj-gallery-toolbar:has(.prj-upload-compact) { flex-basis: auto; }
+        .prj-gallery-toolbar-inner:has(.prj-upload-compact) { height: auto; flex-wrap: wrap; }
+        .prj-gallery-toolbar-inner { width: 100%; min-width: 0; height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+        .prj-gallery-context { flex-shrink: 0; display: flex; align-items: center; gap: 16px; }
+        .prj-gallery-summary { display: flex; align-items: center; gap: 12px; }
+        .prj-gallery-analysis { display: flex; align-items: center; padding-left: 16px; border-left: 1px solid color-mix(in srgb, var(--border-subtle) 72%, transparent); }
+        .prj-gallery-query-tools { min-width: 0; flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+        .prj-gallery-display-tools { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding-left: 12px; border-left: 1px solid color-mix(in srgb, var(--border-subtle) 72%, transparent); }
+        .prj-toolbar-check { width: 18px; height: 18px; flex: 0 0 18px; padding: 0; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--accent-foreground); display: inline-flex; align-items: center; justify-content: center; }
+        .prj-toolbar-check[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+        .prj-ai-control { height: 44px; padding: 0 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--foreground); display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; line-height: 24px; letter-spacing: -0.45px; white-space: nowrap; cursor: pointer; transition: border-color 160ms ease, background 160ms ease, color 160ms ease; }
+        .prj-ai-control:hover:not(:disabled) { border-color: var(--border-strong); background: var(--surface-raised); }
+        /* AI 버튼은 **중립 크롬에서 빼낸다**. 이 자리에 정렬 드롭다운(.prj-gallery-sort)·뷰 전환기와
+         * 높이(44px)·테두리·배경·radius가 전부 같은 버튼으로 있었더니, 기능이 아니라 화면 장치로
+         * 읽혀 "AI가 있는 줄도 몰랐다"는 말이 나왔다.
+         * 구분은 **테두리가 아니라 면**으로 한다 — 테두리를 두면 옆 드롭다운·뷰 전환기와 같은
+         * "네모 칸" 문법에 다시 갇힌다. 무테 + accent 틴트 면이면 같은 줄에서도 성격이 갈린다
+         * (주황 **채움**은 하단 제출 CTA의 몫이라 여기서는 옅은 틴트까지만 쓴다).
+         * ⚠️ 위의 일반 hover 규칙과 명시도가 같으므로 **반드시 그 뒤에** 와야 덮어쓴다. */
+        .prj-ai-control-idle { border-color: transparent; background: rgba(var(--accent-rgb), 0.09); color: var(--accent); }
+        .prj-ai-control-idle:hover:not(:disabled) { border-color: transparent; background: rgba(var(--accent-rgb), 0.16); }
+        .prj-ai-control-processing { border-color: transparent; background: var(--surface-raised); }
+
+        .prj-ai-control:focus-visible { outline: 2px solid rgba(var(--accent-rgb), 0.24); outline-offset: 2px; }
+        .prj-ai-control:disabled { cursor: wait; opacity: 0.62; }
+        .prj-ai-control-processing { color: var(--muted-foreground); }
+        .prj-gallery-search { width: min(500px, 28vw); height: 44px; padding: 0 20px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--subtle-foreground); display: flex; align-items: center; gap: 18px; }
+        .prj-gallery-search:focus-within { border-color: var(--border-strong); box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.08); }
+        .prj-gallery-search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: var(--foreground); font: inherit; font-size: 14px; line-height: 24px; letter-spacing: -0.45px; }
+        .prj-gallery-search input::placeholder { color: var(--placeholder-foreground); }
+        .prj-gallery-sort { height: 44px; padding: 0 16px 0 20px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted-foreground); display: flex; align-items: center; gap: 8px; }
+        .prj-gallery-sort select { appearance: none; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; font-size: 14px; line-height: 24px; letter-spacing: -0.45px; cursor: pointer; }
+        .prj-gallery-view-switch { height: 44px; display: inline-flex; align-items: stretch; }
+        .prj-gallery-view-switch button { width: 57px; border: 1px solid var(--border); background: var(--surface); color: var(--subtle-foreground); display: inline-flex; align-items: center; justify-content: center; }
+        .prj-gallery-view-switch button:first-child { border-radius: 8px 0 0 8px; }
+        .prj-gallery-view-switch button:last-child { margin-left: -1px; border-radius: 0 8px 8px 0; }
+        .prj-gallery-view-switch button.is-active { position: relative; z-index: 1; border-color: var(--border-strong); background: var(--surface-raised); color: var(--foreground); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-strong) 30%, transparent); }
+        .prj-gallery-view-switch button:focus { outline: none; }
+        .prj-gallery-view-switch button:focus-visible { outline: 2px solid rgba(var(--accent-rgb), 0.24); outline-offset: 2px; z-index: 2; }
+        .prj-upload-compact { min-width: 0; min-height: 62px; padding: 5px 10px; border: 1px solid rgba(var(--accent-rgb), 0.18); border-radius: 8px; background: rgba(var(--accent-rgb), 0.06); display: inline-flex; align-items: center; gap: 10px; color: var(--foreground); }
+        .prj-upload-compact-copy { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0; white-space: normal; }
+        .prj-upload-compact-copy strong { font-size: 14px; font-weight: 600; line-height: 20px; letter-spacing: -0.45px; }
+        .prj-upload-compact-copy span { font-size: 12px; font-weight: 500; line-height: 18px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+        .prj-upload-ring { width: 22px; height: 22px; flex: 0 0 22px; transform: rotate(-90deg); }
+        .prj-upload-ring-track { fill: none; stroke: var(--border); stroke-width: 2.5; }
+        .prj-upload-ring-value { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; transition: stroke-dashoffset 0.3s ease; }
+        .prj-upload-stop { min-width: 32px; height: 32px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--muted-foreground); font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .prj-upload-stop:hover:not(:disabled) { border-color: var(--border-strong); color: var(--foreground); }
+        .prj-upload-stop:disabled { cursor: wait; opacity: 0.55; }
+        @media (max-width: 1280px) and (min-width: 769px) {
+          .prj-gallery-toolbar { padding-inline: 24px; gap: 12px; }
+          .prj-gallery-context { gap: 12px; }
+          .prj-gallery-analysis { padding-left: 12px; }
+          .prj-gallery-query-tools { gap: 8px; }
+          .prj-gallery-display-tools { padding-left: 8px; }
+          .prj-gallery-search { width: min(320px, 24vw); }
+          .prj-ai-control { padding-inline: 12px; }
+          .prj-list-table { width: calc(100% - 48px); margin-inline: auto; }
+          .prj-list-header, .prj-list-row { grid-template-columns: 18px minmax(220px, 1fr) 112px 136px; padding-inline: 24px; gap: 16px; }
+        }
         .prj-mobile-toolbar { display: none; }
         @media (max-width: 768px) {
           .prj-desktop-toolbar { display: none !important; }
           .prj-view-toolbar { display: none !important; }
           .prj-mobile-toolbar { display: flex !important; }
-          .prj-modal-box { max-width: 100% !important; margin: 0 8px !important; }
-          .prj-btn-primary, .prj-btn-secondary, .prj-btn-danger { min-height: 44px !important; padding: 0 16px !important; }
-          /* 고객 초대 바: 모바일 하단 탭 위 고정(스크롤 끝까지 내릴 필요 없음) */
-          .prj-invite-bar {
-            position: fixed;
-            left: 0;
-            right: 0;
-            bottom: calc(60px + env(safe-area-inset-bottom, 0px));
-            z-index: 60;
-            padding: 10px 12px !important;
-            gap: 10px !important;
-            flex-wrap: nowrap !important;
-            align-items: center !important;
-          }
-          .prj-invite-bar .prj-invite-sub { display: none !important; }
-          .prj-invite-bar .prj-invite-title { font-size: 12px !important; margin: 0 !important; }
-          .prj-invite-bar .prj-invite-meta { flex: 1; min-width: 0; }
-          .prj-invite-bar .prj-invite-btn { flex-shrink: 0; white-space: nowrap !important; padding: 8px 12px !important; font-size: 12px !important; }
-          /* 고정 초대 바 + 하단 네비 위 여유 */
-          .prj-photo-scroll-mobile-pad {
-            padding-bottom: calc(72px + 60px + env(safe-area-inset-bottom, 0px)) !important;
-          }
+          .prj-photo-name-row { display: none; }
+          .prj-photo-media { aspect-ratio: 1 / 1; }
+          .prj-photo-select { display: none; }
+          /* 하단 메뉴 여유는 공통 PhotographerFormActionBar가 책임진다. */
         }
       `}</style>
 
       <input ref={fileInputRef} type="file" multiple accept={ACCEPT_TYPES} style={{ display: "none" }} onChange={handleFileChange} />
 
-      <PhotographerPageHeader
-        crumbs={[
-          { label: "프로젝트", href: "/photographer/projects" },
-          { label: project.name, href: `/photographer/projects/${id}` },
-          { label: "원본 업로드" },
-        ]}
-        title="원본 업로드"
-        stats={[
-          { label: "업로드", value: `${displayPhotos.length}장` },
-          { label: "고객 셀렉", value: `${N}장`, accent: displayPhotos.length >= N && N > 0 },
-        ]}
-        actions={
-          <span style={{
-            fontFamily: "var(--font-mono, monospace)",
-            fontSize: 10,
-            letterSpacing: "0.05em",
-            padding: "3px 9px",
-            border: `1px solid ${project.includeOriginal ? "rgba(var(--accent-rgb),0.4)" : "rgba(150,150,150,0.3)"}`,
-            color: project.includeOriginal ? "var(--accent)" : "var(--muted-foreground)",
-            background: project.includeOriginal ? "rgba(var(--accent-rgb),0.08)" : "transparent",
-            whiteSpace: "nowrap",
-          }}>
-            {project.includeOriginal ? "납품용 원본 포함" : "썸네일만"}
-          </span>
-        }
-      />
+      {/* 공통 Light page frame/header로 breadcrumb·title·description·actions의 시작점을 다른 작가 화면과 공유한다. */}
+      <div
+        data-upload-header-mode={immersiveUploadHeader ? "immersive" : compactUploadHeader ? "compact" : "expanded"}
+        className="relative z-20 shrink-0 bg-background"
+      >
+        {/* 축소 상태에서도 프로젝트 이동과 현재 위치를 유지한다. */}
+        <div className={themeStyles.compactHeader} aria-hidden={!compactUploadHeader} inert={!compactUploadHeader}>
+          <button type="button" onClick={() => router.push(`/photographer/projects/${id}`)} aria-label="프로젝트 상세로 돌아가기">←</button>
+          <span title={project.name}>{project.name}</span>
+          <strong>원본 업로드</strong>
+        </div>
+        <div className={themeStyles.expandedHeader} aria-hidden={compactUploadHeader} inert={compactUploadHeader}>
+        <div className={themeStyles.expandedHeaderInner}>
+        <PhotographerLightPageFrame
+          className="pb-4 md:!pt-6"
+        >
+          <PhotographerLightPageHeader
+            compact={false}
+            mobileDense
+            breadcrumb={
+            <nav aria-label="현재 위치" className="flex items-center gap-2 text-[14px] font-medium leading-[17px] tracking-[-0.15px] text-subtle-foreground">
+              <button type="button" onClick={() => router.push("/photographer/projects")} className="transition-colors hover:text-foreground">프로젝트</button>
+              <ChevronRight size={14} aria-hidden />
+              <button type="button" onClick={() => router.push(`/photographer/projects/${id}`)} className="transition-colors hover:text-foreground">
+                {project.name}
+              </button>
+              <ChevronRight size={14} aria-hidden />
+              <span className="text-muted-foreground">원본 업로드</span>
+            </nav>
+            }
+            title="원본 업로드"
+            description={
+              <span>
+                {headerSubtitle}
+                <span className="mx-2 text-disabled-foreground">·</span>
+                {project.includeOriginal ? "납품용 원본 포함" : "셀렉용 사진만 전달"}
+              </span>
+            }
+          />
+        </PhotographerLightPageFrame>
+        </div>
+        </div>
+      </div>
 
-      {/* 모바일: 헤더 바로 아래 전체 너비 진행 라인 (업로드·에러 시; 종료 시 200ms 페이드) */}
+      {/* 모바일도 전체 폭 진행 바 대신 compact 상태를 유지한다. */}
       {mobileProgressBarMounted && (
         <div
           className="prj-mobile-progress md:hidden"
           style={{
             flexShrink: 0,
             background: SURFACE_1,
-            opacity: isUploading || uploadError ? 1 : 0,
+            opacity: isUploading || uploadError || showRecoveryBanner || recoveryBusy ? 1 : 0,
             transition: "opacity 200ms ease",
             zIndex: 11,
           }}
         >
-          <div style={{ height: 2, background: "var(--border)", overflow: "hidden", position: "relative" }}>
-            {showServerWorking ? (
-              <div style={{ width: "100%", height: "100%", background: ACCENT, animation: "prj-bar-indeterminate-pulse 1.4s ease-in-out infinite", position: "relative", overflow: "hidden" }}>
-                <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.35)", width: "35%", animation: "prj-bar-indet-sweep 1.1s linear infinite" }} />
-              </div>
-            ) : isUploading ? (
-              <div style={{ width: `${overallProgress}%`, height: "100%", background: ACCENT, transition: "width 0.3s" }} />
-            ) : null}
-          </div>
           {isUploading && (
-            <div style={{ minHeight: 38, padding: "0 14px", display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, letterSpacing: "0.06em", whiteSpace: "nowrap" }}>
-                {uploadStopRequested ? "중단 중" : sendingSourcePhase ? "원본 전송" : compressingIndex >= 0 ? "압축 중" : "업로드 중"}
-              </span>
-              <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT_MUTED, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {sendingSourcePhase
-                  ? `사진 ${pendingPhotos.length}/${totalUploadCount} · 원본 ${sendingSourceSnap.done}/${sendingSourceSnap.total}${sendingSourceSnap.failed > 0 ? ` · 재시도 ${sendingSourceSnap.failed}` : ""} · 화면을 닫지 마세요`
-                  : `${pendingPhotos.length}/${totalUploadCount}장 · ${showServerWorking ? "서버 처리 중" : `${overallProgress}%`}`}
-              </span>
+            <div style={{ minHeight: 48, padding: "4px 14px", display: "flex", alignItems: "center", gap: 10, borderBottom: `1px solid ${BORDER}` }} role="status" aria-live="polite">
+              {showServerWorking ? (
+                <Loader2 size={20} className="shrink-0 animate-spin text-accent" aria-hidden />
+              ) : (
+                <svg className="prj-upload-ring" viewBox="0 0 20 20" aria-hidden>
+                  <circle className="prj-upload-ring-track" cx="10" cy="10" r="8" />
+                  <circle className="prj-upload-ring-value" cx="10" cy="10" r="8" strokeDasharray="50.27" strokeDashoffset={50.27 * (1 - Math.min(100, overallProgress) / 100)} />
+                </svg>
+              )}
+              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+                <strong style={{ fontSize: 13, lineHeight: "18px", color: TEXT_BRIGHT }}>{uploadStatusLabel}</strong>
+                {uploadSavedLabel ? <span style={{ fontSize: 11, lineHeight: "16px", color: TEXT_MUTED }}>{uploadSavedLabel}</span> : null}
+                {uploadEtaLabel && !uploadStopRequested ? <span style={{ fontSize: 11, lineHeight: "16px", color: TEXT_MUTED }}>{uploadEtaLabel}</span> : null}
+              </div>
               <button
                 type="button"
                 onClick={handleStopUpload}
                 disabled={uploadStopRequested}
-                style={{ flexShrink: 0, padding: "4px 8px", borderRadius: 5, border: "1px solid rgba(255,255,255,0.2)", background: "transparent", color: TEXT_NORMAL, fontFamily: MONO, fontSize: 10, cursor: uploadStopRequested ? "wait" : "pointer", opacity: uploadStopRequested ? 0.55 : 1 }}
+                className="prj-upload-stop"
               >
                 {uploadStopRequested ? "중단 중" : "중단"}
               </button>
             </div>
           )}
           {uploadError && (
-            <p style={{ margin: 0, padding: "6px 16px", fontFamily: MONO, fontSize: 10, color: "#FF3333", borderBottom: `1px solid ${BORDER}` }}>
-              {uploadError}
-            </p>
+            <UploadFailureNotice
+              message={uploadError}
+              failures={uploadFailures}
+              expanded={showUploadFailureDetails}
+              retryDisabled={isUploading || project.status !== "preparing"}
+              onToggle={() => setShowUploadFailureDetails((value) => !value)}
+              onRetry={() => startUpload(
+                uploadFailures.map(({ file }) => file),
+                uploadFailures.map(({ clientUploadId }) => clientUploadId),
+              )}
+              onDismiss={() => {
+                setUploadError(null);
+                setUploadFailures([]);
+                setShowUploadFailureDetails(false);
+              }}
+            />
           )}
           {/* ── 이어 업로드 복구 배너 ── */}
           {showRecoveryBanner && pendingRecovery.length > 0 && uploadPhase === "idle" && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 14px", background: "rgba(245,158,11,0.1)", borderBottom: `1px solid rgba(245,158,11,0.3)`, flexShrink: 0 }}>
-              <AlertTriangle size={12} style={{ color: "#F59E0B", flexShrink: 0 }} />
-              <span style={{ fontFamily: MONO, fontSize: 10, color: "#B45309", flex: 1 }}>
-                원본 업로드 미완료 {pendingRecovery.length}개 — 파일을 선택해 이어 업로드할 수 있습니다
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "6px 14px", background: "rgba(250,192,5,0.1)", borderBottom: `1px solid rgba(250,192,5,0.3)`, flexShrink: 0 }}>
+              <AlertTriangle size={12} style={{ color: "var(--warning)", flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: "var(--warning)", flex: 1 }}>
+                원본 {pendingRecovery.length}장 확인 필요 · 완료된 사진은 다시 보내지 않습니다
               </span>
+              {recoveryCachedCount > 0 && (
+                <button type="button" disabled={recoveryBusy} onClick={() => recoverOriginalFiles([])}
+                  style={{ fontSize: 12, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "4px 8px", borderRadius: 4, flexShrink: 0 }}>
+                  {recoveryBusy ? "다시 업로드 중…" : `실패 원본 ${recoveryCachedCount}장 재시도`}
+                </button>
+              )}
               <label style={{ cursor: "pointer" }}>
                 <input
                   ref={recoveryFileInputRef}
+                  disabled={recoveryBusy}
                   type="file"
                   accept="image/*"
                   multiple
@@ -2824,8 +3377,8 @@ export default function ProjectDetailPage() {
                     if (files.length > 0) recoverOriginalFiles(files);
                   }}
                 />
-                <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}>
-                  이어 업로드
+                <span style={{ fontSize: 12, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}>
+                  파일 다시 선택
                 </span>
               </label>
               <button type="button" onClick={() => setShowRecoveryBanner(false)} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 0, display: "flex" }}>
@@ -2835,22 +3388,22 @@ export default function ProjectDetailPage() {
           )}
           {/* ── 복구 매칭 실패 — 즉시 표시 ── */}
           {unmatchedJobs.length > 0 && (
-            <div style={{ padding: "8px 14px", background: "rgba(239,68,68,0.06)", borderBottom: `1px solid rgba(239,68,68,0.2)`, flexShrink: 0 }}>
+            <div style={{ padding: "8px 14px", background: "rgba(220,46,47,0.06)", borderBottom: `1px solid rgba(220,46,47,0.2)`, flexShrink: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <AlertTriangle size={12} style={{ color: "#EF4444", flexShrink: 0 }} />
-                <span style={{ fontFamily: MONO, fontSize: 10, color: "#B91C1C", fontWeight: 600 }}>
+                <AlertTriangle size={12} style={{ color: "var(--danger)", flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: "var(--danger)", fontWeight: 600 }}>
                   원본 파일을 찾지 못했습니다 ({unmatchedJobs.length}개)
                 </span>
                 <button type="button" onClick={() => setUnmatchedJobs([])} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 0, display: "flex", marginLeft: "auto" }}>
                   <X size={12} />
                 </button>
               </div>
-              <div style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED, marginBottom: 6, lineHeight: 1.6 }}>
+              <div style={{ fontSize: 11, color: TEXT_MUTED, marginBottom: 6, lineHeight: 1.6 }}>
                 파일명이 변경되었거나 다른 파일을 선택했을 수 있습니다. 원본 파일명 그대로 다시 선택해 주세요.
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
                 {unmatchedJobs.map((j) => (
-                  <span key={j.id} style={{ fontFamily: MONO, fontSize: 9, background: "rgba(239,68,68,0.1)", color: "#B91C1C", padding: "1px 6px", borderRadius: 3 }}>
+                  <span key={j.id} style={{ fontSize: 11, background: "rgba(220,46,47,0.1)", color: "var(--danger)", padding: "1px 6px", borderRadius: 3 }}>
                     {j.original_filename ?? "(파일명 없음)"}
                   </span>
                 ))}
@@ -2859,6 +3412,7 @@ export default function ProjectDetailPage() {
                 <label style={{ cursor: "pointer" }}>
                   <input
                     ref={retryRecoveryFileInputRef}
+                    disabled={recoveryBusy}
                     type="file"
                     accept="image/*"
                     multiple
@@ -2874,13 +3428,13 @@ export default function ProjectDetailPage() {
                       }
                     }}
                   />
-                  <span style={{ fontFamily: MONO, fontSize: 9, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}>
+                  <span style={{ fontSize: 11, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}>
                     다시 파일 선택
                   </span>
                 </label>
                 <button
                   type="button"
-                  style={{ fontFamily: MONO, fontSize: 9, color: "#EF4444", border: "1px solid rgba(239,68,68,0.4)", background: "none", padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}
+                  style={{ fontSize: 11, color: "var(--danger)", border: "1px solid rgba(220,46,47,0.4)", background: "none", padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}
                   onClick={async () => {
                     const supabase = createClient();
                     const { data: { session } } = await supabase.auth.getSession();
@@ -2903,38 +3457,53 @@ export default function ProjectDetailPage() {
 
       {/* 데스크톱 업로드 오류 표시 (모바일 오류는 mobileProgressBarMounted 블록 내에 표시됨) */}
       {uploadError && (
-        <div
-          className="prj-desktop-toolbar"
-          style={{ padding: "7px 16px", background: "rgba(255,51,51,0.07)", borderBottom: "1px solid rgba(255,51,51,0.25)", flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}
-        >
-          <AlertTriangle size={12} color="#FF3333" style={{ flexShrink: 0 }} />
-          <p style={{ margin: 0, fontFamily: MONO, fontSize: 10, color: "#FF3333" }}>{uploadError}</p>
-          <button type="button" onClick={() => setUploadError(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#FF3333", padding: 0, display: "flex" }}>
-            <X size={12} />
-          </button>
+        <div className="prj-desktop-toolbar">
+          <UploadFailureNotice
+            message={uploadError}
+            failures={uploadFailures}
+            expanded={showUploadFailureDetails}
+            retryDisabled={isUploading || project.status !== "preparing"}
+            onToggle={() => setShowUploadFailureDetails((value) => !value)}
+            onRetry={() => startUpload(
+              uploadFailures.map(({ file }) => file),
+              uploadFailures.map(({ clientUploadId }) => clientUploadId),
+            )}
+            onDismiss={() => {
+              setUploadError(null);
+              setUploadFailures([]);
+              setShowUploadFailureDetails(false);
+            }}
+          />
         </div>
       )}
 
       {/* 데스크톱 원본 복구 배너 (모바일 배너는 mobileProgressBarMounted 블록 내에 표시됨) */}
       {showRecoveryBanner && pendingRecovery.length > 0 && uploadPhase === "idle" && (
-        <div className="prj-desktop-toolbar" style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 16px", background: "rgba(245,158,11,0.1)", borderBottom: `1px solid rgba(245,158,11,0.3)`, flexShrink: 0 }}>
-          <AlertTriangle size={12} style={{ color: "#F59E0B", flexShrink: 0 }} />
-          <span style={{ fontFamily: MONO, fontSize: 10, color: "#B45309", flex: 1 }}>
-            원본 업로드 미완료 {pendingRecovery.length}개 — 파일을 선택해 이어 업로드할 수 있습니다
+        <div className="prj-desktop-toolbar" style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 16px", background: "rgba(250,192,5,0.1)", borderBottom: `1px solid rgba(250,192,5,0.3)`, flexShrink: 0 }}>
+          <AlertTriangle size={12} style={{ color: "var(--warning)", flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: "var(--warning)", flex: 1 }}>
+            원본 {pendingRecovery.length}장 확인 필요 · 완료된 사진은 다시 보내지 않습니다
           </span>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, maxWidth: 420 }}>
             {pendingRecovery.slice(0, 8).map((j) => (
-              <span key={j.id} style={{ fontFamily: MONO, fontSize: 9, background: "rgba(245,158,11,0.12)", color: "#B45309", padding: "1px 6px", borderRadius: 3 }}>
+              <span key={j.id} style={{ fontSize: 11, background: "rgba(250,192,5,0.12)", color: "var(--warning)", padding: "1px 6px", borderRadius: 3 }}>
                 {j.original_filename ?? "(파일명 없음)"}
               </span>
             ))}
             {pendingRecovery.length > 8 && (
-              <span style={{ fontFamily: MONO, fontSize: 9, color: "#B45309" }}>외 {pendingRecovery.length - 8}개</span>
+              <span style={{ fontSize: 11, color: "var(--warning)" }}>외 {pendingRecovery.length - 8}개</span>
             )}
           </div>
-          <label style={{ cursor: "pointer" }}>
+          {recoveryCachedCount > 0 && (
+                <button type="button" disabled={recoveryBusy} onClick={() => recoverOriginalFiles([])}
+                  style={{ fontSize: 12, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "4px 8px", borderRadius: 4, flexShrink: 0 }}>
+                  {recoveryBusy ? "다시 업로드 중…" : `실패 원본 ${recoveryCachedCount}장 재시도`}
+                </button>
+              )}
+              <label style={{ cursor: "pointer" }}>
             <input
               ref={recoveryFileInputRefDesktop}
+              disabled={recoveryBusy}
               type="file"
               accept="image/*"
               multiple
@@ -2945,8 +3514,8 @@ export default function ProjectDetailPage() {
                 if (files.length > 0) recoverOriginalFiles(files);
               }}
             />
-            <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}>
-              이어 업로드
+            <span style={{ fontSize: 12, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}>
+              파일 다시 선택
             </span>
           </label>
           <button type="button" onClick={() => setShowRecoveryBanner(false)} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 0, display: "flex" }}>
@@ -2956,22 +3525,22 @@ export default function ProjectDetailPage() {
       )}
       {/* 데스크톱 복구 매칭 실패 배너 */}
       {unmatchedJobs.length > 0 && (
-        <div className="prj-desktop-toolbar" style={{ padding: "8px 16px", background: "rgba(239,68,68,0.06)", borderBottom: `1px solid rgba(239,68,68,0.2)`, flexShrink: 0 }}>
+        <div className="prj-desktop-toolbar" style={{ padding: "8px 16px", background: "rgba(220,46,47,0.06)", borderBottom: `1px solid rgba(220,46,47,0.2)`, flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <AlertTriangle size={12} style={{ color: "#EF4444", flexShrink: 0 }} />
-            <span style={{ fontFamily: MONO, fontSize: 10, color: "#B91C1C", fontWeight: 600 }}>
+            <AlertTriangle size={12} style={{ color: "var(--danger)", flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: "var(--danger)", fontWeight: 600 }}>
               원본 파일을 찾지 못했습니다 ({unmatchedJobs.length}개)
             </span>
             <button type="button" onClick={() => setUnmatchedJobs([])} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 0, display: "flex", marginLeft: "auto" }}>
               <X size={12} />
             </button>
           </div>
-          <div style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED, marginBottom: 6, lineHeight: 1.6 }}>
+          <div style={{ fontSize: 11, color: TEXT_MUTED, marginBottom: 6, lineHeight: 1.6 }}>
             파일명이 변경되었거나 다른 파일을 선택했을 수 있습니다. 원본 파일명 그대로 다시 선택해 주세요.
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
             {unmatchedJobs.map((j) => (
-              <span key={j.id} style={{ fontFamily: MONO, fontSize: 9, background: "rgba(239,68,68,0.1)", color: "#B91C1C", padding: "1px 6px", borderRadius: 3 }}>
+              <span key={j.id} style={{ fontSize: 11, background: "rgba(220,46,47,0.1)", color: "var(--danger)", padding: "1px 6px", borderRadius: 3 }}>
                 {j.original_filename ?? "(파일명 없음)"}
               </span>
             ))}
@@ -2994,13 +3563,13 @@ export default function ProjectDetailPage() {
                   }
                 }}
               />
-              <span style={{ fontFamily: MONO, fontSize: 9, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}>
+              <span style={{ fontSize: 11, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}>
                 다시 파일 선택
               </span>
             </label>
             <button
               type="button"
-              style={{ fontFamily: MONO, fontSize: 9, color: "#EF4444", border: "1px solid rgba(239,68,68,0.4)", background: "none", padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}
+              style={{ fontSize: 11, color: "var(--danger)", border: "1px solid rgba(220,46,47,0.4)", background: "none", padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}
               onClick={async () => {
                 const supabase = createClient();
                 const { data: { session } } = await supabase.auth.getSession();
@@ -3025,17 +3594,151 @@ export default function ProjectDetailPage() {
         {/* ── Right Panel ── */}
         <section style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, overflow: "hidden" }}>
 
+          {displayPhotos.length > 0 && (
+            <div className="prj-desktop-toolbar prj-gallery-toolbar">
+              <div className="prj-gallery-toolbar-inner">
+              {selectedPhotoIds.size > 0 && !isUploading ? (
+                <>
+                  <div className="flex items-center gap-3 px-1">
+                    <button type="button" onClick={() => setSelectedPhotoIds(new Set())} className="flex size-[18px] items-center justify-center text-muted-foreground hover:text-foreground" aria-label="선택 해제">
+                      <X size={15} />
+                    </button>
+                    <span className="text-[16px] font-medium leading-[29px] tracking-[-0.54px] text-foreground">
+                      {selectedPhotoIds.size.toLocaleString()}장 선택됨
+                    </span>
+                  </div>
+                  <PhotographerLightButton
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setDeleteConfirmTarget({ kind: "selected", count: selectedPhotoIds.size })}
+                    disabled={deletingId === "__selected__"}
+                  >
+                    {deletingId === "__selected__" ? "삭제 중…" : "삭제"}
+                  </PhotographerLightButton>
+                </>
+              ) : (
+                <>
+                  <div className="prj-gallery-context px-1">
+                    <div className="prj-gallery-summary">
+                      <button
+                        type="button"
+                        className="prj-toolbar-check"
+                        aria-label={allVisibleSelected ? "전체 선택 해제" : "전체 선택"}
+                        aria-pressed={allVisibleSelected}
+                        onClick={toggleAllVisible}
+                      >
+                        {allVisibleSelected ? <Check size={14} strokeWidth={3} /> : null}
+                      </button>
+                      <div className="flex items-center gap-2 text-[16px] font-semibold leading-[29px] tracking-[-0.54px]">
+                        <span className="text-foreground">전체 원본</span>
+                        <span className="text-muted-foreground">{displayPhotos.length.toLocaleString()}장</span>
+                      </div>
+                    </div>
+                    <div className="prj-gallery-analysis">
+                      {isUploading ? (
+                        <div className="prj-upload-compact" role="status" aria-live="polite">
+                          {showServerWorking ? (
+                            <Loader2 size={20} className="shrink-0 animate-spin text-accent" aria-hidden />
+                          ) : (
+                            <svg className="prj-upload-ring" viewBox="0 0 20 20" aria-hidden>
+                              <circle className="prj-upload-ring-track" cx="10" cy="10" r="8" />
+                              <circle
+                                className="prj-upload-ring-value"
+                                cx="10"
+                                cy="10"
+                                r="8"
+                                strokeDasharray="50.27"
+                                strokeDashoffset={50.27 * (1 - Math.min(100, overallProgress) / 100)}
+                              />
+                            </svg>
+                          )}
+                          <div className="prj-upload-compact-copy">
+                            <strong>{uploadStatusLabel}</strong>
+                            {uploadSavedLabel ? <span>{uploadSavedLabel}</span> : null}
+                            {uploadEtaLabel && !uploadStopRequested ? <span>{uploadEtaLabel}</span> : null}
+                          </div>
+                          <button type="button" className="prj-upload-stop" onClick={handleStopUpload} disabled={uploadStopRequested}>
+                            {uploadStopRequested ? "중단 중" : "중단"}
+                          </button>
+                        </div>
+                      ) : canUploadOriginals(project.status) ? (
+                        /* AI 버튼과 유사컷 토글은 **서로 대체하지 않는다**.
+                         * 예전에는 삼항으로 갈라 분석이 끝나면 버튼이 토글로 바뀌었는데, 그러면
+                         * 분석 이후 AI 진입점이 화면에서 사라져 품질 확인을 시작할 방법이 없었다.
+                         * 토글은 "묶어서 볼까"라는 보기 설정이고 버튼은 "분석을 걸까"라는 작업이다. */
+                        <>
+                          <button
+                            type="button"
+                            onClick={aiBusy ? handleCancelAiAnalysis : openAiPromptManually}
+                            disabled={clipAnalysisTriggering}
+                            className={`prj-ai-control${aiBusy ? " prj-ai-control-processing" : " prj-ai-control-idle"}`}
+                          >
+                            {aiBusy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                            <span>{aiControlLabel}</span>
+                          </button>
+                          {/* 원본 업로드와 원본 탭이 같은 필터 컴포넌트를 쓴다. 유사컷은 목록을
+                            * 좁히는 필터가 아니라 그룹을 대표컷으로 접는 보기 설정이며,
+                            * 눈감음·흔들림을 함께 켜면 두 조건은 OR로 적용된다. */}
+                          <PhotoAnalysisFilterGroup
+                            similarity={showSimilarityToggle ? {
+                              count: photoGroups.length,
+                              checked: similarityToggleOn,
+                              onChange: setSimilarityToggleOn,
+                            } : undefined}
+                            eyesClosed={qualityCounts.eyesClosed > 0 ? {
+                              count: qualityCounts.eyesClosed,
+                              checked: qualityFilter.has("eyesClosed"),
+                              onChange: () => toggleQualityFilter("eyesClosed"),
+                            } : undefined}
+                            blurry={qualityCounts.blurry > 0 ? {
+                              count: qualityCounts.blurry,
+                              checked: qualityFilter.has("blurry"),
+                              onChange: () => toggleQualityFilter("blurry"),
+                            } : undefined}
+                          />
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="prj-gallery-query-tools px-1">
+                    <label className="prj-gallery-search">
+                      <Search size={20} aria-hidden />
+                      <input value={photoSearch} onChange={(event) => setPhotoSearch(event.target.value)} placeholder="파일명 검색" aria-label="파일명 검색" />
+                    </label>
+                    <div className="prj-gallery-display-tools">
+                      <label className="prj-gallery-sort">
+                        <select value={photoSort} onChange={(event) => setPhotoSort(event.target.value as PhotoSort)} aria-label="사진 정렬">
+                          <option value="filename-asc">정렬 : 파일명순</option>
+                          <option value="filename-desc">정렬 : 파일명 역순</option>
+                          <option value="file-size-desc">정렬 : 원본 용량 큰 순</option>
+                          <option value="resolution-desc">정렬 : 해상도 높은 순</option>
+                          <option value="uploaded-desc">정렬 : 최근 업로드순</option>
+                        </select>
+                        <ChevronDown size={16} aria-hidden />
+                      </label>
+                      <div className="prj-gallery-view-switch" aria-label="보기 방식">
+                        <button type="button" className={viewMode === "grid" ? "is-active" : ""} onClick={() => setViewMode("grid")} aria-label="갤러리 보기"><LayoutGrid size={18} /></button>
+                        <button type="button" className={viewMode === "list" ? "is-active" : ""} onClick={() => setViewMode("list")} aria-label="목록 보기"><List size={18} /></button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+              </div>
+            </div>
+          )}
+
           {/* ── 뷰 토글 툴바 ── */}
           {displayPhotos.length > 0 && (
-            <div className="prj-desktop-toolbar prj-view-toolbar" style={{ height: 44, borderBottom: `1px solid ${BORDER}`, background: SURFACE_1, display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: 16, paddingRight: 16, flexShrink: 0 }}>
+            <div className="hidden" style={{ height: 44, borderBottom: `1px solid ${BORDER}`, background: SURFACE_1, alignItems: "center", justifyContent: "space-between", paddingLeft: 16, paddingRight: 16, flexShrink: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED }}>{displayPhotos.length.toLocaleString()}장</span>
+                <span style={{ fontVariantNumeric: "tabular-nums", fontSize: 12, color: TEXT_MUTED }}>{displayPhotos.length.toLocaleString()}장</span>
                 {canFlushAll && (
                   <button
                     type="button"
                     onClick={() => setShowFlushAllConfirm(true)}
-                    style={{ fontFamily: MONO, fontSize: 10, background: "transparent", border: "none", color: TEXT_MUTED, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, transition: "color 0.15s" }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "#FF4757"; }}
+                    style={{ fontSize: 12, background: "transparent", border: "none", color: TEXT_MUTED, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, transition: "color 0.15s" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "var(--danger)"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = TEXT_MUTED; }}
                   >
                     <Trash2 size={11} />전체삭제
@@ -3050,7 +3753,7 @@ export default function ProjectDetailPage() {
                   >
                     <span className="prj-similarity-checkbox">
                       {similarityToggleOn && (
-                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--accent-foreground)" strokeWidth={5}>
                           <polyline points="20 6 9 17 4 12" />
                         </svg>
                       )}
@@ -3065,7 +3768,7 @@ export default function ProjectDetailPage() {
                     key={mode}
                     type="button"
                     onClick={() => setViewMode(mode)}
-                    style={{ padding: "4px 10px", background: viewMode === mode ? ACCENT_DIM : "transparent", border: "none", cursor: "pointer", color: viewMode === mode ? ACCENT : TEXT_MUTED, display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontFamily: MONO, transition: "all 0.15s" }}
+                    style={{ padding: "4px 10px", borderRadius: 4, background: viewMode === mode ? ACCENT_DIM : "transparent", border: "none", cursor: "pointer", color: viewMode === mode ? ACCENT : TEXT_MUTED, display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, transition: "all 0.15s" }}
                   >
                     {icon}{label}
                   </button>
@@ -3093,99 +3796,83 @@ export default function ProjectDetailPage() {
                 rowGap: 4,
               }}
             >
-              {displayPhotos.length > 0 && (
-                <span style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED }}>{displayPhotos.length.toLocaleString()}장</span>
-              )}
-              {canFlushAll && (
-                <button
-                  type="button"
-                  onClick={() => setShowFlushAllConfirm(true)}
-                  style={{
-                    fontFamily: MONO,
-                    fontSize: 11,
-                    background: "transparent",
-                    border: "none",
-                    color: "#FF4757",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    minHeight: 36,
-                    padding: "0 4px",
-                  }}
-                >
-                  <Trash2 size={13} />
-                  전체삭제
-                </button>
-              )}
-              {showSimilarityToggle && (
-                <button
-                  type="button"
-                  onClick={() => setSimilarityToggleOn((v) => !v)}
-                  className={`prj-similarity-toggle${similarityToggleOn ? " prj-similarity-on" : ""}`}
-                  style={{ color: similarityToggleOn ? ACCENT : TEXT_MUTED }}
-                >
-                  <span className="prj-similarity-checkbox">
-                    {similarityToggleOn && (
-                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </span>
-                  유사컷 적용
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* ── 업로드 진행 배너 (압축·전송 단계 레이블 + 장수 카운터 + 역주행 없는 진행률) ── */}
-          {isUploading && (
-            <div className="prj-desktop-toolbar" style={{ flexShrink: 0, padding: "7px 16px", background: SURFACE_1, borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, letterSpacing: "0.1em", minWidth: 52 }}>
-                {uploadStopRequested ? "중단 중" : sendingSourcePhase ? "원본 전송" : compressingIndex >= 0 ? "압축 중" : "업로드 중"}
-              </span>
-              {totalUploadCount > 0 && (
-                <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT_MUTED, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
-                  사진 {pendingPhotos.length}/{totalUploadCount}
-                  {project.includeOriginal && sendingSourceSnap.total > 0
-                    ? ` · 원본 ${sendingSourceSnap.done}/${sendingSourceSnap.total}${sendingSourceSnap.failed > 0 ? ` · 재시도 ${sendingSourceSnap.failed}` : ""}`
-                    : ""}
-                </span>
-              )}
-              <div style={{ flex: 1, height: 2, background: "var(--border)", overflow: "hidden" }}>
-                {showServerWorking ? (
-                  <div style={{ width: "100%", height: "100%", background: ACCENT, animation: "prj-bar-indeterminate-pulse 1.4s ease-in-out infinite", position: "relative", overflow: "hidden" }}>
-                    <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.35)", width: "35%", animation: "prj-bar-indet-sweep 1.1s linear infinite" }} />
+              {mobilePhotoManageMode ? (
+                <>
+                  <div data-mobile-photo-manage-mode style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: TEXT_BRIGHT }}>사진 선택</span>
+                    <span
+                      aria-label={`${selectedPhotoIds.size.toLocaleString()}장 선택됨`}
+                      style={{
+                        minWidth: 28,
+                        height: 24,
+                        padding: "0 8px",
+                        borderRadius: 999,
+                        background: "rgba(var(--accent-rgb), 0.10)",
+                        color: ACCENT,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {selectedPhotoIds.size.toLocaleString()}장
+                    </span>
                   </div>
-                ) : (
-                  <div style={{ width: `${overallProgress}%`, height: "100%", background: ACCENT, transition: "width 0.3s" }} />
-                )}
-              </div>
-              <span style={{ fontFamily: MONO, fontSize: 10, color: TEXT_BRIGHT, minWidth: 32, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                {showServerWorking ? "…" : `${overallProgress}%`}
-              </span>
-              <button
-                type="button"
-                onClick={handleStopUpload}
-                disabled={uploadStopRequested}
-                style={{
-                  flexShrink: 0, padding: "5px 9px", borderRadius: 6,
-                  border: "1px solid rgba(255,255,255,0.2)", background: "transparent",
-                  color: TEXT_NORMAL, fontFamily: MONO, fontSize: 10,
-                  cursor: uploadStopRequested ? "wait" : "pointer",
-                  opacity: uploadStopRequested ? 0.55 : 1,
-                }}
-              >
-                {uploadStopRequested ? "중단 중…" : "업로드 중단"}
-              </button>
+                  <button type="button" onClick={toggleAllVisible} aria-pressed={allVisibleSelected} className="min-h-11 px-2 text-xs font-semibold text-foreground">{allVisibleSelected ? "전체 해제" : "전체 선택"}</button>
+                  <button
+                    type="button"
+                    onClick={exitMobilePhotoManageMode}
+                    style={{ minHeight: 44, padding: "0 4px", border: 0, background: "transparent", color: TEXT_NORMAL, fontSize: 13, fontWeight: 600 }}
+                  >
+                    취소
+                  </button>
+                </>
+              ) : (
+                <>
+                  {displayPhotos.length > 0 ? (
+                    <span style={{ fontVariantNumeric: "tabular-nums", fontSize: 12, color: TEXT_MUTED }}>{displayPhotos.length.toLocaleString()}장</span>
+                  ) : <span />}
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    {showSimilarityToggle && (
+                      <button
+                        type="button"
+                        onClick={() => setSimilarityToggleOn((v) => !v)}
+                        className={`prj-similarity-toggle${similarityToggleOn ? " prj-similarity-on" : ""}`}
+                        style={{ color: similarityToggleOn ? ACCENT : TEXT_MUTED }}
+                      >
+                        <span className="prj-similarity-checkbox">
+                          {similarityToggleOn && (
+                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--accent-foreground)" strokeWidth={5}>
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </span>
+                        유사컷 적용
+                      </button>
+                    )}
+                    {canFlushAll ? (
+                      <button
+                        type="button"
+                        onClick={() => enterMobilePhotoManageMode()}
+                        className="inline-flex min-h-11 items-center gap-1.5 border-0 bg-transparent px-2 text-[12px] font-medium text-foreground"
+                      >
+                        선택
+                      </button>
+                    ) : null}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
           {/* photo grid — 가상 스크롤로 보이는 행만 마운트·이미지 로드 */}
           <div
             ref={photoScrollRef}
+            onScroll={handlePhotoScroll}
             className="prj-scroll prj-photo-scroll-mobile-pad"
-            style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "rgba(3,3,3,0.4)", position: "relative" }}
+            style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "var(--background)", position: "relative" }}
             onDrop={!isMobileUploadClient() && photoUploadAllowed && uploadPhase === "idle" ? onDrop : undefined}
             onDragOver={!isMobileUploadClient() && photoUploadAllowed && uploadPhase === "idle" ? onDragOver : undefined}
             onDragLeave={!isMobileUploadClient() && photoUploadAllowed && uploadPhase === "idle" ? onDragLeave : undefined}
@@ -3200,14 +3887,14 @@ export default function ProjectDetailPage() {
                 <div style={{ width: 56, height: 56, borderRadius: "50%", border: `1px solid ${ACCENT}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Upload size={22} color={ACCENT} />
                 </div>
-                <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 15, color: ACCENT }}>
+                <p style={{ fontWeight: 600, fontSize: 15, color: ACCENT }}>
                   여기에 파일을 놓으세요
                 </p>
               </div>
             )}
             {photosLoading ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", gap: 8 }}>
-                <span className="prj-tech-label" style={{ color: TEXT_MUTED }}>불러오는 중...</span>
+                <span style={{ fontSize: 13, color: TEXT_MUTED }}>불러오는 중...</span>
               </div>
             ) : displayPhotos.length === 0 && !photoUploadAllowed ? (
               <div
@@ -3227,36 +3914,52 @@ export default function ProjectDetailPage() {
                   <Lock size={22} color="var(--subtle-foreground)" />
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 15, color: dragOver ? ACCENT : "var(--muted-foreground)", marginBottom: 6 }}>
+                  <p style={{ fontWeight: 600, fontSize: 15, color: dragOver ? ACCENT : "var(--muted-foreground)", marginBottom: 6 }}>
                     {project.status === "selecting" ? "고객이 사진을 선택 중입니다" : "사진을 추가할 수 없는 프로젝트입니다"}
                   </p>
-                  <p style={{ fontFamily: MONO, fontSize: 10, color: "var(--subtle-foreground)" }}>
+                  <p style={{ fontSize: 12, color: "var(--subtle-foreground)" }}>
                     고객 초대 전까지 사진을 추가할 수 있습니다
                   </p>
                 </div>
               </div>
-            ) : viewMode === "grid" || (displayPhotos.length === 0 && photoUploadAllowed) ? (
-              <VirtualizedPhotoGrid
+            ) : displayPhotos.length === 0 && photoUploadAllowed ? (
+              <EmptyUploadPanel onBrowse={requestOpenFilePicker} maxPhotos={betaMaxPhotosPerProject} />
+            ) : galleryPhotos.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+                <Search size={24} className="text-subtle-foreground" aria-hidden />
+                <p className="m-0 text-[15px] font-semibold leading-6 tracking-[-0.45px] text-foreground">검색 결과가 없습니다</p>
+                <p className="m-0 text-[13px] leading-5 tracking-[-0.35px] text-muted-foreground">다른 파일명으로 검색해보세요.</p>
+              </div>
+            ) : (
+              <OriginalPhotoGallery
                 scrollRef={photoScrollRef}
-                photos={groupedDisplayPhotos}
-                onDelete={handleDeletePhoto}
-                deletingId={deletingId}
-                isEditMode={project.status === "preparing"}
+                photos={galleryPhotos}
+                viewMode={viewMode}
                 minCols={isMobile ? 3 : 1}
+                mobileMinCols={3}
+                mobileGridGap={6}
+                mobileSquareMedia
                 thumbQueue={thumbQueue}
-                onPhotoClick={setLightboxIndex}
+                onPhotoClick={handleOpenPhotoViewer}
+                showQualityBadges
                 groupsById={groupsById}
-                similarityToggleOn={similarityToggleOn}
+                showSimilarityGroups={similarityToggleOn}
                 expandedGroups={expandedGroups}
                 onGroupBadgeClick={handleGroupBadgeClick}
                 // 데스크톱은 워커 풀로 여러 장을 동시에 압축해 "지금 압축 중인 파일 1장" 하이라이트가
                 // 더 이상 의미 없음(모바일은 풀 크기 1이라 기존과 동일하게 단일 하이라이트 유지)
-                compressingTempId={isMobile && compressingIndex >= 0 && queuedPreviews[compressingIndex] ? queuedPreviews[compressingIndex].tempId : null}
-                leadingUploadCell={
-                  photoUploadAllowed ? (
+                compressingPhotoId={isMobile && compressingIndex >= 0 && queuedPreviews[compressingIndex] ? queuedPreviews[compressingIndex].tempId : null}
+                selectedPhotoIds={selectedPhotoIds}
+                onToggleSelected={togglePhotoSelected}
+                mobileManageMode={isMobile && mobilePhotoManageMode}
+                onPhotoLongPress={isMobile && photoUploadAllowed && !isUploading ? enterMobilePhotoManageMode : undefined}
+                compact={isMobile}
+                allVisibleSelected={allVisibleSelected}
+                onToggleAllVisible={toggleAllVisible}
+                leadingCell={
+                  photoUploadAllowed && isMobile && !mobilePhotoManageMode ? (
                     <UploadTile
                       isUploading={isUploading}
-                      uploadProgress={uploadProgress}
                       overallProgress={overallProgress}
                       showServerWorking={showServerWorking}
                       hasPhotos={displayPhotos.length > 0}
@@ -3266,20 +3969,6 @@ export default function ProjectDetailPage() {
                   ) : undefined
                 }
               />
-            ) : (
-              <VirtualizedPhotoList
-                scrollRef={photoScrollRef}
-                photos={groupedDisplayPhotos}
-                onDelete={handleDeletePhoto}
-                deletingId={deletingId}
-                isEditMode={project.status === "preparing"}
-                thumbQueue={thumbQueue}
-                onPhotoClick={setLightboxIndex}
-                groupsById={groupsById}
-                similarityToggleOn={similarityToggleOn}
-                expandedGroups={expandedGroups}
-                onGroupBadgeClick={handleGroupBadgeClick}
-              />
             )}
           </div>
         </section>
@@ -3288,13 +3977,13 @@ export default function ProjectDetailPage() {
       {/* ── AI 유사컷 분석 — 초대 링크 활성화와 독립된 별도 트리거 ── */}
       {canUploadOriginals(project.status) && displayPhotos.length > 0 && (
         <div
-          className="prj-clip-analysis-bar"
+          className="hidden"
           style={{
             flexShrink: 0,
-            background: "rgba(8, 4, 2, 0.96)",
-            borderTop: "1px solid rgba(255,255,255,0.08)",
+            background: SURFACE_1,
+            borderTop: `1px solid ${BORDER}`,
             padding: "10px 24px",
-            display: "flex",
+            display: "none",
             alignItems: "center",
             justifyContent: "space-between",
             gap: 16,
@@ -3317,12 +4006,11 @@ export default function ProjectDetailPage() {
                 display: "flex", alignItems: "center", gap: 6,
                 padding: "8px 16px",
                 background: "transparent",
-                border: "1px solid rgba(255,80,80,0.4)",
+                border: "1px solid rgba(220,46,47,0.4)",
                 borderRadius: 8,
-                color: "rgba(255,100,100,0.9)",
+                color: "var(--danger)",
                 fontSize: 12, fontWeight: 500,
                 cursor: clipAnalysisTriggering ? "not-allowed" : "pointer",
-                fontFamily: MONO,
                 opacity: clipAnalysisTriggering ? 0.6 : 1,
               }}
             >
@@ -3343,7 +4031,6 @@ export default function ProjectDetailPage() {
                 color: TEXT_NORMAL,
                 fontSize: 12, fontWeight: 500,
                 cursor: clipAnalysisTriggering ? "not-allowed" : "pointer",
-                fontFamily: MONO,
                 opacity: clipAnalysisTriggering ? 0.6 : 1,
               }}
             >
@@ -3354,418 +4041,441 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
-      {/* ── Gemini 유사컷 그룹핑 POC — 관리자 전용, OpenCLIP 분석과 완전히 독립된 실험 기능 ── */}
+      {/* ── Gemini 유사컷 그룹핑 POC — 관리자용 데스크톱 실험 기능 ── */}
       {isAdminTier && canUploadOriginals(project.status) && displayPhotos.length > 0 && (
-        <GeminiAnalysisPanel projectId={id} photos={photos} />
-      )}
-
-      {/* ── 고객 초대 하단 고정 바 ── */}
-      <div
-        className="prj-invite-bar"
-        style={{
-          flexShrink: 0,
-          background: "rgba(8, 4, 2, 0.96)",
-          borderTop: `1px solid ${isInviteActive ? "rgba(var(--accent-rgb), 0.35)" : "rgba(var(--accent-rgb), 0.2)"}`,
-          backdropFilter: "blur(12px)",
-          padding: "12px 24px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 16,
-          zIndex: 50,
-        }}
-      >
-        {isInviteActive ? (
-          /* 활성화 후 — 초대 링크 공유 버튼 */
-          <>
-            <div className="prj-invite-meta" style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-              <div className="prj-invite-title" style={{ fontSize: 13, fontWeight: 500, color: TEXT_BRIGHT }}>
-                {isMobile ? "고객 초대 링크" : "고객 초대 링크가 활성화되었습니다"}
-              </div>
-              <div className="prj-invite-sub" style={{ fontSize: 11, color: TEXT_MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {inviteUrl.replace(/^https?:\/\//, "")}
-              </div>
-              {project.includeOriginal && (
-                <div style={{ fontSize: 11, color: TEXT_MUTED }}>납품용 원본은 고객 링크에서 파일별로 바로 다운로드할 수 있습니다.</div>
-              )}
-            </div>
-            <button
-              type="button"
-              className="prj-invite-btn"
-              onClick={() => setInviteShareModalOpen(true)}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "9px 20px",
-                background: ACCENT, border: "none", borderRadius: 8,
-                color: "#000", fontSize: 13, fontWeight: 600,
-                cursor: "pointer", fontFamily: MONO,
-                boxShadow: `0 0 16px ${ACCENT_GLOW}`,
-                transition: "all 0.2s",
-              }}
-            >
-              <Link2 size={14} />
-              {isMobile ? "링크 공유" : "초대 링크 공유"}
-            </button>
-          </>
-        ) : (
-          /* 활성화 전 — 초대 링크 활성화 버튼 */
-          <>
-            <div className="prj-invite-meta" style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-              <div className="prj-invite-title" style={{ fontSize: 13, fontWeight: 500, color: TEXT_BRIGHT }}>
-                {isMobile
-                  ? (uploadBlockingInvite
-                      ? "고객 초대"
-                      : N > 0
-                      ? (displayPhotos.length >= N ? `${displayPhotos.length}/${N}장 · 활성화 가능` : `${displayPhotos.length}/${N}장`)
-                      : `${displayPhotos.length}장 · 셀렉 미정`)
-                  : "고객 초대 준비"}
-              </div>
-              {(!isMobile || !uploadBlockingInvite) && (
-                <div className="prj-invite-sub" style={{ fontSize: 11, color: TEXT_MUTED }}>
-                  {M < N
-                    ? `${displayPhotos.length}장 업로드됨 · ${N}장 이상 업로드 후 활성화 가능합니다`
-                    : `${displayPhotos.length}장 업로드 완료 · 초대 링크를 활성화할 수 있습니다`}
-                </div>
-              )}
-            </div>
-            <button
-              type="button"
-              className="prj-invite-btn"
-              onClick={handleEnableClientAccess}
-              disabled={inviteActivating || uploadBlockingInvite || M < N}
-              style={{
-                display: "flex", alignItems: "center", gap: 4,
-                padding: "9px 20px",
-                background: M >= N && !uploadBlockingInvite ? ACCENT : "rgba(var(--accent-rgb), 0.15)",
-                border: "none", borderRadius: 8,
-                color: M >= N && !uploadBlockingInvite ? "#000" : ACCENT,
-                fontSize: 13, fontWeight: 600,
-                cursor: M >= N && !inviteActivating && !uploadBlockingInvite ? "pointer" : "not-allowed",
-                fontFamily: MONO,
-                opacity: inviteActivating ? 0.75 : 1,
-                boxShadow: M >= N && !uploadBlockingInvite ? `0 0 16px ${ACCENT_GLOW}` : "none",
-                transition: "all 0.2s",
-              }}
-            >
-              {inviteActivating
-                ? (inviteOriginalsProcessing ? "원본 확인 중…" : "처리 중…")
-                : uploadBlockingInvite
-                  ? (isMobile ? "업로드 중" : "사진 업로드 중…")
-                : M < N
-                  ? "사진 업로드 필요"
-                : isMobile ? "초대링크 활성화" : "고객 초대 링크 활성화"}
-              {!inviteActivating && uploadBlockingInvite && (
-                <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />
-              )}
-              {!inviteActivating && M >= N && !uploadBlockingInvite && !isMobile && <ChevronRight size={14} />}
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* ── 라이트박스 (body 포털: main z-10 < 사이드바 z-20 스택 때문에, 고정 오버레이가 사이드바에 가려지지 않게) ── */}
-      {lightboxIndex !== null && groupedDisplayPhotos[lightboxIndex] && typeof document !== "undefined" && document.body
-        ? createPortal(
-            <div
-              role="presentation"
-              onClick={() => setLightboxIndex(null)}
-              style={{
-                position: "fixed",
-                inset: 0,
-                zIndex: 100_000,
-                isolation: "isolate",
-                background: "rgba(0,0,0,0.92)",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {/* 닫기 */}
-              <button
-                type="button"
-                onClick={() => setLightboxIndex(null)}
-                style={{
-                  position: "absolute",
-                  top: 16,
-                  right: 16,
-                  zIndex: 2,
-                  width: 36,
-                  height: 36,
-                  borderRadius: "50%",
-                  background: "rgba(255,255,255,0.1)",
-                  border: "none",
-                  color: "white",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <X size={18} />
-              </button>
-              {/* 카운터 */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: 22,
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  zIndex: 2,
-                  fontFamily: MONO,
-                  fontSize: 11,
-                  color: "rgba(255,255,255,0.45)",
-                }}
-              >
-                {lightboxIndex + 1} / {groupedDisplayPhotos.length}
-              </div>
-              <PrevNextButton
-                direction="prev"
-                size="lg"
-                align="edge"
-                style={{ zIndex: 2 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setLightboxIndex((i) => (i! > 0 ? i! - 1 : groupedDisplayPhotos.length - 1));
-                }}
-              />
-              {/* 이미지 */}
-              <div
-                onClick={(e) => e.stopPropagation()}
-                style={{ display: "flex", flexDirection: "column", alignItems: "center", maxWidth: "90vw", zIndex: 1 }}
-              >
-                <img
-                  key={groupedDisplayPhotos[lightboxIndex].id}
-                  src={groupedDisplayPhotos[lightboxIndex].previewUrl ?? groupedDisplayPhotos[lightboxIndex].url}
-                  alt={groupedDisplayPhotos[lightboxIndex].originalFilename ?? ""}
-                  decoding="async"
-                  fetchPriority="high"
-                  style={{ maxHeight: "80vh", maxWidth: "90vw", objectFit: "contain", borderRadius: 6, display: "block" }}
-                />
-                {groupedDisplayPhotos[lightboxIndex].originalFilename && (
-                  <div style={{ marginTop: 12, fontFamily: MONO, fontSize: 11, color: "rgba(255,255,255,0.45)" }}>
-                    {groupedDisplayPhotos[lightboxIndex].originalFilename}
-                  </div>
-                )}
-              </div>
-              <PrevNextButton
-                direction="next"
-                size="lg"
-                align="edge"
-                style={{ zIndex: 2 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setLightboxIndex((i) => (i! < groupedDisplayPhotos.length - 1 ? i! + 1 : 0));
-                }}
-              />
-            </div>,
-            document.body,
-          )
-        : null}
-
-      {/* ── 전체삭제 확인 팝업 ── */}
-      {showFlushAllConfirm && (
-        <div
-          className="prj-modal-overlay"
-          onClick={(e) => {
-            if (deletingId === "__all__") return;
-            if (e.target === e.currentTarget) setShowFlushAllConfirm(false);
-          }}
-        >
-          <div className="prj-modal-box" style={{ maxWidth: 360 }}>
-            <div style={{ padding: "14px 18px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 8 }}>
-              <Trash2 size={14} style={{ color: "#FF4757" }} />
-              <span className="prj-tech-label" style={{ color: "#FF4757" }}>전체 삭제</span>
-            </div>
-            <div style={{ padding: "20px 18px" }}>
-              <p style={{ fontSize: 14, fontWeight: 700, color: TEXT_BRIGHT, marginBottom: 16, lineHeight: 1.5 }}>
-                {displayPhotos.length.toLocaleString()}장을 모두 삭제할까요?
-              </p>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => setShowFlushAllConfirm(false)}
-                  disabled={deletingId === "__all__"}
-                  className="prj-btn-secondary"
-                  style={{ flex: 1, padding: "10px 0", opacity: deletingId === "__all__" ? 0.5 : 1 }}
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={handleFlushAll}
-                  disabled={deletingId === "__all__"}
-                  className="prj-btn-danger"
-                  style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, opacity: deletingId === "__all__" ? 0.5 : 1 }}
-                >
-                  <Trash2 size={12} />
-                  {deletingId === "__all__" ? "삭제 중..." : "삭제"}
-                </button>
-              </div>
-            </div>
-          </div>
+        <div className="hidden md:block" data-admin-gemini-analysis>
+          <GeminiAnalysisPanel projectId={id} photos={photos} />
         </div>
       )}
 
+      {/* 업로드 화면의 주요 행동도 생성·수정 화면과 동일한 공통 하단 액션 영역에서 관리한다. */}
+      <PhotographerFormActionBar
+        maxWidth={1920}
+        className="shrink-0"
+        leading={mobilePhotoManageMode ? undefined : (
+          <div>
+            <p className="text-sm font-bold text-foreground">
+              원본 {M.toLocaleString()}장
+              <span className="mx-2 font-medium text-disabled-foreground">·</span>
+              셀렉 목표 {N.toLocaleString()}장
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {isInviteActive
+                ? "고객에게 초대 링크를 공유할 수 있어요."
+                : M < N
+                  ? `셀렉 요청까지 원본 ${(N - M).toLocaleString()}장이 더 필요해요.`
+                  : "업로드를 확인한 뒤 고객에게 셀렉을 요청하세요."}
+            </p>
+          </div>
+        )}
+        actions={mobilePhotoManageMode ? (
+          <PhotographerLightButton
+            type="button"
+            variant="danger"
+            onClick={() => setDeleteConfirmTarget({ kind: "selected", count: selectedPhotoIds.size })}
+            disabled={selectedPhotoIds.size === 0 || deletingId === "__selected__"}
+            className="h-12 w-full px-5 text-[14px] md:w-auto"
+          >
+            <Trash2 size={16} />
+            {selectedPhotoIds.size > 0
+              ? `선택한 사진 ${selectedPhotoIds.size.toLocaleString()}장 삭제`
+              : "삭제할 사진을 선택하세요"}
+          </PhotographerLightButton>
+        ) : (
+          <>
+            {photoUploadAllowed && displayPhotos.length > 0 ? (
+              <PhotographerLightButton
+                type="button"
+                variant="secondary"
+                onClick={requestOpenFilePicker}
+                disabled={isUploading || isPreparingFiles}
+              >
+                <ImagePlus size={15} />사진 추가
+              </PhotographerLightButton>
+            ) : null}
+            <PhotographerLightButton
+              type="button"
+              variant={inviteButtonReady ? "primary" : "secondary"}
+              onClick={isInviteActive
+                ? () => setInviteShareModalOpen(true)
+                : () => setSelectionRequestModalOpen(true)}
+              disabled={!isInviteActive && (inviteActivating || uploadBlockingInvite || M < N)}
+              className="min-w-[129px]"
+            >
+              {isInviteActive
+                ? (isMobile ? "링크 공유" : "초대 링크 공유")
+                : inviteActivating
+                  ? (inviteOriginalsProcessing ? "원본 확인 중…" : "처리 중…")
+                  : uploadBlockingInvite
+                    ? (isMobile ? "업로드 중" : "사진 업로드 중…")
+                    : M < N
+                      ? "사진 업로드 필요"
+                      : "셀렉 요청하기"}
+            </PhotographerLightButton>
+          </>
+        )}
+      />
+
+      {isPhotoViewerOpen && activePhoto && viewerFilmstripIndex !== null ? (
+        <OriginalPhotoViewer
+          photos={viewerFilmstripPhotos}
+          activeIndex={viewerFilmstripIndex}
+          onActiveIndexChange={(index) => {
+            if (inGroupReview) setGroupReviewIndex(index);
+            else setLightboxIndex(index);
+          }}
+          onClose={handleCloseLightbox}
+          onPrevious={inGroupReview
+            ? handleGroupReviewPrev
+            : () => setLightboxIndex((index) => (index! > 0 ? index! - 1 : viewerOverviewPhotos.length - 1))}
+          onNext={inGroupReview
+            ? handleGroupReviewNext
+            : () => setLightboxIndex((index) => (index! < viewerOverviewPhotos.length - 1 ? index! + 1 : 0))}
+          reviewMode={inGroupReview}
+          showGroupShortcut
+          canToggleGroup={canEnterActiveGroup}
+          onToggleGroup={inGroupReview ? handleExitGroupReview : () => handleEnterGroupReview()}
+          reviewBar={canUploadOriginals(project.status) ? (
+            <div className="flex flex-col text-white">
+              <div className="flex min-h-[52px] items-center justify-between gap-4 px-5 py-2 max-md:flex-wrap max-md:gap-2 max-md:px-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <ImagePlus size={16} aria-hidden className="shrink-0 text-white/70" />
+                  <span className="whitespace-nowrap text-[12px] font-semibold">고객 진입 대표</span>
+                  <span className="truncate text-[11px] text-white/50">현재 사진을 첫 화면에 사용</span>
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-white/25 bg-white/10 px-3.5 py-2 text-[12px] font-semibold text-white disabled:opacity-50"
+                  disabled={coverSaving || project.coverPhotoId === activePhoto.id}
+                  onClick={() => void handleSaveEntryCover(activePhoto.id)}
+                >
+                  {coverSaving
+                    ? "저장 중…"
+                    : project.coverPhotoId === activePhoto.id
+                      ? <><Check size={14} aria-hidden /> 대표 사진</>
+                      : "대표 사진으로 설정"}
+                </button>
+              </div>
+              {inGroupReview && groupReviewGroup ? (
+                <div className="flex min-h-[48px] items-center justify-between gap-4 border-t border-white/10 px-5 py-2 max-md:px-3">
+                  <div className="flex min-w-0 items-center gap-3 max-md:gap-1.5">
+                    <button type="button" className="flex items-center gap-1.5 border-0 bg-transparent px-1 py-1.5 text-[13px] font-semibold text-white" onClick={handleExitGroupReview}>
+                      <ChevronLeft size={16} aria-hidden /> 전체 사진
+                    </button>
+                    <span className="whitespace-nowrap text-[12px] leading-[18px] text-white/60">유사컷 {groupReviewMembers.length.toLocaleString()}장</span>
+                  </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center gap-1 rounded-md border border-white/25 bg-transparent px-3.5 py-2 text-[12px] font-semibold text-white disabled:opacity-50"
+                    disabled={groupActionPending !== null || groupReviewGroup.representativePhotoId === activePhoto.id}
+                    onClick={() => handleSetRepresentative(activePhoto.id, groupReviewGroup.id)}
+                  >
+                    {groupReviewGroup.representativePhotoId === activePhoto.id ? <><Check size={14} aria-hidden /> 대표컷</> : "대표컷으로 지정"}
+                  </button>
+                  <button type="button" className="inline-flex items-center justify-center rounded-md border border-white/25 bg-transparent px-3.5 py-2 text-[12px] font-semibold text-white disabled:opacity-50" disabled={groupActionPending !== null} onClick={() => handleRemoveFromGroup(activePhoto.id)}>
+                    묶음에서 제외
+                  </button>
+                </div>
+                </div>
+              ) : null}
+            </div>
+          ) : undefined}
+          onThumbnailClick={(photo, index) => {
+            if (inGroupReview) setGroupReviewIndex(index);
+            else {
+              const group = photo.similarityGroupId ? groupsById.get(photo.similarityGroupId) : undefined;
+              const count = group ? (membersByGroup.get(group.id)?.length ?? group.photoCount) : 0;
+              if (group && count > 1) handleEnterGroupReview(photo);
+              else setLightboxIndex(index);
+            }
+          }}
+          getThumbnailAriaLabel={(photo, index, isActive) => {
+            const group = !inGroupReview && photo.similarityGroupId ? groupsById.get(photo.similarityGroupId) : undefined;
+            const count = group ? (membersByGroup.get(group.id)?.length ?? group.photoCount) : 0;
+            return group && count > 1
+              ? `${photo.originalFilename ?? `${index + 1}번째 사진`} 유사컷 ${count}장 보기`
+              : `${index + 1}번째 사진${isActive ? " (현재)" : ""}`;
+          }}
+          renderThumbnailOverlay={(photo) => {
+            const group = !inGroupReview && photo.similarityGroupId ? groupsById.get(photo.similarityGroupId) : undefined;
+            const count = group ? (membersByGroup.get(group.id)?.length ?? group.photoCount) : 0;
+            const representative = inGroupReview && groupReviewGroup?.representativePhotoId === photo.id;
+            const entryCover = project.coverPhotoId === photo.id;
+            return <>
+              {group && count > 1 ? <span className="absolute bottom-[5px] right-[5px] z-[2] inline-flex h-5 min-w-[25px] items-center justify-center rounded-full border border-white/45 bg-[#111315]/80 px-1.5 text-[10px] font-bold text-white">+{(count - 1).toLocaleString()}</span> : null}
+              {representative ? <span className="absolute bottom-0.5 left-0.5 z-[2] rounded-[3px] bg-accent px-1 py-px text-[8px] font-bold text-accent-foreground">대표</span> : null}
+              {entryCover ? <span className="absolute left-0.5 top-0.5 z-[2] rounded-[3px] bg-white/90 px-1 py-px text-[8px] font-bold text-[#191918]">진입 대표</span> : null}
+            </>;
+          }}
+        />
+      ) : null}
+
+      {/* ── 업로드 완료 → AI 분석 제안 ──
+        * 버튼 하나를 눈에 띄게 만드는 대신 **AI가 무엇을 해주는지 목록으로 가르치는** 자리다.
+        * 유사컷 버튼은 툴바에서 정렬 드롭다운·뷰 전환기와 폭·높이·테두리·배경이 전부 같아
+        * 중립 크롬으로 읽혔고, 품질 확인은 관리자 패널 밖으로 나온 적이 없어 존재 자체가 숨어 있었다.
+        * 모달을 닫아도 툴바 버튼은 상시 진입점으로 남는다. */}
+      <PhotographerModal
+        open={aiPromptOpen}
+        onClose={handleDismissAiPrompt}
+        maxWidth={412}
+        variant="confirmation"
+        title="AI가 정리를 도와드릴까요?"
+        description={aiPromptSource === "upload"
+          ? `원본 ${displayPhotos.length.toLocaleString()}장 업로드가 완료되었습니다.`
+          : `이 프로젝트의 원본 ${displayPhotos.length.toLocaleString()}장을 분석합니다.`}
+        footer={(
+          <div className="flex gap-2">
+            <PhotographerLightButton
+              type="button"
+              variant="secondary"
+              onClick={handleSkipAiPrompt}
+              size="confirmation"
+              className="flex-1"
+            >
+              건너뛰기
+            </PhotographerLightButton>
+            <PhotographerLightButton
+              type="button"
+              variant="primary"
+              /* 둘 다 끄면 시작할 게 없다 — 빈 요청을 보내는 대신 버튼을 잠근다 */
+              disabled={!aiWantSimilar && !aiWantQuality}
+              onClick={() => { void handleStartAiFromPrompt(); }}
+              size="confirmation"
+              className="flex-1"
+            >
+              분석 시작
+            </PhotographerLightButton>
+          </div>
+        )}
+      >
+        <div className="flex flex-col gap-2">
+          {([
+            {
+              checked: aiWantSimilar,
+              set: setAiWantSimilar,
+              label: "유사컷 묶기",
+              desc: "연속 촬영된 비슷한 사진을 자동으로 묶습니다",
+              /* 툴바 버튼으로도 열 수 있게 되면서 "이미 한 걸 또 하는 건가?"를 답해줘야 한다.
+               * 분석은 캐시가 있어 이미 끝난 사진은 다시 부르지 않으므로, 남은 장수를 그대로 알린다. */
+              state: clipAnalysisStatus === "completed" && (clipPending?.pending ?? 0) === 0
+                ? "이미 분석 완료"
+                : (clipPending?.pending ?? 0) > 0 && (clipPending?.alreadyAnalyzed ?? 0) > 0
+                  ? `새 사진 ${clipPending?.pending.toLocaleString()}장 분석`
+                  : null,
+            },
+            {
+              checked: aiWantQuality,
+              set: setAiWantQuality,
+              label: "눈감음·흐림 확인",
+              desc: "골라내기 전에 확인할 사진을 미리 표시합니다",
+              state: qualityAnalysisStatus === "completed" ? "이미 확인 완료" : null,
+            },
+          ] as const).map((item) => (
+            <label
+              key={item.label}
+              className="flex cursor-pointer items-start gap-3 rounded-xl bg-surface-raised p-4"
+            >
+              <input
+                type="checkbox"
+                checked={item.checked}
+                onChange={(e) => item.set(e.target.checked)}
+                className="mt-[2px] h-4 w-4 flex-none accent-[var(--accent)]"
+              />
+              <span className="min-w-0">
+                <span className="flex items-center gap-2 text-[14px] font-semibold leading-[22px] tracking-[-0.35px] text-foreground">
+                  {item.label}
+                  {item.state && (
+                    <span className="rounded px-1.5 py-px text-[11px] font-medium leading-[16px] tracking-[-0.2px] text-subtle-foreground ring-1 ring-inset ring-border">
+                      {item.state}
+                    </span>
+                  )}
+                </span>
+                <span className="block text-[13px] font-normal leading-[20px] tracking-[-0.3px] text-muted-foreground">
+                  {item.desc}
+                </span>
+              </span>
+            </label>
+          ))}
+          <p className="m-0 px-1 text-[12px] leading-[18px] tracking-[-0.25px] text-subtle-foreground">
+            분석은 백그라운드에서 진행되며 언제든 중단할 수 있어요.
+          </p>
+        </div>
+      </PhotographerModal>
+
+      {/* ── 사진 삭제 확인 — Figma #55798 공용 confirmation pattern ── */}
+      <PhotographerConfirmDialog
+        open={deleteConfirmTarget !== null}
+        onClose={() => { if (!deletingId) setDeleteConfirmTarget(null); }}
+        onConfirm={handleConfirmPhotoDelete}
+        title={deleteConfirmTarget?.kind === "selected"
+          ? `원본 ${deleteConfirmTarget.count.toLocaleString()}장을 삭제할까요?`
+          : `“${deleteConfirmTarget?.filename ?? "선택한 사진"}”을 삭제할까요?`}
+        description={deleteConfirmTarget?.kind === "selected"
+          ? "삭제한 원본은 복구할 수 없어요."
+          : "삭제한 원본은 복구할 수 없으며, 필요한 사진은 다시 업로드해야 해요."}
+        confirmLabel={deleteConfirmTarget?.kind === "selected" ? "원본 삭제" : "삭제하기"}
+        pendingLabel="삭제 중…"
+        pending={deletingId !== null}
+        tone="danger"
+      />
+
+      <PhotographerConfirmDialog
+        open={showFlushAllConfirm}
+        onClose={() => { if (deletingId !== "__all__") setShowFlushAllConfirm(false); }}
+        onConfirm={handleFlushAll}
+        title={`원본 ${displayPhotos.length.toLocaleString()}장을 삭제할까요?`}
+        description={(
+          <>
+            <span className="block">삭제한 원본은 복구할 수 없으며,</span>
+            <span className="block">필요한 사진은 다시 업로드해야 해요</span>
+          </>
+        )}
+        confirmLabel="삭제하기"
+        pendingLabel="삭제 중…"
+        pending={deletingId === "__all__"}
+        tone="danger"
+      />
+
       {/* toast */}
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "var(--surface-raised)", border: `1px solid ${BORDER_MID}`, padding: "10px 20px", zIndex: 200, fontFamily: MONO, fontSize: 11, color: TEXT_BRIGHT, pointerEvents: "none", whiteSpace: "nowrap" }}>
+        <div style={{ position: "fixed", bottom: isMobile ? "calc(88px + env(safe-area-inset-bottom, 0px))" : 24, left: "50%", transform: "translateX(-50%)", background: "var(--surface-raised)", border: `1px solid ${BORDER_MID}`, padding: "10px 20px", zIndex: 200, fontSize: 13, color: TEXT_BRIGHT, pointerEvents: "none", whiteSpace: "nowrap" }}>
           {toast}
         </div>
       )}
 
-      {/* ── selecting 안내 모달 ── */}
-      {showSelectingWarn && (
-        <div
-          className="prj-modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) handleSelectingWarnCancel();
-          }}
-        >
-          <div className="prj-modal-box" style={{ maxWidth: 420 }}>
-            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 6, height: 6, background: ACCENT }} />
-              <span className="prj-tech-label" style={{ color: ACCENT }}>안내</span>
-            </div>
-            <div style={{ padding: 24 }}>
-              <p style={{ fontSize: 15, fontWeight: 700, color: TEXT_BRIGHT, marginBottom: 10 }}>
-                원본 사진을 추가할까요?
-              </p>
-              <p style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, lineHeight: 1.7, marginBottom: 18 }}>
-                고객이 사진을 고르고 있는 단계예요. 추가된 사진은 즉시 갤러리에 반영되며 고객 화면에도 곧바로 보입니다.
-              </p>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={handleSelectingWarnCancel}
-                  className="prj-btn-secondary"
-                  style={{ flex: 1, padding: "10px 0" }}
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSelectingWarnConfirm}
-                  className="prj-btn-primary"
-                  style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-                >
-                  <ImagePlus size={12} />
-                  추가하기
-                </button>
-              </div>
-            </div>
+      {/* ── selecting 안내 모달 — 공용 PhotographerModal 재사용 ── */}
+      <PhotographerModal
+        open={showSelectingWarn}
+        onClose={handleSelectingWarnCancel}
+        title="원본 사진을 추가할까요?"
+        description="고객이 현재 사진을 고르고 있습니다."
+        maxWidth={420}
+        footer={
+          <div style={{ display: "flex", gap: 8 }}>
+            <PhotographerLightButton type="button" variant="secondary" onClick={handleSelectingWarnCancel} className="flex-1">
+              취소
+            </PhotographerLightButton>
+            <PhotographerLightButton type="button" variant="primary" onClick={handleSelectingWarnConfirm} className="flex-1">
+              <ImagePlus size={12} />
+              추가하기
+            </PhotographerLightButton>
           </div>
+        }
+      >
+        <div className="rounded-xl bg-surface-raised p-4 text-[13px] leading-5 text-muted-foreground">
+          추가한 사진은 업로드가 끝나는 즉시 고객 갤러리에 표시됩니다.
         </div>
-      )}
+      </PhotographerModal>
 
-      {/* ── 업로드 확인 모달 ── */}
+      {/* ── 업로드 확인 모달 — 공용 PhotographerModal 재사용 ── */}
       {pendingFiles.length > 0 && (() => {
         const heicCount = pendingFiles.filter(isHeicFile).length;
         const isMob = isMobileUploadClient();
         const inclOrig = project.includeOriginal;
-        const estMin = estimateUploadMinutes(pendingFiles.length, inclOrig, isMob);
+        const selectedBytes = pendingFiles.reduce((sum, file) => sum + file.size, 0);
         const closeModal = () => setPendingFiles([]);
         return (
-          <div className="prj-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
-            <div className="prj-modal-box" style={{ maxWidth: 400 }}>
-              <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 6, height: 6, background: ACCENT }} />
-                <span className="prj-tech-label" style={{ color: ACCENT }}>업로드 확인</span>
+          <PhotographerModal
+            open
+            onClose={closeModal}
+            title={`원본 ${pendingFiles.length.toLocaleString()}장을 업로드할까요?`}
+            description={!isMob
+              ? `총 ${formatUploadBytes(selectedBytes)} · 전송을 시작하면 남은 시간을 안내합니다.`
+              : "선택한 원본의 업로드 설정을 확인해 주세요."}
+            maxWidth={440}
+            footer={
+              <div style={{ display: "flex", gap: 8 }}>
+                <PhotographerLightButton type="button" variant="secondary" onClick={closeModal} className="flex-1">
+                  취소
+                </PhotographerLightButton>
+                <PhotographerLightButton
+                  type="button"
+                  variant="primary"
+                  onClick={() => {
+                    const f = pendingFiles;
+                    setPendingFiles([]);
+                    startUpload(f);
+                  }}
+                  disabled={uploadPhase !== "idle"}
+                  className="flex-1"
+                >
+                  <Upload size={12} />
+                  업로드 시작
+                </PhotographerLightButton>
               </div>
-              <div style={{ padding: 24 }}>
-                <p style={{ fontSize: 15, fontWeight: 600, color: TEXT_BRIGHT, marginBottom: 4 }}>
-                  {pendingFiles.length.toLocaleString()}장을 업로드합니다
-                </p>
-                {!isMob && (
-                  <p style={{ fontFamily: MONO, fontSize: 11, color: TEXT_MUTED, marginBottom: 16 }}>
-                    약 {estMin}분 예상 · 네트워크 환경에 따라 다를 수 있습니다
+            }
+          >
+            <div className="flex flex-col gap-4">
+              {/* 프로젝트에서 정한 납품 설정은 변경 컨트롤이 아니라 확인용 정보 행으로 표시한다. */}
+              <div className="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-border-subtle bg-surface px-4 py-3">
+                <span className="text-[12px] font-medium text-muted-foreground">업로드 설정</span>
+                <span className="text-[13px] font-semibold text-foreground">
+                  {inclOrig ? "납품용 원본 포함" : "썸네일만 업로드"}
+                </span>
+              </div>
+
+              {/* Warning만 semantic color를 사용한다. */}
+              {heicCount > 0 && inclOrig ? (
+                <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning" />
+                  <p className="text-[12px] leading-[18px] text-muted-foreground">
+                    HEIC 파일 {heicCount}개는 원본을 포함할 수 없어 썸네일만 업로드됩니다.
                   </p>
-                )}
-
-                {/* 프로젝트 납품 설정 표시 */}
-                {(!isMob || inclOrig) && (
-                  <div style={{
-                    display: "inline-flex", alignItems: "center", gap: 6,
-                    padding: "6px 10px", marginBottom: heicCount > 0 && inclOrig ? 10 : 20,
-                    border: `1px solid ${inclOrig ? "rgba(var(--accent-rgb),0.35)" : BORDER}`,
-                    background: inclOrig ? ACCENT_DIM : SURFACE_1,
-                  }}>
-                    <span style={{ fontFamily: MONO, fontSize: 10, color: inclOrig ? ACCENT : TEXT_MUTED }}>
-                      {inclOrig ? "납품용 원본 포함" : "썸네일만"}
-                    </span>
-                    {!isMob && <span style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED }}>— 프로젝트 설정</span>}
-                  </div>
-                )}
-
-                {/* HEIC 경고 */}
-                {heicCount > 0 && inclOrig && (
-                  <div style={{
-                    display: "flex", gap: 8, alignItems: "flex-start",
-                    padding: "10px 12px", background: "rgba(255,180,0,0.08)",
-                    border: "1px solid rgba(255,180,0,0.3)", marginBottom: 20,
-                  }}>
-                    <AlertTriangle size={13} color="#FFB800" style={{ flexShrink: 0, marginTop: 1 }} />
-                    <p style={{ fontFamily: MONO, fontSize: 10, color: TEXT_NORMAL, lineHeight: 1.6 }}>
-                      HEIC 파일 {heicCount}개는 원본 포함 불가 — 해당 파일은 썸네일만 업로드됩니다
-                    </p>
-                  </div>
-                )}
-
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="prj-btn-secondary"
-                    style={{ flex: 1, padding: "10px 0" }}
-                  >
-                    취소
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const f = pendingFiles;
-                      setPendingFiles([]);
-                      startUpload(f);
-                    }}
-                    disabled={uploadPhase !== "idle"}
-                    className="prj-btn-primary"
-                    style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, opacity: uploadPhase !== "idle" ? 0.55 : 1 }}
-                  >
-                    <Upload size={12} />
-                    업로드 시작
-                  </button>
                 </div>
-              </div>
+              ) : null}
             </div>
-          </div>
+          </PhotographerModal>
         );
       })()}
 
-      {/* ── PIN MODAL ── */}
-      {showPinModal && (
-        <div className="prj-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setShowPinModal(false); setPinInput(""); setPinError(""); } }}>
-          <div className="prj-modal-box" style={{ maxWidth: 380 }}>
-            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 6, height: 6, background: ACCENT }} /><span className="prj-tech-label" style={{ color: ACCENT }}>{project.accessPin ? "PIN 변경" : "PIN 설정"}</span></div>
-              <button type="button" onClick={() => { setShowPinModal(false); setPinInput(""); setPinError(""); }} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 4 }}><X size={14} /></button>
-            </div>
-            <div style={{ padding: 24 }}>
-              <span style={{ ...labelStyle }}>접속 코드 (4자리)</span>
-              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                <input type="text" inputMode="numeric" maxLength={4} value={pinInput} onChange={(e) => setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="0000" style={{ flex: 1, padding: "10px 14px", background: SURFACE_2, border: `1px solid ${BORDER_MID}`, color: TEXT_BRIGHT, fontSize: 22, fontFamily: MONO, outline: "none", letterSpacing: 12, fontWeight: 700 }} onFocus={(e) => { e.currentTarget.style.borderColor = ACCENT; }} onBlur={(e) => { e.currentTarget.style.borderColor = BORDER_MID; }} />
-                <button type="button" onClick={() => setPinInput(Math.floor(1000 + Math.random() * 9000).toString())} className="prj-btn-secondary" style={{ padding: "10px 12px", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}><RefreshCw size={11} />랜덤</button>
-              </div>
-              <p style={{ fontFamily: MONO, fontSize: 9, color: TEXT_MUTED, marginBottom: 16 }}>4자리 숫자를 입력하거나 랜덤 생성 버튼을 누르세요</p>
-              {pinError && <div style={{ padding: "6px 10px", background: "rgba(255,51,51,0.08)", border: "1px solid rgba(255,51,51,0.2)", marginBottom: 12 }}><span style={{ fontFamily: MONO, fontSize: 10, color: "#FF3333" }}>[ERR] {pinError}</span></div>}
-              <div style={{ display: "flex", gap: 8 }}>
-                {project.accessPin && <button type="button" onClick={() => handleSavePin(null)} disabled={pinSaving} className="prj-btn-danger" style={{ padding: "10px 14px" }}>PIN 삭제</button>}
-                <button type="button" onClick={() => { setShowPinModal(false); setPinInput(""); setPinError(""); }} disabled={pinSaving} className="prj-btn-secondary" style={{ flex: 1, padding: "10px 0" }}>취소</button>
-                <button type="button" onClick={() => handleSavePin(pinInput || null)} disabled={pinSaving || (!!pinInput && pinInput.length !== 4)} className="prj-btn-primary" style={{ flex: 1, padding: "10px 0", opacity: (pinSaving || (!!pinInput && pinInput.length !== 4)) ? 0.4 : 1 }}>{pinSaving ? "저장 중..." : "저장"}</button>
-              </div>
-            </div>
+      {/* ── PIN MODAL — 공용 PhotographerModal 재사용 ── */}
+      <PhotographerModal
+        open={showPinModal}
+        onClose={() => { setShowPinModal(false); setPinInput(""); setPinError(""); }}
+        title={project.accessPin ? "PIN 변경" : "PIN 설정"}
+        description="고객이 갤러리에 접속할 때 사용할 숫자 4자리를 설정합니다."
+        closeDisabled={pinSaving}
+        maxWidth={380}
+        footer={
+          <div style={{ display: "flex", gap: 8 }}>
+            {project.accessPin && (
+              <PhotographerLightButton type="button" variant="danger" onClick={() => handleSavePin(null)} disabled={pinSaving}>
+                PIN 삭제
+              </PhotographerLightButton>
+            )}
+            <PhotographerLightButton
+              type="button"
+              variant="secondary"
+              onClick={() => { setShowPinModal(false); setPinInput(""); setPinError(""); }}
+              disabled={pinSaving}
+              className="flex-1"
+            >
+              취소
+            </PhotographerLightButton>
+            <PhotographerLightButton
+              type="button"
+              variant="primary"
+              onClick={() => handleSavePin(pinInput || null)}
+              disabled={pinSaving || (!!pinInput && pinInput.length !== 4)}
+              className="flex-1"
+            >
+              {pinSaving ? "저장 중..." : "저장"}
+            </PhotographerLightButton>
           </div>
+        }
+      >
+        <label htmlFor="project-access-pin" className="mb-2 block text-[13px] font-semibold text-foreground">접속 PIN</label>
+        <div className="flex gap-2">
+          <input id="project-access-pin" aria-invalid={Boolean(pinError)} type="text" inputMode="numeric" maxLength={4} value={pinInput} onChange={(e) => setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="0000" className="min-w-0 flex-1 rounded-lg border border-border-subtle bg-surface px-4 py-3 text-center text-[20px] font-bold tracking-[0.35em] text-foreground outline-none transition-colors placeholder:text-placeholder-foreground focus:border-accent focus:ring-2 focus:ring-accent/10" />
+          <PhotographerLightButton type="button" variant="secondary" onClick={() => setPinInput(Math.floor(1000 + Math.random() * 9000).toString())}>
+            <RefreshCw size={11} />랜덤
+          </PhotographerLightButton>
         </div>
-      )}
+        <p className="mt-2 text-[12px] leading-[18px] text-muted-foreground">직접 입력하거나 랜덤 PIN을 만들 수 있습니다.</p>
+        {pinError ? <p role="alert" className="mt-3 rounded-lg border border-danger/25 bg-danger/8 px-3 py-2 text-[12px] text-danger">{pinError}</p> : null}
+      </PhotographerModal>
 
       <CustomerInviteShareModal
         open={inviteShareModalOpen}
@@ -3776,25 +4486,55 @@ export default function ProjectDetailPage() {
         description="카카오톡, 이메일 등으로 아래 링크를 보내주세요. 고객이 사진 셀렉을 시작할 수 있습니다."
       />
 
-      {/* ── EDIT GUIDE MODAL ── */}
-      {showEditGuideModal && (
-        <div className="prj-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowEditGuideModal(false); }}>
-          <div className="prj-modal-box" style={{ maxWidth: 420 }}>
-            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 6, height: 6, background: "#2ed573" }} />
-              <span className="prj-tech-label" style={{ color: "#2ed573" }}>안내</span>
-            </div>
-            <div style={{ padding: 24 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}><CheckCircle2 size={18} color="#2ed573" /><span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 15, color: TEXT_BRIGHT }}>보정을 시작하지 않았습니다</span></div>
-              <p style={{ fontSize: 13, color: TEXT_NORMAL, lineHeight: 1.7, marginBottom: 24 }}>보정본을 업로드하려면 먼저 셀렉 결과를 확인하고<strong style={{ color: TEXT_BRIGHT }}> [보정 시작하기]</strong>를 눌러주세요.</p>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button type="button" onClick={() => setShowEditGuideModal(false)} className="prj-btn-secondary" style={{ flex: 1, padding: "10px 0" }}>닫기</button>
-                <button type="button" onClick={() => { setShowEditGuideModal(false); router.push(`/photographer/projects/${id}/results`); }} className="prj-btn-primary" style={{ flex: 1, padding: "10px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>셀렉 결과 보기<ChevronRight size={12} /></button>
-              </div>
-            </div>
+      <CustomerSelectionRequestModal
+        key={selectionRequestModalOpen ? "selection-request-open" : "selection-request-closed"}
+        open={selectionRequestModalOpen}
+        onClose={() => setSelectionRequestModalOpen(false)}
+        customerName={project.customerName}
+        customerPhone={project.customerPhone}
+        photoCount={M}
+        requiredCount={project.requiredCount}
+        includeOriginal={project.includeOriginal}
+        initialDeadline={project.deadline?.slice(0, 10) ?? ""}
+        inviteUrl={inviteUrl}
+        accessPin={project.accessPin}
+        pending={inviteActivating}
+        onRequest={handleEnableClientAccess}
+      />
+
+      {/* ── EDIT GUIDE MODAL — 공용 PhotographerModal 재사용 ── */}
+      <PhotographerModal
+        open={showEditGuideModal}
+        onClose={() => setShowEditGuideModal(false)}
+        title="보정 작업을 먼저 시작해 주세요"
+        description="셀렉 결과를 확인하면 보정본 업로드를 시작할 수 있습니다."
+        maxWidth={420}
+        footer={
+          <div style={{ display: "flex", gap: 8 }}>
+            <PhotographerLightButton type="button" variant="secondary" onClick={() => setShowEditGuideModal(false)} className="flex-1">
+              닫기
+            </PhotographerLightButton>
+            <PhotographerLightButton
+              type="button"
+              variant="primary"
+              onClick={() => { setShowEditGuideModal(false); router.push(`/photographer/projects/${id}/results`); }}
+              className="flex-1"
+            >
+              셀렉 결과 보기<ChevronRight size={12} />
+            </PhotographerLightButton>
+          </div>
+        }
+      >
+        <div className="flex items-start gap-3 rounded-xl bg-surface-raised p-4">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-success/10 text-success" aria-hidden>
+            <CheckCircle2 size={18} />
+          </span>
+          <div>
+            <p className="text-[14px] font-semibold text-foreground">셀렉 결과 확인이 필요합니다</p>
+            <p className="mt-1 break-keep text-[13px] leading-5 text-muted-foreground">선택 사진과 고객 요청을 확인한 뒤 ‘보정 시작하기’를 눌러주세요.</p>
           </div>
         </div>
-      )}
+      </PhotographerModal>
     </div>
   );
 }

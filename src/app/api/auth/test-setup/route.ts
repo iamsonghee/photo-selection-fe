@@ -22,7 +22,12 @@ type Action =
   | "set_project_status"
   | "reset_beta_survey"
   | "backdate_survey_later"
-  | "insert_project_log";
+  | "insert_project_log"
+  // AI 유사컷 그룹 리뷰 모드 E2E용 — clip-service 분석을 실제로 돌리지 않고 photo_groups
+  // 행 + photos.similarity_group_id를 직접 세팅해 "이미 그룹이 있는 상태"만 재현한다.
+  | "seed_photo_group"
+  | "seed_selections"
+  | "seed_photo_version";
 
 /** 테스트 전용 데이터 세팅 — ENABLE_TEST_LOGIN=true 일 때만 동작 (production에서는 항상 비활성) */
 export async function POST(req: Request) {
@@ -38,6 +43,7 @@ export async function POST(req: Request) {
     status?: ProjectStatus;
     surveyType?: SurveyType;
     logAction?: string;
+    photoIds?: string[];
   };
   const { action } = body;
 
@@ -73,7 +79,13 @@ export async function POST(req: Request) {
       original_filename: `E2E_TEST_${String(i + 1).padStart(3, "0")}.jpg`,
       file_size: 12345,
     }));
-    await admin.from("photos").insert(photos);
+    const { data: insertedPhotos, error: photosError } = await admin
+      .from("photos")
+      .insert(photos)
+      .select("id");
+    if (photosError) {
+      return NextResponse.json({ error: photosError.message }, { status: 500 });
+    }
 
     // 3. photo_count 업데이트 + 상태 선택 단계로 전환
     await admin.from("projects").update({
@@ -84,9 +96,11 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       projectId: project.id,
+      projectName: project.name,
       accessToken: project.access_token,
       photoCount,
       requiredCount,
+      photoIds: (insertedPhotos ?? []).map((photo) => photo.id),
     });
   }
 
@@ -179,6 +193,86 @@ export async function POST(req: Request) {
       .eq("photographer_id", photographer.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
+  }
+
+  // ── AI 유사컷 그룹 시딩(테스트 전용) — photo_groups 행 + photos.similarity_group_id 세팅 ──
+  if (action === "seed_photo_group") {
+    if (!body.projectId || !body.photoIds || body.photoIds.length < 2) {
+      return NextResponse.json({ error: "projectId, photoIds(>=2) required" }, { status: 400 });
+    }
+    const { data: group, error: groupError } = await admin
+      .from("photo_groups")
+      .insert({
+        project_id: body.projectId,
+        representative_photo_id: body.photoIds[0],
+        photo_count: body.photoIds.length,
+      })
+      .select("id")
+      .single();
+    if (groupError || !group) {
+      return NextResponse.json({ error: groupError?.message ?? "insert failed" }, { status: 500 });
+    }
+    const { error: photosError } = await admin
+      .from("photos")
+      .update({ similarity_group_id: group.id })
+      .in("id", body.photoIds);
+    if (photosError) return NextResponse.json({ error: photosError.message }, { status: 500 });
+    return NextResponse.json({ ok: true, groupId: group.id });
+  }
+
+  if (action === "seed_selections") {
+    const photoIds = body.photoIds ?? [];
+    if (!body.projectId || photoIds.length === 0) {
+      return NextResponse.json({ error: "projectId and photoIds are required" }, { status: 400 });
+    }
+    await admin.from("selections").delete().eq("project_id", body.projectId);
+    const { error } = await admin.from("selections").insert(photoIds.map((photoId) => ({
+      project_id: body.projectId,
+      photo_id: photoId,
+      is_selected: true,
+    })));
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === "seed_photo_version") {
+    const photoId = body.photoIds?.[0];
+    if (!body.projectId || !photoId) {
+      return NextResponse.json({ error: "projectId and photoIds[0] are required" }, { status: 400 });
+    }
+    const { data: ownedProject } = await admin
+      .from("projects")
+      .select("id")
+      .eq("id", body.projectId)
+      .eq("photographer_id", photographer.id)
+      .maybeSingle();
+    if (!ownedProject) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+    const { data: photo } = await admin
+      .from("photos")
+      .select("id")
+      .eq("id", photoId)
+      .eq("project_id", body.projectId)
+      .maybeSingle();
+    if (!photo) {
+      return NextResponse.json({ error: "Photo not found" }, { status: 404 });
+    }
+    const { data: version, error } = await admin
+      .from("photo_versions")
+      .insert({
+        photo_id: photoId,
+        version: 1,
+        r2_url: `e2e/versions/${body.projectId}/${photoId}/v1.jpg`,
+        r2_thumb_url: "/customer/entry/hero-fallback.svg",
+        filename: "E2E_RETOUCHED_001.jpg",
+      })
+      .select("id")
+      .single();
+    if (error || !version) {
+      return NextResponse.json({ error: error?.message ?? "insert failed" }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, versionId: version.id });
   }
 
   // ── beta_survey_responses 행 삭제(테스트 케이스 간 초기화) ───────────────
@@ -274,7 +368,7 @@ async function _createProject(
       photo_count: 0,
       status,
     })
-    .select("id, access_token")
+    .select("id, name, access_token")
     .single();
 
   if (error || !project) throw new Error(error?.message ?? "Project creation failed");

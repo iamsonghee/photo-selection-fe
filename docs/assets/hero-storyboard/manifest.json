@@ -1,0 +1,29 @@
+{
+  "scenes": [
+    [
+      "01-gallery",
+      1200,
+      641,
+      0
+    ],
+    [
+      "02-comment-writing",
+      640,
+      800,
+      5.95
+    ],
+    [
+      "03-comment-saved",
+      640,
+      800,
+      6.5
+    ],
+    [
+      "04-photographer",
+      1200,
+      641,
+      11
+    ]
+  ],
+  "apiRequests": []
+}

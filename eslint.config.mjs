@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone node:test scripts (CommonJS by design, run outside the Next.js bundle).
+    "tests/unit/**/*.cjs",
   ]),
 ]);
 

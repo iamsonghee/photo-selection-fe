@@ -1,15 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, LogOut } from "lucide-react";
+import { ChevronLeft, ChevronUp, LogOut, Settings } from "lucide-react";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { PHOTOGRAPHER_NAV_ITEMS } from "@/lib/photographer-nav";
 import { FeedbackButton } from "@/components/photographer/FeedbackModal";
 import { useProfile } from "@/contexts/ProfileContext";
 import { getProfileImageUrl } from "@/lib/photographer";
+import { usePhotographerQuota } from "@/lib/use-photographer-quota";
+import { isPhotographerLightRoute } from "@/lib/photographer-sidebar-routes";
 import styles from "@/components/layout/Sidebar.module.css";
+
+/**
+ * quota.tier → 사용자에게 보여줄 짧은 plan 표기. 실제 tier 값(beta/general/admin)만 사용 —
+ * 하드코딩된 "Basic" 등은 쓰지 않는다. Dashboard의 사용량 패널도 이 값을 그대로 재사용한다
+ * (같은 정보에 서로 다른 plan 이름이 생기지 않도록 — src/app/photographer/dashboard/DashboardOverview.tsx 참고).
+ */
+export const TIER_LABEL: Record<string, string> = {
+  admin: "관리자",
+  beta: "베타",
+  general: "무료체험",
+};
 
 const sidebarSans = Inter({
   subsets: ["latin"],
@@ -25,9 +39,9 @@ const sidebarMono = JetBrains_Mono({
   display: "swap",
 });
 
-/** `PhotographerDesktopShell` 의 `md:ml-[240px]` / `md:ml-[72px]` 와 동일 값 유지 */
-export const PHOTOGRAPHER_SIDEBAR_WIDTH_FULL = 240;
-export const PHOTOGRAPHER_SIDEBAR_WIDTH_COLLAPSED = 72;
+/** Figma #56039 NavigationMenu의 펼침/접힘 폭. Desktop shell의 content offset과 함께 관리한다. */
+export const PHOTOGRAPHER_SIDEBAR_WIDTH_FULL = 266;
+export const PHOTOGRAPHER_SIDEBAR_WIDTH_COLLAPSED = 102.5;
 
 export type SidebarToggleProps = {
   onToggle: () => void;
@@ -49,8 +63,37 @@ export function Sidebar({
   sidebarToggle: SidebarToggleProps;
 }) {
   const pathname = usePathname();
+  const isLightRoute = isPhotographerLightRoute(pathname);
   const { profile } = useProfile();
+  const quota = usePhotographerQuota();
   const displayName = profile?.name?.trim() || profile?.email?.split("@")[0] || "작가";
+  const tierLabel = quota ? TIER_LABEL[quota.tier] : null;
+  const usagePct =
+    quota && quota.max ? Math.min(100, Math.round((quota.current / quota.max) * 100)) : 0;
+
+  // Profile Popover — 완전 제어형(open state)으로 전환: 네이티브 <details>의 toggle-only 동작만으로는
+  // Escape로 닫기, Sidebar collapse 시 자동으로 닫기 같은 것이 안 돼서 실제 QA에서 발견된 버그.
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+
+  const profileMenuRef = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setProfileMenuOpen(false);
+    }
+    function onPointerDown(e: PointerEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [profileMenuOpen]);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -109,10 +152,13 @@ export function Sidebar({
     <aside
       className={[
         styles.root,
+        isLightRoute ? styles.rootLight : "",
         collapsed ? styles.rootCollapsed : styles.rootExpanded,
         sidebarSans.variable,
         sidebarMono.variable,
       ].join(" ")}
+      data-photographer-sidebar
+      data-sidebar-theme={isLightRoute ? "light" : "dark"}
       style={{
         fontFamily: "var(--acb-sidebar-sans), system-ui, sans-serif",
       }}
@@ -121,11 +167,15 @@ export function Sidebar({
         <button
           type="button"
           className={styles.toggleBtn}
-          onClick={sidebarToggle.onToggle}
+          onClick={() => {
+            setProfileMenuOpen(false);
+            sidebarToggle.onToggle();
+          }}
           aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
           title={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
         >
           <span
+            data-sidebar-toggle-visual
             className={[styles.toggleIcon, collapsed ? styles.toggleIconCollapsed : ""].filter(Boolean).join(" ")}
           >
             <ChevronLeft size={16} strokeWidth={2} aria-hidden />
@@ -157,92 +207,138 @@ export function Sidebar({
         </Link>
       </div>
 
-      {/* Profile section — 클릭 시 설정으로 이동 */}
-      <Link
-        href="/photographer/settings"
-        title="설정"
-        aria-label={collapsed ? "설정" : undefined}
-        className={`flex items-center border-b hover:bg-[var(--surface)] transition-colors ${
-          collapsed ? "justify-center px-0 py-4" : "gap-3 px-6 py-4"
-        }`}
-        style={{ borderColor: "var(--acb-border)" }}
-      >
-        <div
-          className="w-10 h-10 rounded-full overflow-hidden border flex-shrink-0 flex items-center justify-center text-sm font-bold text-foreground"
-          style={{ borderColor: "var(--acb-border)", background: "var(--surface)" }}
-        >
-          {profile?.profileImageUrl ? (
-            <img
-              src={getProfileImageUrl(profile.profileImageUrl)}
-              alt=""
-              className="w-full h-full object-cover"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-            />
-          ) : (
-            <span style={{ fontFamily: "var(--acb-sidebar-sans)" }}>
-              {displayName.charAt(0).toUpperCase()}
-            </span>
-          )}
-        </div>
-        {!collapsed && (
-          <div className="overflow-hidden min-w-0">
-            <p
-              className="text-sm font-semibold text-foreground truncate"
-              style={{ fontFamily: "var(--acb-sidebar-sans)" }}
-            >
-              {displayName} 작가님
-            </p>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-              <p
-                className="text-[10px] text-muted-foreground uppercase tracking-wider"
-                style={{ fontFamily: "var(--acb-sidebar-mono)" }}
-              >
-                세션 활성
-              </p>
-            </div>
-          </div>
-        )}
-      </Link>
-
-      <nav className={styles.navContainer}>
-        <div
-          className={[styles.navLabel, collapsed ? styles.navLabelCollapsed : ""].filter(Boolean).join(" ")}
-          style={{ fontFamily: "var(--acb-sidebar-mono), ui-monospace, monospace" }}
-        >
-          MENU
-        </div>
+      <nav className={styles.navContainer} aria-label="주요 메뉴">
         {PHOTOGRAPHER_NAV_ITEMS.map(({ href, label, icon, comingSoon }) =>
           renderNavItem(href, label, icon, comingSoon, label),
         )}
       </nav>
 
-      <div className={styles.sidebarFooter}>
-        <FeedbackButton
-          triggerClassName={[styles.navItem, collapsed ? styles.navItemCollapsed : ""].filter(Boolean).join(" ")}
-          iconClassName={[styles.navIcon, collapsed ? styles.navIconCollapsed : ""].filter(Boolean).join(" ")}
-          textClassName={[styles.navText, collapsed ? styles.navTextCollapsed : ""].filter(Boolean).join(" ")}
-        />
-        <button
-          type="button"
-          className={[
-            styles.navItem,
-            collapsed ? styles.navItemCollapsed : "",
-            styles.navItemLogout,
-          ].join(" ")}
-          onClick={handleLogout}
-          aria-label="로그아웃"
-          title="로그아웃"
+      <div className={styles.sidebarFooter} data-sidebar-footer>
+        {/* 대시보드는 본문에 상세 도표를 제공하므로 중복 사용량을 숨긴다. 다른 화면에서는 작업 중에도
+            한도를 확인할 수 있도록 작은 진행 막대를 유지한다. */}
+        {!collapsed && pathname !== "/photographer/dashboard" && quota && quota.max !== null && (
+          <div className={styles.usageCard}>
+            <div className="flex items-end justify-between">
+              <span
+                className={styles.usageLabel}
+                style={{ color: "var(--acb-text-tertiary)" }}
+              >
+                활성 프로젝트
+              </span>
+              <span className={styles.usageValue}>
+                <span className="font-bold" style={{ color: "var(--acb-text-primary)" }}>{quota.current}</span>
+                <span style={{ color: "var(--acb-text-tertiary)" }}>/{quota.max}</span>
+              </span>
+            </div>
+            <div className={styles.usageTrack} style={{ background: "var(--acb-border)" }}>
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${usagePct}%`,
+                  background: usagePct >= 100 ? "var(--acb-danger)" : usagePct >= 80 ? "var(--acb-accent)" : "var(--acb-text-secondary)",
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Profile — 클릭 시 Popover(설정/문의하기/로그아웃). 네이티브 details/summary — ProjectInformationCard의
+            더보기 메뉴와 동일한 패턴을 재사용(새 dropdown 구현을 만들지 않음), 위쪽으로 열리도록 anchor만 반전. */}
+        <details
+          ref={profileMenuRef}
+          className={styles.profileDetails}
+          open={profileMenuOpen}
+          onToggle={(e) => setProfileMenuOpen((e.target as HTMLDetailsElement).open)}
         >
-          <span className={[styles.navIcon, collapsed ? styles.navIconCollapsed : ""].filter(Boolean).join(" ")} aria-hidden>
-            <LogOut size={20} strokeWidth={2} />
-          </span>
-          <span
-            className={[styles.navText, collapsed ? styles.navTextCollapsed : ""].filter(Boolean).join(" ")}
+          <summary
+            data-sidebar-profile-trigger
+            aria-label={collapsed ? "프로필 메뉴" : undefined}
+            aria-expanded={profileMenuOpen}
+            title="프로필 메뉴"
+            onClick={(e) => {
+              e.preventDefault();
+              setProfileMenuOpen((v) => !v);
+            }}
+            className={[styles.profileTrigger, collapsed ? styles.profileTriggerCollapsed : ""].filter(Boolean).join(" ")}
           >
-            로그아웃
-          </span>
-        </button>
+            <div
+              className={styles.profileAvatar}
+              style={{ borderColor: "var(--acb-border)", background: "var(--surface)" }}
+            >
+              {profile?.profileImageUrl ? (
+                <img
+                  src={getProfileImageUrl(profile.profileImageUrl)}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
+              ) : (
+                <span style={{ fontFamily: "var(--acb-sidebar-sans)" }}>
+                  {displayName.charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
+            {!collapsed && (
+              <div className="overflow-hidden min-w-0">
+                <p
+                  className="truncate text-[15px] font-semibold leading-5 tracking-[-0.35px] text-foreground"
+                  style={{ fontFamily: "var(--acb-sidebar-sans)" }}
+                >
+                  {displayName} 작가님
+                </p>
+                {tierLabel && (
+                  <p
+                    className="mt-0.5 text-[12px] leading-[18px] tracking-[-0.25px] text-muted-foreground"
+                    style={{ fontFamily: "inherit" }}
+                  >
+                    {tierLabel}
+                  </p>
+                )}
+              </div>
+            )}
+            {!collapsed ? (
+              <ChevronUp
+                size={16}
+                strokeWidth={1.8}
+                aria-hidden
+                className={[styles.profileChevron, profileMenuOpen ? styles.profileChevronOpen : ""].filter(Boolean).join(" ")}
+              />
+            ) : null}
+          </summary>
+
+          <div
+            role="menu"
+            className={[styles.profileMenu, collapsed ? styles.profileMenuCollapsed : styles.profileMenuExpanded].join(" ")}
+          >
+            {profile?.email && (
+              <div className={styles.profileMenuEmail}>
+                {profile.email}
+              </div>
+            )}
+            <Link
+              href="/photographer/settings"
+              role="menuitem"
+              className={styles.profileMenuItem}
+            >
+              <Settings size={18} strokeWidth={2} /> 설정
+            </Link>
+            <FeedbackButton
+              triggerRole="menuitem"
+              triggerClassName={styles.profileMenuItem}
+              iconClassName={styles.profileMenuIcon}
+              textClassName={styles.profileMenuText}
+            />
+            <div className={styles.profileMenuDivider} />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={handleLogout}
+              className={[styles.profileMenuItem, styles.profileMenuDanger].join(" ")}
+            >
+              <LogOut size={18} strokeWidth={2} /> 로그아웃
+            </button>
+          </div>
+        </details>
       </div>
     </aside>
   );

@@ -73,8 +73,12 @@ test("확정된 셀렉 원본을 고른 폴더에 원본 파일명으로 스트�
     route.fulfill({ status: 200, contentType: "image/jpeg", body: "original-image-bytes" }),
   );
 
-  await page.goto(`/photographer/projects/${project.projectId}/workflow`);
+  await page.goto(`/photographer/projects/${project.projectId}/assets/retouched`);
   await page.waitForLoadState("networkidle");
+  const initialUploadDialog = page.getByRole("dialog", { name: "보정본 업로드" });
+  if (await initialUploadDialog.isVisible().catch(() => false)) {
+    await initialUploadDialog.getByRole("button", { name: "닫기" }).click();
+  }
   await page.getByRole("button", { name: "내보내기" }).click();
 
   const downloadButton = page.getByRole("button", { name: /셀렉 원본 다운로드/ });
@@ -118,8 +122,12 @@ test("원본 미포함 프로젝트는 1200px JPEG 프리뷰로 명확히 구분
     route.fulfill({ status: 200, contentType: "image/jpeg", body: "preview-image-bytes" }),
   );
 
-  await page.goto(`/photographer/projects/${previewProject.projectId}/workflow`);
+  await page.goto(`/photographer/projects/${previewProject.projectId}/assets/retouched`);
   await page.waitForLoadState("networkidle");
+  const initialUploadDialog = page.getByRole("dialog", { name: "보정본 업로드" });
+  if (await initialUploadDialog.isVisible().catch(() => false)) {
+    await initialUploadDialog.getByRole("button", { name: "닫기" }).click();
+  }
   await page.getByRole("button", { name: "내보내기" }).click();
 
   const previewButton = page.getByRole("button", { name: /셀렉 프리뷰 다운로드/ });

@@ -23,6 +23,14 @@ export type UploadCompressOptions = {
   skipBelowBytes?: number;
 };
 
+/** 기존 압축 디코딩 단계에서 함께 얻은 원본 픽셀 크기. 별도 디코딩은 하지 않는다. */
+export type UploadSourceMetadata = {
+  width: number | null;
+  height: number | null;
+};
+
+type CompressOutcome = UploadSourceMetadata & { file: File };
+
 function workerSupported(): boolean {
   return typeof Worker !== "undefined" && typeof OffscreenCanvas !== "undefined";
 }
@@ -81,7 +89,7 @@ function compressOnWorker(
   maxEdge: number,
   jpegQuality: number,
   signal?: AbortSignal,
-): Promise<Blob | null> {
+): Promise<{ blob: Blob | null; width: number | null; height: number | null }> {
   return new Promise((resolve, reject) => {
     const id = ++requestIdCounter;
     const cleanup = () => {
@@ -89,10 +97,19 @@ function compressOnWorker(
       worker.removeEventListener("error", onError);
       signal?.removeEventListener("abort", onAbort);
     };
-    const onMessage = (event: MessageEvent<{ id: number; blob: Blob | null }>) => {
+    const onMessage = (event: MessageEvent<{
+      id: number;
+      blob: Blob | null;
+      sourceWidth: number | null;
+      sourceHeight: number | null;
+    }>) => {
       if (event.data.id !== id) return;
       cleanup();
-      resolve(event.data.blob);
+      resolve({
+        blob: event.data.blob,
+        width: event.data.sourceWidth,
+        height: event.data.sourceHeight,
+      });
     };
     const onError = (err: unknown) => {
       cleanup();
@@ -145,7 +162,7 @@ async function decodeToDrawable(file: File): Promise<{ drawable: CanvasImageSour
 }
 
 /** 워커 없이(또는 워커 실패 후) 메인 스레드 canvas로 압축 — 기존 폴백 로직 그대로. */
-async function compressWithCanvasFallback(file: File, maxEdge: number, jpegQuality: number): Promise<File> {
+async function compressWithCanvasFallback(file: File, maxEdge: number, jpegQuality: number): Promise<CompressOutcome> {
   let cleanup: (() => void) | undefined;
   try {
     const { drawable, cleanup: c } = await decodeToDrawable(file);
@@ -153,7 +170,7 @@ async function compressWithCanvasFallback(file: File, maxEdge: number, jpegQuali
 
     const w = drawable instanceof HTMLImageElement ? drawable.naturalWidth : (drawable as ImageBitmap).width;
     const h = drawable instanceof HTMLImageElement ? drawable.naturalHeight : (drawable as ImageBitmap).height;
-    if (w <= 0 || h <= 0) return file;
+    if (w <= 0 || h <= 0) return { file, width: null, height: null };
 
     const scale = Math.min(1, maxEdge / Math.max(w, h));
     const cw = Math.max(1, Math.round(w * scale));
@@ -163,19 +180,23 @@ async function compressWithCanvasFallback(file: File, maxEdge: number, jpegQuali
     canvas.width = cw;
     canvas.height = ch;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return file;
+    if (!ctx) return { file, width: w, height: h };
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(drawable, 0, 0, cw, ch);
 
     const blob: Blob | null = await new Promise((res) => canvas.toBlob((b) => res(b), "image/jpeg", jpegQuality));
-    if (!blob || blob.size === 0) return file;
-    if (blob.size >= file.size * 0.98) return file;
+    if (!blob || blob.size === 0) return { file, width: w, height: h };
+    if (blob.size >= file.size * 0.98) return { file, width: w, height: h };
 
     const base = baseNameFromFilename(file.name) || "photo";
-    return new File([blob], `${base}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
+    return {
+      file: new File([blob], `${base}.jpg`, { type: "image/jpeg", lastModified: Date.now() }),
+      width: w,
+      height: h,
+    };
   } catch {
-    return file;
+    return { file, width: null, height: null };
   } finally {
     cleanup?.();
   }
@@ -190,30 +211,37 @@ async function compressWithWorker(
   file: File,
   options?: UploadCompressOptions,
   signal?: AbortSignal,
-): Promise<File> {
+): Promise<CompressOutcome> {
   const maxEdge = options?.maxEdge ?? DEFAULT_MAX_EDGE;
   const jpegQuality = options?.jpegQuality ?? DEFAULT_JPEG_QUALITY;
   const skipBelowBytes = options?.skipBelowBytes ?? DEFAULT_SKIP_BELOW_BYTES;
 
-  if (file.size <= skipBelowBytes) return file;
+  if (file.size <= skipBelowBytes) return { file, width: null, height: null };
   const mime = (file.type || "").toLowerCase();
-  if (!mime.startsWith("image/")) return file;
+  if (!mime.startsWith("image/")) return { file, width: null, height: null };
 
   if (worker) {
-    let blob: Blob | null = null;
+    let workerResult: { blob: Blob | null; width: number | null; height: number | null } | null = null;
     try {
-      blob = await compressOnWorker(worker, file, maxEdge, jpegQuality, signal);
+      workerResult = await compressOnWorker(worker, file, maxEdge, jpegQuality, signal);
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") throw error;
-      blob = null;
+      workerResult = null;
     }
+    const blob = workerResult?.blob ?? null;
     if (blob && blob.size > 0 && blob.size < file.size * 0.98) {
-      return new File([blob], `${baseNameFromFilename(file.name) || "photo"}.jpg`, {
-        type: "image/jpeg",
-        lastModified: Date.now(),
-      });
+      return {
+        file: new File([blob], `${baseNameFromFilename(file.name) || "photo"}.jpg`, {
+          type: "image/jpeg",
+          lastModified: Date.now(),
+        }),
+        width: workerResult?.width ?? null,
+        height: workerResult?.height ?? null,
+      };
     }
-    if (blob) return file;
+    if (workerResult) {
+      return { file, width: workerResult.width, height: workerResult.height };
+    }
   }
 
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -222,7 +250,8 @@ async function compressWithWorker(
 
 /** 기존 단일 파일 압축 API — 동작·시그니처 완전히 유지(싱글턴 워커 사용). */
 export async function compressImageForUpload(file: File, options?: UploadCompressOptions): Promise<File> {
-  return compressWithWorker(getCompressionWorker(), file, options);
+  const result = await compressWithWorker(getCompressionWorker(), file, options);
+  return result.file;
 }
 
 // ── 워커 풀(compressImagesInParallel 전용) ─────────────────────────────────────
@@ -265,6 +294,7 @@ export async function compressImagesInParallel(
   poolSize: number,
   options?: UploadCompressOptions,
   onFileDone?: () => void,
+  sourceMetadataOut?: UploadSourceMetadata[],
 ): Promise<File[]> {
   if (signal.aborted) throw new DOMException("Aborted", "AbortError");
   if (files.length === 0) return [];
@@ -276,7 +306,9 @@ export async function compressImagesInParallel(
   if (slots.length === 0) {
     for (let i = 0; i < files.length; i++) {
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-      results[i] = await compressWithWorker(null, files[i], options);
+      const outcome = await compressWithWorker(null, files[i], options);
+      results[i] = outcome.file;
+      if (sourceMetadataOut) sourceMetadataOut[i] = { width: outcome.width, height: outcome.height };
       onFileDone?.();
     }
     return results;
@@ -321,7 +353,7 @@ export async function compressImagesInParallel(
       const worker = slot.worker;
       worker?.addEventListener("error", healthListener);
 
-      const finishTask = (result: File, replaceWorker: boolean) => {
+      const finishTask = (outcome: CompressOutcome, replaceWorker: boolean) => {
         worker?.removeEventListener("error", healthListener);
         slot.busy = false;
         if (replaceWorker || workerErrored) {
@@ -333,7 +365,8 @@ export async function compressImagesInParallel(
           slot.worker = tryCreateWorker();
         }
         if (aborted || signal.aborted) return;
-        results[idx] = result;
+        results[idx] = outcome.file;
+        if (sourceMetadataOut) sourceMetadataOut[idx] = { width: outcome.width, height: outcome.height };
         completed++;
         onFileDone?.();
         if (completed === files.length) {
@@ -349,7 +382,7 @@ export async function compressImagesInParallel(
           // abort는 상위 Promise가 이미 종료·워커 교체까지 마쳤다. 여기서 다시 교체하면
           // 새 워커를 덮어써 누수될 수 있으므로 후속 처리를 하지 않는다.
           if (error instanceof DOMException && error.name === "AbortError") return;
-          finishTask(files[idx], true); // 예외적 실패 — 원본 파일로 안전망, 워커 교체
+          finishTask({ file: files[idx], width: null, height: null }, true); // 예외적 실패 — 원본 파일로 안전망, 워커 교체
         });
     }
 

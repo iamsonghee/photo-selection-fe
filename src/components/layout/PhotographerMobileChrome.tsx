@@ -15,6 +15,11 @@ const ACCENT = "var(--accent)";
 export function PhotographerMobileChrome() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
+    setOpen(false);
+  }
 
   const hasFixedBottomAction =
     pathname === "/photographer/projects/new" ||
@@ -31,10 +36,6 @@ export function PhotographerMobileChrome() {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
   }, [open]);
-
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
 
   const handleLogout = async () => {
     const supabase = createClient();

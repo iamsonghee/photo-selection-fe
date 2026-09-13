@@ -45,7 +45,7 @@ async function mockOriginalDownload(page: Page, byteSizes: number[], selectedInd
 async function openFileSelection(page: Page) {
   await page.goto(`/c/${project.accessToken}`);
   await page.getByRole("button", { name: "납품용 원본 다운로드" }).click();
-  await page.getByRole("button", { name: "개별 파일 선택", exact: true }).first().click();
+  await page.getByRole("tab", { name: "사진 골라 받기", exact: true }).click();
 }
 
 async function expectFullyInViewport(page: Page, locator: ReturnType<Page["getByRole"]>) {
@@ -110,6 +110,28 @@ test.afterAll(async ({ browser }) => {
 
 test.describe("고객 원본 개별 다운로드 — 모바일", () => {
   test.use(mobileDevice);
+
+  test("전체 압축파일은 라이트 바텀시트로 열리고 사진 선택 시 전체 화면으로 확장된다", async ({ page }) => {
+    await mockOriginalDownload(page, Array.from({ length: 3 }, () => 3 * MIB));
+    await page.goto(`/c/${project.accessToken}`);
+    await page.getByRole("button", { name: "납품용 원본 다운로드" }).click();
+
+    const dialog = page.getByRole("dialog");
+    const modal = dialog.locator(".original-download-modal");
+    await expect(page.getByRole("heading", { name: "원본 사진 다운로드" })).toBeVisible();
+    await expect(modal).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    const archiveBox = await modal.boundingBox();
+    const viewport = page.viewportSize();
+    expect(archiveBox).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    expect(archiveBox!.height).toBeLessThan(viewport!.height);
+    expect(archiveBox!.y + archiveBox!.height).toBeCloseTo(viewport!.height, 0);
+
+    await page.getByRole("tab", { name: "사진 골라 받기" }).click();
+    const filesBox = await modal.boundingBox();
+    expect(filesBox).not.toBeNull();
+    expect(filesBox!.height).toBeCloseTo(viewport!.height, 0);
+  });
 
   test("10장까지만 선택하고, 해제 후 다른 사진을 선택할 수 있다", async ({ page }) => {
     await mockOriginalDownload(page, Array.from({ length: 12 }, () => 3 * MIB));
@@ -316,8 +338,35 @@ test.describe("고객 원본 개별 다운로드 — PC", () => {
     await page.goto(`/c/${project.accessToken}`);
     await page.getByRole("button", { name: "납품용 원본 다운로드" }).click();
     const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "전체 압축파일 다운로드" }).click();
+    await page.getByRole("button", { name: "전체 원본 다운로드" }).click();
     expect((await downloadPromise).suggestedFilename()).toBe("archive.zip");
+  });
+
+  test("전체 압축파일 준비 중 실제 장수·용량 진행률과 예상 시간을 표시한다", async ({ page }) => {
+    const totalBytes = 100 * MIB;
+    await page.route(/\/api\/c\/original-download\?/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          visible: true, available: true, expired: false, preparing: false, failed: false,
+          fileCount: 100, totalBytes, expiresAt: "2099-12-31T00:00:00.000Z",
+          files: originalFiles(Array.from({ length: 100 }, () => MIB)),
+          archivePreparing: true, archiveFailed: false, archiveBlocked: false,
+          incompleteOriginalCount: 0, archiveFiles: [],
+          archiveProcessedFiles: 50, archiveProcessedBytes: 50 * MIB,
+          archiveUploadedBytes: 0,
+          archiveStartedAt: new Date(Date.now() - 60_000).toISOString(),
+        }),
+      });
+    });
+
+    await page.goto(`/c/${project.accessToken}`);
+    await page.getByRole("button", { name: "납품용 원본 다운로드" }).click();
+    const progress = page.getByRole("progressbar", { name: "전체 원본 압축파일 준비 진행률" });
+    await expect(progress).toHaveAttribute("aria-valuenow", "43");
+    await expect(page.getByText("50 / 100장 처리 · 50.0 MB / 100.0 MB")).toBeVisible();
+    await expect(page.getByText(/약 \d+분 남음/)).toBeVisible();
   });
 
   test("저장 직전에는 실제 navigator 기준으로 모바일 제한을 다시 검증한다", async ({ page }) => {

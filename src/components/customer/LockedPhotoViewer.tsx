@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 import { MobileViewerPinchPhoto } from "@/components/MobileViewerPinchPhoto";
+import { PhotoFocusOverlay } from "@/components/customer/PhotoFocusOverlay";
 import { PrevNextButton } from "@/components/PrevNextButton";
 import { useAdjacentImagePreload } from "@/lib/use-adjacent-image-preload";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
+import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
 import type { Photo } from "@/types";
 
 type Props = {
@@ -14,7 +16,8 @@ type Props = {
   photos: Photo[];
   initialIndex: number;
   sectionLabel: string;
-  selected: boolean;
+  selectedPhotoIds: Set<string>;
+  comments: Record<string, { comment?: string }>;
   onClose: () => void;
 };
 
@@ -24,13 +27,15 @@ function displayName(photo: Photo): string {
   return photo.originalFilename?.split("/").pop() ?? `#${photo.orderIndex}`;
 }
 
-export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, selected, onClose }: Props) {
+export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, selectedPhotoIds, comments, onClose }: Props) {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [zoomed, setZoomed] = useState(false);
   const [presignedPreviews, setPresignedPreviews] = useState<Map<string, PresignedPreview>>(new Map());
   const presignedPreviewCacheRef = useRef<Map<string, PresignedPreview>>(new Map());
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const current = photos[activeIndex] ?? null;
+
+  const [focusOpen, setFocusOpen] = useState(false);
 
   const goPrev = useCallback(() => {
     setActiveIndex((index) => (index - 1 + photos.length) % photos.length);
@@ -87,6 +92,8 @@ export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, s
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (focusOpen) return;
+      if (hasShortcutModifier(event)) return; // 윈도우 Alt+←/→(뒤로/앞으로 가기)와 겹치지 않게
       if (event.key === "Escape") {
         event.preventDefault();
         onClose();
@@ -104,20 +111,22 @@ export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, s
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
       previouslyFocused?.focus();
     };
-  }, [goNext, goPrev, onClose, photos.length]);
+  }, [focusOpen, goNext, goPrev, onClose, photos.length]);
 
   if (!current || typeof document === "undefined") return null;
 
   const filename = displayName(current);
   const hasMultiple = photos.length > 1;
   const currentSrc = presignedPreviews.get(current.id)?.url ?? viewerImageUrl(current);
+  const selected = selectedPhotoIds.has(current.id);
+  const comment = comments[current.id]?.comment?.trim() ?? "";
 
   return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-label={`${sectionLabel} 상세보기`}
-      className="fixed inset-0 z-[300] flex flex-col bg-black/95 text-white backdrop-blur-sm"
+      className="locked-photo-viewer fixed inset-0 z-[300] flex flex-col bg-black text-white"
       onTouchStart={(event) => {
         if (zoomed || event.touches.length !== 1) {
           touchStartRef.current = null;
@@ -137,47 +146,104 @@ export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, s
         else goNext();
       }}
     >
-      <header className="relative z-10 flex min-h-14 items-center justify-between gap-3 border-b border-white/10 bg-black/70 px-4 py-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-semibold">{filename}</span>
-            <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${selected ? "border-accent/45 bg-accent/15 text-accent" : "border-white/15 bg-white/5 text-white/55"}`}>
-              {selected ? "선택됨" : "미선택"}
-            </span>
-          </div>
-          <p className="mt-0.5 text-[11px] text-white/45">{sectionLabel}</p>
-        </div>
+      <header className="relative z-10 flex min-h-[55px] items-center justify-between gap-1 border-b border-[#424242] bg-[#161a1d] px-5 md:min-h-14 md:gap-3 md:border-white/10 md:bg-black/70 md:px-4 md:py-2">
         <button
           type="button"
           onClick={onClose}
           autoFocus
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          className="-ml-2 inline-flex h-11 w-8 shrink-0 items-center justify-center bg-transparent text-white md:hidden"
+          aria-label="셀렉 상세보기로 돌아가기"
+        >
+          <ChevronLeft size={24} strokeWidth={1.8} />
+        </button>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-base font-normal md:text-sm md:font-semibold">{filename}</span>
+          </div>
+          <p className="mt-0.5 hidden text-[11px] text-white/45 md:block">{sectionLabel}</p>
+        </div>
+        <span className={`${selected ? "inline-flex" : "hidden md:inline-flex"} ml-auto shrink-0 text-base font-normal text-white md:rounded-full md:border md:px-2 md:py-0.5 md:text-[10px] md:font-semibold ${selected ? "md:border-accent/45 md:bg-accent/15 md:text-accent" : "md:border-white/15 md:bg-white/5 md:text-white/55"}`}>
+          {selected ? "선택됨" : "미선택"}
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 md:inline-flex"
           aria-label="상세보기 닫기"
         >
           <X size={20} />
         </button>
       </header>
 
-      <main className="relative min-h-0 flex-1 overflow-hidden">
+      <main
+        className="locked-viewer-stage relative min-h-0 flex-1 overflow-hidden"
+        style={{ cursor: "zoom-in" }}
+        onClick={(event) => {
+          /* 이전/다음 버튼 클릭이 집중 보기로 이어지지 않게 한다 */
+          if ((event.target as HTMLElement).closest("button")) return;
+          setFocusOpen(true);
+        }}
+      >
         <MobileViewerPinchPhoto
           key={current.id}
           src={currentSrc}
           alt={filename}
-          showBadge={selected}
+          showBadge={false}
           onZoomStateChange={setZoomed}
+          /* 다른 고객 뷰어와 같은 동작 — 탭/클릭하면 사진만 남는 전체화면 */
+          onSingleTap={() => setFocusOpen(true)}
         />
         {hasMultiple && (
-          <>
-            <PrevNextButton direction="prev" onClick={goPrev} size="lg" align="edge" />
-            <PrevNextButton direction="next" onClick={goNext} size="lg" align="edge" />
-          </>
+          <div className="locked-viewer-arrows">
+            <PrevNextButton direction="prev" onClick={goPrev} size="sm" align="edge" />
+            <PrevNextButton direction="next" onClick={goNext} size="sm" align="edge" />
+          </div>
         )}
       </main>
 
-      <footer className="relative z-10 flex min-h-12 items-center justify-center border-t border-white/10 bg-black/70 px-4 text-xs text-white/55">
-        <span>{activeIndex + 1} / {photos.length}</span>
-        {hasMultiple && <span className="ml-3 hidden text-white/35 sm:inline">← → 이전·다음</span>}
+      <footer className="locked-viewer-footer relative z-10 flex items-center bg-black px-5 pb-[calc(24px+env(safe-area-inset-bottom))] pt-2 md:min-h-12 md:justify-center md:border-t md:border-white/10 md:bg-black/70 md:px-4 md:py-0 md:text-xs md:text-white/55">
+        <div className={`locked-viewer-comment ${comment ? "has-comment" : ""}`}>
+          {comment || "코멘트 없음"}
+        </div>
+        <span className="hidden md:inline">{activeIndex + 1} / {photos.length}</span>
+        {hasMultiple && <span className="ml-3 hidden text-white/35 md:inline">← → 이전·다음</span>}
       </footer>
+      <PhotoFocusOverlay
+        open={focusOpen}
+        src={currentSrc}
+        alt={filename}
+        onClose={() => setFocusOpen(false)}
+        onPrev={hasMultiple ? goPrev : undefined}
+        onNext={hasMultiple ? goNext : undefined}
+      />
+
+      <style>{`
+        .locked-viewer-comment {
+          width: 100%;
+          min-height: 48px;
+          box-sizing: border-box;
+          display: flex;
+          align-items: center;
+          padding: 0 16px;
+          overflow: hidden;
+          border: 0.8px solid #bfbfbf;
+          border-radius: 8px;
+          background: #181818;
+          color: #c0c0c0;
+          font: 400 15px/24px Pretendard, sans-serif;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .locked-viewer-comment.has-comment { border-color: #ff4d00; color: #fff; }
+        .locked-viewer-arrows button { background: rgba(0,0,0,.18) !important; border-color: rgba(255,255,255,.12) !important; }
+        .locked-viewer-stage { padding: 60px 0; box-sizing: border-box; }
+        .locked-viewer-footer { min-height: calc(80px + env(safe-area-inset-bottom)); box-sizing: border-box; }
+        @media (min-width: 768px) {
+          .locked-viewer-stage { padding: 0; }
+          .locked-viewer-footer { min-height: 48px; }
+          .locked-viewer-comment { display: none; }
+        }
+      `}</style>
     </div>,
     document.body,
   );

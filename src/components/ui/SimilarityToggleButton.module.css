@@ -1,0 +1,92 @@
+.button {
+  --similarity-accent: var(--accent, #ff4d00);
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #bfc5ca;
+  background: #fff;
+  color: #6f747b;
+  font-family: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.button:hover:not(:disabled) {
+  border-color: #929aa2;
+  color: #34383d;
+}
+
+.button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--similarity-accent) 28%, transparent);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.active {
+  border-color: var(--similarity-accent);
+  background: color-mix(in srgb, var(--similarity-accent) 9%, #fff);
+  color: var(--similarity-accent);
+}
+
+.compact {
+  min-width: 70px;
+  height: 30px;
+  gap: 4px;
+  padding: 0 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.default {
+  min-width: 108px;
+  height: 44px;
+  gap: 8px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #eef0f2;
+  color: #6f747b;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.compact .count {
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  font-size: 8px;
+  line-height: 14px;
+}
+
+.default .count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 22px;
+}
+
+.active .count {
+  background: var(--similarity-accent);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button { transition: none; }
+}

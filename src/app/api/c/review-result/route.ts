@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   if (!token?.trim()) {
     return NextResponse.json({ error: "token required" }, { status: 400 });
   }
-  const pinErr = checkPinAuth(req, token);
+  const pinErr = await checkPinAuth(req, token);
   if (pinErr) return pinErr;
   try {
     const admin = getAdminClient();
@@ -55,23 +55,35 @@ export async function GET(req: NextRequest) {
     // v1 + v2 photo_versions 동시 조회
     const { data: pvRows } = await admin
       .from("photo_versions")
-      .select("id, photo_id, version")
-      .in("photo_id", photoIds);
+      .select("id, photo_id, version, r2_thumb_url, r2_url, created_at")
+      .in("photo_id", photoIds)
+      .order("created_at", { ascending: false });
 
-    type PvRow = { id: string; photo_id: string; version: number };
-    const pv1ByPhotoId = new Map<string, string>();
-    const pv2ByPhotoId = new Map<string, string>();
+    type PvRow = {
+      id: string;
+      photo_id: string;
+      version: number;
+      r2_thumb_url: string | null;
+      r2_url: string | null;
+      created_at: string;
+    };
+    const pv1ByPhotoId = new Map<string, PvRow>();
+    const pv2ByPhotoId = new Map<string, PvRow>();
     for (const r of (pvRows ?? []) as PvRow[]) {
-      if (r.version === 1) pv1ByPhotoId.set(r.photo_id, r.id);
-      else if (r.version === 2) pv2ByPhotoId.set(r.photo_id, r.id);
+      // 같은 회차를 교체한 이력이 섞여 와도 가장 최근 활성 행을 사용한다.
+      if (r.version === 1 && !pv1ByPhotoId.has(r.photo_id)) pv1ByPhotoId.set(r.photo_id, r);
+      else if (r.version === 2 && !pv2ByPhotoId.has(r.photo_id)) pv2ByPhotoId.set(r.photo_id, r);
     }
-    const allPvIds = (pvRows ?? []).map((r: PvRow) => r.id);
+    const activeVersions = [...pv1ByPhotoId.values(), ...pv2ByPhotoId.values()];
+    const allPvIds = activeVersions.map((r) => r.id);
 
     // v1 + v2 version_reviews 동시 조회
-    const { data: reviewRows } = await admin
-      .from("version_reviews")
-      .select("photo_version_id, status, customer_comment")
-      .in("photo_version_id", allPvIds);
+    const reviewRows = allPvIds.length
+      ? (await admin
+          .from("version_reviews")
+          .select("photo_version_id, status, customer_comment")
+          .in("photo_version_id", allPvIds)).data
+      : [];
     type VrRow = { photo_version_id: string; status: string; customer_comment: string | null };
     const reviewByPvId = new Map(
       (reviewRows ?? []).map((r: VrRow) => [
@@ -84,13 +96,17 @@ export async function GET(req: NextRequest) {
       id: string; number: number; r2_thumb_url: string; original_filename: string | null;
     }) => {
       // v2 review 우선, 없으면 v1 fallback (workflow와 동일 로직)
-      const pv2Id = pv2ByPhotoId.get(row.id);
-      const pv1Id = pv1ByPhotoId.get(row.id);
-      const review = (pv2Id && reviewByPvId.get(pv2Id)) || (pv1Id ? reviewByPvId.get(pv1Id) : undefined);
+      const pv2 = pv2ByPhotoId.get(row.id);
+      const pv1 = pv1ByPhotoId.get(row.id);
+      const pv2Review = pv2 ? reviewByPvId.get(pv2.id) : undefined;
+      const pv1Review = pv1 ? reviewByPvId.get(pv1.id) : undefined;
+      // 상태·코멘트·이미지가 반드시 같은 보정 회차를 가리키도록 함께 선택한다.
+      const chosenVersion = pv2Review ? pv2 : pv1Review ? pv1 : (pv2 ?? pv1);
+      const review = pv2Review ?? pv1Review;
       return {
         photoId: row.id,
         originalFilename: row.original_filename,
-        thumbUrl: row.r2_thumb_url,
+        thumbUrl: chosenVersion?.r2_thumb_url ?? chosenVersion?.r2_url ?? row.r2_thumb_url,
         reviewStatus: review?.status ?? null,
         customerComment: review?.customerComment ?? null,
         orderIndex: row.number,

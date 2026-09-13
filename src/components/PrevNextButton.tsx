@@ -4,7 +4,7 @@ import type { CSSProperties, MouseEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 type Direction = "prev" | "next";
-type Size = "sm" | "md" | "lg";
+type Size = "sm" | "md" | "lg" | "xl";
 type Position = "absolute" | "static";
 type Align = "inside" | "edge";
 
@@ -12,6 +12,7 @@ const SIZE: Record<Size, { box: number; icon: number }> = {
   sm: { box: 32, icon: 16 },
   md: { box: 40, icon: 18 },
   lg: { box: 48, icon: 22 },
+  xl: { box: 74, icon: 20 },
 };
 
 export type PrevNextButtonProps = {
@@ -69,14 +70,15 @@ export function PrevNextButton({
         width: box,
         height: box,
         borderRadius: 9999,
-        background: "rgba(0,0,0,0.45)",
-        border: "1px solid #27272c",
+        background: "rgba(0,0,0,0.30)",
+        border: "1px solid rgba(255,255,255,0.16)",
+        backdropFilter: "blur(6px)",
         color: "#fff",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.4 : 1,
+        opacity: disabled ? 0.28 : 0.86,
         padding: 0,
         transition: "background 0.15s, border-color 0.15s",
         ...style,

@@ -31,21 +31,18 @@ test.beforeAll(async ({ browser }) => {
   const renamedPath = path.join(path.dirname(sourceFilePath), "E2E_TEST_001.jpg");
   fs.copyFileSync(sourceFilePath, renamedPath);
 
-  await setupPage.goto(`/photographer/projects/${project.projectId}/workflow`);
+  await setupPage.goto(`/photographer/projects/${project.projectId}/assets/retouched`);
   await setupPage.waitForLoadState("networkidle");
-  await setupPage.getByRole("button", { name: /^V1/i }).first().click();
-  await setupPage
-    .getByRole("button", { name: /보정본 업로드|V1 업로드|업로드 시작|보정 시작/i })
-    .first()
-    .click();
-  await setupPage.locator('input[type="file"][multiple]').setInputFiles(renamedPath);
-  const uploadBtn = setupPage.getByRole("button", { name: /^업로드$/i });
+  const uploadDialog = setupPage.getByRole("dialog", { name: "보정본 업로드" });
+  await expect(uploadDialog).toBeVisible({ timeout: 8000 });
+  await uploadDialog.locator('input[type="file"][multiple]').setInputFiles(renamedPath);
+  const uploadBtn = uploadDialog.getByRole("button", { name: /^업로드$/i });
   await expect(uploadBtn).toBeEnabled({ timeout: 8000 });
   await uploadBtn.click();
   // 업로드 버튼 자체가 안 보이게 된 뒤에도 패널 컨테이너가 잠시 남아 뒤 버튼 클릭을
   // 가로챌 수 있으므로, 패널 헤딩이 완전히 사라질 때까지 기다린다.
   await expect(
-    setupPage.getByRole("heading", { name: "V1 보정본 업로드" })
+    setupPage.getByRole("heading", { name: "보정본 업로드" })
   ).not.toBeVisible({ timeout: 20000 });
 
   fs.rmSync(renamedPath, { force: true });

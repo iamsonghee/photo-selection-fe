@@ -3,6 +3,18 @@
 
 .customer-app-shell {
   font-family: "Pretendard", system-ui, sans-serif;
+
+  /* Customer light tokens — docs/customer-design.md §4. 전역 :root 토큰(--surface, --background 등)은
+   * Dark Photo Workspace와 공유되므로 여기서 값을 바꾸지 않고, 고객 화면 전용 라이트 팔레트를 별도
+   * 변수로 스코프한다. --accent는 전역값이 이미 #ff4d00과 동일해 그대로 재사용한다. */
+  --customer-canvas: #ffffff;
+  --customer-ink: #191918;
+  --customer-ink-secondary: #5f5e5b;
+  --customer-control: #26282c;
+  --customer-divider: #dde1e4;
+  --customer-gallery-max-width: 1440px;
+  --customer-danger: #ff3636;
+  --customer-danger-text: #484b51;
 }
 
 .customer-app-shell .font-display-ps {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { canTransition } from "@/lib/project-status";
+import { canTransition, getTransitionErrorMessage } from "@/lib/project-status";
 import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 import type { ProjectStatus } from "@/types";
 
@@ -102,7 +102,7 @@ export async function PATCH(
     const admin = getAdminClient();
     const { data: project, error: projectError } = await admin
       .from("projects")
-      .select("id, photographer_id, photo_count, status")
+      .select("id, photographer_id, photo_count, status, include_original, access_pin")
       .eq("id", id)
       .single();
 
@@ -114,7 +114,8 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    const now = new Date().toISOString();
+    const payload: Record<string, unknown> = { updated_at: now };
     if (typeof body.name === "string") payload.name = body.name;
     if (typeof body.customer_name === "string") payload.customer_name = body.customer_name;
     if (typeof body.shoot_date === "string") payload.shoot_date = body.shoot_date;
@@ -132,9 +133,22 @@ export async function PATCH(
       payload.required_count = body.required_count;
     }
     if ('access_pin' in body) {
-      if (body.access_pin === null || (typeof body.access_pin === 'string' && /^\d{4}$/.test(body.access_pin))) {
-        payload.access_pin = body.access_pin;
+      const nextAccessPin = body.access_pin;
+      if (nextAccessPin !== null && !(typeof nextAccessPin === 'string' && /^\d{4}$/.test(nextAccessPin))) {
+        return NextResponse.json(
+          { error: '고객 비밀번호는 숫자 4자리이거나 비밀번호 없음이어야 합니다.' },
+          { status: 400 }
+        );
       }
+      const projectStatus = (project as { status: string }).status;
+      const currentAccessPin = (project as { access_pin: string | null }).access_pin;
+      if (projectStatus === 'delivered' && nextAccessPin !== currentAccessPin) {
+        return NextResponse.json(
+          { error: '납품 완료 후에는 고객 비밀번호를 변경할 수 없습니다.' },
+          { status: 400 }
+        );
+      }
+      if (nextAccessPin !== currentAccessPin) payload.access_pin = nextAccessPin;
     }
     if (typeof body.max_revision_count === 'number' && [0, 1, 2].includes(body.max_revision_count)) {
       payload.max_revision_count = body.max_revision_count;
@@ -142,19 +156,44 @@ export async function PATCH(
     if ('include_original' in body && typeof body.include_original === 'boolean') {
       const photoCount = (project as { photo_count: number | null }).photo_count ?? 0;
       const projectStatus = (project as { status: string }).status;
-      if (projectStatus !== 'preparing' || photoCount > 0) {
+      const currentIncludeOriginal = (project as { include_original: boolean }).include_original;
+      if ((projectStatus !== 'preparing' || photoCount > 0) && body.include_original !== currentIncludeOriginal) {
         return NextResponse.json(
           { error: '업로드된 사진이 있거나 preparing 상태가 아니면 납품 설정을 변경할 수 없습니다.' },
           { status: 400 }
         );
       }
-      payload.include_original = body.include_original;
+      if (body.include_original !== currentIncludeOriginal) payload.include_original = body.include_original;
     }
     if ('review_deadline' in body) {
       payload.review_deadline = body.review_deadline ?? null;
     }
+    if ("cover_photo_id" in body) {
+      if (body.cover_photo_id !== null && typeof body.cover_photo_id !== "string") {
+        return NextResponse.json({ error: "대표 사진 값이 올바르지 않습니다." }, { status: 400 });
+      }
+      if (body.cover_photo_id) {
+        const { data: coverPhoto, error: coverPhotoError } = await admin
+          .from("photos")
+          .select("id")
+          .eq("id", body.cover_photo_id)
+          .eq("project_id", id)
+          .maybeSingle();
+        if (coverPhotoError || !coverPhoto) {
+          return NextResponse.json({ error: "이 프로젝트의 사진만 대표 사진으로 설정할 수 있습니다." }, { status: 400 });
+        }
+        payload.cover_photo_id = body.cover_photo_id;
+      } else if (body.cover_photo_id === null) {
+        payload.cover_photo_id = null;
+      }
+    }
     if ('customer_phone' in body) {
       payload.customer_phone = body.customer_phone ?? null;
+    }
+    if ("location" in body) {
+      payload.location = typeof body.location === "string" && body.location.trim()
+        ? body.location.trim()
+        : null;
     }
     if ("shoot_type" in body) {
       if (body.shoot_type === null) {
@@ -170,11 +209,16 @@ export async function PATCH(
       const currentStatus = (project as { status: string }).status as ProjectStatus;
       if (!canTransition(currentStatus, body.status as ProjectStatus)) {
         return NextResponse.json(
-          { error: `상태를 '${body.status}'로 변경할 수 없습니다. (현재: ${currentStatus})` },
+          {
+            error: getTransitionErrorMessage(currentStatus, body.status as ProjectStatus),
+            code: "INVALID_STATUS_TRANSITION",
+            currentStatus,
+          },
           { status: 400 }
         );
       }
       payload.status = body.status;
+      if (body.status === "delivered") payload.delivered_at = now;
     }
 
     const { error: updateError } = await admin

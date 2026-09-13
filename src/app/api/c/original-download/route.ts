@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "token required" }, { status: 400 });
   }
 
-  const pinErr = checkPinAuth(req, token);
+  const pinErr = await checkPinAuth(req, token);
   if (pinErr) return pinErr;
 
   try {

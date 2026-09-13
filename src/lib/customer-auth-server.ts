@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { getAdminClient } from "@/lib/supabase-admin";
 
 const COOKIE_TTL_SECONDS = 86400; // 24 hours
 
@@ -9,15 +10,23 @@ function getSecret(): string {
   return s;
 }
 
-export function signPinCookie(token: string): string {
+function pinSignatureScope(accessPin: string | null): string {
+  return accessPin === null ? "none" : `pin:${accessPin}`;
+}
+
+export function signPinCookie(token: string, accessPin: string | null): string {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const sig = createHmac("sha256", getSecret())
-    .update(`${token}:${timestamp}`)
+    .update(`${token}:${pinSignatureScope(accessPin)}:${timestamp}`)
     .digest("base64url");
   return `${timestamp}.${sig}`;
 }
 
-export function verifyPinCookie(token: string, cookieValue: string): boolean {
+export function verifyPinCookie(
+  token: string,
+  cookieValue: string,
+  accessPin: string | null,
+): boolean {
   try {
     const dot = cookieValue.indexOf(".");
     if (dot < 1) return false;
@@ -30,7 +39,7 @@ export function verifyPinCookie(token: string, cookieValue: string): boolean {
     if (Math.floor(Date.now() / 1000) - ts > COOKIE_TTL_SECONDS) return false;
 
     const expectedRaw = createHmac("sha256", getSecret())
-      .update(`${token}:${timestamp}`)
+      .update(`${token}:${pinSignatureScope(accessPin)}:${timestamp}`)
       .digest();
 
     const sigRaw = Buffer.from(sig, "base64url");
@@ -41,14 +50,57 @@ export function verifyPinCookie(token: string, cookieValue: string): boolean {
   }
 }
 
-export function checkPinAuth(
+export async function checkPinAuth(
   req: NextRequest,
   token: string
-): NextResponse | null {
+): Promise<NextResponse | null> {
+  const result = await getPinAuthorizedProject(req, token);
+  return result.error;
+}
+
+export type PinAuthorizedProject = {
+  id: string;
+  access_pin: string | null;
+};
+
+/**
+ * PIN 인증과 프로젝트 식별을 한 번의 DB 조회로 처리한다.
+ * 프로젝트 id가 필요한 API가 checkPinAuth 뒤에 token→project를 다시 조회하던 왕복을
+ * 피할 수 있도록 인증된 프로젝트를 함께 반환한다.
+ */
+export async function getPinAuthorizedProject(
+  req: NextRequest,
+  token: string
+): Promise<{ project: PinAuthorizedProject | null; error: NextResponse | null }> {
   const cookieName = `pin_verified_${token}`;
   const cookieValue = req.cookies.get(cookieName)?.value;
-  if (!cookieValue || !verifyPinCookie(token, cookieValue)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!cookieValue) {
+    return {
+      project: null,
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    };
   }
-  return null;
+
+  const admin = getAdminClient();
+  const { data: project, error } = await admin
+    .from("projects")
+    .select("id, access_pin")
+    .eq("access_token", token)
+    .limit(1)
+    .maybeSingle();
+  if (error || !project) {
+    return {
+      project: null,
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    };
+  }
+  const authorizedProject = project as PinAuthorizedProject;
+  const accessPin = authorizedProject.access_pin;
+  if (!verifyPinCookie(token, cookieValue, accessPin)) {
+    return {
+      project: null,
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    };
+  }
+  return { project: authorizedProject, error: null };
 }

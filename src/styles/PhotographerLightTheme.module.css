@@ -1,0 +1,44 @@
+/* Photographer Light UI가 공유하는 단일 Light Theme token source.
+   Dashboard / Project List / Project Create의 route-scoped *.module.css는
+   이 클래스를 composes로 재사용한다 — 페이지 전용 token/class는 각 route module에 그대로 남긴다. */
+:global(:root) {
+  /* Root overscroll canvas cannot inherit tokens from a descendant main. */
+  --photographer-light-canvas: #f5f8f8;
+}
+
+.lightTheme {
+  color-scheme: light;
+  color: var(--foreground);
+  font-family: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+
+  --background: var(--photographer-light-canvas);
+  --foreground: #023852;
+  --muted-foreground: rgba(2, 56, 82, 0.68);
+  --subtle-foreground: rgba(2, 56, 82, 0.52);
+  --placeholder-foreground: rgba(2, 56, 82, 0.46);
+  --disabled-foreground: rgba(2, 56, 82, 0.38);
+
+  --surface: #ffffff;
+  --surface-raised: #eef3f4;
+  --border: color-mix(in srgb, #023852 16%, #ffffff);
+  --border-strong: color-mix(in srgb, #023852 28%, #ffffff);
+  --border-subtle: color-mix(in srgb, #023852 9%, #ffffff);
+
+  --accent: #ff5712;
+  --accent-rgb: 255, 87, 18;
+  --accent-foreground: #ffffff;
+  --primary: #079fa0;
+  --cyan: #079fa0;
+  --customer-foreground: #079fa0;
+  --customer-soft: color-mix(in srgb, #9fd8c5 24%, #ffffff);
+  --danger: #dc2e2f;
+  --warning: #fac005;
+  --success: #079fa0;
+
+  --stepper-done-node: color-mix(in srgb, #023852 68%, #ffffff);
+  --stepper-completed-node: color-mix(in srgb, #023852 38%, #ffffff);
+  --accent-hover: #e94b0d;
+
+  --mobile-header-height: 56px;
+  --mobile-page-gutter: 20px;
+}

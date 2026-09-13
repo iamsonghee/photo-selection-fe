@@ -41,23 +41,16 @@ test.afterAll(async ({ browser }) => {
 test.describe("작가 — 보정본 업로드 부분 실패 처리 (BUG-05 회귀)", () => {
   test("빈 파일을 업로드하면 조용히 성공 처리되지 않고 실패가 표시된다", async ({ page }) => {
     await loginAsPhotographer(page);
-    await page.goto(`/photographer/projects/${project.projectId}/workflow`);
+    await page.goto(`/photographer/projects/${project.projectId}/assets/retouched`);
     await page.waitForLoadState("networkidle");
 
-    const v1Tab = page.getByRole("button", { name: /^V1/i }).first();
-    await expect(v1Tab).toBeVisible({ timeout: 8000 });
-    await v1Tab.click();
+    const uploadDialog = page.getByRole("dialog", { name: "보정본 업로드" });
+    await expect(uploadDialog).toBeVisible({ timeout: 8000 });
 
-    const openPanelBtn = page
-      .getByRole("button", { name: /보정본 업로드|V1 업로드|업로드 시작|보정 시작/i })
-      .first();
-    await expect(openPanelBtn).toBeVisible({ timeout: 8000 });
-    await openPanelBtn.click();
-
-    const fileInput = page.locator('input[type="file"][multiple]');
+    const fileInput = uploadDialog.locator('input[type="file"][multiple]');
     await fileInput.setInputFiles(emptyFilePath);
 
-    const uploadBtn = page.getByRole("button", { name: /^업로드$/i });
+    const uploadBtn = uploadDialog.getByRole("button", { name: /^업로드$/i });
     await expect(uploadBtn).toBeEnabled({ timeout: 8000 });
     await uploadBtn.click();
 

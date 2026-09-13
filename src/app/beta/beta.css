@@ -1,0 +1,44 @@
+/* 랜딩과 같은 밝은 캔버스. 공용 폼 컴포넌트는 베타 범위의 토큰을 상속한다. */
+.beta-light{--background:#fafbf9;--foreground:#191918;--muted-foreground:#666864;--subtle-foreground:#737373;--placeholder-foreground:#858585;--disabled-foreground:#929292;--border:#dededb;--border-strong:#cbcdca;--border-subtle:#eceeeb;--surface:#fff;--surface-raised:#f7f8f6;--primary:#d94100;--accent:#ff4d00;--danger:#c92b32;min-height:100dvh;background:var(--background);color:var(--foreground);color-scheme:light;font-family:Pretendard,"Noto Sans KR",sans-serif;line-height:1.7;}
+body:has(.beta-light){background:#fafbf9;}
+.beta-light :is(h1,h2,p,legend,label){word-break:keep-all;overflow-wrap:break-word;}
+.beta-header{height:80px;max-width:1120px;padding-inline:32px;margin:auto;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-subtle);}
+.beta-header>a:last-child{display:flex;align-items:center;gap:7px;font-size:13px;color:#666;}
+.beta-main{width:min(100% - 48px,680px);margin:auto;padding-block:64px 80px;}
+.beta-footer{padding:24px;text-align:center;color:#888;font-size:12px;border-top:1px solid var(--border-subtle);}
+.beta-footer span{margin-left:12px;color:#404040;font-weight:600;}
+.beta-form-card{background:white;border:1px solid var(--border);padding:36px;border-radius:14px;box-shadow:0 12px 40px #19191804;}
+.beta-form-card h1{font-size:28px;letter-spacing:-.04em;line-height:1.35;}
+.beta-form-card>div:first-child{padding-bottom:24px;border-bottom:1px solid var(--border-subtle);}
+.beta-eyebrow{font-size:11px;color:#d94100;letter-spacing:.08em;font-weight:600;margin-bottom:12px;}
+.beta-form-card input:not([type=checkbox]),.beta-form-card textarea,.beta-form-card select{background:#fff;min-height:46px;}
+.beta-form-card input[type=checkbox]{accent-color:#d94100;flex-shrink:0;width:17px;height:17px;margin-top:4px;}
+.beta-form-card button[aria-pressed]{height:auto;min-height:40px;padding-block:8px;white-space:normal;text-align:left;}
+.beta-form-card button[aria-pressed=true]{background:#fff4ee;}
+.beta-signin{padding:42px 36px;}
+.beta-signin>div:first-child{border:0;padding:0;}
+.beta-signin h1{font-size:28px;}
+.beta-signin>button{margin-top:12px;}
+.beta-complete{text-align:center;padding:48px 36px;}
+.beta-complete-icon{display:flex;align-items:center;justify-content:center;margin:0 auto 22px;width:54px;height:54px;background:#fff1e9;color:#d94100;border-radius:50%;}
+/* 베타에 열린 공용 로그인 모달도 같은 라이트 톤으로 표시한다. */
+.beta-light .auth-modal-overlay{background:rgba(25,25,24,.35)!important;backdrop-filter:blur(6px);}
+.beta-light .auth-modal-container{background:#fff!important;box-shadow:0 24px 80px #19191820!important;}
+.beta-light .auth-modal-google{border:1px solid #dededb;}
+.beta-light .auth-modal-error{color:#b83219!important;background:#fff1ec!important;}
+@media(max-width:700px){
+.beta-header{height:68px;padding-inline:20px;}
+.beta-main{width:calc(100% - 32px);padding-block:32px 48px;}
+.beta-form-card{padding:24px 20px;}
+.beta-form-card h1,.beta-signin h1{font-size:24px;}
+.beta-signin,.beta-complete{padding:32px 22px;}
+}
+@media(prefers-reduced-motion:reduce){.beta-light *{animation:none!important;transition:none!important;}}
+.beta-light .auth-modal-backdrop{background:rgba(25,25,24,.35)!important;}
+.beta-light .auth-modal-container{border:1px solid #e1e1de!important;border-radius:16px!important;}
+.beta-light :is(.auth-modal-bracket,.auth-modal-scanlines,.auth-modal-sys-status,.auth-modal-meta-block){display:none!important;}
+.beta-light .auth-modal-header{justify-content:flex-end;}
+.beta-light .auth-modal-logo{font-family:inherit;font-weight:750;letter-spacing:-.05em;}
+.beta-light .auth-modal-headline{font-family:inherit;letter-spacing:-.04em;}
+.beta-light .auth-modal-btn-google{border:1px solid #dededb;}
+.beta-light .auth-modal-kakao-warning-text,.beta-light .auth-modal-kakao-warning-text strong,.beta-light .auth-modal-kakao-step strong,.beta-light .auth-modal-kakao-warning-title,.beta-light .auth-modal-copy-btn{color:#795900!important;}

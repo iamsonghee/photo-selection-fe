@@ -26,7 +26,15 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    refetch().finally(() => setLoading(false));
+    let ignore = false;
+    async function load() {
+      await refetch();
+      if (!ignore) setLoading(false);
+    }
+    load();
+    return () => {
+      ignore = true;
+    };
   }, [refetch]);
 
   const updateProfile = useCallback((patch: Partial<PhotographerProfile>) => {

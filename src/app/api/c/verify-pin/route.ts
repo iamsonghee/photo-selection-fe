@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       // 5. Set verification cookie
       const cookieName = `pin_verified_${token}`;
       const response = NextResponse.json({ success: true });
-      response.cookies.set(cookieName, signPinCookie(token), {
+      response.cookies.set(cookieName, signPinCookie(token, accessPin), {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",

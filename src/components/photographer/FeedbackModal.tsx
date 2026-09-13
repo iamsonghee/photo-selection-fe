@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { createPortal } from "react-dom";
+import { useId, useState, type ButtonHTMLAttributes } from "react";
+import { PhotographerLightButton } from "./PhotographerLightButton";
+import { PhotographerModal } from "@/components/ui/PhotographerModal";
 import { usePathname } from "next/navigation";
-import { MessageCircle, X } from "lucide-react";
+import { CheckCircle2, MessageCircle } from "lucide-react";
+
+function FeedbackAction({ primary = false, fullWidth = false, className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { primary?: boolean; fullWidth?: boolean }) {
+  return <PhotographerLightButton {...props} variant={primary ? "primary" : "secondary"} className={`${fullWidth ? "w-full" : ""} ${className}`} />;
+}
 
 type Category = "bug" | "suggestion";
 
@@ -11,13 +16,17 @@ export function FeedbackButton({
   triggerClassName,
   iconClassName,
   textClassName,
+  triggerRole,
 }: {
   triggerClassName?: string;
   iconClassName?: string;
   textClassName?: string;
+  triggerRole?: "menuitem";
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const messageId = useId();
+  const errorId = useId();
   const projectIdMatch = pathname.match(/^\/photographer\/projects\/([^/]+)(?:\/|$)/);
   const projectId = projectIdMatch && projectIdMatch[1] !== "new" ? projectIdMatch[1] : null;
 
@@ -35,11 +44,13 @@ export function FeedbackButton({
   }
 
   function close() {
+    if (submitting) return;
     setOpen(false);
     reset();
   }
 
   async function submit() {
+    if (submitting) return;
     if (!message.trim()) {
       setError("내용을 입력해주세요.");
       return;
@@ -67,6 +78,7 @@ export function FeedbackButton({
         type="button"
         onClick={() => setOpen(true)}
         className={triggerClassName}
+        role={triggerRole}
         aria-label="문의하기"
         title="문의하기"
       >
@@ -76,81 +88,76 @@ export function FeedbackButton({
         <span className={textClassName}>문의하기</span>
       </button>
 
-      {open &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4" onClick={close}>
-            <div
-              className="w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-xl"
-              onClick={(e) => e.stopPropagation()}
+      <PhotographerModal
+        open={open}
+        onClose={close}
+        closeDisabled={submitting}
+        title="문의하기"
+        description="사용 중 불편했던 점이나 필요한 기능을 알려주세요."
+        maxWidth={420}
+        footer={done ? (
+          <FeedbackAction primary fullWidth type="button" onClick={close}>닫기</FeedbackAction>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <FeedbackAction type="button" onClick={close} disabled={submitting}>취소</FeedbackAction>
+            <FeedbackAction
+              primary
+              type="button"
+              aria-busy={submitting}
+              onClick={submit}
+              disabled={submitting}
             >
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-semibold text-foreground">문의하기</h2>
-                <button type="button" onClick={close} className="text-muted-foreground hover:text-foreground">
-                  <X size={18} />
-                </button>
-              </div>
-
-              {done ? (
-                <div className="mt-4">
-                  <p className="text-sm text-foreground">전달되었습니다. 감사합니다!</p>
-                  <button
-                    type="button"
-                    onClick={close}
-                    className="mt-4 w-full rounded-lg bg-accent py-2 text-sm font-semibold text-black"
-                  >
-                    닫기
-                  </button>
-                </div>
-              ) : (
-                <div className="mt-4 flex flex-col gap-3">
-                  <div className="flex gap-2">
-                    {(["bug", "suggestion"] as const).map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setCategory(c)}
-                        className={`flex-1 rounded-lg border px-3 py-1.5 text-sm ${
-                          category === c
-                            ? "border-accent bg-accent/10 text-foreground"
-                            : "border-border text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {c === "bug" ? "버그" : "제안"}
-                      </button>
-                    ))}
-                  </div>
-                  <textarea
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder={category === "bug" ? "어떤 문제가 있었나요?" : "어떤 기능이 있으면 좋을까요?"}
-                    rows={5}
-                    className="w-full resize-none rounded-lg border border-border bg-background p-3 text-sm text-foreground placeholder:text-placeholder-foreground"
-                  />
-                  {error && <p className="text-xs text-danger">{error}</p>}
-                  <div className="flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={close}
-                      className="rounded-lg px-4 py-2 text-sm text-muted-foreground hover:text-foreground"
-                    >
-                      취소
-                    </button>
-                    <button
-                      type="button"
-                      onClick={submit}
-                      disabled={submitting}
-                      className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
-                    >
-                      {submitting ? "보내는 중…" : "보내기"}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>,
-          document.body
+              {submitting ? "보내는 중…" : "보내기"}
+            </FeedbackAction>
+          </div>
         )}
+      >
+        {done ? (
+          <div className="flex flex-col items-center py-4 text-center">
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-success/10 text-success" aria-hidden>
+              <CheckCircle2 size={24} strokeWidth={1.8} />
+            </span>
+            <p className="mt-3 text-[15px] font-semibold text-foreground">의견이 전달되었습니다.</p>
+            <p className="mt-1 text-[13px] text-muted-foreground">보내주신 내용은 서비스 개선에 참고하겠습니다.</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-2" role="group" aria-label="문의 유형">
+              {(["bug", "suggestion"] as const).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCategory(c)}
+                  aria-pressed={category === c}
+                  disabled={submitting}
+                  className={`min-h-10 rounded-lg border px-3 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 ${
+                    category === c
+                      ? "border-accent bg-accent/8 text-accent"
+                      : "border-border-subtle bg-surface text-muted-foreground hover:bg-surface-raised hover:text-foreground"
+                  }`}
+                >
+                  {c === "bug" ? "오류 제보" : "기능 제안"}
+                </button>
+              ))}
+            </div>
+            <div>
+              <label htmlFor={messageId} className="mb-2 block text-[13px] font-semibold text-foreground">문의 내용</label>
+              <textarea
+                id={messageId}
+                disabled={submitting}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? errorId : undefined}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder={category === "bug" ? "어떤 문제가 있었는지 알려주세요." : "어떤 기능이 필요하신가요?"}
+                rows={5}
+                className="w-full resize-none rounded-xl border border-border-subtle bg-surface p-3.5 text-[14px] leading-6 text-foreground outline-none placeholder:text-placeholder-foreground focus:border-accent/50 focus:ring-2 focus:ring-accent/10"
+              />
+              {error ? <p id={errorId} role="alert" className="mt-2 text-[12px] font-medium text-danger">{error}</p> : null}
+            </div>
+          </div>
+        )}
+      </PhotographerModal>
     </>
   );
 }

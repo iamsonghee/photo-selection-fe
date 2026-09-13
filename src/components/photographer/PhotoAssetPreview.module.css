@@ -1,0 +1,4 @@
+.filenameRow { display: flex; align-items: center; min-width: 0; height: 22px; padding: 0 2px; }
+.filename { display: block; min-width: 0; overflow: hidden; color: var(--muted-foreground); font-family: "Pretendard Variable", "Pretendard", -apple-system, system-ui, sans-serif; font-size: 12px; font-weight: 500; line-height: 20px; letter-spacing: -.35px; text-overflow: ellipsis; white-space: nowrap; }
+.media { position: relative; width: 100%; min-width: 0; overflow: hidden; border: 0; border-radius: 8px; aspect-ratio: var(--photo-asset-aspect); background: var(--surface-raised); }
+@media (max-width: 767px) { .filenameRow { height: 20px; } }

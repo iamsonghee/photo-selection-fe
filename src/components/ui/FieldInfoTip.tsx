@@ -6,7 +6,15 @@ import { Info } from "lucide-react";
 
 type TooltipPlacement = "above" | "below";
 
-export function FieldInfoTip({ text }: { text: string }) {
+export function FieldInfoTip({
+  text,
+  ariaLabel = "필드 설명",
+  touchFriendly = false,
+}: {
+  text: string;
+  ariaLabel?: string;
+  touchFriendly?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [placement, setPlacement] = useState<TooltipPlacement>("above");
   const [coords, setCoords] = useState({ top: 0, left: 0 });
@@ -71,12 +79,16 @@ export function FieldInfoTip({ text }: { text: string }) {
         ref={btnRef}
         type="button"
         tabIndex={0}
-        className="inline-flex shrink-0 items-center justify-center w-4 h-4 rounded-full text-subtle-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/50 transition-colors"
-        aria-label="필드 설명"
+        className={`inline-flex shrink-0 items-center justify-center rounded-full text-subtle-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/50 transition-colors ${
+          touchFriendly ? "h-11 w-11 md:h-4 md:w-4" : "h-4 w-4"
+        }`}
+        aria-label={ariaLabel}
+        aria-expanded={open}
         onMouseEnter={show}
         onMouseLeave={hide}
         onFocus={show}
         onBlur={hide}
+        onClick={show}
       >
         <Info size={12} strokeWidth={2.25} />
       </button>

@@ -1,11 +1,12 @@
+import { Check } from "lucide-react";
 import Link from "next/link";
 import { Card } from "@/components/ui";
 
 export default function BetaApplyCompletePage() {
   return (
-    <div className="mx-auto flex min-h-screen max-w-xl items-center justify-center px-6 py-16">
-      <Card className="w-full text-center">
-        <p className="text-3xl">✓</p>
+    <div className="beta-complete-wrap">
+      <Card className="beta-form-card beta-complete w-full text-center">
+        <div className="beta-complete-icon"><Check size={26} aria-hidden="true"/></div>
         <h1 className="mt-3 text-xl font-semibold text-foreground">신청 완료</h1>
         <p className="mt-3 text-sm text-muted-foreground">
           신청이 정상적으로 접수되었습니다.

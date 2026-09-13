@@ -19,7 +19,7 @@ export default async function InvitePage({
   if (project) {
     const cookieStore = await cookies();
     const cookieValue = cookieStore.get(`pin_verified_${token}`)?.value;
-    if (!cookieValue || !verifyPinCookie(token, cookieValue)) {
+    if (!cookieValue || !verifyPinCookie(token, cookieValue, project.accessPin ?? null)) {
       redirect(`/c/${token}/pin?from=${encodeURIComponent(`/c/${token}`)}`);
     }
   }

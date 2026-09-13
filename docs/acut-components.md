@@ -2,7 +2,8 @@
 
 > 상태: Draft 0.1
 > 작성일: 2026-07-29
-> foundation: `docs/design-system.md`
+> foundation: Shared/Dark는 `docs/design-system.md`, 작가 Light PC는 [design-system-light.md](design-system-light.md), 고객 PC는 [customer-design.md](customer-design.md)
+> **2026-09-09 PC 적용 안내:** 아래에는 이전 설계/proposal도 남아 있다. 현재 Light 구현의 재사용 컴포넌트와 적용 route는 `design-system-light.md` §0.4–0.5, 실제 미해결 문제는 [PC 검수 결과](desktop-design-audit-2026-09-09.md)를 우선한다. 이 갱신은 모바일 패턴 검증을 포함하지 않는다.
 > page patterns: `docs/page-patterns.md`
 
 ## 1. 범위
@@ -87,7 +88,7 @@
 | State | 표현 |
 |---|---|
 | `loading` | 고정 크기 neutral skeleton |
-| `ready` | 기본 border |
+| `ready` | border 없는 image plate |
 | `selected` | orange 2px ring + check + accessible selected text |
 | `current` | blue 2px ring + 현재 사진 label |
 | `pending` | 작은 spinner + 상태 동사 |
@@ -127,6 +128,7 @@ Mobile:
 
 ### 기존 구현 재사용
 
+- `PhotoThumbnailFrame`: 고객 셀렉과 작가 원본 grid에 먼저 적용된 공통 image plate. 기본 무테, active 시 orange 2px inset만 책임지고 비율·metadata·checkbox는 상위 카드가 소유한다.
 - `GalleryPhotoCard`의 queued thumbnail loading
 - upload page의 thumbnail error/fallback
 - locked page의 4:3 photo state
@@ -195,8 +197,8 @@ Mobile:
 
 - `/c/[token]/gallery`
 - `/photographer/projects/[id]/upload`
-- `/photographer/projects/[id]/results`
-- `/photographer/projects/[id]/workflow`
+- `/photographer/projects/[id]/assets/original|selected`
+- `/photographer/projects/[id]/assets/retouched`
 - `/c/[token]/review`
 - `/c/[token]/locked`
 

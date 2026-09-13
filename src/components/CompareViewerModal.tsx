@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { MessageSquare, X } from "lucide-react";
 import { PrevNextButton } from "@/components/PrevNextButton";
 import { useAdjacentImagePreload } from "@/lib/use-adjacent-image-preload";
+import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
 
 type CompareItem = {
   original: { url: string; filename: string; comment?: string | null };
@@ -22,43 +23,41 @@ type Props = {
 };
 
 export default function CompareViewerModal({ isOpen, onClose, photos, initialIndex, initialTab }: Props) {
-  const [mounted, setMounted] = useState(false);
-  const [index, setIndex] = useState(initialIndex);
-  const [tab, setTab] = useState<"original" | "v1" | "v2">("original");
+  const [index, setIndex] = useState(() => Math.min(Math.max(0, initialIndex), Math.max(0, photos.length - 1)));
+  const [tab, setTab] = useState<"original" | "v1" | "v2">(initialTab ?? "original");
   const [splitMode, setSplitMode] = useState(false);
   const total = photos.length;
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setIndex(Math.min(Math.max(0, initialIndex), Math.max(0, total - 1)));
-    if (initialTab) setTab(initialTab);
-  }, [isOpen, initialIndex, total, initialTab]);
 
   const current = useMemo(() => {
     if (!isOpen || total === 0) return null;
     return photos[index] ?? null;
   }, [isOpen, photos, total, index]);
 
+  const currentV1 = current?.v1 ?? current?.retouched;
+  const resolvedTab = !current
+    ? tab
+    : tab === "v2" && !current.v2?.url
+      ? currentV1?.url ? "v1" : "original"
+      : tab === "v1" && !currentV1?.url
+        ? "original"
+        : tab;
+
   const preloadUrlGroups = useMemo(() => photos.map((photo) => {
     const firstRetouched = photo.v1 ?? photo.retouched;
     if (!splitMode) {
-      if (tab === "v2") return [photo.v2?.url ?? photo.original.url];
-      if (tab === "v1") return [firstRetouched?.url ?? photo.original.url];
+      if (resolvedTab === "v2") return [photo.v2?.url ?? photo.original.url];
+      if (resolvedTab === "v1") return [firstRetouched?.url ?? photo.original.url];
       return [photo.original.url];
     }
 
-    if (tab === "v2") {
+    if (resolvedTab === "v2") {
       return [firstRetouched?.url ?? photo.original.url, photo.v2?.url ?? photo.original.url];
     }
-    if (tab === "v1") {
+    if (resolvedTab === "v1") {
       return [photo.original.url, firstRetouched?.url ?? photo.original.url];
     }
     return [photo.original.url, firstRetouched?.url ?? photo.v2?.url ?? photo.original.url];
-  }), [photos, splitMode, tab]);
+  }), [photos, resolvedTab, splitMode]);
   useAdjacentImagePreload(preloadUrlGroups, isOpen ? index : null, {
     desktopBefore: 1,
     desktopAfter: splitMode ? 1 : 2,
@@ -68,20 +67,10 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
     mobileMaxDecoded: splitMode ? 4 : 3,
   });
 
-  // Navigation fallback: only downgrade tab if current photo lacks that version
-  useEffect(() => {
-    if (!current) return;
-    const v1 = current.v1 ?? current.retouched;
-    setTab((prev) => {
-      if (prev === "v2" && !current.v2?.url) return v1?.url ? "v1" : "original";
-      if (prev === "v1" && !v1?.url) return "original";
-      return prev;
-    });
-  }, [current]);
-
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
+      if (hasShortcutModifier(e)) return; // 윈도우 Alt+←/→(뒤로/앞으로 가기)와 겹치지 않게
       if (e.key === "Escape") {
         e.preventDefault();
         onClose();
@@ -106,33 +95,32 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
     };
   }, [isOpen]);
 
-  if (!isOpen || !current) return null;
-  if (!mounted) return null;
+  if (!isOpen || !current || typeof document === "undefined") return null;
 
   const v1 = current.v1 ?? current.retouched;
   const hasV1 = Boolean(v1?.url);
   const hasV2 = Boolean(current.v2?.url);
   const canSplit = hasV1 || hasV2; // split 버튼 표시 조건
   const activeImage =
-    tab === "original" ? current.original : tab === "v1" ? (v1 ?? current.original) : (current.v2 ?? current.original);
-  const activeLabel = tab === "original" ? "원본" : tab === "v1" ? "보정본 v1" : "보정본 v2";
+    resolvedTab === "original" ? current.original : resolvedTab === "v1" ? (v1 ?? current.original) : (current.v2 ?? current.original);
+  const activeLabel = resolvedTab === "original" ? "원본" : resolvedTab === "v1" ? "보정본 v1" : "보정본 v2";
   const activeComment =
-    tab === "original" ? (current.original.comment ?? null)
-    : tab === "v1"     ? (v1?.comment ?? null)
+    resolvedTab === "original" ? (current.original.comment ?? null)
+    : resolvedTab === "v1"     ? (v1?.comment ?? null)
     :                    (current.v2?.comment ?? null);
 
   // split 모드: 항상 원본 → v1 → v2 순서로 왼쪽=이전버전, 오른쪽=이후버전
   const splitLeft =
-    tab === "v2" ? (v1 ?? current.original) : current.original;
+    resolvedTab === "v2" ? (v1 ?? current.original) : current.original;
   const splitLeftLabel =
-    tab === "v2" ? (hasV1 ? "보정본 v1" : "원본") : "원본";
+    resolvedTab === "v2" ? (hasV1 ? "보정본 v1" : "원본") : "원본";
   const splitRight =
-    tab === "original" ? (v1 ?? current.v2)
-    : tab === "v1"     ? (v1 ?? current.original)
+    resolvedTab === "original" ? (v1 ?? current.v2)
+    : resolvedTab === "v1"     ? (v1 ?? current.original)
     :                    (current.v2 ?? current.original);
   const splitRightLabel =
-    tab === "original" ? (hasV1 ? "보정본 v1" : "보정본 v2")
-    : tab === "v1"     ? "보정본 v1"
+    resolvedTab === "original" ? (hasV1 ? "보정본 v1" : "보정본 v2")
+    : resolvedTab === "v1"     ? "보정본 v1"
     :                    "보정본 v2";
 
   /** document.body에 붙여 작가 레이아웃(main z-10)·사이드바(z-30)·하단 고정바(z-100) 스택 위에 표시 */
@@ -169,7 +157,7 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
             <button
               type="button"
               onClick={() => setTab("original")}
-              className={`rounded px-2 py-1 text-xs ${tab === "original" ? "bg-foreground text-background" : "bg-surface-raised text-muted-foreground"}`}
+              className={`rounded px-2 py-1 text-xs ${resolvedTab === "original" ? "bg-foreground text-background" : "bg-surface-raised text-muted-foreground"}`}
             >
               원본
             </button>
@@ -177,7 +165,7 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
               <button
                 type="button"
                 onClick={() => setTab("v1")}
-                className={`rounded px-2 py-1 text-xs ${tab === "v1" ? "bg-foreground text-background" : "bg-surface-raised text-muted-foreground"}`}
+                className={`rounded px-2 py-1 text-xs ${resolvedTab === "v1" ? "bg-foreground text-background" : "bg-surface-raised text-muted-foreground"}`}
               >
                 보정본 v1
               </button>
@@ -186,7 +174,7 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
               <button
                 type="button"
                 onClick={() => setTab("v2")}
-                className={`rounded px-2 py-1 text-xs ${tab === "v2" ? "bg-foreground text-background" : "bg-surface-raised text-muted-foreground"}`}
+                className={`rounded px-2 py-1 text-xs ${resolvedTab === "v2" ? "bg-foreground text-background" : "bg-surface-raised text-muted-foreground"}`}
               >
                 보정본 v2
               </button>
@@ -229,6 +217,7 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
                 <div className="mb-2 shrink-0 text-xs font-semibold text-muted-foreground">{activeLabel}</div>
                 <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded bg-surface-raised">
                   <img
+                    key={`${index}:${resolvedTab}:${activeImage.url}`}
                     src={activeImage.url}
                     alt=""
                     decoding="async"
@@ -244,6 +233,7 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
                   <div className="mb-2 shrink-0 text-xs font-semibold text-muted-foreground">{splitLeftLabel}</div>
                   <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded bg-surface-raised">
                     <img
+                      key={`${index}:left:${splitLeft.url}`}
                       src={splitLeft.url}
                       alt=""
                       decoding="async"
@@ -257,6 +247,7 @@ export default function CompareViewerModal({ isOpen, onClose, photos, initialInd
                   <div className="mb-2 shrink-0 text-xs font-semibold text-muted-foreground">{splitRightLabel}</div>
                   <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded bg-surface-raised">
                     <img
+                      key={`${index}:right:${(splitRight ?? current.original).url}`}
                       src={(splitRight ?? current.original).url}
                       alt=""
                       decoding="async"

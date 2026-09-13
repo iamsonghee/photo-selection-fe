@@ -1,0 +1,98 @@
+/* 실제 갤러리 카드 구조와 공용 주황색 토큰을 유지한 고정 녹화 뷰포트. */
+#demo-film { width:1200px;height:641px;position:relative;overflow:hidden;background:#fff;color:#191918;font-family:Pretendard,Arial,sans-serif;--accent:#ff4d00;--foreground:#191918;--surface:#fff;--border-subtle:#e3e7e9;--background:#fff; }
+#demo-film * { animation:none!important;transition:none!important;box-sizing:border-box; }
+.film-screen {position:absolute;inset:0;background:#fff;isolation:isolate;z-index:0;}
+.film-screen header {height:72px;display:flex;align-items:center;gap:30px;padding:0 28px;border-bottom:1px solid #e3e7e9;}
+.film-screen header>span {margin-left:auto;display:flex;align-items:center;gap:8px;font-size:15px;color:#666;}
+.film-toolbar {height:64px;padding:0 28px;display:flex;align-items:center;justify-content:space-between;font-size:17px;}
+.film-toolbar small {color:#666;margin-left:8px;}
+.film-gallery {display:grid;grid-template-columns:repeat(5,1fr);gap:12px;padding:0 28px;}
+.film-gallery .gl-photo-card {position:relative;display:block;aspect-ratio:1.16;overflow:hidden;border-radius:4px;background:#eee;color:white;}
+.film-gallery .gl-card-media {height:100%;}
+.film-gallery img {width:100%;height:100%;object-fit:cover;object-position:50% 38%;}
+.gl-check-box {position:absolute;top:9px;left:9px;z-index:8;width:24px;height:24px;border:1px solid #fff;background:#ffffffe8;display:grid;place-items:center;border-radius:3px;}
+.gl-selected .gl-check-box {background:var(--accent);border-color:var(--accent);}
+.gl-card-overlay {position:absolute;bottom:0;left:0;right:0;padding:10px;background:linear-gradient(transparent,#0009);pointer-events:none;}
+.gl-overlay-filename {font-size:13px;margin:0 0 4px;}
+.film-screen footer {position:absolute;bottom:0;height:65px;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-top:1px solid #e3e7e9;background:#fff;font-size:19px;}
+.film-screen footer button {display:flex;gap:8px;align-items:center;background:var(--accent);color:white;border:0;border-radius:6px;padding:12px 24px;font-size:18px;}
+.film-detail {z-index:20;position:absolute;inset:90px 100px 85px;background:#fff;box-shadow:0 0 0 200px #0005,0 16px 60px #0003;display:grid;grid-template-columns:440px 1fr;border-radius:10px;overflow:hidden;}
+.film-detail img {width:440px;height:466px;object-fit:cover;}
+.film-detail aside {padding:44px 30px;}
+.film-detail h2 {font-size:26px;margin:12px 0 42px;}
+.film-detail label {font-size:18px;display:block;margin-bottom:12px;}
+.film-comment {padding:20px;border:2px solid var(--accent);border-radius:6px;font-size:24px;line-height:1.7;min-height:160px;}
+.film-detail p {margin-top:12px;color:#666;}
+.film-writer {z-index:1;--accent:#ff5712;}
+.film-writer-toolbar {height:72px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;}
+.film-writer-toolbar>span {font-size:17px;color:#666;}
+.film-results {display:grid;grid-template-columns:repeat(3,1fr);gap:22px;padding:0 28px;}
+.film-results img {width:100%;height:270px;object-fit:cover;object-position:50% 38%;}
+.film-results h2 {display:flex;justify-content:space-between;font-size:19px;margin:12px 0 8px;}
+.film-results h2 svg {color:var(--accent);}
+.film-results p {color:#666;font-size:15px;}
+.film-results [title] {font-size:19px;}
+.film-results [title]>p {font-size:19px;line-height:1.5;}
+.film-cursor {position:absolute;z-index:210;color:#191918;filter:drop-shadow(0 2px 2px #0004);}
+
+#demo-film .selection-confirm-dialog { transform:scale(1.2); }
+
+/* 가로 히어로 안에 실제 2열 고객 카드를 담는 기기 프레임.운영 UI에는 영향을 주지 않는다. */
+.film-customer-scene {position:absolute;inset:0;background:#f7f7f5;}
+.film-customer {inset:18px auto auto 140px;width:350px;height:605px;border:5px solid #292927;border-radius:28px;overflow:hidden;transform:translateZ(0);box-shadow:0 12px 32px #19191818;}
+.film-customer header {height:62px;padding:0 16px;gap:14px;}
+.film-customer header strong {font-size:13px;}
+.film-customer header svg {max-width:70px;}
+.film-customer .film-toolbar {height:54px;padding:8px 16px;display:block;font-size:13px;}
+.film-customer .film-toolbar>span {display:block;font-size:11px;margin-top:5px;color:#666;}
+.film-customer .film-gallery {grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0 12px;height:416px;overflow:hidden;align-content:start;grid-auto-rows:128px;}
+.film-customer .gl-photo-card {aspect-ratio:auto;}
+.film-customer .gl-overlay-filename {font-size:10px;}
+.film-customer .gl-check-box {width:22px;height:22px;top:7px;left:7px;}
+.film-customer footer {height:64px;padding:0 14px;font-size:14px;}
+.film-customer footer button {font-size:13px;padding:12px 18px;}
+.film-customer .film-detail {inset:62px 0 64px;display:flex;flex-direction:column;border-radius:0;box-shadow:none;}
+.film-customer .film-detail>div {height:255px;overflow:hidden;flex-shrink:0;}
+.film-customer .film-detail img {width:100%;height:255px;object-fit:contain;}
+.film-customer .film-detail aside {padding:12px 16px;}
+.film-customer .film-detail small {display:none;}
+.film-customer .film-detail h2 {font-size:14px;margin:0 0 10px;}
+.film-customer .film-detail label {font-size:12px;margin-bottom:6px;}
+.film-customer .film-comment {font-size:16px;line-height:1.6;padding:10px;min-height:72px;}
+.film-customer .film-detail p {font-size:11px;margin:5px 0;}
+#demo-film .film-customer .selection-confirm-backdrop {position:absolute;padding:12px;}
+#demo-film .film-customer .selection-confirm-dialog {transform:none;width:295px;}
+.film-tap {position:absolute;z-index:220;width:30px;height:30px;border:2px solid var(--accent);background:#ff4d0033;border-radius:50%;}
+.film-context {position:absolute;left:565px;top:94px;right:65px;}
+.film-context>span {font-size:16px;color:#6c6c66;}
+.film-context h1 {font-size:38px;line-height:1.4;letter-spacing:-1.4px;font-weight:650;margin:15px 0 18px;}
+.film-context>p {font-size:18px;line-height:1.7;color:#6c6c66;}
+.film-picked {display:flex;gap:12px;margin:26px 0 18px;}
+.film-picked>div {position:relative;flex:1;min-width:0;opacity:.45;}
+.film-picked>div[data-selected="true"] {opacity:1;}
+.film-picked img {width:100%;height:110px;object-fit:cover;border-radius:5px;}
+.film-picked span {display:block;font-size:12px;margin-top:8px;}
+.film-picked svg {position:absolute;top:7px;right:7px;background:var(--accent);color:white;border-radius:50%;padding:2px;}
+.film-context>small {display:block;font-size:17px;line-height:1.7;min-height:58px;}
+/* 모바일 랜딩은 별도 세로 프레임으로 녹화해 작은 가로 영상을 축소하지 않는다. */
+@media (max-width:700px) {
+ #demo-film {width:640px;height:800px;}
+ .film-context {display:none;}
+ .film-customer {left:145px;top:43px;transform:scale(1.18);transform-origin:top center;}
+ .film-writer header {height:95px;gap:18px;padding:0 24px;flex-wrap:wrap;align-content:center;}
+ .film-writer header strong {font-size:17px;}
+ .film-writer header>span {width:100%;margin:0;font-size:16px;}
+ .film-writer-toolbar {height:76px;padding:0 24px;}
+ .film-writer-toolbar>span {display:none;}
+ .film-results {grid-template-columns:1fr;gap:16px;padding:0 24px;}
+ .film-results article {display:grid;grid-template-columns:176px 1fr;column-gap:20px;min-height:165px;align-content:start;}
+ .film-results article>div:first-child {grid-row:span 2;}
+ .film-results img {height:165px;}
+ .film-results h2 {font-size:20px;align-self:end;margin:8px 0;}
+ .film-results [title]>p {font-size:19px;}
+ .film-writer footer {font-size:15px;padding:0 24px;}
+ .film-writer footer button {font-size:15px;padding:12px;}
+}
+
+.film-writer-toolbar [data-project-asset-tabs] {min-width:330px;}
+.film-writer-toolbar [data-project-asset-tab-face] {white-space:nowrap;}

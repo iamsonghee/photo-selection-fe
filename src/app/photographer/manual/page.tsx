@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import {
   Camera,
   FolderPlus,
@@ -15,7 +14,8 @@ import {
   HelpCircle,
   ChevronRight,
 } from "lucide-react";
-import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
+import { PhotographerLightPageFrame, PhotographerLightPageHeader } from "@/components/layout/PhotographerLightPageHeader";
+import { PhotographerMobilePageHeader } from "@/components/layout/PhotographerMobilePageHeader";
 
 // ─── 섹션 정의 ───────────────────────────────────────────────────────────────
 
@@ -253,13 +253,14 @@ export default function ManualPage() {
   return (
     <div
       className="min-h-screen bg-background text-foreground"
-      style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}
     >
-      <PhotographerPageHeader
-        crumbs={[{ label: "매뉴얼" }]}
-        title="사용 매뉴얼"
-        stats={[{ label: "베타", value: "v1.0" }]}
-      />
+      <div className="md:hidden">
+      <PhotographerMobilePageHeader title="사용 매뉴얼" backHref="/photographer/settings" description="프로젝트 생성부터 납품까지 확인하세요." />
+
+      </div>
+      <PhotographerLightPageFrame className="hidden md:block">
+        <PhotographerLightPageHeader title="사용 매뉴얼" description="프로젝트 생성부터 셀렉, 보정과 납품까지 확인해 보세요." />
+      </PhotographerLightPageFrame>
 
       <div className="flex gap-0 md:gap-8 p-4 md:p-8 max-w-[1200px] mx-auto">
         {/* ── 좌측 목차 (sticky) ── */}
@@ -370,7 +371,7 @@ export default function ManualPage() {
                 "고객이 선택해야 하는 <strong>최소·최대 장수</strong>를 입력합니다.",
                 "<strong>만들기</strong> 버튼을 눌러 프로젝트를 생성합니다.",
               ]} />
-              <Tip>셀렉 갯수를 '최소 = 최대'로 설정하면 정확히 N장만 선택 가능합니다.</Tip>
+              <Tip>셀렉 갯수를 &apos;최소 = 최대&apos;로 설정하면 정확히 N장만 선택 가능합니다.</Tip>
             </div>
           </section>
 
@@ -570,7 +571,7 @@ export default function ManualPage() {
                       <p>다음을 확인해 주세요:</p>
                       <ul className="list-disc pl-4 mt-2 space-y-1">
                         <li>파일 확장자가 지원 형식(JPEG/PNG/HEIC)인지 확인</li>
-                        <li>파일명에 특수문자( / * ? : " 등)가 포함되어 있으면 제거 후 재시도</li>
+                        <li>파일명에 특수문자( / * ? : &quot; 등)가 포함되어 있으면 제거 후 재시도</li>
                         <li>네트워크 연결이 안정적인지 확인</li>
                         <li>브라우저 탭을 닫지 않고 업로드가 완전히 끝날 때까지 기다리기</li>
                       </ul>

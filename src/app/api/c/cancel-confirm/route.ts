@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const pinErr = checkPinAuth(req, token);
+    const pinErr = await checkPinAuth(req, token);
     if (pinErr) return pinErr;
     const project = await validateTokenAndProject(token, project_id);
     if (!project) {

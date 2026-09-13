@@ -1,0 +1,196 @@
+.lightTheme {
+  composes: lightTheme from "../../../../../styles/PhotographerLightTheme.module.css";
+}
+
+.page {
+  display: flex;
+  height: 100dvh;
+  min-height: 100dvh;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.tabs {
+  display: flex;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.tab {
+  position: relative;
+  width: 100px;
+  min-height: 42px;
+  border: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 32px;
+  letter-spacing: -0.45px;
+  cursor: pointer;
+}
+
+.tabCount {
+  margin-left: 5px;
+  color: var(--subtle-foreground);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tab:hover { color: var(--foreground); }
+
+.tabActive {
+  color: var(--foreground);
+  font-weight: 700;
+}
+
+.tabActive::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  content: "";
+}
+
+.toolbarControls {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.control {
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 14px;
+  line-height: 24px;
+  letter-spacing: -0.45px;
+}
+
+.control:focus-visible,
+.tab:focus-visible,
+.photoButton:focus-visible,
+.exportButton:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 42%, transparent);
+  outline-offset: 2px;
+}
+
+.search { width: clamp(160px, 20vw, 280px); }
+
+.resultsScroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.mainFeedback { margin: 26px 40px 0; }
+
+.exportMenu { position: relative; height: 44px; border-left: 1px solid var(--border-subtle); margin-left: 2px; padding-left: 12px; }
+.exportMenu[open] > summary { background: var(--surface-raised); }
+.exportMenu summary { list-style: none; }
+.exportMenu summary::-webkit-details-marker { display: none; }
+.exportTrigger { color: var(--muted-foreground); }
+.exportTrigger:hover { border-color: var(--border-strong); background: var(--surface-raised); color: var(--foreground); }
+
+.exportPopover {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  z-index: 40;
+  width: 272px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 6px;
+  box-shadow: 0 12px 32px rgba(2, 56, 82, 0.14);
+}
+
+.exportButton {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 0 10px;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.exportButton:hover { background: var(--surface-raised); }
+.exportButton:disabled { cursor: not-allowed; opacity: 0.48; }
+.exportButton:disabled:hover { background: transparent; }
+.exportDivider { height: 1px; margin: 6px 8px; background: var(--border-subtle); }
+.exportDownloadButton { min-height: 58px; align-items: flex-start; padding-block: 9px; text-align: left; }
+.exportDownloadButton > span { display: block; min-width: 0; }
+.exportDownloadButton strong { display: block; font-size: 13px; font-weight: 600; line-height: 20px; }
+.exportDownloadButton small { display: block; margin-top: 1px; color: var(--muted-foreground); font-size: 11px; line-height: 16px; }
+.exportAccentIcon { flex-shrink: 0; margin-top: 2px; color: var(--accent); }
+
+.mobileExportAction {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 0 16px;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.mobileExportAction:disabled { opacity: 0.45; }
+.mobileExportPrimary { min-height: 62px; border-color: rgba(var(--accent-rgb), 0.28); background: rgba(var(--accent-rgb), 0.06); color: var(--accent); }
+.mobileExportPrimary > span { display: block; }
+.mobileExportPrimary strong { display: block; font-size: 14px; line-height: 20px; }
+.mobileExportPrimary small { display: block; margin-top: 1px; color: var(--muted-foreground); font-size: 11px; font-weight: 500; line-height: 16px; }
+
+.skeletonBlock {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-raised) 25%, var(--surface) 48%, var(--surface-raised) 72%);
+  background-size: 240% 100%;
+  animation: skeletonSweep 1.35s ease-in-out infinite;
+}
+
+.skeletonHeader { display: flex; min-height: 40px; align-items: center; justify-content: space-between; gap: 24px; padding-inline: 8px; }
+.skeletonBreadcrumb { width: min(320px, 42vw); height: 16px; }
+.skeletonDescription { width: min(220px, 28vw); height: 16px; }
+.skeletonTabs { width: 224px; height: 43px; border-radius: 0; }
+.skeletonToolbar { display: flex; min-height: 72px; align-items: center; justify-content: space-between; margin-inline: -32px; border: 1px solid var(--border-subtle); background: var(--surface); padding: 14px 40px; }
+.skeletonGallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(218px, 1fr)); gap: 12px; padding: 24px 40px; }
+.skeletonCard { display: flex; min-width: 0; flex-direction: column; gap: 8px; padding: 5px; }
+.skeletonMedia { width: 100%; aspect-ratio: 218.32 / 150.7; border-radius: 8px; }
+
+@keyframes skeletonSweep { to { background-position: -140% 0; } }
+
+@media (max-width: 767px) {
+  .skeletonHeader { display: none; }
+  .resultsScroll { background: var(--surface); scrollbar-gutter: auto; }
+  .toolbarControls { flex-wrap: wrap; justify-content: stretch; }
+  .search { width: 100%; }
+  .skeletonGallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 16px; }
+  .mainFeedback { margin: 16px; }
+}

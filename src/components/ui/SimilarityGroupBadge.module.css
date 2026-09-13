@@ -1,0 +1,15 @@
+.wrap { position: absolute; right: 4px; bottom: 2px; z-index: 22; display: flex; flex-direction: column; align-items: flex-end; pointer-events: none; }
+.inline { position: relative; inset: auto; flex-shrink: 0; }
+.button { position: relative; min-height: 36px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; color: white; border: 0; border-radius: 7px; background: transparent; font: 600 11px/1.2 Pretendard, sans-serif; cursor: pointer; pointer-events: auto; white-space: nowrap; isolation: isolate; }
+.button::before { content: ""; position: absolute; inset: 4px 0; border-radius: inherit; background: rgba(24,30,34,.82); z-index: -1; }
+.button:hover::before { background: rgba(24,30,34,.96); }
+.button:focus-visible { outline: 2px solid white; outline-offset: -2px; }
+.selected { padding: 3px 6px; border-radius: 4px; background: rgba(24,30,34,.82); color: white; font: 500 10px/1.2 Pretendard, sans-serif; }
+@media (max-width: 767px) {
+  .wrap { right: 2px; bottom: 0; }
+  .inline { right: auto; }
+  .button { min-height: 44px; padding-inline: 6px; gap: 3px; font-size: 10px; }
+  .button::before { inset-block: 8px; }
+  .word { display: none; }
+  .selected { font-size: 9px; margin-bottom: -5px; }
+}

@@ -1,0 +1,22 @@
+{
+  "seconds": 12,
+  "fps": 30,
+  "width": 2400,
+  "height": 1440,
+  "files": {
+    "acut-review.webm": 2889636,
+    "acut-review.mp4": 2332786,
+    "acut-review-poster.webp": 79826
+  },
+  "gallery": [
+    "10"
+  ],
+  "selected": [
+    "10"
+  ],
+  "retouched": {
+    "photoId": "10",
+    "filename": "ACUT_0010-보정.jpg"
+  },
+  "comment": "피부 톤을 조금 더 자연스럽게 조정해주세요."
+}

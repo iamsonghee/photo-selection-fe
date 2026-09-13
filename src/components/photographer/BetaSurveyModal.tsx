@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
+import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { QuestionHeader, PointScaleField, RadioListField, ChipMultiSelectField, Textarea } from "@/components/ui";
 import type {
   ProjectCreatedSurveyAnswers,
@@ -76,8 +77,8 @@ const TITLES: Record<SurveyType, string> = {
   project_created: "프로젝트를 만드셨네요!",
   original_uploaded: "원본 업로드를 완료하셨네요!",
   selection_received: "고객이 셀렉을 완료했어요!",
-  first_delivery: "첫 프로젝트를 완료하셨네요! 🎉",
-  second_delivery: "두 번째 프로젝트도 완료하셨네요! 🎉",
+  first_delivery: "첫 프로젝트를 완료하셨네요!",
+  second_delivery: "두 번째 프로젝트도 완료하셨네요!",
 };
 
 const npsBtnCls = (active: boolean) =>
@@ -292,17 +293,26 @@ export function BetaSurveyModal({
   const handleSubmit = SUBMIT_HANDLERS[surveyType];
 
   return (
-    <PhotographerModal open onClose={handleLater} title={TITLES[surveyType]} maxWidth={480}>
+    <PhotographerModal
+      open
+      onClose={handleLater}
+      closeDisabled={pending !== null}
+      title={TITLES[surveyType]}
+      description="짧은 답변으로 A-CUT을 더 편하게 만드는 데 도움을 주세요."
+      maxWidth={520}
+      mobilePresentation="fullscreen"
+    >
       {done ? (
         <div className="flex flex-col gap-4">
           <p className="text-sm text-foreground">소중한 의견 감사합니다!</p>
-          <button
+          <PhotographerLightButton
             type="button"
+            variant="primary"
             onClick={onDone}
-            className="w-full rounded-xl bg-accent py-3 text-sm font-semibold text-black"
+            className="w-full"
           >
             닫기
-          </button>
+          </PhotographerLightButton>
         </div>
       ) : (
         <div className="flex flex-col gap-6">
@@ -519,22 +529,24 @@ export function BetaSurveyModal({
 
           <div className="flex justify-end">
             <div className="flex gap-2">
-              <button
+              <PhotographerLightButton
                 type="button"
+                variant="secondary"
                 onClick={handleLater}
                 disabled={pending !== null}
-                className="rounded-lg px-4 py-2 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
               >
                 나중에
-              </button>
-              <button
+              </PhotographerLightButton>
+              <PhotographerLightButton
                 type="button"
+                variant="primary"
                 onClick={handleSubmit}
                 disabled={pending !== null}
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
+                pending={pending === "submit"}
+                pendingLabel="제출 중…"
               >
-                {pending === "submit" ? "제출 중…" : "제출"}
-              </button>
+                제출
+              </PhotographerLightButton>
             </div>
           </div>
         </div>

@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
   // PIN 없음 → 쿠키 발급 후 원래 페이지로
   const cookieName = `pin_verified_${token}`;
   const response = NextResponse.redirect(new URL(to, req.url));
-  response.cookies.set(cookieName, signPinCookie(token), {
+  response.cookies.set(cookieName, signPinCookie(token, null), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

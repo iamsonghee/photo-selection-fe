@@ -1,0 +1,245 @@
+.canvas {
+  --entry-text: #191918;
+  --entry-text-secondary: #5f5e5b;
+  --entry-control: #26282c;
+  --entry-divider: #dde1e4;
+  --entry-danger: #ff3636;
+  --entry-accent: #ff4d00;
+  display: grid;
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  max-height: 100dvh;
+  grid-template-rows: minmax(300px, 46dvh) minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.panel {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+}
+
+.hero {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: #eceeed;
+}
+
+.heroPlaceholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 68% 24%, rgba(255, 77, 0, 0.11), transparent 32%),
+    linear-gradient(145deg, #f4f4f2 0%, #e7e9e8 100%);
+}
+
+.heroPlaceholder span {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 12px;
+  background: #ff4d00;
+  color: #fff;
+  font-size: 23px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.heroImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.heroImageLoaded { opacity: 1; }
+
+.creator {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  height: 120px;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 0 24px 24px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 12%, rgba(0, 0, 0, 0.64));
+  color: #fff;
+}
+
+.avatar {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 50%;
+  background: #fff;
+  object-fit: cover;
+}
+
+.creatorName {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 23px;
+  letter-spacing: -0.027em;
+}
+
+.copy {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 20px;
+  padding: 20px 24px 16px;
+  overflow: hidden;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  gap: 8px;
+  padding: 8px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff 50%);
+}
+
+@media (max-width: 1023px) {
+  .selectionCanvas {
+    grid-template-rows: minmax(340px, 54dvh) minmax(0, 1fr);
+  }
+
+  .selectionCopy {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 1023px) and (max-height: 700px) {
+  .canvas { grid-template-rows: 300px minmax(0, 1fr); }
+  .selectionCanvas { grid-template-rows: minmax(340px, 54dvh) minmax(0, 1fr); }
+  .copy { gap: 12px; padding-top: 12px; padding-bottom: 8px; }
+  .actions { padding-top: 6px; padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+}
+
+@media (max-width: 1023px) and (max-height: 600px) {
+  .canvas { grid-template-rows: 250px minmax(0, 1fr); }
+  .selectionCanvas { grid-template-rows: 280px minmax(0, 1fr); }
+}
+
+@media (min-width: 1024px) {
+  .canvas {
+    grid-template-columns: minmax(520px, 1.08fr) minmax(440px, 0.92fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .hero {
+    grid-column: 1;
+    grid-row: 1;
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  .panel {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    grid-column: 2;
+    grid-row: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: clamp(32px, 4vh, 40px);
+    padding: 40px clamp(48px, 5vw, 80px) clamp(72px, 10vh, 112px);
+    overflow: hidden;
+    background: #fff;
+  }
+
+  .heroImage { transform: scale(1.001); }
+
+  .creator {
+    height: 168px;
+    gap: 12px;
+    padding: 0 40px 40px;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0) 8%, rgba(0, 0, 0, 0.68));
+  }
+
+  .avatar {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+
+  .creatorName {
+    font-size: 17px;
+    line-height: 25px;
+  }
+
+  .copy {
+    width: min(100%, 560px);
+    align-self: auto;
+    gap: clamp(24px, 3.2vh, 32px);
+    margin: 0 auto;
+    padding: 0;
+  }
+
+  .selectionCopy {
+    justify-content: center;
+  }
+
+  .actions {
+    width: min(100%, 560px);
+    gap: 12px;
+    margin: 0 auto;
+    padding: 0;
+    background: #fff;
+  }
+
+  .actions :global(.original-download-entry-trigger) {
+    min-height: 44px;
+    border-color: #e5e7e9;
+    background: #fafafa;
+    color: #5f5e5b;
+    font-size: 14px;
+    font-weight: 500;
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 760px) {
+  .panel {
+    gap: 24px;
+    padding-top: 24px;
+    padding-bottom: 40px;
+  }
+
+  .copy { gap: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroImage { transition: none; }
+}
+
+/* 고정 높이로 내용을 자르지 않고, 짧은 화면과 글자 확대에는 문서 스크롤을 허용한다. */
+.canvas { height: auto; min-height: 100dvh; max-height: none; overflow: visible; grid-template-rows: clamp(220px, 40dvh, 340px) auto; }
+.panel, .copy { overflow: visible; }
+.copy { flex: 0 0 auto; gap: 20px; padding: 28px 24px 20px; }
+.panel { justify-content: center; }
+.actions { padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 1024px) {
+  .canvas { grid-template-columns: minmax(0, 1fr) minmax(440px, 1fr); grid-template-rows: auto; }
+  .hero { position: sticky; top: 0; height: 100dvh; }
+  .panel { min-height: 100dvh; padding: 48px clamp(32px, 5vw, 80px); gap: 32px; }
+  .copy { padding: 0; gap: 28px; }
+  .actions { padding: 0; }
+}

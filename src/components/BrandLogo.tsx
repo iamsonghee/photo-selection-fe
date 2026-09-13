@@ -9,6 +9,7 @@ const MARK_FONT = "'JetBrains Mono', 'Space Mono', ui-monospace, monospace";
 const WORD_FONT = "'Space Grotesk', 'Pretendard Variable', system-ui, sans-serif";
 
 export type BrandLogoSize = "sm" | "md" | "lg";
+export type BrandLogoVariant = "default" | "customerEntry";
 
 const BAR: Record<BrandLogoSize, { mark: number; markFont: number; text: number; gap: number }> = {
   sm: { mark: 20, markFont: 11, text: 14, gap: 8 },
@@ -16,7 +17,15 @@ const BAR: Record<BrandLogoSize, { mark: number; markFont: number; text: number;
   lg: { mark: 28, markFont: 16, text: 22, gap: 12 },
 };
 
-function LogoMark({ size, fontSize }: { size: number; fontSize: number }) {
+function LogoMark({
+  size,
+  fontSize,
+  variant,
+}: {
+  size: number;
+  fontSize: number;
+  variant: BrandLogoVariant;
+}) {
   return (
     <div
       style={{
@@ -26,12 +35,12 @@ function LogoMark({ size, fontSize }: { size: number; fontSize: number }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: ACCENT,
-        color: "#000",
-        fontWeight: 700,
+        backgroundColor: variant === "customerEntry" ? "#ff4d00" : ACCENT,
+        color: variant === "customerEntry" ? "#fff" : "#000",
+        fontWeight: variant === "customerEntry" ? 800 : 700,
         fontSize,
-        borderRadius: 2,
-        fontFamily: MARK_FONT,
+        borderRadius: variant === "customerEntry" ? 6.72 : 2,
+        fontFamily: variant === "customerEntry" ? "Pretendard, sans-serif" : MARK_FONT,
         lineHeight: 1,
       }}
     >
@@ -40,20 +49,26 @@ function LogoMark({ size, fontSize }: { size: number; fontSize: number }) {
   );
 }
 
-function LogoWordmark({ fontSize }: { fontSize: number }) {
+function LogoWordmark({
+  fontSize,
+  variant,
+}: {
+  fontSize: number;
+  variant: BrandLogoVariant;
+}) {
   return (
     <span
       style={{
-        fontFamily: WORD_FONT,
-        fontWeight: 700,
+        fontFamily: variant === "customerEntry" ? "Pretendard, sans-serif" : WORD_FONT,
+        fontWeight: variant === "customerEntry" ? 800 : 700,
         fontSize,
-        letterSpacing: "-0.05em",
-        color: "var(--foreground)",
+        letterSpacing: variant === "customerEntry" ? "-0.04em" : "-0.05em",
+        color: variant === "customerEntry" ? "#191918" : "var(--foreground)",
         whiteSpace: "nowrap",
         lineHeight: 1,
       }}
     >
-      A-CUT<span style={{ color: ACCENT }}>.</span>
+      A-CUT{variant === "default" && <span style={{ color: ACCENT }}>.</span>}
     </span>
   );
 }
@@ -64,14 +79,18 @@ export const BrandLogoBar = memo(function BrandLogoBar({
   className = "",
   href,
   priority = false,
+  variant = "default",
 }: {
   size?: BrandLogoSize;
   className?: string;
   href?: string;
   priority?: boolean;
+  variant?: BrandLogoVariant;
 }) {
   void priority;
-  const s = BAR[size];
+  const s = variant === "customerEntry"
+    ? { mark: 24.96, markFont: 13.44, text: 18.24, gap: 7.2 }
+    : BAR[size];
   const inner = (
     <div
       role="img"
@@ -79,8 +98,8 @@ export const BrandLogoBar = memo(function BrandLogoBar({
       className={`inline-flex shrink-0 items-center ${className}`}
       style={{ gap: s.gap }}
     >
-      <LogoMark size={s.mark} fontSize={s.markFont} />
-      <LogoWordmark fontSize={s.text} />
+      <LogoMark size={s.mark} fontSize={s.markFont} variant={variant} />
+      <LogoWordmark fontSize={s.text} variant={variant} />
     </div>
   );
   if (href) {
@@ -108,8 +127,8 @@ export function BrandLogoFull({
   return (
     <div className={className} style={{ maxWidth }}>
       <div className="inline-flex items-center" style={{ gap: s.gap }} role="img" aria-label="A-CUT">
-        <LogoMark size={s.mark} fontSize={s.markFont} />
-        <LogoWordmark fontSize={s.text} />
+        <LogoMark size={s.mark} fontSize={s.markFont} variant="default" />
+        <LogoWordmark fontSize={s.text} variant="default" />
       </div>
     </div>
   );

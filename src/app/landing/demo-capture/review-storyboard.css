@@ -1,0 +1,46 @@
+/* 03 검토용 미디어 구도. 실제 랜딩/히어로 스타일에는 영향을 주지 않는다. */
+#demo-film.review-board {width:1200px;height:720px;position:relative;overflow:hidden;display:flex;align-items:center;gap:85px;padding:32px 80px;background:#f5f5f2;color:#191918;font-family:Pretendard,Arial,sans-serif;--accent:#ff4d00;}
+.review-board *{box-sizing:border-box;}
+.rb-phone{width:386px;height:656px;flex-shrink:0;border:5px solid #292927;border-radius:35px;background:white;overflow:hidden;box-shadow:0 18px 40px #20202012;position:relative;}
+.rb-phone header{height:61px;padding:0 17px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e7e7e2;}
+.rb-phone header>span{font-size:12px;color:#777;}
+.rb-file{height:38px;padding:0 14px;display:flex;align-items:center;gap:8px;font-size:11px;}
+.rb-file>span{margin-left:auto;color:#777;}
+.rb-photo{height:300px;position:relative;background:#eee;}
+.rb-photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 44%;}
+.rb-compare{display:block;margin:10px auto 0;border:1px solid #ddd;border-radius:20px;background:white;color:#444;padding:6px 18px;font-size:11px;}
+.rb-compare[data-active=true]{background:#292927;color:white;border-color:#292927;}
+.rb-panel{padding:12px 16px;}
+.rb-actions{display:flex;gap:8px;margin-bottom:12px;}
+.rb-actions button{display:flex;align-items:center;justify-content:center;gap:6px;height:36px;flex:1;border:0;border-radius:7px;background:#f6f6f3;color:#444;font-size:12px;}
+.rb-actions .rb-primary{background:var(--accent);color:white;}
+.rb-actions .rb-active{color:var(--accent);background:#fff2eb;}
+.rb-panel label{font-size:11px;display:block;margin-bottom:6px;font-weight:600;}
+.rb-panel label span{color:var(--accent);font-size:10px;margin-left:4px;}
+.rb-input{height:58px;border:1px solid #e0e0db;border-radius:7px;padding:10px;font-size:12px;line-height:1.6;color:#96968f;background:#fafaf8;}
+.rb-input[data-active=true]{border-color:var(--accent);background:white;color:#242421;}
+.rb-input i{display:inline-block;height:12px;width:1px;background:var(--accent);vertical-align:-2px;margin-left:2px;}
+.rb-panel>small{display:block;text-align:right;font-size:9px;color:#888;height:14px;margin-top:4px;}
+.rb-verdict{display:flex;align-items:center;gap:7px;font-size:12px;height:36px;color:var(--accent);}
+.rb-phone footer{position:absolute;bottom:0;left:0;right:0;height:35px;border-top:1px solid #eee;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:10px;color:#888;background:white;}
+.rb-story{flex:1;min-width:0;}
+.rb-eyebrow{font-size:12px;letter-spacing:1px;color:#85857a;}
+.rb-story h1{font-size:36px;font-weight:650;line-height:1.4;letter-spacing:-1.3px;margin:18px 0;}
+.rb-story>p{font-size:16px;line-height:1.8;color:#77776e;white-space:pre-line;}
+.rb-steps{margin-top:30px;}
+.rb-steps>div{display:flex;align-items:center;gap:15px;height:51px;border-bottom:1px solid #dfdfd7;color:#aaa99f;font-size:14px;}
+.rb-steps b{font-size:11px;font-weight:500;}
+.rb-steps svg{margin-left:auto;}
+.rb-steps [data-active=true]{color:#252521;font-weight:600;}
+.rb-steps [data-active=true] b{color:var(--accent);}
+.rb-story blockquote{margin:20px 0 0;padding:16px 20px;border-left:2px solid var(--accent);background:#fff9;}
+.rb-story blockquote>span{font-size:10px;color:#858579;}
+.rb-story blockquote p{font-size:15px;line-height:1.7;margin:8px 0 0;}
+.rb-story blockquote small{display:flex;gap:5px;align-items:center;font-size:10px;color:#777;margin-top:8px;}
+@media(max-width:700px){#demo-film.review-board{width:640px;height:800px;padding:20px;justify-content:center;}.rb-story{display:none;}.rb-phone{transform:scale(1.13);}}
+
+/* PC의 누르기 동작을 커서로 표시한다. 모바일 기기 형태와 구분한다. */
+.rb-phone{border-width:1px;border-color:#d8d8d2;border-radius:16px;}
+.rb-compare{position:relative;min-width:175px;}
+.rb-press{position:absolute;right:10px;top:14px;color:#242424;z-index:3;}
+.rb-press[data-held=true]::before{content:"";position:absolute;width:42px;height:42px;left:-15px;top:-14px;border-radius:50%;border:2px solid var(--accent);background:#ff4d001c;}

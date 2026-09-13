@@ -1,0 +1,30 @@
+.overlay { padding: 24px; }
+.dialog { max-height: min(820px, calc(100dvh - 48px)); }
+@media (max-width: 767px) {
+  .overlay { padding: 12px; }
+  .dialog { max-height: calc(100dvh - 24px); min-width: 0; outline: none; }
+  .dialog footer { padding: 10px 12px max(10px, env(safe-area-inset-bottom)); }
+  .dialog header h2 { font-size: 20px; line-height: 28px; }
+}
+
+@media (max-width: 767px) {
+  .dialog [data-upload-selection-summary] {
+    display: flex;
+    min-height: 52px;
+    gap: 8px;
+    padding: 4px 6px 4px 12px;
+    border-color: var(--border) !important;
+    border-radius: 10px;
+    background: var(--surface-raised) !important;
+  }
+  .dialog [data-upload-selection-icon] {
+    display: none;
+  }
+  .dialog [data-upload-selection-copy] {
+    min-width: 0;
+  }
+  .dialog [data-upload-selection-actions] {
+    width: auto;
+    flex-wrap: nowrap;
+  }
+}

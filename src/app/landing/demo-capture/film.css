@@ -1,0 +1,14 @@
+/* 18초 최종 녹화: 공용 갤러리의 카드 아래 요청을 영상 크기에서도 읽을 수 있게 표시한다. */
+.film-final .story-workarea {display:block;}
+.film-final .story-photo-list {max-width:860px;height:330px;overflow:hidden;}
+.film-final [data-original-photo-row], .film-final [data-original-photo-card] {overflow:visible!important;}
+.film-final [data-original-photo-card] [title] p {white-space:normal;overflow:visible;word-break:keep-all;font-size:14px;line-height:1.65;}
+.film-final [data-original-photo-card] [title] {flex-shrink:0;}
+.film-final .film-morph-photo {position:absolute;z-index:25;object-fit:cover;object-position:center;}
+@media(max-width:700px) {
+ .film-final .story-photo-list {height:515px;}
+ .film-final .story-project-heading {height:75px;}
+ .film-final .story-list-toolbar {height:38px;}
+ .film-final .film-writer-toolbar {height:52px;}
+ .film-final [data-original-photo-card] [title] p {font-size:16px;}
+}

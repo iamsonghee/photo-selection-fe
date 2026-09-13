@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { checkPinAuth } from "@/lib/customer-auth-server";
+import { getPinAuthorizedProject } from "@/lib/customer-auth-server";
 import { extractR2Key } from "@/lib/r2-key-server";
 import { callPresignApi } from "@/lib/presign-server";
 
@@ -19,8 +19,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "token required" }, { status: 400 });
   }
 
-  const pinErr = checkPinAuth(req, token);
-  if (pinErr) return pinErr;
+  const auth = await getPinAuthorizedProject(req, token);
+  if (auth.error) return auth.error;
+  if (!auth.project) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const photoIdsParam = req.nextUrl.searchParams.get("photoIds");
   if (!photoIdsParam?.trim()) {
@@ -44,22 +47,11 @@ export async function GET(req: NextRequest) {
   try {
     const admin = getAdminClient();
 
-    // token → project 확인
-    const { data: project } = await admin
-      .from("projects")
-      .select("id")
-      .eq("access_token", token)
-      .single();
-
-    if (!project) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 404 });
-    }
-
     // photo_id → r2_thumb_url 조회 (이 프로젝트 소속만)
     const { data: photos, error } = await admin
       .from("photos")
       .select("id, r2_thumb_url")
-      .eq("project_id", project.id)
+      .eq("project_id", auth.project.id)
       .in("id", photoIds);
 
     if (error) {

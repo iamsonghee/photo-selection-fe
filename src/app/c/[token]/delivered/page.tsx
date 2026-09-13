@@ -3,12 +3,11 @@
 import { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { PackageCheck } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import styles from "./delivered.module.css";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { CustomerHeader } from "@/components/customer/CustomerHeader";
-import { CustomerFooter } from "@/components/customer/CustomerFooter";
+import { useCustomerLightCanvas } from "@/lib/use-customer-light-canvas";
 import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
 import FinalDeliveryDownloadEntry from "@/components/customer/FinalDeliveryDownloadEntry";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
@@ -18,6 +17,7 @@ type PhotographerInfo = { name: string | null; profile_image_url: string | null 
 const subscribeToHydration = () => () => {};
 
 export default function DeliveredPage() {
+  useCustomerLightCanvas();
   const params = useParams();
   const router = useRouter();
   const token = (params?.token as string) ?? "";
@@ -37,7 +37,7 @@ export default function DeliveredPage() {
 
   useEffect(() => {
     if (project && project.status !== "delivered") router.replace(`/c/${token}`);
-  }, [project?.status, token, router]);
+  }, [project, token, router]);
 
   if (!mounted || loading) {
     return <SystemLoadingScreen />;
@@ -60,64 +60,58 @@ export default function DeliveredPage() {
 
   const photographerName = photographer?.name?.trim() || "작가";
   const invitePath = token ? `/c/${token}` : "/";
+  const projectFacts = (<dl className={styles.facts}>
+              {project.shootDate && <div><dt>촬영일</dt><dd>{formatDate(project.shootDate)}</dd></div>}
+              {project.location && <div><dt>촬영 장소</dt><dd>{project.location}</dd></div>}
+              {project.deliveredAt && <div><dt>수령 완료일</dt><dd>{formatDate(project.deliveredAt)}</dd></div>}
+            </dl>);
   return (
     <div className={styles.root}>
-      <div className={`${styles.viewportBracket} ${styles.bracketTl}`} aria-hidden />
-      <div className={`${styles.viewportBracket} ${styles.bracketTr}`} aria-hidden />
-      <div className={`${styles.viewportBracket} ${styles.bracketBl}`} aria-hidden />
-      <div className={`${styles.viewportBracket} ${styles.bracketBr}`} aria-hidden />
-
-      <CustomerHeader>
-        <BrandLogoBar size="sm" href={invitePath} />
+      <CustomerHeader theme="customerLight">
+        <BrandLogoBar size="sm" href={invitePath} variant="customerEntry" />
         <span className="font-mono text-[11px] text-subtle-foreground max-w-[180px] truncate">{project.name}</span>
       </CustomerHeader>
 
       <main className={styles.container}>
-        <div className={styles.portalCmd}>셀렉 · 보정 완료</div>
-        <h1 className={styles.title}>
-          모든 과정이 완료됐어요
-        </h1>
-        <p className={styles.subtitle}>
-          사진 선택과 보정 확인이 모두 끝났습니다.
-          <br />
-          최종 사진 전달이 완료되었습니다.
-        </p>
+        <header className={styles.intro}>
+          <div className={styles.portalCmd}>최종 납품 완료</div>
+          <h1 className={styles.title}>{project.name}</h1>
+        </header>
 
         <section className={styles.card} aria-label="완료 정보">
-          <div className={styles.successBadge} aria-hidden>
-            <PackageCheck style={{ width: 32, height: 32, color: "var(--accent-green)" }} />
-          </div>
-
-          <div className={styles.detailBox}>
+          <div className={styles.projectBar}>
             {photographer?.profile_image_url ? (
               <div className={styles.profileRow}>
                 <img src={photographer.profile_image_url} alt="" className={styles.avatar} />
                 <div style={{ minWidth: 0 }}>
                   <p className={styles.name}>{photographerName}</p>
-                  <p className={styles.meta}>{project.name}</p>
+
                 </div>
               </div>
             ) : (
-              <div style={{ marginBottom: 12 }}>
+              <div className={styles.profileText}>
                 <p className={styles.name}>{photographerName}</p>
-                <p className={styles.meta}>{project.name}</p>
+
               </div>
             )}
 
-            <div className={styles.message}>소중한 순간을 함께해서 영광이었습니다. 감사합니다</div>
-
-            <div className={styles.ctaRow}>
-              <FinalDeliveryDownloadEntry token={token} />
-              <OriginalDownloadEntry token={token} variant="inline" />
-            </div>
+            {/* 날짜가 실제로 제공된 경우에만 표시한다. 기한은 다운로드 API 기준으로 안내한다. */}
+            {projectFacts}
           </div>
+          <div className={styles.deliveryBody}><FinalDeliveryDownloadEntry token={token} /></div>
+          {project.includeOriginal && <div className={styles.originalRow}><div><strong>촬영 원본</strong></div><OriginalDownloadEntry token={token} variant="inline" /></div>}
         </section>
+        <aside className={styles.saveNote} aria-label="사진 보관 안내">
+          <p>다운로드 후 압축을 풀어 확인하고, 별도 저장 공간에 백업해 주세요.</p>
+        </aside>
       </main>
 
-      <CustomerFooter>
-        <span className="font-mono text-[10px] text-subtle-foreground">© 2026 A컷 · A-CUT</span>
-        <span className="font-mono text-[10px] text-subtle-foreground">{photographerName} 작가님이 A컷을 통해 전달했습니다.</span>
-      </CustomerFooter>
+
     </div>
   );
+}
+
+function formatDate(value: string) {
+  if (Number.isNaN(new Date(value).getTime())) return "—";
+  return new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Seoul" }).format(new Date(value));
 }

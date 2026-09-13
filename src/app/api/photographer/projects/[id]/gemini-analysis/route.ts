@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase-admin";
+import { isAdminEmail } from "@/lib/admin-emails";
 
 const CLIP_SERVICE_URL = process.env.CLIP_SERVICE_URL ?? "";
 const CLIP_INTERNAL_TOKEN = process.env.CLIP_INTERNAL_TOKEN ?? "";
@@ -18,7 +19,9 @@ const GEMINI_ERROR_FALLBACK = "분석 시작에 실패했습니다. 잠시 후 �
  * 호출하는 실사용 경로다 — 더 이상 관리자 전용 POC가 아니므로 일반 세션+소유권 검증만 한다.
  * 관리자 전용 품질(Flash) 조회는 별도로 분리된 `/groups`(include_quality) 라우트에서만 검증한다.
  */
-async function getPhotographerIdFromSession(): Promise<string | null> {
+async function getPhotographerIdFromSession(): Promise<
+  { photographerId: string; isAdmin: boolean } | null
+> {
   const supabase = await createClient();
   const {
     data: { session },
@@ -30,7 +33,8 @@ async function getPhotographerIdFromSession(): Promise<string | null> {
     .eq("auth_id", session.user.id)
     .limit(1)
     .single();
-  return data?.id ?? null;
+  if (!data?.id) return null;
+  return { photographerId: data.id, isAdmin: isAdminEmail(session.user.email) };
 }
 
 async function assertProjectOwnership(
@@ -58,15 +62,19 @@ export async function POST(
   }
 
   try {
-    const photographerId = await getPhotographerIdFromSession();
-    if (!photographerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await getPhotographerIdFromSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const owns = await assertProjectOwnership(projectId, photographerId);
+    const owns = await assertProjectOwnership(projectId, session.photographerId);
     if (!owns) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const body = await req.json().catch(() => ({}));
     const limit = typeof body?.limit === "number" ? body.limit : undefined;
-    const force = body?.force === true;
+    /* `force`는 저장된 임베딩 캐시를 무시하고 **전량 재분석**시키는 운영 스위치다(모델/프롬프트
+     * 교체 시 사용). 캐시가 있기 때문에 "사진 수 = 비용 상한"이 성립하는데, force가 켜지면
+     * 그 상한이 사라진다 — 화면에는 이 스위치가 없지만 API는 본문에서 그대로 읽으므로
+     * 일반 세션이 직접 호출해 반복 과금시킬 수 있었다. 관리자에게만 허용한다. */
+    const force = session.isAdmin && body?.force === true;
 
     const res = await fetch(`${CLIP_SERVICE_URL}/analyze/gemini`, {
       method: "POST",
@@ -112,10 +120,10 @@ export async function DELETE(
   }
 
   try {
-    const photographerId = await getPhotographerIdFromSession();
-    if (!photographerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await getPhotographerIdFromSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const owns = await assertProjectOwnership(projectId, photographerId);
+    const owns = await assertProjectOwnership(projectId, session.photographerId);
     if (!owns) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const res = await fetch(`${CLIP_SERVICE_URL}/analyze/gemini/${projectId}`, {
@@ -149,10 +157,10 @@ export async function GET(
   }
 
   try {
-    const photographerId = await getPhotographerIdFromSession();
-    if (!photographerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await getPhotographerIdFromSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const owns = await assertProjectOwnership(projectId, photographerId);
+    const owns = await assertProjectOwnership(projectId, session.photographerId);
     if (!owns) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const res = await fetch(`${CLIP_SERVICE_URL}/analyze/gemini/${projectId}/status`, {

@@ -181,7 +181,10 @@ export default function GeminiAnalysisPanel({ projectId, photos }: Props) {
   const [imageLimitChoice, setImageLimitChoice] = useState<"50" | "100" | "all">("50");
   const [panelOpen, setPanelOpen] = useState(false);
   const [groups, setGroups] = useState<GeminiGroup[]>([]);
-  const [groupsThreshold, setGroupsThreshold] = useState(0.96);
+  /* 실제 실행 당시 값은 로드되는 즉시 thresholdSeededRef가 run.similarity_threshold로 덮어쓴다 —
+   * 이 초깃값은 그 전 잠깐(로드 중) 슬라이더에 스치는 값일 뿐이라, clip-service 기본값과만
+   * 맞추면 된다(clip-service/app/config.py GEMINI_SIMILARITY_THRESHOLD). */
+  const [groupsThreshold, setGroupsThreshold] = useState(0.94);
   const [groupsLoading, setGroupsLoading] = useState(false);
   const thresholdSeededRef = useRef(false);
 

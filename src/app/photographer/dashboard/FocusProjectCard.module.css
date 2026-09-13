@@ -1,0 +1,39 @@
+/* PC density follows the card's available space (including Sidebar/Aside). */
+@media (min-width: 768px) {
+  .root { container-type: inline-size; }
+  .top {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 16px;
+    height: auto;
+    align-items: center;
+  }
+  .imageGroup { display: contents; }
+  .thumbnail { width: 150px; height: 100px; }
+  .mobileHeadline { display: none; }
+  .desktopHeadline { display: flex; align-items: flex-start; }
+  .desktopHeadline svg { margin-top: 7px; }
+  .headline {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+    white-space: normal;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+  .metrics { grid-column: 1 / -1; width: 100%; height: auto; }
+  .metricSub { white-space: nowrap; font-size: 14px; }
+  .footer { flex-direction: row; flex-wrap: wrap; }
+  .followUp { white-space: normal; overflow: visible; }
+  .actions { margin-left: auto; }
+
+  @container (min-width: 820px) {
+    .top { grid-template-columns: 150px minmax(0, 1fr) minmax(260px, 30%); }
+    .metrics { grid-column: auto; height: 100%; }
+  }
+  @container (max-width: 400px) {
+    .top { grid-template-columns: 114px minmax(0, 1fr); gap: 12px; }
+    .thumbnail { width: 114px; height: 76px; }
+    .actions { width: 100%; }
+  }
+}

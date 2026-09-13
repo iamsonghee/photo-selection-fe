@@ -11,17 +11,36 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Lock, RefreshCw, AlertCircle, AlertTriangle, ChevronRight } from "lucide-react";
+import { AlertCircle, AlertTriangle } from "lucide-react";
 import { addDays, format } from "date-fns";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useQuota } from "@/contexts/QuotaContext";
 import { parseBetaLimitError } from "@/lib/beta-limits";
-import { SHOOT_TYPES } from "@/lib/project-shoot-types";
-import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
-import { BetaApprovalBanner, type BetaApplicationStatus } from "@/components/photographer/BetaApprovalBanner";
-import { PhoneInput } from "@/components/ui/PhoneInput";
+import { BetaApprovalBanner } from "@/components/photographer/BetaApprovalBanner";
 import { isValidKoreanPhone } from "@/lib/phone";
+import { PhotographerLightPageFrame } from "@/components/layout/PhotographerLightPageHeader";
+import themeStyles from "./NewProjectTheme.module.css";
+import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { PhotographerFormActionBar } from "@/components/photographer/PhotographerFormActionBar";
+import {
+  PROJECT_FORM_INPUT_CLASS,
+  ProjectFormDateInput,
+  ProjectFormField,
+  ProjectFormInput,
+  ProjectFormPhoneInput,
+  ProjectFormPageHeading,
+  ProjectFormSection,
+  ProjectFormToggleRow,
+  ProjectPinControl,
+  ProjectRevisionSelector,
+  ProjectShootTypeSelector,
+  projectFormInputStateClass,
+} from "@/components/photographer/ProjectFormFields";
 
-const QUICK_DAYS = [3, 5, 7, 14, 30];
+// 셀렉 기한은 이 페이지에서 더 이상 입력받지 않는다 — 원본 업로드 후 고객 초대 시점에 별도로 정하며,
+// 그 전까지는 촬영일 기준 기본값(+7일)을 자동으로 채워 기존 기능(마감일 임박순 정렬, D-day 배지 등)이
+// 계속 동작하도록 한다.
+const DEFAULT_DEADLINE_DAYS = 7;
 
 function getErrorMessage(e: unknown): string {
   if (e instanceof Error && e.message) return e.message;
@@ -33,62 +52,14 @@ function getErrorMessage(e: unknown): string {
   return String(e) || "프로젝트 생성에 실패했습니다.";
 }
 
-// ── Field wrapper ──────────────────────────────────────────
-function Field({ label, hint, required, children }: {
-  label: string;
-  hint?: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <label className="text-sm font-semibold text-muted-foreground">{label}</label>
-        {required && <span className="text-[10px] text-accent font-medium">필수</span>}
-        {hint && <span className="text-[10px] text-disabled-foreground ml-auto">{hint}</span>}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-// ── Step indicator ─────────────────────────────────────────
-function StepDots({ current }: { current: number }) {
-  const steps = ["프로젝트 만들기", "사진 업로드", "링크 공유"];
-  return (
-    <div className="flex items-center gap-0">
-      {steps.map((label, i) => (
-        <div key={i} className="flex items-center">
-          <div className="flex items-center gap-2">
-            <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border transition-colors"
-              style={{
-                background: i === current ? "var(--accent)" : "transparent",
-                color: i === current ? "#000" : i < current ? "var(--foreground)" : "var(--border-strong)",
-                borderColor: i === current ? "var(--accent)" : i < current ? "var(--border-strong)" : "var(--border)",
-              }}
-            >
-              {i < current ? "✓" : i + 1}
-            </div>
-            <span
-              className="text-xs font-medium hidden sm:block"
-              style={{ color: i === current ? "var(--foreground)" : "var(--border-strong)" }}
-            >
-              {label}
-            </span>
-          </div>
-          {i < steps.length - 1 && (
-            <div className="w-8 sm:w-16 h-px mx-2 sm:mx-3" style={{ background: i < current ? "var(--border-strong)" : "var(--border)" }} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function NewProjectPage() {
   const router = useRouter();
-  const { profile } = useProfile();
+  const { profile, loading: profileLoading } = useProfile();
+
+  // 이 페이지에서 도달 가능한 모든 분기(빈 상태/한도초과/폼)의 공통 뒤로가기 대상을 미리 prefetch.
+  useEffect(() => {
+    router.prefetch("/photographer/projects");
+  }, [router]);
 
   const [shootType,     setShootType]     = useState<string | null>(null);
   const [name,          setName]          = useState("");
@@ -96,68 +67,29 @@ export default function NewProjectPage() {
   const [customerName,  setCustomerName]  = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [requiredCount, setRequiredCount] = useState("");
-  const [quickDays,     setQuickDays]     = useState<number | null>(7);
   const [deadline,      setDeadline]      = useState<string>(() =>
-    format(addDays(new Date(), 7), "yyyy-MM-dd")
+    format(addDays(new Date(), DEFAULT_DEADLINE_DAYS), "yyyy-MM-dd")
   );
   const [location,      setLocation]      = useState("");
   const [accessPin,     setAccessPin]     = useState("");
   const [maxRevisionCount, setMaxRevisionCount] = useState<0 | 1 | 2>(2);
   const [includeOriginal, setIncludeOriginal] = useState(false);
   const [submitting,    setSubmitting]    = useState(false);
+  const [submitAction,  setSubmitAction]  = useState<"later" | "upload" | null>(null);
   const [error,         setError]         = useState<string | null>(null);
   const [fieldErrors,   setFieldErrors]   = useState<Record<string, string>>({});
-  const [quota, setQuota] = useState<{
-    tier: "admin" | "beta" | "general";
-    current: number;
-    max: number | null;
-    maxPhotosPerProject: number | null;
-    betaStatus: "not_invited" | "active" | "ended" | "suspended";
-    betaApplicationStatus: BetaApplicationStatus;
-  } | null>(null);
-  const [quotaError, setQuotaError] = useState(false);
-  const [quotaRetryTick, setQuotaRetryTick] = useState(0);
+  const { quota, loading: quotaLoading, error: quotaError, refetch: refetchQuota } = useQuota();
 
+  // atLimit 게이트는 실제 생성을 막는 비즈니스 룰이라, 세션 공유 캐시에 기대지 않고 이 페이지를
+  // 방문할 때마다 최신 값으로 다시 확인한다(서버도 POST 시점에 최종 검증하지만, 폼을 다 채운
+  // 뒤에야 막히는 UX를 피하기 위한 선제 확인).
   useEffect(() => {
-    if (!profile?.id) return;
-    let cancelled = false;
-    setQuotaError(false);
-    (async () => {
-      try {
-        const res = await fetch("/api/photographer/quota");
-        const data = await res.json();
-        if (cancelled) return;
-        if (res.ok) setQuota(data);
-        else setQuotaError(true);
-      } catch {
-        // 조회 실패 시 "무제한"으로 잘못 간주하지 않는다 — 서버가 최종 검증하긴 하지만,
-        // 이미 한도를 다 쓴 사용자가 폼을 전부 채운 뒤에야 막히는 걸 방지하기 위해 명시적 에러 상태로 남긴다.
-        if (!cancelled) setQuotaError(true);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [profile?.id, quotaRetryTick]);
+    refetchQuota();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const handleQuickDays = (days: number) => {
-    setQuickDays(days);
-    const base = shootDate ? new Date(shootDate) : new Date();
-    setDeadline(format(addDays(base, days), "yyyy-MM-dd"));
-  };
-
-  const handleDeadlineInput = (val: string) => {
-    setDeadline(val);
-    setQuickDays(null);
-  };
-
-const isValid =
-    name.trim() !== "" &&
-    shootDate !== "" &&
-    customerName.trim() !== "" &&
-    Number(requiredCount) >= 1 &&
-    deadline !== "";
-
-  const handleSubmit = async () => {
-    if (submitting) return;
+  const handleSubmit = async (goToUpload: boolean) => {
+    if (submitting || profileLoading) return;
 
     // 필드별 검증
     const errors: Record<string, string> = {};
@@ -165,22 +97,28 @@ const isValid =
     if (!shootDate)                errors.shootDate     = "촬영 일자를 선택해주세요.";
     if (!customerName.trim())      errors.customerName  = "고객 이름을 입력해주세요.";
     if (Number(requiredCount) < 1) errors.requiredCount = "셀렉 갯수를 1 이상으로 입력해주세요.";
-    if (!deadline)                 errors.deadline      = "셀렉 기한을 선택해주세요.";
     if (customerPhone.trim() && !isValidKoreanPhone(customerPhone))
       errors.customerPhone = "연락처는 010-0000-0000 형식으로 입력해주세요.";
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       const firstKey = Object.keys(errors)[0];
-      document.getElementById(`field-${firstKey}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      requestAnimationFrame(() => {
+        const field = document.getElementById(`field-${firstKey}`);
+        field?.querySelector<HTMLElement>("input, textarea, select")?.focus({ preventScroll: true });
+        field?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
       return;
     }
 
     setFieldErrors({});
     setError(null);
     setSubmitting(true);
+    setSubmitAction(goToUpload ? "upload" : "later");
     try {
       if (!profile?.id) throw new Error("로그인이 필요합니다.");
+      // 생성 후 이동 위치와 원본 다운로드 설정은 독립적으로 유지한다.
+      const finalIncludeOriginal = includeOriginal;
       const res = await fetch("/api/photographer/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -195,7 +133,7 @@ const isValid =
           access_pin: accessPin || null,
           max_revision_count: maxRevisionCount,
           location: location.trim() || null,
-          include_original: includeOriginal,
+          include_original: finalIncludeOriginal,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -204,23 +142,25 @@ const isValid =
         if (betaErr) throw new Error(betaErr.message);
         throw new Error((data as { error?: string }).error ?? "프로젝트 생성에 실패했습니다.");
       }
-      router.push(`/photographer/projects/${data.id}`);
+      refetchQuota();
+      router.push(goToUpload ? `/photographer/projects/${data.id}/upload` : `/photographer/projects/${data.id}`);
     } catch (e) {
       setError(getErrorMessage(e));
     } finally {
       setSubmitting(false);
+      setSubmitAction(null);
     }
   };
 
   // 한도 확인 실패 — "무제한"으로 잘못 간주해 폼을 열어주지 않는다(폼을 다 채운 뒤에야 막히는 UX 방지)
   if (quotaError) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <div className={`${themeStyles.lightTheme} min-h-screen bg-background flex items-center justify-center px-4`}>
         <div className="flex flex-col items-center gap-4 text-center">
           <p className="text-sm text-muted-foreground">이용 한도를 확인하지 못했습니다. 네트워크 상태를 확인해주세요.</p>
           <button
             type="button"
-            onClick={() => setQuotaRetryTick((t) => t + 1)}
+            onClick={() => refetchQuota()}
             className="px-5 py-2 bg-surface border border-border-subtle text-foreground text-sm font-semibold rounded-xl hover:border-accent/40 transition-colors"
           >
             다시 시도
@@ -231,9 +171,9 @@ const isValid =
   }
 
   // 로딩 중 — 한도 확인 전에는 폼을 렌더하지 않음
-  if (quota === null) {
+  if (quotaLoading || quota === null) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className={`${themeStyles.lightTheme} min-h-screen bg-background flex items-center justify-center`}>
         <div className="w-6 h-6 rounded-full border-2 border-accent/20 border-t-accent" style={{ animation: "spin 0.9s linear infinite" }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
@@ -253,19 +193,24 @@ const isValid =
         : <>무료 체험에서는 프로젝트 {quota.max}개까지 생성할 수 있습니다.<br />더 이용하시려면 베타 참여를 문의해주세요.</>;
     return (
       <div
-        className="min-h-screen bg-background text-foreground"
+        className={`${themeStyles.lightTheme} min-h-screen bg-background text-foreground`}
         style={{ fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif" }}
       >
-        <PhotographerPageHeader
-          crumbs={[
-            { label: "프로젝트", href: "/photographer/projects" },
-            { label: "새 프로젝트" },
-          ]}
-          title="새 프로젝트 만들기"
-        />
+        <PhotographerLightPageFrame className="pb-16">
+          <div className="max-w-[840px] mx-auto">
+            <ProjectFormPageHeading
+              title="새 프로젝트 만들기"
+              description="프로젝트 기본 정보와 고객 갤러리 이용 조건을 설정해 주세요."
+              onBack={() => router.push("/photographer/projects")}
+            />
+          </div>
+        </PhotographerLightPageFrame>
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-16 flex flex-col items-center text-center gap-6">
-          <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-            <AlertCircle size={28} color="#ef4444" />
+          <div
+            className="w-16 h-16 rounded-2xl border flex items-center justify-center"
+            style={{ background: "rgba(220,46,47,0.08)", borderColor: "rgba(220,46,47,0.2)" }}
+          >
+            <AlertCircle size={28} color="var(--danger)" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-foreground mb-2">{heading}</h2>
@@ -274,7 +219,7 @@ const isValid =
           <button
             type="button"
             onClick={() => router.push("/photographer/projects")}
-            className="px-6 py-2.5 bg-accent text-black text-sm font-bold rounded-xl hover:bg-[#ff5e1a] transition-colors"
+            className="px-6 py-2.5 bg-accent text-[var(--accent-foreground)] text-sm font-bold rounded-xl hover:bg-[#ff5e1a] transition-colors"
           >
             프로젝트 목록으로
           </button>
@@ -285,35 +230,24 @@ const isValid =
 
   return (
     <div
-      className="min-h-screen bg-background text-foreground"
+      className={`${themeStyles.lightTheme} min-h-screen bg-background text-foreground`}
       style={{ fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif" }}
       onKeyDown={(e) => { if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault(); }}
     >
-      <style>{`
-        .np-input {
-          width: 100%; background: var(--background); border: 1px solid var(--border);
-          color: var(--foreground); padding: 12px 16px; font-size: 14px; outline: none;
-          border-radius: 12px; transition: border-color 0.2s; box-sizing: border-box;
-          font-family: inherit;
-        }
-        .np-input:focus { border-color: rgba(var(--accent-rgb),0.5); }
-        .np-input::placeholder { color: var(--placeholder-foreground); }
-        .np-input::-webkit-calendar-picker-indicator { filter: invert(0.4); cursor: pointer; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
-
-      {/* ── 헤더 ── */}
-      <PhotographerPageHeader
-        crumbs={[
-          { label: "프로젝트", href: "/photographer/projects" },
-          { label: "새 프로젝트" },
-        ]}
-        title="새 프로젝트 만들기"
-        actions={<StepDots current={0} />}
-      />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* ── 메인 ── */}
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-20">
+      {/* 페이지 시작 좌표는 Dashboard/Project List와 동일한 PhotographerLightPageFrame(좌우 32px,
+          상단 24px)을 그대로 재사용한다. 실제 폼은 Figma #56054 카드 폭(1120px)의 80% 비율로
+          좁혀 중앙에 배치한다(다크 테마 때 이미 승인된 폭 — 테마만 바뀌므로 그대로 유지). */}
+      <PhotographerLightPageFrame className="pb-8">
+        <div className="max-w-[840px] mx-auto">
+
+        <ProjectFormPageHeading
+          title="새 프로젝트 만들기"
+          description="프로젝트 기본 정보와 고객 갤러리 이용 조건을 설정해 주세요."
+          onBack={() => router.push("/photographer/projects")}
+        />
 
         {quota.tier === "general" &&
           quota.betaApplicationStatus !== null &&
@@ -329,111 +263,109 @@ const isValid =
             </div>
           )}
 
-        {/* 한도 임박 (잔여 1개) */}
+        {/* 한도 임박 (잔여 1개) — design-system-light.md §2.1 --warning(#FAC005) 토큰 */}
         {quota.max !== null && quota.current === quota.max - 1 && (
-          <div className="flex items-center gap-2 bg-yellow-500/5 border border-yellow-500/20 rounded-xl px-4 py-2.5 mb-4">
-            <AlertTriangle size={13} color="#eab308" />
-            <span className="text-xs text-yellow-500/80">
-              잔여 1개 · {quota.tier === "beta" ? "베타 기간 중" : "무료 체험은"} 최대 {quota.max}개까지 생성 가능합니다.
+          <div
+            className="flex items-center gap-2 border rounded-xl px-4 py-2.5 mb-4"
+            style={{ background: "rgba(250,192,5,0.08)", borderColor: "rgba(250,192,5,0.25)" }}
+          >
+            <AlertTriangle size={13} color="var(--warning)" />
+            <span className="text-xs" style={{ color: "var(--warning)" }}>
+              <span className="md:hidden">프로젝트를 1개 더 만들 수 있어요.</span>
+              <span className="hidden md:inline">잔여 1개 · {quota.tier === "beta" ? "베타 기간 중" : "무료 체험은"} 최대 {quota.max}개까지 생성 가능합니다.</span>
             </span>
           </div>
         )}
 
         <div className="flex flex-col gap-5">
-
-            {/* ── 폼 카드 ── */}
-            <div className="bg-surface border border-surface-raised rounded-2xl p-6 flex flex-col gap-6">
-
-              {/* 촬영 유형 */}
-              <Field label="촬영 유형" hint="선택사항">
-                <div className="flex gap-2 flex-wrap">
-                  {SHOOT_TYPES.map(({ value, label, icon: Icon }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setShootType(shootType === value ? null : value)}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-colors"
-                      style={{
-                        background: shootType === value ? "rgba(var(--accent-rgb),0.08)" : "transparent",
-                        borderColor: shootType === value ? "rgba(var(--accent-rgb),0.5)" : "var(--border)",
-                        color: shootType === value ? "var(--accent)" : "var(--subtle-foreground)",
-                      }}
-                    >
-                      <Icon size={12} />
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </Field>
+            <ProjectFormSection
+              number="01"
+              title="기본 정보"
+              description="프로젝트를 구분하고 고객에게 안내할 정보를 입력해 주세요."
+            >
 
               {/* 프로젝트명 */}
               <div id="field-name">
-                <Field label="프로젝트명" required>
-                  <input
-                    className="np-input"
+                <ProjectFormField error={fieldErrors.name} label="프로젝트명" required>
+                  <ProjectFormInput
+                    className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(name), error: Boolean(fieldErrors.name) })}`}
                     value={name}
                     onChange={(e) => { setName(e.target.value); setFieldErrors((p) => ({ ...p, name: "" })); }}
                     placeholder="예: 2024 김민수님 스튜디오 촬영"
-                    style={{ borderColor: fieldErrors.name ? "rgba(239,68,68,0.7)" : name ? "rgba(var(--accent-rgb),0.3)" : undefined }}
                   />
-                </Field>
-                {fieldErrors.name && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.name}</p>}
+                </ProjectFormField>
               </div>
 
-              {/* 2열: 촬영일자 + 고객이름 */}
+              <ProjectFormField group label="촬영 유형">
+                <ProjectShootTypeSelector value={shootType} onChange={setShootType} />
+              </ProjectFormField>
+
+              {/* 2열: 고객이름 + 촬영일자 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div id="field-customerName">
+                  <ProjectFormField error={fieldErrors.customerName} label="고객 이름" required>
+                    <ProjectFormInput
+                      className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(customerName), error: Boolean(fieldErrors.customerName) })}`}
+                      value={customerName}
+                      onChange={(e) => { setCustomerName(e.target.value); setFieldErrors((p) => ({ ...p, customerName: "" })); }}
+                      placeholder="예: 김민수"
+                    />
+                  </ProjectFormField>
+                </div>
                 <div id="field-shootDate">
-                  <Field label="촬영 일자" required>
-                    <input
-                      className="np-input"
-                      type="date"
+                  <ProjectFormField error={fieldErrors.shootDate} label="촬영 일자" required>
+                    <ProjectFormDateInput
+                      className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(shootDate), error: Boolean(fieldErrors.shootDate) })}`}
                       value={shootDate}
                       onChange={(e) => {
                         setShootDate(e.target.value);
                         setFieldErrors((p) => ({ ...p, shootDate: "" }));
-                        if (quickDays && e.target.value) {
-                          setDeadline(format(addDays(new Date(e.target.value), quickDays), "yyyy-MM-dd"));
+                        // 셀렉 기한 입력 UI는 제거됐지만, 촬영일 기준 기본값(+7일)은 계속 자동으로 맞춰둔다.
+                        if (e.target.value) {
+                          setDeadline(format(addDays(new Date(e.target.value), DEFAULT_DEADLINE_DAYS), "yyyy-MM-dd"));
                         }
                       }}
                       onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
-                      style={{ borderColor: fieldErrors.shootDate ? "rgba(239,68,68,0.7)" : shootDate ? "rgba(var(--accent-rgb),0.3)" : undefined }}
                     />
-                  </Field>
-                  {fieldErrors.shootDate && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.shootDate}</p>}
-                </div>
-                <div id="field-customerName">
-                  <Field label="고객 이름" required>
-                    <input
-                      className="np-input"
-                      value={customerName}
-                      onChange={(e) => { setCustomerName(e.target.value); setFieldErrors((p) => ({ ...p, customerName: "" })); }}
-                      placeholder="고객님 성함"
-                      style={{ borderColor: fieldErrors.customerName ? "rgba(239,68,68,0.7)" : customerName ? "rgba(var(--accent-rgb),0.3)" : undefined }}
-                    />
-                  </Field>
-                  {fieldErrors.customerName && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.customerName}</p>}
+                  </ProjectFormField>
                 </div>
               </div>
 
-              {/* 2열: 연락처 + 셀렉 갯수 */}
+              {/* 2열: 연락처 + 촬영장소 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div id="field-customerPhone">
-                  <Field label="연락처" hint="선택사항">
-                    <PhoneInput
-                      className="np-input"
+                  <ProjectFormField error={fieldErrors.customerPhone} label="연락처" info="알림 기능 연동 시 사용됩니다">
+                    <ProjectFormPhoneInput
+                      className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(customerPhone), error: Boolean(fieldErrors.customerPhone) })}`}
                       value={customerPhone}
                       onChange={(v) => { setCustomerPhone(v); setFieldErrors((p) => ({ ...p, customerPhone: "" })); }}
-                      style={{ borderColor: fieldErrors.customerPhone ? "rgba(239,68,68,0.7)" : customerPhone ? "rgba(var(--accent-rgb),0.3)" : undefined }}
                     />
-                    <span className="text-[10px] text-disabled-foreground">알림 기능 연동 시 사용됩니다</span>
-                  </Field>
-                  {fieldErrors.customerPhone && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.customerPhone}</p>}
+                  </ProjectFormField>
                 </div>
+                <ProjectFormField label="촬영 장소">
+                  <ProjectFormInput
+                    className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(location) })}`}
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="예: 강남 스튜디오"
+                  />
+                </ProjectFormField>
+              </div>
+            </ProjectFormSection>
+
+            <ProjectFormSection
+              number="02"
+              title="고객 갤러리 설정"
+              description="고객이 사진을 선택하고 요청을 남길 수 있는 범위와 접속 방식을 설정해 주세요."
+            >
+
+              {/* 2열: 셀렉 갯수 + 재보정 요청 횟수 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div id="field-requiredCount">
-                  <Field label="셀렉 갯수" required>
-                    <div className="flex items-center gap-2">
-                      <input
-                        className="np-input text-right flex-1"
+                  <ProjectFormField error={fieldErrors.requiredCount} label="셀렉 갯수" required>
+                    <div className="relative">
+                      <ProjectFormInput
+                        className={`${PROJECT_FORM_INPUT_CLASS} pr-12 text-right ${projectFormInputStateClass({ hasValue: Boolean(requiredCount), error: Boolean(fieldErrors.requiredCount) })}`}
                         type="text"
                         inputMode="numeric"
                         pattern="[0-9]*"
@@ -444,196 +376,74 @@ const isValid =
                           setRequiredCount(v);
                           setFieldErrors((p) => ({ ...p, requiredCount: "" }));
                         }}
-                        style={{ borderColor: fieldErrors.requiredCount ? "rgba(239,68,68,0.7)" : requiredCount ? "rgba(var(--accent-rgb),0.3)" : undefined }}
                       />
-                      <span className="text-sm text-subtle-foreground shrink-0">장</span>
+                      <span className="pointer-events-none absolute inset-y-0 right-5 flex items-center text-sm text-subtle-foreground">
+                        장
+                      </span>
                     </div>
-                    <span className="text-[10px] text-disabled-foreground">고객이 선택할 사진 수</span>
-                  </Field>
-                  {fieldErrors.requiredCount && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.requiredCount}</p>}
+                    <span className="hidden text-[10px] text-disabled-foreground md:inline">고객이 선택할 사진 수</span>
+                  </ProjectFormField>
                 </div>
+
+                <ProjectFormField group label="재보정 요청 횟수" required>
+                  <ProjectRevisionSelector value={maxRevisionCount} onChange={setMaxRevisionCount} />
+                </ProjectFormField>
               </div>
 
-              {/* 촬영 장소 */}
-              <Field label="촬영 장소" hint="선택사항">
-                <input
-                  className="np-input"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="예: 서울 강남 스튜디오, 한강공원 잠원지구 등"
-                />
-              </Field>
-            </div>
+              <ProjectFormToggleRow
+                label="원본 다운로드 허용"
+                description="고객이 셀렉 갤러리에서 원본 사진을 내려받을 수 있도록 허용해요"
+                checked={includeOriginal}
+                onCheckedChange={setIncludeOriginal}
+                ariaLabel="원본 다운로드 허용"
+              />
 
-            {/* ── 셀렉 기한 카드 ── */}
-            <div className="bg-surface border border-surface-raised rounded-2xl p-6 flex flex-col gap-4">
-              <div className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                셀렉 기한
-                <span className="text-[10px] text-accent font-medium">필수</span>
-              </div>
+              <ProjectPinControl value={accessPin} onChange={setAccessPin} />
+            </ProjectFormSection>
 
-              {/* 빠른 선택 */}
-              <div className="flex gap-2 flex-wrap">
-                {QUICK_DAYS.map((days) => (
-                  <button
-                    key={days}
-                    type="button"
-                    onClick={() => handleQuickDays(days)}
-                    className="px-3 py-2 rounded-xl text-xs font-medium border transition-colors"
-                    style={{
-                      background: quickDays === days ? "rgba(var(--accent-rgb),0.08)" : "transparent",
-                      borderColor: quickDays === days ? "rgba(var(--accent-rgb),0.5)" : "var(--border)",
-                      color: quickDays === days ? "var(--accent)" : "var(--subtle-foreground)",
-                    }}
-                  >
-                    +{days}일
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setQuickDays(null)}
-                  className="px-3 py-2 rounded-xl text-xs font-medium border transition-colors"
-                  style={{
-                    background: quickDays === null ? "rgba(var(--accent-rgb),0.08)" : "transparent",
-                    borderColor: quickDays === null ? "rgba(var(--accent-rgb),0.5)" : "var(--border)",
-                    color: quickDays === null ? "var(--accent)" : "var(--subtle-foreground)",
-                  }}
-                >
-                  직접 입력
-                </button>
-              </div>
 
-              <div id="field-deadline">
-                <input
-                  className="np-input"
-                  type="date"
-                  value={deadline}
-                  onChange={(e) => { handleDeadlineInput(e.target.value); setFieldErrors((p) => ({ ...p, deadline: "" })); }}
-                  onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
-                  style={{ borderColor: fieldErrors.deadline ? "rgba(239,68,68,0.7)" : deadline ? "rgba(var(--accent-rgb),0.3)" : undefined }}
-                />
-                {fieldErrors.deadline && <p className="text-xs text-red-400 mt-1 ml-0.5">{fieldErrors.deadline}</p>}
-              </div>
 
-            </div>
-
-            {/* ── 보안 설정 카드 ── */}
-            <div className="bg-surface border border-surface-raised rounded-2xl p-6 flex flex-col gap-6">
-
-              {/* PIN */}
-              <Field label="고객 비밀번호 (PIN)" hint="선택사항">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Lock size={13} className="text-disabled-foreground shrink-0" />
-                  <input
-                    className="np-input w-28 text-center tracking-widest text-lg font-bold"
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={4}
-                    pattern="[0-9]*"
-                    value={accessPin}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/\D/g, "").slice(0, 4);
-                      setAccessPin(v);
-                    }}
-                    placeholder="0000"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setAccessPin(Math.floor(1000 + Math.random() * 9000).toString())}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs text-subtle-foreground border border-border hover:border-border-strong hover:text-muted-foreground rounded-xl transition-colors"
-                  >
-                    <RefreshCw size={11} /> 랜덤
-                  </button>
-                  {accessPin && (
-                    <button
-                      type="button"
-                      onClick={() => setAccessPin("")}
-                      className="text-xs text-disabled-foreground hover:text-muted-foreground transition-colors"
-                    >
-                      삭제
-                    </button>
-                  )}
-                </div>
-                <span className="text-[10px] text-disabled-foreground">설정 시 고객이 링크 접속 시 비밀번호를 입력해야 합니다</span>
-              </Field>
-
-              {/* 재보정 */}
-              <Field label="재보정 허용 횟수">
-                <div className="flex gap-2">
-                  {([
-                    { value: 0, label: "없음",  desc: "보정 후 바로 납품" },
-                    { value: 1, label: "1회",   desc: "재보정 1회 허용" },
-                    { value: 2, label: "2회",   desc: "재보정 최대 2회" },
-                  ] as const).map(({ value, label, desc }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setMaxRevisionCount(value)}
-                      className="flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-semibold transition-colors"
-                      style={{
-                        background: maxRevisionCount === value ? "rgba(var(--accent-rgb),0.08)" : "transparent",
-                        borderColor: maxRevisionCount === value ? "rgba(var(--accent-rgb),0.5)" : "var(--border)",
-                        color: maxRevisionCount === value ? "var(--accent)" : "var(--subtle-foreground)",
-                      }}
-                    >
-                      {label}
-                      <span className="text-[10px] font-normal" style={{ color: maxRevisionCount === value ? "rgba(var(--accent-rgb),0.6)" : "var(--border-strong)" }}>{desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </Field>
-
-              {/* 납품 원본 */}
-              <Field label="납품 파일">
-                <div className="flex gap-2">
-                  {([
-                    { value: false, label: "원본 없이", desc: "셀렉용 이미지만 업로드" },
-                    { value: true,  label: "원본 포함", desc: "납품용 원본 파일 함께 업로드" },
-                  ] as const).map(({ value, label, desc }) => (
-                    <button
-                      key={String(value)}
-                      type="button"
-                      onClick={() => setIncludeOriginal(value)}
-                      className="flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-semibold transition-colors"
-                      style={{
-                        background: includeOriginal === value ? "rgba(var(--accent-rgb),0.08)" : "transparent",
-                        borderColor: includeOriginal === value ? "rgba(var(--accent-rgb),0.5)" : "var(--border)",
-                        color: includeOriginal === value ? "var(--accent)" : "var(--subtle-foreground)",
-                      }}
-                    >
-                      {label}
-                      <span className="text-[10px] font-normal" style={{ color: includeOriginal === value ? "rgba(var(--accent-rgb),0.6)" : "var(--border-strong)" }}>{desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </Field>
-            </div>
-
-            {/* 에러 */}
-            {error && (
-              <div className="flex items-center gap-2 bg-red-500/5 border border-red-500/20 rounded-xl px-4 py-3">
-                <AlertCircle size={14} color="#ef4444" />
-                <p className="text-sm text-red-400">{error}</p>
-              </div>
-            )}
-
-            {/* 액션 버튼 */}
-            <div className="flex items-center justify-end gap-4 pt-2">
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="flex items-center gap-2 bg-accent hover:bg-[#ff5e1a] disabled:opacity-40 disabled:cursor-not-allowed text-black px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-accent/20 transition-all hover:-translate-y-0.5 disabled:translate-y-0 disabled:shadow-none"
-              >
-                {submitting ? (
-                  <><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> 생성 중...</>
-                ) : (
-                  <>생성완료</>
-                )}
-              </button>
-            </div>
           </div>
-      </main>
+        </div>
+      </PhotographerLightPageFrame>
+
+      {/* 액션 — Figma #56054: 하단 고정 바. 폼 카드 폭(840px) 안에서만 스크롤되지 않고, 화면
+          가로 전체 폭에 구분선+배경을 깔아 항상 보이게 고정한다(카드 내부 인라인 배치였던 것을
+          정정). 내부 컨텐츠는 위 폼과 동일하게 좌우 32px 프레임 + 840px 중앙 정렬을 그대로 재사용. */}
+      <PhotographerFormActionBar
+        maxWidth={840}
+        error={error}
+        leading={(
+          <div>
+              <p className="text-sm font-bold text-foreground">프로젝트를 만든 후 원본을 바로 올릴까요?</p>
+              <p className="text-xs text-muted-foreground mt-1">원본은 나중에 프로젝트에서도 올릴 수 있어요.</p>
+          </div>
+        )}
+        actions={(
+          <>
+              <PhotographerLightButton
+                type="button"
+                variant="secondary"
+                onClick={() => handleSubmit(false)}
+                pending={submitting && submitAction === "later"}
+                pendingLabel="생성 중…"
+                disabled={submitting || profileLoading}
+              >
+                나중에 올리기
+              </PhotographerLightButton>
+              <PhotographerLightButton
+                type="button"
+                variant="primary"
+                onClick={() => handleSubmit(true)}
+                pending={submitting && submitAction === "upload"}
+                pendingLabel="생성 중…"
+                disabled={submitting || profileLoading}
+              >
+                원본 올리기
+              </PhotographerLightButton>
+          </>
+        )}
+      />
     </div>
   );
 }

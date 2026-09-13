@@ -1,7 +1,11 @@
 # 업로드 플로우
 
+## 고객 검토 이후 재보정본 교체
+
+고객 검토 이력이 있는 V2 사진은 갤러리·목록·일괄 업로드 모달에서 서버 파일 삭제를 제공하지 않는다. `UploadPanelTarget.deleteLocked`로 사진별 제한을 전달하고, 검토 전 V2 파일은 기존 삭제를 허용한다. 교체는 기존 이력 보존 업로드를 사용하며, 교체 후에도 V2 스냅샷의 검토 이력을 기준으로 삭제 제한을 유지한다. 로컬에서 고른 아직 업로드하지 않은 파일의 매칭 해제는 서버 파일 삭제와 별개로 유지한다.
+
 > 코드 기준: `upload/page.tsx`, `upload-client-compress.ts`, `upload-compress.worker.ts`, `upload.py`, `storage.py`
-> 마지막 업데이트: 2026-08-07 — 모바일 경로(iPhone/iPad, Android 휴대폰·태블릿)에도 bounded producer-consumer 파이프라인을 적용했다. 동시 네트워크 전송·압축 워커 수는 기존 모바일 값(각각 1)을 유지하고, 전송 중 다음 batch 압축만 겹쳐 round barrier의 유휴 시간을 제거한다. iOS·Android 태블릿 메모리 상한을 위해 모바일은 queue가 찬 상태에서 추가 batch 압축을 시작하지 않는다.
+> 마지막 업데이트: 2026-09-11 — 원본 URL 선발급 예약, 미리보기/원본 큐 분리, 1600px 중간 이미지, 세션 내 실패 원본 재시도.
 
 ---
 
@@ -15,6 +19,8 @@
 
 이 둘은 같은 파일 선택에서 **동시에** 발생한다 — `include_original=true`이면 압축본은 FastAPI로, 압축하지 않은 원본은 R2로, 같은 사진이 두 경로로 각각 전송된다.
 
+화면 책임은 프로젝트 상태로 분리한다. `/photographer/projects/[id]/upload`는 `preparing` 동안의 업로드·선택·삭제·유사도 분석 전용이다. 초대 링크가 활성화된 뒤 직접 재진입하면 `/photographer/projects/[id]/assets/original`로 이동하며, 여기서는 업로드 화면과 같은 가상화 `PhotographerPhotoGallery` 구현을 읽기 전용으로 사용한다. 확정 이후의 원본·셀렉·보정본은 각각 `/assets/original`, `/assets/selected`, `/assets/retouched`로 분리하되 공용 `ProjectAssetTabs`로 탐색한다. 원본/셀렉 화면은 동일한 grid/list media geometry와 상세 뷰어 shell을 공유하고, 원본 메타데이터와 셀렉 코멘트만 variant slot으로 나눈다.
+
 ---
 
 ## 레이어별 역할
@@ -23,18 +29,19 @@
 
 1. 파일 선택 → `startUpload()` 호출.
 2. `include_original=true`이면 HEIC 파일 전체 차단(FE 선행 검증, BE도 동일하게 거부).
-3. **모든 파일**을 브라우저에서 압축(`include_original` 여부와 무관하게 항상 실행). 업로드 화면 전용 `compressImagesInParallel()`이 워커 풀(PC 2 / 모바일 1)로, producer-consumer 파이프라인의 batch를 압축한다 — 비원본은 PC 8장/모바일 3장, 원본 포함은 모든 기기에서 1장 batch다(§FE 배치·동시성·파이프라인 구조 참고). 여기서 모바일은 iPhone/iPad와 Android 휴대폰·태블릿을 뜻한다. 그 외 화면(설정 프로필 이미지, 보정본 업로드 등)은 싱글턴 워커 기반 `compressImageForUpload()`를 그대로 사용 — 두 진입점 모두 실제 압축 로직은 `compressWithWorker()`를 공유한다.
-4. 파일 선택 시 각 파일에 세션 내 고정 UUID(`client_upload_id`)를 부여하고 압축 결과와 함께 FormData로 FastAPI `POST /api/upload/photos`에 보낸다. 직접 호출 재시도와 Next 프록시 fallback도 같은 UUID를 재사용한다.
-5. `include_original=true`이면, 같은 배치 처리 안에서 압축하지 않은 브라우저 원본(`rawFile`)을 응답의 `original_presigned` URL로 R2에 직접 PUT — 이 PUT과 다음 단계 confirm이 끝나야 그 배치가 완료 처리된다(§7 진행률 참고).
-6. PUT 완료 후 서버에 confirm 통지(`POST /originals/confirm`).
+3. **모든 파일**을 브라우저에서 압축(`include_original` 여부와 무관하게 항상 실행). 업로드 화면 전용 `compressImagesInParallel()`이 워커 풀로 producer-consumer 파이프라인의 batch를 압축한다. 비원본은 PC 8장/모바일 3장이고, 원본 포함은 예약·job 연결을 위해 1장 batch를 유지하되 PC에서 2~3개 batch를 한 압축 라운드로 묶는다. 모바일은 워커 1개다(§FE 배치·동시성·파이프라인 구조 참고). 여기서 모바일은 iPhone/iPad와 Android 휴대폰·태블릿을 뜻한다. 그 외 화면(설정 프로필 이미지, 보정본 업로드 등)은 싱글턴 워커 기반 `compressImageForUpload()`를 그대로 사용 — 두 진입점 모두 실제 압축 로직은 `compressWithWorker()`를 공유한다.
+4. 파일 선택 시 각 파일에 세션 내 고정 UUID(`client_upload_id`)를 부여하고 압축 결과와 함께 FormData로 FastAPI `POST /api/upload/photos`에 보낸다. 모든 업로드에 원본 `File`의 이름/크기/MIME/수정 시각과, 압축 디코딩에서 얻은 경우 `source_widths/source_heights`를 함께 보낸다. 직접 호출 재시도와 Next 프록시 fallback도 같은 UUID를 재사용한다.
+5. `include_original=true`이면 producer가 압축과 함께 `POST /originals/presign` 예약을 시작한다. 원본 큐는 예약 URL로 raw `File`을 직접 PUT하고, 미리보기 큐는 예약 결과 확인 + 압축 완료 후 `/photos`를 보낸다. `/photos`에는 선발급 성공 시 `early_original_upload=true`를 함께 보내며 서버는 예약 lease를 갱신한다. 사진/job 등록 응답은 원본 큐에 전달하고 미리보기 lane은 다음 사진으로 진행한다.
+6. 원본 큐는 PUT와 사진/job 등록이 모두 끝난 뒤 기존 confirm/recover로 저장을 확인한다. 모바일은 요청 슬롯을 1개로 공유하므로 PUT과 `/photos`가 동시 전송되지 않지만 압축은 PUT과 겹칠 수 있다. 모든 미리보기·원본 작업이 끝나야 finalize와 세션 완료를 진행한다.
+7. 선발급 미지원/실패 시 기존 `/photos` 응답 URL을 사용하는 경로로 폴백한다. 이미 등록된 사진의 presign 예약은 `deferred=true`를 반환하여 불필요한 선전송 덮어쓰기를 피한다.
 
 ### FastAPI (`upload.py`)
 
 `POST /api/upload/photos` 하나의 요청 안에서 아래를 **전부 동기로** 처리하고 나서 응답한다.
 
-1. FormData에서 압축본 파일을 받아 Pillow로 EXIF 보정 → 썸네일(300px/q75) 생성 → **같은 decode 결과에서** 프리뷰(1200px/q82) 생성(순차). 이 압축본 bytes는 썸네일/프리뷰 생성 입력으로만 쓰이고 처리 후 즉시 버려진다 — R2에 별도로 저장되지 않는다(§4).
+1. FormData에서 압축본 파일을 받아 Pillow로 EXIF 보정 → 썸네일(300px/q75) 생성 → **같은 decode 결과에서** 프리뷰(1200px/q82) 생성(순차). 브라우저가 source 크기를 보내지 못한 작은 비압축 파일은 이 decode의 입력 크기로 해상도를 채운다. 압축본 bytes는 썸네일/프리뷰 생성 입력으로만 쓰이고 처리 후 즉시 버려진다 — R2에 별도로 저장되지 않는다(§4).
 2. 썸네일 + 프리뷰를 R2에 **병렬** 업로드(`asyncio.gather`).
-3. 요청에 포함된 모든 파일 처리가 끝난 뒤 `insert_photos_with_numbers` RPC가 `photos` 행과, `include_original=true`인 경우 대응하는 `original_jobs` 행을 **한 DB 트랜잭션**에서 생성한다. `(project_id, client_upload_id)` UNIQUE 제약과 프로젝트 행 잠금을 함께 사용하므로 서버 처리는 성공했지만 브라우저가 응답을 받지 못해 같은 요청을 재전송해도 기존 photo/job을 반환하고 새 행을 만들지 않는다. 번호 할당·사진·job 생성 중 하나라도 실패하면 전체가 롤백된다.
+3. 요청에 포함된 모든 파일 처리가 끝난 뒤 `insert_photos_with_numbers` RPC가 `photos` 행(포함 `source_*`)과, `include_original=true`인 경우 대응하는 `original_jobs` 행을 **한 DB 트랜잭션**에서 생성한다. `(project_id, client_upload_id)` UNIQUE 제약과 프로젝트 행 잠금을 함께 사용하므로 서버 처리는 성공했지만 브라우저가 응답을 받지 못해 같은 요청을 재전송해도 기존 photo/job을 반환하고 새 행을 만들지 않는다. replay 사진에서 source metadata만 비어 있으면 새 요청값으로 보강한다. 번호 할당·사진·job 생성 중 하나라도 실패하면 전체가 롤백된다.
 4. FastAPI가 생성된 `original_jobs`를 재조회해 presigned PUT URL을 응답에 포함한다. DB 마이그레이션보다 BE가 먼저 배포된 짧은 구간에만 기존 별도 job INSERT 폴백을 사용한다.
 5. confirm 요청(`/originals/confirm`) 수신 시 R2 HEAD 확인 → job 상태를 `awaiting_upload → pending`으로 전이.
 
@@ -52,12 +59,13 @@
 ## 보정본 업로드와 최종 납품
 
 1. `UploadVersionsPanel`/단일 교체가 원본 파일 metadata로 `POST /api/upload/versions/delivery/presign`을 호출한다. 파일당 상한은 100MiB(`DELIVERY_VERSION_MAX_BYTES`), 브라우저 direct PUT 동시성은 3(`DIRECT_UPLOAD_CONCURRENCY`)이다.
-2. 브라우저가 원본 바이트를 R2에 직접 PUT한 뒤, 별도로 `compressImageForUpload()`한 검토용 파일과 `delivery_metadata`를 `POST /api/upload/versions`에 보낸다.
-3. FastAPI는 delivery key prefix와 R2 HEAD 실제 크기를 확인하고 검토용 1200px/82% JPEG와 300px/75% 썸네일을 만든 뒤 `photo_versions`를 upsert한다. 업로드/교체는 `editing`(V1) 또는 `editing_v2`(V2)에서만 가능하다.
-4. 작가가 고객 검토를 시작하면 `start_retouch_review_with_archive`가 모든 `selections.is_selected=true` 사진에 납품 자산이 있는지 검사한다. V1 검토는 V1, V2 검토는 각 사진의 V2 우선·없으면 V1을 선택해 immutable manifest를 만든다.
-5. `final_delivery_archive_worker`가 기존 `ARCHIVE_PART_MAX_BYTES`(기본 500MiB) 기준으로 ZIP을 만든다. 고객이 재보정을 요청하면 후보를 폐기하고 다음 검토 시작 시 다시 만든다. V1 또는 어느 V2 회차에서든 최종 확정되면 해당 회차 후보가 최종 ZIP이 된다.
+2. 브라우저는 원본 바이트의 R2 direct PUT과 `compressImageForUpload()` 검토용 파일 준비를 동시에 시작한다. 두 작업이 모두 끝나면 검토용 파일과 `delivery_metadata`를 `POST /api/upload/versions`에 보낸다. 개별 카드 업로드 잠금은 사진·버전 단위이므로 다른 카드의 업로드를 막지 않으며, 연속 완료 시 목록 재조회는 짧게 합쳐 한 번만 수행한다.
+3. FastAPI는 delivery key prefix와 R2 HEAD 실제 크기를 확인하고, 매 업로드마다 고유한 key에 검토용 1200px/82% JPEG와 300px/75% 썸네일을 만든다. 같은 V1/V2 단계의 기존 파일이 있으면 `replace_photo_versions_with_history` RPC가 기존 활성 파일과 고객 검토 결과를 `photo_version_revisions`에 스냅샷으로 보존한 뒤 현재 `photo_versions`를 원자적으로 교체한다. 단, 현재 `version_reviews.status='approved'`인 사진은 UI의 선택·교체 대상에서 제외하고 FastAPI와 RPC도 교체를 거부한다.
+4. 교체 이력은 같은 단계 안의 파일 변경 기록일 뿐 V3를 생성하거나 재보정 허용 횟수를 소비하지 않는다. 고객 API와 최종 납품 후보는 현재 활성 `photo_versions`만 사용하며, 작가 상세 뷰어에서만 과거 파일을 읽기 전용으로 확인할 수 있다.
+5. 작가가 고객 검토를 시작하면 `start_retouch_review_with_archive`가 모든 `selections.is_selected=true` 사진에 납품 자산이 있는지 검사한다. V1 검토는 V1, V2 검토는 각 사진의 V2 우선·없으면 V1을 선택해 immutable manifest를 만든다.
+6. `final_delivery_archive_worker`가 기존 `ARCHIVE_PART_MAX_BYTES`(기본 500MiB) 기준으로 ZIP을 만든다. 고객이 재보정을 요청하면 후보를 폐기하고 다음 검토 시작 시 다시 만든다. V1 또는 어느 V2 회차에서든 최종 확정되면 `projects.status='delivered'`와 `delivered_at`이 함께 기록되고 해당 회차 후보가 최종 ZIP이 된다. DB 트리거와 CHECK 제약이 날짜 없는 완료 상태를 허용하지 않는다.
 
-FE 압축본(브라우저에서 만든 3200px/q0.82 JPEG)은 R2에 전혀 닿지 않는다 — `/api/upload/photos` 요청 바디로만 존재하고 BE가 썸네일/프리뷰를 만드는 즉시 폐기된다.
+FE 압축본(업로드 화면에서 만드는 최대 1600px/q0.82 JPEG: `UPLOAD_INTERMEDIATE_MAX_EDGE`, `UPLOAD_INTERMEDIATE_JPEG_QUALITY`)은 R2에 전혀 닿지 않는다 — `/api/upload/photos` 요청 바디로만 존재하고 BE가 썸네일/프리뷰를 만드는 즉시 폐기된다.
 
 ### Worker (`original_compress_worker`) — 재압축 없음
 
@@ -69,7 +77,7 @@ FE 압축본(브라우저에서 만든 3200px/q0.82 JPEG)은 R2에 전혀 닿지
   1. R2 HEAD로 `r2_source_key`(`originals/source/{project_id}/{hex}.{ext}`) 객체가 실제 존재하는지만 확인 — **다운로드/재압축/재업로드하지 않는다.**
   2. `complete_original_job` RPC로 `photos.r2_original_url = r2_source_key`(그 키 그대로), `original_ready_at`, `original_status='completed'` 갱신.
   3. source 파일은 삭제하지 않는다 — 이 객체 자체가 보존해야 할 납품 원본이기 때문("이 객체를 다시 압축하거나 삭제하면 고객 ZIP이 원본이 아니게 된다", 코드 주석).
-  4. 프로젝트의 모든 원본이 `completed`가 되면 `enqueue_original_archive_build` RPC로 다운로드용 ZIP 아카이브 빌드를 큐에 넣는다(`app/archive.py`, 사용자 대기와 무관한 별도 비동기 처리 — 상세는 `docs/user-flow.md` §8.2).
+  4. 프로젝트의 모든 원본이 `completed`가 되면 `enqueue_original_archive_build` RPC로 다운로드용 ZIP 아카이브 빌드를 큐에 넣는다. 워커는 작은 원본을 최대 4개(`ARCHIVE_DOWNLOAD_CONCURRENCY=4`)까지 선행 다운로드하되, 파트별 192MiB 메모리 예산(`ARCHIVE_PREFETCH_MEMORY_BYTES`)과 동시 빌드 수에 따라 자동으로 동시성을 낮춘다. 실제 ZIP 기록 진행률은 최소 2초 간격(`ARCHIVE_PROGRESS_UPDATE_SECONDS=2`)으로 DB에 기록한다(`app/archive.py`, 상세는 `docs/user-flow.md` §8.2).
 - 과거 재압축 로직이었던 `_process_original_sync()`(JPEG 변환 + 20MB 목표 단계적 품질/해상도 하향, §9)는 **함수는 코드에 남아 있지만 현재 어떤 경로에서도 호출되지 않는다.**
 - 재압축이 없어졌기 때문에, Railway가 Sleep 상태가 아닌 한 job은 통상 다음 5초 폴링 안에 `completed`로 끝난다(과거 "수분~수십분" 서술은 재압축 단계가 있던 시절 기준).
 
@@ -122,7 +130,7 @@ Browser                    FastAPI                    R2                    DB
   │                           │                        │                    │
   │◀──────────────────────────│                        │                    │
   │  { uploaded: N }          │                        │                    │
-  │  (이 응답까지가 progress 90%│                        │                    │
+  │  (미리보기 저장 응답)       │                        │                    │
   │   구간 이후의 "서버 처리")  │                        │                    │
 ```
 
@@ -222,7 +230,7 @@ HEIC/PNG/WebP → JPEG로 변환된다. `include_original=true`일 때는 이 �
 
 **두 진입점**:
 - `compressImageForUpload(file)` — 파일 1개, 싱글턴 워커. 설정 프로필 이미지, `WorkflowPageClient.tsx` 보정본 단일 파일, `UploadVersionsPanel.tsx`/`retouch-gemini-match.ts` 보정본 여러 파일 등에서 사용.
-- `compressImagesInParallel(files, signal, poolSize)` — 업로드 화면(`upload/page.tsx`) 전용. 워커 풀(acquire/release, 워커당 동시 작업 최대 1개)로 파이프라인의 batch를 압축한다. 풀 크기는 **PC 2 / 모바일 1**(메모리 안정성 우선). `AbortSignal`로 취소하면 부분 결과 없이 AbortError를 던지고, 그 시점에 busy하던 워커는 즉시 교체해 다음 세션이 기다리지 않게 한다.
+- `compressImagesInParallel(files, signal, poolSize)` — 업로드 화면(`upload/page.tsx`) 전용. 워커 풀(acquire/release, 워커당 동시 작업 최대 1개)로 파이프라인의 batch를 압축한다. 원본 포함 PC는 CPU·메모리에 따라 **2~3개**(저사양 1개), 그 외 PC는 2개, 모바일은 1개를 쓴다. `AbortSignal`로 취소하면 부분 결과 없이 AbortError를 던지고, 그 시점에 busy하던 워커는 즉시 교체해 다음 세션이 기다리지 않게 한다.
 - 실제 압축 처리(워커 호출 + canvas 폴백)는 `compressWithWorker()`로 공유 — 두 진입점 모두 동일 로직.
 
 ---
@@ -236,18 +244,24 @@ HEIC/PNG/WebP → JPEG로 변환된다. `include_original=true`일 때는 이 �
 | `include_original=true`, PC | **1장/배치** | 4(기본), 고사양 기기+빠른 회선이면 6 | `ORIGINAL_PC_CONCURRENCY=4`, `ORIGINAL_PC_CONCURRENCY_FAST=6` |
 | `include_original=true`, Mobile | **1장/배치** | 1 | `getDesktopUploadConcurrency` 미적용, 고정 1 |
 
-`include_original=true`일 때 배치 크기를 1로 고정하는 이유: 서버가 1장에 presigned URL 1개를 발급하고, 브라우저가 즉시 PUT하는 사이클을 유지하기 위함. 위 배치 크기·동시성 값 자체는 파이프라인 적용 전후로 **변경되지 않았다** — 바뀐 것은 이 값들을 소비하는 오케스트레이션 구조뿐이다.
+`include_original=true`는 파일별 예약·job·원본 결과를 연결하기 위해 1장 batch를 유지한다. 표의 동시성은 `requestSlots`의 전체 요청 상한이다. PC 미리보기 lane은 최대 2개이며 원본 큐는 2개에서 시작한다. 256KB 이상·500ms 이상 걸린 원본 PUT을 표본으로 삼아 `개별 전송률 중앙값 × 현재 동시 수`를 비교하고, 처리량이 5% 이상 좋아지면 한 개씩 늘리고 최고 처리량보다 15% 이상 낮아지거나 전송이 실패하면 한 개씩 줄인다. 범위는 1~`requestSlots-1`이고 전체 요청은 기존 상한 4/6을 넘지 않는다. 모바일은 측정 조절 없이 1개를 유지한다.
 
 ### 모든 기기: producer-consumer 파이프라인 (2026-08-07 모바일 적용)
 
 `pipelineMode = true`로 `include_original` 값과 기기 종류에 무관하게 같은 파이프라인 구조를 쓴다. 압축(producer)과 XHR 전송(consumer)을 **bounded async channel**로 연결해, batch 압축이 끝나는 즉시 전송을 시작하고 동시에 다음 batch 압축을 이어간다 — 기존 round의 "전체 압축 완료 후 전송 시작" barrier를 제거했다.
 
-- **producer**: batch를 순서대로 하나씩 `compressImagesInParallel()`에 넘겨 압축한다. PC는 워커 2개, 모바일은 워커 1개이며 워커 풀 내부 busy-slot 추적이 호출 1건 단위로 설계돼 있어 동시 호출하지 않는다. 압축이 끝난 batch는 즉시 channel에 push하고, 전송 완료를 기다리지 않고 다음 batch 압축을 이어간다.
+- **producer**: 셀렉 전용과 모바일은 기존처럼 batch를 순서대로 압축한다. 원본 포함 PC는 1장 batch의 예약/job 연결은 유지하면서 2~3개 batch의 파일을 한 번에 워커 풀에 넘겨 실제 병렬 압축하고, 결과를 다시 각 1장 batch로 분리해 순서대로 channel에 넣는다. 압축 라운드가 끝나면 전송 완료를 기다리지 않고 다음 라운드를 이어간다.
 - **channel(bounded queue)**: 용량 = `concurrency`다. PC는 기존 값(비원본 기본 6, 원본 포함 기본 4/고사양·빠른 회선 6)을 유지하고, 모바일은 항상 1이다(`MOBILE_CONCURRENCY=1`; 원본 포함도 고정 1). 모바일 producer는 queue가 차면 **다음 batch 압축 전에** 대기하므로, 전송 중인 batch와 다음 batch를 넘는 압축본·미리보기 누적을 막는다.
-- **consumer lane**: `concurrency`개의 lane이 channel에서 batch를 꺼내 즉시 처리한다(`uploadOneBatch`). lane 하나는 자신이 꺼낸 batch를 **끝까지**(`include_original=true`면 `/photos → original PUT → confirm` 전 과정) 처리해야 다음 batch를 꺼낸다. 모바일은 lane=1이므로 요청·원본 PUT 수는 기존과 동일하게 순차다.
+- **consumer lane**: 셀렉 전용은 기존 `concurrency`, 원본 포함은 `previewConcurrency`개의 lane이 `/photos` 응답까지 처리한다. 원본 PUT/confirm은 별도 `originalQueue`에서 처리하므로 미리보기 lane이 원본 전송을 기다리지 않는다. `UploadWorkQueue`는 FIFO로 활성 작업 수를 제한한다. 사진 등록 결과를 기다리는 동안에는 네트워크 슬롯을 점유하지 않아 모바일 단일 슬롯 교착을 피한다. 대기 항목은 이미 선택된 File 참조·Promise이며 새 원본 복사본을 만들지 않는다.
 - **FE 압축과 network 업로드의 overlap**: 다음 batch 압축은 현재 batch의 네트워크 전송 중에 진행될 수 있다. 따라서 모바일에서도 압축 대기와 전송 대기가 번갈아 생기던 유휴 구간을 줄인다. 단, 모바일은 동시 전송을 늘리지 않으므로 원본 R2 PUT의 실제 업링크 대역폭 자체를 높이지는 않는다. `uploadOneBatch()`의 `setTimeout(0)` 양보는 유지돼 iOS에서 이전 batch 프리뷰가 그려진 뒤 다음 전송이 시작된다.
 - `include_original=false`(OPT-ROUND-01) 실측(로컬, 100/500장, 12~17MP급 실사진, 2026-08-06): 첫 업로드 시작(T_first_xhr_start)이 약 5~7.5배 빨라지고, 전체 소요시간(T_done)이 약 26~35% 단축됨을 확인 — 채택 결정.
 - `include_original=true`(OPT-ROUND-02)도 실사진 기반(5~20MB급 원본 24장) 실측을 거쳐 채택했다 — 회선/원본 크기에 따라 개선폭이 달라질 수 있어 별도 성능 기록 위치가 생기기 전까지는 이 문서에 구체 수치를 고정하지 않는다.
+
+### PC 실측 튜닝과 압축 병렬화 (3단계, 2026-09-11)
+
+동시 원본 수는 Network Information API의 다운로드 추정값만으로 결정하지 않고 세션 중 완료된 실제 원본 PUT 처리량으로 조절한다. 첫 측정 구간은 2개로 시작하고 각 동시 수준에서 `현재 동시 수 × 2`개의 유효 표본이 모인 뒤 다음 수준을 판단한다. 조절은 대기 중 작업에만 적용되어 진행 중 요청을 취소하지 않는다. 결정값과 측정 구간 수는 식별정보 없이 `UploadTelemetry` v3의 `originalConcurrency`에 포함된다. 짧거나 작은 파일은 연결 준비 비용의 영향이 커 표본에서 제외되며, 업로드 파일이 적으면 초기값 2로 완료될 수 있다.
+
+원본 포함 PC 압축은 같은 라운드의 2~3장을 하나의 `compressImagesInParallel()` 호출에 전달한다. 원본 File은 압축하지 않고 R2 PUT 경로에 그대로 사용하며, 병렬화 대상은 1600px 미리보기 중간 파일뿐이다. 모바일은 메모리 안전을 위해 압축·전송 모두 1개를 유지한다.
 
 FastAPI 서버 측 동시성(요청 1건 안에서 파일별 처리) — 파이프라인 적용 여부와 무관하게 동일:
 - `include_original=false`: `UPLOAD_PHOTOS_CONCURRENCY`(기본 5)
@@ -282,7 +296,24 @@ FastAPI 서버 측 동시성(요청 1건 안에서 파일별 처리) — 파이�
 
 ## 진행률(progress) · 완료 조건
 
-`uploadProgress`(0~90%)는 **XHR 업로드 바디 전송 바이트**만 기준으로 올라간다(`xhr.upload.onprogress`) — FE 압축 완료 여부, BE의 썸네일/프리뷰 생성·R2 PUT·DB INSERT 소요 시간, 원본 R2 PUT/confirm 소요 시간은 이 숫자에 전혀 반영되지 않는다. 이 구간은 별도 boolean(`awaitingServerFinalize`, "서버 처리 중" 배너)으로만 표시된다.
+2026-09-11: PC·모바일 모두 `UploadTelemetry`(`src/lib/upload-telemetry.ts`)의 세션 통계를 `UPLOAD_SAMPLE_MS=500`ms 간격으로 화면에 반영한다. 2단계에서 병렬 미리보기/원본 단계를 별도 기록하며 준비 상태가 진행 중인 원본 PUT 표시를 덮어쓰지 않는다. 전체 요청 상한과 최종 저장 확인 조건은 유지한다.
+
+- **원본 포함**: R2 direct PUT을 XHR로 관찰해 `원본 전송 바이트 / 선택한 원본 총 바이트`로 전송률을 계산한다. 미리보기 바이트와 완료 배치 수를 섞지 않는다. 원본 파일별 최대 전송 위치를 유지하므로 재전송 바이트가 중복 합산되거나 진행률이 역행하지 않는다. 이는 유효 전송 진행량이며 재시도까지 포함한 실제 회선 사용량은 아니다.
+- **셀렉 전용**: 압축본 multipart body의 `loaded/total` 실측 비율에 원본 파일 크기를 가중치로 적용한다. 압축 전에는 최종 전송량이 확정되지 않으므로 GB 수치는 표시하지 않는다.
+- **완료 구분**: 전송률은 100%까지 표시한다. 이 값은 저장 완료율이 아니다. 사진 준비 / 미리보기 전송 / 원본 전송 / 저장 확인 / 다시 시도 상태와 `N/M장 저장 완료`, 실패 장수를 별도로 표시한다. 원본 포함 사진은 PUT + confirm/recover 성공 뒤에만 저장 완료로 집계하며 worker·ZIP 완료를 뜻하지 않는다. 병렬 처리 중에는 재시도 → 전송 → 저장 확인 순으로 대표 상태를 표시한다.
+- **남은 시간**: `ETA_WINDOW_MS=15000`ms 동안의 유효 전송량 증가를 사용한다. 최소 `ETA_MIN_SAMPLE_MS=3000`ms 표본이 필요하며, `ETA_STALE_MS=5000`ms 동안 진행이 없거나 실패 시 추정을 중지한다. 재시도 중에는 복구 문구를 표시한다. 예상치는 ±20% 범위의 분 단위로 표시하며 통계적 신뢰구간이 아니다. `전송 약 N~M분 남음`은 전송 예상 시간이며 저장 확인 시간까지 보장하지 않는다. 초기에는 `남은 시간 계산 중`, 바이트 전송 후에는 `저장 확인 중`을 표시한다. PC의 시작 전 고정 회선 가정 예상 시간은 선택 파일 총 용량과 전송 후 안내 문구로 대체했다.
+
+### 구간별 성능 기록
+
+세션 종료 또는 화면 이탈 시 브라우저 console의 `[upload-performance]` 및 `acut:upload-performance` CustomEvent로 집계 1건을 기록한다. 서버 전송·영구 보관은 하지 않는다. 파일명, 파일 객체, 프로젝트/사용자 ID, R2 key, URL, 토큰은 포함하지 않는다.
+
+- `version=2`, `previewBytes`(준비된 중간 이미지 크기 합계), `device`, `includesOriginal`, `fileCount`, `sourceBytes`, `transferredBytes`(유효 전송량), `savedCount`, `failedCount`, `outcome`, `elapsedMs`, `retryCount`
+- `firstOriginalMs`: 파일 선택 세션 시작부터 첫 원본 PUT 시작까지
+- `firstSavedMs`: 세션 시작부터 첫 사진 저장 확인 성공까지
+- `fileStageMs`: 큐 대기, 압축 준비, 압축 후 대기, 미리보기 바디 전송, 미리보기 응답 대기, 원본 PUT, 저장 확인, 재시도 등 단계 체류 시간의 파일별 합계
+- `finalizeMs`: 세션 마지막 DB 집계 요청 시간
+
+병렬 파일의 시간은 겹치므로 `fileStageMs` 합계를 전체 소요 시간으로 해석하면 안 된다. 셀렉 전용의 여러 파일 batch는 batch의 단계 경계를 각 파일에 적용한다. `previewProcessing`은 브라우저의 바디 전송 완료부터 응답까지로 네트워크 왕복·서버 이미지 처리·R2·DB 시간이 합쳐진 값이다. **서버 내부 CPU/R2/DB 개별 시간 또는 운영 속도 개선율을 실측한 지표가 아니다.**
 
 "업로드 완료!" 토스트가 실제로 기다리는 것:
 
@@ -296,13 +327,13 @@ FastAPI 서버 측 동시성(요청 1건 안에서 파일별 처리) — 파이�
 | worker의 원본 R2 HEAD 검증(`processing→completed`) | 해당 없음 | **대기 안 함** — 완전 비동기 |
 | 다운로드 ZIP 아카이브 빌드 | 해당 없음 | **대기 안 함** — 완전 비동기(`user-flow.md` §8.2) |
 
-모든 pipeline batch(`include_original` 값·기기 종류와 무관)가 끝나면, 원본 포함 세션은 `POST /originals/finalize`를 한 번 호출해 DB 상태를 집계한 뒤 `uploadProgress=100` → `uploadPhase="done"` → 토스트, 600ms 뒤 DB 재조회(위 섹션). finalize는 R2 HEAD·ZIP 생성·worker 완료 대기를 수행하지 않으며 confirm을 통과한 `pending/processing/completed`를 정상으로 인정한다. 따라서 성공 경로의 추가 비용은 작은 DB count 조회 1회뿐이다.
+모든 미리보기 pipeline batch와 원본 큐 작업이 끝나면, 원본 포함 세션은 `POST /originals/finalize`를 한 번 호출해 DB 상태를 집계한 뒤 `uploadProgress=100` → `uploadPhase="done"` → 토스트, 600ms 뒤 DB 재조회(위 섹션). finalize는 R2 HEAD·ZIP 생성·worker 완료 대기를 수행하지 않으며 confirm을 통과한 `pending/processing/completed`를 정상으로 인정한다. 따라서 성공 경로의 추가 비용은 작은 DB count 조회 1회뿐이다.
 
-업로드 직후 고객 링크 활성화가 worker보다 먼저 실행될 수 있다. 상태 API는 이때 `pending/processing`만 남아 있으면 `originals_processing`을 반환하고, 업로드 화면은 최대 15초 동안 1초 간격으로 활성화를 자동 재시도한다. 버튼에는 `원본 확인 중…`을 표시한다. `awaiting_upload`/`failed`/`NULL` 등 실제 재업로드가 필요한 상태가 섞여 있을 때만 `originals_incomplete`와 복구 안내를 반환한다.
+업로드 직후 고객 링크 활성화가 worker보다 먼저 실행될 수 있다. 작가는 `셀렉 요청하기` 모달에서 고객 요약과 접속 정보, 셀렉 마감일을 확인하고, 활성화 후 원본 사진 추가·삭제·교체가 제한된다는 안내 checkbox를 선택해야 요청 CTA를 실행할 수 있다. 화면은 먼저 변경된 마감일을 저장한 뒤 기존 status API를 호출하고, 성공 후 별도 공유 모달을 열어 링크/PIN 복사를 제공한다. 상태 API는 `pending/processing`만 남아 있으면 `originals_processing`을 반환하고, 업로드 화면은 최대 15초 동안 1초 간격으로 활성화를 자동 재시도한다. 버튼에는 `원본 확인 중…`을 표시한다. `awaiting_upload`/`failed`/`NULL` 등 실제 재업로드가 필요한 상태가 섞여 있을 때만 `originals_incomplete`와 복구 안내를 반환한다.
 
 원본 PUT은 첫 요청이 성공하면 추가 대기 없이 끝난다. 각 원본 파일은 PUT과 confirm이 하나의 총 재시도 예산(`ORIGINAL_TRANSFER_MAX_RETRIES=4`, 최초 요청 제외)을 공유한다. 네트워크 오류, 408/429/500/502/503/504, presigned URL 403에만 `/originals/recover`로 R2 존재 여부를 먼저 확인하고, 남은 예산 안에서 500ms부터 최대 4초까지 지수 백오프(`ORIGINAL_RETRY_BASE_DELAY_MS`, `ORIGINAL_RETRY_MAX_DELAY_MS`)와 ±25% jitter를 적용한다. PUT·confirm 단계별 재시도와 업로드 종료 후 지연 재전송을 중첩하지 않으므로 한 파일의 PUT/confirm 재호출은 최초 요청 이후 합계 최대 4번이다(R2 존재 확인용 recover 호출은 별도). 최종 실패만 `/originals/report-failure`로 `last_error`에 기록하고, finalize 결과와 함께 "업로드 완료" 대신 "원본 업로드 확인 필요"를 표시한다. 셀렉용 사진 업로드 성공 자체는 되돌리지 않으므로 사용자는 누락 원본만 다시 선택해 복구한다.
 
-**UI phase**: 코드에 정의된 값은 `idle`/`processing`/`done`(과 실패 시 `idle`로 복귀)뿐이다. `uploadPhase === "sending"`을 조건으로 쓰는 UI 코드가 일부 있으나, 실제로 `setUploadPhase("sending")`을 호출하는 지점은 없다 — 즉 `sending`은 현재 코드 경로상 도달하지 않는 상태다(압축과 전송 모두 `processing` 상태로 표시됨).
+**UI phase**: 코드에 정의된 값은 `idle`/`processing`/`done`(과 실패 시 `idle`로 복귀)뿐이다. `uploadPhase === "sending"`을 조건으로 쓰는 UI 코드가 일부 있으나, 실제로 `setUploadPhase("sending")`을 호출하는 지점은 없다 — 즉 `sending`은 현재 코드 경로상 도달하지 않는 상태다(세션 lifecycle 값이며 실제 단계 문구는 `UploadTelemetry`로 분리한다).
 
 ---
 
@@ -360,6 +391,8 @@ Railway Starter 플랜은 HTTP 요청이 5분간 없으면 인스턴스가 Sleep
 
 `photos.file_size`에 저장되는 값은 썸네일 + 프리뷰 바이트 합산이다. 원본 파일 크기나 브라우저 압축본 크기가 아니다.
 
+원본 업로드 목록은 별도의 `photos.source_file_size/source_width/source_height/source_content_type/source_last_modified`를 사용한다. 파일 크기·이름·MIME·수정 시각은 브라우저 `File`에서 받고, 픽셀 크기는 브라우저가 압축 때문에 이미 디코딩한 경우 그 값을 재사용한다. 압축을 생략한 작은 파일은 서버가 썸네일을 만들며 이미 디코딩한 입력 크기를 사용하므로 메타데이터 수집만을 위한 추가 디코딩이나 네트워크 요청은 없다. 과거 행에서 source metadata가 없으면 `file_size`로 대체하거나 해상도를 추정하지 않는다.
+
 **`photos.original_compressed_size`는 현재 원본 객체 크기**
 
 컬럼명은 과거 재압축 결과를 저장하던 때의 이름을 유지하지만, 현재 `original_compress_worker`는 R2 HEAD에서 확인한 압축하지 않은 원본 바이트 크기를 `complete_original_job(p_file_size)`로 전달해 이 컬럼에 저장한다. 과거 행 등 값이 NULL인 경우에만 `app/archive.py`가 고정 추정치 20MiB(`_FALLBACK_PHOTO_BYTES`)를 사용한다.
@@ -385,3 +418,35 @@ HEIC 파일은 `include_original=true` 상태에서 FE와 BE 모두에서 거부
 | `app/routers/upload.py`의 `_process_original_sync()` | 정의만 있고 호출부 없음(grep 확인). 재압축 파이프라인이 있던 시절의 로직. 삭제는 별도 승인 필요 — 이 파일에서는 참고용으로만 남김. |
 | `storage.py`의 R2 key 패턴 `^originals/{project}/{hex}\.jpg$` | 신규 업로드는 이 경로에 쓰지 않음(현재는 `originals/source/...`만 생성). 과거 생성된 객체 검증/호환용으로 패턴만 남아 있을 가능성. |
 | FE `uploadPhase` 값 `"sending"` | UI 조건문에는 남아 있으나 `setUploadPhase("sending")` 호출 지점이 없어 현재 코드 경로상 도달 불가. |
+
+## 모바일 업로드 UI와 생성 설정 (2026-09-09)
+
+- `projects/new/page.tsx`의 `handleSubmit(goToUpload)`는 이동 위치만 결정하며 `include_original`에는 `includeOriginal`을 그대로 전달한다. 원본 올리기를 눌러도 false를 true로 덮어쓰지 않는다. Next 생성 API의 저장과 FastAPI 원본 처리 분기는 기존 계약을 유지한다.
+- `UploadVersionsPanel`은 body portal과 Light scope로 열리며 Mobile inset/scroll/footer는 `UploadVersionsPanel.module.css`에서 관리한다. 자동 표시 조건과 파일 매칭/전송 로직은 유지하고 toolbar에서 일괄 업로드/교체를 다시 열 수 있다.
+- 모바일 보정 목록의 개별 파일 선택은 즉시 업로드한다. 일괄 창은 파일 선택·매칭 확인 후 업로드로 확정한다. 하단에 실제 업로드/교체 잔여 장수와 요청 가능 이유를 표시한다.
+- 원본 gallery는 long press release click을 경계에서 차단해 해당 gesture로 하나의 사진만 선택한다. 선택/전체 선택/취소 UI를 제공하고 삭제 확인과 서버 삭제 로직은 유지한다.
+- R2 key, presigned URL, worker, 압축 품질, batch/concurrency는 변경하지 않았다. [모바일 구현 검증과 한계](mobile-design-implementation-2026-09-09.md).
+
+모바일 보정 화면 후속 개선: `SingleVersionUploadSlot compact`는 점선 영역 대신 ‘파일 선택’ 버튼을 사용한다. toolbar와 전체 업로드 완료 전 하단 Primary `일괄 업로드`는 같은 기존 일괄 창을 열고, 필터·보기 전환은 공통 아이콘 버튼으로 직접 배치한다. 보정본 Mobile 내보내기는 제거한다. 현재 보정 단계의 모든 대상 업로드가 완료되면 하단 action은 검토 요청으로 전환한다. 파일 검증과 개별/일괄 전송 로직은 유지한다.
+
+모바일 `UploadVersionsPanel` footer는 취소·업로드 버튼만 유지한다. 파일이 없을 때의 `추가로 업로드할 파일을 선택해주세요.` 안내는 비활성 업로드 버튼과 의미가 겹치므로 모바일에서 숨기며, Desktop 상태 문구와 실제 업로드 진행률 표시는 유지한다.
+
+
+## 원본 선발급 예약·만료 정리 (2단계, 2026-09-11)
+
+- DB 마이그레이션: `20260911150000_original_upload_reservations.sql`. `original_upload_reservations`와 service-role 전용 `reserve_original_upload`, `renew_original_upload_reservation`, `claim_expired_original_uploads` RPC를 추가한다. 예약은 프로젝트 소유권·`preparing`·원본 포함 설정·파일 metadata·업로드 한도를 검사한다. 같은 `(project_id, client_upload_id)`는 같은 key와 metadata를 재사용한다. 프로젝트 삭제 후에도 미등록 객체를 정리할 수 있도록 예약 테이블에는 프로젝트 cascade FK가 없다.
+- 예약 수명은 SQL의 48시간, URL은 기존 `ORIGINAL_PRESIGNED_EXPIRES=3600`초다. `/photos`가 선발급된 항목을 처리하기 전에 예약을 갱신하므로, 정리가 선점한 예약의 늦은 미리보기 요청은 409로 종료된다. 원본 큐가 늦게 실행되어 URL 만료까지 30초 이내이면 선전송 시도를 생략하고 job recover에서 URL을 다시 얻는다. 확인 직전에 최신 브라우저 세션 토큰을 읽어 오래 대기한 항목의 인증 만료를 피한다.
+- `original_reservation_sweep_worker`는 `RESERVATION_SWEEP_SECONDS=1800`초마다 최대 50개를 claim한다. `original_jobs.r2_source_key`와 `photos.(project_id,client_upload_id)` 둘 다 연결이 없을 때만 객체를 삭제한다. DB/R2 오류 시 예약을 남기고, 중단된 cleanup claim은 10분 뒤 재선점할 수 있다. 정리 중에는 예약 재발급/갱신을 거부한다. 원본을 복사하거나 재압축하지 않는다.
+- 선전송은 job 생성 전 1회만 시도한다. 실패/응답 유실 뒤에는 job recover의 HEAD 확인을 먼저 수행하며, 재전송이 필요하면 기존 공유 재시도 예산 1회를 소비한다. 최초 선전송을 포함한 PUT/confirm 시도 예산이 중첩되지 않는다.
+- 중단 시 진행 중인 요청은 정리하고 아직 전송하지 않은 등록 job은 복구 대상으로 남긴다. 미등록 원본은 예약 만료 정리 대상이다. 성공한 원본은 worker/ZIP 완료 여부와 무관하게 기존 confirm 조건으로 처리한다.
+- 배포 순서: DB migration → BE(예약 endpoint·sweep) → FE. migration/BE가 아직 없으면 FE가 선발급 실패를 받아 기존 `/photos` URL 방식으로 동작한다. migration이 적용되기 전에는 추적되지 않는 선발급 URL을 발급하지 않는다. 이 작업에서는 운영 DB migration·배포를 실행하지 않았다.
+
+## 실패 원본 재시도 UI (2단계)
+
+같은 페이지 세션의 실패 원본만 `recoveryFilesRef`에 보관한다. PC·모바일 복구 배너의 `실패 원본 N장 재시도`는 파일 선택창 없이 기존 recover → 필요한 PUT → confirm을 실행한다. 저장이 이미 확인된 파일은 재전송하지 않는다. 성공·상태 재조회 때 캐시를 비우며 페이지 종료/새로고침 후에는 파일 재선택과 기존 이름+크기+수정시각 매칭을 사용한다. 복구 중 중복 클릭과 신규 업로드 시작을 차단하고, 파일을 찾지 못한 경우와 전송 실패를 서로 다른 문구로 표시한다.
+
+### 2단계 검증 범위
+
+- 예약 거부/미배포 시 무서명, 연결된 객체·DB 오류 시 정리 금지, R2 삭제 오류 시 원장 유지에 대한 BE 테스트 및 기존 업로드/종료 테스트.
+- FIFO 동시성 상한·오류 후 슬롯 반환·모바일 단일 슬롯 등록 대기·병렬 단계 표시 테스트.
+- 브라우저의 3600×2400 합성 패턴을 실제 압축 worker로 비교: 3200px 538,266B → 1600px 184,921B, 최종 표시 크기 1200×800 비교 PSNR 약 40.0dB. 원본 크기 metadata는 유지된다. 이는 합성 표본 1개의 중간 파일 비교로, 실제 사진 전체의 화질 보장이나 원본 업로드 시간 개선율이 아니다. 업로드 화면 외 `compressImageForUpload`의 기본 3200px 설정은 유지한다.

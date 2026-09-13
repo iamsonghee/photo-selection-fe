@@ -6,6 +6,7 @@
   --acb-bg-active: rgba(var(--accent-rgb), 0.12);
   --acb-accent: var(--accent);
   --acb-accent-glow: rgba(var(--accent-rgb), 0.2);
+  --acb-danger: var(--danger);
   --acb-text-primary: var(--foreground);
   --acb-text-secondary: var(--muted-foreground);
   --acb-text-tertiary: var(--subtle-foreground);
@@ -19,28 +20,45 @@
   z-index: 30;
   display: flex;
   flex-direction: column;
-  /* 토글이 바깥(right: -12px)으로 나가도 잘리지 않음 — 스크롤은 .navContainer */
+  box-sizing: border-box;
+  /* 프로필 popover가 LNB 밖으로 열릴 수 있도록 유지 — 스크롤은 .navContainer */
   overflow: visible;
   background-color: var(--acb-bg-sidebar);
   border-right: 1px solid var(--acb-border);
   transition: width var(--acb-transition) cubic-bezier(0.2, 0, 0, 1);
 }
 
+/* Light Golden Reference routes share one LNB token scope. Route eligibility is
+   resolved by isPhotographerLightRoute() so page content and navigation cannot
+   drift into different themes. */
+.rootLight {
+  composes: lightTheme from "../../styles/PhotographerLightTheme.module.css";
+  --acb-bg-sidebar: color-mix(in srgb, var(--background) 72%, var(--surface));
+  --acb-bg-active: var(--surface);
+  font-family: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif !important;
+}
+
+.rootLight * {
+  font-family: inherit !important;
+}
+
 .rootCollapsed {
-  width: 72px;
+  width: 102.5px;
+  padding: 28px 0 20px;
 }
 
 .rootExpanded {
-  width: 240px;
+  width: 266px;
+  padding: 28px 24px 20px;
 }
 
 .brandHeader {
-  height: 80px;
+  height: 43.2px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  padding: 0 24px;
-  border-bottom: 1px solid var(--acb-border);
+  padding: 0;
+  border-bottom: 0;
   overflow: hidden;
 }
 
@@ -64,24 +82,26 @@
 }
 
 .logoMark {
-  width: 24px;
-  height: 24px;
+  width: 31.2px;
+  height: 31.2px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background-color: var(--acb-accent);
-  color: #000;
-  font-weight: 700;
-  font-size: 14px;
-  border-radius: 2px;
+  color: #fff;
+  font-weight: 800;
+  font-size: 16.8px;
+  line-height: 26.88px;
+  border-radius: 8.4px;
 }
 
 .logoText {
   margin-left: 12px;
-  font-weight: 700;
-  font-size: 18px;
-  letter-spacing: -0.5px;
+  font-weight: 800;
+  font-size: 22.8px;
+  line-height: 36.48px;
+  letter-spacing: -0.912px;
   color: var(--acb-text-primary);
   white-space: nowrap;
   transition: opacity var(--acb-transition);
@@ -101,38 +121,49 @@
 
 .toggleWrap {
   position: absolute;
-  right: -12px;
-  top: 28px;
+  /* 펼침/축소 모두 경계 중앙에 고정한다. 폭 전환을 따라 가로로만 움직여 로고와 겹치지 않는다. */
+  right: -20px;
+  top: 29.6px;
   z-index: 50;
   pointer-events: auto;
 }
 
 .toggleBtn {
-  width: 24px;
-  height: 24px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--acb-bg-hover);
-  border: 1px solid var(--acb-border);
-  border-radius: 4px;
+  background: transparent;
+  border: 0;
   cursor: pointer;
   color: var(--acb-text-secondary);
   transition: color 0.2s, border-color 0.2s, background-color 0.2s;
   padding: 0;
 }
 
-.toggleBtn:hover {
+.toggleBtn:hover,
+.toggleBtn:focus-visible {
   color: var(--acb-text-primary);
-  border-color: var(--acb-text-secondary);
-  background-color: var(--acb-bg-hover);
+  outline: 0;
 }
 
 .toggleIcon {
   display: flex;
+  width: 25.92px;
+  height: 25.92px;
   align-items: center;
   justify-content: center;
+  border: 1px solid var(--acb-border);
+  border-radius: 6px;
+  background: var(--acb-bg-hover);
   transition: transform var(--acb-transition);
+}
+
+.toggleBtn:hover .toggleIcon,
+.toggleBtn:focus-visible .toggleIcon {
+  border-color: var(--acb-text-secondary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--acb-accent) 20%, transparent);
 }
 
 .toggleIconCollapsed {
@@ -142,11 +173,12 @@
 .navContainer {
   flex: 1;
   min-height: 0;
-  padding: 24px 0;
+  padding: 34px 0 0;
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
   overflow-y: auto;
+  gap: 6px;
 }
 
 .navLabel {
@@ -171,15 +203,19 @@
 .navItem {
   display: flex;
   align-items: center;
-  padding: 12px 24px;
+  min-height: 50px;
+  padding: 0;
   text-decoration: none;
   color: var(--acb-text-secondary);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+  letter-spacing: -0.35px;
   position: relative;
   transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
   white-space: nowrap;
-  border-left: 3px solid transparent;
+  border-left: 0;
+  border-radius: 10px;
   background: transparent;
   border-top: none;
   border-right: none;
@@ -193,8 +229,8 @@
 
 .navItemCollapsed {
   justify-content: center;
-  padding-left: 12px;
-  padding-right: 12px;
+  width: 74.5px;
+  margin: 0 14px;
 }
 
 .navItem:hover:not(:disabled) {
@@ -203,9 +239,13 @@
 }
 
 .navItemActive {
-  color: var(--acb-accent);
+  color: var(--acb-text-primary);
   background-color: var(--acb-bg-active);
-  border-left-color: var(--acb-accent);
+  box-shadow: inset 3px 0 0 var(--acb-accent), 0 1px 2px rgba(2, 56, 82, 0.04);
+}
+
+.navItemActive .navIcon {
+  color: var(--acb-accent);
 }
 
 .navItemDisabled {
@@ -219,13 +259,13 @@
 }
 
 .navIcon {
-  width: 20px;
-  height: 20px;
+  width: 44px;
+  height: 44px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 16px;
+  margin-right: 8px;
   transition: margin var(--acb-transition), color 0.2s ease;
 }
 
@@ -248,23 +288,220 @@
 }
 
 .badgeSoon {
-  font-size: 8px;
-  font-weight: 700;
-  padding: 2px 6px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
+  margin-right: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--disabled-foreground);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: -0.2px;
   flex-shrink: 0;
-  font-family: var(--acb-sidebar-mono), ui-monospace, monospace;
+  font-family: inherit;
 }
 
 .sidebarFooter {
   flex-shrink: 0;
-  border-top: 1px solid var(--acb-border);
-  padding-top: 12px;
-  padding-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-top: 0;
+  padding: 0;
+}
+
+.profileDetails {
+  position: relative;
+  width: 100%;
+}
+
+.profileTrigger {
+  display: flex;
+  width: 100%;
+  min-height: 56px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border: 0;
+  border-radius: 12px;
+  outline: 0;
+  list-style: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.profileTrigger::-webkit-details-marker {
+  display: none;
+}
+
+.profileTrigger:hover,
+.profileTrigger:focus-visible {
+  background: var(--surface-raised);
+}
+
+.profileTrigger:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--acb-accent) 32%, transparent);
+}
+
+.profileTriggerCollapsed {
+  justify-content: center;
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.profileAvatar {
+  display: flex;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid;
+  border-radius: 12px;
+  color: var(--acb-text-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.profileChevron {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--acb-text-tertiary);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.profileChevronOpen {
+  transform: rotate(180deg);
+  color: var(--acb-text-primary);
+}
+
+.profileMenu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  z-index: 50;
+  width: 218px;
+  padding: 8px;
+  border: 1px solid var(--acb-border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(2, 56, 82, 0.1);
+}
+
+.profileMenuExpanded {
+  left: 0;
+}
+
+.profileMenuCollapsed {
+  left: calc(100% + 12px);
+}
+
+.profileMenuEmail {
+  overflow: hidden;
+  margin-bottom: 8px;
+  padding: 6px 8px 10px;
+  border-bottom: 1px solid var(--acb-border);
+  color: var(--acb-text-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  letter-spacing: -0.25px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profileMenuItem {
+  display: flex;
+  width: 100%;
+  height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--acb-text-primary);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: -0.3px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.profileMenuItem:hover,
+.profileMenuItem:focus-visible {
+  background: var(--surface-raised);
+  outline: 0;
+}
+
+.profileMenuIcon {
+  display: flex;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  color: var(--acb-text-primary);
+}
+
+.profileMenuIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.profileMenuText {
+  color: inherit;
+}
+
+.profileMenuDivider {
+  height: 1px;
+  margin: 8px 0;
+  background: var(--acb-border);
+}
+
+.profileMenuDanger {
+  color: var(--acb-danger);
+}
+
+.profileMenuDanger:hover,
+.profileMenuDanger:focus-visible {
+  background: color-mix(in srgb, var(--acb-danger) 8%, transparent);
+}
+
+.usageCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 218px;
+  padding: 10px 8px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.usageLabel,
+.usageValue {
+  font-size: 12px;
+  line-height: 19.2px;
+  letter-spacing: -0.36px;
+}
+
+.usageTrack {
+  width: 202px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+}
+
+.rootCollapsed .brandHeader {
+  justify-content: center;
+}
+
+.rootCollapsed .navContainer {
+  padding-top: 34px;
 }
 
 .navItemLogout {

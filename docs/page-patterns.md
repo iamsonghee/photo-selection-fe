@@ -2,7 +2,8 @@
 
 > 상태: Draft 0.1
 > 작성일: 2026-07-29
-> foundation: `docs/design-system.md`
+> foundation: Shared/Dark는 `docs/design-system.md`, 작가 Light PC는 [design-system-light.md](design-system-light.md), 고객 PC는 [customer-design.md](customer-design.md)
+> **2026-09-09 PC 적용 안내:** 아래에는 이전 설계/proposal도 남아 있다. 현재 Light 구현의 재사용 컴포넌트와 적용 route는 `design-system-light.md` §0.4–0.5, 실제 미해결 문제는 [PC 검수 결과](desktop-design-audit-2026-09-09.md)를 우선한다. 이 갱신은 모바일 패턴 검증을 포함하지 않는다.
 > component: `docs/acut-components.md`
 
 ## 1. 목적
@@ -209,13 +210,14 @@
 - upload/recovery는 `UploadProgress`로 계속 보이게 한다.
 - analysis 결과는 사진 선택보다 높은 시각 우선순위를 갖지 않는다.
 - 빈 project는 upload dropzone/CTA를 보여준다.
+- `보정 중` 단계에서 보정본이 0장인 첫 진입은 일괄 업로드 패널을 자동 제안한다. 파일 선택창은 CTA 이후에만 열고, 닫은 패널은 같은 탭 세션에서 반복 노출하지 않는다.
 - filter 결과 없음은 grid 안에서 filter 초기화를 제공한다.
 
 ### 적용 위치
 
 - `/photographer/projects/[id]/upload`
-- `/photographer/projects/[id]/results`
-- `/photographer/projects/[id]/workflow`
+- `/photographer/projects/[id]/assets/original|selected`
+- `/photographer/projects/[id]/assets/retouched`
 - `/c/[token]/gallery`
 - `/c/[token]/viewer/[photoId]`
 - `/c/[token]/review`
@@ -476,4 +478,3 @@ desktop의 좌우 배치를 mobile에서 좌→우 순서로 기계적으로 쌓
 - 기능 state와 API 호출은 유지하고 presentation 경계를 먼저 분리한다.
 - desktop/mobile을 동시에 정의하되 한 번에 모든 route를 바꾸지 않는다.
 - 고객 갤러리 → 작가 업로드 → 관리자 프로젝트 목록 순으로 패턴을 검증한다.
-

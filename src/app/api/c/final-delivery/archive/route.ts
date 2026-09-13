@@ -6,7 +6,7 @@ import { getFinalDeliveryArchiveDownloadUrls } from "@/lib/customer-api-server";
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
   if (!token?.trim()) return NextResponse.json({ error: "token required" }, { status: 400 });
-  const pinError = checkPinAuth(req, token);
+  const pinError = await checkPinAuth(req, token);
   if (pinError) return pinError;
   try {
     const files = await getFinalDeliveryArchiveDownloadUrls(getAdminClient(), token);

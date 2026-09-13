@@ -1,5 +1,15 @@
 # 시스템 아키텍처
 
+## 재보정 검토 이력 삭제 보호
+
+보정본 DELETE API는 V2 현재 리뷰와 같은 사진의 V2 `photo_version_revisions`에서 검토 상태 또는 검토 일시를 확인한다. 검토 이력이 있으면 `409 reviewed_retouch_delete_locked`로 거절하며 R2/리뷰/버전 삭제를 실행하지 않는다. 이력 조회 실패도 삭제 전에 중단한다. 교체로 현재 리뷰가 초기화되어도 이전 스냅샷이 잠금을 유지한다. 기존 확정본·고객 검토 중 삭제 제한은 유지한다.
+
+## 랜딩 샘플 격리 (2026-09-12)
+
+히어로는 정적 WebM/MP4와 poster를 `HeroVideo`에서 재생한다. 녹화 전용 `/landing/demo-capture`는 개발 환경에서만 제공하며 실제 고객 카드·선택 확인·작가 코멘트·사진 탭을 로컬 샘플 상태로 렌더링한다. 재생성 스크립트는 API 및 서비스 경로를 차단한다. 자세한 타임라인과 검증은 `landing-hero-video.md` 참조.
+
+`/`와 `/landing`은 `sample-project.ts`의 로컬 사진·가상 상태·`SAMPLE_PLAN_LIMITS`만 사용한다. 랜딩의 `getAppSettings()` 및 Supabase 인증 조회·구독을 제거했다. “무료 시작하기” CTA는 클릭 시에만 Supabase 세션을 확인하여 기존 세션이 있으면 작가 대시보드로 이동하고, 없으면 기존 AuthModal을 연다. “고객 셀렉 체험하기” 보조 링크만 로컬 데모로 스크롤한다. 다른 서비스 페이지 링크는 prefetch를 비활성화했다. 서비스 페이지로 명시적으로 이동한 이후의 인증·운영 설정 흐름은 기존대로다. 랜딩 체험 자체는 FE 메모리에서만 동작하며 BE·DB·스토리지를 호출하지 않는다.
+
 > 이 문서는 2026-07-13 기준 `photo-selection-fe`(Next.js)와 `photo-selection-be`(FastAPI, `clip-service` 포함) 실제 코드를 근거로 작성되었습니다.
 > 추측이 필요한 부분은 모두 **`확인 필요`**로 표시했습니다. 값이 확인되었더라도 실제 운영 환경(Railway/Vercel/Supabase 대시보드) 설정까지 코드로 검증할 수 없는 항목은 별도로 표시합니다.
 > 저장 위치는 FE 저장소(`photo-selection-fe/docs/`)이지만, 내용은 FE + BE 전체 프로젝트를 대상으로 합니다.
@@ -154,7 +164,7 @@ clip-service/          완전히 독립된 FastAPI 앱 (별도 배포 단위)
 - **가상 스크롤**: `@tanstack/react-virtual` (대량 사진 갤러리 렌더링용, 정확한 사용처는 갤러리 페이지로 추정 — 상세 코드 라인은 `확인 필요`).
 - **로컬 실행**: `npm run dev` → `next dev -p 3001` (포트 3001 고정). `dev:no-turbopack` 대안 스크립트 존재.
 - **인증 클라이언트**: `@supabase/ssr` — 서버(`src/lib/supabase/server.ts`, 쿠키 기반 `createServerClient`)와 브라우저(`src/lib/supabase/client.ts`, `createBrowserClient`) 두 종류의 클라이언트를 분리해 사용. 별도로 서비스 롤 키를 쓰는 관리자 클라이언트(`src/lib/supabase-admin.ts`)가 API 라우트 내부에서 사용됨.
-- **미들웨어**: `src/middleware.ts` — matcher가 `/c/:token/:path+` 하나뿐이라 **`/photographer/**` 경로는 미들웨어 보호 대상이 아님** (§11에서 상세). PIN 미인증 시 `/pin?from=<pathname+search>`로 리다이렉트하며 원래 URL의 쿼리스트링까지 보존한다(`pathname + req.nextUrl.search`) — PIN 인증 완료 후 `PinForm`이 `from`으로 복귀하므로, 쿼리 파라미터가 붙은 딥링크(예: 뷰어의 `?grouped=1`)로 최초 접근해도 인증 왕복 후 그대로 유지된다.
+- **미들웨어**: `src/middleware.ts` — matcher가 `/c/:token/:path+` 하나뿐이라 **`/photographer/**` 경로는 미들웨어 보호 대상이 아님** (§11에서 상세). PIN 미인증 시 `/pin?from=<pathname+search>`로 리다이렉트하며 원래 URL의 쿼리스트링까지 보존한다(`pathname + req.nextUrl.search`) — PIN 인증 완료 후 `PinForm`이 `from`으로 복귀하므로, 쿼리 파라미터가 붙은 딥링크(예: 뷰어의 `?grouped=1`)로 최초 접근해도 인증 왕복 후 그대로 유지된다. PIN 인증 쿠키의 HMAC 범위에는 프로젝트 토큰과 현재 `access_pin` 상태가 함께 포함되며, 미들웨어와 고객 API의 `checkPinAuth`가 DB의 현재 PIN을 기준으로 검증하므로 PIN 설정·변경·삭제 시 기존 쿠키는 즉시 무효화된다.
 
 ---
 
@@ -171,7 +181,7 @@ clip-service/          완전히 독립된 FastAPI 앱 (별도 배포 단위)
 - **스토리지 클라이언트**: `boto3` S3 호환 클라이언트로 Cloudflare R2 접근(`app/storage.py`). GCS 관련 코드도 존재하나 어떤 라우터에서도 호출되지 않는 것으로 확인됨(죽은 코드로 추정).
 - **DB 접근**: ORM 없음. 공식 `supabase` Python 클라이언트(PostgREST 기반)로만 접근. `app/models/`는 빈 패키지.
 - **CLIP 서비스**: `clip-service/`는 메인 앱과 완전히 분리된 별도 FastAPI 앱(자체 `Dockerfile`, `requirements.txt`에 `torch`/`torchvision`/`open_clip_torch`/`opencv-python-headless` 포함). 메인 백엔드 코드(`app/`)는 어디에서도 `clip-service`를 호출하지 않음 — **프론트엔드가 `CLIP_SERVICE_URL`로 clip-service를 직접 호출**한다.
-- **Gemini Embedding — 베타 유사컷 분석 엔진** (2026-07-28 도입, 같은 날 베타 전환): 같은 `clip-service` 프로세스 안에 OpenCLIP 파이프라인과 완전히 독립된 `/analyze/gemini*` 엔드포인트로 추가됨(별도 서비스 아님). 최초에는 관리자 전용 POC(OpenCLIP과 결과 비교 목적)로 도입됐으나, 같은 날 **베타 공개 시점에 작가 업로드 화면의 `[AI 유사도 분석]` 버튼이 호출하는 대상 자체가 OpenCLIP(`/analyze`)에서 Gemini(`/analyze/gemini`)로 전환**되어 지금은 모든 베타 사용자가 쓰는 실사용 엔진이다. `google-genai` SDK로 `gemini-embedding-2` 멀티모달 모델을 호출해 이미지 임베딩을 생성하고, 그룹핑 알고리즘(`grouping.py`)은 OpenCLIP과 동일하게 재사용한다. 임베딩 자체는 신규 테이블(`gemini_analysis_runs`, `gemini_embeddings`)에만 저장하지만, 계산된 그룹 결과는 `sync_groups_to_db()`가 **기존 운영 스키마(`photo_groups`/`photos.similarity_group_id`)에 그대로 반영(persist)**한다 — 작가 업로드 화면과 고객 갤러리의 "유사컷 대표이미지 적용" 관련 코드는 엔진이 무엇이든 동일한 스키마를 읽으므로 전혀 수정할 필요가 없었다. 흔들림/눈감음 품질 판정(OpenCV/MediaPipe)은 이 전환에 포함되지 않으며 베타 흐름에서 완전히 빠졌다(§6.4/§6.6 참고, 향후 재도입 시에는 §6.7의 Gemini Flash를 쓴다). §6.6, §7.4 참고.
+- **Gemini Embedding — 베타 유사컷 분석 엔진** (2026-07-28 도입, 같은 날 베타 전환): 같은 `clip-service` 프로세스 안에 OpenCLIP 파이프라인과 완전히 독립된 `/analyze/gemini*` 엔드포인트로 추가됨(별도 서비스 아님). 최초에는 관리자 전용 POC(OpenCLIP과 결과 비교 목적)로 도입됐으나, 같은 날 **베타 공개 시점에 작가 업로드 화면의 `[AI 유사도 분석]` 버튼이 호출하는 대상 자체가 OpenCLIP(`/analyze`)에서 Gemini(`/analyze/gemini`)로 전환**되어 지금은 모든 베타 사용자가 쓰는 실사용 엔진이다. `google-genai` SDK로 `gemini-embedding-2` 멀티모달 모델을 호출해 이미지 임베딩을 생성하고, 그룹핑 알고리즘(`grouping.py`)은 OpenCLIP과 동일하게 재사용한다. 임베딩 자체는 신규 테이블(`gemini_analysis_runs`, `gemini_embeddings`)에만 저장하지만, 계산된 그룹 결과는 `sync_groups_to_db()`가 **기존 운영 스키마(`photo_groups`/`photos.similarity_group_id`)에 그대로 반영(persist)**한다 — 작가 업로드 화면과 고객 갤러리의 "유사컷 대표이미지 적용" 관련 코드는 엔진이 무엇이든 동일한 스키마를 읽으므로 전혀 수정할 필요가 없었다. 흔들림/눈감음 품질 판정(OpenCV/MediaPipe)은 이 전환에 포함되지 않으며 베타 흐름에서 완전히 빠졌다 — **그 결과 고객 갤러리의 품질 배지가 데이터 없이 남아 있다가, 2026-09-12에 Gemini Flash(§6.7)를 단일 출처로 삼아 되살아났다**. §6.6, §7.4 참고.
 - **테스트**: 백엔드에는 자동화 테스트가 전혀 없음 (`app/`, `clip-service/` 어디에도 test 파일 없음, pytest 등 의존성 없음).
 
 ---
@@ -183,26 +193,28 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | 테이블 | 코드에서 확인된 주요 컬럼 | 비고 |
 |---|---|---|
 | `photographers` | `id, auth_id, email, name, profile_image_url, bio, instagram_url, portfolio_url, contact_phone, created_at, beta_status("not_invited"\|"active"\|"ended"\|"suspended"), beta_start_date, beta_end_date, admin_note, total_projects_created` | `auth_id`는 Supabase Auth의 `user.id`. 회원가입 시 자동 생성(`src/app/auth/callback/route.ts`). 등급(관리자/베타/일반) 컬럼은 2026-07-26 베타 등급 시스템에서 추가(`supabase/migrations/20260726_beta_tier_system.sql`) — 기존 가입자도 그랜드파더링 없이 `beta_status='not_invited'`(일반)로 시작. `total_projects_created`는 삭제해도 감소하지 않는 누적 생성 카운터로 설계됐으나, 2026-07-26 정책 변경(커밋 `2b2e241`/`818affc`)으로 일반 사용자 한도 판정이 "현재 보유 수" 기준으로 바뀌면서 **더 이상 어떤 검증 로직에서도 읽히지 않는 컬럼**이 됐다(계속 +1은 되지만 사용처 없음) — §6.3, §13 참고. |
-| `projects` | `id, photographer_id, name, customer_name, shoot_date, deadline, required_count, photo_count, status, access_token, access_pin, confirmed_at, delivered_at, customer_cancel_count, max_revision_count, revision_round, review_deadline, shoot_type, customer_phone, clip_analysis_status, display_id, include_original, original_archive_status, original_download_started_at, original_archive_processing_started_at, created_at, updated_at` | `status`는 8가지 값의 상태 머신(§9). `access_token`이 고객 링크의 토큰, `access_pin`이 4자리 PIN(nullable). `original_archive_status`(신규, `20260731_original_archive_download.sql`, `NULL/pending/processing/ready/failed`)는 납품용 원본 다운로드 ZIP 아카이브 생성 상태 — `include_original=true`이고 `original_download_started_at`(신규, 초대 링크 최초 활성화 시각, 재전달로 초기화 안 됨)가 있어야 고객 화면에 다운로드가 노출된다. 아카이브 생성 흐름은 `user-flow.md` §8.2 참고. |
-| `photos` | `id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, memo, similarity_group_id, blur_variance, is_blurry, face_detected, eyes_closed, r2_original_url, original_ready_at, original_status, original_compressed_size, created_at` | `number`는 `insert_photos_with_numbers` RPC로 원자적 할당. `similarity_group_id`는 Gemini(`sync_groups_to_db`)가 채우며, `blur_variance/is_blurry/face_detected/eyes_closed`는 과거 OpenCLIP 분석 데이터에만 남아 있다(§6.5/§6.6). `original_status`(`awaiting_upload`→`pending`→`processing`→`completed`/`failed`)는 `include_original=true` 업로드의 원본 검증 상태다. `original_compress_worker`는 재압축 없이 `originals/source/{project_id}/{hex}.{ext}` 키를 `r2_original_url`로 확정하고, R2 HEAD에서 확인한 실제 원본 바이트 크기를 기존 컬럼 `original_compressed_size`에 저장한다. 컬럼명과 달리 현재 값은 재압축 결과가 아니다. 과거 행 등 NULL인 경우에만 아카이브 파트 산정이 20MiB(`_FALLBACK_PHOTO_BYTES`)를 사용한다. `file_size`는 썸네일+프리뷰 바이트 합계로 별개 용도다. 상세: `docs/upload-flow.md`. |
+| `projects` | `id, photographer_id, name, customer_name, shoot_date, deadline, required_count, photo_count, status, access_token, access_pin, confirmed_at, delivered_at, customer_cancel_count, max_revision_count, revision_round, review_deadline, shoot_type, customer_phone, clip_analysis_status, display_id, include_original, original_archive_status, original_download_started_at, original_archive_processing_started_at, cover_photo_id, cover_focal_y, created_at, updated_at` | `status`는 8가지 값의 상태 머신(§9). `status='delivered'`이면 `delivered_at`은 반드시 존재한다(`20260821131000_add_projects_delivered_at.sql`의 BEFORE 트리거 + CHECK 제약). `access_token`이 고객 링크의 토큰, `access_pin`이 4자리 PIN(nullable). `cover_photo_id`는 고객 진입 hero와 작가 프로젝트 목록·대시보드 카드의 대표 썸네일이다. 미지정·삭제·조회 실패 시 첫 사진으로 폴백한다. 고객 hero는 중앙 기준으로 표시한다. `cover_focal_y`는 기존 데이터 호환을 위해 DB에 남아 있지만 현재 FE/API에서는 읽거나 저장하지 않는 레거시 컬럼이다. `original_archive_status`(신규, `20260731_original_archive_download.sql`, `NULL/pending/processing/ready/failed`)는 납품용 원본 다운로드 ZIP 아카이브 생성 상태 — `include_original=true`이고 `original_download_started_at`(신규, 초대 링크 최초 활성화 시각, 재전달로 초기화 안 됨)가 있어야 고객 화면에 다운로드가 노출된다. 아카이브 생성 흐름은 `user-flow.md` §8.2 참고. |
+| `photos` | `id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, source_file_size, source_width, source_height, source_content_type, source_last_modified, memo, similarity_group_id, blur_variance, is_blurry, face_detected, eyes_closed, r2_original_url, original_ready_at, original_status, original_compressed_size, created_at` | `number`는 `insert_photos_with_numbers` RPC로 원자적 할당. `source_*`는 사용자가 선택한 압축 전 파일의 목록용 메타데이터이며, 해상도는 기존 클라이언트 압축 또는 서버 썸네일 디코딩 단계에서 수집해 추가 디코딩을 만들지 않는다. `similarity_group_id`는 Gemini(`sync_groups_to_db`)가 채우며, `blur_variance/is_blurry/face_detected/eyes_closed`는 과거 OpenCLIP 분석 데이터에만 남아 있다(§6.5/§6.6). `original_status`(`awaiting_upload`→`pending`→`processing`→`completed`/`failed`)는 `include_original=true` 업로드의 원본 검증 상태다. `original_compress_worker`는 재압축 없이 `originals/source/{project_id}/{hex}.{ext}` 키를 `r2_original_url`로 확정하고, R2 HEAD에서 확인한 실제 원본 바이트 크기를 기존 컬럼 `original_compressed_size`에 저장한다. 컬럼명과 달리 현재 값은 재압축 결과가 아니다. 과거 행 등 NULL인 경우에만 아카이브 파트 산정이 20MiB(`_FALLBACK_PHOTO_BYTES`)를 사용한다. `file_size`는 썸네일+프리뷰 바이트 합계로 별개 용도다. 상세: `docs/upload-flow.md`. |
 | `original_jobs` | `id, photo_id, project_id, job_type, r2_source_key, source_content_type, original_filename, original_file_size, original_last_modified, original_content_type, status, attempts, max_attempts, last_error, next_attempt_at, processing_started_at, completed_at, created_at` | 원본 검증 비동기 job queue. `(photo_id, job_type)` UNIQUE. `insert_photos_with_numbers` RPC가 `photos` 행과 해당 job을 한 트랜잭션에서 생성해 고아 `awaiting_upload` 사진을 방지한다(`20260813_harden_original_archive_activation.sql`). 과거 고아 행은 마이그레이션이 파일명 기반 `failed` job으로 복구하며, size/lastModified가 없으므로 FE가 파일명으로만 매칭한다. 5상태(`awaiting_upload/pending/processing/completed/failed`), `SELECT FOR UPDATE SKIP LOCKED` 클레임. `r2_source_key`는 브라우저가 직접 PUT한 미압축 원본 R2 key이며 worker는 재압축·재업로드 없이 그대로 납품 원본으로 확정한다. |
 | `selections` | `project_id, photo_id, rating, color_tag, comment, is_selected` | `(project_id, photo_id)` unique 제약으로 upsert. |
-| `photo_versions` | `id, photo_id, version(1\|2), r2_url, r2_thumb_url, file_size, filename, r2_delivery_url, delivery_filename, delivery_file_size, delivery_content_type, delivery_ready_at, created_at` | `(photo_id, version)` conflict로 upsert. `r2_url`/`r2_thumb_url`은 검토용이고 `r2_delivery_url`은 재인코딩하지 않은 최종 납품 원본 R2 key다. |
-| `version_reviews` | `photo_version_id, photo_id, status("approved"\|"revision_requested"), customer_comment, reviewed_at` | `photo_version_id` unique(conflict 대상). 보정본 재업로드 시 관련 행 삭제됨. |
+| `photo_versions` | `id, photo_id, version(1\|2), r2_url, r2_thumb_url, file_size, filename, r2_delivery_url, delivery_filename, delivery_file_size, delivery_content_type, delivery_ready_at, created_at` | `(photo_id, version)`당 현재 활성 보정본 1행만 유지한다. 교체는 `replace_photo_versions_with_history` RPC가 담당하며, `r2_url`/`r2_thumb_url`은 검토용이고 `r2_delivery_url`은 재인코딩하지 않은 최종 납품 원본 R2 key다. |
+| `photo_version_revisions` | `id, photo_id, version(1\|2), revision_no, source_photo_version_id, r2_url, r2_thumb_url, file_size, filename, r2_delivery_url, delivery_filename, archived_review_status, archived_customer_comment, archived_reviewed_at, original_created_at, superseded_at` | 같은 V1/V2 단계에서 파일을 교체하기 직전의 `photo_versions`와 고객 검토 결과를 append-only 스냅샷으로 보존한다. 이 행은 V3를 만들거나 재보정 허용 횟수를 소비하지 않으며, 고객 화면에는 노출하지 않고 작가 상세 뷰어의 읽기 전용 이력에서만 사용한다. |
+| `version_reviews` | `photo_version_id, photo_id, status("approved"\|"revision_requested"), customer_comment, reviewed_at, created_at` | 현재 활성 `photo_versions`에 대한 검토 결과만 저장한다. 교체 RPC가 기존 결과를 `photo_version_revisions`에 함께 보존한 뒤 현재 검토 행을 삭제한다. |
 | `project_logs` | `id, project_id, photographer_id, action, created_at` | 상태 변경 이력. `action` CHECK 제약이 8개 상태 전이 전부(`created/uploaded/selecting/confirmed/editing/reviewing_v1/editing_v2/reviewing_v2/delivered`)를 허용(`supabase/migrations/20260726_project_logs_expand_actions.sql`, 2026-07-26 이전엔 5개만 허용됐음). |
+| `project_participants` | `project_id, color("red"\|"yellow"\|"green"\|"blue"\|"purple"), nickname, updated_at` | 고객 셀렉 참가자 슬롯의 **표시 이름**만 저장(`supabase/migrations/20260910000000_add_project_participants.sql`, 2026-09-10). PK `(project_id, color)`. 링크+PIN을 여러 사람이 공유해 서버가 요청자를 구분하지 못하므로 `selections.color_tag`의 색을 참가자로 재해석하는데, "그 색이 누구인지"를 담을 곳이 없어 추가했다. 본인 확인 수단이 아니라 표시용 라벨이다. RLS 활성화, 정책 없음 — `/api/c/participants`(PIN 검증 + service role)로만 접근. |
 | `feedback` | `id, reporter_type("photographer"\|"customer"), photographer_id, project_id, category("bug"\|"suggestion"), message, page_url, status("new"\|"reviewing"\|"resolved"), created_at` | 베타 운영 피드백(신규, `supabase/migrations/20260726_feedback.sql`). 현재는 작가만 제출(§6.3). RLS 활성화, 정책 없음 — 서버(service role/세션 검증 라우트)만 접근. |
 | `beta_invitations` | `id, email(unique), invited_at, consumed_at, admin_note` | 가입 전 이메일 사전 등록(신규, `20260726_beta_tier_system.sql`). `consumed_at IS NULL`이면 대기 중 — 해당 이메일로 가입하면 `src/app/auth/callback/route.ts`가 자동으로 베타를 부여하고 `consumed_at`을 채운다. |
 | `admin_audit_logs` | `id, photographer_id, actor("admin"\|"system"), action, detail(jsonb), created_at` | 베타 부여/종료/중지/기간변경(관리자 행위) + 프로젝트/업로드 제한 발생(시스템 이벤트) 감사 로그(신규, `20260726_beta_tier_system.sql`). `project_logs`는 `project_id NOT NULL`이라 프로젝트와 무관한 사용자 단위 이벤트를 담을 수 없어 별도 테이블로 분리. |
 | `app_settings` | `id(=1 고정, 싱글턴), general_max_projects, general_max_photos_per_project, beta_max_projects_total, beta_max_photos_per_project, beta_max_revision_count, beta_default_duration_days, updated_at, updated_by` | 관리자 설정(`/admin/settings`)에서 실시간 편집 가능한 이용 한도 값(신규, `20260726_app_settings.sql`). 항상 `id=1` 행 하나만 존재. `ADMIN_EMAILS`는 여기 포함하지 않고 계속 코드 하드코딩 유지(§6.3). RLS 활성화, 정책 없음 — service-role 클라이언트만 접근. |
 | `beta_survey_responses` | `id, photographer_id, project_id, survey_type("link_sent"\|"project_created"\|"original_uploaded"\|"selection_received"\|"first_delivery"\|"second_delivery"), answers(jsonb), later_until, skipped_at, submitted_at, created_at, updated_at` | 베타 5·6단계(신규, `20260727_beta_survey_responses.sql` + `20260727b_beta_survey_responses_add_micro_types.sql`로 `survey_type` CHECK 확장, plan/beta-system.md §7). `(photographer_id, survey_type)` UNIQUE — 설문 시점별 1행. 트리거·문항이 실제로 구현된 값은 `project_created`·`original_uploaded`·`selection_received`·`first_delivery`·`second_delivery` 5개(①`link_sent`만 문항 미확정이라 §13 보류). 상태는 별도 컬럼 없이 `later_until`(나중에, 24h 후 재노출)/`skipped_at`(영구 건너뛰기)/`submitted_at`(제출 완료) 세 시각의 존재 여부로 판단. RLS 활성화, 정책 없음 — service-role만 접근. |
 | `delivery_files` | (제거됨) | **2026-07-23 `DROP TABLE`로 완전히 제거됨** — 과거 `delivered` 상태 이후 별도 업로드하던 납품 파일 저장소였으나, 지금은 `include_original` 아키텍처(아래 `original_archive_parts` 등)로 대체됐다. |
-| `original_archive_parts` | `id, project_id, part_number, r2_key, file_count, byte_size, manifest(jsonb, photo_id 배열), status(pending\|processing\|completed\|failed), attempts, max_attempts, last_error, processing_started_at, completed_at, deleted_at, created_at`, UNIQUE(`project_id, part_number`) | (신규, `20260731_original_archive_download.sql`) 납품용 원본 고객 다운로드 ZIP 아카이브 — `original_jobs`와 동일한 큐 패턴(claim/complete/fail RPC). `projects.original_archive_status`가 프로젝트 단위 집계 상태를 겸한다. §9 참고. |
+| `original_archive_parts` | `id, project_id, part_number, r2_key, file_count, byte_size, manifest(jsonb, photo_id 배열), status(pending\|processing\|completed\|failed), attempts, max_attempts, last_error, processing_started_at, processed_file_count, processed_bytes, progress_updated_at, completed_at, deleted_at, created_at`, UNIQUE(`project_id, part_number`) | (신규, `20260731_original_archive_download.sql`, 진행률 `20260912000000_original_archive_progress.sql`) 납품용 원본 고객 다운로드 ZIP 아카이브 — `original_jobs`와 동일한 큐 패턴(claim/complete/fail RPC). 워커가 실제 ZIP 기록 장수·바이트를 제한된 주기로 갱신하며 `projects.original_archive_status`가 프로젝트 단위 집계 상태를 겸한다. §9 참고. |
 | `final_delivery_archives` / `final_delivery_archive_parts` | 검토 회차, immutable 보정본 manifest, 파일 수/용량, 큐 상태, R2 ZIP key | `20260814_final_retouch_delivery.sql`. 고객 검토 시작 시 후보를 만들고 재보정 시 폐기/재생성한다. `projects.active_final_delivery_archive_id`가 현재 후보를 가리킨다. |
 | `pin_attempts` | `project_token, ip_address, attempted_at` | PIN 시도 rate-limit(1분 내 5회)용. |
 | `photo_groups` | `id, project_id, representative_photo_id, photo_count` | 유사컷 그룹 — 엔진에 무관한 범용 스키마(테이블 자체에 OpenCLIP/Gemini 전용 컬럼 없음). 2026-07-28 베타 전환 이전에는 OpenCLIP `analyzer.py`가 채웠고, 이후에는 **Gemini의 `sync_groups_to_db()`가 매 실행마다 프로젝트 단위로 전체 삭제 후 재삽입**한다(§6.6). `src/types/supabase.ts` 생성 타입에는 **없음**(수동 캐스팅으로 접근). 사진 1건 삭제 시 `delete_photo_and_resolve_group` RPC(`supabase/migrations/20260720_delete_photo_group_cleanup.sql`, OpenCLIP 시절 그대로, 수정 없음)가 대표컷 재지정/`photo_count` 갱신/그룹 해체를 원자적으로 처리한 뒤, Gemini 사용 프로젝트라면 곧이어 clip-service의 `sync-groups`가 best-effort로 재정합화한다(§6.6). 프로젝트 전체 사진 삭제("전체삭제") 시에는 `api/photographer/projects/[id]/photos`가 이 테이블 행을 직접 정리한다. |
 | `deleted_photographers` | `id, deleted_at, project_count, join_month` | 계정 삭제 시 익명화 통계로 남김. |
 | `photos.clip_embedding` | (컬럼) | `clip-service/migration.sql`에서 추가. CLIP 임베딩 저장. |
-| `photos.blur_variance` / `is_blurry` / `face_detected` / `eyes_closed` | (컬럼) | `clip-service/migration_002_quality_flags.sql`에서 추가. 흔들림/눈감음 경고 배지용 — §6.4 참고. |
+| `photos.blur_variance` / `is_blurry` / `face_detected` / `eyes_closed` | (컬럼) | `clip-service/migration_002_quality_flags.sql`에서 추가. **(2026-09-12) 더 이상 읽지 않는다** — 흔들림/눈감음 표시의 출처는 `gemini_quality_assessments`로 옮겼다(§6.7). 채우는 경로(OpenCLIP `/analyze`)에 프론트 진입점이 없어 전체의 4%만 값이 있고 신규 프로젝트는 전부 null이었다. 기존 데이터 보존 목적으로 컬럼만 남겨둠. |
 | `gemini_analysis_runs` | `id, project_id, status, requested_image_limit, embedding_model, embedding_dimension, similarity_threshold, image_count, processed_count, failed_count, estimated_cost_usd, usage_metadata(jsonb), error, started_at, completed_at, duration_ms` | (2026-07-28 추가, `clip-service/migration_003_gemini_poc.sql`) Gemini 실행(run) 단위 메타데이터 — 도입 당시엔 POC 전용이었으나 베타 전환 이후 실사용 실행 기록도 여기 쌓인다. `projects` 테이블에는 컬럼을 추가하지 않음 — 진행 상태는 이 테이블의 최신 행으로만 조회. |
 | `gemini_embeddings` | `id, project_id, photo_id, embedding_model, embedding(double precision[]), dimension, embedding_version, source_object_key, created_at`, UNIQUE(`project_id, photo_id, embedding_model, dimension, embedding_version`) | (2026-07-28 추가, 베타 전환 시 `migration_005`로 `embedding_version`/`source_object_key` 추가 + UNIQUE 재정의) `photos.clip_embedding`과 완전히 분리된 저장소. **이미지 단위 캐시**: `(project_id, photo_id, embedding_model, dimension, embedding_version)`이 모두 일치하면 재호출을 스킵 — dimension/model 변경은 새 조합이라 upsert 충돌 없이 별도 행이 쌓인다. `source_object_key`는 `r2_thumb_url`에서 `R2_PUBLIC_URL` 접두사를 제거한 R2 객체 key(URL 자체보다 안정적인 캐시 식별자, 값이 있으면 캐시 판정 시 함께 대조). threshold를 바꿔가며 재그룹핑할 때도 Gemini API를 재호출하지 않기 위한 캐시 역할을 겸함(`GET /analyze/gemini/{id}/groups?threshold=`). |
 | `gemini_quality_runs` | `id, project_id, status, requested_image_limit, model, prompt_version, image_count, processed_count, failed_count, reused_count, estimated_cost_usd, usage_metadata(jsonb), error, started_at, completed_at, duration_ms` | (2026-07-28 추가, `clip-service/migration_004_gemini_quality_poc.sql`) Gemini Flash 품질 판정 실행(run) 단위 메타데이터. Embedding용 `gemini_analysis_runs`와 완전히 별개(§6.7). |
@@ -227,6 +239,8 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 
 재보정 가능 여부는 `max_revision_count`(0~2)와 `revision_round`로 판단하며, 실제 상태 전이는 `submitVersionReviews()`(`src/lib/db.ts`)에서 `hasRevision && maxRevisionCount > 0 && currentRound < maxRevisionCount` 조건으로 계산됩니다.
 
+`delivered` 전환 시 애플리케이션은 `status`, `delivered_at`, `updated_at`을 같은 시각으로 갱신한다. DB의 `projects_ensure_delivered_at` BEFORE 트리거도 모든 쓰기 경로에서 누락된 시각을 채우고, `projects_delivered_at_required` CHECK 제약이 `status='delivered' AND delivered_at IS NULL`인 행을 거부한다. 마이그레이션 이전 완료 데이터는 당시 상태 갱신 시각인 `updated_at`으로 백필한다.
+
 ---
 
 ## 6. 주요 페이지와 라우트
@@ -237,15 +251,15 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 |---|---|---|
 | `/photographer/dashboard` | `src/app/photographer/dashboard/page.tsx` | 대시보드 요약. 프로젝트가 1개 이상 있고 5개 설문 트리거 중 하나라도 충족되면 베타 설문 모달(`BetaSurveyModal`, §7.1 목록의 `api/photographer/beta-survey/*`) 조건부 노출(§6.1b 베타 설문 참고) |
 | `/photographer/projects` | `src/app/photographer/projects/page.tsx` | 프로젝트 목록/검색/필터 |
-| `/photographer/projects/new` | `src/app/photographer/projects/new/page.tsx` | 프로젝트 생성 폼 (PIN·재보정 횟수 포함) |
-| `/photographer/projects/[id]` | `ProjectNexusPageClient.tsx` | 프로젝트 상세 작업 허브. 공통 `ProjectInformationCard`가 수정 가능한 모든 프로젝트 설정을 표시하고, `ProjectWorkPanel`이 기존 `ProjectStatus`를 6개 표시 모드로 묶어 상태별 CTA(업로드·셀렉·보정·검토·결과)만 바꾼다. 상세 전용 `ProjectProgressCard`는 현재 상태를 중립적인 단계 카드로 표시하며, 초대 링크·PIN·삭제 기능은 기존과 동일 |
-| `/photographer/projects/[id]/upload` | `upload/page.tsx` | 원본 사진 업로드/관리 (메인 업로드 UI). **(2026-07-28 베타 전환)** `[AI 유사도 분석]` 버튼의 호출 대상이 OpenCLIP(`clip-analysis`)에서 Gemini Embedding(`gemini-analysis`)으로 바뀌었다 — 변수/함수명(`clipAnalysisStatus`, `handleStartClipAnalysis` 등)은 그대로 두고 내부 호출 대상만 바꿨다(레거시 네이밍, 최소 diff 목적). 흔들림/눈감음 경고 배지·필터 UI는 이 전환과 함께 **완전히 제거**됨(OpenCV/MediaPipe가 더 이상 실행되지 않아 신규 데이터가 없으므로) — `src/lib/photo-quality.ts` 관련 배지 참고는 더 이상 이 페이지에 해당하지 않음. 버튼 상태는 5단계 머신(최초 분석 필요/신규 이미지 분석 필요/일부 분석 실패/분석 중/전체 완료)으로 계산되며 "전체 완료" 상태 클릭 시에는 API 재호출 없이 토글만 켠다(이미 DB에 최신 결과가 있으므로). AI 유사컷 분석 트리거는 `preparing`/`selecting` 상태 모두에서 노출(`canUploadOriginals`) — 초대 링크 활성화 이후 추가 업로드된 사진도 이미지 단위로 재분석 가능(캐시 히트한 기존 사진은 Gemini API 재호출 없음, §6.6). 사진 삭제(1건/전체) 시 `photo_groups`가 Gemini 기준으로 재동기화된다. 관리자 등급에게만 같은 페이지 하단에 `GeminiAnalysisPanel`(`src/components/photographer/GeminiAnalysisPanel.tsx`) "Gemini 분석 (POC)" 바가 별도로 노출됨 — threshold 실험과 Gemini Flash 품질 판정(관리자 전용) 비교용, §6.6/§6.7 참고 |
-| `/photographer/projects/[id]/workflow` | `WorkflowPageClient.tsx` | **보정본 V1/V2 업로드·전달을 포함한 실사용 통합 화면.** 실제 업로드 UI는 하위 컴포넌트 `src/components/photographer/UploadVersionsPanel.tsx`가 담당하며, `src/lib/version-mapping.ts`(파일-사진 매칭)와 `src/lib/retouch-clip-match.ts`(CLIP 폴백 매칭)를 사용한다. `ProjectNexusPageClient.tsx`의 모든 보정 관련 버튼은 이 라우트로만 연결된다. 고객 확정 이후 `내보내기`에서 원본 포함 프로젝트는 선택 원본을, 미포함 프로젝트는 확인용 최대 1200px JPEG 프리뷰를 PC Chrome/Edge 폴더에 스트리밍 저장한다. |
-| `/photographer/projects/[id]/results` | `results/page.tsx` | 최종 납품 결과 화면(CSV/TXT 내보내기). `confirmed`/`editing` 상태에서는 "보정 시작하기"/"보정본 업로드" 버튼과 진행단계 사이드바가 `/workflow`로 이동시킨다(2026-07-13부터 — 이전에는 `/upload-versions`로 이동했음, 아래 삭제 이력 참고). |
+| `/photographer/projects/new` | `src/app/photographer/projects/new/page.tsx` | PIN·재보정 횟수를 포함한 840px 프로젝트 생성 폼. 상세 수정 view와 `ProjectFormFields.tsx`의 Page Heading·Section·Field·Input·촬영유형·재보정·Switch·PIN primitive 및 `PhotographerFormActionBar`를 공유하고, 생성 화면은 `나중에 올리기`/`원본 올리기` 액션을 주입한다. |
+| `/photographer/projects/[id]` | `ProjectNexusPageClient.tsx` | Light 프로젝트 상세 작업 허브. 공통 Light Page Header 아래에 `ProjectProgressCard`가 Project List와 같은 상태 매핑을 재사용한 6단계 Expanded Stepper를 표시한다. 본문은 `ProjectInformationCard`(기본 정보·고객 갤러리 설정·고객 링크/PIN 조회)와 470px `ProjectWorkPanel`(상태별 업로드·셀렉·보정·검토·결과 CTA)의 2열이며, 최근 활동 패널은 Figma 상세 구조에 맞춰 표시하지 않는다. `정보 수정`은 중앙 모달이 아니라 840px 전체 수정 view로 전환되며 프로젝트 생성 화면과 동일한 `ProjectFormFields.tsx` primitive와 폼 geometry를 사용한다. 촬영장소와 4자리 숫자 PIN(`access_pin`, 빈 값은 제거)을 저장하고, 진행 상태에 따른 셀렉 수·원본 설정 잠금은 유지한다. 상세 조회 view의 PIN은 읽기 전용이며 변경은 이 수정 view에서만 한다. 수정 view의 하단은 생성 폼과 공용 `PhotographerFormActionBar`를 사용한다. 초대 링크 복사·PIN 표시·삭제 기능은 유지한다. `알림톡 보내기`는 Figma 위치에 표시하는 비활성 준비 중 버튼이며 아직 이벤트/API가 없다. |
+| `/photographer/projects/[id]/upload` | `upload/page.tsx` | 초대 전(`preparing`) 원본 사진 업로드/편집 화면. N장 이상 업로드하면 `CustomerSelectionRequestModal`이 공용 `PhotographerModal.workflow` shell로 고객 요약·마감일·접속 링크/PIN과 사진 구성 잠금 안내를 표시한다. 확인 checkbox 전에는 CTA가 비활성이고, `셀렉 요청하기`는 deadline 저장 후 `preparing→selecting` 상태 전환과 원본 완료 재시도를 실행한다. 성공 직후에는 `CustomerInviteShareModal`을 먼저 열고, 이후 이 URL에 직접 재진입하면 `/assets/original`로 replace 이동한다. 갤러리 렌더링은 공용 `OriginalPhotoGallery`를 편집 모드로 사용한다. AI 유사도 분석·사진 추가·삭제는 이 `preparing` 화면에서만 가능하다. |
+| `/photographer/projects/[id]/assets/original` · `/assets/selected` | `assets/ProjectAssetsPageClient.tsx` | 확정 이후의 원본/셀렉 통합 조회 workspace. 경로는 분리하지만 공용 `ProjectAssetTabs`와 동일한 클라이언트 화면을 사용한다. 두 탭 모두 업로드 화면과 같은 가상화 `PhotographerPhotoGallery`와 공용 `OriginalPhotoViewer`를 재사용한다. 원본은 읽기 전용 메타데이터와 유사컷 상태를, 셀렉은 순번·고객 코멘트를 variant slot으로 표시한다. 셀렉 탭은 목록 내보내기와 셀렉 원본/프리뷰 폴더 저장을 제공한다. |
+| `/photographer/projects/[id]/assets/retouched` | `workflow/WorkflowPageClient.tsx` | **보정본 V1/V2 업로드·전달을 포함한 실사용 화면.** 실제 업로드 UI는 `src/components/photographer/UploadVersionsPanel.tsx`가 담당하며 `src/lib/version-mapping.ts`와 `src/lib/retouch-clip-match.ts`를 사용한다. 원본·셀렉과 같은 `ProjectAssetTabs` 자산 탐색 체계에 속하며, grid 최소 카드 폭·간격·반응형 여백·사진 비율도 `OriginalPhotoGallery`가 내보내는 공용 규격을 사용한다. 기존 `/workflow`와 `/results`는 저장된 링크 호환을 위해 새 자산 경로로 redirect한다. |
 | `/photographer/settings` | `settings/page.tsx` | 프로필 설정, 프로필 이미지 업로드, 계정 삭제 |
 | `/auth/callback` | `src/app/auth/callback/route.ts` | OAuth 콜백, `photographers` 행 자동 생성 |
 
-**삭제된 레거시 라우트(2026-07-13)**: `/auth`(no-op 리다이렉트), `/photographer/projects/[id]/upload_backup`, `/photographer/projects/[id]/edit/start`, `/photographer/projects/[id]/edit/progress`, `/photographer/projects/[id]/upload-versions`, `/photographer/projects/[id]/upload-versions/v2`, `api/photographer/upload-versions`(프록시). 전부 코드베이스 전체 grep으로 들어오는 링크가 0건임을 확인 후 삭제했으며, `/upload-versions` 계열은 `results/page.tsx`의 버튼 3곳이 `/workflow`로 가도록 함께 수정했다. `upload/page.tsx`의 관련 미사용 변수(`editVersionsPath` 등)도 함께 정리.
+**삭제된 레거시 라우트(2026-07-13)**: `/auth`(no-op 리다이렉트), `/photographer/projects/[id]/upload_backup`, `/photographer/projects/[id]/edit/start`, `/photographer/projects/[id]/edit/progress`, `/photographer/projects/[id]/upload-versions`, `/photographer/projects/[id]/upload-versions/v2`, `api/photographer/upload-versions`(프록시). 전부 코드베이스 전체 grep으로 들어오는 링크가 0건임을 확인 후 삭제했다. 현재 보정 진입점은 `/assets/retouched`이며, 과거 `/workflow` 주소는 호환 redirect만 유지한다.
 
 ### 6.1a 베타 신청(`/beta/**`, 라우트는 공개지만 제출은 로그인 필수)
 
@@ -271,7 +285,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 
 | 라우트 | 설명 |
 |---|---|
-| `/c/[token]` | 진입점. 서버에서 `delivered` 여부·PIN 쿠키 존재 여부 우선 확인 후 클라이언트에서 상태별 재분기 |
+| `/c/[token]` | 진입점. 서버에서 `delivered` 여부·PIN 쿠키 존재 여부를 먼저 확인한 뒤 클라이언트에서 상태별 재분기한다. `selecting`과 `reviewing_v1/v2`는 `CustomerInviteIntro`가 `CustomerEntryShell` 위에서 대표 사진·작가 정보·PC split/mobile stack·CTA 영역을 공통 제공한다. 레이아웃은 `100dvh` 안에서 완결되고 페이지 overflow를 만들지 않는다. 대표 사진 URL은 사전 로드 성공 후에만 DOM 이미지에 연결한다. |
 | `/c/[token]/pin` | PIN 입력 폼 (PIN 없는 프로젝트는 `/api/c/auto-verify`로 자동 통과) |
 | `/c/[token]/about` | 고객 온보딩/도움말 |
 | `/c/[token]/gallery` | 사진 선택 그리드. 흔들림/눈감음 의심 사진에 경고 배지 표시(정보성, 선택/확정 차단 없음) — 이 배지 UI 코드는 그대로 남아있지만, **베타 전환(2026-07-28) 이후 신규 분석에서는 관련 컬럼(`blur_variance` 등)이 더 이상 채워지지 않아** 과거 OpenCLIP으로 분석된 레거시 프로젝트에서만 실제로 보인다(§5, §6.5). 유사도분석이 완료된 프로젝트는 "유사컷 묶어보기" 토글도 노출(기본 OFF, 2026-07-30 이전 라벨은 "유사컷 대표이미지 적용"). **(2026-07-30 UX 개선)** 켜면 그룹별 표지 사진 1장만 보이고 나머지 멤버는 배지를 눌러야 펼쳐짐 — 표지는 그룹 내 선택이 없으면 내부 기본값(구 "대표컷", 화면에 문구 노출 안 함), 1장 이상 선택되면 개수와 무관하게 항상 선택된 사진 중 원래 순서가 가장 앞선 사진이다. 배지는 `+N`(표지 외 접힌 사진 수, 고정값)에 선택이 있으면 `· M/전체 선택`을 병기한다. 펼치면 항상 원래 orderIndex 순서로 표시되고, 선택/해제가 순서나 펼침 상태를 바꾸지 않는다(`src/lib/photo-groups.ts`의 `getGroupFrontPhotoId`/`buildGroupSelectionInfo`). 이 토글은 엔진 무관하게 `photo_groups`/`similarity_group_id`를 그대로 읽으므로, 베타 전환 이후에는 Gemini가 채운 결과로 동일하게 동작한다(§6.6). 가시성에 직접 영향을 주는 기능. 이 토글 상태는 사진 클릭 시 뷰어에 `?grouped=1`로 전달됨(`GalleryFilterState.groupedView`, `src/lib/gallery-filter.ts`). **필터 상태 전체(선택됨 탭/별점/색상/정렬/파일명 검색/품질/그룹핑)가 URL 쿼리와 동기화**되어 새로고침·뒤로가기 후에도 유지됨 — 마운트 시 1회 복원, 이후 `router.replace`로 반영(히스토리 미증가) |
@@ -284,7 +298,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 
 **납품용 원본 다운로드 진입점**: `OriginalDownloadEntry.tsx`는 고객 페이지의 inline 진입점으로 마운트된다. `include_original=false`면 숨기고, 초대 링크 활성화 후 ZIP이 아직 `ready`가 아니어도 진입점과 개별 원본 다운로드는 노출하며 ZIP 탭에는 준비 중 상태를 표시한다. 개별 파일 탭은 전체 ZIP과 역할이 겹치지 않도록 PC·모바일 모두 전체 선택을 노출하지 않는다. PC Chrome/Edge는 `showDirectoryPicker()`로 사용자가 고른 폴더에 presigned 원본을 한 파일씩 스트리밍해, 반복 `<a>.click()`이 Chrome의 자동 다중 다운로드 권한에 막히는 문제를 피한다. 이 API가 없는 데스크톱 브라우저만 기존 anchor 다운로드로 폴백한다. 모바일은 Web Share 전에 원본을 전부 Blob/File로 메모리에 적재하므로 최대 10장(`MOBILE_MAX_FILE_COUNT=10`)과 선택 원본 합계 100MiB(`MOBILE_MAX_TOTAL_BYTES=100 * 1024 * 1024`)를 선택 시점과 저장 직전에 모두 검사한다. §8.2 `user-flow.md` 참고.
 
-**최종 보정본 다운로드**: `FinalDeliveryDownloadEntry.tsx`는 `delivered` 화면에 별도로 마운트된다. `include_original`과 무관하며 최종 확정된 검토 회차의 원본 크기 보정본 ZIP을 `delivered_at`부터 30일 동안 제공한다. `final_delivery_archive_worker`는 기본 500MiB(`ARCHIVE_PART_MAX_BYTES`) 단위로 파트를 만들고, 실제 클릭 시에만 1시간 presigned URL을 발급한다.
+**최종 보정본 다운로드**: `FinalDeliveryDownloadEntry.tsx`는 `delivered` 화면에 별도로 마운트된다. `include_original`과 무관하며 최종 확정된 검토 회차의 원본 크기 보정본 ZIP을 `delivered_at`부터 30일 동안 제공한다. `final_delivery_archive_worker`는 기본 500MiB(`ARCHIVE_PART_MAX_BYTES`) 단위로 파트를 만들고, 실제 클릭 시에만 1시간 presigned URL을 발급한다. 단일 파트는 URL 발급 직후 바로 다운로드하며, 여러 파트일 때만 파트별 링크를 고르는 창을 표시한다.
 
 ### 6.3 관리자(`/admin/**`, `ADMIN_EMAILS`에 등록된 운영자 계정 전용 베타 운영 백오피스)
 
@@ -305,7 +319,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 - 셸/사이드바는 `src/components/admin/AdminShell.tsx`, `AdminSidebar.tsx`, 메뉴 배열은 `src/lib/admin-nav.ts`. `/photographer/**`의 접기형 사이드바와 달리 데스크톱 전용 고정폭 사이드바로 단순화했다. `metadata.robots.index = false`로 검색엔진 노출 차단.
 - **조회 전용 화면**(Dashboard/Beta Users/Projects 목록·상세/Activity Logs/Feedback 목록)은 전부 `src/lib/admin-db.ts`의 서버 전용 함수가 `getAdminClient()`(service role, RLS 우회)로 직접 조회한다 — 별도 API 라우트 없음.
 - **개입(쓰기) 동작**만 `/api/admin/**` Route Handler로 분리되어 있고, 각 라우트가 자체적으로 `getAdminUser()`를 다시 호출해 인가를 검증한다(레이아웃의 서버 가드는 페이지 렌더링에만 적용되고 API 라우트에는 자동 적용되지 않으므로): `PATCH /api/admin/projects/[id]/pin`(PIN 재설정/제거), `PATCH /api/admin/feedback/[id]`(피드백 상태 변경), `PATCH /api/admin/users/[id]/beta`(베타 상태/기간/메모 변경 + `admin_audit_logs` 기록), `POST /api/admin/beta-invitations` / `DELETE /api/admin/beta-invitations/[id]`(사전 초대 등록/취소).
-- **작가용 피드백 제출**: `POST /api/feedback`(세션 기반, `src/lib/db.ts`류 패턴과 동일하게 `photographer_id`를 세션에서 조회해 저장). 제출 UI는 `src/components/photographer/FeedbackModal.tsx`(`FeedbackButton`)이며 `Sidebar.tsx` 하단(로그아웃 버튼 위)에 "문의하기"로 노출된다.
+- **작가용 피드백 제출**: `POST /api/feedback`(세션 기반, `src/lib/db.ts`류 패턴과 동일하게 `photographer_id`를 세션에서 조회해 저장). 제출 UI는 `src/components/photographer/FeedbackModal.tsx`(`FeedbackButton`)이며 `Sidebar.tsx`의 Profile Popover 안(설정/로그아웃과 함께, 2026-08-20부터 — 이전에는 사이드바 하단 상시 노출 버튼)에 "문의하기"로 노출된다.
 - **베타 신청서(`beta_applications` 테이블, 신규, 2026-07-26, `supabase/migrations/20260726_beta_applications.sql`)**: `plan/beta-system.md`의 1~4단계 구현. `name`/`phone`(UNIQUE, 신청자 식별 키)/`email`/`genre`/`monthly_shoot_count`/`avg_photos_per_project`/`current_workflow`/`reason`/`privacy_consent_at`/`contact_consent_at`/`status`(applied→reviewing→approved/on_hold/rejected)/`admin_note`/`contacted`/`matched_photographer_id`(FK, `ON DELETE SET NULL`). **§6.3의 베타 등급 시스템(`photographers.beta_status`)과는 완전히 별개** — 신청 승인이 `beta_status`를 자동으로 바꾸지 않는다. **제출은 로그인 필수**(`POST /api/beta/applications`, 세션 없으면 401, 2026-07-27부터 — 상세는 §6.1a)이며, 이메일과 `matched_photographer_id`는 항상 서버가 세션에서 가져온 값이라 제출 즉시 100% 매칭된다(클라이언트가 이메일을 보내는 경로 자체가 없음). 전화번호는 `src/lib/phone.ts`로 정규화(숫자만) 후 저장하며, 같은 번호 재신청은 신규 레코드를 만들지 않고 409로 거부한다. 이메일은 `beta_invitations`와 동일하게 소문자로 정규화해 저장한다. RLS는 활성화되어 있으나 정책이 없어(feedback 테이블과 동일 컨벤션) anon/authenticated 직접 접근은 차단된다. `email`/`matched_photographer_id` 컬럼 자체는 여전히 nullable(2026-07-27 정책 도입 이전의 레거시 행 1건이 이미 존재해 NOT NULL로 조이지 않음).
   - **가입 시점 매칭(2026-07-26 추가, `src/app/auth/callback/route.ts`)**: 신청은 이제 항상 로그인 후에 일어나 정상 흐름에서는 실행될 일이 거의 없지만, 레거시 데이터 등 예외 상황을 위한 방어 코드로 그대로 남겨뒀다. 같은 이메일로 신규 가입하면 `photographers` 행 생성 직후 `matched_photographer_id IS NULL`인 신청 레코드를 찾아 새 계정과 연결한다. 기존 `photographer` 행 생성과 같은 try/catch로 감싸여 있어 실패해도 로그인 자체는 막히지 않는다.
   - **관리자 승인→가입 연결 UI(2026-07-26 추가, 2026-07-27 재작성, `AdminBetaApplicationControl.tsx`)**: 상태가 `approved`이고 매칭된 계정이 아직 베타가 아닐 때만 노출. **"베타 초대 등록"(가입 전 이메일 사전등록) 버튼은 폐기** — 신청자가 이미 가입돼 있는 지금 구조에서는 호출할 때마다 "이미 가입된 사용자입니다" 오류만 반환하기 때문. 대신 **"베타 부여" 버튼**이 기존 `PATCH /api/admin/users/[id]/beta`를 그대로 호출해 `{beta_status:'active'}`만 전송한다(날짜 없이 무기한 부여 — `beta-policy.ts`의 `isBetaActive()`가 `betaEndDate` null을 "무기한 유효"로 처리). **"계정 매칭"(이메일로 수동 검색) 입력창은 완전히 제거**됐다 — 신청 시점에 항상 자동 매칭되므로 더 이상 필요 없다고 판단(사용자 확인, 예외 상황용 폴백도 남기지 않기로 함). `matched_photographer_id`가 비어 있는 예외 상황(정상 흐름에서는 발생 안 함)은 경고 문구만 표시.
@@ -351,9 +365,87 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 - **비용 확인**: `GEMINI_IMAGE_PRICE_USD` 1곳에서만 단가를 관리하고 `image_count * price`로 예상 비용을 계산해 `gemini_analysis_runs.estimated_cost_usd`에 기록. SDK 응답에 실제 usage 정보가 있으면 `usage_metadata`(jsonb)에 함께 남긴다.
 - **접근 제어(2026-07-28 베타 전환으로 변경됨)**: `api/photographer/projects/[id]/gemini-analysis`(POST/GET/DELETE, 분석 트리거/폴링/취소)는 이제 모든 베타 사용자의 실사용 경로이므로 **일반 세션+프로젝트 소유권만 검증한다**(관리자 제한 없음 — `clip-analysis`와 동일한 검증 수준). 도입 초기에는 이 라우트도 `isAdminEmail()`로 막혀 있었으나, 업로드 화면 버튼이 이 엔드포인트를 직접 호출하도록 바뀌면서 일반 등급도 통과해야 정상 동작하므로 함께 풀었다. **관리자 전용으로 남은 것은 품질(Flash) 데이터가 섞여 나오는 `api/photographer/projects/[id]/gemini-analysis/groups?include_quality=true` 하나뿐**이다 — 이 라우트만 세션의 `session.user.email`을 `isAdminEmail()`로 재검증하고, `include_quality`는 클라이언트 입력을 신뢰하지 않고 서버가 직접 `true`로 고정한다(§6.7). `GeminiAnalysisPanel`(threshold 실험 + Flash 품질 POC 패널) 자체는 여전히 `GET /api/photographer/quota`의 `tier === "admin"`일 때만 렌더링(UI 편의용, §6.1 표 참고). clip-service 자체는 기존과 동일하게 `X-Internal-Token`으로만 보호(요청자 등급 판단은 전부 Next.js 라우트 계층 책임).
 
-### 6.7 Gemini Flash 사진 품질 판정 — 관리자 전용 POC로 계속 유지 (2026-07-28 추가)
+### 6.7 Gemini Flash 사진 품질 판정 — 품질 표시의 **단일 출처**로 전환 (2026-07-28 추가 → 2026-09-12 일반 공개)
 
-§6.6이 베타 실사용 엔진으로 전환된 것과 달리 **이 기능은 계속 관리자 전용 POC로만 남는다** — 사진별 품질(눈감음/흔들림/초점/얼굴판정)을 Gemini Flash로 판정해 유사컷 그룹 안에서 "품질 이슈가 적으면서 그룹을 잘 대표하는 사진"을 추천한다. **자동 삭제·숨김 기능이 아니며, 품질 이슈가 있는 사진도 그룹에서 제외되지 않는다** — 그룹 멤버 구성(`grouping.py`)은 전혀 건드리지 않고, 그룹이 정해진 뒤 "어떤 사진을 먼저 보여줄지"에만 관여한다. **베타 사용자의 대표컷 선정에는 절대 영향을 주지 않는다**: `compute_groups()`에 `include_quality: bool = False`(기본값)가 있어, 베타 경로(`sync_groups_to_db`, 버튼이 호출하는 일반 `/groups` 조회)는 이 값을 넘기지 않으므로 Flash 데이터를 아예 조회하지 않는다 — `include_quality=true`는 관리자 전용 `.../gemini-analysis/groups` 라우트가 서버에서 직접 고정하는 값이며, 클라이언트가 임의로 켤 수 없다(§6.6 접근 제어 문단).
+> **(2026-09-12) 관리자 전용 POC에서 일반 경로로 전환됐고, 동시에 흔들림·눈감음 표시의 유일한 출처가 됐다.**
+>
+> **왜**: §6.6 전환 때 품질 판정(OpenCV/MediaPipe)이 베타 흐름에서 빠지면서, `photos.is_blurry`/`eyes_closed`를 **채우는 경로가 사라졌다**. 그 컬럼을 읽던 고객 갤러리의 흔들림·눈감음 배지는 그때부터 켜질 수 없는 상태였다 — 실측 결과 photos 12,593장 중 `is_blurry`가 채워진 건 514장(4%)뿐이고 최근 프로젝트 8개는 전부 0장이었다. 화면은 살아 있는데 데이터가 죽어 있었다.
+>
+> **무엇이 바뀌었나**:
+> - 읽기 출처가 `photos.*` 컬럼 → `gemini_quality_assessments`로 이동. 매핑은 `src/lib/photo-quality.ts` 한 곳에만 있다.
+> - 고객 경로: `customer-api-server.ts`가 사진 조회와 함께 판정을 병렬로 읽어 `Photo`에 얹는다(실패해도 사진 목록은 살린다 — 품질은 부가 정보).
+> - 작가 경로: `gemini_quality_assessments`에 RLS가 걸려 브라우저에서 직접 못 읽으므로(실측: service role 80행 / anon 0행) `GET /api/photographer/projects/[id]/photo-quality`를 거친다. 업로드 갤러리와 프로젝트 자산의 원본 탭에 배지·눈감음·흔들림 필터가 표시된다(`OriginalPhotoGallery`의 `showQualityBadges`).
+> - 트리거(`/api/photographer/projects/[id]/gemini-quality`)의 **관리자 이메일 게이트를 제거**했다 — §6.6이 베타 전환 때 밟은 것과 같은 전환. ⚠️ 호출마다 Gemini 비용이 발생하므로 **한도는 등급 정책이 맡아야 한다**(현재 별도 한도 없음, clip-service의 프로젝트 동시 실행 세마포어만 존재).
+>
+> **⚠️ 흔들림과 초점은 하나의 `흐림 의심` 배지로 합친다**(`blur_or_shake` 또는 `focus_issue` 중 하나라도 해당):
+> - 작가에게 결론이 같다 — 흔들렸든 초점이 나갔든 "이 컷은 못 쓴다"이고 둘 다 고칠 수 없다
+> - 더 중요한 이유는 **견고성**이다: 흐릿한 사진 하나를 Gemini가 `blur_or_shake`로 부를지 `focus_issue`로 부를지는 사실상 동전 던지기라, 나눠 두면 **동전이 맞게 떨어져야만 배지가 켜진다**. 합치면 어느 쪽으로 판정하든 잡힌다
+> - 그래서 문구도 "흔들림"이 아니라 **"흐림"** 이다 — 둘 중 하나만 가리키는 말은 사실과 어긋난다(고객 배지·필터 `흐림만`, 작가 배지 툴팁 `흐림 의심 (흔들림 또는 초점)`)
+> - ⚠️ **관리자 POC 패널(`GeminiAnalysisPanel`)은 축을 계속 나눠 보여준다** — 거기는 원판정을 그대로 확인하는 화면이라 합치면 안 된다
+> - 눈감음은 합치지 않는다: 흐림과 달리 다른 결론(다시 찍기/다른 컷)으로 이어진다
+>
+> **⚠️ 품질 판정은 작가 전용이다 — 고객 화면에는 내려보내지 않는다**(2026-09-12 결정).
+> - **왜**: AI 오판의 비용을 **작가가** 진다 — 의도적 아웃포커싱·패닝·감성 컷을 "흐림"으로 찍으면 고객이 좋은 사진을 스스로 지운다. 작가가 고객에게 보내는 화면에 작가 작업물의 결함을 표시하는 셈이라 상품에 흠집도 낸다. 무엇보다 이 판정의 목적이 **작가가 보내기 전에 거르는 것**이라, 걸렀다면 고객 화면에 표시할 게 없어야 정상이다.
+> - **선은 "AI냐 아니냐"가 아니라 "정리냐 흠결 판정이냐"다** — 유사컷 묶기(중립적 정리)는 고객도 그대로 쓴다. 눈감음·흐림(품질 흠결)만 작가 전용이다.
+> - 구현: `customer-api-server.ts`의 `mapPhotoRow`가 세 필드를 **명시적으로 `null`로 둔다**(그 자리에 이유를 주석으로 남겼다). 고객 갤러리의 품질 배지와 `흐림만`/`눈감음만` 필터는 값이 있을 때만 렌더되므로 **자동으로 사라진다** — UI 코드는 남아 있고, 되살리려면 `buildQualityFlagMap(..., "customer")`로 채우면 된다. ⚠️ "데이터가 없어 안 보이는 상태"는 이 프로젝트에서 이미 한 번 사고를 냈으므로(위 전환 경위 참조), **비운 이유를 코드와 문서 양쪽에 남기는 것이 이 결정의 일부다.**
+> - `photo-quality.ts`의 `QualityAudience`에 `customer`(=`likely`만, 정밀도 우선) 기준은 그대로 남겨 뒀다 — 지금은 호출부가 없지만, 되살릴 때 기준을 다시 계산하지 않아도 되게 하기 위해서다.
+>
+> **작가 기준은 `likely` + `possible`** — 골라내기 전 훑어보는 쪽이라 놓치는 게 더 아프다(재현율 우선).
+> - `unknown`은 "판정 못 함"이지 "문제 없음"이 아니라 `false`가 아닌 `null`로 남긴다
+> - 검증(2026-09-12, `샘플사진 외쿡인` 30장 · `eyes_closed`가 likely 4 / possible 4): 작가 기준 **8개**(고객 기준이었다면 4개)
+>
+> **⚠️ 미검증 — 흐림 판정이 실제로 발화하는지 확인되지 않았다.** 판정 80건(프로젝트 2개) 전수에서 `blur_or_shake`·`focus_issue`가 **둘 다 100% `ok`** 인 반면, `eyes_closed`(possible 6·likely 4)와 `face_occluded`(possible 2·likely 1)는 정상 발화했다. 표본 사진에 흐린 컷이 없었을 수도 있지만, **선명도 관련 두 축만 침묵하는** 패턴이라 입력 해상도가 원인일 가능성이 있다 — 품질 판정은 `r2_preview_url`(1200px)을 쓰는데 다운샘플링은 고주파를 깎아내므로 원본에서 흔들린 사진도 축소하면 또렷해 보인다.
+> 확인 방법은 **흐린 컷이 실제로 있는 프로젝트에 지금 그대로 한 번 돌려보는 것**이다(추가 비용 0). 원본 해상도로 보내 비교하는 실험은 권하지 않는다: 원본은 파생본의 **약 51배**(실측 6.5MB vs 0.13MB)라 다운로드·전송·토큰이 전부 늘어 비용과 시간이 **함께** 오르는데, Gemini가 이미지를 내부에서 타일·축소해 처리하므로 결과가 그대로일 수 있어 결론이 안 난다.
+>
+> `photos.blur_variance`/`is_blurry`/`face_detected`/`eyes_closed` 컬럼은 **더 이상 읽지 않는다**(기존 514장 데이터 보존 목적으로 컬럼 자체는 남겨둠). §6.4의 OpenCLIP 품질 경로는 프론트 진입점이 없다.
+
+> **(2026-09-12) 업로드 완료 → AI 분석 제안 모달** (`upload/page.tsx`의 `aiPromptOpen`)
+>
+> **문제**: 유사컷 버튼(`.prj-ai-control`)이 툴바에서 정렬 드롭다운·뷰 전환기와 **높이(44px)·테두리·배경·radius가 전부 같아** 중립 크롬으로 읽혔고, 가치 제안은 `title` 툴팁에만 있어 터치에서는 볼 수 없었다. 품질 확인은 관리자 패널 밖으로 나온 적이 없어 존재 자체가 숨어 있었다.
+>
+> **툴바도 함께 고쳤다**(2026-09-12):
+> - `.prj-ai-control-idle`에 accent 틴트(테두리 0.42 / 배경 0.06 / 글자 accent)를 줘 중립 크롬에서 분리했다. 크기·자리는 그대로다. 주황 **채움**은 하단 제출 CTA의 몫이라 여기서는 쓰지 않는다. ⚠️ 일반 `:hover` 규칙과 명시도가 같으므로 idle 규칙이 **뒤에** 와야 한다
+> - 버튼이 곧바로 유사컷을 실행하는 대신 **모달을 연다** — 기능이 둘인데 버튼 하나로는 메뉴를 보여줄 수 없다
+> - **버튼과 유사컷 토글이 서로를 대체하지 않는다.** 예전에는 삼항으로 갈라 분석이 끝나면 버튼이 토글로 바뀌었고, 그러면 **분석 이후 AI 진입점이 사라져 품질 확인을 시작할 방법이 없었다**. 토글은 "묶어서 볼까"(보기 설정), 버튼은 "분석을 걸까"(작업)로 성격이 다르다
+> - 분석 중에는 버튼이 `AI 분석 중`(양쪽이면) / `유사컷 분석 중` / `품질 확인 중`으로 바뀌고, 누르면 **돌고 있는 것만** 중단한다
+> - **구분은 테두리가 아니라 면으로 한다**(무테 + accent 틴트). 테두리를 두면 옆 드롭다운·뷰 전환기와 같은 "네모 칸" 문법에 다시 갇힌다
+>
+> **AI 결과 체크박스**(`.prj-ai-chip`) — CTA 바로 옆에 `유사컷 묶어보기 N · 눈감음만 N · 흐림만 N`을 무테 체크박스로 나열한다. 분석 결과가 어디에 쌓이는지 버튼 옆에서 바로 보이고, 눌러 그것만 골라볼 수 있다.
+> - **체크박스인 이유**: 셋은 배타가 아니라 **동시에 켤 수 있는** 것들이라(눈감음+흐림은 OR로 합쳐진다) 체크박스가 칩보다 정직하다. 모달의 항목 선택과도 같은 문법이라 AI 기능 전체가 한 언어를 쓴다
+> - **결과가 0인 항목은 렌더하지 않는다** — 분석 전에는 줄 전체가 없어 조용하다(빈 필터로 자리만 차지하지 않는다)
+> - 눈감음·흐림은 `galleryPhotos`를 좁히는 **필터**이고 여러 개를 켜면 OR다 — 고객 갤러리(`gallery-filter.ts`)와 같은 규칙·같은 키(`blurry`/`eyesClosed`)
+> - ⚠️ **유사컷만 성격이 다르다**: 필터가 아니라 그룹을 대표컷으로 접는 **보기 방식**이다. 체크박스를 한 줄에 두면서 이 차이는 **문구로** 갈랐다 — `~만`은 목록을 좁히는 필터, `묶어보기`는 보기 방식. `~만`은 고객 갤러리가 이미 쓰는 표현이라 두 화면의 말이 같아진다
+> - 껍데기가 `<label>`이라 글자를 눌러도 켜진다. `<label>`에는 포커스가 가지 않으므로 포커스 링은 `:focus-within`으로 안쪽 체크박스에서 끌어올린다
+> - **켜진 표시는 체크박스와 글자색만**이다(배경 틴트 없음). 배경까지 얹으면 체크 표시가 이미 말한 것을 한 번 더 말하고, 여러 개를 켰을 때 주황 면이 줄줄이 생겨 옆 AI CTA(같은 틴트)와 구분이 흐려진다. 배경은 hover(일시적 반응) 전용
+> - 공용 `SimilarityToggleButton`을 쓰지 않고 이 화면 전용으로 그린 이유: 그 컴포넌트는 자산 화면·고객 갤러리와 **공유**라 restyle하면 번진다
+>
+> **왜 모달인가**: 버튼 하나를 눈에 띄게 만드는 것으로는 **AI가 무엇을 해주는지(두 가지다)** 를 가르칠 수 없다. 업로드 직후는 의도가 가장 높은 순간이고, 체크박스 목록이 기능의 메뉴를 한 자리에서 보여준다.
+>
+> - **기본값은 둘 다 켜짐** — 비워 두면 대부분 그대로 닫아 지금과 같아진다. 켜 두면 "보이는 자동 실행 + 끌 수 있음"이 되어 통제권은 유지된다
+> - **띄우는 조건**: 사진이 실제로 올라갔고 · 이번 방문에서 `건너뛰기`를 누른 적이 없고 · 이미 분석이 돌고 있지 않을 때
+> - **⚠️ "건너뛰기"와 "그냥 닫기"를 구분한다.** 처음에는 둘 다 `onClose` 하나로 묶고 `localStorage`에 영구 저장했는데 치명적이었다: `PhotographerModal`은 Escape·배경 클릭도 `onClose`를 부르므로 **실수로 닫기만 해도 영구 차단**됐고, 한 번 박히면 사진을 전부 지우고 다시 올려도 모달이 영영 뜨지 않았다(실제 발생 2026-09-12). 지금은 **명시적 `건너뛰기`만** 기록하고, 그마저 `localStorage`가 아니라 `useRef`(이번 방문 한정)다. 잔소리를 막자고 기능을 영구히 잠그는 건 균형이 맞지 않는다
+> - **두 진입점이 같은 모달을 연다** — 업로드 완료 직후(`source: "upload"`)와 툴바 `AI 분석` 버튼(`source: "manual"`). 안내 문구가 갈리고(후자는 "방금 올린 것"이 없다), 수동으로 열 때는 **이미 끝난 항목의 체크를 꺼 둔 채** 연다. 각 항목에 `이미 분석 완료` / `새 사진 N장 분석` 상태 칩을 붙여 "또 돌리는 건가?"에 답한다
+> - 두 분석은 **서로 독립**(별도 트리거·별도 폴링·`allSettled`)이라 한쪽이 실패해도 다른 쪽은 진행된다
+> - 품질 완료 시 `loadPhotos()`를 다시 부른다 — 배지는 `Photo`에 실려 오므로 다시 읽지 않으면 분석이 끝나도 화면이 그대로다
+>
+> **AI 분석에 별도 등급 한도를 두지 않는다 — 사진 한도가 이미 비용 상한이기 때문이다.**
+>
+> 두 파이프라인 모두 **결과를 캐시한다**(임베딩 `get_cached_photo_ids`, 품질 `get_existing_photo_ids` → `reused_count`). 같은 사진을 몇 번 재분석해도 **API 호출 0회·비용 0원**이고, 새로 올라온 사진만 1회 과금된다. 따라서 비용은 `app_settings`의 사진 한도에 자동으로 묶인다:
+>
+> | 등급 | 프로젝트당 사진 | 분석 비용 상한(임베딩 기준) |
+> |---|---|---|
+> | 일반 | 500장 | 약 $0.06 |
+> | 베타 | 2,000장 | 프로젝트당 약 $0.24 |
+>
+> 별도 장수 한도를 더 걸면 같은 것을 두 번 세는 데다 **새 실패 모드**가 생긴다 — "사진은 1,000장인데 AI는 500장까지"가 되면 작가는 어느 500장이 분석됐는지 알 수 없고, 유사컷은 인접 비교라 중간이 잘리면 그룹이 끊긴다.
+>
+> ⚠️ **그 전제를 무너뜨리는 유일한 변수가 `force`였다** — 캐시를 무시하고 전량 재분석시키는 운영 스위치로, 화면에는 없지만 API가 요청 본문에서 그대로 읽어 일반 세션이 직접 호출할 수 있었다. **2026-09-12에 두 라우트 모두 관리자에게만 허용하도록 잠갔다**(`session.isAdmin && body?.force === true`). 이제 "사진 수 = 비용 상한"이 정확히 성립한다.
+>
+> 남은 비용 변수는 **모델·프롬프트 버전 상향**이다(`GEMINI_EMBEDDING_VERSION` / `GEMINI_QUALITY_PROMPT_VERSION`) — 올리면 캐시가 전부 무효가 되어 전 프로젝트가 재분석 대상이 된다. 한 번에 큰 비용이 나가는 유일한 지점이므로 운영 시 유의한다.
+>
+> 한도가 정말 필요해지는 시점은 베타 작가 **수**가 늘 때다(상한이 1인당 값이므로). 그때는 장수가 아니라 "계정당 월 분석 장수"가 맞는 단위다 — `gemini_analysis_runs`/`gemini_quality_runs`에 `estimated_cost_usd`가 이미 쌓이고 있으니 **실제 수치를 본 뒤에** 정한다.
+
+아래는 2026-07-28 최초 도입 시점의 설계 기록이다. 사진별 품질(눈감음/흔들림/초점/얼굴판정)을 Gemini Flash로 판정해 유사컷 그룹 안에서 "품질 이슈가 적으면서 그룹을 잘 대표하는 사진"을 추천한다. **자동 삭제·숨김 기능이 아니며, 품질 이슈가 있는 사진도 그룹에서 제외되지 않는다** — 그룹 멤버 구성(`grouping.py`)은 전혀 건드리지 않고, 그룹이 정해진 뒤 "어떤 사진을 먼저 보여줄지"에만 관여한다. **베타 사용자의 대표컷 선정에는 절대 영향을 주지 않는다**: `compute_groups()`에 `include_quality: bool = False`(기본값)가 있어, 베타 경로(`sync_groups_to_db`, 버튼이 호출하는 일반 `/groups` 조회)는 이 값을 넘기지 않으므로 Flash 데이터를 아예 조회하지 않는다 — `include_quality=true`는 관리자 전용 `.../gemini-analysis/groups` 라우트가 서버에서 직접 고정하는 값이며, 클라이언트가 임의로 켤 수 없다(§6.6 접근 제어 문단).
 
 - **엔드포인트**: `/analyze/gemini/quality`(POST), `/analyze/gemini/quality/{project_id}/status`(GET), `/analyze/gemini/quality/{project_id}`(DELETE) — Embedding 분석과 독립적으로 트리거/취소/재사용된다. 그룹 반영 결과는 §6.6의 `GET /analyze/gemini/{project_id}/groups`에 `recommended_photo_id`/`recommendation_tier`/`recommendation_reason`/`quality_by_photo`로 결합되어 응답한다(품질 분석이 없으면 `recommended_photo_id`는 기존 medoid `representative_photo_id`와 동일하게 나와 회귀 없음). **(2026-07-28 추가) `GET /analyze/gemini/quality/{project_id}/overview`**는 유사컷 그룹 소속 여부와 무관하게 **프로젝트 전체 사진**의 품질 판정을 반환한다 — Flash는 그룹핑과 무관하게 프로젝트 전체를 분석하는데, 그룹 API는 union-find로 묶인(2장 이상) 사진만 대상으로 하므로 싱글톤(그룹 미형성) 사진의 결과가 기존 방식으로는 화면에 노출되지 않던 문제를 해결하기 위함(`gemini_quality_analyzer.py`의 `compute_quality_overview`). 이 엔드포인트도 저장된 결과만 읽어 Gemini API를 재호출하지 않는다.
 - **모델/SDK**: 같은 `google-genai` 클라이언트(`gemini_client.get_client()` 공유)로 `client.aio.models.generate_content()` 호출. 모델은 `gemini-3.5-flash-lite`(env `GEMINI_FLASH_MODEL`) — 2026-10-16 종료 예정인 2.5 계열을 피하고 현재 GA인 3.5 계열 중 가장 비용 효율적인 모델 채택. `response_schema`(Pydantic `PhotoQualityAssessment`)로 구조화된 JSON을 강제하고 `temperature=0`으로 판정 일관성을 확보한다.
@@ -388,21 +480,22 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/c/original-download/files` | POST | PIN 쿠키 | 선택한 `photoIds`(1~3,000개)의 개별 원본 presigned URL만 발급 |
 | `api/c/selections` | POST | PIN 쿠키 | 별점/색상/코멘트/선택 upsert (`selecting`/`preparing` 상태만 허용). body에 키가 없는 필드는 건드리지 않고(undefined=미변경), `null`이면 명시적으로 지움 — 부분 업데이트 시맨틱 |
 | `api/c/selections` | GET | PIN 쿠키 | `?token=&project_id=`로 `selectedIds`/`photoStates`만 경량 조회(다른 세션의 변경사항 반영용 5초 폴링 전용, 사진/그룹은 포함 안 함) |
+| `api/c/participants` | GET / POST | PIN 쿠키 | 참가자 색 슬롯의 표시 이름 명단 조회 / 내 색 이름 upsert(`project_id,color` 충돌 시 덮어씀, 20자 초과는 잘림). 표시용 라벨일 뿐 본인 확인이 아니며, 클라이언트는 실패 시 조용히 빈 명단으로 폴백한다 |
 | `api/c/confirm` | POST | PIN 쿠키 | 선택 확정 → `confirmed`. `selected_photo_ids.length === required_count` 서버 재검증 |
 | `api/c/cancel-confirm` | POST | PIN 쿠키 | `confirmed → selecting`, `customer_cancel_count` +1(최대 3) |
 | `api/c/review`, `api/c/review-result` | GET | PIN 쿠키(review-result는 `확인 필요`, 코드 인용 부족) | 보정본 검토 데이터/결과 조회 |
 | `api/c/review/submit` | POST | PIN 쿠키 | 보정본 검토 일괄 제출 → `delivered` 또는 `editing_v2` |
-| `api/c/review-submit` | POST | `확인 필요` | 레거시/모크 폴백 경로로 추정(프론트 조사 보고 근거) |
+| `api/c/review-submit` | POST | PIN 쿠키 | 레거시 경로. 실제 DB 프로젝트는 `410 Gone`으로 거부하고 테스트용 목업 데이터만 처리 |
 | `api/c/photographer` | GET | 없음 | 토큰으로 작가 공개 프로필 조회 |
 | `api/photographer/profile` | GET/PATCH | 세션 | 작가 프로필 CRUD |
 | `api/photographer/account` | DELETE | 세션 | 계정 삭제(통계 익명화 후 Auth 사용자 삭제) |
 | `api/photographer/projects` | POST | 세션 | 프로젝트 생성 — 등급별 한도(§6.3 베타 등급 시스템) 서버 검증 후 INSERT. 기존 클라이언트 직접 INSERT(`src/lib/db.ts`의 `createProject()`)를 대체 |
-| `api/photographer/projects/[id]` | PATCH/DELETE | 세션+소유권 | 프로젝트 수정(상태 전이 포함)/삭제(+FastAPI R2 정리 호출) |
+| `api/photographer/projects/[id]` | PATCH/DELETE | 세션+소유권 | 프로젝트 기본 정보(`location` 포함)·갤러리 설정·상태 수정/삭제(+FastAPI R2 정리 호출) |
 | `api/photographer/projects/[id]/status` | PATCH | 세션+소유권 | 상태 전이 전용(제한적). 원본 포함 프로젝트 활성화 시 `pending/processing`은 자동 재시도 가능한 `originals_processing`, 실제 누락·실패는 `originals_incomplete`(409)로 구분 |
 | `api/photographer/projects/[id]/photos` | GET/DELETE | 세션+소유권 | 사진 목록 조회 / 전체 삭제("전체삭제", `preparing`만). (2026-07-28 베타 전환 추가) 전체 삭제 시 사진이 모두 사라져 `photo_groups`도 전부 무의미해지므로 이 라우트가 직접 해당 프로젝트의 `photo_groups` 행을 정리한다(clip-service sync-groups 호출은 이 경우 의미 없음 — 임베딩도 함께 CASCADE 삭제되어 조기 종료하므로, §6.6) |
 | `api/photographer/projects/[id]/photo-groups` | GET | 세션+소유권 | 유사컷 그룹 조회(`photo_groups`, 엔진 무관 — 2026-07-28부터 Gemini가 채움, §6.6) |
 | `api/photographer/projects/[id]/versions` | GET | 세션+소유권 | 보정본+리뷰 조회 |
-| `api/photographer/projects/[id]/versions/[versionId]` | DELETE | 세션+소유권 | 보정본 1건 삭제 |
+| `api/photographer/projects/[id]/versions/[versionId]` | DELETE | 세션+소유권 | 보정본 1건 삭제. 고객 확정(`version_reviews.status='approved'`) 보정본은 409로 거부 |
 | `api/photographer/projects/[id]/selected-originals` | POST | 세션+소유권 | 고객 확정 셀렉(`is_selected=true`)을 서버에서 재조회해 presigned URL 발급. 확정 이후 상태만 허용하고 `include_original=true`면 원본, `false`면 최대 1200px JPEG 프리뷰를 반환한다. 원본 포함 프로젝트의 준비 미완료 원본은 프리뷰로 대체하지 않고 409로 전체 중단 |
 | `api/photographer/projects/[id]/clip-analysis` | POST/GET/DELETE | 세션+소유권 | OpenCLIP 분석 트리거/폴링/취소(clip-service 프록시). **2026-07-28 베타 전환 이후 FE 어디에서도 더 이상 호출되지 않음**(라우트/clip-service 엔드포인트 자체는 삭제하지 않고 보존, §6.5) |
 | `api/photographer/projects/[id]/gemini-analysis` | POST/GET/DELETE | 세션+소유권 | (2026-07-28 추가, 같은 날 접근 제어 변경) 작가 업로드 화면의 `[AI 유사도 분석]` 버튼이 호출하는 실사용 경로(clip-service `/analyze/gemini*` 프록시). **도입 당시엔 관리자 이메일 검증이 있었으나 베타 전환으로 모든 사용자가 호출해야 해서 제거함** — 일반 세션+소유권만 검증(clip-analysis와 동일 수준). 관리자 전용 `GeminiAnalysisPanel`도 같은 엔드포인트를 재사용한다 |
@@ -511,10 +604,10 @@ FE가 FastAPI(`NEXT_PUBLIC_API_URL`/`API_URL`/`BACKEND_URL`)를 호출하는 지
 ## 9. 고객 인증, PIN, 쿠키/토큰 처리 흐름
 
 - 고객은 회원가입 없이 `access_token`(UUID, 링크 경로의 `[token]`)만으로 프로젝트에 접근합니다.
-- 프로젝트에 `access_pin`(4자리, nullable)이 설정되어 있으면 PIN 입력이 필요하고, 없으면 자동 통과(`/api/c/auto-verify`)합니다.
+- 프로젝트에 `access_pin`(4자리, nullable)이 설정되어 있으면 PIN 입력이 필요하고, 없으면 고객 미들웨어가 현재 요청에서 서명 쿠키를 발급해 자동 통과합니다. `/api/c/auto-verify`는 `/pin` 직접 접근 호환용 fallback으로 유지합니다.
 - 인증 성공 시 `pin_verified_${token}`이라는 **HttpOnly, `sameSite=lax` 서명 쿠키**(HMAC-SHA256, `PIN_COOKIE_SECRET`)가 발급되며 유효기간은 24시간(`maxAge: 86400`)입니다.
 - 서명 검증 로직은 **두 곳에 중복 구현**되어 있습니다: `src/middleware.ts`(Edge 런타임, Web Crypto 사용)와 `src/lib/customer-auth-server.ts`(Node 런타임, `crypto` 모듈 사용). 두 구현이 어긋나면 미들웨어 통과 여부와 실제 API 인증 결과가 달라질 수 있습니다.
-- `src/middleware.ts`의 matcher는 `/c/:token/:path+`(하위 경로 1개 이상 필수)이므로, `/c/[token]` 자체(하위 경로 없음)는 미들웨어를 거치지 않습니다. 대신 서버 컴포넌트(`src/app/c/[token]/page.tsx`)가 쿠키의 **존재 여부만** 직접 확인하고(서명 검증은 하지 않음), 실제 데이터 조회(`/api/c/photos` 등)는 여전히 `checkPinAuth`로 서명까지 검증하므로 위조 쿠키로 데이터를 읽을 수는 없습니다.
+- `src/middleware.ts`는 `/c/:token` 루트와 모든 하위 경로를 보호합니다. 쿠키가 없거나 서명이 유효하지 않으면 `projects.access_pin`만 조회해 PIN 없는 프로젝트에는 같은 요청에서 쿠키를 발급하고, PIN 보호 프로젝트만 `/pin`으로 보냅니다. 루트 서버 컴포넌트도 같은 쿠키 서명을 재검증합니다.
 - PIN 오답은 `pin_attempts` 테이블에 IP와 함께 기록되어 **토큰 기준 1분에 5회**로 제한됩니다(락아웃 시 429 + `retryAfterSeconds`).
 
 ### 9.1 고객 PIN 인증 시퀀스
@@ -528,14 +621,13 @@ sequenceDiagram
     participant DB as Supabase(projects, pin_attempts)
 
     C->>MW: GET /c/token/gallery (쿠키 없음)
-    MW->>DB: (쿠키 없음 → 검증 생략)
-    MW-->>C: 302 → /c/token/pin?from=/c/token/gallery
-    C->>Pin: GET /c/token/pin
-    Pin->>DB: projects.access_pin 조회
+    MW->>DB: projects.access_pin 조회
     alt access_pin === null
-        Pin-->>C: 302 → /api/c/auto-verify?token&to=from
-        Note over C: 쿠키 자동 발급 후 원래 페이지로
+        MW-->>C: 요청 계속 + Set-Cookie pin_verified_token
+        Note over C: 추가 redirect 없이 원래 페이지 렌더
     else access_pin 존재
+        MW-->>C: 302 → /c/token/pin?from=/c/token/gallery
+        C->>Pin: GET /c/token/pin
         Pin-->>C: PIN 입력 폼 렌더
         C->>API: POST {token, pin}
         API->>DB: pin_attempts 1분 내 카운트 확인
@@ -559,7 +651,7 @@ sequenceDiagram
 
 > 원본 사진(셀렉용) 업로드의 배치/동시성/producer-consumer 파이프라인(모든 기기), progress 산정 기준, 화면 표시(blob URL vs 서버 썸네일) 등 세부는 `docs/upload-flow.md`에 더 자세히 정리되어 있다. 아래는 요약.
 
-1. **선택/사전 압축(브라우저)**: 업로드 화면(`upload/page.tsx`) 전용 `compressImagesInParallel()`(워커 풀, PC 2 / 모바일 1)이 최대 3200px, JPEG q=0.82로 리사이즈(600KB 미만 파일은 스킵). `include_original` 값과 무관하게 **모든 파일**을 압축해 `/api/upload/photos`로 보낸다 — `include_original=true`일 때는 이와 별개로 **압축하지 않은 브라우저 원본**(`rawFile`)을 R2에 직접 PUT한다(즉 같은 사진이 두 번 전송됨). HEIC 파일은 `include_original=true` 시 베타 정책상 거부됨(JPEG/PNG/WebP만 허용).
+1. **선택/사전 압축(브라우저)**: 업로드 화면(`upload/page.tsx`) 전용 `compressImagesInParallel()`이 최대 1600px, JPEG q=0.82로 리사이즈한다(600KB 미만 파일은 스킵). 원본 포함 PC는 기기 사양에 따라 워커 2~3개(저사양 1개), 그 외 PC는 2개, 모바일은 1개다. `include_original` 값과 무관하게 **모든 파일**의 중간 이미지를 `/api/upload/photos`로 보내며, `include_original=true`일 때는 이와 별개로 **압축하지 않은 브라우저 원본**(`rawFile`)을 R2에 직접 PUT한다(즉 같은 사진이 두 번 전송됨). HEIC 파일은 `include_original=true` 시 베타 정책상 거부됨(JPEG/PNG/WebP만 허용).
 2. **배치 전송**: PC 비원본은 8장/배치, 동시 배치 수는 회선 상태에 따라 2~6(기본 6, `getDesktopUploadConcurrency()` — 느린 회선일수록 낮춤). 모바일 비원본은 3장/배치, 동시 배치 수 1(`MOBILE_BATCH_SIZE=3`, `MOBILE_CONCURRENCY=1`). 여기서 모바일은 iPhone/iPad와 Android 휴대폰·태블릿을 뜻하며, iPadOS 13+ Safari의 `Macintosh` UA는 `maxTouchPoints > 1`로 함께 판별한다. `include_original=true`는 배치 크기 1장으로 축소, 동시 배치 수 PC 4(고사양 기기+회선이면 6, `ORIGINAL_PC_CONCURRENCY`/`_FAST`) / 모바일 1. **(2026-08-07)** 모든 기기는 `include_original` 여부와 무관하게 batch 압축이 끝나는 즉시 bounded producer-consumer 파이프라인(용량=concurrency)으로 전송하고 다음 batch 압축을 이어간다. 모바일은 worker·lane·queue 모두 1로 유지하며, queue가 찬 상태에서는 다음 batch를 압축하지 않는다. 따라서 동시 업로드나 원본 R2 PUT 수·메모리 상한을 높이지 않고 압축과 전송 사이의 유휴 시간만 줄인다. `XMLHttpRequest` 멀티파트 전송, `Authorization: Bearer <Supabase access_token>` 포함.
 3. **전송 대상**: 우선 `NEXT_PUBLIC_API_URL` (FastAPI) 직접 호출 → 네트워크/CORS 오류(`TypeError`) 시 Next API 프록시(`/api/photographer/upload/photos`)로 폴백. 파일 선택 시 부여한 `client_upload_id`는 XHR 재시도와 프록시 fallback에서도 유지된다. DB의 부분 UNIQUE 인덱스 `photos_project_client_upload_id_uidx(project_id, client_upload_id)`와 `insert_photos_with_numbers` RPC가 같은 논리 요청을 기존 photo/job으로 replay하므로, 첫 서버 응답만 유실되어도 중복 행이 생기지 않는다. 프록시 라우트는 `await req.formData()`로 전체 바디를 버퍼링한 뒤 다시 전송하는 방식이라 스트리밍이 아니다.
 4. **백엔드 처리(`photo-selection-be/app/routers/upload.py`)** — `POST /api/upload/photos`는 아래를 **전부 동기로 끝내야 응답**한다(즉 이 처리 시간은 FE progress bar에 반영되지 않고, 완료 여부만 이 응답으로 판가름남):
@@ -570,8 +662,9 @@ sequenceDiagram
    - 요청에 포함된 모든 파일의 처리가 끝난 뒤 `insert_photos_with_numbers` RPC가 `photos.number` 할당, `photos` INSERT, 원본 포함 시 `original_jobs` INSERT를 한 트랜잭션에서 수행한다. 동일 `(project_id, client_upload_id)`가 이미 있으면 기존 행을 반환하고 번호·`photo_count`·job을 추가하지 않는다. replay 발생은 `admin_audit_logs.action='upload_idempotency_replay'`로 기록한다.
    - `projects.photo_count` 갱신.
    - 업로드 한도: 프로젝트당 최대 `app_settings.beta_max_photos_per_project`장(관리자는 무제한, §6.3).
+   - 모든 업로드의 FormData에 `original_filenames/original_file_sizes/original_last_modifieds/original_content_types`와 `source_widths/source_heights`를 포함해 `photos.source_*` 목록 메타데이터를 저장한다. 픽셀 크기는 기존 클라이언트 압축 디코딩에서 얻은 경우 전송하고, 압축을 생략한 경우 서버의 기존 썸네일 디코딩 결과로 채운다.
    - **`include_original=true`일 때 추가 흐름**:
-     - FormData에 `original_filenames/original_file_sizes/original_last_modifieds/original_content_types` 포함(복구 매칭용 원본 파일 메타).
+     - 같은 원본 파일 메타데이터를 `original_jobs` 복구 매칭에도 사용한다.
      - 서버: presigned PUT URL(`originals/source/{project_id}/{hex32}.{ext}`) 생성 + `original_jobs` INSERT(`status='awaiting_upload'`, 4개 원본 메타 포함) + `photos.original_status='awaiting_upload'` 설정.
      - 응답에 `original_presigned: [{job_id, url, source_key, content_type, expires_at}]` 포함.
      - 브라우저가 presigned URL로 R2에 **압축하지 않은 원본(raw) 파일**을 BE를 거치지 않고 직접 PUT → `POST /api/upload/originals/confirm`(`job_id` 전달) → confirm 서버에서 소유권 확인 + R2 HEAD 검증 후 조건부 UPDATE → `pending`으로 전이. FE는 이 confirm 응답까지 받아야 해당 배치를 완료 처리한다("업로드 완료" 토스트가 기다리는 범위에 포함).
@@ -581,11 +674,11 @@ sequenceDiagram
      - **복구 흐름**: 브라우저 종료/네트워크 단절로 presigned PUT이 미완료된 경우, 페이지 재방문 시 `GET /api/upload/originals/pending`으로 `awaiting_upload`/`failed` job 목록을 조회해 복구 배너 표시. 사용자가 파일 선택 시 `POST /api/upload/originals/recover`로 R2 HEAD 확인 후 이미 있으면 confirm, 없으면 새 presigned URL 발급해 재업로드.
      - 초대 링크가 `preparing→selecting`으로 활성화된 후에만 `enqueue_original_archive_build` RPC가 ZIP 아카이브 빌드를 큐에 넣는다. 활성화 시점에 원본 처리가 남아 있으면 마지막 `complete_original_job`이 다시 enqueue한다. 활성화 전 사진 추가·삭제 가능성 때문에 ZIP 사전 생성은 하지 않는다(상세: `user-flow.md` §8.2).
      - **⚠️ Railway Sleep**: Railway Starter 플랜은 HTTP 요청이 5분간 없으면 인스턴스를 Sleep시키며 `asyncio` worker task가 모두 파괴된다. `pending`/`awaiting_upload` 상태 job은 DB에 보존되지만 처리가 중단되고, 다음 HTTP 요청이 도착해야 worker가 재생성되어 재개된다. **Railway Hobby 플랜($5/월)은 Sleep 없이 상시 가동**되므로 안정적 운영을 위해 Starter가 아닌 Hobby 플랜이 필수다.
-5. **조회(고객 갤러리)**: `SelectionContext`가 `/api/c/photos`(Next.js, Supabase 직접 조회)를 호출해 사진 메타(포함 `r2_thumb_url`/`r2_preview_url` 원문 URL)를 가져오지만, **(2026-08-06 정정)** 그리드 카드는 이 URL을 직접 쓰지 않는다 — `GET /api/c/presign-thumbs?token=...&photoIds=...`(최대 200장/요청)로 `r2_thumb_url`에서 R2 key를 추출해 FastAPI `/api/storage/presign`으로 발급받은 presigned GET URL을 렌더링에 사용한다(R2 key는 응답에 노출 안 됨). 뷰어의 대형 프리뷰는 `GET /api/c/presign-preview?photoIds=...`로 현재·인접 사진을 최대 5장까지 한 번에 서명받는다. 클라이언트는 URL을 만료 60초 전까지 최대 100장 캐시하고, 실제 decode용 `Image` 객체는 최근 6장만 유지한다. PC는 이전 1장·다음 2장, 모바일은 이전·다음 각 1장을 선로딩하며 데이터 절약 모드에서는 현재 사진만 요청한다. 현재 공개 R2 전환 기간에는 서명 발급 전/실패 시 `r2_preview_url`을 즉시 표시하는 폴백이 남아 있다.
-6. **보정본(V1/V2) 업로드**: 브라우저가 `/api/upload/versions/delivery/presign`을 받아 원본을 `versions/{project_id}/delivery/v{version}/...`에 동시 3개(`DIRECT_UPLOAD_CONCURRENCY`)씩 direct PUT한다. 이후 `/api/upload/versions`가 HEAD 검증 후 검토용 1200px/82%와 300px/75% JPEG를 만들고 두 자산을 함께 upsert한다. 검토 중 교체는 서버에서 차단된다.
+5. **조회(고객 갤러리)**: `SelectionContext`가 `/api/c/photos`(Next.js, Supabase 직접 조회)를 호출해 사진 메타(포함 `r2_thumb_url`/`r2_preview_url` 원문 URL)를 가져오지만, **(2026-08-06 정정)** 그리드 카드는 이 URL을 직접 쓰지 않는다 — `GET /api/c/presign-thumbs?token=...&photoIds=...`(최대 200장/요청)로 `r2_thumb_url`에서 R2 key를 추출해 FastAPI `/api/storage/presign`으로 발급받은 presigned GET URL을 렌더링에 사용한다(R2 key는 응답에 노출 안 됨). 최초 가상화 범위는 즉시 presign하고 이후 스크롤 범위만 80ms debounce한다. API는 PIN 인증 조회에서 얻은 project ID를 사진 소유권 조회에 재사용해 token→project 중복 DB 조회를 제거한다. 썸네일 URL, 진행 중 photo ID, 로드 완료 queue는 `[token]` 공통 레이아웃의 `CustomerImageCacheProvider`가 최대 500장까지 보유하고 만료 30초 전부터 재발급 대상으로 처리한다. 큐 동시성은 작가 원본 갤러리와 같은 12이며, IntersectionObserver가 화면 근처 이미지만 슬롯에 넣은 뒤 마운트된 `<img>`는 `eager`로 시작해 native lazy-load와 이중 지연되지 않는다. 따라서 갤러리→뷰어→갤러리 이동으로 페이지 컴포넌트가 재마운트되어도 동일 URL과 브라우저 decode/cache를 즉시 재사용하며, token 변경 시 Provider를 새로 마운트해 캐시를 격리한다. 뷰어의 대형 프리뷰는 `GET /api/c/presign-preview?photoIds=...`로 현재·인접 사진을 최대 5장까지 한 번에 서명받는다. 클라이언트는 URL을 만료 60초 전까지 최대 100장 캐시하고, 실제 decode용 `Image` 객체는 최근 6장만 유지한다. PC는 이전 1장·다음 2장, 모바일은 이전·다음 각 1장을 선로딩하며 데이터 절약 모드에서는 현재 사진만 요청한다. 현재 공개 R2 전환 기간에는 서명 발급 전/실패 시 `r2_preview_url`을 즉시 표시하는 폴백이 남아 있다.
+6. **보정본(V1/V2) 업로드**: 브라우저가 `/api/upload/versions/delivery/presign`을 받아 원본을 `versions/{project_id}/delivery/v{version}/...`에 동시 3개(`DIRECT_UPLOAD_CONCURRENCY`)씩 direct PUT한다. 이후 `/api/upload/versions`가 HEAD 검증 후 고유한 업로드 토큰을 포함한 key에 검토용 1200px/82%와 300px/75% JPEG를 만든다. `replace_photo_versions_with_history` RPC는 기존 활성 파일과 검토 결과를 `photo_version_revisions`에 먼저 보존하고 현재 `photo_versions`를 원자적으로 교체한다. 고객 확정(`version_reviews.status='approved'`) 사진은 presign·업로드 확정·RPC에서 교체를 거부한다. 그 외 교체는 프로젝트 상태, V1/V2 단계, 재보정 허용 횟수를 변경하지 않으며 고객 API는 계속 현재 활성 행만 읽는다. 작가 상세 API만 교체 이력을 읽기 전용으로 함께 반환한다.
    - **파일-사진 매칭 우선순위**(`src/lib/version-mapping.ts`, `src/lib/retouch-clip-match.ts`, `UploadVersionsPanel.tsx`의 `runClipMatchPass`): ① `exact`(확장자 제외 파일명 완전 일치) → ② `fuzzy`(편집 툴 접미사·1~2자리 버전 번호 제거 후 stem 일치, 2026-07-13부터 3자리 이상 원본 순번은 보존하도록 수정 — BUG-02 참고) → ③ `clip`/`clip_low`(clip-service 이미지 유사도, 임계값 0.85/0.60) → ④ `order`(2026-07-13 추가: 위 세 단계 모두 실패한 잔여 타깃과 잔여 파일을 순서대로 짝짓는 최후 폴백). ④는 매칭 근거가 없으므로 UI에 항상 별도의 "순서" 배지(호박색, exact/fuzzy/AI의 초록·에메랄드와 구분)로 표시되어 작가가 "변경"으로 재지정할 수 있다.
    - **사진 전환 선로딩**: `useAdjacentImagePreload`가 이미 화면 데이터에 포함된 표시용 URL만 사용해 인접 이미지를 다운로드하고 `Image.decode()`를 시작한다. 고객 보정본 수령/상세와 워크플로우 비교 뷰어는 현재 보기 탭에서 실제 필요한 원본·V1·V2 조합만 대상으로 하며, 업로드/셀렉 결과 라이트박스는 원본 파일이 아니라 기존 1200px 프리뷰만 대상으로 한다. 기본 범위는 PC 이전 1장·다음 2장(두 이미지를 동시에 쓰는 비교 모드는 양옆 1장), 모바일 양옆 1장이고, 유지하는 `Image` 객체는 화면별 최대 2~6개다. 브라우저 데이터 절약 모드에서는 현재 사진만 로드하며 `(max-width: 900px)` 변화도 즉시 반영한다. 이 최적화는 신규 API나 서버 재조회를 만들지 않는다.
-7. **삭제**: 프로젝트/사진/보정본 삭제 시 Next API가 FastAPI `POST /api/storage/delete`(§12: 인증 헤더 없음)를 호출해 R2 객체를 먼저 지운 뒤 DB 행을 삭제.
+7. **삭제**: 프로젝트/사진/보정본 삭제 시 Next API가 FastAPI `POST /api/storage/delete`(§12: 인증 헤더 없음)를 호출해 R2 객체를 먼저 지운 뒤 DB 행을 삭제. 보정본은 해당 편집 단계에서만 삭제할 수 있고, 고객 확정 보정본은 개별·일괄 선택과 서버 삭제를 모두 거부한다.
 
 ---
 
@@ -648,7 +741,7 @@ sequenceDiagram
 ## 13. 권한 및 데이터 격리 구조
 
 - **작가 데이터 격리**: 거의 모든 작가용 API 라우트가 "세션에서 `auth_id` 추출 → `photographers.id` 조회 → 대상 리소스의 `photographer_id`와 일치 확인" 패턴을 반복 구현합니다(공용 미들웨어/헬퍼로 통합되어 있지 않고 각 라우트 파일에 개별 구현).
-- **`/photographer/**` 페이지 자체는 미들웨어로 보호되지 않습니다.** `src/middleware.ts`의 matcher가 `/c/:token/:path+` 하나뿐이므로, 인증되지 않은 사용자도 페이지 셸은 렌더링될 수 있고, 실제 데이터는 각 API 호출이 401을 반환할 때 비로소 막힙니다(레이아웃 자체의 렌더 타임 인증 체크는 없음).
+- **`/photographer/**` 페이지 자체는 미들웨어로 보호되지 않습니다.** `src/middleware.ts`의 matcher는 고객 경로(`/c/:token`, `/c/:token/:path+`)와 관리자 경로만 포함하므로, 인증되지 않은 사용자도 작가 페이지 셸은 렌더링될 수 있고, 실제 데이터는 각 API 호출이 401을 반환할 때 비로소 막힙니다(레이아웃 자체의 렌더 타임 인증 체크는 없음).
 - **`/admin/**`는 이와 반대로 레이아웃(서버 컴포넌트) 렌더 타임에 접근 제어됩니다.** `src/app/admin/layout.tsx`가 매 요청마다 `getAdminUser()`(`src/lib/admin-auth.ts`)로 세션 이메일을 확인해, 허용 목록(`ADMIN_EMAILS`)에 없으면 페이지 셸이 렌더링되기 전에 리다이렉트합니다. 미들웨어는 사용하지 않으며(matcher에 `/admin`을 추가하지 않음), 역할/권한 테이블 없이 이메일 하드코딩만으로 판별하는 단일 계정 전용 구조입니다. **레이아웃 가드는 페이지 렌더링에만 적용되고 API 라우트에는 자동 적용되지 않으므로**, `/api/admin/**`(PIN 재설정, 피드백 상태 변경)의 각 Route Handler는 자체적으로 `getAdminUser()`를 다시 호출해 인가를 재검증합니다(§6.3).
 - **레거시 미인증 라우트**: `src/app/api/projects/[id]/route.ts`(PATCH)는 세션/소유권 확인이 전혀 없이 `src/lib/db.ts`의 `updateProject()`를 직접 호출합니다. 같은 기능을 하는 `src/app/api/photographer/projects/[id]/route.ts`는 세션+소유권 검증을 하므로, 이 레거시 경로는 사용되지 않는 것으로 보이나 **엔드포인트 자체는 살아있어 확인 필요**합니다.
 - **FastAPI `/api/storage/delete`는 인증 의존성이 전혀 없습니다.** 요청 가능한 누구나 임의의 R2 키 목록을 삭제 요청할 수 있는 구조입니다(코드상 사실이며, 실제 배포 환경에서 네트워크 격리 등으로 외부 접근이 막혀 있는지는 `확인 필요`).
@@ -731,3 +824,36 @@ sequenceDiagram
 - `TanStack Virtual`이 실제로 어느 페이지의 가상 스크롤에 적용되어 있는지 구체적 파일:라인.
 - `src/types/supabase.ts` 타입이 최신 스키마(예: `photo_groups`, `clip_analysis_*` 컬럼 포함) 기준으로 재생성되었는지 여부.
 - 로컬 개발 시 `photo-selection-be`와 `clip-service`를 동시에 띄워야 전체 기능이 동작하는지, 아니면 CLIP 관련 기능만 선택적으로 비활성화되는지(에러 핸들링 여부).
+
+
+### 업로드 진행 표시와 세션 성능 관측 (2026-09-11)
+
+`upload/page.tsx`는 원본 presigned PUT의 XHR progress를 `upload-telemetry.ts`에 전달하고 PC·모바일 표시를 500ms(`UPLOAD_SAMPLE_MS`) 간격으로 갱신한다. 파일별 유효 전송량, 준비·전송·확인·재시도 상태와 완료 장수를 분리한다. 세션 집계는 브라우저 console 및 `acut:upload-performance` 이벤트에만 남긴다. 새 서버 API나 DB 테이블은 없으며, 업로드 경로·동시성·worker·완료 검증 계약은 유지한다. 지표 범위와 해석 한계는 `upload-flow.md`의 구간별 성능 기록을 참고한다.
+
+
+### 원본 업로드 큐와 예약 (2단계, 2026-09-11)
+
+원본 포함 업로드는 예약 API를 압축과 함께 시작하고, 별도 원본 큐에서 PUT과 사진 등록 후 confirm을 수행한다. 미리보기 큐는 `/photos` 응답 뒤 다음 항목으로 진행한다. 공통 `UploadWorkQueue` 요청 슬롯은 PC 기존 상한(일반 4/조건부 6), 모바일 1을 유지한다. 업로드 화면 중간 이미지 상한은 1600px이며 납품 원본은 바꾸지 않는다.
+
+`original_upload_reservations`는 선전송 후 미리보기 실패·중단으로 남은 객체의 정리 원장이다. 사진 등록 전 lease 갱신과 만료 cleanup claim을 구분하여 늦은 등록/삭제 경합을 막는다. service-role 전용 RPC·48시간 예약 만료·30분 sweep과 배포 순서는 `upload-flow.md`에 정의한다. 기존 `photos`, `original_jobs`, 고객 링크 활성화 및 ZIP 완료 계약은 유지한다. 원본 포함 PC는 실제 PUT 처리량으로 원본 큐를 1~안전 상한 사이에서 조절하고 2~3개 압축 worker를 병렬 활용한다. 모바일은 두 상한 모두 1개다. `UploadTelemetry` v3는 병렬 원본 상태, 중간 파일 바이트와 동시성 조절 결과를 기록한다.
+
+
+## 03 검토 영상 적용 (2026-09-12)
+
+`LandingStory`의 보정본 등록 전 예시는 `ReviewVideo`의 12초 정적 영상으로 표시한다. 원본을 2초씩 두 번 비교하며, 기존 등록 후 검토 체험은 유지한다. 5:3 비율과 contain으로 모바일에서도 전체 프레임을 표시한다. 무음 자동 재생·인라인·반복 재생을 사용하고, 움직임 축소 설정에서는 영상을 마운트하지 않는다. 자동 재생 거절·오류 시 poster를 유지하며 마지막 0.6초는 첫 장면 poster로 전환해 반복 경계를 완화한다. 운영 API나 실제 서비스 검토 흐름은 변경하지 않는다.
+
+### 키보드 단축키와 브라우저/OS 조합키 충돌 (2026-09-13)
+
+**문제**: 보정본 검토 상세의 `R`(재보정) 단축키가 `e.code === "KeyR"`만 보고 반응해, 맥에서 새로고침(Cmd+R)을 누르면 재보정 버튼이 같이 눌렸다 — Cmd/Ctrl이 눌려 있는지를 전혀 확인하지 않았기 때문이다. 같은 패턴(`e.code`/`e.key`만 비교하고 조합키를 안 보는 것)을 쓰는 다른 키보드 단축키 핸들러 20곳을 전부 훑어 같은 결함이 더 있는지 확인했다.
+
+**추가로 발견한 충돌**:
+- `Digit1`~`Digit5`(고객 뷰어 별점) — Cmd/Ctrl+1~9는 브라우저 탭 전환(Chrome·Edge·Firefox·Safari, 맥·윈도우 공통)
+- `KeyF`(고객 뷰어 찜) — Cmd/Ctrl+F는 페이지 내 찾기
+- `KeyG`(작가 원본 뷰어 그룹 토글) — Cmd/Ctrl+G는 다음 찾기
+- **방향키(사진 이동 전반, 7개 화면)** — 윈도우에서 Alt+←/→는 브라우저 뒤로/앞으로 가기다. 이 핸들러들이 전부 `e.preventDefault()`를 부르므로, 윈도우 사용자가 Alt+←로 뒤로 가려 하면 그 자체가 씹히고 대신 사진이 넘어갔다 — 문의를 받은 R 단축키 건보다 넓게 걸리는 문제였다(고객 셀렉 뷰어, 검토 상세·목록, 잠금 갤러리 뷰어, 사진 집중 보기, 작가 원본 뷰어, 사진 비교 모달).
+
+**고친 위치**: `src/app/c/[token]/review/[photoId]/page.tsx`(2곳), `review/page.tsx`, `viewer/[photoId]/page.tsx`, `CompareViewerModal.tsx`, `customer/PhotoFocusOverlay.tsx`, `customer/LockedPhotoViewer.tsx`, `photographer/OriginalPhotoViewer.tsx`.
+
+**규칙**: `src/lib/keyboard-shortcut-guard.ts`의 `hasShortcutModifier(e)`(= `e.metaKey || e.ctrlKey || e.altKey`)를 모든 단축키 분기 앞에서 먼저 호출한다. Shift는 일부러 뺐다 — `Shift+/`(=`?`, 도움말 열기)처럼 이 앱이 의도적으로 쓰는 조합이 있고, bare Shift+글자는 이 목록의 조합키들과 달리 브라우저/OS가 전역으로 예약해 둔 게 없다. **새 단축키 핸들러를 추가할 때는 이 함수를 가장 먼저 부른다** — Escape/Tab처럼 모달이 이미 쓰는 키, 순수 문자/숫자/방향키에는 아무 영향이 없고 조합키가 눌렸을 때만 앱이 조용해진다.
+
+**Escape/Tab 트랩은 그대로 둔다**: 모달 접근성 훅(`useDialogAccessibility.ts`)의 Escape·Tab-트랩, PIN 입력의 Backspace/Enter처럼 조합키와 무관한 단독 키는 대상이 아니다.

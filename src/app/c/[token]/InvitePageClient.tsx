@@ -1,54 +1,22 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Icon } from "@iconify/react";
-import { endOfDay, format, isBefore } from "date-fns";
+import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { CalendarDays } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { getProfileImageUrl } from "@/lib/photographer";
-import { getReviewMockData } from "@/lib/mock-data";
-import { BrandLogoBar } from "@/components/BrandLogo";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
-import { CustomerHeader } from "@/components/customer/CustomerHeader";
-import { CustomerFooter } from "@/components/customer/CustomerFooter";
+import { Badge } from "@/components/ui/Badge";
 import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
+import { CustomerInviteIntro } from "@/components/customer/CustomerInviteIntro";
+import { CustomerEntryHeader, CustomerEntryShell } from "@/components/customer/CustomerEntryShell";
+import { customerDDay } from "@/lib/customer-dday";
+import styles from "./customer-entry.module.css";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
-
-const STEPS = [
-  { icon: "solar:gallery-minimalistic-bold", title: "갤러리 감상" },
-  { icon: "solar:cursor-bold",               title: "사진 선택" },
-  { icon: "solar:check-circle-bold",         title: "확정 & 보정" },
-];
-
-/* ── Floating Glass Header ── */
-function PageHeader({ inviteHref, right }: { inviteHref?: string; right?: React.ReactNode }) {
-  return (
-    <header className="sticky top-0 z-50 px-4 pt-3 pb-2">
-      <div
-        className="flex h-11 items-center justify-between rounded-full px-4"
-        style={{
-          background: "rgba(5,5,5,0.80)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-          border: "1px solid rgba(255,255,255,0.08)",
-        }}
-      >
-        <BrandLogoBar size="sm" href={inviteHref} />
-        {right && (
-          <div
-            className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] text-muted-foreground max-w-[150px] truncate"
-            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)" }}
-          >
-            {right}
-          </div>
-        )}
-      </div>
-    </header>
-  );
-}
 
 /* ── Loading ── */
 function LoadingScreen() {
@@ -64,13 +32,13 @@ export default function InvitePageClient() {
   const inviteHref = token ? `/c/${token}` : undefined;
   const ctx      = useSelectionOptional();
   const project  = ctx?.project ?? null;
+  const firstPhotoId = ctx?.photos[0]?.id ?? null;
+  const coverPhotoId = project?.coverPhotoId && ctx?.photos.some((photo) => photo.id === project.coverPhotoId)
+    ? project.coverPhotoId
+    : firstPhotoId;
   const loading  = ctx?.loading ?? true;
   const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
-
-  const reviewData = useMemo(() => {
-    if (!project?.id) return null;
-    return getReviewMockData(project.id);
-  }, [project?.id]);
+  const [introImage, setIntroImage] = useState<{ photoId: string; url: string } | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -79,6 +47,18 @@ export default function InvitePageClient() {
       .then((data) => data && setPhotographer({ name: data.name ?? null, profile_image_url: data.profile_image_url ?? null }))
       .catch(() => {});
   }, [token]);
+
+  useEffect(() => {
+    if (!token || !coverPhotoId) return;
+    let cancelled = false;
+    fetch(`/api/c/presign-preview?token=${encodeURIComponent(token)}&photoId=${encodeURIComponent(coverPhotoId)}`, { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (!cancelled && data?.url) setIntroImage({ photoId: coverPhotoId, url: data.url });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [coverPhotoId, token]);
 
   useEffect(() => {
     if (!project) return;
@@ -91,508 +71,155 @@ export default function InvitePageClient() {
 
   if (!project) {
     return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-4 text-center">
-        <Icon icon="solar:link-broken-bold" width={36} style={{ color: "#3a3f55", marginBottom: 12 }} />
-        <p className="text-[15px] font-semibold text-muted-foreground">존재하지 않는 초대 링크입니다</p>
-        <p className="mt-1 text-[13px] text-subtle-foreground">URL을 다시 확인해주세요</p>
-      </div>
+      <CustomerEntryShell className={styles.invalidCanvas}>
+        <CustomerEntryHeader />
+        <div className={styles.entryCopy}>
+          <h1 className={styles.entryTitle}>이 링크는 사용할 수 없어요</h1>
+          <p className={styles.entryDescription}>
+            주소가 잘못되었거나 링크가 삭제되었을 수 있어요.<br />
+            받은 메세지의 링크를 다시 확인해 주세요.
+          </p>
+        </div>
+        <div className={styles.invalidIllustrationWrap} aria-hidden="true">
+          <img
+            className={styles.invalidIllustration}
+            src="/customer/entry/invalid-link.png"
+            alt=""
+            width={245}
+            height={367}
+          />
+        </div>
+        <div className={styles.stickyActions}>
+          <button
+            className={styles.entryPrimary}
+            type="button"
+            onClick={() => {
+              if (window.history.length > 1) window.history.back();
+              else window.location.assign("/");
+            }}
+          >
+            작가에게 문의하기
+          </button>
+        </div>
+      </CustomerEntryShell>
     );
   }
 
   if (["editing", "editing_v2", "confirmed", "delivered"].includes(project.status)) return <LoadingScreen />;
 
-  /* ──────────────── reviewing_v1 / v2 ──────────────── */
-  if (project.status === "reviewing_v1" || project.status === "reviewing_v2") {
-    const total             = reviewData?.photos.length ?? project.requiredCount ?? 0;
-    const isV2              = project.status === "reviewing_v2";
-    const revisionRemaining = Math.max(0, (project.maxRevisionCount ?? 0) - (project.revisionRound ?? 0));
-    const deadlineStr       = format(new Date(project.deadline), "yyyy.MM.dd", { locale: ko });
-    const reviewPath        = `/c/${token}/review`;
-    const photographerName  = photographer?.name ?? "담당 작가";
-    const prjIdShort        = project.id.replace(/-/g, "").slice(0, 8).toUpperCase();
-    const MONO              = "'JetBrains Mono', 'Courier New', Courier, monospace";
+  const introImageUrl = introImage?.photoId === coverPhotoId ? introImage.url : null;
+  const entryPhotographerName = photographer?.name?.trim();
+  const photographerLabel = entryPhotographerName ? `${entryPhotographerName} 작가` : "담당 작가";
+  const avatarUrl = photographer?.profile_image_url
+    ? getProfileImageUrl(photographer.profile_image_url)
+    : "/customer/entry/avatar-fallback.svg";
+  const introCommonProps = {
+    href: inviteHref,
+    heroUrl: introImageUrl,
+    heroAlt: `${project.name} 대표 사진`,
+    photographerLabel,
+    photographerAvatarUrl: avatarUrl,
+  };
 
+  if (project.status === "selecting") {
+    const deadlineDate = new Date(project.deadline);
+    // 고객 화면의 모든 기한은 갤러리·검토·다운로드와 같은 계산과 Badge를 사용한다.
+    const dday = customerDDay(deadlineDate);
     return (
-      <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)", display: "flex", flexDirection: "column", position: "relative", overflowX: "hidden", fontFamily: "'Pretendard Variable','Pretendard',-apple-system,sans-serif" }}>
-        <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
-
-          .cp-grid-bg {
-            position: fixed; inset: 0; z-index: 0; pointer-events: none;
-            background-image: linear-gradient(to right, var(--border-subtle) 1px, transparent 1px), linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
-            background-size: 40px 40px;
-          }
-          .cp-bracket { position: fixed; width: 32px; height: 32px; border: 2px solid var(--border-strong); z-index: 50; pointer-events: none; }
-          .cp-bracket-tl { top: 20px; left: 20px; border-right: none; border-bottom: none; }
-          .cp-bracket-tr { top: 20px; right: 20px; border-left: none; border-bottom: none; }
-          .cp-bracket-bl { bottom: 20px; left: 20px; border-right: none; border-top: none; }
-          .cp-bracket-br { bottom: 20px; right: 20px; border-left: none; border-top: none; }
-
-          .cp-header {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 32px 64px; position: relative; z-index: 10;
-          }
-          .cp-brand-cluster { display: flex; align-items: center; gap: 12px; }
-          .cp-logo-box { background: var(--accent); color: #000; font-weight: 800; font-size: 14px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
-          .cp-brand-name { font-weight: 800; font-size: 20px; letter-spacing: -0.5px; }
-          .cp-brand-name span { color: var(--accent); }
-          .cp-sys-info { display: flex; align-items: center; gap: 24px; font-family: ${MONO}; font-size: 11px; letter-spacing: 1px; color: var(--muted-foreground); }
-          .cp-status-indicator { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid var(--border); background: var(--background); }
-          .cp-status-dot { width: 6px; height: 6px; border-radius: 50%; }
-
-          .cp-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; position: relative; z-index: 10; }
-          .cp-portal-cmd { font-family: ${MONO}; font-size: 12px; color: var(--accent); letter-spacing: 2px; margin-bottom: 24px; text-transform: uppercase; display: flex; align-items: center; gap: 12px; }
-          .cp-portal-cmd::before, .cp-portal-cmd::after { content: ''; width: 24px; height: 1px; background: var(--accent); }
-
-          .cp-card { width: 100%; max-width: 640px; background: rgba(10,10,10,0.6); border: 1px solid var(--border); padding: 56px 48px; position: relative; backdrop-filter: blur(4px); }
-          .cp-card-corner-tl { position: absolute; top: -1px; left: -1px; width: 8px; height: 8px; border: 1px solid var(--border-strong); border-right: none; border-bottom: none; pointer-events: none; }
-          .cp-card-corner-br { position: absolute; bottom: -1px; right: -1px; width: 8px; height: 8px; border: 1px solid var(--border-strong); border-left: none; border-top: none; pointer-events: none; }
-          .cp-card-header { margin-bottom: 48px; text-align: center; }
-          .cp-h1 { font-size: 42px; font-weight: 800; line-height: 1.2; letter-spacing: -1px; margin-bottom: 16px; word-break: keep-all; }
-          .cp-subtitle { font-size: 16px; line-height: 1.6; color: var(--muted-foreground); max-width: 80%; margin: 0 auto; word-break: keep-all; }
-
-          .cp-data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 48px; }
-          .cp-data-cell { background: var(--background); padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; }
-          .cp-data-label { font-family: ${MONO}; font-size: 10px; color: var(--subtle-foreground); text-transform: uppercase; letter-spacing: 1px; }
-          .cp-data-value { font-size: 16px; font-weight: 600; color: var(--foreground); }
-
-          .cp-action-area { display: flex; flex-direction: column; align-items: center; gap: 24px; }
-          .cp-btn-primary { display: inline-flex; align-items: center; justify-content: center; width: 100%; background: var(--accent); color: #000; font-size: 18px; font-weight: 700; padding: 20px 32px; border: none; cursor: pointer; transition: background 0.2s; text-decoration: none; font-family: inherit; }
-          .cp-btn-primary:hover:not(:disabled) { background: #ff6600; }
-          .cp-btn-primary:disabled { opacity: 0.35; cursor: not-allowed; background: var(--border-strong); }
-          .cp-btn-arrow { margin-left: 12px; font-weight: 800; transition: transform 0.2s; }
-          .cp-btn-primary:hover:not(:disabled) .cp-btn-arrow { transform: translateX(4px); }
-
-          .cp-photographer-card { margin-top: 48px; padding-top: 32px; border-top: 1px dashed var(--border); display: flex; align-items: center; justify-content: space-between; }
-          .cp-photo-meta { display: flex; align-items: center; gap: 16px; }
-          .cp-avatar-box { width: 48px; height: 48px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); overflow: hidden; flex-shrink: 0; }
-          .cp-author-name { font-size: 15px; font-weight: 700; }
-          .cp-author-role { font-family: ${MONO}; font-size: 10px; color: var(--subtle-foreground); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
-          .cp-sys-tag { font-family: ${MONO}; font-size: 10px; color: var(--accent); letter-spacing: 1px; display: flex; align-items: center; gap: 6px; }
-          .cp-sys-tag::before { content: ''; width: 4px; height: 4px; background: var(--accent); display: inline-block; }
-
-          .cp-footer { padding: 24px 64px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); font-family: ${MONO}; font-size: 10px; color: var(--subtle-foreground); letter-spacing: 1px; position: relative; z-index: 10; background: var(--background); }
-          .cp-footer-secure { color: var(--muted-foreground); }
-
-          @media (max-width: 768px) {
-            .cp-header { padding: env(safe-area-inset-top, 16px) 20px 16px; }
-            .cp-footer { padding: 16px 20px calc(16px + env(safe-area-inset-bottom)); }
-            .cp-sys-info { display: none; }
-            .cp-card { padding: 28px 20px; }
-            .cp-card-header { margin-bottom: 28px; }
-            .cp-h1 { font-size: 28px; margin-bottom: 10px; }
-            .cp-subtitle { font-size: 14px; max-width: 100%; }
-            .cp-data-grid { grid-template-columns: 1fr; margin-bottom: 28px; }
-            .cp-data-cell { padding: 12px 16px; }
-            .cp-data-value { font-size: 14px; }
-            .cp-btn-primary { font-size: 16px; padding: 16px 24px; }
-            .cp-photographer-card { margin-top: 28px; padding-top: 20px; }
-            .cp-bracket { display: none; }
-            .cp-main { padding: 20px 16px; overflow-y: auto; }
-          }
-        `}</style>
-
-        <div className="cp-grid-bg" />
-        <div className="cp-bracket cp-bracket-tl" /><div className="cp-bracket cp-bracket-tr" />
-        <div className="cp-bracket cp-bracket-bl" /><div className="cp-bracket cp-bracket-br" />
-
-        <CustomerHeader>
-          <BrandLogoBar size="sm" href={inviteHref} />
-          <span className="font-mono text-[11px] text-subtle-foreground max-w-[200px] truncate">
-            {isV2 ? "보정본 V2 검토 중" : "보정본 V1 검토 중"}
-          </span>
-        </CustomerHeader>
-
-        <main className="cp-main">
-          <div className="cp-portal-cmd">CMD :: SYS.REVIEW_INVITE</div>
-
-          <div className="cp-card">
-            <div className="cp-card-corner-tl" />
-            <div className="cp-card-corner-br" />
-
-            <div className="cp-card-header">
-              <h1 className="cp-h1">
-                보정이 완료됐어요.<br />
-                마음에 드시나요?
-              </h1>
-              <p className="cp-subtitle">
-                {photographerName} 작가님의 보정본을 확인하고, 마음에 들면 확정, 수정이 필요하면 재보정 요청을 남겨주세요.
-              </p>
-            </div>
-
-            <div className="cp-data-grid">
-              <div className="cp-data-cell">
-                <span className="cp-data-label">FIELD :: PROJECT_NAME</span>
-                <span className="cp-data-value">{project.name}</span>
-              </div>
-              <div className="cp-data-cell">
-                <span className="cp-data-label">FIELD :: PHOTOGRAPHER</span>
-                <span className="cp-data-value">{photographerName}</span>
-              </div>
-              <div className="cp-data-cell">
-                <span className="cp-data-label">SYS :: DEADLINE</span>
-                <span className="cp-data-value">{deadlineStr} 까지</span>
-              </div>
-              <div className="cp-data-cell">
-                <span className="cp-data-label">DATA :: REVISION_QUOTA</span>
-                <span className="cp-data-value" style={{ fontFamily: MONO, fontSize: 18 }}>
-                  <span style={{ color: "var(--accent)" }}>{revisionRemaining}</span>회 가능
-                  <span style={{ fontFamily: MONO, fontSize: 11, color: "var(--subtle-foreground)", marginLeft: 8 }}>
-                    {isV2 ? "2차 검토" : "1차 검토"}
-                  </span>
-                </span>
-              </div>
-            </div>
-
-            <div className="cp-action-area">
-              <Link href={reviewPath} style={{ width: "100%" }}>
-                <button type="button" className="cp-btn-primary">
-                  보정본 검토하기 <span className="cp-btn-arrow">→</span>
-                </button>
-              </Link>
-              <OriginalDownloadEntry token={token} variant="inline" />
-            </div>
-
-            <div className="cp-photographer-card">
-              <div className="cp-photo-meta">
-                <div className="cp-avatar-box">
-                  {photographer?.profile_image_url ? (
-                    <img src={getProfileImageUrl(photographer.profile_image_url)} alt={photographerName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  ) : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--subtle-foreground)" strokeWidth="1.5"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" /></svg>
-                  )}
-                </div>
-                <div>
-                  <div className="cp-author-name">{photographerName}</div>
-                  <div className="cp-author-role">담당 작가</div>
-                </div>
-              </div>
-              <div className="cp-sys-tag">VERIFIED_CREATOR</div>
-            </div>
-          </div>
-        </main>
-
-        <CustomerFooter>
-          <span className="font-mono text-[10px] text-subtle-foreground">SECURE_CONNECTION</span>
-          <span className="font-mono text-[10px] text-subtle-foreground">© 2026 A컷</span>
-        </CustomerFooter>
-      </div>
+      <CustomerInviteIntro
+        {...introCommonProps}
+        variant="selection"
+        actions={(
+          <>
+            <Link href={`/c/${token}/gallery`} className={styles.entryPrimary}>
+              사진 선택하기
+            </Link>
+            <OriginalDownloadEntry token={token} variant="entry" />
+          </>
+        )}
+      >
+        <div className={styles.introTextGroup}>
+          <p className={styles.projectLabel}>{project.name}</p>
+          <h1 className={`${styles.entryTitle} ${styles.introTitle}`}>
+            {project.customerName ? `${project.customerName}님,` : "고객님,"}<br />
+            사진이 도착했어요
+          </h1>
+          <p className={styles.entryDescription}>
+            총 {project.photoCount.toLocaleString()}장 중 마음에 드는 <strong className={styles.introAccent}>{project.requiredCount.toLocaleString()}장</strong>을 골라주세요.
+          </p>
+        </div>
+        <div className={styles.deadlineRow} aria-label={`선택 마감일 ${format(deadlineDate, "yyyy년 M월 d일 EEEE", { locale: ko })}${dday ? `, ${dday.label}` : ""}`}>
+          <CalendarDays className={styles.deadlineIcon} aria-hidden="true" strokeWidth={1.6} />
+          <span className={styles.deadlineLabel}>선택 기한</span>
+          <span className={styles.deadlineDate}>{format(deadlineDate, "yyyy.MM.dd (EEE)", { locale: ko })}</span>
+          {dday && <Badge tone={dday.tone} theme="customerLight" className="font-mono">{dday.label}</Badge>}
+        </div>
+      </CustomerInviteIntro>
     );
   }
 
-  /* ──────────────── selecting / preparing ──────────────── */
-  const M     = project.photoCount;
-  const N     = project.requiredCount;
-  const ready = project.status === "selecting";
-  const deadlineDate = new Date(project.deadline);
-  const deadlineFormatted = format(deadlineDate, "yyyy.MM.dd", { locale: ko });
-  const selectionDeadlinePassed = isBefore(endOfDay(deadlineDate), new Date());
-  const photographerName = photographer?.name?.trim() || "담당 작가";
-  const photographerSubject = photographer?.name?.trim()
-    ? `${photographer.name.trim()} 작가가`
-    : "담당 작가가";
-
-  const MONO = "'JetBrains Mono', 'Courier New', Courier, monospace";
-
-  return (
-    <div style={{ minHeight: "100dvh", background: "#030303", color: "#fff", display: "flex", flexDirection: "column", position: "relative", overflowX: "hidden", fontFamily: "'Pretendard Variable','Pretendard',-apple-system,sans-serif" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
-
-        .cp-grid-bg {
-          position: fixed; inset: 0; z-index: 0; pointer-events: none;
-          background-image: linear-gradient(to right, var(--border-subtle) 1px, transparent 1px), linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
-          background-size: 40px 40px;
-        }
-        .cp-bracket {
-          position: fixed; width: 32px; height: 32px;
-          border: 2px solid var(--border-strong); z-index: 50; pointer-events: none;
-        }
-        .cp-bracket-tl { top: 20px; left: 20px; border-right: none; border-bottom: none; }
-        .cp-bracket-tr { top: 20px; right: 20px; border-left: none; border-bottom: none; }
-        .cp-bracket-bl { bottom: 20px; left: 20px; border-right: none; border-top: none; }
-        .cp-bracket-br { bottom: 20px; right: 20px; border-left: none; border-top: none; }
-
-        .cp-header {
-          display: flex; justify-content: space-between; align-items: center;
-          padding: 32px 64px; position: relative; z-index: 10;
-        }
-        .cp-brand-cluster { display: flex; align-items: center; gap: 12px; }
-        .cp-logo-box {
-          background: var(--accent); color: #000;
-          font-weight: 800; font-size: 14px;
-          width: 24px; height: 24px;
-          display: flex; align-items: center; justify-content: center;
-        }
-        .cp-brand-name { font-weight: 800; font-size: 20px; letter-spacing: -0.5px; }
-        .cp-brand-name span { color: var(--accent); }
-
-        .cp-sys-info {
-          display: flex; align-items: center; gap: 24px;
-          font-family: ${MONO}; font-size: 11px; letter-spacing: 1px; color: var(--muted-foreground);
-        }
-        .cp-status-indicator {
-          display: flex; align-items: center; gap: 8px;
-          padding: 6px 12px; border: 1px solid var(--border); background: var(--background);
-        }
-        .cp-status-dot {
-          width: 6px; height: 6px; background: #00E676;
-          border-radius: 50%; box-shadow: 0 0 8px #00E676;
-        }
-
-        .cp-main {
-          flex: 1; display: flex; flex-direction: column;
-          align-items: center; justify-content: center;
-          padding: 32px 20px; position: relative; z-index: 10;
-        }
-        .cp-portal-cmd {
-          font-family: ${MONO}; font-size: 12px; color: var(--accent);
-          letter-spacing: 1px; margin-bottom: 18px;
-          display: flex; align-items: center; gap: 12px;
-        }
-        .cp-portal-cmd::before, .cp-portal-cmd::after {
-          content: ''; width: 24px; height: 1px; background: var(--accent);
-        }
-
-        .cp-card {
-          width: 100%; max-width: 760px;
-          background: rgba(10,10,10,0.6);
-          border: 1px solid var(--border);
-          padding: 44px 46px 32px;
-          position: relative;
-          backdrop-filter: blur(4px);
-        }
-        .cp-card-corner-tl {
-          position: absolute; top: -1px; left: -1px;
-          width: 8px; height: 8px;
-          border: 1px solid var(--border-strong);
-          border-right: none; border-bottom: none;
-          pointer-events: none;
-        }
-        .cp-card-corner-br {
-          position: absolute; bottom: -1px; right: -1px;
-          width: 8px; height: 8px;
-          border: 1px solid var(--border-strong);
-          border-left: none; border-top: none;
-          pointer-events: none;
-        }
-
-        .cp-card-header { margin-bottom: 30px; text-align: center; }
-        .cp-h1 {
-          font-size: 38px; font-weight: 800; line-height: 1.2;
-          letter-spacing: -1px; margin-bottom: 14px; word-break: keep-all;
-        }
-        .cp-subtitle {
-          font-size: 16px; line-height: 1.6; color: var(--muted-foreground);
-          max-width: 620px; margin: 0 auto; word-break: keep-all;
-        }
-
-        .cp-data-grid {
-          display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 1px; background: var(--border);
-          border: 1px solid var(--border); margin-bottom: 28px;
-        }
-        .cp-data-cell {
-          min-width: 0; background: var(--background); padding: 16px 14px;
-          display: flex; flex-direction: column; gap: 7px;
-        }
-        .cp-data-label {
-          font-family: ${MONO}; font-size: 11px; color: var(--subtle-foreground);
-          text-transform: uppercase; letter-spacing: 0.08em;
-        }
-        .cp-data-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 650; color: var(--foreground); }
-        .cp-data-value-accent { color: var(--accent); }
-        .cp-deadline-notice { margin: -16px 0 24px; color: #ffbd8f; font-size: 12px; line-height: 1.5; text-align: center; }
-
-        .cp-action-area {
-          display: flex; flex-direction: column; align-items: center; gap: 12px;
-        }
-        .cp-btn-primary {
-          display: inline-flex; align-items: center; justify-content: center;
-          width: 100%; background: var(--accent); color: #000;
-          min-height: 56px; box-sizing: border-box; font-size: 17px; font-weight: 700;
-          padding: 16px 28px; border: none; cursor: pointer;
-          transition: background 0.2s; text-decoration: none;
-          font-family: inherit;
-        }
-        .cp-btn-primary:hover:not(:disabled) { background: #ff6600; }
-        .cp-btn-primary:disabled { opacity: 0.35; cursor: not-allowed; background: var(--border-strong); }
-        .cp-btn-arrow { margin-left: 12px; font-weight: 800; transition: transform 0.2s; }
-        .cp-btn-primary:hover:not(:disabled) .cp-btn-arrow { transform: translateX(4px); }
-
-        .cp-btn-sub {
-          font-size: 13px; color: var(--muted-foreground);
-          text-decoration: none; display: flex; align-items: center; gap: 8px;
-          transition: color 0.2s; background: none; border: none; cursor: pointer;
-        }
-        .cp-btn-sub:hover { color: var(--foreground); }
-
-        .cp-photographer-card {
-          margin-top: 28px; padding-top: 20px;
-          border-top: 1px dashed var(--border);
-          display: flex; align-items: center; justify-content: space-between;
-        }
-        .cp-photo-meta { display: flex; align-items: center; gap: 16px; }
-        .cp-avatar-box {
-          width: 48px; height: 48px; border: 1px solid var(--border);
-          display: flex; align-items: center; justify-content: center;
-          background: rgba(255,255,255,0.03); overflow: hidden; flex-shrink: 0;
-        }
-        .cp-author-name { font-size: 15px; font-weight: 700; }
-        .cp-author-role {
-          font-size: 12px; color: var(--subtle-foreground); margin-top: 3px;
-        }
-        .cp-sys-tag {
-          font-size: 11px; color: var(--accent);
-          display: flex; align-items: center; gap: 6px;
-        }
-        .cp-sys-tag::before {
-          content: ''; width: 4px; height: 4px; background: var(--accent);
-          display: inline-block;
-        }
-
-        .cp-footer {
-          padding: 24px 64px;
-          display: flex; justify-content: space-between; align-items: center;
-          border-top: 1px solid var(--border);
-          font-family: ${MONO}; font-size: 10px; color: var(--subtle-foreground);
-          letter-spacing: 1px; position: relative; z-index: 10; background: var(--background);
-        }
-        .cp-footer-secure { color: var(--muted-foreground); }
-
-        @media (max-width: 768px) {
-          .cp-header { padding: env(safe-area-inset-top, 16px) 20px 16px; }
-          .cp-footer { padding: 16px 20px calc(16px + env(safe-area-inset-bottom)); }
-          .cp-sys-info { display: none; }
-          .cp-card { padding: 24px 18px; }
-          .cp-card-header { margin-bottom: 22px; }
-          .cp-h1 { font-size: 28px; margin-bottom: 10px; }
-          .cp-subtitle { font-size: 14px; max-width: 100%; }
-          .cp-data-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 22px; }
-          .cp-data-cell { padding: 12px; }
-          .cp-data-label { font-size: 11px; }
-          .cp-data-value { font-size: 14px; }
-          .cp-deadline-notice { margin: -10px 0 18px; text-align: left; }
-          .cp-btn-primary { min-height: 52px; font-size: 16px; padding: 14px 20px; }
-          .cp-photographer-card { margin-top: 22px; padding-top: 16px; }
-          .cp-avatar-box { width: 42px; height: 42px; }
-          .cp-bracket { display: none; }
-          .cp-main { justify-content: flex-start; padding: 18px 16px 28px; }
-          .cp-portal-cmd { margin-bottom: 12px; }
-        }
-      `}</style>
-
-      {/* Grid background */}
-      <div className="cp-grid-bg" />
-
-      {/* Corner brackets */}
-      <div className="cp-bracket cp-bracket-tl" />
-      <div className="cp-bracket cp-bracket-tr" />
-      <div className="cp-bracket cp-bracket-bl" />
-      <div className="cp-bracket cp-bracket-br" />
-
-      {/* Header */}
-      <CustomerHeader>
-        <BrandLogoBar size="sm" href={inviteHref} />
-        <span className="font-mono text-[11px] text-subtle-foreground max-w-[180px] truncate">{project.name}</span>
-      </CustomerHeader>
-
-      {/* Main */}
-      <main className="cp-main">
-        <div className="cp-portal-cmd">CMD :: PHOTO_SELECTION</div>
-
-        <div className="cp-card">
-          <div className="cp-card-corner-tl" />
-          <div className="cp-card-corner-br" />
-
-          {/* Card header */}
-          <div className="cp-card-header">
-            <h1 className="cp-h1">
-              {project.customerName ? (
-                <>{project.customerName}님,<br /></>
-              ) : null}
-              {ready ? "사진이 도착했어요." : "사진이 곧 준비돼요."}
-            </h1>
-            <p className="cp-subtitle">
-              {ready
-                ? `${photographerSubject} 촬영한 ${M.toLocaleString()}장 중 마음에 드는 사진 ${N.toLocaleString()}장을 골라주세요.`
-                : "작가가 사진을 업로드하고 있어요. 잠시만 기다려주세요."}
-            </p>
-          </div>
-
-          {/* Data grid */}
-          <div className="cp-data-grid">
-            <div className="cp-data-cell">
-              <span className="cp-data-label">PROJECT</span>
-              <span className="cp-data-value">{project.name}</span>
-            </div>
-            <div className="cp-data-cell">
-              <span className="cp-data-label">SELECT</span>
-              <span className="cp-data-value cp-data-value-accent">{N.toLocaleString()}장 선택</span>
-            </div>
-            <div className="cp-data-cell">
-              <span className="cp-data-label">TOTAL</span>
-              <span className="cp-data-value">{M.toLocaleString()}장</span>
-            </div>
-            <div className="cp-data-cell">
-              <span className="cp-data-label">DEADLINE</span>
-              <span className="cp-data-value">{deadlineFormatted}</span>
-            </div>
-          </div>
-
-          {selectionDeadlinePassed && ready && (
-            <p className="cp-deadline-notice">선택 권장일이 지났지만 지금도 사진을 선택할 수 있어요.</p>
-          )}
-
-          {/* Action area */}
-          <div className="cp-action-area">
-            {ready ? (
-              <Link href={`/c/${token}/gallery`} className="cp-btn-primary">
-                사진 선택 시작하기 <span className="cp-btn-arrow">→</span>
-              </Link>
-            ) : (
-              <button type="button" className="cp-btn-primary" disabled>
-                업로드 중... <span className="cp-btn-arrow">→</span>
-              </button>
-            )}
-            {ready && <OriginalDownloadEntry token={token} variant="inline" />}
-            <Link href={`/c/${token}/about`} className="cp-btn-sub">
-              A컷이 처음이신가요? 이용 가이드 →
+  /* ──────────────── reviewing_v1 / v2 ──────────────── */
+  if (project.status === "reviewing_v1" || project.status === "reviewing_v2") {
+    const isV2 = project.status === "reviewing_v2";
+    const revisionRemaining = Math.max(0, (project.maxRevisionCount ?? 0) - (project.revisionRound ?? 0));
+    const deadlineDate = new Date(project.reviewDeadline ?? project.deadline);
+    const deadlineStr = format(deadlineDate, "yyyy.MM.dd (EEE)", { locale: ko });
+    const dday = customerDDay(deadlineDate);
+    const reviewPath = `/c/${token}/review`;
+    return (
+      <CustomerInviteIntro
+        {...introCommonProps}
+        actions={(
+          <>
+            <Link href={reviewPath} className={styles.entryPrimary}>
+              보정본 검토하기
             </Link>
-          </div>
-
-          {/* Photographer card */}
-          <div className="cp-photographer-card">
-            <div className="cp-photo-meta">
-              <div className="cp-avatar-box">
-                {photographer?.profile_image_url ? (
-                  <img
-                    src={getProfileImageUrl(photographer.profile_image_url)}
-                    alt={photographerName}
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  />
-                ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--subtle-foreground)" strokeWidth="1.5">
-                    <circle cx="12" cy="8" r="4" />
-                    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-                  </svg>
-                )}
-              </div>
-              <div>
-                <div className="cp-author-name">{photographerName}</div>
-                <div className="cp-author-role">담당 작가</div>
-              </div>
-            </div>
-            <div className="cp-sys-tag">VERIFIED_CREATOR</div>
-          </div>
+            <OriginalDownloadEntry token={token} variant="entry" />
+          </>
+        )}
+      >
+        <div className={styles.introTextGroup}>
+          <p className={styles.projectLabel}>{project.name}</p>
+          <p className={styles.reviewEyebrow}>{isV2 ? "재보정본 검토" : "1차 보정본 검토"}</p>
+          <h1 className={`${styles.entryTitle} ${styles.introTitle}`}>
+            {project.customerName ? `${project.customerName}님,` : "고객님,"}<br />
+            <span className={styles.introAccent}>보정본</span>이 도착했어요
+          </h1>
+          <p className={styles.entryDescription}>
+            사진을 확인하고 마음에 들면 확정해 주세요.<br />수정이 필요하면 재보정을 요청할 수 있어요.
+          </p>
         </div>
-      </main>
 
-      {/* Footer */}
-      <CustomerFooter>
-        <span className="font-mono text-[10px] text-subtle-foreground">SECURE_CONNECTION</span>
-        <span className="font-mono text-[10px] text-subtle-foreground">© 2026 A컷</span>
-      </CustomerFooter>
-    </div>
+        <dl className={styles.reviewSummary} aria-label="보정본 검토 정보">
+          <div className={styles.reviewSummaryRow}>
+            <dt>검토 기한</dt>
+            <dd className={styles.reviewDeadline}>
+              <span>{deadlineStr}</span>
+              {dday && <Badge tone={dday.tone} theme="customerLight" className="font-mono">{dday.label}</Badge>}
+            </dd>
+          </div>
+          <div className={styles.reviewSummaryRow}>
+            <dt>재보정</dt>
+            <dd>{revisionRemaining}회 요청 가능</dd>
+          </div>
+        </dl>
+      </CustomerInviteIntro>
+    );
+  }
+
+  // 준비 중에도 동일한 초대 레이아웃을 사용하며, 선택 화면으로의 진입은 제공하지 않는다.
+  return (
+    <CustomerInviteIntro {...introCommonProps} actions={(
+      <p className={styles.entryDescription}>사진 준비가 끝나면 이 링크에서 확인하실 수 있어요.</p>
+    )}>
+      <div className={styles.introTextGroup}>
+        <p className={styles.projectLabel}>{project.name}</p>
+        <p className={styles.reviewEyebrow}>사진 준비 중</p>
+        <h1 className={`${styles.entryTitle} ${styles.introTitle}`}>
+          {project.customerName ? `${project.customerName}님,` : "고객님,"}<br />사진을 준비하고 있어요
+        </h1>
+        <p className={styles.entryDescription}>작가가 촬영한 사진을 정리하고 있어요.<br />조금만 기다려 주세요.</p>
+      </div>
+    </CustomerInviteIntro>
   );
 }

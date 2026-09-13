@@ -1,14 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Check, X } from "lucide-react";
-import { useSelection, type CommentSaveStatus } from "@/contexts/SelectionContext";
+import { Star, ArrowLeft, Check, Layers, MessageSquare, X } from "lucide-react";
+import { useSelection, type CommentSaveStatus, type SelectionToggleResult } from "@/contexts/SelectionContext";
 import { PrevNextButton } from "@/components/PrevNextButton";
-import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
+import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
+import { SelectionLimitSnackbar } from "@/components/customer/SelectionLimitSnackbar";
+import { ParticipantSheet } from "@/components/customer/ParticipantSheet";
+import { PhotoPositionBar } from "@/components/customer/PhotoPositionBar";
+import { PhotoFocusOverlay } from "@/components/customer/PhotoFocusOverlay";
 import {
+  fetchRoster,
+  getUsedColors,
+  readParticipant,
+  saveRosterName,
+  writeParticipant,
+  type Participant,
+  type ParticipantRoster,
+} from "@/lib/customer-participant";
+import {
+  COLOR_OPTIONS,
+  getReadableInk,
   parseFilterFromSearchParams,
+  buildFilterQueryString,
   buildGalleryHrefWithFocus,
   getFilteredPhotos,
   getPhotoDisplayName,
@@ -29,14 +45,8 @@ import {
 } from "@/lib/viewer-image-guard";
 import type { StarRating, ColorTag } from "@/types";
 import { MobileViewerPinchPhoto } from "@/components/MobileViewerPinchPhoto";
-
-const COLOR_OPTIONS: { key: ColorTag; color: string }[] = [
-  { key: "red",    color: "#ef4444" },
-  { key: "yellow", color: "#f97316" },
-  { key: "green",  color: "#22c55e" },
-  { key: "blue",   color: "#3b82f6" },
-  { key: "purple", color: "#a855f7" },
-];
+import { triggerSelectionHaptic } from "@/lib/selection-feedback";
+import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
 
 const COMMENT_MAX_LENGTH = 150;
 const PREVIEW_URL_CACHE_MAX = 100;
@@ -46,45 +56,6 @@ const PREVIEW_EXPIRY_SAFETY_SECONDS = 60;
 type PresignedPreviewInfo = {
   url: string;
   expiresAt: number;
-};
-
-const MONO = "'JetBrains Mono', 'Space Mono', monospace";
-
-const SELECT_BASE = {
-  height: 40,
-  padding: "0 18px",
-  display: "flex" as const,
-  alignItems: "center" as const,
-  justifyContent: "center" as const,
-  gap: 7,
-  fontFamily: MONO,
-  fontSize: 12,
-  fontWeight: 700,
-  cursor: "pointer" as const,
-  border: "1px solid",
-  borderRadius: 8,
-  transition: "all 0.15s",
-  letterSpacing: "0.02em",
-  flexShrink: 0,
-};
-
-const SELECT_ACTIVE = {
-  background: "rgba(var(--accent-rgb), 0.12)",
-  color: "var(--accent)",
-  borderColor: "rgba(var(--accent-rgb), 0.45)",
-} as const;
-
-const SELECT_INACTIVE = {
-  background: "var(--accent)",
-  color: "#000",
-  borderColor: "var(--accent)",
-} as const;
-
-const SELECT_BASE_MOBILE = {
-  ...SELECT_BASE,
-  height: 36,
-  padding: "0 14px",
-  fontSize: 12,
 };
 
 function CommentSaveIndicator({ status, onRetry }: { status: CommentSaveStatus; onRetry: () => void }) {
@@ -97,71 +68,9 @@ function CommentSaveIndicator({ status, onRetry }: { status: CommentSaveStatus; 
   if (status === "error") {
     return <span role="alert" style={{ color: "#f87171", fontSize: 11 }}>저장 실패 · <button type="button" onClick={onRetry} style={{ padding: 0, border: 0, background: "none", color: "inherit", fontSize: "inherit", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>다시 시도</button></span>;
   }
-  return <span style={{ color: "rgba(255,255,255,0.38)", fontSize: 11 }}>자동 저장</span>;
-}
-
-function getObjectFitContainOffset(
-  containerW: number, containerH: number,
-  naturalW: number, naturalH: number
-) {
-  if (containerW <= 0 || containerH <= 0 || naturalW <= 0 || naturalH <= 0)
-    return { left: 0, top: 0 };
-  const scale = Math.min(containerW / naturalW, containerH / naturalH);
-  return {
-    left: (containerW - naturalW * scale) / 2,
-    top: (containerH - naturalH * scale) / 2,
-  };
-}
-
-function ViewerPhotoWithBadge({ src, alt, showBadge }: { src: string; alt: string; showBadge: boolean }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const [badgeOffset, setBadgeOffset] = useState({ left: 5, top: 5 });
-
-  const measureBadge = useCallback(() => {
-    const el = containerRef.current;
-    const img = imgRef.current;
-    if (!el) return;
-    const { width: cw, height: ch } = el.getBoundingClientRect();
-    const nw = img?.naturalWidth ?? 0;
-    const nh = img?.naturalHeight ?? 0;
-    if (nw <= 0 || nh <= 0) { setBadgeOffset({ left: 5, top: 5 }); return; }
-    const { left, top } = getObjectFitContainOffset(cw, ch, nw, nh);
-    setBadgeOffset({ left: left + 5, top: top + 5 });
-  }, []);
-
-  useEffect(() => {
-    const frame = requestAnimationFrame(measureBadge);
-    const el = containerRef.current;
-    if (!el || typeof ResizeObserver === "undefined") {
-      return () => cancelAnimationFrame(frame);
-    }
-    const ro = new ResizeObserver(() => measureBadge());
-    ro.observe(el);
-    return () => { cancelAnimationFrame(frame); ro.disconnect(); };
-  }, [measureBadge, src]);
-
-  useEffect(() => {
-    const onResize = () => measureBadge();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [measureBadge]);
-
-  return (
-    <div ref={containerRef} style={{ width: "100%", height: "100%", position: "relative" }}
-      onContextMenu={viewerImageDownloadBlocked ? (e) => e.preventDefault() : undefined}>
-      <img ref={imgRef} src={src} alt={alt} onLoad={measureBadge}
-        {...viewerImageBlockDownloadHandlers}
-        style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center", display: "block", ...viewerImageBlockDownloadStyle }}
-      />
-      {showBadge && (
-        <div className="pointer-events-none absolute z-[3] flex items-center justify-center rounded-full"
-          style={{ left: badgeOffset.left, top: badgeOffset.top, width: 20, height: 20, background: "var(--accent)", border: "2px solid white", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }} aria-hidden>
-          <Check style={{ width: 10, height: 10, color: "white" }} strokeWidth={3} />
-        </div>
-      )}
-    </div>
-  );
+  /* 유휴 상태에서는 아무것도 그리지 않는다 — "자동 저장"은 저장이 일어날 때만 의미가 있는데
+   * 상시 노출하면 아무 일도 없을 때조차 한 줄을 차지했다. */
+  return null;
 }
 
 export default function ViewerPage() {
@@ -174,6 +83,13 @@ export default function ViewerPage() {
 
   // 로컬 state로 현재 사진 관리 — router.push 없이 전환해 컴포넌트 재마운트 방지
   const [activePhotoId, setActivePhotoId] = useState(photoId);
+  const [selectionFeedback, setSelectionFeedback] = useState<{ photoId: string; key: number } | null>(null);
+  const [selectionLimitNoticeKey, setSelectionLimitNoticeKey] = useState<number | null>(null);
+  const selectionFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (selectionFeedbackTimerRef.current) clearTimeout(selectionFeedbackTimerRef.current);
+  }, []);
 
   // 외부에서 URL이 바뀔 때(갤러리→뷰어 첫 진입, 브라우저 앞/뒤) 동기화
   useEffect(() => { setActivePhotoId(photoId); }, [photoId]);
@@ -221,7 +137,7 @@ export default function ViewerPage() {
     : (contextPhotos ?? []).find((p) => p.id === activePhotoId) ?? null;
   const commentSaveStatus = current ? (commentSaveStates[current.id] ?? "idle") : "idle";
 
-  /** 그룹 펼침 상태(힌트 pill/PC 미니 스트립/모바일 바텀시트 공용).
+  /** 그룹 펼침 상태(힌트 pill/PC 미니 스트립/모바일 그룹 필름스트립 공용).
    *  groupId별로 "마지막 펼침 여부"를 기억한다(그룹핑이 켜져 있는 동안 세션 내내 유지) —
    *  최초로 그 그룹에 진입할 때만 "지금 보는 사진이 표지가 아니면 1회 자동으로 편다"를 판단하고,
    *  이후로는(다른 그룹/미소속 사진에 갔다 돌아와도) 사용자의 마지막 의도(수동 조작이든 최초
@@ -278,9 +194,6 @@ export default function ViewerPage() {
 
   const totalVisiblePhotos = filteredPhotos.length;
   const currentPhotoOrdinal = totalVisiblePhotos > 0 ? Math.max(1, navAnchorIndex + 1) : 0;
-  const viewerProgressPercent = totalVisiblePhotos > 0
-    ? Math.round((currentPhotoOrdinal / totalVisiblePhotos) * 100)
-    : 0;
 
   const currentGroupId = current?.similarityGroupId ?? null;
   const currentGroup = currentGroupId ? groupsById.get(currentGroupId) : undefined;
@@ -390,9 +303,18 @@ export default function ViewerPage() {
 
   const [hoverStar,      setHoverStar]      = useState(0);
   const [starPressRing,  setStarPressRing]  = useState<number | null>(null);
-  const [colorPressRing, setColorPressRing] = useState<ColorTag | null>(null);
   const [draftComment,   setDraftComment]   = useState("");
   const [isCommentEditing, setIsCommentEditing] = useState(false);
+  /** 모바일: 사진을 탭하면 별점/색상/필름스트립/코멘트 오버레이를 숨겨 사진에 집중할 수 있게 한다 */
+  /* 사진 탭/클릭 → 전체화면 집중 보기. 화면마다 자기 챙을 숨기는 대신 공통 오버레이 하나를 쓴다. */
+  const [focusOpen, setFocusOpen] = useState(false);
+  /** 이 기기가 어떤 색(=참가자)인지. 첫 "찜" 시점에 시트로 물어본다. */
+  const [participant, setParticipant] = useState<Participant | null>(null);
+  const [participantSheetOpen, setParticipantSheetOpen] = useState(false);
+  /** "mark" = 찜하려다 신원이 없어서 열림(확정 후 그 찜을 이어서 적용), "edit" = 이름/색만 고치러 열림 */
+  const [participantSheetIntent, setParticipantSheetIntent] = useState<"mark" | "edit">("mark");
+  /** 색 → 표시 이름. 서버 공유라 다른 참가자의 마크에도 이름을 붙일 수 있다. */
+  const [roster, setRoster] = useState<ParticipantRoster>({});
   const [showShortcuts,  setShowShortcuts]  = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirming,       setConfirming]       = useState(false);
@@ -400,11 +322,10 @@ export default function ViewerPage() {
 
   const N = project?.requiredCount ?? 0;
   const canConfirm  = N > 0 && Y === N;
-  const progressPct = N > 0 ? Math.min(Math.round((Y / N) * 100), 100) : 0;
   const queryString = searchParams.toString() ? `?${searchParams.toString()}` : "";
 
   const handleConfirm = useCallback(async () => {
-    if (!project?.id || !token) return;
+    if (!project?.id || !token || !canConfirm || confirming) return;
     setConfirming(true);
     setConfirmError(null);
     try {
@@ -426,9 +347,11 @@ export default function ViewerPage() {
       setConfirming(false);
       setConfirmError("네트워크 오류가 발생했습니다");
     }
-  }, [project?.id, token, selectedIds]);
+  }, [project?.id, token, selectedIds, canConfirm, confirming]);
 
   const filmstripRef     = useRef<HTMLDivElement>(null);
+  const mobileFilmstripRef = useRef<HTMLDivElement>(null);
+  const mobileCommentRef = useRef<HTMLTextAreaElement>(null);
   const filmstripSeenRef = useRef(false); // 마운트 후 첫 실행 여부 추적
 
   useEffect(() => {
@@ -445,6 +368,19 @@ export default function ViewerPage() {
     filmstripSeenRef.current = true;
     container.scrollTo({ left: Math.max(0, target), behavior });
   }, [navAnchorIndex]);
+
+  /* 기본 상태는 필름스트립 대신 얇은 위치 인디케이터를 쓰므로, 썸네일 행은
+   * "유사컷 그룹을 펼쳐서 멤버를 골라야 하는" 경우에만 필요하다. */
+  const mobileGroupMembers = groupingActive && expandedGroupId
+    ? (membersByGroup.get(expandedGroupId) ?? [])
+    : [];
+
+  useEffect(() => {
+    const container = mobileFilmstripRef.current;
+    if (!container) return;
+    const active = container.querySelector<HTMLElement>(`[data-mobile-photo-id="${activePhotoId}"]`);
+    active?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [activePhotoId, expandedGroupId, mobileGroupMembers.length]);
 
   useEffect(() => {
     // Do not overwrite text currently being composed, but do reflect the
@@ -470,6 +406,85 @@ export default function ViewerPage() {
     toggleColor(current.id, c);
   }, [current, toggleColor]);
 
+  /* 기기에 저장된 참가자(색) 복원 — 없으면 첫 찜 때 시트를 띄운다. */
+  useEffect(() => {
+    if (!token) return;
+    setParticipant(readParticipant(token));
+  }, [token]);
+
+  /* 공유 명단(색 → 이름)은 다른 기기가 바꿀 수 있으므로 사진이 바뀔 때마다 최신값을 읽는다. */
+  useEffect(() => {
+    if (!token || !project?.id) return;
+    let alive = true;
+    void fetchRoster(token, project.id).then((next) => {
+      if (alive) setRoster(next);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [token, project?.id, activePhotoId]);
+
+  /** 프로젝트에서 이미 쓰인 색 = 참여 중인 사람들(별도 명단 저장 없이 태그에서 역산) */
+  const usedColors = useMemo(() => getUsedColors(photoStates), [photoStates]);
+  const myColor = participant?.color ?? null;
+  const isMarkedByMe = myColor != null && (color?.includes(myColor) ?? false);
+  /** #rrggbb → rgba(r,g,b,alpha). 찜 켜짐 틴트를 CSS color-mix 없이 만들기 위함(구형 사파리 대응). */
+  const myColorHex = myColor ? COLOR_OPTIONS.find((o) => o.key === myColor)?.hex ?? null : null;
+  const myColorVars = useMemo<CSSProperties | undefined>(() => {
+    if (!myColorHex) return undefined;
+    const r = parseInt(myColorHex.slice(1, 3), 16);
+    const g = parseInt(myColorHex.slice(3, 5), 16);
+    const b = parseInt(myColorHex.slice(5, 7), 16);
+    return {
+      "--fv-my-color": myColorHex,
+      "--fv-my-ink": getReadableInk(myColorHex),
+      "--fv-my-tint": `rgba(${r}, ${g}, ${b}, 0.18)`,
+      /* 바 안에서는 테두리 없이 "채움"만으로 켜짐을 알려야 해서 더 진한 틴트가 필요하다 */
+      "--fv-my-tint-strong": `rgba(${r}, ${g}, ${b}, 0.34)`,
+      "--fv-my-line": `rgba(${r}, ${g}, ${b}, 0.55)`,
+    } as CSSProperties;
+  }, [myColorHex]);
+
+  const otherMarks = useMemo(
+    () => (color ?? []).filter((c) => c !== myColor),
+    [color, myColor],
+  );
+  /** 다른 참가자 마크를 사진 위에 얹기 위한 표시용 데이터.
+   * 이름 없는 원은 "찜은 있는데 누군지 모른다"를 그대로 드러내 정체불명으로 읽혔다 —
+   * 이름을 등록해줄 수 있는 건 그 기기의 참가자 본인뿐이라 여기서는 "미등록"임을 `?`로 명시한다. */
+  const otherMarkChips = useMemo(
+    () =>
+      otherMarks.map((mark) => {
+        const name = roster[mark] || "";
+        const hex = COLOR_OPTIONS.find((o) => o.key === mark)?.hex ?? "#888";
+        return {
+          key: mark,
+          hex,
+          ink: getReadableInk(hex),
+          text: name ? name.slice(0, 2) : "?",
+          named: name.length > 0,
+          label: name ? `${name} 찜` : "이름을 등록하지 않은 참가자가 찜함",
+        };
+      }),
+    [otherMarks, roster],
+  );
+
+  /** 찜 토글 — 아직 내 색을 안 정했으면 먼저 "누구세요?" 시트를 연다. */
+  const toggleMyMark = useCallback(() => {
+    if (!myColor) {
+      setParticipantSheetIntent("mark");
+      setParticipantSheetOpen(true);
+      return;
+    }
+    setColor(myColor);
+  }, [myColor, setColor]);
+
+  /** 내 표시(이름·색) 고치기 — 찜 상태는 건드리지 않는다. */
+  const editMyIdentity = useCallback(() => {
+    setParticipantSheetIntent("edit");
+    setParticipantSheetOpen(true);
+  }, []);
+
   const saveComment = useCallback(() => {
     if (!current) return;
     const trimmed = draftComment.trim();
@@ -484,7 +499,22 @@ export default function ViewerPage() {
     return () => window.clearTimeout(timer);
   }, [current?.id, draftComment, isCommentEditing, photoStates, saveComment]);
 
-  const toggleSelect = useCallback(() => { if (current) toggle(current.id); }, [current, toggle]);
+  const toggleSelect = useCallback((): SelectionToggleResult => {
+    if (!current) return "unavailable";
+    const result = toggle(current.id);
+    if (result === "limit-reached") {
+      triggerSelectionHaptic("limit");
+      setSelectionLimitNoticeKey((value) => (value ?? 0) + 1);
+    }
+    return result;
+  }, [current, toggle]);
+
+  const showSelectedPhotos = useCallback(() => {
+    setSelectionLimitNoticeKey(null);
+    const selectedFilter = { ...filterState, selectedFilter: "selected" as const };
+    const query = buildFilterQueryString(selectedFilter);
+    router.push(`/c/${token}/gallery${query}`);
+  }, [filterState, router, token]);
 
   // ── Navigation ───────────────────────────────────────────────────────────
 
@@ -523,51 +553,123 @@ export default function ViewerPage() {
     navigateTo(filteredPhotos[(anchor + 1) % filteredPhotos.length].id);
   }, [groupingActive, goNext, navAnchorIndex, filteredPhotos, navigateTo]);
 
+  /* 뷰어는 스크롤할 것이 없는 전체화면이다. 그런데 코멘트 입력으로 키보드가 뜨면 브라우저가 문서를
+   * 위로 스크롤하고, 키보드가 닫힌 뒤에도 그 스크롤이 남아 하단에 검은 띠가 보였다.
+   * 문서 스크롤을 아예 잠가 두고(고무줄 스크롤 포함), 시트가 닫힐 때 원위치로 되돌린다. */
+  useEffect(() => {
+    const { body, documentElement: html } = document;
+    const prev = {
+      bodyOverflow: body.style.overflow,
+      htmlOverflow: html.style.overflow,
+      overscroll: body.style.overscrollBehavior,
+    };
+    body.style.overflow = "hidden";
+    html.style.overflow = "hidden";
+    body.style.overscrollBehavior = "none";
+    return () => {
+      body.style.overflow = prev.bodyOverflow;
+      html.style.overflow = prev.htmlOverflow;
+      body.style.overscrollBehavior = prev.overscroll;
+    };
+  }, []);
+
+  /* 키보드가 닫히는 시점(시트 종료)에 남아 있는 스크롤을 걷어낸다. */
+  useEffect(() => {
+    if (isCommentEditing) return;
+    const reset = () => window.scrollTo(0, 0);
+    reset();
+    /* iOS는 키보드 접힘 애니메이션이 끝난 뒤에 한 번 더 밀어 올리는 경우가 있어 뒤늦게 한 번 더 맞춘다 */
+    const timer = setTimeout(reset, 300);
+    return () => clearTimeout(timer);
+  }, [isCommentEditing]);
+
+  /** 코멘트 시트 열기 — 하단 아이콘 버튼과 "위로 스와이프" 제스처가 함께 쓴다. */
+  const openCommentEditor = useCallback(() => {
+    setIsCommentEditing(true);
+    requestAnimationFrame(() => mobileCommentRef.current?.focus());
+  }, []);
+
+  /** 얇은 위치 인디케이터를 탭/드래그해 임의 위치로 점프 — 필름스트립이 하던 "점프" 역할을 대신한다. */
+  const seekToRatio = useCallback((ratio: number) => {
+    if (!filteredPhotos.length) return;
+    const clamped = Math.min(1, Math.max(0, ratio));
+    const index = Math.round(clamped * (filteredPhotos.length - 1));
+    const photo = filteredPhotos[index];
+    if (photo && photo.id !== activePhotoId) navigateTo(photo.id);
+  }, [filteredPhotos, activePhotoId, navigateTo]);
+
   // ── Touch swipe ───────────────────────────────────────────────────────────
 
   const touchStartXRef      = useRef(0);
+  const touchStartYRef      = useRef(0);
   const mobileImageZoomedRef = useRef(false);
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 1) touchStartXRef.current = e.touches[0].clientX;
+    if (e.touches.length === 1) {
+      touchStartXRef.current = e.touches[0].clientX;
+      touchStartYRef.current = e.touches[0].clientY;
+    }
   };
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (mobileImageZoomedRef.current) return;
-    const diff = touchStartXRef.current - e.changedTouches[0].clientX;
-    if (Math.abs(diff) > 50) { diff > 0 ? goNextWrap() : goPrevWrap(); }
+    const dx = touchStartXRef.current - e.changedTouches[0].clientX;
+    const dy = touchStartYRef.current - e.changedTouches[0].clientY;
+    /* 대각선 스와이프는 어느 쪽도 아닌 걸로 취급 — 한쪽이 뚜렷하게(1.5배 이상) 커야 그 방향으로 확정한다 */
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx > 0) goNextWrap();
+      else goPrevWrap();
+      return;
+    }
+    /* 위로 스와이프 — 코멘트를 남기는 손짓(끌어올려 시트를 연다)과 방향이 맞다.
+     * 아래로 당기기(갤러리 복귀)는 브라우저 스크롤·키보드 닫기와 헷갈려 제거했다 — 복귀는 좌상단 뒤로가기로. */
+    if (dy > 70 && Math.abs(dy) > Math.abs(dx) * 1.5) {
+      openCommentEditor();
+    }
   };
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (focusOpen) return;
     const tag = (e.target as HTMLElement).tagName;
     if (tag === "TEXTAREA" || tag === "INPUT") return;
     if (showConfirmModal) {
       if (e.key === "Escape" && !confirming) setShowConfirmModal(false);
       return;
     }
-    if (e.key === "?" || (e.shiftKey && e.key === "/")) { setShowShortcuts(s => !s); return; }
+    if (showShortcuts) {
+      if (e.key === "Escape" || e.key === "?" || (e.shiftKey && e.key === "/")) {
+        e.preventDefault();
+        setShowShortcuts(false);
+      }
+      return;
+    }
+    if (e.key === "?" || (e.shiftKey && e.key === "/")) { e.preventDefault(); setShowShortcuts(true); return; }
     if (e.key === "Escape") {
       router.push(buildGalleryHrefWithFocus(token, searchParams, activePhotoId));
       return;
     }
+    /* Cmd/Ctrl+1~9(브라우저 탭 전환), Cmd/Ctrl+F(페이지 찾기), 윈도우 Alt+←/→(뒤로/앞으로
+     * 가기)와 겹치지 않게 막는다 — 숫자키는 별점, F는 찜, 방향키는 사진 이동이라 조합키까지
+     * 그대로 반응하면 브라우저 기능이 씹히고 엉뚱한 곳에서 별점·찜이 바뀐다. */
+    if (hasShortcutModifier(e)) return;
     switch (e.code) {
       case "Digit1": setStar(1); setStarPressRing(1); setTimeout(() => setStarPressRing(null), 200); break;
       case "Digit2": setStar(2); setStarPressRing(2); setTimeout(() => setStarPressRing(null), 200); break;
       case "Digit3": setStar(3); setStarPressRing(3); setTimeout(() => setStarPressRing(null), 200); break;
       case "Digit4": setStar(4); setStarPressRing(4); setTimeout(() => setStarPressRing(null), 200); break;
       case "Digit5": setStar(5); setStarPressRing(5); setTimeout(() => setStarPressRing(null), 200); break;
-      case "KeyQ": setColor("red");    setColorPressRing("red");    setTimeout(() => setColorPressRing(null), 200); break;
-      case "KeyW": setColor("yellow"); setColorPressRing("yellow"); setTimeout(() => setColorPressRing(null), 200); break;
-      case "KeyE": setColor("green");  setColorPressRing("green");  setTimeout(() => setColorPressRing(null), 200); break;
-      case "KeyR": setColor("blue");   setColorPressRing("blue");   setTimeout(() => setColorPressRing(null), 200); break;
-      case "KeyT": setColor("purple"); setColorPressRing("purple"); setTimeout(() => setColorPressRing(null), 200); break;
+      /* 색은 참가자 식별자이므로 남의 색을 찍을 수 있는 색별 단축키 대신 "내 찜" 하나만 둔다 */
+      case "KeyF": toggleMyMark(); break;
+      /* 선택은 keyup에서 한 번만 바꾸되, keydown의 기본 스크롤은 여기서 먼저 막는다. */
+      case "Space": e.preventDefault(); break;
       case "ArrowLeft":  e.preventDefault(); goPrevWrap(); break;
       case "ArrowRight": e.preventDefault(); goNextWrap(); break;
     }
-  }, [setStar, setColor, goPrevWrap, goNextWrap, showConfirmModal, confirming, router, token, searchParams, activePhotoId]);
+  }, [focusOpen, setStar, toggleMyMark, goPrevWrap, goNextWrap, showConfirmModal, showShortcuts, confirming, router, token, searchParams, activePhotoId]);
 
   useEffect(() => {
     const handleKeyUp = (e: KeyboardEvent) => {
+      if (focusOpen) return;
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "TEXTAREA" || tag === "INPUT") return;
       if (showConfirmModal) return;
@@ -582,7 +684,7 @@ export default function ViewerPage() {
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
       window.removeEventListener("keyup", handleKeyUp, { capture: true });
     };
-  }, [handleKeyDown, toggleSelect, showConfirmModal]);
+  }, [focusOpen, handleKeyDown, toggleSelect, showConfirmModal]);
 
   useEffect(() => {
     if (!project) return;
@@ -619,9 +721,18 @@ export default function ViewerPage() {
   // 사용) — 필름스트립/화살표로 다른 사진을 보다가 닫으면 activePhotoId를 써야 실제로 보던 사진으로 돌아간다.
   const galleryHref        = buildGalleryHrefWithFocus(token, searchParams, activePhotoId);
 
+  // 고객 상세뷰어의 완료 동작은 고정된 하단에서 제공해 선택 시 사진 높이가 변하지 않는다.
+  const selectionCompletion = (
+    <div className="fs-completion" aria-label="셀렉 진행">
+      <span aria-live="polite">{Y} / {N}장 선택{canConfirm ? " 완료" : Y > N ? ` · ${Y - N}장 줄여주세요` : ` · ${Math.max(0, N - Y)}장 남음`}</span>
+      <button type="button" disabled={!canConfirm || confirming} onClick={() => { setConfirmError(null); setShowConfirmModal(true); }}>셀렉 확정하기</button>
+    </div>
+  );
+
   return (
     <div
-      style={{ background: "#000", height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column", position: "relative" }}
+      className="fs-page-root"
+      style={{ background: "#0f1113", height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column", position: "relative" }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -634,10 +745,13 @@ export default function ViewerPage() {
           background-size: 40px 40px;
         }
         .fs-hud {
-          background: rgba(10, 11, 13, 0.75);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(255,255,255,0.1);
+          background: transparent;
+          border: 0;
+        }
+        .fs-page-root {
+          --viewer-surface: #191c1f;
+          --viewer-surface-raised: #24282c;
+          --viewer-stage: #0f1113;
         }
         .fs-nav-btn {
           background: rgba(0,0,0,0.4);
@@ -651,141 +765,434 @@ export default function ViewerPage() {
         .fs-nav-btn:hover { background: var(--accent); color: black; border-color: var(--accent); }
         .fs-nav-btn:disabled { opacity: 0.2; cursor: not-allowed; }
         .fs-nav-btn:disabled:hover { background: rgba(0,0,0,0.4); color: var(--foreground); border-color: var(--border-subtle); }
+        /* 위치 표시(PhotoPositionBar)를 필름스트립 윗변에 놓는다 */
+        .fs-strip-gallery { position: relative; flex: 1; min-width: 0; padding: 0 24px; }
+        .fs-completion { box-sizing: border-box; flex: 0 0 320px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; text-align: center; }
+        .fs-completion span { color: rgba(255,255,255,.72); font: 600 13px/1.3 Pretendard, sans-serif; }
+        .fs-completion button { width: 100%; height: 42px; border: 0; border-radius: 9px; background: var(--accent); color: white; font: 700 13px/1 Pretendard, sans-serif; cursor: pointer; }
+        .fs-completion button:disabled { background: rgba(255,255,255,.08); color: rgba(255,255,255,.38); cursor: not-allowed; }
+        .fs-completion button:focus-visible { outline: 2px solid white; outline-offset: 2px; }
+        @media (max-width: 1200px) { .fs-completion { flex-basis: 288px; } }
+        @media (max-width: 767px) {
+          .fv-bottom-overlay .fs-completion { flex-direction: row; align-items: center; justify-content: space-between; padding: 4px 20px 8px; height: 56px; gap: 12px; }
+          .fv-bottom-overlay .fs-completion span { font-size: 12px; }
+          .fv-bottom-overlay .fs-completion button { width: 132px; flex-shrink: 0; }
+        }
+        .fs-position { position: absolute; top: 0; left: 24px; right: 24px; height: 18px; }
+
+        /* ── PC 2단 구성: 사진(가변) + 우측 컨트롤 패널(고정) ──
+         * 세로 화면과 달리 PC에서 사진은 "세로"에 갇혀 있고 좌우가 비어 있었다.
+         * 컨트롤을 아래가 아니라 옆으로 보내면 그만큼 사진 높이가 늘어난다. */
+        .fs-stage-row { flex: 1; min-height: 0; display: flex; }
+        .fs-side {
+          flex: 0 0 320px; width: 320px; min-width: 0;
+          display: flex; flex-direction: column;
+          background: var(--viewer-surface);
+          overflow-y: auto;
+        }
+        /* 폭이 넉넉하지 않으면 패널이 사진을 너무 잡아먹으므로 조금 줄인다 */
+        @media (max-width: 1200px) { .fs-side { flex-basis: 288px; width: 288px; } }
+        .fs-side .fs-mini-strip { flex-wrap: wrap; }
+        .fs-side .fs-mini-thumb { width: 80px; height: 54px; }
+        /* 실제 단축키는 있었지만 여는 버튼이 없어 발견할 수 없었다. 작업 패널의 마지막 정보로
+         * 짧은 요약을 상시 두고, 상세 목록은 눌렀을 때만 보여 사진 작업보다 앞서지 않게 한다. */
+        .fs-shortcuts {
+          margin-top: auto; padding: 12px 20px 14px;
+          border: 0; border-top: 1px solid rgba(255,255,255,.08);
+          background: transparent; color: rgba(255,255,255,.42);
+          font: 500 11px/17px Pretendard, 'Noto Sans KR', sans-serif;
+          letter-spacing: -.15px; text-align: left; cursor: pointer;
+          transition: color 140ms ease, background-color 140ms ease;
+        }
+        .fs-shortcuts:hover { color: rgba(255,255,255,.72); background: rgba(255,255,255,.025); }
+        .fs-shortcuts:focus-visible { outline: 2px solid #fff; outline-offset: -4px; }
+        .fs-shortcuts b { color: rgba(255,255,255,.72); font-weight: 700; }
+        .fs-shortcuts-line { display: block; }
+        .fs-help {
+          position: fixed; inset: 0; z-index: 210;
+          display: grid; place-items: center; padding: 20px;
+          background: rgba(0,0,0,.72); backdrop-filter: blur(4px);
+        }
+        .fs-help-card {
+          width: 100%; max-width: 360px; box-sizing: border-box;
+          padding: 24px; border-radius: 14px;
+          background: #16181b; border: 1px solid var(--border); color: #fff;
+        }
+        .fs-help-card h3 { margin: 0 0 16px; font: 800 16px/1 Pretendard, sans-serif; }
+        .fs-help-card dl { margin: 0 0 20px; display: flex; flex-direction: column; gap: 10px; }
+        .fs-help-card dl > div { display: flex; align-items: center; gap: 12px; }
+        .fs-help-card dt { flex: 0 0 88px; display: flex; gap: 4px; margin: 0; }
+        .fs-help-card dd { margin: 0; font: 400 13px/1.4 Pretendard, sans-serif; color: var(--muted-foreground); }
+        .fs-help-card kbd {
+          min-width: 26px; box-sizing: border-box; padding: 4px 6px; text-align: center;
+          border: 1px solid rgba(255,255,255,.24); border-radius: 6px;
+          background: rgba(255,255,255,.08);
+          font: 700 11px/1 Pretendard, sans-serif; color: #fff;
+        }
+        .fs-help-card > button {
+          width: 100%; height: 40px; border: 1px solid rgba(255,255,255,.28); border-radius: 10px;
+          background: transparent; color: #fff; cursor: pointer; font: 700 13px/1 Pretendard, sans-serif;
+        }
+        .fs-help-card > button:hover { background: rgba(255,255,255,.1); }
+
         .fs-thumb {
-          height: 100px; width: 150px; flex-shrink: 0;
-          border: 1px solid var(--border-subtle);
-          filter: grayscale(1); opacity: 0.5;
+          height: 88px; width: 132px; flex-shrink: 0;
+          border: 2px solid transparent; border-radius: 4px;
+          filter: grayscale(1); opacity: 0.45;
           transition: all 0.3s ease; cursor: pointer; position: relative; overflow: hidden;
         }
+        /* 현재 위치는 흰 테두리 — 주황은 "선택됨"(체크 배지) 전용이라 같은 색을 쓰면 둘이 구분되지 않는다 */
         .fs-thumb.active {
           filter: grayscale(0); opacity: 1;
-          border-color: var(--accent); transform: scale(1.05); z-index: 5;
+          border-color: #fff; transform: scale(1.05); z-index: 5;
         }
         .fs-thumb:not(.active):hover { opacity: 0.75; filter: grayscale(0.4); }
         .fs-hide-scrollbar::-webkit-scrollbar { display: none; }
         .fs-hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .fs-comment-input {
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.1);
-          outline: none; font-size: 13px; color: var(--foreground);
-          font-family: 'Inter', -apple-system, sans-serif;
+          background: #181818;
+          border: 1px solid #a8abae;
+          outline: none; font-size: 13px; line-height: 1.55; color: #fff;
+          font-family: Pretendard, 'Noto Sans KR', sans-serif;
+          resize: none;
         }
-        .fs-comment-input::placeholder { color: var(--placeholder-foreground); }
+        .fs-comment-input::placeholder { color: #d6d6d6; }
         .fs-comment-input:focus { border-color: rgba(var(--accent-rgb), 0.4); }
-        .fs-star { cursor: pointer; transition: transform 0.1s; }
+        .fs-comment-input-wrap { position: relative; display: flex; align-items: center; min-width: 0; }
+        .fs-comment-input-icon { position: absolute; left: 14px; color: #d6d6d6; pointer-events: none; }
+        .fs-star { display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; background: transparent; cursor: pointer; transition: transform 0.1s; }
         .fs-star:hover { transform: scale(1.2); }
-        @keyframes fs-selection-pop {
-          0% { opacity: 0; transform: scale(0.86); }
-          70% { transform: scale(1.06); }
+        .fs-panel-label {
+          display: block; margin: 2px 0 0;
+          color: rgba(255,255,255,.56);
+          font: 600 12px/1 Pretendard, 'Noto Sans KR', sans-serif;
+          letter-spacing: -.2px;
+        }
+        @keyframes fv-check-pop {
+          0% { opacity: 0; transform: scale(.6); }
+          70% { opacity: 1; transform: scale(1.08); }
           100% { opacity: 1; transform: scale(1); }
         }
+        @keyframes fv-check-glyph {
+          0% { opacity: 0; transform: scale(.72); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes fv-image-selection-flash {
+          0% { opacity: .7; box-shadow: inset 0 0 0 2px #ff4d00; }
+          100% { opacity: 0; box-shadow: inset 0 0 0 2px #ff4d00; }
+        }
         /* ── 유사컷 그룹 힌트/펼침 (PC) ── */
+        /* 주황은 "선택"(작가에게 전달되는 결과물) 전용 — 유사컷은 탐색 보조라 중립색을 쓴다.
+         * 같은 주황을 쓰면 그룹 밴드가 화면에서 가장 강한 요소가 되어 선택 상태와 경쟁했다. */
         .fs-group-hint {
           display: flex; align-items: center; gap: 6px;
-          height: 32px; padding: 0 12px; flex-shrink: 0;
-          background: rgba(0,0,0,0.4); border: 1px solid #FF4D00; color: #FF4D00;
-          font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 11px; font-weight: 700;
+          height: 32px; padding: 0 12px; flex-shrink: 0; border-radius: 999px;
+          background: rgba(0,0,0,0.4); border: 1px solid var(--border); color: #fff;
+          font-family: Pretendard, 'Noto Sans KR', sans-serif; font-size: 12px; font-weight: 600;
           cursor: pointer; transition: all 0.15s ease;
         }
-        .fs-group-hint:hover { background: #FF4D00; color: #000; }
+        .fs-group-hint:hover { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.5); }
         .fs-mini-strip-wrap {
-          flex-shrink: 0; background: rgba(255,77,0,0.06);
-          border-top: 1px solid rgba(255,77,0,0.25); border-bottom: 1px solid rgba(255,77,0,0.25);
-          padding: 10px 28px;
+          flex-shrink: 0; background: rgba(255,255,255,0.045);
+          padding: 14px 20px;
         }
         .fs-mini-strip-label {
-          font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 10px;
-          color: #FF4D00; letter-spacing: 0.06em; margin-bottom: 8px;
+          font-family: Pretendard, 'Noto Sans KR', sans-serif; font-size: 11px; font-weight: 600;
+          color: var(--muted-foreground); margin-bottom: 8px;
         }
         .fs-mini-strip { display: flex; gap: 10px; overflow-x: auto; }
         .fs-mini-thumb {
           height: 64px; width: 96px; flex-shrink: 0; position: relative;
-          border: 1px solid var(--border-subtle); cursor: pointer; overflow: hidden;
-          filter: grayscale(1); opacity: 0.6; transition: all 0.2s ease;
+          border: 2px solid transparent; border-radius: 4px; cursor: pointer; overflow: hidden;
+          filter: grayscale(1); opacity: 0.55; transition: all 0.2s ease;
         }
         .fs-mini-thumb:hover { opacity: 0.85; filter: grayscale(0.3); }
-        .fs-mini-thumb.active { filter: grayscale(0); opacity: 1; border-color: var(--accent); }
+        .fs-mini-thumb.active { filter: grayscale(0); opacity: 1; border-color: #fff; }
         .fs-mini-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        /* 메인 필름스트립: 펼쳐진 그룹의 표지(front) 사진에 오렌지 링(.active의 border/transform과 레이어 분리) */
-        .fs-thumb.group-expanded { box-shadow: 0 0 0 2px #FF4D00; }
+        /* 메인 필름스트립: 펼쳐진 그룹의 표지(front) 사진 표시(.active의 border/transform과 레이어 분리).
+         * 탐색 보조이므로 주황이 아니라 옅은 흰 링을 쓴다. */
+        .fs-thumb.group-expanded { box-shadow: 0 0 0 2px rgba(255,255,255,.45); }
+
+        /* ── Figma #56109 모바일 상세 ── */
+        .fv-mobile {
+          /* 높이는 inset으로만 정한다 — 100dvh를 함께 주면 over-constrained가 되어
+           * URL 바·키보드 전환마다 높이가 흔들린다.
+           * 주의: 이 규칙의 position이 클래스로 붙은 Tailwind fixed를 덮으므로(같은 명시도, 늦은 순서)
+           * 여기서 직접 fixed/inset을 선언해야 한다. relative로 두면 높이가 0이 된다. */
+          position: fixed; inset: 0;
+          background: #000; color: #fff;
+          font-family: Pretendard, 'Noto Sans KR', sans-serif;
+          overflow: hidden;
+          /* 챙 높이는 여기서만 정의하고 아래 각 행과 사진 stage offset이 모두 이 값을 참조한다
+           * (행 높이를 바꿔도 사진 정렬이 따로 놀지 않도록 단일 출처로 유지). */
+          --fv-appbar-h: 56px;
+          /* 컨트롤 행은 위치 트랙(20px) + 알약 행(56px)을 한 덩어리로 품는다 */
+          --fv-controls-h: 76px;
+          /* 추가 행은 유사컷 그룹을 펼쳤을 때만 — 그때는 위치 트랙 대신 멤버 썸네일이 위치를 알려준다 */
+          --fv-strip-h: 0px;
+          --fv-top-chrome: calc(env(safe-area-inset-top) + var(--fv-appbar-h) + 12px);
+          --fv-bottom-chrome: calc(56px + 20px + var(--fv-controls-h) + var(--fv-strip-h) + 14px + env(safe-area-inset-bottom));
+        }
+        .fv-mobile.fv-group-expanded { --fv-controls-h: 56px; --fv-strip-h: 68px; }
+
+        /* 사진에 집중할 수 있도록 컨트롤은 별도 검은 띠가 아니라 사진 위 그라디언트 오버레이로 띄운다.
+         * 사진을 탭하면 오버레이가 페이드아웃되는 "챙 숨기기" 모드(onSingleTap)와 짝을 이룬다. */
+        .fv-top-overlay {
+          position: absolute; top: 0; left: 0; right: 0; z-index: 30;
+          background: linear-gradient(to bottom, rgba(0,0,0,.78) 0%, rgba(0,0,0,.48) 62%, transparent 100%);
+          padding-bottom: 12px;
+          transition: opacity 200ms ease, transform 200ms ease;
+        }
+        .fv-bottom-overlay {
+          position: absolute; bottom: 0; left: 0; right: 0; z-index: 30;
+          /* 사진은 챙 사이 영역(.fv-image-stage)에 놓이므로 스크림이 사진을 덮지 않는다.
+           * 흐린 배경 위에서 컨트롤이 읽힐 정도만 유지하고, 대비는 요소별 그림자로 보강한다. */
+          background: linear-gradient(to top, rgba(0,0,0,.82) 0%, rgba(0,0,0,.5) 55%, transparent 100%);
+          padding-top: 20px;
+          /* 바가 화면 끝에 딱 붙으면 답답하다 — safe area 위에 실제 여백을 얹는다 */
+          padding-bottom: calc(14px + env(safe-area-inset-bottom));
+          transition: opacity 200ms ease, transform 200ms ease;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .fv-top-overlay, .fv-bottom-overlay { transition: opacity 200ms ease; }
+        }
+
+        .fv-appbar { padding-top: env(safe-area-inset-top); }
+        .fv-appbar-row { height: var(--fv-appbar-h); padding: 0 16px 0 20px; display: flex; align-items: center; gap: 10px; }
+        .fv-back { width: 24px; height: 44px; flex: 0 0 24px; margin-left: -4px; padding: 0; border: 0; background: transparent; color: #fff; display: grid; place-items: center; }
+        /* 파일명 대신 "몇 장 골랐는지"를 가장 높은 위계로 — 셀렉의 실제 목표를 상시 노출한다. */
+        .fv-title { min-width: 0; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+        .fv-selection-count { min-width: 0; font: 600 17px/22px Pretendard, sans-serif; letter-spacing: -.2px; white-space: nowrap; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+        /* 보조 줄 — 사진 위에 얹히므로 그림자로 대비를 준다. 길면 잘라낸다(전체는 title 속성으로 남는다). */
+        .fv-filename { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px/13px 'Space Mono', Pretendard, sans-serif; color: rgba(255,255,255,.62); text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+        .fv-selection-count strong { color: #ff4d00; font-weight: 700; }
+        /* 신원 칩 — 이름·색은 사진마다 바뀌는 값이 아니라 "이 세션에서 나는 누구"라 앱바에 둔다.
+         * 파일명·진행 바를 걷어낸 자리라 새 공간을 쓰지 않는다. */
+        .fv-identity {
+          flex: 0 0 auto; height: 32px; padding: 0 11px 0 8px;
+          display: flex; align-items: center; gap: 6px;
+          border: 1px solid rgba(255,255,255,.28); border-radius: 999px;
+          background: rgba(0,0,0,.42); color: #fff;
+          font: 600 13px/1 Pretendard, sans-serif; letter-spacing: -.2px;
+        }
+        .fv-identity-dot { width: 14px; height: 14px; flex: 0 0 14px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+        /* 이름 미등록 — 사진 위 마크와 같은 점선 언어로 "색으로만 보이는 중"임을 알린다 */
+        .fv-identity-unnamed { border-style: dashed; color: rgba(255,255,255,.72); }
+        .fv-identity-unnamed .fv-identity-dot { opacity: .75; }
+        .fv-identity:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+        /* C6. 체크박스만 :focus-visible 규칙이 없어 브라우저 기본 파란 링이 그대로 나왔다. */
+        .fv-back:focus-visible, .fv-star:focus-visible, .fv-thumb:focus-visible, .fv-photo-checkbox:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 10px; }
+        .fv-photo-checkbox:focus:not(:focus-visible) { outline: none; }
+        /* 위치 트랙(윗변) + 알약 행을 한 덩어리로 품는다 */
+        .fv-controls {
+          height: var(--fv-controls-h); box-sizing: border-box;
+          padding: 20px 14px 0; display: flex; align-items: center;
+          justify-content: space-between; gap: 8px; position: relative;
+        }
+        .fv-mobile.fv-group-expanded .fv-controls { padding-top: 0; }
+
+        /* ── 하단 컨트롤 바 ──
+         * 별점·유사컷·코멘트·찜을 각각 알약으로 감쌌더니 둥근 1px 테두리가 4겹으로 반복되고
+         * 찜 안쪽 dot까지 더해져 동심원이 됐다. 껍데기는 이 바 하나만 갖고 내부는 무테로 둔다. */
+        .fv-bar {
+          flex: 1; min-width: 0; height: 52px; box-sizing: border-box;
+          display: flex; align-items: center; justify-content: space-between; gap: 8px;
+          padding: 0 4px 0 10px;
+          border: 1px solid rgba(255,255,255,.22); border-radius: 999px;
+          background: rgba(0,0,0,.5);
+          box-shadow: 0 2px 10px rgba(0,0,0,.4);
+        }
+        .fv-bar-right { display: flex; align-items: center; gap: 2px; min-width: 0; }
+
+        /* 바 안의 항목 — 크기·정렬만 공유하고 테두리/배경은 갖지 않는다 */
+        .fv-pill {
+          height: 44px; box-sizing: border-box; flex: 0 0 auto;
+          display: flex; align-items: center; justify-content: center;
+          border: 0; border-radius: 999px;
+          background: transparent; color: #fff;
+          font: 600 13px/18px Pretendard, sans-serif;
+        }
+
+        .fv-stars { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
+        .fv-star { width: 28px; height: 42px; padding: 0; border: 0; background: transparent; color: #737373; font-size: 22px; line-height: 22px; display: grid; place-items: center; text-shadow: 0 1px 3px rgba(0,0,0,.85); }
+
+        /* 찜은 신원 구획을 떼어내 순수 토글이 됐다 — 두 구획으로 나눴더니 "이름 vs 찜함" 택1로 읽혔다.
+         * 이름·색을 고치는 곳은 앱바의 신원 칩(.fv-identity)이다. */
+        .fv-mark-toggle { padding: 0 16px; }
+        /* 켜진 찜은 주황이 아니라 "내 색" — 주황과 겹치면 선택과 구분이 안 되고, 색이 곧 사람이라 의미도 맞다 */
+        /* 켜짐은 테두리가 아니라 내 색으로 "채운" 면 — 바 안에서 테두리를 또 그리면 동심원이 된다.
+         * 채움이 충분히 진해야 상태가 읽히므로 별도의 strong 틴트를 쓴다. */
+        .fv-mark-toggle-on {
+          background: var(--fv-my-tint-strong, rgba(255,77,0,.34));
+          color: #fff;
+        }
+        .fv-image { position: absolute; inset: 0; overflow: hidden; background: #000; }
+        .fv-image-stage {
+          position: absolute; left: 0; right: 0;
+          top: var(--fv-top-chrome); bottom: var(--fv-bottom-chrome);
+          transition: top 220ms ease, bottom 220ms ease;
+        }
+        .fv-detail-arrows button { background: rgba(0,0,0,.18) !important; border-color: rgba(255,255,255,.12) !important; }
+        @media (prefers-reduced-motion: reduce) {
+          .fv-image-stage { transition: none; }
+        }
+        /* 유사컷 pill(좌) + 코멘트 버튼(우)을 한 줄에 모은 메타 행 */
+        /* 다른 항목이 44px인데 혼자 23px이라 통일했다던 시각 언어가 깨져 있었다 */
+        .fv-group-pill { height: 44px; min-width: 44px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; color: rgba(255,255,255,.8); display: flex; align-items: center; justify-content: center; gap: 5px; font: 600 12px/1 Pretendard, sans-serif; }
+        .fv-group-pill-active { color: #fff; background: rgba(255,255,255,.14); }
+        .fv-filmstrip { height: var(--fv-strip-h); box-sizing: border-box; display: flex; align-items: center; overflow-x: auto; gap: 6px; padding: 10px 20px; scroll-padding-inline: 20px; scroll-snap-type: x proximity; }
+        /* 위치 인디케이터(PhotoPositionBar)를 컨트롤 행의 "윗변"에 놓는다 — 시각적 선은 3px이지만
+         * 위쪽 20px 전체가 탭/드래그 영역이라 알약과 타깃이 겹치지 않는다. */
+        .fv-position {
+          position: absolute; top: 0; left: 14px; right: 14px; height: 20px;
+          box-sizing: border-box;
+        }
+        .fv-thumb { width: 42px; height: 42px; box-sizing: border-box; flex: 0 0 42px; padding: 0; border: 1px solid #4f545a; background: #636971; opacity: .68; overflow: hidden; position: relative; scroll-snap-align: center; transition: width 150ms ease, height 150ms ease, flex-basis 150ms ease, opacity 150ms ease; }
+        .fv-thumb img { width: 100%; height: 100%; display: block; object-fit: cover; filter: grayscale(1); }
+        .fv-thumb-active { width: 48px; height: 48px; flex-basis: 48px; border: 2px solid #fff; opacity: 1; }
+        .fv-thumb-active img { filter: none; }
+        .fv-thumb-selected-mark { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 0; background: #ff4d00; color: #fff; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,.45); opacity: 0; transform: scale(.75); transition: opacity 140ms ease, transform 140ms ease; pointer-events: none; }
+        .fv-thumb-selected-mark-visible { opacity: 1; transform: scale(1); }
+        .fv-thumb-selected-mark-enter { animation: fv-check-pop 200ms cubic-bezier(.2,.8,.2,1) both; }
+        .fv-thumb-selected-mark-enter svg { animation: fv-check-glyph 140ms 40ms ease-out both; }
+        .fv-selection-flash { position: absolute; z-index: 2; pointer-events: none; animation: fv-image-selection-flash 300ms ease-out both; }
+        /* 선택된 사진의 테두리 — 사진 실제 렌더 영역(object-fit: contain 계산값)에 딱 맞춘다.
+         * 안쪽 흰 선을 한 겹 둬서 주황과 사진이 비슷한 색일 때도 경계가 살아남는다. */
+        /* 다른 참가자의 찜 — 사진 우측 상단. 사진 위에 얹히므로 어두운 링으로 밝은 사진에서도 살린다. */
+        .fv-photo-marks {
+          position: absolute; z-index: 3; pointer-events: none;
+          display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 4px;
+        }
+        .fv-photo-mark {
+          min-width: 22px; height: 22px; padding: 0 5px; box-sizing: border-box;
+          border-radius: 999px; display: grid; place-items: center;
+          font: 700 11px/1 Pretendard, sans-serif;
+          letter-spacing: -.3px; white-space: nowrap;
+          border: 1.5px solid rgba(255,255,255,.9);
+          box-shadow: 0 0 0 1px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.4);
+        }
+        /* 이름 없는 원은 "찜은 있는데 누군지 모른다"로 읽혔다 — 점선 테두리 + 물음표로 미등록임을 드러낸다 */
+        .fv-photo-mark-unnamed { border-style: dashed; }
+        .fv-selected-frame {
+          position: absolute; z-index: 2; pointer-events: none;
+          box-shadow: inset 0 0 0 3px #ff4d00, inset 0 0 0 4px rgba(255,255,255,.5);
+        }
+        /* 코멘트: 별점·찜과 같은 .fv-pill 껍데기를 쓰고 내용만 다르다 —
+         * 비어 있으면 아이콘만, 내용이 있으면 흰 점, 저장 실패면 재시도 라벨로 바뀐다. */
+        .fv-comment-fab {
+          flex: 0 1 auto; min-width: 44px; max-width: 200px;
+          gap: 6px; padding: 0 12px;
+        }
+        /* 주황은 "선택"(작가에게 전달되는 결과물) 전용 — 코멘트 유무는 중립 흰색으로 알린다 */
+        .fv-comment-fab-filled { color: #fff; }
+        .fv-comment-dot { width: 7px; height: 7px; border-radius: 50%; background: #fff; flex-shrink: 0; }
+        .fv-comment-fab-error { color: #ff6262; }
+        .fv-comment-fab-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 110px; }
+        .fv-comment-fab:focus-visible, .fv-mark-toggle:focus-visible, .fv-group-pill:focus-visible { outline: 2px solid #fff; outline-offset: -2px; border-radius: 999px; }
+        .fv-comment-sheet { position: fixed; left: 50%; bottom: 0; z-index: 80; width: min(100%, 375px); transform: translateX(-50%); background: #fff; color: #191918; box-shadow: 0 -4px 8px rgba(0,0,0,.12); border-radius: 12px 12px 0 0; padding: 16px 20px calc(20px + env(safe-area-inset-bottom)); }
+        .fv-comment-sheet textarea { width: 100%; min-height: 72px; max-height: 144px; padding: 0; resize: none; border: 0; outline: 0; background: transparent; color: #191918; font: 400 15px/24px Pretendard, sans-serif; letter-spacing: -.36px; }
+        .fv-comment-sheet-actions { min-height: 36px; margin-top: 4px; display: flex; align-items: center; justify-content: space-between; }
+        .fv-comment-save { width: 48px; height: 36px; padding: 0; border: 0; border-radius: 8px; background: #ff4d00; color: #fff; display: grid; place-items: center; }
+        @media (prefers-reduced-motion: reduce) {
+          .fv-thumb, .fv-image * { scroll-behavior: auto !important; transition: none !important; }
+          .fv-thumb-selected-mark-enter, .fv-thumb-selected-mark-enter svg { animation: none !important; }
+          .fv-selection-flash { display: none !important; }
+        }
+
+        /* PC(≥768px)도 모바일 Figma #56109와 같은 다크 사진 워크스페이스 톤을 쓴다.
+         * .fs-grid-bg(사이버펑크 격자 장식)만 모바일처럼 숨긴다 — 나머지 .fs-* 색상은 모바일 .fv-* 팔레트를 참고해 조정했다. */
+        @media (min-width: 768px) {
+          .fs-grid-bg { display: none; }
+        }
       `}</style>
 
       {/* Grid background */}
       <div className="fs-grid-bg" />
 
       {/* ════ DESKTOP (md+) ════ */}
-      <div className="hidden md:flex flex-col" style={{ height: "100vh" }}>
+      <div className="hidden md:flex flex-col" style={{ height: "100vh", ...myColorVars }}>
 
         {/* Header HUD bar */}
         <header style={{
           flexShrink: 0, zIndex: 40,
-          background: "rgba(10, 11, 13, 0.92)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          borderBottom: "1px solid var(--border-subtle)",
+          background: "var(--viewer-surface)",
+          borderBottom: 0,
         }}>
           <div style={{
             display: "flex", alignItems: "center", gap: 20,
-            padding: "16px 28px", width: "100%", minHeight: 64,
+            padding: "14px 24px", width: "100%", minHeight: 68,
           }}>
             {/* Back link */}
             <Link href={galleryHref} scroll={false} title="갤러리로"
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, color: "var(--subtle-foreground)", textDecoration: "none", flexShrink: 0, transition: "color 0.15s", borderRadius: 8 }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, color: "#fff", textDecoration: "none", flexShrink: 0, transition: "color 0.15s", borderRadius: 8 }}
               onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--subtle-foreground)")}>
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#fff")}>
               <X style={{ width: 18, height: 18 }} strokeWidth={2} />
             </Link>
 
             {/* Divider */}
-            <div style={{ width: 1, height: 36, background: "var(--border)", flexShrink: 0 }} />
 
-            {/* 사진 정보만 */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, flex: 1, justifyContent: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                <span style={{ width: 8, height: 8, background: "var(--accent)", flexShrink: 0 }} />
-                <h2 style={{
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  fontWeight: 800,
-                  fontSize: 15,
-                  letterSpacing: "-0.02em",
-                  margin: 0,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  color: "var(--foreground)",
-                  lineHeight: 1.25,
-                }}>
-                  {filename}
-                </h2>
-              </div>
+            {/* 셀렉의 목표(몇 장 골랐는지)를 최상위 위계로 — 파일명은 고객에게 의미가 없어 보조로 내린다.
+              * 모바일 앱바가 `Y / N장 선택`을 상시 노출하는 것과 같은 계약이다. */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, flex: 1, justifyContent: "center" }}>
+              <h2 style={{
+                fontFamily: "Pretendard, 'Noto Sans KR', sans-serif",
+                fontWeight: 600,
+                fontSize: 17,
+                letterSpacing: "-0.02em",
+                margin: 0,
+                whiteSpace: "nowrap",
+                color: "#fff",
+                lineHeight: 1.3,
+              }}>
+                <strong style={{ color: "var(--accent)", fontWeight: 700 }}>{Y}</strong> / {N}장 선택
+              </h2>
               <p style={{
-                fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
-                fontSize: 11,
+                fontFamily: "Pretendard, 'Noto Sans KR', sans-serif",
+                fontSize: 12,
                 color: "var(--muted-foreground)",
-                letterSpacing: "0.06em",
                 margin: 0,
                 lineHeight: 1.3,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}>
-                {project?.name ?? "PROJECT"}
+                {filename}{project?.name ? ` · ${project.name}` : ""}
               </p>
             </div>
 
-            <div style={{ width: 128, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 7 }}>
-              <span style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", color: "var(--accent)", fontSize: 12, fontWeight: 700, letterSpacing: "0.03em" }}>
-                {currentPhotoOrdinal}번째 · {totalVisiblePhotos}장
-              </span>
-              <div aria-hidden style={{ width: "100%", height: 3, background: "rgba(255,255,255,0.12)", overflow: "hidden" }}>
-                <div style={{ width: `${viewerProgressPercent}%`, height: "100%", background: "var(--accent)", transition: "width 0.2s ease" }} />
-              </div>
-            </div>
+
+            {/* 신원 칩 — 모바일 앱바와 같은 자리·같은 규칙(이름·색은 세션 단위 정보) */}
+            {myColor && (
+              <button
+                type="button"
+                onClick={editMyIdentity}
+                title="내 표시(이름·색) 바꾸기"
+                aria-label={
+                  participant?.initial
+                    ? `내 표시 바꾸기 (현재 ${participant.initial})`
+                    : "이름 등록하기 — 다른 참가자에게 색으로만 보여요"
+                }
+                style={{
+                  flexShrink: 0, height: 32, padding: "0 11px 0 8px",
+                  display: "flex", alignItems: "center", gap: 6,
+                  border: `1px ${participant?.initial ? "solid" : "dashed"} var(--border)`,
+                  borderRadius: 999, background: "transparent",
+                  color: participant?.initial ? "#fff" : "var(--muted-foreground)",
+                  font: "600 13px/1 Pretendard, 'Noto Sans KR', sans-serif",
+                  cursor: "pointer",
+                }}
+              >
+                <span style={{ width: 14, height: 14, flexShrink: 0, borderRadius: "50%", background: myColorHex ?? undefined, boxShadow: "0 0 0 1px rgba(0,0,0,.35)" }} />
+                <span>{participant?.initial || "이름"}</span>
+              </button>
+            )}
           </div>
         </header>
 
         {/* Main image area */}
-        <main style={{ flex: 1, height: 0, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 10, overflow: "hidden" }}>
+        <div className="fs-stage-row">
+        <main style={{ flex: 1, minWidth: 0, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: 8, zIndex: 10, overflow: "hidden", background: "var(--viewer-stage)" }}>
 
           <PrevNextButton
             direction="prev"
@@ -814,62 +1221,78 @@ export default function ViewerPage() {
                 {...viewerImageBlockDownloadHandlers}
                 style={{
                   maxHeight: "100%",
-                  maxWidth: "calc(100vw - 140px)",
+                  maxWidth: "100%",
                   width: "auto",
                   objectFit: "contain",
                   display: "block",
-                  boxShadow: "0 25px 50px rgba(0,0,0,0.9)",
-                  border: "1px solid rgba(255,255,255,0.05)",
+                  boxShadow: "none",
+                  border: 0,
                   ...viewerImageBlockDownloadStyle,
+                  cursor: "zoom-in",
                 }}
+                onClick={() => setFocusOpen(true)}
               />
             ) : (
               <div style={{ color: "var(--muted-foreground)", padding: 16 }}>사진 없음</div>
             )}
-            {/* 갤러리와 동일한 선택 체크 디자인 */}
-            {isCurrentSelected && viewerSrc ? (
-              <div
+            {/* 선택 체크박스 — 헤더/HUD의 별도 CTA 대신 사진 좌측 상단에 배치 */}
+            {viewerSrc && (
+              <button
+                type="button"
+                onClick={toggleSelect}
+                aria-label={isCurrentSelected ? "사진 선택 해제" : "사진 선택"}
+                aria-pressed={isCurrentSelected}
+                className="fv-photo-checkbox"
                 style={{
                   position: "absolute",
                   top: 8,
                   left: 8,
-                  width: 22,
-                  height: 22,
-                  background: "var(--accent)",
+                  width: 44,
+                  height: 44,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   zIndex: 12,
-                  pointerEvents: "none",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
+                  background: "transparent",
+                  border: 0,
+                  padding: 0,
+                  cursor: "pointer",
                 }}
-                aria-hidden
               >
-                <Check style={{ width: 12, height: 12, color: "#000" }} strokeWidth={3} />
-              </div>
-            ) : null}
-            {/* EXIF decorative */}
-            <div style={{
-              position: "absolute", bottom: -28, left: 0,
-              fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 9,
-              textTransform: "uppercase", letterSpacing: "0.2em",
-              color: "rgba(255,255,255,0.3)", whiteSpace: "nowrap",
-              pointerEvents: "none",
-            }}>
-              {filename}
-            </div>
+                <span
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    /* 갤러리 카드·모바일 뷰어와 같은 규칙 — 미선택은 흰 채움이라 어두운 사진에서도 빈 체크박스로 읽힌다 */
+                    background: isCurrentSelected ? "var(--accent)" : "rgba(255,255,255,0.92)",
+                    border: isCurrentSelected ? "2px solid var(--accent)" : "2px solid rgba(255,255,255,0.95)",
+                    boxShadow: isCurrentSelected
+                      ? "0 0 0 1px rgba(0,0,0,0.25), 0 2px 8px rgba(0,0,0,0.35)"
+                      : "0 0 0 1px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.35)",
+                    transition: "background-color 160ms ease, border-color 160ms ease",
+                  }}
+                >
+                  {isCurrentSelected && <Check style={{ width: 20, height: 20, color: "#fff" }} strokeWidth={3} />}
+                </span>
+              </button>
+            )}
           </div>
         </main>
 
-        {/* 별·라벨·메모·선택 — 메인 이미지와 필름스트립 사이 */}
+        {/* 별·찜·코멘트·유사컷 — 사진 오른쪽 패널 */}
+        <aside className="fs-side">
         <section
           className="fs-hud"
           style={{
             flexShrink: 0,
             zIndex: 35,
-            borderTop: "1px solid #1A1A1A",
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
-            padding: "14px 28px",
+            borderLeft: "none",
+            borderRight: "none",
+            padding: "18px 20px",
           }}
         >
           <div
@@ -881,114 +1304,138 @@ export default function ViewerPage() {
               width: "100%",
             }}
           >
+            <span className="fs-panel-label">별점 · 찜</span>
             <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
               <div style={{ display: "flex", gap: 4, alignItems: "center", flexShrink: 0, padding: "4px 0" }}>
                 {([1, 2, 3, 4, 5] as const).map((s) => {
                   const filled = s <= displayRating;
+                  const previewing = hoverStar > 0;
                   return (
-                    <span
+                    <button
+                      type="button"
+                      aria-label={`별점 ${s}점`}
+                      aria-pressed={star === s}
                       key={s}
                       className="fs-star"
                       onClick={() => setStar(s)}
                       onMouseEnter={() => setHoverStar(s)}
                       onMouseLeave={() => setHoverStar(0)}
+                      onPointerDown={() => setHoverStar(s)}
                       style={{
                         fontSize: 20,
                         lineHeight: 1,
                         userSelect: "none",
-                        color: filled ? "var(--accent)" : "var(--border-strong)",
+                        color: filled ? (previewing ? "rgba(255,77,0,.7)" : "#FF4D00") : "#777B7F",
                         transform: starPressRing === s ? "scale(1.2)" : undefined,
                       }}
                     >
-                      {filled ? "★" : "☆"}
-                    </span>
-                  );
-                })}
-              </div>
-              <div style={{ width: 1, height: 28, background: "var(--border)", flexShrink: 0 }} />
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-                {COLOR_OPTIONS.map((opt) => {
-                  const isActive = color?.includes(opt.key) ?? false;
-                  const showRing = isActive || colorPressRing === opt.key;
-                  return (
-                    <button
-                      key={opt.key}
-                      type="button"
-                      title={opt.key}
-                      onClick={() => setColor(opt.key)}
-                      style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: "50%",
-                        background: opt.color,
-                        cursor: "pointer",
-                        border: showRing ? "2px solid white" : "2px solid rgba(0,0,0,0.35)",
-                        boxShadow: showRing ? "0 0 0 2px rgba(255,255,255,0.2)" : "none",
-                        flexShrink: 0,
-                        position: "relative",
-                        transition: "transform 0.1s",
-                      }}
-                    >
-                      {isActive && (
-                        <Check
-                          style={{ position: "absolute", inset: 0, margin: "auto", width: 10, height: 10, color: "white" }}
-                          strokeWidth={3}
-                        />
-                      )}
+                      <Star size={22} fill={filled ? "currentColor" : "none"} strokeWidth={2} aria-hidden="true" style={{ display: "block", flexShrink: 0 }} />
                     </button>
                   );
                 })}
               </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                {/* 다른 참가자가 찜한 표시 — 읽기 전용. 이름 미등록은 점선 테두리 + `?`로 구분한다 */}
+                {otherMarkChips.map((mark) => (
+                  <span
+                    key={mark.key}
+                    title={mark.label}
+                    style={{
+                      minWidth: 18,
+                      height: 18,
+                      padding: "0 4px",
+                      boxSizing: "border-box",
+                      borderRadius: 999,
+                      background: mark.hex,
+                      color: mark.ink,
+                      border: mark.named ? "1.5px solid transparent" : "1.5px dashed rgba(0,0,0,.4)",
+                      boxShadow: "0 0 0 1px rgba(0,0,0,.4)",
+                      flexShrink: 0,
+                      display: "grid",
+                      placeItems: "center",
+                      font: "700 10px/1 Pretendard, sans-serif",
+                      letterSpacing: "-.3px",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {mark.text}
+                  </span>
+                ))}
+                {/* 신원(이름·색)은 헤더 칩으로 뺐다 — 두 구획으로 나누면 "이름 vs 찜함" 택1 라디오로 읽힌다.
+                  * 여기 남는 건 모바일과 같은 순수 토글 하나. */}
+                <button
+                  type="button"
+                  onClick={toggleMyMark}
+                  aria-pressed={isMarkedByMe}
+                  title={isMarkedByMe ? "내 찜 해제" : "내 찜 추가"}
+                  style={{
+                    flexShrink: 0,
+                    height: 32,
+                    padding: "0 14px 0 10px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    borderRadius: 999,
+                    border: `1px solid ${isMarkedByMe && myColorHex ? myColorHex : "var(--border)"}`,
+                    background: isMarkedByMe ? "var(--fv-my-tint, transparent)" : "transparent",
+                    color: "#fff",
+                    font: "600 13px/18px Pretendard, 'Noto Sans KR', sans-serif",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 14,
+                      height: 14,
+                      flexShrink: 0,
+                      boxSizing: "border-box",
+                      borderRadius: "50%",
+                      border: "2px solid rgba(255,255,255,.8)",
+                      background: isMarkedByMe && myColorHex ? myColorHex : "transparent",
+                    }}
+                  />
+                  <span>{isMarkedByMe ? "찜함" : "찜"}</span>
+                </button>
+              </div>
 
               {showGroupHint && currentGroup && (
                 <>
-                  <div style={{ width: 1, height: 28, background: "var(--border)", flexShrink: 0 }} />
                   <button
                     type="button"
                     className="fs-group-hint"
                     onClick={() => setGroupExpanded(currentGroup.id, expandedGroupId !== currentGroup.id)}
                   >
-                    ◧ 유사컷 {currentGroup.photoCount - 1}장 {expandedGroupId === currentGroup.id ? "접기 ▴" : "▾"}
+                    <Layers size={14} strokeWidth={1.8} aria-hidden />
+                    유사컷 {currentGroup.photoCount - 1}장 {expandedGroupId === currentGroup.id ? "접기" : "보기"}
                   </button>
                 </>
               )}
             </div>
 
+            <span className="fs-panel-label" style={{ marginTop: 8 }}>사진별 요청</span>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 12, minWidth: 0 }}>
-              <div style={{ flex: "1 1 240px", display: "flex", flexDirection: "column", alignItems: "stretch", gap: 4, minWidth: 0 }}>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "stretch", gap: 4, minWidth: 0 }}>
                 <div style={{ minHeight: 14, display: "flex", alignItems: "center" }}>
                   <CommentSaveIndicator status={commentSaveStatus} onRetry={saveComment} />
                 </div>
-                <input
-                  type="text"
-                  className="fs-comment-input"
-                  value={draftComment}
-                  onFocus={() => setIsCommentEditing(true)}
-                  onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
-                  onBlur={() => { setIsCommentEditing(false); saveComment(); }}
-                  onKeyDown={(e) => {
-                    if (e.nativeEvent.isComposing) return;
-                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                  }}
-                  placeholder="코멘트 입력…"
-                  style={{ flex: 1, padding: "0 14px", height: 38, borderRadius: 8, minWidth: 0 }}
-                />
+                <div className="fs-comment-input-wrap">
+                  <MessageSquare size={14} strokeWidth={1.8} className="fs-comment-input-icon" aria-hidden />
+                  <textarea
+                    className="fs-comment-input"
+                    value={draftComment}
+                    onFocus={() => setIsCommentEditing(true)}
+                    onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
+                    onBlur={() => { setIsCommentEditing(false); saveComment(); }}
+                    onKeyDown={(e) => {
+                      if (e.nativeEvent.isComposing) return;
+                      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") (e.target as HTMLTextAreaElement).blur();
+                    }}
+                    placeholder="사진별 요청을 입력해 주세요."
+                    aria-label="사진별 요청"
+                    style={{ width: "100%", padding: "11px 14px 11px 36px", minHeight: 88, borderRadius: 8, minWidth: 0 }}
+                  />
+                </div>
               </div>
-
-              <button
-                type="button"
-                onClick={toggleSelect}
-                aria-label={isCurrentSelected ? "사진 선택 해제" : "사진 선택"}
-                aria-pressed={isCurrentSelected}
-                style={{
-                  ...SELECT_BASE,
-                  ...(isCurrentSelected ? SELECT_ACTIVE : SELECT_INACTIVE),
-                  animation: isCurrentSelected ? "fs-selection-pop 0.2s ease-out" : undefined,
-                }}
-              >
-                {isCurrentSelected && <Check style={{ width: 14, height: 14 }} strokeWidth={3} />}
-                <span>{isCurrentSelected ? `선택됨 · ${Y} / ${N}` : `선택 ${Y} / ${N}`}</span>
-              </button>
             </div>
           </div>
         </section>
@@ -1024,17 +1471,36 @@ export default function ViewerPage() {
             </div>
           </div>
         )}
+        <button type="button" className="fs-shortcuts" onClick={() => setShowShortcuts(true)}>
+          <span className="fs-shortcuts-line"><b>Space</b> 선택 · <b>1–5</b> 별점 · <b>F</b> 찜</span>
+          <span className="fs-shortcuts-line"><b>← →</b> 이동 · <b>?</b> 전체 단축키</span>
+        </button>
+        </aside>
+        </div>
 
         {/* Filmstrip footer */}
-        <footer style={{
-          height: 160, background: "rgba(0,0,0,0.85)", borderTop: "1px solid rgba(255,255,255,0.08)",
-          zIndex: 30, display: "flex", alignItems: "center", padding: "0 32px",
+        <footer className="fs-selection-strip" style={{
+          height: 124, background: "var(--viewer-surface)",
+          zIndex: 30, display: "flex", alignItems: "center", padding: "0",
           position: "relative", flexShrink: 0,
         }}>
+          <div className="fs-strip-gallery">
+          {/* 위치 표시 — 헤더의 "N번째 · M장" 텍스트 대신 모바일과 같은 바로 보여준다.
+            * 필름스트립 윗변에 붙여 "이 목록 안에서 어디쯤"이라는 뜻이 바로 읽히게 한다. */}
+          <PhotoPositionBar
+            className="fs-position"
+            /* 모바일(.fv-position)과 같은 흰색 — 주황은 선택/제출의 색이라 위치 트랙에 쓰면
+             * 바로 아래 풋터 진행바와 같은 모양·같은 색의 가로바가 두 겹이 된다. */
+            tone="plain"
+            ordinal={currentPhotoOrdinal}
+            total={totalVisiblePhotos}
+            prefix={groupingActive ? "대표컷 " : ""}
+            onSeek={seekToRatio}
+          />
           <div
             ref={filmstripRef}
             className="fs-hide-scrollbar"
-            style={{ display: "flex", gap: 16, overflowX: "auto", width: "100%", padding: "16px 0", alignItems: "center" }}
+            style={{ display: "flex", gap: 12, overflowX: "auto", width: "100%", padding: "14px 0", alignItems: "center" }}
           >
             {filteredPhotos.map((photo, i) => {
               const isActive  = i === navAnchorIndex;
@@ -1056,13 +1522,6 @@ export default function ViewerPage() {
                     decoding="async"
                     style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                   />
-                  <span style={{
-                    position: "absolute", bottom: 4, right: 4,
-                    fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 8,
-                    background: "rgba(0,0,0,0.8)", padding: "0 4px", color: "var(--foreground)",
-                  }}>
-                    {String(i + 1).padStart(3, "0")}
-                  </span>
                   {isSelected && (
                     <div style={{
                       position: "absolute", top: 4, left: 4, width: 14, height: 14,
@@ -1075,347 +1534,347 @@ export default function ViewerPage() {
               );
             })}
           </div>
-
-          {/* Decorative lat/lng */}
-          <div style={{
-            position: "absolute", bottom: 8, right: 24,
-            opacity: 0.3, pointerEvents: "none",
-            display: "flex", alignItems: "center", gap: 12,
-          }}>
-            <div style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 7, textAlign: "right", color: "white" }}>
-              <p style={{ margin: 0 }}>37.5665° N</p>
-              <p style={{ margin: 0 }}>126.9780° E</p>
-            </div>
-            <div style={{ width: 16, height: 16, border: "1px solid rgba(255,255,255,0.2)" }} />
           </div>
+          {selectionCompletion}
         </footer>
 
-        {/* Selection footer (show on complete OR over-select, like gallery) */}
-        <div
-          style={{
-            maxHeight: N > 0 && Y >= N ? 88 : 0,
-            overflow: "hidden",
-            transition: "max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
-            flexShrink: 0,
-          }}
-          aria-hidden={!(N > 0 && Y >= N)}
-        >
-          <SelectionConfirmFooter
-            Y={Y}
-            N={N}
-            position="static"
-            disabled={!canConfirm}
-            onConfirm={() => setShowConfirmModal(true)}
-            zIndex={50}
-          />
-        </div>
       </div>
 
-      {/* ════ MOBILE (<md): fullscreen stack ════ */}
-      <div className="md:hidden fixed inset-0 flex flex-col" style={{ background: "#030303" }}>
-
-        {/* Topbar */}
-        <div style={{
-          background: "rgba(0,0,0,0.78)", backdropFilter: "blur(14px)",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
-          flexShrink: 0, zIndex: 20,
-          paddingTop: "env(safe-area-inset-top, 44px)",
-        }}>
-          <div style={{ height: 52, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "0 16px" }}>
-            <Link href={galleryHref} scroll={false}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", borderRadius: 10, color: "var(--foreground)", fontSize: 14, fontWeight: 600, textDecoration: "none", flexShrink: 0 }}>
-              ← 갤러리
-            </Link>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--subtle-foreground)", flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 4px" }}>
-              {filename}
-            </span>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", color: "var(--accent)" }}>
-                {currentPhotoOrdinal}번째
-              </span>
-              <span style={{ fontSize: 10, fontWeight: 600, color: "var(--muted-foreground)" }}>전체 {totalVisiblePhotos}장</span>
-            </div>
-          </div>
-          <div aria-hidden style={{ height: 2, background: "rgba(255,255,255,0.1)" }}>
-            <div style={{ width: `${viewerProgressPercent}%`, height: "100%", background: "var(--accent)", transition: "width 0.2s ease" }} />
-          </div>
-        </div>
-
-        {/* Image */}
-        <div style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 0, minWidth: 0 }}>
-          {viewerSrc
-            ? (
+      {/* ════ MOBILE (<md): Figma #56109 detail viewer ════ */}
+      <div className={`fv-mobile md:hidden fixed inset-0${groupingActive && expandedGroupId ? " fv-group-expanded" : ""}`}>
+        <div className="fv-image">
+          {viewerSrc ? (
+            <div className="fv-image-stage">
               <MobileViewerPinchPhoto
                 src={viewerSrc}
                 alt={filename}
-                showBadge={isCurrentSelected}
-                onZoomStateChange={(z) => { mobileImageZoomedRef.current = z; }}
+                /* 사진을 한 번 탭하면 챙뿐 아니라 사진 위 오버레이(체크박스·참가자 마크·선택 테두리)까지
+                 * 함께 사라져 "사진만" 남는다 — 집중 모드의 목적이 그것이다. */
+                showBadge
+                selected={isCurrentSelected}
+                onToggleSelect={() => {
+                  const result = toggleSelect();
+                  if (result === "selected" || result === "deselected") triggerSelectionHaptic("change");
+                  if (result === "selected") {
+                    setSelectionFeedback((previous) => ({
+                      photoId: current.id,
+                      key: (previous?.key ?? 0) + 1,
+                    }));
+                    if (selectionFeedbackTimerRef.current) clearTimeout(selectionFeedbackTimerRef.current);
+                    selectionFeedbackTimerRef.current = setTimeout(() => setSelectionFeedback(null), 360);
+                  }
+                }}
+                selectionFlashKey={selectionFeedback?.photoId === current.id ? selectionFeedback.key : 0}
+                marks={otherMarkChips}
+                onZoomStateChange={(zoomed) => { mobileImageZoomedRef.current = zoomed; }}
+                onSingleTap={() => setFocusOpen(true)}
               />
-            )
-            : <div style={{ color: "var(--muted-foreground)", padding: 16 }}>사진 없음</div>
-          }
-          <PrevNextButton direction="prev" onClick={goPrevWrap} disabled={groupingActive && navAnchorIndex <= 0} size="sm" />
-          <PrevNextButton direction="next" onClick={goNextWrap} disabled={groupingActive && (navAnchorIndex < 0 || navAnchorIndex === filteredPhotos.length - 1)} size="sm" />
-
-          {showGroupHint && currentGroup && (
-            <button
-              type="button"
-              onClick={() => setGroupExpanded(currentGroup.id, expandedGroupId !== currentGroup.id)}
-              style={{
-                position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)",
-                display: "flex", alignItems: "center", gap: 6,
-                height: 30, padding: "0 14px", zIndex: 15,
-                background: "rgba(0,0,0,0.7)",
-                border: "1px solid #FF4D00",
-                color: "#FF4D00",
-                fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              ◧ 유사컷 {currentGroup.photoCount - 1}장 {expandedGroupId === currentGroup.id ? "닫기 ✕" : "▾"}
-            </button>
-          )}
-
-          {/* 시트가 열려 있는 동안 이미지 영역만 시각적으로 딤 처리(하단 액션바는 가리지 않음) */}
-          {groupingActive && expandedGroupId && (
-            <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", pointerEvents: "none", zIndex: 10 }} />
+              {filteredPhotos.length > 1 ? (
+                <div className="fv-detail-arrows">
+                  <PrevNextButton direction="prev" onClick={goPrev} disabled={navAnchorIndex <= 0} size="sm" align="edge" style={{ zIndex: 24 }} />
+                  <PrevNextButton direction="next" onClick={goNext} disabled={navAnchorIndex < 0 || navAnchorIndex === filteredPhotos.length - 1} size="sm" align="edge" style={{ zIndex: 24 }} />
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div style={{ color: "#8B8E91", padding: 20 }}>사진 없음</div>
           )}
         </div>
 
-        {/* 유사컷 바텀시트 (모바일 펼침) — 문서 흐름 안의 일반 flex 자식으로 배치해 하단 액션바(별점/코멘트) 위를
-         *  덮지 않고 그 위에 별도 패널로 쌓인다(예전엔 position:fixed 오버레이였는데, 뷰포트 전체를 덮어 액션바를
-         *  가려버리는 문제가 있었음). 스와이프/이전·다음 버튼은 이 패널 밖(이미지 영역)에 있으므로 계속 동작한다. */}
-        {groupingActive && expandedGroupId && current && (
-          <div
-            style={{
-              flexShrink: 0, zIndex: 25, background: "rgba(10,10,11,0.97)", backdropFilter: "blur(12px)",
-              borderTop: "1px solid #FF4D00", maxHeight: "34vh", overflow: "hidden",
-              padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10,
-            }}
-            onTouchStart={(e) => e.stopPropagation()}
-            onTouchEnd={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "#FF4D00", letterSpacing: "0.06em" }}>
-                이 사진과 유사한 사진 ({(membersByGroup.get(expandedGroupId) ?? []).length}장)
+        <div className="fv-top-overlay">
+          <header className="fv-appbar">
+            <div className="fv-appbar-row">
+              <Link className="fv-back" href={galleryHref} scroll={false} aria-label="갤러리로 돌아가기">
+                <ArrowLeft size={18} strokeWidth={1.8} />
+              </Link>
+              {/* 진행 바는 바로 옆 카운터와 같은 사실을 한 번 더 말하면서 위치상 "몇 번째 사진"으로
+                * 오독돼 걷어냈다. 파일명도 같이 걷어냈었지만, 격자에서 파일명을 없애면서
+                * 앱 전체에 파일명이 남는 곳이 없어져 되살린다 — 작가에게 "이 사진"이라고
+                * 짚어 말할 때 쓰는 유일한 번호다. 카운터와 경쟁하지 않도록 PC 헤더와 같은 구성으로
+                * (카운터 아래 작은 보조 줄) 둔다. 두 줄을 합쳐도 35px라 앱바 56px 안에 들어간다. */}
+              <span className="fv-title">
+                <span className="fv-selection-count">
+                  <strong>{Y}</strong> / {N}장 선택
+                </span>
+                <span className="fv-filename" title={filename}>{filename}</span>
               </span>
-              {currentGroup && (
+              {/* 이름·색은 "이 세션에서 내가 누구인가"라 사진마다 바뀌는 값이 아니다 —
+                * 사진별 컨트롤 행이 아니라 앱바에 두고, 아래 찜 버튼은 순수 토글로 남긴다.
+                * (파일명·진행 바를 걷어내 이 자리가 비어 있다) */}
+              {myColor && (
                 <button
                   type="button"
-                  onClick={() => setGroupExpanded(currentGroup.id, false)}
-                  style={{ background: "none", border: "none", color: "var(--muted-foreground)", padding: 4, cursor: "pointer" }}
+                  className={`fv-identity${participant?.initial ? "" : " fv-identity-unnamed"}`}
+                  onClick={editMyIdentity}
+                  aria-label={
+                    participant?.initial
+                      ? `내 표시 바꾸기 (현재 ${participant.initial})`
+                      : "이름 등록하기 — 다른 참가자에게 색으로만 보여요"
+                  }
                 >
-                  <X style={{ width: 14, height: 14 }} />
+                  <span className="fv-identity-dot" style={{ background: myColorHex ?? undefined }} />
+                  <span>{participant?.initial || "이름"}</span>
                 </button>
               )}
             </div>
-            <div style={{ display: "flex", gap: 8, overflowX: "auto" }}>
-              {(membersByGroup.get(expandedGroupId) ?? []).map((member) => {
-                const isMemberActive = member.id === current.id;
-                const isMemberSelected = selectedIds.has(member.id);
+          </header>
+        </div>
+
+        <div
+          className="fv-bottom-overlay"
+          style={myColorVars}
+        >
+          {/* 유사컷 멤버 썸네일은 컨트롤 바 "위"에 붙인다 — 아래에 붙이면 바가 화면 끝에서 밀려 올라가
+            * 위치가 흔들린다. 위로 열리면 바는 그대로 있고 사진 쪽으로 펼쳐진다. */}
+          {groupingActive && expandedGroupId && (
+            <div
+              ref={mobileFilmstripRef}
+              className="fv-filmstrip fs-hide-scrollbar"
+              aria-label="유사한 사진 목록"
+              onTouchStart={(event) => event.stopPropagation()}
+              onTouchEnd={(event) => event.stopPropagation()}
+            >
+              {mobileGroupMembers.map((photo) => {
+                const active = photo.id === activePhotoId;
+                const selected = selectedIds.has(photo.id);
                 return (
-                  <div
-                    key={member.id}
-                    onClick={() => navigateTo(member.id)}
-                    style={{
-                      position: "relative", width: 88, height: 66, flexShrink: 0, overflow: "hidden",
-                      border: isMemberActive ? "2px solid var(--accent)" : "1px solid rgba(255,255,255,0.15)",
-                      opacity: isMemberActive ? 1 : 0.75,
-                    }}
+                  <button
+                    key={photo.id}
+                    type="button"
+                    data-mobile-photo-id={photo.id}
+                    className={`fv-thumb${active ? " fv-thumb-active" : ""}${selected ? " fv-thumb-selected" : ""}`}
+                    onClick={() => navigateTo(photo.id)}
+                    aria-label={`${getPhotoDisplayName(photo)} 상세 보기${active ? ", 현재 사진" : ""}`}
+                    aria-current={active ? "true" : undefined}
                   >
-                    <img
-                      src={member.url}
-                      alt={getPhotoDisplayName(member)}
-                      loading="lazy"
-                      decoding="async"
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    />
-                    {isMemberSelected && (
-                      <div style={{
-                        position: "absolute", top: 2, right: 2, width: 14, height: 14,
-                        background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>
-                        <Check style={{ width: 8, height: 8, color: "black" }} strokeWidth={4} />
-                      </div>
-                    )}
-                  </div>
+                    <img src={photo.url} alt="" loading="lazy" decoding="async" />
+                    <span
+                      className={`fv-thumb-selected-mark${selected ? " fv-thumb-selected-mark-visible" : ""}${selected && selectionFeedback?.photoId === photo.id ? " fv-thumb-selected-mark-enter" : ""}`}
+                      aria-hidden
+                    >
+                      <Check size={12} strokeWidth={4} />
+                    </span>
+                  </button>
                 );
               })}
+            </div>
+          )}
+
+          <section
+            className="fv-controls"
+            aria-label="사진 평가"
+            onTouchStart={(event) => event.stopPropagation()}
+            onTouchEnd={(event) => event.stopPropagation()}
+          >
+            {/* 위치 표시는 이 행의 "윗변"으로 붙인다 — 별도 행으로 떨어져 있으면 위 컨트롤과
+              * 아무 관계 없어 보였다. 유사컷을 펼친 동안은 아래 필름스트립이 위치를 대신 알려주므로 감춘다. */}
+            {!(groupingActive && expandedGroupId) && (
+              <PhotoPositionBar
+                className="fv-position"
+                tone="plain"
+                ordinal={currentPhotoOrdinal}
+                total={totalVisiblePhotos}
+                onSeek={seekToRatio}
+              />
+            )}
+
+            {/* 알약이 나란히 4개면 둥근 테두리가 4겹으로 반복돼 격자처럼 읽혔다 —
+              * 껍데기는 이 바 하나가 갖고 내부 컨트롤은 무테로 둔다. */}
+            <div className="fv-bar">
+            <div className="fv-stars" aria-label="별점">
+              {([1, 2, 3, 4, 5] as const).map((value) => {
+                const filled = value <= (hoverStar || star || 0);
+                const previewing = hoverStar > 0;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    className="fv-star"
+                    onClick={() => setStar(value)}
+                    onMouseEnter={() => setHoverStar(value)}
+                    onMouseLeave={() => setHoverStar(0)}
+                    onPointerDown={() => setHoverStar(value)}
+                    onPointerUp={() => setHoverStar(0)}
+                    aria-label={`${value}점`}
+                    aria-pressed={star === value}
+                    style={{ color: filled ? (previewing ? "rgba(255, 77, 0, 0.7)" : "#FF4D00") : "#777B7F" }}
+                  >
+                    <Star size={22} fill={filled ? "currentColor" : "none"} strokeWidth={2} aria-hidden="true" style={{ display: "block", flexShrink: 0 }} />
+                  </button>
+                );
+              })}
+            </div>
+            <div className="fv-bar-right">
+            {showGroupHint && currentGroup && (
+              <button
+                type="button"
+                className={`fv-group-pill${expandedGroupId === currentGroup.id ? " fv-group-pill-active" : ""}`}
+                onClick={() => setGroupExpanded(currentGroup.id, expandedGroupId !== currentGroup.id)}
+                aria-label={`유사한 사진 ${currentGroup.photoCount}장 ${expandedGroupId === currentGroup.id ? "닫기" : "보기"}`}
+                aria-expanded={expandedGroupId === currentGroup.id}
+              >
+                <Layers size={16} strokeWidth={1.8} aria-hidden />
+                <span>{currentGroup.photoCount}</span>
+              </button>
+            )}
+
+            {!isCommentEditing && (
+              commentSaveStatus === "error" ? (
+                <button
+                  type="button"
+                  className="fv-pill fv-comment-fab fv-comment-fab-error"
+                  onClick={saveComment}
+                  onTouchStart={(event) => event.stopPropagation()}
+                  onTouchEnd={(event) => event.stopPropagation()}
+                  aria-label="코멘트 저장 실패, 다시 시도"
+                >
+                  <MessageSquare size={16} strokeWidth={1.8} style={{ flexShrink: 0 }} aria-hidden />
+                  <span className="fv-comment-fab-text">저장 실패 · 재시도</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={`fv-pill fv-comment-fab${draftComment.trim() ? " fv-comment-fab-filled" : ""}`}
+                  onClick={openCommentEditor}
+                  onTouchStart={(event) => event.stopPropagation()}
+                  onTouchEnd={(event) => event.stopPropagation()}
+                  aria-label={draftComment.trim() ? `코멘트 수정: ${draftComment.trim()}` : "코멘트 남기기"}
+                >
+                  <MessageSquare size={16} strokeWidth={1.8} style={{ flexShrink: 0 }} aria-hidden />
+                  {/* 3글자짜리 잘린 미리보기는 폭만 먹고 못 읽는다 — 유무만 점으로 알리고 내용은 시트에서 본다 */}
+                  {draftComment.trim() && <span className="fv-comment-dot" aria-hidden />}
+                </button>
+              )
+            )}
+
+            {/* 다른 참가자 마크는 사진 우측 상단(MobileViewerPinchPhoto marks), 내 이름·색은 앱바 칩에 있다.
+              * 여기 남는 건 순수 토글 하나 — 두 구획으로 나눴더니 "신랑 vs 찜함" 택1 라디오로 읽혔다. */}
+            <button
+              type="button"
+              className={`fv-pill fv-mark-toggle${isMarkedByMe ? " fv-mark-toggle-on" : ""}`}
+              onClick={toggleMyMark}
+              aria-pressed={isMarkedByMe}
+              aria-label={isMarkedByMe ? "내 찜 해제" : "내 찜 추가"}
+            >
+              {/* 알약 안에 또 링(dot)을 두면 동심원이 된다 — 켜짐은 "내 색으로 채워진 배경"으로 알린다.
+                * 내 색이 무엇인지는 앱바 신원 칩이 상시 보여주므로 여기서 색을 또 보일 필요가 없다. */}
+              <span>{isMarkedByMe ? "찜함" : "찜"}</span>
+            </button>
+            </div>
+            </div>
+          </section>
+          {selectionCompletion}
+        </div>
+
+        {isCommentEditing && (
+          <div
+            className="fv-comment-sheet"
+            onTouchStart={(event) => event.stopPropagation()}
+            onTouchEnd={(event) => event.stopPropagation()}
+          >
+            <textarea
+              ref={mobileCommentRef}
+              autoFocus
+              maxLength={COMMENT_MAX_LENGTH}
+              value={draftComment}
+              onChange={(event) => setDraftComment(event.target.value.slice(0, COMMENT_MAX_LENGTH))}
+              onBlur={() => {
+                setIsCommentEditing(false);
+                saveComment();
+              }}
+              placeholder="코멘트를 남기세요..."
+              aria-label="사진 코멘트"
+            />
+            <div className="fv-comment-sheet-actions">
+              <span aria-live="polite">
+                {commentSaveStatus === "saving" ? "저장 중..." : `${draftComment.length}/${COMMENT_MAX_LENGTH}`}
+              </span>
+              <button
+                type="button"
+                className="fv-comment-save"
+                onPointerDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  const commentInput = mobileCommentRef.current;
+                  if (commentInput && document.activeElement === commentInput) commentInput.blur();
+                  else {
+                    saveComment();
+                    setIsCommentEditing(false);
+                  }
+                }}
+                aria-label="코멘트 저장"
+              >
+                <Check size={17} strokeWidth={2.5} />
+              </button>
             </div>
           </div>
         )}
-
-        {/* Bottom action bar */}
-        <div style={{
-          background: "rgba(10,10,11,0.96)", backdropFilter: "blur(12px)",
-          borderTop: "1px solid rgba(255,255,255,0.07)",
-          padding: "10px 16px calc(10px + env(safe-area-inset-bottom))",
-          flexShrink: 0, display: "flex", flexDirection: "column", gap: 8,
-        }}>
-          {/* Row 1: Stars · Colors */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {/* Stars */}
-            <div style={{ display: "flex", gap: 1, flexShrink: 0 }}>
-              {([1, 2, 3, 4, 5] as const).map((s) => {
-                const filled = s <= (hoverStar || star || 0);
-                return (
-                  <button key={s} type="button"
-                    onClick={() => setStar(s)}
-                    onMouseEnter={() => setHoverStar(s)}
-                    onMouseLeave={() => setHoverStar(0)}
-                    style={{ fontSize: 20, lineHeight: 1, padding: "4px 2px", color: filled ? "var(--accent)" : "var(--border-strong)", background: "none", border: "none", cursor: "pointer" }}>
-                    {filled ? "★" : "☆"}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div style={{ width: 1, height: 22, background: "var(--border)", flexShrink: 0 }} />
-
-            {/* Color tags */}
-            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-              {COLOR_OPTIONS.map((opt) => {
-                const isActive = color?.includes(opt.key) ?? false;
-                return (
-                  <button key={opt.key} type="button" onClick={() => setColor(opt.key)}
-                    style={{ width: 22, height: 22, borderRadius: "50%", background: opt.color, border: isActive ? "2px solid white" : "2px solid transparent", boxShadow: isActive ? "0 0 0 2px rgba(255,255,255,0.25)" : "none", cursor: "pointer", position: "relative", flexShrink: 0 }}>
-                    {isActive && <Check style={{ position: "absolute", inset: 0, margin: "auto", width: 10, height: 10, color: "white" }} strokeWidth={3} />}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div style={{ flex: 1 }} />
-          </div>
-
-          <div style={{ minHeight: 14, display: "flex", alignItems: "center" }}>
-            <CommentSaveIndicator status={commentSaveStatus} onRetry={saveComment} />
-          </div>
-
-          {/* Row 2: Comment */}
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input
-              type="text"
-              value={draftComment}
-              onFocus={() => setIsCommentEditing(true)}
-              onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
-              onBlur={() => { setIsCommentEditing(false); saveComment(); }}
-              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-              placeholder="코멘트 입력…"
-              style={{
-                flex: 1, height: 38, padding: "0 12px",
-                background: "rgba(29, 30, 35, 0.6)", border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 8, color: "var(--foreground)", fontSize: 13,
-                fontFamily: "'Inter', system-ui, sans-serif", outline: "none",
-              }}
-            />
-
-            {/* Select button (right of comment) */}
-            <button
-              type="button"
-              onClick={toggleSelect}
-              aria-label={isCurrentSelected ? "사진 선택 해제" : "사진 선택"}
-              aria-pressed={isCurrentSelected}
-              style={{
-                ...SELECT_BASE_MOBILE,
-                ...(isCurrentSelected ? SELECT_ACTIVE : SELECT_INACTIVE),
-                height: 38,
-                animation: isCurrentSelected ? "fs-selection-pop 0.2s ease-out" : undefined,
-              }}
-            >
-              {isCurrentSelected
-                ? <><Check style={{ width: 12, height: 12, flexShrink: 0 }} strokeWidth={3} /><span>선택됨 · {Y} / {N}</span></>
-                : <span>선택 {Y} / {N}</span>
-              }
-            </button>
-          </div>
-        </div>
-
       </div>
+
+      {selectionLimitNoticeKey !== null && (
+        <SelectionLimitSnackbar
+          count={N}
+          noticeKey={selectionLimitNoticeKey}
+          placement="viewer"
+          onViewSelected={showSelectedPhotos}
+          onDismiss={() => setSelectionLimitNoticeKey(null)}
+        />
+      )}
+
+      <PhotoFocusOverlay
+        open={focusOpen}
+        src={viewerSrc}
+        alt={filename}
+        onClose={() => setFocusOpen(false)}
+        onPrev={goPrevWrap}
+        onNext={goNextWrap}
+      />
+
+      {participantSheetOpen && (
+        <ParticipantSheet
+          usedColors={usedColors}
+          roster={roster}
+          current={participant}
+          onClose={() => setParticipantSheetOpen(false)}
+          onConfirm={(next) => {
+            writeParticipant(token, next);
+            setParticipant(next);
+            setParticipantSheetOpen(false);
+            /* 이름은 다른 참가자에게도 보여야 하므로 공유 명단에 저장한다 */
+            setRoster((prev) => ({ ...prev, [next.color]: next.initial }));
+            if (project?.id) void saveRosterName(token, project.id, next.color, next.initial);
+            /* 찜하려다 열린 경우에만 그 찜을 이어서 적용한다(이름만 고치러 온 경우엔 사진을 건드리지 않는다) */
+            if (participantSheetIntent === "mark" && current) toggleColor(current.id, next.color);
+          }}
+        />
+      )}
 
       {/* Keyboard shortcuts modal */}
       {showShortcuts && (
-        <div
-          style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center" }}
-          onClick={() => setShowShortcuts(false)}
-        >
-          <div className="fs-hud" style={{ padding: "28px 32px", minWidth: 320, borderRadius: 2 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <div style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "var(--accent)", letterSpacing: "0.1em" }}>KEYBOARD SHORTCUTS</div>
-              <button type="button" onClick={() => setShowShortcuts(false)}
-                style={{ background: "none", border: "none", color: "var(--muted-foreground)", cursor: "pointer", padding: 4 }}>
-                <X style={{ width: 14, height: 14 }} />
-              </button>
-            </div>
-            <div style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: "var(--muted-foreground)", display: "grid", gridTemplateColumns: "auto 1fr", gap: "10px 24px" }}>
-              <span style={{ color: "var(--accent)" }}>← →</span><span>이전 / 다음 사진</span>
-              <span style={{ color: "var(--accent)" }}>SPACE</span><span>선택 / 선택 해제</span>
-              <span style={{ color: "var(--accent)" }}>1 – 5</span><span>별점 설정</span>
-              <span style={{ color: "var(--accent)" }}>Q W E R T</span><span>색상 태그</span>
-              <span style={{ color: "var(--accent)" }}>?</span><span>단축키 보기 / 닫기</span>
-              <span style={{ color: "var(--accent)" }}>ESC</span><span>창 닫기</span>
-            </div>
+        <div className="fs-help" role="dialog" aria-modal="true" aria-label="단축키" onClick={() => setShowShortcuts(false)}>
+          <div className="fs-help-card" onClick={(event) => event.stopPropagation()}>
+            <h3>단축키</h3>
+            <dl>
+              <div><dt><kbd>Space</kbd></dt><dd>사진 선택 · 선택 해제</dd></div>
+              <div><dt><kbd>1–5</kbd></dt><dd>별점 설정</dd></div>
+              <div><dt><kbd>F</kbd></dt><dd>내 찜 표시 · 해제</dd></div>
+              <div><dt><kbd>←</kbd><kbd>→</kbd></dt><dd>이전 · 다음 사진</dd></div>
+              <div><dt><kbd>Esc</kbd></dt><dd>갤러리로 돌아가기</dd></div>
+              <div><dt><kbd>?</kbd></dt><dd>이 도움말 열기 · 닫기</dd></div>
+            </dl>
+            <button type="button" onClick={() => setShowShortcuts(false)}>닫기</button>
           </div>
         </div>
       )}
 
       {/* Confirm Selection modal */}
       {showConfirmModal && (
-        <div
-          style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(6px)", padding: 16 }}
-          onClick={() => !confirming && setShowConfirmModal(false)}
-        >
-          <div
-            style={{ width: "100%", maxWidth: 440, background: "var(--surface)", border: "1px solid var(--accent)", borderRadius: 8, padding: 32, position: "relative" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{
-              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 24,
-              textTransform: "uppercase", fontStyle: "italic",
-              margin: 0, marginBottom: 16, color: "var(--foreground)",
-            }}>
-              Confirm Selection
-            </h3>
-            <p style={{ color: "var(--muted-foreground)", fontSize: 13, lineHeight: 1.7, margin: 0, marginBottom: 28 }}>
-              총 <span style={{ color: "var(--accent)", fontWeight: 700 }}>{Y}장</span>의 사진이 선택되었습니다.
-            </p>
-
-            {confirmError && (
-              <p style={{ color: "#ef4444", fontSize: 12, margin: 0, marginBottom: 16 }} role="alert">{confirmError}</p>
-            )}
-
-            <div style={{ display: "flex", gap: 12 }}>
-              <button
-                type="button"
-                onClick={() => !confirming && setShowConfirmModal(false)}
-                disabled={confirming}
-                style={{
-                  flex: 1, height: 44, borderRadius: 8,
-                  border: "1px solid var(--border-subtle)", background: "transparent",
-                  color: "var(--muted-foreground)", fontFamily: MONO, fontSize: 12, fontWeight: 700,
-                  cursor: confirming ? "not-allowed" : "pointer", transition: "all 0.15s",
-                }}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirm}
-                disabled={confirming}
-                style={{
-                  flex: 1, height: 44, borderRadius: 8,
-                  background: "var(--accent)", color: "#000",
-                  fontFamily: MONO, fontSize: 12, fontWeight: 700,
-                  border: "1px solid var(--accent)",
-                  cursor: confirming ? "not-allowed" : "pointer",
-                  opacity: confirming ? 0.6 : 1,
-                }}
-              >
-                {confirming ? "처리 중..." : "확정 및 전송"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <SelectionConfirmDialog
+          count={Y}
+          confirming={confirming}
+          error={confirmError}
+          onCancel={() => { if (!confirming) setShowConfirmModal(false); }}
+          onConfirm={handleConfirm}
+        />
       )}
     </div>
   );

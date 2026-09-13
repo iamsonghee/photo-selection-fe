@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
+import { PhotographerConfirmDialog } from "@/components/ui/PhotographerConfirmDialog";
 
 export function ConfirmCancelButton({
   projectId,
@@ -25,9 +26,10 @@ export function ConfirmCancelButton({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        const msg = (data as { error?: string }).error ?? res.statusText;
+        const responseError = data as { error?: string; currentStatus?: string };
+        const msg = responseError.error ?? res.statusText;
         // 이미 selecting이면 UX 관점에서 성공으로 취급 (중복 클릭/화면 지연 대비)
-        if (typeof msg === "string" && msg.includes("현재: selecting")) {
+        if (responseError.currentStatus === "selecting") {
           setOpen(false);
           onSuccess?.();
           router.refresh();
@@ -56,28 +58,20 @@ export function ConfirmCancelButton({
       <Button variant="outline" className="flex items-center gap-2" onClick={() => setOpen(true)}>
         확정 취소
       </Button>
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-sm rounded-xl border border-border bg-surface-raised p-6 shadow-xl">
-            <p className="text-center text-muted-foreground">
-              고객이 다시 사진을 수정할 수 있게 됩니다. 취소하시겠습니까?
-            </p>
-            <div className="mt-6 flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>
-                아니오
-              </Button>
-              <Button
-                variant="primary"
-                className="flex-1"
-                onClick={handleConfirm}
-                disabled={submitting}
-              >
-                {submitting ? "처리 중..." : "예, 취소합니다"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PhotographerConfirmDialog
+        open={open}
+        onClose={() => { if (!submitting) setOpen(false); }}
+        onConfirm={handleConfirm}
+        title="셀렉 확정을 취소할까요?"
+        description="고객이 다시 선택 사진과 요청을 수정할 수 있습니다."
+        detail="현재 확정 상태가 해제되고 프로젝트가 고객 셀렉 단계로 돌아갑니다."
+        cancelLabel="유지하기"
+        confirmLabel="확정 취소"
+        pendingLabel="처리 중…"
+        pending={submitting}
+        tone="primary"
+        compact
+      />
     </>
   );
 }

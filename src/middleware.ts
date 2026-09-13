@@ -69,7 +69,8 @@ function base64urlToBuffer(s: string): ArrayBuffer {
 
 async function verifyPinCookieEdge(
   token: string,
-  cookieValue: string
+  cookieValue: string,
+  accessPin: string | null,
 ): Promise<boolean> {
   const secret = process.env.PIN_COOKIE_SECRET;
   if (!secret) return false;
@@ -97,14 +98,14 @@ async function verifyPinCookieEdge(
       "HMAC",
       key,
       base64urlToBuffer(sig),
-      enc.encode(`${token}:${timestamp}`)
+      enc.encode(`${token}:${accessPin === null ? "none" : `pin:${accessPin}`}:${timestamp}`)
     );
   } catch {
     return false;
   }
 }
 
-async function signPinCookieEdge(token: string): Promise<string> {
+async function signPinCookieEdge(token: string, accessPin: string | null): Promise<string> {
   const secret = process.env.PIN_COOKIE_SECRET;
   if (!secret) throw new Error("PIN_COOKIE_SECRET is not set");
 
@@ -120,7 +121,7 @@ async function signPinCookieEdge(token: string): Promise<string> {
   const signature = await crypto.subtle.sign(
     "HMAC",
     key,
-    enc.encode(`${token}:${timestamp}`)
+    enc.encode(`${token}:${accessPin === null ? "none" : `pin:${accessPin}`}:${timestamp}`)
   );
   const base64url = btoa(String.fromCharCode(...new Uint8Array(signature)))
     .replace(/\+/g, "-")
@@ -174,15 +175,18 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
   const cookieName = `pin_verified_${token}`;
   const cookieValue = req.cookies.get(cookieName)?.value;
 
-  if (cookieValue && (await verifyPinCookieEdge(token, cookieValue))) {
-    return NextResponse.next();
-  }
-
   try {
     const project = await getCustomerPin(token);
+    if (
+      project.found &&
+      cookieValue &&
+      (await verifyPinCookieEdge(token, cookieValue, project.accessPin))
+    ) {
+      return NextResponse.next();
+    }
     if (project.found && project.accessPin === null) {
       // PIN 없는 링크는 /pin → /api/c/auto-verify 왕복 없이 현재 요청에서 바로 인증한다.
-      const signedCookie = await signPinCookieEdge(token);
+      const signedCookie = await signPinCookieEdge(token, null);
       // 현재 Server Component 요청도 즉시 인증된 쿠키를 보도록 request/response 양쪽에 반영한다.
       req.cookies.set(cookieName, signedCookie);
       const response = NextResponse.next({ request: req });

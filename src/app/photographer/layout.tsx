@@ -2,6 +2,7 @@ import type { Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { PhotographerDesktopShell } from "@/components/layout/PhotographerDesktopShell";
 import { ProfileProvider } from "@/contexts/ProfileContext";
+import { QuotaProvider } from "@/contexts/QuotaContext";
 import { PhotographerModalProvider } from "@/contexts/PhotographerModalContext";
 import { BetaSurveyGate } from "@/components/photographer/BetaSurveyGate";
 import "./photographer.css";
@@ -32,19 +33,20 @@ export default function PhotographerLayout({
 }) {
   return (
     <ProfileProvider>
-      <PhotographerModalProvider>
-        <div
-          className={`photographer-app relative flex min-h-screen bg-background text-foreground ${inter.variable} ${mono.variable}`}
-          style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}
-        >
-          <div className="pointer-events-none fixed inset-0 z-0" aria-hidden>
-            <div className="absolute -left-24 top-[8%] h-72 w-72 rounded-full bg-[#4f7eff]/15 blur-[100px]" />
-            <div className="absolute right-[-15%] top-[35%] h-64 w-64 rounded-full bg-violet-500/10 blur-[90px]" />
+      <QuotaProvider>
+        <PhotographerModalProvider>
+          <div
+            className={`photographer-app relative flex min-h-screen bg-background text-foreground ${inter.variable} ${mono.variable}`}
+          >
+            <div className="pointer-events-none fixed inset-0 z-0" aria-hidden>
+              <div className="absolute -left-24 top-[8%] h-72 w-72 rounded-full bg-[#4f7eff]/15 blur-[100px]" />
+              <div className="absolute right-[-15%] top-[35%] h-64 w-64 rounded-full bg-violet-500/10 blur-[90px]" />
+            </div>
+            <PhotographerDesktopShell>{children}</PhotographerDesktopShell>
+            <BetaSurveyGate />
           </div>
-          <PhotographerDesktopShell>{children}</PhotographerDesktopShell>
-          <BetaSurveyGate />
-        </div>
-      </PhotographerModalProvider>
+        </PhotographerModalProvider>
+      </QuotaProvider>
     </ProfileProvider>
   );
 }

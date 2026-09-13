@@ -3,11 +3,13 @@ import { loginAsPhotographer } from "./auth";
 
 export interface TestProject {
   projectId: string;
+  projectName?: string;
   accessToken: string;
   uploadUrl: string;
   galleryUrl: string;
   photoCount?: number;
   requiredCount?: number;
+  photoIds?: string[];
 }
 
 /** 기본 프로젝트 생성 (preparing, 사진 없음) — 업로드 테스트용 */
@@ -29,14 +31,23 @@ export async function createFullProject(page: Page, photoCount = 5): Promise<Tes
     data: { action: "create_full_project", photoCount },
   });
   if (!res.ok()) throw new Error(`createFullProject failed (${res.status()}): ${await res.text()}`);
-  const data = await res.json() as { projectId: string; accessToken: string; photoCount: number; requiredCount: number };
+  const data = await res.json() as {
+    projectId: string;
+    projectName: string;
+    accessToken: string;
+    photoCount: number;
+    requiredCount: number;
+    photoIds: string[];
+  };
   return {
     projectId: data.projectId,
+    projectName: data.projectName,
     accessToken: data.accessToken,
     uploadUrl: `/photographer/projects/${data.projectId}/upload`,
     galleryUrl: `/c/${data.accessToken}/gallery`,
     photoCount: data.photoCount,
     requiredCount: data.requiredCount,
+    photoIds: data.photoIds,
   };
 }
 

@@ -14,15 +14,22 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get("code");
   const next = requestUrl.searchParams.get("next") ?? "/photographer/dashboard";
 
+  // request.url의 origin은 next dev가 리버스 프록시(ngrok/cloudflared 등) 뒤에서 실제 요청
+  // Host를 무시하고 항상 localhost:PORT로 되돌려주는 문제가 있어(dev 서버 특유의 동작),
+  // 그 값 대신 프록시가 넘겨주는 forwarded 헤더를 우선 신뢰한다.
+  const forwardedHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const forwardedProto = request.headers.get("x-forwarded-proto") ?? requestUrl.protocol.replace(":", "");
+  const origin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : requestUrl.origin;
+
   if (!code) {
-    return NextResponse.redirect(new URL("/", requestUrl.origin));
+    return NextResponse.redirect(new URL("/", origin));
   }
 
   const supabase = await createClient();
   const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
     console.error("[Auth Callback] exchangeCodeForSession error:", error);
-    return NextResponse.redirect(new URL("/?error=" + encodeURIComponent(error.message), requestUrl.origin));
+    return NextResponse.redirect(new URL("/?error=" + encodeURIComponent(error.message), origin));
   }
 
   const user = sessionData?.user;
@@ -111,5 +118,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(new URL(next, requestUrl.origin));
+  return NextResponse.redirect(new URL(next, origin));
 }

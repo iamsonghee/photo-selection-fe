@@ -9,6 +9,8 @@ self.onmessage = async (event: MessageEvent<CompressRequest>) => {
   const { id, file, maxEdge, jpegQuality } = event.data;
   try {
     const bitmap = await createImageBitmap(file);
+    const sourceWidth = bitmap.width;
+    const sourceHeight = bitmap.height;
     const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
     const width = Math.max(1, Math.round(bitmap.width * scale));
     const height = Math.max(1, Math.round(bitmap.height * scale));
@@ -20,8 +22,8 @@ self.onmessage = async (event: MessageEvent<CompressRequest>) => {
     context.drawImage(bitmap, 0, 0, width, height);
     bitmap.close();
     const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: jpegQuality });
-    self.postMessage({ id, blob });
+    self.postMessage({ id, blob, sourceWidth, sourceHeight });
   } catch {
-    self.postMessage({ id, blob: null });
+    self.postMessage({ id, blob: null, sourceWidth: null, sourceHeight: null });
   }
 };

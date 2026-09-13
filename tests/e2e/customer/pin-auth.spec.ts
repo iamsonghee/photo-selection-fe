@@ -16,10 +16,10 @@ import { loginAsPhotographer } from "../../helpers/auth";
 
 const SECRET = process.env.PIN_COOKIE_SECRET ?? "";
 
-function signCookie(token: string, timestampOverride?: number): string {
+function signCookie(token: string, timestampOverride?: number, accessPin: string | null = null): string {
   const timestamp = (timestampOverride ?? Math.floor(Date.now() / 1000)).toString();
   const sig = createHmac("sha256", SECRET)
-    .update(`${token}:${timestamp}`)
+    .update(`${token}:${accessPin === null ? "none" : `pin:${accessPin}`}:${timestamp}`)
     .digest("base64url");
   return `${timestamp}.${sig}`;
 }
@@ -204,6 +204,30 @@ test.describe("Phase A — middleware redirect", () => {
     expect(page.url()).toContain("rating=5");
     await ctx.close();
   });
+
+  test("M4: PIN 없이 초대 링크를 연 뒤 PIN을 설정하면 기존 인증이 즉시 만료된다", async ({ browser }) => {
+    const photographerPage = await browser.newPage();
+    const changedPinProject = await setupFullProject(photographerPage, 3);
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    try {
+      await page.goto(changedPinProject.galleryUrl, { waitUntil: "networkidle" });
+      await expect(page).not.toHaveURL(/\/pin/);
+
+      await setProjectPin(photographerPage, changedPinProject.projectId, "4826");
+      await page.goto(changedPinProject.galleryUrl, { waitUntil: "commit" });
+      await expect(page).toHaveURL(/\/pin/);
+
+      const staleApiResponse = await ctx.request.get(
+        `/api/c/photos?token=${encodeURIComponent(changedPinProject.accessToken)}`,
+      );
+      expect(staleApiResponse.status()).toBe(401);
+    } finally {
+      await ctx.close();
+      await deleteTestProject(photographerPage, changedPinProject.projectId);
+      await photographerPage.close();
+    }
+  });
 });
 
 // ─── PIN 폼 UI 흐름 (regression: 인증 직후 목적지 렌더링) ────────────────────
@@ -238,7 +262,7 @@ test.describe("Phase A — PIN 폼 UI 흐름", () => {
     await expect(page).toHaveURL(/\/pin/);
 
     for (const digit of "1234") {
-      await page.keyboard.press(digit);
+      await page.getByRole("button", { name: digit, exact: true }).click();
     }
 
     await page.waitForURL(/\/gallery/, { timeout: 10_000 });

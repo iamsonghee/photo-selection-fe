@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       );
     }
     // ── 공통 선행 검증(is_selected/rating/comment/color_op 전부 적용) ──────────
-    const pinErr = checkPinAuth(req, token);
+    const pinErr = await checkPinAuth(req, token);
     if (pinErr) return pinErr;
     const project = await validateTokenAndProject(token, project_id);
     if (!project) {
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
         { status: 400 }
       );
     }
-    const pinErr = checkPinAuth(req, token);
+    const pinErr = await checkPinAuth(req, token);
     if (pinErr) return pinErr;
     const project = await validateTokenAndProject(token, projectId);
     if (!project) {

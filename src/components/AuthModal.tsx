@@ -21,14 +21,12 @@ export function AuthModal({ isOpen, onClose, redirectPath }: AuthModalProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [isKakao, setIsKakao] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 600);
+  const [isKakao] = useState(isKakaoInAppBrowser);
   const [urlCopied, setUrlCopied] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
-    setIsMobile(window.innerWidth <= 600);
-    setIsKakao(isKakaoInAppBrowser());
     const handler = () => setIsMobile(window.innerWidth <= 600);
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);

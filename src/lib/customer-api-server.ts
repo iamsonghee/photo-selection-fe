@@ -52,6 +52,7 @@ function mapProjectRow(row: ProjectsRow): Project {
         .original_archive_status ?? null,
     originalDownloadStartedAt:
       (row as { original_download_started_at?: string | null }).original_download_started_at ?? null,
+    coverPhotoId: (row as { cover_photo_id?: string | null }).cover_photo_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -76,9 +77,25 @@ function mapPhotoRow(
       : undefined,
     comment: undefined,
     similarityGroupId: (row as { similarity_group_id?: string | null }).similarity_group_id ?? null,
-    isBlurry: (row as { is_blurry?: boolean | null }).is_blurry ?? null,
-    faceDetected: (row as { face_detected?: boolean | null }).face_detected ?? null,
-    eyesClosed: (row as { eyes_closed?: boolean | null }).eyes_closed ?? null,
+    /* ⚠️ **고객에게는 품질 판정(눈감음·흐림)을 내려보내지 않는다 — 의도적으로 비운 것이다.**
+     * (2026-09-12 결정. 예전에 `photos.is_blurry`를 읽었고, 잠시 Gemini Flash를 읽도록 바꿨다가 되돌렸다.)
+     *
+     * 이유:
+     *  - AI 오판의 비용을 **작가가** 진다. 의도적 아웃포커싱·패닝·감성 컷을 "흐림"으로 찍으면
+     *    고객이 좋은 사진을 스스로 지운다. 고객 기준을 `likely`로 좁혀도 방향은 그대로다.
+     *  - 작가가 고객에게 보내는 화면에 작가 작업물의 결함을 표시하는 셈이라 상품에 흠집을 낸다.
+     *  - 이 판정의 목적은 애초에 **작가가 보내기 전에 거르는 것**이다. 걸렀다면 고객 화면에
+     *    표시할 게 없어야 정상이다.
+     *
+     * 선은 "AI냐 아니냐"가 아니라 **정리냐 흠결 판정이냐**다 — 유사컷 묶기(중립적 정리)는
+     * 고객도 쓰지만, 눈감음·흐림(품질 흠결)은 작가 전용이다.
+     *
+     * 그래서 고객 갤러리의 품질 배지·`흐림만`/`눈감음만` 필터는 **값이 없어 렌더되지 않는다**.
+     * 되살리려면 이 세 필드를 `buildQualityFlagMap(..., "customer")`로 채우면 된다(§6.7).
+     */
+    isBlurry: null,
+    faceDetected: null,
+    eyesClosed: null,
   };
 }
 
@@ -464,6 +481,10 @@ export interface OriginalDownloadInfo {
   archiveBlocked: boolean;
   incompleteOriginalCount: number;
   archiveFiles: OriginalArchiveDownloadFile[];
+  archiveProcessedFiles: number;
+  archiveProcessedBytes: number;
+  archiveUploadedBytes: number;
+  archiveStartedAt: string | null;
 }
 
 /**
@@ -494,6 +515,10 @@ export async function getOriginalDownloadInfo(
       archiveBlocked: false,
       incompleteOriginalCount: 0,
       archiveFiles: [],
+      archiveProcessedFiles: 0,
+      archiveProcessedBytes: 0,
+      archiveUploadedBytes: 0,
+      archiveStartedAt: null,
     };
   }
 
@@ -513,6 +538,10 @@ export async function getOriginalDownloadInfo(
       archiveBlocked: false,
       incompleteOriginalCount: 0,
       archiveFiles: [],
+      archiveProcessedFiles: 0,
+      archiveProcessedBytes: 0,
+      archiveUploadedBytes: 0,
+      archiveStartedAt: null,
     };
   }
 
@@ -567,6 +596,10 @@ export async function getOriginalDownloadInfo(
       archiveBlocked,
       incompleteOriginalCount,
       archiveFiles: [],
+      archiveProcessedFiles: 0,
+      archiveProcessedBytes: 0,
+      archiveUploadedBytes: 0,
+      archiveStartedAt: null,
     };
   }
 
@@ -581,18 +614,57 @@ export async function getOriginalDownloadInfo(
   const archivePreparing = !archiveBlocked && project.originalArchiveStatus !== "ready" && project.originalArchiveStatus !== "failed";
   const archiveFailed = project.originalArchiveStatus === "failed";
   let archiveFiles: OriginalArchiveDownloadFile[] = [];
-  if (!archivePreparing && !archiveFailed) {
-    const { data: partsRaw, error: partsError } = await admin
+  let archiveProcessedFiles = 0;
+  let archiveProcessedBytes = 0;
+  let archiveUploadedBytes = 0;
+  let archiveStartedAt: string | null = null;
+  if (!archiveBlocked) {
+    let { data: partsRaw, error: partsError } = await admin
       .from("original_archive_parts")
-      .select("part_number, file_count, byte_size")
+      .select("part_number, file_count, byte_size, status, processed_file_count, processed_bytes, processing_started_at, created_at")
       .eq("project_id", project.id)
-      .eq("status", "completed")
       .is("deleted_at", null)
       .order("part_number", { ascending: true });
+    // FE가 진행률 마이그레이션보다 먼저 실행된 배포 구간에서도 기존 다운로드 CTA와
+    // ready ZIP을 숨기지 않는다. 진행률만 0으로 폴백하고 마이그레이션 적용 후 자동 활성화한다.
+    if (partsError?.code === "42703") {
+      const legacyParts = await admin
+        .from("original_archive_parts")
+        .select("part_number, file_count, byte_size, status, processing_started_at, created_at")
+        .eq("project_id", project.id)
+        .is("deleted_at", null)
+        .order("part_number", { ascending: true });
+      partsRaw = (legacyParts.data ?? []).map((part) => ({
+        ...part,
+        processed_file_count: 0,
+        processed_bytes: 0,
+      })) as typeof partsRaw;
+      partsError = legacyParts.error;
+    }
     if (partsError) throw new Error(partsError.message);
-    type PartRow = { part_number: number; file_count: number; byte_size: number };
+    type PartRow = {
+      part_number: number;
+      file_count: number;
+      byte_size: number;
+      status: string;
+      processed_file_count: number;
+      processed_bytes: number;
+      processing_started_at: string | null;
+      created_at: string;
+    };
     const parts = (partsRaw ?? []) as PartRow[];
-    archiveFiles = parts.map((part) => ({
+    archiveProcessedFiles = parts.reduce((sum, part) => sum + (
+      part.status === "completed" ? part.file_count : Math.min(part.file_count, Math.max(0, part.processed_file_count ?? 0))
+    ), 0);
+    archiveProcessedBytes = parts.reduce((sum, part) => sum + (
+      part.status === "completed" ? part.byte_size : Math.min(part.byte_size, Math.max(0, part.processed_bytes ?? 0))
+    ), 0);
+    archiveUploadedBytes = parts.reduce((sum, part) => sum + (part.status === "completed" ? part.byte_size : 0), 0);
+    archiveStartedAt = parts
+      .map((part) => part.processing_started_at ?? part.created_at)
+      .filter(Boolean)
+      .sort()[0] ?? null;
+    archiveFiles = parts.filter((part) => part.status === "completed").map((part) => ({
       partNumber: part.part_number,
       fileCount: part.file_count,
       byteSize: part.byte_size,
@@ -614,6 +686,10 @@ export async function getOriginalDownloadInfo(
     archiveBlocked,
     incompleteOriginalCount,
     archiveFiles,
+    archiveProcessedFiles,
+    archiveProcessedBytes,
+    archiveUploadedBytes,
+    archiveStartedAt,
   };
 }
 
@@ -722,6 +798,13 @@ export type FinalDeliveryArchiveFile = {
   url?: string;
 };
 
+export type FinalDeliveryPreviewFile = {
+  photoId: string;
+  filename: string;
+  url: string;
+  thumbnailUrl: string;
+};
+
 export type FinalDeliveryDownloadInfo = {
   visible: boolean;
   expired: boolean;
@@ -731,6 +814,8 @@ export type FinalDeliveryDownloadInfo = {
   totalBytes: number;
   expiresAt: string | null;
   files: FinalDeliveryArchiveFile[];
+  /** 최종 ZIP에 고정된 보정본의 검토용 이미지. 원본 크기 납품 파일 URL은 노출하지 않는다. */
+  previewFiles: FinalDeliveryPreviewFile[];
 };
 
 /** 최종 확정된 검토 회차의 원본 크기 보정본 ZIP 상태. */
@@ -744,15 +829,21 @@ export async function getFinalDeliveryDownloadInfo(
   if (error || !project) return null;
   const row = project as { id: string; status: string; delivered_at: string | null; active_final_delivery_archive_id: string | null };
   if (row.status !== "delivered" || !row.delivered_at || !row.active_final_delivery_archive_id) {
-    return { visible: false, expired: false, preparing: false, failed: false, fileCount: 0, totalBytes: 0, expiresAt: null, files: [] };
+    return { visible: false, expired: false, preparing: false, failed: false, fileCount: 0, totalBytes: 0, expiresAt: null, files: [], previewFiles: [] };
   }
   const expiresAt = new Date(new Date(row.delivered_at).getTime() + FINAL_DELIVERY_DOWNLOAD_WINDOW_DAYS * 86400000);
   const expired = Date.now() > expiresAt.getTime();
   const { data: archive, error: archiveError } = await admin.from("final_delivery_archives")
-    .select("id,status,file_count,byte_size")
+    .select("id,status,file_count,byte_size,manifest")
     .eq("id", row.active_final_delivery_archive_id).eq("project_id", row.id).single();
-  if (archiveError || !archive) return { visible: false, expired, preparing: false, failed: false, fileCount: 0, totalBytes: 0, expiresAt: expiresAt.toISOString(), files: [] };
-  const a = archive as { id: string; status: string; file_count: number; byte_size: number };
+  if (archiveError || !archive) return { visible: false, expired, preparing: false, failed: false, fileCount: 0, totalBytes: 0, expiresAt: expiresAt.toISOString(), files: [], previewFiles: [] };
+  const a = archive as {
+    id: string;
+    status: string;
+    file_count: number;
+    byte_size: number;
+    manifest: Array<{ photo_id?: string; key?: string; filename?: string }> | null;
+  };
   let files: FinalDeliveryArchiveFile[] = [];
   if (!expired && a.status === "ready") {
     const { data: parts, error: partsError } = await admin.from("final_delivery_archive_parts")
@@ -764,10 +855,36 @@ export async function getFinalDeliveryDownloadInfo(
       partNumber: part.part_number, fileCount: part.file_count, byteSize: part.byte_size,
     }));
   }
+  const manifest = Array.isArray(a.manifest) ? a.manifest : [];
+  const deliveryKeys = manifest.flatMap((entry) => typeof entry.key === "string" && entry.key ? [entry.key] : []);
+  const previewRows: Array<{
+    photo_id: string;
+    r2_delivery_url: string;
+    r2_url: string;
+    r2_thumb_url: string | null;
+    delivery_filename: string | null;
+  }> = [];
+  for (let offset = 0; offset < deliveryKeys.length; offset += 200) {
+    const { data: batch } = await admin.from("photo_versions")
+      .select("photo_id,r2_delivery_url,r2_url,r2_thumb_url,delivery_filename")
+      .in("r2_delivery_url", deliveryKeys.slice(offset, offset + 200));
+    previewRows.push(...((batch ?? []) as typeof previewRows));
+  }
+  const previewByDeliveryKey = new Map(previewRows.map((preview) => [preview.r2_delivery_url, preview]));
+  const previewFiles = manifest.flatMap((entry) => {
+    const preview = entry.key ? previewByDeliveryKey.get(entry.key) : undefined;
+    if (!preview?.r2_url) return [];
+    return [{
+      photoId: preview.photo_id,
+      filename: entry.filename || preview.delivery_filename || "최종 보정본",
+      url: preview.r2_url,
+      thumbnailUrl: preview.r2_thumb_url || preview.r2_url,
+    }];
+  });
   return {
     visible: true, expired, preparing: !expired && (a.status === "pending" || a.status === "processing"),
     failed: a.status === "failed", fileCount: a.file_count, totalBytes: a.byte_size,
-    expiresAt: expiresAt.toISOString(), files,
+    expiresAt: expiresAt.toISOString(), files, previewFiles,
   };
 }
 

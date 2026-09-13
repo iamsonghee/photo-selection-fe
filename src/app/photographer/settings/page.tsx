@@ -1,6 +1,6 @@
 "use client";
 
-import { PageLoader } from "@/components/ui/PageLoader";
+import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -8,10 +8,15 @@ import {
   Loader2,
   Check,
   Camera,
+  Mail,
   Bell,
-  AlertTriangle,
+  Globe2,
+  Instagram,
   LogOut,
-  X,
+  Phone,
+  ShieldCheck,
+  Trash2,
+  UserRound,
 } from "lucide-react";
 import type { PhotographerProfile } from "@/app/api/photographer/profile/route";
 import { getProfileImageUrl } from "@/lib/photographer";
@@ -19,16 +24,27 @@ import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useProfile } from "@/contexts/ProfileContext";
-import { PhotographerPageHeader } from "@/components/layout/PhotographerPageHeader";
+import {
+  PhotographerLightPageFrame,
+  PhotographerLightPageHeader,
+} from "@/components/layout/PhotographerLightPageHeader";
+import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { PhotographerConfirmDialog } from "@/components/ui/PhotographerConfirmDialog";
+import {
+  PROJECT_FORM_INPUT_CLASS,
+  ProjectFormField,
+  ProjectFormInput,
+  ProjectFormTextarea,
+  ProjectFormPhoneInput,
+  ProjectFormError,
+  PhotographerLightSwitch,
+} from "@/components/photographer/ProjectFormFields";
 import { compressImageForUpload } from "@/lib/upload-client-compress";
-import { PhoneInput } from "@/components/ui/PhoneInput";
 import { isValidKoreanPhone } from "@/lib/phone";
+import themeStyles from "./SettingsTheme.module.css";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const ACCEPT_IMAGE = "image/jpeg,image/png,image/webp";
-
-const INPUT_CLS =
-  "w-full bg-background border border-border-strong rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-placeholder-foreground focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition-all disabled:opacity-50";
 
 function getInitial(name: string | null, email: string | null): string {
   if (name?.trim()) return name.trim().charAt(0).toUpperCase();
@@ -42,12 +58,75 @@ interface ToastItem {
   isError: boolean;
 }
 
+/** 설정 패널의 제목·설명·상태를 한 위계로 묶어 긴 단일 폼에서도 현재 영역을 빠르게 찾게 한다. */
+function SettingsSectionHeading({
+  icon: Icon,
+  title,
+  description,
+  status,
+}: {
+  icon: typeof UserRound;
+  title: string;
+  description: string;
+  status?: string;
+}) {
+  return (
+    <header className="flex items-start gap-3 border-b border-border-subtle bg-surface-raised/55 px-4 py-4 md:px-6 md:py-5">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface text-foreground ring-1 ring-inset ring-border-subtle" aria-hidden>
+        <Icon size={18} strokeWidth={1.9} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-[18px] font-bold leading-6 tracking-[-0.45px] text-foreground md:text-[20px] md:leading-7">{title}</h2>
+          {status ? <span className="rounded-md bg-surface px-2 py-0.5 text-[11px] font-semibold text-muted-foreground ring-1 ring-inset ring-border-subtle">{status}</span> : null}
+        </div>
+        <p className="mt-1 break-keep text-[13px] leading-5 text-muted-foreground">{description}</p>
+      </div>
+    </header>
+  );
+}
+
+/** Figma #56044 "알림"/"계정" 섹션 공통 행 — 라벨+설명(좌) / 컨트롤(우), 카드 배경 없이 플랫하게. */
+function SettingsRow({
+  icon: Icon,
+  label,
+  description,
+  children,
+  danger = false,
+}: {
+  icon?: typeof UserRound;
+  label: string;
+  description: string;
+  children: React.ReactNode;
+  danger?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 px-4 py-4 md:gap-6 md:px-6 md:py-5">
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        {Icon ? (
+          <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg ${danger ? "bg-danger/8 text-danger" : "bg-surface-raised text-muted-foreground"}`} aria-hidden>
+            <Icon size={17} strokeWidth={1.9} />
+          </span>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <p className={`text-[14px] font-semibold leading-5 ${danger ? "text-danger" : "text-foreground"}`}>{label}</p>
+          <p className="mt-1 max-w-[540px] break-keep text-[12px] leading-[18px] text-muted-foreground md:text-[13px] md:leading-5">{description}</p>
+        </div>
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
+
+function SettingsPanel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <section data-settings-panel className={`overflow-hidden rounded-2xl border border-border-subtle bg-surface ${className}`}>{children}</section>;
+}
+
 export default function SettingsPage() {
   const router = useRouter();
-  const { updateProfile: updateCtxProfile } = useProfile();
+  const { profile: ctxProfile, loading: profileLoading, updateProfile: updateCtxProfile } = useProfile();
 
   const [profile, setProfile] = useState<PhotographerProfile | null>(null);
-  const [loading, setLoading] = useState(true);
 
   const [editName, setEditName] = useState("");
   const [editBio, setEditBio] = useState("");
@@ -64,26 +143,21 @@ export default function SettingsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
 
+  // ProfileContext가 이미 세션당 1회 가져온 프로필을 여기서 다시 fetch하지 않고, 최초 도착 시에만
+  // 로컬 편집 상태를 시딩한다(이후 handleSave/이미지 업로드가 profile을 낙관적으로 직접 patch하므로
+  // ctxProfile이 갱신돼도 다시 덮어쓰지 않음).
   useEffect(() => {
-    fetch("/api/photographer/profile")
-      .then((r) => {
-        if (!r.ok) throw new Error("프로필을 불러올 수 없습니다.");
-        return r.json();
-      })
-      .then((data: PhotographerProfile) => {
-        setProfile(data);
-        setEditName(data.name ?? "");
-        setEditBio(data.bio ?? "");
-        const raw = data.instagramUrl ?? "";
-        setEditInstagram(
-          raw.replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/$/, ""),
-        );
-        setEditPortfolio(data.portfolioUrl ?? "");
-        setEditPhone(data.contactPhone ?? "");
-      })
-      .catch((e) => setFormError(e instanceof Error ? e.message : "오류"))
-      .finally(() => setLoading(false));
-  }, []);
+    if (!ctxProfile || profile) return;
+    setProfile(ctxProfile);
+    setEditName(ctxProfile.name ?? "");
+    setEditBio(ctxProfile.bio ?? "");
+    const raw = ctxProfile.instagramUrl ?? "";
+    setEditInstagram(
+      raw.replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/$/, ""),
+    );
+    setEditPortfolio(ctxProfile.portfolioUrl ?? "");
+    setEditPhone(ctxProfile.contactPhone ?? "");
+  }, [ctxProfile, profile]);
 
   const showToast = (message: string, isError = false) => {
     const id = Date.now();
@@ -209,8 +283,8 @@ export default function SettingsPage() {
     }
   };
 
-  if (loading) {
-    return <PageLoader variant="full" />;
+  if (profileLoading) {
+    return <SystemLoadingScreen />;
   }
 
   if (!profile) return null;
@@ -220,341 +294,260 @@ export default function SettingsPage() {
     ? format(new Date(profile.createdAt), "yyyy년 M월", { locale: ko })
     : null;
 
-  const cardCls = "bg-surface border border-border-subtle rounded-2xl overflow-hidden";
-
   return (
     <div
-      className="min-h-screen bg-background text-foreground"
-      style={{ fontFamily: "var(--font-inter, 'Pretendard', sans-serif)" }}
+      className={`${themeStyles.lightTheme} min-h-screen bg-background text-foreground`}
+      style={{ fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif" }}
       onKeyDown={(e) => { if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault(); }}
     >
-      <PhotographerPageHeader
-        crumbs={[{ label: "설정" }]}
-        title="설정"
-        stats={[
-          { label: "계정", value: profile.email?.split("@")[0] ?? "—" },
-        ]}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={ACCEPT_IMAGE}
+        className="hidden"
+        onChange={handleProfileImageChange}
+        disabled={uploadingImage}
       />
 
-      <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-6">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={ACCEPT_IMAGE}
-          className="hidden"
-          onChange={handleProfileImageChange}
-          disabled={uploadingImage}
-        />
+      <PhotographerLightPageFrame className="pb-16 pt-10 md:pb-20 md:pt-6">
+        <div className="mx-auto max-w-[1120px]">
+          <PhotographerLightPageHeader
+            title="설정"
+            description="고객에게 보이는 프로필과 계정 환경을 관리하세요."
+            className="mb-6 md:mb-8"
+            mobileDense
+          />
 
-        {/* 프로필 요약 */}
-        <section className={`${cardCls} p-6 flex flex-col sm:flex-row items-start sm:items-center gap-6`}>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="relative w-20 h-20 rounded-full shrink-0 overflow-hidden border border-border-strong focus:outline-none focus:ring-2 focus:ring-accent/40"
-          >
-            <div
-              className={`w-full h-full flex items-center justify-center ${
-                profile.profileImageUrl ? "bg-transparent" : "bg-accent"
-              }`}
-            >
-              {profile.profileImageUrl ? (
-                <img
-                  src={getProfileImageUrl(profile.profileImageUrl)}
-                  alt=""
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = getProfileImageUrl(null);
-                  }}
-                />
-              ) : (
-                <span
-                  className="text-2xl font-bold text-black"
-                  style={{ fontFamily: "var(--font-mono, monospace)" }}
-                >
-                  {initial}
-                </span>
-              )}
-            </div>
-            <div className="absolute inset-0 flex items-center justify-center bg-black/75 text-accent text-[10px] font-semibold opacity-0 hover:opacity-100 transition-opacity">
-              {uploadingImage ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  <Camera size={16} className="mr-1" />
-                  변경
-                </>
-              )}
-            </div>
-          </button>
-
-          <div className="flex-1 min-w-0">
-            <h2 className="text-xl md:text-2xl font-bold text-foreground tracking-tight truncate">
-              {profile.name || "이름 없음"}
-            </h2>
-            <p
-              className="text-sm text-muted-foreground mt-1 truncate"
-              style={{ fontFamily: "var(--font-mono, monospace)" }}
-            >
-              {profile.email ?? ""}
-            </p>
-            <div className="flex flex-wrap gap-2 mt-3">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-accent/10 text-accent border border-accent/30">
-                <Check size={12} strokeWidth={2.5} aria-hidden />
-                Google 연결됨
-              </span>
-              {joinDate && (
-                <span
-                  className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] text-muted-foreground bg-border-subtle border border-border-strong"
-                  style={{ fontFamily: "var(--font-mono, monospace)" }}
-                >
-                  {joinDate} 가입
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-2">
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-border-strong text-muted-foreground hover:border-accent hover:text-accent transition-colors"
-            >
-              <LogOut size={16} />
-              로그아웃
-            </button>
-            <div className="w-full h-px bg-border-subtle" />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingImage}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-border-strong text-muted-foreground hover:border-accent hover:text-accent transition-colors disabled:opacity-50"
-            >
-              <Camera size={16} />
-              이미지 변경
-            </button>
-            <p className="text-[10px] text-disabled-foreground text-center sm:text-right leading-relaxed">
-              JPG, PNG, WebP · 최대 5MB
-              <br />
-              권장 200×200px
-            </p>
-          </div>
-        </section>
-
-        <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6 items-start">
-          {/* 프로필 편집 */}
-          <div className={cardCls}>
-            <div className="px-6 py-4 border-b border-border-subtle bg-background/40">
-              <h3 className="text-base font-bold text-foreground">프로필 편집</h3>
-              <p className="text-xs text-muted-foreground mt-1">고객에게 보이는 이름과 링크를 관리합니다.</p>
-            </div>
-
-            <div className="p-6 flex flex-col gap-5">
-              <div>
-                <label className="text-sm font-semibold text-muted-foreground block mb-2">이름</label>
-                <input
-                  className={INPUT_CLS}
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  placeholder="이름"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold text-muted-foreground block mb-2">소개</label>
-                <textarea
-                  className={`${INPUT_CLS} min-h-[88px] resize-none leading-relaxed`}
-                  value={editBio}
-                  onChange={(e) => setEditBio(e.target.value)}
-                  placeholder="간단한 소개 (선택)"
-                />
-                <p className="text-[11px] text-disabled-foreground mt-1.5">고객 갤러리 페이지에 표시됩니다.</p>
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold text-muted-foreground block mb-2">연락처</label>
-                <PhoneInput
-                  className={INPUT_CLS}
-                  value={editPhone}
-                  onChange={setEditPhone}
-                />
-                <p className="text-[11px] text-disabled-foreground mt-1.5">알림 연동 시 사용됩니다 (선택).</p>
-              </div>
-
-              <div className="h-px bg-border-subtle my-1" />
-
-              <div>
-                <label className="text-sm font-semibold text-muted-foreground block mb-2">인스타그램</label>
-                <div className="flex rounded-xl overflow-hidden border border-border-strong focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/20 transition-all">
-                  <span
-                    className="shrink-0 px-3 py-2.5 text-xs text-muted-foreground bg-background border-r border-border-strong flex items-center"
-                    style={{ fontFamily: "var(--font-mono, monospace)" }}
+          <div data-settings-layout className="grid items-start gap-5 xl:grid-cols-[280px_minmax(0,1fr)] xl:gap-8">
+            {/* 프로필 사진과 계정 식별 정보는 긴 폼에서 분리해 PC 스크롤 중에도 맥락을 유지한다. */}
+            {/* 본문 카드(`SettingsPanel` 등)는 전부 `bg-surface`(흰색)라, 이 사이드바만 톤을
+              * 낮춰(`bg-surface-raised`) 스크롤되는 본문과 다른 "고정된 패널"이라는 정체성을
+              * 준다 — `xl:sticky`로 실제로 고정되는 동작과 색으로 짝을 맞춘다. */}
+            <aside data-settings-profile-summary className="overflow-hidden rounded-2xl border border-border-subtle bg-surface-raised xl:sticky xl:top-6">
+              <div className="flex items-center gap-4 p-5 xl:flex-col xl:items-stretch xl:p-6">
+                <div className="flex shrink-0 justify-center">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-[22px] ring-1 ring-inset ring-border-subtle focus:outline-none focus:ring-2 focus:ring-accent/40 xl:h-24 xl:w-24 xl:rounded-[26px]"
+                    aria-label="프로필 이미지 변경"
                   >
-                    instagram.com/
-                  </span>
-                  <input
-                    className="flex-1 min-w-0 bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-placeholder-foreground outline-none"
-                    value={editInstagram}
-                    onChange={(e) => setEditInstagram(e.target.value)}
-                    placeholder="계정명"
-                  />
+                    <div
+                      className={`w-full h-full flex items-center justify-center ${
+                        profile.profileImageUrl ? "bg-transparent" : "bg-accent"
+                      }`}
+                    >
+                      {profile.profileImageUrl ? (
+                        <img
+                          src={getProfileImageUrl(profile.profileImageUrl)}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = getProfileImageUrl(null);
+                          }}
+                        />
+                      ) : (
+                        <span className="text-2xl font-bold text-[var(--accent-foreground)] xl:text-[28px]">
+                          {initial}
+                        </span>
+                      )}
+                    </div>
+                    {/* hover 시에만 사진 위에 스크림 + "이미지 변경" 안내 — 평소엔 아무 배지도
+                        없이 사진만 보이다가, hover하면 무엇을 클릭하는 건지 알려준다. */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 bg-black/70 opacity-0 transition-opacity group-hover:opacity-100">
+                      {uploadingImage ? (
+                        <Loader2 size={16} className="animate-spin text-white" />
+                      ) : (
+                        <>
+                          <Camera size={16} className="text-white" />
+                          <span className="text-[10px] font-semibold text-white">이미지 변경</span>
+                        </>
+                      )}
+                    </div>
+                  </button>
+
                 </div>
-              </div>
 
-              <div>
-                <label className="text-sm font-semibold text-muted-foreground block mb-2">포트폴리오</label>
-                <input
-                  className={INPUT_CLS}
-                  value={editPortfolio}
-                  onChange={(e) => setEditPortfolio(e.target.value)}
-                  placeholder="https://..."
-                />
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-border-subtle bg-background/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              {formError ? (
-                <p className="text-xs text-rose-400 order-2 sm:order-1">{formError}</p>
-              ) : (
-                <span className="hidden sm:block order-1" />
-              )}
-              <div className="flex gap-2 w-full sm:w-auto justify-end order-1 sm:order-2">
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  disabled={saving}
-                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-semibold border border-border-strong text-muted-foreground hover:bg-border-subtle transition-colors disabled:opacity-50"
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-accent hover:bg-[#ff5e1a] text-black transition-colors disabled:opacity-60"
-                >
-                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {saving ? "저장 중..." : "저장하기"}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-6">
-            {/* 알림 */}
-            <div className={cardCls}>
-              <div className="px-6 py-4 border-b border-border-subtle bg-background/40 flex items-start justify-between gap-3">
-                <div className="flex items-start gap-2 min-w-0">
-                  <Bell size={18} className="text-accent shrink-0 mt-0.5" />
-                  <div>
-                    <h3 className="text-base font-bold text-foreground">알림 설정</h3>
-                    <p className="text-xs text-muted-foreground mt-1">이메일·푸시 알림은 준비 중입니다.</p>
+                <div className="min-w-0 flex-1 xl:text-center">
+                    <h2 className="truncate text-[18px] font-bold leading-6 tracking-[-0.45px] text-foreground">
+                      {profile.name || "이름 없음"}
+                    </h2>
+                    <div className="mt-1 flex min-w-0 items-center gap-1.5 xl:justify-center">
+                      <Mail size={13} className="shrink-0 text-subtle-foreground" />
+                      <span className="text-[13px] text-muted-foreground truncate">{profile.email ?? ""}</span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 xl:justify-center">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-accent/8 px-2 py-0.5 text-[11px] font-semibold text-accent ring-1 ring-inset ring-accent/20">
+                        <Check size={11} strokeWidth={2.5} aria-hidden />
+                        Google 연결됨
+                      </span>
+                      {joinDate && (
+                        <span className="text-[11px] text-disabled-foreground">{joinDate} 가입</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-border-subtle text-muted-foreground border border-border-strong">
-                  준비 중
-                </span>
-              </div>
-              <ul className="divide-y divide-border-subtle">
-                {[
-                  { label: "고객 셀렉 완료 알림", desc: "최종 확정 시 알림" },
-                  { label: "재보정 요청 알림", desc: "재보정 요청 시 알림" },
-                  { label: "마감 임박 알림", desc: "셀렉 기한 3일 전 알림" },
-                ].map((item) => (
-                  <li key={item.label}>
-                    <button
-                      type="button"
-                      onClick={() => showToast("준비 중인 기능입니다.")}
-                      className="w-full flex items-center justify-between gap-4 px-6 py-4 text-left hover:bg-border-subtle/30 transition-colors"
-                    >
-                      <div>
-                        <div className="text-sm font-medium text-foreground">{item.label}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">{item.desc}</div>
-                      </div>
-                      <div className="w-9 h-5 rounded-full border border-border-strong bg-background shrink-0 relative">
-                        <div className="absolute left-1 top-1 w-3 h-3 rounded-full bg-disabled-foreground" />
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            </aside>
 
-            {/* 위험 영역 */}
-            <div className={`${cardCls} border-rose-500/20`}>
-              <div className="px-6 py-4 border-b border-rose-500/15 bg-rose-500/5">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-2">
-                  <AlertTriangle size={14} />
-                  위험 영역
-                </h3>
-                <p className="text-base font-bold text-rose-300 mt-2">계정 탈퇴</p>
-                <p className="text-xs text-muted-foreground mt-1">모든 프로젝트와 데이터가 영구 삭제됩니다.</p>
-              </div>
-              <div className="p-6">
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteModal(true)}
-                  className="w-full py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/30 text-rose-400 text-sm font-semibold transition-colors"
+            <main className="flex min-w-0 flex-col gap-5 md:gap-6">
+              <SettingsPanel>
+                <SettingsSectionHeading
+                  icon={UserRound}
+                  title="프로필"
+                  description="고객 갤러리와 공유 화면에 표시되는 정보를 관리합니다."
+                />
+
+                <div className="grid gap-5 p-4 md:grid-cols-2 md:gap-x-5 md:gap-y-6 md:p-6">
+                  <ProjectFormField label="작가명 또는 스튜디오명">
+                    <ProjectFormInput
+                      className={PROJECT_FORM_INPUT_CLASS}
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="이름"
+                    />
+                  </ProjectFormField>
+
+                  <ProjectFormField label="연락처" hint="알림 연동 시 사용됩니다.">
+                    <div className="relative">
+                      <Phone size={16} className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-subtle-foreground md:left-5" aria-hidden />
+                      <ProjectFormPhoneInput
+                        className={`${PROJECT_FORM_INPUT_CLASS} !pl-11`}
+                        value={editPhone}
+                        onChange={setEditPhone}
+                      />
+                    </div>
+                  </ProjectFormField>
+
+                  <ProjectFormField label="소개글" hint="고객 갤러리 페이지에 표시됩니다." className="md:col-span-2">
+                    <ProjectFormTextarea
+                      className={`${PROJECT_FORM_INPUT_CLASS} min-h-[104px] resize-none leading-relaxed`}
+                      value={editBio}
+                      onChange={(e) => setEditBio(e.target.value)}
+                      placeholder="촬영 스타일이나 스튜디오를 간단히 소개해 주세요."
+                    />
+                  </ProjectFormField>
+
+                  <ProjectFormField label="인스타그램">
+                    <div className="flex overflow-hidden rounded-lg border border-border-subtle bg-surface transition-colors focus-within:border-accent/50 md:rounded-xl">
+                      <span className="flex shrink-0 items-center border-r border-border-subtle bg-surface-raised px-3 text-xs text-muted-foreground" aria-hidden>
+                        <Instagram size={15} />
+                      </span>
+                      <span className="flex shrink-0 items-center pl-3 text-[13px] text-subtle-foreground">@</span>
+                      <ProjectFormInput
+                        className="min-w-0 flex-1 bg-transparent px-2 py-[11px] text-[16px] text-foreground outline-none placeholder:text-placeholder-foreground md:py-[14px]"
+                        value={editInstagram}
+                        onChange={(e) => setEditInstagram(e.target.value)}
+                        placeholder="계정명"
+                      />
+                    </div>
+                  </ProjectFormField>
+
+                  <ProjectFormField label="포트폴리오">
+                    <div className="relative">
+                      <Globe2 size={16} className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-subtle-foreground md:left-5" aria-hidden />
+                      <ProjectFormInput
+                        className={`${PROJECT_FORM_INPUT_CLASS} !pl-11`}
+                        value={editPortfolio}
+                        onChange={(e) => setEditPortfolio(e.target.value)}
+                        placeholder="https://..."
+                      />
+                    </div>
+                  </ProjectFormField>
+                </div>
+
+                <footer className="flex flex-col gap-3 border-t border-border-subtle bg-surface-raised/55 px-4 py-4 sm:flex-row sm:items-center sm:justify-between md:px-6">
+                  <div className="min-h-[18px]">{formError ? <ProjectFormError>{formError}</ProjectFormError> : null}</div>
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+                  <PhotographerLightButton
+                    type="button"
+                    variant="secondary"
+                    onClick={handleCancel}
+                    disabled={saving}
+                  >
+                    취소
+                  </PhotographerLightButton>
+                  <PhotographerLightButton
+                    type="button"
+                    variant="primary"
+                    onClick={handleSave}
+                    pending={saving}
+                    pendingLabel="저장 중…"
+                  >
+                    변경사항 저장
+                  </PhotographerLightButton>
+                  </div>
+                </footer>
+              </SettingsPanel>
+
+              <SettingsPanel>
+                <SettingsSectionHeading
+                  icon={Bell}
+                  title="알림"
+                  description="프로젝트에서 확인해야 할 변화를 놓치지 않도록 알려드립니다."
+                  status="준비 중"
+                />
+                <div className="divide-y divide-border-subtle">
+                  {[
+                    { label: "고객 단계 완료", desc: "고객이 셀렉을 확정하거나 최종 승인하면 알려드려요." },
+                    { label: "보정 요청 도착", desc: "새로운 수정 또는 재보정 요청이 등록되면 알려드려요." },
+                    { label: "마감 임박", desc: "마감일 3일 전, 완료되지 않은 프로젝트를 알려드려요." },
+                  ].map((item) => (
+                    <SettingsRow key={item.label} label={item.label} description={item.desc}>
+                      <PhotographerLightSwitch
+                        checked={false}
+                        onCheckedChange={() => showToast("준비 중인 기능입니다.")}
+                        ariaLabel={item.label}
+                      />
+                    </SettingsRow>
+                  ))}
+                </div>
+              </SettingsPanel>
+
+              <SettingsPanel>
+                <SettingsSectionHeading
+                  icon={ShieldCheck}
+                  title="계정"
+                  description="로그인 상태와 계정 데이터를 관리합니다."
+                />
+                <div className="divide-y divide-border-subtle">
+                <SettingsRow icon={LogOut} label="로그아웃" description="현재 로그인된 기기에서 A-CUT 사용을 종료합니다.">
+                  <PhotographerLightButton type="button" variant="secondary" onClick={handleLogout}>
+                    로그아웃
+                  </PhotographerLightButton>
+                </SettingsRow>
+                <SettingsRow
+                  icon={Trash2}
+                  label="계정 삭제"
+                  description="모든 프로젝트와 사진을 영구적으로 삭제합니다. 삭제 후에는 복구할 수 없습니다."
+                  danger
                 >
-                  탈퇴하기
-                </button>
-              </div>
-            </div>
+                  <PhotographerLightButton
+                    type="button"
+                    variant="danger"
+                    onClick={() => setShowDeleteModal(true)}
+                  >
+                    계정 삭제
+                  </PhotographerLightButton>
+                </SettingsRow>
+                </div>
+              </SettingsPanel>
+            </main>
           </div>
         </div>
-      </div>
+      </PhotographerLightPageFrame>
 
-      {/* 탈퇴 모달 */}
-      {showDeleteModal && (
-        <div
-          className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget && !deletingAccount) setShowDeleteModal(false);
-          }}
-        >
-          <div className="bg-surface border border-rose-500/25 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
-              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                <AlertTriangle size={18} className="text-rose-500" />
-                계정 탈퇴
-              </h3>
-              <button
-                type="button"
-                onClick={() => !deletingAccount && setShowDeleteModal(false)}
-                aria-label="닫기"
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-border-subtle hover:text-foreground"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-6">
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                모든 프로젝트와 사진 데이터가 삭제됩니다.{" "}
-                <strong className="text-rose-400 font-semibold">되돌릴 수 없습니다.</strong>
-              </p>
-              <div className="flex flex-col-reverse sm:flex-row gap-2 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteModal(false)}
-                  disabled={deletingAccount}
-                  className="flex-1 py-3 rounded-xl border border-border-strong bg-border-subtle text-muted-foreground text-sm font-semibold hover:bg-border-strong disabled:opacity-50"
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeleteAccount}
-                  disabled={deletingAccount}
-                  className="flex-1 py-3 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-400 text-sm font-bold disabled:opacity-50 inline-flex items-center justify-center gap-2"
-                >
-                  {deletingAccount && <Loader2 className="w-4 h-4 animate-spin" />}
-                  탈퇴하기
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <PhotographerConfirmDialog
+        open={showDeleteModal}
+        onClose={() => { if (!deletingAccount) setShowDeleteModal(false); }}
+        onConfirm={handleDeleteAccount}
+        title="계정을 삭제할까요?"
+        description="계정 삭제 후에는 복구할 수 없습니다."
+        detail="모든 프로젝트, 원본 사진, 셀렉 기록과 보정본이 영구적으로 삭제됩니다."
+        confirmLabel="계정 삭제"
+        pendingLabel="삭제 중…"
+        pending={deletingAccount}
+        tone="danger"
+      />
 
       {/* 토스트 */}
       <div className="fixed bottom-6 right-4 md:right-8 z-[210] flex flex-col gap-2 max-w-[calc(100vw-2rem)]">
@@ -563,13 +556,11 @@ export default function SettingsPage() {
             key={t.id}
             className={`rounded-xl border px-4 py-3 text-sm shadow-lg flex items-start gap-3 ${
               t.isError
-                ? "bg-surface border-rose-500/40 text-rose-200"
+                ? "bg-surface border-danger/40 text-danger"
                 : "bg-surface border-border-strong text-foreground border-l-[3px] border-l-accent"
             }`}
           >
-            <span
-              className={`text-[10px] font-mono shrink-0 mt-0.5 ${t.isError ? "text-rose-400" : "text-accent"}`}
-            >
+            <span className={`text-[10px] font-semibold shrink-0 mt-0.5 ${t.isError ? "text-danger" : "text-accent"}`}>
               {t.isError ? "오류" : "완료"}
             </span>
             <span>{t.message}</span>

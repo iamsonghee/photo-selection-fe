@@ -24,8 +24,8 @@ function BetaApplySignInPrompt() {
   const [authOpen, setAuthOpen] = useState(true);
 
   return (
-    <Card className="flex flex-col items-center gap-4 text-center">
-      <h1 className="text-xl font-semibold text-foreground">A-CUT 클로즈드 베타 신청</h1>
+    <Card className="beta-form-card beta-signin flex flex-col items-center gap-4 text-center">
+      <h1 className="text-xl font-semibold text-foreground">클로즈드 베타 신청</h1>
       <p className="text-sm text-muted-foreground">
         베타 신청은 로그인 후 진행할 수 있습니다.
         <br />
@@ -254,11 +254,12 @@ function BetaApplyFormFields({ email }: { email: string }) {
   }
 
   return (
-    <Card className="flex flex-col gap-6">
+    <Card className="beta-form-card flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-semibold text-foreground">A-CUT 클로즈드 베타 신청</h1>
+        <p className="beta-eyebrow">A-CUT CLOSED BETA</p>
+        <h1 className="text-xl font-semibold text-foreground">클로즈드 베타 신청</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          약 1~2분이면 끝나요. 신청서를 검토한 뒤 입력하신 번호로 직접 연락드립니다.
+          약 1~2분이면 끝나요.<br />신청서를 검토한 뒤 입력하신 번호로 직접 연락드립니다.
         </p>
       </div>
 

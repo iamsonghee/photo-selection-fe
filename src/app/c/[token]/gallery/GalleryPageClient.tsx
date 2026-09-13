@@ -4,17 +4,30 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { RotateCcw, ChevronsUp, ChevronsDown } from "lucide-react";
+import { ChevronDown, Search, SlidersHorizontal, Star, X } from "lucide-react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useSelection } from "@/contexts/SelectionContext";
+import { useCustomerImageCache } from "@/contexts/CustomerImageCacheContext";
 import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
+import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
+import { SelectionLimitSnackbar } from "@/components/customer/SelectionLimitSnackbar";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
+import { GalleryDesktopHeader } from "@/components/customer/GalleryDesktopHeader";
+import {
+  fetchRoster,
+  getUsedColors,
+  readParticipant,
+  type Participant,
+  type ParticipantRoster,
+} from "@/lib/customer-participant";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
-import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { SimilarityToggleButton } from "@/components/ui/SimilarityToggleButton";
 import {
   appendGalleryScrollQuery,
   buildFilterQueryString,
+  COLOR_LABELS,
   COLOR_OPTIONS,
   GALLERY_FOCUS_PARAM,
   GALLERY_SCROLL_PARAM,
@@ -31,36 +44,64 @@ import {
   getGroupFrontPhotoId,
 } from "@/lib/photo-groups";
 import type { StarRating, ColorTag, SortOrder } from "@/types";
+import { triggerSelectionHaptic } from "@/lib/selection-feedback";
+import { customerDDay } from "@/lib/customer-dday";
+import { useCustomerLightCanvas } from "@/lib/use-customer-light-canvas";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 type TabFilter = "all" | "selected";
 
-const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
-  { value: "filename", label: "Sort: Filename" },
-  { value: "oldest",   label: "Sort: Number"   },
-  { value: "newest",   label: "Sort: Newest"   },
-];
+function CustomerGalleryHomeMark({ token, compact = false }: { token: string; compact?: boolean }) {
+  return (
+    <Link
+      href={`/c/${token}`}
+      aria-label="처음 화면으로"
+      className={`gl-mobile-brand-home${compact ? " is-compact" : ""}`}
+    >
+      <span aria-hidden="true">A</span>
+    </Link>
+  );
+}
 
 /** 그리드 레이아웃 상수 — 가상화된 행 높이·열 수 계산에 사용 */
-const GRID_MIN_CELL   = 148;
+// /review와 같은 PC 카드 밀도. 별 5개와 참가자 컬러칩 5개도 한 줄에서 겹치지 않는다.
+const GRID_MIN_CELL   = 180;
+const DESKTOP_CARD_ASPECT = 1;
 const GRID_GAP        = 12;
 const MOBILE_MAX_W    = 767;
-const MOBILE_COLS     = 3;
-const MOBILE_GAP      = 3;
-const PRESIGN_BATCH_MAX = 100;
+type MobileGalleryColumns = 2 | 3 | 4;
+const MOBILE_DEFAULT_COLS: MobileGalleryColumns = 2;
+/** 사진은 모든 밀도에서 1:1. `info`는 2열에서 사진 **아래** 붙는 정보 패널 높이(파일명 + 복사 + 별점 줄)로,
+ * 가상 스크롤의 행 높이에 더해야 한다 — 여기를 빼먹으면 카드가 겹치거나 잘린다. */
+const MOBILE_LAYOUT: Record<MobileGalleryColumns, { gap: number; aspect: number; info: number }> = {
+  /* 2열만 가로 4:3이다. 1:1로 두면 한 장이 168px까지 커져 한 화면에 두 줄밖에 안 들어온다 —
+   * 2열은 "크게 보며 고르는" 밀도지 한 장을 감상하는 화면이 아니다.
+   * 대신 세로 사진은 그만큼 위아래가 잘린다(1.33 crop) — 원본 확인은 상세보기의 몫이다.
+   * `info`는 사진 아래 정보 줄 높이로, 가상 스크롤 행 높이에 더해야 한다.
+   * 파일명을 상세보기로 옮기면서 지금은 모든 밀도가 0 — 다시 무언가를 사진 밖에 두면 여기부터 고친다. */
+  2: { gap: 10, aspect: 4 / 3, info: 0 },
+  3: { gap: 8, aspect: 1, info: 0 },
+  4: { gap: 6, aspect: 1, info: 0 },
+};
+const SIMILARITY_HINT_STORAGE_KEY = "ps:c-gallery-similarity-hint:v1";
+const SIMILARITY_HINT_DURATION_MS = 4500;
+const MOBILE_HEADER_COLLAPSE_Y = 72;
+const MOBILE_HEADER_DIRECTION_THRESHOLD = 12;
 const PRESIGN_DEBOUNCE_MS = 80;
-const PRESIGN_CACHE_MAX = 500;
 
 type GridLayout = { cols: number; gap: number; rowHeight: number; overscan: number };
-const DEFAULT_LAYOUT: GridLayout = { cols: 4, gap: GRID_GAP, rowHeight: GRID_MIN_CELL + GRID_GAP, overscan: 6 };
+const DEFAULT_LAYOUT: GridLayout = { cols: 4, gap: GRID_GAP, rowHeight: Math.ceil(GRID_MIN_CELL / DESKTOP_CARD_ASPECT) + GRID_GAP, overscan: 6 };
 
 export default function GalleryPageClient() {
+  /* 셀렉 갤러리도 라이트 화면이다 — 모바일 러버밴드/주소창 전환 때 body의 검은 바탕이 비치지 않게 한다 */
+  useCustomerLightCanvas();
   const params       = useParams();
   const router       = useRouter();
   const searchParams = useSearchParams();
   const token        = (params?.token as string) ?? "";
 
   const { project, photos, photoGroups, Y, N, toggle, selectedIds, photoStates, loading, updatePhotoState } = useSelection();
+  const { thumbUrls: presignedUrls, thumbQueue, ensureThumbUrls, refreshThumbUrl } = useCustomerImageCache();
   const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
 
   /* 새로고침/뒤로가기 시 필터가 초기화되지 않도록, 마운트 시 1회 URL에서 필터 상태를 복원한다.
@@ -71,6 +112,12 @@ export default function GalleryPageClient() {
   const [tabFilter,     setTabFilter]     = useState<TabFilter>(initialFilterState.selectedFilter === "selected" ? "selected" : "all");
   const [starFilter,    setStarFilter]    = useState<number>(initialFilterState.starFilter === "all" ? 0 : initialFilterState.starFilter);
   const [colorFilter,   setColorFilter]   = useState<ColorTag[]>(Array.isArray(initialFilterState.colorFilter) ? initialFilterState.colorFilter : []);
+  /** 두 명 이상을 고를 때 "한 명이라도 찜"(any) / "모두 찜"(all) 중 무엇으로 볼지 */
+  const [colorFilterMode, setColorFilterMode] = useState<"any" | "all">(initialFilterState.colorFilterMode);
+  /** 색 = 참가자 슬롯. 내 색은 "내 찜"으로 표시하고, 실제 쓰인 색만 필터에 노출한다. */
+  const [participant, setParticipant] = useState<Participant | null>(null);
+  /** 서버에 저장된 (색 → 표시 이름). 이름이 있으면 "빨강 찜" 대신 그 이름으로 부른다. */
+  const [roster, setRoster] = useState<ParticipantRoster>({});
   const [sortOrder,     setSortOrder]     = useState<SortOrder>(initialFilterState.sortOrder);
   const [hoverStar,     setHoverStar]     = useState(0);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -82,16 +129,78 @@ export default function GalleryPageClient() {
   const [searchValue, setSearchValue] = useState(initialFilterState.nameFilter);
   /** 흔들림/눈감음 경고 필터 — 켜진 조건 중 하나라도 해당하면 표시(OR) */
   const [qualityFilter, setQualityFilter] = useState<Set<"blurry" | "eyesClosed">>(new Set(initialFilterState.qualityFilter));
+  const [mobileColumns, setMobileColumns] = useState<MobileGalleryColumns>(MOBILE_DEFAULT_COLS);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [mobileScopeOpen, setMobileScopeOpen] = useState(false);
+  const [mobileHeaderCompact, setMobileHeaderCompact] = useState(false);
+  const [similarityHintVisible, setSimilarityHintVisible] = useState(false);
+  const [selectionLimitNoticeKey, setSelectionLimitNoticeKey] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    setParticipant(readParticipant(token));
+  }, [token]);
+
+  useEffect(() => {
+    if (!token || !project?.id) return;
+    let alive = true;
+    void fetchRoster(token, project.id).then((next) => { if (alive) setRoster(next); });
+    return () => { alive = false; };
+  }, [token, project?.id]);
+
+  /** 필터·칩에서 색을 부르는 이름. 내 색이면 "내 찜", 이름이 등록돼 있으면 "OO 찜", 없으면 색 이름. */
+  const colorLabel = useCallback(
+    (key: ColorTag) => {
+      if (key === participant?.color) return "내 찜";
+      const name = roster[key];
+      return name ? `${name} 찜` : `${COLOR_LABELS[key]} 찜`;
+    },
+    [participant, roster],
+  );
+
+  /** 프로젝트에서 실제로 쓰인 색 = 참여 중인 사람. 안 쓰인 색은 필터에 띄워봐야 결과가 0장이라 감춘다. */
+  const usedColors = useMemo(() => getUsedColors(photoStates), [photoStates]);
+  const colorFilterOptions = useMemo(
+    () =>
+      COLOR_OPTIONS.filter((option) => usedColors.includes(option.key)).map((option) => ({
+        ...option,
+        label: colorLabel(option.key),
+      })),
+    [usedColors, colorLabel],
+  );
+
+  const activeMobileFilterCount =
+    (starFilter > 0 ? 1 : 0) +
+    colorFilter.length +
+    (searchValue.trim() ? 1 : 0) +
+    qualityFilter.size;
+  const mobileFilterChipsVisible = activeMobileFilterCount > 0 && !mobileSearchOpen;
+
+  const clearMobileFilters = useCallback(() => {
+    setStarFilter(0);
+    setColorFilter([]);
+    setColorFilterMode("any");
+    setSearchValue("");
+    setQualityFilter(new Set());
+    setHoverStar(0);
+  }, []);
+
+  const dismissSimilarityHint = useCallback(() => {
+    setSimilarityHintVisible(false);
+    try {
+      localStorage.setItem(SIMILARITY_HINT_STORAGE_KEY, "seen");
+    } catch {
+      /* storage가 차단돼도 현재 화면의 안내는 닫는다. */
+    }
+  }, []);
 
   // ── Presigned thumb 관리 ──────────────────────────────────────────────────
   const gridRef        = useRef<HTMLDivElement>(null);
-  const pendingIdsRef  = useRef(new Set<string>()); // 이미 요청한 photoId
+  const mobileHeaderScrollRef = useRef({ lastY: 0, directionDelta: 0 });
+  const densityAnchorIdRef = useRef<string | null>(null);
   const retryingIdsRef = useRef(new Set<string>()); // onError 재시도 중
-  const [presignedUrls, setPresignedUrls] = useState(
-    new Map<string, { url: string; expiresAt: number }>()
-  );
-  // 화면 밖으로 스크롤된 카드의 진행 중인 썸네일 다운로드를 실제로 취소하기 위한 동시성 큐.
-  const [thumbQueue] = useState(() => createThumbLoadQueue(8));
+  const firstThumbRangeRequestedRef = useRef(false);
 
   // ── 가상화 그리드 레이아웃 (열 수·행 높이는 컨테이너 폭 기준으로 JS에서 계산) ──
   const [layout, setLayout] = useState<GridLayout>(DEFAULT_LAYOUT);
@@ -102,6 +211,17 @@ export default function GalleryPageClient() {
 
   const galleryScrollKey = token ? `ps:c-gallery-scroll:${token}` : "";
   const galleryFocusKey = token ? `ps:c-gallery-focus:${token}` : "";
+  const galleryDensityKey = token ? `ps:c-gallery-density:${token}` : "";
+
+  useEffect(() => {
+    if (!galleryDensityKey) return;
+    try {
+      const stored = Number(sessionStorage.getItem(galleryDensityKey));
+      if (stored >= 2 && stored <= 4) setMobileColumns(stored as MobileGalleryColumns);
+    } catch {
+      /* storage가 막힌 브라우저에서는 Figma 기본값(2열)을 사용한다. */
+    }
+  }, [galleryDensityKey]);
 
   /* 브라우저 기본 스크롤 복원과 충돌하지 않도록 (갤러리에 있는 동안만 manual) */
   useLayoutEffect(() => {
@@ -110,6 +230,69 @@ export default function GalleryPageClient() {
     history.scrollRestoration = "manual";
     return () => {
       history.scrollRestoration = prev;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!mobileFiltersOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileFiltersOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [mobileFiltersOpen]);
+
+  // 모바일에서는 아래로 탐색할 때 제목/마감일 행을 접고, 위로 되돌아갈 때 다시 펼친다.
+  // 작은 스크롤 변화는 누적 임계값으로 무시해 헤더가 떨리는 현상을 막는다.
+  useEffect(() => {
+    let frame = 0;
+    const scrollState = mobileHeaderScrollRef.current;
+
+    const updateHeader = () => {
+      frame = 0;
+      if (window.innerWidth > MOBILE_MAX_W) {
+        setMobileHeaderCompact(false);
+        scrollState.lastY = window.scrollY;
+        scrollState.directionDelta = 0;
+        return;
+      }
+
+      const nextY = Math.max(0, window.scrollY);
+      const delta = nextY - scrollState.lastY;
+
+      if (nextY <= 16) {
+        setMobileHeaderCompact(false);
+        scrollState.directionDelta = 0;
+      } else if (Math.sign(delta) !== Math.sign(scrollState.directionDelta)) {
+        scrollState.directionDelta = delta;
+      } else {
+        scrollState.directionDelta += delta;
+      }
+
+      if (nextY > MOBILE_HEADER_COLLAPSE_Y && scrollState.directionDelta >= MOBILE_HEADER_DIRECTION_THRESHOLD) {
+        setMobileHeaderCompact(true);
+        scrollState.directionDelta = 0;
+      } else if (scrollState.directionDelta <= -MOBILE_HEADER_DIRECTION_THRESHOLD) {
+        setMobileHeaderCompact(false);
+        scrollState.directionDelta = 0;
+      }
+
+      scrollState.lastY = nextY;
+    };
+
+    const requestUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(updateHeader);
+    };
+
+    scrollState.lastY = window.scrollY;
+    setMobileHeaderCompact(window.innerWidth <= MOBILE_MAX_W && window.scrollY > MOBILE_HEADER_COLLAPSE_Y);
+    window.addEventListener("scroll", requestUpdate, { passive: true });
+    window.addEventListener("resize", requestUpdate);
+    return () => {
+      window.removeEventListener("scroll", requestUpdate);
+      window.removeEventListener("resize", requestUpdate);
+      if (frame) window.cancelAnimationFrame(frame);
     };
   }, []);
 
@@ -138,11 +321,12 @@ export default function GalleryPageClient() {
     selectedFilter: tabFilter === "selected" ? "selected" : "all",
     starFilter:     starFilter === 0 ? "all" : (starFilter as StarRating),
     colorFilter:    colorFilter.length > 0 ? colorFilter : "all",
+    colorFilterMode,
     sortOrder,
     nameFilter: searchValue,
     qualityFilter: Array.from(qualityFilter),
     groupedView: similarityToggleOn,
-  }), [tabFilter, starFilter, colorFilter, sortOrder, searchValue, qualityFilter, similarityToggleOn]);
+  }), [tabFilter, starFilter, colorFilter, colorFilterMode, sortOrder, searchValue, qualityFilter, similarityToggleOn]);
 
   const filteredPhotos = useMemo(() => {
     return getFilteredPhotos(photos, selectedIds, photoStates, filterState);
@@ -163,6 +347,25 @@ export default function GalleryPageClient() {
   // OpenCLIP 전용 컬럼이라 Gemini 분석에서는 계속 null로 남아 예전 조건대로면 토글이 영영 안 뜬다.
   const showSimilarityToggle = photoGroups.length > 0;
 
+  useEffect(() => {
+    if (!showSimilarityToggle || window.innerWidth > MOBILE_MAX_W) {
+      setSimilarityHintVisible(false);
+      return;
+    }
+    if (similarityToggleOn) {
+      dismissSimilarityHint();
+      return;
+    }
+    try {
+      if (localStorage.getItem(SIMILARITY_HINT_STORAGE_KEY)) return;
+    } catch {
+      /* storage 사용이 막혀도 현재 진입에서는 안내를 표시한다. */
+    }
+    setSimilarityHintVisible(true);
+    const timer = window.setTimeout(dismissSimilarityHint, SIMILARITY_HINT_DURATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [dismissSimilarityHint, showSimilarityToggle, similarityToggleOn]);
+
   const hasBlurryPhotos = useMemo(() => photos.some((p) => p.isBlurry === true), [photos]);
   const hasEyesClosedPhotos = useMemo(
     () => photos.some((p) => p.faceDetected === true && p.eyesClosed === true),
@@ -182,6 +385,15 @@ export default function GalleryPageClient() {
    *  실제 필터링 자체는 filterState를 통해 getFilteredPhotos(공유 로직, 뷰어와 동일)가 수행한다. */
   const narrowingFilterActive = searchValue.trim().length > 0 || qualityFilter.size > 0;
 
+  /** 파일명이 지금 "작업의 대상"인지 — 이때만 격자에 파일명을 되살린다.
+   *  검색 결과는 파일명이 보이지 않으면 무엇이 왜 걸렸는지 확인할 방법이 없다.
+   *  평소에는 파일명을 상세보기 한 곳에서만 말한다(§파일명 규칙).
+   *
+   *  파일명 **정렬**은 조건에 넣지 않는다 — `filename`이 기본 정렬값이라(`toSearchParams`가 이 값만
+   *  URL에서 생략한다) "정렬이 파일명"은 사용자가 선택한 특별한 상태가 아니고, 넣으면 사실상
+   *  항상 참이 되어 파일명을 걷어낸 의미가 사라진다. */
+  const filenameContextActive = searchValue.trim().length > 0;
+
   /* 토글 ON: 표지(front) + 미분류 사진만, 펼쳐진 그룹은 orderIndex 원래 순서 그대로 인라인 삽입.
    *  셀렉/표지 변경과 무관하게 항상 원래 순서를 유지해야 하므로, 표지를 맨 앞으로 옮기지 않고
    *  membersByGroup(이미 orderIndex 정렬됨)을 그대로 push한다.
@@ -189,7 +401,9 @@ export default function GalleryPageClient() {
   const displayPhotos = useMemo(() => {
     if (narrowingFilterActive) return filteredPhotos;
     if (!similarityToggleOn) return filteredPhotos;
-    const fronts = filterToGroupFrontPhotos(filteredPhotos, groupsById, photoIdSet, groupSelectionInfo);
+    const stableSelectionInfo = new Map(groupSelectionInfo);
+    expandedGroups.forEach((groupId) => stableSelectionInfo.delete(groupId));
+    const fronts = filterToGroupFrontPhotos(filteredPhotos, groupsById, photoIdSet, stableSelectionInfo);
     const result: typeof filteredPhotos = [];
     // 대표컷이 photos 목록에서 사라진 방어 폴백(filterToGroupFrontPhotos 참고)이 발동하면
     // 같은 groupId의 멤버 여러 장이 fronts에 남을 수 있다 — 그룹당 한 번만 처리해 멤버 중복
@@ -243,75 +457,35 @@ export default function GalleryPageClient() {
     router.replace(`/c/${token}/gallery${nextQs ? `?${nextQs}` : ""}`, { scroll: false });
   }, [filterState, token, router]);
 
-  // presigned URL 일괄 적용. 4,000장 갤러리를 끝까지 스크롤해도 Map이 무한히 커지지
-  // 않도록 오래된 항목부터 정리한다 — pendingIdsRef도 같은 id를 같이 제거해야
-  // range-fetch 이펙트가 스크롤로 돌아왔을 때 재요청을 계속 건너뛰지 않는다.
-  const applyPresignedUrls = useCallback(
-    (data: Record<string, { url: string; expiresAt: number }>) => {
-      const evictedIds: string[] = [];
-      setPresignedUrls((prev) => {
-        const next = new Map(prev);
-        for (const [id, info] of Object.entries(data)) next.set(id, info);
-        while (next.size > PRESIGN_CACHE_MAX) {
-          const oldestId = next.keys().next().value;
-          if (oldestId === undefined) break;
-          next.delete(oldestId);
-          evictedIds.push(oldestId);
-        }
-        return next;
-      });
-      for (const id of evictedIds) pendingIdsRef.current.delete(id);
-    },
-    []
-  );
-
-  // presign-thumbs API 배치 호출 (최대 100장)
-  const fetchPresignBatch = useCallback(
-    async (ids: string[]) => {
-      if (!token || ids.length === 0) return;
-      try {
-        const res = await fetch(
-          `/api/c/presign-thumbs?token=${encodeURIComponent(token)}&photoIds=${ids.join(",")}`
-        );
-        if (!res.ok) { console.warn("[gallery] presign-thumbs", res.status); return; }
-        const data = (await res.json()) as {
-          presignedUrls: Record<string, { url: string; expiresAt: number }>;
-        };
-        applyPresignedUrls(data.presignedUrls ?? {});
-      } catch (e) {
-        console.warn("[gallery] presign batch error", e);
-      }
-    },
-    [token, applyPresignedUrls]
-  );
-
   // img onError → 해당 사진 1회만 재발급 (HEAD 요청 없음)
   const handleThumbError = useCallback(
     (photoId: string) => {
       if (retryingIdsRef.current.has(photoId)) return;
       retryingIdsRef.current.add(photoId);
       console.warn("[gallery] thumb error, re-presigning:", photoId);
-      fetchPresignBatch([photoId]).finally(() => retryingIdsRef.current.delete(photoId));
+      refreshThumbUrl(photoId).finally(() => retryingIdsRef.current.delete(photoId));
     },
-    [fetchPresignBatch]
+    [refreshThumbUrl]
   );
 
   // 컨테이너 폭 → 열 수·행 높이·overscan(화면 2.5개 분량) 계산.
-  // 모바일(<=767px)은 CSS 미디어쿼리와 동일하게 3열 고정.
+  // 모바일은 2/3/4열 밀도별 gap과 카드 비율을 사용한다.
   useLayoutEffect(() => {
     const el = gridRef.current;
     if (!el) return;
 
     const update = () => {
       const isMobile = window.innerWidth <= MOBILE_MAX_W;
-      const gap = isMobile ? MOBILE_GAP : GRID_GAP;
+      const mobileSpec = MOBILE_LAYOUT[mobileColumns];
+      const gap = isMobile ? mobileSpec.gap : GRID_GAP;
       const width = el.clientWidth;
       if (width <= 0) return;
       const cols = isMobile
-        ? MOBILE_COLS
+        ? mobileColumns
         : Math.max(1, Math.floor((width + gap) / (GRID_MIN_CELL + gap)));
       const cellSize = (width - gap * (cols - 1)) / cols;
-      const rowHeight = Math.ceil(cellSize) + gap;
+      const cardHeight = isMobile ? cellSize / mobileSpec.aspect + mobileSpec.info : cellSize / DESKTOP_CARD_ASPECT;
+      const rowHeight = Math.ceil(cardHeight) + gap;
       const visibleRows = Math.max(1, Math.ceil(window.innerHeight / rowHeight));
       const overscan = Math.ceil(visibleRows * 2.5);
       setLayout((prev) =>
@@ -332,7 +506,7 @@ export default function GalleryPageClient() {
       ro.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, [loading]);
+  }, [loading, mobileColumns, mobileHeaderCompact]);
 
   const rowCount = layout.cols > 0 ? Math.ceil(displayPhotos.length / layout.cols) : 0;
 
@@ -349,6 +523,50 @@ export default function GalleryPageClient() {
     rowVirtualizer.measure();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout.rowHeight]);
+
+  const rememberDensityAnchor = useCallback(() => {
+    const grid = gridRef.current;
+    if (!grid) return;
+    const viewportCenter = window.innerHeight / 2;
+    let closestId: string | null = null;
+    let closestDistance = Number.POSITIVE_INFINITY;
+    for (const card of grid.querySelectorAll<HTMLElement>("[data-photo-id]")) {
+      const rect = card.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight) continue;
+      const distance = Math.abs(rect.top + rect.height / 2 - viewportCenter);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestId = card.dataset.photoId ?? null;
+      }
+    }
+    densityAnchorIdRef.current = closestId;
+  }, []);
+
+  const applyMobileColumns = useCallback((next: MobileGalleryColumns) => {
+    if (next === mobileColumns) return;
+    rememberDensityAnchor();
+    setMobileColumns(next);
+    try {
+      if (galleryDensityKey) sessionStorage.setItem(galleryDensityKey, String(next));
+    } catch {
+      /* ignore */
+    }
+  }, [mobileColumns, rememberDensityAnchor, galleryDensityKey]);
+
+  // 밀도 변경 전 화면 중앙에 있던 사진을 새 열 수에서도 중앙 부근에 유지한다.
+  useLayoutEffect(() => {
+    const anchorId = densityAnchorIdRef.current;
+    if (!anchorId || !layoutMeasured || layout.cols !== mobileColumns) return;
+    const index = displayPhotos.findIndex((photo) => photo.id === anchorId);
+    densityAnchorIdRef.current = null;
+    if (index < 0) return;
+    rowVirtualizer.measure();
+    requestAnimationFrame(() => {
+      rowVirtualizer.scrollToIndex(Math.floor(index / layout.cols), { align: "center" });
+    });
+    // rowVirtualizer는 렌더마다 새 참조라 의도적으로 제외한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout.cols, layout.rowHeight, layoutMeasured, mobileColumns, displayPhotos]);
 
   /** 뷰어에서 갤러리로 돌아왔을 때 스크롤 위치 복원.
    *  픽셀 위치(gs)가 아니라 "보고 있던 사진 id"(gf, 없으면 sessionStorage 폴백)를 우선 사용해
@@ -418,9 +636,9 @@ export default function GalleryPageClient() {
     ? `${virtualRows[0].index}-${virtualRows[virtualRows.length - 1].index}-${layout.cols}`
     : "";
 
-  // 현재 렌더 범위(visible + overscan)의 photoId만 모아 100장 단위로 presign.
-  // 빠른 스크롤 중에는 range가 계속 바뀌므로 80ms 안정될 때까지 실제 fetch를 미룬다 —
-  // 그사이 range가 또 바뀌면 cleanup에서 취소되어 스쳐 지나간 사진은 요청되지 않는다.
+  // 현재 렌더 범위(visible + overscan)의 photoId만 모아 공통 캐시에서 presign한다.
+  // 최초 화면은 지연 없이 요청한다. 이후 빠른 스크롤만 80ms 안정될 때까지 기다려
+  // 스쳐 지나간 범위의 불필요한 presign 요청을 줄인다.
   useEffect(() => {
     if (loading || !token || virtualRows.length === 0) return;
     const startPhoto = virtualRows[0].index * layout.cols;
@@ -429,22 +647,27 @@ export default function GalleryPageClient() {
       displayPhotos.length
     );
 
-    const timer = setTimeout(() => {
+    const requestRange = () => {
       const ids: string[] = [];
       for (let i = startPhoto; i < endPhoto; i++) {
         const photo = displayPhotos[i];
-        if (!photo || pendingIdsRef.current.has(photo.id)) continue;
-        pendingIdsRef.current.add(photo.id);
+        if (!photo) continue;
         ids.push(photo.id);
       }
-      for (let i = 0; i < ids.length; i += PRESIGN_BATCH_MAX) {
-        fetchPresignBatch(ids.slice(i, i + PRESIGN_BATCH_MAX));
-      }
-    }, PRESIGN_DEBOUNCE_MS);
+      void ensureThumbUrls(ids);
+    };
+
+    if (!firstThumbRangeRequestedRef.current) {
+      firstThumbRangeRequestedRef.current = true;
+      requestRange();
+      return;
+    }
+
+    const timer = setTimeout(requestRange, PRESIGN_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rangeKey, loading, token, displayPhotos, fetchPresignBatch]);
+  }, [rangeKey, loading, token, displayPhotos, ensureThumbUrls]);
 
   /* ── 처음/마지막/인덱스로 이동 ── */
   const scrollToPhotoIndex = useCallback(
@@ -466,8 +689,21 @@ export default function GalleryPageClient() {
   const handleCheckClick = useCallback((e: React.MouseEvent, photoId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    toggle(photoId);
+    const result = toggle(photoId);
+    if (result === "limit-reached") {
+      triggerSelectionHaptic("limit");
+      setSelectionLimitNoticeKey((current) => (current ?? 0) + 1);
+    }
   }, [toggle]);
+
+  const showSelectedPhotos = useCallback(() => {
+    setSelectionLimitNoticeKey(null);
+    setTabFilter("selected");
+    setMobileSearchOpen(false);
+    setMobileFiltersOpen(false);
+    setMobileScopeOpen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   const handleGroupBadgeClick = useCallback((e: React.MouseEvent, groupId: string) => {
     e.preventDefault();
@@ -551,8 +787,18 @@ export default function GalleryPageClient() {
   }
 
   const canConfirm  = Y === N;
-  const progressPct = N > 0 ? Math.min(Math.round((Y / N) * 100), 100) : 0;
   const remaining   = N - Y;
+  const deadlineDate = new Date(project.deadline);
+  const deadlineLabel = Number.isNaN(deadlineDate.getTime()) ? "" : format(deadlineDate, "yy.MM.dd", { locale: ko });
+  /* D-day는 고객 화면 공통 규칙(customerDDay) — 검토 마감·원본 다운로드 기한과 같은 계산·같은 색이다 */
+  const dday = customerDDay(deadlineDate);
+  const dDayLabel = dday?.label ?? "";
+  const dDayTone: BadgeTone = dday?.tone ?? "time";
+  const footerButtonLabel = remaining > 0
+    ? `${remaining}장을 더 셀렉해주세요`
+    : remaining < 0
+      ? `${Math.abs(remaining)}장 초과됐어요`
+      : "셀렉 확정하기";
 
   return (
     <>
@@ -571,26 +817,29 @@ export default function GalleryPageClient() {
           position: relative;
           aspect-ratio: 1 / 1;
           background: var(--surface);
-          border: 1px solid var(--border-subtle);
+          border: 0;
+          border-radius: 4px;
           transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
           cursor: pointer; overflow: hidden;
           display: block; text-decoration: none;
         }
+        .gl-card-media { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: 3px; }
+        .gl-card-placeholder { width: 100%; height: 100%; background: var(--surface); }
+        /* 코멘트가 있는 사진 표식. 색은 중립 흰색이다 — 주황은 "선택/제출 + 별점"의 색이라(§색 규칙)
+         * 여기에 쓰면 "골랐다"와 같은 무게로 읽힌다. 사진 위에 얹히므로 그림자로 대비를 준다. */
+        .gl-comment-indicator {
+          display: inline-grid; place-items: center; flex: 0 0 13px;
+          width: 13px; height: 13px; color: #fff;
+          filter: drop-shadow(0 1px 2px rgba(0,0,0,.5));
+        }
+        .gl-comment-indicator svg { display: block; }
         .gl-photo-card img {
           width: 100%; height: 100%; object-fit: cover;
           transition: transform 0.6s ease; display: block;
         }
         .gl-photo-card:hover img { transform: scale(1.05); }
-        .gl-photo-card.gl-selected {
-          border-color: var(--accent);
-          box-shadow: inset 0 0 0 1px var(--accent);
-        }
         .gl-photo-card.gl-selected .gl-check-box {
           background: var(--accent) !important; border-color: var(--accent) !important;
-        }
-        .gl-photo-card.gl-in-expanded-group {
-          border-color: var(--accent);
-          box-shadow: inset 0 0 0 1px var(--accent);
         }
 
         .gl-card-overlay {
@@ -600,6 +849,21 @@ export default function GalleryPageClient() {
           padding: 10px; display: flex; flex-direction: column; justify-content: flex-end;
         }
         .gl-card-overlay .gl-overlay-interactive { pointer-events: auto; }
+        .gl-rating-summary { display:none; }
+        @media (min-width: 768px) {
+          .gl-photo-card { aspect-ratio: 1; }
+          /* PC 카드에서는 빈 별 다섯 개도 작아 보이지 않도록 클릭 영역과 선을 함께 키운다. */
+          .gl-rating-row button { width:22px; height:24px; display:grid; place-items:center; }
+          .gl-rating-row svg { width:16px; height:16px; }
+        }
+        /* 파일명 검색·정렬이 켜진 동안에만 나타난다 — 평소 격자에는 파일명이 없다.
+         * 사진 위에 얹히므로 카드 높이가 변하지 않고, 따라서 가상 스크롤 행 높이도 그대로다. */
+        .gl-overlay-filename {
+          margin: 0 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          color: rgba(255,255,255,.82); font: 9px/1.2 'Space Mono', 'Noto Sans KR', sans-serif;
+          text-shadow: 0 1px 3px rgba(0,0,0,.8);
+        }
+        .gl-mobile-filter-backdrop, .gl-mobile-filter-sheet, .gl-mobile-similarity-hint { display: none; }
 
         .gl-check-box {
           position: absolute; top: 10px; left: 10px;
@@ -609,6 +873,9 @@ export default function GalleryPageClient() {
           z-index: 20; transition: all 0.2s ease;
           background: rgba(0,0,0,0.35);
         }
+        .gl-group-media { outline: 1px solid rgba(90,110,120,.4); outline-offset: -1px; }
+        .gl-in-expanded-group { background: var(--customer-divider); }
+        .gl-group-stack { border-bottom: 4px double rgba(255,255,255,.8); }
         .gl-group-badge {
           position: absolute; bottom: 8px; right: 8px;
           min-width: 22px; height: 20px; padding: 0 6px;
@@ -630,54 +897,6 @@ export default function GalleryPageClient() {
         }
         .gl-quality-badge-eyes {
           border-color: #4DA3FF; color: #4DA3FF;
-        }
-
-        .gl-similarity-toggle {
-          display: flex; align-items: center; gap: 6px;
-          font-size: 12px; font-weight: 700; background: none; border: none;
-          cursor: pointer; white-space: nowrap; font-family: inherit; padding: 8px 10px;
-        }
-        .gl-similarity-checkbox {
-          width: 14px; height: 14px; flex-shrink: 0;
-          border: 1.5px solid rgba(255,255,255,0.35);
-          display: flex; align-items: center; justify-content: center;
-          transition: all 0.15s ease;
-        }
-        .gl-similarity-toggle.gl-similarity-on .gl-similarity-checkbox {
-          background: #FF4D00; border-color: #FF4D00;
-        }
-
-        .gl-jump-group {
-          display: flex; align-items: center; gap: 4px; flex-shrink: 0;
-        }
-        .gl-jump-btn {
-          display: flex; align-items: center; justify-content: center;
-          width: 26px; height: 26px; padding: 0;
-          background: none; border: 1px solid var(--border); color: var(--muted-foreground);
-          cursor: pointer; transition: all 0.15s ease;
-        }
-        .gl-jump-btn:hover { color: var(--accent); border-color: var(--accent); }
-        .gl-search-group {
-          display: flex; align-items: center; gap: 4px; flex-shrink: 0;
-        }
-        .gl-search-input {
-          width: 190px; height: 26px; padding: 0 8px;
-          background: transparent; border: 1px solid var(--border); color: var(--foreground);
-          font-family: 'Space Mono', 'Noto Sans KR', sans-serif; font-size: 11px;
-          outline: none;
-        }
-        .gl-search-input:focus { border-color: var(--accent); }
-
-        .gl-filter-tab {
-          position: relative; padding: 8px 14px;
-          font-size: 12px; font-weight: 700; color: var(--subtle-foreground);
-          transition: color 0.2s; background: none; border: none;
-          cursor: pointer; white-space: nowrap; font-family: inherit;
-        }
-        .gl-filter-tab.gl-tab-active { color: var(--accent); }
-        .gl-filter-tab.gl-tab-active::after {
-          content: ''; position: absolute; bottom: -1px; left: 0;
-          width: 100%; height: 2px; background: var(--accent);
         }
 
         .gl-btn-confirm {
@@ -711,48 +930,200 @@ export default function GalleryPageClient() {
         ::-webkit-scrollbar-thumb { background: var(--accent); }
 
         @media (max-width: 767px) {
-          /* 헤더 상단 줄 */
-          .gl-header-top { height: 56px !important; padding: 0 14px !important; }
-          .gl-header-project-title { font-size: 15px !important; }
-          .gl-header-deadline { display: none; }
-          .gl-photographer-section { display: none !important; }
-          .gl-header-selected-label { display: none; }
-          .gl-header-selected-count { font-size: 20px !important; }
+          .gl-mobile-header { display: block !important; }
+          .gl-grid-bg { display: none; }
+          .gl-page-wrapper { background: #fff !important; }
 
-          /* 필터 바 — 가로 스크롤 단일 행 */
-          .gl-header-filter {
-            height: 44px !important;
-            padding: 0 8px !important;
-            justify-content: flex-start !important;
-            gap: 4px !important;
-            overflow-x: auto !important;
-            overflow-y: hidden !important;
-            flex-wrap: nowrap !important;
-            scrollbar-width: none;
+          .gl-mobile-appbar {
+            height: 51px; padding: 0 20px; display: flex; align-items: center;
+            justify-content: space-between; background: #fff;
+            overflow: hidden; opacity: 1; transform: translateY(0);
+            transition: height 200ms ease, opacity 140ms ease, transform 200ms ease;
           }
-          .gl-header-filter::-webkit-scrollbar { display: none; }
-          .gl-filter-right {
-            flex-shrink: 0;
-            gap: 8px !important;
+          .gl-mobile-title { display: flex; align-items: center; gap: 5px; min-width: 0; color: #26282c; }
+          .gl-mobile-brand-home {
+            width: 38px; height: 44px; margin-left: -6px; flex: 0 0 38px;
+            display: grid; place-items: center; border-radius: 8px;
+            text-decoration: none; -webkit-tap-highlight-color: transparent;
           }
-          .gl-filter-tab { padding: 6px 10px !important; font-size: 11px !important; }
-          .gl-filter-divider { margin: 0 4px !important; }
-          .gl-filter-stars button { width: 20px !important; height: 20px !important; font-size: 12px !important; }
+          .gl-mobile-brand-home span {
+            width: 26px; height: 26px; display: grid; place-items: center;
+            border-radius: 7px; background: #ff4d00; color: #fff;
+            font: 800 14px/1 Pretendard, sans-serif;
+            box-shadow: 0 1px 2px rgba(25, 25, 24, .12);
+            transition: transform 120ms ease, background-color 120ms ease;
+          }
+          .gl-mobile-brand-home:active span { transform: scale(.94); background: #e84600; }
+          .gl-mobile-brand-home:focus-visible { outline: 2px solid #ff4d00; outline-offset: 1px; }
+          .gl-mobile-brand-home.is-compact { width: 34px; flex-basis: 34px; margin-left: -4px; }
+          .gl-mobile-brand-home.is-compact span { width: 24px; height: 24px; border-radius: 6px; font-size: 13px; }
+          .gl-mobile-title strong { font-size: 16px; line-height: 24px; letter-spacing: -0.32px; }
+          .gl-mobile-deadline { display: flex; align-items: center; gap: 6px; font: 500 12px/18px Pretendard, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: 0; color: var(--customer-ink-secondary); white-space: nowrap; }
+          .gl-mobile-toolbar { height: 48px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff; transition: height 200ms ease; }
+          .gl-mobile-toolbar-leading { min-width: 0; display: flex; align-items: center; gap: 4px; }
+          .gl-mobile-header-compact .gl-mobile-appbar { height: 0; opacity: 0; transform: translateY(-10px); pointer-events: none; }
+          .gl-mobile-header-compact .gl-mobile-toolbar { height: 56px; }
+          .gl-mobile-filter-trigger { min-height: 44px; margin-left: -4px; padding: 0 4px; border: 0; background: transparent; display: flex; align-items: center; gap: 6px; color: #191918; font: inherit; }
+          .gl-mobile-filter-trigger strong, .gl-mobile-filter-trigger span { font-size: 12px; line-height: 19px; white-space: nowrap; }
+          @media (max-width: 359px) {
+            .gl-mobile-toolbar { padding: 0 10px; gap: 4px; }
+            .gl-mobile-filter-trigger { gap: 3px; }
+            .gl-mobile-toolbar-actions { gap: 4px !important; }
+          }
+          .gl-mobile-filter-trigger span { color: #6f6f6f; font-weight: 600; }
+          .gl-mobile-scope-menu { position: absolute; left: 20px; top: calc(99px + env(safe-area-inset-top)); z-index: 2; width: 148px; padding: 6px; border: 1px solid #dde1e4; border-radius: 6px; background: #fff; box-shadow: 0 8px 24px rgba(25,25,24,.12); }
+          .gl-mobile-header-compact .gl-mobile-scope-menu { top: calc(56px + env(safe-area-inset-top)); }
+          .gl-mobile-scope-option { width: 100%; height: 40px; padding: 0 10px; border: 0; border-radius: 4px; background: transparent; display: flex; align-items: center; justify-content: space-between; color: #26282c; font: 13px/20px Pretendard, sans-serif; }
+          .gl-mobile-scope-option-active { background: #fff0e8; color: #ff4d00; font-weight: 700; }
+          .gl-mobile-toolbar-actions { display: flex; gap: 8px; }
+          .gl-mobile-tool-wrap { position: relative; }
+          /* 버튼 상자는 덜어내되 터치 높이는 유지해 텍스트와 같은 무게로 정렬한다. */
+          .gl-mobile-tool-btn { width: 34px; height: 44px; border: 0; border-radius: 6px; background: transparent; color: #6f747b; display: grid; place-items: center; padding: 0; }
+          .gl-mobile-tool-btn-active { background: #fff0e8; color: #ff4d00; }
+          .gl-mobile-similarity-toggle { border:0 !important; background:transparent !important; height:44px !important; padding:0 5px !important; font-size:12px !important; }
+          .gl-mobile-similarity-toggle[aria-pressed="true"] { background:#fff0e8 !important; }
+          .gl-mobile-tool-btn:focus-visible, .gl-mobile-similarity-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+          .gl-mobile-density-icon { width: 15px; height: 14px; display: grid; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 2px; }
+          .gl-mobile-density-icon span { min-width: 0; min-height: 0; border: 1px solid currentColor; border-radius: 1px; }
+          .gl-mobile-similarity-hint { position: absolute; top: 38px; right: 0; z-index: 5; width: 218px; min-height: 44px; box-sizing: border-box; padding: 9px 34px 9px 12px; border-radius: 7px; background: rgba(25,25,24,.95); color: #fff; display: flex; align-items: center; box-shadow: 0 8px 24px rgba(0,0,0,.2); font: 500 11px/17px Pretendard, sans-serif; letter-spacing: -.2px; }
+          .gl-mobile-similarity-hint::before { content: ''; position: absolute; top: -5px; right: 28px; width: 10px; height: 10px; transform: rotate(45deg); background: rgba(25,25,24,.95); }
+          .gl-mobile-similarity-hint button { position: absolute; top: 3px; right: 3px; width: 32px; height: 38px; padding: 0; border: 0; background: transparent; color: rgba(255,255,255,.65); display: grid; place-items: center; }
+          .gl-mobile-filter-count { position: absolute; top: -6px; right: -6px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 999px; background: #ff4d00; color: #fff; font-size: 8px; line-height: 14px; font-weight: 700; text-align: center; pointer-events: none; }
+          .gl-mobile-search-row { height: 51px; padding: 7px 20px 8px; background: #fff; }
+          .gl-mobile-search-box { height: 36px; border: 1px solid #ff4d00; border-radius: 4px; display: flex; align-items: center; gap: 8px; padding: 0 10px; }
+          .gl-mobile-search-box input { min-width: 0; flex: 1; border: 0; outline: 0; color: #26282c; font: 12px/19px Pretendard, sans-serif; background: transparent; }
+          .gl-mobile-active-filters { min-height: 37px; padding: 4px 20px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; background: #fff; }
+          .gl-mobile-active-filters::-webkit-scrollbar { display: none; }
+          .gl-mobile-filter-chip { height: 29px; padding: 0 8px 0 12px; border: 1px solid #838b94; border-radius: 999px; background: #fff; color: #191918; display: flex; align-items: center; gap: 5px; flex: 0 0 auto; font: 12px/19px Pretendard, sans-serif; }
+          .gl-mobile-filter-chip-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+          .gl-mobile-filter-empty { margin: 0; padding: 4px 2px; color: #6f747b; font: 12px/19px Pretendard, sans-serif; }
+          /* 두 명 이상을 고르면 "누구 하나라도" 와 "둘 다"가 전혀 다른 결과라 명시적으로 고르게 한다 */
+          .gl-mobile-filter-mode { margin-top: 10px; display: flex; gap: 6px; }
+          .gl-mobile-filter-mode button {
+            flex: 1; min-height: 38px; padding: 0 10px;
+            border: 1px solid #dde1e4; border-radius: 8px; background: #fff;
+            font: 500 13px/18px Pretendard, sans-serif; color: #5f5e5b;
+          }
+          .gl-mobile-filter-mode-active { border-color: #ff4d00 !important; background: #fff5f0 !important; color: #191918 !important; font-weight: 600 !important; }
 
           /* 그리드 — 열 수/간격은 JS에서 뷰포트 폭 기준으로 계산(가상화) */
-          .gl-page-wrapper { padding-top: 104px !important; padding-bottom: 72px !important; }
-          .gl-grid-main { padding: 0 6px !important; }
-          .gl-search-group { display: none !important; }
+          .gl-page-wrapper { padding-top: calc(99px + env(safe-area-inset-top)) !important; padding-bottom: calc(92px + env(safe-area-inset-bottom)) !important; transition: padding-top 200ms ease; }
+          .gl-page-wrapper.gl-mobile-search-expanded { padding-top: calc(150px + env(safe-area-inset-top)) !important; }
+          .gl-page-wrapper.gl-mobile-filter-active { padding-top: calc(136px + env(safe-area-inset-top)) !important; }
+          .gl-page-wrapper.gl-mobile-header-compact { padding-top: calc(56px + env(safe-area-inset-top)) !important; }
+          .gl-page-wrapper.gl-mobile-header-compact.gl-mobile-search-expanded { padding-top: calc(107px + env(safe-area-inset-top)) !important; }
+          .gl-page-wrapper.gl-mobile-header-compact.gl-mobile-filter-active { padding-top: calc(93px + env(safe-area-inset-top)) !important; }
 
-          /* 카드 오버레이 — 모바일 크기 축소 */
-          .gl-card-overlay { padding: 6px !important; }
-          .gl-card-overlay p { font-size: 7px !important; margin-bottom: 2px !important; }
+          @media (prefers-reduced-motion: reduce) {
+            .gl-mobile-appbar, .gl-mobile-toolbar, .gl-page-wrapper { transition: none; }
+            .gl-mobile-brand-home span { transition: none; }
+          }
+          .gl-grid-main { padding: 0 20px !important; }
+
+          /* 카드 구조는 PC와 같다(카드 = 사진 1:1, 파일명·별점은 사진 위 그라데이션).
+           * 배경은 흰 카드 + 얇은 구분선 — 기본값 var(--surface)는 다크 토큰(#15161a)이라
+           * 라이트 갤러리에서 사진이 로딩되기 전/실패했을 때 검은 사각형이 뜬다. */
+          .gl-photo-card {
+            border-radius: 4px; transition: none;
+            background: #fff; border: 1px solid var(--customer-divider); box-sizing: border-box;
+          }
+          .gl-card-placeholder { background: #f1f3f6; }
+
+          /* 파일명을 걷어내면서 카드 상자(.gl-card-shell)도 함께 없앴다 — 상자는 사진과 파일명 줄을
+           * 한 덩어리로 묶으려고 둔 것이라 파일명이 사라지면 남는 게 사진뿐이다.
+           * 그래서 선택 표시도 3·4열·검토 목록·잠금 갤러리와 같은 사진 안쪽 링으로 돌아간다
+           * (2열만 상자 테두리로 알리면 밀도를 바꿀 때 선택 표시가 다른 것으로 바뀌어 보인다). */
+          .gl-photo-card:hover img { transform: none; }
+          .gl-card-media { border-radius: 3px; }
+          .gl-card-overlay { padding: 5px !important; background: none; }
           .gl-card-overlay .gl-overlay-interactive button { font-size: 8px !important; }
-          .gl-card-overlay .gl-overlay-interactive span { width: 5px !important; height: 5px !important; }
+          /* 코멘트 표식과 찜 dot이 나란히 서므로 무게를 맞춘다 — 예전에는 14px 외곽선 아이콘 옆에
+           * 5px 채운 원이라 2.8배 차이가 났다. */
+          .gl-card-overlay .gl-color-dot { width: 7px !important; height: 7px !important; }
 
           /* 체크박스 크기 */
-          .gl-check-box { width: 18px !important; height: 18px !important; top: 6px !important; left: 6px !important; }
+          .gl-check-box { width: 44px !important; height: 44px !important; top: 0 !important; left: 0 !important; border: 0 !important; background: transparent !important; justify-content: flex-start; align-items: flex-start; padding: 9px 0 0 9px; }
+          .gl-check-box::before { content: ''; position: absolute; left: 6px; top: 6px; width: 18px; height: 18px; border: 1px solid rgba(255,255,255,.72); background: rgba(255,255,255,.92); box-sizing: border-box; }
+          .gl-photo-card.gl-selected .gl-check-box { background: transparent !important; border-color: transparent !important; }
+          .gl-photo-card.gl-selected .gl-check-box::before { background: #ff4d00; border-color: #ff4d00; }
+          .gl-check-box svg { position: relative; z-index: 1; }
           .gl-quality-badge { width: 18px !important; height: 18px !important; top: 6px !important; right: 6px !important; }
+          .gl-group-badge { min-width: 18px; height: 16px; right: 5px; bottom: 5px; padding: 0 4px; border: 0; border-radius: 2px; background: rgba(0,0,0,.45); color: #fff; font-size: 8px; }
+
+          /* 비율은 모든 밀도에서 1:1 — 형제 화면(검토 목록·잠금 갤러리)과 같은 값이다.
+           * 2열이 사진을 가장 크게 보는 밀도인데 거기서 가장 많이 잘리던(1.46:1 가로 crop) 것을 없앤다. */
+          .gl-density-2 .gl-photo-card { aspect-ratio: 4 / 3; }
+          .gl-density-3 .gl-photo-card,
+          .gl-density-4 .gl-photo-card { aspect-ratio: 1 / 1; }
+
+          /* 검색·정렬이 켜졌을 때만 나타나는 파일명 — 4열은 8px 글자가 뭉개져 읽히지 않고
+           * 그라데이션도 없어 사진에 그대로 묻히므로 그때는 감춘다. */
+          .gl-density-2 .gl-overlay-filename { font-size: 9px; }
+          .gl-density-3 .gl-overlay-filename { font-size: 8px; margin-bottom: 2px; }
+          .gl-density-4 .gl-overlay-filename { display: none; }
+
+          /* 그라데이션은 별점·표식이 얹히는 2·3열에만 */
+          .gl-density-2 .gl-card-overlay,
+          .gl-density-3 .gl-card-overlay { background: linear-gradient(to top, rgba(0,0,0,.62), rgba(0,0,0,.18) 42%, transparent 68%); }
+          .gl-density-2 .gl-overlay-interactive { height: 16px; min-height: 16px !important; align-items: center !important; }
+          .gl-density-2 .gl-rating-row, .gl-density-2 .gl-marker-row { height: 16px; align-items: center; }
+          .gl-density-2 .gl-overlay-interactive button {
+            width: 16px; height: 16px; display: grid; place-items: center;
+            font-size: 12px !important; line-height: 16px !important;
+          }
+          .gl-density-2 .gl-comment-indicator {
+            width: 13px !important; height: 13px !important; flex: 0 0 13px;
+            transform: translateY(-1px);
+          }
+          .gl-density-2 .gl-check-box { top: 2px !important; left: 2px !important; }
+
+          /* 별점·코멘트·색은 3열까지 유지한다 — 밀도는 "한 번에 몇 장을 보나"이지 기능 스위치가 아니다.
+           * 4열은 별 하나가 8px 밑이라 누를 수도 읽을 수도 없어 그때만 감춘다. */
+          .gl-density-3 .gl-overlay-interactive { height: 14px; min-height: 14px !important; align-items: center !important; }
+          .gl-density-3 .gl-rating-row, .gl-density-3 .gl-marker-row { height: 14px; align-items: center; }
+          .gl-density-3 .gl-overlay-interactive button {
+            width: 13px; height: 13px; display: grid; place-items: center;
+            font-size: 10px !important; line-height: 13px !important;
+          }
+          .gl-density-3 .gl-comment-indicator {
+            width: 11px !important; height: 11px !important; flex: 0 0 11px;
+            transform: translateY(-1px);
+          }
+          /* 작은 모바일 카드에서는 조작 대신 평가 결과만 표시한다. 상세에서 별점을 바꾼다. */
+          .gl-density-3 .gl-rating-row, .gl-density-4 .gl-rating-row { display:none !important; }
+          .gl-density-3 .gl-rating-summary, .gl-density-4 .gl-rating-summary { display:inline-flex; align-items:center; gap:3px; color:#fff; font-size:11px; line-height:16px; }
+          .gl-density-4 .gl-card-overlay { display:flex; padding:4px; background:linear-gradient(to top,rgba(0,0,0,.6),transparent 60%); }
+          .gl-density-4 .gl-marker-row { display:none !important; }
+          .gl-density-4 .gl-check-box { top: 0 !important; left: 0 !important; padding: 6px 0 0 6px; }
+          .gl-density-4 .gl-check-box::before { left: 5px; top: 5px; width: 12px; height: 12px; }
+          .gl-density-4 .gl-check-box svg { width: 8px; height: 8px; }
+          .gl-density-4 .gl-quality-badge { display: none; }
+          .gl-photo-card.gl-selected .gl-card-media img { filter: brightness(.8); }
+
+          .gl-mobile-filter-backdrop { display: block; position: fixed; inset: 0; z-index: 80; border: 0; background: rgba(0,0,0,.48); padding: 0; }
+          .gl-mobile-filter-sheet { display: block; position: fixed; left: 50%; bottom: 0; z-index: 81; width: min(100%, 375px); transform: translateX(-50%); border-radius: 8px 8px 0 0; background: #fff; padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -8px 30px rgba(0,0,0,.12); }
+          .gl-mobile-filter-sheet-header { height: 58px; padding: 20px 20px 0; display: flex; align-items: center; justify-content: space-between; }
+          .gl-mobile-filter-sheet-title { margin: 0; color: #191918; font-size: 18px; line-height: 30px; font-weight: 700; letter-spacing: -.6px; }
+          .gl-mobile-filter-reset { border: 0; background: transparent; color: #838b94; font: 12px/24px Pretendard, sans-serif; text-decoration: underline; padding: 0; }
+          .gl-mobile-filter-sheet-body { padding: 20px; }
+          .gl-mobile-filter-section + .gl-mobile-filter-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid #eef0f2; }
+          .gl-mobile-filter-section h3 { margin: 0 0 10px; color: rgba(0,0,0,.9); font-size: 14px; line-height: 24px; font-weight: 500; letter-spacing: -.45px; }
+          .gl-mobile-filter-options { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+          .gl-mobile-filter-option { height: 39px; min-width: 0; padding: 0 4px; border: 1px solid #c6cbd0; border-radius: 4px; background: #fff; color: #191918; display: flex; align-items: center; justify-content: center; gap: 4px; font: 12px/19px Pretendard, sans-serif; }
+          .gl-mobile-filter-option-active { border-color: #ff4d00; background: #fff0e8; }
+          .gl-mobile-star-option { color: #191918; }
+          .gl-mobile-star-option .gl-mobile-star-icon { color: #aab0b8; transition: color 120ms ease; }
+          .gl-mobile-star-option:hover .gl-mobile-star-icon, .gl-mobile-star-option:active .gl-mobile-star-icon { color: rgba(255,77,0,.7); }
+          .gl-mobile-star-option-active .gl-mobile-star-icon { color: #ff4d00; }
+          .gl-mobile-star-option-active { border-color: #c6cbd0; background: #fff; }
+          .gl-mobile-filter-option-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+
+          .gl-empty-mobile { min-height: 478px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 20px; color: #191918; }
+          .gl-empty-mobile-icon { width: 58px; height: 58px; border-radius: 12px; background: #f1f3f6; color: #aab0b8; display: grid; place-items: center; margin-bottom: 16px; }
+          .gl-empty-mobile h2 { margin: 0; font-size: 19px; line-height: 38px; letter-spacing: -1.18px; }
+          .gl-empty-mobile p { margin: 0; color: #5f5e5b; font-size: 11px; line-height: 17px; }
+          .gl-empty-mobile button { height: 39px; margin-top: 28px; padding: 0 24px; border: 1px solid #bfbfbf; border-radius: 4px; background: #fff; color: #191918; font: 12px/19px Pretendard, sans-serif; }
+          .gl-empty-desktop { display: none !important; }
 
           /* 하단 바 */
           .gl-footer-inner { height: 60px !important; padding: 0 14px !important; gap: 12px !important; }
@@ -760,242 +1131,227 @@ export default function GalleryPageClient() {
           .gl-footer-progress { gap: 4px !important; }
           .gl-footer-progress-label { font-size: 9px !important; }
           .gl-btn-confirm { height: 40px !important; padding: 0 18px !important; font-size: 12px !important; }
-          .gl-filter-sort { display: none !important; }
+        }
+
+        @media (min-width: 768px) {
+          .gl-page-wrapper { padding-top:calc(var(--selection-header-height, 116px) + 16px) !important; }
+          .gl-mobile-header { display: none !important; }
+          .gl-empty-mobile { display: none !important; }
+
+          /* PC 라이트 재스킨 — docs/customer-design.md §10 "PC composition".
+           * 다크 워크스페이스 토큰(var(--surface)/var(--background))을 그대로 물려받던 배경/카드를
+           * 고객 라이트 토큰으로 override한다. 그리드 컬럼 계산(JS)과 카드 구조는 그대로 둔다. */
+          .gl-grid-bg { display: none; }
+          .gl-page-wrapper { background: var(--customer-canvas) !important; }
+          .gl-photo-card, .gl-card-placeholder { background: var(--customer-divider); }
         }
       `}</style>
 
-      <div className="gl-page-wrapper" style={{ background: "var(--background)", minHeight: "100vh", paddingTop: 140, paddingBottom: 100 }}>
+      <div className={`gl-page-wrapper gl-density-${mobileColumns}${mobileHeaderCompact ? " gl-mobile-header-compact" : ""}${mobileSearchOpen ? " gl-mobile-search-expanded" : ""}${mobileFilterChipsVisible ? " gl-mobile-filter-active" : ""}`} style={{ background: "var(--background)", minHeight: "100vh", paddingTop: 140, paddingBottom: 100 }}>
         <div className="gl-grid-bg" />
 
         {/* ── Header ── */}
-        <header style={{
-          position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
-          background: "rgba(10,10,12,0.90)", backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          borderBottom: "1px solid var(--border-subtle)",
-        }}>
-          {/* Top row */}
-          <div className="gl-header-top" style={{ maxWidth: 1800, margin: "0 auto", height: 80, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <Link href={token ? `/c/${token}` : "#"} style={{ textDecoration: "none" }}>
-                <div style={{ width: 32, height: 32, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", color: "#000", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 18, flexShrink: 0 }}>A</div>
-              </Link>
-              <div>
-                <h1 className="gl-header-project-title" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 20, letterSpacing: "-0.5px", lineHeight: 1, color: "var(--foreground)", margin: 0 }}>
-                  {project.name}
-                </h1>
-                <p className="gl-header-deadline" style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: "var(--subtle-foreground)", marginTop: 4, letterSpacing: "0.1em" }}>
-                  DEADLINE // {format(new Date(project.deadline), "yyyy.MM.dd", { locale: ko })}
-                </p>
-              </div>
+        <header
+          className={`gl-mobile-header${mobileHeaderCompact ? " gl-mobile-header-compact" : ""}`}
+          style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 60, paddingTop: "env(safe-area-inset-top)", background: "#fff", borderBottom: "1px solid #eef0f2" }}
+        >
+          <div className="gl-mobile-appbar">
+            <div className="gl-mobile-title">
+              {!mobileHeaderCompact && <CustomerGalleryHomeMark token={token} />}
+              <strong>사진 셀렉</strong>
             </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
-              {photographer?.name && (
-                <>
-                  <div className="gl-photographer-section" style={{ textAlign: "right" }}>
-                    <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, color: "var(--subtle-foreground)", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>Photography by</p>
-                    <p style={{ fontWeight: 700, fontSize: 14, color: "var(--foreground)", marginTop: 2 }}>{photographer.name}</p>
-                  </div>
-                  <div className="gl-photographer-section" style={{ width: 1, height: 32, background: "var(--border)", flexShrink: 0 }} />
-                </>
-              )}
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span className="gl-header-selected-label" style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>SELECTED</span>
-                  <span className="gl-header-selected-count" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 28, lineHeight: 1, color: "var(--foreground)" }}>
-                    {Y}{" "}
-                    <span style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 12, color: "var(--disabled-foreground)", fontWeight: 400 }}>/ {N}</span>
-                  </span>
-                </div>
-              </div>
+            <div className="gl-mobile-deadline">
+              <span>{deadlineLabel}</span>
+              {dDayLabel && <Badge tone={dDayTone} theme="customerLight" className="font-mono">{dDayLabel}</Badge>}
             </div>
           </div>
-
-          {/* Filter bar */}
-          <div style={{ borderTop: "1px solid var(--border-subtle)", background: "rgba(0,0,0,0.5)" }}>
-            <div className="gl-header-filter" style={{ maxWidth: 1800, margin: "0 auto", height: 56, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", overflowX: "auto" }}>
-              {/* Left: tabs + star buttons */}
-              <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                {(["all", "selected"] as const).map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => setTabFilter(v)}
-                    className={`gl-filter-tab${tabFilter === v ? " gl-tab-active" : ""}`}
-                  >
-                    {v === "all" ? "전체 사진" : "선택됨"}
-                  </button>
-                ))}
-
-                <div className="gl-filter-divider" style={{ width: 1, height: 16, background: "var(--border)", margin: "0 8px", flexShrink: 0 }} />
-
-                {/* Star filter */}
-                <div className="gl-filter-stars" style={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <span style={{ fontSize: 13, color: starFilter > 0 ? "var(--accent)" : "var(--disabled-foreground)", fontFamily: "'Space Mono', monospace", marginRight: 3, lineHeight: 1, userSelect: "none" }}>≥</span>
-                  {([1, 2, 3, 4, 5] as const).map((s) => {
-                    const filled = s <= (hoverStar || starFilter);
-                    return (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => { setStarFilter((prev) => (prev === s ? 0 : s)); setHoverStar(0); window.setTimeout(() => setHoverStar(0), 0); }}
-                        onMouseEnter={() => setHoverStar(s)}
-                        onMouseLeave={() => setHoverStar(0)}
-                        style={{
-                          width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 13, lineHeight: 1, color: filled ? "var(--accent)" : "var(--disabled-foreground)",
-                          background: "none", border: "none", cursor: "pointer",
-                          transition: "color 0.1s, transform 0.1s",
-                          transform: hoverStar === s ? "scale(1.2)" : "scale(1)",
-                        }}
-                      >
-                        {filled ? "★" : "☆"}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {showSimilarityToggle && (
-                  <>
-                    <div className="gl-filter-divider" style={{ width: 1, height: 16, background: "#222", margin: "0 8px", flexShrink: 0 }} />
-                    <button
-                      type="button"
-                      onClick={() => setSimilarityToggleOn((v) => !v)}
-                      className={`gl-similarity-toggle${similarityToggleOn ? " gl-similarity-on" : ""}`}
-                      style={{ color: similarityToggleOn ? "#FF4D00" : "#555" }}
-                    >
-                      <span className="gl-similarity-checkbox">
-                        {similarityToggleOn && (
-                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        )}
-                      </span>
-                      유사컷 묶어보기
-                    </button>
-                  </>
-                )}
-                {hasBlurryPhotos && (
-                  <button
-                    type="button"
-                    onClick={() => toggleQualityFilter("blurry")}
-                    className={`gl-similarity-toggle${qualityFilter.has("blurry") ? " gl-similarity-on" : ""}`}
-                    style={{ color: qualityFilter.has("blurry") ? "#FFB800" : "#555" }}
-                  >
-                    <span className="gl-similarity-checkbox" style={{ borderColor: qualityFilter.has("blurry") ? "#FFB800" : undefined, background: qualityFilter.has("blurry") ? "#FFB800" : undefined }}>
-                      {qualityFilter.has("blurry") && (
-                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </span>
-                    흔들림만
-                  </button>
-                )}
-                {hasEyesClosedPhotos && (
-                  <button
-                    type="button"
-                    onClick={() => toggleQualityFilter("eyesClosed")}
-                    className={`gl-similarity-toggle${qualityFilter.has("eyesClosed") ? " gl-similarity-on" : ""}`}
-                    style={{ color: qualityFilter.has("eyesClosed") ? "#4DA3FF" : "#555" }}
-                  >
-                    <span className="gl-similarity-checkbox" style={{ borderColor: qualityFilter.has("eyesClosed") ? "#4DA3FF" : undefined, background: qualityFilter.has("eyesClosed") ? "#4DA3FF" : undefined }}>
-                      {qualityFilter.has("eyesClosed") && (
-                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth={5}>
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </span>
-                    눈감음만
-                  </button>
-                )}
-              </div>
-
-              {/* Right: colors + reset + sort */}
-              <div className="gl-filter-right" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-                <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
-                  {COLOR_OPTIONS.map((opt) => {
-                    const isActive = colorFilter.includes(opt.key);
-                    return (
-                      <button
-                        key={opt.key}
-                        type="button"
-                        title={opt.key}
-                        onClick={() =>
-                          setColorFilter((prev) =>
-                            prev.includes(opt.key)
-                              ? prev.filter((c) => c !== opt.key)
-                              : [...prev, opt.key]
-                          )
-                        }
-                        style={{
-                          width: 13, height: 13, borderRadius: "50%",
-                          background: opt.hex,
-                          border: isActive ? "2px solid var(--foreground)" : "2px solid transparent",
-                          cursor: "pointer", flexShrink: 0, outline: "none", transition: "border-color 0.15s",
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-
-                <button
-                  type="button"
-                  title="초기화"
-                  onClick={() => { setStarFilter(0); setColorFilter([]); setHoverStar(0); window.setTimeout(() => setHoverStar(0), 0); }}
-                  style={{ background: "none", border: "none", color: "var(--disabled-foreground)", cursor: "pointer", display: "flex", alignItems: "center", padding: "4px 6px" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--muted-foreground)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--disabled-foreground)")}
-                >
-                  <RotateCcw style={{ width: 12, height: 12 }} />
-                </button>
-
-                <select
-                  className="gl-filter-sort"
-                  value={sortOrder}
-                  onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-                  style={{ background: "transparent", fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 10, textTransform: "uppercase", border: "1px solid var(--border)", padding: "4px 8px", color: "var(--muted-foreground)", outline: "none", cursor: "pointer" }}
-                >
-                  {SORT_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value} style={{ background: "var(--surface-raised)" }}>{o.label}</option>
-                  ))}
-                </select>
-
-                <div className="gl-jump-group">
-                  <button type="button" title="처음으로" aria-label="처음으로 이동" onClick={handleJumpToFirst} className="gl-jump-btn">
-                    <ChevronsUp style={{ width: 14, height: 14 }} />
-                  </button>
-                  <button type="button" title="마지막으로" aria-label="마지막으로 이동" onClick={handleJumpToLast} className="gl-jump-btn">
-                    <ChevronsDown style={{ width: 14, height: 14 }} />
-                  </button>
-                </div>
-
-                {/* 파일명 검색(필터) — PC 전용(모바일은 화면이 좁아 gl-search-group을 숨김).
-                    쉼표/공백으로 여러 파일명을 구분하면 LIKE(부분 일치)로 OR 검색된다. */}
-                <div className="gl-search-group">
-                  <input
-                    type="text"
-                    placeholder="파일명 검색 (쉼표로 여러 개)"
-                    value={searchValue}
-                    onChange={(e) => setSearchValue(e.target.value)}
-                    className="gl-search-input"
-                    aria-label="파일명으로 필터링"
+          <div className="gl-mobile-toolbar">
+            <div className="gl-mobile-toolbar-leading">
+              {mobileHeaderCompact && <CustomerGalleryHomeMark token={token} compact />}
+              <button type="button" className="gl-mobile-filter-trigger" aria-expanded={mobileScopeOpen} onClick={() => { setMobileScopeOpen((value) => !value); setMobileSearchOpen(false); setMobileFiltersOpen(false); }}>
+                <strong>{tabFilter === "selected" ? "선택됨" : "전체"}</strong>
+                <span>{tabFilter === "selected" ? Y : photos.length}장</span>
+                <ChevronDown size={12} strokeWidth={1.8} />
+              </button>
+            </div>
+            <div className="gl-mobile-toolbar-actions">
+              {showSimilarityToggle && (
+                <div className="gl-mobile-tool-wrap">
+                  <SimilarityToggleButton
+                    className="gl-mobile-similarity-toggle"
+                    size="compact"
+                    active={similarityToggleOn}
+                    count={photoGroups.length}
+                    onClick={() => {
+                      dismissSimilarityHint();
+                      setSimilarityToggleOn((value) => !value);
+                      setMobileSearchOpen(false);
+                      setMobileFiltersOpen(false);
+                      setMobileScopeOpen(false);
+                    }}
                   />
-                  {searchValue && (
-                    <button type="button" title="검색 초기화" aria-label="파일명 필터 초기화" onClick={() => setSearchValue("")} className="gl-jump-btn">
-                      ×
-                    </button>
+                  {similarityHintVisible && (
+                    <aside className="gl-mobile-similarity-hint" role="status">
+                      비슷한 사진을 묶어서 볼 수 있어요
+                      <button type="button" onClick={dismissSimilarityHint} aria-label="유사컷 안내 닫기"><X size={14} /></button>
+                    </aside>
+                  )}
+                </div>
+              )}
+              <button
+                type="button"
+                className="gl-mobile-tool-btn"
+                onClick={() => {
+                  const nextColumns = mobileColumns === 4
+                    ? 2
+                    : (mobileColumns + 1) as MobileGalleryColumns;
+                  applyMobileColumns(nextColumns);
+                  setMobileSearchOpen(false);
+                  setMobileFiltersOpen(false);
+                  setMobileScopeOpen(false);
+                }}
+                aria-label={`현재 ${mobileColumns}열, 누르면 ${mobileColumns === 4 ? 2 : mobileColumns + 1}열로 변경`}
+                title={`${mobileColumns}열 보기`}
+              >
+                <span
+                  className="gl-mobile-density-icon"
+                  style={{ gridTemplateColumns: `repeat(${mobileColumns}, minmax(0, 1fr))` }}
+                  aria-hidden="true"
+                >
+                  {Array.from({ length: mobileColumns * 2 }, (_, index) => <span key={index} />)}
+                </span>
+              </button>
+              <div className="gl-mobile-tool-wrap">
+                <button type="button" className={`gl-mobile-tool-btn${mobileFiltersOpen ? " gl-mobile-tool-btn-active" : ""}`} onClick={() => { setMobileFiltersOpen(true); setMobileSearchOpen(false); setMobileScopeOpen(false); }} aria-label="사진 필터 설정" aria-expanded={mobileFiltersOpen}>
+                  <SlidersHorizontal size={14} strokeWidth={1.5} />
+                </button>
+                {activeMobileFilterCount > 0 && <span className="gl-mobile-filter-count">{activeMobileFilterCount}</span>}
+              </div>
+              <button type="button" className={`gl-mobile-tool-btn${mobileSearchOpen ? " gl-mobile-tool-btn-active" : ""}`} onClick={() => { setMobileSearchOpen((value) => !value); setMobileFiltersOpen(false); setMobileScopeOpen(false); }} aria-label="파일명 검색" aria-expanded={mobileSearchOpen}>
+                <Search size={14} strokeWidth={1.7} />
+              </button>
+            </div>
+          </div>
+          {mobileScopeOpen && (
+            <div className="gl-mobile-scope-menu">
+              <button type="button" className={`gl-mobile-scope-option${tabFilter === "all" ? " gl-mobile-scope-option-active" : ""}`} onClick={() => { setTabFilter("all"); setMobileScopeOpen(false); }}><span>전체</span><span>{photos.length}장</span></button>
+              <button type="button" className={`gl-mobile-scope-option${tabFilter === "selected" ? " gl-mobile-scope-option-active" : ""}`} onClick={() => { setTabFilter("selected"); setMobileScopeOpen(false); }}><span>선택됨</span><span>{Y}장</span></button>
+            </div>
+          )}
+          {mobileSearchOpen && (
+            <div className="gl-mobile-search-row">
+              <label className="gl-mobile-search-box">
+                <Search size={14} color="#aab0b8" aria-hidden />
+                <input autoFocus type="search" value={searchValue} onChange={(event) => setSearchValue(event.target.value)} placeholder="파일명 검색" aria-label="파일명으로 필터링" />
+                {searchValue && <button type="button" onClick={() => setSearchValue("")} aria-label="검색어 지우기" style={{ border: 0, background: "transparent", padding: 4, display: "grid", placeItems: "center" }}><X size={14} /></button>}
+              </label>
+            </div>
+          )}
+          {mobileFilterChipsVisible && (
+            <div className="gl-mobile-active-filters" aria-label="적용 중인 필터">
+              {starFilter > 0 && <button type="button" className="gl-mobile-filter-chip" onClick={() => setStarFilter(0)}><Star size={13} fill="#FF4D00" color="#FF4D00" /><span>{starFilter}점</span><X size={14} /></button>}
+              {colorFilter.map((color) => <button key={color} type="button" className="gl-mobile-filter-chip" onClick={() => setColorFilter((current) => current.filter((item) => item !== color))}><span className="gl-mobile-filter-chip-dot" style={{ background: COLOR_OPTIONS.find((option) => option.key === color)?.hex }} /><span>{colorLabel(color)}</span><X size={14} /></button>)}
+              {colorFilter.length > 1 && colorFilterMode === "all" && <button type="button" className="gl-mobile-filter-chip" onClick={() => setColorFilterMode("any")}><span>모두 찜</span><X size={14} /></button>}
+              {searchValue.trim() && <button type="button" className="gl-mobile-filter-chip" onClick={() => setSearchValue("")}><Search size={13} /><span>{searchValue.trim()}</span><X size={14} /></button>}
+              {qualityFilter.has("blurry") && <button type="button" className="gl-mobile-filter-chip" onClick={() => toggleQualityFilter("blurry")}><span>흐림</span><X size={14} /></button>}
+              {qualityFilter.has("eyesClosed") && <button type="button" className="gl-mobile-filter-chip" onClick={() => toggleQualityFilter("eyesClosed")}><span>눈감음</span><X size={14} /></button>}
+            </div>
+          )}
+        </header>
+
+        <GalleryDesktopHeader
+          token={token}
+          projectName={project.name}
+          photographerName={photographer?.name ?? null}
+          deadlineLabel={deadlineLabel}
+          dDayLabel={dDayLabel}
+          dDayTone={dDayTone}
+          Y={Y}
+          N={N}
+          tabFilter={tabFilter}
+          onTabFilterChange={setTabFilter}
+          starFilter={starFilter}
+          hoverStar={hoverStar}
+          onStarFilterChange={setStarFilter}
+          onHoverStarChange={setHoverStar}
+          colorFilter={colorFilter}
+          usedColors={usedColors}
+          myColor={participant?.color ?? null}
+          colorLabel={colorLabel}
+          colorFilterMode={colorFilterMode}
+          onColorFilterModeChange={setColorFilterMode}
+          onColorFilterChange={setColorFilter}
+          showSimilarityToggle={showSimilarityToggle}
+          similarityToggleOn={similarityToggleOn}
+          onSimilarityToggleChange={setSimilarityToggleOn}
+          hasBlurryPhotos={hasBlurryPhotos}
+          hasEyesClosedPhotos={hasEyesClosedPhotos}
+          qualityFilter={qualityFilter}
+          onToggleQualityFilter={toggleQualityFilter}
+          onResetFilters={() => { setStarFilter(0); setColorFilter([]); setColorFilterMode("any"); setHoverStar(0); }}
+          sortOrder={sortOrder}
+          onSortOrderChange={setSortOrder}
+          searchValue={searchValue}
+          onSearchValueChange={setSearchValue}
+          onJumpToFirst={handleJumpToFirst}
+          onJumpToLast={handleJumpToLast}
+        />
+
+        {mobileFiltersOpen && (
+          <>
+            <button type="button" className="gl-mobile-filter-backdrop" aria-label="필터 닫기" onClick={() => setMobileFiltersOpen(false)} />
+            <section className="gl-mobile-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-filter-title">
+              <div className="gl-mobile-filter-sheet-header">
+                <h2 id="mobile-filter-title" className="gl-mobile-filter-sheet-title">필터 설정</h2>
+                <button type="button" className="gl-mobile-filter-reset" onClick={clearMobileFilters}>필터 초기화</button>
+              </div>
+              <div className="gl-mobile-filter-sheet-body">
+                <div className="gl-mobile-filter-section">
+                  <h3>별점</h3>
+                  <div className="gl-mobile-filter-options">
+                    {([1, 2, 3, 4, 5] as const).map((star) => (
+                      <button key={star} type="button" className={`gl-mobile-filter-option gl-mobile-star-option${starFilter === star ? " gl-mobile-star-option-active" : ""}`} aria-pressed={starFilter === star} onClick={() => setStarFilter((current) => current === star ? 0 : star)}>
+                        <Star className="gl-mobile-star-icon" size={13} fill="currentColor" /><span>{star}.0</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="gl-mobile-filter-section">
+                  <h3>찜</h3>
+                  <div className="gl-mobile-filter-options">
+                    {colorFilterOptions.length === 0 ? (
+                      <p className="gl-mobile-filter-empty">아직 찜한 사람이 없어요</p>
+                    ) : (
+                      colorFilterOptions.map((option) => {
+                        const active = colorFilter.includes(option.key);
+                        return (
+                          <button key={option.key} type="button" className={`gl-mobile-filter-option${active ? " gl-mobile-filter-option-active" : ""}`} aria-pressed={active} onClick={() => setColorFilter((current) => current.includes(option.key) ? current.filter((item) => item !== option.key) : [...current, option.key])}>
+                            <span className="gl-mobile-filter-option-dot" style={{ background: option.hex }} /><span>{option.label}</span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                  {colorFilter.length > 1 && (
+                    <div className="gl-mobile-filter-mode" role="radiogroup" aria-label="찜 조건">
+                      <button type="button" role="radio" aria-checked={colorFilterMode === "any"}
+                        className={colorFilterMode === "any" ? "gl-mobile-filter-mode-active" : ""}
+                        onClick={() => setColorFilterMode("any")}>한 명이라도 찜</button>
+                      <button type="button" role="radio" aria-checked={colorFilterMode === "all"}
+                        className={colorFilterMode === "all" ? "gl-mobile-filter-mode-active" : ""}
+                        onClick={() => setColorFilterMode("all")}>모두 찜</button>
+                    </div>
                   )}
                 </div>
               </div>
-            </div>
-          </div>
-        </header>
+            </section>
+          </>
+        )}
 
         {/* ── Gallery Grid (가상화: 화면 + overscan 범위만 실제 DOM에 렌더) ── */}
-        <main className="gl-grid-main" style={{ position: "relative", zIndex: 10, maxWidth: 1800, margin: "0 auto", padding: "0 24px" }}>
-          <div ref={gridRef} style={{ position: "relative", width: "100%", height: rowVirtualizer.getTotalSize() }}>
+        <main className="gl-grid-main" style={{ position: "relative", zIndex: 10, maxWidth: "var(--customer-gallery-max-width, 1440px)", margin: "0 auto", padding: "0 24px" }}>
+          <p style={{ margin: "0 0 12px", fontSize: 12, color: "var(--customer-ink-secondary)", wordBreak: "keep-all" }}>체크한 사진이 최종 선택됩니다. 별점과 찜은 고를 때 참고하세요.</p>
+          <div ref={gridRef} style={{ position: "relative", width: "100%", height: rowVirtualizer.getTotalSize(), touchAction: "pan-y" }}>
             {virtualRows.map((vRow) => {
               const rowStart = vRow.index * layout.cols;
               const cells: React.ReactNode[] = [];
@@ -1028,8 +1384,10 @@ export default function GalleryPageClient() {
                     selected={selected}
                     rating={rating}
                     colorTags={colorTags}
+                    hasComment={Boolean(state?.comment?.trim())}
                     showGroupBadge={showGroupBadge}
                     groupId={group?.id}
+                    groupLabel={group ? `묶음 ${photoGroups.findIndex((item) => item.id === group.id) + 1}` : undefined}
                     restCount={restCount}
                     totalCount={totalCount}
                     selectedCount={selectedCount}
@@ -1038,6 +1396,8 @@ export default function GalleryPageClient() {
                     presignedThumb={presignedThumb}
                     thumbQueue={thumbQueue}
                     viewerQueryString={viewerQueryString}
+                    density={layout.cols}
+                    showFilename={filenameContextActive}
                     onPhotoClick={handlePhotoClick}
                     onCheckClick={handleCheckClick}
                     onGroupBadgeClick={handleGroupBadgeClick}
@@ -1051,7 +1411,7 @@ export default function GalleryPageClient() {
                   key={vRow.key}
                   style={{
                     position: "absolute", top: 0, left: 0, width: "100%",
-                    height: vRow.size,
+                    height: Math.max(vRow.size - layout.gap, 0),
                     transform: `translateY(${vRow.start - scrollMargin}px)`,
                     display: "grid",
                     gridTemplateColumns: `repeat(${layout.cols}, 1fr)`,
@@ -1066,10 +1426,34 @@ export default function GalleryPageClient() {
           </div>
 
           {displayPhotos.length === 0 && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0", gap: 12 }}>
-              <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "var(--border-strong)", letterSpacing: "0.1em" }}>NO_RESULTS</p>
-              <p style={{ fontSize: 12, color: "var(--subtle-foreground)" }}>필터 조건에 맞는 사진이 없습니다</p>
-            </div>
+            <>
+              <div className="gl-empty-mobile">
+                <div className="gl-empty-mobile-icon"><Search size={26} strokeWidth={1.5} /></div>
+                <h2>{activeMobileFilterCount > 0 ? "조건에 맞는 사진이 없어요" : "선택한 사진이 없어요"}</h2>
+                <p>{activeMobileFilterCount > 0 ? "검색어 또는 필터를 바꿔보세요" : "마음에 드는 사진을 먼저 선택해 주세요"}</p>
+                <button type="button" onClick={activeMobileFilterCount > 0 ? clearMobileFilters : () => setTabFilter("all")}>
+                  {activeMobileFilterCount > 0 ? "검색 · 필터 지우기" : "전체 사진 보기"}
+                </button>
+              </div>
+              <div className="gl-empty-desktop" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "120px 0", gap: 16 }}>
+                <div style={{ width: 58, height: 58, borderRadius: 12, background: "var(--customer-divider)", color: "var(--customer-ink-secondary)", display: "grid", placeItems: "center" }}>
+                  <Search size={26} strokeWidth={1.5} />
+                </div>
+                <h2 style={{ margin: 0, fontSize: 19, lineHeight: "28px", color: "var(--customer-ink)" }}>
+                  {activeMobileFilterCount > 0 ? "조건에 맞는 사진이 없어요" : "선택한 사진이 없어요"}
+                </h2>
+                <p style={{ margin: 0, fontSize: 13, color: "var(--customer-ink-secondary)" }}>
+                  {activeMobileFilterCount > 0 ? "검색어 또는 필터를 바꿔보세요" : "마음에 드는 사진을 먼저 선택해 주세요"}
+                </p>
+                <button
+                  type="button"
+                  onClick={activeMobileFilterCount > 0 ? clearMobileFilters : () => setTabFilter("all")}
+                  style={{ height: 39, marginTop: 12, padding: "0 24px", border: "1px solid var(--customer-divider)", borderRadius: 4, background: "var(--customer-canvas)", color: "var(--customer-ink)", font: "12px/19px Pretendard, sans-serif", cursor: "pointer" }}
+                >
+                  {activeMobileFilterCount > 0 ? "검색 · 필터 지우기" : "전체 사진 보기"}
+                </button>
+              </div>
+            </>
           )}
         </main>
 
@@ -1081,55 +1465,32 @@ export default function GalleryPageClient() {
           disabled={!canConfirm}
           onConfirm={() => canConfirm && setShowConfirmModal(true)}
           zIndex={50}
+          buttonLabel={footerButtonLabel}
+          showMeta={false}
+          mobileGallery
+          theme="customerLight"
+          attentionKey={selectionLimitNoticeKey ?? 0}
         />
+
+        {selectionLimitNoticeKey !== null && (
+          <SelectionLimitSnackbar
+            count={N}
+            noticeKey={selectionLimitNoticeKey}
+            placement="gallery"
+            onViewSelected={showSelectedPhotos}
+            onDismiss={() => setSelectionLimitNoticeKey(null)}
+          />
+        )}
 
         {/* ── Confirm Modal ── */}
         {showConfirmModal && (
-          <div
-            style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(6px)", padding: 16 }}
-            onClick={() => !confirming && setShowConfirmModal(false)}
-          >
-            <div
-              style={{ width: "100%", maxWidth: 440, background: "var(--surface)", border: "1px solid var(--accent)", padding: 40, position: "relative" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="gl-modal-bracket gl-modal-b-tl" />
-              <div className="gl-modal-bracket gl-modal-b-tr" />
-              <div className="gl-modal-bracket gl-modal-b-bl" />
-              <div className="gl-modal-bracket gl-modal-b-br" />
-
-              <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: 28, textTransform: "uppercase", fontStyle: "italic", marginBottom: 16, color: "var(--foreground)" }}>
-                Confirm Selection
-              </h3>
-              <p style={{ color: "var(--muted-foreground)", fontSize: 13, lineHeight: 1.7, marginBottom: 32 }}>
-                총 <span style={{ color: "var(--accent)", fontWeight: 700 }}>{Y}장</span>의 사진이 선택되었습니다.
-              </p>
-
-              {confirmError && (
-                <p style={{ color: "#ef4444", fontSize: 12, marginBottom: 16 }} role="alert">{confirmError}</p>
-              )}
-
-              <div style={{ display: "flex", gap: 12 }}>
-                <button
-                  type="button"
-                  onClick={() => !confirming && setShowConfirmModal(false)}
-                  style={{ flex: 1, height: 48, border: "1px solid var(--border)", background: "none", color: "var(--muted-foreground)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s" }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--foreground)"; e.currentTarget.style.color = "#000"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "var(--muted-foreground)"; }}
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirm}
-                  disabled={confirming}
-                  style={{ flex: 1, height: 48, background: "var(--accent)", color: "#000", fontSize: 13, fontWeight: 900, textTransform: "uppercase", border: "none", cursor: confirming ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: confirming ? 0.6 : 1 }}
-                >
-                  {confirming ? "처리 중..." : "확정 및 전송"}
-                </button>
-              </div>
-            </div>
-          </div>
+          <SelectionConfirmDialog
+            count={Y}
+            confirming={confirming}
+            error={confirmError}
+            onCancel={() => { if (!confirming) setShowConfirmModal(false); }}
+            onConfirm={handleConfirm}
+          />
         )}
       </div>
     </>

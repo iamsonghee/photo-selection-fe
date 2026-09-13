@@ -22,7 +22,7 @@ export async function findActiveProjectToken(page: Page): Promise<string | null>
   const projectLinks = await page.locator("a[href*='/photographer/projects/']").all();
   for (const link of projectLinks.slice(0, 5)) {
     const href = await link.getAttribute("href");
-    if (!href || href.includes("/upload") || href.includes("/workflow")) continue;
+    if (!href || href.includes("/upload") || href.includes("/workflow") || href.includes("/assets/")) continue;
     const idMatch = href.match(/\/projects\/([a-f0-9-]{36})/);
     if (!idMatch) continue;
     await page.goto(href);

@@ -30,6 +30,14 @@ export interface Photo {
   originalFilename?: string | null;
   /** DB file_size (bytes). R2에 올라간 썸네일+미리보기 JPEG 합계 */
   fileSize?: number | null;
+  /** 사용자가 선택한 원본 파일의 File.size (bytes). 가공 산출물 fileSize와 별개 */
+  sourceFileSize?: number | null;
+  /** EXIF 회전을 반영한 원본 픽셀 크기. 과거 데이터는 null일 수 있음 */
+  sourceWidth?: number | null;
+  sourceHeight?: number | null;
+  /** 업로드 압축 전 원본 MIME type / File.lastModified */
+  sourceContentType?: string | null;
+  sourceLastModified?: number | null;
   /** DB created_at — 업로드 일시 */
   createdAt?: string | null;
   selected?: boolean;
@@ -115,6 +123,8 @@ export interface Project {
   originalDownloadStartedAt?: string | null;
   /** 런타임 전용 — photos 테이블에서 조회한 첫 번째 사진 썸네일 URL */
   thumbnailUrl?: string | null;
+  /** 고객 진입 화면의 대표 사진. 미지정 시 첫 번째 사진을 사용한다. */
+  coverPhotoId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

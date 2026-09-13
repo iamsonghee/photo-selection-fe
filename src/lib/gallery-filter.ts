@@ -41,6 +41,7 @@ export const FILTER_PARAM = {
   name: "name",
   quality: "quality",
   grouped: "grouped",
+  color_mode: "color_mode",
 } as const;
 
 export type QualityFilterFlag = "blurry" | "eyesClosed";
@@ -140,6 +141,12 @@ export function appendGalleryScrollQuery(viewerQueryString: string, scrollY: num
 export type GalleryFilterState = {
   starFilter: StarRating | "all";
   colorFilter: ColorTag[] | "none" | "all";
+  /**
+   * 색 = 참가자 슬롯이라 두 사람 이상을 고를 때 의미가 갈린다.
+   * "any"(기본) = 한 명이라도 찜한 사진, "all" = 고른 사람이 모두 찜한 사진.
+   * 색이 1개 이하면 두 모드의 결과가 같다.
+   */
+  colorFilterMode: "any" | "all";
   selectedFilter: "all" | "selected";
   sortOrder: SortOrder;
   /** 파일명 검색(쉼표/공백으로 구분한 여러 파일명, LIKE OR) — 원문 그대로 보관, 매칭 시 split */
@@ -192,8 +199,10 @@ export function parseFilterFromSearchParams(
     .split(",")
     .filter((v): v is QualityFilterFlag => v === "blurry" || v === "eyesClosed");
   const groupedView = searchParams.get(FILTER_PARAM.grouped) === "1";
+  const colorFilterMode: "any" | "all" =
+    searchParams.get(FILTER_PARAM.color_mode) === "all" ? "all" : "any";
 
-  return { starFilter, colorFilter, selectedFilter, sortOrder, nameFilter, qualityFilter, groupedView };
+  return { starFilter, colorFilter, colorFilterMode, selectedFilter, sortOrder, nameFilter, qualityFilter, groupedView };
 }
 
 /** 현재 필터 상태로 URL 쿼리 문자열 생성 (기본값은 생략) */
@@ -209,10 +218,23 @@ export function buildFilterQueryString(state: GalleryFilterState): string {
   if (state.selectedFilter !== "all") params.set(FILTER_PARAM.selected, state.selectedFilter);
   if (state.nameFilter.trim()) params.set(FILTER_PARAM.name, state.nameFilter.trim());
   if (state.qualityFilter.length > 0) params.set(FILTER_PARAM.quality, state.qualityFilter.join(","));
+  /* 색이 2개 이상일 때만 모드가 결과를 바꾼다 — 그 외에는 쿼리를 더럽히지 않는다 */
+  if (state.colorFilterMode === "all" && Array.isArray(state.colorFilter) && state.colorFilter.length > 1) {
+    params.set(FILTER_PARAM.color_mode, "all");
+  }
   if (state.groupedView) params.set(FILTER_PARAM.grouped, "1");
   const qs = params.toString();
   return qs ? `?${qs}` : "";
 }
+
+/** 색 = 참가자 슬롯이라 이름이 없을 때만 쓰는 폴백 라벨(§11). */
+export const COLOR_LABELS: Record<ColorTag, string> = {
+  red: "빨강",
+  yellow: "노랑",
+  green: "초록",
+  blue: "파랑",
+  purple: "보라",
+};
 
 export const COLOR_OPTIONS: { key: ColorTag; hex: string }[] = [
   { key: "red",    hex: "#ef4444" },
@@ -221,6 +243,26 @@ export const COLOR_OPTIONS: { key: ColorTag; hex: string }[] = [
   { key: "blue",   hex: "#3b82f6" },
   { key: "purple", hex: "#8b5cf6" },
 ];
+
+/**
+ * 참가자 색 위에 올릴 글자색. 흰 글자는 노랑(#f59e0b)에서 2.15:1, 초록(#22c55e)에서 2.27:1로
+ * WCAG AA(4.5:1)에 한참 못 미친다. 색마다 상대 휘도를 재서 대비가 큰 쪽을 고른다.
+ * (현재 팔레트 5색은 모두 어두운 잉크가 유리하다 — 4.32~8.52:1. 팔레트가 바뀌어도 규칙이 따라가도록 계산으로 둔다.)
+ */
+export function getReadableInk(hex: string): string {
+  const channel = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const r = channel(parseInt(hex.slice(1, 3), 16));
+  const g = channel(parseInt(hex.slice(3, 5), 16));
+  const b = channel(parseInt(hex.slice(5, 7), 16));
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const DARK_INK = "#1a1a1a";
+  const onWhite = 1.05 / (luminance + 0.05);
+  const onDark = (luminance + 0.05) / (0.0074 + 0.05);
+  return onDark >= onWhite ? DARK_INK : "#fff";
+}
 
 export type PhotoStateMap = Record<
   string,
@@ -242,9 +284,13 @@ export function getFilteredPhotos(
     list = list.filter((p) => (photoStates[p.id]?.rating ?? 0) >= (state.starFilter as number));
   }
   if (Array.isArray(state.colorFilter) && state.colorFilter.length > 0) {
-    list = list.filter((p) =>
-      (state.colorFilter as ColorTag[]).some((c) => photoStates[p.id]?.color?.includes(c))
-    );
+    const colors = state.colorFilter as ColorTag[];
+    list = list.filter((p) => {
+      const marks = photoStates[p.id]?.color;
+      return state.colorFilterMode === "all"
+        ? colors.every((c) => marks?.includes(c))
+        : colors.some((c) => marks?.includes(c));
+    });
   }
   if (state.colorFilter === "none") {
     list = list.filter((p) => !photoStates[p.id]?.color?.length);

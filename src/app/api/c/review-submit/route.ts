@@ -19,38 +19,17 @@ export async function POST(req: NextRequest) {
     if (!result || !["all_approved", "has_revision"].includes(result)) {
       return NextResponse.json({ error: "result must be all_approved or has_revision" }, { status: 400 });
     }
-    const pinErr = checkPinAuth(req, token);
+    const pinErr = await checkPinAuth(req, token);
     if (pinErr) return pinErr;
 
     const admin = getAdminClient();
-    let project = await getProjectByToken(admin, token);
+    const project = await getProjectByToken(admin, token);
 
     if (project) {
-      const newStatus: ProjectStatus =
-        result === "all_approved" ? "delivered" : "editing_v2";
-      const { error } = await admin
-        .from("projects")
-        .update({
-          status: newStatus,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", project.id);
-      if (error) {
-        console.error("[review-submit]", error);
-        return NextResponse.json(
-          { error: error.message ?? "Update failed" },
-          { status: 500 }
-        );
-      }
-      // 로그 기록(실패해도 상태 전환 자체는 이미 완료됐으므로 무시)
-      await admin
-        .from("project_logs")
-        .insert({ project_id: project.id, photographer_id: project.photographerId, action: newStatus })
-        .then(
-          () => {},
-          () => {}
-        );
-      return NextResponse.json({ ok: true, status: newStatus });
+      return NextResponse.json(
+        { error: "이 검토 제출 방식은 더 이상 지원되지 않습니다. 페이지를 새로고침해 주세요." },
+        { status: 410 },
+      );
     }
 
     // 목업: DB에 없으면 mock 프로젝트 상태만 변경

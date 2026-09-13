@@ -1,0 +1,188 @@
+.lightTheme {
+  composes: lightTheme from "../../../styles/PhotographerLightTheme.module.css";
+
+  /* B. Dense operational table pattern candidate.
+     Project List 검토가 끝난 뒤 design-system-light 승격 여부를 결정한다. */
+  --dense-table-row-height: 100px;
+}
+
+.desktopFab {
+  color: #ffffff;
+}
+
+@media (min-width: 768px) {
+  .desktopFab {
+    background-color: #ff5712;
+  }
+}
+
+.menuTheme {
+  /* Legacy selector retained; future consumers still share the single palette. */
+  composes: lightTheme from "../../../styles/PhotographerLightTheme.module.css";
+}
+
+/* 4열을 화면 너비에 맞춰 배분해 다음 작업이 잘리지 않도록 한다. */
+.desktopList { padding:32px; min-width:0; }
+.listHeading { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:18px; }
+.listHeading h1 { font-size:28px; font-weight:750; letter-spacing:-.04em; }
+.listHeading p { font-size:14px; color:var(--muted-foreground); margin-top:6px; }
+.listViews { display:flex; gap:24px; border-bottom:1px solid var(--border-subtle); margin-bottom:16px; }
+.listViews button { display:flex; align-items:center; gap:8px; min-height:48px; font-size:14px; color:var(--muted-foreground); border-bottom:2px solid transparent; }
+.listViews button[aria-pressed=true] { border-color:var(--accent); color:var(--foreground); font-weight:700; }
+.listViews button span { font-size:12px; color:var(--subtle-foreground); }
+/* 검색 도구를 개별 폼 대신 같은 높이의 목록 도구 모음으로 표시한다. */
+.listToolbar { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:16px; }
+.searchGroup,.dateSortGroup { display:flex; align-items:center; gap:10px; min-width:0; }
+.listSearch { width:240px; min-width:0; display:flex; align-items:center; gap:8px; padding:0 12px; height:44px; background:var(--surface); border:1px solid var(--border-subtle); border-radius:8px; color:var(--muted-foreground); }
+.listSearch input { width:100%; min-width:0; outline:none; font-size:13px; color:var(--foreground); }
+.listSearch:focus-within { border-color:var(--accent); }
+.listToolbar select { width:120px; height:44px; border:1px solid var(--border-subtle); border-radius:8px; background:var(--surface); padding:0 10px; font-size:13px; color:var(--foreground); }
+.shootRange { display:flex; align-items:center; gap:6px; min-width:0; height:44px; padding:0 10px; border:1px solid var(--border-subtle); border-radius:8px; background:var(--surface); }
+.shootRange .rangeLabel { font-size:12px; white-space:nowrap; color:var(--muted-foreground); margin-right:2px; }
+.shootRange input { width:126px; min-width:0; height:32px; border:0; background:transparent; padding:0 2px; font-size:12px; color:var(--foreground); }
+.shootRange > span { color:var(--muted-foreground); font-size:12px; }
+.listSummary { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; min-height:48px; font-size:12px; color:var(--muted-foreground); }
+.listSummary button,.listEmpty button { text-decoration:underline; min-height:36px; }
+.projectTable { width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0; background:var(--surface); border:1px solid var(--border-subtle); border-radius:10px; }
+.identityColumn { width:auto; }.statusColumn { width:320px; }.deadlineColumn { width:150px; }.actionColumn { width:160px; }
+.projectTable th { position:sticky; top:0; z-index:2; background:var(--surface-raised); text-align:left; font-size:12px; font-weight:600; height:48px; padding:12px 16px; border-bottom:1px solid var(--border-subtle); }
+.projectTable th:first-child { border-top-left-radius:10px; }.projectTable th:last-child { border-top-right-radius:10px; }
+.projectTable td { height:88px; padding:12px 16px; vertical-align:middle; font-size:13px; overflow-wrap:anywhere; }
+.projectTable tr+tr td { border-top:1px solid var(--border-subtle); }
+.projectTable tbody tr:hover { background:var(--surface-raised); }
+.identity { display:flex; align-items:center; gap:12px; min-width:0; }
+.thumbnail { display:grid; place-items:center; width:52px; height:52px; flex-shrink:0; overflow:hidden; border-radius:8px; background:var(--surface-raised); font-size:12px; color:var(--muted-foreground); }
+.thumbnail img { width:100%; height:100%; object-fit:cover; }
+.identityText { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.projectName { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; font-weight:700; }
+.projectName:hover { text-decoration:none; }
+.projectMeta { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; color:var(--muted-foreground); }
+.stateLabel { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; }
+.stateLabel i { width:6px; height:6px; flex-shrink:0; border-radius:50%; background:var(--subtle-foreground); }
+.stateLabel[data-actor=photographer] i { background:var(--accent); }.stateLabel[data-actor=customer] i { background:var(--customer-foreground); }
+.projectTable small { display:block; font-size:11px; color:var(--muted-foreground); margin:3px 0; }
+.dueLabel { display:block; font-size:11px; font-weight:600; color:var(--accent); margin-top:2px; }.dueLabel[data-level=danger] { color:var(--danger); }
+.emptyDeadline { font-size:12px; color:var(--subtle-foreground); }
+.nextAction { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:36px; padding:6px 10px; border:1px solid var(--border-subtle); border-radius:7px; font-size:12px; font-weight:600; }
+.nextAction svg { flex-shrink:0; }.nextAction[data-primary=true] { color:var(--foreground); background:var(--surface); border-color:var(--border-subtle); }
+.nextAction:hover { filter:brightness(.95); }.desktopList a:focus-visible,.desktopList button:focus-visible,.desktopList select:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.listEmpty { display:flex; align-items:center; flex-direction:column; gap:12px; padding:48px 16px; font-size:14px; color:var(--muted-foreground); }
+/* 전체 위치는 작은 구간으로 보조하고 프로젝트명과 현재 상태를 먼저 읽게 한다. */
+.progress { --step-color:var(--accent); min-width:0; max-width:288px; }
+.progress[data-actor=customer] { --step-color:var(--customer-foreground); }
+.progress[data-actor=completed] { --step-color:var(--muted-foreground); }
+.progressSteps { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:4px; margin:0; padding:0; list-style:none; }
+.progressSteps li { display:flex; flex-direction:column; gap:6px; min-width:0; text-align:center; font-size:10px; line-height:14px; color:var(--muted-foreground); white-space:nowrap; }
+.progressSegment { display:block; height:4px; border-radius:2px; background:var(--border-subtle); }
+.progressSteps li[data-done=true] .progressSegment { background:var(--border-strong); }
+.progressSteps li[data-current=true] { font-weight:700; color:var(--foreground); }
+.progressSteps li[data-current=true] .progressSegment { background:var(--step-color); }
+.progressSteps li[data-skipped=true] .progressSegment { background:transparent; border:1px dashed var(--border-strong); }
+.progressSteps li[data-skipped=true] .stepName { opacity:.55; }
+.progressCaption { display:flex; align-items:center; flex-wrap:wrap; gap:4px 8px; margin-bottom:10px; font-size:12px; line-height:16px; }
+.progressCaption strong { font-weight:600; }.progressCaption > span { color:var(--muted-foreground); }
+@media (max-width:1100px) { .desktopList { padding:24px 16px; }.projectTable th,.projectTable td { padding:10px 8px; }.thumbnail { display:none; }.listHeading p { max-width:240px; }.listViews { gap:16px; }.identityColumn { width:29%; }.statusColumn { width:32%; }.deadlineColumn { width:18%; }.actionColumn { width:21%; }.projectMeta { white-space:normal; }.nextAction { padding:5px; } }
+
+/* 상태를 먼저 읽고 전체 위치를 확인하도록 폭과 대비를 제한한다. */
+.identityText .projectId { font-weight:400; }
+.progressCaption > span { padding-left:8px; border-left:1px solid var(--border-strong); }
+.progressSteps li[data-done=true] { color:var(--muted-foreground); }
+.detailAction { display:inline-flex; align-items:center; gap:6px; min-height:36px; color:var(--muted-foreground); font-size:12px; }
+.detailAction svg { flex-shrink:0; }
+.detailAction:hover { color:var(--foreground); text-decoration:underline; }
+.projectTable tbody tr:focus-within { background:var(--surface-raised); }
+.projectTable tbody tr:hover .projectName { text-decoration:none; }
+.desktopList input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+@media (max-width:1100px) { .progressCaption { gap:4px; }.progressCaption > span { padding-left:4px; } }
+
+/* 사이드바를 포함한 실제 사용 가능 폭을 기준으로 두 묶음을 두 줄로 전환한다. */
+.desktopList { container-type:inline-size; }
+@container (max-width:880px) {
+  .searchGroup,.dateSortGroup { width:100%; }
+  .listSearch { flex:1; width:auto; }
+  .shootRange { flex:1; }
+  .shootRange input { flex:1; width:0; }
+  .listToolbar select { flex-shrink:0; }
+}
+
+/* 좁은 PC에서도 진행 구간은 한 줄을 유지하고 열 폭을 함께 축소한다. */
+@container (max-width:960px) {
+  .statusColumn { width:240px; }.deadlineColumn { width:124px; }.actionColumn { width:142px; }
+}
+@container (max-width:700px) {
+  .identityColumn { width:34%; }.statusColumn { width:28%; }.deadlineColumn { width:18%; }.actionColumn { width:20%; }
+  .stepName { display:none; }
+  .progressCaption { flex-direction:column; align-items:flex-start; }
+  .progressCaption > span { border:0; padding:0; }
+}
+
+.compactPosition { display:none; font-weight:400; color:var(--muted-foreground); }
+@container (max-width:700px) { .compactPosition { display:inline; } }
+
+/* 촬영일·현재 상태를 독립 열로 두고, 남는 폭이 프로젝트에 과하게 몰리지 않도록 배분한다. */
+.identityColumn { width:auto; }.shootColumn { width:110px; }.statusColumn { width:260px; }.currentColumn { width:125px; }.deadlineColumn { width:185px; }.actionColumn { width:150px; }
+.currentState { display:flex; flex-direction:column; gap:5px; font-size:12px; }
+.currentState strong { font-weight:600; }
+.currentState > span { color:var(--muted-foreground); font-size:11px; }
+.inlineState,.inlineShoot { display:none; }
+.deadlineLine { display:flex; align-items:baseline; gap:7px; white-space:nowrap; }
+.deadlineLine .dueLabel { display:inline; margin:0; }
+.shootCell { white-space:nowrap; }
+@container (max-width:1150px) {
+  .currentColumn,.currentCell { display:none; }
+  .inlineState { display:block; margin-bottom:9px; }
+  .currentState { flex-direction:row; flex-wrap:wrap; gap:4px 8px; align-items:baseline; }
+  .identityColumn { width:auto; }.shootColumn { width:100px; }.statusColumn { width:260px; }.deadlineColumn { width:180px; }.actionColumn { width:160px; }
+}
+@container (max-width:850px) {
+  .shootColumn,.shootCell { display:none; }.inlineShoot { display:inline; }
+  .statusColumn { width:28%; }.deadlineColumn { width:180px; }.actionColumn { width:130px; }
+}
+@container (max-width:600px) {
+  .identityColumn { width:30%; }.statusColumn { width:24%; }.deadlineColumn { width:28%; }.actionColumn { width:18%; }
+  .deadlineLine { gap:4px; font-size:11px; }.deadlineLine .dueLabel { font-size:10px; }
+}
+/* 넓은 화면의 여유 공간도 여러 열에 나눠 프로젝트 뒤의 긴 공백을 줄인다. */
+@container (min-width:1151px) {
+  .identityColumn { width:30%; }.shootColumn { width:10%; }.statusColumn { width:22%; }.currentColumn { width:10%; }.deadlineColumn { width:15%; }.actionColumn { width:13%; }
+}
+
+/* 헤더와 행은 같은 6열 격자를 사용해 단계명이 구간과 어긋나지 않도록 한다. */
+.desktopList { max-width:1504px; margin-inline:auto; }
+.progress { max-width:none; }
+.stepHeader { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:4px; margin-top:8px; text-align:center; font-size:10px; font-weight:400; color:var(--muted-foreground); white-space:nowrap; }
+.progressSegment { height:5px; }
+.projectMeta { display:flex; align-items:center; gap:8px; overflow:visible; min-width:0; }
+.customerName { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.location { position:relative; display:flex; align-items:center; gap:3px; min-width:0; max-width:60%; color:var(--muted-foreground); }
+.location svg { flex-shrink:0; }
+.location > span:first-of-type { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.locationTooltip { display:none; position:absolute; left:0; top:100%; z-index:3; width:max-content; max-width:240px; padding:6px 8px; background:var(--surface); border:1px solid var(--border-strong); border-radius:6px; white-space:normal; overflow-wrap:anywhere; box-shadow:0 4px 12px #0001; }
+.location:hover .locationTooltip,.location:focus .locationTooltip { display:block; }
+.location:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.inlineShoot { font-size:11px; color:var(--muted-foreground); }
+@container (min-width:1151px) {
+  .identityColumn { width:22%; }.shootColumn { width:10%; }.statusColumn { width:24%; }.currentColumn { width:12%; }.deadlineColumn { width:17%; }.actionColumn { width:15%; }
+}
+@container (max-width:700px) {
+  .stepHeader { display:none; }
+  .projectMeta { flex-wrap:wrap; gap:3px 6px; }.location { max-width:100%; }
+}
+
+/* 필터와 표의 양끝을 맞추고 남는 폭은 프로젝트 검색에 배분한다. */
+.searchGroup { flex:1; }
+.searchGroup .listSearch { width:auto; flex:1; }
+.dateSortGroup { flex-shrink:0; }
+.currentState { flex-direction:column; align-items:flex-start; gap:5px; }
+.currentState .actorLabel { display:inline-flex; align-items:center; gap:5px; }
+.actorLabel i { width:6px; height:6px; flex-shrink:0; border-radius:50%; background:var(--muted-foreground); }
+.currentState[data-actor=photographer] .actorLabel i { background:var(--accent); }
+.currentState[data-actor=customer] .actorLabel i { background:var(--customer-foreground); }
+/* 진행 구간과 현재 상태가 한 덩어리로 붙어 보이지 않도록 열 사이 호흡을 확보한다. */
+@container (min-width:1151px) {
+  .projectTable th:nth-child(3),.projectTable td:nth-child(3) { padding-right:28px; }
+  .currentCell { padding-left:28px !important; }
+}
+@container (max-width:880px) {
+  .searchGroup { flex-basis:100%; }
+}

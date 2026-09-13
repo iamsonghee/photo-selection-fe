@@ -38,6 +38,8 @@ export interface Database {
           created_at: string;
           updated_at: string;
           access_pin: string | null;
+          cover_photo_id: string | null;
+          cover_focal_y: number | null;
         };
         Insert: {
           id?: string;
@@ -55,6 +57,8 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
           access_pin?: string | null;
+          cover_photo_id?: string | null;
+          cover_focal_y?: number | null;
         };
         Update: {
           id?: string;
@@ -72,6 +76,8 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
           access_pin?: string | null;
+          cover_photo_id?: string | null;
+          cover_focal_y?: number | null;
         };
       };
       pin_attempts: {
@@ -104,6 +110,11 @@ export interface Database {
           original_filename: string | null;
           memo: string | null;
           file_size: number | null;
+          source_file_size: number | null;
+          source_width: number | null;
+          source_height: number | null;
+          source_content_type: string | null;
+          source_last_modified: number | null;
           r2_original_url: string | null;
           original_ready_at: string | null;
           original_status: 'awaiting_upload' | 'pending' | 'processing' | 'completed' | 'failed' | null;
@@ -119,6 +130,11 @@ export interface Database {
           original_filename?: string | null;
           memo?: string | null;
           file_size?: number | null;
+          source_file_size?: number | null;
+          source_width?: number | null;
+          source_height?: number | null;
+          source_content_type?: string | null;
+          source_last_modified?: number | null;
           r2_original_url?: string | null;
           original_ready_at?: string | null;
           original_status?: 'awaiting_upload' | 'pending' | 'processing' | 'completed' | 'failed' | null;
@@ -134,6 +150,11 @@ export interface Database {
           original_filename?: string | null;
           memo?: string | null;
           file_size?: number | null;
+          source_file_size?: number | null;
+          source_width?: number | null;
+          source_height?: number | null;
+          source_content_type?: string | null;
+          source_last_modified?: number | null;
           r2_original_url?: string | null;
           original_ready_at?: string | null;
           original_status?: 'awaiting_upload' | 'pending' | 'processing' | 'completed' | 'failed' | null;

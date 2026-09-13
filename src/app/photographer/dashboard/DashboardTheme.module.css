@@ -1,0 +1,142 @@
+.lightTheme {
+  composes: lightTheme from "../../../styles/PhotographerLightTheme.module.css";
+}
+
+/* 대시보드는 PC 전용이다. 넓은 화면에서도 콘텐츠 간 거리가 과도하게 벌어지지 않도록 폭을 제한한다. */
+.frame { max-width:1504px; margin:auto; padding:32px; }
+.heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:24px; }
+.heading h1 { font-size:28px; font-weight:750; letter-spacing:-.04em; }
+.heading p { margin-top:6px; color:var(--muted-foreground); font-size:14px; }
+
+/* 업무 수치는 하나의 상황판으로 묶고, 한도 정보와 시각적으로 분리한다. */
+.overview { position:relative; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:stretch; gap:28px; margin-top:24px; padding:26px 30px; overflow:hidden; border:1px solid color-mix(in srgb,var(--accent) 18%,var(--border-subtle)); border-radius:18px; background:linear-gradient(118deg,color-mix(in srgb,var(--accent) 8%,var(--surface)) 0%,var(--surface) 60%); }
+.overview::after { content:""; position:absolute; right:-52px; bottom:-78px; width:210px; height:210px; border:38px solid color-mix(in srgb,var(--accent) 5%,transparent); border-radius:50%; pointer-events:none; }
+.overviewIntro { position:relative; z-index:1; min-width:0; }
+.overviewIntro>span { display:block; margin-bottom:9px; color:var(--accent); font-size:12px; font-weight:700; }
+.overviewIntro>div { display:flex; align-items:baseline; gap:13px; }
+.overviewIntro strong { color:var(--foreground); font-size:38px; line-height:1; font-weight:760; font-variant-numeric:tabular-nums; }
+.overviewIntro h2 { font-size:21px; font-weight:730; letter-spacing:-.035em; }
+.overviewIntro p { margin-top:10px; color:var(--muted-foreground); font-size:13px; word-break:keep-all; }
+.turnStats { position:relative; z-index:1; display:grid; grid-template-columns:repeat(2,minmax(132px,1fr)); align-items:center; border-left:1px solid var(--border-subtle); }
+.turnStats>div { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:5px 8px; padding:4px 24px; }
+.turnStats>div+div { border-left:1px solid var(--border-subtle); }
+.turnStats svg { grid-row:1/3; align-self:start; margin-top:3px; color:var(--accent); }
+.turnStats [data-actor=customer] svg { color:var(--customer-foreground); }
+.turnStats span { color:var(--muted-foreground); font-size:12px; white-space:nowrap; }
+.turnStats strong { font-size:25px; line-height:1; font-weight:730; font-variant-numeric:tabular-nums; }
+.turnStats small { margin-left:4px; color:var(--muted-foreground); font-size:12px; font-weight:400; }
+
+.layout { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:24px; margin-top:24px; align-items:start; }
+.main { display:flex; flex-direction:column; gap:34px; min-width:0; }
+.sideRail { position:sticky; top:24px; display:flex; flex-direction:column; gap:16px; min-width:0; }
+.sectionHeading,.panelHeading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.sectionHeading { margin-bottom:13px; }
+.sectionHeading h2,.panelHeading h2 { font-size:17px; font-weight:720; letter-spacing:-.025em; }
+.sectionHeading a,.more { display:inline-flex; align-items:center; gap:5px; color:var(--muted-foreground); font-size:12px; }
+.sectionTitleGroup p { margin-top:5px; color:var(--muted-foreground); font-size:12px; word-break:keep-all; }
+
+/* 대표 사진은 최우선 프로젝트에서만 크게 쓰고 나머지 작업은 빠르게 훑는 목록으로 낮춘다. */
+.featuredTask { display:grid; grid-template-columns:clamp(240px,28%,280px) minmax(0,1fr); overflow:hidden; border:1px solid color-mix(in srgb,var(--accent) 18%,var(--border-subtle)); border-radius:16px; background:var(--surface); box-shadow:0 12px 32px color-mix(in srgb,var(--foreground) 5%,transparent); }
+.featuredTask[data-actor=customer] { border-color:color-mix(in srgb,var(--customer-foreground) 25%,var(--border-subtle)); }
+.featuredMedia { display:block; width:100%; aspect-ratio:1; overflow:hidden; background:var(--surface-raised); }
+.featuredMedia img,.featuredMedia .placeholder { display:grid; width:100%; height:100%; border-radius:0; object-fit:cover; object-position:center; transition:transform .24s ease; }
+.featuredTask:hover .featuredMedia img { transform:scale(1.025); }
+.featuredBody { display:flex; flex-direction:column; min-width:0; padding:24px 26px; }
+.featuredTopline { display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--muted-foreground); font-size:11px; }
+.featuredName { display:block; width:max-content; max-width:100%; margin-top:12px; overflow:hidden; color:var(--foreground); font-size:20px; font-weight:740; text-overflow:ellipsis; white-space:nowrap; }
+.featuredReason { margin-top:13px; font-size:14px; line-height:1.55; word-break:keep-all; }
+.featuredBottom { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:auto; padding-top:15px; }
+.featuredBottom small { color:var(--muted-foreground); font-size:12px; }
+.deadlineMeta { display:flex; align-items:baseline; gap:7px; min-width:0; color:var(--muted-foreground); font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.deadlineBadge { display:inline; color:var(--accent); font-size:11px; font-weight:600; line-height:inherit; }
+.deadlineBadge[data-level=danger] { color:var(--danger); }
+.deadlineMetaCompact { margin-top:5px; font-size:11px; }
+.primaryAction,.action { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:38px; border-radius:8px; white-space:nowrap; font-size:12px; font-weight:650; }
+.primaryAction { padding:9px 13px; color:var(--accent-foreground); background:var(--accent); }
+.followingTasks { margin-top:24px; }
+.workList { overflow:hidden; border:1px solid var(--border-subtle); border-radius:12px; background:var(--surface); }
+.workRow { display:grid; grid-template-columns:minmax(210px,.9fr) minmax(220px,1fr) auto; align-items:center; gap:16px; padding:15px 16px; transition:background-color .16s; }
+.workRow+.workRow { border-top:1px solid var(--border-subtle); }
+.workRow:hover { background:var(--surface-raised); }
+.identity { display:flex; align-items:center; gap:11px; min-width:0; }
+.identity>div { min-width:0; }
+.identity>img,.identity>.placeholder { width:52px; height:52px; flex:0 0 52px; border-radius:8px; object-fit:cover; }
+.placeholder { display:grid; place-items:center; background:var(--surface-raised); color:var(--muted-foreground); font-size:12px; }
+.name { display:block; overflow:hidden; color:var(--foreground); font-size:14px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+.meta { display:flex; align-items:center; gap:7px; min-width:0; margin-top:5px; overflow:hidden; color:var(--muted-foreground); font-size:12px; white-space:nowrap; }
+.meta>span { display:flex; align-items:center; gap:3px; min-width:0; max-width:65%; overflow:hidden; text-overflow:ellipsis; }
+.meta svg { flex-shrink:0; }
+.actor { display:inline-flex; align-items:center; gap:5px; color:var(--muted-foreground); font-size:11px; }
+.actor i { width:6px; height:6px; border-radius:50%; background:var(--muted-foreground); }
+.actor[data-actor=photographer] i { background:var(--accent); }
+.actor[data-actor=customer] i { background:var(--customer-foreground); }
+.reason p { margin-top:4px; font-size:13px; line-height:1.45; word-break:keep-all; }
+.reason small { color:var(--muted-foreground); font-size:11px; }
+.action { padding:8px 11px; border:1px solid var(--border-subtle); }
+.more { margin-top:12px; }
+
+/* 최근 프로젝트는 사진 비중을 높여 텍스트 목록 사이에 시각적 리듬을 만든다. */
+.recentGrid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.recentCard { display:block; overflow:hidden; border:1px solid var(--border-subtle); border-radius:12px; background:var(--surface); transition:transform .18s,box-shadow .18s,border-color .18s; }
+.recentCard:hover { transform:translateY(-2px); border-color:var(--border); box-shadow:0 10px 24px color-mix(in srgb,var(--foreground) 7%,transparent); }
+.recentMedia { position:relative; aspect-ratio:16/9; overflow:hidden; background:var(--surface-raised); }
+.recentMedia>img,.recentMedia>.placeholder { width:100%; height:100%; border-radius:0; object-fit:cover; transition:transform .22s ease; }
+.recentCard:hover .recentMedia>img { transform:scale(1.025); }
+.recentMedia>.actor { position:absolute; left:10px; bottom:10px; padding:5px 8px; border:1px solid color-mix(in srgb,var(--border-subtle) 80%,transparent); border-radius:6px; background:color-mix(in srgb,var(--surface) 93%,transparent); backdrop-filter:blur(8px); }
+.recentBody { padding:13px 14px 14px; }
+.recentBody>strong { display:block; overflow:hidden; font-size:14px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+.recentBody small { display:block; margin-top:11px; color:var(--muted-foreground); font-size:11px; }
+
+/* 사용량은 업무 상태 카드와 분리한 계정 정보 패널로 둔다. */
+.usagePanel,.activity { padding:20px; border:1px solid var(--border-subtle); border-radius:16px; background:var(--surface); }
+.panelHeading { padding-bottom:15px; border-bottom:1px solid var(--border-subtle); }
+.panelHeading>div { display:flex; align-items:center; gap:8px; }
+.panelHeading>span { padding:3px 7px; border-radius:5px; color:var(--accent); background:color-mix(in srgb,var(--accent) 9%,var(--surface)); font-size:10px; font-weight:700; }
+.usageDonut { position:relative; display:grid; place-items:center; width:112px; height:112px; margin:20px auto 12px; }
+.usageDonut svg { position:absolute; inset:0; width:100%; height:100%; transform:rotate(-90deg); }
+.usageDonut circle { fill:none; stroke-width:7; }
+.usageDonutTrack { stroke:var(--surface-raised); }
+.usageDonutValue { stroke:var(--accent); stroke-linecap:round; }
+.usageDonut strong { margin-top:-8px; font-size:28px; line-height:1; font-weight:760; font-variant-numeric:tabular-nums; }
+.usageDonut>span { position:absolute; top:65px; color:var(--muted-foreground); font-size:10px; white-space:nowrap; }
+.usageNumbers { display:flex; align-items:baseline; justify-content:center; gap:5px; }
+.usageNumbers strong { font-size:20px; font-weight:720; font-variant-numeric:tabular-nums; }
+.usageNumbers span { color:var(--muted-foreground); font-size:13px; }
+.usagePanel>p { margin-top:7px; color:var(--muted-foreground); font-size:12px; line-height:1.5; text-align:center; word-break:keep-all; }
+
+.timeline { display:block; margin-top:18px; }
+.timeline li { position:relative; margin-left:4px; padding-left:18px; border-left:1px solid var(--border-subtle); }
+.timeline li:last-child { border-left-color:transparent; }
+.timeline li a { display:flex; flex-direction:column; gap:7px; padding:0 0 22px; font-size:12px; }
+.timeline li:last-child a { padding-bottom:0; }
+.logDot { position:absolute; top:4px; left:-4px; width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 4px var(--surface); }
+.timeline li[data-actor=customer] .logDot { background:var(--customer-foreground); }
+.timeline time { color:var(--muted-foreground); font-size:12px; }
+.logSentence { color:var(--foreground); font-size:14px; line-height:1.6; word-break:keep-all; overflow-wrap:anywhere; }
+.logSentence strong { font-size:14px; font-weight:700; }
+.logMeta { display:flex; align-items:baseline; flex-wrap:wrap; gap:5px; color:var(--muted-foreground); font-size:12px; }
+.empty { padding:24px 16px; color:var(--muted-foreground); font-size:13px; }
+.empty button { min-height:36px; margin-top:10px; text-decoration:underline; }
+
+.frame a,.frame a:hover { text-decoration:none; }
+.frame a:focus-visible,.frame button:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+
+@media(max-width:1250px) {
+  .overview { gap:16px; padding:24px; }
+  .turnStats>div { padding-inline:16px; }
+  .layout { grid-template-columns:1fr; }
+  .sideRail { position:static; display:grid; grid-template-columns:280px minmax(0,1fr); align-items:start; }
+}
+
+@media(max-width:930px) {
+  .overview { grid-template-columns:1fr; }
+  .turnStats { border-top:1px solid var(--border-subtle); border-left:0; padding-top:18px; }
+  .turnStats>div:first-child { padding-left:0; }
+  .workRow { grid-template-columns:minmax(190px,.8fr) minmax(190px,1fr) auto; gap:12px; }
+  .recentGrid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .recentCard:last-child { display:none; }
+}
+
+@media(prefers-reduced-motion:reduce) {
+  .featuredMedia img,.recentCard,.recentMedia>img { transition:none; transform:none!important; }
+}

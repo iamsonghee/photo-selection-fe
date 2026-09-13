@@ -118,10 +118,59 @@
 .versionCell:hover .deleteBtn { opacity: 1; }
 
 /* Custom scrollbar */
+.scrollArea { scrollbar-gutter: stable; }
 .scrollArea::-webkit-scrollbar { width: 4px; height: 4px; }
 .scrollArea::-webkit-scrollbar-track { background: transparent; }
 .scrollArea::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
 .scrollArea::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+.assetGrid {
+  display: grid;
+}
+@media (min-width: 768px) and (max-width: 1799px) {
+  .assetGrid { grid-template-columns: repeat(auto-fill, minmax(218px, 1fr)) !important; }
+}
+@media (min-width: 1800px) {
+  .assetGrid { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; }
+}
+
+.mobileRetouchedCardHeader { display: none; }
+.comparisonMedia { display: block; }
+
+.filename { display: flex; min-width: 0; outline-offset: 2px; }
+.filenameStart { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filenameEnd { flex-shrink: 0; }
+.filenameTooltip { display: none; }
+@media (min-width: 768px) {
+  .filename:hover .filenameTooltip, .filename:focus-visible .filenameTooltip {
+    display: block; position: absolute; inset: auto 0 100%; z-index: 20;
+    padding: 8px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface); color: var(--foreground); white-space: normal; overflow-wrap: anywhere;
+    box-shadow: 0 4px 12px #0001;
+  }
+}
+
+@media (max-width: 767px) {
+  .scrollArea {
+    background: var(--surface);
+    scrollbar-gutter: auto;
+  }
+
+  .assetGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .mobileRetouchedCardHeader {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    margin: 0 2px 6px;
+  }
+
+}
 
 /* Diagonal stripe background for "v1 confirmed, no v2 needed" cells */
 .stripeBg {
@@ -164,3 +213,8 @@
   box-shadow: none;
   cursor: not-allowed;
 }
+.readableStatus { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; font-size: 12px; font-weight: 600; }
+.approvedStatus { color: var(--customer-foreground); }
+.needsRevision { padding: 0 8px; border-radius: 5px; background: rgba(var(--accent-rgb), .09); color: var(--accent); }
+/* 사진은 가리지 않고 처리할 카드의 상단만 강조한다. */
+.revisionCard::before { content: ""; position: absolute; top: 0; left: 5px; right: 5px; height: 2px; background: var(--accent); border-radius: 2px; }

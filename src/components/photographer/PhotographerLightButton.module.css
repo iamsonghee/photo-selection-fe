@@ -1,0 +1,58 @@
+/* PC interaction is shared by every size; mobile visual treatments stay as shipped. */
+@media (min-width: 768px) {
+  .button {
+    transition: background-color 150ms, border-color 150ms, color 150ms;
+  }
+
+  .button:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--accent) 50%, transparent);
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
+  .button:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+    transform: none;
+  }
+
+  .button[data-variant="primary"]:hover:not(:disabled) {
+    background: var(--accent-hover, var(--accent));
+  }
+
+  .button[data-variant="secondary"]:hover:not(:disabled),
+  .button[data-variant="outline"]:hover:not(:disabled) {
+    background: var(--surface-raised);
+    border-color: var(--border-strong);
+  }
+
+  .button[data-variant="danger"]:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--danger) 90%, black);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button { transition: none; }
+  .button:active { transform: none; }
+}
+
+@media (max-width: 767px) {
+  .button { min-width: 44px; }
+  .button[data-button-size="regular"],
+  .button[data-button-size="confirmation"],
+  .button[data-button-size="work-panel"] {
+    min-height: 48px;
+    font-size: 14px;
+    line-height: 20px;
+  }
+}
+
+@media (max-width: 767px) {
+  .button[data-variant="primary"]:disabled {
+    background: var(--surface-raised);
+    border-color: var(--border-subtle);
+    color: var(--subtle-foreground);
+    opacity: 1;
+    transform: none;
+  }
+}

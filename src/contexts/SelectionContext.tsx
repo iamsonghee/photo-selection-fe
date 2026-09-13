@@ -131,6 +131,7 @@ export type PhotoState = {
 };
 
 export type CommentSaveStatus = "idle" | "saving" | "saved" | "error";
+export type SelectionToggleResult = "selected" | "deselected" | "limit-reached" | "unavailable";
 
 type SelectionContextValue = {
   project: import("@/types").Project | null;
@@ -140,7 +141,7 @@ type SelectionContextValue = {
   photoStates: Record<string, PhotoState>;
   Y: number;
   N: number;
-  toggle: (photoId: string) => void;
+  toggle: (photoId: string) => SelectionToggleResult;
   isSelected: (photoId: string) => boolean;
   updatePhotoState: (photoId: string, patch: Partial<Omit<PhotoState, "color">>) => void;
   toggleColor: (photoId: string, color: ColorTag) => void;
@@ -166,7 +167,6 @@ export function useSelectionOptional() {
 
 export function SelectionProvider({ children }: { children: React.ReactNode }) {
   const params = useParams();
-  const router = useRouter();
   const token = (params?.token as string) ?? "";
 
   const [project, setProject] = useState<import("@/types").Project | null>(null);
@@ -555,8 +555,8 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   );
 
   const toggle = useCallback(
-    (photoId: string) => {
-      if (!project?.id || !token) return;
+    (photoId: string): SelectionToggleResult => {
+      if (!project?.id || !token) return "unavailable";
       const requiredCount = project.requiredCount;
       // React state(selectedIds)의 클로저 값 대신 항상 최신인 selectedIdsRef를 기준으로 삼는다 —
       // 그래야 리렌더 사이클보다 빠른 연속 클릭에서도 매 클릭이 직전 클릭의 결과를 보고 판단한다.
@@ -565,7 +565,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       // 이미 목표 장수(N)를 채운 상태면 새 사진은 추가 선택할 수 없다 —
       // 그렇지 않으면 고객이 N장을 넘겨 선택해도 확정 버튼이 계속 비활성화된 채로 남는다.
       if (!isSelected && requiredCount > 0 && current.size >= requiredCount) {
-        return;
+        return "limit-reached";
       }
       const nextIsSelected = !isSelected;
       const next = new Set(current);
@@ -583,6 +583,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
 
       setSelectedIds(next);
       flushSelection(photoId);
+      return nextIsSelected ? "selected" : "deselected";
     },
     [project?.id, project?.requiredCount, token, flushSelection, bumpVersion]
   );

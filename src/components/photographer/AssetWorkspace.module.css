@@ -1,0 +1,23 @@
+/* 탭마다 도구 수가 달라도 사진과 도구의 시작선은 동일하게 유지한다. */
+.header { padding-top: 16px !important; }
+.header [data-project-asset-identity] { min-height: 0; max-height: 40px; padding-inline: 0; transition: max-height 200ms ease, opacity 200ms ease; }
+.compact [data-project-asset-identity] { max-height: 0; opacity: 0; }
+.compact { padding-top: 4px !important; }
+.tabs { border-radius: 0; gap: 12px; padding-inline: 0; }
+.tabs [role="tab"] { min-width: 84px; min-height: 44px; font-size: 15px; border: 0; border-radius: 0; background: transparent; }
+.tabs [role="tab"][aria-selected="true"]::after { content: ""; position: absolute; bottom: 0; left: 12px; right: 12px; height: 2px; background: var(--accent); }
+.toolbar { align-items: center; flex-wrap: wrap; gap: 12px; }
+@media (min-width: 768px) {
+  .toolbar { height: auto; max-height: none; flex-direction: row; padding: 14px 0; border-inline: 0; background: var(--background); }
+  .toolbar > :first-child { flex-wrap: wrap; }
+  .toolbar > :last-child { max-width: 100%; }
+}
+@media (max-width: 767px) {
+  .header { padding-top: 0 !important; }
+  .tabs { gap: 0; }
+  .tabs [role="tab"] { min-width: 0; font-size: 14px; }
+  .toolbar { flex-wrap: nowrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .header [data-project-asset-identity] { transition: none; }
+}

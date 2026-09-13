@@ -1,0 +1,8 @@
+/* 이미지 내용만 교체한다. 바깥 ac-photo/as-photo의 크기·그리드·비율은 유지한다. */
+.ac-photo, .as-photo { position: relative; overflow: hidden; }
+.ac-sample-image { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; border-radius: inherit; background: #e8ebe5; }
+.ac-sample-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ac-sample-image[data-image-state="loading"] img, .ac-sample-image[data-image-state="error"] img { opacity: 0; }
+.ac-sample-image-status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 8px; font-size: 12px !important; letter-spacing: 0 !important; color: #5f6b55; }
+.ac-sample-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 7px; color: #7c8474; background: #e8ebe5; }
+.ac-sample-placeholder span { font-size: 12px; letter-spacing: .1em; }

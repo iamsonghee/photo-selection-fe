@@ -26,13 +26,29 @@ type VersionRow = {
   file_size: number | null;
   created_at: string;
   filename: string | null;
-  photos: { original_filename: string | null } | null;
+  photos: { original_filename: string | null; project_id: string } | null;
 };
 
 type VersionReviewRow = {
   photo_version_id: string;
   photo_id: string;
   status: "approved" | "revision_requested";
+  customer_comment: string | null;
+  reviewed_at: string | null;
+};
+
+type VersionHistoryRow = {
+  id: string;
+  photo_id: string;
+  version: 1 | 2;
+  revision_no: number;
+  r2_url: string;
+  r2_thumb_url: string | null;
+  file_size: number | null;
+  filename: string | null;
+  original_created_at: string;
+  superseded_at: string;
+  review_status: "approved" | "revision_requested" | null;
   customer_comment: string | null;
   reviewed_at: string | null;
 };
@@ -52,39 +68,32 @@ export async function GET(
     }
 
     const admin = getAdminClient();
-    const { data: project, error: projErr } = await admin
-      .from("projects")
-      .select("id, photographer_id, status")
-      .eq("id", id)
-      .single();
+    // 프로젝트 소유권 확인과 보정본 조회는 서로 의존하지 않으므로 동시에 시작한다.
+    // versions는 photos.project_id 관계로 범위를 제한해 selections를 다시 읽지 않는다.
+    const [
+      { data: project, error: projErr },
+      { data, error },
+    ] = await Promise.all([
+      admin
+        .from("projects")
+        .select("id, photographer_id, status")
+        .eq("id", id)
+        .single(),
+      admin
+        .from("photo_versions")
+        .select(
+          "id, photo_id, version, r2_url, r2_thumb_url, file_size, created_at, filename, photos!inner(original_filename, project_id)"
+        )
+        .eq("photos.project_id", id)
+        .order("created_at", { ascending: false }),
+    ]);
+
     if (projErr || !project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
     if ((project as { photographer_id: string }).photographer_id !== photographerId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-
-    // 선택된 사진만 대상으로 versions를 보여주기 위해 selections 기반으로 필터링
-    const { data: selections, error: selErr } = await admin
-      .from("selections")
-      .select("photo_id")
-      .eq("project_id", id);
-    if (selErr) return NextResponse.json({ error: selErr.message }, { status: 500 });
-    const allowed = new Set((selections ?? []).map((s: { photo_id: string }) => s.photo_id));
-    if (allowed.size === 0) {
-      return NextResponse.json({
-        project_status: (project as { status: string }).status,
-        versions: [],
-      });
-    }
-
-    const { data, error } = await admin
-      .from("photo_versions")
-      .select(
-        "id, photo_id, version, r2_url, r2_thumb_url, file_size, created_at, filename, photos!inner(original_filename)"
-      )
-      .in("photo_id", Array.from(allowed))
-      .order("created_at", { ascending: false });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -104,41 +113,37 @@ export async function GET(
     // PostgREST nested select 의존을 제거하고, photo_version_id 로 명시 SELECT.
     // 환경에 따라 FK 추론이 실패하거나 RLS 가 적용된 경우 review_status 가 일괄 null 로 반환되는 버그가 있어 보강.
     const pvIds = deduped.map((r) => r.id);
+    const photoIds = [...new Set(deduped.map((r) => r.photo_id))];
     const vrByPvId = new Map<string, VersionReviewRow>();
+    let versionHistory: VersionHistoryRow[] = [];
     if (pvIds.length > 0) {
-      const { data: vrRows, error: vrErr } = await admin
+      const [
+        { data: vrRows, error: vrErr },
+        { data: historyRows, error: historyErr },
+      ] = await Promise.all([
+        admin
         .from("version_reviews")
         .select("photo_version_id, photo_id, status, customer_comment, reviewed_at")
-        .in("photo_version_id", pvIds);
+        .in("photo_version_id", pvIds),
+        admin
+          .from("photo_version_revisions")
+          .select(
+            "id, photo_id, version, revision_no, r2_url, r2_thumb_url, file_size, filename, original_created_at, superseded_at, review_status, customer_comment, reviewed_at"
+          )
+          .in("photo_id", photoIds)
+          .order("version", { ascending: false })
+          .order("revision_no", { ascending: false }),
+      ]);
       if (vrErr) {
         console.warn("[GET projects versions] version_reviews fetch failed", vrErr.message);
+      }
+      if (historyErr) {
+        return NextResponse.json({ error: historyErr.message }, { status: 500 });
       }
       for (const r of (vrRows ?? []) as VersionReviewRow[]) {
         vrByPvId.set(r.photo_version_id, r);
       }
-
-      // 진단: photo_id 단위 review 수와 photo_version_id 단위 매칭 수를 비교해
-      // photo_versions ↔ version_reviews 매핑이 끊겨 있는지(orphan) 확인한다.
-      const { data: photoLevelRows, error: plErr } = await admin
-        .from("version_reviews")
-        .select("photo_version_id")
-        .in("photo_id", Array.from(allowed));
-      if (plErr) {
-        console.warn("[GET projects versions] version_reviews photo_level fetch failed", plErr.message);
-      } else {
-        const photoLevelCount = (photoLevelRows ?? []).length;
-        const matched = vrByPvId.size;
-        if (photoLevelCount > 0 && photoLevelCount !== matched) {
-          const expectedPvIds = new Set(pvIds);
-          const orphanPvIds = (photoLevelRows ?? [])
-            .map((r) => (r as { photo_version_id: string }).photo_version_id)
-            .filter((pvId) => !expectedPvIds.has(pvId));
-          console.warn(
-            "[GET projects versions] orphan version_reviews detected",
-            { projectId: id, photoLevelCount, matched, orphanPvIds: orphanPvIds.slice(0, 20) }
-          );
-        }
-      }
+      versionHistory = (historyRows ?? []) as VersionHistoryRow[];
     }
 
     const versions = deduped.map((r) => {
@@ -162,6 +167,21 @@ export async function GET(
     return NextResponse.json({
       project_status: (project as { status: string }).status,
       versions,
+      version_history: versionHistory.map((row) => ({
+        id: row.id,
+        photo_id: row.photo_id,
+        version: row.version,
+        revision_no: row.revision_no,
+        r2_url: row.r2_url,
+        r2_thumb_url: row.r2_thumb_url,
+        file_size: row.file_size,
+        version_filename: row.filename,
+        created_at: row.original_created_at,
+        superseded_at: row.superseded_at,
+        review_status: row.review_status,
+        customer_comment: row.customer_comment,
+        reviewed_at: row.reviewed_at,
+      })),
     });
   } catch (e) {
     console.error("[GET projects versions]", e);

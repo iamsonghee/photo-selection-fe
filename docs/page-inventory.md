@@ -1,5 +1,7 @@
 # A-CUT 페이지 인벤토리
 
+> Mobile implementation: [Current implementation and verification](mobile-design-implementation-2026-09-09.md). Earlier audit/proposal links are historical.
+
 > 조사일: 2026-07-29
 > 대상: `photo-selection-fe` 현재 작업 트리(커밋되지 않은 변경 포함)
 > 원칙: 코드를 수정하지 않고 App Router 페이지, 레이아웃, 연결 컴포넌트, 기존 E2E 시나리오와 공개 화면 렌더링을 조사했다.
@@ -37,8 +39,8 @@
 2. `/photographer/projects/new`에서 프로젝트 생성
 3. `/photographer/projects/[id]` 허브에서 메타데이터, 고객 링크, PIN, 진행 단계 확인
 4. `/photographer/projects/[id]/upload`에서 원본 업로드·유사컷 분석·고객 초대 활성화
-5. 고객 확정 후 `/photographer/projects/[id]/results`에서 셀렉 결과 확인·내보내기
-6. `/photographer/projects/[id]/workflow`에서 보정 시작, V1/V2 업로드, 고객 검토 요청, 최종 납품 파일 처리
+5. 고객 확정 후 `/photographer/projects/[id]/assets/original|selected`에서 원본·셀렉 결과 확인 및 내보내기
+6. `/photographer/projects/[id]/assets/retouched`에서 보정 시작, V1/V2 업로드, 고객 검토 요청, 최종 납품 파일 처리
 7. `/photographer/settings`에서 프로필과 계정 설정
 
 근거 파일:
@@ -47,7 +49,7 @@
 - `src/app/photographer/projects/new/page.tsx`
 - `src/app/photographer/projects/[id]/ProjectNexusPageClient.tsx`
 - `src/app/photographer/projects/[id]/upload/page.tsx`
-- `src/app/photographer/projects/[id]/results/page.tsx`
+- `src/app/photographer/projects/[id]/assets/ProjectAssetsPageClient.tsx`
 - `src/app/photographer/projects/[id]/workflow/WorkflowPageClient.tsx`
 
 ### 2.3 고객 핵심 흐름
@@ -95,32 +97,37 @@
 
 | 라우트 | 페이지 파일 | 화면 목적과 주요 UI | 레이아웃/반응형 | 상태 처리 |
 |---|---|---|---|---|
-| `/` | `src/app/page.tsx` | `/landing` 구현을 재사용하는 메인 랜딩 | 루트 셸, 장식 그리드·스캔라인, 반응형 섹션 | 인증 모달 상태는 랜딩 내부 |
-| `/landing` | `src/app/landing/page.tsx` | 제품 소개, 문제/솔루션/후기/CTA | `landing.css`, 344줄. 모바일 미디어쿼리와 Tailwind 혼용 | 로그인 여부에 따라 대시보드 이동 또는 `AuthModal` |
+| `/` | `src/app/page.tsx` | `/landing` 구현을 재사용하는 메인 랜딩 | 밝은 반응형 셸과 로컬 제품 데모 | 가상 데이터만 사용, 시작 CTA는 셀렉 체험으로 이동, 운영 설정·인증 조회 없음 |
+| `/landing` | `src/app/landing/page.tsx` | 제품 소개·히어로 시연·독립 샘플 체험 | 무음 영상과 반응형 로컬 데모 | 가상 상태만 사용, 영상 실패/움직임 축소 시 poster |
+| `/landing/demo-capture` | `src/app/landing/demo-capture/page.tsx` | 영상 재생성용 고정 타임라인 | 1200×641 CSS px, 개발 전용 | production에서는 notFound, 운영 API 미사용 |
 | `/guide` | `src/app/guide/page.tsx`, `GuidePageClient.tsx` | 작가/고객 탭형 사용 가이드 | 독립적인 장문 가이드 UI, Noto Sans KR 기반 | 탭 전환, CTA disabled 처리 |
 | `/beta/apply` | `src/app/beta/apply/page.tsx`, `BetaApplyForm.tsx` | 로그인 전 인증 유도 또는 베타 신청 폼 | 공통 `Card`, `Input`, `Textarea`, `Button`을 가장 일관되게 사용 | 로그인/제출/검증/오류/완료 |
 | `/beta/apply/complete` | `src/app/beta/apply/complete/page.tsx` | 신청 완료 확인 | 중앙 카드 | 단일 완료 상태 |
 
 ### 3.2 작가 화면
 
+> 2026-09-09: 아래 작가 PC 구현을 갱신했다. 모바일 패턴 및 이 문서의 기존 전체 UI 문제 목록은 이번에 재검증하지 않았다. [PC 검수 범위/한계](desktop-design-audit-2026-09-09.md)를 참고한다.
+
 | 라우트 | 페이지 파일 | 화면 목적과 주요 UI | 레이아웃/반응형 | 상태 처리 |
 |---|---|---|---|---|
-| `/photographer/dashboard` | `src/app/photographer/dashboard/page.tsx` | 지표 카드, 대기/진행 프로젝트, 최근 완료, 새 프로젝트 CTA | 공통 작가 셸 + `PhotographerPageHeader`; 모바일/데스크톱 카드 그리드 | `PageLoader`, `EmptyDashboard`, 인증 오류, 베타 설문 |
-| `/photographer/projects` | `src/app/photographer/projects/page.tsx` | 검색·필터·상태별 프로젝트 목록 | 모바일 카드와 데스크톱 테이블을 별도 마크업으로 구현 | 로딩, 오류, 빈 목록, 삭제 `alert`, 커스텀 드롭다운 |
-| `/photographer/projects/new` | `src/app/photographer/projects/new/page.tsx` | 2단계 프로젝트 생성 폼 | `max-w-2xl`; `sm` 기준 1→2열 | 필드 검증, API 오류, 제출 중 disabled |
-| `/photographer/projects/[id]` | `page.tsx`, `ProjectNexusPageClient.tsx` | 프로젝트 허브: 상태, 메타, 링크/PIN, 액션 플로우, 위험 영역 | `max-w-[1600px]`, 데스크톱 2열 + 우측 380px, 모바일 1열 | 로딩/권한 오류, 3종 공통 모달, 로컬 토스트 |
-| `/photographer/projects/[id]/upload` | `upload/page.tsx` | 원본 업로드, 가상화 그리드/목록, 복구, 삭제, 유사컷 분석, 초대 활성화 | 고정 `100dvh` 작업공간; 768px 기준 모바일 전용 조정 | 가장 많은 로딩/진행/실패/복구/모달/토스트 상태 |
-| `/photographer/projects/[id]/results` | `results/page.tsx` | 셀렉 결과 그리드/목록, 코멘트, CSV/TXT/클립보드, 뷰어 | 고정 `100dvh`; 1400px에서 8열, 768px 이하 액션바 재배치 | 로딩/오류/빈 결과, 2종 모달, 자체 토스트/라이트박스 |
-| `/photographer/projects/[id]/workflow` | `WorkflowPageClient.tsx` | 상태 탭, 보정본 V1/V2 업로드·매칭·검토 결과·전달·납품 | `max-w-[1600px]`, 2~7열 그리드, 모바일 하단 CTA | 로딩/오류, 확인/기한 모달, `alert`, 비교 뷰어, disabled 단계 |
-| `/photographer/settings` | `settings/page.tsx` | 프로필, 이미지, 알림 예정 기능, 계정 삭제 | `max-w-[1600px]`, 데스크톱 1.4fr/1fr, 모바일 스택 | 로딩/폼 오류/다중 토스트/계정 삭제 모달 |
-| `/photographer/manual` | `manual/page.tsx` | 작가용 상세 매뉴얼/FAQ | 장문 카드형 문서, 모바일 스택 | 섹션 탐색과 FAQ |
+| `/photographer/dashboard` | `src/app/photographer/dashboard/page.tsx` | Focus, 최근 프로젝트, usage/activity, 새 프로젝트 CTA | Light Frame/Header, main + 320px aside; 빈 상태는 `FirstProjectOnboarding` | loading/error/empty, beta welcome, quota 안내 |
+| `/photographer/projects` | `src/app/photographer/projects/page.tsx` | lifecycle·actor·stage·date·search·sort, PC dense rows | Light Frame/Header + `PhotographerDenseFilterToolbar` + `ProjectStepper` | loading/error/empty/filter empty. PC 목록의 수정·삭제는 상세에서 관리 |
+| `/photographer/projects/new` | `src/app/photographer/projects/new/page.tsx` | 프로젝트 생성 폼·quota 안내 | PC `max-w-[840px]`, `ProjectFormFields`, 공통 하단 action bar | 필드 검증/API 오류/disabled. 한도 초과 및 quota 모킹한 일반 폼·필수 오류 E2E 확인; 정상 생성 전송 미실행 |
+| `/photographer/projects/[id]` | `page.tsx`, `ProjectNexusPageClient.tsx` | 정보·진행·고객 링크·다음 행동, 정보 수정 | Light Frame/Header, Expanded Stepper, 정보/작업 패널; edit는 중앙 840px 공통 form | 대표 상태·더보기·공통 confirmation, 로컬 toast |
+| `/photographer/projects/[id]/upload` | `upload/page.tsx` | 원본 업로드·목록·복구·삭제·유사컷·초대 | Light viewport workspace, 공통 Frame/Header·Gallery·ActionBar | loading/progress/recovery/modal. 업로드 처리는 이번에 미실행 |
+| `/photographer/projects/[id]/assets/original` / `selected` | `assets/ProjectAssetsPageClient.tsx` | 원본/셀렉 grid·list, 코멘트·내보내기·viewer | 공통 Asset Header/Tab/Toolbar, `PhotographerPhotoGallery`, viewport 작업공간 | loading/error/empty, 공통 provider, selection action bar |
+| `/photographer/projects/[id]/assets/retouched` | `workflow/WorkflowPageClient.tsx` | 보정본 round·업로드·매칭·검토·납품 | 공통 Asset Header/Tab/Toolbar + 업무별 photo card/modal | loading/empty/disabled, upload modal, 비교 viewer |
+| `/photographer/projects/[id]/assets/final` | `workflow/WorkflowPageClient.tsx` | 마지막 확정 보정본·내보내기 | 공통 Asset Header/Tab/Toolbar, final 전용 이미지/파일명 | delivered에서 tab 표시; 이번에는 0장 empty 상태 검수 |
+| `/photographer/projects/[id]/results` / `workflow` | 각 `page.tsx` | legacy 경로 호환 | 각각 assets original/selected, retouched로 redirect | 독립 page composition 없음 |
+| `/photographer/settings` | `settings/page.tsx` | 프로필·알림 예정 기능·계정 | Light Frame/Header + PC `max-w-[840px]` 단일 column, 공통 Field/Input/Switch/Button | loading/form error/toast/계정 dialog. 기본 폼 검수, 저장 미실행 |
+| `/photographer/manual` | `manual/page.tsx` | 상세 매뉴얼/FAQ | PC Light shell, 공유 Frame/Header | 섹션 탐색/FAQ; 네 PC 폭의 Light header·넘침 검사 통과 |
 
 ### 3.3 고객 화면
 
 | 라우트 | 페이지 파일 | 화면 목적과 주요 UI | 레이아웃/반응형 | 상태 처리 |
 |---|---|---|---|---|
-| `/c/[token]` | `page.tsx`, `InvitePageClient.tsx` | 초대 랜딩 또는 상태별 목적지 분기 | `CustomerHeader/Footer` 또는 독자 HUD 스타일 혼용 | 프로젝트 로딩/오류, 상태별 리다이렉트 |
-| `/c/[token]/pin` | `pin/page.tsx`, `PinForm.tsx` | 4자리 PIN 인증 | 중앙 단일 패널, `100dvh`, 커스텀 브랜드 바 | 입력 오류, 제출 중, 리다이렉트 |
+| `/c/[token]` | `page.tsx`, `InvitePageClient.tsx` | 초대 랜딩 또는 상태별 목적지 분기 | `selecting`과 `reviewing_v1/v2`는 `CustomerInviteIntro`로 대표 사진·작가 정보·본문/CTA slot을 공유. 모바일은 기기 전체 폭, PC는 split layout, 공통 `100dvh` no-scroll composition | 프로젝트 로딩/잘못된 링크, 대표 사진 preloading/fallback, 상태별 리다이렉트 |
+| `/c/[token]/pin` | `pin/page.tsx`, `PinForm.tsx` | 4자리 PIN 인증 | Figma #56108 전체 화면 숫자 키패드, 375px canvas, safe-area CTA | 입력 오류, 5회 락아웃, 제출 중, 리다이렉트 |
 | `/c/[token]/about` | `AboutPageClient.tsx`, `about.module.css` | 고객용 서비스/작가 소개 | 전용 CSS 모듈 598줄, 768px 미디어쿼리 | 로딩/오류 |
 | `/c/[token]/gallery` | `GalleryPageClient.tsx`, `GalleryPhotoCard.tsx` | 선택, 별점, 색상 태그, 유사컷, 품질 필터, 검색/정렬, 확정 | JS 계산 가상화 그리드; 767px 별도 규칙; 고정 2단 헤더와 하단 확정 바 | 로딩/오류/빈 필터 결과, 확정 모달, 동기화 상태 |
 | `/c/[token]/viewer/[photoId]` | `page.tsx` | 단일 사진 확대, 선택, 별점, 색상, 코멘트, 유사컷 | 데스크톱/모바일 DOM을 완전히 분리; 모바일 pinch 컴포넌트 | 로딩/잘못된 사진/상태 리다이렉트/저장 |
@@ -149,6 +156,12 @@
 
 ### 4.1 루트/랜딩
 
+> 2026-09-11 개편 2차: 첫 화면 아래 `LandingStory.tsx`와 `story.css`로 전체 흐름, 고객 셀렉 데모, 작가 결과, 보정 검토, 프로젝트 상태, 작업 방식 비교, 이용 조건·FAQ·마지막 CTA를 추가했다. 아래 개편 1차 범위 설명은 이 변경으로 확장된다. 사진은 빈 프레임을 유지한다. 히어로 보조 CTA는 고객 셀렉 체험으로 연결되며 MP4는 사용하지 않는다.
+
+> 샘플 이미지 적용: `sample-project.ts`를 고객·작가·히어로의 공통 데이터로 사용한다. 현재 사용자 제공 Gemini 이미지 2장을 로컬 JPEG로 적용했으며 나머지 10장과 보정본은 준비 중 프레임을 유지한다. 자산 출처·규격·확인 결과는 `landing-sample-project.md`를 따른다.
+
+> 2026-09-11 개편 1차: 현재 `/`와 `/landing`은 밝은 공통 헤더·푸터와 첫 화면만 렌더링한다. 아래의 기존 장식·섹션 설명은 개편 전 관찰 기록이다. 첫 화면은 Pretendard와 `ac-` 범위 토큰, 빈 사진 프레임의 고객·작가 정적 예시를 사용한다. 모바일은 고객→작가 순서로 배치한다. 공동 찜·AI 유사컷(베타)·보정 피드백을 소개하며 일반 체험 한도는 서버 설정을 유지한다. 보조 CTA는 제품 예시 앵커, 주 CTA는 기존 인증 모달 또는 대시보드다. 인증 모달은 라이트 테마 밖에서 기존 스타일을 유지한다. 단계형 데모·독립 체험·나머지 본문은 후속 범위이며 이번 변경에서 브라우저 시각 검증은 수행하지 않았다.
+
 - 루트 `body`는 `Noto Sans KR`, 어두운 배경과 전역 토큰을 사용한다.
 - 랜딩은 `Space Mono`, `Space Grotesk`, `JetBrains Mono`, Pretendard를 추가로 불러온다.
 - 화면 전체 장식, 스캔라인, 각진 패널과 시스템 라벨이 강한 마케팅 전용 문법을 만든다.
@@ -156,14 +169,14 @@
 
 ### 4.2 작가 셸
 
-- `PhotographerDesktopShell`이 데스크톱 사이드바(240/72px), 모바일 상단 헤더(57px), 하단 내비게이션(60px + safe area)을 제공한다.
-- 프로젝트 상세 루트에서만 사이드바를 기본 축소한다.
+- PC `PhotographerDesktopShell`은 Sidebar의 공통 상수 `PHOTOGRAPHER_SIDEBAR_WIDTH_FULL=266`, `PHOTOGRAPHER_SIDEBAR_WIDTH_COLLAPSED=102.5`를 content offset에도 사용한다(`Sidebar.tsx`). 모바일 셸의 현재 계약은 별도 진행 중인 Light 문서 §5.3을 참조하며 이번 검수 대상이 아니다.
+- Sidebar의 초기 축소 상태는 `isProjectDetailRootPath(pathname)`에서 결정하고, shell이 유지되는 route 이동에서는 사용자의 펼침/접힘 상태를 보존한다. 이 정규식은 `/projects/new`도 매칭한다.
 - 모든 작가 페이지가 이 셸 안에 있지만 내부 최대 폭, 헤더, 고정 작업공간 여부는 페이지마다 다르다.
 - `PhotographerMobileChrome.tsx`는 별도 모바일 드로어 구현이지만 현재 어디에서도 사용되지 않는다.
 
 ### 4.3 고객 셸
 
-- 토큰 레이아웃은 전역 배경 효과와 `SelectionProvider`, `ReviewProvider`만 제공한다.
+- 토큰 레이아웃은 전역 배경 효과와 `SelectionProvider`, `ReviewProvider`를 제공한다. PIN·잘못된 링크는 `CustomerEntryShell`의 375px preview canvas를 사용하고, 셀렉·보정본 검토 인트로의 responsive variant는 기기 전체 폭의 white canvas와 Figma customer app bar를 제공한다.
 - 실제 헤더·푸터·고정 도구막대는 각 페이지가 선택적으로 구현한다.
 - `CustomerHeader/Footer`를 쓰는 상태 화면과 완전히 독립적인 갤러리·뷰어·리뷰 작업공간이 병존한다.
 

@@ -175,11 +175,11 @@ function PhotographerContent({ betaMaxProjectsTotal }: { betaMaxProjectsTotal: n
         <ScreenshotPlaceholder />
         <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
           <Step n={1} title="로그인">
-            <a href="https://acut.vercel.app" target="_blank" rel="noreferrer" style={{ color: ORANGE }}>acut.vercel.app</a>에 접속한 뒤 <strong style={{ color: "var(--foreground)" }}>"Google로 시작하기"</strong> 버튼을 클릭합니다.
+            <a href="https://acut.vercel.app" target="_blank" rel="noreferrer" style={{ color: ORANGE }}>acut.vercel.app</a>에 접속한 뒤 <strong style={{ color: "var(--foreground)" }}>&quot;Google로 시작하기&quot;</strong> 버튼을 클릭합니다.
             <br /><span style={{ fontSize: 12, color: MUTED }}>※ 베타 기간 중 구글 로그인만 지원합니다. 카카오 로그인은 정식 출시 후 제공 예정.</span>
           </Step>
           <Step n={2} title="대시보드 진입">로그인하면 대시보드로 자동 이동합니다.</Step>
-          <Step n={3} title="새 프로젝트 생성">화면 오른쪽 하단의 <strong style={{ color: "var(--foreground)" }}>"새 프로젝트" (+) 버튼</strong>을 클릭합니다.</Step>
+          <Step n={3} title="새 프로젝트 생성">화면 오른쪽 하단의 <strong style={{ color: "var(--foreground)" }}>&quot;새 프로젝트&quot; (+) 버튼</strong>을 클릭합니다.</Step>
           <Step n={4} title="프로젝트 정보 입력">
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
@@ -212,7 +212,7 @@ function PhotographerContent({ betaMaxProjectsTotal }: { betaMaxProjectsTotal: n
                 </tbody>
               </table>
             </div>
-            <br />입력 완료 후 <strong style={{ color: "var(--foreground)" }}>"만들기" 버튼</strong>을 클릭합니다.
+            <br />입력 완료 후 <strong style={{ color: "var(--foreground)" }}>&quot;만들기&quot; 버튼</strong>을 클릭합니다.
           </Step>
         </ol>
         <TipBox>
@@ -236,13 +236,13 @@ function PhotographerContent({ betaMaxProjectsTotal }: { betaMaxProjectsTotal: n
         <ScreenshotPlaceholder />
         <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
           <Step n={1} title="프로젝트 진입">대시보드에서 해당 프로젝트 카드를 클릭합니다.</Step>
-          <Step n={2} title="업로드 시작">프로젝트 상세 페이지 상단의 <strong style={{ color: "var(--foreground)" }}>"원본 업로드" 버튼</strong>을 클릭합니다.</Step>
+          <Step n={2} title="업로드 시작">프로젝트 상세 페이지 상단의 <strong style={{ color: "var(--foreground)" }}>&quot;원본 업로드&quot; 버튼</strong>을 클릭합니다.</Step>
           <Step n={3} title="파일 선택">
             업로드할 사진 파일을 선택합니다. 단일 또는 다중 선택 모두 가능합니다.<br />
             지원 형식: <strong style={{ color: "var(--foreground)" }}>JPEG, PNG, WebP, HEIC/HEIF</strong>
           </Step>
-          <Step n={4} title="업로드 진행 확인">업로드 진행률이 화면에 표시됩니다. 프로젝트 상태가 "업로드 중"으로 표시됩니다.</Step>
-          <Step n={5} title="완료 확인">셀렉 갯수(N장) 이상 업로드가 완료되면 화면 하단의 <strong style={{ color: "var(--foreground)" }}>"고객 초대 링크 활성화" 버튼</strong>이 활성화됩니다.</Step>
+          <Step n={4} title="업로드 진행 확인">업로드 진행률이 화면에 표시됩니다. 프로젝트 상태가 &quot;업로드 중&quot;으로 표시됩니다.</Step>
+          <Step n={5} title="완료 확인">셀렉 갯수(N장) 이상 업로드가 완료되면 화면 하단의 <strong style={{ color: "var(--foreground)" }}>&quot;고객 초대 링크 활성화&quot; 버튼</strong>이 활성화됩니다.</Step>
         </ol>
         <TipBox>
           <ul style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -265,13 +265,13 @@ function PhotographerContent({ betaMaxProjectsTotal }: { betaMaxProjectsTotal: n
         <ScreenshotPlaceholder />
         <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
           <Step n={1} title="초대 링크 활성화">
-            업로드 페이지 하단의 <strong style={{ color: "var(--foreground)" }}>"고객 초대 링크 활성화" 버튼</strong>을 클릭합니다.<br />
+            업로드 페이지 하단의 <strong style={{ color: "var(--foreground)" }}>&quot;고객 초대 링크 활성화&quot; 버튼</strong>을 클릭합니다.<br />
             <span style={{ fontSize: 12, color: MUTED }}>이 버튼은 셀렉 갯수(N장) 이상 업로드됐을 때만 클릭할 수 있어요.</span>
           </Step>
-          <Step n={2} title="공유 모달 확인">버튼 클릭 즉시 프로젝트 상태가 <strong style={{ color: "var(--foreground)" }}>"셀렉 중"</strong>으로 변경되고, 공유 모달이 자동으로 열립니다.</Step>
+          <Step n={2} title="공유 모달 확인">버튼 클릭 즉시 프로젝트 상태가 <strong style={{ color: "var(--foreground)" }}>&quot;셀렉 중&quot;</strong>으로 변경되고, 공유 모달이 자동으로 열립니다.</Step>
           <Step n={3} title="링크 복사">
-            PIN을 설정한 경우 <strong style={{ color: "var(--foreground)" }}>"링크와 비밀번호 복사"</strong> 버튼을 클릭합니다.<br />
-            PIN이 없는 경우 <strong style={{ color: "var(--foreground)" }}>"초대 링크 공유"</strong> 버튼을 클릭합니다.
+            PIN을 설정한 경우 <strong style={{ color: "var(--foreground)" }}>&quot;링크와 비밀번호 복사&quot;</strong> 버튼을 클릭합니다.<br />
+            PIN이 없는 경우 <strong style={{ color: "var(--foreground)" }}>&quot;초대 링크 공유&quot;</strong> 버튼을 클릭합니다.
           </Step>
           <Step n={4} title="고객에게 전달">
             복사된 링크를 카카오톡, 문자 등으로 고객에게 <strong style={{ color: "var(--foreground)" }}>직접 전달</strong>합니다.<br />
@@ -281,7 +281,7 @@ function PhotographerContent({ betaMaxProjectsTotal }: { betaMaxProjectsTotal: n
         </ol>
         <TipBox>
           <ul style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: 6 }}>
-            <li>"링크와 비밀번호 복사" 버튼으로 링크와 PIN을 <strong style={{ color: "var(--foreground)" }}>한 번에</strong> 복사할 수 있어요.</li>
+            <li>&quot;링크와 비밀번호 복사&quot; 버튼으로 링크와 PIN을 <strong style={{ color: "var(--foreground)" }}>한 번에</strong> 복사할 수 있어요.</li>
             <li>나중에 링크를 다시 공유해야 할 때는 프로젝트 페이지에서 언제든 다시 복사 가능합니다.</li>
             <li>고객은 갤러리에서 사진마다 별점(1~5점)과 색상 태그를 달 수 있어요. 보정 참고 자료로 활용하세요.</li>
           </ul>
@@ -299,17 +299,17 @@ function PhotographerContent({ betaMaxProjectsTotal }: { betaMaxProjectsTotal: n
         <p style={{ color: MUTED, fontSize: 14, marginBottom: 28, marginLeft: 40 }}>고객이 최종 확정한 사진 목록을 확인하고 보정을 시작합니다.</p>
         <ScreenshotPlaceholder />
         <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
-          <Step n={1} title="셀렉 완료 확인">대시보드에서 해당 프로젝트 상태 배지가 <strong style={{ color: "var(--foreground)" }}>"셀렉 완료"</strong>로 변경됐는지 확인합니다.</Step>
-          <Step n={2} title="결과 페이지 진입">프로젝트 카드를 클릭한 뒤, 워크플로우에서 <strong style={{ color: "var(--foreground)" }}>"셀렉 확인"</strong> 단계를 클릭합니다.</Step>
+          <Step n={1} title="셀렉 완료 확인">대시보드에서 해당 프로젝트 상태 배지가 <strong style={{ color: "var(--foreground)" }}>&quot;셀렉 완료&quot;</strong>로 변경됐는지 확인합니다.</Step>
+          <Step n={2} title="결과 페이지 진입">프로젝트 카드를 클릭한 뒤, 워크플로우에서 <strong style={{ color: "var(--foreground)" }}>&quot;셀렉 확인&quot;</strong> 단계를 클릭합니다.</Step>
           <Step n={3} title="선택 결과 확인">고객이 선택한 사진 목록과 각 사진에 남긴 코멘트를 확인합니다.</Step>
           <Step n={4} title="목록 내보내기 (선택)">
-            <strong style={{ color: "var(--foreground)" }}>"CSV"</strong> 버튼으로 파일명 목록을 다운로드하거나, <strong style={{ color: "var(--foreground)" }}>"CLIPBOARD"</strong> 버튼으로 복사할 수 있어요.
+            <strong style={{ color: "var(--foreground)" }}>&quot;CSV&quot;</strong> 버튼으로 파일명 목록을 다운로드하거나, <strong style={{ color: "var(--foreground)" }}>&quot;CLIPBOARD&quot;</strong> 버튼으로 복사할 수 있어요.
           </Step>
-          <Step n={5} title="보정 시작">결과를 확인했으면 <strong style={{ color: "var(--foreground)" }}>"보정 시작하기" 버튼</strong>을 클릭합니다. 프로젝트 상태가 "보정 중"으로 전환됩니다.</Step>
+          <Step n={5} title="보정 시작">결과를 확인했으면 <strong style={{ color: "var(--foreground)" }}>&quot;보정 시작하기&quot; 버튼</strong>을 클릭합니다. 프로젝트 상태가 &quot;보정 중&quot;으로 전환됩니다.</Step>
         </ol>
         <TipBox>
           <ul style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: 6 }}>
-            <li>"보정 시작하기"를 클릭하면 고객은 더 이상 최종확정을 취소할 수 없어요. 클릭 전에 선택 목록을 꼭 확인해 주세요.</li>
+            <li>&quot;보정 시작하기&quot;를 클릭하면 고객은 더 이상 최종확정을 취소할 수 없어요. 클릭 전에 선택 목록을 꼭 확인해 주세요.</li>
             <li>고객이 코멘트를 남겼다면 결과 페이지에서 먼저 읽고 보정을 시작하세요.</li>
           </ul>
         </TipBox>
@@ -386,14 +386,14 @@ function ClientContent() {
         <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
           <Step n={1} title="사진 선택">갤러리에서 원하는 사진을 클릭해 선택합니다. 다시 클릭하면 해제됩니다.</Step>
           <Step n={2} title="별점·태그·코멘트 추가 (선택 사항)">사진을 클릭하면 상세 보기에서 별점(1~5), 색상 태그, 텍스트 코멘트를 남길 수 있어요. 작가의 보정 참고 자료가 됩니다.</Step>
-          <Step n={3} title="선택 확인">상단 <strong style={{ color: "var(--foreground)" }}>"선택됨"</strong> 탭을 누르면 선택한 사진만 필터해서 확인할 수 있어요.</Step>
+          <Step n={3} title="선택 확인">상단 <strong style={{ color: "var(--foreground)" }}>&quot;선택됨&quot;</strong> 탭을 누르면 선택한 사진만 필터해서 확인할 수 있어요.</Step>
           <Step n={4} title="보정 의뢰">
-            N장 선택이 완료되면 하단 <strong style={{ color: "var(--foreground)" }}>"보정 의뢰하기"</strong> 버튼이 활성화됩니다. 클릭 후 모달에서 <strong style={{ color: "var(--foreground)" }}>"확정 및 전송"</strong>을 눌러 최종 확정합니다.
+            N장 선택이 완료되면 하단 <strong style={{ color: "var(--foreground)" }}>&quot;보정 의뢰하기&quot;</strong> 버튼이 활성화됩니다. 클릭 후 모달에서 <strong style={{ color: "var(--foreground)" }}>&quot;확정 및 전송&quot;</strong>을 눌러 최종 확정합니다.
           </Step>
         </ol>
         <TipBox>
           <ul style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: 6 }}>
-            <li>확정 후 작가가 보정을 시작하기 전이라면 확정 화면의 <strong style={{ color: "var(--foreground)" }}>"확정 취소 후 다시 선택"</strong> 버튼으로 최대 3회까지 되돌릴 수 있어요.</li>
+            <li>확정 후 작가가 보정을 시작하기 전이라면 확정 화면의 <strong style={{ color: "var(--foreground)" }}>&quot;확정 취소 후 다시 선택&quot;</strong> 버튼으로 최대 3회까지 되돌릴 수 있어요.</li>
             <li>별점·색상 태그·코멘트는 모두 선택 사항입니다.</li>
           </ul>
         </TipBox>
@@ -413,11 +413,11 @@ function ClientContent() {
           <Step n={1} title="재접속">작가에게서 보정 완료 알림을 받으면 기존 링크로 다시 접속합니다.</Step>
           <Step n={2} title="보정본 확인">각 사진의 보정본을 확인하며 <strong style={{ color: "var(--foreground)" }}>확정</strong> 또는 <strong style={{ color: "var(--foreground)" }}>재보정 요청</strong> 중 하나를 선택합니다.</Step>
           <Step n={3} title="코멘트 추가 (재보정 요청 시)">재보정을 요청할 경우 코멘트로 수정 내용을 남길 수 있어요.</Step>
-          <Step n={4} title="검토 완료 전달">모든 사진 검토 후 <strong style={{ color: "var(--foreground)" }}>"작가에게 전달"</strong> 버튼을 클릭합니다.</Step>
+          <Step n={4} title="검토 완료 전달">모든 사진 검토 후 <strong style={{ color: "var(--foreground)" }}>&quot;작가에게 전달&quot;</strong> 버튼을 클릭합니다.</Step>
         </ol>
         <TipBox>
           <ul style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: 6 }}>
-            <li>재보정 횟수가 0회로 설정된 프로젝트는 이 단계가 없습니다. 보정본 전체를 확인 후 <strong style={{ color: "var(--foreground)" }}>"수령 완료"</strong> 버튼을 클릭하세요.</li>
+            <li>재보정 횟수가 0회로 설정된 프로젝트는 이 단계가 없습니다. 보정본 전체를 확인 후 <strong style={{ color: "var(--foreground)" }}>&quot;수령 완료&quot;</strong> 버튼을 클릭하세요.</li>
             <li>이 섹션은 작가가 재보정 횟수를 1회 이상으로 설정한 프로젝트에만 해당합니다.</li>
           </ul>
         </TipBox>

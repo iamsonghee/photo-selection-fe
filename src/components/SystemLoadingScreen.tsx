@@ -1,197 +1,74 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-
-const LOG_LINES = [
-  { ts: "[SYS:BOOT:0.865]", msg: "Checking local storage integrity..." },
-  { ts: "[SYS:BOOT:1.265]", msg: "Initializing UI components..." },
-  { ts: "[SYS:BOOT:2.065]", msg: "Connection established." },
-  { ts: "[SYS:BOOT:2.465]", msg: "Finalizing layout rendering..." },
-];
-
-export function SystemLoadingScreen() {
-  const clockRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    let rafId: number;
-    function tick() {
-      const now = new Date();
-      const t =
-        now.getHours().toString().padStart(2, "0") +
-        ":" +
-        now.getMinutes().toString().padStart(2, "0") +
-        ":" +
-        now.getSeconds().toString().padStart(2, "0") +
-        ":" +
-        now.getMilliseconds().toString().padStart(3, "0");
-      if (clockRef.current) clockRef.current.textContent = t;
-      rafId = requestAnimationFrame(tick);
-    }
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, []);
-
+/**
+ * 전체 화면 로딩 표시 — 고객·작가 화면이 공유하는 **단일** 진행 상태 컴포넌트.
+ *
+ * 예전에는 화면마다 로딩 표시가 달랐다: 이 컴포넌트 자체에 `light`/`dark` 두 버전이 있었고
+ * (실제로는 전 호출부가 `variant="light"`만 써서 `dark` 버전은 죽은 코드였다), 작가 화면 중
+ * 일부는 완전히 다른 컴포넌트(`PageLoader` — 이중 회전 아크 스피너)를, 또 일부는 스켈레톤
+ * 그리드를, 심지어 어떤 화면은 회전 표시조차 없는 평문 "SYS.LOADING…" 텍스트를 화면 중간
+ * 어딘가(중앙정렬 아님)에 띄웠다. 같은 "페이지를 불러오는 중"인데 화면마다 모양도 위치도
+ * 달라 보였다(2026-09-12 통일).
+ *
+ * 이제 전체 화면 로딩은 이 컴포넌트 하나뿐이다:
+ * - `position:fixed; inset:0; display:grid; place-items:center`로 뷰포트 정중앙에 고정한다.
+ * - 배경은 흰색으로 고정한다 — 로딩을 보여주는 화면은 전부 라이트 화면(고객 전체, 작가
+ *   대시보드/목록/설정/업로드/자산)이다. 다크로 남아 있는 화면(작가 워크플로우 등)은 아직
+ *   전체가 다크 워크스페이스 스타일이라 이 컴포넌트를 쓰지 않는다 — 그 화면들이 라이트로
+ *   전환되면 그때 같이 이 컴포넌트를 쓰면 된다(별도 톤 분기를 다시 만들 필요는 없다. 다크
+ *   화면 자체가 없어지는 방향이 맞다).
+ * - 문구는 기본값(`페이지를 준비하고 있어요` / `잠시만 기다려 주세요`)이 있고, 맥락이 필요한
+ *   화면(예: "프로젝트 불러오는 중")은 `title`/`description`으로 바꿔 쓴다 — 레이아웃과 애니
+ *   메이션은 항상 같고 문구만 다르다.
+ */
+export function SystemLoadingScreen({
+  title = "페이지를 준비하고 있어요",
+  description = "잠시만 기다려 주세요",
+}: {
+  title?: string;
+  description?: string;
+}) {
   return (
-    <>
+    <div className="sls-root" role="status" aria-live="polite" aria-label={title}>
       <style>{`
-        @keyframes sls-scanline {
-          0%   { top: -150px; }
-          100% { top: 100vh; }
+        @keyframes sls-mark {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(.94); }
         }
-        @keyframes sls-breathe {
-          0%, 100% {
-            box-shadow: 0 0 0px rgba(var(--accent-rgb), 0);
-            transform: scale(1);
-          }
-          50% {
-            box-shadow: 0 0 40px rgba(var(--accent-rgb), 0.4);
-            transform: scale(1.05);
-          }
+        @keyframes sls-progress {
+          0% { transform: translateX(-110%); }
+          100% { transform: translateX(280%); }
         }
-        @keyframes sls-pulse {
-          0%   { opacity: 0.2; }
-          100% { opacity: 1; }
+        .sls-root {
+          position: fixed; inset: 0; z-index: 9999;
+          min-height: 100dvh; padding: env(safe-area-inset-top) 24px env(safe-area-inset-bottom);
+          display: grid; place-items: center; overflow: hidden;
+          background: #fff; color: #191918;
+          font-family: Pretendard, 'Noto Sans KR', sans-serif;
         }
-        .sls-scanline {
-          width: 100%;
-          height: 150px;
-          position: absolute;
-          top: -150px;
-          left: 0;
-          background: linear-gradient(to bottom, rgba(var(--accent-rgb), 0) 0%, rgba(var(--accent-rgb), 0.03) 50%, rgba(var(--accent-rgb), 0) 100%);
-          animation: sls-scanline 8s linear infinite;
-          pointer-events: none;
-          z-index: 1;
+        .sls-content { width: 100%; max-width: 280px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .sls-mark {
+          width: 48px; height: 48px; border-radius: 12px;
+          display: grid; place-items: center;
+          background: #ff4d00; color: #fff;
+          font-family: 'Space Grotesk', sans-serif; font-size: 25px; line-height: 1; font-weight: 900;
+          animation: sls-mark 1.8s ease-in-out infinite;
         }
-        .sls-logo {
-          width: 64px;
-          height: 64px;
-          background-color: var(--accent);
-          color: #000;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-family: 'Space Grotesk', sans-serif;
-          font-weight: 900;
-          font-size: 32px;
-          animation: sls-breathe 4s ease-in-out infinite;
-        }
-        .sls-pulse {
-          width: 6px;
-          height: 6px;
-          background-color: var(--accent);
-          border-radius: 50%;
-          animation: sls-pulse 2s infinite alternate;
-          flex-shrink: 0;
+        .sls-title { margin: 22px 0 0; font-size: 16px; line-height: 24px; font-weight: 700; letter-spacing: -.4px; }
+        .sls-description { margin: 5px 0 0; color: #838b94; font-size: 12px; line-height: 19px; }
+        .sls-track { width: 112px; height: 3px; margin-top: 24px; border-radius: 999px; overflow: hidden; background: #eef0f2; }
+        .sls-progress { width: 36px; height: 100%; border-radius: inherit; background: #ff4d00; animation: sls-progress 1.25s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          .sls-mark { animation: none; }
+          .sls-progress { width: 100%; animation: none; opacity: .7; }
         }
       `}</style>
-
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "var(--background)",
-          color: "var(--foreground)",
-          fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-          zIndex: 9999,
-        }}
-      >
-        {/* Grid background */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
-            backgroundPosition: "center center",
-            pointerEvents: "none",
-            zIndex: 0,
-          }}
-        />
-
-        {/* Scanline */}
-        <div className="sls-scanline" />
-
-        {/* Corner brackets */}
-        {/* TL */}
-        <div style={{ position: "absolute", top: 32, left: 32, width: 32, height: 32, borderTop: "2px solid var(--border-subtle)", borderLeft: "2px solid var(--border-subtle)", zIndex: 10, pointerEvents: "none" }} />
-        {/* TR */}
-        <div style={{ position: "absolute", top: 32, right: 32, width: 32, height: 32, borderTop: "2px solid var(--border-subtle)", borderRight: "2px solid var(--border-subtle)", zIndex: 10, pointerEvents: "none" }} />
-        {/* BL */}
-        <div style={{ position: "absolute", bottom: 32, left: 32, width: 32, height: 32, borderBottom: "2px solid var(--border-subtle)", borderLeft: "2px solid var(--border-subtle)", zIndex: 10, pointerEvents: "none" }} />
-        {/* BR */}
-        <div style={{ position: "absolute", bottom: 32, right: 32, width: 32, height: 32, borderBottom: "2px solid var(--border-subtle)", borderRight: "2px solid var(--border-subtle)", zIndex: 10, pointerEvents: "none" }} />
-
-        {/* Content */}
-        <div style={{ position: "relative", zIndex: 10, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "48px" }}>
-
-          {/* Header */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            {/* Status badge */}
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, border: "1px solid var(--border-subtle)", padding: "6px 12px" }}>
-              <div className="sls-pulse" />
-              <span style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--subtle-foreground)" }}>
-                SYS :: STANDBY
-              </span>
-            </div>
-
-            {/* Clock */}
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--subtle-foreground)", marginBottom: 4 }}>
-                LOCAL_TIME
-              </div>
-              <span ref={clockRef} style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 14, opacity: 0.6 }}>
-                00:00:00:000
-              </span>
-            </div>
-          </div>
-
-          {/* Center logo */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1 }}>
-            <div className="sls-logo">A</div>
-            <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--subtle-foreground)", marginTop: 32, opacity: 0.4 }}>
-              INITIALIZING ENVIRONMENT...
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", width: "100%" }}>
-
-            {/* Terminal log */}
-            <div style={{ width: 400, height: 100, padding: 12, display: "flex", flexDirection: "column", justifyContent: "flex-end", overflow: "hidden" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10, color: "var(--subtle-foreground)" }}>
-                {LOG_LINES.map((line, i) => (
-                  <div key={i} style={{ display: "flex", gap: 8, opacity: 0.3 + i * 0.2 }}>
-                    <span style={{ flexShrink: 0 }}>{line.ts}</span>
-                    <span>{line.msg}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* System info */}
-            <div style={{ textAlign: "right", display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--subtle-foreground)" }}>
-                TARGET_ENV: <span style={{ color: "var(--foreground)" }}>PRODUCTION</span>
-              </div>
-              <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--subtle-foreground)" }}>
-                A-CUT_VERSION: <span style={{ color: "var(--foreground)" }}>1.2.0-CORE</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
-                <span style={{ fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--disabled-foreground)" }}>SECURE</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--border-strong)" strokeWidth="2">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="sls-content">
+        <div className="sls-mark" aria-hidden>A</div>
+        <p className="sls-title">{title}</p>
+        <p className="sls-description">{description}</p>
+        <div className="sls-track" aria-hidden><div className="sls-progress" /></div>
       </div>
-    </>
+    </div>
   );
 }

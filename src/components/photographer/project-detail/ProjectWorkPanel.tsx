@@ -1,5 +1,23 @@
-import { ChevronRight, Flag, ListChecks, PenLine, Upload } from "lucide-react";
+import { PhotographerLightButton } from "../PhotographerLightButton";
+import { ChevronRight, Clock, Flag, ListChecks, PenLine, Upload } from "lucide-react";
+import { addDays, format, parseISO } from "date-fns";
 import type { Project, ProjectStatus } from "@/types";
+import { dday, getProjectActor } from "@/lib/project-actor";
+import { getActiveDeadline } from "@/lib/project-deadline";
+
+// 고객 화면(src/lib/customer-api-server.ts)의 ORIGINAL_DOWNLOAD_WINDOW_DAYS /
+// FINAL_DELIVERY_DOWNLOAD_WINDOW_DAYS와 동일한 30일. 그 파일은 Service Role 클라이언트를 쓰는
+// 서버 전용 모듈이라 여기서 import할 수 없어 값만 맞춰 둔다.
+const ORIGINAL_RETENTION_DAYS = 30;
+const FINAL_DELIVERY_RETENTION_DAYS = 30;
+
+function formatRetentionDeadline(iso: string, days: number): string {
+  try {
+    return format(addDays(parseISO(iso), days), "yyyy-MM-dd");
+  } catch {
+    return "—";
+  }
+}
 
 type WorkMode =
   | "upload-start"
@@ -8,6 +26,17 @@ type WorkMode =
   | "retouch"
   | "review"
   | "complete";
+
+const MOBILE_META_LABELS: Record<string, string> = {
+  "업로드된 사진": "업로드",
+  "고객 셀렉 목표": "목표",
+  "셀렉 마감": "마감",
+  "재보정 허용": "재보정",
+  "검토 기한": "기한",
+  "최종 납품": "납품",
+  "최종 보정본 보관 종료": "보관 종료",
+  "원본 보관 종료": "원본 보관",
+};
 
 type Props = {
   project: Project;
@@ -26,7 +55,9 @@ type WorkPanelContent = {
   cta: string;
   icon: React.ReactNode;
   onClick: () => void;
-  meta: Array<{ label: string; value: string }>;
+  meta: Array<{ label: string; value: string; overdue?: string }>;
+  /** Figma #56060 "완료 후 30일동안 파일을 보관해요" — complete 모드에서만 노출되는 보관 안내 캡션 */
+  note?: string;
 };
 
 function getWorkMode(status: ProjectStatus, photoCount: number): WorkMode {
@@ -51,6 +82,12 @@ export function ProjectWorkPanel({
   onResults,
 }: Props) {
   const mode = getWorkMode(project.status, project.photoCount);
+  const actor = getProjectActor(project.status);
+  // Dashboard·Project List와 동일하게, 현재 고객 단계의 실제 기한만 계산한다.
+  // 마감 전(D-/D-day)은 별도 강조하지 않고 초과된 D+만 Critical로 표시한다.
+  const activeDeadline = actor === "customer" ? getActiveDeadline(project) : null;
+  const deadlineResult = activeDeadline ? dday(activeDeadline.date) : null;
+  const overdueText = deadlineResult?.text.startsWith("D+") ? deadlineResult.text : undefined;
   const content: WorkPanelContent = (() => {
     switch (mode) {
       case "upload-start":
@@ -95,7 +132,7 @@ export function ProjectWorkPanel({
           onClick: onSelection,
           meta: [
             { label: "고객 셀렉 목표", value: `${project.requiredCount}장` },
-            { label: "셀렉 마감", value: deadlineDisplay },
+            { label: "셀렉 마감", value: deadlineDisplay, overdue: overdueText },
           ],
         };
       case "retouch":
@@ -130,11 +167,33 @@ export function ProjectWorkPanel({
           icon: <ListChecks size={20} />,
           onClick: onWorkflow,
           meta: [
-            { label: "검토 기한", value: reviewDeadlineDisplay ?? "미설정" },
+            { label: "검토 기한", value: reviewDeadlineDisplay ?? "미설정", overdue: overdueText },
             { label: "재보정 허용", value: project.maxRevisionCount === 0 ? "없음" : `최대 ${project.maxRevisionCount}회` },
           ],
         };
-      case "complete":
+      case "complete": {
+        // Figma #56060 "완료" 카드 실측: 완료일(시각 포함) · 최종 납품 · 최종 보정본 보관 종료
+        // 3개 행 + 하단 보관 안내 캡션. 원본 포함 프로젝트는 원본 다운로드 기한(고객 화면과 동일
+        // 계산식, originalDownloadStartedAt + 30일)을 이어서 안내한다 — Figma 예시 프로젝트는
+        // 원본 미포함이라 이 행이 없었지만, 같은 행 패턴을 그대로 확장했다. "최종 보정본"/"원본"
+        // 두 보관 기한은 서로 다른 파일의 독립적인 삭제 스케줄이라 라벨을 대칭적으로 구분한다
+        // (고객 화면 FinalDeliveryDownloadEntry.tsx의 "최종 보정본" 용어를 그대로 사용).
+        const deliveredAtDisplay = project.deliveredAt
+          ? (() => {
+              try {
+                return format(parseISO(project.deliveredAt as string), "yyyy-MM-dd HH:mm");
+              } catch {
+                return project.deliveredAt as string;
+              }
+            })()
+          : "—";
+        const finalRetentionDisplay = project.deliveredAt
+          ? formatRetentionDeadline(project.deliveredAt, FINAL_DELIVERY_RETENTION_DAYS)
+          : "—";
+        const originalRetentionDisplay = project.includeOriginal && project.originalDownloadStartedAt
+          ? formatRetentionDeadline(project.originalDownloadStartedAt, ORIGINAL_RETENTION_DAYS)
+          : null;
+
         return {
           eyebrow: "프로젝트 완료",
           title: "사진 납품이 완료되었습니다",
@@ -143,44 +202,116 @@ export function ProjectWorkPanel({
           icon: <Flag size={20} />,
           onClick: onResults,
           meta: [
-            { label: "업로드된 사진", value: `${project.photoCount}장` },
-            { label: "고객 셀렉 목표", value: `${project.requiredCount}장` },
+            { label: "완료일", value: deliveredAtDisplay },
+            { label: "최종 납품", value: `${project.requiredCount}장` },
+            { label: "최종 보정본 보관 종료", value: finalRetentionDisplay },
+            ...(originalRetentionDisplay
+              ? [{ label: "원본 보관 종료", value: originalRetentionDisplay }]
+              : []),
           ],
+          note: "완료 후 30일동안 파일을 보관해요",
         };
+      }
     }
   })();
 
+  const isPhotographer = actor === "photographer";
+  const isCustomer = actor === "customer";
+  const semanticTone = isPhotographer
+    ? "text-accent"
+    : isCustomer
+      ? "text-cyan"
+      : "text-muted-foreground";
+  const iconTone = isPhotographer
+    ? "bg-accent text-white"
+    : isCustomer
+      ? "bg-cyan text-white"
+      : "bg-surface-raised text-muted-foreground";
+  const actorLabel = isPhotographer ? "작가 진행 중" : isCustomer ? "고객 진행 중" : "완료";
+  const actorBadgeTone = isPhotographer
+    ? "bg-accent/8 text-accent"
+    : isCustomer
+      ? "bg-[var(--customer-soft)] text-cyan"
+      : "bg-surface-raised text-muted-foreground";
+
+
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-accent/45 bg-accent/8 p-5 md:p-6">
-      <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full bg-accent/10 blur-2xl" />
-      <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex min-w-0 items-start gap-3.5">
-          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-black">
+    <section
+      data-project-work-panel
+      data-actor={actor}
+      className="flex flex-col rounded-xl border border-border-subtle bg-surface p-4 md:p-6"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg [&>svg]:h-4 [&>svg]:w-4 ${iconTone}`}>
             {content.icon}
           </span>
-          <div className="min-w-0">
-            <p className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-accent">{content.eyebrow}</p>
-            <h2 className="text-lg font-bold tracking-tight text-foreground md:text-xl">{content.title}</h2>
-            <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">{content.description}</p>
-            <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
-              {content.meta.map((item) => (
-                <div key={item.label} className="flex items-baseline gap-2">
-                  <dt className="text-xs text-subtle-foreground">{item.label}</dt>
-                  <dd className="text-sm font-semibold text-foreground">{item.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
+          <p className={`truncate text-[14px] font-bold leading-5 tracking-[-0.35px] ${semanticTone}`}>
+            {content.eyebrow}
+          </p>
         </div>
-        <button
-          type="button"
-          onClick={content.onClick}
-          className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-black transition-colors hover:bg-[#ff5e1a]"
-        >
-          {content.cta}
-          <ChevronRight size={16} />
-        </button>
+        <span className={`hidden shrink-0 rounded-md px-2 py-1 text-[11px] font-medium leading-4 tracking-[-0.25px] md:inline-flex ${actorBadgeTone}`}>
+          {actorLabel}
+        </span>
       </div>
+
+      <div className="mt-3 md:mt-5">
+        <h2 className="text-[20px] font-bold leading-7 tracking-[-0.45px] text-foreground md:text-[24px] md:leading-8 md:tracking-[-0.5px]">
+          {content.title}
+        </h2>
+        <p className="mt-2 hidden text-[14px] font-normal leading-[22px] tracking-[-0.35px] text-muted-foreground md:block">
+          {content.description}
+        </p>
+      </div>
+
+      <p className="mt-2 truncate text-[12px] font-medium leading-5 text-muted-foreground md:hidden">
+        {content.meta.map((item) => `${MOBILE_META_LABELS[item.label] ?? item.label} ${item.value}${item.overdue ? ` ${item.overdue}` : ""}`).join(" · ")}
+      </p>
+
+      <dl className="mt-5 hidden overflow-hidden rounded-lg bg-surface-raised md:block">
+        {content.meta.map((item, index) => (
+          <div
+            key={item.label}
+            className={`flex min-h-11 items-center justify-between gap-4 px-4 py-2.5 ${
+              index > 0 ? "border-t border-border-subtle" : ""
+            }`}
+          >
+            <dt className="text-[13px] font-normal leading-5 tracking-[-0.3px] text-muted-foreground">
+              {item.label}
+            </dt>
+            <dd className="flex items-center justify-end gap-2 text-right text-[14px] font-semibold leading-5 tracking-[-0.35px] text-foreground">
+              <span>{item.value}</span>
+              {item.overdue ? (
+                <span
+                  title={`${item.label} ${item.overdue}`}
+                  className="font-mono text-[12px] font-semibold leading-[18px] tracking-normal text-danger"
+                >
+                  {item.overdue}
+                </span>
+              ) : null}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      {content.note ? (
+        <div className="mt-3 hidden items-center gap-2 rounded-lg bg-surface-raised px-4 py-3 md:flex">
+          <Clock size={14} className="shrink-0 text-subtle-foreground" />
+          <p className="text-[12px] font-medium leading-4 tracking-[-0.25px] text-muted-foreground">
+            {content.note}
+          </p>
+        </div>
+      ) : null}
+
+      <PhotographerLightButton
+        size="work-panel"
+        variant={isPhotographer ? "primary" : "secondary"}
+        onClick={content.onClick}
+        className="mt-4 w-full shrink-0 gap-1.5 md:mt-6"
+      >
+        {content.cta}
+        <ChevronRight size={16} />
+      </PhotographerLightButton>
     </section>
   );
 }

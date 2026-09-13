@@ -31,10 +31,10 @@ export function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row
     customerPhone: ext.customer_phone ?? null,
     status: row.status as ProjectStatus,
     accessToken: row.access_token,
-    accessPin: (row as any).access_pin ?? null,
+    accessPin: (row as { access_pin?: string | null }).access_pin ?? null,
     confirmedAt: row.confirmed_at ?? undefined,
     deliveredAt: row.delivered_at ?? undefined,
-    displayId: (row as any).display_id ?? undefined,
+    displayId: (row as { display_id?: string | null }).display_id ?? undefined,
     maxRevisionCount: (ext.max_revision_count ?? (ext.allow_revision ? 2 : 0)) as 0 | 1 | 2,
     revisionRound: ext.revision_round ?? 0,
     location: ext.location ?? null,
@@ -42,12 +42,13 @@ export function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row
     clipAnalysisStatus:
       (row as { clip_analysis_status?: "processing" | "completed" | "failed" | null })
         .clip_analysis_status ?? null,
-    includeOriginal: (row as any).include_original ?? false,
+    includeOriginal: (row as { include_original?: boolean | null }).include_original ?? false,
     originalArchiveStatus:
       (row as { original_archive_status?: "pending" | "processing" | "ready" | "failed" | null })
         .original_archive_status ?? null,
     originalDownloadStartedAt:
       (row as { original_download_started_at?: string | null }).original_download_started_at ?? null,
+    coverPhotoId: (row as { cover_photo_id?: string | null }).cover_photo_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -70,6 +71,11 @@ function mapPhotoRow(
     previewUrl: row.r2_preview_url ?? row.r2_thumb_url,
     originalFilename: row.original_filename ?? null,
     fileSize: (row as unknown as Record<string, unknown>).file_size as number | null ?? null,
+    sourceFileSize: row.source_file_size ?? null,
+    sourceWidth: row.source_width ?? null,
+    sourceHeight: row.source_height ?? null,
+    sourceContentType: row.source_content_type ?? null,
+    sourceLastModified: row.source_last_modified ?? null,
     createdAt: row.created_at ?? null,
     selected,
     tag: state ? { star: state.rating as 1 | 2 | 3 | 4 | 5 | undefined, color: state.color } : undefined,
@@ -175,17 +181,39 @@ export async function getProjectsByPhotographerId(
   if (projects.length === 0) return projects;
 
   const projectIds = projects.map((p) => p.id);
-  const { data: thumbData } = await supabase
+  const coverPhotoIds = projects.flatMap((project) => project.coverPhotoId ? [project.coverPhotoId] : []);
+  const firstThumbRequest = supabase
     .from("photos")
     .select("project_id, r2_thumb_url")
     .in("project_id", projectIds)
     .eq("number", 1);
+  const coverThumbRequest = coverPhotoIds.length > 0
+    ? supabase
+        .from("photos")
+        .select("id, project_id, r2_thumb_url")
+        .in("id", coverPhotoIds)
+    : Promise.resolve({ data: [] as Array<{ id: string; project_id: string; r2_thumb_url: string }> });
+  const [{ data: thumbData }, { data: coverThumbData }] = await Promise.all([
+    firstThumbRequest,
+    coverThumbRequest,
+  ]);
 
   const thumbMap: Record<string, string> = Object.fromEntries(
     (thumbData ?? []).map((r) => [r.project_id, r.r2_thumb_url])
   );
+  const coverThumbMap = new Map<string, string>();
+  const projectById = new Map(projects.map(project => [project.id, project]));
+  for (const row of coverThumbData ?? []) {
+    // API가 같은 프로젝트의 사진만 저장하지만, 목록 조회에서도 교차 프로젝트 값을 방어한다.
+    if (projectById.get(row.project_id)?.coverPhotoId === row.id) {
+      coverThumbMap.set(row.project_id, row.r2_thumb_url);
+    }
+  }
 
-  return projects.map((p) => ({ ...p, thumbnailUrl: thumbMap[p.id] ?? null }));
+  return projects.map((project) => ({
+    ...project,
+    thumbnailUrl: coverThumbMap.get(project.id) ?? thumbMap[project.id] ?? null,
+  }));
 }
 
 /** 프로젝트 ID로 단건 조회 */
@@ -283,7 +311,8 @@ export async function updateProject(
     delivered_at: string | null;
   }>
 ): Promise<void> {
-  const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const now = new Date().toISOString();
+  const payload: Record<string, unknown> = { updated_at: now };
   if (patch.name != null) payload.name = patch.name;
   if (patch.customer_name != null) payload.customer_name = patch.customer_name;
   if (patch.shoot_date != null) payload.shoot_date = patch.shoot_date;
@@ -292,6 +321,9 @@ export async function updateProject(
   if (patch.status != null) payload.status = patch.status;
   if (patch.confirmed_at !== undefined) payload.confirmed_at = patch.confirmed_at;
   if (patch.delivered_at !== undefined) payload.delivered_at = patch.delivered_at;
+  if (patch.status === "delivered" && patch.delivered_at === undefined) {
+    payload.delivered_at = now;
+  }
 
   const { error } = await supabase.from("projects").update(payload).eq("id", id);
   if (error) throw error;
@@ -302,19 +334,27 @@ export async function getPhotosByProjectId(projectId: string): Promise<Photo[]> 
   // Supabase PostgREST 기본 limit=1000 우회.
   // BETA_MAX=3000이므로 3페이지를 처음부터 병렬 요청 — count 왕복 없음.
   const PAGE = 1000;
-  const COLS =
+  const SOURCE_COLS =
+    "id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, source_file_size, source_width, source_height, source_content_type, source_last_modified, similarity_group_id, is_blurry, face_detected, eyes_closed, original_status";
+  const LEGACY_COLS =
     "id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, similarity_group_id, is_blurry, face_detected, eyes_closed, original_status";
 
-  const results = await Promise.all(
-    [0, 1, 2].map((i) =>
-      supabase
-        .from("photos")
-        .select(COLS)
-        .eq("project_id", projectId)
-        .order("number", { ascending: true })
-        .range(i * PAGE, (i + 1) * PAGE - 1)
-    )
+  const fetchPages = (columns: string) => Promise.all(
+    [0, 1, 2].map((i) => supabase
+      .from("photos")
+      .select(columns)
+      .eq("project_id", projectId)
+      .order("number", { ascending: true })
+      .range(i * PAGE, (i + 1) * PAGE - 1))
   );
+
+  let results = await fetchPages(SOURCE_COLS);
+  const sourceSchemaMissing = results.some(({ error }) =>
+    !!error && /source_(file_size|width|height|content_type|last_modified)|column.*does not exist/i.test(error.message),
+  );
+  // DB migration과 FE 배포 사이에도 기존 사진 목록은 계속 보여야 한다. source metadata만
+  // 비워 둔 채 구버전 컬럼으로 재조회하고, 네트워크/권한 오류는 숨기지 않는다.
+  if (sourceSchemaMissing) results = await fetchPages(LEGACY_COLS);
 
   const all: Photo[] = [];
   for (const { data, error } of results) {
@@ -560,14 +600,18 @@ export async function submitVersionReviews(
     photo_id: string;
     status: "approved" | "revision_requested";
     customer_comment?: string | null;
-  }>
+  }>,
+  expectedStatus: "reviewing_v1" | "reviewing_v2",
 ): Promise<{ status: ProjectStatus }> {
   // 프로젝트의 재보정 설정 조회
   const { data: projData } = await admin
     .from("projects")
-    .select("max_revision_count, revision_round")
+    .select("status, max_revision_count, revision_round")
     .eq("id", projectId)
     .single();
+  if (!projData || (projData as { status?: string }).status !== expectedStatus) {
+    throw new Error("현재 프로젝트는 보정본 검토를 제출할 수 있는 상태가 아닙니다.");
+  }
   const maxRevisionCount: number = (projData as { max_revision_count?: number } | null)?.max_revision_count ?? 0;
   const currentRound: number = (projData as { revision_round?: number } | null)?.revision_round ?? 0;
 
@@ -599,24 +643,20 @@ export async function submitVersionReviews(
   if (newStatus === "editing_v2") updatePayload.revision_round = currentRound + 1;
   if (newStatus === "delivered") updatePayload.delivered_at = now;
 
-  let updateError: { message: string } | null = null;
-  const { error: err } = await admin
+  const { data: updatedProject, error: updateError } = await admin
     .from("projects")
     .update(updatePayload)
-    .eq("id", projectId);
-  updateError = err;
-
-  // delivered_at 컬럼이 없을 수 있음(마이그레이션 미적용) → 제외하고 재시도
-  if (updateError && newStatus === "delivered" && /delivered_at|column/i.test(updateError.message)) {
-    const fallbackPayload = { status: newStatus, updated_at: now };
-    const { error: err2 } = await admin.from("projects").update(fallbackPayload).eq("id", projectId);
-    if (!err2) return { status: newStatus };
-    updateError = err2;
-  }
+    .eq("id", projectId)
+    .eq("status", expectedStatus)
+    .select("id")
+    .maybeSingle();
 
   if (updateError) {
     console.error("[submitVersionReviews] projects update", updateError);
     throw new Error(`프로젝트 상태 변경 실패: ${updateError.message}`);
+  }
+  if (!updatedProject) {
+    throw new Error("검토 상태가 이미 변경되었습니다. 페이지를 새로고침해 주세요.");
   }
   return { status: newStatus };
 }

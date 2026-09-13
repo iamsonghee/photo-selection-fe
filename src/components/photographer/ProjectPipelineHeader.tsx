@@ -133,7 +133,7 @@ export function ProjectPipelineHeader({ projectId, project, activeStepIndex }: P
           ) : null}
         </div>
         <span style={{ ...techLabel, color: TEXT_BRIGHT, fontSize: "0.58rem" }}>
-          {idShort.toUpperCase()} //{" "}
+          {idShort.toUpperCase()} {"//"}{" "}
           <span style={{ color: linkActive ? "#22c55e" : TEXT_MUTED, fontWeight: 700 }}>
             {linkActive ? "LINK_ACTIVE" : "LINK_INACTIVE"}
           </span>

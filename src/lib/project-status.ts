@@ -75,6 +75,17 @@ export function getStatusLabel(status: ProjectStatus): string {
   return PROJECT_STATUS_LABELS[status] ?? status;
 }
 
+/** API 상태값을 노출하지 않고, 현재 상황과 다음 조치를 설명하는 작가용 오류 문구. */
+export function getTransitionErrorMessage(from: ProjectStatus, to: ProjectStatus): string {
+  if (from === "selecting" && to === "editing") {
+    return "고객이 사진 셀렉 확정을 취소해 보정을 시작할 수 없어요. 고객이 다시 확정한 뒤 시작해 주세요.";
+  }
+  if (from === to) {
+    return `프로젝트가 이미 '${getStatusLabel(from)}' 단계입니다. 화면을 새로고침해 주세요.`;
+  }
+  return `현재 프로젝트가 '${getStatusLabel(from)}' 단계라 '${getStatusLabel(to)}' 단계로 변경할 수 없어요. 화면을 새로고침한 뒤 다시 확인해 주세요.`;
+}
+
 /** preparing일 때 photoCount에 따라 "업로드 전" | "업로드 중" 반환. 그 외는 getStatusLabel과 동일. */
 export function getDisplayStatusLabel(status: ProjectStatus, photoCount?: number): string {
   if (status === "preparing") {

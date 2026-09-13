@@ -1,65 +1,21 @@
-import { MoreHorizontal, PenLine, Trash2 } from "lucide-react";
+"use client";
+
+import { MapPin, MoreHorizontal, PenLine, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Project } from "@/types";
 import { SHOOT_TYPES } from "@/lib/project-shoot-types";
-import { StatusPill } from "@/components/ui/StatusPill";
-import { FieldInfoTip } from "@/components/ui/FieldInfoTip";
-
-const MONO_FONT = "var(--font-mono, monospace)";
 
 function getInitial(name: string): string {
   return name.trim().charAt(0);
 }
 
-function FieldLabel({
-  label,
-  required,
-  optional,
-  info,
-}: {
-  label: string;
-  required?: boolean;
-  optional?: boolean;
-  info?: string;
-}) {
-  return (
-    <div className="mb-1.5 flex items-center gap-1.5">
-      <span className="text-xs font-semibold text-muted-foreground">{label}</span>
-      {info && <FieldInfoTip text={info} />}
-      {required && <span className="text-[10px] font-medium text-accent">필수</span>}
-      {optional && <span className="text-[10px] text-disabled-foreground">선택</span>}
-    </div>
-  );
-}
-
-function MetaItem({
-  label,
-  required,
-  optional,
-  info,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  optional?: boolean;
-  info?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div>
-      <FieldLabel label={label} required={required} optional={optional} info={info} />
-      <div className="text-base text-foreground">{children}</div>
-    </div>
-  );
-}
-
 type Props = {
   project: Project;
   shootDisplay: string;
-  deadlineDisplay: string;
   reviewDeadlineDisplay: string | null;
   onEdit: () => void;
   onDelete: () => void;
+  children?: ReactNode;
 };
 
 /**
@@ -69,138 +25,145 @@ type Props = {
 export function ProjectInformationCard({
   project,
   shootDisplay,
-  deadlineDisplay,
   reviewDeadlineDisplay,
   onEdit,
   onDelete,
+  children,
 }: Props) {
   const photoCount = project.photoCount;
   const requiredCount = project.requiredCount;
   const shootType = SHOOT_TYPES.find((type) => type.value === project.shootType);
-  const ShootTypeIcon = shootType?.icon;
+  const mobileGallerySummary = `셀렉 ${requiredCount}장 · ${project.includeOriginal ? "원본 포함" : "원본 미포함"}`;
+  const mobileRevisionSummary = project.maxRevisionCount === 0 ? "재수정 없음" : `재수정 ${project.maxRevisionCount}회`;
 
   return (
-    <section className="rounded-2xl border border-border-subtle bg-surface p-5 md:p-6">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span
-              className="rounded border border-border-subtle bg-background px-1.5 py-0.5 text-[11px] text-subtle-foreground"
-              style={{ fontFamily: MONO_FONT }}
-            >
-              {project.displayId ?? project.id.slice(0, 12).toUpperCase()}
-            </span>
-            <StatusPill status={project.status} photoCount={photoCount} requiredCount={requiredCount} />
-          </div>
-          <p className="text-xs font-semibold text-muted-foreground">프로젝트 상세 정보</p>
-          <h2 className="mt-1 text-xl font-bold tracking-tight text-foreground md:text-2xl">
-            {project.name}
-          </h2>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={onEdit}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-raised px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-border-strong"
+    <section data-project-information-card className="overflow-hidden rounded-xl border border-border-subtle bg-surface">
+      <div className="flex items-center gap-2 px-4 py-3 md:hidden">
+        <h2 className="min-w-0 flex-1 text-[14px] font-bold leading-5 text-foreground">
+          프로젝트 정보
+        </h2>
+        <details className="group relative">
+          <summary
+            aria-label="프로젝트 더보기"
+            className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-lg bg-transparent text-muted-foreground transition-colors active:bg-surface-raised [&::-webkit-details-marker]:hidden"
           >
-            <PenLine size={12} /> 정보 수정
-          </button>
-          <details className="group relative">
-            <summary
-              aria-label="프로젝트 더보기"
-              className="flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-lg bg-surface-raised text-subtle-foreground transition-colors hover:bg-border-strong hover:text-foreground [&::-webkit-details-marker]:hidden"
+            <MoreHorizontal size={16} />
+          </summary>
+          <div role="menu" className="absolute right-0 top-10 z-20 w-40 rounded-xl border border-border-subtle bg-surface p-1 shadow-lg">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={onDelete}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-semibold text-danger"
             >
-              <MoreHorizontal size={16} />
-            </summary>
-            <div
-              role="menu"
-              className="absolute right-0 top-9 z-20 w-40 rounded-xl border border-border-subtle bg-surface p-1 shadow-lg"
-            >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={onDelete}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-400 transition-colors hover:bg-rose-500/10"
-              >
-                <Trash2 size={13} /> 프로젝트 삭제
-              </button>
-            </div>
-          </details>
-        </div>
+              <Trash2 size={13} /> 삭제하기
+            </button>
+          </div>
+        </details>
       </div>
 
-      <div className="grid gap-x-5 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-        <MetaItem label="고객 이름" required info="고객 화면·알림에 표시">
-          <span className="inline-flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-raised text-[10px] font-bold text-foreground">
-              {getInitial(project.customerName || "?")}
-            </span>
-            <span>{project.customerName || "—"}</span>
-          </span>
-        </MetaItem>
-
-        <MetaItem label="촬영 일자" required info="실제 촬영일">
-          <span style={{ fontFamily: MONO_FONT }}>{shootDisplay}</span>
-        </MetaItem>
-
-        <MetaItem label="셀렉 기한" required info="고객 셀렉 마감일">
-          <span style={{ fontFamily: MONO_FONT }}>{deadlineDisplay}</span>
-        </MetaItem>
-
-        <MetaItem label="촬영 유형" optional info="목록 분류용 (웨딩, 가족 등)">
-          {shootType ? (
-            <span className="inline-flex items-center gap-1.5 rounded-xl border border-accent/40 bg-accent/8 px-3 py-1.5 text-sm font-medium text-accent">
-              {ShootTypeIcon && <ShootTypeIcon size={13} />}
-              {shootType.label}
-            </span>
-          ) : (
-            <span className="text-sm text-disabled-foreground">—</span>
-          )}
-        </MetaItem>
-
-        <MetaItem label="연락처" optional info="알림 발송용 (선택)">
-          <span style={{ fontFamily: MONO_FONT }}>{project.customerPhone?.trim() || "—"}</span>
-        </MetaItem>
-
-        <MetaItem label="셀렉 갯수 (N)" required info="고객이 고를 최종 장수">
-          <span>
-            <span className="text-2xl font-bold leading-none text-accent" style={{ fontFamily: MONO_FONT }}>
-              {requiredCount}
-            </span>
-            <span className="ml-1.5 text-sm text-subtle-foreground">장</span>
-          </span>
-        </MetaItem>
-
-        <MetaItem label="업로드 사진 수" info="업로드된 셀렉용 사진 수">
-          <span>
-            <span className="text-2xl font-bold leading-none text-foreground" style={{ fontFamily: MONO_FONT }}>
-              {photoCount}
-            </span>
-            <span className="ml-1.5 text-sm text-subtle-foreground">장</span>
-          </span>
-        </MetaItem>
-
-        <MetaItem label="재보정 허용 횟수" info="검토 후 재보정 허용">
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-semibold ${
-              project.maxRevisionCount > 0
-                ? "border-accent/40 bg-accent/10 text-accent"
-                : "border-surface-raised bg-border-subtle text-subtle-foreground"
-            }`}
+      <div className="hidden flex-wrap items-center justify-between gap-3 border-b border-border-subtle px-5 py-4 md:flex md:px-6">
+        <h2 className="text-[18px] font-bold leading-6 tracking-[-0.4px] text-foreground">
+          프로젝트 설정
+        </h2>
+        <details className="group relative">
+          <summary
+            aria-label="프로젝트 더보기"
+            className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-lg bg-surface-raised text-subtle-foreground transition-colors hover:bg-border-strong hover:text-foreground [&::-webkit-details-marker]:hidden"
           >
-            {project.maxRevisionCount === 0 ? "재보정 없음" : `최대 ${project.maxRevisionCount}회`}
-          </span>
-        </MetaItem>
+            <MoreHorizontal size={16} />
+          </summary>
+          <div role="menu" className="absolute right-0 top-10 z-20 w-40 rounded-xl border border-border-subtle bg-surface p-1 shadow-lg">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={onEdit}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-semibold text-foreground transition-colors hover:bg-surface-raised"
+            >
+              <PenLine size={13} /> 수정하기
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={onDelete}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-semibold text-danger transition-colors hover:bg-danger/8"
+            >
+              <Trash2 size={13} /> 삭제하기
+            </button>
+          </div>
+        </details>
+      </div>
 
-        <MetaItem label="납품 파일" info="업로드 후에는 변경할 수 없음">
-          <span className="text-sm">{project.includeOriginal ? "원본 포함" : "원본 없이"}</span>
-        </MetaItem>
+      <div>
+      <div data-project-mobile-information-summary className="px-4 pb-4 pt-1 md:hidden">
+        <dl
+          className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg px-4 py-3"
+          style={{ background: "color-mix(in srgb, var(--surface-raised) 52%, var(--surface))" }}
+        >
+          <div>
+            <dt className="text-[11px] font-medium text-muted-foreground">고객</dt>
+            <dd className="mt-0.5 truncate text-[13px] font-semibold text-foreground">{project.customerName}</dd>
+          </div>
+          {project.location?.trim() ? (
+            <div>
+              <dt className="text-[11px] font-medium text-muted-foreground">촬영 장소</dt>
+              <dd data-project-location className="mt-0.5 truncate text-[13px] font-semibold text-foreground">{project.location}</dd>
+            </div>
+          ) : null}
+          <div>
+            <dt className="text-[11px] font-medium text-muted-foreground">갤러리</dt>
+            <dd className="mt-0.5 truncate text-[13px] font-semibold text-foreground">{mobileGallerySummary}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-medium text-muted-foreground">수정</dt>
+            <dd className="mt-0.5 truncate text-[13px] font-semibold text-foreground">{mobileRevisionSummary}</dd>
+          </div>
+          {project.customerPhone?.trim() ? (
+            <div>
+              <dt className="text-[11px] font-medium text-muted-foreground">연락처</dt>
+              <dd className="mt-0.5 truncate text-[13px] font-semibold text-foreground">{project.customerPhone}</dd>
+            </div>
+          ) : null}
+          {reviewDeadlineDisplay ? (
+            <div>
+              <dt className="text-[11px] font-medium text-muted-foreground">검토 기한</dt>
+              <dd className="mt-0.5 truncate text-[13px] font-semibold text-foreground">{reviewDeadlineDisplay}</dd>
+            </div>
+          ) : null}
+        </dl>
+      </div>
 
-        {reviewDeadlineDisplay && (
-          <MetaItem label="검토 기한" info="보정본 검토 마감일">
-            <span style={{ fontFamily: MONO_FONT }}>{reviewDeadlineDisplay}</span>
-          </MetaItem>
-        )}
+      {/* 촬영일과 설정을 같은 크기의 정보 행으로 표시해 현재 작업보다 강조되지 않게 한다. */}
+      <div className="hidden px-5 py-5 md:block">
+        <div className="flex items-center gap-3 pb-5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--customer-soft)] text-sm font-semibold text-cyan">{getInitial(project.customerName || "?")}</span>
+          <div className="min-w-0">
+            <p className="break-words text-[15px] font-semibold">{project.customerName || "고객 미등록"}</p>
+            {project.customerPhone && <p data-project-customer-phone className="mt-1 text-xs text-muted-foreground">{project.customerPhone}</p>}
+          </div>
+        </div>
+        <dl className="space-y-4 border-t border-border-subtle pt-5 text-[13px]">
+          <div className="flex justify-between gap-4"><dt className="shrink-0 text-muted-foreground">촬영일</dt><dd data-project-shoot-date>{shootDisplay}</dd></div>
+          {project.location && <div className="flex justify-between gap-4"><dt className="shrink-0 text-muted-foreground">촬영 장소</dt><dd data-project-location className="flex min-w-0 items-start gap-1 text-right [overflow-wrap:anywhere]"><MapPin size={14} className="mt-0.5 shrink-0 text-muted-foreground"/>{project.location}</dd></div>}
+          {shootType && <div className="flex justify-between gap-4"><dt className="text-muted-foreground">촬영 유형</dt><dd>{shootType.label}</dd></div>}
+          {reviewDeadlineDisplay && <div className="flex justify-between gap-4"><dt className="text-muted-foreground">검토 기한</dt><dd data-project-review-deadline>{reviewDeadlineDisplay}</dd></div>}
+        </dl>
+        <h3 className="mb-4 mt-6 border-t border-border-subtle pt-5 text-xs font-semibold text-muted-foreground">고객 갤러리 설정</h3>
+        <dl data-project-gallery-summary className="space-y-4 text-[13px]">
+          {[
+            { label: "셀렉 목표", value: `${requiredCount}장` },
+            { label: "업로드 사진", value: `${photoCount}장` },
+            { label: "재수정 요청", value: project.maxRevisionCount === 0 ? "허용 안함" : `${project.maxRevisionCount}회` },
+            { label: "납품 파일", value: project.includeOriginal ? "원본 포함" : "원본 미포함" },
+          ].map(item => <div key={item.label} className="flex justify-between gap-4"><dt className="text-muted-foreground">{item.label}</dt><dd className="font-medium">{item.value}</dd></div>)}
+        </dl>
+      </div>
+
+      {children ? (
+        <div className="bg-surface px-4 py-4 md:border-t md:border-border-subtle md:px-6 md:py-6">
+          {children}
+        </div>
+      ) : null}
       </div>
     </section>
   );

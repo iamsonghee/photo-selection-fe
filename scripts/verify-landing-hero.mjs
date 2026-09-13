@@ -1,0 +1,116 @@
+import { chromium } from "playwright";
+import assert from "node:assert/strict";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { tmpdir } from "node:os";
+
+const origin = process.env.DEMO_ORIGIN || "http://127.0.0.1:3001";
+assert(["localhost", "127.0.0.1"].includes(new URL(origin).hostname));
+const output = path.join(tmpdir(), "acut-hero-verification");
+await mkdir(output, { recursive: true });
+const browser = await chromium.launch();
+const results = {};
+try {
+  for (const scenario of ["desktop", "mobile", "reduced", "autoplay-denied", "media-error", "mobile-reduced", "mobile-autoplay-denied", "mobile-media-error"]) {
+    const context = await browser.newContext({ viewport: scenario.startsWith("mobile") ? { width: 390, height: 844 } : { width: 1440, height: 1000 },
+      reducedMotion: scenario.endsWith("reduced") ? "reduce" : "no-preference" });
+    const page = await context.newPage();
+    const apis = [], media = [];
+    await page.route("**/*", route => {
+      const url = route.request().url();
+      if (/\/api\/|supabase/.test(url)) { apis.push(url); return route.abort(); }
+      if (/\/landing\/hero\/.*\.(webm|mp4)/.test(url)) {
+        media.push(url);
+        if (scenario.endsWith("media-error")) return route.abort();
+      }
+      return route.continue();
+    });
+    if (scenario.endsWith("autoplay-denied")) await page.addInitScript(() => {
+      // 브라우저의 자동 재생 거절을 재현한다. 네트워크 오류와 별도로 검증한다.
+      HTMLMediaElement.prototype.play = function () {
+        this.removeAttribute("autoplay");
+        return Promise.reject(new DOMException("Autoplay denied for verification", "NotAllowedError"));
+      };
+    });
+    await page.goto(`${origin}/landing`);
+    await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+    const film = page.locator(".ac-hero-film");
+    await film.scrollIntoViewIfNeeded();
+    await page.waitForFunction(() => document.querySelector(".ac-hero-poster")?.naturalWidth > 0);
+    if (["desktop", "mobile"].includes(scenario)) {
+      await page.waitForFunction(() => document.querySelector(".ac-hero-film").dataset.playing === "true");
+      // 실제 반복 경계와 일시적인 버퍼 대기에서 poster로 되돌아가지 않아야 한다.
+      await page.evaluate(() => {
+        window.heroHiddenDuringLoop = false;
+        const film = document.querySelector(".ac-hero-film");
+        window.heroLoopObserver = new MutationObserver(records => {
+          if (records.some(record => record.oldValue === "false") || film.dataset.playing !== "true") {
+            window.heroHiddenDuringLoop = true;
+          }
+        });
+        window.heroLoopObserver.observe(film, { attributes: true, attributeFilter: ["data-playing"], attributeOldValue: true });
+      });
+      for (let loop = 0; loop < 2; loop++) {
+        await page.evaluate(() => { document.querySelector("video").currentTime = 19.65; });
+        await page.waitForFunction(() => {
+          const v = document.querySelector("video");
+          return v.currentTime < 1 && !v.seeking && !v.paused;
+        });
+      }
+      await page.evaluate(() => document.querySelector("video").dispatchEvent(new Event("waiting")));
+      await page.waitForTimeout(100);
+      assert.equal(await film.getAttribute("data-playing"), "true");
+      assert.equal(await page.evaluate(() => {
+        window.heroLoopObserver.disconnect();
+        return window.heroHiddenDuringLoop;
+      }), false);
+      await page.evaluate(() => { const v = document.querySelector("video"); v.currentTime = 14; });
+      await page.waitForFunction(() => !document.querySelector("video").seeking);
+    } else {
+      await page.waitForTimeout(1200);
+      assert.equal(await film.getAttribute("data-playing"), "false");
+    }
+    const state = await page.evaluate(() => {
+      const f = document.querySelector(".ac-hero-film"), v = document.querySelector("video");
+      const { width, height } = f.getBoundingClientRect();
+      return { width, height, overflow: document.documentElement.scrollWidth > innerWidth,
+        video: v ? { width: v.videoWidth, height: v.videoHeight, duration: v.duration, muted: v.muted,
+          controls: v.controls, loop: v.loop, playsInline: v.playsInline, fit: getComputedStyle(v).objectFit } : null };
+    });
+    assert(Math.abs(state.width / state.height - (scenario.startsWith("mobile") ? 4 / 5 : 1200 / 641)) < .001);
+    assert.equal(state.overflow, false);
+    assert.equal(apis.length, 0);
+    if (scenario.endsWith("reduced")) { assert.equal(state.video, null); assert.equal(media.length, 0); }
+    if (["desktop", "mobile"].includes(scenario)) {
+      assert.equal(state.video.width, scenario.startsWith("mobile") ? 960 : 2400); assert.equal(state.video.height, scenario.startsWith("mobile") ? 1200 : 1282);
+      assert(Math.abs(state.video.duration - 20) < .1);
+      assert(media.every(url => url.includes("acut-demo-mobile") === (scenario === "mobile")));
+      assert.equal(state.video.controls, false); assert.equal(state.video.muted, true);
+      assert.equal(state.video.loop, true); assert.equal(state.video.playsInline, true);
+      assert.equal(state.video.fit, "contain");
+    }
+    await film.screenshot({ path: path.join(output, `${scenario}.png`) });
+    if (["desktop", "mobile"].includes(scenario)) {
+      await page.evaluate(() => { document.querySelector("video").currentTime = 18.6; });
+      await page.waitForFunction(() => !document.querySelector("video").seeking);
+      await film.screenshot({ path: path.join(output, `${scenario}-uploaded.png`) });
+    }
+    results[scenario] = { ...state, apiRequests: apis.length, mediaRequests: media.length };
+    await context.close();
+  }
+  // MP4 대체 소스도 별도로 디코딩해 방향·해상도·길이를 확인한다.
+  const page = await browser.newPage({ viewport: { width: 1200, height: 641 } });
+  await page.setContent(`<style>body{margin:0}video{width:1200px;height:641px}</style><video muted src="${origin}/landing/hero/acut-demo.mp4"></video>`);
+  await page.waitForFunction(() => document.querySelector("video").readyState >= 2);
+  results.mp4 = await page.evaluate(() => { const v = document.querySelector("video"); return { width: v.videoWidth, height: v.videoHeight, duration: v.duration }; });
+  assert.deepEqual(results.mp4, { width: 2400, height: 1282, duration: 20 });
+  await page.evaluate(() => { document.querySelector("video").currentTime = 14; });
+  await page.waitForFunction(() => !document.querySelector("video").seeking);
+  await page.screenshot({ path: path.join(output, "mp4.png") });
+  await page.setContent(`<video muted src="${origin}/landing/hero/acut-demo-mobile.mp4"></video>`);
+  await page.waitForFunction(() => document.querySelector("video").readyState >= 2);
+  results.mobileMp4 = await page.evaluate(() => { const v = document.querySelector("video"); return { width: v.videoWidth, height: v.videoHeight, duration: v.duration }; });
+  assert.deepEqual(results.mobileMp4, { width: 960, height: 1200, duration: 20 });
+  await writeFile(path.join(output, "results.json"), JSON.stringify(results, null, 2) + "\n");
+  console.log(JSON.stringify(results, null, 2), `\nScreenshots: ${output}`);
+} finally { await browser.close(); }
