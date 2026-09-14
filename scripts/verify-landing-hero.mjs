@@ -81,7 +81,13 @@ try {
     assert(Math.abs(state.width / state.height - (scenario.startsWith("mobile") ? 4 / 5 : 1200 / 641)) < .001);
     assert.equal(state.overflow, false);
     assert.equal(apis.length, 0);
-    if (scenario.endsWith("reduced")) { assert.equal(state.video, null); assert.equal(media.length, 0); }
+    if (scenario.endsWith("reduced")) {
+      assert(state.video);
+      assert.equal(media.length, 0);
+      assert.equal(await page.getByRole("button", { name: "제품 시연 영상 재생" }).isVisible(), true);
+      await page.getByRole("button", { name: "제품 시연 영상 재생" }).click();
+      await page.waitForFunction(() => document.querySelector(".ac-hero-film")?.dataset.playing === "true");
+    }
     if (["desktop", "mobile"].includes(scenario)) {
       assert.equal(state.video.width, scenario.startsWith("mobile") ? 960 : 2400); assert.equal(state.video.height, scenario.startsWith("mobile") ? 1200 : 1282);
       assert(Math.abs(state.video.duration - 20) < .1);
@@ -90,7 +96,7 @@ try {
       assert.equal(state.video.loop, true); assert.equal(state.video.playsInline, true);
       assert.equal(state.video.fit, "contain");
       assert(state.video.currentSrc.endsWith(".mp4"));
-      assert.deepEqual(state.video.sourceOrder, ["video/mp4", "video/webm"]);
+      assert.deepEqual(state.video.sourceOrder, ["video/mp4"]);
     }
     if (scenario.endsWith("autoplay-denied") || scenario.endsWith("media-error")) {
       assert.equal(await page.getByRole("button", { name: "제품 시연 영상 재생" }).isVisible(), true);

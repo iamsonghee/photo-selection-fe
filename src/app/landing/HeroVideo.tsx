@@ -11,6 +11,7 @@ export function HeroVideo() {
   const poster = mobile ? "/landing/hero/acut-demo-mobile-poster.webp" : POSTER;
   const stem = mobile ? "acut-demo-mobile" : "acut-demo";
   const [enabled, setEnabled] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [playbackBlocked, setPlaybackBlocked] = useState(false);
 
@@ -20,10 +21,12 @@ export function HeroVideo() {
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
     const sync = () => {
       setMobile(viewport.matches);
-      setEnabled(!preference.matches);
+      setEnabled(true);
+      setReducedMotion(preference.matches);
       if (preference.matches) {
         video.current?.pause();
         setPlaying(false);
+        setPlaybackBlocked(true);
       }
     };
     sync();
@@ -58,23 +61,41 @@ export function HeroVideo() {
     };
     const handleCanPlay = () => tryPlay();
 
+    if (reducedMotion) {
+      element.pause();
+      return () => {
+        disposed = true;
+      };
+    }
+
+    // Safari가 play() Promise를 거절하지 않은 채 대기시키는 경우에도 사용자가 직접 재생할 수 있게 한다.
+    const fallbackTimer = setTimeout(() => {
+      if (!disposed && element.paused) setPlaybackBlocked(true);
+    }, 1500);
+
     element.addEventListener("canplay", handleCanPlay, { once: true });
     element.load();
     if (element.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) tryPlay();
 
     return () => {
       disposed = true;
+      clearTimeout(fallbackTimer);
       element.removeEventListener("canplay", handleCanPlay);
       element.pause();
     };
-  }, [enabled, mobile]);
+  }, [enabled, mobile, reducedMotion]);
 
   const retryPlayback = useCallback(() => {
     const element = video.current;
     if (!element) return;
     element.muted = true;
+    element.defaultMuted = true;
+    element.setAttribute("muted", "");
+    element.setAttribute("playsinline", "");
+    element.setAttribute("webkit-playsinline", "");
     setPlaybackBlocked(false);
-    element.play()?.catch(() => setPlaybackBlocked(true));
+    // 클릭 이벤트 안에서 곧바로 play()를 호출해야 iOS의 사용자 제스처 권한이 유지된다.
+    element.play()?.then(() => setPlaybackBlocked(false)).catch(() => setPlaybackBlocked(true));
   }, []);
 
   return (
@@ -85,19 +106,18 @@ export function HeroVideo() {
         {enabled && <video
           key={stem}
           ref={video}
-          autoPlay muted playsInline loop
-          preload="metadata"
+          autoPlay={!reducedMotion} muted playsInline loop
+          preload={reducedMotion ? "none" : "metadata"}
           poster={poster}
           width={mobile ? 960 : 2400} height={mobile ? 1200 : 1282}
           aria-label="고객이 사진 3장을 선택하고 요청을 남기면 작가에게 동일한 사진과 요청이 정리되고 작가가 보정본을 업로드하는 20초 제품 시연"
           // 반복 경계의 waiting은 오류가 아니다. 재생한 프레임을 유지해 poster 전환 깜빡임을 막는다.
-          onLoadStart={() => setPlaybackBlocked(false)}
+          onLoadStart={() => { if (!reducedMotion) setPlaybackBlocked(false); }}
           onPlaying={() => { setPlaying(true); setPlaybackBlocked(false); }}
           onError={() => { setPlaying(false); setPlaybackBlocked(true); }}
         >
-          {/* H.264 MP4를 먼저 두어 iOS Safari가 WebM을 잘못 선택하는 경우를 피한다. */}
+          {/* 히어로는 iOS가 안정적으로 선택하는 H.264 MP4 단일 소스를 사용한다. */}
           <source src={`/landing/hero/${stem}.mp4`} type="video/mp4" />
-          <source src={`/landing/hero/${stem}.webm`} type="video/webm" />
         </video>}
         {enabled && playbackBlocked && (
           <button type="button" className="ac-hero-play" onClick={retryPlayback} aria-label="제품 시연 영상 재생">

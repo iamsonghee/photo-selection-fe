@@ -182,7 +182,6 @@ body:has(.ac-landing) {
 .ac-hero-play { position:absolute; z-index:3; left:50%; bottom:18px; transform:translateX(-50%); display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:40px; padding:0 15px; border:1px solid #ffffffb8; border-radius:999px; background:#191918d9; color:#fff; box-shadow:0 6px 22px #19191826; font-size:13px; font-weight:700; cursor:pointer; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
 .ac-hero-play:focus-visible { outline:3px solid color-mix(in srgb,var(--ac-orange) 45%,transparent); outline-offset:3px; }
 @media (max-width:767px) { .ac-hero-film { border-radius:8px; aspect-ratio:4 / 5; } }
-@media (prefers-reduced-motion:reduce) { .ac-hero-film video { display:none; } }
 
 /* 한국어는 어절을 보존하고, 작성된 설명은 문장 단위로 다음 줄에서 시작한다.
    고정 nowrap/높이를 사용하지 않아 작은 화면과 글자 확대에서도 내용을 숨기지 않는다. */

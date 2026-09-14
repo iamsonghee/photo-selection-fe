@@ -60,11 +60,11 @@ PNG 프레임은 os.tmpdir()의 acut-hero-frames / acut-hero-mobile-frames에 �
 
 개발 전용 /landing/demo-capture에서 실제 GalleryPhotoCard, SelectionConfirmDialog, ProjectAssetTabs, OriginalPhotoGallery 등에 정적 샘플을 적용한다. production은 notFound()로 차단한다. 운영 API·고객 경로·외부 서비스 요청은 녹화 스크립트에서 차단하고 검사한다. 서비스 기능·DB·업로드 흐름은 변경하지 않는다. 주요 녹화 로직은 한국어 주석을 포함한다.
 
-HeroVideo는 autoPlay·muted·playsInline·loop·poster를 제공하고 컨트롤을 숨긴다. iOS Safari가 지원이 불완전한 WebM을 먼저 선택하지 않도록 H.264 MP4를 첫 source로 제공하고, 소스 변경 후 `load()`와 `canplay` 시점 재시도로 inline 자동재생을 시작한다. 저전력 모드처럼 자동재생이 거절되면 poster 위에 작은 "영상 재생" 버튼을 표시해 사용자 동작으로 다시 시작할 수 있다. CSS로 비율을 예약해 레이아웃 이동을 방지한다. 첫 재생 전·자동 재생 거절·미디어 오류에는 poster를 유지한다. 최초 재생 후 waiting 또는 반복 경계에서는 poster로 되돌리지 않아 깜빡임을 방지한다. 움직임 축소 설정에서는 video를 마운트하지 않고 화면 폭에 맞는 poster만 표시한다.
+HeroVideo는 autoPlay·muted·playsInline·loop·poster를 제공하고 컨트롤을 숨긴다. 히어로 재생 소스는 iOS Safari가 안정적으로 선택하는 H.264 MP4 하나로 제한하고, 소스 변경 후 `load()`와 `canplay` 시점 재시도로 inline 자동재생을 시작한다. 저전력 모드처럼 자동재생이 거절되거나 Safari의 `play()` 요청이 응답 없이 대기하면 poster 위에 작은 "영상 재생" 버튼을 표시해 사용자 동작으로 다시 시작할 수 있다. CSS로 비율을 예약해 레이아웃 이동을 방지한다. 첫 재생 전·자동 재생 거절·미디어 오류에는 poster를 유지한다. 최초 재생 후 waiting 또는 반복 경계에서는 poster로 되돌리지 않아 깜빡임을 방지한다. 움직임 축소 설정에서는 자동재생과 선로딩을 생략하고 poster를 우선 표시하되, 사용자가 재생 버튼을 누르면 같은 화면에서 영상을 재생한다.
 
 ## 검증 방법
 
-verify-landing-hero.mjs는 데스크톱 1440px·모바일 390px에서 비율, 가로 넘침, 실제 반복 경계 2회, waiting, 자동 재생 거절 모의, 미디어 오류, 움직임 축소를 검사한다. 가로/세로 MP4도 별도로 디코딩한다. 결과와 스크린샷은 os.tmpdir()/acut-hero-verification/에 저장한다. 실기기 Safari/iOS는 검증 범위에 포함하지 않는다.
+verify-landing-hero.mjs는 데스크톱 1440px·모바일 390px에서 비율, 가로 넘침, 실제 반복 경계 2회, waiting, 자동 재생 거절 모의, 미디어 오류, 움직임 축소와 수동 재생을 검사한다. 가로/세로 MP4도 별도로 디코딩한다. 결과와 스크린샷은 os.tmpdir()/acut-hero-verification/에 저장한다. WebKit iPhone 13 환경에서 자동재생과 움직임 축소 상태의 수동 재생을 별도로 확인하며, 실제 물리 기기는 검증 범위에 포함하지 않는다.
 
 이전 정지 시안은 /landing/demo-capture?storyboard=1에서 별도로 보존하며, 최종 영상은 DemoCapture.tsx를 사용한다. 정지 시안의 오른쪽 패널은 최종 영상에 포함되지 않는다.
 
