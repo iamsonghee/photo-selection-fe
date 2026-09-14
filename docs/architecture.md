@@ -6,7 +6,7 @@
 
 ## 랜딩 샘플 격리 (2026-09-12)
 
-히어로는 정적 WebM/MP4와 poster를 `HeroVideo`에서 재생한다. 녹화 전용 `/landing/demo-capture`는 개발 환경에서만 제공하며 실제 고객 카드·선택 확인·작가 코멘트·사진 탭을 로컬 샘플 상태로 렌더링한다. 재생성 스크립트는 API 및 서비스 경로를 차단한다. 자세한 타임라인과 검증은 `landing-hero-video.md` 참조.
+히어로(`HeroVideo`)와 03 검토 영상(`ReviewVideo`)은 정적 MP4와 poster를 공통 `LandingVideo`에서 재생한다. 무음 자동재생·화면 진입 재시도·실패 시 수동 재생·진단 기능을 공유한다. 녹화 전용 `/landing/demo-capture`는 개발 환경에서만 제공하며 실제 고객 카드·선택 확인·작가 코멘트·사진 탭을 로컬 샘플 상태로 렌더링한다. 재생성 스크립트는 API 및 서비스 경로를 차단한다. 자세한 타임라인과 검증은 `landing-hero-video.md` 참조.
 
 `/`와 `/landing`은 `sample-project.ts`의 로컬 사진·가상 상태·`SAMPLE_PLAN_LIMITS`만 사용한다. 랜딩의 `getAppSettings()` 및 Supabase 인증 조회·구독을 제거했다. “무료 시작하기” CTA는 클릭 시에만 Supabase 세션을 확인하여 기존 세션이 있으면 작가 대시보드로 이동하고, 없으면 기존 AuthModal을 연다. “고객 셀렉 체험하기” 보조 링크만 로컬 데모로 스크롤한다. 다른 서비스 페이지 링크는 prefetch를 비활성화했다. 서비스 페이지로 명시적으로 이동한 이후의 인증·운영 설정 흐름은 기존대로다. 랜딩 체험 자체는 FE 메모리에서만 동작하며 BE·DB·스토리지를 호출하지 않는다.
 

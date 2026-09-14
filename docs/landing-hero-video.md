@@ -97,3 +97,10 @@ verify-landing-hero.mjs는 데스크톱 1440px·모바일 390px에서 비율, �
 ## 움직임 축소 자동 정지 제거 (2026-09-14)
 
 실기기 진단에서 자동재생 성공 직후 움직임 축소 분기가 영상을 정지시키는 것을 확인했다. 사용자 승인에 따라 히어로의 해당 분기·설정 변경 리스너·onPlaying 정지 처리를 제거했다. `autoPlay`, 무음, inline, loop는 항상 유지한다. 진단 버전은 `hero-autoplay-v2`이며 reducedMotion 값은 진단에만 기록한다. Chromium PC/모바일 및 WebKit iPhone 에뮬레이션에서 움직임 축소가 켜져 있어도 실제 시간이 흐르고 재생 버튼이 숨겨지는지 검사한다. 다른 페이지의 움직임 축소 정책은 변경하지 않는다.
+
+
+## 랜딩 영상 재생 공통화 (2026-09-14)
+
+히어로와 03 검토 영상은 `LandingVideo.tsx`를 공유한다. 두 영상 모두 최초 HTML에 video와 MP4를 포함하며 움직임 축소 설정에서도 autoplay/muted/playsInline/loop를 유지한다. 화면 진입·canplay·탭 복귀 시 재시도하고 실제 시간 진행에 맞춰 재생 버튼을 숨긴다. 실패 시 poster와 수동 재생 버튼을 제공한다. 검토 영상의 display:none 및 마지막 장면 opacity 전환을 제거해 반복 중 프레임을 숨기지 않는다. 영상별 비율과 소스, 히어로 모바일 소스 선택은 유지한다.
+
+진단 버전은 `landing-autoplay-v3`이며 `?videoDebug=1`에서 각 영상 아래 해당 영상의 진단 결과를 표시한다. `node scripts/verify-landing-videos.mjs`로 Chromium/WebKit에서 두 영상 모두 움직임 축소 켜짐/꺼짐, 재생 오류, 자동재생 거절, 실제 시간 진행과 반복을 확인한다. 기존 히어로 회귀 검증은 `node scripts/verify-landing-hero.mjs`로 실행한다.
