@@ -13,6 +13,7 @@ import { useParams } from "next/navigation";
 import type { ReviewStatus } from "@/types";
 import type { ReviewPhotoItem } from "@/lib/customer-api-server";
 import { normalizeReviewComment } from "@/lib/review-submission-validation";
+import type { CommentSaveStatus } from "@/lib/comment-save-status";
 
 export type ReviewStateItem = {
   status: ReviewStatus;
@@ -33,6 +34,8 @@ type ReviewContextValue = {
   resetAll: () => void;
   /** 초안이 저장소에 남아 있는지 — 화면에서 "자동 저장됨"을 표시할 때 쓴다 */
   draftSaved: boolean;
+  /** photoId → 서버 저장 진행 상태 — 셀렉 화면의 commentSaveStates와 같은 용도(CommentSaveIndicator) */
+  commentSaveStates: Record<string, CommentSaveStatus>;
 };
 
 const ReviewContext = createContext<ReviewContextValue | null>(null);
@@ -137,6 +140,26 @@ export function ReviewProvider({ children }: { children: React.ReactNode }) {
   const pollSeqRef = useRef(0);
   const appliedPollSeqRef = useRef(0);
 
+  // 코멘트 자동저장 상태 — 셀렉(SelectionContext)의 commentSaveStates와 같은 패턴:
+  // "saved"는 2초 뒤 idle로 되돌아간다(계속 떠 있으면 상시 노출이라 의미가 없다).
+  const [commentSaveStates, setCommentSaveStates] = useState<Record<string, CommentSaveStatus>>({});
+  const commentSavedTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const setCommentSaveStatus = useCallback((photoId: string, status: CommentSaveStatus) => {
+    const existingTimer = commentSavedTimersRef.current.get(photoId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      commentSavedTimersRef.current.delete(photoId);
+    }
+    setCommentSaveStates((prev) => ({ ...prev, [photoId]: status }));
+    if (status === "saved") {
+      const timer = setTimeout(() => {
+        commentSavedTimersRef.current.delete(photoId);
+        setCommentSaveStates((prev) => (prev[photoId] === "saved" ? { ...prev, [photoId]: "idle" } : prev));
+      }, 2000);
+      commentSavedTimersRef.current.set(photoId, timer);
+    }
+  }, []);
+
   const bumpVersion = useCallback((photoId: string) => {
     const next = (versionRef.current.get(photoId) ?? 0) + 1;
     versionRef.current.set(photoId, next);
@@ -222,6 +245,7 @@ export function ReviewProvider({ children }: { children: React.ReactNode }) {
   const queueDraftSave = useCallback((photoId: string, next: ReviewStateItem | null) => {
     if (!token) return;
     dirtyRef.current.set(photoId, next);
+    setCommentSaveStatus(photoId, "saving");
     const timers = saveTimersRef.current;
     const pending = timers.get(photoId);
     if (pending) window.clearTimeout(pending);
@@ -245,17 +269,18 @@ export function ReviewProvider({ children }: { children: React.ReactNode }) {
           }),
         })
           .then((res) => {
-            /* 보내는 사이에 또 바뀌었으면 dirty를 풀지 않는다 — 뒤따르는 저장이 정리한다 */
-            if (!res.ok) return;
+            if (!res.ok) { setCommentSaveStatus(photoId, "error"); return; }
+            /* 보내는 사이에 또 바뀌었으면 dirty도, "저장됨" 표시도 아직 이르다 — 뒤따르는 저장이 정리한다 */
             if ((versionRef.current.get(photoId) ?? 0) === versionAtSend) {
               dirtyRef.current.delete(photoId);
+              setCommentSaveStatus(photoId, "saved");
             }
           })
           /* 실패해도 로컬 값은 그대로 두고 dirty를 유지한다(폴링이 덮어쓰지 않도록) */
-          .catch(() => {});
+          .catch(() => setCommentSaveStatus(photoId, "error"));
       }, 350),
     );
-  }, [token]);
+  }, [token, setCommentSaveStatus]);
 
   useEffect(() => () => {
     for (const id of saveTimersRef.current.values()) window.clearTimeout(id);
@@ -291,9 +316,12 @@ export function ReviewProvider({ children }: { children: React.ReactNode }) {
   const resetAll = useCallback(() => {
     for (const id of saveTimersRef.current.values()) window.clearTimeout(id);
     saveTimersRef.current.clear();
+    for (const id of commentSavedTimersRef.current.values()) clearTimeout(id);
+    commentSavedTimersRef.current.clear();
     dirtyRef.current.clear();
     versionRef.current.clear();
     setReviewState({});
+    setCommentSaveStates({});
   }, []);
 
   /* 다른 기기가 저장한 판단을 따라잡는 폴링 — 셀렉의 selections 폴링과 같은 주기·같은 규칙이다.
@@ -373,8 +401,9 @@ export function ReviewProvider({ children }: { children: React.ReactNode }) {
       clearReview,
       resetAll,
       draftSaved,
+      commentSaveStates,
     }),
-    [reviewPhotos, loadReviewPhotos, reviewPhotosLoading, reviewState, setReview, getReview, clearReview, resetAll, draftSaved]
+    [reviewPhotos, loadReviewPhotos, reviewPhotosLoading, reviewState, setReview, getReview, clearReview, resetAll, draftSaved, commentSaveStates]
   );
 
   return (

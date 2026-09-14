@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Check, RefreshCw, Maximize2, X } from "lucide-react";
 import { useSelection } from "@/contexts/SelectionContext";
 import { useReview } from "@/contexts/ReviewContext";
+import { CommentSaveIndicator } from "@/components/customer/CommentSaveIndicator";
 import { PrevNextButton } from "@/components/PrevNextButton";
 import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
 import { PhotoPositionBar } from "@/components/customer/PhotoPositionBar";
@@ -34,7 +35,7 @@ export default function ReviewViewerPage() {
   const photoId = params?.photoId as string;
 
   const { project, loading: selectionLoading } = useSelection();
-  const { reviewPhotos, loadReviewPhotos, reviewPhotosLoading, reviewState, setReview, getReview, resetAll } = useReview();
+  const { reviewPhotos, loadReviewPhotos, reviewPhotosLoading, reviewState, setReview, getReview, resetAll, commentSaveStates } = useReview();
 
   const [activePhotoId,    setActivePhotoId]    = useState(photoId);
   const [showSubmitModal,  setShowSubmitModal]  = useState(false);
@@ -107,6 +108,7 @@ export default function ReviewViewerPage() {
   const status     = review?.status ?? "pending";
   const isApproved = status === "approved";
   const isRevision = status === "revision_requested";
+  const commentSaveStatus = current ? (commentSaveStates[current.id] ?? "idle") : "idle";
   const [originalReadyUrl, setOriginalReadyUrl] = useState<string | null>(null);
   const {
     previewActive: holdOriginal,
@@ -293,6 +295,16 @@ export default function ReviewViewerPage() {
     setRevisionDraft(normalized ?? "");
     setRevisionError(null);
   }, [current, isRevision, revisionDraft, setReview]);
+
+  // 셀렉 화면(뷰어)과 같은 방식 — 입력을 멈추고 600ms 지나면 자동 저장한다. 예전에는 칸을
+  // 벗어나야만(blur) 저장돼서, 다음 사진으로 넘어가지 않고 계속 고치는 동안은 저장 안내가
+  // 뜰 일도, 실제로 저장될 일도 없었다.
+  useEffect(() => {
+    if (!current?.id || !isRevision) return;
+    if (revisionDraft.trim() === (review?.comment ?? "")) return;
+    const timer = window.setTimeout(handleRevisionSave, 600);
+    return () => window.clearTimeout(timer);
+  }, [current?.id, revisionDraft, isRevision, review?.comment, handleRevisionSave]);
 
   const handleSubmit = useCallback(async () => {
     if ((!receiptMode && !canSubmit) || photos.length === 0 || !token || submitting) return;
@@ -657,6 +669,7 @@ export default function ReviewViewerPage() {
 
         .rvx-comment-block { display: none; flex-direction: column; gap: 8px; }
         .rvx-comment-block-open { display: flex; }
+        .rvx-comment-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .rvx-comment-block-off { display: none; }
         .rvx-comment {
           width: 100%; box-sizing: border-box; min-height: 96px; resize: vertical;
@@ -1027,9 +1040,12 @@ export default function ReviewViewerPage() {
 
             {/* 재보정을 선택한 사진에서만 사유 입력을 펼친다. */}
             <div className={`rvx-comment-block${isRevision ? " rvx-comment-block-open" : ""}${isApproved ? " rvx-comment-block-off" : ""}`}>
-              <label className="rvx-panel-label" htmlFor="rvx-revision-comment">
-                재보정 요청 내용 {isRevision && <span className="rvx-required">필수</span>}
-              </label>
+              <div className="rvx-comment-label-row">
+                <label className="rvx-panel-label" htmlFor="rvx-revision-comment">
+                  재보정 요청 내용 {isRevision && <span className="rvx-required">필수</span>}
+                </label>
+                <CommentSaveIndicator status={commentSaveStatus} onRetry={handleRevisionSave} />
+              </div>
               <textarea
                 id="rvx-revision-comment"
                 className="rvx-comment"

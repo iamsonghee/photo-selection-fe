@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button, ProgressBar } from "@/components/ui";
+import type { CommentSaveStatus } from "@/lib/comment-save-status";
 /** 고객 플로우: API Route 호출 (Service Role로 selections 처리) */
 async function fetchCustomerPhotos(token: string) {
   const res = await fetch(`/api/c/photos?token=${encodeURIComponent(token)}`);
@@ -135,7 +136,7 @@ export type PhotoState = {
   comment?: string;
 };
 
-export type CommentSaveStatus = "idle" | "saving" | "saved" | "error";
+export type { CommentSaveStatus };
 export type SelectionToggleResult = "selected" | "deselected" | "limit-reached" | "unavailable";
 
 type SelectionContextValue = {

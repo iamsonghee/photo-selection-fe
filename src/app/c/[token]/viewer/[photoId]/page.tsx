@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Star, ArrowLeft, Check, Layers, MessageSquare, X } from "lucide-react";
-import { useSelection, type CommentSaveStatus, type SelectionToggleResult } from "@/contexts/SelectionContext";
+import { useSelection, type SelectionToggleResult } from "@/contexts/SelectionContext";
+import { CommentSaveIndicator } from "@/components/customer/CommentSaveIndicator";
 import { PrevNextButton } from "@/components/PrevNextButton";
 import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
 import { SelectionLimitSnackbar } from "@/components/customer/SelectionLimitSnackbar";
@@ -57,21 +58,6 @@ type PresignedPreviewInfo = {
   url: string;
   expiresAt: number;
 };
-
-function CommentSaveIndicator({ status, onRetry }: { status: CommentSaveStatus; onRetry: () => void }) {
-  if (status === "saving") {
-    return <span role="status" aria-live="polite" style={{ color: "rgba(255,255,255,0.55)", fontSize: 11 }}>저장 중…</span>;
-  }
-  if (status === "saved") {
-    return <span role="status" aria-live="polite" style={{ color: "#4ade80", fontSize: 11 }}>✓ 저장됨</span>;
-  }
-  if (status === "error") {
-    return <span role="alert" style={{ color: "#f87171", fontSize: 11 }}>저장 실패 · <button type="button" onClick={onRetry} style={{ padding: 0, border: 0, background: "none", color: "inherit", fontSize: "inherit", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>다시 시도</button></span>;
-  }
-  /* 유휴 상태에서는 아무것도 그리지 않는다 — "자동 저장"은 저장이 일어날 때만 의미가 있는데
-   * 상시 노출하면 아무 일도 없을 때조차 한 줄을 차지했다. */
-  return null;
-}
 
 export default function ViewerPage() {
   const params = useParams();
