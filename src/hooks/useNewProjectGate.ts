@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuota } from "@/contexts/QuotaContext";
 
 export type ProjectLimitInfo = {
   tier: "admin" | "beta" | "general";
@@ -18,23 +19,17 @@ export type ProjectLimitInfo = {
  */
 export function useNewProjectGate() {
   const router = useRouter();
+  const { refetch } = useQuota();
   const [limitInfo, setLimitInfo] = useState<ProjectLimitInfo | null>(null);
 
   const handleNewProject = useCallback(async () => {
-    try {
-      const res = await fetch("/api/photographer/quota");
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.max !== null && data?.max !== undefined && data.current >= data.max) {
-          setLimitInfo({ tier: data.tier, current: data.current, max: data.max });
-          return;
-        }
-      }
-    } catch {
-      // quota 확인 실패 — 기존 동작(그대로 이동)으로 fail-open, /new 페이지 자체 가드가 최종 방어선
+    const data = await refetch();
+    if (data?.max !== null && data?.max !== undefined && data.current >= data.max) {
+      setLimitInfo({ tier: data.tier, current: data.current, max: data.max });
+      return;
     }
     router.push("/photographer/projects/new");
-  }, [router]);
+  }, [refetch, router]);
 
   return { handleNewProject, limitInfo, closeLimitModal: () => setLimitInfo(null) };
 }

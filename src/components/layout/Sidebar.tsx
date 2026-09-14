@@ -10,7 +10,7 @@ import { PHOTOGRAPHER_NAV_ITEMS } from "@/lib/photographer-nav";
 import { FeedbackButton } from "@/components/photographer/FeedbackModal";
 import { useProfile } from "@/contexts/ProfileContext";
 import { getProfileImageUrl } from "@/lib/photographer";
-import { usePhotographerQuota } from "@/lib/use-photographer-quota";
+import { useQuota } from "@/contexts/QuotaContext";
 import { isPhotographerLightRoute } from "@/lib/photographer-sidebar-routes";
 import styles from "@/components/layout/Sidebar.module.css";
 
@@ -65,7 +65,7 @@ export function Sidebar({
   const pathname = usePathname();
   const isLightRoute = isPhotographerLightRoute(pathname);
   const { profile } = useProfile();
-  const quota = usePhotographerQuota();
+  const { quota } = useQuota();
   const displayName = profile?.name?.trim() || profile?.email?.split("@")[0] || "사용자";
   const tierLabel = quota ? TIER_LABEL[quota.tier] : null;
   const usagePct =

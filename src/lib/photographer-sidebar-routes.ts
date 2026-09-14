@@ -34,7 +34,6 @@ export function isPhotographerLightRoute(pathname: string | null): boolean {
     pathname === "/photographer/projects" ||
     pathname === "/photographer/projects/new" ||
     pathname === "/photographer/settings" ||
-    pathname === "/photographer/manual" ||
     isProjectDetailRootPath(pathname) ||
     isProjectUploadPath(pathname) ||
     isProjectResultsPath(pathname) ||

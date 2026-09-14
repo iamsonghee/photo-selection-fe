@@ -8,7 +8,7 @@ interface QuotaContextValue {
   quota: PhotographerQuota | null;
   loading: boolean;
   error: boolean;
-  refetch: () => Promise<void>;
+  refetch: () => Promise<PhotographerQuota | null>;
 }
 
 const QuotaContext = createContext<QuotaContextValue | null>(null);
@@ -27,13 +27,15 @@ export function QuotaProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch("/api/photographer/quota");
       if (!res.ok) {
         setError(true);
-        return;
+        return null;
       }
       const data: PhotographerQuota = await res.json();
       setQuota(data);
       setError(false);
+      return data;
     } catch {
       setError(true);
+      return null;
     }
   }, []);
 

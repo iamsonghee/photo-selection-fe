@@ -1,14 +1,13 @@
+import { format } from "date-fns";
+import type { PhotographerTier, BetaStatus } from "@/lib/beta-policy";
+
 export function formatAdminDate(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+  return format(new Date(iso), "yyyy.MM.dd");
 }
 
 export function formatAdminDateTime(iso: string): string {
-  const d = new Date(iso);
-  return `${formatAdminDate(iso)} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return format(new Date(iso), "yyyy.MM.dd HH:mm");
 }
-
-import type { PhotographerTier, BetaStatus } from "@/lib/beta-policy";
 
 export type TierBadge = { label: string; className: string };
 
@@ -23,7 +22,9 @@ export function getTierBadge(tier: PhotographerTier, betaStatus: BetaStatus): Ti
 
 export type DdayLevel = "ok" | "warn" | "danger";
 
-/** D-day 텍스트 + 위험도. date는 ISO 날짜/일시 문자열. */
+/** D-day 텍스트 + 위험도. date는 ISO 날짜/일시 문자열.
+ * customerDDay(고객 화면용)와 계산식이 다르다 — 여기는 date 자체를 자정으로 정규화해
+ * 시:분:초에 관계없이 "그 날짜"를 기준으로 세므로 병합하지 않는다. */
 export function ddayFrom(date: string): { text: string; level: DdayLevel } {
   const diff = Math.ceil(
     (new Date(date).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86_400_000
