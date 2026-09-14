@@ -60,7 +60,7 @@ PNG 프레임은 os.tmpdir()의 acut-hero-frames / acut-hero-mobile-frames에 �
 
 개발 전용 /landing/demo-capture에서 실제 GalleryPhotoCard, SelectionConfirmDialog, ProjectAssetTabs, OriginalPhotoGallery 등에 정적 샘플을 적용한다. production은 notFound()로 차단한다. 운영 API·고객 경로·외부 서비스 요청은 녹화 스크립트에서 차단하고 검사한다. 서비스 기능·DB·업로드 흐름은 변경하지 않는다. 주요 녹화 로직은 한국어 주석을 포함한다.
 
-HeroVideo는 autoPlay·muted·playsInline·loop·poster를 제공하고 컨트롤을 숨긴다. Safari가 video 내부의 `source media` 조건을 안정적으로 적용하지 않으므로 서버 HTML은 모바일 H.264 MP4 하나로 시작한다. 따라서 아이폰은 hydration 전부터 올바른 모바일 영상으로 네이티브 autoplay를 시도하며, 데스크톱에서만 viewport 확인 후 데스크톱 MP4로 교체한다. iOS의 네이티브 autoplay를 다시 초기화하지 않도록 `load()`를 호출하지 않으며 `play()`와 `canplay` 재시도는 보조 수단으로만 사용한다. 자동재생이 거절되거나 5초 동안 시작되지 않으면 poster 위에 작은 "영상 재생" 버튼을 표시한다. CSS로 비율을 예약해 레이아웃 이동을 방지한다. 첫 재생 전·자동 재생 거절·미디어 오류에는 poster를 유지한다. 최초 재생 후 waiting 또는 반복 경계에서는 poster로 되돌리지 않아 깜빡임을 방지한다. 움직임 축소 설정에서는 hydration 직후 자동재생을 멈추고 poster를 우선 표시하되, 사용자가 재생 버튼을 누르면 같은 화면에서 영상을 재생한다.
+HeroVideo는 autoPlay·muted·playsInline·loop·poster를 제공하고 컨트롤을 숨긴다. Safari가 video 내부의 `source media` 조건을 안정적으로 적용하지 않으므로 서버 HTML은 모바일 H.264 MP4 하나로 시작한다. 따라서 아이폰은 hydration 전부터 올바른 모바일 영상으로 네이티브 autoplay를 시도하며, 데스크톱에서만 viewport 확인 후 데스크톱 MP4로 교체한다. iOS의 네이티브 autoplay를 다시 초기화하지 않도록 `load()`를 호출하지 않으며 `play()`와 `canplay` 재시도는 보조 수단으로만 사용한다. 영상 표시는 React의 `playing` 이벤트 상태에 의존하지 않으며 실제 video 프레임을 항상 전면에 둔다. 자동재생이 거절되거나 5초 동안 현재 프레임조차 준비되지 않으면 poster 위에 작은 "영상 재생" 버튼을 표시한다. CSS로 비율을 예약해 레이아웃 이동을 방지한다. 최초 재생 후 waiting 또는 반복 경계에서는 poster로 되돌리지 않아 깜빡임을 방지한다. 움직임 축소 설정에서는 hydration 직후 자동재생을 멈추고 poster를 우선 표시하되, 사용자가 재생 버튼을 누르면 같은 화면에서 영상을 재생한다.
 
 ## 검증 방법
 

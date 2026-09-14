@@ -8,7 +8,6 @@ const POSTER = "/landing/hero/acut-demo-poster.webp";
 export function HeroVideo() {
   const video = useRef<HTMLVideoElement>(null);
   const manualPlayback = useRef(false);
-  const playbackActive = useRef(false);
   const reducedMotionEnabled = useRef(false);
   // 서버 HTML은 모바일 MP4로 시작해 iOS가 hydration 전부터 네이티브 autoplay를 시도하게 한다.
   const [mobile, setMobile] = useState(true);
@@ -45,7 +44,6 @@ export function HeroVideo() {
     const element = video.current;
     if (!element) return;
     let disposed = false;
-    playbackActive.current = false;
 
     // video를 첫 HTML부터 유지하고 muted/inline 상태를 보강해 iOS의 네이티브 autoplay 조건을 지킨다.
     element.muted = true;
@@ -57,7 +55,7 @@ export function HeroVideo() {
     const tryPlay = () => {
       const request = element.play();
       request?.then(() => {
-        if (!disposed) setPlaybackBlocked(false);
+        if (!disposed && (!reducedMotionEnabled.current || manualPlayback.current)) setPlaybackBlocked(false);
       }).catch(() => {
         if (!disposed) {
           setPlaying(false);
@@ -76,7 +74,8 @@ export function HeroVideo() {
 
     // 느린 네트워크에서는 충분히 기다린 뒤에만 수동 재생 수단을 보여준다.
     const fallbackTimer = setTimeout(() => {
-      if (!disposed && !playbackActive.current) setPlaybackBlocked(true);
+      const unavailable = element.paused || element.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || Boolean(element.error);
+      if (!disposed && unavailable) setPlaybackBlocked(true);
     }, 5000);
 
     element.addEventListener("canplay", handleCanPlay, { once: true });
@@ -119,7 +118,6 @@ export function HeroVideo() {
           width={mobile ? 960 : 2400} height={mobile ? 1200 : 1282}
           aria-label="고객이 사진 3장을 선택하고 요청을 남기면 작가에게 동일한 사진과 요청이 정리되고 작가가 보정본을 업로드하는 20초 제품 시연"
           // 반복 경계의 waiting은 오류가 아니다. 재생한 프레임을 유지해 poster 전환 깜빡임을 막는다.
-          onPause={() => { playbackActive.current = false; setPlaying(false); setPlaybackBlocked(true); }}
           onPlaying={() => {
             if (reducedMotionEnabled.current && !manualPlayback.current) {
               video.current?.pause();
@@ -127,11 +125,10 @@ export function HeroVideo() {
               setPlaybackBlocked(true);
               return;
             }
-            playbackActive.current = true;
             setPlaying(true);
             setPlaybackBlocked(false);
           }}
-          onError={() => { playbackActive.current = false; setPlaying(false); setPlaybackBlocked(true); }}
+          onError={() => { setPlaying(false); setPlaybackBlocked(true); }}
         >
           {/* iOS 첫 HTML에는 모바일 H.264 MP4 하나만 제공해 source 재선택을 피한다. */}
           <source src={`/landing/hero/${stem}.mp4`} type="video/mp4" />

@@ -44,18 +44,7 @@ try {
     await film.scrollIntoViewIfNeeded();
     await page.waitForFunction(() => document.querySelector(".ac-hero-poster")?.naturalWidth > 0);
     if (["desktop", "mobile"].includes(scenario)) {
-      await page.waitForFunction(() => document.querySelector(".ac-hero-film").dataset.playing === "true");
-      // 실제 반복 경계와 일시적인 버퍼 대기에서 poster로 되돌아가지 않아야 한다.
-      await page.evaluate(() => {
-        window.heroHiddenDuringLoop = false;
-        const film = document.querySelector(".ac-hero-film");
-        window.heroLoopObserver = new MutationObserver(records => {
-          if (records.some(record => record.oldValue === "false") || film.dataset.playing !== "true") {
-            window.heroHiddenDuringLoop = true;
-          }
-        });
-        window.heroLoopObserver.observe(film, { attributes: true, attributeFilter: ["data-playing"], attributeOldValue: true });
-      });
+      await page.waitForFunction(() => { const video = document.querySelector(".ac-hero-film video"); return video && !video.paused && video.readyState >= 2; });
       for (let loop = 0; loop < 2; loop++) {
         await page.evaluate(() => { document.querySelector("video").currentTime = 19.65; });
         await page.waitForFunction(() => {
@@ -65,11 +54,7 @@ try {
       }
       await page.evaluate(() => document.querySelector("video").dispatchEvent(new Event("waiting")));
       await page.waitForTimeout(100);
-      assert.equal(await film.getAttribute("data-playing"), "true");
-      assert.equal(await page.evaluate(() => {
-        window.heroLoopObserver.disconnect();
-        return window.heroHiddenDuringLoop;
-      }), false);
+      assert.equal(await page.locator(".ac-hero-film video").evaluate(video => getComputedStyle(video).opacity), "1");
       await page.evaluate(() => { const v = document.querySelector("video"); v.currentTime = 14; });
       await page.waitForFunction(() => !document.querySelector("video").seeking);
     } else {
@@ -91,7 +76,7 @@ try {
       assert(state.video);
       assert.equal(await page.getByRole("button", { name: "제품 시연 영상 재생" }).isVisible(), true);
       await page.getByRole("button", { name: "제품 시연 영상 재생" }).click();
-      await page.waitForFunction(() => document.querySelector(".ac-hero-film")?.dataset.playing === "true");
+      await page.waitForFunction(() => { const video = document.querySelector(".ac-hero-film video"); return video && !video.paused && video.readyState >= 2; });
     }
     if (["desktop", "mobile"].includes(scenario)) {
       assert.equal(state.video.width, scenario.startsWith("mobile") ? 960 : 2400); assert.equal(state.video.height, scenario.startsWith("mobile") ? 1200 : 1282);
@@ -142,7 +127,7 @@ try {
   await page.goto(`${origin}/landing`);
   const film = page.locator(".ac-hero-film");
   await film.scrollIntoViewIfNeeded();
-  await page.waitForFunction(() => document.querySelector(".ac-hero-film")?.dataset.playing === "true");
+  await page.waitForFunction(() => { const video = document.querySelector(".ac-hero-film video"); return video && !video.paused && video.readyState >= 2; });
   const state = await page.locator(".ac-hero-film video").evaluate(video => ({
     currentSrc: video.currentSrc,
     paused: video.paused,

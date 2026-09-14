@@ -177,8 +177,7 @@ body:has(.ac-landing) {
 /* 실측 히어로(1200×641) 비율을 예약하고 모바일에서도 프레임 전체를 표시한다. */
 .ac-hero-film { position:relative; aspect-ratio:1200 / 641; overflow:hidden; border-radius:16px; background:#fff; box-shadow:0 0 0 1px var(--ac-line),0 18px 50px #1919180a; }
 .ac-hero-film video, .ac-hero-poster { display:block; position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
-.ac-hero-film video { opacity:0; }
-.ac-hero-film[data-playing="true"] video { opacity:1; }
+.ac-hero-film video { opacity:1; }
 .ac-hero-play { position:absolute; z-index:3; left:50%; bottom:18px; transform:translateX(-50%); display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:40px; padding:0 15px; border:1px solid #ffffffb8; border-radius:999px; background:#191918d9; color:#fff; box-shadow:0 6px 22px #19191826; font-size:13px; font-weight:700; cursor:pointer; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
 .ac-hero-play:focus-visible { outline:3px solid color-mix(in srgb,var(--ac-orange) 45%,transparent); outline-offset:3px; }
 @media (max-width:767px) { .ac-hero-film { border-radius:8px; aspect-ratio:4 / 5; } }
