@@ -12,13 +12,10 @@ const POSTER = "/landing/hero/acut-demo-poster.webp";
 
 export function HeroVideo() {
   const video = useRef<HTMLVideoElement>(null);
-  const manualPlayback = useRef(false);
-  const reducedMotionEnabled = useRef(false);
   // 서버 HTML은 모바일 MP4로 시작해 iOS가 hydration 전부터 네이티브 autoplay를 시도하게 한다.
   const [mobile, setMobile] = useState(true);
   const stem = mobile ? "acut-demo-mobile" : "acut-demo";
   const poster = mobile ? "/landing/hero/acut-demo-mobile-poster.webp" : POSTER;
-  const [reducedMotion, setReducedMotion] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [playbackBlocked, setPlaybackBlocked] = useState(false);
 
@@ -36,7 +33,7 @@ export function HeroVideo() {
       }
       const rect = element.getBoundingClientRect();
       setDiagnostics(JSON.stringify({
-        version: "hero-progress-v1", userAgent: navigator.userAgent,
+        version: "hero-autoplay-v2", userAgent: navigator.userAgent,
         reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
         visibility: document.visibilityState, viewport: [innerWidth, innerHeight],
         bounds: [rect.x, rect.y, rect.width, rect.height],
@@ -60,8 +57,7 @@ export function HeroVideo() {
     let previous = element.currentTime;
     const observeProgress = () => {
       const current = element.currentTime;
-      if (!element.paused && !element.seeking && current !== previous &&
-          (!reducedMotionEnabled.current || manualPlayback.current)) {
+      if (!element.paused && !element.seeking && current !== previous) {
         setPlaying(true);
         setPlaybackBlocked(false);
       }
@@ -73,23 +69,10 @@ export function HeroVideo() {
 
   useEffect(() => {
     const viewport = window.matchMedia("(max-width: 767px)");
-    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const sync = () => {
-      reducedMotionEnabled.current = preference.matches;
-      setMobile(viewport.matches);
-      setReducedMotion(preference.matches);
-      if (preference.matches) {
-        manualPlayback.current = false;
-        video.current?.pause();
-        setPlaying(false);
-        setPlaybackBlocked(true);
-      }
-    };
+    const sync = () => setMobile(viewport.matches);
     sync();
-    preference.addEventListener("change", sync);
     viewport.addEventListener("change", sync);
     return () => {
-      preference.removeEventListener("change", sync);
       viewport.removeEventListener("change", sync);
     };
   }, []);
@@ -106,18 +89,7 @@ export function HeroVideo() {
     element.setAttribute("playsinline", "");
     element.setAttribute("webkit-playsinline", "");
 
-    if (reducedMotion) {
-      element.removeAttribute("autoplay");
-      element.pause();
-      const reducedTimer = setTimeout(() => {
-        if (!disposed) setPlaybackBlocked(true);
-      }, 0);
-      return () => {
-        disposed = true;
-        clearTimeout(reducedTimer);
-      };
-    }
-
+    // 사용자 요청에 따라 움직임 축소 설정과 무관하게 무음 자동재생을 시도한다.
     element.autoplay = true;
     element.setAttribute("autoplay", "");
     let inView = false;
@@ -171,12 +143,11 @@ export function HeroVideo() {
       element.removeEventListener("canplay", handleCanPlay);
       element.pause();
     };
-  }, [mobile, reducedMotion]);
+  }, [mobile]);
 
   const retryPlayback = useCallback(() => {
     const element = video.current;
     if (!element) return;
-    manualPlayback.current = true;
     element.muted = true;
     element.defaultMuted = true;
     element.setAttribute("muted", "");
@@ -199,19 +170,13 @@ export function HeroVideo() {
         <video
           key={stem}
           ref={video}
-          autoPlay={!reducedMotion} muted playsInline loop
-          preload={reducedMotion ? "none" : "metadata"}
+          autoPlay muted playsInline loop
+          preload="metadata"
           poster={poster}
           width={mobile ? 960 : 2400} height={mobile ? 1200 : 1282}
           aria-label="고객이 사진 3장을 선택하고 요청을 남기면 작가에게 동일한 사진과 요청이 정리되고 작가가 보정본을 업로드하는 20초 제품 시연"
           // 반복 경계의 waiting은 오류가 아니다. 재생한 프레임을 유지해 poster 전환 깜빡임을 막는다.
           onPlaying={() => {
-            if (reducedMotionEnabled.current && !manualPlayback.current) {
-              video.current?.pause();
-              setPlaying(false);
-              setPlaybackBlocked(true);
-              return;
-            }
             setPlaying(true);
             setPlaybackBlocked(false);
           }}

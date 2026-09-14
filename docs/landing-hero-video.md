@@ -60,11 +60,11 @@ PNG 프레임은 os.tmpdir()의 acut-hero-frames / acut-hero-mobile-frames에 �
 
 개발 전용 /landing/demo-capture에서 실제 GalleryPhotoCard, SelectionConfirmDialog, ProjectAssetTabs, OriginalPhotoGallery 등에 정적 샘플을 적용한다. production은 notFound()로 차단한다. 운영 API·고객 경로·외부 서비스 요청은 녹화 스크립트에서 차단하고 검사한다. 서비스 기능·DB·업로드 흐름은 변경하지 않는다. 주요 녹화 로직은 한국어 주석을 포함한다.
 
-HeroVideo는 autoPlay·muted·playsInline·loop·poster를 제공하고 컨트롤을 숨긴다. Safari가 video 내부의 `source media` 조건을 안정적으로 적용하지 않으므로 서버 HTML은 모바일 H.264 MP4 하나로 시작한다. 따라서 아이폰은 hydration 전부터 올바른 모바일 영상으로 네이티브 autoplay를 시도하며, 데스크톱에서만 viewport 확인 후 데스크톱 MP4로 교체한다. iOS의 네이티브 autoplay를 다시 초기화하지 않도록 `load()`를 호출하지 않으며 `play()`와 `canplay` 재시도는 보조 수단으로만 사용한다. 영상 표시는 React의 `playing` 이벤트 상태에 의존하지 않으며 실제 video 프레임을 항상 전면에 둔다. 영상이 화면에 들어올 때 자동재생을 다시 시도하며, 이후 3초 동안 현재 프레임조차 준비되지 않으면 poster 위에 작은 "영상 재생" 버튼을 표시한다. CSS로 비율을 예약해 레이아웃 이동을 방지한다. 최초 재생 후 waiting 또는 반복 경계에서는 poster로 되돌리지 않아 깜빡임을 방지한다. 움직임 축소 설정에서는 hydration 직후 자동재생을 멈추고 poster를 우선 표시하되, 사용자가 재생 버튼을 누르면 같은 화면에서 영상을 재생한다.
+HeroVideo는 autoPlay·muted·playsInline·loop·poster를 제공하고 컨트롤을 숨긴다. Safari가 video 내부의 `source media` 조건을 안정적으로 적용하지 않으므로 서버 HTML은 모바일 H.264 MP4 하나로 시작한다. 따라서 아이폰은 hydration 전부터 올바른 모바일 영상으로 네이티브 autoplay를 시도하며, 데스크톱에서만 viewport 확인 후 데스크톱 MP4로 교체한다. iOS의 네이티브 autoplay를 다시 초기화하지 않도록 `load()`를 호출하지 않으며 `play()`와 `canplay` 재시도는 보조 수단으로만 사용한다. 영상 표시는 React의 `playing` 이벤트 상태에 의존하지 않으며 실제 video 프레임을 항상 전면에 둔다. 영상이 화면에 들어올 때 자동재생을 다시 시도하며, 이후 3초 동안 현재 프레임조차 준비되지 않으면 poster 위에 작은 "영상 재생" 버튼을 표시한다. CSS로 비율을 예약해 레이아웃 이동을 방지한다. 최초 재생 후 waiting 또는 반복 경계에서는 poster로 되돌리지 않아 깜빡임을 방지한다. 사용자 요청에 따라 움직임 축소 설정에서도 무음 자동재생을 시도한다. 브라우저가 재생을 거절하거나 미디어 오류가 발생하면 수동 재생 버튼과 poster를 제공한다.
 
 ## 검증 방법
 
-verify-landing-hero.mjs는 데스크톱 1440px·모바일 390px에서 비율, 가로 넘침, 실제 반복 경계 2회, waiting, 자동 재생 거절 모의, 미디어 오류, 움직임 축소와 수동 재생을 검사한다. 가로/세로 MP4도 별도로 디코딩한다. 결과와 스크린샷은 os.tmpdir()/acut-hero-verification/에 저장한다. WebKit iPhone 13 환경에서 자동재생 시 실제 재생 시간이 증가하는지 별도로 확인하며, 실제 물리 기기는 검증 범위에 포함하지 않는다.
+verify-landing-hero.mjs는 데스크톱 1440px·모바일 390px에서 비율, 가로 넘침, 실제 반복 경계 2회, waiting, 자동 재생 거절 모의, 미디어 오류, 움직임 축소 설정에서의 자동재생을 검사한다. 가로/세로 MP4도 별도로 디코딩한다. 결과와 스크린샷은 os.tmpdir()/acut-hero-verification/에 저장한다. WebKit iPhone 13 환경에서 움직임 축소를 켠 상태로 자동재생 시 실제 재생 시간이 증가하는지 별도로 확인하며, 실제 물리 기기는 검증 범위에 포함하지 않는다.
 
 이전 정지 시안은 /landing/demo-capture?storyboard=1에서 별도로 보존하며, 최종 영상은 DemoCapture.tsx를 사용한다. 정지 시안의 오른쪽 패널은 최종 영상에 포함되지 않는다.
 
@@ -82,7 +82,7 @@ verify-landing-hero.mjs는 데스크톱 1440px·모바일 390px에서 비율, �
 | 데스크톱 | 8,353,166 bytes | 6,382,195 bytes | 112,088 bytes |
 | 모바일 | 5,352,986 bytes | 4,923,602 bytes | 61,708 bytes |
 
-검증 완료: 데스크톱 1440px·모바일 390px에서 20초/해상도 일치, 가로 넘침 없음. 반복 경계 2회 및 waiting에서 poster 전환 없음. 자동 재생 거절·미디어 오류는 poster 유지, 움직임 축소는 영상 요청 0건. 두 MP4 디코딩 성공. 모든 시나리오 운영 API 0건. 업로드 완료 프레임 시각 확인 및 TypeScript·ESLint 통과. 실기기 iOS는 미검증, 배포하지 않음.
+검증 완료: 데스크톱 1440px·모바일 390px에서 20초/해상도 일치, 가로 넘침 없음. 반복 경계 2회 및 waiting에서 poster 전환 없음. 자동 재생 거절·미디어 오류는 poster 유지, 움직임 축소 동작은 아래 최신 정책을 따른다. 두 MP4 디코딩 성공. 모든 시나리오 운영 API 0건. 업로드 완료 프레임 시각 확인 및 TypeScript·ESLint 통과. 실기기 iOS는 미검증, 배포하지 않음.
 
 
 ## 아이폰 재생 진단 (2026-09-14)
@@ -92,3 +92,8 @@ verify-landing-hero.mjs는 데스크톱 1440px·모바일 390px에서 비율, �
 `/?videoDebug=1` 또는 `/landing?videoDebug=1`에서만 영상 아래 진단 항목을 표시한다. UA, 화면 크기, 움직임 축소 설정, 현재 소스, 재생 시간, 미디어 준비 상태·오류와 최근 이벤트/재생 요청 결과를 브라우저 메모리에 기록한다. 진단 텍스트를 선택해 복사할 수 있으며 서버로 전송하거나 저장하지 않는다. 일반 주소에서는 진단 UI와 수집 타이머를 사용하지 않는다.
 
 `node scripts/verify-landing-hero.mjs`는 실제 시간 증가, 남은 재생 버튼 복구, 자동재생 거절 오류의 진단 노출도 검사한다. WebKit 에뮬레이션 통과는 물리 아이폰에서의 해결 확인을 대신하지 않는다. 실제 기기에서 반복되는 실패 원인은 이 진단 결과로 추가 확인해야 한다.
+
+
+## 움직임 축소 자동 정지 제거 (2026-09-14)
+
+실기기 진단에서 자동재생 성공 직후 움직임 축소 분기가 영상을 정지시키는 것을 확인했다. 사용자 승인에 따라 히어로의 해당 분기·설정 변경 리스너·onPlaying 정지 처리를 제거했다. `autoPlay`, 무음, inline, loop는 항상 유지한다. 진단 버전은 `hero-autoplay-v2`이며 reducedMotion 값은 진단에만 기록한다. Chromium PC/모바일 및 WebKit iPhone 에뮬레이션에서 움직임 축소가 켜져 있어도 실제 시간이 흐르고 재생 버튼이 숨겨지는지 검사한다. 다른 페이지의 움직임 축소 정책은 변경하지 않는다.

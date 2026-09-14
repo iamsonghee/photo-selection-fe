@@ -43,7 +43,7 @@ try {
     const film = page.locator(".ac-hero-film");
     await film.scrollIntoViewIfNeeded();
     await page.waitForFunction(() => document.querySelector(".ac-hero-poster")?.naturalWidth > 0);
-    if (["desktop", "mobile"].includes(scenario)) {
+    if (["desktop", "mobile", "reduced", "mobile-reduced"].includes(scenario)) {
       await page.waitForFunction(() => { const video = document.querySelector(".ac-hero-film video"); return video && !video.paused && video.readyState >= 2; });
       const initialTime = await page.locator(".ac-hero-film video").evaluate(video => video.currentTime);
       await page.waitForFunction(start => document.querySelector(".ac-hero-film video").currentTime > start + .3, initialTime);
@@ -78,17 +78,11 @@ try {
     assert(Math.abs(state.width / state.height - (scenario.startsWith("mobile") ? 4 / 5 : 1200 / 641)) < .001);
     assert.equal(state.overflow, false);
     assert.equal(apis.length, 0);
-    if (scenario.endsWith("reduced")) {
-      assert(state.video);
-      assert.equal(await page.getByRole("button", { name: "제품 시연 영상 재생" }).isVisible(), true);
-      await page.getByRole("button", { name: "제품 시연 영상 재생" }).click();
-      await page.waitForFunction(() => { const video = document.querySelector(".ac-hero-film video"); return video && !video.paused && video.readyState >= 2; });
-    }
-    if (["desktop", "mobile"].includes(scenario)) {
+    if (["desktop", "mobile", "reduced", "mobile-reduced"].includes(scenario)) {
       assert.equal(state.video.width, scenario.startsWith("mobile") ? 960 : 2400); assert.equal(state.video.height, scenario.startsWith("mobile") ? 1200 : 1282);
       assert(Math.abs(state.video.duration - 20) < .1);
-      assert(state.video.currentSrc.includes(scenario === "mobile" ? "acut-demo-mobile.mp4" : "acut-demo.mp4"));
-      if (scenario === "mobile") assert(media.every(url => url.includes("acut-demo-mobile")));
+      assert(state.video.currentSrc.includes(scenario.startsWith("mobile") ? "acut-demo-mobile.mp4" : "acut-demo.mp4"));
+      if (scenario.startsWith("mobile")) assert(media.every(url => url.includes("acut-demo-mobile")));
       assert.equal(state.video.controls, false); assert.equal(state.video.muted, true);
       assert.equal(state.video.loop, true); assert.equal(state.video.playsInline, true);
       assert.equal(state.video.fit, "contain");
@@ -98,12 +92,12 @@ try {
     if (scenario.endsWith("autoplay-denied") || scenario.endsWith("media-error")) {
       await page.getByRole("button", { name: "제품 시연 영상 재생" }).waitFor({ state: "visible", timeout: 6500 });
     }
-    await page.waitForFunction(() => document.querySelector('textarea[aria-label="영상 재생 진단 결과"]')?.value.includes('"version": "hero-progress-v1"'));
+    await page.waitForFunction(() => document.querySelector('textarea[aria-label="영상 재생 진단 결과"]')?.value.includes('"version": "hero-autoplay-v2"'));
     if (scenario.endsWith("autoplay-denied")) {
       assert((await page.locator('textarea[aria-label="영상 재생 진단 결과"]').inputValue()).includes("NotAllowedError"));
     }
     await film.screenshot({ path: path.join(output, `${scenario}.png`) });
-    if (["desktop", "mobile"].includes(scenario)) {
+    if (["desktop", "mobile", "reduced", "mobile-reduced"].includes(scenario)) {
       await page.evaluate(() => { document.querySelector("video").currentTime = 18.6; });
       await page.waitForFunction(() => !document.querySelector("video").seeking);
       await film.screenshot({ path: path.join(output, `${scenario}-uploaded.png`) });
@@ -132,7 +126,7 @@ try {
 // 실제 iPhone과 같은 UA/viewport를 WebKit에 적용해 H.264 모바일 영상이 재생되는지 확인한다.
 const safari = await webkit.launch();
 try {
-  const context = await safari.newContext({ ...devices["iPhone 13"], reducedMotion: "no-preference" });
+  const context = await safari.newContext({ ...devices["iPhone 13"], reducedMotion: "reduce" });
   const page = await context.newPage();
   await page.goto(`${origin}/landing`);
   const film = page.locator(".ac-hero-film");
