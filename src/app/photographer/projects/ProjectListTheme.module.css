@@ -49,7 +49,9 @@
 .projectTable th:first-child { border-top-left-radius:10px; }.projectTable th:last-child { border-top-right-radius:10px; }
 .projectTable td { height:88px; padding:12px 16px; vertical-align:middle; font-size:13px; overflow-wrap:anywhere; }
 .projectTable tr+tr td { border-top:1px solid var(--border-subtle); }
-.projectTable tbody tr:hover { background:var(--surface-raised); }
+.projectTable tbody tr:hover { background:var(--surface-raised); cursor:pointer; }
+/* 다음 작업/링크 셀은 자기 목적지가 따로 있으니 행 클릭 커서를 덮지 않는다 */
+.projectTable tbody tr td:last-child { cursor:auto; }
 .identity { display:flex; align-items:center; gap:12px; min-width:0; }
 .thumbnail { display:grid; place-items:center; width:52px; height:52px; flex-shrink:0; overflow:hidden; border-radius:8px; background:var(--surface-raised); font-size:12px; color:var(--muted-foreground); }
 .thumbnail img { width:100%; height:100%; object-fit:cover; }

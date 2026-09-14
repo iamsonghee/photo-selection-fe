@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import type { MouseEvent } from "react";
 import { ArrowRight, Plus, Search, MapPin } from "lucide-react";
 import type { Project } from "@/types";
 import { getDisplayStatusLabel } from "@/lib/project-status";
@@ -56,7 +58,15 @@ function ProjectCurrentState({ project }: { project: Project }) {
 
 /** 목록은 현재 상황과 다음 작업에 집중한다. 상태 전환이나 업로드는 기존 목적지에서 수행한다. */
 export function DesktopProjectList(props: Props) {
+  const router = useRouter();
   const hasFilters = props.step !== "all" || !!props.from || !!props.to;
+  // 행 안의 "다음 작업" 등 자체 목적지가 있는 링크는 그대로 두고, 그 외 영역(썸네일·이름·상태 등)을
+  // 눌러도 상세로 이동한다 — 지금까지는 이름 텍스트만 정확히 클릭해야 이동할 수 있었다.
+  const goToDetail = (project: Project) => (event: MouseEvent<HTMLTableRowElement>) => {
+    if ((event.target as HTMLElement).closest("a")) return;
+    props.onRemember();
+    router.push(`/photographer/projects/${project.id}`);
+  };
   return <section className={styles.desktopList} aria-label="PC 프로젝트 목록">
     <header className={styles.listHeading}><div><h1>프로젝트</h1><p>진행 상황을 확인하고 다음 작업을 이어가세요.</p></div><PhotographerLightButton onClick={props.onCreate}><Plus size={16} />새 프로젝트</PhotographerLightButton></header>
     <div className={styles.listViews} role="group" aria-label="PC 프로젝트 빠른 필터">{(["all", "mine", "waiting", "completed"] as const).map(view => <button key={view} type="button" aria-pressed={props.view === view} onClick={() => props.onView(view)}>{({all:"전체",mine:"내 작업",waiting:"고객 대기",completed:"완료"})[view]}<span>{props.counts[view]}</span></button>)}</div>
@@ -79,7 +89,7 @@ export function DesktopProjectList(props: Props) {
         const deadline = getActiveDeadline(project);
         const due = deadline ? dday(deadline.date) : null;
         const action = props.getAction(project);
-        return <tr key={project.id} data-desktop-project-row>
+        return <tr key={project.id} data-desktop-project-row onClick={goToDetail(project)}>
           <td><div className={styles.identity}><span className={styles.thumbnail}>{project.thumbnailUrl ? <img src={project.thumbnailUrl} alt="" loading="lazy" /> : <span>{project.name.slice(0,2)}</span>}</span><div className={styles.identityText}>
             {/* 표 안의 링크를 사용해 새 탭 열기·키보드 이동도 기본 브라우저 동작을 따른다. */}
             <Link href={`/photographer/projects/${project.id}`} prefetch={false} onClick={props.onRemember} className={styles.projectName} title={project.name}>{project.name}</Link>
