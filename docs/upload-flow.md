@@ -58,6 +58,8 @@
 
 ## 보정본 업로드와 최종 납품
 
+일괄 업로드의 파일 매칭은 파일명 exact/fuzzy → Gemini 임베딩 → 순서 폴백 순서다. Gemini 점수가 `GEMINI_MATCH_AUTO_THRESHOLD`(기본 0.96) 이상이어도 1·2위 후보 차이가 `GEMINI_MATCH_MARGIN_THRESHOLD`(기본 0.03) 미만이면 연결과 업로드는 유지하면서 `AI 확인 필요`로 표시한다. 이미 계산한 유사도 행렬을 재사용하므로 추가 AI 호출이나 업로드 지연은 없다.
+
 1. `UploadVersionsPanel`/단일 교체가 원본 파일 metadata로 `POST /api/upload/versions/delivery/presign`을 호출한다. 파일당 상한은 100MiB(`DELIVERY_VERSION_MAX_BYTES`), 브라우저 direct PUT 동시성은 3(`DIRECT_UPLOAD_CONCURRENCY`)이다.
 2. 브라우저는 원본 바이트의 R2 direct PUT과 `compressImageForUpload()` 검토용 파일 준비를 동시에 시작한다. 두 작업이 모두 끝나면 검토용 파일과 `delivery_metadata`를 `POST /api/upload/versions`에 보낸다. 개별 카드 업로드 잠금은 사진·버전 단위이므로 다른 카드의 업로드를 막지 않으며, 연속 완료 시 목록 재조회는 짧게 합쳐 한 번만 수행한다.
 3. FastAPI는 delivery key prefix와 R2 HEAD 실제 크기를 확인하고, 매 업로드마다 고유한 key에 검토용 1200px/82% JPEG와 300px/75% 썸네일을 만든다. 같은 V1/V2 단계의 기존 파일이 있으면 `replace_photo_versions_with_history` RPC가 기존 활성 파일과 고객 검토 결과를 `photo_version_revisions`에 스냅샷으로 보존한 뒤 현재 `photo_versions`를 원자적으로 교체한다. 단, 현재 `version_reviews.status='approved'`인 사진은 UI의 선택·교체 대상에서 제외하고 FastAPI와 RPC도 교체를 거부한다.
