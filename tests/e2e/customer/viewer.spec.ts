@@ -4,6 +4,17 @@ import { loginAsPhotographer } from "../../helpers/auth";
 
 let project: TestProject;
 
+/* 다운로드 기한 표시는 D-day(오늘 기준 계산)와 만료 일시 두 가지다 — 만료일을 고정 날짜로 박으면
+ * 작성한 날에만 통과하고 다음 날부터 매일 깨진다(실제로 `2026-10-13` + `D-30` 조합이 그렇게 썩었다).
+ * 오늘 자정 + 30일로 만들어 D-30을 고정하고, 화면에 나올 문자열도 같은 값에서 뽑아 쓴다. */
+const EXPIRES_IN_DAYS = 30;
+const expiresAtDate = new Date(new Date().setHours(0, 0, 0, 0) + EXPIRES_IN_DAYS * 86_400_000);
+const expiresAtIso = expiresAtDate.toISOString();
+const expiresAtLabel = new Intl.DateTimeFormat("ko-KR", {
+  year: "numeric", month: "long", day: "numeric",
+  hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Seoul",
+}).format(expiresAtDate);
+
 test("V12: 완료 화면의 라이트 테마와 다운로드 준비·만료 상태", async ({ page }) => {
   await page.route("**/api/c/photos?*", async route => {
     const response = await route.fetch();
@@ -13,7 +24,7 @@ test("V12: 완료 화면의 라이트 테마와 다운로드 준비·만료 상�
   let expired = false;
   await page.route("**/api/c/final-delivery?*", route => route.fulfill({ json: {
     visible: true, expired, preparing: false, failed: false, fileCount: 6, totalBytes: 5242880,
-    expiresAt: "2026-10-13T00:00:00Z", files: [{ partNumber: 1, fileCount: 6, byteSize: 5242880 }],
+    expiresAt: expiresAtIso, files: [{ partNumber: 1, fileCount: 6, byteSize: 5242880 }],
     previewFiles: [
       { photoId: "final-1", filename: "final-1.jpg", url: "/landing/sample-project/studio-v2/retouched/ACUT_0001.jpg", thumbnailUrl: "/landing/sample-project/studio-v2/retouched/ACUT_0001.jpg" },
       { photoId: "final-2", filename: "final-2.jpg", url: "/landing/sample-project/studio-v2/retouched/ACUT_0006.jpg", thumbnailUrl: "/landing/sample-project/studio-v2/retouched/ACUT_0006.jpg" },
@@ -32,11 +43,10 @@ test("V12: 완료 화면의 라이트 테마와 다운로드 준비·만료 상�
   await expect(page.getByRole("heading", { level: 1 })).toContainText("[E2E]");
   await expect(page.locator("body")).toHaveCSS("background-color", "rgb(255, 255, 255)");
   await expect(page.getByLabel("최종 보정본 다운로드 정보")).toContainText("6장");
-  await expect(page.getByLabel("최종 보정본 다운로드 정보")).toContainText("2026년 10월 13일");
+  await expect(page.getByLabel("최종 보정본 다운로드 정보")).toContainText(expiresAtLabel);
   await expect(page.getByLabel("최종 보정본 미리보기").getByRole("button", { name: /크게 보기/ })).toHaveCount(5);
   await expect(page.getByLabel("최종 보정본 미리보기").locator("small:visible").filter({ hasText: "더보기" })).toHaveCount(1);
-  await expect(page.getByLabel("최종 보정본 다운로드 정보").getByText("D-30", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("최종 보정본 다운로드 정보")).toContainText("09:00");
+  await expect(page.getByLabel("최종 보정본 다운로드 정보").getByText(`D-${EXPIRES_IN_DAYS}`, { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1)).toBe(true);
   await page.screenshot({ path: "test-results/delivery-desktop.png", fullPage: true });
   await page.getByRole("button", { name: "final-1.jpg 크게 보기" }).click();

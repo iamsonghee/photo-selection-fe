@@ -34,8 +34,14 @@ export function useHoldPreview({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const onActivatedRef = useRef(onActivated);
+  /* `enabled`는 비교 원본이 decode된 뒤에야 true가 된다 — 그 전환은 사진이 DOM에 그려지는 커밋에서
+   * 일어나지만, 이 값을 클로저로 읽으면 `useEffect`로 다시 붙는 리스너가 한 프레임 늦게 갱신된다.
+   * 그 사이에 들어온 키/포인터는 "아직 준비 안 됨"으로 판정돼 조용히 무시되고, 한 번 누르고 마는
+   * 입력(`\` 키다운)은 영영 복구되지 않는다. 최신 값을 ref로 읽어 그 창을 없앤다. */
+  const enabledRef = useRef(enabled);
 
   useEffect(() => { onActivatedRef.current = onActivated; }, [onActivated]);
+  useEffect(() => { enabledRef.current = enabled; }, [enabled]);
 
   const endHold = useCallback((cancelled = false) => {
     void cancelled; // 호출부 의미(정상 종료/취소)는 유지하되, 소비된 홀드는 다음 제스처 전까지 보존한다.
@@ -51,7 +57,7 @@ export function useHoldPreview({
   const beginHold = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     consumedRef.current = false;
     endHold(false);
-    if (!enabled || !event.isPrimary || event.button !== 0) return;
+    if (!enabledRef.current || !event.isPrimary || event.button !== 0) return;
     /* 확대 오버레이는 전체 판에 캡처해 release 뒤에도 열린 상태를 유지하고,
      * 작가 상세는 실제 사진에 캡처해 후속 click의 이미지 target을 보존한다. */
     const pointerTarget = captureTarget === "eventTarget" && event.target instanceof HTMLElement
@@ -66,7 +72,7 @@ export function useHoldPreview({
       setPreviewActive(true);
       onActivatedRef.current?.();
     }, delayMs);
-  }, [captureTarget, delayMs, enabled, endHold, resetKey]);
+  }, [captureTarget, delayMs, endHold, resetKey]);
 
   const moveHold = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     const start = startRef.current;
@@ -76,11 +82,10 @@ export function useHoldPreview({
   }, [endHold, moveTolerancePx]);
 
   const showPreview = useCallback(() => {
-    if (enabled) {
-      setActiveKey(resetKey);
-      setPreviewActive(true);
-    }
-  }, [enabled, resetKey]);
+    if (!enabledRef.current) return;
+    setActiveKey(resetKey);
+    setPreviewActive(true);
+  }, [resetKey]);
   const hidePreview = useCallback(() => endHold(false), [endHold]);
   const cancelHold = useCallback(() => endHold(true), [endHold]);
   const isConsumed = useCallback(() => consumedRef.current, []);

@@ -86,7 +86,9 @@ export function PhotoFocusOverlay({
         onNext();
         return;
       }
-      if (event.code === "Backslash" && canCompareOriginal) {
+      /* 준비 여부는 showPreview가 최신 값(ref)으로 판단한다 — 여기서 클로저로 한 번 더 거르면
+       * 원본 decode 직후의 한 프레임 동안 키가 통째로 무시된다. */
+      if (event.code === "Backslash") {
         event.preventDefault();
         event.stopImmediatePropagation();
         showPreview();
@@ -104,9 +106,18 @@ export function PhotoFocusOverlay({
     return () => {
       window.removeEventListener("keydown", onKey, { capture: true });
       window.removeEventListener("keyup", onKeyUp, { capture: true });
-      hidePreview();
     };
-  }, [canCompareOriginal, hidePreview, open, onClose, onPrev, onNext, showPreview]);
+  }, [hidePreview, open, onClose, onPrev, onNext, showPreview]);
+
+  /* 비교 보기를 내리는 것은 "닫힐 때"뿐이다.
+   * 위 리스너 effect의 cleanup에서 같이 내렸더니, 부모가 `onClose={() => ...}`처럼 콜백을
+   * 인라인으로 넘기는 한(실제로 검토 상세가 그렇다) 부모가 리렌더될 때마다 effect가 다시 붙으면서
+   * 그 cleanup이 `\` 를 누르고 있는 중에도 원본 비교를 꺼버렸다 — 화면에서는 "누르고 있는데
+   * 원본이 혼자 사라지는" 증상이다. 이 effect는 deps가 안정적이라 열림/닫힘에만 반응한다. */
+  useEffect(() => {
+    if (!open) hidePreview();
+    return () => { hidePreview(); };
+  }, [open, hidePreview]);
 
   if (!open) return null;
 
