@@ -782,6 +782,29 @@ export default function ViewerPage() {
         .fs-side .fs-mini-thumb { width: 80px; height: 54px; }
         /* 실제 단축키는 있었지만 여는 버튼이 없어 발견할 수 없었다. 작업 패널의 마지막 정보로
          * 짧은 요약을 상시 두고, 상세 목록은 눌렀을 때만 보여 사진 작업보다 앞서지 않게 한다. */
+        .fs-select-big {
+          margin: 16px 20px 0; box-sizing: border-box;
+          display: flex; align-items: center; gap: 14px;
+          padding: 16px; border-radius: 12px;
+          border: 1.5px solid rgba(255,255,255,.16);
+          background: rgba(255,255,255,.04);
+          color: rgba(255,255,255,.92); cursor: pointer; text-align: left;
+          transition: border-color 140ms ease, background-color 140ms ease;
+        }
+        .fs-select-big:hover { border-color: rgba(255,255,255,.34); background: rgba(255,255,255,.07); }
+        .fs-select-big:focus-visible { outline: 2px solid white; outline-offset: 2px; }
+        /* 미선택 상자는 흰 채움 — 갤러리 카드·모바일 뷰어와 같은 규칙이다(어두운 바탕에서도 상자로 읽힌다) */
+        .fs-select-big-box {
+          width: 34px; height: 34px; flex: 0 0 34px; border-radius: 8px;
+          border: 2px solid rgba(255,255,255,.55); background: rgba(255,255,255,.92);
+          display: grid; place-items: center;
+        }
+        .fs-select-big-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+        .fs-select-big-text strong { font: 700 15px/1.2 Pretendard, 'Noto Sans KR', sans-serif; letter-spacing: -.2px; }
+        .fs-select-big-text small { font: 500 11px/1.2 Pretendard, 'Noto Sans KR', sans-serif; color: rgba(255,255,255,.45); }
+        /* 주황은 "선택됨" 전용 */
+        .fs-select-big.is-selected { border-color: var(--accent); background: rgba(255,77,0,.12); }
+        .fs-select-big.is-selected .fs-select-big-box { background: var(--accent); border-color: var(--accent); }
         .fs-shortcuts {
           margin-top: auto; padding: 12px 20px 14px;
           border: 0; border-top: 1px solid rgba(255,255,255,.08);
@@ -1425,6 +1448,36 @@ export default function ViewerPage() {
             </div>
           </div>
         </section>
+
+        {/* 코멘트 아래 빈 공간에 두는 큰 선택 버튼(PC 패널 전용 — 모바일에는 이 여백이 없다).
+          * 사진 좌측 상단의 작은 체크박스는 "지금 상태"를 사진에 붙여 보여주는 자리라 그대로 두고,
+          * "고르는 행동"은 눈에 확실히 띄는 크기로 패널에서 한 번 더 제공한다.
+          * 하단 `셀렉 확정하기` 자리를 겸하게 만들지 않는 이유: 개수를 채우면 그 버튼이 확정으로
+          * 바뀌면서 정작 셀렉을 취소할 방법이 다시 작은 체크박스뿐이 된다(한 버튼에 두 역할 금지).
+          * 미선택 상자를 흰 채움으로 두는 것은 갤러리 카드·모바일 뷰어와 같은 규칙이고,
+          * 주황은 "선택됨" 전용이라 선택된 상태에서만 쓴다. */}
+        <button
+          type="button"
+          className={`fs-select-big${isCurrentSelected ? " is-selected" : ""}`}
+          aria-pressed={isCurrentSelected}
+          onClick={() => { void toggleSelect(); }}
+        >
+          <span className="fs-select-big-box" aria-hidden>
+            {isCurrentSelected && <Check style={{ width: 22, height: 22, color: "#fff" }} strokeWidth={3} />}
+          </span>
+          <span className="fs-select-big-text">
+            <strong>{isCurrentSelected ? "선택됨" : "이 사진 선택하기"}</strong>
+            <small>
+              {isCurrentSelected
+                ? "다시 누르면 선택 해제 · Space"
+                : canConfirm
+                  /* 한도에 찼을 때 — 누르면 기존 한도 스낵바가 뜨지만, 이렇게 큰 버튼이
+                   * 아무 설명 없이 거절하면 고장으로 읽힌다. 먼저 할 일을 문구로 말한다. */
+                  ? `${N}장을 모두 골랐어요 · 바꾸려면 다른 사진을 먼저 해제하세요`
+                  : "Space 키로도 선택할 수 있어요"}
+            </small>
+          </span>
+        </button>
 
         {/* 유사컷 미니 스트립 (PC 펼침) */}
         {groupingActive && expandedGroupId && (
