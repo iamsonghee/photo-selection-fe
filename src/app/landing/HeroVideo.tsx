@@ -52,39 +52,61 @@ export function HeroVideo() {
     element.setAttribute("playsinline", "");
     element.setAttribute("webkit-playsinline", "");
 
-    const tryPlay = () => {
-      const request = element.play();
-      request?.then(() => {
-        if (!disposed && (!reducedMotionEnabled.current || manualPlayback.current)) setPlaybackBlocked(false);
-      }).catch(() => {
-        if (!disposed) {
-          setPlaying(false);
-          setPlaybackBlocked(true);
-        }
-      });
-    };
-    const handleCanPlay = () => tryPlay();
-
     if (reducedMotion) {
+      element.removeAttribute("autoplay");
       element.pause();
+      const reducedTimer = setTimeout(() => {
+        if (!disposed) setPlaybackBlocked(true);
+      }, 0);
       return () => {
         disposed = true;
+        clearTimeout(reducedTimer);
       };
     }
 
-    // 느린 네트워크에서는 충분히 기다린 뒤에만 수동 재생 수단을 보여준다.
-    const fallbackTimer = setTimeout(() => {
-      const unavailable = element.paused || element.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || Boolean(element.error);
-      if (!disposed && unavailable) setPlaybackBlocked(true);
-    }, 5000);
+    element.autoplay = true;
+    element.setAttribute("autoplay", "");
+    let inView = false;
+    let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
 
-    element.addEventListener("canplay", handleCanPlay, { once: true });
-    // load()로 네이티브 autoplay를 초기화하지 않고 현재 로드 상태에서 재생만 보조한다.
-    tryPlay();
+    const tryPlay = () => {
+      element.play()?.then(() => {
+        if (!disposed) setPlaybackBlocked(false);
+      }).catch(() => {
+        if (!disposed) setPlaying(false);
+      });
+    };
+    const scheduleFallback = () => {
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      fallbackTimer = setTimeout(() => {
+        if (disposed || !inView) return;
+        const unavailable = element.paused || element.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || Boolean(element.error);
+        if (unavailable) setPlaybackBlocked(true);
+      }, 3000);
+    };
+    const playWhenVisible = () => {
+      if (!inView || document.hidden) return;
+      tryPlay();
+      scheduleFallback();
+    };
+    const handleCanPlay = () => playWhenVisible();
+    const handleVisibility = () => playWhenVisible();
+    const observer = new IntersectionObserver(([entry]) => {
+      inView = entry.isIntersecting;
+      if (inView) playWhenVisible();
+      else if (fallbackTimer) clearTimeout(fallbackTimer);
+    }, { threshold: 0.1 });
+
+    // iOS는 화면 밖에서 거절한 autoplay를 다시 시도하지 않을 수 있어 실제 노출 시점에 재요청한다.
+    observer.observe(element);
+    document.addEventListener("visibilitychange", handleVisibility);
+    element.addEventListener("canplay", handleCanPlay);
 
     return () => {
       disposed = true;
-      clearTimeout(fallbackTimer);
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", handleVisibility);
       element.removeEventListener("canplay", handleCanPlay);
       element.pause();
     };
