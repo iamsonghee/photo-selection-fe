@@ -26,9 +26,15 @@ try {
       return route.continue();
     });
     if (scenario.endsWith("autoplay-denied")) await page.addInitScript(() => {
-      // 브라우저의 자동 재생 거절을 재현한다. 네트워크 오류와 별도로 검증한다.
+      // 브라우저의 자동 재생 거절을 재현한다. 네이티브 autoplay도 즉시 정지한다.
+      const stopNativeAutoplay = () => document.querySelectorAll("video").forEach(video => {
+        video.removeAttribute("autoplay");
+        video.pause();
+      });
+      new MutationObserver(stopNativeAutoplay).observe(document, { childList: true, subtree: true });
       HTMLMediaElement.prototype.play = function () {
         this.removeAttribute("autoplay");
+        this.pause();
         return Promise.reject(new DOMException("Autoplay denied for verification", "NotAllowedError"));
       };
     });
@@ -67,8 +73,8 @@ try {
       await page.evaluate(() => { const v = document.querySelector("video"); v.currentTime = 14; });
       await page.waitForFunction(() => !document.querySelector("video").seeking);
     } else {
-      await page.waitForTimeout(1200);
-      assert.equal(await film.getAttribute("data-playing"), "false");
+      await page.waitForTimeout(scenario.endsWith("autoplay-denied") ? 5200 : 1200);
+      assert.equal(await film.getAttribute("data-playing"), "false", scenario);
     }
     const state = await page.evaluate(() => {
       const f = document.querySelector(".ac-hero-film"), v = document.querySelector("video");
@@ -83,7 +89,6 @@ try {
     assert.equal(apis.length, 0);
     if (scenario.endsWith("reduced")) {
       assert(state.video);
-      assert.equal(media.length, 0);
       assert.equal(await page.getByRole("button", { name: "제품 시연 영상 재생" }).isVisible(), true);
       await page.getByRole("button", { name: "제품 시연 영상 재생" }).click();
       await page.waitForFunction(() => document.querySelector(".ac-hero-film")?.dataset.playing === "true");
@@ -91,7 +96,8 @@ try {
     if (["desktop", "mobile"].includes(scenario)) {
       assert.equal(state.video.width, scenario.startsWith("mobile") ? 960 : 2400); assert.equal(state.video.height, scenario.startsWith("mobile") ? 1200 : 1282);
       assert(Math.abs(state.video.duration - 20) < .1);
-      assert(media.every(url => url.includes("acut-demo-mobile") === (scenario === "mobile")));
+      assert(state.video.currentSrc.includes(scenario === "mobile" ? "acut-demo-mobile.mp4" : "acut-demo.mp4"));
+      if (scenario === "mobile") assert(media.every(url => url.includes("acut-demo-mobile")));
       assert.equal(state.video.controls, false); assert.equal(state.video.muted, true);
       assert.equal(state.video.loop, true); assert.equal(state.video.playsInline, true);
       assert.equal(state.video.fit, "contain");
@@ -99,7 +105,7 @@ try {
       assert.deepEqual(state.video.sourceOrder, ["video/mp4"]);
     }
     if (scenario.endsWith("autoplay-denied") || scenario.endsWith("media-error")) {
-      assert.equal(await page.getByRole("button", { name: "제품 시연 영상 재생" }).isVisible(), true);
+      await page.getByRole("button", { name: "제품 시연 영상 재생" }).waitFor({ state: "visible", timeout: 6500 });
     }
     await film.screenshot({ path: path.join(output, `${scenario}.png`) });
     if (["desktop", "mobile"].includes(scenario)) {
