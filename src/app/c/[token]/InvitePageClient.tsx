@@ -62,7 +62,6 @@ export default function InvitePageClient() {
 
   useEffect(() => {
     if (!project) return;
-    if (project.status === "editing" || project.status === "editing_v2") { router.replace(`/c/${token}/locked`); return; }
     if (project.status === "confirmed")  { router.replace(`/c/${token}/confirmed`); return; }
     if (project.status === "delivered")  { router.replace(`/c/${token}/delivered`); return; }
   }, [project, token, router]);
@@ -105,7 +104,7 @@ export default function InvitePageClient() {
     );
   }
 
-  if (["editing", "editing_v2", "confirmed", "delivered"].includes(project.status)) return <LoadingScreen />;
+  if (["confirmed", "delivered"].includes(project.status)) return <LoadingScreen />;
 
   const introImageUrl = introImage?.photoId === coverPhotoId ? introImage.url : null;
   const entryPhotographerName = photographer?.name?.trim();
@@ -203,6 +202,37 @@ export default function InvitePageClient() {
             <dd>{revisionRemaining}회 요청 가능</dd>
           </div>
         </dl>
+      </CustomerInviteIntro>
+    );
+  }
+
+  /* ──────────────── editing / editing_v2 (보정·재보정 진행 중) ────────────────
+   * 예전에는 이 상태에서 이 화면 진입 자체를 막고 /locked로 튕겼다 — 그러면 /locked에서
+   * 로고를 눌러도 같은 화면으로 되돌아올 뿐이라 "처음으로" 이동이 항상 no-op이었다.
+   * 검토 CTA는 아직 검토할 보정본이 없으므로 비활성화하고, 대신 진행 상태를 보여준다.
+   * 원본 다운로드는 이 상태에서도 가능해야 하므로 그대로 유지한다. */
+  if (project.status === "editing" || project.status === "editing_v2") {
+    const isV2 = project.status === "editing_v2";
+    return (
+      <CustomerInviteIntro {...introCommonProps} actions={(
+        <>
+          <button type="button" className={styles.entryPrimary} disabled>
+            {isV2 ? "재보정 진행 중" : "보정 진행 중"}
+          </button>
+          <OriginalDownloadEntry token={token} variant="entry" />
+        </>
+      )}>
+        <div className={styles.introTextGroup}>
+          <p className={styles.projectLabel}>{project.name}</p>
+          <p className={styles.reviewEyebrow}>{isV2 ? "재보정 진행 중" : "보정 진행 중"}</p>
+          <h1 className={`${styles.entryTitle} ${styles.introTitle}`}>
+            {project.customerName ? `${project.customerName}님,` : "고객님,"}<br />
+            작가가 {isV2 ? "재보정" : "보정"}을 진행하고 있어요
+          </h1>
+          <p className={styles.entryDescription}>
+            {isV2 ? "재보정" : "보정"}이 끝나면 이 링크에서 검토 요청을 받으실 수 있어요.
+          </p>
+        </div>
       </CustomerInviteIntro>
     );
   }

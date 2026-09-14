@@ -166,7 +166,7 @@
   cursor: pointer;
 }
 
-.entryPrimary:disabled { cursor: not-allowed; }
+.entryPrimary:disabled { cursor: not-allowed; opacity: 0.45; }
 
 .invalidCanvas {
   display: flex;

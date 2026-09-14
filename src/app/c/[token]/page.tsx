@@ -25,7 +25,9 @@ export default async function InvitePage({
   }
 
   // 클라이언트 데이터 hydration 뒤 이동하지 않도록 서버에서 동일한 상태 라우팅을 확정한다.
-  if (status === "editing" || status === "editing_v2") redirect(`/c/${token}/locked`);
+  // editing/editing_v2는 여기서 튕기지 않는다 — InvitePageWrapper가 이 상태 전용 화면(검토
+  // CTA 비활성 + 원본 다운로드 유지)을 직접 그린다. /locked에서 로고를 눌러 돌아오는
+  // 유일한 목적지이므로, 여기서 다시 /locked로 되돌리면 로고 클릭이 항상 no-op이 된다.
   if (status === "confirmed") redirect(`/c/${token}/confirmed`);
   if (status === "delivered") redirect(`/c/${token}/delivered`);
 
