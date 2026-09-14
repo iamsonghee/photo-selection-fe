@@ -3,6 +3,11 @@
 import { Play } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+// 진단 정보는 브라우저 안에만 보관하며 서버로 전송하지 않는다.
+function recordPlayback(element: HTMLVideoElement, result: string) {
+  element.dispatchEvent(new CustomEvent("acut-playback", { detail: result }));
+}
+
 const POSTER = "/landing/hero/acut-demo-poster.webp";
 
 export function HeroVideo() {
@@ -16,6 +21,55 @@ export function HeroVideo() {
   const [reducedMotion, setReducedMotion] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [playbackBlocked, setPlaybackBlocked] = useState(false);
+
+  const [diagnostics, setDiagnostics] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("videoDebug") !== "1") return;
+    const element = video.current;
+    if (!element) return;
+    const events: string[] = [];
+    const update = (event?: Event) => {
+      if (event) {
+        events.push(`${Math.round(performance.now())}ms ${event.type}: ${event instanceof CustomEvent ? event.detail : ""}`);
+        if (events.length > 30) events.shift();
+      }
+      const rect = element.getBoundingClientRect();
+      setDiagnostics(JSON.stringify({
+        version: "hero-progress-v1", userAgent: navigator.userAgent,
+        reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+        visibility: document.visibilityState, viewport: [innerWidth, innerHeight],
+        bounds: [rect.x, rect.y, rect.width, rect.height],
+        source: element.currentSrc, time: element.currentTime,
+        paused: element.paused, muted: element.muted, inline: element.playsInline,
+        readyState: element.readyState, networkState: element.networkState,
+        error: element.error ? { code: element.error.code, message: element.error.message } : null,
+        events,
+      }, null, 2));
+    };
+    const names = ["loadstart", "loadedmetadata", "canplay", "playing", "pause", "waiting", "stalled", "error", "acut-playback"];
+    names.forEach(name => element.addEventListener(name, update));
+    const timer = setInterval(update, 1000);
+    return () => { clearInterval(timer); names.forEach(name => element.removeEventListener(name, update)); };
+  }, [mobile]);
+
+  // 재생 이벤트가 늦어도 실제 시간 진행을 확인해 남아 있는 재생 버튼을 숨긴다.
+  useEffect(() => {
+    const element = video.current;
+    if (!element) return;
+    let previous = element.currentTime;
+    const observeProgress = () => {
+      const current = element.currentTime;
+      if (!element.paused && !element.seeking && current !== previous &&
+          (!reducedMotionEnabled.current || manualPlayback.current)) {
+        setPlaying(true);
+        setPlaybackBlocked(false);
+      }
+      previous = current;
+    };
+    element.addEventListener("timeupdate", observeProgress);
+    return () => element.removeEventListener("timeupdate", observeProgress);
+  }, [mobile]);
 
   useEffect(() => {
     const viewport = window.matchMedia("(max-width: 767px)");
@@ -69,12 +123,19 @@ export function HeroVideo() {
     let inView = false;
     let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
 
+    let pending = false;
     const tryPlay = () => {
+      if (pending || (!element.paused && element.readyState >= 2)) return;
+      pending = true;
+      recordPlayback(element, "automatic request");
       element.play()?.then(() => {
-        if (!disposed) setPlaybackBlocked(false);
-      }).catch(() => {
-        if (!disposed) setPlaying(false);
-      });
+        if (!disposed) { recordPlayback(element, "automatic resolved"); setPlaybackBlocked(false); }
+      }).catch((error: unknown) => {
+        if (!disposed) {
+          recordPlayback(element, error instanceof Error ? `${error.name}: ${error.message}` : String(error));
+          if (element.paused) setPlaying(false);
+        }
+      }).finally(() => { pending = false; });
     };
     const scheduleFallback = () => {
       if (fallbackTimer) clearTimeout(fallbackTimer);
@@ -123,7 +184,11 @@ export function HeroVideo() {
     element.setAttribute("webkit-playsinline", "");
     setPlaybackBlocked(false);
     // 클릭 이벤트 안에서 곧바로 play()를 호출해야 iOS의 사용자 제스처 권한이 유지된다.
-    element.play()?.then(() => setPlaybackBlocked(false)).catch(() => setPlaybackBlocked(true));
+    recordPlayback(element, "manual request");
+    element.play()?.then(() => setPlaybackBlocked(false)).catch((error: unknown) => {
+      recordPlayback(element, error instanceof Error ? `${error.name}: ${error.message}` : String(error));
+      if (element.paused) setPlaybackBlocked(true);
+    });
   }, []);
 
   return (
@@ -162,6 +227,14 @@ export function HeroVideo() {
           </button>
         )}
       </div>
+      {diagnostics !== null && (
+        <details style={{ marginTop: 12, textAlign: "left" }}>
+          <summary>영상 재생 진단 · 펼쳐서 결과 복사</summary>
+          <textarea aria-label="영상 재생 진단 결과" readOnly value={diagnostics}
+            onFocus={event => event.currentTarget.select()}
+            style={{ width: "100%", height: 240, fontSize: 12, color: "#222", background: "#fff" }} />
+        </details>
+      )}
       <figcaption id="preview-caption">고객은 사진을 고르고 요청을 남기고, 작가는 선택 결과를 모아 확인합니다.</figcaption>
     </figure>
   );

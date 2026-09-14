@@ -38,13 +38,19 @@ try {
         return Promise.reject(new DOMException("Autoplay denied for verification", "NotAllowedError"));
       };
     });
-    await page.goto(`${origin}/landing`);
+    await page.goto(`${origin}/landing?videoDebug=1`);
     await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
     const film = page.locator(".ac-hero-film");
     await film.scrollIntoViewIfNeeded();
     await page.waitForFunction(() => document.querySelector(".ac-hero-poster")?.naturalWidth > 0);
     if (["desktop", "mobile"].includes(scenario)) {
       await page.waitForFunction(() => { const video = document.querySelector(".ac-hero-film video"); return video && !video.paused && video.readyState >= 2; });
+      const initialTime = await page.locator(".ac-hero-film video").evaluate(video => video.currentTime);
+      await page.waitForFunction(start => document.querySelector(".ac-hero-film video").currentTime > start + .3, initialTime);
+      assert.equal(await page.getByRole("button", { name: "제품 시연 영상 재생" }).count(), 0);
+      // 재생 도중 남은 오류 UI는 새 playing 이벤트 없이 시간 진행만으로 복구한다.
+      await page.locator(".ac-hero-film video").evaluate(video => video.dispatchEvent(new Event("error")));
+      await page.getByRole("button", { name: "제품 시연 영상 재생" }).waitFor({ state: "hidden" });
       for (let loop = 0; loop < 2; loop++) {
         await page.evaluate(() => { document.querySelector("video").currentTime = 19.65; });
         await page.waitForFunction(() => {
@@ -92,6 +98,10 @@ try {
     if (scenario.endsWith("autoplay-denied") || scenario.endsWith("media-error")) {
       await page.getByRole("button", { name: "제품 시연 영상 재생" }).waitFor({ state: "visible", timeout: 6500 });
     }
+    await page.waitForFunction(() => document.querySelector('textarea[aria-label="영상 재생 진단 결과"]')?.value.includes('"version": "hero-progress-v1"'));
+    if (scenario.endsWith("autoplay-denied")) {
+      assert((await page.locator('textarea[aria-label="영상 재생 진단 결과"]').inputValue()).includes("NotAllowedError"));
+    }
     await film.screenshot({ path: path.join(output, `${scenario}.png`) });
     if (["desktop", "mobile"].includes(scenario)) {
       await page.evaluate(() => { document.querySelector("video").currentTime = 18.6; });
@@ -128,6 +138,9 @@ try {
   const film = page.locator(".ac-hero-film");
   await film.scrollIntoViewIfNeeded();
   await page.waitForFunction(() => { const video = document.querySelector(".ac-hero-film video"); return video && !video.paused && video.readyState >= 2; });
+  const initialTime = await page.locator(".ac-hero-film video").evaluate(video => video.currentTime);
+  await page.waitForFunction(start => document.querySelector(".ac-hero-film video").currentTime > start + .3, initialTime);
+  assert.equal(await page.getByRole("button", { name: "제품 시연 영상 재생" }).count(), 0);
   const state = await page.locator(".ac-hero-film video").evaluate(video => ({
     currentSrc: video.currentSrc,
     paused: video.paused,
