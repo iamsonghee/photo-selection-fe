@@ -4449,6 +4449,7 @@ export default function ProjectDetailPage() {
         accessPin={project.accessPin}
         pending={inviteActivating}
         onRequest={handleEnableClientAccess}
+        onSavePin={handleSavePin}
       />
 
       {/* ── EDIT GUIDE MODAL — 공용 PhotographerModal 재사용 ── */}

@@ -2191,6 +2191,20 @@ export default function WorkflowPageClient({
     setReviewDeadlineModal(null);
   }
 
+  /** CustomerInviteShareModal의 인라인 PIN 편집이 위임하는 저장 — upload 페이지의
+   * 같은 콜백과 동일한 계약이다(실패하면 던져서 모달 안 에러 문구로 보여준다). */
+  async function handleSavePin(newPin: string | null) {
+    if (!project) return;
+    const res = await fetch(`/api/photographer/projects/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ access_pin: newPin }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((data as { error?: string }).error ?? "저장 실패");
+    setProject((prev) => prev ? { ...prev, accessPin: newPin } : null);
+  }
+
   // 본문 그리드용 카드 인덱스를 viewer 인덱스에 맞추기 위해 filteredRows 사용
   // 원본 갤러리와 동일한 최소 카드 폭(218px)과 간격(12px)을 사용한다.
   // 고정 breakpoint 상한을 두지 않아 넓은 화면에서는 7열 이상도 자연스럽게 표시된다.
@@ -3067,6 +3081,7 @@ export default function WorkflowPageClient({
         onClose={closeReviewDeadlineModal}
         inviteUrl={inviteUrl}
         accessPin={project?.accessPin}
+        onSavePin={handleSavePin}
       />
     </div>
   );
