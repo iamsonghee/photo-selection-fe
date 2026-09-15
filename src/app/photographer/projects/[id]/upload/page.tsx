@@ -75,7 +75,11 @@ const PC_CONCURRENCY = 5;
 // 일반 데스크톱은 4개, CPU·메모리·회선 힌트가 충분한 경우에만 6개까지 사용한다.
 const ORIGINAL_PC_CONCURRENCY = 4;
 const ORIGINAL_PC_CONCURRENCY_FAST = 6;
-const MOBILE_BATCH_SIZE = 3;
+/* XHR은 1개로 묶여 있어(MOBILE_CONCURRENCY) 매 요청의 고정비(인증·DB 왕복)가
+ * batch가 클수록 더 많은 파일에 나눠진다. 서버의 파일별 처리 세마포어가 요청당
+ * 5장 동시 처리라(UPLOAD_PHOTOS_CONCURRENCY, be/app/routers/upload.py), 3장이면
+ * 그 병렬 처리량의 일부만 쓰고 만다 — 5로 맞춰 요청당 서버 병렬성을 그대로 채운다. */
+const MOBILE_BATCH_SIZE = 5;
 const MOBILE_CONCURRENCY = 1;
 const INVITE_ORIGINAL_PROCESSING_MAX_ATTEMPTS = 15;
 const INVITE_ORIGINAL_PROCESSING_RETRY_MS = 1000;
@@ -147,6 +151,19 @@ function getDesktopCompressionConcurrency(): number {
   const memoryGiB = device.deviceMemory ?? 4;
   if (cores >= 8 && memoryGiB >= 8) return 3;
   return cores >= 4 && memoryGiB >= 4 ? 2 : 1;
+}
+
+/**
+ * 모바일 압축 워커 풀 — XHR 동시성(MOBILE_CONCURRENCY)과는 완전히 별개다.
+ * XHR을 1개로 묶은 건 iOS WKWebView가 동시 요청 중엔 화면을 안 그려주던 버그를
+ * 고치기 위해서였고(§업로드 문서, 5·6차 수정), 압축은 그 요청이 나가기 *전* 단계라
+ * 여기 풀을 늘려도 그 버그와 무관하다.
+ * Device Memory API는 iOS Safari가 아예 지원하지 않는다(deviceMemory === undefined) —
+ * 그 경우 기존처럼 1을 유지해 안전지대를 벗어나지 않고, 지원하는 Android에서만
+ * 4GiB 이상일 때 2로 올린다. */
+function getMobileCompressionConcurrency(): number {
+  const memoryGiB = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  return memoryGiB !== undefined && memoryGiB >= 4 ? 2 : 1;
 }
 
 /* 500도 재시도한다. 서버의 500은 대부분 **일시적 네트워크 오류**(Supabase 조회 중 읽기 실패
@@ -2129,7 +2146,7 @@ export default function ProjectDetailPage() {
       };
 
       const producer = (async () => {
-        const compressionWorkers = mobileUploadClient ? 1 : (inclOrig ? getDesktopCompressionConcurrency() : 2);
+        const compressionWorkers = mobileUploadClient ? getMobileCompressionConcurrency() : (inclOrig ? getDesktopCompressionConcurrency() : 2);
         const batchesPerCompressionRound = inclOrig && !mobileUploadClient ? compressionWorkers : 1;
         let nextTokenRefreshAt = refreshInterval;
         for (let groupStart = 0; groupStart < totalBatches; groupStart += batchesPerCompressionRound) {
