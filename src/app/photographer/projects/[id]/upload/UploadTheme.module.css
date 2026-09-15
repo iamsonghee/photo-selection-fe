@@ -12,9 +12,9 @@
 .workspace :global(.prj-ai-control) { height:36px; font-size:12px; padding:0 12px; }
 .workspace :global(.prj-ai-chip) { min-height:36px; font-size:12px; }
 .workspace :global(.prj-gallery-query-tools) { flex-basis:100%; justify-content:space-between; border-top:1px solid var(--border-subtle); padding:12px 0 0; gap:16px; }
-.workspace :global(.prj-gallery-search) { width:min(400px,100%); min-width:140px; height:40px; padding:0 12px; gap:8px; border-color:var(--border-subtle); background:var(--surface-raised); }
-.workspace :global(.prj-gallery-search) svg { width:16px; flex-shrink:0; }
-.workspace :global(.prj-gallery-search) input { font-size:13px; }
+/* 색·테두리·아이콘·placeholder는 FilenameSearchInput(fsi-root)이 고정한다 — 이 업로드
+ * 전용 스코프에서는 --fsi-* 변수로 크기·밀도만 나머지 툴바(정렬 40px 등)에 맞춘다. */
+.workspace :global(.prj-gallery-search) { --fsi-width: min(400px, 100%); --fsi-height: 40px; --fsi-gap: 8px; min-width:140px; padding:0 12px; }
 .workspace :global(.prj-gallery-display-tools) { border:0; padding:0; gap:8px; }
 .workspace :global(.prj-gallery-sort) { height:40px; padding:0 10px; border-color:var(--border-subtle); }
 .workspace :global(.prj-gallery-sort) select { font-size:12px; }
