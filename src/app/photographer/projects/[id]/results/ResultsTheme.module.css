@@ -87,7 +87,10 @@
   outline-offset: 2px;
 }
 
-.search { width: clamp(160px, 20vw, 280px); }
+/* 색·테두리·placeholder는 FilenameSearchInput(fsi-root)이 고정한다 — 여기서는
+ * --fsi-* 변수로 이 툴바 자리에 맞는 크기만 넘긴다(.control이 sort 등 다른 컨트롤과도
+ * 공유돼 그쪽까지 손대지 않도록 이 클래스에서만 지정한다). */
+.search { --fsi-width: clamp(160px, 20vw, 280px); --fsi-height: 44px; --fsi-radius: 8px; --fsi-gap: 18px; --fsi-font-size: 14px; }
 
 .resultsScroll {
   min-height: 0;

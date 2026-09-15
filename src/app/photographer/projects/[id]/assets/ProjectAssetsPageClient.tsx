@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import { useParams, useRouter } from "next/navigation";
 import {
   AlertTriangle, Check, ChevronDown, ChevronLeft, Clipboard, Download,
-  Loader2, Search, Sparkles, X,
+  Loader2, Sparkles,
 } from "lucide-react";
 import { PhotographerLightPageFrame } from "@/components/layout/PhotographerLightPageHeader";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -23,6 +23,7 @@ import { PhotoAnalysisFilterGroup } from "@/components/photographer/PhotoAnalysi
 import { ViewerCommentPanel } from "@/components/photographer/ViewerCommentPanel";
 import { ProjectAssetStatusActionBar } from "@/components/photographer/ProjectAssetStatusActionBar";
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
+import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { useProjectAssetsData } from "@/components/photographer/ProjectAssetsDataProvider";
 import { usePriorityImagePreload } from "@/lib/gallery-filter";
 import { getPhotoDisplayFilename } from "@/lib/photo-display-filename";
@@ -627,10 +628,7 @@ export default function ProjectAssetsPageClient({
             <div className="hidden md:contents">
               {/* 자주 쓰는 파일명 복사는 다운로드 메뉴를 열지 않고 바로 실행한다. */}
               {activeTab === "selected" ? <ProjectAssetToolbarButton onClick={handleCopyClipboard} disabled={selectedPhotos.length === 0}><Clipboard size={16} />파일명 복사</ProjectAssetToolbarButton> : null}
-              <label className={`${styles.control} ${styles.search} flex items-center gap-[18px] px-5`}>
-                <Search size={20} className="shrink-0 text-subtle-foreground" />
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="파일명 검색" className="min-w-0 flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-placeholder-foreground" aria-label="파일명 검색" />
-              </label>
+              <FilenameSearchInput value={query} onChange={setQuery} className={styles.search} />
               <label className={`${styles.control} flex shrink-0 items-center gap-2 px-5`}>
                 <span className="sr-only">정렬</span>
                 <select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)} className="appearance-none bg-transparent pr-5 text-[14px] outline-none">
@@ -694,22 +692,12 @@ export default function ProjectAssetsPageClient({
             <div className="space-y-5 py-5">
               <section aria-labelledby="mobile-filename-search-title">
                 <h3 id="mobile-filename-search-title" className="mb-2 text-[14px] font-semibold text-foreground">파일명 검색</h3>
-                <label className="flex h-12 items-center gap-3 rounded-lg border border-border bg-surface px-4 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/10">
-                  <Search size={18} className="shrink-0 text-subtle-foreground" aria-hidden />
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="파일명을 입력하세요"
-                    className="min-w-0 flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-placeholder-foreground"
-                    aria-label="파일명 검색"
-                  />
-                  {query ? (
-                    <button type="button" onClick={() => setQuery("")} className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground" aria-label="검색어 지우기">
-                      <X size={16} aria-hidden />
-                    </button>
-                  ) : null}
-                </label>
+                <FilenameSearchInput
+                  value={query}
+                  onChange={setQuery}
+                  placeholder="파일명을 입력하세요"
+                  style={{ "--fsi-height": "48px", "--fsi-radius": "8px" } as React.CSSProperties}
+                />
               </section>
 
               <section className="border-t border-border-subtle pt-5" aria-labelledby="mobile-sort-title">

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
-import { Star, ChevronsDown, ChevronsUp, Layers, RotateCcw, Search } from "lucide-react";
+import { Star, ChevronsDown, ChevronsUp, Layers, RotateCcw } from "lucide-react";
+import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { COLOR_OPTIONS } from "@/lib/gallery-filter";
 import type { ColorTag, SortOrder } from "@/types";
@@ -281,16 +282,13 @@ export function GalleryDesktopHeader({
               </button>
             </div>
 
-            <label className="gld-search">
-              <Search size={13} strokeWidth={1.8} aria-hidden />
-              <input
-                type="text"
-                placeholder="파일명 검색 (쉼표로 여러 개)"
-                value={searchValue}
-                onChange={(event) => onSearchValueChange(event.target.value)}
-                aria-label="파일명으로 필터링"
-              />
-            </label>
+            <FilenameSearchInput
+              value={searchValue}
+              onChange={onSearchValueChange}
+              placeholder="파일명 검색 (쉼표로 여러 개)"
+              className="gld-search"
+              style={{ "--fsi-height": "32px", "--fsi-input-width": "180px" } as React.CSSProperties}
+            />
           </div>
           </div>
         </div>
@@ -598,35 +596,6 @@ export function GalleryDesktopHeader({
           gap: 4px;
         }
 
-        .gld-search {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          height: 28px;
-          padding: 0 10px;
-          border: 1px solid var(--customer-divider);
-          border-radius: 6px;
-          color: var(--customer-ink-secondary);
-        }
-        .gld-search:focus-within {
-          border-color: var(--accent);
-        }
-        .gld-search input {
-          width: 180px;
-          border: none;
-          outline: none;
-          background: transparent;
-          font-size: 12px;
-          color: var(--customer-ink);
-        }
-        .gld-search input::placeholder {
-          /* 아이콘·테두리에 쓰는 ink-secondary(#5f5e5b)를 placeholder에도 그대로 쓰면
-           * "아직 아무것도 안 친 빈 칸"이 이미 값이 채워진 것처럼 짙게 보여 비활성 필드로
-           * 오인된다(실측: 이 색 조합이 작가 쪽 검색창들보다 눈에 띄게 어두웠다) — placeholder만
-           * 더 옅게 낮춰 빈 상태와 입력된 상태가 한눈에 구분되게 한다. */
-          color: color-mix(in srgb, var(--customer-ink-secondary) 55%, transparent);
-        }
-
         @media (max-width: 767px) {
           .gld-header {
             display: none !important;
@@ -636,7 +605,6 @@ export function GalleryDesktopHeader({
         .gld-inline-tools { flex:1 1 640px; min-width:0; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 16px; }
         .gld-inline-tools .gld-filter-left, .gld-inline-tools .gld-filter-right { flex-wrap:wrap; }
         .gld-inline-tools .gld-star-btn { width:24px; height:32px; }
-        .gld-inline-tools .gld-search { height:32px; }
         .gld-active-filters { max-width:1440px; margin:auto; background:var(--customer-canvas); display:flex; flex-wrap:wrap; gap:8px; padding:8px 24px; }
         .gld-active-filters button { border:1px solid var(--customer-divider); border-radius:16px; padding:5px 10px; font-size:12px; }
       `}</style>

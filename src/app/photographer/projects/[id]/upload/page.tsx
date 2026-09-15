@@ -37,6 +37,7 @@ import { CustomerInviteShareModal } from "@/components/photographer/CustomerInvi
 import { CustomerSelectionRequestModal } from "@/components/photographer/CustomerSelectionRequestModal";
 import GeminiAnalysisPanel from "@/components/photographer/GeminiAnalysisPanel";
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
+import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { PhotographerConfirmDialog } from "@/components/ui/PhotographerConfirmDialog";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { PhotographerFormActionBar } from "@/components/photographer/PhotographerFormActionBar";
@@ -3215,10 +3216,9 @@ export default function ProjectDetailPage() {
         .prj-ai-control:focus-visible { outline: 2px solid rgba(var(--accent-rgb), 0.24); outline-offset: 2px; }
         .prj-ai-control:disabled { cursor: wait; opacity: 0.62; }
         .prj-ai-control-processing { color: var(--muted-foreground); }
-        .prj-gallery-search { width: min(500px, 28vw); height: 44px; padding: 0 20px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--subtle-foreground); display: flex; align-items: center; gap: 18px; }
-        .prj-gallery-search:focus-within { border-color: var(--border-strong); box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.08); }
-        .prj-gallery-search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: var(--foreground); font: inherit; font-size: 14px; line-height: 24px; letter-spacing: -0.45px; }
-        .prj-gallery-search input::placeholder { color: var(--placeholder-foreground); }
+        /* 색·테두리·placeholder는 FilenameSearchInput(fsi-root)이 고정한다 — 여기서는
+         * --fsi-* 변수로 이 툴바 자리에 맞는 크기만 넘긴다. */
+        .prj-gallery-search { --fsi-width: min(500px, 28vw); --fsi-height: 44px; --fsi-gap: 18px; --fsi-radius: 8px; --fsi-font-size: 14px; }
         .prj-gallery-sort { height: 44px; padding: 0 16px 0 20px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted-foreground); display: flex; align-items: center; gap: 8px; }
         .prj-gallery-sort select { appearance: none; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; font-size: 14px; line-height: 24px; letter-spacing: -0.45px; cursor: pointer; }
         .prj-gallery-view-switch { height: 44px; display: inline-flex; align-items: stretch; }
@@ -3244,7 +3244,7 @@ export default function ProjectDetailPage() {
           .prj-gallery-analysis { padding-left: 12px; }
           .prj-gallery-query-tools { gap: 8px; }
           .prj-gallery-display-tools { padding-left: 8px; }
-          .prj-gallery-search { width: min(320px, 24vw); }
+          .prj-gallery-search { --fsi-width: min(320px, 24vw); }
           .prj-ai-control { padding-inline: 12px; }
           .prj-list-table { width: calc(100% - 48px); margin-inline: auto; }
           .prj-list-header, .prj-list-row { grid-template-columns: 18px minmax(220px, 1fr) 112px 136px; padding-inline: 24px; gap: 16px; }
@@ -3690,10 +3690,11 @@ export default function ProjectDetailPage() {
                     </div>
                   </div>
                   <div className="prj-gallery-query-tools px-1">
-                    <label className="prj-gallery-search">
-                      <Search size={20} aria-hidden />
-                      <input value={photoSearch} onChange={(event) => setPhotoSearch(event.target.value)} placeholder="파일명 검색" aria-label="파일명 검색" />
-                    </label>
+                    <FilenameSearchInput
+                      value={photoSearch}
+                      onChange={setPhotoSearch}
+                      className="prj-gallery-search"
+                    />
                     <div className="prj-gallery-display-tools">
                       <label className="prj-gallery-sort">
                         <select value={photoSort} onChange={(event) => setPhotoSort(event.target.value as PhotoSort)} aria-label="사진 정렬">

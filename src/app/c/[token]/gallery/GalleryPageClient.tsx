@@ -24,6 +24,7 @@ import {
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { SimilarityToggleButton } from "@/components/ui/SimilarityToggleButton";
+import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import {
   appendGalleryScrollQuery,
   buildFilterQueryString,
@@ -990,8 +991,6 @@ export default function GalleryPageClient() {
           .gl-mobile-similarity-hint button { position: absolute; top: 3px; right: 3px; width: 32px; height: 38px; padding: 0; border: 0; background: transparent; color: rgba(255,255,255,.65); display: grid; place-items: center; }
           .gl-mobile-filter-count { position: absolute; top: -6px; right: -6px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 999px; background: #ff4d00; color: #fff; font-size: 8px; line-height: 14px; font-weight: 700; text-align: center; pointer-events: none; }
           .gl-mobile-search-row { height: 51px; padding: 7px 20px 8px; background: #fff; }
-          .gl-mobile-search-box { height: 36px; border: 1px solid #ff4d00; border-radius: 4px; display: flex; align-items: center; gap: 8px; padding: 0 10px; }
-          .gl-mobile-search-box input { min-width: 0; flex: 1; border: 0; outline: 0; color: #26282c; font: 12px/19px Pretendard, sans-serif; background: transparent; }
           .gl-mobile-active-filters { min-height: 37px; padding: 4px 20px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; background: #fff; }
           .gl-mobile-active-filters::-webkit-scrollbar { display: none; }
           .gl-mobile-filter-chip { height: 29px; padding: 0 8px 0 12px; border: 1px solid #838b94; border-radius: 999px; background: #fff; color: #191918; display: flex; align-items: center; gap: 5px; flex: 0 0 auto; font: 12px/19px Pretendard, sans-serif; }
@@ -1240,11 +1239,13 @@ export default function GalleryPageClient() {
           )}
           {mobileSearchOpen && (
             <div className="gl-mobile-search-row">
-              <label className="gl-mobile-search-box">
-                <Search size={14} color="#aab0b8" aria-hidden />
-                <input autoFocus type="search" value={searchValue} onChange={(event) => setSearchValue(event.target.value)} placeholder="파일명 검색" aria-label="파일명으로 필터링" />
-                {searchValue && <button type="button" onClick={() => setSearchValue("")} aria-label="검색어 지우기" style={{ border: 0, background: "transparent", padding: 4, display: "grid", placeItems: "center" }}><X size={14} /></button>}
-              </label>
+              <FilenameSearchInput
+                value={searchValue}
+                onChange={setSearchValue}
+                ariaLabel="파일명으로 필터링"
+                autoFocus
+                style={{ "--fsi-height": "36px", "--fsi-border-color": "#ff4d00", "--fsi-radius": "4px" } as React.CSSProperties}
+              />
             </div>
           )}
           {mobileFilterChipsVisible && (
