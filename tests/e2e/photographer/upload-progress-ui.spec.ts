@@ -141,7 +141,7 @@ for (const viewport of scenarios) {
         expect(await page.evaluate(() => (window as unknown as { putCount: number }).putCount)).toBe(6);
         return;
       }
-      const status = viewport.width < 768 ? page.locator(".prj-mobile-progress [role=status]") : page.locator(".prj-upload-compact");
+      const status = viewport.width < 768 ? page.locator(".prj-mobile-progress [role=status]") : page.locator(".prj-upload-bottom-status");
       await advance(0.25);
       await expect(status).toContainText(/원본 전송 중 · 2[45]%/, { timeout: 20_000 });
       await expect(status).toContainText("0/1장 저장 완료");

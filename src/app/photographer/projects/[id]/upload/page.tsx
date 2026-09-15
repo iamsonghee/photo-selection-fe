@@ -3647,33 +3647,10 @@ export default function ProjectDetailPage() {
                       </div>
                     </div>
                     <div className="prj-gallery-analysis">
-                      {isUploading ? (
-                        <div className="prj-upload-compact" role="status" aria-live="polite">
-                          {showServerWorking ? (
-                            <Loader2 size={20} className="shrink-0 animate-spin text-accent" aria-hidden />
-                          ) : (
-                            <svg className="prj-upload-ring" viewBox="0 0 20 20" aria-hidden>
-                              <circle className="prj-upload-ring-track" cx="10" cy="10" r="8" />
-                              <circle
-                                className="prj-upload-ring-value"
-                                cx="10"
-                                cy="10"
-                                r="8"
-                                strokeDasharray="50.27"
-                                strokeDashoffset={50.27 * (1 - Math.min(100, overallProgress) / 100)}
-                              />
-                            </svg>
-                          )}
-                          <div className="prj-upload-compact-copy">
-                            <strong>{uploadStatusLabel}</strong>
-                            {uploadSavedLabel ? <span>{uploadSavedLabel}</span> : null}
-                            {uploadEtaLabel && !uploadStopRequested ? <span>{uploadEtaLabel}</span> : null}
-                          </div>
-                          <button type="button" className="prj-upload-stop" onClick={handleStopUpload} disabled={uploadStopRequested}>
-                            {uploadStopRequested ? "중단 중" : "중단"}
-                          </button>
-                        </div>
-                      ) : canUploadOriginals(project.status) ? (
+                      {/* 업로드 진행 현황은 하단 바로 옮겼다 — 그 자리는 업로드 중엔 어차피
+                        * "사진 추가"·초대 버튼이 비활성으로 노는 자리라(§PhotographerFormActionBar),
+                        * 같은 정보를 화면 위아래 두 곳에 겹쳐 보여줄 이유가 없다. */}
+                      {isUploading ? null : canUploadOriginals(project.status) ? (
                         /* AI 버튼과 유사컷 토글은 **서로 대체하지 않는다**.
                          * 예전에는 삼항으로 갈라 분석이 끝나면 버튼이 토글로 바뀌었는데, 그러면
                          * 분석 이후 AI 진입점이 화면에서 사라져 품질 확인을 시작할 방법이 없었다.
@@ -4060,11 +4037,38 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
-      {/* 업로드 화면의 주요 행동도 생성·수정 화면과 동일한 공통 하단 액션 영역에서 관리한다. */}
+      {/* 업로드 화면의 주요 행동도 생성·수정 화면과 동일한 공통 하단 액션 영역에서 관리한다.
+        * 업로드 중에는 "사진 추가"·초대 버튼 둘 다 어차피 비활성이라(§isUploading), 그 자리에
+        * "사진 업로드 중…"이라는 죽은 문구만 있었다 — 그 자리를 실제 진행률로 채운다.
+        * 예전엔 이 정보가 갤러리 위 toolbar에도 따로 떠서, 화면 위아래에 같은 걸 두 번
+        * 보여주고 있었다(§prj-gallery-analysis). */}
       <PhotographerFormActionBar
         maxWidth={1920}
         className="shrink-0"
-        leading={mobilePhotoManageMode ? undefined : (
+        leading={mobilePhotoManageMode ? undefined : isUploading ? (
+          <div className="prj-upload-bottom-status flex items-center gap-3" role="status" aria-live="polite">
+            {showServerWorking ? (
+              <Loader2 size={22} className="shrink-0 animate-spin text-accent" aria-hidden />
+            ) : (
+              <svg className="prj-upload-ring" viewBox="0 0 20 20" aria-hidden>
+                <circle className="prj-upload-ring-track" cx="10" cy="10" r="8" />
+                <circle
+                  className="prj-upload-ring-value"
+                  cx="10"
+                  cy="10"
+                  r="8"
+                  strokeDasharray="50.27"
+                  strokeDashoffset={50.27 * (1 - Math.min(100, overallProgress) / 100)}
+                />
+              </svg>
+            )}
+            <div className="prj-upload-compact-copy">
+              <strong>{uploadStatusLabel}</strong>
+              {uploadSavedLabel ? <span>{uploadSavedLabel}</span> : null}
+              {uploadEtaLabel && !uploadStopRequested ? <span>{uploadEtaLabel}</span> : null}
+            </div>
+          </div>
+        ) : (
           <div>
             <p className="text-sm font-bold text-foreground">
               원본 {M.toLocaleString()}장
@@ -4093,6 +4097,16 @@ export default function ProjectDetailPage() {
               ? `선택한 사진 ${selectedPhotoIds.size.toLocaleString()}장 삭제`
               : "삭제할 사진을 선택하세요"}
           </PhotographerLightButton>
+        ) : isUploading ? (
+          <PhotographerLightButton
+            type="button"
+            variant="secondary"
+            onClick={handleStopUpload}
+            disabled={uploadStopRequested}
+            className="min-w-[129px]"
+          >
+            {uploadStopRequested ? "중단 중…" : "업로드 중단"}
+          </PhotographerLightButton>
         ) : (
           <>
             {photoUploadAllowed && displayPhotos.length > 0 ? (
@@ -4100,7 +4114,7 @@ export default function ProjectDetailPage() {
                 type="button"
                 variant="secondary"
                 onClick={requestOpenFilePicker}
-                disabled={isUploading || isPreparingFiles}
+                disabled={isPreparingFiles}
               >
                 <ImagePlus size={15} />사진 추가
               </PhotographerLightButton>
