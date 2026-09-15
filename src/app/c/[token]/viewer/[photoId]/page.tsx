@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Star, ArrowLeft, Check, Layers, MessageSquare, X } from "lucide-react";
@@ -340,20 +340,82 @@ export default function ViewerPage() {
   const mobileCommentRef = useRef<HTMLTextAreaElement>(null);
   const filmstripSeenRef = useRef(false); // 마운트 후 첫 실행 여부 추적
 
+  /* ── PC 필름스트립 윈도우 렌더링 ──────────────────────────────────────
+   * 예전엔 filteredPhotos 전체를 실 DOM으로 그렸다 — 베타 사용자 프로젝트 사진 한도가
+   * 2000장(§beta-limits)이라 "수천 장"은 가정이 아니라 실제 지원 범위였고, 그 규모에서
+   * 매번 수천 개 DOM 노드를 레이아웃하는 비용이 그대로 쌓인다.
+   * 지금 위치 기준 앞뒤 RADIUS장만 그린다 — 최대 3000장 프로젝트도 실 DOM은 최대
+   * RADIUS*2+1개로 고정된다. 클릭/이전·다음 이동은 이 창을 그대로 재중심화하고,
+   * 클릭 없이 직접 끝까지 드래그해 훑어보는 경우만 스크롤이 가장자리에 닿을 때
+   * 그 방향으로 이어붙인다(무한 스크롤과 같은 모양). */
+  const FILMSTRIP_THUMB_W = 150;
+  const FILMSTRIP_GAP = 16;
+  const FILMSTRIP_STEP = FILMSTRIP_THUMB_W + FILMSTRIP_GAP;
+  const FILMSTRIP_WINDOW_RADIUS = 60;
+  const FILMSTRIP_GROW_BATCH = 60;
+  const FILMSTRIP_EDGE_PX = FILMSTRIP_STEP * 3;
+
+  const filmstripAnchor = navAnchorIndex >= 0 ? navAnchorIndex : 0;
+  /* 재중심 창은 navAnchorIndex의 순수 파생값이다 — state+effect로 만들면 "새 창 계산 →
+   * 리렌더 → 그제서야 스크롤"의 한 프레임 사이에 옛 창(다른 스크롤 폭) 기준으로 스크롤
+   * 명령이 나가 버려, 정확히 이 작업의 발단이 된 "처음 위치에서 밀려오는" 증상을 스스로
+   * 만든다. useMemo로 같은 렌더 안에서 확정해야 그 프레임이 아예 생기지 않는다. */
+  const filmstripRecenteredWindow = useMemo(() => ({
+    start: Math.max(0, filmstripAnchor - FILMSTRIP_WINDOW_RADIUS),
+    end: Math.min(filteredPhotos.length, filmstripAnchor + FILMSTRIP_WINDOW_RADIUS + 1),
+  }), [filmstripAnchor, filteredPhotos.length]);
+  /* 클릭 없이 자유 스크롤로 훑어볼 때만 늘어나는 여분 — 사진을 이동하면(navAnchorIndex
+   * 변경) 그 즉시 원래 폭으로 되돌아간다. */
+  const [filmstripManualExpand, setFilmstripManualExpand] = useState({ before: 0, after: 0 });
+  useEffect(() => {
+    setFilmstripManualExpand({ before: 0, after: 0 });
+  }, [filmstripAnchor]);
+  const filmstripWindow = useMemo(() => ({
+    start: Math.max(0, filmstripRecenteredWindow.start - filmstripManualExpand.before),
+    end: Math.min(filteredPhotos.length, filmstripRecenteredWindow.end + filmstripManualExpand.after),
+  }), [filmstripRecenteredWindow, filmstripManualExpand, filteredPhotos.length]);
+  const filmstripPhotos = useMemo(
+    () => filteredPhotos.slice(filmstripWindow.start, filmstripWindow.end),
+    [filteredPhotos, filmstripWindow.start, filmstripWindow.end]
+  );
+
   useEffect(() => {
     const container = filmstripRef.current;
     if (!container) return;
-    const THUMB_W = 150;
-    const GAP     = 16;
-    const step    = THUMB_W + GAP;
-    // 비대표 멤버를 미리보기 중이면 메인 필름스트립엔 없으므로(navAnchorIndex) 그룹 대표컷 위치로 스크롤
-    const anchor  = navAnchorIndex >= 0 ? navAnchorIndex : 0;
-    const target  = anchor * step - container.clientWidth / 2 + THUMB_W / 2;
+    // filmstripWindow는 navAnchorIndex와 같은 렌더에서 확정되므로, 이 시점의 DOM은
+    // 이미 새 창 기준으로 그려져 있다 — 옛 창을 향해 스크롤한 뒤 다시 보정하지 않는다.
+    const relativeIndex = filmstripAnchor - filmstripWindow.start;
+    const target = relativeIndex * FILMSTRIP_STEP - container.clientWidth / 2 + FILMSTRIP_THUMB_W / 2;
     // 첫 마운트(갤러리→뷰어 진입)는 instant, 이후 사진 전환은 smooth
     const behavior = filmstripSeenRef.current ? "smooth" : "instant";
     filmstripSeenRef.current = true;
     container.scrollTo({ left: Math.max(0, target), behavior });
-  }, [navAnchorIndex]);
+  }, [navAnchorIndex, filmstripWindow.start]);
+
+  /* 가장자리 근처까지 자유 스크롤하면 그 방향으로 창을 넓힌다. 앞쪽(start)을 넓히는
+   * 건 기존 항목들 앞에 새 항목을 끼워 넣는 것이라 scrollLeft가 그만큼 밀린다 —
+   * 늘어난 폭을 그대로 더해 보정한다(뒤쪽 확장은 끝에 붙기만 하므로 보정 불필요). */
+  const prevFilmstripStartRef = useRef(filmstripWindow.start);
+  useLayoutEffect(() => {
+    const container = filmstripRef.current;
+    const prevStart = prevFilmstripStartRef.current;
+    if (container && prevStart > filmstripWindow.start) {
+      container.scrollLeft += (prevStart - filmstripWindow.start) * FILMSTRIP_STEP;
+    }
+    prevFilmstripStartRef.current = filmstripWindow.start;
+  }, [filmstripWindow.start]);
+
+  const handleFilmstripScroll = useCallback(() => {
+    const container = filmstripRef.current;
+    if (!container) return;
+    if (container.scrollLeft <= FILMSTRIP_EDGE_PX && filmstripWindow.start > 0) {
+      setFilmstripManualExpand((current) => ({ ...current, before: current.before + FILMSTRIP_GROW_BATCH }));
+    }
+    const distanceFromEnd = container.scrollWidth - container.clientWidth - container.scrollLeft;
+    if (distanceFromEnd <= FILMSTRIP_EDGE_PX && filmstripWindow.end < filteredPhotos.length) {
+      setFilmstripManualExpand((current) => ({ ...current, after: current.after + FILMSTRIP_GROW_BATCH }));
+    }
+  }, [filmstripWindow.start, filmstripWindow.end, filteredPhotos.length]);
 
   /* 기본 상태는 필름스트립 대신 얇은 위치 인디케이터를 쓰므로, 썸네일 행은
    * "유사컷 그룹을 펼쳐서 멤버를 골라야 하는" 경우에만 필요하다. */
@@ -1540,8 +1602,10 @@ export default function ViewerPage() {
             ref={filmstripRef}
             className="fs-hide-scrollbar"
             style={{ display: "flex", gap: 12, overflowX: "auto", width: "100%", padding: "14px 0", alignItems: "center" }}
+            onScroll={handleFilmstripScroll}
           >
-            {filteredPhotos.map((photo, i) => {
+            {filmstripPhotos.map((photo, windowIndex) => {
+              const i = filmstripWindow.start + windowIndex;
               const isActive  = i === navAnchorIndex;
               const thumbSrc  = photo.url; // r2_thumb_url — 필름스트립은 썸네일로 충분
               const thumbName = getPhotoDisplayName(photo);
