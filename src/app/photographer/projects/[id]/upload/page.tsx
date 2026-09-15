@@ -822,11 +822,6 @@ export default function ProjectDetailPage() {
       .catch(() => {});
   }, []);
 
-  const [showPinModal, setShowPinModal] = useState(false);
-  const [pinInput, setPinInput] = useState("");
-  const [pinVisible, setPinVisible] = useState(false);
-  const [pinSaving, setPinSaving] = useState(false);
-  const [pinError, setPinError] = useState("");
   const [inviteActivating, setInviteActivating] = useState(false);
   const [inviteOriginalsProcessing, setInviteOriginalsProcessing] = useState(false);
   const [inviteShareModalOpen, setInviteShareModalOpen] = useState(false);
@@ -942,10 +937,12 @@ export default function ProjectDetailPage() {
       return next;
     });
   }, []);
-  /* 기본값은 **둘 다 켜짐**이다. 비워 두면 대부분 그대로 닫아 지금(버튼을 못 찾는 상태)과
-   * 같아진다 — 켜 두면 "보이는 자동 실행 + 끌 수 있음"이 되어 작가의 통제권은 그대로다. */
+  /* 기본값은 **유사컷 묶기만 켬**이다. 비워 두면 대부분 그대로 닫아 지금(버튼을 못 찾는 상태)과
+   * 같아진다 — 켜 두면 "보이는 자동 실행 + 끌 수 있음"이 되어 작가의 통제권은 그대로다.
+   * 눈감음·흐림 확인은 기본으로 같이 돌리지 않는다 — 유사컷 묶기보다 판단 성격이 달라
+   * 원치 않는 작가가 매번 체크를 해제해야 했다. 필요하면 여기서 직접 켜면 된다. */
   const [aiWantSimilar, setAiWantSimilar] = useState(true);
-  const [aiWantQuality, setAiWantQuality] = useState(true);
+  const [aiWantQuality, setAiWantQuality] = useState(false);
 
   /** Gemini 분석 POC — 관리자 전용 노출 여부 판단용 (실제 접근 제어는 API route에서도 재검증됨) */
   const { quota } = useQuota();
@@ -2527,7 +2524,7 @@ export default function ProjectDetailPage() {
         qualityAnalysisStatus !== "processing"
       ) {
         setAiWantSimilar(true);
-        setAiWantQuality(true);
+        setAiWantQuality(false);
         setAiPromptSource("upload");
         setAiPromptOpen(true);
       }
@@ -2691,16 +2688,14 @@ export default function ProjectDetailPage() {
     setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
 
+  /** CustomerInviteShareModal의 인라인 PIN 편집이 위임하는 저장 — 실패하면 던져서
+   * 그 모달 안의 에러 문구로 보여준다(별도 PIN 모달을 다시 띄우지 않는다). */
   const handleSavePin = async (newPin: string | null) => {
     if (!project) return;
-    setPinError(""); setPinSaving(true);
-    try {
-      const res = await fetch(`/api/photographer/projects/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ access_pin: newPin }) });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error((data as { error?: string }).error ?? "저장 실패");
-      setProject({ ...project, accessPin: newPin }); setShowPinModal(false); setPinInput("");
-    } catch (e) { setPinError(e instanceof Error ? e.message : "저장 실패"); }
-    finally { setPinSaving(false); }
+    const res = await fetch(`/api/photographer/projects/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ access_pin: newPin }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((data as { error?: string }).error ?? "저장 실패");
+    setProject({ ...project, accessPin: newPin });
   };
 
   const handleDeletePhoto = async (photoId: string) => {
@@ -4430,53 +4425,6 @@ export default function ProjectDetailPage() {
         );
       })()}
 
-      {/* ── PIN MODAL — 공용 PhotographerModal 재사용 ── */}
-      <PhotographerModal
-        open={showPinModal}
-        onClose={() => { setShowPinModal(false); setPinInput(""); setPinError(""); }}
-        title={project.accessPin ? "PIN 변경" : "PIN 설정"}
-        description="고객이 갤러리에 접속할 때 사용할 숫자 4자리를 설정합니다."
-        closeDisabled={pinSaving}
-        maxWidth={380}
-        footer={
-          <div style={{ display: "flex", gap: 8 }}>
-            {project.accessPin && (
-              <PhotographerLightButton type="button" variant="danger" onClick={() => handleSavePin(null)} disabled={pinSaving}>
-                PIN 삭제
-              </PhotographerLightButton>
-            )}
-            <PhotographerLightButton
-              type="button"
-              variant="secondary"
-              onClick={() => { setShowPinModal(false); setPinInput(""); setPinError(""); }}
-              disabled={pinSaving}
-              className="flex-1"
-            >
-              취소
-            </PhotographerLightButton>
-            <PhotographerLightButton
-              type="button"
-              variant="primary"
-              onClick={() => handleSavePin(pinInput || null)}
-              disabled={pinSaving || (!!pinInput && pinInput.length !== 4)}
-              className="flex-1"
-            >
-              {pinSaving ? "저장 중..." : "저장"}
-            </PhotographerLightButton>
-          </div>
-        }
-      >
-        <label htmlFor="project-access-pin" className="mb-2 block text-[13px] font-semibold text-foreground">접속 PIN</label>
-        <div className="flex gap-2">
-          <input id="project-access-pin" aria-invalid={Boolean(pinError)} type="text" inputMode="numeric" maxLength={4} value={pinInput} onChange={(e) => setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="0000" className="min-w-0 flex-1 rounded-lg border border-border-subtle bg-surface px-4 py-3 text-center text-[20px] font-bold tracking-[0.35em] text-foreground outline-none transition-colors placeholder:text-placeholder-foreground focus:border-accent focus:ring-2 focus:ring-accent/10" />
-          <PhotographerLightButton type="button" variant="secondary" onClick={() => setPinInput(Math.floor(1000 + Math.random() * 9000).toString())}>
-            <RefreshCw size={11} />랜덤
-          </PhotographerLightButton>
-        </div>
-        <p className="mt-2 text-[12px] leading-[18px] text-muted-foreground">직접 입력하거나 랜덤 PIN을 만들 수 있습니다.</p>
-        {pinError ? <p role="alert" className="mt-3 rounded-lg border border-danger/25 bg-danger/8 px-3 py-2 text-[12px] text-danger">{pinError}</p> : null}
-      </PhotographerModal>
-
       <CustomerInviteShareModal
         open={inviteShareModalOpen}
         onClose={() => setInviteShareModalOpen(false)}
@@ -4484,6 +4432,7 @@ export default function ProjectDetailPage() {
         accessPin={project.accessPin}
         title="고객 초대 링크가 활성화되었습니다"
         description="카카오톡, 이메일 등으로 아래 링크를 보내주세요. 고객이 사진 셀렉을 시작할 수 있습니다."
+        onSavePin={handleSavePin}
       />
 
       <CustomerSelectionRequestModal
