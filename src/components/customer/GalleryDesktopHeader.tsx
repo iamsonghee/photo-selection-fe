@@ -620,7 +620,11 @@ export function GalleryDesktopHeader({
           color: var(--customer-ink);
         }
         .gld-search input::placeholder {
-          color: var(--customer-ink-secondary);
+          /* 아이콘·테두리에 쓰는 ink-secondary(#5f5e5b)를 placeholder에도 그대로 쓰면
+           * "아직 아무것도 안 친 빈 칸"이 이미 값이 채워진 것처럼 짙게 보여 비활성 필드로
+           * 오인된다(실측: 이 색 조합이 작가 쪽 검색창들보다 눈에 띄게 어두웠다) — placeholder만
+           * 더 옅게 낮춰 빈 상태와 입력된 상태가 한눈에 구분되게 한다. */
+          color: color-mix(in srgb, var(--customer-ink-secondary) 55%, transparent);
         }
 
         @media (max-width: 767px) {
