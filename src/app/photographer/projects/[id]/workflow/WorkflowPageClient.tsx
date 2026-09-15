@@ -1026,7 +1026,7 @@ export default function WorkflowPageClient({
   const [startingReview, setStartingReview] = useState<1 | 2 | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [reviewDeadlineModal, setReviewDeadlineModal] = useState<
-    { v: 1 | 2; dateInput: string; stage: "setup" | "share" } | null
+    { v: 1 | 2; dateInput: string; stage: "setup" | "share"; error?: string } | null
   >(null);
   const [uploadingVersionKeys, setUploadingVersionKeys] = useState<Set<string>>(new Set());
   const uploadingVersionKeysRef = useRef<Set<string>>(new Set());
@@ -2138,6 +2138,8 @@ export default function WorkflowPageClient({
     if (project.status !== expectedStatus) return;
     const nextStatus = v === 1 ? "reviewing_v1" : "reviewing_v2";
     setStartingReview(v);
+    // 재시도 가능성이 있는 요청이라 이전 실패 문구를 지우고 시작한다.
+    setReviewDeadlineModal((m) => (m ? { ...m, error: undefined } : null));
     try {
       if (reviewDeadline) {
         const ymd = normalizeReviewDeadlineYmd(reviewDeadline);
@@ -2169,7 +2171,11 @@ export default function WorkflowPageClient({
       // 성공 시 같은 모달을 공유 단계로 전환 (작가가 직접 링크 공유)
       setReviewDeadlineModal((m) => (m ? { ...m, stage: "share" } : null));
     } catch (e) {
-      alert(e instanceof Error ? e.message : "고객 검토 시작 실패");
+      // 화면 표시상 "보정본 N장 준비 완료"라도 서버의 최종 납품 처리(delivery_ready_at)가
+      // 아직 안 끝났으면 여기서 거절될 수 있다(409). alert()는 닫으면 흔적이 안 남고
+      // 모달은 setup 단계 그대로라 재시도 안내조차 안 보인다 — 모달 안에 그대로 남긴다.
+      const message = e instanceof Error ? e.message : "고객 검토 시작 실패";
+      setReviewDeadlineModal((m) => (m ? { ...m, error: message } : null));
     } finally {
       setStartingReview(null);
     }
@@ -3049,6 +3055,7 @@ export default function WorkflowPageClient({
           photoCount={reviewDeadlineModal.v === 2 ? v2Total : counts.total}
           initialDeadline={reviewDeadlineModal.dateInput || project?.reviewDeadline}
           pending={startingReview === reviewDeadlineModal.v}
+          error={reviewDeadlineModal.error}
           onRequest={(deadline) => {
             void runStartCustomerReview(reviewDeadlineModal.v, deadline);
           }}

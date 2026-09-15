@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarDays, Link2 } from "lucide-react";
+import { AlertTriangle, CalendarDays, Link2 } from "lucide-react";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
 
@@ -48,6 +48,7 @@ export function CustomerRetouchReviewRequestModal({
   photoCount,
   initialDeadline,
   pending,
+  error,
   onRequest,
 }: {
   open: boolean;
@@ -57,6 +58,8 @@ export function CustomerRetouchReviewRequestModal({
   photoCount: number;
   initialDeadline?: string | null;
   pending: boolean;
+  /** 직전 요청 실패 사유. alert() 대신 이 모달 안에 남겨 재시도할 곳을 잃지 않게 한다. */
+  error?: string;
   onRequest: (deadline?: string) => void | Promise<void>;
 }) {
   const [deadline, setDeadline] = useState(initialDeadline ?? "");
@@ -123,6 +126,13 @@ export function CustomerRetouchReviewRequestModal({
             </div>
           </div>
         </section>
+
+        {error ? (
+          <section role="alert" className="flex items-start gap-3 rounded-lg border border-danger/25 bg-danger/8 px-4 py-3.5">
+            <AlertTriangle size={18} strokeWidth={1.8} className="mt-0.5 shrink-0 text-danger" aria-hidden />
+            <p className="min-w-0 text-[13px] leading-5 text-danger">{error}</p>
+          </section>
+        ) : null}
 
         <section>
           <div className="flex items-center justify-between gap-4">
