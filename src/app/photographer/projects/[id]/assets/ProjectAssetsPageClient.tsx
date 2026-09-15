@@ -25,7 +25,7 @@ import { ProjectAssetStatusActionBar } from "@/components/photographer/ProjectAs
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
 import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { useProjectAssetsData } from "@/components/photographer/ProjectAssetsDataProvider";
-import { usePriorityImagePreload } from "@/lib/gallery-filter";
+import { usePriorityImagePreload, matchesFilenameQuery } from "@/lib/gallery-filter";
 import { getPhotoDisplayFilename } from "@/lib/photo-display-filename";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import { useAdjacentImagePreload } from "@/lib/use-adjacent-image-preload";
@@ -209,10 +209,9 @@ export default function ProjectAssetsPageClient({
   }, []);
 
   const ungroupedFilteredPhotos = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase();
     const tabPhotos = activeTab === "original" ? displayPhotos : selectedPhotos;
     const next = tabPhotos.filter((photo) => {
-      if (!getDisplayFilename(photo).toLocaleLowerCase().includes(normalizedQuery)) return false;
+      if (!matchesFilenameQuery(getDisplayFilename(photo), query)) return false;
       if (activeTab !== "original" || qualityFilter.size === 0) return true;
       return (qualityFilter.has("blurry") && photo.isBlurry === true)
         || (qualityFilter.has("eyesClosed") && photo.faceDetected === true && photo.eyesClosed === true);
@@ -695,7 +694,6 @@ export default function ProjectAssetsPageClient({
                 <FilenameSearchInput
                   value={query}
                   onChange={setQuery}
-                  placeholder="파일명을 입력하세요"
                   style={{ "--fsi-height": "48px", "--fsi-radius": "8px" } as React.CSSProperties}
                 />
               </section>

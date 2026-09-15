@@ -285,7 +285,6 @@ export function GalleryDesktopHeader({
             <FilenameSearchInput
               value={searchValue}
               onChange={onSearchValueChange}
-              placeholder="파일명 검색 (쉼표로 여러 개)"
               className="gld-search"
               style={{ "--fsi-height": "32px", "--fsi-width": "auto", "--fsi-input-width": "180px" } as React.CSSProperties}
             />

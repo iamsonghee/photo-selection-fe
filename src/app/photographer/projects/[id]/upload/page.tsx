@@ -38,6 +38,7 @@ import { CustomerSelectionRequestModal } from "@/components/photographer/Custome
 import GeminiAnalysisPanel from "@/components/photographer/GeminiAnalysisPanel";
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
 import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
+import { matchesFilenameQuery } from "@/lib/gallery-filter";
 import { PhotographerConfirmDialog } from "@/components/ui/PhotographerConfirmDialog";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { PhotographerFormActionBar } from "@/components/photographer/PhotographerFormActionBar";
@@ -1257,11 +1258,8 @@ export default function ProjectDetailPage() {
   }), [photos]);
 
   const galleryPhotos = useMemo(() => {
-    const normalizedQuery = photoSearch.trim().toLocaleLowerCase();
-    const searched = normalizedQuery
-      ? groupedDisplayPhotos.filter((photo) =>
-          (photo.originalFilename ?? "").toLocaleLowerCase().includes(normalizedQuery),
-        )
+    const searched = photoSearch.trim()
+      ? groupedDisplayPhotos.filter((photo) => matchesFilenameQuery(photo.originalFilename ?? "", photoSearch))
       : groupedDisplayPhotos;
     const filtered = qualityFilter.size === 0
       ? searched

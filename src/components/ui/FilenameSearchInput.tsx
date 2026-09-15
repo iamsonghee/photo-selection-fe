@@ -37,7 +37,7 @@ export type FilenameSearchInputProps = {
 export function FilenameSearchInput({
   value,
   onChange,
-  placeholder = "파일명 검색",
+  placeholder = "파일명 검색 (쉼표로 여러 개)",
   ariaLabel = "파일명으로 필터링",
   autoFocus = false,
   className = "",
