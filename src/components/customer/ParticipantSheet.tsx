@@ -47,7 +47,7 @@ export function ParticipantSheet({ usedColors, roster = {}, current, onConfirm, 
         <p className="cps-desc">
           {editing
             ? "이름은 함께 보는 사람 화면에도 바로 반영돼요."
-            : "함께 보는 사람과 겹치지 않는 색을 고르세요 — 내가 찜한 사진을 구분해드려요."}
+            : "함께 보는 사람과 겹치지 않는 색을 고르세요. 내가 찜한 사진이 이 색으로 표시돼요."}
         </p>
 
         {/* 세로 카드 목록 대신 원 한 줄로 — 색 고르기는 가벼운 동작인데 5줄짜리 카드는 스크롤만
@@ -123,6 +123,19 @@ export function ParticipantSheet({ usedColors, roster = {}, current, onConfirm, 
             box-shadow: 0 -4px 16px rgba(0,0,0,.18);
             padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
             font-family: Pretendard, 'Noto Sans KR', sans-serif;
+          }
+          /* PC는 화면 아래에서 올라오는 시트가 아니라 가운데 뜨는 카드로 — 아래에서 슬라이드되는
+           * 모바일 제스처 패턴을 마우스로 쓰는 큰 화면에 그대로 옮기면 어색하다. */
+          @media (min-width: 768px) {
+            .cps-sheet {
+              top: 50%; bottom: auto;
+              transform: translate(-50%, -50%);
+              border-radius: 16px;
+              box-shadow: 0 8px 32px rgba(0,0,0,.24);
+              padding: 24px;
+              max-height: 85vh;
+              overflow-y: auto;
+            }
           }
           .cps-title { margin: 0; font-size: 18px; line-height: 26px; font-weight: 700; letter-spacing: -.3px; }
           .cps-desc { margin: 6px 0 0; font-size: 13px; line-height: 19px; color: #5f5e5b; }
