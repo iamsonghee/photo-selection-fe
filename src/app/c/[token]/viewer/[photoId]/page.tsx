@@ -338,6 +338,7 @@ export default function ViewerPage() {
   const filmstripRef     = useRef<HTMLDivElement>(null);
   const mobileFilmstripRef = useRef<HTMLDivElement>(null);
   const mobileCommentRef = useRef<HTMLTextAreaElement>(null);
+  const pcCommentRef = useRef<HTMLTextAreaElement>(null);
   const filmstripSeenRef = useRef(false); // 마운트 후 첫 실행 여부 추적
 
   /* ── PC 필름스트립 윈도우 렌더링 ──────────────────────────────────────
@@ -637,6 +638,13 @@ export default function ViewerPage() {
     requestAnimationFrame(() => mobileCommentRef.current?.focus());
   }, []);
 
+  /** PC 패널의 "사진별 요청"도 평소엔 접어 버튼만 두고, 눌렀을 때만 입력창을 편다 —
+   *  항상 펼쳐진 textarea가 사진마다 코멘트 작성을 은근히 유도하는 느낌이 있었다. */
+  const openPcCommentEditor = useCallback(() => {
+    setIsCommentEditing(true);
+    requestAnimationFrame(() => pcCommentRef.current?.focus());
+  }, []);
+
   /** 얇은 위치 인디케이터를 탭/드래그해 임의 위치로 점프 — 필름스트립이 하던 "점프" 역할을 대신한다. */
   const seekToRatio = useCallback((ratio: number) => {
     if (!filteredPhotos.length) return;
@@ -931,6 +939,18 @@ export default function ViewerPage() {
         .fs-comment-input:focus { border-color: rgba(var(--accent-rgb), 0.4); }
         .fs-comment-input-wrap { position: relative; display: flex; align-items: center; min-width: 0; }
         .fs-comment-input-icon { position: absolute; left: 14px; color: #d6d6d6; pointer-events: none; }
+        /* 평소엔 이 버튼만 두고, 눌렀을 때만 위 textarea가 펼쳐진다 — §openPcCommentEditor */
+        .fs-comment-toggle {
+          display: flex; align-items: center; gap: 8px;
+          width: 100%; min-height: 40px; padding: 0 14px;
+          background: #181818; border: 1px solid #a8abae; border-radius: 8px;
+          color: rgba(255,255,255,.56); font: 400 13px/1.4 Pretendard, 'Noto Sans KR', sans-serif;
+          text-align: left; cursor: pointer;
+        }
+        .fs-comment-toggle:hover { border-color: rgba(var(--accent-rgb), 0.4); }
+        .fs-comment-toggle-filled { color: #fff; }
+        .fs-comment-toggle-error { border-color: #ff6262; color: #ff6262; }
+        .fs-comment-toggle-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
         .fs-star { display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; background: transparent; cursor: pointer; transition: transform 0.1s; }
         .fs-star:hover { transform: scale(1.2); }
         .fs-panel-label {
@@ -1484,6 +1504,7 @@ export default function ViewerPage() {
             </div>
 
             <span className="fs-panel-label" style={{ marginTop: 8 }}>사진별 요청</span>
+            {isCommentEditing ? (
             <div style={{ display: "flex", alignItems: "flex-end", gap: 12, minWidth: 0 }}>
               <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "stretch", gap: 4, minWidth: 0 }}>
                 <div style={{ minHeight: 14, display: "flex", alignItems: "center" }}>
@@ -1492,9 +1513,9 @@ export default function ViewerPage() {
                 <div className="fs-comment-input-wrap">
                   <MessageSquare size={14} strokeWidth={1.8} className="fs-comment-input-icon" aria-hidden />
                   <textarea
+                    ref={pcCommentRef}
                     className="fs-comment-input"
                     value={draftComment}
-                    onFocus={() => setIsCommentEditing(true)}
                     onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
                     onBlur={() => { setIsCommentEditing(false); saveComment(); }}
                     onKeyDown={(e) => {
@@ -1508,6 +1529,27 @@ export default function ViewerPage() {
                 </div>
               </div>
             </div>
+            ) : (
+              <button
+                type="button"
+                className={`fs-comment-toggle${commentSaveStatus === "error" ? " fs-comment-toggle-error" : draftComment.trim() ? " fs-comment-toggle-filled" : ""}`}
+                onClick={commentSaveStatus === "error" ? saveComment : openPcCommentEditor}
+                aria-label={
+                  commentSaveStatus === "error"
+                    ? "사진별 요청 저장 실패, 다시 시도"
+                    : draftComment.trim()
+                      ? `사진별 요청 수정: ${draftComment.trim()}`
+                      : "사진별 요청 남기기"
+                }
+              >
+                <MessageSquare size={14} strokeWidth={1.8} style={{ flexShrink: 0 }} aria-hidden />
+                <span className="fs-comment-toggle-text">
+                  {commentSaveStatus === "error"
+                    ? "저장 실패 · 다시 시도"
+                    : draftComment.trim() || "요청이 있다면 남겨주세요"}
+                </span>
+              </button>
+            )}
           </div>
         </section>
 
