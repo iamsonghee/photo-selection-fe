@@ -221,10 +221,14 @@ export function GalleryDesktopHeader({
           </div>
 
           <div className="gld-filter-right">
+            {usedColors.length > 0 && <span className="gld-colors-label">찜</span>}
             <div className="gld-colors">
               {COLOR_OPTIONS.filter((option) => usedColors.includes(option.key)).map((option) => {
                 const isActive = colorFilter.includes(option.key);
                 const label = colorLabel(option.key);
+                /* 라벨엔 이미 "찜"이 붙어 있다("내 찜"/"민 찜") — 그룹 제목으로 한 번 더 말했으니
+                 * 칩 안에서는 사람을 가리키는 부분만 남긴다. */
+                const chipText = label.replace(/\s*찜$/, "");
                 return (
                   <button
                     key={option.key}
@@ -237,9 +241,15 @@ export function GalleryDesktopHeader({
                         isActive ? colorFilter.filter((c) => c !== option.key) : [...colorFilter, option.key]
                       )
                     }
-                    className={`gld-color-dot${isActive ? " gld-color-dot-active" : ""}${option.key === myColor ? " gld-color-dot-mine" : ""}`}
-                    style={{ background: option.hex }}
-                  />
+                    className={`gld-color-chip${isActive ? " gld-color-chip-active" : ""}`}
+                  >
+                    <span
+                      className={`gld-color-dot${option.key === myColor ? " gld-color-dot-mine" : ""}`}
+                      style={{ background: option.hex }}
+                      aria-hidden
+                    />
+                    <span className="gld-color-chip-text">{chipText}</span>
+                  </button>
                 );
               })}
             </div>
@@ -520,25 +530,48 @@ export function GalleryDesktopHeader({
           background: #e9f2ff;
         }
 
+        .gld-colors-label {
+          flex-shrink: 0;
+          color: var(--customer-ink-secondary);
+          font-size: 12px;
+          font-weight: 600;
+        }
         .gld-colors {
           display: flex;
           align-items: center;
-          gap: 7px;
+          gap: 6px;
+          flex-wrap: wrap;
         }
+        /* 예전엔 이름 없는 14px 원만 있어 호버 툴팁을 봐야 누구 색인지 알 수 있었다 — 모바일
+         * 필터 시트처럼 원 옆에 이름을 바로 붙여 마우스 없이도 바로 읽히게 한다. */
+        .gld-color-chip {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 5px 10px 5px 6px;
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--customer-ink-secondary);
+          background: none;
+          border: 1px solid var(--customer-divider);
+          border-radius: 999px;
+          cursor: pointer;
+          white-space: nowrap;
+          font-family: inherit;
+        }
+        .gld-color-chip-active {
+          color: var(--customer-ink);
+          border-color: var(--customer-ink);
+          background: var(--customer-control);
+        }
+        .gld-color-chip-text { max-width: 72px; overflow: hidden; text-overflow: ellipsis; }
         .gld-color-dot {
           width: 14px;
           height: 14px;
           border-radius: 50%;
-          border: 2px solid transparent;
-          cursor: pointer;
           flex-shrink: 0;
-          padding: 0;
-          transition: border-color 0.15s;
         }
         .gld-color-dot-mine { box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--customer-divider); }
-        .gld-color-dot-active {
-          border-color: var(--customer-ink);
-        }
         .gld-color-mode {
           height: 24px;
           padding: 0 9px;
