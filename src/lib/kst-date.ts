@@ -54,6 +54,12 @@ export function formatKstLongDate(iso: string): string {
   return `${year}년 ${Number(month)}월 ${Number(day)}일`;
 }
 
+/** "2026년 9월 16일 14:30" */
+export function formatKstLongDateTime(iso: string): string {
+  const { year, month, day, hour, minute } = kstParts(iso);
+  return `${year}년 ${Number(month)}월 ${Number(day)}일 ${hour}:${minute}`;
+}
+
 /**
  * KST 벽시계 값을 UTC getter로 바로 읽을 수 있도록 시각을 밀어둔 Date를 돌려준다
  * (한국은 DST가 없어 항상 고정 +9시간이라 이 방식이 안전하다). "이 시각 + N일" 같은

@@ -10,6 +10,7 @@ import { CustomerHeader } from "@/components/customer/CustomerHeader";
 import { useCustomerLightCanvas } from "@/lib/use-customer-light-canvas";
 import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
 import FinalDeliveryDownloadEntry from "@/components/customer/FinalDeliveryDownloadEntry";
+import { formatKstLongDate } from "@/lib/kst-date";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
@@ -113,5 +114,5 @@ export default function DeliveredPage() {
 
 function formatDate(value: string) {
   if (Number.isNaN(new Date(value).getTime())) return "—";
-  return new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Seoul" }).format(new Date(value));
+  return formatKstLongDate(value);
 }
