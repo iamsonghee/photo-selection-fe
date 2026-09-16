@@ -74,7 +74,7 @@ function getAction(project: Project) {
   const action = getDesktopNextAction(project);
   return {
     href: "href" in action ? action.href : `/photographer/projects/${project.id}`,
-    label: "label" in action ? action.label : "진행 확인",
+    label: "label" in action ? action.label : "프로젝트 보기",
   };
 }
 

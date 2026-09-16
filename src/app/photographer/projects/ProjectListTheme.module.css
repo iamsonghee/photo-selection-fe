@@ -89,9 +89,6 @@
 .identityText .projectId { font-weight:400; }
 .progressCaption > span { padding-left:8px; border-left:1px solid var(--border-strong); }
 .progressSteps li[data-done=true] { color:var(--muted-foreground); }
-.detailAction { display:inline-flex; align-items:center; gap:6px; min-height:36px; color:var(--muted-foreground); font-size:12px; }
-.detailAction svg { flex-shrink:0; }
-.detailAction:hover { color:var(--foreground); text-decoration:underline; }
 .projectTable tbody tr:focus-within { background:var(--surface-raised); }
 .projectTable tbody tr:hover .projectName { text-decoration:none; }
 .desktopList input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }

@@ -99,7 +99,7 @@ export function DesktopProjectList(props: Props) {
           <td><CompactProjectProgress project={project}/></td>
           <td className={styles.currentCell}><ProjectCurrentState project={project}/></td>
           <td>{deadline ? <><small>{deadline.label}</small><span className={styles.deadlineLine}><span>{dateLabel(deadline.date)}</span>{due && due.level !== "ok" && <strong className={styles.dueLabel} data-level={due.level}>{due.text}</strong>}</span></> : project.deliveredAt ? <><small>완료일</small><span>{dateLabel(project.deliveredAt)}</span></> : <span className={styles.emptyDeadline}>—</span>}</td>
-          <td>{action.href ? <Link href={action.href} prefetch={false} onClick={props.onRemember} className={styles.nextAction} data-primary={action.kind === "primary"}>{action.label}<ArrowRight size={14} aria-hidden/></Link> : <Link href={`/photographer/projects/${project.id}`} prefetch={false} onClick={props.onRemember} className={styles.detailAction}>진행 확인<ArrowRight size={14} aria-hidden/></Link>}</td>
+          <td>{action.href ? <Link href={action.href} prefetch={false} onClick={props.onRemember} className={styles.nextAction} data-primary={action.kind === "primary"}>{action.label}<ArrowRight size={14} aria-hidden/></Link> : <span className={styles.emptyDeadline}>—</span>}</td>
         </tr>;
       })}</tbody>
     </table>
