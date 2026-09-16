@@ -1,9 +1,9 @@
 import { PhotographerLightButton } from "../PhotographerLightButton";
 import { ChevronRight, Clock, Flag, ListChecks, PenLine, Upload } from "lucide-react";
-import { addDays, format, parseISO } from "date-fns";
 import type { Project, ProjectStatus } from "@/types";
 import { dday, getProjectActor } from "@/lib/project-actor";
 import { getActiveDeadline } from "@/lib/project-deadline";
+import { formatKstDateTimeDash, toKstShifted } from "@/lib/kst-date";
 
 // 고객 화면(src/lib/customer-api-server.ts)의 ORIGINAL_DOWNLOAD_WINDOW_DAYS /
 // FINAL_DELIVERY_DOWNLOAD_WINDOW_DAYS와 동일한 30일. 그 파일은 Service Role 클라이언트를 쓰는
@@ -13,7 +13,12 @@ const FINAL_DELIVERY_RETENTION_DAYS = 30;
 
 function formatRetentionDeadline(iso: string, days: number): string {
   try {
-    return format(addDays(parseISO(iso), days), "yyyy-MM-dd");
+    const shifted = toKstShifted(iso);
+    shifted.setUTCDate(shifted.getUTCDate() + days);
+    const y = shifted.getUTCFullYear();
+    const m = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(shifted.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
   } catch {
     return "—";
   }
@@ -181,7 +186,7 @@ export function ProjectWorkPanel({
         const deliveredAtDisplay = project.deliveredAt
           ? (() => {
               try {
-                return format(parseISO(project.deliveredAt as string), "yyyy-MM-dd HH:mm");
+                return formatKstDateTimeDash(project.deliveredAt as string);
               } catch {
                 return project.deliveredAt as string;
               }

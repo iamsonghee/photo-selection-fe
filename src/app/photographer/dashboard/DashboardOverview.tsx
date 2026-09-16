@@ -208,7 +208,7 @@ export function DashboardOverview({ projects, logs, logsError, onRetryLogs, onCr
             const project = projects.find(item => item.id === log.projectId);
             return <li key={log.id} data-actor={actor}><Link href={`/photographer/projects/${log.projectId}`} prefetch={false}>
               <i className={styles.logDot} aria-hidden/>
-              <time dateTime={log.createdAt}>{new Date(log.createdAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time>
+              <time dateTime={log.createdAt}>{new Date(log.createdAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time>
               <p className={styles.logSentence}><strong>{log.projectName}</strong> {logLabels[log.action] || "프로젝트를 업데이트했어요"}</p>
               <div className={styles.logMeta}>{log.customerName || project?.customerName || "고객 미등록"}{project && <><span>·</span><ProjectIdText project={project}/></>}</div>
             </Link></li>;

@@ -21,8 +21,7 @@ import {
 import type { PhotographerProfile } from "@/app/api/photographer/profile/route";
 import { getProfileImageUrl } from "@/lib/photographer";
 import { createClient } from "@/lib/supabase/client";
-import { format } from "date-fns";
-import { ko } from "date-fns/locale";
+import { formatKstYearMonth } from "@/lib/kst-date";
 import { useProfile } from "@/contexts/ProfileContext";
 import {
   PhotographerLightPageFrame,
@@ -290,9 +289,7 @@ export default function SettingsPage() {
   if (!profile) return null;
 
   const initial = getInitial(profile.name, profile.email);
-  const joinDate = profile.createdAt
-    ? format(new Date(profile.createdAt), "yyyy년 M월", { locale: ko })
-    : null;
+  const joinDate = profile.createdAt ? formatKstYearMonth(profile.createdAt) : null;
 
   return (
     <div

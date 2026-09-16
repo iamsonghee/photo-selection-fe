@@ -8,6 +8,7 @@ import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { formatKstLongDate } from "@/lib/kst-date";
 
 const CUSTOMER_CANCEL_MAX = 3;
 
@@ -66,13 +67,7 @@ export default function ConfirmedPage() {
   const remainingCancels = Math.max(0, CUSTOMER_CANCEL_MAX - cancelCount);
   const canCancel = project.status === "confirmed" && remainingCancels > 0;
   const copy = completionCopy(project.status);
-  const confirmedDateLabel = project.confirmedAt
-    ? new Intl.DateTimeFormat("ko-KR", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }).format(new Date(project.confirmedAt))
-    : null;
+  const confirmedDateLabel = project.confirmedAt ? formatKstLongDate(project.confirmedAt) : null;
 
   const handleConfirmCancel = async () => {
     if (!project.id || !token || cancelling) return;

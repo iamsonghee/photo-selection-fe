@@ -1,12 +1,12 @@
-import { format } from "date-fns";
 import type { PhotographerTier, BetaStatus } from "@/lib/beta-policy";
+import { formatKstDate, formatKstDateTime } from "@/lib/kst-date";
 
 export function formatAdminDate(iso: string): string {
-  return format(new Date(iso), "yyyy.MM.dd");
+  return formatKstDate(iso);
 }
 
 export function formatAdminDateTime(iso: string): string {
-  return format(new Date(iso), "yyyy.MM.dd HH:mm");
+  return formatKstDateTime(iso);
 }
 
 export type TierBadge = { label: string; className: string };
