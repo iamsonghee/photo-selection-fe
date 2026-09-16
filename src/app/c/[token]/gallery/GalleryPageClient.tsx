@@ -1110,11 +1110,9 @@ export default function GalleryPageClient() {
           .gl-mobile-filter-options { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
           .gl-mobile-filter-option { height: 39px; min-width: 0; padding: 0 4px; border: 1px solid #c6cbd0; border-radius: 4px; background: #fff; color: #191918; display: flex; align-items: center; justify-content: center; gap: 4px; font: 12px/19px Pretendard, sans-serif; }
           .gl-mobile-filter-option-active { border-color: #ff4d00; background: #fff0e8; }
-          .gl-mobile-star-option { color: #191918; }
-          .gl-mobile-star-option .gl-mobile-star-icon { color: #aab0b8; transition: color 120ms ease; }
-          .gl-mobile-star-option:hover .gl-mobile-star-icon, .gl-mobile-star-option:active .gl-mobile-star-icon { color: rgba(255,77,0,.7); }
-          .gl-mobile-star-option-active .gl-mobile-star-icon { color: #ff4d00; }
-          .gl-mobile-star-option-active { border-color: #c6cbd0; background: #fff; }
+          .gl-mobile-stars { display: flex; align-items: center; gap: 4px; padding: 2px 0; }
+          .gl-mobile-stars-op { margin-right: 4px; color: #aab0b8; font: 700 16px/1 Pretendard, sans-serif; }
+          .gl-mobile-star-btn { padding: 4px; border: 0; background: transparent; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
           .gl-mobile-filter-option-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
 
           .gl-empty-mobile { min-height: 478px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 20px; color: #191918; }
@@ -1309,12 +1307,25 @@ export default function GalleryPageClient() {
               <div className="gl-mobile-filter-sheet-body">
                 <div className="gl-mobile-filter-section">
                   <h3>별점</h3>
-                  <div className="gl-mobile-filter-options">
-                    {([1, 2, 3, 4, 5] as const).map((star) => (
-                      <button key={star} type="button" className={`gl-mobile-filter-option gl-mobile-star-option${starFilter === star ? " gl-mobile-star-option-active" : ""}`} aria-pressed={starFilter === star} onClick={() => setStarFilter((current) => current === star ? 0 : star)}>
-                        <Star className="gl-mobile-star-icon" size={13} fill="currentColor" /><span>{star}.0</span>
-                      </button>
-                    ))}
+                  {/* PC 헤더(gld-stars)와 같은 방식 — 숫자별 박스 대신 별을 눌러 그 점수까지
+                    * 채우는 "≥" 등급 입력으로 통일한다. */}
+                  <div className="gl-mobile-stars">
+                    <span className="gl-mobile-stars-op" style={{ color: starFilter > 0 ? "#ff4d00" : undefined }}>≥</span>
+                    {([1, 2, 3, 4, 5] as const).map((star) => {
+                      const filled = star <= starFilter;
+                      return (
+                        <button
+                          key={star}
+                          type="button"
+                          className="gl-mobile-star-btn"
+                          aria-label={`별점 ${star}점 이상 필터`}
+                          aria-pressed={starFilter === star}
+                          onClick={() => setStarFilter((current) => current === star ? 0 : star)}
+                        >
+                          <Star size={26} fill={filled ? "currentColor" : "none"} strokeWidth={2} style={{ color: filled ? "#ff4d00" : "#c6cbd0" }} />
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
                 <div className="gl-mobile-filter-section">
