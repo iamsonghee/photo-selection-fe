@@ -956,11 +956,9 @@ export default function ProjectDetailPage() {
       return next;
     });
   }, []);
-  /* 기본값은 **유사컷 묶기만 켬**이다. 비워 두면 대부분 그대로 닫아 지금(버튼을 못 찾는 상태)과
-   * 같아진다 — 켜 두면 "보이는 자동 실행 + 끌 수 있음"이 되어 작가의 통제권은 그대로다.
-   * 눈감음·흐림 확인은 기본으로 같이 돌리지 않는다 — 유사컷 묶기보다 판단 성격이 달라
-   * 원치 않는 작가가 매번 체크를 해제해야 했다. 필요하면 여기서 직접 켜면 된다. */
-  const [aiWantSimilar, setAiWantSimilar] = useState(true);
+  /* 둘 다 기본은 꺼둔다 — 원치 않는 작가가 모달을 열 때마다 매번 체크를 해제해야 했다.
+   * 필요하면 여기서 직접 켜면 된다. */
+  const [aiWantSimilar, setAiWantSimilar] = useState(false);
   const [aiWantQuality, setAiWantQuality] = useState(false);
 
   /** Gemini 분석 POC — 관리자 전용 노출 여부 판단용 (실제 접근 제어는 API route에서도 재검증됨) */
@@ -2539,7 +2537,7 @@ export default function ProjectDetailPage() {
         clipAnalysisStatus !== "processing" &&
         qualityAnalysisStatus !== "processing"
       ) {
-        setAiWantSimilar(true);
+        setAiWantSimilar(false);
         setAiWantQuality(false);
         setAiPromptSource("upload");
         setAiPromptOpen(true);
