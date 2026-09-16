@@ -956,9 +956,10 @@ export default function ProjectDetailPage() {
       return next;
     });
   }, []);
-  /* 둘 다 기본은 꺼둔다 — 원치 않는 작가가 모달을 열 때마다 매번 체크를 해제해야 했다.
-   * 필요하면 여기서 직접 켜면 된다. */
-  const [aiWantSimilar, setAiWantSimilar] = useState(false);
+  /* 유사컷 묶기는 기본으로 켜둔다 — 업로드 완료 시 모달이 자동으로 뜨는데, 둘 다 꺼둔
+   * 채로 열리면 "분석 시작" 버튼이 곧바로 비활성 상태라 뭔가 먼저 체크해야 누를 수 있는
+   * 어색한 모달이 된다. 눈감음·흐림 확인은 판단 성격이 달라 기본으로 같이 돌리지 않는다. */
+  const [aiWantSimilar, setAiWantSimilar] = useState(true);
   const [aiWantQuality, setAiWantQuality] = useState(false);
 
   /** Gemini 분석 POC — 관리자 전용 노출 여부 판단용 (실제 접근 제어는 API route에서도 재검증됨) */
@@ -2537,7 +2538,7 @@ export default function ProjectDetailPage() {
         clipAnalysisStatus !== "processing" &&
         qualityAnalysisStatus !== "processing"
       ) {
-        setAiWantSimilar(false);
+        setAiWantSimilar(true);
         setAiWantQuality(false);
         setAiPromptSource("upload");
         setAiPromptOpen(true);
