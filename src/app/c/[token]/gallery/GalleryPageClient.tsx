@@ -995,7 +995,9 @@ export default function GalleryPageClient() {
           .gl-mobile-active-filters::-webkit-scrollbar { display: none; }
           .gl-mobile-filter-chip { height: 29px; padding: 0 8px 0 12px; border: 1px solid #838b94; border-radius: 999px; background: #fff; color: #191918; display: flex; align-items: center; gap: 5px; flex: 0 0 auto; font: 12px/19px Pretendard, sans-serif; }
           .gl-mobile-filter-chip-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
-          .gl-mobile-filter-empty { margin: 0; padding: 4px 2px; color: #6f747b; font: 12px/19px Pretendard, sans-serif; }
+          /* .gl-mobile-filter-options가 grid-template-columns: repeat(5, 1fr)라, 이 문구도
+           * 한 칸(1/5 폭)에 갇혀 여백이 있는데도 줄바꿈됐다 — 전체 폭을 쓰게 한다. */
+          .gl-mobile-filter-empty { grid-column: 1 / -1; margin: 0; padding: 4px 2px; color: #6f747b; font: 12px/19px Pretendard, sans-serif; white-space: nowrap; }
           /* 두 명 이상을 고르면 "누구 하나라도" 와 "둘 다"가 전혀 다른 결과라 명시적으로 고르게 한다 */
           .gl-mobile-filter-mode { margin-top: 10px; display: flex; gap: 6px; }
           .gl-mobile-filter-mode button {
