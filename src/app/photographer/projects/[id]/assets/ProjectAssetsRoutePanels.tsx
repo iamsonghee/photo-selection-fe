@@ -1,11 +1,11 @@
 "use client";
 
 import { Activity, useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import WorkflowPageClient from "../workflow/WorkflowPageClient";
 import ProjectAssetsPageClient, { type ResultsTab } from "./ProjectAssetsPageClient";
 import { useProjectAssetsData } from "@/components/photographer/ProjectAssetsDataProvider";
-import { hasRetouchedAssetTab } from "@/components/photographer/ProjectAssetTabs";
+import { hasRetouchedAssetTab, hasSelectedAssetTab } from "@/components/photographer/ProjectAssetTabs";
 import { prefetchRetouchedVersionData } from "@/lib/retouched-version-data";
 
 type AssetRouteTab = ResultsTab | "retouched" | "final";
@@ -23,11 +23,18 @@ function tabFromPathname(pathname: string): AssetRouteTab {
  */
 export function ProjectAssetsRoutePanels() {
   const pathname = usePathname();
+  const router = useRouter();
   const activeTab = tabFromPathname(pathname);
   const { project } = useProjectAssetsData();
+  const selectedUnavailable = activeTab === "selected" && Boolean(project && !hasSelectedAssetTab(project.status));
   const [visitedTabs, setVisitedTabs] = useState<Set<AssetRouteTab>>(
     () => new Set([activeTab]),
   );
+
+  useEffect(() => {
+    if (!selectedUnavailable || !project) return;
+    router.replace(`/photographer/projects/${project.id}/assets/original`);
+  }, [project, router, selectedUnavailable]);
 
   useEffect(() => {
     if (visitedTabs.has(activeTab)) return;
@@ -53,6 +60,8 @@ export function ProjectAssetsRoutePanels() {
   }, [activeTab, project]);
 
   const shouldRender = (tab: AssetRouteTab) => activeTab === tab || visitedTabs.has(tab);
+
+  if (selectedUnavailable) return null;
 
   return (
     <>

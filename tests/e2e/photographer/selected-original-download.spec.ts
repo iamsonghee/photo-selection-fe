@@ -79,7 +79,22 @@ test("확정된 셀렉 원본을 고른 폴더에 원본 파일명으로 스트�
   if (await initialUploadDialog.isVisible().catch(() => false)) {
     await initialUploadDialog.getByRole("button", { name: "닫기" }).click();
   }
-  await page.getByRole("button", { name: "내보내기" }).click();
+  const viewButton = page.getByRole("button", { name: "목록으로 보기" });
+  const exportButton = page.locator("[data-project-asset-export-trigger]:visible");
+  const bulkButton = page.locator("[data-workflow-bulk-upload-action]:visible");
+  const [viewBox, exportBox, bulkBox] = await Promise.all([
+    viewButton.boundingBox(),
+    exportButton.boundingBox(),
+    bulkButton.boundingBox(),
+  ]);
+  expect(viewBox).not.toBeNull();
+  expect(exportBox).not.toBeNull();
+  expect(bulkBox).not.toBeNull();
+  expect(viewBox!.x).toBeLessThan(exportBox!.x);
+  expect(exportBox!.x).toBeLessThan(bulkBox!.x);
+  await expect(bulkButton).toHaveCSS("border-top-width", "0px");
+  await expect(bulkButton).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await page.locator("[data-project-asset-export-trigger]:visible").click();
 
   const downloadButton = page.getByRole("button", { name: /셀렉 원본 다운로드/ });
   await expect(downloadButton).toBeEnabled();

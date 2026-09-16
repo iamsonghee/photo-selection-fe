@@ -12,6 +12,7 @@ import {
 import { useParams, useRouter } from "next/navigation";
 import { Button, ProgressBar } from "@/components/ui";
 import type { CommentSaveStatus } from "@/lib/comment-save-status";
+import { planRecommendationSelection } from "@/lib/selection-recommendations";
 /** 고객 플로우: API Route 호출 (Service Role로 selections 처리) */
 async function fetchCustomerPhotos(token: string) {
   const res = await fetch(`/api/c/photos?token=${encodeURIComponent(token)}`);
@@ -40,6 +41,8 @@ async function fetchSelectionsPoll(
   return res.json();
 }
 
+class SelectionLimitError extends Error {}
+
 async function upsertSelectionApi(
   token: string,
   projectId: string,
@@ -63,6 +66,25 @@ async function upsertSelectionApi(
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
+    if (data.code === "limit_reached") throw new SelectionLimitError("Selection limit reached");
+    throw new Error(data.error ?? "Failed");
+  }
+}
+
+async function upsertSelectionsApi(
+  token: string,
+  projectId: string,
+  photoIds: readonly string[],
+  isSelected: boolean
+) {
+  const res = await fetch("/api/c/selections", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, project_id: projectId, photo_ids: photoIds, is_selected: isSelected }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    if (data.code === "limit_reached") throw new SelectionLimitError("Selection limit reached");
     throw new Error(data.error ?? "Failed");
   }
 }
@@ -148,6 +170,8 @@ type SelectionContextValue = {
   Y: number;
   N: number;
   toggle: (photoId: string) => SelectionToggleResult;
+  includeRecommendations: () => Promise<"saved" | "failed" | "limit-reached">;
+  selectionSaving: boolean;
   isSelected: (photoId: string) => boolean;
   updatePhotoState: (photoId: string, patch: Partial<Omit<PhotoState, "color">>) => void;
   toggleColor: (photoId: string, color: ColorTag) => void;
@@ -182,6 +206,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   const [photoStates, setPhotoStates] = useState<Record<string, PhotoState>>({});
   const [loading, setLoading] = useState(true);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [selectionSaving, setSelectionSaving] = useState(false);
   const [commentSaveStates, setCommentSaveStates] = useState<Record<string, CommentSaveStatus>>({});
   const commentSavedTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -255,37 +280,43 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       if (!project?.id || !token) return;
       const projectId = project.id;
       selectionFlushingRef.current.add(photoId);
+      setSelectionSaving(true);
       try {
         for (;;) {
           const target = desiredSelectedRef.current.get(photoId);
           if (target === undefined) break;
           let ok = true;
+          let limitReached = false;
           try {
             await upsertSelectionApi(token, projectId, photoId, { is_selected: target });
           } catch (e) {
-            console.error(e);
             ok = false;
+            limitReached = e instanceof SelectionLimitError;
+            if (!limitReached) console.error(e);
           }
           // 이 요청을 보낸 뒤에도 사용자의 최신 의도가 그대로면(더 안 바뀌었으면) 큐를 비우고 종료.
           // 그 사이 또 바뀌었으면 성공/실패와 무관하게 최신값으로 다시 시도한다.
           if (desiredSelectedRef.current.get(photoId) === target) {
             desiredSelectedRef.current.delete(photoId);
             if (!ok) {
+              setSaveError(limitReached
+                ? "다른 참여자가 먼저 목표 장수를 채웠어요. 최신 선택 상태를 확인해 주세요."
+                : "사진 선택을 저장하지 못했습니다. 선택 상태를 확인한 뒤 다시 시도해 주세요.");
               // 실패했고 그 이후 새 조작이 없었다면, 실제로는 저장되지 않은 값이므로
               // 로컬 낙관적 상태를 서버 실패 이전 상태로 되돌린다(사용자의 최신 의도를
               // 덮어쓰는 게 아니라, 방금 그 시도 자체가 무효였음을 반영하는 것).
-              setSelectedIds((prev) => {
-                const next = new Set(prev);
-                if (target) next.delete(photoId);
-                else next.add(photoId);
-                return next;
-              });
+              const next = new Set(selectedIdsRef.current);
+              if (target) next.delete(photoId);
+              else next.add(photoId);
+              selectedIdsRef.current = next;
+              setSelectedIds(next);
             }
             break;
           }
         }
       } finally {
         selectionFlushingRef.current.delete(photoId);
+        setSelectionSaving(selectionFlushingRef.current.size > 0 || desiredSelectedRef.current.size > 0);
       }
     },
     [project?.id, token]
@@ -491,6 +522,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     }
     desiredSelectedRef.current = new Map();
     selectionFlushingRef.current = new Set();
+    setSelectionSaving(false);
     desiredPatchRef.current = new Map();
     patchFlushingRef.current = new Set();
     desiredColorRef.current = new Map();
@@ -574,6 +606,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         return "limit-reached";
       }
       const nextIsSelected = !isSelected;
+      setSaveError(null);
       const next = new Set(current);
       if (isSelected) next.delete(photoId);
       else next.add(photoId);
@@ -598,6 +631,49 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     (photoId: string) => selectedIds.has(photoId),
     [selectedIds]
   );
+
+  const includeRecommendations = useCallback(async () => {
+    if (!project?.id || !token || project.status !== "selecting") return "failed" as const;
+    const plan = planRecommendationSelection(selectedIdsRef.current,
+      photos.filter((photo) => photo.photographerRecommended).map((photo) => photo.id), project.requiredCount);
+    if (!plan.fits) return "limit-reached" as const;
+    setSaveError(null);
+    const next = new Set(selectedIdsRef.current);
+    for (const id of plan.additions) {
+      next.add(id);
+      bumpVersion(id, "selected");
+      desiredSelectedRef.current.set(id, true);
+    }
+    selectedIdsRef.current = next;
+    setSelectedIds(next);
+    if (plan.additions.length === 0) return "saved" as const;
+    setSelectionSaving(true);
+    try {
+      await upsertSelectionsApi(token, project.id, plan.additions, true);
+      plan.additions.forEach((id) => {
+        if (desiredSelectedRef.current.get(id) === true) desiredSelectedRef.current.delete(id);
+      });
+      return "saved" as const;
+    } catch (error) {
+      if (!(error instanceof SelectionLimitError)) console.error(error);
+      const reverted = new Set(selectedIdsRef.current);
+      plan.additions.forEach((id) => {
+        if (desiredSelectedRef.current.get(id) !== true) return;
+        desiredSelectedRef.current.delete(id);
+        reverted.delete(id);
+      });
+      selectedIdsRef.current = reverted;
+      setSelectedIds(reverted);
+      if (error instanceof SelectionLimitError) {
+        setSaveError("다른 참여자가 먼저 목표 장수를 채웠어요. 최신 선택 상태를 확인해 주세요.");
+        return "limit-reached" as const;
+      }
+      setSaveError("추천 사진을 저장하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.");
+      return "failed" as const;
+    } finally {
+      setSelectionSaving(selectionFlushingRef.current.size > 0 || desiredSelectedRef.current.size > 0);
+    }
+  }, [project, token, photos, bumpVersion]);
 
   const Y = selectedIds.size;
   const N = project?.requiredCount ?? 0;
@@ -725,6 +801,8 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       Y,
       N,
       toggle,
+      includeRecommendations,
+      selectionSaving,
       isSelected,
       updatePhotoState,
       toggleColor,
@@ -744,6 +822,8 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       Y,
       N,
       toggle,
+      includeRecommendations,
+      selectionSaving,
       isSelected,
       updatePhotoState,
       toggleColor,

@@ -64,7 +64,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .control {
@@ -87,7 +87,10 @@
   outline-offset: 2px;
 }
 
-.search { width: clamp(160px, 20vw, 280px); }
+/* 색·테두리·placeholder는 FilenameSearchInput(fsi-root)이 고정한다 — 여기서는
+ * --fsi-* 변수로 이 툴바 자리에 맞는 크기만 넘긴다(.control이 sort 등 다른 컨트롤과도
+ * 공유돼 그쪽까지 손대지 않도록 이 클래스에서만 지정한다). */
+.search { --fsi-width: clamp(180px, 22vw, 320px); --fsi-height: 44px; --fsi-radius: 8px; --fsi-gap: 12px; --fsi-font-size: 14px; }
 
 .resultsScroll {
   min-height: 0;
@@ -98,37 +101,33 @@
 
 .mainFeedback { margin: 26px 40px 0; }
 
-.exportMenu { position: relative; height: 44px; border-left: 1px solid var(--border-subtle); margin-left: 2px; padding-left: 12px; }
-.exportMenu[open] > summary { background: var(--surface-raised); }
-.exportMenu summary { list-style: none; }
-.exportMenu summary::-webkit-details-marker { display: none; }
-.exportTrigger { color: var(--muted-foreground); }
-.exportTrigger:hover { border-color: var(--border-strong); background: var(--surface-raised); color: var(--foreground); }
+.exportMenu { position: relative; height: 42px; }
+.exportMenu[open] > summary { background: color-mix(in srgb, var(--foreground) 8%, var(--surface)); color: var(--foreground); }
+.exportMenu[open] > summary svg:last-child { transform: rotate(180deg); }
 
 .exportPopover {
   position: absolute;
-  top: 50px;
+  top: 48px;
   right: 0;
   z-index: 40;
-  width: 272px;
+  width: 252px;
   overflow: hidden;
-  border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface);
   padding: 6px;
-  box-shadow: 0 12px 32px rgba(2, 56, 82, 0.14);
+  box-shadow: 0 12px 28px rgba(2, 56, 82, 0.16);
 }
 
 .exportButton {
   display: flex;
   width: 100%;
-  min-height: 38px;
+  min-height: 40px;
   align-items: center;
   gap: 8px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
-  padding: 0 10px;
+  padding: 0 12px;
   color: var(--foreground);
   font: inherit;
   font-size: 13px;

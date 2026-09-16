@@ -41,7 +41,6 @@ import {
   X,
 } from "lucide-react";
 import styles from "./Workflow.module.css";
-import { PhotoCardComment } from "@/components/photographer/PhotoCardComment";
 import { normalizeReviewDeadlineYmd } from "@/lib/format-review-deadline";
 import { compressImageForUpload } from "@/lib/upload-client-compress";
 import { abandonDeliveryVersions, uploadDeliveryVersions, type DeliveryVersionUpload } from "@/lib/delivery-version-upload";
@@ -52,6 +51,7 @@ import {
   ProjectAssetToolbarButton,
   ProjectAssetMobileSheet,
   ProjectAssetMobileToolbarActions,
+  ProjectAssetExportTrigger,
   ProjectAssetToolbarSummary,
   ProjectAssetToolbarViewToggle,
   ProjectAssetWorkspaceToolbar,
@@ -295,110 +295,6 @@ function StatusBadge({
     <Badge tone="attention-warning" icon={<Clock size={11} />}>
       {compact ? "대기" : "검토 대기"}
     </Badge>
-  );
-}
-
-// ── Stage stepper (정의 유지, 렌더링은 제거됨) ──────────────────────────────
-
-type StepKey = "select" | "v1_upload" | "v1_review" | "v2_upload" | "v2_review" | "delivered";
-
-function StageStepper({
-  status,
-  allowRevision,
-  v1Uploaded,
-  v1Total,
-  approved,
-  revision,
-  v2Uploaded,
-  v2Total,
-}: {
-  status: ProjectStatus;
-  allowRevision: boolean;
-  v1Uploaded: number;
-  v1Total: number;
-  approved: number;
-  revision: number;
-  v2Uploaded: number;
-  v2Total: number;
-}) {
-  const steps: { key: StepKey; label: string; sub?: string }[] = [
-    { key: "select",      label: "셀렉",      sub: v1Total > 0 ? `${v1Total}장` : undefined },
-    { key: "v1_upload",   label: "V1 업로드",  sub: v1Total > 0 ? `${v1Uploaded}/${v1Total}` : undefined },
-    { key: "v1_review",   label: "V1 검토",    sub: revision > 0 ? `재보정 ${revision}` : approved > 0 ? `확정 ${approved}` : undefined },
-  ];
-  if (allowRevision) {
-    steps.push({ key: "v2_upload", label: "V2 업로드", sub: v2Total > 0 ? `${v2Uploaded}/${v2Total}` : undefined });
-    steps.push({ key: "v2_review", label: "V2 검토" });
-  }
-  steps.push({ key: "delivered", label: "납품" });
-
-  const stateOf = (key: StepKey): "done" | "active" | "todo" => {
-    const order: ProjectStatus[] = ["preparing", "selecting", "confirmed", "editing", "reviewing_v1", "editing_v2", "reviewing_v2", "delivered"];
-    const idx = order.indexOf(status);
-    const stageRank: Record<StepKey, number> = {
-      select:    1, // selecting 진입 시 active, 이후 done
-      v1_upload: 2,
-      v1_review: 3,
-      v2_upload: 4,
-      v2_review: 5,
-      delivered: 6,
-    };
-    const statusToRank: Record<ProjectStatus, number> = {
-      preparing:    0,
-      selecting:    1,
-      confirmed:    2,
-      editing:      2,
-      reviewing_v1: 3,
-      editing_v2:   4,
-      reviewing_v2: 5,
-      delivered:    6,
-    };
-    const cur = statusToRank[status] ?? 0;
-    const my = stageRank[key];
-    if (idx < 0) return "todo";
-    if (cur > my) return "done";
-    if (cur === my) return "active";
-    return "todo";
-  };
-
-  return (
-    <div className="shrink-0 px-4 md:px-8 py-2.5 md:py-3 border-b border-border-subtle bg-background/60">
-      <div className="flex items-center justify-between gap-2 max-w-[1600px] mx-auto">
-        {steps.map((step, i) => {
-          const s = stateOf(step.key);
-          const dot =
-            s === "done" ? "bg-emerald-500"
-            : s === "active" ? "bg-accent shadow-[0_0_8px_rgba(var(--accent-rgb),0.6)]"
-            : "bg-disabled-foreground";
-          const label =
-            s === "done" ? "text-muted-foreground"
-            : s === "active" ? "text-foreground"
-            : "text-disabled-foreground";
-          const sub =
-            s === "active" ? "text-accent" : "text-subtle-foreground";
-          const line =
-            s === "done" ? "bg-emerald-500/40" : "bg-border-subtle";
-          return (
-            <div key={step.key} className="flex items-center gap-2 flex-1 min-w-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className={`w-2 h-2 rounded-full ${dot} shrink-0`} />
-                <span className={`text-[11px] font-bold uppercase tracking-wider ${label} truncate`}>
-                  {step.label}
-                </span>
-                {step.sub && (
-                  <span className={`text-[10px] font-mono ${sub} hidden md:inline`}>
-                    {step.sub}
-                  </span>
-                )}
-              </div>
-              {i < steps.length - 1 && (
-                <div className={`flex-1 h-px ${line} mx-1`} />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 
@@ -766,7 +662,6 @@ function V1Card({
           <StatusBadge status={effectiveStatus === "pending" && isReviewingV1 ? "reviewing" : effectiveStatus as "approved" | "revision_requested" | "pending"} compact />
         </div>
       ) : null}
-      {!selectionMode && v1?.comment ? <PhotoCardComment readable label="검토 코멘트" comment={v1.comment} /> : null}
     </CardShell>
   );
 }
@@ -925,7 +820,6 @@ function V2Card({
       {showV2Status && !selectionMode ? (
         <div className="mt-1.5 min-w-0"><StatusBadge status={effectiveV2Status === "pending" && isReviewingV2 ? "reviewing" : effectiveV2Status} compact /></div>
       ) : null}
-      {!selectionMode && v2?.comment ? <PhotoCardComment readable label="검토 코멘트" comment={v2.comment} /> : null}
     </CardShell>
   );
 }
@@ -1026,7 +920,7 @@ export default function WorkflowPageClient({
   const [startingReview, setStartingReview] = useState<1 | 2 | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [reviewDeadlineModal, setReviewDeadlineModal] = useState<
-    { v: 1 | 2; dateInput: string; stage: "setup" | "share" } | null
+    { v: 1 | 2; dateInput: string; stage: "setup" | "share"; error?: string } | null
   >(null);
   const [uploadingVersionKeys, setUploadingVersionKeys] = useState<Set<string>>(new Set());
   const uploadingVersionKeysRef = useRef<Set<string>>(new Set());
@@ -1036,6 +930,7 @@ export default function WorkflowPageClient({
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [mobileExportOpen, setMobileExportOpen] = useState(false);
+  const [mobileRoundOpen, setMobileRoundOpen] = useState(false);
   const [reviewNoticeDismissed, setReviewNoticeDismissed] = useState(false);
   const [thumbQueue] = useState(() => createThumbLoadQueue(12));
   const contentScrollRef = useRef<HTMLDivElement>(null);
@@ -2138,6 +2033,8 @@ export default function WorkflowPageClient({
     if (project.status !== expectedStatus) return;
     const nextStatus = v === 1 ? "reviewing_v1" : "reviewing_v2";
     setStartingReview(v);
+    // 재시도 가능성이 있는 요청이라 이전 실패 문구를 지우고 시작한다.
+    setReviewDeadlineModal((m) => (m ? { ...m, error: undefined } : null));
     try {
       if (reviewDeadline) {
         const ymd = normalizeReviewDeadlineYmd(reviewDeadline);
@@ -2169,7 +2066,11 @@ export default function WorkflowPageClient({
       // 성공 시 같은 모달을 공유 단계로 전환 (작가가 직접 링크 공유)
       setReviewDeadlineModal((m) => (m ? { ...m, stage: "share" } : null));
     } catch (e) {
-      alert(e instanceof Error ? e.message : "고객 검토 시작 실패");
+      // 화면 표시상 "보정본 N장 준비 완료"라도 서버의 최종 납품 처리(delivery_ready_at)가
+      // 아직 안 끝났으면 여기서 거절될 수 있다(409). alert()는 닫으면 흔적이 안 남고
+      // 모달은 setup 단계 그대로라 재시도 안내조차 안 보인다 — 모달 안에 그대로 남긴다.
+      const message = e instanceof Error ? e.message : "고객 검토 시작 실패";
+      setReviewDeadlineModal((m) => (m ? { ...m, error: message } : null));
     } finally {
       setStartingReview(null);
     }
@@ -2183,6 +2084,20 @@ export default function WorkflowPageClient({
 
   function closeReviewDeadlineModal() {
     setReviewDeadlineModal(null);
+  }
+
+  /** CustomerInviteShareModal의 인라인 PIN 편집이 위임하는 저장 — upload 페이지의
+   * 같은 콜백과 동일한 계약이다(실패하면 던져서 모달 안 에러 문구로 보여준다). */
+  async function handleSavePin(newPin: string | null) {
+    if (!project) return;
+    const res = await fetch(`/api/photographer/projects/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ access_pin: newPin }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((data as { error?: string }).error ?? "저장 실패");
+    setProject((prev) => prev ? { ...prev, accessPin: newPin } : null);
   }
 
   // 본문 그리드용 카드 인덱스를 viewer 인덱스에 맞추기 위해 filteredRows 사용
@@ -2202,6 +2117,24 @@ export default function WorkflowPageClient({
         originalCount={photos.length}
         selectedCount={selectedIds.size}
         compact={compactHeader}
+        tabTrailing={assetView === "retouched" && showV2Tab ? (
+          <>
+            <div data-retouch-stage-stepper role="group" aria-label="보정 단계" className="hidden h-8 items-center gap-1 pl-1 md:flex">
+              <button type="button" data-retouch-round="v1" data-viewed={stageTab === "v1" ? "true" : "false"} aria-pressed={stageTab === "v1"} onClick={() => selectRound("v1")} className={`h-8 px-2 text-[13px] font-semibold leading-8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 ${stageTab === "v1" ? "text-accent" : "text-muted-foreground"}`}>
+                1차 보정
+              </button>
+              <span className="text-[12px] text-disabled-foreground" aria-hidden>·</span>
+              <button type="button" data-retouch-round="v2" data-viewed={stageTab === "v2" ? "true" : "false"} aria-current="step" aria-pressed={stageTab === "v2"} onClick={() => selectRound("v2")} className={`flex h-8 items-center gap-1.5 px-2 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 ${stageTab === "v2" ? "font-bold text-accent" : "font-semibold text-foreground"}`}>
+                <span>재보정</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan" aria-hidden />
+                <span className="text-[10px] font-medium text-cyan">진행 중</span>
+              </button>
+            </div>
+            <button type="button" data-mobile-retouch-stage-trigger onClick={() => setMobileRoundOpen(true)} className="flex h-10 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-foreground md:hidden" aria-haspopup="dialog" aria-expanded={mobileRoundOpen}>
+              {stageTab === "v2" ? "2/2 재보정" : "1/2 1차 보정"}<ChevronDown size={14} className="text-muted-foreground" aria-hidden />
+            </button>
+          </>
+        ) : undefined}
       />
 
       {/* ── Retouch work toolbar ── */}
@@ -2211,40 +2144,6 @@ export default function WorkflowPageClient({
           compactMobile
           leading={(
             <>
-              {assetView === "retouched" && showV2Tab ? (
-                <>
-                  <div
-                    role="tablist"
-                    aria-label="보정 회차"
-                    className="hidden h-9 shrink-0 items-center gap-0.5 rounded-lg bg-surface-raised p-1 md:flex"
-                  >
-                    {(["v1", "v2"] as const).map((round) => (
-                      <button
-                        key={round}
-                        type="button"
-                        role="tab"
-                        aria-selected={stageTab === round}
-                        onClick={() => selectRound(round)}
-                        className={`h-7 rounded-md px-3 text-[12px] font-semibold transition-[background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 ${
-                          stageTab === round
-                            ? "bg-surface text-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {round === "v1" ? "1차 보정" : "재보정"}
-                      </button>
-                    ))}
-                  </div>
-                  <select
-                    aria-label="보정 라운드"
-                    value={stageTab}
-                    onChange={(event) => selectRound(event.target.value as "v1" | "v2")}
-                    className="h-11 min-w-0 max-w-[94px] shrink-0 bg-transparent pr-1 text-[13px] font-semibold text-foreground md:hidden"
-                  >
-                    <option value="v1">1차 보정</option><option value="v2">재보정</option>
-                  </select>
-                </>
-              ) : null}
               <div className="flex min-w-0 items-center gap-1 md:gap-3">
                 {viewMode === "gallery" && activeCanSelect && selectableVersionIds.length > 0 ? (
                   <button
@@ -2406,65 +2305,47 @@ export default function WorkflowPageClient({
                 ) : undefined}
               />
             ) : null}
-            {selectedVersionIds.size === 0 && stageTab !== "final" && toolbarDataAvailable && activeUploadTotal > 0 && activeCanUpload ? (
-              <div
-                className="hidden items-center border-r border-border-subtle pr-4 md:flex"
-                title={activeUploadDisabledReason}
-              >
-                <ProjectAssetToolbarButton
-                  onClick={() => openPanel(stageTab === "v2" ? 2 : 1)}
-                  disabled={!activeCanUpload}
-                  title={activeUploadDisabledReason ?? (activeUploadComplete
-                    ? "업로드한 보정본을 일괄 교체합니다"
-                    : "남은 보정본을 일괄 업로드합니다")}
-                  variant="secondary"
-                >
-                  {activeUploadComplete ? <SquarePen size={16} /> : <Upload size={16} />}
-                  {activeUploadComplete ? "일괄 교체" : "일괄 업로드"}
-                </ProjectAssetToolbarButton>
+            {selectedVersionIds.size === 0 ? (
+              <div className="hidden md:block">
+                <ProjectAssetToolbarViewToggle value={viewMode} onChange={setViewMode} />
               </div>
             ) : null}
             {selectedVersionIds.size === 0 && rows.length > 0 && (
               <div ref={exportMenuRef} className="relative hidden md:block">
-                <ProjectAssetToolbarButton
+                <ProjectAssetExportTrigger
+                  ariaLabel={`${stageTab === "final" ? "최종본" : "보정본"} 내보내기`}
+                  open={showExportMenu}
                   onClick={() => setShowExportMenu((v) => !v)}
-                >
-                  <Download size={17} />
-                  내보내기
-                  <ChevronDown size={16} className={`transition-transform ${showExportMenu ? "rotate-180" : ""}`} />
-                </ProjectAssetToolbarButton>
+                />
                 {showExportMenu && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
                     <div
                       data-desktop-export-menu
-                      className="absolute right-0 top-full z-20 mt-1 min-w-[232px] overflow-hidden rounded-xl border border-border-subtle bg-surface shadow-xl"
+                      className="absolute right-0 top-[48px] z-20 w-[252px] overflow-hidden rounded-[10px] bg-surface p-1.5 shadow-[0_12px_28px_rgba(2,56,82,0.16)]"
                     >
-                      <div className="px-4 pt-3 pb-1 text-[9px] font-mono tracking-[0.14em] text-disabled-foreground">
-                        목록 내보내기
-                      </div>
                       <button
                         type="button"
-                        onClick={() => handleDownloadReview(false)}
-                        className="w-full flex items-center gap-2 px-4 py-2.5 text-[11px] text-muted-foreground hover:bg-surface-raised hover:text-foreground transition-colors text-left"
+                        onClick={() => { setShowExportMenu(false); handleDownloadReview(false); }}
+                        className="flex min-h-10 w-full items-center gap-2 rounded-[7px] px-3 text-left text-[13px] text-foreground transition-colors hover:bg-surface-raised"
                       >
-                        <Download size={11} className="text-subtle-foreground shrink-0" />
+                        <Download size={15} className="shrink-0 text-muted-foreground" />
                         파일명 목록 (.csv)
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDownloadReview(true)}
-                        className="w-full flex items-center gap-2 px-4 py-2.5 text-[11px] text-muted-foreground hover:bg-surface-raised hover:text-foreground transition-colors text-left"
+                        onClick={() => { setShowExportMenu(false); handleDownloadReview(true); }}
+                        className="flex min-h-10 w-full items-center gap-2 rounded-[7px] px-3 text-left text-[13px] text-foreground transition-colors hover:bg-surface-raised"
                       >
-                        <Download size={11} className="text-accent shrink-0" />
+                        <Download size={15} className="shrink-0 text-accent" />
                         코멘트 포함 (.csv)
                       </button>
                       <div className="h-px bg-border-subtle mx-3" />
                       <button
                         type="button"
-                        onClick={() => void handleDownloadSelectedOriginals()}
+                        onClick={() => { setShowExportMenu(false); void handleDownloadSelectedOriginals(); }}
                         disabled={!canDownloadSelectedOriginals || originalDownloadProgress !== null}
-                        className="w-full flex items-start gap-2 px-4 py-3 text-left transition-colors enabled:hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex min-h-[58px] w-full items-start gap-2 rounded-[7px] px-3 py-2.5 text-left transition-colors enabled:hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <Download size={12} className="text-accent shrink-0 mt-0.5" />
                         <span className="min-w-0">
@@ -2488,15 +2369,60 @@ export default function WorkflowPageClient({
                 )}
               </div>
             )}
-            {selectedVersionIds.size === 0 ? (
-              <div className="ml-2 hidden border-l border-border-subtle pl-3 md:block">
-                <ProjectAssetToolbarViewToggle value={viewMode} onChange={setViewMode} />
+            {selectedVersionIds.size === 0 && stageTab !== "final" && toolbarDataAvailable && activeUploadTotal > 0 && activeCanUpload ? (
+              <div className="hidden items-center md:flex" title={activeUploadDisabledReason}>
+                <ProjectAssetToolbarButton
+                  data-workflow-bulk-upload-action
+                  onClick={() => openPanel(stageTab === "v2" ? 2 : 1)}
+                  disabled={!activeCanUpload}
+                  title={activeUploadDisabledReason ?? (activeUploadComplete
+                    ? "업로드한 보정본을 일괄 교체합니다"
+                    : "남은 보정본을 일괄 업로드합니다")}
+                  className="!h-[42px] !border-0 !bg-accent/[0.10] !px-3.5 !text-[13px] !font-semibold !text-accent hover:!bg-accent/[0.16]"
+                >
+                  {activeUploadComplete ? <SquarePen size={16} /> : <Upload size={16} />}
+                  {activeUploadComplete ? "일괄 교체" : "일괄 업로드"}
+                </ProjectAssetToolbarButton>
               </div>
             ) : null}
             </div>
           )}
         />
       )}
+
+      <ProjectAssetMobileSheet
+        open={!isSelecting && assetView === "retouched" && showV2Tab && mobileRoundOpen}
+        onClose={() => setMobileRoundOpen(false)}
+        title="보정 단계"
+        titleId="mobile-retouch-stage-title"
+        closeLabel="보정 단계 닫기"
+      >
+        <div className="space-y-2 py-5" role="group" aria-label="보정 단계 이동">
+          {(["v1", "v2"] as const).map((round) => {
+            const selected = stageTab === round;
+            const current = round === "v2";
+            return (
+              <button
+                key={round}
+                type="button"
+                aria-pressed={selected}
+                aria-current={current ? "step" : undefined}
+                onClick={() => { selectRound(round); setMobileRoundOpen(false); }}
+                className={`flex min-h-14 w-full items-center gap-3 rounded-lg px-3 text-left transition-colors ${selected ? "bg-accent/[0.08]" : "bg-transparent"}`}
+              >
+                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[12px] font-bold ${selected ? "bg-accent text-white" : current ? "border border-cyan text-cyan" : "bg-[var(--stepper-done-node)] text-white"}`}>
+                  {current ? "2" : <Check size={13} strokeWidth={3} aria-hidden />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <strong className={`block text-[14px] ${selected ? "text-accent" : "text-foreground"}`}>{round === "v1" ? "1차 보정" : "재보정"}</strong>
+                  <small className={`mt-0.5 block text-[11px] ${current ? "text-cyan" : "text-muted-foreground"}`}>{current ? "현재 진행 단계" : "완료된 단계"}</small>
+                </span>
+                {selected ? <Check size={17} className="text-accent" aria-label="현재 보고 있는 단계" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      </ProjectAssetMobileSheet>
 
       <ProjectAssetMobileSheet
         open={!isSelecting && mobileToolsOpen}
@@ -3049,6 +2975,7 @@ export default function WorkflowPageClient({
           photoCount={reviewDeadlineModal.v === 2 ? v2Total : counts.total}
           initialDeadline={reviewDeadlineModal.dateInput || project?.reviewDeadline}
           pending={startingReview === reviewDeadlineModal.v}
+          error={reviewDeadlineModal.error}
           onRequest={(deadline) => {
             void runStartCustomerReview(reviewDeadlineModal.v, deadline);
           }}
@@ -3060,6 +2987,7 @@ export default function WorkflowPageClient({
         onClose={closeReviewDeadlineModal}
         inviteUrl={inviteUrl}
         accessPin={project?.accessPin}
+        onSavePin={handleSavePin}
       />
     </div>
   );

@@ -33,7 +33,7 @@ export function PhotoAnalysisFilterGroup({
   return (
     <div className={`${styles.root}${layout === "grid" ? ` ${styles.grid}` : ""}`} role="group" aria-label="사진 분석 필터">
       {options.map((option) => (
-        <label key={option.key} className={styles.item} data-active={option.checked ? "true" : undefined}>
+        <label key={option.key} className={styles.item}>
           <input type="checkbox" checked={option.checked} onChange={(event) => option.onChange(event.target.checked)} />
           <span>{option.label}</span>
           <b>{option.count.toLocaleString()}</b>

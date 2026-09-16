@@ -26,6 +26,24 @@ export function getPhotoDisplayName(photo: Photo): string {
   return `#${photo.orderIndex}`;
 }
 
+/** 쉼표/공백으로 구분한 여러 검색어를 OR로 매칭 — 파일명 검색을 쓰는 모든 화면(고객 갤러리
+ * 기준)이 공유하는 규칙. macOS에서 한글 파일명이 NFD로 분해돼 저장되는 경우를 대비해
+ * NFC로 정규화한 뒤 비교한다. */
+export function matchesFilenameQuery(name: string, query: string): boolean {
+  const terms = Array.from(
+    new Set(
+      query
+        .normalize("NFC")
+        .split(/[,\s]+/)
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean)
+    )
+  );
+  if (terms.length === 0) return true;
+  const normalizedName = name.normalize("NFC").toLowerCase();
+  return terms.some((term) => normalizedName.includes(term));
+}
+
 /** 정렬 키: original_filename 우선, 없으면 URL에서 추출 (파일명순 정렬용) */
 function getPhotoSortKey(photo: Photo): string {
   const name = photo.originalFilename?.trim();
@@ -147,7 +165,7 @@ export type GalleryFilterState = {
    * 색이 1개 이하면 두 모드의 결과가 같다.
    */
   colorFilterMode: "any" | "all";
-  selectedFilter: "all" | "selected";
+  selectedFilter: "all" | "selected" | "recommended";
   sortOrder: SortOrder;
   /** 파일명 검색(쉼표/공백으로 구분한 여러 파일명, LIKE OR) — 원문 그대로 보관, 매칭 시 split */
   nameFilter: string;
@@ -192,8 +210,8 @@ export function parseFilterFromSearchParams(
   })();
   const sortOrder: SortOrder =
     sort === "oldest" ? "oldest" : sort === "newest" ? "newest" : "filename";
-  const selectedFilter: "all" | "selected" =
-    selected === "selected" ? "selected" : "all";
+  const selectedFilter: "all" | "selected" | "recommended" =
+    selected === "selected" || selected === "recommended" ? selected : "all";
   const nameFilter = name ?? "";
   const qualityFilter: QualityFilterFlag[] = (quality ?? "")
     .split(",")
@@ -279,6 +297,8 @@ export function getFilteredPhotos(
   let list = [...photos];
   if (state.selectedFilter === "selected") {
     list = list.filter((p) => selectedIds.has(p.id));
+  } else if (state.selectedFilter === "recommended") {
+    list = list.filter((p) => p.photographerRecommended);
   }
   if (state.starFilter !== "all") {
     list = list.filter((p) => (photoStates[p.id]?.rating ?? 0) >= (state.starFilter as number));
@@ -295,19 +315,8 @@ export function getFilteredPhotos(
   if (state.colorFilter === "none") {
     list = list.filter((p) => !photoStates[p.id]?.color?.length);
   }
-  const nameTerms = Array.from(
-    new Set(
-      state.nameFilter
-        .split(/[,\s]+/)
-        .map((s) => s.trim().toLowerCase())
-        .filter(Boolean)
-    )
-  );
-  if (nameTerms.length > 0) {
-    list = list.filter((p) => {
-      const name = getPhotoDisplayName(p).toLowerCase();
-      return nameTerms.some((term) => name.includes(term));
-    });
+  if (state.nameFilter.trim()) {
+    list = list.filter((p) => matchesFilenameQuery(getPhotoDisplayName(p), state.nameFilter));
   }
   if (state.qualityFilter.length > 0) {
     list = list.filter((p) =>

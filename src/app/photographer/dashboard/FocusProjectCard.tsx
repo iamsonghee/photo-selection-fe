@@ -6,6 +6,7 @@ import type { ComponentType, CSSProperties } from "react";
 import type { Project } from "@/types";
 import { getActiveDeadline } from "@/lib/project-deadline";
 import { dday, getProjectActor } from "@/lib/project-actor";
+import { formatKstDate } from "@/lib/kst-date";
 import { ProjectIdText } from "@/components/photographer/ProjectIdText";
 import styles from "./FocusProjectCard.module.css";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -30,7 +31,7 @@ const ACCENT_COLOR: Record<HeadlineAccent, string> = {
 type IconComponent = ComponentType<{ size?: number; className?: string; style?: CSSProperties }>;
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" });
+  return formatKstDate(iso);
 }
 
 /**

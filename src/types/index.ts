@@ -28,6 +28,8 @@ export interface Photo {
   previewUrl?: string | null;
   /** DB original_filename. 없으면 URL에서 추출하거나 number로 fallback */
   originalFilename?: string | null;
+  /** 고객 셀렉 전 작가가 추천한 사진 */
+  photographerRecommended?: boolean;
   /** DB file_size (bytes). R2에 올라간 썸네일+미리보기 JPEG 합계 */
   fileSize?: number | null;
   /** 사용자가 선택한 원본 파일의 File.size (bytes). 가공 산출물 fileSize와 별개 */

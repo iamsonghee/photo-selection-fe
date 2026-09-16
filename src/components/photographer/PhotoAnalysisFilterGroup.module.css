@@ -14,39 +14,22 @@
 
 .item {
   min-height: 44px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
+  padding: 0 6px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--muted-foreground);
+  color: var(--foreground);
   font-size: 13px;
   font-weight: 600;
   letter-spacing: -0.35px;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
 }
 
 .grid .item {
   width: 100%;
-  border: 1px solid var(--border);
-  background: var(--surface);
 }
 
-.item:hover {
-  background: var(--surface-raised);
-  color: var(--foreground);
-}
-
-.item:focus-within {
-  outline: 2px solid rgba(var(--accent-rgb), 0.24);
-  outline-offset: 2px;
-}
-
-.item[data-active="true"] { color: var(--accent); }
 .item input { width: 15px; height: 15px; margin: 0; flex: none; cursor: pointer; accent-color: var(--accent); }
 .item b { font-weight: 700; font-variant-numeric: tabular-nums; }
 .grid .item b { margin-left: auto; }

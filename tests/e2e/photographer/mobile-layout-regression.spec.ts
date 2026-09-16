@@ -423,7 +423,7 @@ for (const browserName of ["chromium", "webkit"] as const) {
         await page.setViewportSize({ width: 1440, height: 1000 });
         await expect(page.locator('.photographer-mobile-header')).toBeHidden();
         await expect.poll(async () => (await mappedRow.locator('[data-original-photo-list-thumbnail]').first().boundingBox())?.width ?? 0).toBe(52);
-        await page.getByRole('button', { name: '갤러리 보기', exact: true }).click();
+        await page.getByRole('button', { name: '갤러리로 보기', exact: true }).click();
         await expect(assetGrid).toBeVisible();
         const desktopCard = workflowCards.filter({ hasText: retouchedFilename });
         const desktopCheckbox = desktopCard.getByRole('checkbox', { name: /보정본 선택$/ });
@@ -468,8 +468,8 @@ for (const browserName of ["chromium", "webkit"] as const) {
         fixtureStatus = "editing_v2";
         await page.setViewportSize({ width: 402, height: 874 });
         await page.goto(`/photographer/projects/${project.projectId}/assets/retouched?round=v1`);
-        const round = page.getByRole('combobox', { name: '보정 라운드' });
-        await expect(round).toHaveValue('v1');
+        const roundTrigger = page.locator('[data-mobile-retouch-stage-trigger]');
+        await expect(roundTrigger).toContainText('1/2 1차 보정');
         await expect(retouchedGridCard).not.toContainText(retouchComment);
         const roundFooter = page.locator('[data-photographer-page-action-bar]');
         await expect(roundFooter).toContainText('1차 보정 검토 완료');
@@ -481,7 +481,11 @@ for (const browserName of ["chromium", "webkit"] as const) {
         await expect(currentReviewComment).toContainText(retouchComment);
         await expect(currentReviewComment).not.toContainText(selectionComment);
         await revisionViewer.getByRole('button', { name: '사진 상세 보기 닫기' }).tap();
-        await round.selectOption('v2');
+        await roundTrigger.click();
+        const stageSheet = page.getByRole('dialog', { name: '보정 단계' });
+        await expect(stageSheet.getByText('현재 진행 단계', { exact: true })).toBeVisible();
+        await stageSheet.getByRole('button', { name: /재보정 현재 진행 단계/ }).click();
+        await expect(roundTrigger).toContainText('2/2 재보정');
         await expect(roundFooter.getByRole('button', { name: '일괄 업로드', exact: true })).toBeVisible();
         for (const width of [402, 320]) {
           await page.setViewportSize({ width, height: 874 });
@@ -493,7 +497,8 @@ for (const browserName of ["chromium", "webkit"] as const) {
         await page.reload();
         await expect(roundFooter).toContainText('재보정본 1장 준비 완료');
         await expect(roundFooter.getByRole('button', { name: '재보정본 검토 요청', exact: true })).toBeEnabled();
-        await round.selectOption('v1');
+        await page.locator('[data-mobile-retouch-stage-trigger]').click();
+        await page.getByRole('dialog', { name: '보정 단계' }).getByRole('button', { name: /1차 보정 완료된 단계/ }).click();
         await expect(roundFooter.getByRole('button', { name: '재보정본 검토 요청', exact: true })).toHaveCount(0);
 
         fixtureStatus = "delivered";
@@ -508,7 +513,7 @@ for (const browserName of ["chromium", "webkit"] as const) {
         await expect(deliveredActionBar.getByText('보정 작업 보기', { exact: true })).toHaveCount(0);
         await page.goto(`/photographer/projects/${project.projectId}/assets/final`, { waitUntil: "domcontentloaded", timeout: 15_000 });
         await expect(page.getByRole('tab', { name: '최종본', exact: true })).toHaveAttribute('aria-selected', 'true');
-        await expect(page.locator('[data-workflow-asset-content]')).not.toContainText('재보정 요청');
+        await expect(page.getByText('재보정 요청', { exact: true }).filter({ visible: true })).toHaveCount(0);
         await expect(page.getByRole('region', { name: '최종본 작업 도구' })).toContainText('최종 확정본');
       } finally { try { await deleteTestProject(page, project.projectId); } finally { await browser.close(); } }
     });

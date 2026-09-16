@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  AlertTriangle, Check, ChevronDown, ChevronLeft, Clipboard, Download,
-  Loader2, Search, Sparkles, X,
+  AlertTriangle, Check, ChevronLeft, Clipboard, Download,
+  Loader2, Sparkles,
 } from "lucide-react";
 import { PhotographerLightPageFrame } from "@/components/layout/PhotographerLightPageHeader";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -14,17 +14,21 @@ import {
   ProjectAssetToolbarButton,
   ProjectAssetMobileSheet,
   ProjectAssetMobileToolbarActions,
+  ProjectAssetExportTrigger,
   ProjectAssetToolbarViewToggle,
   ProjectAssetWorkspaceToolbar,
 } from "@/components/photographer/ProjectAssetWorkspaceToolbar";
 import { PhotographerPhotoGallery } from "@/components/photographer/OriginalPhotoGallery";
 import { OriginalPhotoViewer } from "@/components/photographer/OriginalPhotoViewer";
+import { PhotoScopeSelect } from "@/components/photographer/PhotoScopeSelect";
 import { PhotoAnalysisFilterGroup } from "@/components/photographer/PhotoAnalysisFilterGroup";
 import { ViewerCommentPanel } from "@/components/photographer/ViewerCommentPanel";
 import { ProjectAssetStatusActionBar } from "@/components/photographer/ProjectAssetStatusActionBar";
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
+import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
+import { PhotoSortSelect } from "@/components/photographer/PhotoSortSelect";
 import { useProjectAssetsData } from "@/components/photographer/ProjectAssetsDataProvider";
-import { usePriorityImagePreload } from "@/lib/gallery-filter";
+import { usePriorityImagePreload, matchesFilenameQuery } from "@/lib/gallery-filter";
 import { getPhotoDisplayFilename } from "@/lib/photo-display-filename";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import { useAdjacentImagePreload } from "@/lib/use-adjacent-image-preload";
@@ -36,7 +40,7 @@ import type { Photo, PhotoGroupInfo } from "@/types";
 import styles from "../results/ResultsTheme.module.css";
 
 type ViewMode = "gallery" | "list";
-type SortMode = "filename-asc" | "filename-desc" | "comment-first";
+type SortMode = "filename-asc" | "uploaded-desc" | "uploaded-asc" | "comment-first";
 type QualityFilter = "eyesClosed" | "blurry";
 export type ResultsTab = "original" | "selected";
 
@@ -88,6 +92,7 @@ export default function ProjectAssetsPageClient({
   const [actionError, setActionError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [showRecommendedOnly, setShowRecommendedOnly] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>("filename-asc");
   const [viewMode, setViewMode] = useState<ViewMode>("gallery");
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
@@ -138,8 +143,9 @@ export default function ProjectAssetsPageClient({
   }, [id]);
 
   useEffect(() => {
+    if (activeTab !== "original") return;
     void Promise.all([loadPhotoGroups(), loadAnalysisStatus()]);
-  }, [loadAnalysisStatus, loadPhotoGroups]);
+  }, [activeTab, loadAnalysisStatus, loadPhotoGroups]);
 
   useEffect(() => {
     if (activeTab !== "original") return;
@@ -193,6 +199,17 @@ export default function ProjectAssetsPageClient({
     () => displayPhotos.filter((photo) => selectedIds.has(photo.id)),
     [displayPhotos, selectedIds],
   );
+  const recommendedPhotoIds = useMemo(
+    () => new Set(displayPhotos.filter((photo) => photo.photographerRecommended).map((photo) => photo.id)),
+    [displayPhotos],
+  );
+  const recommendedCount = recommendedPhotoIds.size;
+
+  useEffect(() => {
+    if (activeTab !== "original" || recommendedCount === 0) {
+      setShowRecommendedOnly(false);
+    }
+  }, [activeTab, recommendedCount]);
 
   const qualityCounts = useMemo(() => ({
     eyesClosed: displayPhotos.filter((photo) => photo.faceDetected === true && photo.eyesClosed === true).length,
@@ -208,10 +225,11 @@ export default function ProjectAssetsPageClient({
   }, []);
 
   const ungroupedFilteredPhotos = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase();
-    const tabPhotos = activeTab === "original" ? displayPhotos : selectedPhotos;
+    const tabPhotos = activeTab === "original"
+      ? showRecommendedOnly ? displayPhotos.filter((photo) => recommendedPhotoIds.has(photo.id)) : displayPhotos
+      : selectedPhotos;
     const next = tabPhotos.filter((photo) => {
-      if (!getDisplayFilename(photo).toLocaleLowerCase().includes(normalizedQuery)) return false;
+      if (!matchesFilenameQuery(getDisplayFilename(photo), query)) return false;
       if (activeTab !== "original" || qualityFilter.size === 0) return true;
       return (qualityFilter.has("blurry") && photo.isBlurry === true)
         || (qualityFilter.has("eyesClosed") && photo.faceDetected === true && photo.eyesClosed === true);
@@ -222,13 +240,21 @@ export default function ProjectAssetsPageClient({
         const bHasComment = Boolean(photoStates[b.id]?.comment?.trim());
         if (aHasComment !== bHasComment) return aHasComment ? -1 : 1;
       }
-      const compared = getDisplayFilename(a).localeCompare(getDisplayFilename(b), undefined, {
+      if (sortMode === "uploaded-desc" || sortMode === "uploaded-asc") {
+        const aTime = Date.parse(a.createdAt ?? "") || 0;
+        const bTime = Date.parse(b.createdAt ?? "") || 0;
+        if (aTime !== bTime) {
+          if (!aTime) return 1;
+          if (!bTime) return -1;
+          return sortMode === "uploaded-desc" ? bTime - aTime : aTime - bTime;
+        }
+      }
+      return getDisplayFilename(a).localeCompare(getDisplayFilename(b), undefined, {
         numeric: true, sensitivity: "base",
       });
-      return sortMode === "filename-desc" ? -compared : compared;
     });
     return next;
-  }, [activeTab, displayPhotos, photoStates, qualityFilter, query, selectedPhotos, sortMode]);
+  }, [activeTab, displayPhotos, photoStates, qualityFilter, query, recommendedPhotoIds, selectedPhotos, showRecommendedOnly, sortMode]);
 
   const groupsById = useMemo(() => buildGroupsById(photoGroups), [photoGroups]);
   const membersByGroup = useMemo(() => buildMembersByGroup(displayPhotos), [displayPhotos]);
@@ -547,6 +573,14 @@ export default function ProjectAssetsPageClient({
         mobileHidden={immersiveHeader}
         leading={activeTab === "original" ? (
           <div className="flex w-full min-w-0 items-center gap-2 text-[16px] font-semibold leading-[29px] tracking-[-0.54px] md:w-auto md:shrink-0">
+            {recommendedCount > 0 ? (
+              <PhotoScopeSelect
+                totalCount={displayPhotos.length}
+                recommendedCount={recommendedCount}
+                recommendedOnly={showRecommendedOnly}
+                onChange={setShowRecommendedOnly}
+              />
+            ) : null}
             <div className="md:hidden">
               {photoGroups.length > 0 ? (
                 <PhotoAnalysisFilterGroup
@@ -625,28 +659,24 @@ export default function ProjectAssetsPageClient({
               exportLabel="셀렉 결과 내보내기"
             />
             <div className="hidden md:contents">
-              {/* 자주 쓰는 파일명 복사는 다운로드 메뉴를 열지 않고 바로 실행한다. */}
-              {activeTab === "selected" ? <ProjectAssetToolbarButton onClick={handleCopyClipboard} disabled={selectedPhotos.length === 0}><Clipboard size={16} />파일명 복사</ProjectAssetToolbarButton> : null}
-              <label className={`${styles.control} ${styles.search} flex items-center gap-[18px] px-5`}>
-                <Search size={20} className="shrink-0 text-subtle-foreground" />
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="파일명 검색" className="min-w-0 flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-placeholder-foreground" aria-label="파일명 검색" />
-              </label>
-              <label className={`${styles.control} flex shrink-0 items-center gap-2 px-5`}>
-                <span className="sr-only">정렬</span>
-                <select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)} className="appearance-none bg-transparent pr-5 text-[14px] outline-none">
-                  <option value="filename-asc">정렬 : 파일명순</option>
-                  <option value="filename-desc">정렬 : 파일명 역순</option>
-                  {activeTab === "selected" ? <option value="comment-first">정렬 : 코멘트 우선</option> : null}
-                </select>
-                <ChevronDown size={16} className="-ml-5 pointer-events-none text-subtle-foreground" />
-              </label>
+              <FilenameSearchInput value={query} onChange={setQuery} className={styles.search} />
+              <PhotoSortSelect
+                value={sortMode}
+                onChange={setSortMode}
+                options={[
+                  { value: "filename-asc", label: "파일명순" },
+                  { value: "uploaded-desc", label: "최근 업로드순" },
+                  { value: "uploaded-asc", label: "오래된 업로드순" },
+                  ...(activeTab === "selected" ? [{ value: "comment-first" as const, label: "코멘트 우선" }] : []),
+                ]}
+              />
               <ProjectAssetToolbarViewToggle value={viewMode} onChange={setViewMode} />
               {activeTab === "selected" ? <details ref={exportMenuRef} className={styles.exportMenu}>
-                <summary className={`${styles.control} ${styles.exportTrigger} flex cursor-pointer list-none items-center gap-2 px-4`} aria-label="셀렉 결과 내보내기"><Download size={17} /><span>내보내기</span></summary>
+                <ProjectAssetExportTrigger as="summary" ariaLabel="셀렉 결과 내보내기" />
                 <div className={styles.exportPopover}>
-                  <button type="button" className={styles.exportButton} onClick={handleCopyClipboard}><Clipboard size={15} /> 파일명 복사</button>
-                  <button type="button" className={styles.exportButton} onClick={handleDownloadCsv}><Download size={15} /> CSV 다운로드</button>
-                  <button type="button" className={styles.exportButton} onClick={handleDownloadTxt}><Download size={15} /> TXT 다운로드</button>
+                  <button type="button" className={styles.exportButton} onClick={() => { exportMenuRef.current?.removeAttribute("open"); void handleCopyClipboard(); }}><Clipboard size={15} /> 파일명 복사</button>
+                  <button type="button" className={styles.exportButton} onClick={() => { exportMenuRef.current?.removeAttribute("open"); handleDownloadCsv(); }}><Download size={15} /> CSV 다운로드</button>
+                  <button type="button" className={styles.exportButton} onClick={() => { exportMenuRef.current?.removeAttribute("open"); handleDownloadTxt(); }}><Download size={15} /> TXT 다운로드</button>
                   <div className={styles.exportDivider} />
                   <button
                     type="button"
@@ -694,30 +724,20 @@ export default function ProjectAssetsPageClient({
             <div className="space-y-5 py-5">
               <section aria-labelledby="mobile-filename-search-title">
                 <h3 id="mobile-filename-search-title" className="mb-2 text-[14px] font-semibold text-foreground">파일명 검색</h3>
-                <label className="flex h-12 items-center gap-3 rounded-lg border border-border bg-surface px-4 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/10">
-                  <Search size={18} className="shrink-0 text-subtle-foreground" aria-hidden />
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="파일명을 입력하세요"
-                    className="min-w-0 flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-placeholder-foreground"
-                    aria-label="파일명 검색"
-                  />
-                  {query ? (
-                    <button type="button" onClick={() => setQuery("")} className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground" aria-label="검색어 지우기">
-                      <X size={16} aria-hidden />
-                    </button>
-                  ) : null}
-                </label>
+                <FilenameSearchInput
+                  value={query}
+                  onChange={setQuery}
+                  style={{ "--fsi-height": "48px", "--fsi-radius": "8px" } as React.CSSProperties}
+                />
               </section>
 
               <section className="border-t border-border-subtle pt-5" aria-labelledby="mobile-sort-title">
                 <h3 id="mobile-sort-title" className="mb-2 text-[14px] font-semibold text-foreground">정렬</h3>
-                <div className={`grid gap-2 ${activeTab === "selected" ? "grid-cols-3" : "grid-cols-2"}`} role="group" aria-label="사진 정렬 방식">
+                <div className="grid grid-cols-2 gap-2" role="group" aria-label="사진 정렬 방식">
                   {([
                     ["filename-asc", "파일명순"],
-                    ["filename-desc", "파일명 역순"],
+                    ["uploaded-desc", "최근 업로드순"],
+                    ["uploaded-asc", "오래된 업로드순"],
                     ...(activeTab === "selected" ? [["comment-first", "코멘트 우선"] as const] : []),
                   ] as ReadonlyArray<readonly [SortMode, string]>).map(([value, label]) => (
                     <button
@@ -804,7 +824,7 @@ export default function ProjectAssetsPageClient({
         {dataError || actionError ? <div className={`${styles.mainFeedback} mb-4 rounded-lg border border-danger/20 bg-danger/5 px-4 py-3 text-[13px] text-danger`}>{dataError ?? actionError}</div> : null}
         {filteredPhotos.length === 0 ? (
           <div className={`${styles.mainFeedback} flex min-h-[360px] items-center justify-center rounded-xl border border-border-subtle bg-surface text-[14px] text-muted-foreground`}>
-            {query.trim() || qualityFilter.size > 0
+            {query.trim() || qualityFilter.size > 0 || showRecommendedOnly
               ? "검색 결과가 없습니다."
               : activeTab === "original"
                 ? "업로드된 원본 사진이 없습니다."
@@ -821,12 +841,12 @@ export default function ProjectAssetsPageClient({
             readonly
             variant={activeTab === "original" ? "original" : "selection"}
             showQualityBadges={activeTab === "original"}
+            recommendedPhotoIds={activeTab === "original" ? recommendedPhotoIds : undefined}
             mobileMinCols={activeTab === "original" ? 3 : 2}
             mobileGridGap={6}
             showMobileFilename={activeTab === "original"}
             mobileSquareMedia={activeTab === "original"}
             getSecondaryText={activeTab === "selected" ? (photo) => photoStates[photo.id]?.comment?.trim() ?? "" : undefined}
-            readableComments
             groupsById={groupsById}
             showSimilarityGroups={activeTab === "original" && similarityVisible}
             expandedGroups={expandedGroups}

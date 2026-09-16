@@ -364,8 +364,11 @@ export default function NewProjectPage() {
                 <div id="field-requiredCount">
                   <ProjectFormField error={fieldErrors.requiredCount} label="셀렉 갯수" required>
                     <div className="relative">
+                      {/* pr-12만 있으면 md:px-5(공용 클래스)가 데스크톱에서 이 padding-right를
+                        * 20px로 덮어써 "장" 자리에 숫자가 겹친다 — md:pr-12로 같은 브레이크포인트에서
+                        * 명시해야 이긴다(수정 화면의 같은 필드가 이미 이 형태). */}
                       <ProjectFormInput
-                        className={`${PROJECT_FORM_INPUT_CLASS} pr-12 text-right ${projectFormInputStateClass({ hasValue: Boolean(requiredCount), error: Boolean(fieldErrors.requiredCount) })}`}
+                        className={`${PROJECT_FORM_INPUT_CLASS} pr-12 md:pr-12 text-right ${projectFormInputStateClass({ hasValue: Boolean(requiredCount), error: Boolean(fieldErrors.requiredCount) })}`}
                         type="text"
                         inputMode="numeric"
                         pattern="[0-9]*"

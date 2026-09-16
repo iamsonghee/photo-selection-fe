@@ -5,6 +5,7 @@ import { Download, LoaderCircle, X } from "lucide-react";
 import { formatStoredFileSizeBytes } from "@/lib/format-file-size";
 import { Badge } from "@/components/ui/Badge";
 import { customerDDay } from "@/lib/customer-dday";
+import { formatKstLongDateTime } from "@/lib/kst-date";
 import { FinalDeliveryPreview } from "@/components/customer/FinalDeliveryPreview";
 import type { FinalDeliveryPreviewFile } from "@/lib/customer-api-server";
 import styles from "./FinalDeliveryDownloadEntry.module.css";
@@ -66,7 +67,7 @@ export default function FinalDeliveryDownloadEntry({ token }: { token: string })
   if (!info.visible) return <p className="text-sm text-muted-foreground">다운로드할 최종 보정본이 아직 없습니다. 작가에게 전달 상태를 확인해 주세요.</p>;
   const deadline = customerDDay(info.expiresAt);
   const expiresLabel = info.expiresAt && !Number.isNaN(new Date(info.expiresAt).getTime())
-    ? new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Seoul" }).format(new Date(info.expiresAt)) : null;
+    ? formatKstLongDateTime(info.expiresAt) : null;
   return (
     <>
       {/* 고객이 모달을 열기 전 장수·기한·준비 상태를 판단할 수 있어야 한다. */}

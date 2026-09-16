@@ -1,12 +1,18 @@
 import { test, expect } from "@playwright/test";
 import { loginAsPhotographer } from "../../helpers/auth";
-import { setupFullProject, deleteTestProject, createEditingProject, setProjectStatus, type TestProject } from "../../helpers/setup";
+import { deleteTestProject, createEditingProject, setProjectStatus, type TestProject } from "../../helpers/setup";
 
 let project: TestProject;
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage();
-  project = await setupFullProject(page, 5); // 사진 5장 포함 프로젝트
+  await loginAsPhotographer(page);
+  project = await createEditingProject(page, 5);
+  const photosResponse = await page.request.get(`/api/photographer/projects/${project.projectId}/photos`);
+  const { photos } = await photosResponse.json() as { photos: Array<{ id: string }> };
+  await page.request.post("/api/auth/test-setup", {
+    data: { action: "seed_photo_version", projectId: project.projectId, photoIds: [photos[0].id] },
+  });
   await page.close();
 });
 
@@ -128,7 +134,7 @@ test.describe("작가 — 워크플로우(보정 관리)", () => {
     }));
     expect(mappingGeometry.scrollWidth).toBeLessThanOrEqual(mappingGeometry.clientWidth);
     const mobileMappingFiles = mobileMappingRow.locator(":scope > div[role='cell']");
-    await expect(mobileMappingFiles).toHaveCount(3);
+    await expect(mobileMappingFiles).toHaveCount(2);
     await expect(mobileMappingFiles.nth(1)).toHaveCSS("display", "grid");
     await expect(retouchedList.getByText("원본명 유지", { exact: true })).toHaveCount(0);
     await retouchedMobileActions.getByRole("button", { name: "갤러리로 보기" }).click();
@@ -187,7 +193,7 @@ test.describe("작가 — 워크플로우(보정 관리)", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await expect(finalHeader).toHaveText("FINAL_DELIVERY.jpg");
     await expect(finalHeader).not.toContainText("원본");
-    await finalToolbar.getByRole("button", { name: "목록 보기" }).click();
+    await finalToolbar.getByRole("button", { name: "목록으로 보기" }).click();
     await expect(finalList.getByRole("columnheader")).toHaveCount(2);
     await expect(finalList.getByText("FINAL_DELIVERY.jpg", { exact: true })).toBeVisible();
 
@@ -238,42 +244,36 @@ test.describe("작가 — 워크플로우(보정 관리)", () => {
     await page.goto(`/photographer/projects/${project.projectId}/assets/retouched`);
     await page.waitForLoadState("networkidle");
     // 원본 탭은 모든 상태에서 보임
-    await expect(page.getByText("원본").first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("tab", { name: /^원본/ })).toBeVisible({ timeout: 8000 });
   });
 
-  test("W2: 원본 탭 → 내보내기 버튼 존재", async ({ page }) => {
+  test("W2: 셀렉 탭 → 내보내기 버튼 존재", async ({ page }) => {
     await page.goto(`/photographer/projects/${project.projectId}/assets/retouched`);
     await page.waitForLoadState("networkidle");
-    await page.getByText("원본").first().click();
+    await page.getByRole("tab", { name: /^셀렉/ }).click();
     await page.waitForTimeout(500);
-    // 사진이 있는 경우 내보내기 버튼 확인
-    const exportBtn = page.getByRole("button", { name: /내보내기/i });
+    const exportBtn = page.getByRole("region", { name: "셀렉 결과 도구" }).locator("[data-project-asset-export-trigger]");
     await expect(exportBtn).toBeVisible({ timeout: 8000 });
   });
 
   test("W3: 갤러리/파일명 뷰 토글", async ({ page }) => {
     await page.goto(`/photographer/projects/${project.projectId}/assets/retouched`);
     await page.waitForLoadState("networkidle");
-    // 파일명(리스트) 뷰 버튼 클릭 — List 아이콘 버튼
-    const buttons = page.getByRole("button").filter({ hasNotText: /내보|탭|원본|V1|V2/ });
-    const listBtn = buttons.last();
-    if (await listBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await listBtn.click();
-      await page.waitForTimeout(300);
-    }
+    await page.getByRole("button", { name: "목록으로 보기", exact: true }).click();
     await expect(page).toHaveURL(/\/assets\/retouched/);
   });
 
-  test("W4: 원본 탭 → CSV 내보내기 다운로드", async ({ page }) => {
+  test("W4: 셀렉 탭 → CSV 내보내기 다운로드", async ({ page }) => {
     await page.goto(`/photographer/projects/${project.projectId}/assets/retouched`);
     await page.waitForLoadState("networkidle");
-    await page.getByText("원본").first().click();
+    await page.getByRole("tab", { name: /^셀렉/ }).click();
     await page.waitForTimeout(500);
-    const exportBtn = page.getByRole("button", { name: /내보내기/i });
+    const exportBtn = page.getByRole("region", { name: "셀렉 결과 도구" }).locator("[data-project-asset-export-trigger]");
     await expect(exportBtn).toBeVisible({ timeout: 8000 });
+    await exportBtn.click();
     const [download] = await Promise.all([
       page.waitForEvent("download", { timeout: 8000 }),
-      exportBtn.click(),
+      page.getByRole("button", { name: "CSV 다운로드", exact: true }).click(),
     ]);
     expect(download.suggestedFilename()).toMatch(/\.csv$/);
   });
@@ -362,6 +362,55 @@ test.describe("작가 — 워크플로우(보정 관리)", () => {
       await expect(next).toBeVisible();
     } finally {
       await deleteTestProject(page, detailProject.projectId);
+    }
+  });
+
+  test("W6: 보정 회차를 보정본 탭 옆 단계 진행으로 표시한다", async ({ page }) => {
+    const stageProject = await createEditingProject(page, 1);
+    try {
+      const photosResponse = await page.request.get(`/api/photographer/projects/${stageProject.projectId}/photos`);
+      const { photos } = await photosResponse.json() as { photos: Array<{ id: string }> };
+      const photo = photos[0];
+      await page.route(`**/api/photographer/projects/${stageProject.projectId}/versions*`, route => route.fulfill({
+        json: {
+          project_status: "editing_v2",
+          versions: [
+            { id: "stage-v1", photo_id: photo.id, version: 1, r2_url: "/customer/entry/hero-fallback.svg", r2_thumb_url: "/customer/entry/hero-fallback.svg", review_status: "revision_requested", customer_comment: "재보정 요청", version_filename: "STAGE_V1.jpg", created_at: new Date().toISOString(), reviewed_at: new Date().toISOString() },
+            { id: "stage-v2", photo_id: photo.id, version: 2, r2_url: "/customer/entry/hero-fallback.svg", r2_thumb_url: "/customer/entry/hero-fallback.svg", review_status: null, customer_comment: null, version_filename: "STAGE_V2.jpg", created_at: new Date().toISOString(), reviewed_at: null },
+          ],
+          version_history: [],
+        },
+      }));
+      await setProjectStatus(page, stageProject.projectId, "editing_v2");
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(`/photographer/projects/${stageProject.projectId}/assets/retouched?round=v2`);
+
+      const retouchedTab = page.getByRole("tab", { name: "보정본", exact: true });
+      const stepper = page.locator("[data-retouch-stage-stepper]");
+      await expect(stepper).toBeVisible();
+      await expect(page.getByRole("tablist", { name: "보정 회차" })).toHaveCount(0);
+      const [tabBox, stepperBox] = await Promise.all([retouchedTab.boundingBox(), stepper.boundingBox()]);
+      expect(tabBox).not.toBeNull();
+      expect(stepperBox).not.toBeNull();
+      expect(stepperBox!.x).toBeGreaterThanOrEqual(tabBox!.x + tabBox!.width);
+      await expect(stepper.getByRole("button", { name: "재보정" })).toHaveAttribute("aria-current", "step");
+      await expect(stepper.locator('[data-retouch-round="v2"]')).toHaveAttribute("data-viewed", "true");
+      await stepper.locator('[data-retouch-round="v1"]').click();
+      await expect(stepper.locator('[data-retouch-round="v1"]')).toHaveAttribute("data-viewed", "true");
+      await expect(stepper.locator('[data-retouch-round="v2"]')).toContainText("진행 중");
+      await stepper.locator('[data-retouch-round="v2"]').click();
+
+      await page.setViewportSize({ width: 390, height: 844 });
+      const trigger = page.locator("[data-mobile-retouch-stage-trigger]");
+      await expect(trigger).toContainText("2/2 재보정");
+      await trigger.click();
+      const sheet = page.getByRole("dialog", { name: "보정 단계" });
+      await expect(sheet.getByText("완료된 단계", { exact: true })).toBeVisible();
+      await sheet.getByRole("button", { name: /1차 보정 완료된 단계/ }).click();
+      await expect(trigger).toContainText("1/2 1차 보정");
+      await expect(page).toHaveURL(/round=v1/);
+    } finally {
+      await deleteTestProject(page, stageProject.projectId);
     }
   });
 });

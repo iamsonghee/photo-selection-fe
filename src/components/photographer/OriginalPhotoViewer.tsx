@@ -1,5 +1,7 @@
 "use client";
 
+import { RecommendationMark } from "@/components/RecommendationMark";
+
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { useDesktopViewport } from "@/hooks/useDesktopViewport";
 import { useDialogAccessibility } from "@/hooks/useDialogAccessibility";
@@ -264,7 +266,9 @@ export function OriginalPhotoViewer({
           <X size={15} strokeWidth={1.7} aria-hidden />
         </button>
         <div className={styles.filename} title={activeFilename}>{activeFilename}</div>
-        {headerControls ? <div className={styles.headerControls}>{headerControls}</div> : null}
+        {headerControls ? <div className={styles.headerControls}>{headerControls}</div> : activePhoto.photographerRecommended ? (
+          <div className={styles.headerControls}><span className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-white"><RecommendationMark size={12} aria-hidden />작가 추천</span></div>
+        ) : null}
         <div className={styles.counter} aria-label={`${photos.length}장 중 ${activeIndex + 1}번째 사진`}>
           <strong>{(activeIndex + 1).toLocaleString()}</strong><span>/</span><span>{photos.length.toLocaleString()}</span>
         </div>
@@ -292,6 +296,15 @@ export function OriginalPhotoViewer({
             <div><dt><kbd>ESC</kbd></dt><dd>{reviewMode ? "전체 사진" : "뷰어 닫기"}</dd></div>
           </dl>
         </aside>
+      ) : null}
+
+      {mobileView ? (
+        <div className={styles.mobileViewControls} onClick={(event) => event.stopPropagation()}>
+          <div className={styles.mobileModes} role="group" aria-label="사진 보기 모드">
+            <button type="button" aria-pressed={mobileView.mode === "original"} onClick={() => mobileView.onChange("original")}>원본</button>
+            <button type="button" aria-pressed={mobileView.mode !== "original"} onClick={() => mobileView.onChange("retouched")}>보정본</button>
+          </div>
+        </div>
       ) : null}
 
       <div className={`${styles.workspace} ${inspector ? styles.workspaceWithInspector : ""}`}>
@@ -373,7 +386,7 @@ export function OriginalPhotoViewer({
         <summary>{activeImageLabel ?? "보정본"}{activeStatusLabel ? ` · ${activeStatusLabel}` : ""}<span className={styles.mobileInspectorHint}>요청·이력</span></summary>
         <div>{inspector}</div>
       </details> : null}
-      {usesMobileDetailLayout && !mobileView && mobileComments.some((comment) => comment.text.trim()) ? <div className={styles.mobileDetailsBar} onClick={(event) => event.stopPropagation()}>
+      {usesMobileDetailLayout && mobileComments.some((comment) => comment.text.trim()) ? <div className={styles.mobileDetailsBar} onClick={(event) => event.stopPropagation()}>
         <ViewerCommentPanel comments={mobileComments} heading={mobileCommentsHeading} />
       </div> : null}
 

@@ -14,6 +14,7 @@
  */
 
 import { test, expect } from "@playwright/test";
+import type { BrowserContext, Page, Route } from "@playwright/test";
 import { setupFullProject, deleteTestProject, type TestProject } from "../../helpers/setup";
 import { loginAsPhotographer } from "../../helpers/auth";
 
@@ -21,9 +22,20 @@ let project: TestProject;
 let photoId: string;
 let viewerUrl: string;
 
+async function identifyAs(context: BrowserContext, color: string, initial: string) {
+  await context.addInitScript(({ token, color, initial }) => {
+    localStorage.setItem(`ps:c-participant:v1:${token}`, JSON.stringify({ color, initial }));
+  }, { token: project.accessToken, color, initial });
+}
+
+async function openPcComment(page: Page) {
+  await page.getByRole("button", { name: /사진별 요청 (남기기|수정)/ }).click();
+  return page.getByRole("textbox", { name: "사진별 요청" });
+}
+
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage();
-  project = await setupFullProject(page, 3);
+  project = await setupFullProject(page, 5);
   await page.goto(project.galleryUrl, { waitUntil: "networkidle" });
   const photosRes = await page.request.get(
     `/api/c/photos?token=${encodeURIComponent(project.accessToken)}`
@@ -45,6 +57,8 @@ test.afterAll(async ({ browser }) => {
 test("C1: A가 별점, B가 색상칩을 거의 동시에 저장해도 서버에 둘 다 남는다", async ({ browser }) => {
   const ctxA = await browser.newContext();
   const ctxB = await browser.newContext();
+  await identifyAs(ctxA, "yellow", "A");
+  await identifyAs(ctxB, "red", "B");
   const pageA = await ctxA.newPage();
   const pageB = await ctxB.newPage();
 
@@ -57,7 +71,7 @@ test("C1: A가 별점, B가 색상칩을 거의 동시에 저장해도 서버에
   await stars.nth(4).click();
 
   // B: 빨간 색상칩 클릭 — A의 로컬 캐시가 이 변경을 모르는 상태에서 요청을 보낸다
-  const redChip = pageB.locator('button[title="red"]');
+  const redChip = pageB.locator('button[title="내 찜 추가"]');
   await expect(redChip).toBeVisible({ timeout: 8000 });
   await redChip.click();
 
@@ -85,7 +99,7 @@ test("C2: 코멘트를 남긴 뒤 다른 세션이 선택 토글을 해도 코�
   await pageA.goto(viewerUrl, { waitUntil: "networkidle" });
   await pageB.goto(viewerUrl, { waitUntil: "networkidle" });
 
-  const commentBox = pageA.locator('input[placeholder="코멘트..."]:visible').first();
+  const commentBox = await openPcComment(pageA);
   await expect(commentBox).toBeVisible({ timeout: 8000 });
   await commentBox.fill("코멘트 유지 테스트");
   await commentBox.blur();
@@ -122,17 +136,19 @@ test("C3: 다른 탭의 코멘트가 5초 폴링 후 현재 뷰어 입력창에 
   await pageA.goto(viewerUrl, { waitUntil: "networkidle" });
   await pageB.goto(viewerUrl, { waitUntil: "networkidle" });
 
-  const commentA = pageA.locator('input[placeholder="코멘트..."]:visible').first();
-  const commentB = pageB.locator('input[placeholder="코멘트..."]:visible').first();
+  const commentB = await openPcComment(pageB);
   await commentB.fill(remoteComment);
   await commentB.blur();
 
-  await expect(commentA).toHaveValue(remoteComment, { timeout: 8_000 });
+  const remoteCommentButton = pageA.getByRole("button", { name: `사진별 요청 수정: ${remoteComment}` });
+  await expect(remoteCommentButton).toBeVisible({ timeout: 8_000 });
+  const commentA = await openPcComment(pageA);
+  await expect(commentA).toHaveValue(remoteComment);
   await ctxA.close();
   await ctxB.close();
 });
 
-test("C4: 코멘트 저장 실패 → 오류를 알리고 서버 값으로 복원한다", async ({ browser }) => {
+test("C4: 코멘트 저장 실패 → 오류를 알리고 서버 값은 유지한다", async ({ browser }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await page.goto(viewerUrl, { waitUntil: "networkidle" });
@@ -148,11 +164,140 @@ test("C4: 코멘트 저장 실패 → 오류를 알리고 서버 값으로 복�
   });
 
   await page.reload({ waitUntil: "networkidle" });
-  const comment = page.locator('input[placeholder="코멘트..."]:visible').first();
+  const comment = await openPcComment(page);
   await comment.fill("저장 실패 테스트");
   await comment.blur();
 
   await expect(page.getByText("저장에 실패했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.")).toBeVisible();
-  await expect(comment).toHaveValue("");
+  await expect(page.getByRole("button", { name: "사진별 요청 저장 실패, 다시 시도" })).toBeVisible();
+  const saved = await page.request.get(
+    `/api/c/selections?token=${encodeURIComponent(project.accessToken)}&project_id=${encodeURIComponent(project.projectId)}`
+  );
+  expect((await saved.json()).photoStates[photoId]?.comment).toBeUndefined();
   await ctx.close();
+});
+
+test("C5: PC와 모바일 참가자가 같은 사진을 동시에 찜해도 두 색이 모두 남는다", async ({ browser }) => {
+  const reset = await browser.newPage();
+  await reset.goto(project.galleryUrl, { waitUntil: "networkidle" });
+  for (const color of ["red", "yellow"]) {
+    await reset.request.post("/api/c/selections", { data: {
+      token: project.accessToken, project_id: project.projectId, photo_id: photoId,
+      color_op: { color, add: false },
+    } });
+  }
+  await reset.close();
+
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await identifyAs(ctxA, "red", "A");
+  await identifyAs(ctxB, "yellow", "B");
+  const pageA = await ctxA.newPage();
+  const pageB = await ctxB.newPage();
+  await Promise.all([
+    pageA.goto(viewerUrl, { waitUntil: "networkidle" }),
+    pageB.goto(viewerUrl, { waitUntil: "networkidle" }),
+  ]);
+
+  await Promise.all([
+    pageA.locator('button[title="내 찜 추가"]').click(),
+    pageB.getByRole("button", { name: "내 찜 추가" }).click(),
+  ]);
+
+  await expect.poll(async () => {
+    const response = await pageA.request.get(
+      `/api/c/selections?token=${encodeURIComponent(project.accessToken)}&project_id=${encodeURIComponent(project.projectId)}`
+    );
+    return [...((await response.json()).photoStates[photoId]?.color ?? [])].sort();
+  }).toEqual(["red", "yellow"]);
+
+  await Promise.all([pageA.reload(), pageB.reload()]);
+  await expect(pageA.locator('button[title="내 찜 해제"]')).toBeVisible();
+  await expect(pageB.getByRole("button", { name: "내 찜 해제" })).toBeVisible();
+  await ctxA.close();
+  await ctxB.close();
+});
+
+test("C6: 같은 사진을 빠르게 세 번 선택해도 최종 선택 상태와 서버가 일치한다", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto(viewerUrl, { waitUntil: "networkidle" });
+  await page.request.post("/api/c/selections", { data: {
+    token: project.accessToken, project_id: project.projectId, photo_id: photoId, is_selected: false,
+  } });
+  await page.reload({ waitUntil: "networkidle" });
+
+  let selectionPosts = 0;
+  await page.route("**/api/c/selections", async (route) => {
+    if (route.request().method() !== "POST" || typeof route.request().postDataJSON()?.is_selected !== "boolean") {
+      await route.continue();
+      return;
+    }
+    selectionPosts += 1;
+    if (selectionPosts === 1) await new Promise((resolve) => setTimeout(resolve, 400));
+    await route.continue();
+  });
+
+  await page.getByRole("button", { name: "사진 선택", exact: true }).click();
+  await page.getByRole("button", { name: "사진 선택 해제", exact: true }).click();
+  await page.getByRole("button", { name: "사진 선택", exact: true }).click();
+
+  await expect.poll(async () => {
+    const response = await page.request.get(
+      `/api/c/selections?token=${encodeURIComponent(project.accessToken)}&project_id=${encodeURIComponent(project.projectId)}`
+    );
+    return (await response.json()).selectedIds.includes(photoId);
+  }).toBe(true);
+  await expect(page.getByRole("button", { name: "사진 선택 해제", exact: true })).toBeVisible();
+  expect(selectionPosts).toBe(1);
+  await ctx.close();
+});
+
+test("C7: 두 세션의 동시 선택도 서버에서 목표 장수를 넘지 않는다", async ({ browser }) => {
+  const reset = await browser.newPage();
+  await reset.goto(project.galleryUrl, { waitUntil: "networkidle" });
+  const resetResponse = await reset.request.post("/api/c/selections", { data: {
+    token: project.accessToken, project_id: project.projectId, photo_ids: project.photoIds, is_selected: false,
+  } });
+  expect(resetResponse.ok()).toBe(true);
+  await reset.close();
+
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const pageA = await ctxA.newPage();
+  const pageB = await ctxB.newPage();
+  await Promise.all([
+    pageA.goto(project.galleryUrl, { waitUntil: "networkidle" }),
+    pageB.goto(project.galleryUrl, { waitUntil: "networkidle" }),
+  ]);
+  const delaySelectionWrite = async (route: Route) => {
+    if (route.request().method() === "POST" && typeof route.request().postDataJSON()?.is_selected === "boolean") {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+    await route.continue();
+  };
+  await pageA.route("**/api/c/selections", delaySelectionWrite);
+  await pageB.route("**/api/c/selections", delaySelectionWrite);
+
+  const cardsA = pageA.locator(".gl-photo-card");
+  const cardsB = pageB.locator(".gl-photo-card");
+  await Promise.all([
+    (async () => { await cardsA.nth(0).locator('.gl-check-box[aria-label="선택"]').click(); await cardsA.nth(1).locator('.gl-check-box[aria-label="선택"]').click(); })(),
+    (async () => { await cardsB.nth(2).locator('.gl-check-box[aria-label="선택"]').click(); await cardsB.nth(3).locator('.gl-check-box[aria-label="선택"]').click(); })(),
+  ]);
+
+  await expect.poll(async () => {
+    const response = await pageA.request.get(
+      `/api/c/selections?token=${encodeURIComponent(project.accessToken)}&project_id=${encodeURIComponent(project.projectId)}`
+    );
+    return (await response.json()).selectedIds.length;
+  }).toBe(3);
+  await expect.poll(async () =>
+    await pageA.getByText("다른 참여자가 먼저 목표 장수를 채웠어요. 최신 선택 상태를 확인해 주세요.").count()
+    + await pageB.getByText("다른 참여자가 먼저 목표 장수를 채웠어요. 최신 선택 상태를 확인해 주세요.").count()
+  ).toBeGreaterThan(0);
+  await expect(pageA.getByRole("button", { name: "선택한 3장 확인하기" })).toBeVisible({ timeout: 8_000 });
+  await expect(pageB.getByRole("button", { name: "선택한 3장 확인하기" })).toBeVisible({ timeout: 8_000 });
+  await ctxA.close();
+  await ctxB.close();
 });

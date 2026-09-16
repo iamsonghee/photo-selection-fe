@@ -70,6 +70,7 @@ function mapPhotoRow(
     url: row.r2_thumb_url,
     previewUrl: row.r2_preview_url ?? row.r2_thumb_url,
     originalFilename: row.original_filename ?? null,
+    photographerRecommended: (row as { is_photographer_recommended?: boolean }).is_photographer_recommended ?? false,
     fileSize: (row as unknown as Record<string, unknown>).file_size as number | null ?? null,
     sourceFileSize: row.source_file_size ?? null,
     sourceWidth: row.source_width ?? null,
@@ -335,7 +336,7 @@ export async function getPhotosByProjectId(projectId: string): Promise<Photo[]> 
   // BETA_MAX=3000이므로 3페이지를 처음부터 병렬 요청 — count 왕복 없음.
   const PAGE = 1000;
   const SOURCE_COLS =
-    "id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, source_file_size, source_width, source_height, source_content_type, source_last_modified, similarity_group_id, is_blurry, face_detected, eyes_closed, original_status";
+    "id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, is_photographer_recommended, file_size, source_file_size, source_width, source_height, source_content_type, source_last_modified, similarity_group_id, is_blurry, face_detected, eyes_closed, original_status";
   const LEGACY_COLS =
     "id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, similarity_group_id, is_blurry, face_detected, eyes_closed, original_status";
 
@@ -350,7 +351,7 @@ export async function getPhotosByProjectId(projectId: string): Promise<Photo[]> 
 
   let results = await fetchPages(SOURCE_COLS);
   const sourceSchemaMissing = results.some(({ error }) =>
-    !!error && /source_(file_size|width|height|content_type|last_modified)|column.*does not exist/i.test(error.message),
+    !!error && /source_(file_size|width|height|content_type|last_modified)|is_photographer_recommended|column.*does not exist/i.test(error.message),
   );
   // DB migration과 FE 배포 사이에도 기존 사진 목록은 계속 보여야 한다. source metadata만
   // 비워 둔 채 구버전 컬럼으로 재조회하고, 네트워크/권한 오류는 숨기지 않는다.

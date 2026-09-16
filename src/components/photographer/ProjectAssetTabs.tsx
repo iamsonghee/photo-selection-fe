@@ -18,6 +18,10 @@ export function hasRetouchedAssetTab(status: ProjectStatus) {
   return RETOUCHED_STATUSES.includes(status);
 }
 
+export function hasSelectedAssetTab(status: ProjectStatus) {
+  return !["preparing", "selecting"].includes(status);
+}
+
 export function hasFinalAssetTab(status: ProjectStatus) {
   return status === "delivered";
 }
@@ -45,12 +49,14 @@ export function ProjectAssetTabs({
       count: originalCount,
       href: `/photographer/projects/${projectId}/assets/original`,
     },
-    {
-      key: "selected",
-      label: "셀렉",
-      count: selectedCount,
-      href: `/photographer/projects/${projectId}/assets/selected`,
-    },
+    ...(hasSelectedAssetTab(status)
+      ? [{
+          key: "selected" as const,
+          label: "셀렉",
+          count: selectedCount,
+          href: `/photographer/projects/${projectId}/assets/selected`,
+        }]
+      : []),
     ...(hasRetouchedAssetTab(status)
       ? [{
           key: "retouched" as const,

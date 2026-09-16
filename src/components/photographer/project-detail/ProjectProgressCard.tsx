@@ -52,7 +52,7 @@ export function ProjectProgressCard({ project, onUpload, onSelection, onWorkflow
 
   const actionForStep = (step: number): (() => void) | undefined => {
     if (step === 1) return onUpload;
-    if (step === 2 && (completed || currentStep >= 2)) return onSelection;
+    if (step === 2 && project.status !== "selecting" && (completed || currentStep >= 2)) return onSelection;
     if (step === 6 && completed) return onResults;
     // 고객 셀렉 확정(confirmed)은 아직 보정 시작 전이다. 현재 단계 표시는 유지하되,
     // 우측 작업 CTA의 확인 절차를 거치기 전에는 3단계에서 보정 화면으로 이동하지 않는다.

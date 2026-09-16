@@ -3,6 +3,7 @@ import {
   validateTokenAndProject,
   assertPhotoBelongsToProject,
   upsertSelectionAdmin,
+  setSelectionStatesAdmin,
   toggleSelectionColorAdmin,
   getSelectionsOnlyAdmin,
 } from "@/lib/customer-api-server";
@@ -18,10 +19,13 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { token, project_id, photo_id, rating, color_tag, comment, is_selected, color_op } = body;
-    if (!token || !project_id || !photo_id) {
+    const { token, project_id, photo_id, photo_ids, rating, color_tag, comment, is_selected, color_op } = body;
+    const bulkPhotoIds = Array.isArray(photo_ids)
+      ? [...new Set(photo_ids.filter((id): id is string => typeof id === "string" && id.trim().length > 0))]
+      : null;
+    if (!token || !project_id || (bulkPhotoIds ? bulkPhotoIds.length === 0 : !photo_id)) {
       return NextResponse.json(
-        { error: "token, project_id, photo_id required" },
+        { error: "token, project_id, and photo_id or photo_ids required" },
         { status: 400 }
       );
     }
@@ -33,14 +37,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid token or project" }, { status: 401 });
     }
     const admin = getAdminClient();
+    if (project.status !== "selecting" && project.status !== "preparing") {
+      return NextResponse.json({ error: "Project is not in selecting status" }, { status: 403 });
+    }
+    if (bulkPhotoIds) {
+      if (bulkPhotoIds.length > 3000 || typeof is_selected !== "boolean" || rating !== undefined || color_tag !== undefined || comment !== undefined || color_op !== undefined) {
+        return NextResponse.json({ error: "Invalid bulk selection request" }, { status: 400 });
+      }
+      const ownershipQueries = await Promise.all(
+        Array.from({ length: Math.ceil(bulkPhotoIds.length / 100) }, (_, index) =>
+          admin
+            .from("photos")
+            .select("id")
+            .eq("project_id", project_id)
+            .in("id", bulkPhotoIds.slice(index * 100, (index + 1) * 100))
+        )
+      );
+      for (const result of ownershipQueries) if (result.error) throw new Error(result.error.message);
+      const ownedIds = new Set(ownershipQueries.flatMap((result) => result.data?.map((photo) => photo.id) ?? []));
+      if (ownedIds.size !== bulkPhotoIds.length) {
+        return NextResponse.json({ error: "Photo does not belong to project" }, { status: 403 });
+      }
+      const result = await setSelectionStatesAdmin(admin, project_id, bulkPhotoIds, is_selected);
+      if (result === "limit_reached") {
+        return NextResponse.json({ error: "Selection limit reached", code: result }, { status: 409 });
+      }
+      if (result !== "saved") {
+        return NextResponse.json({ error: "Invalid bulk selection request", code: result }, { status: 400 });
+      }
+      return NextResponse.json({ ok: true });
+    }
     // 유효한 고객 링크만으로 photo_id를 다른 프로젝트 사진으로 바꿔 저장하는 것을
-    // 막는 접근 통제 검증 — 색상 경로만이 아니라 이 라우트의 모든 mutation에 공통 적용.
+    // 막는 접근 통제 검증 — 색상 경로만이 아니라 이 라우트의 모든 단건 mutation에 공통 적용.
     const photoOk = await assertPhotoBelongsToProject(admin, photo_id, project_id);
     if (!photoOk) {
       return NextResponse.json({ error: "Photo does not belong to project" }, { status: 403 });
-    }
-    if (project.status !== "selecting" && project.status !== "preparing") {
-      return NextResponse.json({ error: "Project is not in selecting status" }, { status: 403 });
     }
     if (color_op && color_tag !== undefined) {
       return NextResponse.json(
@@ -78,20 +109,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, colorTags });
     }
 
+    if (typeof is_selected === "boolean") {
+      const result = await setSelectionStatesAdmin(admin, project_id, [photo_id], is_selected);
+      if (result === "limit_reached") {
+        return NextResponse.json({ error: "Selection limit reached", code: result }, { status: 409 });
+      }
+      if (result !== "saved") {
+        return NextResponse.json({ error: "Invalid selection request", code: result }, { status: 400 });
+      }
+    }
+
     // rating/color_tag/comment는 body에 키 자체가 없으면 undefined로 들어와
     // upsertSelectionAdmin이 해당 필드를 건드리지 않는다 — 필드 하나만 바뀌어도
     // 로컬에 캐시된 다른 필드 값 전체를 재전송하던 과거 방식이 다른 세션의
     // 변경사항을 덮어쓰는 문제가 있어, 실제로 바뀐 필드만 보내는 것을 전제로 한다.
     // color_tag(레거시 전체교체 필드)는 배포 전환 구간 동안만 트리거를 통해 color_tags에
     // 동기화되며, 신버전 클라이언트는 더 이상 이 필드를 보내지 않는다(color_op만 사용).
-    await upsertSelectionAdmin(admin, {
-      project_id,
-      photo_id,
-      rating,
-      color_tag,
-      comment,
-      is_selected: typeof is_selected === "boolean" ? is_selected : undefined,
-    });
+    if (rating !== undefined || color_tag !== undefined || comment !== undefined) {
+      await upsertSelectionAdmin(admin, { project_id, photo_id, rating, color_tag, comment });
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[api/c/selections POST]", e);

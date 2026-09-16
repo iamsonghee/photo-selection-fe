@@ -76,8 +76,8 @@ test("납품 완료 최종본은 과거 재보정 요청 상태를 노출하지 
     await page.keyboard.press("Escape");
 
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.getByRole("button", { name: "내보내기", exact: true }).filter({ visible: true }).click();
-    const desktopExportMenu = page.getByText("목록 내보내기", { exact: true });
+    await page.locator("[data-project-asset-export-trigger]:visible").click();
+    const desktopExportMenu = page.locator("[data-desktop-export-menu]");
     await expect(desktopExportMenu).toBeVisible();
     const csvExportButton = page.getByRole("button", { name: "파일명 목록 (.csv)", exact: true });
     await expect(csvExportButton).toBeVisible();

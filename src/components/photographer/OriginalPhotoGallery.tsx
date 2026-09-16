@@ -1,4 +1,6 @@
 "use client";
+
+import { RecommendationMark } from "@/components/RecommendationMark";
 import { SimilarityGroupBadge } from "@/components/ui/SimilarityGroupBadge";
 
 import { cloneElement, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
@@ -11,6 +13,7 @@ import { getPhotoDisplayFilename } from "@/lib/photo-display-filename";
 import { useQueuedThumbSrc, type ThumbLoadQueue } from "@/lib/thumb-load-queue";
 import type { Photo, PhotoGroupInfo } from "@/types";
 import styles from "./OriginalPhotoGallery.module.css";
+import { selectGridPhotos, type SelectionRect } from "@/lib/drag-selection";
 
 export const PHOTO_GRID_MIN_CELL = 218;
 export const PHOTO_GRID_GAP = 12;
@@ -47,10 +50,17 @@ export type OriginalPhotoGalleryProps = {
   onGroupBadgeClick?: (event: React.MouseEvent, groupId: string) => void;
   compressingPhotoId?: string | null;
   selectedPhotoIds?: Set<string>;
-  onToggleSelected?: (photoId: string) => void;
+  onToggleSelected?: (photoId: string, options?: { range?: boolean }) => void;
+  /** PC 갤러리 빈 공간에서 시작하는 범위 선택. */
+  onDragSelectionChange?: (photoIds: Set<string>) => void;
+  /** PC에서 카드 hover 시 작업 대상을 고르는 체크박스를 발견 가능하게 표시한다. */
+  selectionOnHover?: boolean;
+  recommendedPhotoIds?: Set<string>;
   selectionDisabled?: boolean;
   /** 모바일 사진 관리 모드. 켜지면 사진 탭이 상세보기가 아닌 선택 토글로 동작한다. */
   mobileManageMode?: boolean;
+  /** 모바일에서 관리 모드 진입 전에도 사진 선택 체크박스를 표시한다. */
+  mobileSelectionVisible?: boolean;
   /** 모바일에서 사진을 길게 눌러 관리 모드에 진입한다. */
   onPhotoLongPress?: (photoId: string) => void;
   allVisibleSelected?: boolean;
@@ -191,7 +201,7 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
     if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) clearLongPress();
   };
 
-  const handlePhotoClick = () => {
+  const handlePhotoClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     clearLongPress();
     if (didLongPressRef.current) {
       didLongPressRef.current = false;
@@ -199,11 +209,14 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
     }
     if (photo.isPending) return;
     if (props.mobileManageMode) props.onToggleSelected?.(photo.id);
+    else if (props.selectionOnHover && (event.shiftKey || event.metaKey || event.ctrlKey)) {
+      props.onToggleSelected?.(photo.id, { range: event.shiftKey });
+    }
     else props.onPhotoClick(index);
   };
 
   return (
-    <article data-original-photo-card className={`${styles.gridCell} ${selectionVariant ? styles.gridCellSelection : ""} ${props.showMobileFilename ? styles.gridCellMobileFilename : ""} ${props.mobileSquareMedia ? styles.gridCellMobileSquare : ""} ${props.mobileManageMode ? styles.gridCellMobileManage : ""} ${selected ? styles.gridCellSelected : ""} ${expanded ? styles.gridCellExpanded : ""}`}>
+    <article data-original-photo-card className={`${styles.gridCell} ${selectionVariant ? styles.gridCellSelection : ""} ${props.showMobileFilename ? styles.gridCellMobileFilename : ""} ${props.mobileSquareMedia ? styles.gridCellMobileSquare : ""} ${props.mobileManageMode ? styles.gridCellMobileManage : ""} ${props.mobileSelectionVisible ? styles.gridCellMobileSelectable : ""} ${selected ? styles.gridCellSelected : ""} ${expanded ? styles.gridCellExpanded : ""}`}>
       <PhotoAssetPreview filename={name} active={selected}
         header={selectionVariant ? undefined : !props.compact ? (
         <div data-original-photo-filename-row className={styles.nameRow}>
@@ -215,7 +228,7 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
           <TruncatedTextTooltip text={name} className={styles.photoFilename} />
         </div>
         ) : null}
-        mediaProps={{ "data-original-photo-media": true, className: `${styles.mediaButton} ${expanded ? styles.groupMedia : props.showSimilarityGroups && representative && group && group.photoCount > 1 ? styles.groupStack : ""}` } as React.HTMLAttributes<HTMLDivElement>}
+        mediaProps={{ "data-original-photo-media": true, className: `${styles.mediaButton} ${props.selectionOnHover ? styles.selectionOnHover : ""} ${expanded ? styles.groupMedia : props.showSimilarityGroups && representative && group && group.photoCount > 1 ? styles.groupStack : ""}` } as React.HTMLAttributes<HTMLDivElement>}
       >
         <QueuedImage photo={photo} scrollRef={props.scrollRef} thumbQueue={props.thumbQueue} />
         <button
@@ -231,16 +244,34 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
           aria-label={props.mobileManageMode ? `${name} ${selected ? "선택 해제" : "선택"}` : `${name} 상세 보기`}
           aria-pressed={props.mobileManageMode ? selected : undefined}
         />
-        {props.mobileManageMode && !photo.isPending ? (
-          <span
+        {props.selectionOnHover && !photo.isPending ? (
+          <button type="button" className={styles.hoverSelectButton}
+            aria-label={`${name} ${selected ? "선택 해제" : "선택"}`}
+            aria-pressed={selected}
+            onClick={(event) => { event.stopPropagation(); props.onToggleSelected?.(photo.id, { range: event.shiftKey }); }}>
+            <span className={styles.hoverSelectFace}>{selected ? <Check strokeWidth={3} /> : null}</span>
+          </button>
+        ) : null}
+        {props.mobileSelectionVisible && !photo.isPending ? (
+          <button
+            type="button"
             data-mobile-selection-checkbox
             className={styles.mobileSelectionCheckbox}
-            aria-hidden
+            aria-label={`${name} ${selected ? "선택 해제" : "선택"}`}
+            aria-pressed={selected}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (props.mobileManageMode) props.onToggleSelected?.(photo.id);
+              else props.onPhotoLongPress?.(photo.id);
+            }}
           >
-            {selected ? <Check size={13} strokeWidth={3} /> : null}
-          </span>
+            <span className={styles.mobileSelectionFace}>{selected ? <Check size={13} strokeWidth={3} /> : null}</span>
+          </button>
         ) : null}
         {photo.isUploading || props.compressingPhotoId === photo.id ? <span className="absolute right-2 top-2 z-[6] text-accent"><Loader2 size={16} className="animate-spin" /></span> : null}
+        {(props.recommendedPhotoIds?.has(photo.id) ?? photo.photographerRecommended) ? (
+          <span className={styles.recommendBadge} aria-label="작가 추천"><RecommendationMark size={12} aria-hidden /><span>작가 추천</span></span>
+        ) : null}
         {/* 눈감음·흔들림 경고. 고객 갤러리와 같은 규칙으로 **둘 다 해당하면 나란히** 보여준다 —
           * 원인이 다른 문제라 하나로 합치면 무엇을 확인해야 할지 알 수 없다.
           * 눈감음은 인물이 감지된 사진에서만 의미가 있다(`faceDetected`가 전제). */}
@@ -349,6 +380,80 @@ function GridGallery(props: OriginalPhotoGalleryProps) {
   }, [props.active, props.compact, props.minCols, props.mobileGridGap, props.mobileMinCols, props.mobileSquareMedia, props.showMobileFilename, props.variant]);
 
   const hasLeadingCell = Boolean(props.leadingCell);
+  const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
+  const dragSelectionRef = useRef({ selected: props.selectedPhotoIds, change: props.onDragSelectionChange });
+  useEffect(() => {
+    dragSelectionRef.current = { selected: props.selectedPhotoIds, change: props.onDragSelectionChange };
+  });
+  const dragEnabled = Boolean(props.onDragSelectionChange);
+  useEffect(() => {
+    const container = containerRef.current;
+    const scroll = props.scrollRef.current;
+    if (!dragEnabled || !container || !scroll) return;
+    let drag: { x: number; y: number; clientX: number; clientY: number; base: Set<string>; previous: Set<string>; additive: boolean; active: boolean } | null = null;
+    let frame = 0;
+    const update = () => {
+      if (!drag) return;
+      const bounds = container.getBoundingClientRect();
+      const x = Math.max(0, Math.min(container.clientWidth, drag.clientX - bounds.left));
+      const y = Math.max(0, Math.min(container.scrollHeight, drag.clientY - bounds.top));
+      if (!drag.active && Math.hypot(x - drag.x, y - drag.y) < 5) return;
+      drag.active = true;
+      suppressReleaseClick.current = true;
+      const rect = { left: Math.min(x, drag.x), top: Math.min(y, drag.y), width: Math.abs(x - drag.x), height: Math.abs(y - drag.y) };
+      setSelectionRect(rect);
+      const selected = selectGridPhotos(props.photos, rect, {
+        width: container.clientWidth, ...layout, paddingTop, leading: hasLeadingCell,
+      }, drag.additive ? drag.base : []);
+      dragSelectionRef.current.change?.(selected);
+    };
+    const tick = () => {
+      if (!drag) return;
+      const bounds = scroll.getBoundingClientRect();
+      const edge = 48;
+      const speed = drag.clientY < bounds.top + edge ? -Math.min(18, (bounds.top + edge - drag.clientY) / 3)
+        : drag.clientY > bounds.bottom - edge ? Math.min(18, (drag.clientY - bounds.bottom + edge) / 3) : 0;
+      if (speed && drag.active) { scroll.scrollTop += speed; update(); }
+      frame = requestAnimationFrame(tick);
+    };
+    const down = (event: PointerEvent) => {
+      if (event.pointerType !== "mouse" || event.button !== 0 || !(event.target instanceof Element)
+        || event.target.closest("article, button, input, select, a")) return;
+      const bounds = container.getBoundingClientRect();
+      const previous = new Set(dragSelectionRef.current.selected);
+      drag = { x: event.clientX - bounds.left, y: event.clientY - bounds.top, clientX: event.clientX, clientY: event.clientY,
+        base: previous, previous, additive: event.metaKey || event.ctrlKey || event.shiftKey, active: false };
+      event.preventDefault();
+      frame = requestAnimationFrame(tick);
+    };
+    const move = (event: PointerEvent) => {
+      if (!drag) return;
+      drag.clientX = event.clientX; drag.clientY = event.clientY;
+      update();
+    };
+    const stop = (clearOnClick = true) => {
+      if (clearOnClick && drag && !drag.active) dragSelectionRef.current.change?.(new Set());
+      drag = null; cancelAnimationFrame(frame); setSelectionRect(null);
+    };
+    const cancel = () => { if (drag) dragSelectionRef.current.change?.(drag.previous); stop(false); };
+    const key = (event: KeyboardEvent) => { if (event.key === "Escape" && drag) { event.preventDefault(); cancel(); } };
+    container.addEventListener("pointerdown", down);
+    window.addEventListener("pointermove", move);
+    const up = () => stop();
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("blur", cancel);
+    window.addEventListener("keydown", key);
+    return () => {
+      cancelAnimationFrame(frame);
+      container.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("blur", cancel);
+      window.removeEventListener("keydown", key);
+    };
+  }, [dragEnabled, props.photos, props.scrollRef, layout, hasLeadingCell, paddingTop]);
   const cellCount = props.photos.length + (hasLeadingCell ? 1 : 0);
   const selectionRowLayoutKey = props.variant === "selection"
     ? props.photos
@@ -371,14 +476,14 @@ function GridGallery(props: OriginalPhotoGalleryProps) {
   const virtualizer = useVirtualizer({
     count: Math.ceil(cellCount / layout.cols),
     getScrollElement: () => props.scrollRef.current,
-    estimateSize: (rowIndex) => layout.rowHeight + (rowHasSelectionComment(rowIndex) ? props.readableComments ? 76 : 40 : 0),
+    estimateSize: (rowIndex) => layout.rowHeight + (rowHasSelectionComment(rowIndex) ? props.readableComments ? 76 : 32 : 0),
     overscan: 2,
   });
   useEffect(() => {
     virtualizer.measure();
     // TanStack Virtual은 렌더마다 인스턴스 참조가 바뀔 수 있어 행 높이 변화만 추적한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasLeadingCell, layout.cols, layout.rowHeight, selectionRowLayoutKey]);
+  }, [hasLeadingCell, layout.cols, layout.rowHeight, props.readableComments, selectionRowLayoutKey]);
 
   return (
     <div
@@ -391,9 +496,11 @@ function GridGallery(props: OriginalPhotoGalleryProps) {
         event.stopPropagation();
       }}
       data-photo-gallery-variant={props.variant ?? "original"}
+      data-selection-active={props.selectionOnHover && (props.selectedPhotoIds?.size ?? 0) > 0 ? "true" : undefined}
       className={`${styles.galleryGrid} ${props.variant === "selection" ? styles.selectionGrid : ""}`}
-      style={{ width: "100%", padding: `${paddingTop}px ${layout.paddingX}px ${paddingBottom}px` }}
+      style={{ position: "relative", minHeight: "100%", userSelect: dragEnabled ? "none" : undefined, width: "100%", padding: `${paddingTop}px ${layout.paddingX}px ${paddingBottom}px` }}
     >
+      {selectionRect && dragEnabled ? <div aria-hidden style={{ position: "absolute", ...selectionRect, zIndex: 20, pointerEvents: "none", border: "1px solid var(--accent)", background: "rgba(var(--accent-rgb), .12)" }} /> : null}
       <div style={{ position: "relative", height: virtualizer.getTotalSize() }}>
         {virtualizer.getVirtualItems().map((row) => {
           const cells: React.ReactNode[] = [];
@@ -467,7 +574,7 @@ function ListGallery(props: OriginalPhotoGalleryProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mobileMediaHeight, mobileRetouchedList, retouchedVariant, scrollMargin]);
 
-  const readonlyClass = props.readonly ? styles.listReadonly : "";
+  const readonlyClass = props.readonly && !props.selectionOnHover ? styles.listReadonly : "";
   const selectionVariant = props.variant === "selection";
   const finalVariant = props.variant === "final";
   const listVariantClass = selectionVariant
@@ -478,7 +585,7 @@ function ListGallery(props: OriginalPhotoGalleryProps) {
         ? styles.listFinal
       : "";
   return (
-    <div data-original-photo-list className={`${styles.listShell} ${selectionVariant ? styles.listShellSelection : ""} ${retouchedVariant ? styles.listShellRetouched : ""}`}>
+    <div data-original-photo-list data-selection-active={props.selectionOnHover && (props.selectedPhotoIds?.size ?? 0) > 0 ? "true" : undefined} className={`${styles.listShell} ${selectionVariant ? styles.listShellSelection : ""} ${retouchedVariant ? styles.listShellRetouched : ""} ${props.mobileSelectionVisible ? styles.listShellMobileSelectable : ""}`}>
       <div className={styles.listTable} role="table" aria-label={selectionVariant ? "고객 셀렉 사진 목록" : finalVariant ? "최종본 사진 목록" : retouchedVariant ? "보정본 사진 목록" : "원본 사진 목록"}>
         <div className={`${styles.listHeader} ${readonlyClass} ${listVariantClass}`} role="row">
           {mobileRetouchedList ? <>
@@ -502,7 +609,7 @@ function ListGallery(props: OriginalPhotoGalleryProps) {
               <span data-mobile-retouched-column-label>보정본</span>
             </span>
           </> : finalVariant ? <><span role="columnheader">사진</span><span role="columnheader">파일명</span></> : selectionVariant ? <><span role="columnheader">사진</span><span role="columnheader">파일명</span><span role="columnheader">고객 코멘트</span></> : <>
-            {!props.readonly ? <button type="button" className={styles.selectButton} onClick={props.onToggleAllVisible} aria-label={props.allVisibleSelected ? "전체 선택 해제" : "전체 선택"} aria-pressed={props.allVisibleSelected} disabled={props.selectionDisabled}>{props.allVisibleSelected ? <Check size={13} strokeWidth={3} /> : null}</button> : null}
+            {!props.readonly ? <button type="button" className={styles.selectButton} onClick={props.onToggleAllVisible} aria-label={props.allVisibleSelected ? "전체 선택 해제" : "전체 선택"} aria-pressed={props.allVisibleSelected} disabled={props.selectionDisabled}>{props.allVisibleSelected ? <Check size={13} strokeWidth={3} /> : null}</button> : props.selectionOnHover || props.mobileSelectionVisible ? <span aria-hidden /> : null}
             {retouchedVariant ? <><span role="columnheader">원본</span><span role="columnheader">보정본</span><span role="columnheader">상태</span><span role="columnheader">재보정 요청</span></> : <><span role="columnheader">파일명</span><span className={styles.listNumericHeader} role="columnheader">원본 용량</span><span className={styles.listNumericHeader} role="columnheader">해상도</span></>}
           </>}
         </div>
@@ -556,10 +663,17 @@ function ListGallery(props: OriginalPhotoGalleryProps) {
                     <TruncatedTextTooltip text={name} className={styles.listFilename} />
                     {secondaryText ? <TruncatedTextTooltip text={secondaryText} className={`${styles.listComment} ${styles.listCommentActive}`} /> : <span className={styles.listComment} aria-hidden />}
                   </> : <>
-                    {!props.readonly ? <button type="button" className={styles.selectButton} aria-label={`${name} ${selected ? "선택 해제" : "선택"}`} aria-pressed={selected} disabled={!selectionId} onClick={() => selectionId && props.onToggleSelected?.(selectionId)}>{selected ? <Check size={13} strokeWidth={3} /> : null}</button> : null}
+                    {!props.readonly || props.selectionOnHover || props.mobileSelectionVisible ? <button type="button" className={`${styles.selectButton} ${props.selectionOnHover ? styles.hoverListSelectButton : ""}`} aria-label={`${name} ${selected ? "선택 해제" : "선택"}`} aria-pressed={selected} disabled={!selectionId} onClick={(event) => {
+                      if (!selectionId) return;
+                      if (props.mobileSelectionVisible && !props.mobileManageMode) props.onPhotoLongPress?.(selectionId);
+                      else props.onToggleSelected?.(selectionId, { range: event.shiftKey });
+                    }}>{selected ? <Check size={13} strokeWidth={3} /> : null}</button> : null}
                     <div className={styles.listFile} role="cell">
-                      <button data-original-photo-list-thumbnail type="button" className={styles.listThumbnail} onClick={() => props.onPhotoClick(row.index)} aria-label={`${name} 상세 보기`}><QueuedImage photo={photo} scrollRef={props.scrollRef} thumbQueue={props.thumbQueue} /></button>
+                      <button data-original-photo-list-thumbnail type="button" className={styles.listThumbnail} onClick={(event) => props.selectionOnHover && (event.shiftKey || event.metaKey || event.ctrlKey) ? props.onToggleSelected?.(photo.id, { range: event.shiftKey }) : props.onPhotoClick(row.index)} aria-label={`${name} 상세 보기`}><QueuedImage photo={photo} scrollRef={props.scrollRef} thumbQueue={props.thumbQueue} /></button>
                       <TruncatedTextTooltip text={name} className={styles.listFilename} />
+                      {(props.recommendedPhotoIds?.has(photo.id) ?? photo.photographerRecommended) ? (
+                        <span className={styles.listRecommendBadge}><RecommendationMark size={12} aria-hidden />작가 추천</span>
+                      ) : null}
                       {props.showSimilarityGroups && group && group.photoCount > 1 ? <SimilarityGroupBadge inline count={group.photoCount} expanded={Boolean(props.expandedGroups?.has(group.id))} onClick={(event) => { event.stopPropagation(); props.onGroupBadgeClick?.(event, group.id); }} /> : null}
                     </div>
                     {retouchedVariant ? <>

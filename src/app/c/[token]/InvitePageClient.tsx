@@ -121,6 +121,7 @@ export default function InvitePageClient() {
   };
 
   if (project.status === "selecting") {
+    const recommendedCount = ctx?.photos.filter((photo) => photo.photographerRecommended).length ?? 0;
     const deadlineDate = new Date(project.deadline);
     // 고객 화면의 모든 기한은 갤러리·검토·다운로드와 같은 계산과 Badge를 사용한다.
     const dday = customerDDay(deadlineDate);
@@ -130,9 +131,25 @@ export default function InvitePageClient() {
         variant="selection"
         actions={(
           <>
-            <Link href={`/c/${token}/gallery`} className={styles.entryPrimary}>
-              사진 선택하기
-            </Link>
+            {(ctx?.Y ?? 0) > 0 ? (
+              <>
+                <Link href={`/c/${token}/gallery`} className={styles.entryPrimary}>이어서 선택하기</Link>
+                {recommendedCount > 0 && <Link href={`/c/${token}/gallery?selected=recommended`} className={styles.entrySecondary}>작가 추천 확인하기</Link>}
+              </>
+            ) : recommendedCount > 0 ? (
+              <>
+                <Link href={`/c/${token}/gallery?selected=recommended`} className={styles.entryPrimary}>
+                  작가 추천 확인하기
+                </Link>
+                <Link href={`/c/${token}/gallery`} className={styles.entrySecondary}>
+                  전체 사진에서 고르기
+                </Link>
+              </>
+            ) : (
+              <Link href={`/c/${token}/gallery`} className={styles.entryPrimary}>
+                사진 선택하기
+              </Link>
+            )}
             <OriginalDownloadEntry token={token} variant="entry" />
           </>
         )}
@@ -144,7 +161,11 @@ export default function InvitePageClient() {
             사진이 도착했어요
           </h1>
           <p className={styles.entryDescription}>
-            총 {project.photoCount.toLocaleString()}장 중 마음에 드는 <strong className={styles.introAccent}>{project.requiredCount.toLocaleString()}장</strong>을 골라주세요.
+            {(ctx?.Y ?? 0) > 0
+              ? <>지금까지 <strong className={styles.introAccent}>{ctx?.Y} / {project.requiredCount}장</strong>을 선택했어요. 이어서 확인해보세요.</>
+              : recommendedCount > 0
+              ? <>총 {project.requiredCount}장을 골라주세요. 작가가 추천한 <strong className={styles.introAccent}>{recommendedCount.toLocaleString()}장</strong>부터 확인할 수 있어요.</>
+              : <>총 {project.photoCount.toLocaleString()}장 중 마음에 드는 <strong className={styles.introAccent}>{project.requiredCount.toLocaleString()}장</strong>을 골라주세요.</>}
           </p>
         </div>
         <div className={styles.deadlineRow} aria-label={`선택 마감일 ${format(deadlineDate, "yyyy년 M월 d일 EEEE", { locale: ko })}${dday ? `, ${dday.label}` : ""}`}>
@@ -210,15 +231,22 @@ export default function InvitePageClient() {
    * 예전에는 이 상태에서 이 화면 진입 자체를 막고 /locked로 튕겼다 — 그러면 /locked에서
    * 로고를 눌러도 같은 화면으로 되돌아올 뿐이라 "처음으로" 이동이 항상 no-op이었다.
    * 검토 CTA는 아직 검토할 보정본이 없으므로 비활성화하고, 대신 진행 상태를 보여준다.
-   * 원본 다운로드는 이 상태에서도 가능해야 하므로 그대로 유지한다. */
+   * 원본 다운로드는 이 상태에서도 가능해야 하므로 그대로 유지한다.
+   * 그런데 그 수정이 반대쪽 문제를 만들었다: 이 화면엔 /locked로 돌아갈 방법이 없어서,
+   * 갤러리·상세뷰어가 editing 상태를 보고 /locked로 보낸 뒤(§gallery, §viewer)
+   * 고객이 로고를 한 번 누르면 자신이 고른 사진·재보정 요청 코멘트를 다시 볼 방법이
+   * 아예 없어졌다 — 확정 화면(`/confirmed`)이 이미 쓰는 것과 같은 링크를 그대로 둔다.
+   * 비활성 버튼("보정 진행 중")은 없앴다 — 바로 위 eyebrow·제목이 같은 말을 이미 하고 있어
+   * 누를 수 없는 버튼이 그 문구를 한 번 더 반복할 뿐이었다. 그 자리를 실제로 갈 수 있는
+   * "선택한 사진 보기"가 대신 차지한다(primary 자리). */
   if (project.status === "editing" || project.status === "editing_v2") {
     const isV2 = project.status === "editing_v2";
     return (
       <CustomerInviteIntro {...introCommonProps} actions={(
         <>
-          <button type="button" className={styles.entryPrimary} disabled>
-            {isV2 ? "재보정 진행 중" : "보정 진행 중"}
-          </button>
+          <Link href={`/c/${token}/locked`} className={styles.entryPrimary}>
+            선택한 사진 보기
+          </Link>
           <OriginalDownloadEntry token={token} variant="entry" />
         </>
       )}>

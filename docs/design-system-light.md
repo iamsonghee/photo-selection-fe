@@ -579,7 +579,7 @@ Project List Row의 Primary/Secondary도 서로 같은 140×38px, 12/19px geomet
 - **Responsive:** 768px 이하에서 header 60px, navigation 44px/edge 8px, filmstrip 82px, thumbnail 72×50px으로 축소한다. 정보 순서와 viewer navigation contract는 바꾸지 않는다.
 - **Classification:** C — 사진 inspection을 위한 cross-theme workspace다. Dark surface 값과 viewer geometry를 일반 Light Modal, Card 또는 page surface 규칙으로 승격하지 않는다.
 
-- 셀렉 grid의 virtual row는 사진 순서와 코멘트 유무가 바뀔 때 다시 측정한다. 정렬 후에도 코멘트가 포함된 행만 compact comment 높이를 더하고 다음 행을 바로 이어 배치한다.
+- 셀렉 grid의 virtual row는 사진 순서·코멘트 유무·코멘트 표시 밀도가 바뀔 때 다시 측정한다. 정렬 후에도 코멘트가 포함된 행만 32px compact comment 높이를 더하고 다음 행을 바로 이어 배치한다. 한 줄에서 잘린 코멘트는 hover 시 공용 tooltip으로 전체 내용을 표시한다.
 
 ### 7.15.6d Photographer Photo Gallery
 
@@ -597,7 +597,8 @@ Project List Row의 Primary/Secondary도 서로 같은 140×38px, 12/19px geomet
 ### 7.15.6e Customer Selection Footer
 
 - **Implementation:** 고객 갤러리의 `SelectionConfirmFooter`에서 `mobileGallery` variant를 사용한다.
-- Mobile 고정 footer는 상단 app bar의 `선택됨 Y/N`과 같은 제목·수량을 반복하지 않는다. 높이는 `80px + safe-area-inset-bottom`, 좌우 20px이며 `4px progress → 8px gap → 48px full-width CTA`만 표시한다. 미완료 CTA는 `N장을 더 셀렉해주세요`, 완료 시 `셀렉 확정하기`로 다음 행동을 전달한다.
+- 고객 셀렉 Mobile 고정 footer는 보기 필터와 무관한 실제 선택 수량 Y/N과 남은 장수를 표시한다. `.gl-page-wrapper .ac-confirm-footer-gallery`에 한해 높이는 `100px + safe-area-inset-bottom`, 좌우 20px이며 `24px 수량·progress → 8px gap → 48px full-width CTA`로 배치한다. 추천 포함·추가 선택·전체 선택 검토·확정 중 현재 가능한 다음 행동 하나를 표시한다. 보정본 검토 footer의 기존 80px 배치는 유지한다.
+- **승인된 플로팅 안내 패턴(현재 갤러리 미사용):** 향후 사진 위에 짧은 안내가 필요한 경우 absolute 토스트로 구현한다. 첫 콘텐츠 위 12px, `z-index: 60`, 97% 흰색 배경, 중립색 10% border, 약한 그림자를 사용한다. PC는 내용 너비·최대 440px, 모바일은 좌우 20px 한 줄로 제한한다. 의미 아이콘만 20px 브랜드색으로 강조하고 우측 닫기는 44px 터치 영역을 확보한다. 토스트는 콘텐츠 좌표에 참여하지 않아 닫을 때 reflow하지 않으며 모바일 자동 종료가 필요한 경우 4초 fade-out을 사용한다. 현재 고객 갤러리의 전체 사진·작가 추천·내가 선택한 사진에는 안내 문구를 표시하지 않는다.
 - 갤러리 본문은 footer 80px과 최소 끝 간격 12px을 합친 `92px + safe-area-inset-bottom`만 확보한다. 선택 제한 snackbar는 footer 위 16px인 `96px + safe-area-inset-bottom`에 표시해 CTA와 겹치지 않는다. Desktop footer 구조는 변경하지 않는다.
 
 ### 7.15.7 Project Detail Responsive Contract
@@ -731,7 +732,7 @@ Project List Row의 Primary/Secondary도 서로 같은 140×38px, 12/19px geomet
 | Compact confirmation | `size="confirmation"` | 56px, 16/24px, 같은 폭의 action pair | `PhotographerConfirmDialog` |
 | Detail Work Panel | `size="work-panel"` | 48px, 14/20px 700 | `ProjectWorkPanel` |
 
-`variant="primary | secondary | outline | danger"`는 의미색을, `size`는 역할별 geometry를 소유한다. 기본 `type="button"`이며 제출 버튼은 `type="submit"`을 명시한다. `pending`은 disabled와 `aria-busy`를 함께 설정한다. PC의 Primary hover는 공통 `--accent-hover: #E94B0D`, neutral hover는 raised surface/strong border, focus-visible은 Orange 2px outline과 2px offset을 사용한다. disabled opacity는 40%이며 hover/active transform을 적용하지 않는다. reduced-motion에서는 transition과 active transform을 제거한다. 업무 wrapper는 action 선택과 배치를 소유하고 상태 CSS를 복제하지 않는다.
+`variant="primary | secondary | outline | danger"`는 의미색을, `size`는 역할별 geometry를 소유한다. 기본 `type="button"`이며 제출 버튼은 `type="submit"`을 명시한다. `pending`은 disabled와 `aria-busy`를 함께 설정한다. PC의 Primary hover는 공통 `--accent-hover: #E94B0D`, neutral hover는 raised surface/strong border, focus-visible은 Orange 2px outline과 2px offset을 사용한다. `PhotographerLightTheme` 안의 button·link·select·비텍스트 input과 portal modal도 같은 Orange focus ring을 사용하며 브라우저 기본 blue outline은 노출하지 않는다. 프로그램 방식으로 focus하는 `tabIndex=-1` shell은 outline을 표시하지 않는다. disabled opacity는 40%이며 hover/active transform을 적용하지 않는다. reduced-motion에서는 transition과 active transform을 제거한다. 업무 wrapper는 action 선택과 배치를 소유하고 상태 CSS를 복제하지 않는다.
 
 ### 7.23 Settings Page
 
@@ -1084,3 +1085,33 @@ Before a retouched file is uploaded, both desktop and mobile card headers show o
 When the gallery is active, the workspace summary exposes a labeled `전체` control with a 44px touch target and a 20px checkbox face. Eligible uploaded versions expose the same image-overlay checkbox on mobile and desktop, leaving the reference thumbnail and filename alignment unchanged. Its 44px hit area is aligned to the upper-left image corner and places the 20px face 4px from both edges to reduce photo obstruction. Unchecked faces use a translucent white surface; checked faces and the card ring use the primary orange. Approved and missing versions do not show a checkbox. The replacement action occupies the opposite lower-right corner with a 44px hit area and a smaller 28px visual button.
 
 The selected bottom action contains the count and one full-width primary action, `선택 삭제 N장`. It does not repeat `선택 해제`; users adjust selection by tapping the checked card or the checked select-all control. The confirmation dialog retains its danger treatment. The upper workspace toolbar never contains a delete CTA.
+
+### 작가 추천 마크
+
+작가 추천은 `RecommendationMark`의 사선 절개가 있는 기하학적 A SVG를 사용한다. 폰트 의존 없이 `currentColor`로 표시한다. 사진 카드의 선택 컨트롤은 삭제와 추천 지정에 함께 쓰는 일반 체크박스이며, 44px 터치 영역 안에서 카드 폭에 따라 18·20·24·28px의 시각 면을 사용한다. 추천 저장 상태는 체크박스와 분리해 A와 `작가 추천` 텍스트 배지로 표시한다. 모바일 사진 관리 체크박스도 같은 카드 폭 기준을 사용한다. 목록형 컨트롤은 36px 영역 안에 20px 체크박스 면을 사용한다. 고객 별점의 별 아이콘은 유지한다.
+
+고객 모바일 갤러리의 보기 범위는 툴바 한 자리를 쓰는 상태형 필로 표시하고, 선택지는 공통 하단 시트에서 제공한다. 작가 추천 보기에서는 연한 Orange surface와 `RecommendationMark`를 함께 사용한다. 좁은 화면에 세 보기 범위를 한 줄 탭으로 압축하지 않는다.
+
+작가 원본 업로드와 셀렉 요청 후 읽기 전용 원본 탭은 공용 `PhotoScopeSelect`로 `전체 사진 / 작가 추천` 범위와 장수를 표시한다. 셀렉터는 외곽 테두리 없이 neutral surface로 구분하며, 작가 추천 선택 시 A와 Orange soft surface로 현재 범위를 전달한다.
+
+Mobile 원본 업로드의 범위 셀렉터 트리거는 장수를 숨기고 132px 너비를 사용한다. 우측에는 공용 격자/목록 전환을 제공하며 정렬은 표시하지 않는다. 업로드 가능한 사진 카드에는 44px hit area의 체크박스를 항상 표시하고, 길게 누르기는 같은 선택 모드로 진입하는 보조 동작으로 유지한다.
+
+Desktop 원본 업로드 toolbar는 72px 한 줄을 사용한다. 보기 범위·AI 분석·검색·정렬·보기 전환을 같은 수직 중심에 배치하며 기능군 사이에 별도 행이나 수평 구분선을 만들지 않는다.
+
+갤러리/목록 보기 전환은 원본 업로드·원본·셀렉·보정 화면 모두 `ProjectAssetToolbarViewToggle`을 사용한다. PC·Mobile 모두 현재 보기의 반대 동작 하나만 44px 아이콘 버튼으로 표시하고 `목록으로 보기 / 갤러리로 보기` tooltip과 접근성 라벨을 제공한다.
+
+Desktop 사진 정렬은 원본 업로드·원본·셀렉 화면 모두 `PhotoSortSelect`를 사용한다. 화면마다 필요한 정렬 항목만 options로 전달한다. 트리거는 외곽선 없는 neutral surface를 사용하고, 브라우저 기본 select 대신 공용 shadow menu에서 현재 항목을 check로 표시한다. Mobile은 같은 정렬 값을 기존 하단 시트의 버튼 그룹으로 조정한다.
+
+원본 업로드·원본·셀렉의 Desktop 검색 도구 바는 `ProjectAssetWorkspaceToolbar`를 공통으로 사용한다. 왼쪽에는 사진 범위와 분석 도구, 오른쪽에는 `검색 → 정렬 → 보기 → 내보내기(있는 경우)` 순서로 배치한다. 검색은 44px 높이와 `clamp(180px, 22vw, 320px)` 너비, 컨트롤 간 12px 간격을 공통으로 사용한다.
+
+보정본·최종본도 같은 `ProjectAssetWorkspaceToolbar` 배치 규칙을 사용한다. 검색과 정렬이 없는 경우 오른쪽 도구는 `보기 → 내보내기 → 일괄 업로드/교체(있는 경우)` 순서로 둔다. Desktop 내보내기 진입점은 모든 자산 탭에서 `ProjectAssetExportTrigger`를 사용하며, 42px 무테 neutral surface와 동일한 chevron·hover·focus 상태를 공유한다. 일괄 업로드/교체는 실제 파일 작업을 여는 주요 행동이므로 오른쪽 끝에 두고, 제출 CTA와 경쟁하지 않는 42px accent soft surface를 사용한다.
+
+재보정이 시작된 프로젝트는 도구 바의 `1차 보정/재보정` segmented control을 사용하지 않는다. Desktop에서는 보정본 탭 오른쪽에 원형 노드와 선택 밑줄 없이 `1차 보정 · 재보정` 텍스트 단계만 표시하고, 보정본 탭 글자의 아래 기준선에 맞춘다. Orange 글자는 현재 보고 있는 회차에만 사용하고, 실제 진행 단계는 작은 cyan 점과 `진행 중` 문구로 분리한다. Mobile은 같은 위치에 `1/2 1차 보정` 또는 `2/2 재보정` 트리거를 표시하고, `보정 단계` 하단 시트에서도 선택한 회차는 Orange surface, 실제 진행 단계는 cyan 상태 문구로 구분한다.
+
+셀렉 결과의 Desktop toolbar는 독립 `파일명 복사` CTA를 두지 않고 `내보내기` 메뉴에 포함한다. 내보내기 트리거는 정렬과 같은 무테 neutral surface를 사용하고, popover는 border 없이 10px radius와 공용 shadow로 구분한다.
+
+원본 사진의 정렬 항목은 `파일명순 / 최근 업로드순 / 오래된 업로드순`만 사용한다. 용량·해상도·파일명 역순은 제거한다. 셀렉 결과는 고객 요청 확인을 위해 `코멘트 우선`을 추가한다. 업로드 일시가 없는 과거 사진은 날짜 정렬의 마지막에 두고 파일명으로 순서를 안정화한다.
+
+셀렉 요청 후 읽기 전용 원본 탭은 저장된 추천이 있을 때만 공용 보기 범위 셀렉터를 표시한다. 추천 카드의 A 표시는 유지하되 이 화면에서 추천 수정 CTA는 제공하지 않는다.
+
+PC 원본 작업 선택은 평소 카드 위에서 숨기고 hover·키보드 focus 시 좌측 상단에 빈 체크박스를 표시한다. 한 장이라도 선택되면 모든 카드의 체크박스를 유지하며, 카드 전체 클릭의 상세보기 동작과 분리한다. 추천 배지와 같은 위치에서는 hover 또는 선택 중인 체크박스를 우선 표시한다. 선택 후 하단에서 `작가 추천으로 지정/제외` 또는 삭제를 실행한다.

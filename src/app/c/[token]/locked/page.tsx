@@ -4,9 +4,8 @@ import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { format } from "date-fns";
-import { ko } from "date-fns/locale";
 import { Check, RefreshCw, Clock, Lock, ChevronLeft, CheckCircle2, ChevronDown, Search, X } from "lucide-react";
+import { formatKstDateTime } from "@/lib/kst-date";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import Link from "next/link";
 import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
@@ -431,9 +430,7 @@ export default function LockedPage() {
   );
   if (project.status === "selecting") return <div className="min-h-dvh bg-background" />;
 
-  const confirmedDate = project.confirmedAt
-    ? format(new Date(project.confirmedAt), "yyyy.MM.dd HH:mm", { locale: ko })
-    : null;
+  const confirmedDate = project.confirmedAt ? formatKstDateTime(project.confirmedAt) : null;
 
   const isEditing  = ["editing", "editing_v2"].includes(project.status);
   const isConfirmed = project.status === "confirmed";

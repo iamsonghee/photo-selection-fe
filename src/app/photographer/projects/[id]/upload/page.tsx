@@ -1,5 +1,7 @@
 "use client";
 
+import { RecommendationMark } from "@/components/RecommendationMark";
+
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -12,8 +14,6 @@ import {
   Lock,
   RefreshCw,
   CheckCircle2,
-  LayoutGrid,
-  List,
   Upload,
   X,
   Loader2,
@@ -37,16 +37,26 @@ import { CustomerInviteShareModal } from "@/components/photographer/CustomerInvi
 import { CustomerSelectionRequestModal } from "@/components/photographer/CustomerSelectionRequestModal";
 import GeminiAnalysisPanel from "@/components/photographer/GeminiAnalysisPanel";
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
+import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { PhotographerConfirmDialog } from "@/components/ui/PhotographerConfirmDialog";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { PhotographerFormActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { OriginalPhotoGallery } from "@/components/photographer/OriginalPhotoGallery";
 import { OriginalPhotoViewer } from "@/components/photographer/OriginalPhotoViewer";
 import { PhotoAnalysisFilterGroup } from "@/components/photographer/PhotoAnalysisFilterGroup";
+import { PhotoScopeSelect } from "@/components/photographer/PhotoScopeSelect";
+import { PhotoSortSelect } from "@/components/photographer/PhotoSortSelect";
+import {
+  ProjectAssetToolbarViewToggle,
+  ProjectAssetWorkspaceToolbar,
+} from "@/components/photographer/ProjectAssetWorkspaceToolbar";
 import {
   PhotographerLightPageFrame,
   PhotographerLightPageHeader,
 } from "@/components/layout/PhotographerLightPageHeader";
+import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
+import { matchesFilenameQuery } from "@/lib/gallery-filter";
+import { selectPhotoRange } from "@/lib/drag-selection";
 import { useQuota } from "@/contexts/QuotaContext";
 import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAssetHeader";
 import themeStyles from "./UploadTheme.module.css";
@@ -75,7 +85,11 @@ const PC_CONCURRENCY = 5;
 // 일반 데스크톱은 4개, CPU·메모리·회선 힌트가 충분한 경우에만 6개까지 사용한다.
 const ORIGINAL_PC_CONCURRENCY = 4;
 const ORIGINAL_PC_CONCURRENCY_FAST = 6;
-const MOBILE_BATCH_SIZE = 3;
+/* XHR은 1개로 묶여 있어(MOBILE_CONCURRENCY) 매 요청의 고정비(인증·DB 왕복)가
+ * batch가 클수록 더 많은 파일에 나눠진다. 서버의 파일별 처리 세마포어가 요청당
+ * 5장 동시 처리라(UPLOAD_PHOTOS_CONCURRENCY, be/app/routers/upload.py), 3장이면
+ * 그 병렬 처리량의 일부만 쓰고 만다 — 5로 맞춰 요청당 서버 병렬성을 그대로 채운다. */
+const MOBILE_BATCH_SIZE = 5;
 const MOBILE_CONCURRENCY = 1;
 const INVITE_ORIGINAL_PROCESSING_MAX_ATTEMPTS = 15;
 const INVITE_ORIGINAL_PROCESSING_RETRY_MS = 1000;
@@ -96,7 +110,7 @@ function canUploadOriginals(status: ProjectStatus): boolean {
   return UPLOADABLE_STATUSES.includes(status);
 }
 
-type PhotoSort = "filename-asc" | "filename-desc" | "file-size-desc" | "resolution-desc" | "uploaded-desc";
+type PhotoSort = "filename-asc" | "uploaded-desc" | "uploaded-asc";
 const LIST_HEADER_H = 48;
 const LIST_ROW_H = 58;
 
@@ -147,6 +161,19 @@ function getDesktopCompressionConcurrency(): number {
   const memoryGiB = device.deviceMemory ?? 4;
   if (cores >= 8 && memoryGiB >= 8) return 3;
   return cores >= 4 && memoryGiB >= 4 ? 2 : 1;
+}
+
+/**
+ * 모바일 압축 워커 풀 — XHR 동시성(MOBILE_CONCURRENCY)과는 완전히 별개다.
+ * XHR을 1개로 묶은 건 iOS WKWebView가 동시 요청 중엔 화면을 안 그려주던 버그를
+ * 고치기 위해서였고(§업로드 문서, 5·6차 수정), 압축은 그 요청이 나가기 *전* 단계라
+ * 여기 풀을 늘려도 그 버그와 무관하다.
+ * Device Memory API는 iOS Safari가 아예 지원하지 않는다(deviceMemory === undefined) —
+ * 그 경우 기존처럼 1을 유지해 안전지대를 벗어나지 않고, 지원하는 Android에서만
+ * 4GiB 이상일 때 2로 올린다. */
+function getMobileCompressionConcurrency(): number {
+  const memoryGiB = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  return memoryGiB !== undefined && memoryGiB >= 4 ? 2 : 1;
 }
 
 /* 500도 재시도한다. 서버의 500은 대부분 **일시적 네트워크 오류**(Supabase 조회 중 읽기 실패
@@ -822,11 +849,6 @@ export default function ProjectDetailPage() {
       .catch(() => {});
   }, []);
 
-  const [showPinModal, setShowPinModal] = useState(false);
-  const [pinInput, setPinInput] = useState("");
-  const [pinVisible, setPinVisible] = useState(false);
-  const [pinSaving, setPinSaving] = useState(false);
-  const [pinError, setPinError] = useState("");
   const [inviteActivating, setInviteActivating] = useState(false);
   const [inviteOriginalsProcessing, setInviteOriginalsProcessing] = useState(false);
   const [inviteShareModalOpen, setInviteShareModalOpen] = useState(false);
@@ -841,6 +863,8 @@ export default function ProjectDetailPage() {
   const [photoSearch, setPhotoSearch] = useState("");
   const [photoSort, setPhotoSort] = useState<PhotoSort>("filename-asc");
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
+  const [recommendationSaving, setRecommendationSaving] = useState(false);
+  const [showRecommendedOnly, setShowRecommendedOnly] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobilePhotoManageMode, setMobilePhotoManageMode] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -942,10 +966,11 @@ export default function ProjectDetailPage() {
       return next;
     });
   }, []);
-  /* 기본값은 **둘 다 켜짐**이다. 비워 두면 대부분 그대로 닫아 지금(버튼을 못 찾는 상태)과
-   * 같아진다 — 켜 두면 "보이는 자동 실행 + 끌 수 있음"이 되어 작가의 통제권은 그대로다. */
+  /* 유사컷 묶기는 기본으로 켜둔다 — 업로드 완료 시 모달이 자동으로 뜨는데, 둘 다 꺼둔
+   * 채로 열리면 "분석 시작" 버튼이 곧바로 비활성 상태라 뭔가 먼저 체크해야 누를 수 있는
+   * 어색한 모달이 된다. 눈감음·흐림 확인은 판단 성격이 달라 기본으로 같이 돌리지 않는다. */
   const [aiWantSimilar, setAiWantSimilar] = useState(true);
-  const [aiWantQuality, setAiWantQuality] = useState(true);
+  const [aiWantQuality, setAiWantQuality] = useState(false);
 
   /** Gemini 분석 POC — 관리자 전용 노출 여부 판단용 (실제 접근 제어는 API route에서도 재검증됨) */
   const { quota } = useQuota();
@@ -1241,38 +1266,66 @@ export default function ProjectDetailPage() {
     eyesClosed: photos.filter((p) => p.faceDetected === true && p.eyesClosed === true).length,
   }), [photos]);
 
+  const recommendedPhotoIds = useMemo(
+    () => new Set(photos.filter((photo) => photo.photographerRecommended).map((photo) => photo.id)),
+    [photos],
+  );
+
+  const saveRecommendations = useCallback(async (nextIds: Set<string>, successMessage: string, clearSelection = false) => {
+    if (recommendationSaving) return;
+    setRecommendationSaving(true);
+    try {
+      const response = await fetch(`/api/photographer/projects/${id}/recommendations`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photo_ids: [...nextIds] }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "추천 저장에 실패했습니다.");
+      setPhotos((current) => current.map((photo) => ({
+        ...photo,
+        photographerRecommended: nextIds.has(photo.id),
+      })));
+      if (clearSelection) {
+        setSelectedPhotoIds(new Set());
+        setMobilePhotoManageMode(false);
+      }
+      setToast(successMessage);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "추천 저장에 실패했습니다.");
+    } finally {
+      setRecommendationSaving(false);
+    }
+  }, [id, recommendationSaving]);
+
   const galleryPhotos = useMemo(() => {
-    const normalizedQuery = photoSearch.trim().toLocaleLowerCase();
-    const searched = normalizedQuery
-      ? groupedDisplayPhotos.filter((photo) =>
-          (photo.originalFilename ?? "").toLocaleLowerCase().includes(normalizedQuery),
-        )
-      : groupedDisplayPhotos;
+    const sourcePhotos = showRecommendedOnly ? displayPhotos : groupedDisplayPhotos;
+    const searched = photoSearch.trim()
+      ? sourcePhotos.filter((photo) => matchesFilenameQuery(photo.originalFilename ?? "", photoSearch))
+      : sourcePhotos;
+    const recommendationFiltered = showRecommendedOnly ? searched.filter(photo => recommendedPhotoIds.has(photo.id)) : searched;
     const filtered = qualityFilter.size === 0
-      ? searched
-      : searched.filter((photo) =>
+      ? recommendationFiltered
+      : recommendationFiltered.filter((photo) =>
           (qualityFilter.has("blurry") && photo.isBlurry === true) ||
           (qualityFilter.has("eyesClosed") && photo.faceDetected === true && photo.eyesClosed === true));
     return [...filtered].sort((a, b) => {
-      if (photoSort === "file-size-desc") {
-        return (b.sourceFileSize ?? -1) - (a.sourceFileSize ?? -1);
+      if (photoSort === "uploaded-desc" || photoSort === "uploaded-asc") {
+        const aTime = Date.parse(a.createdAt ?? "") || 0;
+        const bTime = Date.parse(b.createdAt ?? "") || 0;
+        if (aTime !== bTime) {
+          if (!aTime) return 1;
+          if (!bTime) return -1;
+          return photoSort === "uploaded-desc" ? bTime - aTime : aTime - bTime;
+        }
       }
-      if (photoSort === "resolution-desc") {
-        const aPixels = a.sourceWidth && a.sourceHeight ? a.sourceWidth * a.sourceHeight : -1;
-        const bPixels = b.sourceWidth && b.sourceHeight ? b.sourceWidth * b.sourceHeight : -1;
-        return bPixels - aPixels;
-      }
-      if (photoSort === "uploaded-desc") {
-        return (Date.parse(b.createdAt ?? "") || 0) - (Date.parse(a.createdAt ?? "") || 0);
-      }
-      const result = (a.originalFilename ?? "").localeCompare(
+      return (a.originalFilename ?? "").localeCompare(
         b.originalFilename ?? "",
         undefined,
         { numeric: true, sensitivity: "base" },
       );
-      return photoSort === "filename-asc" ? result : -result;
     });
-  }, [groupedDisplayPhotos, photoSearch, photoSort, qualityFilter]);
+  }, [displayPhotos, groupedDisplayPhotos, photoSearch, photoSort, qualityFilter, showRecommendedOnly, recommendedPhotoIds]);
 
   /** 상세 뷰어의 전체 filmstrip에서는 그룹마다 대표 썸네일 하나만 남긴다.
    * 검색/정렬 결과에 대표컷이 없으면 현재 결과의 첫 멤버를 대신 사용해 검색 맥락을 보존한다. */
@@ -1450,20 +1503,22 @@ export default function ProjectDetailPage() {
     () => galleryPhotos.filter((photo) => !photo.isPending).map((photo) => photo.id),
     [galleryPhotos],
   );
-  const allVisibleSelected = selectableGalleryIds.length > 0
-    && selectableGalleryIds.every((photoId) => selectedPhotoIds.has(photoId));
-
-  const togglePhotoSelected = useCallback((photoId: string) => {
+  const selectionAnchorRef = useRef<string | null>(null);
+  const togglePhotoSelected = useCallback((photoId: string, options?: { range?: boolean }) => {
     setSelectedPhotoIds((current) => {
+      if (options?.range && selectionAnchorRef.current) {
+        return selectPhotoRange(selectableGalleryIds, selectionAnchorRef.current, photoId, current);
+      }
       const next = new Set(current);
       if (next.has(photoId)) next.delete(photoId);
       else next.add(photoId);
+      selectionAnchorRef.current = photoId;
       return next;
     });
     if (isMobile && mobilePhotoManageMode && typeof navigator !== "undefined" && "vibrate" in navigator) {
       navigator.vibrate(10);
     }
-  }, [isMobile, mobilePhotoManageMode]);
+  }, [isMobile, mobilePhotoManageMode, selectableGalleryIds]);
 
   const enterMobilePhotoManageMode = useCallback((photoId?: string) => {
     setMobilePhotoManageMode(true);
@@ -1483,17 +1538,17 @@ export default function ProjectDetailPage() {
     setSelectedPhotoIds(new Set());
   }, []);
 
-  const toggleAllVisible = useCallback(() => {
-    setSelectedPhotoIds((current) => {
-      const next = new Set(current);
-      const shouldSelect = !selectableGalleryIds.every((photoId) => next.has(photoId));
-      for (const photoId of selectableGalleryIds) {
-        if (shouldSelect) next.add(photoId);
-        else next.delete(photoId);
-      }
-      return next;
-    });
-  }, [selectableGalleryIds]);
+  useEffect(() => {
+    if (isMobile || isUploading || deletingId || project?.status !== "preparing") return;
+    const handleSelectAllShortcut = (event: KeyboardEvent) => {
+      if (!hasShortcutModifier(event) || event.key.toLowerCase() !== "a" || (!event.metaKey && !event.ctrlKey) || event.altKey
+        || !photoScrollRef.current?.contains(document.activeElement)) return;
+      event.preventDefault();
+      setSelectedPhotoIds(new Set(selectableGalleryIds));
+    };
+    window.addEventListener("keydown", handleSelectAllShortcut);
+    return () => window.removeEventListener("keydown", handleSelectAllShortcut);
+  }, [deletingId, isMobile, isUploading, project?.status, selectableGalleryIds]);
 
   useEffect(() => {
     const existingIds = new Set(photos.map((photo) => photo.id));
@@ -1558,22 +1613,12 @@ export default function ProjectDetailPage() {
   }, []);
 
   useEffect(() => {
-    if (!isMobile) exitMobilePhotoManageMode();
-  }, [exitMobilePhotoManageMode, isMobile]);
-
-  useEffect(() => {
-    if (mobilePhotoManageMode && selectedPhotoIds.size === 0) {
-      setToast("삭제할 사진을 선택하세요.");
-    }
-  }, [mobilePhotoManageMode, selectedPhotoIds]);
-
-  useEffect(() => {
     if (!isMobile || photosLoading || project?.status !== "preparing" || displayPhotos.length === 0) return;
     const storageKey = "acut:mobile-original-photo-management-tip:v1";
     try {
       if (window.localStorage.getItem(storageKey)) return;
       window.localStorage.setItem(storageKey, "seen");
-      setToast("사진을 길게 누르면 여러 장을 선택해 삭제할 수 있어요.");
+      setToast("사진을 길게 눌러 추천하거나 삭제할 수 있어요.");
     } catch {
       // 사생활 보호 모드처럼 localStorage를 사용할 수 없는 환경에서는 안내 없이 계속 진행한다.
     }
@@ -2132,7 +2177,7 @@ export default function ProjectDetailPage() {
       };
 
       const producer = (async () => {
-        const compressionWorkers = mobileUploadClient ? 1 : (inclOrig ? getDesktopCompressionConcurrency() : 2);
+        const compressionWorkers = mobileUploadClient ? getMobileCompressionConcurrency() : (inclOrig ? getDesktopCompressionConcurrency() : 2);
         const batchesPerCompressionRound = inclOrig && !mobileUploadClient ? compressionWorkers : 1;
         let nextTokenRefreshAt = refreshInterval;
         for (let groupStart = 0; groupStart < totalBatches; groupStart += batchesPerCompressionRound) {
@@ -2527,7 +2572,7 @@ export default function ProjectDetailPage() {
         qualityAnalysisStatus !== "processing"
       ) {
         setAiWantSimilar(true);
-        setAiWantQuality(true);
+        setAiWantQuality(false);
         setAiPromptSource("upload");
         setAiPromptOpen(true);
       }
@@ -2691,16 +2736,14 @@ export default function ProjectDetailPage() {
     setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
 
+  /** CustomerInviteShareModal의 인라인 PIN 편집이 위임하는 저장 — 실패하면 던져서
+   * 그 모달 안의 에러 문구로 보여준다(별도 PIN 모달을 다시 띄우지 않는다). */
   const handleSavePin = async (newPin: string | null) => {
     if (!project) return;
-    setPinError(""); setPinSaving(true);
-    try {
-      const res = await fetch(`/api/photographer/projects/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ access_pin: newPin }) });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error((data as { error?: string }).error ?? "저장 실패");
-      setProject({ ...project, accessPin: newPin }); setShowPinModal(false); setPinInput("");
-    } catch (e) { setPinError(e instanceof Error ? e.message : "저장 실패"); }
-    finally { setPinSaving(false); }
+    const res = await fetch(`/api/photographer/projects/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ access_pin: newPin }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((data as { error?: string }).error ?? "저장 실패");
+    setProject({ ...project, accessPin: newPin });
   };
 
   const handleDeletePhoto = async (photoId: string) => {
@@ -3037,11 +3080,50 @@ export default function ProjectDetailPage() {
   const uploadEtaLabel = uploadCopy ? `${uploadCopy.transfer} · ${uploadCopy.eta}` : "남은 시간 계산 중";
   const uploadSavedLabel = uploadCopy?.details;
   const photoUploadAllowed = project.status === "preparing" && !recoveryBusy;
-  const canFlushAll =
-    project.status === "preparing" &&
-    displayPhotos.length > 0 &&
-    !isUploading &&
-    deletingId !== "__all__";
+
+  const photoSelectionActive = mobilePhotoManageMode || (!isMobile && selectedPhotoIds.size > 0);
+  const selectedPhotosAreRecommended = selectedPhotoIds.size > 0
+    && [...selectedPhotoIds].every((photoId) => recommendedPhotoIds.has(photoId));
+  const updateSelectedRecommendations = () => {
+    if (selectedPhotoIds.size === 0 || recommendationSaving) return;
+    const nextIds = new Set(recommendedPhotoIds);
+    for (const photoId of selectedPhotoIds) {
+      if (selectedPhotosAreRecommended) nextIds.delete(photoId);
+      else nextIds.add(photoId);
+    }
+    const count = selectedPhotoIds.size.toLocaleString();
+    void saveRecommendations(
+      nextIds,
+      selectedPhotosAreRecommended
+        ? `${count}장을 작가 추천에서 제외했습니다.`
+        : `${count}장을 작가 추천으로 지정했습니다.`,
+      true,
+    );
+  };
+  const setPhotoScope = (recommended: boolean) => {
+    setShowRecommendedOnly(recommended);
+    setLightboxIndex(null);
+    setGroupReviewGroupId(null);
+  };
+  const changePhotoViewMode = (mode: "gallery" | "list") => {
+    photoScrollRef.current?.scrollTo({ top: 0 });
+    setViewMode(mode === "gallery" ? "grid" : "list");
+  };
+  const photoScopeControl = (
+    <PhotoScopeSelect
+      totalCount={displayPhotos.length}
+      recommendedCount={recommendedPhotoIds.size}
+      recommendedOnly={showRecommendedOnly}
+      onChange={setPhotoScope}
+    />
+  );
+  const recommendationHint = recommendedPhotoIds.size === 0
+    ? "추천 없이 고객에게 셀렉을 요청할 수 있어요."
+    : recommendedPhotoIds.size === N
+      ? `고객이 추천 ${N.toLocaleString()}장을 확인하고 바로 확정할 수 있어요.`
+      : recommendedPhotoIds.size < N
+        ? `${(N - recommendedPhotoIds.size).toLocaleString()}장을 더 추천하면 고객이 추천 구성 그대로 확정할 수 있어요.`
+        : `추천을 ${N.toLocaleString()}장으로 맞추면 고객이 추천 구성 그대로 확정할 수 있어요.`;
 
   return (
     <div
@@ -3182,7 +3264,7 @@ export default function ProjectDetailPage() {
         .prj-gallery-toolbar-inner { width: 100%; min-width: 0; height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
         .prj-gallery-context { flex-shrink: 0; display: flex; align-items: center; gap: 16px; }
         .prj-gallery-summary { display: flex; align-items: center; gap: 12px; }
-        .prj-gallery-analysis { display: flex; align-items: center; padding-left: 16px; border-left: 1px solid color-mix(in srgb, var(--border-subtle) 72%, transparent); }
+        .prj-gallery-analysis { display: flex; flex-wrap:wrap; gap:8px; align-items: center; padding-left: 16px; border-left: 1px solid color-mix(in srgb, var(--border-subtle) 72%, transparent); }
         .prj-gallery-query-tools { min-width: 0; flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
         .prj-gallery-display-tools { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding-left: 12px; border-left: 1px solid color-mix(in srgb, var(--border-subtle) 72%, transparent); }
         .prj-toolbar-check { width: 18px; height: 18px; flex: 0 0 18px; padding: 0; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--accent-foreground); display: inline-flex; align-items: center; justify-content: center; }
@@ -3203,19 +3285,9 @@ export default function ProjectDetailPage() {
         .prj-ai-control:focus-visible { outline: 2px solid rgba(var(--accent-rgb), 0.24); outline-offset: 2px; }
         .prj-ai-control:disabled { cursor: wait; opacity: 0.62; }
         .prj-ai-control-processing { color: var(--muted-foreground); }
-        .prj-gallery-search { width: min(500px, 28vw); height: 44px; padding: 0 20px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--subtle-foreground); display: flex; align-items: center; gap: 18px; }
-        .prj-gallery-search:focus-within { border-color: var(--border-strong); box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.08); }
-        .prj-gallery-search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: var(--foreground); font: inherit; font-size: 14px; line-height: 24px; letter-spacing: -0.45px; }
-        .prj-gallery-search input::placeholder { color: var(--placeholder-foreground); }
-        .prj-gallery-sort { height: 44px; padding: 0 16px 0 20px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted-foreground); display: flex; align-items: center; gap: 8px; }
-        .prj-gallery-sort select { appearance: none; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; font-size: 14px; line-height: 24px; letter-spacing: -0.45px; cursor: pointer; }
-        .prj-gallery-view-switch { height: 44px; display: inline-flex; align-items: stretch; }
-        .prj-gallery-view-switch button { width: 57px; border: 1px solid var(--border); background: var(--surface); color: var(--subtle-foreground); display: inline-flex; align-items: center; justify-content: center; }
-        .prj-gallery-view-switch button:first-child { border-radius: 8px 0 0 8px; }
-        .prj-gallery-view-switch button:last-child { margin-left: -1px; border-radius: 0 8px 8px 0; }
-        .prj-gallery-view-switch button.is-active { position: relative; z-index: 1; border-color: var(--border-strong); background: var(--surface-raised); color: var(--foreground); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-strong) 30%, transparent); }
-        .prj-gallery-view-switch button:focus { outline: none; }
-        .prj-gallery-view-switch button:focus-visible { outline: 2px solid rgba(var(--accent-rgb), 0.24); outline-offset: 2px; z-index: 2; }
+        /* 색·테두리·placeholder는 FilenameSearchInput(fsi-root)이 고정한다 — 여기서는
+         * --fsi-* 변수로 이 툴바 자리에 맞는 크기만 넘긴다. */
+        .prj-gallery-search { --fsi-width: min(500px, 28vw); --fsi-height: 44px; --fsi-gap: 18px; --fsi-radius: 8px; --fsi-font-size: 14px; }
         .prj-upload-compact { min-width: 0; min-height: 62px; padding: 5px 10px; border: 1px solid rgba(var(--accent-rgb), 0.18); border-radius: 8px; background: rgba(var(--accent-rgb), 0.06); display: inline-flex; align-items: center; gap: 10px; color: var(--foreground); }
         .prj-upload-compact-copy { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0; white-space: normal; }
         .prj-upload-compact-copy strong { font-size: 14px; font-weight: 600; line-height: 20px; letter-spacing: -0.45px; }
@@ -3232,7 +3304,7 @@ export default function ProjectDetailPage() {
           .prj-gallery-analysis { padding-left: 12px; }
           .prj-gallery-query-tools { gap: 8px; }
           .prj-gallery-display-tools { padding-left: 8px; }
-          .prj-gallery-search { width: min(320px, 24vw); }
+          .prj-gallery-search { --fsi-width: min(320px, 24vw); }
           .prj-ai-control { padding-inline: 12px; }
           .prj-list-table { width: calc(100% - 48px); margin-inline: auto; }
           .prj-list-header, .prj-list-row { grid-template-columns: 18px minmax(220px, 1fr) 112px 136px; padding-inline: 24px; gap: 16px; }
@@ -3595,73 +3667,19 @@ export default function ProjectDetailPage() {
         <section style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, overflow: "hidden" }}>
 
           {displayPhotos.length > 0 && (
-            <div className="prj-desktop-toolbar prj-gallery-toolbar">
-              <div className="prj-gallery-toolbar-inner">
-              {selectedPhotoIds.size > 0 && !isUploading ? (
-                <>
-                  <div className="flex items-center gap-3 px-1">
-                    <button type="button" onClick={() => setSelectedPhotoIds(new Set())} className="flex size-[18px] items-center justify-center text-muted-foreground hover:text-foreground" aria-label="선택 해제">
-                      <X size={15} />
-                    </button>
-                    <span className="text-[16px] font-medium leading-[29px] tracking-[-0.54px] text-foreground">
-                      {selectedPhotoIds.size.toLocaleString()}장 선택됨
-                    </span>
-                  </div>
-                  <PhotographerLightButton
-                    type="button"
-                    variant="secondary"
-                    onClick={() => setDeleteConfirmTarget({ kind: "selected", count: selectedPhotoIds.size })}
-                    disabled={deletingId === "__selected__"}
-                  >
-                    {deletingId === "__selected__" ? "삭제 중…" : "삭제"}
-                  </PhotographerLightButton>
-                </>
-              ) : (
-                <>
-                  <div className="prj-gallery-context px-1">
+            <ProjectAssetWorkspaceToolbar
+              ariaLabel="원본 업로드 도구"
+              className="prj-desktop-toolbar prj-gallery-toolbar"
+              leading={(
+                  <div className="prj-gallery-context">
                     <div className="prj-gallery-summary">
-                      <button
-                        type="button"
-                        className="prj-toolbar-check"
-                        aria-label={allVisibleSelected ? "전체 선택 해제" : "전체 선택"}
-                        aria-pressed={allVisibleSelected}
-                        onClick={toggleAllVisible}
-                      >
-                        {allVisibleSelected ? <Check size={14} strokeWidth={3} /> : null}
-                      </button>
-                      <div className="flex items-center gap-2 text-[16px] font-semibold leading-[29px] tracking-[-0.54px]">
-                        <span className="text-foreground">전체 원본</span>
-                        <span className="text-muted-foreground">{displayPhotos.length.toLocaleString()}장</span>
-                      </div>
+                      {photoScopeControl}
                     </div>
                     <div className="prj-gallery-analysis">
-                      {isUploading ? (
-                        <div className="prj-upload-compact" role="status" aria-live="polite">
-                          {showServerWorking ? (
-                            <Loader2 size={20} className="shrink-0 animate-spin text-accent" aria-hidden />
-                          ) : (
-                            <svg className="prj-upload-ring" viewBox="0 0 20 20" aria-hidden>
-                              <circle className="prj-upload-ring-track" cx="10" cy="10" r="8" />
-                              <circle
-                                className="prj-upload-ring-value"
-                                cx="10"
-                                cy="10"
-                                r="8"
-                                strokeDasharray="50.27"
-                                strokeDashoffset={50.27 * (1 - Math.min(100, overallProgress) / 100)}
-                              />
-                            </svg>
-                          )}
-                          <div className="prj-upload-compact-copy">
-                            <strong>{uploadStatusLabel}</strong>
-                            {uploadSavedLabel ? <span>{uploadSavedLabel}</span> : null}
-                            {uploadEtaLabel && !uploadStopRequested ? <span>{uploadEtaLabel}</span> : null}
-                          </div>
-                          <button type="button" className="prj-upload-stop" onClick={handleStopUpload} disabled={uploadStopRequested}>
-                            {uploadStopRequested ? "중단 중" : "중단"}
-                          </button>
-                        </div>
-                      ) : canUploadOriginals(project.status) ? (
+                      {/* 업로드 진행 현황은 하단 바로 옮겼다 — 그 자리는 업로드 중엔 어차피
+                        * "사진 추가"·초대 버튼이 비활성으로 노는 자리라(§PhotographerFormActionBar),
+                        * 같은 정보를 화면 위아래 두 곳에 겹쳐 보여줄 이유가 없다. */}
+                      {isUploading ? null : canUploadOriginals(project.status) ? (
                         /* AI 버튼과 유사컷 토글은 **서로 대체하지 않는다**.
                          * 예전에는 삼항으로 갈라 분석이 끝나면 버튼이 토글로 바뀌었는데, 그러면
                          * 분석 이후 AI 진입점이 화면에서 사라져 품질 확인을 시작할 방법이 없었다.
@@ -3700,81 +3718,32 @@ export default function ProjectDetailPage() {
                       ) : null}
                     </div>
                   </div>
-                  <div className="prj-gallery-query-tools px-1">
-                    <label className="prj-gallery-search">
-                      <Search size={20} aria-hidden />
-                      <input value={photoSearch} onChange={(event) => setPhotoSearch(event.target.value)} placeholder="파일명 검색" aria-label="파일명 검색" />
-                    </label>
+              )}
+              actions={(
+                  <div className="prj-gallery-query-tools">
+                    <FilenameSearchInput
+                      value={photoSearch}
+                      onChange={setPhotoSearch}
+                      className="prj-gallery-search"
+                    />
                     <div className="prj-gallery-display-tools">
-                      <label className="prj-gallery-sort">
-                        <select value={photoSort} onChange={(event) => setPhotoSort(event.target.value as PhotoSort)} aria-label="사진 정렬">
-                          <option value="filename-asc">정렬 : 파일명순</option>
-                          <option value="filename-desc">정렬 : 파일명 역순</option>
-                          <option value="file-size-desc">정렬 : 원본 용량 큰 순</option>
-                          <option value="resolution-desc">정렬 : 해상도 높은 순</option>
-                          <option value="uploaded-desc">정렬 : 최근 업로드순</option>
-                        </select>
-                        <ChevronDown size={16} aria-hidden />
-                      </label>
-                      <div className="prj-gallery-view-switch" aria-label="보기 방식">
-                        <button type="button" className={viewMode === "grid" ? "is-active" : ""} onClick={() => setViewMode("grid")} aria-label="갤러리 보기"><LayoutGrid size={18} /></button>
-                        <button type="button" className={viewMode === "list" ? "is-active" : ""} onClick={() => setViewMode("list")} aria-label="목록 보기"><List size={18} /></button>
-                      </div>
+                      <PhotoSortSelect
+                        value={photoSort}
+                        onChange={setPhotoSort}
+                        options={[
+                          { value: "filename-asc", label: "파일명순" },
+                          { value: "uploaded-desc", label: "최근 업로드순" },
+                          { value: "uploaded-asc", label: "오래된 업로드순" },
+                        ]}
+                      />
+                      <ProjectAssetToolbarViewToggle
+                        value={viewMode === "grid" ? "gallery" : "list"}
+                        onChange={changePhotoViewMode}
+                      />
                     </div>
                   </div>
-                </>
               )}
-              </div>
-            </div>
-          )}
-
-          {/* ── 뷰 토글 툴바 ── */}
-          {displayPhotos.length > 0 && (
-            <div className="hidden" style={{ height: 44, borderBottom: `1px solid ${BORDER}`, background: SURFACE_1, alignItems: "center", justifyContent: "space-between", paddingLeft: 16, paddingRight: 16, flexShrink: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ fontVariantNumeric: "tabular-nums", fontSize: 12, color: TEXT_MUTED }}>{displayPhotos.length.toLocaleString()}장</span>
-                {canFlushAll && (
-                  <button
-                    type="button"
-                    onClick={() => setShowFlushAllConfirm(true)}
-                    style={{ fontSize: 12, background: "transparent", border: "none", color: TEXT_MUTED, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, transition: "color 0.15s" }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "var(--danger)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = TEXT_MUTED; }}
-                  >
-                    <Trash2 size={11} />전체삭제
-                  </button>
-                )}
-                {showSimilarityToggle && (
-                  <button
-                    type="button"
-                    onClick={() => setSimilarityToggleOn((v) => !v)}
-                    className={`prj-similarity-toggle${similarityToggleOn ? " prj-similarity-on" : ""}`}
-                    style={{ color: similarityToggleOn ? ACCENT : TEXT_MUTED }}
-                  >
-                    <span className="prj-similarity-checkbox">
-                      {similarityToggleOn && (
-                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--accent-foreground)" strokeWidth={5}>
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </span>
-                    유사컷 대표이미지 적용
-                  </button>
-                )}
-              </div>
-              <div style={{ display: "flex", background: SURFACE_2, border: `1px solid ${BORDER}`, padding: 2, gap: 1 }}>
-                {([["grid", <LayoutGrid key="g" size={13} />, "갤러리"] as const, ["list", <List key="l" size={13} />, "파일명"] as const]).map(([mode, icon, label]) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setViewMode(mode)}
-                    style={{ padding: "4px 10px", borderRadius: 4, background: viewMode === mode ? ACCENT_DIM : "transparent", border: "none", cursor: "pointer", color: viewMode === mode ? ACCENT : TEXT_MUTED, display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, transition: "all 0.15s" }}
-                  >
-                    {icon}{label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            />
           )}
 
           {/* ── 모바일 툴바 (장수 + 원본포함 토글 + 전체삭제) ── */}
@@ -3798,6 +3767,7 @@ export default function ProjectDetailPage() {
             >
               {mobilePhotoManageMode ? (
                 <>
+                  {photoScopeControl}
                   <div data-mobile-photo-manage-mode style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 14, fontWeight: 700, color: TEXT_BRIGHT }}>사진 선택</span>
                     <span
@@ -3820,7 +3790,6 @@ export default function ProjectDetailPage() {
                       {selectedPhotoIds.size.toLocaleString()}장
                     </span>
                   </div>
-                  <button type="button" onClick={toggleAllVisible} aria-pressed={allVisibleSelected} className="min-h-11 px-2 text-xs font-semibold text-foreground">{allVisibleSelected ? "전체 해제" : "전체 선택"}</button>
                   <button
                     type="button"
                     onClick={exitMobilePhotoManageMode}
@@ -3831,10 +3800,8 @@ export default function ProjectDetailPage() {
                 </>
               ) : (
                 <>
-                  {displayPhotos.length > 0 ? (
-                    <span style={{ fontVariantNumeric: "tabular-nums", fontSize: 12, color: TEXT_MUTED }}>{displayPhotos.length.toLocaleString()}장</span>
-                  ) : <span />}
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  {displayPhotos.length > 0 ? photoScopeControl : <span />}
+                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4 }}>
                     {showSimilarityToggle && (
                       <button
                         type="button"
@@ -3852,15 +3819,10 @@ export default function ProjectDetailPage() {
                         유사컷 적용
                       </button>
                     )}
-                    {canFlushAll ? (
-                      <button
-                        type="button"
-                        onClick={() => enterMobilePhotoManageMode()}
-                        className="inline-flex min-h-11 items-center gap-1.5 border-0 bg-transparent px-2 text-[12px] font-medium text-foreground"
-                      >
-                        선택
-                      </button>
-                    ) : null}
+                    <ProjectAssetToolbarViewToggle
+                      value={viewMode === "grid" ? "gallery" : "list"}
+                      onChange={changePhotoViewMode}
+                    />
                   </div>
                 </>
               )}
@@ -3870,12 +3832,19 @@ export default function ProjectDetailPage() {
           {/* photo grid — 가상 스크롤로 보이는 행만 마운트·이미지 로드 */}
           <div
             ref={photoScrollRef}
+            tabIndex={-1}
+            aria-label="원본 사진 갤러리"
+            onPointerDownCapture={(event) => {
+              if (event.target instanceof Element && !event.target.closest("article, button, input, select, a")) {
+                event.currentTarget.focus({ preventScroll: true });
+              }
+            }}
             onScroll={handlePhotoScroll}
             className="prj-scroll prj-photo-scroll-mobile-pad"
-            style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "var(--background)", position: "relative" }}
-            onDrop={!isMobileUploadClient() && photoUploadAllowed && uploadPhase === "idle" ? onDrop : undefined}
-            onDragOver={!isMobileUploadClient() && photoUploadAllowed && uploadPhase === "idle" ? onDragOver : undefined}
-            onDragLeave={!isMobileUploadClient() && photoUploadAllowed && uploadPhase === "idle" ? onDragLeave : undefined}
+            style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", touchAction: "pan-y", overscrollBehavior: "contain", background: "var(--background)", position: "relative", outline: "none" }}
+            onDrop={!mobilePhotoManageMode && !isMobileUploadClient() && photoUploadAllowed && uploadPhase === "idle" ? onDrop : undefined}
+            onDragOver={!mobilePhotoManageMode && !isMobileUploadClient() && photoUploadAllowed && uploadPhase === "idle" ? onDragOver : undefined}
+            onDragLeave={!mobilePhotoManageMode && !isMobileUploadClient() && photoUploadAllowed && uploadPhase === "idle" ? onDragLeave : undefined}
           >
             {dragOver && !isMobileUploadClient() && photoUploadAllowed && (
               <div style={{
@@ -3927,8 +3896,8 @@ export default function ProjectDetailPage() {
             ) : galleryPhotos.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                 <Search size={24} className="text-subtle-foreground" aria-hidden />
-                <p className="m-0 text-[15px] font-semibold leading-6 tracking-[-0.45px] text-foreground">검색 결과가 없습니다</p>
-                <p className="m-0 text-[13px] leading-5 tracking-[-0.35px] text-muted-foreground">다른 파일명으로 검색해보세요.</p>
+                <p className="m-0 text-[15px] font-semibold leading-6 tracking-[-0.45px] text-foreground">{showRecommendedOnly && recommendedPhotoIds.size === 0 ? "아직 추천한 사진이 없습니다" : "검색 결과가 없습니다"}</p>
+                <PhotographerLightButton variant="secondary" onClick={() => { setShowRecommendedOnly(false); setPhotoSearch(""); setQualityFilter(new Set()); }}>전체 사진 보기</PhotographerLightButton>
               </div>
             ) : (
               <OriginalPhotoGallery
@@ -3949,13 +3918,16 @@ export default function ProjectDetailPage() {
                 // 데스크톱은 워커 풀로 여러 장을 동시에 압축해 "지금 압축 중인 파일 1장" 하이라이트가
                 // 더 이상 의미 없음(모바일은 풀 크기 1이라 기존과 동일하게 단일 하이라이트 유지)
                 compressingPhotoId={isMobile && compressingIndex >= 0 && queuedPreviews[compressingIndex] ? queuedPreviews[compressingIndex].tempId : null}
+                readonly={isMobile ? !mobilePhotoManageMode : true}
                 selectedPhotoIds={selectedPhotoIds}
                 onToggleSelected={togglePhotoSelected}
+                onDragSelectionChange={!isMobile && photoUploadAllowed && !isUploading && !deletingId ? setSelectedPhotoIds : undefined}
+                selectionOnHover={!isMobile && photoUploadAllowed && !isUploading && !deletingId}
+                recommendedPhotoIds={recommendedPhotoIds}
                 mobileManageMode={isMobile && mobilePhotoManageMode}
+                mobileSelectionVisible={isMobile && photoUploadAllowed && !isUploading}
                 onPhotoLongPress={isMobile && photoUploadAllowed && !isUploading ? enterMobilePhotoManageMode : undefined}
                 compact={isMobile}
-                allVisibleSelected={allVisibleSelected}
-                onToggleAllVisible={toggleAllVisible}
                 leadingCell={
                   photoUploadAllowed && isMobile && !mobilePhotoManageMode ? (
                     <UploadTile
@@ -4048,11 +4020,40 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
-      {/* 업로드 화면의 주요 행동도 생성·수정 화면과 동일한 공통 하단 액션 영역에서 관리한다. */}
+      {/* 업로드 화면의 주요 행동도 생성·수정 화면과 동일한 공통 하단 액션 영역에서 관리한다.
+        * 업로드 중에는 "사진 추가"·초대 버튼 둘 다 어차피 비활성이라(§isUploading), 그 자리에
+        * "사진 업로드 중…"이라는 죽은 문구만 있었다 — 그 자리를 실제 진행률로 채운다.
+        * 예전엔 이 정보가 갤러리 위 toolbar에도 따로 떠서, 화면 위아래에 같은 걸 두 번
+        * 보여주고 있었다(§prj-gallery-analysis). */}
       <PhotographerFormActionBar
         maxWidth={1920}
         className="shrink-0"
-        leading={mobilePhotoManageMode ? undefined : (
+        leading={photoSelectionActive ? (
+          <p className="text-sm font-bold text-foreground">{selectedPhotoIds.size.toLocaleString()}장 선택됨</p>
+        ) : isUploading ? (
+          <div className="prj-upload-bottom-status flex items-center gap-3" role="status" aria-live="polite">
+            {showServerWorking ? (
+              <Loader2 size={22} className="shrink-0 animate-spin text-accent" aria-hidden />
+            ) : (
+              <svg className="prj-upload-ring" viewBox="0 0 20 20" aria-hidden>
+                <circle className="prj-upload-ring-track" cx="10" cy="10" r="8" />
+                <circle
+                  className="prj-upload-ring-value"
+                  cx="10"
+                  cy="10"
+                  r="8"
+                  strokeDasharray="50.27"
+                  strokeDashoffset={50.27 * (1 - Math.min(100, overallProgress) / 100)}
+                />
+              </svg>
+            )}
+            <div className="prj-upload-compact-copy">
+              <strong>{uploadStatusLabel}</strong>
+              {uploadSavedLabel ? <span>{uploadSavedLabel}</span> : null}
+              {uploadEtaLabel && !uploadStopRequested ? <span>{uploadEtaLabel}</span> : null}
+            </div>
+          </div>
+        ) : (
           <div>
             <p className="text-sm font-bold text-foreground">
               원본 {M.toLocaleString()}장
@@ -4064,11 +4065,22 @@ export default function ProjectDetailPage() {
                 ? "고객에게 초대 링크를 공유할 수 있어요."
                 : M < N
                   ? `셀렉 요청까지 원본 ${(N - M).toLocaleString()}장이 더 필요해요.`
-                  : "업로드를 확인한 뒤 고객에게 셀렉을 요청하세요."}
+                  : recommendationHint}
             </p>
           </div>
         )}
-        actions={mobilePhotoManageMode ? (
+        actions={photoSelectionActive ? (<>
+          <PhotographerLightButton
+            type="button"
+            onClick={updateSelectedRecommendations}
+            disabled={selectedPhotoIds.size === 0 || recommendationSaving || !!deletingId}
+            pending={recommendationSaving}
+            pendingLabel="저장 중…"
+            className="h-12 w-full px-5 text-[14px] md:w-auto"
+          >
+            <RecommendationMark size={16} aria-hidden />
+            {selectedPhotosAreRecommended ? "작가 추천에서 제외" : "작가 추천으로 지정"}
+          </PhotographerLightButton>
           <PhotographerLightButton
             type="button"
             variant="danger"
@@ -4081,6 +4093,17 @@ export default function ProjectDetailPage() {
               ? `선택한 사진 ${selectedPhotoIds.size.toLocaleString()}장 삭제`
               : "삭제할 사진을 선택하세요"}
           </PhotographerLightButton>
+          </>
+        ) : isUploading ? (
+          <PhotographerLightButton
+            type="button"
+            variant="secondary"
+            onClick={handleStopUpload}
+            disabled={uploadStopRequested}
+            className="min-w-[129px]"
+          >
+            {uploadStopRequested ? "중단 중…" : "업로드 중단"}
+          </PhotographerLightButton>
         ) : (
           <>
             {photoUploadAllowed && displayPhotos.length > 0 ? (
@@ -4088,7 +4111,7 @@ export default function ProjectDetailPage() {
                 type="button"
                 variant="secondary"
                 onClick={requestOpenFilePicker}
-                disabled={isUploading || isPreparingFiles}
+                disabled={isPreparingFiles}
               >
                 <ImagePlus size={15} />사진 추가
               </PhotographerLightButton>
@@ -4119,6 +4142,20 @@ export default function ProjectDetailPage() {
       {isPhotoViewerOpen && activePhoto && viewerFilmstripIndex !== null ? (
         <OriginalPhotoViewer
           photos={viewerFilmstripPhotos}
+          headerControls={photoUploadAllowed ? (
+            <button type="button" disabled={recommendationSaving} aria-pressed={recommendedPhotoIds.has(activePhoto.id)}
+              className="inline-flex min-h-11 items-center gap-2 rounded px-3 text-sm text-white disabled:opacity-50"
+              onClick={() => {
+                const nextIds = new Set(recommendedPhotoIds);
+                const recommended = recommendedPhotoIds.has(activePhoto.id);
+                if (recommended) nextIds.delete(activePhoto.id);
+                else nextIds.add(activePhoto.id);
+                void saveRecommendations(nextIds, recommended ? "작가 추천에서 제외했습니다." : "작가 추천으로 지정했습니다.");
+              }}>
+              <RecommendationMark size={16} />
+              {recommendedPhotoIds.has(activePhoto.id) ? "추천 제외" : "작가 추천"}
+            </button>
+          ) : undefined}
           activeIndex={viewerFilmstripIndex}
           onActiveIndexChange={(index) => {
             if (inGroupReview) setGroupReviewIndex(index);
@@ -4430,53 +4467,6 @@ export default function ProjectDetailPage() {
         );
       })()}
 
-      {/* ── PIN MODAL — 공용 PhotographerModal 재사용 ── */}
-      <PhotographerModal
-        open={showPinModal}
-        onClose={() => { setShowPinModal(false); setPinInput(""); setPinError(""); }}
-        title={project.accessPin ? "PIN 변경" : "PIN 설정"}
-        description="고객이 갤러리에 접속할 때 사용할 숫자 4자리를 설정합니다."
-        closeDisabled={pinSaving}
-        maxWidth={380}
-        footer={
-          <div style={{ display: "flex", gap: 8 }}>
-            {project.accessPin && (
-              <PhotographerLightButton type="button" variant="danger" onClick={() => handleSavePin(null)} disabled={pinSaving}>
-                PIN 삭제
-              </PhotographerLightButton>
-            )}
-            <PhotographerLightButton
-              type="button"
-              variant="secondary"
-              onClick={() => { setShowPinModal(false); setPinInput(""); setPinError(""); }}
-              disabled={pinSaving}
-              className="flex-1"
-            >
-              취소
-            </PhotographerLightButton>
-            <PhotographerLightButton
-              type="button"
-              variant="primary"
-              onClick={() => handleSavePin(pinInput || null)}
-              disabled={pinSaving || (!!pinInput && pinInput.length !== 4)}
-              className="flex-1"
-            >
-              {pinSaving ? "저장 중..." : "저장"}
-            </PhotographerLightButton>
-          </div>
-        }
-      >
-        <label htmlFor="project-access-pin" className="mb-2 block text-[13px] font-semibold text-foreground">접속 PIN</label>
-        <div className="flex gap-2">
-          <input id="project-access-pin" aria-invalid={Boolean(pinError)} type="text" inputMode="numeric" maxLength={4} value={pinInput} onChange={(e) => setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="0000" className="min-w-0 flex-1 rounded-lg border border-border-subtle bg-surface px-4 py-3 text-center text-[20px] font-bold tracking-[0.35em] text-foreground outline-none transition-colors placeholder:text-placeholder-foreground focus:border-accent focus:ring-2 focus:ring-accent/10" />
-          <PhotographerLightButton type="button" variant="secondary" onClick={() => setPinInput(Math.floor(1000 + Math.random() * 9000).toString())}>
-            <RefreshCw size={11} />랜덤
-          </PhotographerLightButton>
-        </div>
-        <p className="mt-2 text-[12px] leading-[18px] text-muted-foreground">직접 입력하거나 랜덤 PIN을 만들 수 있습니다.</p>
-        {pinError ? <p role="alert" className="mt-3 rounded-lg border border-danger/25 bg-danger/8 px-3 py-2 text-[12px] text-danger">{pinError}</p> : null}
-      </PhotographerModal>
-
       <CustomerInviteShareModal
         open={inviteShareModalOpen}
         onClose={() => setInviteShareModalOpen(false)}
@@ -4484,6 +4474,7 @@ export default function ProjectDetailPage() {
         accessPin={project.accessPin}
         title="고객 초대 링크가 활성화되었습니다"
         description="카카오톡, 이메일 등으로 아래 링크를 보내주세요. 고객이 사진 셀렉을 시작할 수 있습니다."
+        onSavePin={handleSavePin}
       />
 
       <CustomerSelectionRequestModal
@@ -4494,12 +4485,14 @@ export default function ProjectDetailPage() {
         customerPhone={project.customerPhone}
         photoCount={M}
         requiredCount={project.requiredCount}
+        recommendedCount={recommendedPhotoIds.size}
         includeOriginal={project.includeOriginal}
         initialDeadline={project.deadline?.slice(0, 10) ?? ""}
         inviteUrl={inviteUrl}
         accessPin={project.accessPin}
         pending={inviteActivating}
         onRequest={handleEnableClientAccess}
+        onSavePin={handleSavePin}
       />
 
       {/* ── EDIT GUIDE MODAL — 공용 PhotographerModal 재사용 ── */}

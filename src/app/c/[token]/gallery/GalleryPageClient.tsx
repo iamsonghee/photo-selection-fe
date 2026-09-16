@@ -14,6 +14,7 @@ import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDi
 import { SelectionLimitSnackbar } from "@/components/customer/SelectionLimitSnackbar";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
 import { GalleryDesktopHeader } from "@/components/customer/GalleryDesktopHeader";
+import { RecommendationMark } from "@/components/RecommendationMark";
 import {
   fetchRoster,
   getUsedColors,
@@ -23,6 +24,7 @@ import {
 } from "@/lib/customer-participant";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { SimilarityToggleButton } from "@/components/ui/SimilarityToggleButton";
 import {
   appendGalleryScrollQuery,
@@ -49,7 +51,7 @@ import { customerDDay } from "@/lib/customer-dday";
 import { useCustomerLightCanvas } from "@/lib/use-customer-light-canvas";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
-type TabFilter = "all" | "selected";
+type TabFilter = "all" | "selected" | "recommended";
 
 function CustomerGalleryHomeMark({ token, compact = false }: { token: string; compact?: boolean }) {
   return (
@@ -100,7 +102,7 @@ export default function GalleryPageClient() {
   const searchParams = useSearchParams();
   const token        = (params?.token as string) ?? "";
 
-  const { project, photos, photoGroups, Y, N, toggle, selectedIds, photoStates, loading, updatePhotoState } = useSelection();
+  const { project, photos, photoGroups, Y, N, toggle, selectedIds, photoStates, loading, updatePhotoState, includeRecommendations, selectionSaving, saveError } = useSelection();
   const { thumbUrls: presignedUrls, thumbQueue, ensureThumbUrls, refreshThumbUrl } = useCustomerImageCache();
   const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
 
@@ -109,7 +111,7 @@ export default function GalleryPageClient() {
    * (뷰어가 쓰는 parseFilterFromSearchParams/buildFilterQueryString과 동일한 GalleryFilterState 포맷 재사용). */
   const [initialFilterState] = useState(() => parseFilterFromSearchParams(searchParams));
 
-  const [tabFilter,     setTabFilter]     = useState<TabFilter>(initialFilterState.selectedFilter === "selected" ? "selected" : "all");
+  const [tabFilter,     setTabFilter]     = useState<TabFilter>(initialFilterState.selectedFilter);
   const [starFilter,    setStarFilter]    = useState<number>(initialFilterState.starFilter === "all" ? 0 : initialFilterState.starFilter);
   const [colorFilter,   setColorFilter]   = useState<ColorTag[]>(Array.isArray(initialFilterState.colorFilter) ? initialFilterState.colorFilter : []);
   /** 두 명 이상을 고를 때 "한 명이라도 찜"(any) / "모두 찜"(all) 중 무엇으로 볼지 */
@@ -123,6 +125,8 @@ export default function GalleryPageClient() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirming,       setConfirming]       = useState(false);
   const [confirmError,     setConfirmError]     = useState<string | null>(null);
+  const [applyingRecommendations, setApplyingRecommendations] = useState(false);
+  const [recommendationError, setRecommendationError] = useState<string | null>(null);
   const [similarityToggleOn, setSimilarityToggleOn] = useState(initialFilterState.groupedView);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   /** 파일명 검색(필터) — 쉼표/공백으로 구분해 여러 파일명을 한 번에 LIKE 검색 */
@@ -318,7 +322,7 @@ export default function GalleryPageClient() {
    * 이 상태를 넘겨받아 parseFilterFromSearchParams+getFilteredPhotos로 동일한 목록을 재구성함)의
    * 이전/다음 이동이 갤러리에서 보이는 필터링된 목록과 정확히 일치한다. */
   const filterState = useMemo<GalleryFilterState>(() => ({
-    selectedFilter: tabFilter === "selected" ? "selected" : "all",
+    selectedFilter: tabFilter,
     starFilter:     starFilter === 0 ? "all" : (starFilter as StarRating),
     colorFilter:    colorFilter.length > 0 ? colorFilter : "all",
     colorFilterMode,
@@ -331,6 +335,11 @@ export default function GalleryPageClient() {
   const filteredPhotos = useMemo(() => {
     return getFilteredPhotos(photos, selectedIds, photoStates, filterState);
   }, [photos, selectedIds, photoStates, filterState]);
+  const recommendedPhotoIds = useMemo(
+    () => new Set(photos.filter((photo) => photo.photographerRecommended).map((photo) => photo.id)),
+    [photos],
+  );
+  const recommendedCount = recommendedPhotoIds.size;
 
   /* ── AI 유사컷 그룹 (갤러리·뷰어 공용 헬퍼: src/lib/photo-groups.ts) ── */
   const groupsById = useMemo(() => buildGroupsById(photoGroups), [photoGroups]);
@@ -454,8 +463,8 @@ export default function GalleryPageClient() {
     if (gf != null) params.set(GALLERY_FOCUS_PARAM, gf);
     const nextQs = params.toString();
     if (current.toString() === nextQs) return;
-    router.replace(`/c/${token}/gallery${nextQs ? `?${nextQs}` : ""}`, { scroll: false });
-  }, [filterState, token, router]);
+    window.history.replaceState(window.history.state, "", `/c/${token}/gallery${nextQs ? `?${nextQs}` : ""}`);
+  }, [filterState, token]);
 
   // img onError → 해당 사진 1회만 재발급 (HEAD 요청 없음)
   const handleThumbError = useCallback(
@@ -699,11 +708,45 @@ export default function GalleryPageClient() {
   const showSelectedPhotos = useCallback(() => {
     setSelectionLimitNoticeKey(null);
     setTabFilter("selected");
+    setSearchValue("");
+    setStarFilter(0);
+    setColorFilter([]);
+    setQualityFilter(new Set());
+    setSimilarityToggleOn(false);
     setMobileSearchOpen(false);
     setMobileFiltersOpen(false);
     setMobileScopeOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
+
+  const showAllPhotos = () => {
+    setTabFilter("all");
+    setSearchValue("");
+    setStarFilter(0);
+    setColorFilter([]);
+    setQualityFilter(new Set());
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const applyRecommendations = async () => {
+    if (applyingRecommendations || selectionSaving) return;
+    setApplyingRecommendations(true);
+    setRecommendationError(null);
+    try {
+      const result = await includeRecommendations();
+      if (result === "saved") {
+        const count = new Set([...selectedIds, ...recommendedPhotoIds]).size;
+        if (count === N) showSelectedPhotos();
+        else showAllPhotos();
+      } else {
+        setRecommendationError(result === "limit-reached"
+          ? "현재 선택과 추천을 모두 포함하면 정해진 장수를 넘어요. 체크박스로 원하는 사진을 골라주세요."
+          : "일부 사진을 저장하지 못했어요. 체크 상태를 확인하고 다시 시도해 주세요.");
+      }
+    } finally {
+      setApplyingRecommendations(false);
+    }
+  };
 
   const handleGroupBadgeClick = useCallback((e: React.MouseEvent, groupId: string) => {
     e.preventDefault();
@@ -739,14 +782,18 @@ export default function GalleryPageClient() {
   );
 
   const handleConfirm = useCallback(async () => {
-    if (!project?.id || !token) return;
+    if (!project?.id || !token || selectionSaving || applyingRecommendations || confirming || N <= 0 || selectedIds.size !== N) return;
     setConfirming(true);
     setConfirmError(null);
     try {
       const res = await fetch("/api/c/confirm", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ token, project_id: project.id, selected_photo_ids: [...selectedIds] }),
+        body:    JSON.stringify({
+          token,
+          project_id: project.id,
+          selected_photo_ids: [...selectedIds],
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -760,8 +807,9 @@ export default function GalleryPageClient() {
     } catch (e) {
       console.error(e);
       setConfirming(false);
+      setConfirmError("네트워크 오류가 발생했습니다. 다시 시도해 주세요.");
     }
-  }, [project?.id, token, router, selectedIds]);
+  }, [project?.id, token, router, selectedIds, selectionSaving, applyingRecommendations, confirming, N]);
 
   /* ── Loading / error states ── */
   if (loading) {
@@ -786,7 +834,12 @@ export default function GalleryPageClient() {
     );
   }
 
-  const canConfirm  = Y === N;
+  const recommendationReview = tabFilter === "recommended";
+  const finalReview = tabFilter === "selected" && !searchValue.trim() && starFilter === 0 && colorFilter.length === 0 && qualityFilter.size === 0 && !similarityToggleOn;
+  const confirmationCount = Y;
+  const canConfirm = N > 0 && Y === N && !selectionSaving && !applyingRecommendations;
+  const recommendationUnionCount = new Set([...selectedIds, ...recommendedPhotoIds]).size;
+  const canApplyRecommendations = recommendedCount > 0 && recommendationUnionCount <= N && recommendationUnionCount > Y;
   const remaining   = N - Y;
   const deadlineDate = new Date(project.deadline);
   const deadlineLabel = Number.isNaN(deadlineDate.getTime()) ? "" : format(deadlineDate, "yy.MM.dd", { locale: ko });
@@ -798,7 +851,7 @@ export default function GalleryPageClient() {
     ? `${remaining}장을 더 셀렉해주세요`
     : remaining < 0
       ? `${Math.abs(remaining)}장 초과됐어요`
-      : "셀렉 확정하기";
+      : finalReview ? "보정 요청하기" : `선택한 ${Y}장 확인하기`;
 
   return (
     <>
@@ -812,7 +865,6 @@ export default function GalleryPageClient() {
           background-size: 40px 40px;
           pointer-events: none; z-index: 0; opacity: 0.5;
         }
-
         .gl-photo-card {
           position: relative;
           aspect-ratio: 1 / 1;
@@ -864,6 +916,7 @@ export default function GalleryPageClient() {
           text-shadow: 0 1px 3px rgba(0,0,0,.8);
         }
         .gl-mobile-filter-backdrop, .gl-mobile-filter-sheet, .gl-mobile-similarity-hint { display: none; }
+        .gl-recommended-badge { position:absolute; top:10px; left:42px; z-index:20; display:flex; align-items:center; gap:3px; padding:3px 6px; border-radius:999px; background:rgba(0,0,0,.58); color:#fff; font-size:10px; font-weight:700; pointer-events:none; }
 
         .gl-check-box {
           position: absolute; top: 10px; left: 10px;
@@ -963,18 +1016,27 @@ export default function GalleryPageClient() {
           .gl-mobile-toolbar-leading { min-width: 0; display: flex; align-items: center; gap: 4px; }
           .gl-mobile-header-compact .gl-mobile-appbar { height: 0; opacity: 0; transform: translateY(-10px); pointer-events: none; }
           .gl-mobile-header-compact .gl-mobile-toolbar { height: 56px; }
-          .gl-mobile-filter-trigger { min-height: 44px; margin-left: -4px; padding: 0 4px; border: 0; background: transparent; display: flex; align-items: center; gap: 6px; color: #191918; font: inherit; }
+          .gl-mobile-filter-trigger { min-width: 0; height: 38px; padding: 0 10px; border: 1px solid #e3e6e8; border-radius: 999px; background: #f6f7f8; display: flex; align-items: center; gap: 5px; color: #191918; font: inherit; }
+          .gl-mobile-filter-trigger-active { border-color: #ffc6ad; background: #fff0e8; color: #d84100; }
           .gl-mobile-filter-trigger strong, .gl-mobile-filter-trigger span { font-size: 12px; line-height: 19px; white-space: nowrap; }
+          .gl-mobile-filter-trigger strong { overflow: hidden; text-overflow: ellipsis; }
+          .gl-mobile-filter-trigger svg { flex: 0 0 auto; }
+          .gl-mobile-filter-trigger[aria-expanded="true"] > svg:last-child { transform: rotate(180deg); }
+          .gl-mobile-scope-cue { animation: gl-scope-cue 650ms ease 350ms 1; }
+          @keyframes gl-scope-cue { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(2px); } }
           @media (max-width: 359px) {
             .gl-mobile-toolbar { padding: 0 10px; gap: 4px; }
             .gl-mobile-filter-trigger { gap: 3px; }
             .gl-mobile-toolbar-actions { gap: 4px !important; }
           }
           .gl-mobile-filter-trigger span { color: #6f6f6f; font-weight: 600; }
-          .gl-mobile-scope-menu { position: absolute; left: 20px; top: calc(99px + env(safe-area-inset-top)); z-index: 2; width: 148px; padding: 6px; border: 1px solid #dde1e4; border-radius: 6px; background: #fff; box-shadow: 0 8px 24px rgba(25,25,24,.12); }
-          .gl-mobile-header-compact .gl-mobile-scope-menu { top: calc(56px + env(safe-area-inset-top)); }
-          .gl-mobile-scope-option { width: 100%; height: 40px; padding: 0 10px; border: 0; border-radius: 4px; background: transparent; display: flex; align-items: center; justify-content: space-between; color: #26282c; font: 13px/20px Pretendard, sans-serif; }
-          .gl-mobile-scope-option-active { background: #fff0e8; color: #ff4d00; font-weight: 700; }
+          .gl-mobile-filter-trigger-active span { color: #d84100; }
+          .gl-mobile-scope-options { padding: 10px 20px 20px; }
+          .gl-mobile-scope-option { width: 100%; height: 52px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; display: flex; align-items: center; justify-content: space-between; color: #26282c; font: 14px/20px Pretendard, sans-serif; }
+          .gl-mobile-scope-option-label { display: flex; align-items: center; gap: 7px; font-weight: 600; }
+          .gl-mobile-scope-option-count { color: #7d7a75; font-variant-numeric: tabular-nums; }
+          .gl-mobile-scope-option-active { background: #fff0e8; color: #d84100; }
+          .gl-mobile-scope-option-active .gl-mobile-scope-option-count { color: #d84100; font-weight: 700; }
           .gl-mobile-toolbar-actions { display: flex; gap: 8px; }
           .gl-mobile-tool-wrap { position: relative; }
           /* 버튼 상자는 덜어내되 터치 높이는 유지해 텍스트와 같은 무게로 정렬한다. */
@@ -990,13 +1052,13 @@ export default function GalleryPageClient() {
           .gl-mobile-similarity-hint button { position: absolute; top: 3px; right: 3px; width: 32px; height: 38px; padding: 0; border: 0; background: transparent; color: rgba(255,255,255,.65); display: grid; place-items: center; }
           .gl-mobile-filter-count { position: absolute; top: -6px; right: -6px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 999px; background: #ff4d00; color: #fff; font-size: 8px; line-height: 14px; font-weight: 700; text-align: center; pointer-events: none; }
           .gl-mobile-search-row { height: 51px; padding: 7px 20px 8px; background: #fff; }
-          .gl-mobile-search-box { height: 36px; border: 1px solid #ff4d00; border-radius: 4px; display: flex; align-items: center; gap: 8px; padding: 0 10px; }
-          .gl-mobile-search-box input { min-width: 0; flex: 1; border: 0; outline: 0; color: #26282c; font: 12px/19px Pretendard, sans-serif; background: transparent; }
           .gl-mobile-active-filters { min-height: 37px; padding: 4px 20px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; background: #fff; }
           .gl-mobile-active-filters::-webkit-scrollbar { display: none; }
           .gl-mobile-filter-chip { height: 29px; padding: 0 8px 0 12px; border: 1px solid #838b94; border-radius: 999px; background: #fff; color: #191918; display: flex; align-items: center; gap: 5px; flex: 0 0 auto; font: 12px/19px Pretendard, sans-serif; }
           .gl-mobile-filter-chip-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
-          .gl-mobile-filter-empty { margin: 0; padding: 4px 2px; color: #6f747b; font: 12px/19px Pretendard, sans-serif; }
+          /* .gl-mobile-filter-options가 grid-template-columns: repeat(5, 1fr)라, 이 문구도
+           * 한 칸(1/5 폭)에 갇혀 여백이 있는데도 줄바꿈됐다 — 전체 폭을 쓰게 한다. */
+          .gl-mobile-filter-empty { grid-column: 1 / -1; margin: 0; padding: 4px 2px; color: #6f747b; font: 12px/19px Pretendard, sans-serif; white-space: nowrap; }
           /* 두 명 이상을 고르면 "누구 하나라도" 와 "둘 다"가 전혀 다른 결과라 명시적으로 고르게 한다 */
           .gl-mobile-filter-mode { margin-top: 10px; display: flex; gap: 6px; }
           .gl-mobile-filter-mode button {
@@ -1007,7 +1069,10 @@ export default function GalleryPageClient() {
           .gl-mobile-filter-mode-active { border-color: #ff4d00 !important; background: #fff5f0 !important; color: #191918 !important; font-weight: 600 !important; }
 
           /* 그리드 — 열 수/간격은 JS에서 뷰포트 폭 기준으로 계산(가상화) */
-          .gl-page-wrapper { padding-top: calc(99px + env(safe-area-inset-top)) !important; padding-bottom: calc(92px + env(safe-area-inset-bottom)) !important; transition: padding-top 200ms ease; }
+          .gl-page-wrapper { padding-top: calc(99px + env(safe-area-inset-top)) !important; padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important; transition: padding-top 200ms ease; }
+          .gl-page-wrapper .ac-confirm-footer-gallery .ac-confirm-footer-inner { height: calc(100px + env(safe-area-inset-bottom)) !important; grid-template-rows: 24px 48px !important; }
+          .gl-page-wrapper .ac-confirm-footer-gallery .ac-confirm-footer-progress { gap: 4px !important; }
+          .gl-page-wrapper .ac-confirm-footer-gallery .ac-confirm-footer-progress-label { display: flex !important; font-size: 11px !important; letter-spacing: 0; }
           .gl-page-wrapper.gl-mobile-search-expanded { padding-top: calc(150px + env(safe-area-inset-top)) !important; }
           .gl-page-wrapper.gl-mobile-filter-active { padding-top: calc(136px + env(safe-area-inset-top)) !important; }
           .gl-page-wrapper.gl-mobile-header-compact { padding-top: calc(56px + env(safe-area-inset-top)) !important; }
@@ -1017,6 +1082,7 @@ export default function GalleryPageClient() {
           @media (prefers-reduced-motion: reduce) {
             .gl-mobile-appbar, .gl-mobile-toolbar, .gl-page-wrapper { transition: none; }
             .gl-mobile-brand-home span { transition: none; }
+            .gl-mobile-scope-cue { animation: none; }
           }
           .gl-grid-main { padding: 0 20px !important; }
 
@@ -1111,11 +1177,9 @@ export default function GalleryPageClient() {
           .gl-mobile-filter-options { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
           .gl-mobile-filter-option { height: 39px; min-width: 0; padding: 0 4px; border: 1px solid #c6cbd0; border-radius: 4px; background: #fff; color: #191918; display: flex; align-items: center; justify-content: center; gap: 4px; font: 12px/19px Pretendard, sans-serif; }
           .gl-mobile-filter-option-active { border-color: #ff4d00; background: #fff0e8; }
-          .gl-mobile-star-option { color: #191918; }
-          .gl-mobile-star-option .gl-mobile-star-icon { color: #aab0b8; transition: color 120ms ease; }
-          .gl-mobile-star-option:hover .gl-mobile-star-icon, .gl-mobile-star-option:active .gl-mobile-star-icon { color: rgba(255,77,0,.7); }
-          .gl-mobile-star-option-active .gl-mobile-star-icon { color: #ff4d00; }
-          .gl-mobile-star-option-active { border-color: #c6cbd0; background: #fff; }
+          .gl-mobile-stars { display: flex; align-items: center; gap: 4px; padding: 2px 0; }
+          .gl-mobile-stars-op { margin-right: 4px; color: #aab0b8; font: 700 16px/1 Pretendard, sans-serif; }
+          .gl-mobile-star-btn { padding: 4px; border: 0; background: transparent; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
           .gl-mobile-filter-option-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
 
           .gl-empty-mobile { min-height: 478px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 20px; color: #191918; }
@@ -1168,10 +1232,11 @@ export default function GalleryPageClient() {
           <div className="gl-mobile-toolbar">
             <div className="gl-mobile-toolbar-leading">
               {mobileHeaderCompact && <CustomerGalleryHomeMark token={token} compact />}
-              <button type="button" className="gl-mobile-filter-trigger" aria-expanded={mobileScopeOpen} onClick={() => { setMobileScopeOpen((value) => !value); setMobileSearchOpen(false); setMobileFiltersOpen(false); }}>
-                <strong>{tabFilter === "selected" ? "선택됨" : "전체"}</strong>
-                <span>{tabFilter === "selected" ? Y : photos.length}장</span>
-                <ChevronDown size={12} strokeWidth={1.8} />
+              <button type="button" className={`gl-mobile-filter-trigger${tabFilter !== "all" ? " gl-mobile-filter-trigger-active" : ""}`} aria-expanded={mobileScopeOpen} aria-haspopup="dialog" onClick={() => { setMobileScopeOpen((value) => !value); setMobileSearchOpen(false); setMobileFiltersOpen(false); }}>
+                {tabFilter === "recommended" && <RecommendationMark size={12} aria-hidden />}
+                <strong>{tabFilter === "selected" ? "내가 선택한 사진" : tabFilter === "recommended" ? "작가 추천" : "전체 사진"}</strong>
+                <span>{tabFilter === "selected" ? Y : tabFilter === "recommended" ? recommendedCount : photos.length}장</span>
+                <ChevronDown className={tabFilter === "recommended" && !mobileScopeOpen ? "gl-mobile-scope-cue" : undefined} size={13} strokeWidth={1.8} />
               </button>
             </div>
             <div className="gl-mobile-toolbar-actions">
@@ -1232,19 +1297,15 @@ export default function GalleryPageClient() {
               </button>
             </div>
           </div>
-          {mobileScopeOpen && (
-            <div className="gl-mobile-scope-menu">
-              <button type="button" className={`gl-mobile-scope-option${tabFilter === "all" ? " gl-mobile-scope-option-active" : ""}`} onClick={() => { setTabFilter("all"); setMobileScopeOpen(false); }}><span>전체</span><span>{photos.length}장</span></button>
-              <button type="button" className={`gl-mobile-scope-option${tabFilter === "selected" ? " gl-mobile-scope-option-active" : ""}`} onClick={() => { setTabFilter("selected"); setMobileScopeOpen(false); }}><span>선택됨</span><span>{Y}장</span></button>
-            </div>
-          )}
           {mobileSearchOpen && (
             <div className="gl-mobile-search-row">
-              <label className="gl-mobile-search-box">
-                <Search size={14} color="#aab0b8" aria-hidden />
-                <input autoFocus type="search" value={searchValue} onChange={(event) => setSearchValue(event.target.value)} placeholder="파일명 검색" aria-label="파일명으로 필터링" />
-                {searchValue && <button type="button" onClick={() => setSearchValue("")} aria-label="검색어 지우기" style={{ border: 0, background: "transparent", padding: 4, display: "grid", placeItems: "center" }}><X size={14} /></button>}
-              </label>
+              <FilenameSearchInput
+                value={searchValue}
+                onChange={setSearchValue}
+                ariaLabel="파일명으로 필터링"
+                autoFocus
+                style={{ "--fsi-height": "36px", "--fsi-border-color": "#ff4d00", "--fsi-radius": "4px" } as React.CSSProperties}
+              />
             </div>
           )}
           {mobileFilterChipsVisible && (
@@ -1266,10 +1327,11 @@ export default function GalleryPageClient() {
           deadlineLabel={deadlineLabel}
           dDayLabel={dDayLabel}
           dDayTone={dDayTone}
-          Y={Y}
+          Y={confirmationCount}
           N={N}
+          recommendedCount={recommendedCount}
           tabFilter={tabFilter}
-          onTabFilterChange={setTabFilter}
+          onTabFilterChange={(filter) => filter === "selected" ? showSelectedPhotos() : setTabFilter(filter)}
           starFilter={starFilter}
           hoverStar={hoverStar}
           onStarFilterChange={setStarFilter}
@@ -1297,6 +1359,23 @@ export default function GalleryPageClient() {
           onJumpToLast={handleJumpToLast}
         />
 
+        {mobileScopeOpen && (
+          <>
+            <button type="button" className="gl-mobile-filter-backdrop" aria-label="사진 보기 선택 닫기" onClick={() => setMobileScopeOpen(false)} />
+            <section className="gl-mobile-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-scope-title">
+              <div className="gl-mobile-filter-sheet-header">
+                <h2 id="mobile-scope-title" className="gl-mobile-filter-sheet-title">사진 보기</h2>
+                <button type="button" className="gl-mobile-tool-btn" aria-label="사진 보기 선택 닫기" onClick={() => setMobileScopeOpen(false)}><X size={18} /></button>
+              </div>
+              <div className="gl-mobile-scope-options" role="radiogroup" aria-label="사진 보기 범위">
+                <button type="button" role="radio" aria-checked={tabFilter === "all"} className={`gl-mobile-scope-option${tabFilter === "all" ? " gl-mobile-scope-option-active" : ""}`} onClick={() => { setTabFilter("all"); setMobileScopeOpen(false); }}><span className="gl-mobile-scope-option-label">전체 사진</span><span className="gl-mobile-scope-option-count">{photos.length}장</span></button>
+                {recommendedCount > 0 && <button type="button" role="radio" aria-checked={tabFilter === "recommended"} className={`gl-mobile-scope-option${tabFilter === "recommended" ? " gl-mobile-scope-option-active" : ""}`} onClick={() => { setTabFilter("recommended"); setMobileScopeOpen(false); }}><span className="gl-mobile-scope-option-label"><RecommendationMark size={13} aria-hidden />작가 추천</span><span className="gl-mobile-scope-option-count">{recommendedCount}장</span></button>}
+                <button type="button" role="radio" aria-checked={tabFilter === "selected"} className={`gl-mobile-scope-option${tabFilter === "selected" ? " gl-mobile-scope-option-active" : ""}`} onClick={() => { showSelectedPhotos(); setMobileScopeOpen(false); }}><span className="gl-mobile-scope-option-label">내가 선택한 사진</span><span className="gl-mobile-scope-option-count">{Y}장</span></button>
+              </div>
+            </section>
+          </>
+        )}
+
         {mobileFiltersOpen && (
           <>
             <button type="button" className="gl-mobile-filter-backdrop" aria-label="필터 닫기" onClick={() => setMobileFiltersOpen(false)} />
@@ -1308,12 +1387,25 @@ export default function GalleryPageClient() {
               <div className="gl-mobile-filter-sheet-body">
                 <div className="gl-mobile-filter-section">
                   <h3>별점</h3>
-                  <div className="gl-mobile-filter-options">
-                    {([1, 2, 3, 4, 5] as const).map((star) => (
-                      <button key={star} type="button" className={`gl-mobile-filter-option gl-mobile-star-option${starFilter === star ? " gl-mobile-star-option-active" : ""}`} aria-pressed={starFilter === star} onClick={() => setStarFilter((current) => current === star ? 0 : star)}>
-                        <Star className="gl-mobile-star-icon" size={13} fill="currentColor" /><span>{star}.0</span>
-                      </button>
-                    ))}
+                  {/* PC 헤더(gld-stars)와 같은 방식 — 숫자별 박스 대신 별을 눌러 그 점수까지
+                    * 채우는 "≥" 등급 입력으로 통일한다. */}
+                  <div className="gl-mobile-stars">
+                    <span className="gl-mobile-stars-op" style={{ color: starFilter > 0 ? "#ff4d00" : undefined }}>≥</span>
+                    {([1, 2, 3, 4, 5] as const).map((star) => {
+                      const filled = star <= starFilter;
+                      return (
+                        <button
+                          key={star}
+                          type="button"
+                          className="gl-mobile-star-btn"
+                          aria-label={`별점 ${star}점 이상 필터`}
+                          aria-pressed={starFilter === star}
+                          onClick={() => setStarFilter((current) => current === star ? 0 : star)}
+                        >
+                          <Star size={26} fill={filled ? "currentColor" : "none"} strokeWidth={2} style={{ color: filled ? "#ff4d00" : "#c6cbd0" }} />
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
                 <div className="gl-mobile-filter-section">
@@ -1350,7 +1442,7 @@ export default function GalleryPageClient() {
 
         {/* ── Gallery Grid (가상화: 화면 + overscan 범위만 실제 DOM에 렌더) ── */}
         <main className="gl-grid-main" style={{ position: "relative", zIndex: 10, maxWidth: "var(--customer-gallery-max-width, 1440px)", margin: "0 auto", padding: "0 24px" }}>
-          <p style={{ margin: "0 0 12px", fontSize: 12, color: "var(--customer-ink-secondary)", wordBreak: "keep-all" }}>체크한 사진이 최종 선택됩니다. 별점과 찜은 고를 때 참고하세요.</p>
+          {(recommendationError || saveError) && <p role="alert" className="mb-3 rounded-md bg-red-50 p-3 text-sm text-red-700">{recommendationError || saveError}</p>}
           <div ref={gridRef} style={{ position: "relative", width: "100%", height: rowVirtualizer.getTotalSize(), touchAction: "pan-y" }}>
             {virtualRows.map((vRow) => {
               const rowStart = vRow.index * layout.cols;
@@ -1359,7 +1451,7 @@ export default function GalleryPageClient() {
                 const photoIndex = rowStart + c;
                 if (photoIndex >= displayPhotos.length) break;
                 const photo = displayPhotos[photoIndex];
-                const selected        = selectedIds.has(photo.id);
+                const selected = selectedIds.has(photo.id);
                 const state           = photoStates[photo.id];
                 const rating          = state?.rating;
                 const colorTags       = state?.color;
@@ -1382,6 +1474,8 @@ export default function GalleryPageClient() {
                     token={token}
                     photo={photo}
                     selected={selected}
+                    checkDisabled={applyingRecommendations || confirming}
+                    recommended={photo.photographerRecommended}
                     rating={rating}
                     colorTags={colorTags}
                     hasComment={Boolean(state?.comment?.trim())}
@@ -1459,13 +1553,24 @@ export default function GalleryPageClient() {
 
         {/* ── Bottom Bar ── */}
         <SelectionConfirmFooter
-          Y={Y}
+          Y={confirmationCount}
           N={N}
           position="fixed"
-          disabled={!canConfirm}
-          onConfirm={() => canConfirm && setShowConfirmModal(true)}
+          progressLabel={Y < N ? `${N - Y}장 더 골라주세요` : "선택한 사진"}
+          disabled={selectionSaving || applyingRecommendations || confirming || (!canConfirm && !recommendationReview && tabFilter !== "selected")}
+          onConfirm={() => {
+            if (canConfirm) {
+              if (!finalReview) showSelectedPhotos();
+              else { setConfirmError(null); setShowConfirmModal(true); }
+            } else if (recommendationReview && canApplyRecommendations) {
+              void applyRecommendations();
+            } else showAllPhotos();
+          }}
           zIndex={50}
-          buttonLabel={footerButtonLabel}
+          buttonLabel={selectionSaving || applyingRecommendations ? "선택 저장 중…"
+            : canConfirm ? footerButtonLabel
+            : recommendationReview && canApplyRecommendations ? (Y === 0 ? "이 추천으로 시작하기" : "추천 사진도 선택하기")
+            : recommendationReview || tabFilter === "selected" ? "전체 사진에서 더 고르기" : footerButtonLabel}
           showMeta={false}
           mobileGallery
           theme="customerLight"
@@ -1485,8 +1590,12 @@ export default function GalleryPageClient() {
         {/* ── Confirm Modal ── */}
         {showConfirmModal && (
           <SelectionConfirmDialog
-            count={Y}
-            confirming={confirming}
+            count={confirmationCount}
+            title={`선택한 ${confirmationCount.toLocaleString()}장으로 보정을 요청할까요?`}
+            description={<>선택한 사진이 작가에게 전달됩니다.<br />보정 시작 후에는 선택을 변경할 수 없어요.</>}
+            confirmLabel="보정 요청하기"
+            busyLabel="요청 중..."
+            confirming={confirming || selectionSaving}
             error={confirmError}
             onCancel={() => { if (!confirming) setShowConfirmModal(false); }}
             onConfirm={handleConfirm}

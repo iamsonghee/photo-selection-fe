@@ -35,6 +35,20 @@ export async function POST(req: NextRequest) {
 
     const admin = getAdminClient();
 
+    const uniquePhotoIds = [...new Set(selected_photo_ids as string[])];
+    if (uniquePhotoIds.length !== selected_photo_ids.length) {
+      return NextResponse.json({ error: "선택 목록에 중복된 사진이 있습니다." }, { status: 400 });
+    }
+    const { data: ownedPhotos, error: ownedPhotosError } = await admin
+      .from("photos")
+      .select("id")
+      .eq("project_id", project_id)
+      .in("id", uniquePhotoIds);
+    if (ownedPhotosError) throw new Error(ownedPhotosError.message);
+    if ((ownedPhotos ?? []).length !== uniquePhotoIds.length) {
+      return NextResponse.json({ error: "프로젝트에 속하지 않은 사진이 포함되어 있습니다." }, { status: 400 });
+    }
+
     // in-flight DELETE race condition 방지:
     // DB에 남아 있는 항목 중 UI 확정 목록에 없는 것만 제거 (별점·태그·코멘트 보존)
     const { data: existing } = await admin
@@ -50,6 +64,12 @@ export async function POST(req: NextRequest) {
     if (toDelete.length > 0) {
       await admin.from("selections").delete().eq("project_id", project_id).in("photo_id", toDelete);
     }
+
+    const { error: selectionError } = await admin.from("selections").upsert(
+      uniquePhotoIds.map((photoId) => ({ project_id, photo_id: photoId, is_selected: true })),
+      { onConflict: "project_id,photo_id" },
+    );
+    if (selectionError) throw new Error(selectionError.message);
 
     await confirmProjectAdmin(admin, project_id);
     await admin.from("project_logs").insert({

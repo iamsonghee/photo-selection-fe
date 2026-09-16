@@ -5,7 +5,7 @@ import workspaceStyles from "./AssetWorkspace.module.css";
 import { useDesktopViewport } from "@/hooks/useDesktopViewport";
 import { PhotographerPortal } from "./PhotographerPortal";
 import { PhotographerLightButton } from "./PhotographerLightButton";
-import { CheckSquare, Download, LayoutGrid, List, SlidersHorizontal, Upload, X } from "lucide-react";
+import { CheckSquare, ChevronDown, Download, LayoutGrid, List, SlidersHorizontal, Upload, X } from "lucide-react";
 import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 type ProjectAssetToolbarButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -121,45 +121,42 @@ type ProjectAssetToolbarViewToggleProps = {
 };
 
 export function ProjectAssetToolbarViewToggle({ value, onChange }: ProjectAssetToolbarViewToggleProps) {
-  const mobileTarget = value === "gallery" ? "list" : "gallery";
-  const mobileLabel = mobileTarget === "list" ? "목록으로 보기" : "갤러리로 보기";
+  const target = value === "gallery" ? "list" : "gallery";
+  const label = target === "list" ? "목록으로 보기" : "갤러리로 보기";
 
   return (
-    <>
-      <ProjectAssetMobileIconButton
-        data-project-asset-view-toggle
-        onClick={() => onChange(mobileTarget)}
-        aria-label={mobileLabel}
-        title={mobileLabel}
-        className="md:hidden"
-      >
-        {mobileTarget === "list" ? <List size={18} aria-hidden /> : <LayoutGrid size={18} aria-hidden />}
-      </ProjectAssetMobileIconButton>
-      <div data-project-asset-view-toggle className="hidden h-11 shrink-0 overflow-hidden rounded-lg border border-border-subtle bg-surface md:flex" role="group" aria-label="보기 방식">
-        {([
-          ["gallery", "갤러리 보기", <LayoutGrid key="gallery" size={18} />],
-          ["list", "목록 보기", <List key="list" size={18} />],
-        ] as const).map(([mode, label, icon], index) => (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => onChange(mode)}
-            aria-label={label}
-            aria-pressed={value === mode}
-            className={`inline-flex w-11 items-center justify-center transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/30 ${
-              index > 0 ? "border-l border-border-subtle" : ""
-            } ${
-              value === mode
-                ? "bg-surface-raised text-foreground"
-                : "bg-surface text-muted-foreground hover:bg-surface-raised hover:text-foreground"
-            }`}
-          >
-            {icon}
-          </button>
-        ))}
-      </div>
-    </>
+    <ProjectAssetMobileIconButton
+      data-project-asset-view-toggle
+      onClick={() => onChange(target)}
+      aria-label={label}
+      title={label}
+    >
+      {target === "list" ? <List size={18} aria-hidden /> : <LayoutGrid size={18} aria-hidden />}
+    </ProjectAssetMobileIconButton>
   );
+}
+
+type ProjectAssetExportTriggerProps = {
+  as?: "button" | "summary";
+  label?: string;
+  ariaLabel: string;
+  open?: boolean;
+  onClick?: () => void;
+};
+
+/** Desktop 자산 화면의 내보내기 진입점. summary와 button의 시각 규격을 함께 관리한다. */
+export function ProjectAssetExportTrigger({
+  as = "button",
+  label = "내보내기",
+  ariaLabel,
+  open = false,
+  onClick,
+}: ProjectAssetExportTriggerProps) {
+  const content = <><Download size={16} aria-hidden /><span>{label}</span><ChevronDown size={15} className={open ? workspaceStyles.exportChevronOpen : ""} aria-hidden /></>;
+  if (as === "summary") {
+    return <summary data-project-asset-export-trigger className={workspaceStyles.exportTrigger} aria-label={ariaLabel}>{content}</summary>;
+  }
+  return <button type="button" data-project-asset-export-trigger className={workspaceStyles.exportTrigger} aria-label={ariaLabel} aria-expanded={open} onClick={onClick}>{content}</button>;
 }
 
 type ProjectAssetMobileToolbarActionsProps = {

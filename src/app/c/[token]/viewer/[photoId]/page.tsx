@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Star, ArrowLeft, Check, Layers, MessageSquare, X } from "lucide-react";
 import { useSelection, type SelectionToggleResult } from "@/contexts/SelectionContext";
 import { CommentSaveIndicator } from "@/components/customer/CommentSaveIndicator";
 import { PrevNextButton } from "@/components/PrevNextButton";
-import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
+import { RecommendationMark } from "@/components/RecommendationMark";
 import { SelectionLimitSnackbar } from "@/components/customer/SelectionLimitSnackbar";
 import { ParticipantSheet } from "@/components/customer/ParticipantSheet";
 import { PhotoPositionBar } from "@/components/customer/PhotoPositionBar";
@@ -65,7 +65,7 @@ export default function ViewerPage() {
   const searchParams = useSearchParams();
   const token = (params?.token as string) ?? "";
   const photoId = (params?.photoId as string) ?? "";
-  const { project, photos: contextPhotos, photoGroups, selectedIds, Y, toggle, photoStates, updatePhotoState, toggleColor, commentSaveStates } = useSelection();
+  const { project, photos: contextPhotos, photoGroups, selectedIds, Y, toggle, photoStates, updatePhotoState, toggleColor, commentSaveStates, selectionSaving, saveError } = useSelection();
 
   // 로컬 state로 현재 사진 관리 — router.push 없이 전환해 컴포넌트 재마운트 방지
   const [activePhotoId, setActivePhotoId] = useState(photoId);
@@ -302,58 +302,93 @@ export default function ViewerPage() {
   /** 색 → 표시 이름. 서버 공유라 다른 참가자의 마크에도 이름을 붙일 수 있다. */
   const [roster, setRoster] = useState<ParticipantRoster>({});
   const [showShortcuts,  setShowShortcuts]  = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [confirming,       setConfirming]       = useState(false);
-  const [confirmError,     setConfirmError]     = useState<string | null>(null);
 
   const N = project?.requiredCount ?? 0;
-  const canConfirm  = N > 0 && Y === N;
+  const canConfirm = N > 0 && Y === N && !selectionSaving;
   const queryString = searchParams.toString() ? `?${searchParams.toString()}` : "";
-
-  const handleConfirm = useCallback(async () => {
-    if (!project?.id || !token || !canConfirm || confirming) return;
-    setConfirming(true);
-    setConfirmError(null);
-    try {
-      const res = await fetch("/api/c/confirm", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ token, project_id: project.id, selected_photo_ids: [...selectedIds] }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setConfirmError((data as { error?: string }).error ?? `오류 (${res.status})`);
-        setConfirming(false);
-        return;
-      }
-      setShowConfirmModal(false);
-      window.location.href = `/c/${token}/confirmed`;
-    } catch (e) {
-      console.error(e);
-      setConfirming(false);
-      setConfirmError("네트워크 오류가 발생했습니다");
-    }
-  }, [project?.id, token, selectedIds, canConfirm, confirming]);
 
   const filmstripRef     = useRef<HTMLDivElement>(null);
   const mobileFilmstripRef = useRef<HTMLDivElement>(null);
   const mobileCommentRef = useRef<HTMLTextAreaElement>(null);
+  const pcCommentRef = useRef<HTMLTextAreaElement>(null);
   const filmstripSeenRef = useRef(false); // 마운트 후 첫 실행 여부 추적
+
+  /* ── PC 필름스트립 윈도우 렌더링 ──────────────────────────────────────
+   * 예전엔 filteredPhotos 전체를 실 DOM으로 그렸다 — 베타 사용자 프로젝트 사진 한도가
+   * 2000장(§beta-limits)이라 "수천 장"은 가정이 아니라 실제 지원 범위였고, 그 규모에서
+   * 매번 수천 개 DOM 노드를 레이아웃하는 비용이 그대로 쌓인다.
+   * 지금 위치 기준 앞뒤 RADIUS장만 그린다 — 최대 3000장 프로젝트도 실 DOM은 최대
+   * RADIUS*2+1개로 고정된다. 클릭/이전·다음 이동은 이 창을 그대로 재중심화하고,
+   * 클릭 없이 직접 끝까지 드래그해 훑어보는 경우만 스크롤이 가장자리에 닿을 때
+   * 그 방향으로 이어붙인다(무한 스크롤과 같은 모양). */
+  const FILMSTRIP_THUMB_W = 150;
+  const FILMSTRIP_GAP = 16;
+  const FILMSTRIP_STEP = FILMSTRIP_THUMB_W + FILMSTRIP_GAP;
+  const FILMSTRIP_WINDOW_RADIUS = 60;
+  const FILMSTRIP_GROW_BATCH = 60;
+  const FILMSTRIP_EDGE_PX = FILMSTRIP_STEP * 3;
+
+  const filmstripAnchor = navAnchorIndex >= 0 ? navAnchorIndex : 0;
+  /* 재중심 창은 navAnchorIndex의 순수 파생값이다 — state+effect로 만들면 "새 창 계산 →
+   * 리렌더 → 그제서야 스크롤"의 한 프레임 사이에 옛 창(다른 스크롤 폭) 기준으로 스크롤
+   * 명령이 나가 버려, 정확히 이 작업의 발단이 된 "처음 위치에서 밀려오는" 증상을 스스로
+   * 만든다. useMemo로 같은 렌더 안에서 확정해야 그 프레임이 아예 생기지 않는다. */
+  const filmstripRecenteredWindow = useMemo(() => ({
+    start: Math.max(0, filmstripAnchor - FILMSTRIP_WINDOW_RADIUS),
+    end: Math.min(filteredPhotos.length, filmstripAnchor + FILMSTRIP_WINDOW_RADIUS + 1),
+  }), [filmstripAnchor, filteredPhotos.length]);
+  /* 클릭 없이 자유 스크롤로 훑어볼 때만 늘어나는 여분 — 사진을 이동하면(navAnchorIndex
+   * 변경) 그 즉시 원래 폭으로 되돌아간다. */
+  const [filmstripManualExpand, setFilmstripManualExpand] = useState({ before: 0, after: 0 });
+  useEffect(() => {
+    setFilmstripManualExpand({ before: 0, after: 0 });
+  }, [filmstripAnchor]);
+  const filmstripWindow = useMemo(() => ({
+    start: Math.max(0, filmstripRecenteredWindow.start - filmstripManualExpand.before),
+    end: Math.min(filteredPhotos.length, filmstripRecenteredWindow.end + filmstripManualExpand.after),
+  }), [filmstripRecenteredWindow, filmstripManualExpand, filteredPhotos.length]);
+  const filmstripPhotos = useMemo(
+    () => filteredPhotos.slice(filmstripWindow.start, filmstripWindow.end),
+    [filteredPhotos, filmstripWindow.start, filmstripWindow.end]
+  );
 
   useEffect(() => {
     const container = filmstripRef.current;
     if (!container) return;
-    const THUMB_W = 150;
-    const GAP     = 16;
-    const step    = THUMB_W + GAP;
-    // 비대표 멤버를 미리보기 중이면 메인 필름스트립엔 없으므로(navAnchorIndex) 그룹 대표컷 위치로 스크롤
-    const anchor  = navAnchorIndex >= 0 ? navAnchorIndex : 0;
-    const target  = anchor * step - container.clientWidth / 2 + THUMB_W / 2;
+    // filmstripWindow는 navAnchorIndex와 같은 렌더에서 확정되므로, 이 시점의 DOM은
+    // 이미 새 창 기준으로 그려져 있다 — 옛 창을 향해 스크롤한 뒤 다시 보정하지 않는다.
+    const relativeIndex = filmstripAnchor - filmstripWindow.start;
+    const target = relativeIndex * FILMSTRIP_STEP - container.clientWidth / 2 + FILMSTRIP_THUMB_W / 2;
     // 첫 마운트(갤러리→뷰어 진입)는 instant, 이후 사진 전환은 smooth
     const behavior = filmstripSeenRef.current ? "smooth" : "instant";
     filmstripSeenRef.current = true;
     container.scrollTo({ left: Math.max(0, target), behavior });
-  }, [navAnchorIndex]);
+  }, [navAnchorIndex, filmstripWindow.start]);
+
+  /* 가장자리 근처까지 자유 스크롤하면 그 방향으로 창을 넓힌다. 앞쪽(start)을 넓히는
+   * 건 기존 항목들 앞에 새 항목을 끼워 넣는 것이라 scrollLeft가 그만큼 밀린다 —
+   * 늘어난 폭을 그대로 더해 보정한다(뒤쪽 확장은 끝에 붙기만 하므로 보정 불필요). */
+  const prevFilmstripStartRef = useRef(filmstripWindow.start);
+  useLayoutEffect(() => {
+    const container = filmstripRef.current;
+    const prevStart = prevFilmstripStartRef.current;
+    if (container && prevStart > filmstripWindow.start) {
+      container.scrollLeft += (prevStart - filmstripWindow.start) * FILMSTRIP_STEP;
+    }
+    prevFilmstripStartRef.current = filmstripWindow.start;
+  }, [filmstripWindow.start]);
+
+  const handleFilmstripScroll = useCallback(() => {
+    const container = filmstripRef.current;
+    if (!container) return;
+    if (container.scrollLeft <= FILMSTRIP_EDGE_PX && filmstripWindow.start > 0) {
+      setFilmstripManualExpand((current) => ({ ...current, before: current.before + FILMSTRIP_GROW_BATCH }));
+    }
+    const distanceFromEnd = container.scrollWidth - container.clientWidth - container.scrollLeft;
+    if (distanceFromEnd <= FILMSTRIP_EDGE_PX && filmstripWindow.end < filteredPhotos.length) {
+      setFilmstripManualExpand((current) => ({ ...current, after: current.after + FILMSTRIP_GROW_BATCH }));
+    }
+  }, [filmstripWindow.start, filmstripWindow.end, filteredPhotos.length]);
 
   /* 기본 상태는 필름스트립 대신 얇은 위치 인디케이터를 쓰므로, 썸네일 행은
    * "유사컷 그룹을 펼쳐서 멤버를 골라야 하는" 경우에만 필요하다. */
@@ -575,6 +610,13 @@ export default function ViewerPage() {
     requestAnimationFrame(() => mobileCommentRef.current?.focus());
   }, []);
 
+  /** PC 패널의 "사진별 요청"도 평소엔 접어 버튼만 두고, 눌렀을 때만 입력창을 편다 —
+   *  항상 펼쳐진 textarea가 사진마다 코멘트 작성을 은근히 유도하는 느낌이 있었다. */
+  const openPcCommentEditor = useCallback(() => {
+    setIsCommentEditing(true);
+    requestAnimationFrame(() => pcCommentRef.current?.focus());
+  }, []);
+
   /** 얇은 위치 인디케이터를 탭/드래그해 임의 위치로 점프 — 필름스트립이 하던 "점프" 역할을 대신한다. */
   const seekToRatio = useCallback((ratio: number) => {
     if (!filteredPhotos.length) return;
@@ -618,10 +660,6 @@ export default function ViewerPage() {
     if (focusOpen) return;
     const tag = (e.target as HTMLElement).tagName;
     if (tag === "TEXTAREA" || tag === "INPUT") return;
-    if (showConfirmModal) {
-      if (e.key === "Escape" && !confirming) setShowConfirmModal(false);
-      return;
-    }
     if (showShortcuts) {
       if (e.key === "Escape" || e.key === "?" || (e.shiftKey && e.key === "/")) {
         e.preventDefault();
@@ -651,14 +689,13 @@ export default function ViewerPage() {
       case "ArrowLeft":  e.preventDefault(); goPrevWrap(); break;
       case "ArrowRight": e.preventDefault(); goNextWrap(); break;
     }
-  }, [focusOpen, setStar, toggleMyMark, goPrevWrap, goNextWrap, showConfirmModal, showShortcuts, confirming, router, token, searchParams, activePhotoId]);
+  }, [focusOpen, setStar, toggleMyMark, goPrevWrap, goNextWrap, showShortcuts, router, token, searchParams, activePhotoId]);
 
   useEffect(() => {
     const handleKeyUp = (e: KeyboardEvent) => {
       if (focusOpen) return;
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "TEXTAREA" || tag === "INPUT") return;
-      if (showConfirmModal) return;
       // keyup은 브라우저가 repeat을 설정하지 않지만(누르고 있는 동안은 keydown만 반복),
       // 방어적으로 가드를 남겨둔다 — 실제 겹친 요청 방지는 SelectionContext의
       // photoId별 저장 큐(flushSelection)가 담당한다.
@@ -670,7 +707,7 @@ export default function ViewerPage() {
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
       window.removeEventListener("keyup", handleKeyUp, { capture: true });
     };
-  }, [focusOpen, handleKeyDown, toggleSelect, showConfirmModal]);
+  }, [focusOpen, handleKeyDown, toggleSelect]);
 
   useEffect(() => {
     if (!project) return;
@@ -711,7 +748,7 @@ export default function ViewerPage() {
   const selectionCompletion = (
     <div className="fs-completion" aria-label="셀렉 진행">
       <span aria-live="polite">{Y} / {N}장 선택{canConfirm ? " 완료" : Y > N ? ` · ${Y - N}장 줄여주세요` : ` · ${Math.max(0, N - Y)}장 남음`}</span>
-      <button type="button" disabled={!canConfirm || confirming} onClick={() => { setConfirmError(null); setShowConfirmModal(true); }}>셀렉 확정하기</button>
+      <button type="button" disabled={selectionSaving} onClick={() => router.push(`/c/${token}/gallery?selected=${canConfirm ? "selected" : "all"}&grouped=0`)}>{selectionSaving ? "선택 저장 중…" : canConfirm ? `선택한 ${Y}장 확인하기` : "전체 사진에서 더 고르기"}</button>
     </div>
   );
 
@@ -869,6 +906,18 @@ export default function ViewerPage() {
         .fs-comment-input:focus { border-color: rgba(var(--accent-rgb), 0.4); }
         .fs-comment-input-wrap { position: relative; display: flex; align-items: center; min-width: 0; }
         .fs-comment-input-icon { position: absolute; left: 14px; color: #d6d6d6; pointer-events: none; }
+        /* 평소엔 이 버튼만 두고, 눌렀을 때만 위 textarea가 펼쳐진다 — §openPcCommentEditor */
+        .fs-comment-toggle {
+          display: flex; align-items: center; gap: 8px;
+          width: 100%; min-height: 40px; padding: 0 14px;
+          background: #181818; border: 1px solid #a8abae; border-radius: 8px;
+          color: rgba(255,255,255,.56); font: 400 13px/1.4 Pretendard, 'Noto Sans KR', sans-serif;
+          text-align: left; cursor: pointer;
+        }
+        .fs-comment-toggle:hover { border-color: rgba(var(--accent-rgb), 0.4); }
+        .fs-comment-toggle-filled { color: #fff; }
+        .fs-comment-toggle-error { border-color: #ff6262; color: #ff6262; }
+        .fs-comment-toggle-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
         .fs-star { display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; background: transparent; cursor: pointer; transition: transform 0.1s; }
         .fs-star:hover { transform: scale(1.2); }
         .fs-panel-label {
@@ -1167,6 +1216,7 @@ export default function ViewerPage() {
                 whiteSpace: "nowrap",
               }}>
                 {filename}{project?.name ? ` · ${project.name}` : ""}
+                {current.photographerRecommended && <span className="ml-2 inline-flex items-center gap-1"><RecommendationMark size={12} />작가 추천</span>}
               </p>
             </div>
 
@@ -1422,6 +1472,7 @@ export default function ViewerPage() {
             </div>
 
             <span className="fs-panel-label" style={{ marginTop: 8 }}>사진별 요청</span>
+            {isCommentEditing ? (
             <div style={{ display: "flex", alignItems: "flex-end", gap: 12, minWidth: 0 }}>
               <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "stretch", gap: 4, minWidth: 0 }}>
                 <div style={{ minHeight: 14, display: "flex", alignItems: "center" }}>
@@ -1430,9 +1481,9 @@ export default function ViewerPage() {
                 <div className="fs-comment-input-wrap">
                   <MessageSquare size={14} strokeWidth={1.8} className="fs-comment-input-icon" aria-hidden />
                   <textarea
+                    ref={pcCommentRef}
                     className="fs-comment-input"
                     value={draftComment}
-                    onFocus={() => setIsCommentEditing(true)}
                     onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
                     onBlur={() => { setIsCommentEditing(false); saveComment(); }}
                     onKeyDown={(e) => {
@@ -1446,6 +1497,27 @@ export default function ViewerPage() {
                 </div>
               </div>
             </div>
+            ) : (
+              <button
+                type="button"
+                className={`fs-comment-toggle${commentSaveStatus === "error" ? " fs-comment-toggle-error" : draftComment.trim() ? " fs-comment-toggle-filled" : ""}`}
+                onClick={commentSaveStatus === "error" ? saveComment : openPcCommentEditor}
+                aria-label={
+                  commentSaveStatus === "error"
+                    ? "사진별 요청 저장 실패, 다시 시도"
+                    : draftComment.trim()
+                      ? `사진별 요청 수정: ${draftComment.trim()}`
+                      : "사진별 요청 남기기"
+                }
+              >
+                <MessageSquare size={14} strokeWidth={1.8} style={{ flexShrink: 0 }} aria-hidden />
+                <span className="fs-comment-toggle-text">
+                  {commentSaveStatus === "error"
+                    ? "저장 실패 · 다시 시도"
+                    : draftComment.trim() || "요청이 있다면 남겨주세요"}
+                </span>
+              </button>
+            )}
           </div>
         </section>
 
@@ -1540,8 +1612,10 @@ export default function ViewerPage() {
             ref={filmstripRef}
             className="fs-hide-scrollbar"
             style={{ display: "flex", gap: 12, overflowX: "auto", width: "100%", padding: "14px 0", alignItems: "center" }}
+            onScroll={handleFilmstripScroll}
           >
-            {filteredPhotos.map((photo, i) => {
+            {filmstripPhotos.map((photo, windowIndex) => {
+              const i = filmstripWindow.start + windowIndex;
               const isActive  = i === navAnchorIndex;
               const thumbSrc  = photo.url; // r2_thumb_url — 필름스트립은 썸네일로 충분
               const thumbName = getPhotoDisplayName(photo);
@@ -1635,7 +1709,7 @@ export default function ViewerPage() {
                 <span className="fv-selection-count">
                   <strong>{Y}</strong> / {N}장 선택
                 </span>
-                <span className="fv-filename" title={filename}>{filename}</span>
+                <span className="fv-filename" title={filename}>{filename}{current.photographerRecommended && <span className="ml-2 inline-flex items-center gap-1"><RecommendationMark size={12} />작가 추천</span>}</span>
               </span>
               {/* 이름·색은 "이 세션에서 내가 누구인가"라 사진마다 바뀌는 값이 아니다 —
                 * 사진별 컨트롤 행이 아니라 앱바에 두고, 아래 찜 버튼은 순수 토글로 남긴다.
@@ -1905,16 +1979,7 @@ export default function ViewerPage() {
         </div>
       )}
 
-      {/* Confirm Selection modal */}
-      {showConfirmModal && (
-        <SelectionConfirmDialog
-          count={Y}
-          confirming={confirming}
-          error={confirmError}
-          onCancel={() => { if (!confirming) setShowConfirmModal(false); }}
-          onConfirm={handleConfirm}
-        />
-      )}
+      {saveError && <p role="alert" className="fixed left-4 right-4 top-20 z-[100] rounded-lg bg-white p-3 text-sm text-red-700">{saveError}</p>}
     </div>
   );
 }

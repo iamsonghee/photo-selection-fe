@@ -638,12 +638,13 @@ test.describe("작가 — 프로젝트 관리", () => {
   test("P8: 셀렉 중 상세 화면은 정확한 안내문·진행 상태를 PC와 모바일에 표시", async ({ page }) => {
     const selectingProject = await createFullProject(page, 5);
     try {
+      await page.setViewportSize({ width: 1440, height: 900 });
       await page.goto(`/photographer/projects/${selectingProject.projectId}`);
       await expect(page.getByRole("heading", { name: "고객이 사진을 선택하고 있습니다" })).toBeVisible({ timeout: 8000 });
       await expect(
         page.getByText("고객이 최종 선택을 완료하면 셀렉 결과와 코멘트를 확인할 수 있습니다.", { exact: true }),
       ).toBeVisible();
-      await expect(page.getByText("고객 셀렉 중", { exact: true })).toBeVisible();
+      await expect(page.getByText("고객 셀렉 중", { exact: true })).toBeHidden();
       await expect(page.getByText("YOU ARE HERE", { exact: true })).toHaveCount(0);
 
       await page.setViewportSize({ width: 375, height: 667 });
@@ -651,9 +652,14 @@ test.describe("작가 — 프로젝트 관리", () => {
       await expect(page.locator("[data-project-information-card] summary[aria-label='프로젝트 더보기']:visible")).toBeVisible({ timeout: 8000 });
       await expect(page.getByText("고객 셀렉 중", { exact: true })).toBeHidden();
 
-      await page.getByRole("button", { name: "셀렉 결과 화면 보기" }).click();
+      await expect(page.getByRole("tab", { name: /셀렉/ })).toHaveCount(0);
+      await page.getByRole("button", { name: "원본 사진 보기" }).click();
       await expect(page).toHaveURL(
-        new RegExp(`/photographer/projects/${selectingProject.projectId}/assets/selected`),
+        new RegExp(`/photographer/projects/${selectingProject.projectId}/assets/original`),
+      );
+      await page.goto(`/photographer/projects/${selectingProject.projectId}/assets/selected`);
+      await expect(page).toHaveURL(
+        new RegExp(`/photographer/projects/${selectingProject.projectId}/assets/original`),
       );
     } finally {
       await deleteTestProject(page, selectingProject.projectId);
@@ -1049,6 +1055,11 @@ test.describe("작가 — 프로젝트 관리", () => {
       expect(firstListImageBox!.width).toBeCloseTo(firstListThumbnailBox!.width, 0);
       expect(firstListImageBox!.height).toBeCloseTo(firstListThumbnailBox!.height, 0);
 
+      const confirmSelectionResponse = await page.request.post("/api/auth/test-setup", {
+        data: { action: "set_project_status", projectId: selectingProject.projectId, status: "confirmed" },
+      });
+      expect(confirmSelectionResponse.ok(), await confirmSelectionResponse.text()).toBe(true);
+      await page.reload();
       await page.getByRole("tab", { name: /셀렉/ }).click();
       await expect(page).toHaveURL(
         new RegExp(`/photographer/projects/${selectingProject.projectId}/assets/selected`),
@@ -1092,7 +1103,8 @@ test.describe("작가 — 프로젝트 관리", () => {
       const sortedSecondRowBox = await sortedSelectionRows.nth(1).boundingBox();
       expect(sortedFirstRowBox).not.toBeNull();
       expect(sortedSecondRowBox).not.toBeNull();
-      expect(sortedFirstRowBox!.height - sortedSecondRowBox!.height).toBeGreaterThanOrEqual(35);
+      expect(sortedFirstRowBox!.height - sortedSecondRowBox!.height).toBeGreaterThanOrEqual(28);
+      expect(sortedFirstRowBox!.height - sortedSecondRowBox!.height).toBeLessThanOrEqual(36);
       expect(sortedSecondRowBox!.y - (sortedFirstRowBox!.y + sortedFirstRowBox!.height)).toBeLessThanOrEqual(1);
       await selectedExportTrigger.click();
       const selectedExportSheet = page.getByRole("dialog", { name: "셀렉 결과 내보내기" });

@@ -1,9 +1,9 @@
 import { PhotographerLightButton } from "../PhotographerLightButton";
 import { ChevronRight, Clock, Flag, ListChecks, PenLine, Upload } from "lucide-react";
-import { addDays, format, parseISO } from "date-fns";
 import type { Project, ProjectStatus } from "@/types";
 import { dday, getProjectActor } from "@/lib/project-actor";
 import { getActiveDeadline } from "@/lib/project-deadline";
+import { formatKstDateTimeDash, toKstShifted } from "@/lib/kst-date";
 
 // 고객 화면(src/lib/customer-api-server.ts)의 ORIGINAL_DOWNLOAD_WINDOW_DAYS /
 // FINAL_DELIVERY_DOWNLOAD_WINDOW_DAYS와 동일한 30일. 그 파일은 Service Role 클라이언트를 쓰는
@@ -13,7 +13,12 @@ const FINAL_DELIVERY_RETENTION_DAYS = 30;
 
 function formatRetentionDeadline(iso: string, days: number): string {
   try {
-    return format(addDays(parseISO(iso), days), "yyyy-MM-dd");
+    const shifted = toKstShifted(iso);
+    shifted.setUTCDate(shifted.getUTCDate() + days);
+    const y = shifted.getUTCFullYear();
+    const m = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(shifted.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
   } catch {
     return "—";
   }
@@ -43,7 +48,6 @@ type Props = {
   deadlineDisplay: string;
   reviewDeadlineDisplay: string | null;
   onUpload: () => void;
-  onSelection: () => void;
   onWorkflow: () => void;
   onResults: () => void;
 };
@@ -77,7 +81,6 @@ export function ProjectWorkPanel({
   deadlineDisplay,
   reviewDeadlineDisplay,
   onUpload,
-  onSelection,
   onWorkflow,
   onResults,
 }: Props) {
@@ -127,9 +130,9 @@ export function ProjectWorkPanel({
           eyebrow: "현재 진행",
           title: "고객이 사진을 선택하고 있습니다",
           description: "고객이 최종 선택을 완료하면 셀렉 결과와 코멘트를 확인할 수 있습니다.",
-          cta: "셀렉 결과 화면 보기",
+          cta: "원본 사진 보기",
           icon: <ListChecks size={20} />,
-          onClick: onSelection,
+          onClick: onUpload,
           meta: [
             { label: "고객 셀렉 목표", value: `${project.requiredCount}장` },
             { label: "셀렉 마감", value: deadlineDisplay, overdue: overdueText },
@@ -181,7 +184,7 @@ export function ProjectWorkPanel({
         const deliveredAtDisplay = project.deliveredAt
           ? (() => {
               try {
-                return format(parseISO(project.deliveredAt as string), "yyyy-MM-dd HH:mm");
+                return formatKstDateTimeDash(project.deliveredAt as string);
               } catch {
                 return project.deliveredAt as string;
               }

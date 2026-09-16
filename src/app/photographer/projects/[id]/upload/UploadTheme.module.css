@@ -3,31 +3,23 @@
 }
 
 /* 업로드 전용 범위: 공용 갤러리의 동작은 유지하고 도구의 밀도와 정렬만 조정한다. */
-.workspace :global(.prj-gallery-toolbar) { flex:0 0 auto; min-height:0; padding:16px 32px; }
-.workspace :global(.prj-gallery-toolbar-inner) { height:auto; flex-wrap:wrap; gap:12px; }
-.workspace :global(.prj-gallery-context) { width:100%; min-width:0; flex-wrap:wrap; justify-content:space-between; gap:12px; padding:0; }
+.workspace :global(.prj-gallery-toolbar) { flex:0 0 72px; min-height:72px; padding:14px 0; border-top:0; border-inline:0; background:var(--background); }
+.workspace :global(.prj-gallery-context) { width:auto; min-width:0; flex-shrink:0; flex-wrap:nowrap; justify-content:flex-start; gap:12px; padding:0; }
 .workspace :global(.prj-gallery-summary) { flex-shrink:0; gap:10px; }
-.workspace :global(.prj-gallery-analysis) { min-width:0; flex-wrap:wrap; gap:8px; border:0; padding:0; }
+.workspace :global(.prj-gallery-analysis) { min-width:0; flex-wrap:nowrap; gap:8px; border:0; padding:0; }
 .workspace :global(.prj-ai-chips) { flex-wrap:wrap; gap:4px; }
 .workspace :global(.prj-ai-control) { height:36px; font-size:12px; padding:0 12px; }
 .workspace :global(.prj-ai-chip) { min-height:36px; font-size:12px; }
-.workspace :global(.prj-gallery-query-tools) { flex-basis:100%; justify-content:space-between; border-top:1px solid var(--border-subtle); padding:12px 0 0; gap:16px; }
-.workspace :global(.prj-gallery-search) { width:min(400px,100%); min-width:140px; height:40px; padding:0 12px; gap:8px; border-color:var(--border-subtle); background:var(--surface-raised); }
-.workspace :global(.prj-gallery-search) svg { width:16px; flex-shrink:0; }
-.workspace :global(.prj-gallery-search) input { font-size:13px; }
-.workspace :global(.prj-gallery-display-tools) { border:0; padding:0; gap:8px; }
-.workspace :global(.prj-gallery-sort) { height:40px; padding:0 10px; border-color:var(--border-subtle); }
-.workspace :global(.prj-gallery-sort) select { font-size:12px; }
-.workspace :global(.prj-gallery-view-switch) { height:40px; }
+.workspace :global(.prj-gallery-query-tools) { min-width:0; flex:0 1 auto; justify-content:flex-end; border:0; padding:0; gap:12px; }
+/* 색·테두리·아이콘·placeholder는 FilenameSearchInput(fsi-root)이 고정한다 — 이 업로드
+ * 전용 스코프에서는 --fsi-* 변수로 크기·밀도만 나머지 툴바(정렬 40px 등)에 맞춘다. */
+.workspace :global(.prj-gallery-search) { --fsi-width:clamp(180px, 22vw, 320px); --fsi-height:44px; --fsi-radius:8px; --fsi-gap:12px; --fsi-font-size:14px; min-width:140px; padding:0 12px; }
+.workspace :global(.prj-gallery-display-tools) { border:0; padding:0; gap:12px; }
 .workspace :global(.prj-upload-compact) { min-height:48px; }
-.workspace :global(.prj-gallery-toolbar-inner):has(:global(.prj-upload-compact)) { flex-wrap:wrap; }
+
 .workspace [data-upload-header-mode] nav { min-width:0; }
 .workspace [data-upload-header-mode] nav button { max-width:45vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .emptyUpload p { word-break:keep-all; }
-@media(max-width:1100px) and (min-width:769px) {
-  .workspace :global(.prj-gallery-context) { align-items:flex-start; }
-  .workspace :global(.prj-gallery-analysis) { flex:1 1 100%; }
-}
 @media(max-width:768px) {
   .emptyUpload { height:auto; min-height:100%; }
 }

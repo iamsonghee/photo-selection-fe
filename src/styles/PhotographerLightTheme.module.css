@@ -42,3 +42,19 @@
   --mobile-header-height: 56px;
   --mobile-page-gutter: 20px;
 }
+
+/* 작가 화면과 body portal 모달까지 브라우저 기본 파란 outline 대신 같은 토큰을 쓴다.
+   검색 같은 텍스트 입력은 각 컴포넌트의 focus-within 테두리가 이미 상태를 표시한다. */
+.lightTheme :global(button:focus-visible),
+.lightTheme :global(a:focus-visible),
+.lightTheme :global(select:focus-visible),
+.lightTheme :global(textarea:focus-visible),
+.lightTheme :global(summary:focus-visible),
+.lightTheme :global(input:not([type="text"]):focus-visible),
+.lightTheme :global([role="button"]:focus-visible) {
+  outline: 2px solid color-mix(in srgb, var(--accent) 48%, transparent);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.lightTheme :global([tabindex="-1"]:focus) { outline: none; }

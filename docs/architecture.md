@@ -1,5 +1,17 @@
 # 시스템 아키텍처
 
+## 작가 추천 셀렉
+
+PC 업로드 갤러리의 드래그 선택은 `preparing` 프로젝트의 일반 탐색 상태에서 활성화한다. 별도 관리 CTA 없이 선택 유무로 삭제 조작을 표시하고, 이동 없는 빈 공간 클릭은 선택을 비운다. 파일 드롭 이벤트와 포인터 범위 선택은 별도 경로로 처리한다.
+
+원본 업로드의 보기 범위 드롭다운은 기존 로컬 추천 필터를 공유한다. PC 드래그 선택은 `OriginalPhotoGallery`의 열 수·행 높이와 `selectGridPhotos`로 전체 목록의 카드 위치를 계산해 가상화로 렌더링되지 않은 사진도 선택한다. 선택 상태만 변경하며 삭제는 기존 확인/API 경로를 사용한다. 다른 갤러리는 `onDragSelectionChange`를 전달하지 않으면 드래그 선택을 활성화하지 않는다.
+
+`photos.is_photographer_recommended`는 고객의 실제 선택인 `selections.is_selected`와 분리한다. 작가는 프로젝트가 `preparing`일 때 갤러리에서 추천 구성을 임시 편집하고 저장 버튼으로 반영한다. `PATCH /api/photographer/projects/[id]/recommendations`는 전달된 사진 ID 전체를 최종 구성으로 보고 `replace_photographer_recommendations` DB 함수에서 프로젝트의 추천 플래그를 한 트랜잭션으로 교체한다. 고객 갤러리의 추천 필터는 보기 범위만 변경하며 카드·상세보기·확정 payload 모두 `SelectionContext.selectedIds`를 사용한다. `includeRecommendations`는 기존 선택과 추천의 합집합이 목표 장수 이내일 때만 미선택 추천을 `POST /api/c/selections`의 `photo_ids` 일괄 저장으로 추가한다. 서버는 사진 소속을 최대 100개 단위로 확인한 뒤 `set_customer_selection_states` RPC에서 프로젝트 잠금·N장 제한 검사·일괄 upsert를 수행하며 별점·찜·코멘트는 변경하지 않는다. 저장 실패한 체크는 되돌리고 오류를 표시하며 `selectionSaving` 동안 확정을 막는다. `/api/c/confirm`에는 항상 실제 고객 선택 ID만 제출하고 기존 정확한 장수 검증 및 `selecting → confirmed` 전이를 유지한다.
+
+추천 작업은 원본 업로드 페이지의 편집 모드로 제공한다. 별도 작업 화면 없이 `OriginalPhotoGallery`·`OriginalPhotoViewer`와 검색·정렬·사진 상태·추천 API를 공유한다. 추천 전용 필터는 로컬 상태이고 저장 또는 취소로 편집을 끝낼 때 해제한다.
+
+파일명 검색은 로컬 사진 목록을 NFC 정규화·대소문자 무시·부분 일치로 필터링한다. 검색 자체와 사진별 추천 체크는 서버 상태를 변경하지 않으며 하단 저장 동작만 추천 전체 구성을 반영한다. 별도 파일명 가져오기 모달은 없다.
+
 ## 재보정 검토 이력 삭제 보호
 
 보정본 DELETE API는 V2 현재 리뷰와 같은 사진의 V2 `photo_version_revisions`에서 검토 상태 또는 검토 일시를 확인한다. 검토 이력이 있으면 `409 reviewed_retouch_delete_locked`로 거절하며 R2/리뷰/버전 삭제를 실행하지 않는다. 이력 조회 실패도 삭제 전에 중단한다. 교체로 현재 리뷰가 초기화되어도 이전 스냅샷이 잠금을 유지한다. 기존 확정본·고객 검토 중 삭제 제한은 유지한다.
@@ -415,8 +427,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 > - **결과가 0인 항목은 렌더하지 않는다** — 분석 전에는 줄 전체가 없어 조용하다(빈 필터로 자리만 차지하지 않는다)
 > - 눈감음·흐림은 `galleryPhotos`를 좁히는 **필터**이고 여러 개를 켜면 OR다 — 고객 갤러리(`gallery-filter.ts`)와 같은 규칙·같은 키(`blurry`/`eyesClosed`)
 > - ⚠️ **유사컷만 성격이 다르다**: 필터가 아니라 그룹을 대표컷으로 접는 **보기 방식**이다. 체크박스를 한 줄에 두면서 이 차이는 **문구로** 갈랐다 — `~만`은 목록을 좁히는 필터, `묶어보기`는 보기 방식. `~만`은 고객 갤러리가 이미 쓰는 표현이라 두 화면의 말이 같아진다
-> - 껍데기가 `<label>`이라 글자를 눌러도 켜진다. `<label>`에는 포커스가 가지 않으므로 포커스 링은 `:focus-within`으로 안쪽 체크박스에서 끌어올린다
-> - **켜진 표시는 체크박스와 글자색만**이다(배경 틴트 없음). 배경까지 얹으면 체크 표시가 이미 말한 것을 한 번 더 말하고, 여러 개를 켰을 때 주황 면이 줄줄이 생겨 옆 AI CTA(같은 틴트)와 구분이 흐려진다. 배경은 hover(일시적 반응) 전용
+> - 껍데기가 `<label>`이라 글자를 눌러도 켜진다. 항목 컨테이너에는 hover·선택 배경·테두리·글자색 변화를 두지 않고 네이티브 체크박스 상태만 바뀐다
 > - 공용 `SimilarityToggleButton`을 쓰지 않고 이 화면 전용으로 그린 이유: 그 컴포넌트는 자산 화면·고객 갤러리와 **공유**라 restyle하면 번진다
 >
 > **왜 모달인가**: 버튼 하나를 눈에 띄게 만드는 것으로는 **AI가 무엇을 해주는지(두 가지다)** 를 가르칠 수 없다. 업로드 직후는 의도가 가장 높은 순간이고, 체크박스 목록이 기능의 메뉴를 한 자리에서 보여준다.
@@ -478,7 +489,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/c/final-delivery` | GET | PIN 쿠키 | 최종 보정본 ZIP 상태·수량·용량·만료일 조회 |
 | `api/c/final-delivery/archive` | GET | PIN 쿠키 | 최종 보정본 ZIP 클릭 시 presigned URL 발급 |
 | `api/c/original-download/files` | POST | PIN 쿠키 | 선택한 `photoIds`(1~3,000개)의 개별 원본 presigned URL만 발급 |
-| `api/c/selections` | POST | PIN 쿠키 | 별점/색상/코멘트/선택 upsert (`selecting`/`preparing` 상태만 허용). body에 키가 없는 필드는 건드리지 않고(undefined=미변경), `null`이면 명시적으로 지움 — 부분 업데이트 시맨틱 |
+| `api/c/selections` | POST | PIN 쿠키 | 별점/색상/코멘트/선택 upsert (`selecting`/`preparing` 상태만 허용). `photo_id`는 단건, `photo_ids`는 동일한 `is_selected` 값을 일괄 저장한다. 동시 선택으로 N장을 넘으면 `409 / limit_reached`. body에 키가 없는 필드는 건드리지 않고(undefined=미변경), `null`이면 명시적으로 지움 — 부분 업데이트 시맨틱 |
 | `api/c/selections` | GET | PIN 쿠키 | `?token=&project_id=`로 `selectedIds`/`photoStates`만 경량 조회(다른 세션의 변경사항 반영용 5초 폴링 전용, 사진/그룹은 포함 안 함) |
 | `api/c/participants` | GET / POST | PIN 쿠키 | 참가자 색 슬롯의 표시 이름 명단 조회 / 내 색 이름 upsert(`project_id,color` 충돌 시 덮어씀, 20자 초과는 잘림). 표시용 라벨일 뿐 본인 확인이 아니며, 클라이언트는 실패 시 조용히 빈 명단으로 폴백한다 |
 | `api/c/confirm` | POST | PIN 쿠키 | 선택 확정 → `confirmed`. `selected_photo_ids.length === required_count` 서버 재검증 |
@@ -685,9 +696,9 @@ sequenceDiagram
 ## 11. 사진 셀렉, 별점, 코멘트 저장 흐름
 
 - 클라이언트 상태는 `SelectionContext`(`src/contexts/SelectionContext.tsx`)가 전역으로 관리하며, `/api/c/photos`로 최초 로드합니다.
-- **선택 토글**(`toggle()`): 클라이언트에서 `requiredCount(N)` 초과 선택을 막습니다(이미 N장을 채운 상태에서 새 사진 선택 시도는 무시). 별점/색상/코멘트는 건드리지 않고 `is_selected`만 전송합니다.
+- **선택 토글**(`toggle()`): 클라이언트에서 `requiredCount(N)` 초과 선택을 먼저 막습니다(이미 N장을 채운 상태에서 새 사진 선택 시도는 무시). 서버도 `set_customer_selection_states` RPC에서 프로젝트 행을 잠그고 현재 선택 수를 검사해, 여러 세션의 요청이 겹쳐도 N장을 넘는 요청을 원자적으로 거부합니다. 별점/색상/코멘트는 건드리지 않고 `is_selected`만 전송합니다.
 - **별점/색상/코멘트 저장**(`updatePhotoState()`): 사진 상태가 바뀔 때마다 fire-and-forget으로 `/api/c/selections`에 POST — **바뀐 필드만** 전송합니다(낙관적 UI, 실패해도 화면은 즉시 반영되고 콘솔에만 에러 로그).
-- **서버 측**(`/api/c/selections` POST): `checkPinAuth`로 PIN 쿠키 검증 → `validateTokenAndProject`로 토큰/프로젝트 일치 확인 → `status`가 `selecting` 또는 `preparing`일 때만 허용 → `selections` 테이블에 `(project_id, photo_id)` 기준 upsert. **N장 초과 선택에 대한 서버 측 카운트 검증은 이 엔드포인트에는 없고**, 최종 확정 시점(`/api/c/confirm`)에서만 `selected_photo_ids.length === required_count`를 강제합니다. upsert payload는 요청 body에 실제로 존재하는 필드만 포함하므로(`rating`/`color_tag`/`comment` 각각 undefined=제외, null=명시적 삭제), 한 필드만 바뀐 요청이 다른 필드를 덮어쓰지 않습니다.
+- **서버 측**(`/api/c/selections` POST): `checkPinAuth`로 PIN 쿠키 검증 → `validateTokenAndProject`로 토큰/프로젝트 일치 확인 → `status`가 `selecting` 또는 `preparing`일 때만 허용합니다. `is_selected`는 `set_customer_selection_states` RPC가 프로젝트 행 잠금 안에서 N장 제한과 사진 소속을 확인한 뒤 `(project_id, photo_id)` 기준 upsert합니다. 초과 요청은 `409 / limit_reached`로 거부하며 클라이언트는 낙관적 체크를 되돌리고 최신 상태 확인을 안내합니다. 별점·코멘트의 일반 upsert payload는 요청 body에 실제로 존재하는 필드만 포함하므로(`rating`/`color_tag`/`comment` 각각 undefined=제외, null=명시적 삭제), 한 필드만 바뀐 요청이 다른 필드를 덮어쓰지 않습니다.
 - **확정**(`/api/c/confirm`): PIN 인증 + `status === "selecting"` 확인 + 개수 일치 확인 후, DB에 남아있는 선택 중 UI가 보낸 목록에 없는 것만 삭제(별점/코멘트가 남아있는 다른 선택은 보존) → `projects.status = "confirmed"` → `project_logs` 기록.
 - **확정 취소**(`/api/c/cancel-confirm`): `status === "confirmed"`일 때만, `customer_cancel_count < 3`일 때만 허용, `confirmed → selecting` 되돌리고 카운트 +1.
 - **동시 세션 동기화(폴링)**: 같은 고객 링크(token)를 여러 브라우저/기기에서 동시에 열어도 실시간 푸시(WebSocket/SSE/Realtime)는 없습니다. 대신 `SelectionContext`가 `status`가 `selecting`/`preparing`인 동안 5초 간격으로 `GET /api/c/selections?token=&project_id=`를 폴링해 `selectedIds`/`photoStates`만 갱신합니다(사진/그룹은 재조회하지 않음 — 가상화 리스트 재렌더 비용 회피). 탭이 백그라운드(`document.hidden`)면 폴링을 건너뛰고, 포그라운드 복귀 시 즉시 1회 재조회합니다. 로컬에서 방금 저장 요청을 보낸 사진(왕복 완료 전)은 폴링 응답 대신 로컬 값을 우선해, 내가 입력 중인 값이 아직 서버에 반영되지 않은 폴링 결과로 되돌아가지 않도록 합니다. 다른 세션의 변경은 최대 폴링 주기(5초, 백그라운드 탭 제외)만큼 지연되어 반영됩니다.
@@ -706,7 +717,7 @@ sequenceDiagram
     C->>C: 클라이언트에서 N장 초과 여부 확인
     C->>Sel: POST {token, project_id, photo_id, is_selected} (rating/color_tag/comment는 이번에 안 바뀌면 생략)
     Sel->>DB: checkPinAuth + status in (selecting, preparing) 확인
-    Sel->>DB: upsert selections (project_id, photo_id) — body에 있는 필드만 갱신, 생략된 필드는 기존값 유지
+    Sel->>DB: 프로젝트 행 잠금 → N장 제한 확인 → is_selected 원자적 upsert
     Sel-->>C: 200 {ok:true} (fire-and-forget, UI는 이미 갱신됨)
     Note over C,Sel: 5초 간격 GET /api/c/selections 폴링으로 다른 세션의 변경사항도 반영
 
@@ -802,7 +813,7 @@ sequenceDiagram
 6. **`/health/db`(FastAPI)가 인증 없이 `photographers` 테이블 샘플 1행을 응답 본문에 포함**합니다.
 7. **`CORS allow_origin_regex`가 `https://*.vercel.app` 전체를 `allow_credentials=True`와 함께 허용**하여, 신뢰 경계가 이 프로젝트의 배포뿐 아니라 Vercel에 배포된 임의의 앱까지 넓어질 수 있습니다.
 8. **서비스 간 시크릿(`INTERNAL_PRESIGN_SECRET`, `CLIP_INTERNAL_TOKEN`) 비교가 문자열 `==`/`!=` 비교**로 구현되어 있어 상수 시간 비교가 아닙니다.
-9. **`selections` 저장 API에는 N장 초과 선택에 대한 서버 측 검증이 없고**, 클라이언트 로직에만 의존합니다(확정 시점에는 검증됨).
+9. ~~`selections` 저장 API가 N장 초과 선택을 클라이언트 로직에만 의존~~ — 2026-09-16 수정됨(§11 참고). `set_customer_selection_states`가 프로젝트 행 잠금 안에서 여러 세션의 선택을 직렬화하고 N장 초과 요청을 거부합니다.
 10. **대량 `print()`/`console.log` 디버그 로그가 프로덕션 경로에 남아있음** — BE의 업로드 경로 메모리 진단 로그, FE의 프로필/업로드 프록시 라우트 로그(토큰 앞 20자 등 일부 민감할 수 있는 정보 포함).
 11. **백엔드/CLIP 서비스 모두 자동화 테스트가 전혀 없음** — 회귀는 FE의 Playwright E2E(주로 Supabase 직접 경로)로만 일부 커버됩니다. 업로드/삭제/presign 등 FastAPI 로직 자체를 검증하는 테스트는 없습니다.
 12. **`GalleryPageClient`/뷰어 등 고객 UI 상세 코드는 이번 조사에서 표면적으로만 확인**했습니다 — 가상 스크롤 구현 세부사항, 무한 스크롤 여부 등은 §16 참고.

@@ -33,19 +33,21 @@ test("선택한 여러 사진을 단일 bulk API로 삭제한다", async ({ page
   await expect(startButton).toBeVisible();
   await startButton.click();
   await expect(page.getByText("업로드 완료!", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: "건너뛰기", exact: true }).click();
 
   const beforeResponse = await page.request.get(`/api/photographer/projects/${project.projectId}/photos`);
   expect(beforeResponse.ok()).toBeTruthy();
   const before = await beforeResponse.json() as { photos: Array<{ id: string }> };
   expect(before.photos).toHaveLength(2);
 
-  const photoChecks = page.locator(".prj-photo-select:not([disabled])");
+  const photoChecks = page.locator('[data-original-photo-card] button[aria-label$=" 선택"]:not([disabled])');
   await expect(photoChecks).toHaveCount(2);
+  await page.locator("[data-original-photo-card]").first().hover();
   await photoChecks.nth(0).click();
-  await photoChecks.nth(1).click();
+  await photoChecks.first().click();
   await expect(page.getByText("2장 선택됨", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "삭제", exact: true }).click();
+  await page.getByRole("button", { name: "선택한 사진 2장 삭제", exact: true }).click();
   const deleteDialog = page.getByRole("dialog").filter({ hasText: "원본 2장을 삭제할까요?" });
   await expect(deleteDialog.getByText("원본 2장을 삭제할까요?", { exact: true })).toBeVisible();
 
@@ -53,7 +55,7 @@ test("선택한 여러 사진을 단일 bulk API로 삭제한다", async ({ page
     response.url().includes(`/api/photographer/projects/${project.projectId}/photos/selected`) &&
     response.request().method() === "DELETE",
   );
-  await deleteDialog.getByRole("button", { name: "삭제하기", exact: true }).click();
+  await deleteDialog.getByRole("button", { name: "원본 삭제", exact: true }).click();
   const deleteResponse = await deleteResponsePromise;
   const deleteBody = await deleteResponse.text();
   expect(deleteResponse.ok(), deleteBody).toBeTruthy();

@@ -108,6 +108,7 @@ export interface Database {
           r2_thumb_url: string;
           r2_preview_url: string | null;
           original_filename: string | null;
+          is_photographer_recommended: boolean;
           memo: string | null;
           file_size: number | null;
           source_file_size: number | null;
@@ -128,6 +129,7 @@ export interface Database {
           r2_thumb_url: string;
           r2_preview_url?: string | null;
           original_filename?: string | null;
+          is_photographer_recommended?: boolean;
           memo?: string | null;
           file_size?: number | null;
           source_file_size?: number | null;
@@ -148,6 +150,7 @@ export interface Database {
           r2_thumb_url?: string;
           r2_preview_url?: string | null;
           original_filename?: string | null;
+          is_photographer_recommended?: boolean;
           memo?: string | null;
           file_size?: number | null;
           source_file_size?: number | null;

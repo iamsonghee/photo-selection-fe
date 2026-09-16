@@ -71,6 +71,7 @@ function mapPhotoRow(
     url: row.r2_thumb_url,
     previewUrl: row.r2_preview_url ?? row.r2_thumb_url,
     originalFilename: row.original_filename ?? null,
+    photographerRecommended: (row as { is_photographer_recommended?: boolean }).is_photographer_recommended ?? false,
     selected: selectedIds.has(pid),
     tag: photoStates[pid]
       ? { star: photoStates[pid].rating as 1 | 2 | 3 | 4 | 5 | undefined, color: photoStates[pid].color }
@@ -248,6 +249,22 @@ export async function upsertSelectionAdmin(
     .from("selections")
     .upsert(payload, { onConflict: "project_id,photo_id" });
   if (error) throw new Error(error.message);
+}
+
+/** 프로젝트 잠금 안에서 선택 수 제한을 확인하고 같은 선택 상태를 원자적으로 저장한다. */
+export async function setSelectionStatesAdmin(
+  admin: SupabaseClient,
+  projectId: string,
+  photoIds: readonly string[],
+  isSelected: boolean
+): Promise<"saved" | "limit_reached" | "invalid_project_state" | "invalid_photos"> {
+  const { data, error } = await admin.rpc("set_customer_selection_states", {
+    p_project_id: projectId,
+    p_photo_ids: photoIds,
+    p_is_selected: isSelected,
+  });
+  if (error) throw new Error(error.message);
+  return data as "saved" | "limit_reached" | "invalid_project_state" | "invalid_photos";
 }
 
 /**

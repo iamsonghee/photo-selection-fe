@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import workspaceStyles from "./AssetWorkspace.module.css";
 import { ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -27,6 +27,7 @@ type ProjectAssetWorkspaceHeaderProps = {
   activeTab: ProjectAssetTab;
   originalCount?: number;
   selectedCount?: number;
+  tabTrailing?: ReactNode;
   className?: string;
   compact?: boolean;
   immersive?: boolean;
@@ -41,6 +42,7 @@ export function ProjectAssetWorkspaceHeader({
   activeTab,
   originalCount,
   selectedCount,
+  tabTrailing,
   className = "",
   compact = false,
   immersive = false,
@@ -107,15 +109,16 @@ export function ProjectAssetWorkspaceHeader({
 
       <h1 className="sr-only">{title}</h1>
 
-      <div className="mt-0 transition-[margin] duration-200 ease-out motion-reduce:transition-none md:mt-3">
+      <div className="mt-0 flex min-w-0 items-end transition-[margin] duration-200 ease-out motion-reduce:transition-none md:mt-3">
         <ProjectAssetTabs
-          className="-mx-2 md:mx-0"
+          className="-mx-2 min-w-0 flex-1 md:mx-0 md:flex-none"
           projectId={projectId}
           status={project.status}
           activeTab={activeTab}
           originalCount={originalCount}
           selectedCount={selectedCount}
         />
+        {tabTrailing ? <div className="flex h-11 shrink-0 items-center border-b border-border-subtle md:h-12 md:items-end md:pb-1">{tabTrailing}</div> : null}
       </div>
     </PhotographerLightPageFrame>
   );

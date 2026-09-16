@@ -66,7 +66,23 @@
 .selectButton[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); }
 .selectButton:focus-visible, .imageHitArea:focus-visible, .groupBadge:focus-visible, .listThumbnail:focus-visible { outline: 2px solid rgba(var(--accent-rgb), 0.34); outline-offset: 2px; }
 
-.mediaButton { isolation: isolate; }
+.mediaButton {
+  --photo-control-face: 28px;
+  container-type: inline-size;
+  isolation: isolate;
+}
+
+@container (max-width: 180px) {
+  .hoverSelectFace, .mobileSelectionCheckbox { --photo-control-face: 24px; }
+}
+
+@container (max-width: 130px) {
+  .hoverSelectFace, .mobileSelectionCheckbox { --photo-control-face: 20px; }
+}
+
+@container (max-width: 96px) {
+  .hoverSelectFace, .mobileSelectionCheckbox { --photo-control-face: 18px; }
+}
 
 .imageHitArea {
   position: absolute;
@@ -127,6 +143,49 @@
 
 .mobileSelectionCheckbox { display: none; }
 
+.hoverSelectButton {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 9;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  padding: 0;
+  pointer-events: none;
+}
+.hoverSelectFace {
+  display: grid;
+  width: var(--photo-control-face);
+  height: var(--photo-control-face);
+  place-items: center;
+  border: 1.5px solid rgba(2, 56, 82, .35);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .88);
+  color: var(--accent-foreground);
+  box-shadow: 0 1px 4px rgba(2, 56, 82, .18);
+}
+.hoverSelectFace svg { width: 62%; height: 62%; }
+.selectionOnHover:hover .hoverSelectButton,
+.galleryGrid[data-selection-active="true"] .hoverSelectButton,
+.hoverSelectButton[aria-pressed="true"],
+.hoverSelectButton:focus-visible { opacity: 1; pointer-events: auto; }
+.hoverSelectButton[aria-pressed="true"] .hoverSelectFace { border-color: var(--accent); background: var(--accent); }
+.hoverSelectButton:focus-visible { outline: 2px solid rgba(var(--accent-rgb), .5); outline-offset: 2px; }
+.selectionOnHover:hover .recommendBadge,
+.galleryGrid[data-selection-active="true"] .recommendBadge,
+.selectionOnHover:has(.hoverSelectButton[aria-pressed="true"]) .recommendBadge { opacity: 0; }
+
+.recommendBadge, .listRecommendBadge { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; white-space:nowrap; }
+.recommendBadge { position:absolute; top:8px; left:8px; z-index:6; border-radius:4px; padding:4px 6px; background:rgba(0,0,0,.65); color:#fff; pointer-events:none; }
+.listRecommendBadge { color:var(--accent); flex-shrink:0; }
+@media (max-width:767px) { .recommendBadge { top:4px; left:4px; padding:3px 4px; font-size:9px; gap:2px; } }
+
 @keyframes mobileSelectionPop {
   0% { transform: scale(0.76); }
   62% { transform: scale(1.12); }
@@ -177,6 +236,11 @@
 .listRow { height: 58px; border-top: 1px solid var(--border-subtle); background: var(--surface); color: var(--foreground); }
 .listRow:hover { background: color-mix(in srgb, var(--surface-raised) 46%, var(--surface)); }
 .listRowSelected { background: rgba(var(--accent-rgb), 0.075); }
+.hoverListSelectButton { opacity: 0; pointer-events: none; }
+.listRow:hover .hoverListSelectButton,
+.listShell[data-selection-active="true"] .hoverListSelectButton,
+.hoverListSelectButton[aria-pressed="true"],
+.hoverListSelectButton:focus-visible { opacity: 1; pointer-events: auto; }
 .listFile { display: flex; min-width: 0; align-items: center; gap: 14px; }
 .listThumbnail { position: relative; display: block; width: 52px; height: 36px; flex: 0 0 52px; overflow: hidden; border: 0; border-radius: 4px; background: var(--surface-raised); cursor: default; padding: 0; }
 .listThumbnailEmpty { display: inline-flex; align-items: center; justify-content: center; color: var(--subtle-foreground); }
@@ -210,14 +274,23 @@
     background: transparent;
     box-shadow: none;
   }
-  .gridCellMobileManage .mobileSelectionCheckbox {
+  .gridCellMobileSelectable .mobileSelectionCheckbox {
     position: absolute;
-    top: 8px;
-    left: 8px;
+    top: 0;
+    left: 0;
     z-index: 8;
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    padding: 0;
+  }
+  .mobileSelectionFace {
     display: inline-flex;
-    width: 22px;
-    height: 22px;
+    width: var(--photo-control-face);
+    height: var(--photo-control-face);
     align-items: center;
     justify-content: center;
     border: 1.5px solid rgba(2, 56, 82, 0.28);
@@ -225,14 +298,14 @@
     background: rgba(255, 255, 255, 0.84);
     color: var(--accent-foreground);
     box-shadow: 0 1px 5px rgba(2, 56, 82, 0.2);
-    pointer-events: none;
     transition: border-color 140ms ease, background-color 140ms ease, opacity 140ms ease;
   }
-  .gridCellMobileManage.gridCellSelected .mobileSelectionCheckbox {
+  .gridCellMobileSelectable.gridCellSelected .mobileSelectionFace {
     border-color: var(--accent);
     background: var(--accent);
     animation: mobileSelectionPop 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
+  .gridCellMobileSelectable .recommendBadge { top: auto; bottom: 4px; }
   .gridCellMobileSquare .nameRow {
     height: 18px;
     gap: 4px;
@@ -246,19 +319,24 @@
 
   @media (prefers-reduced-motion: reduce) {
     .image { transition: none; }
-    .gridCellMobileManage.gridCellSelected .mobileSelectionCheckbox { animation: none; }
-    .gridCellMobileManage .mobileSelectionCheckbox,
+    .gridCellMobileSelectable.gridCellSelected .mobileSelectionFace { animation: none; }
+    .gridCellMobileSelectable .mobileSelectionFace,
     .gridCellMobileManage .mediaButton::after { transition: none; }
   }
   .listShell { padding: 12px 16px 24px; }
   .listHeader, .listRow { grid-template-columns: 18px minmax(160px, 1fr); padding: 0 14px; }
   .listHeader.listReadonly, .listRow.listReadonly { grid-template-columns: minmax(160px, 1fr); }
+  .listShellMobileSelectable .listHeader.listReadonly,
+  .listShellMobileSelectable .listRow.listReadonly { grid-template-columns: 18px minmax(160px, 1fr); }
+  .listShellMobileSelectable .selectButton { display: inline-flex; }
   .listHeader.listSelection, .listRow.listSelection { grid-template-columns: 52px minmax(150px, 1fr); }
   .listHeader.listFinal, .listRow.listFinal { grid-template-columns: 52px minmax(150px, 1fr); }
   .listHeader.listRetouched, .listRow.listRetouched { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .listHeader.listReadonly.listRetouched, .listRow.listReadonly.listRetouched { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .listHeader > :nth-child(n+3), .listRow > :nth-child(n+3) { display: none; }
   .listHeader.listReadonly > :nth-child(n+2), .listRow.listReadonly > :nth-child(n+2) { display: none; }
+  .listShellMobileSelectable .listHeader.listReadonly > :nth-child(2) { display: block; }
+  .listShellMobileSelectable .listRow.listReadonly > :nth-child(2) { display: flex; }
   .listHeader.listReadonly.listFinal > :nth-child(2), .listRow.listReadonly.listFinal > :nth-child(2) { display: block; }
   .listHeader.listSelection > :nth-child(2), .listRow.listSelection > :nth-child(2) { display: block; }
   .listHeader.listSelection > :nth-child(3), .listRow.listSelection > :nth-child(3) { display: none; }

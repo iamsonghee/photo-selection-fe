@@ -1,5 +1,7 @@
 "use client";
 
+import { RecommendationMark } from "@/components/RecommendationMark";
+
 import { memo, useState } from "react";
 import { SimilarityGroupBadge } from "@/components/ui/SimilarityGroupBadge";
 import Link from "next/link";
@@ -15,6 +17,8 @@ type GalleryPhotoCardProps = {
   token: string;
   photo: Photo;
   selected: boolean;
+  checkDisabled?: boolean;
+  recommended?: boolean;
   rating?: StarRating;
   colorTags?: ColorTag[];
   hasComment?: boolean;
@@ -47,6 +51,8 @@ function GalleryPhotoCardImpl({
   token,
   photo,
   selected,
+  checkDisabled = false,
+  recommended = false,
   rating,
   colorTags = EMPTY_COLOR_TAGS,
   hasComment = false,
@@ -187,6 +193,7 @@ function GalleryPhotoCardImpl({
         <button
         type="button"
         onClick={(e) => onCheckClick(e, photo.id)}
+        disabled={checkDisabled}
         aria-label={selected ? "선택 해제" : "선택"}
         className="gl-check-box"
       >
@@ -196,6 +203,11 @@ function GalleryPhotoCardImpl({
           </svg>
         )}
         </button>
+        {recommended && (
+          <span className="gl-recommended-badge" title="작가 추천">
+            <RecommendationMark size={12} /> 작가 추천
+          </span>
+        )}
 
       {/* 흐림과 눈감음은 둘 다 해당하면 나란히 표시 — 원인이 다르므로 하나로 합치지 않는다.
         * (흐림 배지 안에서 흔들림·초점을 합친 것과는 별개 판단 — 그 둘은 작가·고객 모두에게

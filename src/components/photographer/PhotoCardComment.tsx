@@ -1,4 +1,5 @@
 import { MessageSquareText } from "lucide-react";
+import { TruncatedTextTooltip } from "@/components/ui/TruncatedTextTooltip";
 import styles from "./PhotoCardComment.module.css";
 
 type PhotoCardCommentProps = {
@@ -31,13 +32,12 @@ export function PhotoCardComment({
   return (
     <div
       className={`${styles.root} ${compact ? styles.compact : ""} ${minimal ? styles.minimal : ""} ${readable ? styles.readable : ""} ${!truncate ? styles.full : ""} ${className}`.trim()}
-      title={normalizedComment}
     >
       <div className={styles.label}>
         <MessageSquareText size={12} aria-hidden />
         {showLabel ? <span>{label}</span> : null}
       </div>
-      <p className={styles.body}>{normalizedComment}</p>
+      <TruncatedTextTooltip text={normalizedComment} className={styles.body} />
       {onOpen ? <button type="button" className={styles.open} onClick={(event) => { event.stopPropagation(); onOpen(); }}>상세 보기</button> : null}
     </div>
   );

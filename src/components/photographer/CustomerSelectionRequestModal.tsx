@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, CalendarDays, KeyRound, Link2 } from "lucide-react";
+import { AlertTriangle, CalendarDays, KeyRound, Link2, Pencil, RefreshCw } from "lucide-react";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
 
@@ -60,12 +60,14 @@ export function CustomerSelectionRequestModal({
   customerPhone,
   photoCount,
   requiredCount,
+  recommendedCount,
   includeOriginal,
   initialDeadline,
   inviteUrl,
   accessPin,
   pending,
   onRequest,
+  onSavePin,
 }: {
   open: boolean;
   onClose: () => void;
@@ -73,29 +75,69 @@ export function CustomerSelectionRequestModal({
   customerPhone?: string | null;
   photoCount: number;
   requiredCount: number;
+  recommendedCount?: number;
   includeOriginal: boolean;
   initialDeadline: string;
   inviteUrl: string;
   accessPin?: string | null;
   pending: boolean;
   onRequest: (deadline: string) => void | Promise<void>;
+  /** 지정하면 "고객 접속 정보" PIN 칸에 연필 아이콘이 붙고, 이 모달 안에서 바로
+   * 입력 칸으로 바뀐다 — CustomerInviteShareModal의 인라인 PIN 편집과 같은 계약. */
+  onSavePin?: (pin: string | null) => Promise<void>;
 }) {
   const [deadline, setDeadline] = useState(() => initialDeadline || deadlineFromToday(7));
   const [photoLockAcknowledged, setPhotoLockAcknowledged] = useState(false);
   const deadlineLabel = relativeDeadlineLabel(deadline);
   const inviteUrlLabel = compactInviteUrl(inviteUrl);
+  const [editingPin, setEditingPin] = useState(false);
+  const [pinDraft, setPinDraft] = useState("");
+  const [pinSaving, setPinSaving] = useState(false);
+  const [pinSaveError, setPinSaveError] = useState("");
 
   const handleClose = () => {
-    if (pending) return;
+    if (pending || pinSaving) return;
     setPhotoLockAcknowledged(false);
+    setEditingPin(false);
+    setPinSaveError("");
     onClose();
   };
+
+  function startEditPin() {
+    setPinDraft(accessPin ?? "");
+    setPinSaveError("");
+    setEditingPin(true);
+  }
+
+  function cancelEditPin() {
+    setEditingPin(false);
+    setPinSaveError("");
+  }
+
+  async function saveEditPin() {
+    if (!onSavePin) return;
+    const normalized = pinDraft.trim();
+    if (normalized && normalized.length !== 4) {
+      setPinSaveError("4자리 숫자로 입력해 주세요");
+      return;
+    }
+    setPinSaving(true);
+    setPinSaveError("");
+    try {
+      await onSavePin(normalized || null);
+      setEditingPin(false);
+    } catch (e) {
+      setPinSaveError(e instanceof Error ? e.message : "저장 실패");
+    } finally {
+      setPinSaving(false);
+    }
+  }
 
   return (
     <PhotographerModal
       open={open}
       onClose={handleClose}
-      closeDisabled={pending}
+      closeDisabled={pending || pinSaving}
       variant="workflow"
       maxWidth={650}
       title={(
@@ -112,7 +154,7 @@ export function CustomerSelectionRequestModal({
               type="button"
               variant="secondary"
               onClick={handleClose}
-              disabled={pending}
+              disabled={pending || pinSaving}
               className="h-14 w-full px-6 text-[16px] leading-6 tracking-[-0.32px]"
             >
               취소
@@ -122,7 +164,7 @@ export function CustomerSelectionRequestModal({
             type="button"
             variant="primary"
             onClick={() => onRequest(deadline)}
-            disabled={!deadline || !photoLockAcknowledged || pending}
+            disabled={!deadline || !photoLockAcknowledged || pending || pinSaving}
             className="h-12 min-w-0 flex-1 px-4 text-[15px] leading-6 tracking-[-0.32px] sm:h-14 sm:px-6 sm:text-[16px] sm:flex-[1.28]"
           >
             {pending ? "요청 시작 중…" : `${requiredCount.toLocaleString()}장 셀렉 요청하기`}
@@ -170,6 +212,15 @@ export function CustomerSelectionRequestModal({
           </div>
         </section>
 
+        {recommendedCount !== undefined && (
+          <p className="text-[13px] leading-5 text-muted-foreground" data-recommendation-delivery-summary>
+            {recommendedCount === 0
+              ? "추천 없이 전체 사진을 전달합니다. 고객이 직접 사진을 선택합니다."
+              : recommendedCount === requiredCount
+                ? `작가 추천 ${recommendedCount.toLocaleString()}장을 함께 전달합니다. 고객은 추천대로 확정하거나 전체 사진에서 직접 고를 수 있습니다.`
+                : `작가 추천 ${recommendedCount.toLocaleString()}장은 참고용으로 전달합니다. 고객이 최종 ${requiredCount.toLocaleString()}장을 직접 선택합니다.`}
+          </p>
+        )}
         <section>
           <div className="flex items-center justify-between gap-4">
             <span id="selection-deadline-label" className="text-[14px] font-bold leading-5 tracking-[-0.28px] text-foreground">
@@ -249,14 +300,73 @@ export function CustomerSelectionRequestModal({
                 </p>
               </div>
             </div>
-            <div className="flex min-h-[60px] items-center gap-3 border-t border-border-subtle px-4 py-3 sm:border-l sm:border-t-0">
-              <KeyRound size={18} strokeWidth={1.8} className="shrink-0 text-subtle-foreground" />
-              <div className="min-w-0 flex-1">
-                <p className="text-[12px] font-medium leading-[18px] tracking-[-0.24px] text-muted-foreground">접속 비밀번호</p>
-                <p className={`text-[14px] font-medium leading-5 text-foreground ${accessPin ? "tracking-[3px]" : "tracking-[-0.28px]"}`}>
-                  {accessPin || "PIN 없이 접속"}
-                </p>
-              </div>
+            <div className="flex min-h-[60px] flex-col justify-center gap-2 border-t border-border-subtle px-4 py-3 sm:border-l sm:border-t-0">
+              {editingPin ? (
+                // 이 미리보기 자리에서 바로 입력 칸으로 바꾼다 — 요청 전 단계에도
+                // 공유 모달의 인라인 편집과 같은 방식을 쓴다.
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={4}
+                      autoFocus
+                      value={pinDraft}
+                      onChange={(e) => setPinDraft(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                      onKeyDown={(e) => { if (e.key === "Enter") void saveEditPin(); if (e.key === "Escape") cancelEditPin(); }}
+                      disabled={pinSaving}
+                      aria-invalid={Boolean(pinSaveError)}
+                      aria-label="새 접속 PIN"
+                      placeholder="0000"
+                      className="min-w-0 flex-1 rounded-md border border-border-subtle bg-surface px-2 py-1 text-center font-mono text-[13px] font-semibold tracking-[0.14em] text-foreground outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/10 disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPinDraft(Math.floor(1000 + Math.random() * 9000).toString())}
+                      disabled={pinSaving}
+                      title="랜덤으로 채우기"
+                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-raised disabled:opacity-50"
+                    >
+                      <RefreshCw size={12} />
+                    </button>
+                  </div>
+                  {pinSaveError ? <p role="alert" className="text-[11px] text-danger">{pinSaveError}</p> : null}
+                  <div className="flex items-center gap-1.5">
+                    <button type="button" onClick={cancelEditPin} disabled={pinSaving} className="h-7 flex-1 rounded-md text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-surface-raised disabled:opacity-50">
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void saveEditPin()}
+                      disabled={pinSaving || (!!pinDraft && pinDraft.length !== 4)}
+                      className="h-7 flex-1 rounded-md bg-accent text-[11px] font-semibold text-[var(--accent-foreground)] transition-colors hover:bg-accent/90 disabled:opacity-40"
+                    >
+                      {pinSaving ? "저장 중…" : "저장"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <KeyRound size={18} strokeWidth={1.8} className="shrink-0 text-subtle-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[12px] font-medium leading-[18px] tracking-[-0.24px] text-muted-foreground">접속 비밀번호</p>
+                    <p className={`text-[14px] font-medium leading-5 text-foreground ${accessPin ? "tracking-[3px]" : "tracking-[-0.28px]"}`}>
+                      {accessPin || "PIN 없이 접속"}
+                    </p>
+                  </div>
+                  {onSavePin ? (
+                    <button
+                      type="button"
+                      onClick={startEditPin}
+                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground"
+                      title={accessPin ? "PIN 수정" : "PIN 설정"}
+                      aria-label={accessPin ? "PIN 수정" : "PIN 설정"}
+                    >
+                      <Pencil size={13} />
+                    </button>
+                  ) : null}
+                </div>
+              )}
             </div>
           </div>
         </section>

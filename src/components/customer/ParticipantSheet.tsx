@@ -47,19 +47,22 @@ export function ParticipantSheet({ usedColors, roster = {}, current, onConfirm, 
         <p className="cps-desc">
           {editing
             ? "이름은 함께 보는 사람 화면에도 바로 반영돼요."
-            : "내 색을 정하면 내가 찜한 사진을 구분할 수 있어요. 함께 보는 사람과 다른 색을 고르세요."}
+            : "함께 보는 사람과 겹치지 않는 색을 고르세요. 내가 찜한 사진이 이 색으로 표시돼요."}
         </p>
 
+        {/* 세로 카드 목록 대신 원 한 줄로 — 색 고르기는 가벼운 동작인데 5줄짜리 카드는 스크롤만
+         * 늘렸다. 이름·"사용 중" 표시는 원 아래 캡션으로 옮겨 정보는 그대로 유지한다. */}
         <div className="cps-colors" role="radiogroup" aria-label="내 색 고르기">
           {COLOR_OPTIONS.map((option) => {
             const active = color === option.key;
+            const taken = takenByOther(option.key);
             return (
               <button
                 key={option.key}
                 type="button"
                 role="radio"
                 aria-checked={active}
-                className={`cps-color${active ? " cps-color-active" : ""}`}
+                className={`cps-color${active ? " cps-color-active" : ""}${taken ? " cps-color-taken" : ""}`}
                 onClick={() => {
                   setColor(option.key);
                   /* 이미 이름이 있는 슬롯이면 되찾는 경우가 많아 그 이름을 채워둔다 */
@@ -68,14 +71,11 @@ export function ParticipantSheet({ usedColors, roster = {}, current, onConfirm, 
                 }}
               >
                 <span className="cps-color-dot" style={{ background: option.hex }}>
-                  {active && <Check size={16} strokeWidth={3} aria-hidden />}
+                  {active && <Check size={18} strokeWidth={3} aria-hidden />}
                 </span>
-                <span className="cps-color-name">{COLOR_LABELS[option.key]}</span>
-                {takenByOther(option.key) && (
-                  <span className="cps-color-taken">
-                    {roster[option.key] ? `${roster[option.key]} 사용 중` : "사용 중"}
-                  </span>
-                )}
+                <span className="cps-color-caption">
+                  {taken ? (roster[option.key] ?? "사용 중") : COLOR_LABELS[option.key]}
+                </span>
               </button>
             );
           })}
@@ -105,7 +105,7 @@ export function ParticipantSheet({ usedColors, roster = {}, current, onConfirm, 
           disabled={!color}
           onClick={() => color && onConfirm({ color, initial: initial.trim() })}
         >
-          {editing ? "저장" : "이 색으로 시작하기"}
+          {editing ? "저장" : color ? "이 색으로 시작하기" : "색을 선택해주세요"}
         </button>
 
         <style>{`
@@ -124,28 +124,40 @@ export function ParticipantSheet({ usedColors, roster = {}, current, onConfirm, 
             padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
             font-family: Pretendard, 'Noto Sans KR', sans-serif;
           }
+          /* PC는 화면 아래에서 올라오는 시트가 아니라 가운데 뜨는 카드로 — 아래에서 슬라이드되는
+           * 모바일 제스처 패턴을 마우스로 쓰는 큰 화면에 그대로 옮기면 어색하다. */
+          @media (min-width: 768px) {
+            .cps-sheet {
+              top: 50%; bottom: auto;
+              transform: translate(-50%, -50%);
+              border-radius: 16px;
+              box-shadow: 0 8px 32px rgba(0,0,0,.24);
+              padding: 24px;
+              max-height: 85vh;
+              overflow-y: auto;
+            }
+          }
           .cps-title { margin: 0; font-size: 18px; line-height: 26px; font-weight: 700; letter-spacing: -.3px; }
           .cps-desc { margin: 6px 0 0; font-size: 13px; line-height: 19px; color: #5f5e5b; }
-          .cps-colors { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
+          .cps-colors { margin-top: 16px; display: flex; justify-content: space-between; gap: 4px; }
           .cps-color {
-            display: flex; align-items: center; gap: 10px;
-            width: 100%; min-height: 48px; padding: 0 12px;
-            border: 1px solid #dde1e4; border-radius: 10px; background: #fff;
-            font: 500 14px/20px Pretendard, sans-serif; color: #191918; text-align: left;
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+            flex: 1; min-width: 0; padding: 4px 0;
+            border: 0; background: transparent;
+            font: 500 12px/16px Pretendard, sans-serif; color: #5f5e5b; text-align: center;
           }
-          .cps-color-active { border-color: #ff4d00; background: #fff5f0; }
           .cps-color-dot {
-            width: 26px; height: 26px; flex: 0 0 26px; border-radius: 50%;
+            width: 44px; height: 44px; flex: 0 0 44px; border-radius: 50%;
             display: grid; place-items: center; color: #fff;
             box-shadow: 0 0 0 1px rgba(0,0,0,.12);
+            transition: box-shadow 0.15s;
           }
-          .cps-color-name { flex: 1; min-width: 0; }
-          .cps-color-taken {
-            flex: 0 0 auto; padding: 2px 8px; border-radius: 999px;
-            background: #eef0f2; color: #6f747b; font: 500 11px/16px Pretendard, sans-serif;
-          }
-          .cps-field { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
-          .cps-field-label { font: 500 12px/16px Pretendard, sans-serif; color: #5f5e5b; }
+          .cps-color-active .cps-color-dot { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #ff4d00; }
+          .cps-color-active { color: #191918; font-weight: 700; }
+          .cps-color-taken .cps-color-dot { opacity: .35; }
+          .cps-color-caption { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+          .cps-field { margin-top: 20px; display: flex; flex-direction: column; gap: 6px; }
+          .cps-field-label { font: 600 12px/16px Pretendard, sans-serif; color: #3a3a37; }
           .cps-field input {
             height: 48px; box-sizing: border-box; padding: 0 14px;
             border: 1px solid #dde1e4; border-radius: 10px; outline: 0;
