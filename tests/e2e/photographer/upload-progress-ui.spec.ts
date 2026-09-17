@@ -11,7 +11,7 @@ for (const viewport of scenarios) {
     test.setTimeout(60_000);
     let allowConfirm = () => {};
     let allowPreview = () => {};
-    let finalized = false, recovered = false;
+    let finalized = false, recovered = false, previewRegistered = false;
     const context = await browser.newContext({
       viewport,
       baseURL: testInfo.project.use.baseURL,
@@ -41,7 +41,7 @@ for (const viewport of scenarios) {
       } }));
       await page.route("**/rest/v1/projects?**", route => route.fulfill({ json: {
         id: projectId, photographer_id: projectId, name: "업로드 진행률 검증", customer_name: "테스트",
-        required_count: 1, photo_count: 0, status: "preparing", include_original: true,
+        required_count: 1, photo_count: previewRegistered ? 1 : 0, status: "preparing", include_original: true,
         access_token: "test-upload-token", created_at: "2026-09-11T00:00:00Z", updated_at: "2026-09-11T00:00:00Z",
       } }));
       await page.route("**/rest/v1/photos?**", route => route.fulfill({ json: [] }));
@@ -74,6 +74,7 @@ for (const viewport of scenarios) {
         const body = route.request().postDataBuffer()?.toString();
         if (viewport.fallback) expect(body).not.toContain('name="early_original_upload"');
         else expect(body).toContain('name="early_original_upload"');
+        previewRegistered = true;
         await route.fulfill({ json: {
         uploaded: 1, rejected: [], original_presigned: [{ job_id: "test-job", url: "http://localhost:3001/__upload-test/r2", content_type: "image/jpeg", source_key: "test", expires_at: "2099-01-01" }],
       } });
@@ -142,13 +143,16 @@ for (const viewport of scenarios) {
         return;
       }
       const status = viewport.width < 768 ? page.locator(".prj-mobile-progress [role=status]") : page.locator(".prj-upload-bottom-status");
+      // 모바일은 단일 네트워크 슬롯을 프리뷰에 먼저 써야 원본 전송이 셀렉 시작을 막지 않는다.
+      if (viewport.width < 768) allowPreview();
       await advance(0.25);
       await expect(status).toContainText(/원본 전송 중 · 2[45]%/, { timeout: 20_000 });
       await expect(status).toContainText("0/1장 저장 완료");
       await advance(0.75);
       await expect(status).toContainText(/7[45]%/);
-      // The raw PUT advances while the preview response is deliberately unavailable.
-      allowPreview();
+      // PC는 원본 PUT과 프리뷰 처리를 병렬로 진행한다.
+      if (viewport.width >= 768) allowPreview();
+      await expect(page.getByRole("button", { name: "셀렉 요청하기", exact: true })).toBeEnabled({ timeout: 15000 });
       await advance(1, true);
       await expect(status).toContainText("저장 확인 중");
       await expect(status).toContainText("0/1장 저장 완료");
@@ -180,3 +184,44 @@ for (const viewport of scenarios) {
     }
   });
 }
+
+test("activated project can reopen the upload page only to recover unfinished originals", async ({ browser }, testInfo) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, baseURL: testInfo.project.use.baseURL });
+  const page = await context.newPage();
+  try {
+    const expires = Math.floor(Date.now() / 1000) + 3600;
+    const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+    const jwt = `${encode({ alg: "HS256", typ: "JWT" })}.${encode({ sub: projectId, aud: "authenticated", exp: expires })}.test-signature`;
+    const storageKey = `sb-${new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).hostname.split(".")[0]}-auth-token`;
+    await context.addCookies([{ name: storageKey, value: `base64-${encode({ access_token: jwt, refresh_token: "mock-refresh", expires_at: expires,
+      token_type: "bearer", user: { id: projectId, aud: "authenticated", role: "authenticated" } })}`,
+      url: testInfo.project.use.baseURL!, sameSite: "Lax" }]);
+    await page.route("**/rest/v1/**", route => route.fulfill({ json: [] }));
+    await page.route("**/api/photographer/**", route => route.fulfill({ json: {} }));
+    await page.route("**/auth/v1/user", route => route.fulfill({ json: {
+      id: projectId, aud: "authenticated", role: "authenticated", email: "recovery-test@example.test",
+      app_metadata: {}, user_metadata: {}, created_at: "2026-09-17T00:00:00Z",
+    } }));
+    await page.route("**/rest/v1/photographers?**", route => route.fulfill({ json: {
+      id: projectId, auth_id: projectId, name: "테스트 작가", studio_name: "테스트 작가",
+    } }));
+    await page.route("**/rest/v1/projects?**", route => route.fulfill({ json: {
+      id: projectId, photographer_id: projectId, name: "원본 복구 검증", customer_name: "테스트",
+      required_count: 1, photo_count: 1, status: "selecting", include_original: true,
+      access_token: "test-upload-token", created_at: "2026-09-17T00:00:00Z", updated_at: "2026-09-17T00:00:00Z",
+    } }));
+    await page.route("**/api/photographer/quota", route => route.fulfill({ json: {
+      tier: "beta", current: 1, max: 50, maxPhotosPerProject: 1000, betaStatus: "approved",
+    } }));
+    await page.route("**/originals/pending?**", route => route.fulfill({ json: { jobs: [{
+      id: "unfinished-job", original_filename: "sample.jpg", original_file_size: 1234,
+      original_last_modified: 0, created_at: "2026-09-17T00:00:00Z",
+    }] } }));
+    await page.goto(`/photographer/projects/${projectId}/upload?recover=1`);
+    await expect(page).toHaveURL(/\/upload\?recover=1$/);
+    await expect(page.getByText("원본 1장 확인 필요 · 완료된 사진은 다시 보내지 않습니다", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "사진 추가" })).toHaveCount(0);
+  } finally {
+    await context.close();
+  }
+});

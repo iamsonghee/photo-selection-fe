@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { PhotographerLightButton } from "../PhotographerLightButton";
 import { ChevronRight, Clock, Flag, ListChecks, PenLine, Upload } from "lucide-react";
 import type { Project, ProjectStatus } from "@/types";
@@ -41,6 +42,13 @@ const MOBILE_META_LABELS: Record<string, string> = {
   "최종 납품": "납품",
   "최종 보정본 보관 종료": "보관 종료",
   "원본 보관 종료": "원본 보관",
+  "원본 전달": "원본",
+};
+
+type OriginalUploadProgress = {
+  total: number;
+  completed: number;
+  needsRecovery: number;
 };
 
 type Props = {
@@ -48,6 +56,7 @@ type Props = {
   deadlineDisplay: string;
   reviewDeadlineDisplay: string | null;
   onUpload: () => void;
+  onRecoverOriginals: () => void;
   onWorkflow: () => void;
   onResults: () => void;
 };
@@ -81,9 +90,39 @@ export function ProjectWorkPanel({
   deadlineDisplay,
   reviewDeadlineDisplay,
   onUpload,
+  onRecoverOriginals,
   onWorkflow,
   onResults,
 }: Props) {
+  const [originalProgress, setOriginalProgress] = useState<OriginalUploadProgress | null>(null);
+
+  useEffect(() => {
+    if (!project.includeOriginal || project.status === "preparing") {
+      setOriginalProgress(null);
+      return;
+    }
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = async () => {
+      try {
+        const response = await fetch(`/api/photographer/projects/${project.id}/status`);
+        if (!response.ok) throw new Error("failed");
+        const progress = await response.json() as OriginalUploadProgress;
+        if (cancelled) return;
+        setOriginalProgress(progress);
+        if (progress.completed < progress.total) timer = setTimeout(load, 5000);
+      } catch {
+        if (!cancelled) timer = setTimeout(load, 10000);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [project.id, project.includeOriginal, project.status]);
+
   const mode = getWorkMode(project.status, project.photoCount);
   const actor = getProjectActor(project.status);
   // Dashboard·Project List와 동일하게, 현재 고객 단계의 실제 기한만 계산한다.
@@ -217,6 +256,19 @@ export function ProjectWorkPanel({
       }
     }
   })();
+
+  if (originalProgress && originalProgress.total > 0 && originalProgress.completed < originalProgress.total) {
+    content.meta.push({
+      label: "원본 전달",
+      value: originalProgress.needsRecovery > 0
+        ? `${originalProgress.needsRecovery}장 확인 필요`
+        : `${originalProgress.completed}/${originalProgress.total}장`,
+    });
+    if (originalProgress.needsRecovery > 0) {
+      content.cta = "원본 업로드 복구";
+      content.onClick = onRecoverOriginals;
+    }
+  }
 
   const isPhotographer = actor === "photographer";
   const isCustomer = actor === "customer";

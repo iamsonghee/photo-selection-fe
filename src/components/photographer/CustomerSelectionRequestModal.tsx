@@ -62,6 +62,7 @@ export function CustomerSelectionRequestModal({
   requiredCount,
   recommendedCount,
   includeOriginal,
+  originalUploadInProgress,
   initialDeadline,
   inviteUrl,
   accessPin,
@@ -77,6 +78,7 @@ export function CustomerSelectionRequestModal({
   requiredCount: number;
   recommendedCount?: number;
   includeOriginal: boolean;
+  originalUploadInProgress?: boolean;
   initialDeadline: string;
   inviteUrl: string;
   accessPin?: string | null;
@@ -181,7 +183,7 @@ export function CustomerSelectionRequestModal({
             <div className="min-w-0 flex-1">
               <p className="truncate text-[14px] font-semibold leading-5 text-foreground">{customerName}</p>
               <p className="mt-0.5 truncate text-[12px] leading-[18px] tracking-[-0.24px] text-muted-foreground">
-                셀렉 {requiredCount.toLocaleString()}장 · 원본 {photoCount.toLocaleString()}장 · 다운로드 {includeOriginal ? "허용" : "미포함"}
+                셀렉 {requiredCount.toLocaleString()}장 · 전체 {photoCount.toLocaleString()}장 · 원본 다운로드 {includeOriginal ? "포함" : "미포함"}
               </p>
             </div>
           </div>
@@ -381,7 +383,8 @@ export function CustomerSelectionRequestModal({
               className="mt-0.5 h-[18px] w-[18px] shrink-0 accent-[var(--accent)]"
             />
             <span className="min-w-0 text-[13px] font-medium leading-5 tracking-[-0.3px] text-foreground">
-              요청 후 원본 사진을 변경할 수 없음을 확인했어요
+              요청 후 사진 구성을 변경할 수 없음을 확인했어요
+              {includeOriginal && originalUploadInProgress ? " · 원본 업로드는 계속돼요" : ""}
             </span>
           </label>
         </section>
@@ -394,13 +397,16 @@ export function CustomerSelectionRequestModal({
                 id="selection-photo-lock-title"
                 className="text-[14px] font-semibold leading-5 tracking-[-0.28px] text-foreground"
               >
-                셀렉 요청 후에는 원본 사진을 수정할 수 없습니다
+                셀렉 요청 후에는 사진 구성을 수정할 수 없습니다
               </h4>
               <p
                 id="selection-photo-lock-description"
                 className="mt-1 text-[13px] font-normal leading-5 tracking-[-0.3px] text-muted-foreground"
               >
                 사진의 추가·삭제·교체가 제한됩니다. 현재 구성을 최종 확인해주세요.
+                {includeOriginal && originalUploadInProgress
+                  ? " 전달용 원본은 이 화면에서 계속 업로드되며, 미완료 파일은 이후에도 복구할 수 있습니다."
+                  : ""}
               </p>
             </div>
           </div>
@@ -415,7 +421,7 @@ export function CustomerSelectionRequestModal({
               className="h-[18px] w-[18px] shrink-0 accent-[var(--accent)]"
             />
             <span className="text-[13px] font-medium leading-5 tracking-[-0.3px] text-foreground">
-              현재 원본 {photoCount.toLocaleString()}장으로 요청하는 것에 동의합니다
+              현재 사진 {photoCount.toLocaleString()}장으로 요청하는 것에 동의합니다
             </span>
           </label>
         </section>

@@ -91,8 +91,6 @@ const ORIGINAL_PC_CONCURRENCY_FAST = 6;
  * 그 병렬 처리량의 일부만 쓰고 만다 — 5로 맞춰 요청당 서버 병렬성을 그대로 채운다. */
 const MOBILE_BATCH_SIZE = 5;
 const MOBILE_CONCURRENCY = 1;
-const INVITE_ORIGINAL_PROCESSING_MAX_ATTEMPTS = 15;
-const INVITE_ORIGINAL_PROCESSING_RETRY_MS = 1000;
 const ACCEPT_TYPES = "image/*,image/heic,image/heif";
 const RAW_EXTENSIONS = new Set([
   ".cr2", ".cr3", ".nef", ".nrw", ".arw", ".srf", ".sr2",
@@ -850,7 +848,6 @@ export default function ProjectDetailPage() {
   }, []);
 
   const [inviteActivating, setInviteActivating] = useState(false);
-  const [inviteOriginalsProcessing, setInviteOriginalsProcessing] = useState(false);
   const [inviteShareModalOpen, setInviteShareModalOpen] = useState(false);
   const [selectionRequestModalOpen, setSelectionRequestModalOpen] = useState(false);
 
@@ -892,7 +889,7 @@ export default function ProjectDetailPage() {
 
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
-  const [uploadPhase, setUploadPhase] = useState<"idle" | "sending" | "processing" | "done">("idle");
+  const [uploadPhase, setUploadPhase] = useState<"idle" | "sending" | "processing" | "originals" | "done">("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
   const uploadTelemetryRef = useRef<UploadTelemetry | null>(null);
   const [uploadSnapshot, setUploadSnapshot] = useState<UploadSnapshot | null>(null);
@@ -1077,9 +1074,10 @@ export default function ProjectDetailPage() {
   }, [id]);
 
   useEffect(() => {
+    const recoveryMode = new URLSearchParams(window.location.search).get("recover") === "1";
     loadProject().then((loadedProject) => {
       if (!loadedProject) return;
-      if (loadedProject.status !== "preparing") {
+      if (loadedProject.status !== "preparing" && !(recoveryMode && loadedProject.includeOriginal)) {
         router.replace(`/photographer/projects/${id}/assets/original`);
         return;
       }
@@ -1101,7 +1099,9 @@ export default function ProjectDetailPage() {
   }, [quota]);
 
   const overallProgress = uploadSnapshot?.percent ?? uploadProgress;
-  const isUploading = uploadPhase === "sending" || uploadPhase === "processing";
+  const isPreviewUploading = uploadPhase === "sending" || uploadPhase === "processing";
+  const isOriginalUploading = uploadPhase === "originals";
+  const isUploading = isPreviewUploading || isOriginalUploading;
 
   useEffect(() => {
     if (!isUploading) return;
@@ -1627,8 +1627,7 @@ export default function ProjectDetailPage() {
   /** 모바일 헤더 아래 진행 라인: 업로드 종료 후 200ms 페이드아웃 */
   const [mobileProgressBarMounted, setMobileProgressBarMounted] = useState(false);
   useEffect(() => {
-    const uploading = uploadPhase === "sending" || uploadPhase === "processing";
-    const active = isMobile && (uploading || !!uploadError || showRecoveryBanner || recoveryBusy);
+    const active = isMobile && (isUploading || !!uploadError || showRecoveryBanner || recoveryBusy);
     if (active) {
       setMobileProgressBarMounted(true);
       return;
@@ -1639,19 +1638,18 @@ export default function ProjectDetailPage() {
     }
     const id = window.setTimeout(() => setMobileProgressBarMounted(false), 200);
     return () => window.clearTimeout(id);
-  }, [isMobile, uploadPhase, uploadError, showRecoveryBanner, recoveryBusy]);
+  }, [isMobile, isUploading, uploadError, showRecoveryBanner, recoveryBusy]);
 
   useEffect(() => {
-    const uploading = uploadPhase === "sending" || uploadPhase === "processing";
-    if (!uploading) return;
+    if (!isUploading) return;
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [uploadPhase]);
+  }, [isUploading]);
 
   // iOS에서 업로드 중 앱 전환/화면 잠금 감지 → 복귀 시 경고
   useEffect(() => {
-    if (uploadPhase !== "processing" || !isMobileUploadClient()) return;
+    if (!isUploading || !isMobileUploadClient()) return;
     let hiddenAt: number | null = null;
     const handler = () => {
       if (document.visibilityState === "hidden") {
@@ -1665,7 +1663,7 @@ export default function ProjectDetailPage() {
     };
     document.addEventListener("visibilitychange", handler);
     return () => document.removeEventListener("visibilitychange", handler);
-  }, [uploadPhase]);
+  }, [isUploading]);
 
   // 원본 R2 PUT 중 페이지 이탈 시 beforeunload 경고 (PUT 완료 전에 닫으면 job이 awaiting_upload에 멈춤)
   useEffect(() => {
@@ -1702,8 +1700,11 @@ export default function ProjectDetailPage() {
       setPendingRecovery([]);
       setUnmatchedJobs([]);
       setShowRecoveryBanner(false);
+      if (new URLSearchParams(window.location.search).get("recover") === "1") {
+        router.replace(`/photographer/projects/${id}/assets/original`);
+      }
     }
-  }, [id]);
+  }, [id, router]);
 
   // ── upload ──
   const startUpload = useCallback(async (uploadFiles: File[], retryClientUploadIds?: string[]) => {
@@ -1756,14 +1757,12 @@ export default function ProjectDetailPage() {
       : (mobileUploadClient ? MOBILE_CONCURRENCY : getDesktopUploadConcurrency(false));
     const requestSlots = new UploadWorkQueue(concurrency);
     const originalConcurrencyMax = mobileUploadClient ? 1 : Math.max(1, concurrency - 1);
-    const originalConcurrencyInitial = mobileUploadClient ? 1 : Math.min(2, originalConcurrencyMax);
+    // 프리뷰가 모두 등록되기 전에는 원본 lane 하나만 열어 고객 링크 준비 시간을 우선한다.
+    // 이후에는 기존 적응형 상한 안에서 원본 처리량을 다시 높인다.
+    const originalConcurrencyInitial = 1;
+    const originalConcurrencyAfterPreviews = mobileUploadClient ? 1 : Math.min(2, originalConcurrencyMax);
     const originalQueue = new UploadWorkQueue(originalConcurrencyInitial);
-    const adaptiveOriginalConcurrency = inclOrig && !mobileUploadClient
-      ? new AdaptiveUploadConcurrency(originalConcurrencyInitial, 1, originalConcurrencyMax, next => {
-          originalQueue.setConcurrency(next);
-        })
-      : null;
-    if (adaptiveOriginalConcurrency) telemetry.setOriginalConcurrency(adaptiveOriginalConcurrency.report());
+    let adaptiveOriginalConcurrency: AdaptiveUploadConcurrency | null = null;
     const previewConcurrency = inclOrig ? Math.min(2, concurrency) : concurrency;
     const reservationPromises = new Map<number, Promise<OriginalPresignedItem | null>>();
     const originalResults = uploadFiles.map(() => uploadDeferred<{ job: OriginalPresignedItem; token: string } | null>());
@@ -1859,7 +1858,9 @@ export default function ProjectDetailPage() {
           onSending: () => telemetry.originalStage(index, "originalSending"),
           onProgress: (loaded: number) => telemetry.progress(index, loaded),
         };
-        if (early && Date.parse(early.expires_at) > Date.now() + 30_000 && !stopRequestedRef.current && !abortReason) {
+        // 모바일은 공유 네트워크 슬롯이 하나라 early PUT이 프리뷰 요청을 막는다.
+        // 예약은 유지하되 photo/job 등록 뒤에 같은 원본을 전송한다.
+        if (!mobileUploadClient && early && Date.parse(early.expires_at) > Date.now() + 30_000 && !stopRequestedRef.current && !abortReason) {
           earlyOk = await requestSlots.run(() => putOriginalMeasured(early, file, undefined, { retriesUsed: 0, maxRetries: 0 }, observer));
           telemetry.originalStage(index, null);
         }
@@ -2373,6 +2374,22 @@ export default function ProjectDetailPage() {
     }
 
     originalResults.forEach(result => result.resolve(null));
+    if (inclOrig && !abortReason && !stopRequestedRef.current) {
+      // 이 시점에는 모든 preview 요청과 photos INSERT가 끝났다. 원본 queue는 계속 두되
+      // 프로젝트/사진 수를 먼저 갱신해 고객 셀렉 요청을 즉시 열 수 있게 한다.
+      originalQueue.setConcurrency(originalConcurrencyAfterPreviews);
+      if (!mobileUploadClient) {
+        adaptiveOriginalConcurrency = new AdaptiveUploadConcurrency(
+          originalConcurrencyAfterPreviews,
+          1,
+          originalConcurrencyMax,
+          next => originalQueue.setConcurrency(next),
+        );
+        telemetry.setOriginalConcurrency(adaptiveOriginalConcurrency.report());
+      }
+      await Promise.all([loadPhotos(), loadProject()]);
+      setUploadPhase("originals");
+    }
     await Promise.all(originalTasks);
 
     // PUT과 confirm은 파일별 공유 예산 안에서 이미 모두 재시도했다. 여기서는 재전송을
@@ -2595,7 +2612,7 @@ export default function ProjectDetailPage() {
 
   // 복구: filename+size+lastModified 매칭 후 재업로드. 매칭 실패 job은 unmatchedJobs로 표시.
   const recoverOriginalFiles = useCallback(async (selectedFiles: File[]) => {
-    if (recoveryBusyRef.current || uploadInProgressRef.current || project?.status !== "preparing") return;
+    if (recoveryBusyRef.current || uploadInProgressRef.current || !project?.includeOriginal) return;
     recoveryBusyRef.current = true;
     uploadInProgressRef.current = true;
     setRecoveryBusy(true);
@@ -2634,7 +2651,13 @@ export default function ProjectDetailPage() {
         const remainingIds = new Set(remaining.map(job => job.id));
         for (const jobId of recoveryFilesRef.current.keys()) if (!remainingIds.has(jobId)) recoveryFilesRef.current.delete(jobId);
         setShowRecoveryBanner(remaining.length > 0);
-        if (remaining.length === 0) { setUploadError(null); setToast("원본 업로드 복구 완료!"); }
+        if (remaining.length === 0) {
+          setUploadError(null);
+          setToast("원본 업로드 복구 완료!");
+          if (new URLSearchParams(window.location.search).get("recover") === "1") {
+            window.setTimeout(() => router.replace(`/photographer/projects/${id}/assets/original`), 600);
+          }
+        }
       }
       if (failed) setUploadError(`원본 ${failed}장을 아직 저장하지 못했습니다. 실패한 원본만 다시 시도해주세요.`);
     } finally {
@@ -2644,7 +2667,7 @@ export default function ProjectDetailPage() {
       setRecoveryBusy(false);
       setSendingSourcePhase(false);
     }
-  }, [id, pendingRecovery, project?.status]);
+  }, [id, pendingRecovery, project?.includeOriginal, router]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const chosen = e.target.files;
@@ -2867,22 +2890,20 @@ export default function ProjectDetailPage() {
     const m = project.photoCount;
     const n = project.requiredCount;
     if (project.status !== "preparing" || m < n) return;
-    // DB에 먼저 반영된 사진 수만으로 링크를 열면, 같은 화면에서 아직 전송/압축 중인
-    // 나머지 사진이 고객 갤러리에서 빠질 수 있다. 현재 업로드 세션이 완전히 끝날 때까지 막는다.
+    // 고객 갤러리에 들어갈 preview 등록까지만 기다린다. 전달용 원본 PUT은 별도 queue에서
+    // 계속 진행하며 고객 셀렉 시작을 막지 않는다.
     const uploadStillActive =
       uploadPhase === "sending" ||
       uploadPhase === "processing" ||
       isPreparingFiles ||
       awaitingServerFinalize ||
       uploadingPhotos.length > 0 ||
-      queuedPreviews.length > 0 ||
-      sendingSourcePhase;
+      queuedPreviews.length > 0;
     if (uploadStillActive) {
-      setToast("사진 업로드가 모두 완료된 뒤 고객 링크를 활성화할 수 있습니다.");
+      setToast("셀렉용 사진 저장이 끝난 뒤 고객 링크를 활성화할 수 있습니다.");
       return;
     }
     setInviteActivating(true);
-    setInviteOriginalsProcessing(false);
     try {
       if (requestDeadline !== project.deadline) {
         const deadlineResponse = await fetch(`/api/photographer/projects/${id}`, {
@@ -2898,53 +2919,34 @@ export default function ProjectDetailPage() {
         setProject((current) => current ? { ...current, deadline: requestDeadline } : current);
       }
 
-      for (let attempt = 0; attempt < INVITE_ORIGINAL_PROCESSING_MAX_ATTEMPTS; attempt++) {
-        const res = await fetch(`/api/photographer/projects/${id}/status`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "selecting" satisfies ProjectStatus }),
-        });
-        const data = await res.json().catch(() => ({})) as {
-          error?: string;
-          code?: string;
-          processingCount?: number;
-          retryAfterMs?: number;
-        };
-        if (res.ok) {
+      const res = await fetch(`/api/photographer/projects/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "selecting" satisfies ProjectStatus }),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string; alreadyActive?: boolean };
+      if (res.ok) {
+        if (!data.alreadyActive) {
           fetch("/api/photographer/project-logs", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ project_id: id, action: "selecting" }),
           }).catch(() => {});
-          setProject((current) => current
-            ? { ...current, deadline: requestDeadline, status: "selecting" }
-            : current);
-          setSelectionRequestModalOpen(false);
-          setInviteShareModalOpen(true);
-          setToast("셀렉 요청을 시작했습니다.");
-          router.refresh();
-          return;
         }
-
-        if (data.code !== "originals_processing") {
-          setToast(data.error ?? "초대 링크 활성화에 실패했습니다.");
-          return;
-        }
-
-        setInviteOriginalsProcessing(true);
-        if (attempt === INVITE_ORIGINAL_PROCESSING_MAX_ATTEMPTS - 1) {
-          setToast("원본 확인이 지연되고 있습니다. 잠시 후 다시 활성화해 주세요.");
-          return;
-        }
-        setToast(data.error ?? "원본 상태를 확인 중입니다. 완료되면 자동으로 활성화합니다.");
-        const retryMs = Math.max(500, Math.min(data.retryAfterMs ?? INVITE_ORIGINAL_PROCESSING_RETRY_MS, 3000));
-        await new Promise((resolve) => setTimeout(resolve, retryMs));
+        setProject((current) => current
+          ? { ...current, deadline: requestDeadline, status: "selecting" }
+          : current);
+        setSelectionRequestModalOpen(false);
+        setInviteShareModalOpen(true);
+        setToast("셀렉 요청을 시작했습니다.");
+        router.refresh();
+        return;
       }
+      setToast(data.error ?? "초대 링크 활성화에 실패했습니다.");
     } catch (e) {
       setToast(e instanceof Error ? e.message : "초대 링크 활성화에 실패했습니다.");
     } finally {
       setInviteActivating(false);
-      setInviteOriginalsProcessing(false);
     }
   };
 
@@ -3061,16 +3063,14 @@ export default function ProjectDetailPage() {
     shootTypeLabel,
     project.customerName ? `${project.customerName} 고객` : null,
   ].filter(Boolean).join(" | ");
-  // 갤러리 업로드, 클라이언트 압축, 서버 최종 저장, 원본 R2 PUT 중 하나라도 남아 있으면
-  // 고객 링크를 열지 않는다. pendingPhotos는 완료 직후 잠깐 남는 낙관적 표시이므로 제외한다.
+  // 고객 갤러리용 preview 구성만 활성화를 막는다. 전달용 원본 PUT과 복구는 링크를
+  // 연 뒤에도 계속되므로 초대 가능 여부와 분리한다.
   const uploadBlockingInvite =
-    isUploading ||
+    isPreviewUploading ||
     isPreparingFiles ||
     awaitingServerFinalize ||
     uploadingPhotos.length > 0 ||
-    queuedPreviews.length > 0 ||
-    sendingSourcePhase ||
-    pendingRecovery.length > 0;
+    queuedPreviews.length > 0;
   // 헤더 초대 버튼이 지금 실제로 눌러 실행할 수 있는 상태인지 — design-system.md §23:
   // 실행 불가 상태는 Primary(orange fill)가 아니라 Secondary(Neutral Surface fill)로 표현한다.
   const inviteButtonReady = isInviteActive || (M >= N && !uploadBlockingInvite);
@@ -4094,7 +4094,7 @@ export default function ProjectDetailPage() {
               : "삭제할 사진을 선택하세요"}
           </PhotographerLightButton>
           </>
-        ) : isUploading ? (
+        ) : isPreviewUploading ? (
           <PhotographerLightButton
             type="button"
             variant="secondary"
@@ -4104,6 +4104,28 @@ export default function ProjectDetailPage() {
           >
             {uploadStopRequested ? "중단 중…" : "업로드 중단"}
           </PhotographerLightButton>
+        ) : isOriginalUploading ? (
+          <>
+            <PhotographerLightButton
+              type="button"
+              variant="secondary"
+              onClick={handleStopUpload}
+              disabled={uploadStopRequested}
+            >
+              {uploadStopRequested ? "중단 중…" : "원본 업로드 중단"}
+            </PhotographerLightButton>
+            <PhotographerLightButton
+              type="button"
+              variant="primary"
+              onClick={isInviteActive
+                ? () => setInviteShareModalOpen(true)
+                : () => setSelectionRequestModalOpen(true)}
+              disabled={!isInviteActive && (inviteActivating || uploadBlockingInvite || M < N)}
+              className="min-w-[129px]"
+            >
+              {isInviteActive ? (isMobile ? "링크 공유" : "초대 링크 공유") : "셀렉 요청하기"}
+            </PhotographerLightButton>
+          </>
         ) : (
           <>
             {photoUploadAllowed && displayPhotos.length > 0 ? (
@@ -4128,7 +4150,7 @@ export default function ProjectDetailPage() {
               {isInviteActive
                 ? (isMobile ? "링크 공유" : "초대 링크 공유")
                 : inviteActivating
-                  ? (inviteOriginalsProcessing ? "원본 확인 중…" : "처리 중…")
+                  ? "처리 중…"
                   : uploadBlockingInvite
                     ? (isMobile ? "업로드 중" : "사진 업로드 중…")
                     : M < N
@@ -4487,6 +4509,7 @@ export default function ProjectDetailPage() {
         requiredCount={project.requiredCount}
         recommendedCount={recommendedPhotoIds.size}
         includeOriginal={project.includeOriginal}
+        originalUploadInProgress={project.includeOriginal && photos.some((photo) => photo.originalStatus !== "completed")}
         initialDeadline={project.deadline?.slice(0, 10) ?? ""}
         inviteUrl={inviteUrl}
         accessPin={project.accessPin}

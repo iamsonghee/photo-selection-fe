@@ -726,6 +726,7 @@ export function ProjectNexusPageClient() {
             onUpload={() => router.push(project.status === "preparing"
               ? `/photographer/projects/${id}/upload`
               : `/photographer/projects/${id}/assets/original`)}
+            onRecoverOriginals={() => router.push(`/photographer/projects/${id}/upload?recover=1`)}
             onWorkflow={openRetouchedWorkspace}
             onResults={() => router.push(`/photographer/projects/${id}/assets/final`)}
           />

@@ -17,6 +17,36 @@ async function getPhotographerIdFromSession(): Promise<string | null> {
   return data?.id ?? null;
 }
 
+/** GET — 활성화 이후에도 전달용 원본 진행 상태를 작은 집계 응답으로 제공한다. */
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: projectId } = await params;
+  if (!projectId) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  try {
+    const photographerId = await getPhotographerIdFromSession();
+    if (!photographerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const admin = getAdminClient();
+    const { data: project, error: projectError } = await admin
+      .from("projects")
+      .select("photographer_id, include_original")
+      .eq("id", projectId)
+      .single();
+    if (projectError || !project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    if (project.photographer_id !== photographerId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!project.include_original) {
+      return NextResponse.json({ total: 0, completed: 0, processing: 0, needsRecovery: 0 });
+    }
+    const { data, error } = await admin.rpc("get_original_upload_progress", { p_project_id: projectId });
+    if (error) throw new Error(error.message);
+    return NextResponse.json(data ?? { total: 0, completed: 0, processing: 0, needsRecovery: 0 });
+  } catch (error) {
+    console.error("[GET project original progress]", error);
+    return NextResponse.json({ error: "원본 업로드 상태를 확인하지 못했습니다." }, { status: 500 });
+  }
+}
+
 /** PATCH /api/photographer/projects/[id]/status — 허용된 상태 전환만 처리 */
 export async function PATCH(
   req: NextRequest,
@@ -38,7 +68,7 @@ export async function PATCH(
     const admin = getAdminClient();
     const { data: project, error: projErr } = await admin
       .from("projects")
-      .select("id, photographer_id, status, max_revision_count, revision_round, include_original, original_archive_status, original_download_started_at")
+      .select("id, photographer_id, status, max_revision_count, revision_round")
       .eq("id", projectId)
       .single();
 
@@ -48,9 +78,6 @@ export async function PATCH(
       status: string;
       max_revision_count: number;
       revision_round: number;
-      include_original: boolean;
-      original_archive_status: string | null;
-      original_download_started_at: string | null;
     };
     if (proj.photographer_id !== photographerId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -95,77 +122,23 @@ export async function PATCH(
       return NextResponse.json({ status, finalDeliveryArchiveId: archiveId });
     }
 
-    // 원본 포함 프로젝트는 상태 전환과 archive pending 전환을 한 DB 트랜잭션으로 묶는다.
-    // 원본 한 장이라도 미완료면 링크를 열지 않아 고객 화면이 영구 "ZIP 준비 중"이 되지 않는다.
-    if (proj.status === "preparing" && status === "selecting" && proj.include_original) {
-      const { data: activated, error: activateErr } = await admin.rpc("activate_project_with_original_archive", {
+    // 프리뷰 사진 구성을 DB에서 원자적으로 잠근 뒤 고객 셀렉을 시작한다. 원본은 링크
+    // 활성화와 독립적으로 계속 전송되고, 마지막 원본 완료 이벤트가 archive를 enqueue한다.
+    if (proj.status === "preparing" && status === "selecting") {
+      const { data: activationResult, error: activateErr } = await admin.rpc("activate_project_for_selection", {
         p_project_id: projectId,
       });
       if (activateErr) {
         console.error("[PATCH project status] atomic activation failed", activateErr);
-        return NextResponse.json({ error: "원본 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요." }, { status: 500 });
+        return NextResponse.json({ error: "사진 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요." }, { status: 500 });
       }
-      if (!activated) {
-        const [incompleteResult, processingResult] = await Promise.all([
-          admin
-            .from("photos")
-            .select("id", { count: "exact", head: true })
-            .eq("project_id", projectId)
-            .or("original_status.is.null,original_status.neq.completed"),
-          admin
-            .from("photos")
-            .select("id", { count: "exact", head: true })
-            .eq("project_id", projectId)
-            .in("original_status", ["pending", "processing"]),
-        ]);
-        if (incompleteResult.error || processingResult.error) {
-          console.error(
-            "[PATCH project status] original state classification failed",
-            incompleteResult.error ?? processingResult.error,
-          );
-          return NextResponse.json(
-            { error: "원본 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요." },
-            { status: 500 },
-          );
-        }
-
-        const incompleteCount = incompleteResult.count ?? 0;
-        const processingCount = processingResult.count ?? 0;
-        const recoveryCount = Math.max(0, incompleteCount - processingCount);
-
-        // PUT/confirm까지 끝난 pending·processing은 worker의 다음 폴링에서 자동 완료된다.
-        // 실제 재업로드가 필요한 awaiting_upload/failed/null과 같은 복구 문구를 보여주지 않는다.
-        if (incompleteCount > 0 && recoveryCount === 0) {
-          return NextResponse.json(
-            {
-              error: `원본 ${processingCount}장의 상태를 확인 중입니다. 확인이 끝나면 자동으로 고객 링크를 활성화합니다.`,
-              code: "originals_processing",
-              processingCount,
-              retryAfterMs: 1000,
-            },
-            { status: 409 },
-          );
-        }
-
-        return NextResponse.json(
-          {
-            error: `원본 업로드 미완료 ${recoveryCount || incompleteCount || 1}장을 먼저 복구해주세요. 고객 링크는 모든 원본이 완료된 뒤 활성화할 수 있습니다.`,
-            code: "originals_incomplete",
-            incompleteCount: recoveryCount || incompleteCount || null,
-          },
-          { status: 409 }
-        );
+      if (activationResult === "activated" || activationResult === "already_active") {
+        return NextResponse.json({ status, alreadyActive: activationResult === "already_active" });
       }
-      return NextResponse.json({ status });
-    }
-
-    // 원본은 ZIP이 아니라 R2 객체를 직접 제공한다. 고객 링크를 여는 순간부터 30일을 계산한다.
-    if (
-      proj.status === "preparing" &&
-      status === "selecting" &&
-      !proj.original_download_started_at
-    ) {
-      updatePayload.original_download_started_at = new Date().toISOString();
+      if (activationResult === "insufficient_photos") {
+        return NextResponse.json({ error: "셀렉 목표 장수만큼 사진을 업로드해주세요.", code: "insufficient_photos" }, { status: 409 });
+      }
+      return NextResponse.json({ error: "현재 프로젝트 상태에서는 셀렉을 시작할 수 없습니다.", code: activationResult ?? "activation_failed" }, { status: 409 });
     }
 
     // editing_v2로 전환 시(고객 재보정 요청 처리 경로가 아닌 작가 업로드→검토 전송)
