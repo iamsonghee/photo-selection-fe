@@ -45,6 +45,13 @@ for (const viewport of scenarios) {
         required_count: 1, photo_count: previewRegistered ? 1 : 0, status: "preparing", include_original: true,
         access_token: "test-upload-token", created_at: "2026-09-11T00:00:00Z", updated_at: "2026-09-11T00:00:00Z",
       } }));
+      await page.route("**/rest/v1/photos?**", route => route.fulfill({ json:
+        previewRegistered && new URL(route.request().url()).searchParams.get("offset") === "0" ? [{
+          id: "uploading-original", project_id: projectId, number: 1,
+          r2_thumb_url: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+          r2_preview_url: null, original_filename: "sample.jpg", original_status: "awaiting_upload",
+        }] : [],
+      }));
       await page.route("**/rest/v1/photos?**", route => route.fulfill({ json: [] }));
       await page.route("**/api/photographer/quota", route => route.fulfill({ json: {
         tier: "beta", current: 1, max: 50, maxPhotosPerProject: 1000, betaStatus: "approved",
@@ -166,7 +173,9 @@ for (const viewport of scenarios) {
       await advance(0.25);
       await expect(status).toContainText(/원본 전송 중 · 2[45]%/, { timeout: 20_000 });
       await expect(status).toContainText("0/1장 저장 완료");
-      await expect(page.getByText("원본 업로드 중 · 화면을 닫지 마세요", { exact: true })).toBeVisible();
+      await expect(page.getByText("납품용 원본 업로드 중", { exact: true })).toBeVisible();
+      await expect(page.getByText(/현재 보이는 사진은 셀렉용 미리보기입니다/)).toBeVisible();
+      await expect(page.getByText("원본 누락", { exact: true })).toHaveCount(0);
       await advance(0.75);
       await expect(status).toContainText(/7[45]%/);
       await expect(page.getByRole("button", { name: "셀렉 요청하기", exact: true })).toBeEnabled({ timeout: 15000 });

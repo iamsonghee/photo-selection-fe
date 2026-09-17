@@ -3401,18 +3401,6 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      {isOriginalUploading && (
-        <div className="relative z-20 shrink-0 border-y border-warning/35 bg-warning/10" role="status" aria-live="polite">
-          <div className="mx-auto flex w-full max-w-[1920px] items-start gap-2.5 px-4 py-2.5 md:items-center md:px-12 md:py-3">
-            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-warning md:mt-0" aria-hidden />
-            <div className="min-w-0 md:flex md:items-baseline md:gap-2">
-              <strong className="block text-[13px] font-bold leading-5 text-foreground md:text-sm">원본 업로드 중 · 화면을 닫지 마세요</strong>
-              <span className="block text-[11px] font-medium leading-4 text-muted-foreground md:text-xs">이동하거나 화면을 잠그면 남은 원본을 다시 선택해야 할 수 있습니다.</span>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 모바일도 전체 폭 진행 바 대신 compact 상태를 유지한다. */}
       {mobileProgressBarMounted && (
         <div
@@ -3892,6 +3880,19 @@ export default function ProjectDetailPage() {
             onDragOver={!mobilePhotoManageMode && !isMobileUploadClient() && photoUploadAllowed && uploadPhase === "idle" ? onDragOver : undefined}
             onDragLeave={!mobilePhotoManageMode && !isMobileUploadClient() && photoUploadAllowed && uploadPhase === "idle" ? onDragLeave : undefined}
           >
+            {isOriginalUploading && (
+              <div className="sticky top-3 z-30 mx-auto mb-3 w-[calc(100%_-_24px)] max-w-3xl px-3 md:top-4 md:mb-4" role="status" aria-live="polite">
+                <div className="flex items-start gap-3 rounded-xl border border-warning/35 bg-[color-mix(in_srgb,var(--surface)_92%,var(--warning))] px-3.5 py-3 shadow-[0_8px_24px_rgba(2,56,82,0.14)] md:items-center md:px-4">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-warning/15 text-warning">
+                    <Upload size={16} aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <strong className="block text-[13px] font-bold leading-5 text-foreground md:text-sm">납품용 원본 업로드 중</strong>
+                    <span className="block text-[11px] font-medium leading-4 text-muted-foreground md:text-xs md:leading-5">현재 보이는 사진은 셀렉용 미리보기입니다. 고객에게 전달할 원본 업로드가 끝날 때까지 화면을 닫거나 잠그지 마세요.</span>
+                  </div>
+                </div>
+              </div>
+            )}
             {dragOver && !isMobileUploadClient() && photoUploadAllowed && (
               <div style={{
                 position: "absolute", inset: 0, zIndex: 40, pointerEvents: "none",
@@ -3957,7 +3958,7 @@ export default function ProjectDetailPage() {
                 thumbQueue={thumbQueue}
                 onPhotoClick={handleOpenPhotoViewer}
                 showQualityBadges
-                showOriginalUploadBadges={project.includeOriginal}
+                showOriginalUploadBadges={project.includeOriginal && !navigationGuardActive}
                 groupsById={groupsById}
                 showSimilarityGroups={similarityToggleOn}
                 expandedGroups={expandedGroups}
