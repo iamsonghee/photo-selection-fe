@@ -12,7 +12,7 @@ for (const viewport of scenarios) {
     test.setTimeout(60_000);
     let allowConfirm = () => {};
     let allowPreview = () => {};
-    let finalized = false, recovered = false, previewRegistered = false;
+    let finalized = false, recovered = false, previewRegistered = false, selectionActivated = false;
     const context = await browser.newContext({
       viewport,
       baseURL: testInfo.project.use.baseURL,
@@ -50,6 +50,12 @@ for (const viewport of scenarios) {
         tier: "beta", current: 1, max: 50, maxPhotosPerProject: 1000, betaStatus: "approved",
       } }));
       await page.route("**/api/photographer/project-logs", route => route.fulfill({ json: { ok: true } }));
+      await page.route(`**/api/photographer/projects/${projectId}/status`, async route => {
+        expect(route.request().method()).toBe("PATCH");
+        expect(route.request().postDataJSON()).toEqual({ status: "selecting" });
+        selectionActivated = true;
+        await route.fulfill({ json: { status: "selecting" } });
+      });
       await page.route("**/originals/pending?**", route => route.fulfill({ json: { jobs: viewport.retry && finalized && !recovered ? [{
         id: "test-job", original_filename: "sample.jpg", original_file_size: null, original_last_modified: null, created_at: new Date().toISOString(),
       }] : [] } }));
@@ -154,6 +160,17 @@ for (const viewport of scenarios) {
       // PC는 원본 PUT과 프리뷰 처리를 병렬로 진행한다.
       if (viewport.width >= 768) allowPreview();
       await expect(page.getByRole("button", { name: "셀렉 요청하기", exact: true })).toBeEnabled({ timeout: 15000 });
+      if (viewport.width === 1440 && !viewport.fallback) {
+        await page.getByRole("button", { name: "셀렉 요청하기", exact: true }).click();
+        const requestDialog = page.getByRole("dialog", { name: "고객에게 셀렉 요청하기" });
+        expect(await page.evaluate(() => typeof (window as unknown as { advanceUpload?: unknown }).advanceUpload)).toBe("function");
+        await requestDialog.getByRole("checkbox").check();
+        await requestDialog.getByRole("button", { name: "1장 셀렉 요청하기" }).click();
+        const shareDialog = page.getByRole("dialog", { name: "고객 초대 링크가 활성화되었습니다" });
+        await expect(shareDialog).toBeVisible();
+        expect(selectionActivated).toBe(true);
+        await shareDialog.getByText("닫기", { exact: true }).click();
+      }
       await advance(1, true);
       await expect(status).toContainText("저장 확인 중");
       await expect(status).toContainText("0/1장 저장 완료");
