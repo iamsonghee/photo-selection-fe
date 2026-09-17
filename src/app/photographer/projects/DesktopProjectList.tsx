@@ -11,6 +11,7 @@ import { getActiveDeadline } from "@/lib/project-deadline";
 import { ProjectIdText } from "@/components/photographer/ProjectIdText";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { getSixStepPosition, getDisabledSteps } from "@/components/photographer/ProjectStepper";
+import { OriginalUploadWarningBadge } from "@/components/photographer/OriginalUploadWarningBadge";
 import styles from "./ProjectListTheme.module.css";
 
 export type ListSort = "latest" | "updated" | "deadline" | "name" | "shoot_date";
@@ -92,7 +93,10 @@ export function DesktopProjectList(props: Props) {
         return <tr key={project.id} data-desktop-project-row onClick={goToDetail(project)}>
           <td><div className={styles.identity}><span className={styles.thumbnail}>{project.thumbnailUrl ? <img src={project.thumbnailUrl} alt="" loading="lazy" /> : <span>{project.name.slice(0,2)}</span>}</span><div className={styles.identityText}>
             {/* 표 안의 링크를 사용해 새 탭 열기·키보드 이동도 기본 브라우저 동작을 따른다. */}
-            <Link href={`/photographer/projects/${project.id}`} prefetch={false} onClick={props.onRemember} className={styles.projectName} title={project.name}>{project.name}</Link>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <Link href={`/photographer/projects/${project.id}`} prefetch={false} onClick={props.onRemember} className={`${styles.projectName} min-w-0`} title={project.name}>{project.name}</Link>
+              <OriginalUploadWarningBadge count={project.originalRecoveryCount} />
+            </div>
             <div className={styles.projectMeta}><span className={styles.customerName} title={project.customerName}>{project.customerName || "고객 미등록"}</span>{project.location?.trim() && <span className={styles.location} title={project.location} tabIndex={0} aria-label={`촬영장소: ${project.location}`}><MapPin size={12} aria-hidden/><span>{project.location}</span><span className={styles.locationTooltip}>{project.location}</span></span>}</div><span className={styles.inlineShoot}>촬영 {dateLabel(project.shootDate)}</span><ProjectIdText project={project} className={styles.projectId}/>
           </div></div></td>
           <td className={styles.shootCell}>{dateLabel(project.shootDate)}</td>

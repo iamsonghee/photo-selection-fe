@@ -27,6 +27,7 @@ import { FirstProjectOnboarding } from "@/components/photographer/FirstProjectOn
 import styles from "./ProjectListTheme.module.css";
 import { PhotographerMobilePageHeader } from "@/components/layout/PhotographerMobilePageHeader";
 import { ProjectAssetMobileSheet } from "@/components/photographer/ProjectAssetWorkspaceToolbar";
+import { OriginalUploadWarningBadge } from "@/components/photographer/OriginalUploadWarningBadge";
 
 // ── constants ──────────────────────────────────────────────────────────────
 
@@ -58,6 +59,7 @@ function MobileProjectCard({ project, onNavigate }: { project: Project; onNaviga
         </span>
         <span className="min-w-0 flex-1">
           <span className="line-clamp-2 break-words text-[15px] font-bold leading-5">{project.name}</span>
+          <OriginalUploadWarningBadge count={project.originalRecoveryCount} className="mt-1" />
           <span className="mt-1 block truncate text-xs text-muted-foreground">{project.customerName || "고객 미등록"}</span>
           <span className="mt-1 block text-xs text-muted-foreground">촬영 {formatDate(project.shootDate)}</span>
         </span>

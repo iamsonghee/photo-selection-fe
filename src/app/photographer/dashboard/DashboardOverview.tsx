@@ -10,6 +10,7 @@ import { getActiveDeadline } from "@/lib/project-deadline";
 import { dday, getFocusRankedProjects, getProjectActor } from "@/lib/project-actor";
 import { getDesktopNextAction } from "@/lib/project-next-action";
 import { getDisplayStatusLabel } from "@/lib/project-status";
+import { OriginalUploadWarningBadge } from "@/components/photographer/OriginalUploadWarningBadge";
 import type { Project } from "@/types";
 import styles from "./DashboardTheme.module.css";
 
@@ -56,6 +57,7 @@ function Identity({ project }: { project: Project }) {
     <ProjectThumbnail project={project}/>
     <div>
       <Link href={`/photographer/projects/${project.id}`} prefetch={false} className={styles.name} title={project.name}>{project.name}</Link>
+      <OriginalUploadWarningBadge count={project.originalRecoveryCount} />
       <ProjectMeta project={project}/>
     </div>
   </div>;
@@ -92,6 +94,7 @@ function FeaturedTask({ project }: { project: Project }) {
         <span>가장 먼저 확인</span>
       </div>
       <Link href={`/photographer/projects/${project.id}`} prefetch={false} className={styles.featuredName}>{project.name}</Link>
+      <OriginalUploadWarningBadge count={project.originalRecoveryCount} />
       <ProjectMeta project={project}/>
       <p className={styles.featuredReason}>{getAttentionReason(project)}</p>
       <div className={styles.featuredBottom}>
@@ -194,7 +197,7 @@ export function DashboardOverview({ projects, logs, logsError, onRetryLogs, onCr
           <div className={styles.sectionHeading}><div className={styles.sectionTitleGroup}><h2>최근 변경 프로젝트</h2><p>사진으로 프로젝트를 빠르게 찾아보세요.</p></div><Link href="/photographer/projects">전체 보기<ArrowRight size={13}/></Link></div>
           <div className={styles.recentGrid}>{recent.slice(0, 3).map(project => <Link href={`/photographer/projects/${project.id}`} prefetch={false} key={project.id} className={styles.recentCard}>
             <div className={styles.recentMedia}><ProjectThumbnail project={project}/><span className={styles.actor} data-actor={getProjectActor(project.status)}><i/>{getDisplayStatusLabel(project.status, project.photoCount)}</span></div>
-            <div className={styles.recentBody}><strong>{project.name}</strong><ProjectMeta project={project}/><small>{dateText(project.updatedAt)} 변경</small></div>
+            <div className={styles.recentBody}><strong>{project.name}</strong><OriginalUploadWarningBadge count={project.originalRecoveryCount}/><ProjectMeta project={project}/><small>{dateText(project.updatedAt)} 변경</small></div>
           </Link>)}</div>
         </section>
       </main>

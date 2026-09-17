@@ -125,6 +125,8 @@ export interface Project {
   originalDownloadStartedAt?: string | null;
   /** 런타임 전용 — photos 테이블에서 조회한 첫 번째 사진 썸네일 URL */
   thumbnailUrl?: string | null;
+  /** 런타임 전용 — 원본이 미전송/실패 상태로 남아 복구가 필요한 사진 수 */
+  originalRecoveryCount?: number;
   /** 고객 진입 화면의 대표 사진. 미지정 시 첫 번째 사진을 사용한다. */
   coverPhotoId?: string | null;
   createdAt: string;

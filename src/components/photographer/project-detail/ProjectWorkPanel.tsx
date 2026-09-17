@@ -5,6 +5,7 @@ import type { Project, ProjectStatus } from "@/types";
 import { dday, getProjectActor } from "@/lib/project-actor";
 import { getActiveDeadline } from "@/lib/project-deadline";
 import { formatKstDateTimeDash, toKstShifted } from "@/lib/kst-date";
+import { OriginalUploadWarningBadge } from "@/components/photographer/OriginalUploadWarningBadge";
 
 // 고객 화면(src/lib/customer-api-server.ts)의 ORIGINAL_DOWNLOAD_WINDOW_DAYS /
 // FINAL_DELIVERY_DOWNLOAD_WINDOW_DAYS와 동일한 30일. 그 파일은 Service Role 클라이언트를 쓰는
@@ -97,7 +98,7 @@ export function ProjectWorkPanel({
   const [originalProgress, setOriginalProgress] = useState<OriginalUploadProgress | null>(null);
 
   useEffect(() => {
-    if (!project.includeOriginal || project.status === "preparing") {
+    if (!project.includeOriginal) {
       setOriginalProgress(null);
       return;
     }
@@ -305,9 +306,12 @@ export function ProjectWorkPanel({
             {content.eyebrow}
           </p>
         </div>
-        <span className={`hidden shrink-0 rounded-md px-2 py-1 text-[11px] font-medium leading-4 tracking-[-0.25px] md:inline-flex ${actorBadgeTone}`}>
-          {actorLabel}
-        </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <OriginalUploadWarningBadge count={originalProgress?.needsRecovery} />
+          <span className={`hidden shrink-0 rounded-md px-2 py-1 text-[11px] font-medium leading-4 tracking-[-0.25px] md:inline-flex ${actorBadgeTone}`}>
+            {actorLabel}
+          </span>
+        </div>
       </div>
 
       <div className="mt-3 md:mt-5">

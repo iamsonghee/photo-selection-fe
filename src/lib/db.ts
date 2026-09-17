@@ -194,15 +194,25 @@ export async function getProjectsByPhotographerId(
         .select("id, project_id, r2_thumb_url")
         .in("id", coverPhotoIds)
     : Promise.resolve({ data: [] as Array<{ id: string; project_id: string; r2_thumb_url: string }> });
-  const [{ data: thumbData }, { data: coverThumbData }] = await Promise.all([
+  const recoveryCountRequest = Promise.all(projects.filter(project => project.includeOriginal).map(async project => {
+    const { count } = await supabase
+      .from("photos")
+      .select("id", { count: "exact", head: true })
+      .eq("project_id", project.id)
+      .or("original_status.is.null,original_status.in.(awaiting_upload,failed)");
+    return [project.id, count ?? 0] as const;
+  }));
+  const [{ data: thumbData }, { data: coverThumbData }, recoveryCounts] = await Promise.all([
     firstThumbRequest,
     coverThumbRequest,
+    recoveryCountRequest,
   ]);
 
   const thumbMap: Record<string, string> = Object.fromEntries(
     (thumbData ?? []).map((r) => [r.project_id, r.r2_thumb_url])
   );
   const coverThumbMap = new Map<string, string>();
+  const recoveryCountMap = new Map(recoveryCounts);
   const projectById = new Map(projects.map(project => [project.id, project]));
   for (const row of coverThumbData ?? []) {
     // API가 같은 프로젝트의 사진만 저장하지만, 목록 조회에서도 교차 프로젝트 값을 방어한다.
@@ -214,6 +224,7 @@ export async function getProjectsByPhotographerId(
   return projects.map((project) => ({
     ...project,
     thumbnailUrl: coverThumbMap.get(project.id) ?? thumbMap[project.id] ?? null,
+    originalRecoveryCount: recoveryCountMap.get(project.id) ?? 0,
   }));
 }
 
