@@ -886,6 +886,8 @@ export default function ProjectDetailPage() {
   const sendingSourceTotalRef = useRef(0);      // presigned URL 발급 수 (= 실제 시도 예정)
   const sendingSourceFailedRef = useRef(0);     // PUT/confirm까지 끝내지 못한 원본 수
   const [sendingSourcePhase, setSendingSourcePhase] = useState(false);
+  const [pendingNavigationHref, setPendingNavigationHref] = useState<string | null>(null);
+  const navigationPopBypassRef = useRef(false);
   /** 업로드 미완료(awaiting_upload) 원본 job — 복구 배너 표시용 */
   const recoveryFilesRef = useRef(new Map<string, File>());
   const recoveryBusyRef = useRef(false);
@@ -1086,6 +1088,18 @@ export default function ProjectDetailPage() {
   const isPreviewUploading = uploadPhase === "sending" || uploadPhase === "processing";
   const isOriginalUploading = uploadPhase === "originals";
   const isUploading = isPreviewUploading || isOriginalUploading;
+
+  const requestInternalNavigation = useCallback((href: string) => {
+    if (isOriginalUploading) {
+      setPendingNavigationHref(href);
+      return;
+    }
+    router.push(href);
+  }, [isOriginalUploading, router]);
+
+  useEffect(() => {
+    if (!isOriginalUploading) setPendingNavigationHref(null);
+  }, [isOriginalUploading]);
 
   useEffect(() => {
     if (!isUploading) return;
@@ -1656,6 +1670,41 @@ export default function ProjectDetailPage() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [sendingSourcePhase]);
+
+  // Next.js 내부 링크 이동은 beforeunload를 거치지 않으므로 원본 단계에서 별도로 확인한다.
+  useEffect(() => {
+    if (!isOriginalUploading) return;
+    const handler = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const anchor = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
+      if (!anchor || anchor.target === "_blank" || anchor.hasAttribute("download")) return;
+      const next = new URL(anchor.href, window.location.href);
+      if (next.origin !== window.location.origin || (next.pathname === window.location.pathname && next.search === window.location.search)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setPendingNavigationHref(`${next.pathname}${next.search}${next.hash}`);
+    };
+    document.addEventListener("click", handler, true);
+    return () => document.removeEventListener("click", handler, true);
+  }, [isOriginalUploading]);
+
+  // 브라우저 뒤로/앞으로 가기는 history 이동 뒤 발생하므로 취소하면 원래 항목으로 즉시 복귀한다.
+  useEffect(() => {
+    if (!isOriginalUploading) return;
+    const handler = () => {
+      if (navigationPopBypassRef.current) {
+        navigationPopBypassRef.current = false;
+        return;
+      }
+      const leave = window.confirm("원본 업로드가 진행 중입니다. 지금 이동하면 남은 원본 파일을 다시 선택해야 할 수 있습니다. 그래도 이동할까요?");
+      if (!leave) {
+        navigationPopBypassRef.current = true;
+        window.history.forward();
+      }
+    };
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, [isOriginalUploading]);
 
   // awaiting_upload 상태 job 확인 → 복구 배너. 페이지 최초 로드 시 1회 + 업로드 배치 종료 직후
   // 재확인(원본 presigned PUT이 조용히 실패해도 non-fatal로 삼켜지므로, 업로드 "완료" 시점에
@@ -3299,7 +3348,7 @@ export default function ProjectDetailPage() {
       >
         {/* 축소 상태에서도 프로젝트 이동과 현재 위치를 유지한다. */}
         <div className={themeStyles.compactHeader} aria-hidden={!compactUploadHeader} inert={!compactUploadHeader}>
-          <button type="button" onClick={() => router.push(`/photographer/projects/${id}`)} aria-label="프로젝트 상세로 돌아가기">←</button>
+          <button type="button" onClick={() => requestInternalNavigation(`/photographer/projects/${id}`)} aria-label="프로젝트 상세로 돌아가기">←</button>
           <span title={project.name}>{project.name}</span>
           <strong>원본 업로드</strong>
         </div>
@@ -3313,9 +3362,9 @@ export default function ProjectDetailPage() {
             mobileDense
             breadcrumb={
             <nav aria-label="현재 위치" className="flex items-center gap-2 text-[14px] font-medium leading-[17px] tracking-[-0.15px] text-subtle-foreground">
-              <button type="button" onClick={() => router.push("/photographer/projects")} className="transition-colors hover:text-foreground">프로젝트</button>
+              <button type="button" onClick={() => requestInternalNavigation("/photographer/projects")} className="transition-colors hover:text-foreground">프로젝트</button>
               <ChevronRight size={14} aria-hidden />
-              <button type="button" onClick={() => router.push(`/photographer/projects/${id}`)} className="transition-colors hover:text-foreground">
+              <button type="button" onClick={() => requestInternalNavigation(`/photographer/projects/${id}`)} className="transition-colors hover:text-foreground">
                 {project.name}
               </button>
               <ChevronRight size={14} aria-hidden />
@@ -3335,6 +3384,18 @@ export default function ProjectDetailPage() {
         </div>
         </div>
       </div>
+
+      {isOriginalUploading && (
+        <div className="relative z-20 shrink-0 border-y border-warning/35 bg-warning/10" role="status" aria-live="polite">
+          <div className="mx-auto flex w-full max-w-[1920px] items-start gap-2.5 px-4 py-2.5 md:items-center md:px-12 md:py-3">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-warning md:mt-0" aria-hidden />
+            <div className="min-w-0 md:flex md:items-baseline md:gap-2">
+              <strong className="block text-[13px] font-bold leading-5 text-foreground md:text-sm">원본 업로드 중 · 화면을 닫지 마세요</strong>
+              <span className="block text-[11px] font-medium leading-4 text-muted-foreground md:text-xs">이동하거나 화면을 잠그면 남은 원본을 다시 선택해야 할 수 있습니다.</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 모바일도 전체 폭 진행 바 대신 compact 상태를 유지한다. */}
       {mobileProgressBarMounted && (
@@ -4468,6 +4529,23 @@ export default function ProjectDetailPage() {
         onSavePin={handleSavePin}
       />
 
+      <PhotographerConfirmDialog
+        open={pendingNavigationHref !== null}
+        onClose={() => setPendingNavigationHref(null)}
+        onConfirm={() => {
+          const href = pendingNavigationHref;
+          setPendingNavigationHref(null);
+          if (href) router.push(href);
+        }}
+        title="원본 업로드가 진행 중입니다"
+        description="지금 이동하면 진행 중인 원본 전송이 중단될 수 있습니다."
+        detail="나중에 복구할 수 있지만, 남은 원본 파일을 다시 선택해야 할 수 있습니다."
+        cancelLabel="업로드 계속"
+        confirmLabel="그래도 이동"
+        tone="danger"
+        compact
+      />
+
       <CustomerSelectionRequestModal
         key={selectionRequestModalOpen ? "selection-request-open" : "selection-request-closed"}
         open={selectionRequestModalOpen}
@@ -4502,7 +4580,7 @@ export default function ProjectDetailPage() {
             <PhotographerLightButton
               type="button"
               variant="primary"
-              onClick={() => { setShowEditGuideModal(false); router.push(`/photographer/projects/${id}/results`); }}
+              onClick={() => { setShowEditGuideModal(false); requestInternalNavigation(`/photographer/projects/${id}/results`); }}
               className="flex-1"
             >
               셀렉 결과 보기<ChevronRight size={12} />

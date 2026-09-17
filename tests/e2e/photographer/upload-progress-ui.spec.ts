@@ -154,6 +154,14 @@ for (const viewport of scenarios) {
       await advance(0.25);
       await expect(status).toContainText(/원본 전송 중 · 2[45]%/, { timeout: 20_000 });
       await expect(status).toContainText("0/1장 저장 완료");
+      await expect(page.getByText("원본 업로드 중 · 화면을 닫지 마세요", { exact: true })).toBeVisible();
+      if (viewport.width === 1440 && !viewport.fallback) {
+        await page.getByRole("navigation", { name: "현재 위치" }).getByRole("button", { name: "프로젝트", exact: true }).click();
+        const leaveDialog = page.getByRole("dialog", { name: "원본 업로드가 진행 중입니다" });
+        await expect(leaveDialog).toBeVisible();
+        await leaveDialog.getByRole("button", { name: "업로드 계속" }).click();
+        await expect(page).toHaveURL(url);
+      }
       await advance(0.75);
       await expect(status).toContainText(/7[45]%/);
       await expect(page.getByRole("button", { name: "셀렉 요청하기", exact: true })).toBeEnabled({ timeout: 15000 });
