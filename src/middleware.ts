@@ -156,6 +156,14 @@ async function getCustomerPin(token: string): Promise<CustomerPinLookup> {
 export async function middleware(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
 
+  // 레거시 Vercel 기본 도메인 접속을 정식 도메인으로 영구 리다이렉트한다.
+  if (req.headers.get("host") === "acut.vercel.app") {
+    const url = req.nextUrl.clone();
+    url.protocol = "https";
+    url.host = "acut.kr";
+    return NextResponse.redirect(url, 308);
+  }
+
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     return handleAdminGate(req);
   }
@@ -220,5 +228,6 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  matcher: ["/c/:token", "/c/:token/:path+", "/admin", "/admin/:path*"],
+  // 도메인 리다이렉트를 모든 경로에서 처리하기 위해 매처를 정적 자산 제외 전체로 넓힌다.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
