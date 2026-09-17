@@ -50,6 +50,18 @@ export async function DELETE(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // 삭제로 사진/개인정보가 사라지기 전에 비식별 통계 스냅샷을 남긴다. 실패해도 삭제 자체는 막지 않는다.
+    try {
+      const { error: summaryError } = await admin.rpc("record_project_deletion_summary", {
+        p_project_id: id,
+      });
+      if (summaryError) {
+        console.warn("[DELETE projects] deletion summary capture failed (continuing):", summaryError);
+      }
+    } catch (e) {
+      console.warn("[DELETE projects] deletion summary capture failed (continuing):", e);
+    }
+
     const backendUrl = process.env.BACKEND_URL ?? process.env.API_URL ?? "http://localhost:8000";
     const supabase = await createClient();
     const {
