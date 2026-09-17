@@ -209,10 +209,11 @@
 /* 품질 경고(눈감음·흔들림) — 고객 갤러리(.gl-quality-badge)와 **같은 자리(우측 상단)·같은 크기**다.
  * 같은 사진의 같은 사실을 두 화면에서 보는데 자리가 다르면 같은 것으로 읽히지 않는다.
  * 유사컷 배지는 우측 하단이라 겹치지 않는다. */
-.qualityBadges {
-  position: absolute; right: 6px; top: 6px; z-index: 7;
-  display: flex; gap: 4px; pointer-events: none;
-}
+.statusBadges { position: absolute; right: 6px; top: 6px; z-index: 7; display: flex; align-items: center; gap: 4px; pointer-events: none; }
+.qualityBadges { display: flex; gap: 4px; }
+.originalMissingBadge, .listOriginalMissingBadge { display: inline-flex; flex-shrink: 0; align-items: center; gap: 3px; color: var(--warning); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.originalMissingBadge { min-height: 20px; border-radius: 5px; background: rgba(255, 255, 255, .94); padding: 2px 6px; box-shadow: 0 1px 4px rgba(2, 56, 82, .2); }
+.listOriginalMissingBadge { border-radius: 4px; background: color-mix(in srgb, var(--warning) 10%, transparent); padding: 2px 5px; }
 .qualityBadge {
   width: 20px; height: 20px; border-radius: 5px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -251,6 +252,11 @@
 .listComment { min-width: 0; overflow: hidden; color: var(--subtle-foreground); font-size: 13px; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
 .listCommentActive { color: var(--customer-foreground); font-weight: 500; }
 .listStatus { display: flex; min-width: 0; align-items: center; }
+
+@media (max-width: 767px) {
+  .statusBadges { right: 4px; top: 4px; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .originalMissingBadge { min-height: 18px; padding: 2px 4px; font-size: 9px; }
+}
 
 @media (max-width: 767px) {
   .galleryGrid { padding-top: 10px !important; }

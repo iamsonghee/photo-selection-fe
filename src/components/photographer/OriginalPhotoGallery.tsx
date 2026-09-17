@@ -69,6 +69,8 @@ export type OriginalPhotoGalleryProps = {
   /** 같은 사진 골격에서 화면 목적에 맞는 metadata만 바꾼다. */
   /** 눈감음·흔들림 경고 배지를 사진 위에 표시한다(Gemini Flash 품질 판정, `Photo`에 실려 온다) */
   showQualityBadges?: boolean;
+  /** 원본 포함 업로드 화면에서 미전송·실패 원본을 사진별로 표시한다. */
+  showOriginalUploadBadges?: boolean;
   variant?: "original" | "selection" | "retouched" | "final";
   getSecondaryText?: (photo: Photo) => string;
   readableComments?: boolean;
@@ -169,6 +171,8 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
   const name = fileName(photo, index);
   const selectionVariant = props.variant === "selection";
   const secondaryText = props.getSecondaryText?.(photo)?.trim() ?? "";
+  const originalMissing = props.showOriginalUploadBadges && !photo.isPending
+    && (photo.originalStatus == null || photo.originalStatus === "awaiting_upload" || photo.originalStatus === "failed");
   const longPressTimerRef = useRef<number | null>(null);
   const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
   const didLongPressRef = useRef(false);
@@ -272,21 +276,18 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
         {(props.recommendedPhotoIds?.has(photo.id) ?? photo.photographerRecommended) ? (
           <span className={styles.recommendBadge} aria-label="작가 추천"><RecommendationMark size={12} aria-hidden /><span>작가 추천</span></span>
         ) : null}
-        {/* 눈감음·흔들림 경고. 고객 갤러리와 같은 규칙으로 **둘 다 해당하면 나란히** 보여준다 —
-          * 원인이 다른 문제라 하나로 합치면 무엇을 확인해야 할지 알 수 없다.
-          * 눈감음은 인물이 감지된 사진에서만 의미가 있다(`faceDetected`가 전제). */}
-        {props.showQualityBadges && (photo.isBlurry === true || (photo.faceDetected === true && photo.eyesClosed === true)) ? (
-          <span className={styles.qualityBadges} aria-hidden>
-            {photo.isBlurry === true ? (
-              <span className={styles.qualityBadge} title="흐림 의심 (흔들림 또는 초점)">
-                <AlertTriangle size={12} />
+        {(originalMissing || (props.showQualityBadges && (photo.isBlurry === true || (photo.faceDetected === true && photo.eyesClosed === true)))) ? (
+          <span className={styles.statusBadges}>
+            {originalMissing ? (
+              <span className={styles.originalMissingBadge} title="납품용 원본 파일이 업로드되지 않았습니다.">
+                <AlertTriangle size={11} aria-hidden />원본 누락
               </span>
             ) : null}
-            {photo.faceDetected === true && photo.eyesClosed === true ? (
-              <span className={styles.qualityBadge} title="눈 감음 의심">
-                <EyeOff size={12} />
-              </span>
-            ) : null}
+            {/* 눈감음·흔들림 경고는 원인이 다르므로 둘 다 해당하면 나란히 표시한다. */}
+            {props.showQualityBadges && (photo.isBlurry === true || (photo.faceDetected === true && photo.eyesClosed === true)) ? <span className={styles.qualityBadges} aria-hidden>
+              {photo.isBlurry === true ? <span className={styles.qualityBadge} title="흐림 의심 (흔들림 또는 초점)"><AlertTriangle size={12} /></span> : null}
+              {photo.faceDetected === true && photo.eyesClosed === true ? <span className={styles.qualityBadge} title="눈 감음 의심"><EyeOff size={12} /></span> : null}
+            </span> : null}
           </span>
         ) : null}
         {props.showSimilarityGroups && (representative || expanded) && group && group.photoCount > 1 ? (
@@ -621,6 +622,8 @@ function ListGallery(props: OriginalPhotoGalleryProps) {
             const name = fileName(photo, row.index);
             const group = photo.similarityGroupId ? props.groupsById?.get(photo.similarityGroupId) : undefined;
             const secondaryText = props.getSecondaryText?.(photo)?.trim() ?? "";
+            const originalMissing = props.showOriginalUploadBadges && !photo.isPending
+              && (photo.originalStatus == null || photo.originalStatus === "awaiting_upload" || photo.originalStatus === "failed");
             const retouchedPhoto = retouchedVariant ? props.getRetouchedPhoto?.(photo) : null;
             const finalPhoto = finalVariant ? props.getRetouchedPhoto?.(photo) : null;
             const retouchedFilename = retouchedVariant || finalVariant ? (props.getRetouchedFilename?.(photo) || "") : "";
@@ -671,6 +674,7 @@ function ListGallery(props: OriginalPhotoGalleryProps) {
                     <div className={styles.listFile} role="cell">
                       <button data-original-photo-list-thumbnail type="button" className={styles.listThumbnail} onClick={(event) => props.selectionOnHover && (event.shiftKey || event.metaKey || event.ctrlKey) ? props.onToggleSelected?.(photo.id, { range: event.shiftKey }) : props.onPhotoClick(row.index)} aria-label={`${name} 상세 보기`}><QueuedImage photo={photo} scrollRef={props.scrollRef} thumbQueue={props.thumbQueue} /></button>
                       <TruncatedTextTooltip text={name} className={styles.listFilename} />
+                      {originalMissing ? <span className={styles.listOriginalMissingBadge}><AlertTriangle size={11} aria-hidden />원본 누락</span> : null}
                       {(props.recommendedPhotoIds?.has(photo.id) ?? photo.photographerRecommended) ? (
                         <span className={styles.listRecommendBadge}><RecommendationMark size={12} aria-hidden />작가 추천</span>
                       ) : null}

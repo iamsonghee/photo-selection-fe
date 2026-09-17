@@ -3941,6 +3941,7 @@ export default function ProjectDetailPage() {
                 thumbQueue={thumbQueue}
                 onPhotoClick={handleOpenPhotoViewer}
                 showQualityBadges
+                showOriginalUploadBadges={project.includeOriginal}
                 groupsById={groupsById}
                 showSimilarityGroups={similarityToggleOn}
                 expandedGroups={expandedGroups}

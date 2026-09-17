@@ -230,9 +230,13 @@ test("activated project can reopen the upload page only to recover unfinished or
     } }));
     await page.route("**/rest/v1/projects?**", route => route.fulfill({ json: {
       id: projectId, photographer_id: projectId, name: "원본 복구 검증", customer_name: "테스트",
-      required_count: 1, photo_count: 1, status: "selecting", include_original: true,
+      required_count: 1, photo_count: 2, status: "selecting", include_original: true,
       access_token: "test-upload-token", created_at: "2026-09-17T00:00:00Z", updated_at: "2026-09-17T00:00:00Z",
     } }));
+    await page.route("**/rest/v1/photos?**", route => route.fulfill({ json: new URL(route.request().url()).searchParams.get("offset") === "0" ? [
+      { id: "missing-original", project_id: projectId, number: 1, r2_thumb_url: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", r2_preview_url: null, original_filename: "missing.jpg", original_status: "awaiting_upload" },
+      { id: "processing-original", project_id: projectId, number: 2, r2_thumb_url: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", r2_preview_url: null, original_filename: "processing.jpg", original_status: "processing" },
+    ] : [] }));
     await page.route("**/api/photographer/quota", route => route.fulfill({ json: {
       tier: "beta", current: 1, max: 50, maxPhotosPerProject: 1000, betaStatus: "approved",
     } }));
@@ -243,6 +247,8 @@ test("activated project can reopen the upload page only to recover unfinished or
     await page.goto(`/photographer/projects/${projectId}/upload?recover=1`);
     await expect(page).toHaveURL(/\/upload\?recover=1$/);
     await expect(page.getByText("원본 1장 확인 필요 · 완료된 사진은 다시 보내지 않습니다", { exact: true })).toBeVisible();
+    await expect(page.locator("[data-original-photo-card]").filter({ hasText: "원본 누락" })).toHaveCount(1);
+    await expect(page.locator("[data-original-photo-card]").filter({ hasText: "processing.jpg" }).getByText("원본 누락", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "사진 추가" })).toHaveCount(0);
   } finally {
     await context.close();
