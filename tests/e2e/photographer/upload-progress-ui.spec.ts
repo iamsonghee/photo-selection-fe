@@ -150,8 +150,13 @@ for (const viewport of scenarios) {
       }
       const status = viewport.width < 768 ? page.locator(".prj-mobile-progress [role=status]") : page.locator(".prj-upload-bottom-status");
       if (viewport.width === 1440 && !viewport.fallback) {
-        await page.getByRole("navigation", { name: "현재 위치" }).getByRole("button", { name: "업로드 진행률 검증", exact: true }).click();
         const leaveDialog = page.getByRole("dialog", { name: "사진 업로드가 진행 중입니다" });
+        await expect.poll(() => page.evaluate(() => window.history.state?.acutUploadGuard)).toBe(true);
+        await page.evaluate(() => window.history.back());
+        await expect(leaveDialog).toBeVisible();
+        await leaveDialog.getByRole("button", { name: "업로드 계속" }).click();
+        await expect(page).toHaveURL(url);
+        await page.getByRole("navigation", { name: "현재 위치" }).getByRole("button", { name: "업로드 진행률 검증", exact: true }).click();
         await expect(leaveDialog).toBeVisible();
         await leaveDialog.getByRole("button", { name: "업로드 계속" }).click();
         await expect(page).toHaveURL(url);

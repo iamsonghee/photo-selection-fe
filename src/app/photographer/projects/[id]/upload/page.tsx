@@ -92,6 +92,7 @@ const ORIGINAL_PC_CONCURRENCY_FAST = 6;
 const MOBILE_BATCH_SIZE = 5;
 const MOBILE_CONCURRENCY = 1;
 const ACCEPT_TYPES = "image/*,image/heic,image/heif";
+const BROWSER_BACK_TARGET = "__acut_browser_back__";
 const RAW_EXTENSIONS = new Set([
   ".cr2", ".cr3", ".nef", ".nrw", ".arw", ".srf", ".sr2",
   ".dng", ".raf", ".rw2", ".orf", ".pef", ".ptx", ".srw",
@@ -888,6 +889,7 @@ export default function ProjectDetailPage() {
   const [sendingSourcePhase, setSendingSourcePhase] = useState(false);
   const [pendingNavigationHref, setPendingNavigationHref] = useState<string | null>(null);
   const navigationPopBypassRef = useRef(false);
+  const uploadHistoryGuardRef = useRef(false);
   /** 업로드 미완료(awaiting_upload) 원본 job — 복구 배너 표시용 */
   const recoveryFilesRef = useRef(new Map<string, File>());
   const recoveryBusyRef = useRef(false);
@@ -1088,6 +1090,7 @@ export default function ProjectDetailPage() {
   const isPreviewUploading = uploadPhase === "sending" || uploadPhase === "processing";
   const isOriginalUploading = uploadPhase === "originals";
   const isUploading = isPreviewUploading || isOriginalUploading;
+  const navigationGuardActive = isUploading || recoveryBusy;
 
   const requestInternalNavigation = useCallback((href: string) => {
     if (uploadInProgressRef.current) {
@@ -1098,8 +1101,23 @@ export default function ProjectDetailPage() {
   }, [router]);
 
   useEffect(() => {
-    if (!isUploading) setPendingNavigationHref(null);
-  }, [isUploading]);
+    if (!navigationGuardActive) setPendingNavigationHref(null);
+  }, [navigationGuardActive]);
+
+  // 업로드 중에는 같은 URL의 history 항목을 하나 더 둬 브라우저 뒤로가기가
+  // Next.js 라우트를 먼저 이탈하기 전에 현재 화면에서 멈추게 한다.
+  useEffect(() => {
+    if (navigationGuardActive && !uploadHistoryGuardRef.current) {
+      window.history.pushState({ ...window.history.state, acutUploadGuard: true }, "", window.location.href);
+      uploadHistoryGuardRef.current = true;
+      return;
+    }
+    if (!navigationGuardActive && uploadHistoryGuardRef.current) {
+      uploadHistoryGuardRef.current = false;
+      navigationPopBypassRef.current = true;
+      window.history.back();
+    }
+  }, [navigationGuardActive]);
 
   useEffect(() => {
     if (!isUploading) return;
@@ -1639,11 +1657,11 @@ export default function ProjectDetailPage() {
   }, [isMobile, isUploading, uploadError, showRecoveryBanner, recoveryBusy]);
 
   useEffect(() => {
-    if (!isUploading) return;
+    if (!navigationGuardActive) return;
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [isUploading]);
+  }, [navigationGuardActive]);
 
   // iOS에서 업로드 중 앱 전환/화면 잠금 감지 → 복귀 시 경고
   useEffect(() => {
@@ -1688,19 +1706,17 @@ export default function ProjectDetailPage() {
     return () => document.removeEventListener("click", handler, true);
   }, []);
 
-  // 브라우저 뒤로/앞으로 가기는 history 이동 뒤 발생하므로 취소하면 원래 항목으로 즉시 복귀한다.
+  // 브라우저 뒤로가기는 위의 같은-URL guard 항목에서 멈춘 뒤 공통 확인 모달로 처리한다.
   useEffect(() => {
     const handler = () => {
-      if (!uploadInProgressRef.current) return;
       if (navigationPopBypassRef.current) {
         navigationPopBypassRef.current = false;
         return;
       }
-      const leave = window.confirm("사진 업로드가 진행 중입니다. 지금 이동하면 완료되지 않은 사진을 다시 선택해야 할 수 있습니다. 그래도 이동할까요?");
-      if (!leave) {
-        navigationPopBypassRef.current = true;
-        window.history.forward();
-      }
+      if (!uploadInProgressRef.current || !uploadHistoryGuardRef.current) return;
+      setPendingNavigationHref(BROWSER_BACK_TARGET);
+      navigationPopBypassRef.current = true;
+      window.history.forward();
     };
     window.addEventListener("popstate", handler);
     return () => window.removeEventListener("popstate", handler);
@@ -4536,7 +4552,11 @@ export default function ProjectDetailPage() {
         onConfirm={() => {
           const href = pendingNavigationHref;
           setPendingNavigationHref(null);
-          if (href) router.push(href);
+          if (href === BROWSER_BACK_TARGET) {
+            uploadHistoryGuardRef.current = false;
+            navigationPopBypassRef.current = true;
+            window.history.go(window.history.state?.acutUploadGuard ? -2 : -1);
+          } else if (href) router.push(href);
         }}
         title="사진 업로드가 진행 중입니다"
         description="지금 이동하면 진행 중인 사진 업로드가 중단됩니다."
