@@ -119,9 +119,13 @@ body:has(.ac-landing) {
 .ac-capabilities span { display: block; color: var(--ac-muted); font-size: 14px; line-height: 1.7; word-break: keep-all; }
 .ac-capabilities small { display: inline-block; font-size: 12px; margin-left: 6px; color: #9f350c; }
 .ac-footer { border-top: 1px solid var(--ac-line); background: #fff; }
-.ac-footer-inner { display: flex; align-items: center; gap: 24px; padding-block: 26px; font-size: 13px; }
+.ac-footer-inner { padding-block: 26px; font-size: 13px; }
+.ac-footer-main { display: flex; align-items: center; gap: 24px; }
 .ac-footer p { color: #777c72; margin-right: auto; }
 .ac-footer small { font-size: 12px; color: #777c72; }
+.ac-footer-business { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 14px; font-size: 11px !important; line-height: 1.7; color: #8a8e86 !important; word-break: keep-all; overflow-wrap: anywhere; }
+.ac-footer-business span:first-child { flex-basis: 100%; }
+.ac-footer-business a { color: inherit; }
 @media (max-width: 1000px) {
   .ac-preview-sidebar { display: none; }
   .ac-preview-stage { padding-left: 18px; padding-right: 130px; }
@@ -129,7 +133,7 @@ body:has(.ac-landing) {
   .ac-phone { right: -6px; width: 212px; }
   .ac-results-heading > span { display: none; }
   .ac-capabilities { gap: 20px; }
-  .ac-footer-inner { flex-wrap: wrap; gap: 16px; }
+  .ac-footer-main { flex-wrap: wrap; gap: 16px; }
 }
 @media (max-width: 700px) {
   .ac-container { width: calc(100% - 40px); }
@@ -165,10 +169,13 @@ body:has(.ac-landing) {
   .ac-preview figcaption { line-height: 1.8; padding-inline: 7px; }
   .ac-capabilities { grid-template-columns: 1fr; gap: 23px; padding-top: 25px; margin-top: 25px; }
   .ac-capabilities span { font-size: 14px; }
-  .ac-footer-inner { gap: 18px; padding-block: 24px; }
+  .ac-footer-inner { padding-block: 24px; }
+  .ac-footer-main { gap: 18px; }
   .ac-footer p { display: none; }
-  .ac-footer-inner > a:first-child { width: 100%; }
-  .ac-footer small { width: 100%; }
+  .ac-footer-main > a:first-child { width: 100%; }
+  .ac-footer-main > small { width: 100%; }
+  .ac-footer-business { display: block; margin-top: 16px; line-height: 1.75; }
+  .ac-footer-business span { display: block; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ac-landing *, .ac-landing *::before, .ac-landing *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

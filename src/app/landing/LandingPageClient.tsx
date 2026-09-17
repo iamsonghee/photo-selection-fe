@@ -61,7 +61,21 @@ export function LandingPageClient({ limits }: { limits: PlanLimits }) {
           <LandingStory limits={limits} onStart={handleStart} />
         </main>
         {authOpen && <AuthModal isOpen onClose={() => setAuthOpen(false)} redirectPath="/photographer/dashboard" />}
-        <footer className="ac-footer"><div className="ac-container ac-footer-inner"><BrandLogoBar size="sm" variant="customerEntry" /><p>사진에 집중할 수 있도록.</p><Link prefetch={false} href="/beta/apply">클로즈드 베타 신청<ArrowRight size={14} /></Link><small>© {new Date().getFullYear()} A-CUT</small></div></footer>
+        <footer className="ac-footer">
+          <div className="ac-container ac-footer-inner">
+            <div className="ac-footer-main">
+              <BrandLogoBar size="sm" variant="customerEntry" />
+              <p>사진에 집중할 수 있도록.</p>
+              <Link prefetch={false} href="/beta/apply">클로즈드 베타 신청<ArrowRight size={14} /></Link>
+              <small>© {new Date().getFullYear()} A-CUT</small>
+            </div>
+            <small className="ac-footer-business">
+              <span>A-CUT은 순한설기가 운영하는 사진 셀렉·보정 관리 서비스입니다.</span>
+              <span>상호: 순한설기 | 대표자: 심효순 | 사업자등록번호: 890-18-01386</span>
+              <span>문의: <a href="mailto:multihatter@gmail.com">multihatter@gmail.com</a></span>
+            </small>
+          </div>
+        </footer>
       </div>
     </>
   );
