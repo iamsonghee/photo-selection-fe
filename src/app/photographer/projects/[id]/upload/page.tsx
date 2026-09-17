@@ -30,7 +30,7 @@ import { parseBetaLimitError, DEFAULT_BETA_MAX_PHOTOS_PER_PROJECT } from "@/lib/
 import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 import { compressImagesInParallel, type UploadSourceMetadata } from "@/lib/upload-client-compress";
 import { UploadTelemetry, UPLOAD_SAMPLE_MS, describeUpload, formatUploadBytes, type UploadSnapshot, type UploadStage } from "@/lib/upload-telemetry";
-import { AdaptiveUploadConcurrency, UploadWorkQueue, uploadDeferred, UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
+import { AdaptiveUploadConcurrency, MobilePreviewPriorityGate, UploadWorkQueue, uploadDeferred, UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import type { Project, ProjectStatus, Photo, PhotoGroupInfo } from "@/types";
 import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
@@ -91,6 +91,7 @@ const ORIGINAL_PC_CONCURRENCY_FAST = 6;
  * 그 병렬 처리량의 일부만 쓰고 만다 — 5로 맞춰 요청당 서버 병렬성을 그대로 채운다. */
 const MOBILE_BATCH_SIZE = 5;
 const MOBILE_CONCURRENCY = 1;
+const MOBILE_PREVIEWS_PER_ORIGINAL = 5;
 const ACCEPT_TYPES = "image/*,image/heic,image/heif";
 const RAW_EXTENSIONS = new Set([
   ".cr2", ".cr3", ".nef", ".nrw", ".arw", ".srf", ".sr2",
@@ -1762,6 +1763,9 @@ export default function ProjectDetailPage() {
     const originalConcurrencyInitial = 1;
     const originalConcurrencyAfterPreviews = mobileUploadClient ? 1 : Math.min(2, originalConcurrencyMax);
     const originalQueue = new UploadWorkQueue(originalConcurrencyInitial);
+    const mobilePreviewPriority = inclOrig && mobileUploadClient
+      ? new MobilePreviewPriorityGate(MOBILE_PREVIEWS_PER_ORIGINAL)
+      : null;
     let adaptiveOriginalConcurrency: AdaptiveUploadConcurrency | null = null;
     const previewConcurrency = inclOrig ? Math.min(2, concurrency) : concurrency;
     const reservationPromises = new Map<number, Promise<OriginalPresignedItem | null>>();
@@ -1866,6 +1870,7 @@ export default function ProjectDetailPage() {
         }
         const registered = await originalResults[index].promise;
         if (!registered) { telemetry.originalStage(index, null); return; }
+        await mobilePreviewPriority?.waitForOriginal();
         const { job } = registered;
         let jobToken = registered.token;
         if (stopRequestedRef.current && earlyOk !== true) {
@@ -2045,6 +2050,7 @@ export default function ProjectDetailPage() {
             }
 
             if (inclOrig && rawFile) {
+              mobilePreviewPriority?.recordPreview();
               const job = okBody.original_presigned?.[0];
               if (job) {
                 batchStage(batchIndex, "ready");
@@ -2374,6 +2380,7 @@ export default function ProjectDetailPage() {
     }
 
     originalResults.forEach(result => result.resolve(null));
+    mobilePreviewPriority?.finishPreviews();
     if (inclOrig && !abortReason && !stopRequestedRef.current) {
       // 이 시점에는 모든 preview 요청과 photos INSERT가 끝났다. 원본 queue는 계속 두되
       // 프로젝트/사진 수를 먼저 갱신해 고객 셀렉 요청을 즉시 열 수 있게 한다.

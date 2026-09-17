@@ -28,6 +28,39 @@ export class UploadWorkQueue {
   }
 }
 
+/** 모바일 단일 네트워크 슬롯에서 프리뷰 묶음마다 원본 한 장만 통과시킨다. */
+export class MobilePreviewPriorityGate {
+  private registeredPreviews = 0;
+  private startedOriginals = 0;
+  private previewsFinished = false;
+  private waiters: (() => void)[] = [];
+
+  constructor(private readonly previewsPerOriginal: number) {
+    if (!Number.isInteger(previewsPerOriginal) || previewsPerOriginal < 1) throw new Error("Invalid preview burst");
+  }
+
+  recordPreview() {
+    this.registeredPreviews++;
+    this.releaseWaiters();
+  }
+
+  finishPreviews() {
+    this.previewsFinished = true;
+    this.releaseWaiters();
+  }
+
+  async waitForOriginal() {
+    while (!this.previewsFinished && this.registeredPreviews < (this.startedOriginals + 1) * this.previewsPerOriginal) {
+      await new Promise<void>((resolve) => this.waiters.push(resolve));
+    }
+    this.startedOriginals++;
+  }
+
+  private releaseWaiters() {
+    this.waiters.splice(0).forEach((resolve) => resolve());
+  }
+}
+
 export type AdaptiveUploadConcurrencyReport = {
   initial: number;
   current: number;

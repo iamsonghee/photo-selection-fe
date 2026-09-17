@@ -32,7 +32,7 @@
 3. **모든 파일**을 브라우저에서 압축(`include_original` 여부와 무관하게 항상 실행). 업로드 화면 전용 `compressImagesInParallel()`이 워커 풀로 producer-consumer 파이프라인의 batch를 압축한다. 비원본은 PC 8장/모바일 3장이고, 원본 포함은 예약·job 연결을 위해 1장 batch를 유지하되 PC에서 2~3개 batch를 한 압축 라운드로 묶는다. 모바일은 워커 1개다(§FE 배치·동시성·파이프라인 구조 참고). 여기서 모바일은 iPhone/iPad와 Android 휴대폰·태블릿을 뜻한다. 그 외 화면(설정 프로필 이미지, 보정본 업로드 등)은 싱글턴 워커 기반 `compressImageForUpload()`를 그대로 사용 — 두 진입점 모두 실제 압축 로직은 `compressWithWorker()`를 공유한다.
 4. 파일 선택 시 각 파일에 세션 내 고정 UUID(`client_upload_id`)를 부여하고 압축 결과와 함께 FormData로 FastAPI `POST /api/upload/photos`에 보낸다. 모든 업로드에 원본 `File`의 이름/크기/MIME/수정 시각과, 압축 디코딩에서 얻은 경우 `source_widths/source_heights`를 함께 보낸다. 직접 호출 재시도와 Next 프록시 fallback도 같은 UUID를 재사용한다.
 5. `include_original=true`이면 producer가 압축과 함께 `POST /originals/presign` 예약을 시작한다. 원본 큐는 예약 URL로 raw `File`을 직접 PUT하고, 미리보기 큐는 예약 결과 확인 + 압축 완료 후 `/photos`를 보낸다. `/photos`에는 선발급 성공 시 `early_original_upload=true`를 함께 보내며 서버는 예약 lease를 갱신한다. 사진/job 등록 응답은 원본 큐에 전달하고 미리보기 lane은 다음 사진으로 진행한다.
-6. 원본 큐는 PUT와 사진/job 등록이 모두 끝난 뒤 기존 confirm/recover로 저장을 확인한다. 모바일은 요청 슬롯을 1개로 공유하므로 예약만 먼저 만들고 `/photos`로 프리뷰 row를 등록한 뒤 원본 PUT을 시작한다. 모든 프리뷰 row가 등록되면 원본 큐가 남아 있어도 고객 셀렉 요청을 열 수 있으며, 업로드 세션의 완료 토스트와 finalize는 모든 원본 작업이 끝날 때까지 기다린다.
+6. 원본 큐는 PUT와 사진/job 등록이 모두 끝난 뒤 기존 confirm/recover로 저장을 확인한다. 모바일은 요청 슬롯을 1개로 공유하며 프리뷰 row 5장을 등록할 때마다 원본 1장을 전송한다. 모든 프리뷰 등록이 끝나면 남은 원본을 순서대로 전송한다. 프리뷰 row가 모두 등록되면 원본 큐가 남아 있어도 고객 셀렉 요청을 열 수 있으며, 업로드 세션의 완료 토스트와 finalize는 모든 원본 작업이 끝날 때까지 기다린다.
 7. 선발급 미지원/실패 시 기존 `/photos` 응답 URL을 사용하는 경로로 폴백한다. 이미 등록된 사진의 presign 예약은 `deferred=true`를 반환하여 불필요한 선전송 덮어쓰기를 피한다.
 
 ### FastAPI (`upload.py`)
@@ -246,7 +246,7 @@ HEIC/PNG/WebP → JPEG로 변환된다. `include_original=true`일 때는 이 �
 | `include_original=true`, PC | **1장/배치** | 4(기본), 고사양 기기+빠른 회선이면 6 | `ORIGINAL_PC_CONCURRENCY=4`, `ORIGINAL_PC_CONCURRENCY_FAST=6` |
 | `include_original=true`, Mobile | **1장/배치** | 1 | `getDesktopUploadConcurrency` 미적용, 고정 1 |
 
-`include_original=true`는 파일별 예약·job·원본 결과를 연결하기 위해 1장 batch를 유지한다. 표의 동시성은 `requestSlots`의 전체 요청 상한이다. PC 미리보기 lane은 최대 2개이며, 프리뷰 등록 중 원본 큐는 1개로 제한한다. 모든 프리뷰 row가 등록되면 원본 큐를 2개로 높이고 256KB 이상·500ms 이상 걸린 원본 PUT을 표본으로 적응 조절한다. 범위는 1~`requestSlots-1`이고 전체 요청은 기존 상한 4/6을 넘지 않는다. 모바일은 프리뷰 등록을 먼저 끝낸 뒤 원본을 1개씩 전송한다.
+`include_original=true`는 파일별 예약·job·원본 결과를 연결하기 위해 1장 batch를 유지한다. 표의 동시성은 `requestSlots`의 전체 요청 상한이다. PC 미리보기 lane은 최대 2개이며, 프리뷰 등록 중 원본 큐는 1개로 제한한다. 모든 프리뷰 row가 등록되면 원본 큐를 2개로 높이고 256KB 이상·500ms 이상 걸린 원본 PUT을 표본으로 적응 조절한다. 범위는 1~`requestSlots-1`이고 전체 요청은 기존 상한 4/6을 넘지 않는다. 모바일은 동시 전송 1개를 유지하면서 프리뷰 5장마다 원본 1장을 보내고, 프리뷰 등록이 끝나면 남은 원본을 이어 보낸다.
 
 ### 모든 기기: producer-consumer 파이프라인 (2026-08-07 모바일 적용)
 
