@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { AdaptiveUploadConcurrency, MobilePreviewPriorityGate, UploadWorkQueue, uploadDeferred } from "../../../src/lib/upload-work-queue";
+import { AdaptiveUploadConcurrency, UploadWorkQueue, uploadDeferred } from "../../../src/lib/upload-work-queue";
 import { UploadTelemetry, describeUpload } from "../../../src/lib/upload-telemetry";
 
 test("request slots cap concurrency and recover capacity after rejection", async () => {
@@ -20,26 +20,6 @@ test("request slots cap concurrency and recover capacity after rejection", async
   gates[1].resolve(); gates[2].resolve();
   expect((await settled)[0].status).toBe("rejected");
   expect(peak).toBe(2);
-});
-
-test("mobile allows one original per five registered previews, then releases the remainder", async () => {
-  const gate = new MobilePreviewPriorityGate(5);
-  let started = 0;
-  const first = gate.waitForOriginal().then(() => started++);
-  for (let i = 0; i < 4; i++) gate.recordPreview();
-  await Promise.resolve();
-  expect(started).toBe(0);
-  gate.recordPreview();
-  await first;
-  expect(started).toBe(1);
-
-  const second = gate.waitForOriginal().then(() => started++);
-  gate.recordPreview();
-  await Promise.resolve();
-  expect(started).toBe(1);
-  gate.finishPreviews();
-  await second;
-  expect(started).toBe(2);
 });
 
 test("preview preparation cannot overwrite simultaneous original progress or premature completion", () => {

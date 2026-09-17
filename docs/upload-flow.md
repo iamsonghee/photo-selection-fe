@@ -29,11 +29,10 @@
 
 1. 파일 선택 → `startUpload()` 호출.
 2. `include_original=true`이면 HEIC 파일 전체 차단(FE 선행 검증, BE도 동일하게 거부).
-3. **모든 파일**을 브라우저에서 압축(`include_original` 여부와 무관하게 항상 실행). 업로드 화면 전용 `compressImagesInParallel()`이 워커 풀로 producer-consumer 파이프라인의 batch를 압축한다. 비원본은 PC 8장/모바일 3장이고, 원본 포함은 예약·job 연결을 위해 1장 batch를 유지하되 PC에서 2~3개 batch를 한 압축 라운드로 묶는다. 모바일은 워커 1개다(§FE 배치·동시성·파이프라인 구조 참고). 여기서 모바일은 iPhone/iPad와 Android 휴대폰·태블릿을 뜻한다. 그 외 화면(설정 프로필 이미지, 보정본 업로드 등)은 싱글턴 워커 기반 `compressImageForUpload()`를 그대로 사용 — 두 진입점 모두 실제 압축 로직은 `compressWithWorker()`를 공유한다.
+3. **모든 파일**을 브라우저에서 압축(`include_original` 여부와 무관하게 항상 실행). 업로드 화면 전용 `compressImagesInParallel()`이 워커 풀로 producer-consumer 파이프라인의 batch를 압축한다. 비원본은 PC 8장/모바일 3장이고, 원본 포함은 파일별 job 연결을 위해 1장 batch를 유지하되 PC에서 2~3개 batch를 한 압축 라운드로 묶는다. 모바일은 워커 1개다(§FE 배치·동시성·파이프라인 구조 참고). 여기서 모바일은 iPhone/iPad와 Android 휴대폰·태블릿을 뜻한다. 그 외 화면(설정 프로필 이미지, 보정본 업로드 등)은 싱글턴 워커 기반 `compressImageForUpload()`를 그대로 사용 — 두 진입점 모두 실제 압축 로직은 `compressWithWorker()`를 공유한다.
 4. 파일 선택 시 각 파일에 세션 내 고정 UUID(`client_upload_id`)를 부여하고 압축 결과와 함께 FormData로 FastAPI `POST /api/upload/photos`에 보낸다. 모든 업로드에 원본 `File`의 이름/크기/MIME/수정 시각과, 압축 디코딩에서 얻은 경우 `source_widths/source_heights`를 함께 보낸다. 직접 호출 재시도와 Next 프록시 fallback도 같은 UUID를 재사용한다.
-5. `include_original=true`이면 producer가 압축과 함께 `POST /originals/presign` 예약을 시작한다. 원본 큐는 예약 URL로 raw `File`을 직접 PUT하고, 미리보기 큐는 예약 결과 확인 + 압축 완료 후 `/photos`를 보낸다. `/photos`에는 선발급 성공 시 `early_original_upload=true`를 함께 보내며 서버는 예약 lease를 갱신한다. 사진/job 등록 응답은 원본 큐에 전달하고 미리보기 lane은 다음 사진으로 진행한다.
-6. 원본 큐는 PUT와 사진/job 등록이 모두 끝난 뒤 기존 confirm/recover로 저장을 확인한다. 모바일은 요청 슬롯을 1개로 공유하며 프리뷰 row 5장을 등록할 때마다 원본 1장을 전송한다. 모든 프리뷰 등록이 끝나면 남은 원본을 순서대로 전송한다. 프리뷰 row가 모두 등록되면 원본 큐가 남아 있어도 고객 셀렉 요청을 열 수 있으며, 업로드 세션의 완료 토스트와 finalize는 모든 원본 작업이 끝날 때까지 기다린다.
-7. 선발급 미지원/실패 시 기존 `/photos` 응답 URL을 사용하는 경로로 폴백한다. 이미 등록된 사진의 presign 예약은 `deferred=true`를 반환하여 불필요한 선전송 덮어쓰기를 피한다.
+5. `include_original=true`이면 압축한 셀렉용 사진을 `/photos`로 보내 모든 photo row와 original job을 먼저 만든다. 응답의 presigned URL은 원본 큐에 보관하며, 전체 프리뷰 row가 등록되기 전에는 원본 PUT을 시작하지 않는다.
+6. 모든 프리뷰 등록과 화면 갱신이 끝나면 원본 큐가 raw `File` PUT을 시작하고 기존 confirm/recover로 저장을 확인한다. 이때 고객 셀렉 요청을 바로 열 수 있으며, 업로드 세션의 완료 토스트와 finalize는 모든 원본 작업이 끝날 때까지 기다린다.
 
 ### FastAPI (`upload.py`)
 
@@ -246,7 +245,7 @@ HEIC/PNG/WebP → JPEG로 변환된다. `include_original=true`일 때는 이 �
 | `include_original=true`, PC | **1장/배치** | 4(기본), 고사양 기기+빠른 회선이면 6 | `ORIGINAL_PC_CONCURRENCY=4`, `ORIGINAL_PC_CONCURRENCY_FAST=6` |
 | `include_original=true`, Mobile | **1장/배치** | 1 | `getDesktopUploadConcurrency` 미적용, 고정 1 |
 
-`include_original=true`는 파일별 예약·job·원본 결과를 연결하기 위해 1장 batch를 유지한다. 표의 동시성은 `requestSlots`의 전체 요청 상한이다. PC 미리보기 lane은 최대 2개이며, 프리뷰 등록 중 원본 큐는 1개로 제한한다. 모든 프리뷰 row가 등록되면 원본 큐를 2개로 높이고 256KB 이상·500ms 이상 걸린 원본 PUT을 표본으로 적응 조절한다. 범위는 1~`requestSlots-1`이고 전체 요청은 기존 상한 4/6을 넘지 않는다. 모바일은 동시 전송 1개를 유지하면서 프리뷰 5장마다 원본 1장을 보내고, 프리뷰 등록이 끝나면 남은 원본을 이어 보낸다.
+`include_original=true`는 파일별 job·원본 결과를 연결하기 위해 1장 batch를 유지한다. 표의 동시성은 `requestSlots`의 전체 요청 상한이다. PC 미리보기 lane은 최대 2개이며, PC와 모바일 모두 모든 프리뷰 row를 등록할 때까지 원본 네트워크 요청을 시작하지 않는다. 등록 완료 뒤 PC 원본 큐는 2개로 시작해 256KB 이상·500ms 이상 걸린 원본 PUT을 표본으로 적응 조절한다. 범위는 1~`requestSlots-1`이고 전체 요청은 기존 상한 4/6을 넘지 않는다. 모바일 원본 전송은 1개씩 순차 실행한다.
 
 ### 모든 기기: producer-consumer 파이프라인 (2026-08-07 모바일 적용)
 
@@ -434,14 +433,14 @@ HEIC 파일은 `include_original=true` 상태에서 FE와 BE 모두에서 거부
 모바일 `UploadVersionsPanel` footer는 취소·업로드 버튼만 유지한다. 파일이 없을 때의 `추가로 업로드할 파일을 선택해주세요.` 안내는 비활성 업로드 버튼과 의미가 겹치므로 모바일에서 숨기며, Desktop 상태 문구와 실제 업로드 진행률 표시는 유지한다.
 
 
-## 원본 선발급 예약·만료 정리 (2단계, 2026-09-11)
+## 원본 선발급 예약·만료 정리 (호환 유지, 2026-09-11)
+
+현재 업로드 화면은 선발급 예약 API를 호출하지 않고 `/photos`가 반환한 job URL을 사용한다. 아래 예약 테이블과 정리 worker는 이전 선전송 흐름에서 남은 객체 정리와 호환을 위해 유지한다.
 
 - DB 마이그레이션: `20260911150000_original_upload_reservations.sql`. `original_upload_reservations`와 service-role 전용 `reserve_original_upload`, `renew_original_upload_reservation`, `claim_expired_original_uploads` RPC를 추가한다. 예약은 프로젝트 소유권·`preparing`·원본 포함 설정·파일 metadata·업로드 한도를 검사한다. 같은 `(project_id, client_upload_id)`는 같은 key와 metadata를 재사용한다. 프로젝트 삭제 후에도 미등록 객체를 정리할 수 있도록 예약 테이블에는 프로젝트 cascade FK가 없다.
 - 예약 수명은 SQL의 48시간, URL은 기존 `ORIGINAL_PRESIGNED_EXPIRES=3600`초다. `/photos`가 선발급된 항목을 처리하기 전에 예약을 갱신하므로, 정리가 선점한 예약의 늦은 미리보기 요청은 409로 종료된다. 원본 큐가 늦게 실행되어 URL 만료까지 30초 이내이면 선전송 시도를 생략하고 job recover에서 URL을 다시 얻는다. 확인 직전에 최신 브라우저 세션 토큰을 읽어 오래 대기한 항목의 인증 만료를 피한다.
 - `original_reservation_sweep_worker`는 `RESERVATION_SWEEP_SECONDS=1800`초마다 최대 50개를 claim한다. `original_jobs.r2_source_key`와 `photos.(project_id,client_upload_id)` 둘 다 연결이 없을 때만 객체를 삭제한다. DB/R2 오류 시 예약을 남기고, 중단된 cleanup claim은 10분 뒤 재선점할 수 있다. 정리 중에는 예약 재발급/갱신을 거부한다. 원본을 복사하거나 재압축하지 않는다.
-- 선전송은 job 생성 전 1회만 시도한다. 실패/응답 유실 뒤에는 job recover의 HEAD 확인을 먼저 수행하며, 재전송이 필요하면 기존 공유 재시도 예산 1회를 소비한다. 최초 선전송을 포함한 PUT/confirm 시도 예산이 중첩되지 않는다.
-- 중단 시 진행 중인 요청은 정리하고 아직 전송하지 않은 등록 job은 복구 대상으로 남긴다. 미등록 원본은 예약 만료 정리 대상이다. 성공한 원본은 worker/ZIP 완료 여부와 무관하게 기존 confirm 조건으로 처리한다.
-- 배포 순서: DB migration → BE(예약 endpoint·sweep) → FE. migration/BE가 아직 없으면 FE가 선발급 실패를 받아 기존 `/photos` URL 방식으로 동작한다. migration이 적용되기 전에는 추적되지 않는 선발급 URL을 발급하지 않는다. 이 작업에서는 운영 DB migration·배포를 실행하지 않았다.
+- 중단 시 아직 전송하지 않은 등록 job은 복구 대상으로 남긴다. 과거 미등록 원본은 예약 만료 정리 대상이다. 성공한 원본은 worker/ZIP 완료 여부와 무관하게 기존 confirm 조건으로 처리한다.
 
 ## 실패 원본 재시도 UI (2단계)
 

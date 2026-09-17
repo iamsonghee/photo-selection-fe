@@ -844,9 +844,9 @@ sequenceDiagram
 
 ### 원본 업로드 큐와 예약 (2단계, 2026-09-11)
 
-원본 포함 업로드는 예약 API를 압축과 함께 시작하고, 별도 원본 큐에서 PUT과 사진 등록 후 confirm을 수행한다. 미리보기 큐는 `/photos` 응답 뒤 다음 항목으로 진행한다. 공통 `UploadWorkQueue` 요청 슬롯은 PC 기존 상한(일반 4/조건부 6), 모바일 1을 유지한다. 업로드 화면 중간 이미지 상한은 1600px이며 납품 원본은 바꾸지 않는다.
+원본 포함 업로드는 모든 셀렉용 프리뷰를 `/photos`로 먼저 등록하고, 응답으로 받은 job URL을 별도 원본 큐에 보관한다. 전체 프리뷰 등록과 화면 갱신이 끝난 뒤 원본 PUT과 confirm을 시작한다. 공통 `UploadWorkQueue` 요청 슬롯은 PC 기존 상한(일반 4/조건부 6), 모바일 1을 유지한다. 업로드 화면 중간 이미지 상한은 1600px이며 납품 원본은 바꾸지 않는다.
 
-`original_upload_reservations`는 선전송 후 미리보기 실패·중단으로 남은 객체의 정리 원장이다. 사진 등록 전 lease 갱신과 만료 cleanup claim을 구분하며 service-role 전용 RPC·48시간 예약 만료·30분 sweep을 사용한다. 고객 링크 활성화는 예약 존재 여부에 의존하지 않는다. 예약은 삭제한 사진 뒤에도 만료 전까지 남을 수 있기 때문이다. 대신 `activate_project_for_selection`과 `insert_photos_with_numbers`가 같은 프로젝트 행 잠금을 사용하고, `photos_insert_while_preparing` 트리거가 활성화 뒤 신규 INSERT를 막는다. 원본 포함 PC는 프리뷰 등록 중 원본 1개, 등록 완료 뒤 2개부터 적응 조절한다. 모바일은 동시 전송 1개를 유지하면서 프리뷰 5장 등록마다 원본 1장을 전송하고, 프리뷰 등록 완료 뒤 남은 원본을 이어 보낸다.
+`original_upload_reservations`는 과거 선전송 뒤 미리보기 실패·중단으로 남은 객체의 정리 원장이다. 현재 업로드 화면은 예약 API를 호출하지 않지만 service-role 전용 RPC·48시간 예약 만료·30분 sweep은 기존 객체 정리를 위해 유지한다. 고객 링크 활성화는 예약 존재 여부에 의존하지 않는다. 대신 `activate_project_for_selection`과 `insert_photos_with_numbers`가 같은 프로젝트 행 잠금을 사용하고, `photos_insert_while_preparing` 트리거가 활성화 뒤 신규 INSERT를 막는다. PC와 모바일 모두 전체 프리뷰 등록 뒤 원본 전송을 시작한다. PC는 원본 동시성 2개부터 적응 조절하고 모바일은 1개씩 전송한다.
 
 
 ## 03 검토 영상 적용 (2026-09-12)

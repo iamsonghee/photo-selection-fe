@@ -79,8 +79,7 @@ for (const viewport of scenarios) {
       await page.route(/\/api\/(?:photographer\/)?upload\/photos$/, async route => {
         if (!viewport.fallback) await previewGate;
         const body = route.request().postDataBuffer()?.toString();
-        if (viewport.fallback) expect(body).not.toContain('name="early_original_upload"');
-        else expect(body).toContain('name="early_original_upload"');
+        expect(body).not.toContain('name="early_original_upload"');
         previewRegistered = true;
         await route.fulfill({ json: {
         uploaded: 1, rejected: [], original_presigned: [{ job_id: "test-job", url: "http://localhost:3001/__upload-test/r2", content_type: "image/jpeg", source_key: "test", expires_at: "2099-01-01" }],
@@ -150,15 +149,13 @@ for (const viewport of scenarios) {
         return;
       }
       const status = viewport.width < 768 ? page.locator(".prj-mobile-progress [role=status]") : page.locator(".prj-upload-bottom-status");
-      // 모바일은 단일 네트워크 슬롯을 프리뷰에 먼저 써야 원본 전송이 셀렉 시작을 막지 않는다.
-      if (viewport.width < 768) allowPreview();
+      // 모든 기기에서 셀렉용 프리뷰 등록이 끝나기 전에는 원본 PUT을 시작하지 않는다.
+      allowPreview();
       await advance(0.25);
       await expect(status).toContainText(/원본 전송 중 · 2[45]%/, { timeout: 20_000 });
       await expect(status).toContainText("0/1장 저장 완료");
       await advance(0.75);
       await expect(status).toContainText(/7[45]%/);
-      // PC는 원본 PUT과 프리뷰 처리를 병렬로 진행한다.
-      if (viewport.width >= 768) allowPreview();
       await expect(page.getByRole("button", { name: "셀렉 요청하기", exact: true })).toBeEnabled({ timeout: 15000 });
       if (viewport.width === 1440 && !viewport.fallback) {
         await page.getByRole("button", { name: "셀렉 요청하기", exact: true }).click();
@@ -244,7 +241,7 @@ test("activated project can reopen the upload page only to recover unfinished or
   }
 });
 
-test("mobile registers five previews before allowing the first original PUT", async ({ browser }, testInfo) => {
+test("mobile registers every preview before allowing the first original PUT", async ({ browser }, testInfo) => {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
     baseURL: testInfo.project.use.baseURL,
@@ -326,7 +323,8 @@ test("mobile registers five previews before allowing the first original PUT", as
     await page.getByRole("button", { name: "업로드 시작", exact: true }).click();
     await expect(page.getByText("업로드 완료!", { exact: true })).toBeVisible({ timeout: 30_000 });
     const order = await page.evaluate(() => (window as unknown as { uploadOrder: string[] }).uploadOrder);
-    expect(order.indexOf("original")).toBeGreaterThanOrEqual(5);
+    expect(reservationCount).toBe(0);
+    expect(order.indexOf("original")).toBe(6);
     expect(order.filter((event) => event === "preview")).toHaveLength(6);
     expect(order.filter((event) => event === "original")).toHaveLength(6);
   } finally {

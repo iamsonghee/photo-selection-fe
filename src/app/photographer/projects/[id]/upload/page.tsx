@@ -30,7 +30,7 @@ import { parseBetaLimitError, DEFAULT_BETA_MAX_PHOTOS_PER_PROJECT } from "@/lib/
 import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 import { compressImagesInParallel, type UploadSourceMetadata } from "@/lib/upload-client-compress";
 import { UploadTelemetry, UPLOAD_SAMPLE_MS, describeUpload, formatUploadBytes, type UploadSnapshot, type UploadStage } from "@/lib/upload-telemetry";
-import { AdaptiveUploadConcurrency, MobilePreviewPriorityGate, UploadWorkQueue, uploadDeferred, UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
+import { AdaptiveUploadConcurrency, UploadWorkQueue, uploadDeferred, UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import type { Project, ProjectStatus, Photo, PhotoGroupInfo } from "@/types";
 import { CustomerInviteShareModal } from "@/components/photographer/CustomerInviteShareModal";
@@ -91,7 +91,6 @@ const ORIGINAL_PC_CONCURRENCY_FAST = 6;
  * 그 병렬 처리량의 일부만 쓰고 만다 — 5로 맞춰 요청당 서버 병렬성을 그대로 채운다. */
 const MOBILE_BATCH_SIZE = 5;
 const MOBILE_CONCURRENCY = 1;
-const MOBILE_PREVIEWS_PER_ORIGINAL = 5;
 const ACCEPT_TYPES = "image/*,image/heic,image/heif";
 const RAW_EXTENSIONS = new Set([
   ".cr2", ".cr3", ".nef", ".nrw", ".arw", ".srf", ".sr2",
@@ -288,22 +287,6 @@ type OriginalPresignedItem = {
   content_type: string;
   expires_at: string;
 };
-
-async function reserveOriginalUpload(projectId: string, clientId: string, file: File, token: string): Promise<OriginalPresignedItem | null> {
-  try {
-    const inferred = /\.png$/i.test(file.name) ? "image/png" : /\.webp$/i.test(file.name) ? "image/webp" : "image/jpeg";
-    const response = await fetch("/api/photographer/upload/originals/presign", {
-      method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ project_id: projectId, client_upload_id: clientId, filename: file.name,
-        content_type: file.type === "image/jpg" ? "image/jpeg" : file.type || inferred,
-        file_size: file.size, last_modified: file.lastModified }),
-      signal: AbortSignal.timeout(9000),
-    });
-    if (!response.ok) return null; // Optional optimization; /photos still enforces authorization and quotas.
-    const item = await response.json();
-    return item.deferred || !item.url ? null : { ...item, job_id: "" };
-  } catch { return null; }
-}
 
 type OriginalRetryBudget = {
   retriesUsed: number;
@@ -1747,10 +1730,9 @@ export default function ProjectDetailPage() {
     // 서버 UNIQUE(project_id, client_upload_id)가 응답 유실 후 중복 photo/job 생성을 막는다.
     const clientUploadIds = uploadFiles.map((_, index) => retryClientUploadIds?.[index] ?? createClientUploadId());
 
-    // Compression producer + bounded preview channel; originals have their own FIFO queue.
-    // Original-inclusive previews stay one file per request so reservations/jobs are unambiguous.
-    // PC dedicates up to two preview lanes; all queues share the existing network cap.
-    // Mobile keeps one network request at a time while raw PUT can overlap local compression.
+    // Compression producer + bounded preview channel; originals wait until every preview row exists.
+    // Original-inclusive previews stay one file per request so jobs remain unambiguous.
+    // PC dedicates up to two preview lanes. Mobile keeps one network request at a time.
     const mobileUploadClient = isMobileUploadClient();
     const effectiveBatch = inclOrig ? 1 : (mobileUploadClient ? MOBILE_BATCH_SIZE : BATCH_SIZE);
     const concurrency = inclOrig
@@ -1758,17 +1740,15 @@ export default function ProjectDetailPage() {
       : (mobileUploadClient ? MOBILE_CONCURRENCY : getDesktopUploadConcurrency(false));
     const requestSlots = new UploadWorkQueue(concurrency);
     const originalConcurrencyMax = mobileUploadClient ? 1 : Math.max(1, concurrency - 1);
-    // 프리뷰가 모두 등록되기 전에는 원본 lane 하나만 열어 고객 링크 준비 시간을 우선한다.
-    // 이후에는 기존 적응형 상한 안에서 원본 처리량을 다시 높인다.
+    // 원본 task는 생성해 두되 previewsFinished가 풀릴 때까지 네트워크를 사용하지 않는다.
+    // 프리뷰 등록 완료 뒤 기존 적응형 상한 안에서 원본 처리량을 시작한다.
     const originalConcurrencyInitial = 1;
     const originalConcurrencyAfterPreviews = mobileUploadClient ? 1 : Math.min(2, originalConcurrencyMax);
     const originalQueue = new UploadWorkQueue(originalConcurrencyInitial);
-    const mobilePreviewPriority = inclOrig && mobileUploadClient
-      ? new MobilePreviewPriorityGate(MOBILE_PREVIEWS_PER_ORIGINAL)
-      : null;
     let adaptiveOriginalConcurrency: AdaptiveUploadConcurrency | null = null;
     const previewConcurrency = inclOrig ? Math.min(2, concurrency) : concurrency;
-    const reservationPromises = new Map<number, Promise<OriginalPresignedItem | null>>();
+    const previewsFinished = uploadDeferred<void>();
+    const originalTaskIndexes = new Set<number>();
     const originalResults = uploadFiles.map(() => uploadDeferred<{ job: OriginalPresignedItem; token: string } | null>());
     const originalTasks: Promise<void>[] = [];
     const totalBatches = Math.ceil(totalFiles / effectiveBatch);
@@ -1845,16 +1825,13 @@ export default function ProjectDetailPage() {
     };
 
     const startOriginalTask = (index: number) => {
-      if (!inclOrig || reservationPromises.has(index)) return;
+      if (!inclOrig || originalTaskIndexes.has(index)) return;
+      originalTaskIndexes.add(index);
       const file = uploadFiles[index];
-      const reservation = requestSlots.run(() => stopRequestedRef.current || abortReason
-        ? Promise.resolve(null) : reserveOriginalUpload(id, clientUploadIds[index], file, currentToken));
-      reservationPromises.set(index, reservation);
       const task = originalQueue.run(async () => {
-        const early = await reservation;
-        // Only the first PUT may precede photo/job creation. Subsequent attempts use the
-        // established job recover/confirm path and its single shared retry budget.
-        let earlyOk: boolean | null = null;
+        const registered = await originalResults[index].promise;
+        if (!registered) { telemetry.originalStage(index, null); return; }
+        await previewsFinished.promise;
         const budget = createOriginalRetryBudget();
         budget.onRetry = () => telemetry.originalStage(index, "retrying");
         budget.onConfirmAttempt = () => telemetry.originalStage(index, "confirming");
@@ -1862,18 +1839,9 @@ export default function ProjectDetailPage() {
           onSending: () => telemetry.originalStage(index, "originalSending"),
           onProgress: (loaded: number) => telemetry.progress(index, loaded),
         };
-        // 모바일은 공유 네트워크 슬롯이 하나라 early PUT이 프리뷰 요청을 막는다.
-        // 예약은 유지하되 photo/job 등록 뒤에 같은 원본을 전송한다.
-        if (!mobileUploadClient && early && Date.parse(early.expires_at) > Date.now() + 30_000 && !stopRequestedRef.current && !abortReason) {
-          earlyOk = await requestSlots.run(() => putOriginalMeasured(early, file, undefined, { retriesUsed: 0, maxRetries: 0 }, observer));
-          telemetry.originalStage(index, null);
-        }
-        const registered = await originalResults[index].promise;
-        if (!registered) { telemetry.originalStage(index, null); return; }
-        await mobilePreviewPriority?.waitForOriginal();
         const { job } = registered;
         let jobToken = registered.token;
-        if (stopRequestedRef.current && earlyOk !== true) {
+        if (stopRequestedRef.current || abortReason) {
           telemetry.stage(index, "failed");
           recoveryFilesRef.current.set(job.job_id, file);
           setRecoveryCachedCount(recoveryFilesRef.current.size);
@@ -1886,17 +1854,14 @@ export default function ProjectDetailPage() {
           // A long original backlog may outlive the token used by its preview request.
           const { data: { session: latestSession } } = await supabase.auth.getSession();
           jobToken = latestSession?.access_token ?? jobToken;
-          let putOk = earlyOk === true && early?.source_key === job.source_key;
-          if (!putOk) {
-            // Recover first: an early PUT can succeed even if its response was lost.
-            const recovered = await requestSlots.run(() => recoverOriginalJob(job.job_id, jobToken).catch(() => null));
-            if (recovered?.status === "confirmed") putOk = true;
-            else {
-              if (earlyOk !== null && !await waitForOriginalRetry(budget)) throw new Error("원본 재시도 한도 초과");
-              const target = recovered?.status === "needs_upload" ? { ...job, ...recovered } : job;
-              putOk = await requestSlots.run(() => putOriginalMeasured(target, file, jobToken, budget, observer));
-            }
-          }
+          const recovered = await requestSlots.run(() => recoverOriginalJob(job.job_id, jobToken).catch(() => null));
+          const putOk = recovered?.status === "confirmed" || await requestSlots.run(() => putOriginalMeasured(
+            recovered?.status === "needs_upload" ? { ...job, ...recovered } : job,
+            file,
+            jobToken,
+            budget,
+            observer,
+          ));
           telemetry.originalStage(index, "confirming");
           const confirmed = putOk && await requestSlots.run(() => confirmOrRecoverOriginalUpload(job.job_id, jobToken, budget));
           telemetry.originalStage(index, null);
@@ -1942,7 +1907,6 @@ export default function ProjectDetailPage() {
     ) => {
       // 카드 식별자·위치는 queued 단계에서 만든 값을 인계하되, 표시 이미지는 압축본으로 바꾼다.
       // 원본 blob은 고해상도/HEIC일 수 있어 브라우저가 해독하는 동안 카드가 검게 보일 수 있다.
-      const earlyReservation = inclOrig ? await reservationPromises.get(batchIndex) : null;
       const inFlightNow = Date.now();
       const queuedUrlsToRevoke: string[] = [];
       const inFlight = batch.map((file, fi) => {
@@ -1989,7 +1953,6 @@ export default function ProjectDetailPage() {
           const f = new FormData();
           f.append("project_id", id);
           f.append("include_original", (inclOrig && !!rawFile) ? "true" : "false");
-          if (earlyReservation) f.append("early_original_upload", "true");
           batch.forEach((file, fileIndex) => {
             const sourceIndex = batchIndex * effectiveBatch + fileIndex;
             const sourceFile = uploadFiles[sourceIndex] ?? file;
@@ -2050,7 +2013,6 @@ export default function ProjectDetailPage() {
             }
 
             if (inclOrig && rawFile) {
-              mobilePreviewPriority?.recordPreview();
               const job = okBody.original_presigned?.[0];
               if (job) {
                 batchStage(batchIndex, "ready");
@@ -2380,10 +2342,9 @@ export default function ProjectDetailPage() {
     }
 
     originalResults.forEach(result => result.resolve(null));
-    mobilePreviewPriority?.finishPreviews();
     if (inclOrig && !abortReason && !stopRequestedRef.current) {
-      // 이 시점에는 모든 preview 요청과 photos INSERT가 끝났다. 원본 queue는 계속 두되
-      // 프로젝트/사진 수를 먼저 갱신해 고객 셀렉 요청을 즉시 열 수 있게 한다.
+      // 이 시점에는 모든 preview 요청과 photos INSERT가 끝났다. 프로젝트/사진 수를 먼저
+      // 갱신해 고객 셀렉 요청을 연 뒤에만 원본 queue의 네트워크 전송을 시작한다.
       originalQueue.setConcurrency(originalConcurrencyAfterPreviews);
       if (!mobileUploadClient) {
         adaptiveOriginalConcurrency = new AdaptiveUploadConcurrency(
@@ -2397,6 +2358,7 @@ export default function ProjectDetailPage() {
       await Promise.all([loadPhotos(), loadProject()]);
       setUploadPhase("originals");
     }
+    previewsFinished.resolve();
     await Promise.all(originalTasks);
 
     // PUT과 confirm은 파일별 공유 예산 안에서 이미 모두 재시도했다. 여기서는 재전송을
