@@ -32,7 +32,7 @@
 3. **모든 파일**을 브라우저에서 압축(`include_original` 여부와 무관하게 항상 실행). 업로드 화면 전용 `compressImagesInParallel()`이 워커 풀로 producer-consumer 파이프라인의 batch를 압축한다. 비원본은 PC 8장/모바일 3장이고, 원본 포함은 파일별 job 연결을 위해 1장 batch를 유지하되 PC에서 2~3개 batch를 한 압축 라운드로 묶는다. 모바일은 워커 1개다(§FE 배치·동시성·파이프라인 구조 참고). 여기서 모바일은 iPhone/iPad와 Android 휴대폰·태블릿을 뜻한다. 그 외 화면(설정 프로필 이미지, 보정본 업로드 등)은 싱글턴 워커 기반 `compressImageForUpload()`를 그대로 사용 — 두 진입점 모두 실제 압축 로직은 `compressWithWorker()`를 공유한다.
 4. 파일 선택 시 각 파일에 세션 내 고정 UUID(`client_upload_id`)를 부여하고 압축 결과와 함께 FormData로 FastAPI `POST /api/upload/photos`에 보낸다. 모든 업로드에 원본 `File`의 이름/크기/MIME/수정 시각과, 압축 디코딩에서 얻은 경우 `source_widths/source_heights`를 함께 보낸다. 직접 호출 재시도와 Next 프록시 fallback도 같은 UUID를 재사용한다.
 5. `include_original=true`이면 압축한 셀렉용 사진을 `/photos`로 보내 모든 photo row와 original job을 먼저 만든다. 응답의 presigned URL은 원본 큐에 보관하며, 전체 프리뷰 row가 등록되기 전에는 원본 PUT을 시작하지 않는다.
-6. 모든 프리뷰 등록과 화면 갱신이 끝나면 원본 큐가 raw `File` PUT을 시작하고 기존 confirm/recover로 저장을 확인한다. 이때 고객 셀렉 요청을 바로 열 수 있으며, 업로드 세션의 완료 토스트와 finalize는 모든 원본 작업이 끝날 때까지 기다린다. 원본 단계에는 화면 유지 경고를 표시하고 내부 링크·화면 버튼·브라우저 history 이동을 확인한 뒤 처리한다. 실제 문서 종료·새로고침은 `beforeunload`로 경고한다.
+6. 모든 프리뷰 등록과 화면 갱신이 끝나면 원본 큐가 raw `File` PUT을 시작하고 기존 confirm/recover로 저장을 확인한다. 이때 고객 셀렉 요청을 바로 열 수 있으며, 업로드 세션의 완료 토스트와 finalize는 모든 원본 작업이 끝날 때까지 기다린다. 원본 단계에는 화면 유지 경고를 표시한다. 전체 업로드 세션 동안 내부 링크·화면 버튼·브라우저 history 이동을 확인한 뒤 처리하며, 실제 문서 종료·새로고침은 `beforeunload`로 경고한다.
 
 ### FastAPI (`upload.py`)
 

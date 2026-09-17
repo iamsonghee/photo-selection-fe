@@ -1090,16 +1090,16 @@ export default function ProjectDetailPage() {
   const isUploading = isPreviewUploading || isOriginalUploading;
 
   const requestInternalNavigation = useCallback((href: string) => {
-    if (isOriginalUploading) {
+    if (uploadInProgressRef.current) {
       setPendingNavigationHref(href);
       return;
     }
     router.push(href);
-  }, [isOriginalUploading, router]);
+  }, [router]);
 
   useEffect(() => {
-    if (!isOriginalUploading) setPendingNavigationHref(null);
-  }, [isOriginalUploading]);
+    if (!isUploading) setPendingNavigationHref(null);
+  }, [isUploading]);
 
   useEffect(() => {
     if (!isUploading) return;
@@ -1671,10 +1671,10 @@ export default function ProjectDetailPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [sendingSourcePhase]);
 
-  // Next.js 내부 링크 이동은 beforeunload를 거치지 않으므로 원본 단계에서 별도로 확인한다.
+  // Next.js 내부 링크 이동은 beforeunload를 거치지 않으므로 업로드 세션 ref로 별도 확인한다.
   useEffect(() => {
-    if (!isOriginalUploading) return;
     const handler = (event: MouseEvent) => {
+      if (!uploadInProgressRef.current) return;
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
       if (!anchor || anchor.target === "_blank" || anchor.hasAttribute("download")) return;
@@ -1686,17 +1686,17 @@ export default function ProjectDetailPage() {
     };
     document.addEventListener("click", handler, true);
     return () => document.removeEventListener("click", handler, true);
-  }, [isOriginalUploading]);
+  }, []);
 
   // 브라우저 뒤로/앞으로 가기는 history 이동 뒤 발생하므로 취소하면 원래 항목으로 즉시 복귀한다.
   useEffect(() => {
-    if (!isOriginalUploading) return;
     const handler = () => {
+      if (!uploadInProgressRef.current) return;
       if (navigationPopBypassRef.current) {
         navigationPopBypassRef.current = false;
         return;
       }
-      const leave = window.confirm("원본 업로드가 진행 중입니다. 지금 이동하면 남은 원본 파일을 다시 선택해야 할 수 있습니다. 그래도 이동할까요?");
+      const leave = window.confirm("사진 업로드가 진행 중입니다. 지금 이동하면 완료되지 않은 사진을 다시 선택해야 할 수 있습니다. 그래도 이동할까요?");
       if (!leave) {
         navigationPopBypassRef.current = true;
         window.history.forward();
@@ -1704,7 +1704,7 @@ export default function ProjectDetailPage() {
     };
     window.addEventListener("popstate", handler);
     return () => window.removeEventListener("popstate", handler);
-  }, [isOriginalUploading]);
+  }, []);
 
   // awaiting_upload 상태 job 확인 → 복구 배너. 페이지 최초 로드 시 1회 + 업로드 배치 종료 직후
   // 재확인(원본 presigned PUT이 조용히 실패해도 non-fatal로 삼켜지므로, 업로드 "완료" 시점에
@@ -4537,9 +4537,9 @@ export default function ProjectDetailPage() {
           setPendingNavigationHref(null);
           if (href) router.push(href);
         }}
-        title="원본 업로드가 진행 중입니다"
-        description="지금 이동하면 진행 중인 원본 전송이 중단될 수 있습니다."
-        detail="나중에 복구할 수 있지만, 남은 원본 파일을 다시 선택해야 할 수 있습니다."
+        title="사진 업로드가 진행 중입니다"
+        description="지금 이동하면 진행 중인 사진 업로드가 중단됩니다."
+        detail="완료되지 않은 사진은 이 화면에서 다시 선택해 업로드해야 합니다."
         cancelLabel="업로드 계속"
         confirmLabel="그래도 이동"
         tone="danger"
