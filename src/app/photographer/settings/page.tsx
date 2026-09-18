@@ -442,7 +442,7 @@ export default function SettingsPage() {
                     />
                   </ProjectFormField>
 
-                  <ProjectFormField label="연락처" hint="알림 연동 시 사용됩니다.">
+                  <ProjectFormField label="연락처" info="알림 연동 시 사용됩니다.">
                     <div className="relative">
                       <Phone size={16} className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-subtle-foreground md:left-5" aria-hidden />
                       <ProjectFormPhoneInput
@@ -453,7 +453,7 @@ export default function SettingsPage() {
                     </div>
                   </ProjectFormField>
 
-                  <ProjectFormField label="소개글" hint="고객 갤러리 페이지에 표시됩니다." className="md:col-span-2">
+                  <ProjectFormField label="소개글" info="고객 갤러리 페이지에 표시됩니다." className="md:col-span-2">
                     <ProjectFormTextarea
                       className={`${SETTINGS_INPUT_CLASS} min-h-[96px] resize-none leading-relaxed`}
                       value={editBio}

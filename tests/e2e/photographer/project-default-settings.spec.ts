@@ -28,6 +28,9 @@ test("작가 프로젝트 기본값을 불러오고 저장한다", async ({ page
 
   await page.goto("/photographer/settings");
   await expect(page.locator("[data-default-profile-image]")).toHaveAttribute("src", "/brand/a-cut-mark.svg");
+  const contactInfo = page.getByRole("button", { name: "연락처 설명" });
+  await contactInfo.hover();
+  await expect(page.getByRole("tooltip")).toHaveText("알림 연동 시 사용됩니다.");
   const deadlineInput = page.getByLabel("셀렉 마감 기본 기간");
   await expect(deadlineInput).toHaveValue("30");
   await expect(deadlineInput).toHaveCSS("height", "44px");

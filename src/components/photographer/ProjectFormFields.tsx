@@ -139,7 +139,7 @@ export function ProjectFormField({
               {label}{required ? <span className="text-accent"> *</span> : null}
             </label>
           )}
-          {info ? <FieldInfoTip text={info} /> : null}
+          {info ? <FieldInfoTip text={info} ariaLabel={`${label} 설명`} /> : null}
         </div>
         {children}
         {hint ? <p id={hintId} className={hintClassName ?? "text-[11px] text-disabled-foreground mt-1.5"}>{hint}</p> : info ? <span id={hintId} className="sr-only">{info}</span> : null}
