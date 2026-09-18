@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { CalendarDays } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
-import { getProfileImageUrl } from "@/lib/photographer";
+import { DEFAULT_PROFILE_IMAGE, getProfileImageUrl } from "@/lib/photographer";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { Badge } from "@/components/ui/Badge";
 import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
@@ -111,7 +111,7 @@ export default function InvitePageClient() {
   const photographerLabel = entryPhotographerName ? `${entryPhotographerName} 작가` : "담당 작가";
   const avatarUrl = photographer?.profile_image_url
     ? getProfileImageUrl(photographer.profile_image_url)
-    : "/customer/entry/avatar-fallback.svg";
+    : DEFAULT_PROFILE_IMAGE;
   const introCommonProps = {
     href: inviteHref,
     heroUrl: introImageUrl,

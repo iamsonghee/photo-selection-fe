@@ -21,7 +21,7 @@ import {
   UserRound,
 } from "lucide-react";
 import type { PhotographerProfile } from "@/app/api/photographer/profile/route";
-import { getProfileImageUrl } from "@/lib/photographer";
+import { DEFAULT_PROFILE_IMAGE, getProfileImageUrl } from "@/lib/photographer";
 import { createClient } from "@/lib/supabase/client";
 import { formatKstYearMonth } from "@/lib/kst-date";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -380,11 +380,11 @@ export default function SettingsPage() {
                           alt=""
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = "/brand/a-cut-mark.svg";
+                            (e.target as HTMLImageElement).src = DEFAULT_PROFILE_IMAGE;
                           }}
                         />
                       ) : (
-                        <img data-default-profile-image src="/brand/a-cut-mark.svg" alt="" className="h-full w-full object-cover" />
+                        <img data-default-profile-image src={DEFAULT_PROFILE_IMAGE} alt="" className="h-full w-full object-cover" />
                       )}
                     </div>
                     {/* hover 시에만 사진 위에 스크림 + "이미지 변경" 안내 — 평소엔 아무 배지도

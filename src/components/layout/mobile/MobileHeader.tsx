@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useProfile } from "@/contexts/ProfileContext";
-import { getProfileImageUrl } from "@/lib/photographer";
+import { DEFAULT_PROFILE_IMAGE, getProfileImageUrl } from "@/lib/photographer";
 import {
   PHOTOGRAPHER_MOBILE_PROJECT_CONTEXT_EVENT,
   readPhotographerMobileProjectContext,
@@ -130,10 +130,10 @@ export function MobileHeader({ light = false }: { light?: boolean }) {
               src={getProfileImageUrl(profile.profileImageUrl)}
               alt=""
               className="h-full w-full object-cover"
-              onError={(e) => { (e.target as HTMLImageElement).src = "/brand/a-cut-mark.svg"; }}
+              onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PROFILE_IMAGE; }}
             />
           ) : (
-            <img src="/brand/a-cut-mark.svg" alt="" className="h-full w-full object-cover" />
+            <img src={DEFAULT_PROFILE_IMAGE} alt="" className="h-full w-full object-cover" />
           )}
         </span>
       </Link>

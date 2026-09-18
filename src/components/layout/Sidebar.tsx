@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PHOTOGRAPHER_NAV_ITEMS } from "@/lib/photographer-nav";
 import { FeedbackButton } from "@/components/photographer/FeedbackModal";
 import { useProfile } from "@/contexts/ProfileContext";
-import { getProfileImageUrl } from "@/lib/photographer";
+import { DEFAULT_PROFILE_IMAGE, getProfileImageUrl } from "@/lib/photographer";
 import { useQuota } from "@/contexts/QuotaContext";
 import { isPhotographerLightRoute } from "@/lib/photographer-sidebar-routes";
 import styles from "@/components/layout/Sidebar.module.css";
@@ -270,10 +270,10 @@ export function Sidebar({
                   src={getProfileImageUrl(profile.profileImageUrl)}
                   alt=""
                   className="w-full h-full object-cover"
-                  onError={(e) => { (e.target as HTMLImageElement).src = "/brand/a-cut-mark.svg"; }}
+                  onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PROFILE_IMAGE; }}
                 />
               ) : (
-                <img src="/brand/a-cut-mark.svg" alt="" className="h-full w-full object-cover" />
+                <img src={DEFAULT_PROFILE_IMAGE} alt="" className="h-full w-full object-cover" />
               )}
             </div>
             {!collapsed && (

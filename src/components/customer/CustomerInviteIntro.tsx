@@ -2,9 +2,10 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { CustomerEntryHeader, CustomerEntryShell } from "./CustomerEntryShell";
+import { DEFAULT_PROFILE_IMAGE } from "@/lib/photographer";
 import styles from "./CustomerInviteIntro.module.css";
 
-const AVATAR_FALLBACK = "/customer/entry/avatar-fallback.svg";
+const AVATAR_FALLBACK = DEFAULT_PROFILE_IMAGE;
 
 export function CustomerInviteIntro({
   href,
