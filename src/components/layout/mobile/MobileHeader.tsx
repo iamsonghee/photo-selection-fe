@@ -130,10 +130,10 @@ export function MobileHeader({ light = false }: { light?: boolean }) {
               src={getProfileImageUrl(profile.profileImageUrl)}
               alt=""
               className="h-full w-full object-cover"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              onError={(e) => { (e.target as HTMLImageElement).src = "/brand/a-cut-mark.svg"; }}
             />
           ) : (
-            displayName.charAt(0).toUpperCase()
+            <img src="/brand/a-cut-mark.svg" alt="" className="h-full w-full object-cover" />
           )}
         </span>
       </Link>

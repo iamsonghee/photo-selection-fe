@@ -48,12 +48,6 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const ACCEPT_IMAGE = "image/jpeg,image/png,image/webp";
 const SETTINGS_INPUT_CLASS = `${PROJECT_FORM_INPUT_CLASS} !min-h-11 !px-3.5 !py-[9px] md:!min-h-11 md:!rounded-lg md:!px-4 md:!py-[9px]`;
 
-function getInitial(name: string | null, email: string | null): string {
-  if (name?.trim()) return name.trim().charAt(0).toUpperCase();
-  if (email?.trim()) return email.trim().charAt(0).toUpperCase();
-  return "?";
-}
-
 interface ToastItem {
   id: number;
   message: string;
@@ -335,7 +329,6 @@ export default function SettingsPage() {
 
   if (!profile) return null;
 
-  const initial = getInitial(profile.name, profile.email);
   const joinDate = profile.createdAt ? formatKstYearMonth(profile.createdAt) : null;
 
   return (
@@ -387,13 +380,11 @@ export default function SettingsPage() {
                           alt=""
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = getProfileImageUrl(null);
+                            (e.target as HTMLImageElement).src = "/brand/a-cut-mark.svg";
                           }}
                         />
                       ) : (
-                        <span className="text-2xl font-bold text-[var(--accent-foreground)] xl:text-[28px]">
-                          {initial}
-                        </span>
+                        <img data-default-profile-image src="/brand/a-cut-mark.svg" alt="" className="h-full w-full object-cover" />
                       )}
                     </div>
                     {/* hover 시에만 사진 위에 스크림 + "이미지 변경" 안내 — 평소엔 아무 배지도

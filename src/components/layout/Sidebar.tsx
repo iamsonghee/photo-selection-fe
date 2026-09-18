@@ -270,12 +270,10 @@ export function Sidebar({
                   src={getProfileImageUrl(profile.profileImageUrl)}
                   alt=""
                   className="w-full h-full object-cover"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  onError={(e) => { (e.target as HTMLImageElement).src = "/brand/a-cut-mark.svg"; }}
                 />
               ) : (
-                <span style={{ fontFamily: "var(--acb-sidebar-sans)" }}>
-                  {displayName.charAt(0).toUpperCase()}
-                </span>
+                <img src="/brand/a-cut-mark.svg" alt="" className="h-full w-full object-cover" />
               )}
             </div>
             {!collapsed && (
