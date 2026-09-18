@@ -266,7 +266,7 @@ test.describe("Phase A — PIN 폼 UI 흐름", () => {
     }
 
     await page.waitForURL(/\/gallery/, { timeout: 10_000 });
-    await expect(page.locator(".gl-header-project-title")).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator("h1.gld-title")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("INVALID_TOKEN")).toHaveCount(0);
 
     await ctx.close();

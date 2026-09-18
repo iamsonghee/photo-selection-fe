@@ -4255,7 +4255,7 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
-      {photoUploadAllowed && !isUploading && photos.length > 0 && (
+      {photoUploadAllowed && !isUploading && !photoSelectionActive && photos.length > 0 && (
         <section aria-label="작가 추천" className={recommendationEditActive
           ? `sticky bottom-0 z-30 mx-3 mb-3 shrink-0 rounded-xl border border-border-subtle bg-surface px-4 py-3 shadow-lg md:mx-8 ${recommendationTrayClosing ? themeStyles.recommendationTrayClosing : themeStyles.recommendationTrayOpen}`
           : "fixed bottom-24 right-3 z-30 shrink-0 md:right-8"}>
@@ -4272,10 +4272,8 @@ export default function ProjectDetailPage() {
               </span>
               <div className="order-2 hidden min-h-14 min-w-0 basis-full items-center gap-2 xl:flex">
                 {recommendationDraft.size === 0 && <span className="text-xs text-muted-foreground">사진을 선택하면 여기에 표시됩니다.</span>}
-                {photos.filter(photo => recommendationDraft.has(photo.id)).slice(0, 10).map(photo => <button key={photo.id} type="button" aria-label={`${photo.originalFilename ?? "사진"} 추천 해제`} onClick={() => toggleTrayPhoto(photo.id)} className="relative size-14 shrink-0 overflow-hidden rounded-lg">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photo.url} alt="" className="h-full w-full object-cover" />
-                  <span className="absolute right-0 top-0 rounded-bl bg-black/60 p-0.5 text-white"><X size={11} /></span>
+                {photos.filter(photo => recommendationDraft.has(photo.id)).slice(0, 10).map(photo => <button key={photo.id} type="button" aria-label={`${photo.originalFilename ?? "사진"} 추천 해제`} onClick={() => toggleTrayPhoto(photo.id)} className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(photo.url)})` }}>
+                  <span className="absolute right-0 top-0 z-10 rounded-bl bg-black/60 p-0.5 text-white"><X size={11} /></span>
                 </button>)}
                 {recommendationDraft.size > 0 && <button type="button" onClick={() => { setTrayOnly(!trayOnly); setPhotoSearch(""); setQualityFilter(new Set()); }} className="ml-2 inline-flex h-9 shrink-0 items-center gap-2 border-l border-border-subtle pl-3 pr-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground">
                   {recommendationDraft.size > 10 && <span className="rounded-md bg-surface-raised px-1.5 py-1">+{recommendationDraft.size - 10}</span>}

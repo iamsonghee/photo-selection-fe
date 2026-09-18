@@ -271,7 +271,9 @@ for (const width of [1440, 390]) {
     await expect(tray).toContainText("작가 추천 편집 · 1장");
     await expect(page.locator("[data-selection-recommendation-mark]")).toHaveCount(1);
     if (width === 1440) {
-      await expect(tray.getByRole("button", { name: /추천 해제$/ })).toBeVisible();
+      const recommendationThumb = tray.getByRole("button", { name: /추천 해제$/ });
+      await expect(recommendationThumb).toBeVisible();
+      await expect(recommendationThumb).toHaveCSS("background-image", /picsum\.photos/);
       const expandedTrayHeight = (await tray.boundingBox())!.height;
       expect(expandedTrayHeight).toBeGreaterThanOrEqual(120);
       expect(expandedTrayHeight).toBeLessThanOrEqual(170);
@@ -283,7 +285,7 @@ for (const width of [1440, 390]) {
     await page.reload();
     await expect(tray.getByRole("button", { name: "작가 추천 펼치기" })).toBeVisible();
     await expect.poll(() => writes).toBe(2);
-    expect(await page.evaluate((key) => localStorage.getItem(key), `acut:recommendation-draft:${project.projectId}`)).toBeNull();
+    await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), `acut:recommendation-draft:${project.projectId}`)).toBeNull();
     await page.getByRole("button", { name: "셀렉 요청하기", exact: true }).click();
     const requestDialog = page.getByRole("dialog", { name: /셀렉 요청/ });
     const recommendationSummary = requestDialog.locator("[data-recommendation-delivery-summary]");
