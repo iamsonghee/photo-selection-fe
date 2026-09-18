@@ -109,7 +109,6 @@
 .guide > strong { display: block; font-size: 13px; line-height: 20px; }
 .guide > p { margin: 4px 0 0; color: var(--muted-foreground); font-size: 12px; font-weight: 500; line-height: 18px; }
 .guide > p b { color: var(--accent); font-weight: 700; }
-.guide .guideConfirm { margin-top: 8px; border: 0; background: transparent; padding: 0; color: var(--accent); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .guide button:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 42%, transparent); outline-offset: 1px; }
 
 @media (max-width: 767px) {

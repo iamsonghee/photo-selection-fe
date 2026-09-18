@@ -74,7 +74,6 @@ export function PhotoScopeSelect({ totalCount, recommendedCount, recommendedOnly
           <button type="button" onClick={onDismissRecommendationGuide} aria-label="작가 추천 안내 닫기"><X size={14} aria-hidden /></button>
           <strong>고객에게 사진을 추천할 수 있어요</strong>
           <p>사진을 선택한 뒤 <b>고객에게 추천</b>을 누르면 고객 화면에 A 추천으로 표시됩니다.</p>
-          <button type="button" className={styles.guideConfirm} onClick={onDismissRecommendationGuide}>알겠어요</button>
         </div>
       ) : null}
     </div>
