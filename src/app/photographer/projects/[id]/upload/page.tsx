@@ -3113,6 +3113,9 @@ export default function ProjectDetailPage() {
   const uploadStatusLabel = uploadStopRequested ? "업로드 중단 중" : uploadCopy?.label ?? "사진 준비 중";
   const uploadEtaLabel = uploadCopy ? `${uploadCopy.transfer} · ${uploadCopy.eta}` : "남은 시간 계산 중";
   const uploadSavedLabel = uploadCopy?.details;
+  const originalSavedCount = uploadSnapshot?.counts.completed ?? 0;
+  const originalUploadTotal = uploadSnapshot?.total ?? 0;
+  const originalSavedPercent = originalUploadTotal > 0 ? originalSavedCount / originalUploadTotal * 100 : 0;
   const photoUploadAllowed = project.status === "preparing" && !recoveryBusy;
 
   const photoSelectionActive = mobilePhotoManageMode || (!isMobile && selectedPhotoIds.size > 0);
@@ -3909,6 +3912,22 @@ export default function ProjectDetailPage() {
                   <div className="min-w-0">
                     <strong className="block text-[13px] font-bold leading-5 text-foreground md:text-sm">납품용 원본 업로드 중</strong>
                     <span className="block text-[11px] font-medium leading-4 text-muted-foreground md:text-xs md:leading-5">현재 보이는 사진은 셀렉용 미리보기입니다. 고객에게 전달할 원본 업로드가 끝날 때까지 화면을 닫거나 잠그지 마세요.</span>
+                    <div data-original-upload-progress className="mt-2 hidden md:block">
+                      <div className="mb-1 flex items-center justify-between text-[11px] font-semibold leading-4 text-muted-foreground">
+                        <span>원본 저장</span>
+                        <span>{originalSavedCount.toLocaleString()} / {originalUploadTotal.toLocaleString()}장</span>
+                      </div>
+                      <div
+                        className="h-1.5 overflow-hidden rounded-full bg-warning/15"
+                        role="progressbar"
+                        aria-label="납품용 원본 저장 진행률"
+                        aria-valuemin={0}
+                        aria-valuemax={originalUploadTotal}
+                        aria-valuenow={originalSavedCount}
+                      >
+                        <div className="h-full rounded-full bg-warning transition-[width] duration-300 ease-out" style={{ width: `${originalSavedPercent}%` }} />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

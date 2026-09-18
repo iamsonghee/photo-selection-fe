@@ -187,6 +187,14 @@ for (const viewport of scenarios) {
       await expect(status).toContainText("0/1장 저장 완료");
       await expect(page.locator("[data-original-upload-intro]")).toBeVisible();
       await expect(page.locator("[data-original-upload-notice]")).toBeVisible();
+      const originalProgress = page.locator("[data-original-upload-progress]");
+      if (viewport.width >= 768) {
+        await expect(originalProgress).toBeVisible();
+        await expect(originalProgress).toContainText("원본 저장");
+        await expect(originalProgress).toContainText("0 / 1장");
+      } else {
+        await expect(originalProgress).toBeHidden();
+      }
       await expect(page.getByText("원본 누락", { exact: true })).toHaveCount(0);
       await expect(page.locator("[data-original-upload-intro]")).toHaveCSS("visibility", "hidden", { timeout: 4000 });
       await advance(0.75);
