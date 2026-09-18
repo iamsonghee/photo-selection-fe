@@ -46,6 +46,7 @@ import themeStyles from "./SettingsTheme.module.css";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const ACCEPT_IMAGE = "image/jpeg,image/png,image/webp";
+const SETTINGS_INPUT_CLASS = `${PROJECT_FORM_INPUT_CLASS} !min-h-11 !px-3.5 !py-[9px] md:!min-h-11 md:!rounded-lg md:!px-4 md:!py-[9px]`;
 
 function getInitial(name: string | null, email: string | null): string {
   if (name?.trim()) return name.trim().charAt(0).toUpperCase();
@@ -443,7 +444,7 @@ export default function SettingsPage() {
                 <div className="grid gap-5 p-4 md:grid-cols-2 md:gap-x-5 md:gap-y-6 md:p-6">
                   <ProjectFormField label="작가명 또는 스튜디오명">
                     <ProjectFormInput
-                      className={PROJECT_FORM_INPUT_CLASS}
+                      className={SETTINGS_INPUT_CLASS}
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
                       placeholder="이름"
@@ -454,7 +455,7 @@ export default function SettingsPage() {
                     <div className="relative">
                       <Phone size={16} className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-subtle-foreground md:left-5" aria-hidden />
                       <ProjectFormPhoneInput
-                        className={`${PROJECT_FORM_INPUT_CLASS} !pl-11`}
+                        className={`${SETTINGS_INPUT_CLASS} !pl-10 md:!pl-10`}
                         value={editPhone}
                         onChange={setEditPhone}
                       />
@@ -463,7 +464,7 @@ export default function SettingsPage() {
 
                   <ProjectFormField label="소개글" hint="고객 갤러리 페이지에 표시됩니다." className="md:col-span-2">
                     <ProjectFormTextarea
-                      className={`${PROJECT_FORM_INPUT_CLASS} min-h-[104px] resize-none leading-relaxed`}
+                      className={`${SETTINGS_INPUT_CLASS} min-h-[96px] resize-none leading-relaxed`}
                       value={editBio}
                       onChange={(e) => setEditBio(e.target.value)}
                       placeholder="촬영 스타일이나 스튜디오를 간단히 소개해 주세요."
@@ -477,7 +478,7 @@ export default function SettingsPage() {
                       </span>
                       <span className="flex shrink-0 items-center pl-3 text-[13px] text-subtle-foreground">@</span>
                       <ProjectFormInput
-                        className="min-w-0 flex-1 bg-transparent px-2 py-[11px] text-[16px] text-foreground outline-none placeholder:text-placeholder-foreground md:py-[14px]"
+                        className="min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[16px] text-foreground outline-none placeholder:text-placeholder-foreground"
                         value={editInstagram}
                         onChange={(e) => setEditInstagram(e.target.value)}
                         placeholder="계정명"
@@ -489,7 +490,7 @@ export default function SettingsPage() {
                     <div className="relative">
                       <Globe2 size={16} className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-subtle-foreground md:left-5" aria-hidden />
                       <ProjectFormInput
-                        className={`${PROJECT_FORM_INPUT_CLASS} !pl-11`}
+                        className={`${SETTINGS_INPUT_CLASS} !pl-10 md:!pl-10`}
                         value={editPortfolio}
                         onChange={(e) => setEditPortfolio(e.target.value)}
                         placeholder="https://..."
@@ -537,7 +538,7 @@ export default function SettingsPage() {
                     <label className="flex items-center gap-2">
                       <ProjectFormInput
                         aria-label="셀렉 마감 기본 기간"
-                        className={`${PROJECT_FORM_INPUT_CLASS} w-20 text-right md:w-24`}
+                        className={`${SETTINGS_INPUT_CLASS} w-20 text-right md:w-24`}
                         type="text"
                         inputMode="numeric"
                         value={defaultDeadlineDays}

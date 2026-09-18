@@ -27,10 +27,12 @@ test("작가 프로젝트 기본값을 불러오고 저장한다", async ({ page
   });
 
   await page.goto("/photographer/settings");
-  await expect(page.getByLabel("셀렉 마감 기본 기간")).toHaveValue("30");
+  const deadlineInput = page.getByLabel("셀렉 마감 기본 기간");
+  await expect(deadlineInput).toHaveValue("30");
+  await expect(deadlineInput).toHaveCSS("height", "44px");
   await expect(page.getByRole("radio", { name: /원본까지 준비 후 요청/ })).toHaveAttribute("aria-checked", "true");
 
-  await page.getByLabel("셀렉 마감 기본 기간").fill("45");
+  await deadlineInput.fill("45");
   await page.getByLabel("새 프로젝트 원본 다운로드 허용").click();
   await page.getByRole("radio", { name: /빠른 셀렉 요청/ }).click();
   await page.getByRole("button", { name: "기본 설정 저장" }).click();
