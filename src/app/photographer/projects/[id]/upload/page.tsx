@@ -846,6 +846,7 @@ export default function ProjectDetailPage() {
   const [photoSort, setPhotoSort] = useState<PhotoSort>("filename-asc");
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
   const [recommendationSaving, setRecommendationSaving] = useState(false);
+  const [showRecommendationGuide, setShowRecommendationGuide] = useState(false);
   const [showRecommendedOnly, setShowRecommendedOnly] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobilePhotoManageMode, setMobilePhotoManageMode] = useState(false);
@@ -1287,6 +1288,17 @@ export default function ProjectDetailPage() {
     [photos],
   );
 
+  const dismissRecommendationGuide = useCallback(() => {
+    setShowRecommendationGuide(false);
+    localStorage.setItem("acut:recommendation-guide-seen", "1");
+  }, []);
+
+  useEffect(() => {
+    if (photosLoading || displayPhotos.length === 0 || recommendedPhotoIds.size > 0 || isUploading) return;
+    const frame = requestAnimationFrame(() => setShowRecommendationGuide(localStorage.getItem("acut:recommendation-guide-seen") !== "1"));
+    return () => cancelAnimationFrame(frame);
+  }, [displayPhotos.length, isUploading, photosLoading, recommendedPhotoIds.size]);
+
   const saveRecommendations = useCallback(async (nextIds: Set<string>, successMessage: string, clearSelection = false) => {
     if (recommendationSaving) return;
     setRecommendationSaving(true);
@@ -1307,12 +1319,13 @@ export default function ProjectDetailPage() {
         setMobilePhotoManageMode(false);
       }
       setToast(successMessage);
+      if (nextIds.size > 0) dismissRecommendationGuide();
     } catch (error) {
       setToast(error instanceof Error ? error.message : "추천 저장에 실패했습니다.");
     } finally {
       setRecommendationSaving(false);
     }
-  }, [id, recommendationSaving]);
+  }, [dismissRecommendationGuide, id, recommendationSaving]);
 
   const galleryPhotos = useMemo(() => {
     const sourcePhotos = showRecommendedOnly ? displayPhotos : groupedDisplayPhotos;
@@ -3132,8 +3145,8 @@ export default function ProjectDetailPage() {
     void saveRecommendations(
       nextIds,
       selectedPhotosAreRecommended
-        ? `${count}장을 작가 추천에서 제외했습니다.`
-        : `${count}장을 작가 추천으로 지정했습니다.`,
+        ? `${count}장을 추천에서 제외했습니다.`
+        : `${count}장을 고객에게 추천했습니다.`,
       true,
     );
   };
@@ -3152,6 +3165,8 @@ export default function ProjectDetailPage() {
       recommendedCount={recommendedPhotoIds.size}
       recommendedOnly={showRecommendedOnly}
       onChange={setPhotoScope}
+      showRecommendationGuide={showRecommendationGuide && recommendedPhotoIds.size === 0 && !showRecommendedOnly && !isUploading}
+      onDismissRecommendationGuide={dismissRecommendationGuide}
     />
   );
   const recommendationHint = recommendedPhotoIds.size === 0
@@ -3980,10 +3995,11 @@ export default function ProjectDetailPage() {
             ) : displayPhotos.length === 0 && photoUploadAllowed ? (
               <EmptyUploadPanel onBrowse={requestOpenFilePicker} maxPhotos={betaMaxPhotosPerProject} />
             ) : galleryPhotos.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-                <Search size={24} className="text-subtle-foreground" aria-hidden />
-                <p className="m-0 text-[15px] font-semibold leading-6 tracking-[-0.45px] text-foreground">{showRecommendedOnly && recommendedPhotoIds.size === 0 ? "아직 추천한 사진이 없습니다" : "검색 결과가 없습니다"}</p>
-                <PhotographerLightButton variant="secondary" onClick={() => { setShowRecommendedOnly(false); setPhotoSearch(""); setQualityFilter(new Set()); }}>전체 사진 보기</PhotographerLightButton>
+              <div className="flex h-full flex-col items-center justify-center gap-2 px-5 text-center">
+                {showRecommendedOnly && recommendedPhotoIds.size === 0 ? <RecommendationMark size={24} aria-hidden /> : <Search size={24} className="text-subtle-foreground" aria-hidden />}
+                <p className="m-0 text-[15px] font-semibold leading-6 tracking-[-0.45px] text-foreground">{showRecommendedOnly && recommendedPhotoIds.size === 0 ? "아직 추천한 사진이 없어요" : "검색 결과가 없습니다"}</p>
+                {showRecommendedOnly && recommendedPhotoIds.size === 0 ? <p className="m-0 text-xs leading-5 text-muted-foreground">전체 사진에서 사진을 선택한 뒤 고객에게 추천해 보세요.</p> : null}
+                <PhotographerLightButton variant="secondary" onClick={() => { setShowRecommendedOnly(false); setPhotoSearch(""); setQualityFilter(new Set()); if (isMobile) setMobilePhotoManageMode(true); }}>{showRecommendedOnly && recommendedPhotoIds.size === 0 ? "전체 사진에서 선택하기" : "전체 사진 보기"}</PhotographerLightButton>
               </div>
             ) : (
               <OriginalPhotoGallery
@@ -4172,7 +4188,7 @@ export default function ProjectDetailPage() {
             className="h-12 w-full px-5 text-[14px] md:w-auto"
           >
             <RecommendationMark size={16} aria-hidden />
-            {selectedPhotosAreRecommended ? "작가 추천에서 제외" : "작가 추천으로 지정"}
+            {selectedPhotosAreRecommended ? "추천에서 제외" : "고객에게 추천"}
           </PhotographerLightButton>
           <PhotographerLightButton
             type="button"
@@ -4265,10 +4281,10 @@ export default function ProjectDetailPage() {
                 const recommended = recommendedPhotoIds.has(activePhoto.id);
                 if (recommended) nextIds.delete(activePhoto.id);
                 else nextIds.add(activePhoto.id);
-                void saveRecommendations(nextIds, recommended ? "작가 추천에서 제외했습니다." : "작가 추천으로 지정했습니다.");
+                void saveRecommendations(nextIds, recommended ? "추천에서 제외했습니다." : "고객에게 추천했습니다.");
               }}>
               <RecommendationMark size={16} />
-              {recommendedPhotoIds.has(activePhoto.id) ? "추천 제외" : "작가 추천"}
+              {recommendedPhotoIds.has(activePhoto.id) ? "추천 제외" : "고객에게 추천"}
             </button>
           ) : undefined}
           activeIndex={viewerFilmstripIndex}

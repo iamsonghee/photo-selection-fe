@@ -67,8 +67,54 @@
 .menu strong { color: var(--subtle-foreground); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .menu > button[aria-checked="true"] strong { color: var(--accent); }
 
+.guide {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 70;
+  width: min(292px, calc(100vw - 28px));
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 14px 36px 12px 14px;
+  color: var(--foreground);
+  box-shadow: 0 12px 32px rgba(2, 56, 82, 0.2);
+}
+
+.guide::before {
+  position: absolute;
+  top: -6px;
+  left: 24px;
+  width: 12px;
+  height: 12px;
+  background: var(--surface);
+  content: "";
+  transform: rotate(45deg);
+}
+
+.guide > button:first-child {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.guide > strong { display: block; font-size: 13px; line-height: 20px; }
+.guide > p { margin: 4px 0 0; color: var(--muted-foreground); font-size: 12px; font-weight: 500; line-height: 18px; }
+.guide > p b { color: var(--accent); font-weight: 700; }
+.guide .guideConfirm { margin-top: 8px; border: 0; background: transparent; padding: 0; color: var(--accent); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.guide button:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 42%, transparent); outline-offset: 1px; }
+
 @media (max-width: 767px) {
   .trigger { width: 132px; height: 36px; gap: 5px; padding-inline: 9px; font-size: 12px; }
   .trigger > strong { display: none; }
   .menu { width: 208px; }
+  .guide { width: min(280px, calc(100vw - 28px)); }
 }

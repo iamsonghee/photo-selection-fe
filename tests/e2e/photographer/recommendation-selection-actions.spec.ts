@@ -21,6 +21,11 @@ test("선택한 사진을 같은 작업 바에서 추천으로 지정하고 제�
   await expect(page.getByRole("button", { name: /추천 사진 (고르기|수정)/ })).toHaveCount(0);
   const scopeSelect = page.getByRole("button", { name: "보기 범위: 전체 사진" });
   await expect(scopeSelect).toBeVisible();
+  await expect(page.locator("[data-recommendation-guide]:visible")).toBeVisible();
+  await scopeSelect.click();
+  await page.getByRole("menuitemradio", { name: /추천한 사진 0장/ }).click();
+  await expect(page.getByText("아직 추천한 사진이 없어요", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "전체 사진에서 선택하기" }).click();
   const desktopToolbar = page.locator(".prj-desktop-toolbar");
   const [toolbarBox, scopeBox, searchBox] = await Promise.all([
     desktopToolbar.boundingBox(),
@@ -62,23 +67,23 @@ test("선택한 사진을 같은 작업 바에서 추천으로 지정하고 제�
     response.url().includes(`/api/photographer/projects/${project.projectId}/recommendations`)
       && response.request().method() === "PATCH",
   );
-  await page.getByRole("button", { name: "작가 추천으로 지정", exact: true }).click();
+  await page.getByRole("button", { name: "고객에게 추천", exact: true }).click();
   expect((await addResponse).ok()).toBe(true);
   await expect(card.getByLabel("작가 추천")).toBeVisible();
-  await expect(page.getByText("1장을 작가 추천으로 지정했습니다.", { exact: true })).toBeVisible();
+  await expect(page.getByText("1장을 고객에게 추천했습니다.", { exact: true })).toBeVisible();
   await scopeSelect.click();
-  await page.getByRole("menuitemradio", { name: /작가 추천 1장/ }).click();
-  await expect(page.getByRole("button", { name: "보기 범위: 작가 추천" })).toBeVisible();
+  await page.getByRole("menuitemradio", { name: /추천한 사진 1장/ }).click();
+  await expect(page.getByRole("button", { name: "보기 범위: 추천한 사진" })).toBeVisible();
   await expect(page.locator("[data-original-photo-card]")).toHaveCount(1);
 
   await card.hover();
   await card.getByRole("button", { name: / 선택$/ }).click();
-  await expect(page.getByRole("button", { name: "작가 추천에서 제외", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "추천에서 제외", exact: true })).toBeVisible();
   const removeResponse = page.waitForResponse((response) =>
     response.url().includes(`/api/photographer/projects/${project.projectId}/recommendations`)
       && response.request().method() === "PATCH",
   );
-  await page.getByRole("button", { name: "작가 추천에서 제외", exact: true }).click();
+  await page.getByRole("button", { name: "추천에서 제외", exact: true }).click();
   expect((await removeResponse).ok()).toBe(true);
   await expect(card.getByLabel("작가 추천")).toHaveCount(0);
 });
@@ -88,6 +93,7 @@ test("모바일에서 사진을 길게 눌러 추천으로 지정한다", async 
   await page.goto(project.uploadUrl);
   const scopeSelect = page.getByRole("button", { name: "보기 범위: 전체 사진" });
   await expect(scopeSelect).toBeVisible();
+  await page.getByRole("button", { name: "작가 추천 안내 닫기" }).click();
   await expect(scopeSelect.locator("strong")).toBeHidden();
   const scopeBox = await scopeSelect.boundingBox();
   expect(scopeBox).not.toBeNull();
@@ -119,15 +125,15 @@ test("모바일에서 사진을 길게 눌러 추천으로 지정한다", async 
   const checkbox = card.locator("[data-mobile-selection-checkbox]");
   await expect(checkbox).toBeVisible();
   await checkbox.click();
-  await expect(page.getByRole("button", { name: "작가 추천으로 지정", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "고객에게 추천", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "취소", exact: true }).click();
 
   const hitArea = card.getByRole("button", { name: /상세 보기$/ });
   await hitArea.dispatchEvent("pointerdown", { pointerType: "touch", button: 0, clientX: 80, clientY: 240 });
   await page.waitForTimeout(500);
 
-  await expect(page.getByRole("button", { name: "작가 추천으로 지정", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "작가 추천으로 지정", exact: true }).click();
+  await expect(page.getByRole("button", { name: "고객에게 추천", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "고객에게 추천", exact: true }).click();
   await expect(card.getByLabel("작가 추천")).toBeVisible();
 });
 
@@ -145,12 +151,12 @@ test("원본 탭에서 저장된 작가 추천을 표시하고 필터링한다",
   await expect(page.getByLabel("작가 추천")).toHaveCount(1);
 
   await scopeSelect.click();
-  await page.getByRole("menuitemradio", { name: /작가 추천 1장/ }).click();
+  await page.getByRole("menuitemradio", { name: /추천한 사진 1장/ }).click();
   await expect(page.locator("[data-original-photo-card]")).toHaveCount(1);
-  await expect(page.getByRole("button", { name: "보기 범위: 작가 추천" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "보기 범위: 추천한 사진" })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByRole("button", { name: "보기 범위: 작가 추천" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "보기 범위: 추천한 사진" })).toBeVisible();
   expect(await page.locator("[data-project-asset-toolbar]").evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 
