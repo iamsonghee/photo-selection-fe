@@ -42,6 +42,7 @@
 2. 썸네일 + 프리뷰를 R2에 **병렬** 업로드(`asyncio.gather`).
 3. 요청에 포함된 모든 파일 처리가 끝난 뒤 `insert_photos_with_numbers` RPC가 `photos` 행(포함 `source_*`)과, `include_original=true`인 경우 대응하는 `original_jobs` 행을 **한 DB 트랜잭션**에서 생성한다. `(project_id, client_upload_id)` UNIQUE 제약과 프로젝트 행 잠금을 함께 사용하므로 서버 처리는 성공했지만 브라우저가 응답을 받지 못해 같은 요청을 재전송해도 기존 photo/job을 반환하고 새 행을 만들지 않는다. replay 사진에서 source metadata만 비어 있으면 새 요청값으로 보강한다. 번호 할당·사진·job 생성 중 하나라도 실패하면 전체가 롤백된다.
 4. FastAPI가 생성된 `original_jobs`를 재조회해 presigned PUT URL을 응답에 포함한다. DB 마이그레이션보다 BE가 먼저 배포된 짧은 구간에만 기존 별도 job INSERT 폴백을 사용한다.
+5. 프로젝트의 `upload_strategy`에 따라 브라우저가 원본 PUT을 시작한다. `preview_first`는 모든 프리뷰 row 등록 후 원본 queue를 열고, `parallel`은 각 프리뷰 응답에서 presigned 정보를 받는 즉시 원본 queue를 실행한다. 모바일 원본 동시성은 1, PC는 기존 적응형 동시성 범위 안에서 동작한다.
 5. confirm 요청(`/originals/confirm`) 수신 시 R2 HEAD 확인 → job 상태를 `awaiting_upload → pending`으로 전이.
 
 ### R2 저장 경로

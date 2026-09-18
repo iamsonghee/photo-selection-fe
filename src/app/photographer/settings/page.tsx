@@ -8,12 +8,14 @@ import {
   Loader2,
   Check,
   Camera,
+  CalendarDays,
   Mail,
   Bell,
   Globe2,
   Instagram,
   LogOut,
   Phone,
+  SlidersHorizontal,
   ShieldCheck,
   Trash2,
   UserRound,
@@ -134,6 +136,11 @@ export default function SettingsPage() {
   const [editPhone, setEditPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [defaultDeadlineDays, setDefaultDeadlineDays] = useState("30");
+  const [defaultIncludeOriginal, setDefaultIncludeOriginal] = useState(false);
+  const [defaultUploadStrategy, setDefaultUploadStrategy] = useState<"preview_first" | "parallel">("parallel");
+  const [savingDefaults, setSavingDefaults] = useState(false);
+  const [defaultsError, setDefaultsError] = useState<string | null>(null);
 
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -156,6 +163,9 @@ export default function SettingsPage() {
     );
     setEditPortfolio(ctxProfile.portfolioUrl ?? "");
     setEditPhone(ctxProfile.contactPhone ?? "");
+    setDefaultDeadlineDays(String(ctxProfile.defaultSelectionDeadlineDays));
+    setDefaultIncludeOriginal(ctxProfile.defaultIncludeOriginal);
+    setDefaultUploadStrategy(ctxProfile.defaultUploadStrategy);
   }, [ctxProfile, profile]);
 
   const showToast = (message: string, isError = false) => {
@@ -216,6 +226,42 @@ export default function SettingsPage() {
     setEditPortfolio(profile.portfolioUrl ?? "");
     setEditPhone(profile.contactPhone ?? "");
     setFormError(null);
+  };
+
+  const handleDefaultsSave = async () => {
+    if (!profile) return;
+    const days = Number(defaultDeadlineDays);
+    if (!Number.isInteger(days) || days < 1 || days > 365) {
+      setDefaultsError("셀렉 마감 기본 기간은 1~365일로 입력해주세요.");
+      return;
+    }
+    setSavingDefaults(true);
+    setDefaultsError(null);
+    try {
+      const res = await fetch("/api/photographer/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          default_selection_deadline_days: days,
+          default_include_original: defaultIncludeOriginal,
+          default_upload_strategy: defaultUploadStrategy,
+        }),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "저장에 실패했습니다.");
+      const patch = {
+        defaultSelectionDeadlineDays: days,
+        defaultIncludeOriginal,
+        defaultUploadStrategy,
+      };
+      setProfile({ ...profile, ...patch });
+      updateCtxProfile(patch);
+      showToast("프로젝트 기본 설정이 저장되었습니다.");
+    } catch (e) {
+      setDefaultsError(e instanceof Error ? e.message : "저장 실패");
+    } finally {
+      setSavingDefaults(false);
+    }
   };
 
   const handleProfileImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -310,7 +356,7 @@ export default function SettingsPage() {
         <div className="mx-auto max-w-[1120px]">
           <PhotographerLightPageHeader
             title="설정"
-            description="고객에게 보이는 프로필과 계정 환경을 관리하세요."
+            description="고객에게 보이는 프로필과 새 프로젝트 기본값을 관리하세요."
             className="mb-6 md:mb-8"
             mobileDense
           />
@@ -473,6 +519,80 @@ export default function SettingsPage() {
                     변경사항 저장
                   </PhotographerLightButton>
                   </div>
+                </footer>
+              </SettingsPanel>
+
+              <SettingsPanel>
+                <SettingsSectionHeading
+                  icon={SlidersHorizontal}
+                  title="프로젝트 기본 설정"
+                  description="새 프로젝트를 만들 때 자동으로 적용합니다. 기존 프로젝트에는 영향을 주지 않습니다."
+                />
+                <div className="divide-y divide-border-subtle">
+                  <SettingsRow
+                    icon={CalendarDays}
+                    label="셀렉 마감 기본 기간"
+                    description="고객에게 셀렉을 요청하는 날부터 계산합니다."
+                  >
+                    <label className="flex items-center gap-2">
+                      <ProjectFormInput
+                        aria-label="셀렉 마감 기본 기간"
+                        className={`${PROJECT_FORM_INPUT_CLASS} w-20 text-right md:w-24`}
+                        type="text"
+                        inputMode="numeric"
+                        value={defaultDeadlineDays}
+                        onChange={(event) => setDefaultDeadlineDays(event.target.value.replace(/[^0-9]/g, ""))}
+                      />
+                      <span className="text-sm font-semibold text-muted-foreground">일</span>
+                    </label>
+                  </SettingsRow>
+                  <SettingsRow
+                    label="원본 다운로드"
+                    description="새 프로젝트에서 고객에게 납품용 원본을 전달할지 정합니다."
+                  >
+                    <PhotographerLightSwitch
+                      checked={defaultIncludeOriginal}
+                      onCheckedChange={setDefaultIncludeOriginal}
+                      ariaLabel="새 프로젝트 원본 다운로드 허용"
+                    />
+                  </SettingsRow>
+                  <div className="px-4 py-4 md:px-6 md:py-5">
+                    <p className="text-[14px] font-semibold leading-5 text-foreground">고객 셀렉 시작 방식</p>
+                    <p className="mt-1 text-[12px] leading-[18px] text-muted-foreground md:text-[13px] md:leading-5">원본을 포함하는 새 프로젝트의 업로드 순서와 초대 가능 시점을 정합니다.</p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="고객 셀렉 시작 방식">
+                      {([
+                        ["preview_first", "빠른 셀렉 요청", "셀렉용 사진을 먼저 준비하고 원본은 이어서 업로드해요."],
+                        ["parallel", "원본까지 준비 후 요청", "셀렉용 사진과 원본을 함께 올리고 모두 준비되면 요청해요."],
+                      ] as const).map(([value, label, description]) => {
+                        const selected = defaultUploadStrategy === value;
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            onClick={() => setDefaultUploadStrategy(value)}
+                            className={`rounded-xl border px-4 py-3 text-left transition-colors ${selected ? "border-accent bg-accent/5" : "border-border-subtle bg-surface hover:bg-surface-raised"}`}
+                          >
+                            <span className="block text-sm font-bold text-foreground">{label}</span>
+                            <span className="mt-1 block break-keep text-xs leading-[18px] text-muted-foreground">{description}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                <footer className="flex flex-col gap-3 border-t border-border-subtle bg-surface-raised/55 px-4 py-4 sm:flex-row sm:items-center sm:justify-between md:px-6">
+                  <div className="min-h-[18px]">{defaultsError ? <ProjectFormError>{defaultsError}</ProjectFormError> : null}</div>
+                  <PhotographerLightButton
+                    type="button"
+                    variant="primary"
+                    onClick={handleDefaultsSave}
+                    pending={savingDefaults}
+                    pendingLabel="저장 중…"
+                  >
+                    기본 설정 저장
+                  </PhotographerLightButton>
                 </footer>
               </SettingsPanel>
 

@@ -119,6 +119,10 @@ export interface Project {
   clipAnalysisStatus?: "processing" | "completed" | "failed" | null;
   /** 납품용 원본 파일 포함 여부 (프로젝트 생성 시 설정) */
   includeOriginal: boolean;
+  /** 고객 셀렉 요청 모달에 적용할 기본 기간 */
+  selectionDeadlineDays: number;
+  /** preview_first=셀렉용 사진 우선, parallel=원본과 병렬 업로드 후 요청 */
+  uploadStrategy: "preview_first" | "parallel";
   /** 납품용 원본 다운로드 ZIP 아카이브 생성 상태 (include_original=false면 null) */
   originalArchiveStatus?: "pending" | "processing" | "ready" | "failed" | null;
   /** 초대 링크 활성화(다운로드 30일 기산) 시각 — 최초 1회만 기록, 재전달로 초기화 안 됨 */

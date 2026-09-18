@@ -124,6 +124,9 @@ export async function PATCH(
       if (activationResult === "insufficient_photos") {
         return NextResponse.json({ error: "셀렉 목표 장수만큼 사진을 업로드해주세요.", code: "insufficient_photos" }, { status: 409 });
       }
+      if (activationResult === "originals_incomplete") {
+        return NextResponse.json({ error: "납품용 원본 업로드가 끝난 뒤 셀렉을 요청할 수 있습니다.", code: "originals_incomplete" }, { status: 409 });
+      }
       return NextResponse.json({ error: "현재 프로젝트 상태에서는 셀렉을 시작할 수 없습니다.", code: activationResult ?? "activation_failed" }, { status: 409 });
     }
 

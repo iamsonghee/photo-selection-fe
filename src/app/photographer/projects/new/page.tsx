@@ -9,7 +9,7 @@
  * ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS location text;
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, AlertTriangle } from "lucide-react";
 import { addDays, format } from "date-fns";
@@ -78,6 +78,7 @@ export default function NewProjectPage() {
   const [submitAction,  setSubmitAction]  = useState<"later" | "upload" | null>(null);
   const [error,         setError]         = useState<string | null>(null);
   const [fieldErrors,   setFieldErrors]   = useState<Record<string, string>>({});
+  const defaultsAppliedRef = useRef(false);
   const { quota, loading: quotaLoading, error: quotaError, refetch: refetchQuota } = useQuota();
 
   // atLimit 게이트는 실제 생성을 막는 비즈니스 룰이라, 세션 공유 캐시에 기대지 않고 이 페이지를
@@ -87,6 +88,13 @@ export default function NewProjectPage() {
     refetchQuota();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!profile || defaultsAppliedRef.current) return;
+    defaultsAppliedRef.current = true;
+    setIncludeOriginal(profile.defaultIncludeOriginal);
+    setDeadline(format(addDays(new Date(), profile.defaultSelectionDeadlineDays), "yyyy-MM-dd"));
+  }, [profile]);
 
   const handleSubmit = async (goToUpload: boolean) => {
     if (submitting || profileLoading) return;
@@ -400,6 +408,20 @@ export default function NewProjectPage() {
                 onCheckedChange={setIncludeOriginal}
                 ariaLabel="원본 다운로드 허용"
               />
+
+              {profile ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-raised px-4 py-3 text-xs text-muted-foreground">
+                  <span>
+                    셀렉 마감 {profile.defaultSelectionDeadlineDays}일
+                    {includeOriginal
+                      ? ` · ${profile.defaultUploadStrategy === "preview_first" ? "빠른 셀렉 요청" : "원본까지 준비 후 요청"}`
+                      : ""}
+                  </span>
+                  <button type="button" className="font-bold text-accent" onClick={() => router.push("/photographer/settings")}>
+                    기본 설정 변경
+                  </button>
+                </div>
+              ) : null}
 
               <ProjectPinControl value={accessPin} onChange={setAccessPin} />
             </ProjectFormSection>

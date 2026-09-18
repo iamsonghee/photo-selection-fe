@@ -1925,6 +1925,7 @@ export default function ProjectDetailPage() {
 
     let currentToken = token;
     const totalFiles = uploadFiles.length;
+    const previewFirst = project?.uploadStrategy !== "parallel";
     // 같은 파일 전송의 XHR 재시도와 direct API -> Next proxy fallback 전체에서 재사용한다.
     // 서버 UNIQUE(project_id, client_upload_id)가 응답 유실 후 중복 photo/job 생성을 막는다.
     const clientUploadIds = uploadFiles.map((_, index) => retryClientUploadIds?.[index] ?? createClientUploadId());
@@ -1939,14 +1940,15 @@ export default function ProjectDetailPage() {
       : (mobileUploadClient ? MOBILE_CONCURRENCY : getDesktopUploadConcurrency(false));
     const requestSlots = new UploadWorkQueue(concurrency);
     const originalConcurrencyMax = mobileUploadClient ? 1 : Math.max(1, concurrency - 1);
-    // 원본 task는 생성해 두되 previewsFinished가 풀릴 때까지 네트워크를 사용하지 않는다.
-    // 프리뷰 등록 완료 뒤 기존 적응형 상한 안에서 원본 처리량을 시작한다.
-    const originalConcurrencyInitial = 1;
+    // 빠른 셀렉 요청은 모든 프리뷰 등록 뒤 원본을 시작한다. 안정 우선 방식은 각 프리뷰가
+    // 등록되는 즉시 원본을 병렬 전송한다.
+    const originalConcurrencyInitial = previewFirst ? 1 : (mobileUploadClient ? 1 : Math.min(2, originalConcurrencyMax));
     const originalConcurrencyAfterPreviews = mobileUploadClient ? 1 : Math.min(2, originalConcurrencyMax);
     const originalQueue = new UploadWorkQueue(originalConcurrencyInitial);
     let adaptiveOriginalConcurrency: AdaptiveUploadConcurrency | null = null;
     const previewConcurrency = inclOrig ? Math.min(2, concurrency) : concurrency;
     const previewsFinished = uploadDeferred<void>();
+    if (!previewFirst) previewsFinished.resolve();
     const originalTaskIndexes = new Set<number>();
     const originalResults = uploadFiles.map(() => uploadDeferred<{ job: OriginalPresignedItem; token: string } | null>());
     const originalTasks: Promise<void>[] = [];
@@ -2762,7 +2764,7 @@ export default function ProjectDetailPage() {
         setAiPromptOpen(true);
       }
     }, 600);
-  }, [id, loadProject, loadPhotos, router, project?.includeOriginal, loadClipAnalysisStatus, checkPendingOriginals, clipAnalysisStatus, qualityAnalysisStatus]);
+  }, [id, loadProject, loadPhotos, router, project?.includeOriginal, project?.uploadStrategy, loadClipAnalysisStatus, checkPendingOriginals, clipAnalysisStatus, qualityAnalysisStatus]);
 
   const handleStopUpload = useCallback(() => {
     if (stopRequestedRef.current) return;
@@ -3058,17 +3060,21 @@ export default function ProjectDetailPage() {
     const m = project.photoCount;
     const n = project.requiredCount;
     if (project.status !== "preparing" || m < n) return false;
-    // 고객 갤러리에 들어갈 preview 등록까지만 기다린다. 전달용 원본 PUT은 별도 queue에서
-    // 계속 진행하며 고객 셀렉 시작을 막지 않는다.
+    // 빠른 셀렉 요청은 preview 등록까지만 기다린다. 원본까지 준비 후 요청 방식은 원본 PUT과
+    // confirm까지 끝나야 활성화할 수 있고, DB RPC도 같은 조건을 다시 확인한다.
+    const originalsMustFinish = project.includeOriginal && project.uploadStrategy === "parallel";
     const uploadStillActive =
       uploadPhase === "sending" ||
       uploadPhase === "processing" ||
+      (originalsMustFinish && (uploadPhase === "originals" || sendingSourcePhase)) ||
       isPreparingFiles ||
       awaitingServerFinalize ||
       uploadingPhotos.length > 0 ||
       queuedPreviews.length > 0;
     if (uploadStillActive) {
-      setToast("셀렉용 사진 저장이 끝난 뒤 고객 링크를 활성화할 수 있습니다.");
+      setToast(originalsMustFinish
+        ? "납품용 원본 업로드가 끝난 뒤 고객 링크를 활성화할 수 있습니다."
+        : "셀렉용 사진 저장이 끝난 뒤 고객 링크를 활성화할 수 있습니다.");
       return false;
     }
     setInviteActivating(true);
@@ -4854,6 +4860,7 @@ export default function ProjectDetailPage() {
         recommendedPhotos={photos.filter((photo) => recommendedPhotoIds.has(photo.id))}
         includeOriginal={project.includeOriginal}
         initialDeadline={project.deadline?.slice(0, 10) ?? ""}
+        defaultDeadlineDays={project.selectionDeadlineDays}
         inviteUrl={inviteUrl}
         accessPin={project.accessPin}
         pending={inviteActivating}

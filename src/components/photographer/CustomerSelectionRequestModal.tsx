@@ -69,6 +69,7 @@ export function CustomerSelectionRequestModal({
   recommendedPhotos,
   includeOriginal,
   initialDeadline,
+  defaultDeadlineDays,
   inviteUrl,
   accessPin,
   pending,
@@ -86,6 +87,7 @@ export function CustomerSelectionRequestModal({
   recommendedPhotos?: ReadonlyArray<{ id: string; url: string; originalFilename?: string | null }>;
   includeOriginal: boolean;
   initialDeadline: string;
+  defaultDeadlineDays?: number;
   inviteUrl: string;
   accessPin?: string | null;
   pending: boolean;
@@ -95,7 +97,9 @@ export function CustomerSelectionRequestModal({
   onSavePin?: (pin: string | null) => Promise<void>;
   onReviewRecommendations?: () => void;
 }) {
-  const [deadline, setDeadline] = useState(() => initialDeadlineValue(initialDeadline));
+  const [deadline, setDeadline] = useState(() => defaultDeadlineDays
+    ? deadlineFromToday(defaultDeadlineDays)
+    : initialDeadlineValue(initialDeadline));
   const [photoLockAcknowledged, setPhotoLockAcknowledged] = useState(false);
   const deadlineLabel = relativeDeadlineLabel(deadline);
   const inviteUrlLabel = compactInviteUrl(inviteUrl);

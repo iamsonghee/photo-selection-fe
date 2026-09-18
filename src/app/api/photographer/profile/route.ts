@@ -22,10 +22,13 @@ export interface PhotographerProfile {
   instagramUrl: string | null;
   portfolioUrl: string | null;
   contactPhone: string | null;
+  defaultSelectionDeadlineDays: number;
+  defaultIncludeOriginal: boolean;
+  defaultUploadStrategy: "preview_first" | "parallel";
   createdAt: string;
 }
 
-const SELECT_COLS = "id, auth_id, email, name, profile_image_url, bio, instagram_url, portfolio_url, contact_phone, created_at";
+const SELECT_COLS = "id, auth_id, email, name, profile_image_url, bio, instagram_url, portfolio_url, contact_phone, default_selection_deadline_days, default_include_original, default_upload_strategy, created_at";
 
 /** GET: 현재 로그인 작가 프로필. admin 클라이언트 우선, 없으면 server anon 클라이언트로 폴백. */
 export async function GET() {
@@ -104,6 +107,9 @@ export async function GET() {
       instagramUrl: (row.instagram_url as string | null) ?? null,
       portfolioUrl: (row.portfolio_url as string | null) ?? null,
       contactPhone: (row.contact_phone as string | null) ?? null,
+      defaultSelectionDeadlineDays: (row.default_selection_deadline_days as number | null) ?? 30,
+      defaultIncludeOriginal: (row.default_include_original as boolean | null) ?? false,
+      defaultUploadStrategy: row.default_upload_strategy === "preview_first" ? "preview_first" : "parallel",
       createdAt: row.created_at as string,
     };
 
@@ -141,6 +147,21 @@ export async function PATCH(req: NextRequest) {
     else if (body.profile_image_url === null) payload.profile_image_url = null;
     if (typeof body.contact_phone === "string") payload.contact_phone = body.contact_phone;
     else if (body.contact_phone === null) payload.contact_phone = null;
+    if ("default_selection_deadline_days" in body) {
+      if (!Number.isInteger(body.default_selection_deadline_days) || body.default_selection_deadline_days < 1 || body.default_selection_deadline_days > 365) {
+        return NextResponse.json({ error: "셀렉 마감 기본 기간은 1~365일로 입력해주세요." }, { status: 400 });
+      }
+      payload.default_selection_deadline_days = body.default_selection_deadline_days;
+    }
+    if (typeof body.default_include_original === "boolean") {
+      payload.default_include_original = body.default_include_original;
+    }
+    if ("default_upload_strategy" in body) {
+      if (body.default_upload_strategy !== "preview_first" && body.default_upload_strategy !== "parallel") {
+        return NextResponse.json({ error: "업로드 방식이 올바르지 않습니다." }, { status: 400 });
+      }
+      payload.default_upload_strategy = body.default_upload_strategy;
+    }
 
     if (Object.keys(payload).length === 0) {
       return NextResponse.json({ ok: true });

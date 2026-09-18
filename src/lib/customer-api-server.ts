@@ -47,6 +47,8 @@ export function mapProjectRow(row: ProjectsRow): Project {
       (row as { clip_analysis_status?: "processing" | "completed" | "failed" | null })
         .clip_analysis_status ?? null,
     includeOriginal: (row as { include_original?: boolean | null }).include_original ?? false,
+    selectionDeadlineDays: (row as { selection_deadline_days?: number | null }).selection_deadline_days ?? 7,
+    uploadStrategy: (row as { upload_strategy?: "preview_first" | "parallel" | null }).upload_strategy ?? "preview_first",
     originalArchiveStatus:
       (row as { original_archive_status?: "pending" | "processing" | "ready" | "failed" | null })
         .original_archive_status ?? null,

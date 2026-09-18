@@ -298,7 +298,8 @@ test("activated project can reopen the upload page only to recover unfinished or
   }
 });
 
-test("mobile registers every preview before allowing the first original PUT", async ({ browser }, testInfo) => {
+for (const strategy of ["preview_first", "parallel"] as const) {
+test(`mobile ${strategy} upload ordering`, async ({ browser }, testInfo) => {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
     baseURL: testInfo.project.use.baseURL,
@@ -348,6 +349,7 @@ test("mobile registers every preview before allowing the first original PUT", as
     await page.route("**/rest/v1/projects?**", route => route.fulfill({ json: {
       id: projectId, photographer_id: projectId, name: "모바일 순서 검증", customer_name: "테스트",
       required_count: 1, photo_count: previewCount, status: "preparing", include_original: true,
+      upload_strategy: strategy,
       access_token: "test-upload-token", created_at: "2026-09-17T00:00:00Z", updated_at: "2026-09-17T00:00:00Z",
     } }));
     await page.route("**/api/photographer/quota", route => route.fulfill({ json: {
@@ -381,10 +383,12 @@ test("mobile registers every preview before allowing the first original PUT", as
     await expect(page.getByText("업로드 완료!", { exact: true })).toBeVisible({ timeout: 30_000 });
     const order = await page.evaluate(() => (window as unknown as { uploadOrder: string[] }).uploadOrder);
     expect(reservationCount).toBe(0);
-    expect(order.indexOf("original")).toBe(6);
+    if (strategy === "preview_first") expect(order.indexOf("original")).toBe(6);
+    else expect(order.indexOf("original")).toBeLessThan(6);
     expect(order.filter((event) => event === "preview")).toHaveLength(6);
     expect(order.filter((event) => event === "original")).toHaveLength(6);
   } finally {
     await context.close();
   }
 });
+}
