@@ -1,0 +1,262 @@
+/* 고객 셀렉 전용 화면 톤 — docs/customer-design.md §4 수치를 그대로 따른다.
+ * (Entry title 24/36 SemiBold, description 14/21, primary CTA 16/24 Bold, 좌우 여백 24px,
+ *  터치 타겟 최소 44px, accent #ff4d00) CustomerEntryShell과 같은 리터럴 값을 쓴다 —
+ * 그 컴포넌트도 --customer-* CSS 변수 대신 고정 hex를 쓰는 관례라 여기서도 맞춘다. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 24px 8px;
+}
+.back {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid #dde1e4;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  color: #5f5e5b;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #191918;
+  margin: 0;
+}
+
+.body {
+  padding: 6px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  flex: 1;
+}
+
+.entryTitle {
+  font-family: "Space Grotesk", "Pretendard", sans-serif;
+  font-size: 24px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: #191918;
+  margin: 0;
+}
+.bodyText {
+  font-size: 14px;
+  line-height: 21px;
+  color: #5f5e5b;
+  margin: 0;
+}
+.supportText {
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 300;
+  color: #8b8985;
+  margin: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #5f5e5b;
+}
+.input {
+  height: 52px;
+  border-radius: 12px;
+  border: 1.5px solid #dde1e4;
+  padding: 0 15px;
+  font-size: 16px;
+  color: #191918;
+  background: #fff;
+  width: 100%;
+  font-family: inherit;
+}
+.input:focus {
+  outline: none;
+  border-color: #ff4d00;
+  box-shadow: 0 0 0 3px #fff0ea;
+}
+.hint {
+  font-size: 12px;
+  color: #8b8985;
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1.5px solid #dde1e4;
+  background: #fff;
+  color: #5f5e5b;
+  font-size: 13.5px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+.chipOn {
+  border-color: #ff4d00;
+  color: #ff4d00;
+  background: #fff0ea;
+  font-weight: 700;
+}
+
+.btn {
+  height: 52px;
+  border-radius: 14px;
+  border: 1.5px solid #dde1e4;
+  background: #fff;
+  color: #191918;
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: inherit;
+  width: 100%;
+}
+.btnPrimary {
+  background: #ff4d00;
+  border-color: #ff4d00;
+  color: #fff;
+}
+.btnPrimary:disabled {
+  opacity: 0.38;
+}
+.btnSm {
+  height: 40px;
+  font-size: 13px;
+  border-radius: 10px;
+}
+.btnGhost {
+  border-color: transparent;
+  background: transparent;
+  color: #5f5e5b;
+  height: 44px;
+  font-size: 13.5px;
+}
+
+.ctaDock {
+  padding: 14px 24px 22px;
+  border-top: 1px solid #dde1e4;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+  position: sticky;
+  bottom: 0;
+}
+.ctaDockRow {
+  flex-direction: row;
+}
+
+.statPill {
+  border-radius: 12px;
+  background: #f7f6f4;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+}
+.statPillAccent {
+  background: #fff0ea;
+}
+.statPill .n {
+  font-family: "Space Grotesk", "Pretendard", sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+  color: #191918;
+}
+.statPillAccent .n {
+  color: #ff4d00;
+}
+.statPill .l {
+  font-size: 11.5px;
+  color: #5f5e5b;
+}
+
+.banner {
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bannerOk {
+  background: #e7f5ee;
+  border: 1px solid #0f8a5f66;
+}
+.bannerWarn {
+  background: #fff0ea;
+  border: 1px solid #ff4d0059;
+}
+.bannerHeadOk {
+  color: #0f8a5f;
+  font-weight: 700;
+  font-size: 14px;
+}
+.bannerHeadWarn {
+  color: #ff4d00;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.divider {
+  height: 1px;
+  background: #dde1e4;
+  border: 0;
+  margin: 0;
+}
+
+.reqItem {
+  background: #f7f6f4;
+  border-radius: 10px;
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.reqItem .fn {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  color: #8b8985;
+}
+.reqItem .tx {
+  font-size: 13.5px;
+  color: #191918;
+}
+
+.exportBlock {
+  background: #f7f6f4;
+  border-radius: 14px;
+  padding: 14px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  line-height: 1.7;
+  border: 1px solid #ecebe8;
+  max-height: 320px;
+  overflow-y: auto;
+  color: #191918;
+}
