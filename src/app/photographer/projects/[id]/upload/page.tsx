@@ -4638,6 +4638,7 @@ export default function ProjectDetailPage() {
         photoCount={M}
         requiredCount={project.requiredCount}
         recommendedCount={recommendedPhotoIds.size}
+        recommendedPhotos={photos.filter((photo) => recommendedPhotoIds.has(photo.id))}
         includeOriginal={project.includeOriginal}
         originalUploadInProgress={project.includeOriginal && photos.some((photo) => photo.originalStatus !== "completed")}
         initialDeadline={project.deadline?.slice(0, 10) ?? ""}
@@ -4646,6 +4647,16 @@ export default function ProjectDetailPage() {
         pending={inviteActivating}
         onRequest={handleEnableClientAccess}
         onSavePin={handleSavePin}
+        onReviewRecommendations={() => {
+          setSelectionRequestModalOpen(false);
+          setShowRecommendedOnly(recommendedPhotoIds.size > 0);
+          setPhotoSearch("");
+          setQualityFilter(new Set());
+          setLightboxIndex(null);
+          if (recommendedPhotoIds.size === 0 && isMobile) setMobilePhotoManageMode(true);
+          dismissRecommendationGuide();
+          photoScrollRef.current?.scrollTo({ top: 0 });
+        }}
       />
 
       {/* ── EDIT GUIDE MODAL — 공용 PhotographerModal 재사용 ── */}

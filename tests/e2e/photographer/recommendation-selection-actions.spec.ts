@@ -71,8 +71,11 @@ test("선택한 사진을 같은 작업 바에서 추천으로 지정하고 제�
   expect((await addResponse).ok()).toBe(true);
   await expect(card.getByLabel("작가 추천")).toBeVisible();
   await expect(page.getByText("1장을 고객에게 추천했습니다.", { exact: true })).toBeVisible();
-  await scopeSelect.click();
-  await page.getByRole("menuitemradio", { name: /추천한 사진 1장/ }).click();
+  await page.getByRole("button", { name: "셀렉 요청하기", exact: true }).click();
+  const requestDialog = page.getByRole("dialog", { name: "고객에게 셀렉 요청하기" });
+  await expect(requestDialog.getByText("추천한 사진 1장", { exact: true })).toBeVisible();
+  await expect(requestDialog.locator("[data-recommendation-preview] img")).toHaveCount(1);
+  await requestDialog.getByRole("button", { name: "확인·수정" }).click();
   await expect(page.getByRole("button", { name: "보기 범위: 추천한 사진" })).toBeVisible();
   await expect(page.locator("[data-original-photo-card]")).toHaveCount(1);
 
@@ -135,6 +138,22 @@ test("모바일에서 사진을 길게 눌러 추천으로 지정한다", async 
   await expect(page.getByRole("button", { name: "고객에게 추천", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "고객에게 추천", exact: true }).click();
   await expect(card.getByLabel("작가 추천")).toBeVisible();
+});
+
+test("추천이 없는 셀렉 요청에서는 사진 추천 진입점을 보여준다", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(project.uploadUrl);
+  await page.getByRole("button", { name: "작가 추천 안내 닫기" }).click();
+  await page.getByRole("button", { name: "셀렉 요청하기", exact: true }).click();
+
+  const requestDialog = page.getByRole("dialog", { name: "셀렉 요청" });
+  await expect(requestDialog.getByText("추천 사진 없이 전달", { exact: true })).toBeVisible();
+  await expect(requestDialog.locator("[data-recommendation-preview]")).toHaveCount(0);
+  await requestDialog.getByRole("button", { name: "추천 사진 추가" }).click();
+
+  await expect(requestDialog).toBeHidden();
+  await expect(page.getByText("사진 선택", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "보기 범위: 전체 사진" })).toBeVisible();
 });
 
 test("원본 탭에서 저장된 작가 추천을 표시하고 필터링한다", async ({ page }) => {

@@ -61,6 +61,7 @@ export function CustomerSelectionRequestModal({
   photoCount,
   requiredCount,
   recommendedCount,
+  recommendedPhotos,
   includeOriginal,
   originalUploadInProgress,
   initialDeadline,
@@ -69,6 +70,7 @@ export function CustomerSelectionRequestModal({
   pending,
   onRequest,
   onSavePin,
+  onReviewRecommendations,
 }: {
   open: boolean;
   onClose: () => void;
@@ -77,6 +79,7 @@ export function CustomerSelectionRequestModal({
   photoCount: number;
   requiredCount: number;
   recommendedCount?: number;
+  recommendedPhotos?: ReadonlyArray<{ id: string; url: string; originalFilename?: string | null }>;
   includeOriginal: boolean;
   originalUploadInProgress?: boolean;
   initialDeadline: string;
@@ -87,6 +90,7 @@ export function CustomerSelectionRequestModal({
   /** 지정하면 "고객 접속 정보" PIN 칸에 연필 아이콘이 붙고, 이 모달 안에서 바로
    * 입력 칸으로 바뀐다 — CustomerInviteShareModal의 인라인 PIN 편집과 같은 계약. */
   onSavePin?: (pin: string | null) => Promise<void>;
+  onReviewRecommendations?: () => void;
 }) {
   const [deadline, setDeadline] = useState(() => initialDeadline || deadlineFromToday(7));
   const [photoLockAcknowledged, setPhotoLockAcknowledged] = useState(false);
@@ -215,13 +219,40 @@ export function CustomerSelectionRequestModal({
         </section>
 
         {recommendedCount !== undefined && (
-          <p className="text-[13px] leading-5 text-muted-foreground" data-recommendation-delivery-summary>
-            {recommendedCount === 0
-              ? "추천 없이 전체 사진을 전달합니다. 고객이 직접 사진을 선택합니다."
-              : recommendedCount === requiredCount
-                ? `작가 추천 ${recommendedCount.toLocaleString()}장을 함께 전달합니다. 고객은 추천대로 확정하거나 전체 사진에서 직접 고를 수 있습니다.`
-                : `작가 추천 ${recommendedCount.toLocaleString()}장은 참고용으로 전달합니다. 고객이 최종 ${requiredCount.toLocaleString()}장을 직접 선택합니다.`}
-          </p>
+          <section className="rounded-lg border border-border-subtle bg-surface px-3.5 py-3 sm:px-4" data-recommendation-delivery-summary>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h4 className="text-[13px] font-bold leading-5 text-foreground">
+                  {recommendedCount > 0 ? `추천한 사진 ${recommendedCount.toLocaleString()}장` : "추천 사진 없이 전달"}
+                </h4>
+                <p className="mt-0.5 text-[12px] leading-[18px] text-muted-foreground">
+                  {recommendedCount === 0
+                    ? `고객이 전체 사진에서 직접 ${requiredCount.toLocaleString()}장을 선택합니다.`
+                    : recommendedCount === requiredCount
+                      ? "고객은 추천 그대로 확정하거나 다른 사진을 고를 수 있어요."
+                      : `고객이 최종 ${requiredCount.toLocaleString()}장을 고를 때 참고합니다.`}
+                </p>
+              </div>
+              {onReviewRecommendations ? (
+                <button
+                  type="button"
+                  onClick={() => { handleClose(); onReviewRecommendations(); }}
+                  disabled={pending || pinSaving}
+                  className="shrink-0 border-0 bg-transparent px-0 py-0.5 text-[12px] font-bold leading-5 text-accent disabled:opacity-40"
+                >
+                  {recommendedCount > 0 ? "확인·수정" : "추천 사진 추가"}
+                </button>
+              ) : null}
+            </div>
+            {recommendedCount > 0 && recommendedPhotos?.length ? (
+              <div className="mt-3 grid grid-cols-5 gap-1.5 sm:gap-2" data-recommendation-preview>
+                {recommendedPhotos.slice(0, 5).map((photo) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={photo.id} src={photo.url} alt="" title={photo.originalFilename ?? undefined} loading="lazy" className="aspect-square min-w-0 w-full rounded-md bg-surface-raised object-cover" />
+                ))}
+              </div>
+            ) : null}
+          </section>
         )}
         <section>
           <div className="flex items-center justify-between gap-4">
