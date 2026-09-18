@@ -51,7 +51,8 @@ for (const viewport of scenarios) {
         previewRegistered && new URL(route.request().url()).searchParams.get("offset") === "0" ? [{
           id: "uploading-original", project_id: projectId, number: 1,
           r2_thumb_url: verifyThumbnailTransition ? "http://localhost:3001/__upload-test/confirmed-thumb" : "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
-          r2_preview_url: null, original_filename: "sample.jpg", original_status: "awaiting_upload",
+          r2_preview_url: null, original_filename: "sample.jpg",
+          original_status: finalized && !viewport.retry ? "completed" : "awaiting_upload",
         }] : [],
       }));
       const thumbnailGate = new Promise<void>(resolve => { allowThumbnail = resolve; });
@@ -212,6 +213,7 @@ for (const viewport of scenarios) {
       await page.screenshot({ path: testInfo.outputPath(`upload-${viewport.width}.png`) });
       allowConfirm();
       await expect(page.getByText("업로드 완료!", { exact: true })).toBeVisible({ timeout: 15000 });
+      await expect(page.getByText("원본 누락", { exact: true })).toHaveCount(0);
       if (verifyThumbnailTransition) {
         await expect(page.locator("[data-photo-transition-image]")).toHaveCount(1);
         await expect(page.locator("[data-photo-displayed-image]")).toHaveCSS("opacity", "1");

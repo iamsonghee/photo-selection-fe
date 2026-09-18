@@ -3979,7 +3979,12 @@ export default function ProjectDetailPage() {
                 getPhotoKey={(photo) => photo.originalFilename ? `upload:${photo.originalFilename}` : photo.id}
                 onPhotoClick={handleOpenPhotoViewer}
                 showQualityBadges
-                showOriginalUploadBadges={project.includeOriginal && !navigationGuardActive}
+                showOriginalUploadBadges={project.includeOriginal
+                  && uploadPhase === "idle"
+                  && !recoveryBusy
+                  && pendingPhotos.length === 0
+                  && uploadingPhotos.length === 0
+                  && queuedPreviews.length === 0}
                 groupsById={groupsById}
                 showSimilarityGroups={similarityToggleOn}
                 expandedGroups={expandedGroups}
