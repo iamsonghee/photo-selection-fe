@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, CalendarDays, KeyRound, Link2, Pencil, RefreshCw } from "lucide-react";
+import { CalendarDays, KeyRound, Link2, Pencil, RefreshCw } from "lucide-react";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
 
-const QUICK_DEADLINE_DAYS = [3, 5, 7, 15, 30] as const;
+const QUICK_DEADLINE_DAYS = [3, 7, 15] as const;
 
 function toLocalDateInputValue(date: Date): string {
   const year = date.getFullYear();
@@ -19,6 +19,11 @@ function deadlineFromToday(days: number): string {
   date.setHours(12, 0, 0, 0);
   date.setDate(date.getDate() + days);
   return toLocalDateInputValue(date);
+}
+
+function initialDeadlineValue(value: string): string {
+  const normalized = value.slice(0, 10);
+  return normalized && normalized >= toLocalDateInputValue(new Date()) ? normalized : deadlineFromToday(7);
 }
 
 function customerInitial(name: string): string {
@@ -63,7 +68,6 @@ export function CustomerSelectionRequestModal({
   recommendedCount,
   recommendedPhotos,
   includeOriginal,
-  originalUploadInProgress,
   initialDeadline,
   inviteUrl,
   accessPin,
@@ -81,7 +85,6 @@ export function CustomerSelectionRequestModal({
   recommendedCount?: number;
   recommendedPhotos?: ReadonlyArray<{ id: string; url: string; originalFilename?: string | null }>;
   includeOriginal: boolean;
-  originalUploadInProgress?: boolean;
   initialDeadline: string;
   inviteUrl: string;
   accessPin?: string | null;
@@ -92,7 +95,7 @@ export function CustomerSelectionRequestModal({
   onSavePin?: (pin: string | null) => Promise<void>;
   onReviewRecommendations?: () => void;
 }) {
-  const [deadline, setDeadline] = useState(() => initialDeadline || deadlineFromToday(7));
+  const [deadline, setDeadline] = useState(() => initialDeadlineValue(initialDeadline));
   const [photoLockAcknowledged, setPhotoLockAcknowledged] = useState(false);
   const deadlineLabel = relativeDeadlineLabel(deadline);
   const inviteUrlLabel = compactInviteUrl(inviteUrl);
@@ -100,6 +103,7 @@ export function CustomerSelectionRequestModal({
   const [pinDraft, setPinDraft] = useState("");
   const [pinSaving, setPinSaving] = useState(false);
   const [pinSaveError, setPinSaveError] = useState("");
+  const recommendationOverflow = Math.max(0, (recommendedCount ?? 0) - requiredCount);
 
   const handleClose = () => {
     if (pending || pinSaving) return;
@@ -161,7 +165,7 @@ export function CustomerSelectionRequestModal({
               variant="secondary"
               onClick={handleClose}
               disabled={pending || pinSaving}
-              className="h-14 w-full px-6 text-[16px] leading-6 tracking-[-0.32px]"
+              className="h-12 w-full px-3 text-[14px] leading-5 tracking-[-0.28px] sm:h-14 sm:px-5 sm:text-[15px]"
             >
               취소
             </PhotographerLightButton>
@@ -187,7 +191,7 @@ export function CustomerSelectionRequestModal({
             <div className="min-w-0 flex-1">
               <p className="truncate text-[14px] font-semibold leading-5 text-foreground">{customerName}</p>
               <p className="mt-0.5 truncate text-[12px] leading-[18px] tracking-[-0.24px] text-muted-foreground">
-                셀렉 {requiredCount.toLocaleString()}장 · 전체 {photoCount.toLocaleString()}장 · 원본 다운로드 {includeOriginal ? "포함" : "미포함"}
+                원본 {photoCount.toLocaleString()}장 · 셀렉 {requiredCount.toLocaleString()}장 · 원본 다운로드 {includeOriginal ? "포함" : "미포함"}
               </p>
             </div>
           </div>
@@ -203,8 +207,12 @@ export function CustomerSelectionRequestModal({
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-2 border-t border-border-subtle pt-4 sm:min-w-[250px] sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+            <div className="grid grid-cols-3 border-t border-border-subtle pt-4 sm:min-w-[330px] sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
               <div className="pr-4 text-left sm:text-center">
+                <p className="text-[12px] font-medium leading-[18px] tracking-[-0.24px] text-muted-foreground">원본</p>
+                <p className="text-[14px] font-semibold leading-5 tracking-[-0.28px] text-foreground">{photoCount.toLocaleString()}장</p>
+              </div>
+              <div className="border-l border-border-subtle px-4 text-left sm:text-center">
                 <p className="text-[12px] font-medium leading-[18px] tracking-[-0.24px] text-muted-foreground">셀렉</p>
                 <p className="text-[14px] font-semibold leading-5 tracking-[-0.28px] text-foreground">{requiredCount.toLocaleString()}장</p>
               </div>
@@ -223,11 +231,13 @@ export function CustomerSelectionRequestModal({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h4 className="text-[13px] font-bold leading-5 text-foreground">
-                  {recommendedCount > 0 ? `추천한 사진 ${recommendedCount.toLocaleString()}장` : "추천 사진 없이 전달"}
+                  작가 추천 사진 · {recommendedCount > 0 ? `${recommendedCount.toLocaleString()}장` : "없음"}
                 </h4>
                 <p className="mt-0.5 text-[12px] leading-[18px] text-muted-foreground">
                   {recommendedCount === 0
                     ? `고객이 전체 사진에서 직접 ${requiredCount.toLocaleString()}장을 선택합니다.`
+                    : recommendationOverflow > 0
+                      ? `셀렉 요청 수보다 ${recommendationOverflow.toLocaleString()}장 많아요.`
                     : recommendedCount === requiredCount
                       ? "고객은 추천 그대로 확정하거나 다른 사진을 고를 수 있어요."
                       : `고객이 최종 ${requiredCount.toLocaleString()}장을 고를 때 참고합니다.`}
@@ -245,16 +255,24 @@ export function CustomerSelectionRequestModal({
               ) : null}
             </div>
             {recommendedCount > 0 && recommendedPhotos?.length ? (
-              <div className="mt-3 grid grid-cols-5 gap-1.5 sm:gap-2" data-recommendation-preview>
-                {recommendedPhotos.slice(0, 5).map((photo) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={photo.id} src={photo.url} alt="" title={photo.originalFilename ?? undefined} loading="lazy" className="aspect-square min-w-0 w-full rounded-md bg-surface-raised object-cover" />
+              <div className="mt-3 grid grid-cols-3 gap-1.5 sm:grid-cols-5 sm:gap-2" data-recommendation-preview>
+                {recommendedPhotos.slice(0, 5).map((photo, index) => (
+                  <div key={photo.id} className={`relative min-w-0 ${index >= 3 ? "hidden sm:block" : ""}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photo.url} alt="" title={photo.originalFilename ?? undefined} loading="lazy" className="aspect-square min-w-0 w-full rounded-md bg-surface-raised object-cover" />
+                    {index === 2 && recommendedCount > 3 ? (
+                      <span className="absolute inset-0 flex items-center justify-center rounded-md bg-black/55 text-[13px] font-bold text-white sm:hidden">+{(recommendedCount - 3).toLocaleString()}</span>
+                    ) : null}
+                    {index === 4 && recommendedCount > 5 ? (
+                      <span className="absolute inset-0 hidden items-center justify-center rounded-md bg-black/55 text-[13px] font-bold text-white sm:flex">+{(recommendedCount - 5).toLocaleString()}</span>
+                    ) : null}
+                  </div>
                 ))}
               </div>
             ) : null}
           </section>
         )}
-        <section>
+        <section data-selection-deadline-controls>
           <div className="flex items-center justify-between gap-4">
             <span id="selection-deadline-label" className="text-[14px] font-bold leading-5 tracking-[-0.28px] text-foreground">
               셀렉 마감일
@@ -263,39 +281,38 @@ export function CustomerSelectionRequestModal({
               {deadlineLabel}
             </span>
           </div>
-          <div
-            data-mobile-deadline-field
-            className="relative mt-2.5 flex h-12 min-w-0 max-w-full items-center justify-between overflow-hidden rounded-lg border border-border-subtle bg-surface px-3 text-foreground focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/10 sm:hidden"
-          >
-            <span className="min-w-0 truncate text-[14px] font-medium leading-6 tracking-[-0.2px]">
-              {formattedDeadline(deadline)}
-            </span>
-            <CalendarDays className="ml-3 shrink-0 text-subtle-foreground" size={18} strokeWidth={1.8} aria-hidden />
-            <input
-              id="selection-deadline-mobile"
-              type="date"
-              value={deadline}
-              min={toLocalDateInputValue(new Date())}
-              onChange={(event) => setDeadline(event.target.value)}
-              disabled={pending}
-              aria-labelledby="selection-deadline-label"
-              className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-            />
-          </div>
-          <div className="relative mt-3 hidden sm:block">
-            <CalendarDays className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-subtle-foreground" size={18} strokeWidth={1.8} aria-hidden />
-            <input
-              id="selection-deadline-desktop"
-              type="date"
-              value={deadline}
-              min={toLocalDateInputValue(new Date())}
-              onChange={(event) => setDeadline(event.target.value)}
-              disabled={pending}
-              aria-labelledby="selection-deadline-label"
-              className="h-[54px] min-w-0 max-w-full w-full rounded-lg border border-border-subtle bg-surface pl-12 pr-5 text-[16px] font-normal leading-6 tracking-[-0.32px] text-foreground outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/10 disabled:opacity-50"
-            />
-          </div>
-          <div className="mt-2.5 flex min-w-0 flex-wrap gap-2 sm:mt-3">
+          <div data-selection-deadline-input-row className="mt-2.5 flex min-w-0 flex-wrap items-center gap-2">
+            <div
+              data-mobile-deadline-field
+              className="relative flex h-12 w-full min-w-0 items-center justify-between overflow-hidden rounded-lg border border-border-subtle bg-surface px-3 text-foreground focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/10 sm:hidden"
+            >
+              <span className="min-w-0 truncate text-[14px] font-medium leading-6 tracking-[-0.2px]">
+                {formattedDeadline(deadline)}
+              </span>
+              <CalendarDays className="ml-3 shrink-0 text-subtle-foreground" size={18} strokeWidth={1.8} aria-hidden />
+              <input
+                id="selection-deadline-mobile"
+                type="date"
+                value={deadline}
+                min={toLocalDateInputValue(new Date())}
+                onChange={(event) => setDeadline(event.target.value)}
+                disabled={pending}
+                aria-labelledby="selection-deadline-label"
+                className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+              />
+            </div>
+            <div className="relative hidden min-w-0 sm:block sm:flex-1">
+              <input
+                id="selection-deadline-desktop"
+                type="date"
+                value={deadline}
+                min={toLocalDateInputValue(new Date())}
+                onChange={(event) => setDeadline(event.target.value)}
+                disabled={pending}
+                aria-labelledby="selection-deadline-label"
+                className="h-11 min-w-0 w-full rounded-lg border border-border-subtle bg-surface px-3 text-[14px] font-normal leading-5 tracking-[-0.28px] text-foreground outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/10 disabled:opacity-50"
+              />
+            </div>
             {QUICK_DEADLINE_DAYS.map((days) => {
               const quickDate = deadlineFromToday(days);
               const active = deadline === quickDate;
@@ -305,13 +322,13 @@ export function CustomerSelectionRequestModal({
                   type="button"
                   onClick={() => setDeadline(quickDate)}
                   disabled={pending}
-                  className={`${days === 5 || days === 30 ? "hidden sm:inline-flex" : "inline-flex"} min-h-8 items-center rounded-md px-3 py-1.5 text-[13px] leading-[18px] tracking-[-0.24px] transition-colors disabled:opacity-40 ${
+                  className={`hidden min-h-8 items-center rounded-md px-3 py-1.5 text-[13px] leading-[18px] tracking-[-0.24px] transition-colors disabled:opacity-40 sm:inline-flex ${
                     active
                       ? "bg-accent/10 font-semibold text-accent"
                       : "bg-surface-raised font-normal text-muted-foreground hover:bg-border-subtle hover:text-foreground"
                   }`}
                 >
-                  +{days}일
+                  {days}일 후
                 </button>
               );
             })}
@@ -415,33 +432,12 @@ export function CustomerSelectionRequestModal({
             />
             <span className="min-w-0 text-[13px] font-medium leading-5 tracking-[-0.3px] text-foreground">
               요청 후 사진 구성을 변경할 수 없음을 확인했어요
-              {includeOriginal && originalUploadInProgress ? " · 원본 업로드는 계속돼요" : ""}
             </span>
           </label>
         </section>
 
         <section className="hidden rounded-lg border border-accent/25 bg-accent/5 px-4 py-3.5 sm:block">
-          <div className="flex items-start gap-3">
-            <AlertTriangle size={18} strokeWidth={1.8} className="mt-0.5 shrink-0 text-accent" aria-hidden />
-            <div>
-              <h4
-                id="selection-photo-lock-title"
-                className="text-[14px] font-semibold leading-5 tracking-[-0.28px] text-foreground"
-              >
-                셀렉 요청 후에는 사진 구성을 수정할 수 없습니다
-              </h4>
-              <p
-                id="selection-photo-lock-description"
-                className="mt-1 text-[13px] font-normal leading-5 tracking-[-0.3px] text-muted-foreground"
-              >
-                사진의 추가·삭제·교체가 제한됩니다. 현재 구성을 최종 확인해주세요.
-                {includeOriginal && originalUploadInProgress
-                  ? " 전달용 원본은 이 화면에서 계속 업로드되며, 미완료 파일은 이후에도 복구할 수 있습니다."
-                  : ""}
-              </p>
-            </div>
-          </div>
-          <label className="mt-3 flex min-h-10 cursor-pointer items-center gap-3 border-t border-accent/15 pt-3">
+          <label className="flex cursor-pointer items-start gap-3">
             <input
               type="checkbox"
               checked={photoLockAcknowledged}
@@ -449,10 +445,21 @@ export function CustomerSelectionRequestModal({
               disabled={pending}
               aria-labelledby="selection-photo-lock-title"
               aria-describedby="selection-photo-lock-description"
-              className="h-[18px] w-[18px] shrink-0 accent-[var(--accent)]"
+              className="mt-0.5 h-[18px] w-[18px] shrink-0 accent-[var(--accent)]"
             />
-            <span className="text-[13px] font-medium leading-5 tracking-[-0.3px] text-foreground">
-              현재 사진 {photoCount.toLocaleString()}장으로 요청하는 것에 동의합니다
+            <span className="min-w-0">
+              <span
+                id="selection-photo-lock-title"
+                className="block text-[14px] font-semibold leading-5 tracking-[-0.28px] text-foreground"
+              >
+                요청 후에는 사진을 변경할 수 없어요
+              </span>
+              <span
+                id="selection-photo-lock-description"
+                className="mt-1 block text-[13px] font-normal leading-5 tracking-[-0.3px] text-muted-foreground"
+              >
+                사진 {photoCount.toLocaleString()}장을 확인해 주세요.
+              </span>
             </span>
           </label>
         </section>

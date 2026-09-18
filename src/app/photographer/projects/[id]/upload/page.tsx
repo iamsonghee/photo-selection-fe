@@ -23,6 +23,7 @@ import {
   Search,
   ChevronDown,
   Check,
+  MoreHorizontal,
 } from "lucide-react";
 import { getProjectById, getPhotosByProjectId } from "@/lib/db";
 import { createClient } from "@/lib/supabase/client";
@@ -846,6 +847,40 @@ export default function ProjectDetailPage() {
   const [photoSort, setPhotoSort] = useState<PhotoSort>("filename-asc");
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
   const [recommendationSaving, setRecommendationSaving] = useState(false);
+  const [recommendationDraft, setRecommendationDraft] = useState<Set<string> | null>(null);
+  const [recommendationAutoSaveState, setRecommendationAutoSaveState] = useState<"idle" | "pending" | "saving" | "saved" | "error">("idle");
+  const [recommendationTrayCollapsed, setRecommendationTrayCollapsed] = useState(false);
+  const [recommendationTrayClosing, setRecommendationTrayClosing] = useState(false);
+  const [trayOnly, setTrayOnly] = useState(false);
+  const recommendationDraftStorageKey = `acut:recommendation-draft:${id}`;
+  const recommendationDraftRestoredRef = useRef(false);
+  const recommendationUnsavedRef = useRef(false);
+  const recommendationDraftLatestRef = useRef<Set<string> | null>(null);
+  const recommendationSavedSignatureRef = useRef("");
+  const recommendationAutoSaveRunningRef = useRef(false);
+  const recommendationAutoSaveRequestedRef = useRef(false);
+  const toggleTrayPhoto = (photoId: string) => {
+    setRecommendationDraft(current => {
+      if (!current) return current;
+      const next = new Set(current);
+      if (next.has(photoId)) next.delete(photoId); else next.add(photoId);
+      recommendationDraftLatestRef.current = next;
+      localStorage.setItem(recommendationDraftStorageKey, JSON.stringify([...next]));
+      setRecommendationAutoSaveState("pending");
+      return next;
+    });
+  };
+  const collapseRecommendationTray = () => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setRecommendationTrayCollapsed(true);
+      return;
+    }
+    setRecommendationTrayClosing(true);
+    window.setTimeout(() => {
+      setRecommendationTrayCollapsed(true);
+      setRecommendationTrayClosing(false);
+    }, 160);
+  };
   const [showRecommendationGuide, setShowRecommendationGuide] = useState(false);
   const [showRecommendedOnly, setShowRecommendedOnly] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -1091,15 +1126,42 @@ export default function ProjectDetailPage() {
   const isPreviewUploading = uploadPhase === "sending" || uploadPhase === "processing";
   const isOriginalUploading = uploadPhase === "originals";
   const isUploading = isPreviewUploading || isOriginalUploading;
-  const navigationGuardActive = isUploading || recoveryBusy;
+
+  useEffect(() => {
+    if (photosLoading || recommendationDraftRestoredRef.current) return;
+    recommendationDraftRestoredRef.current = true;
+    const stored = localStorage.getItem(recommendationDraftStorageKey);
+    if (stored === null) return;
+    try {
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed)) throw new Error("invalid recommendation draft");
+      const photoIds = new Set(photos.map((photo) => photo.id));
+      const restored = new Set(parsed.filter((photoId): photoId is string => typeof photoId === "string" && photoIds.has(photoId)));
+      recommendationSavedSignatureRef.current = photos.filter((photo) => photo.photographerRecommended).map((photo) => photo.id).sort().join("|");
+      recommendationDraftLatestRef.current = restored;
+      setRecommendationDraft(restored);
+      setRecommendationAutoSaveState("pending");
+      setRecommendationTrayCollapsed(true);
+    } catch {
+      localStorage.removeItem(recommendationDraftStorageKey);
+    }
+  }, [photos, photosLoading, recommendationDraftStorageKey]);
+
+  useEffect(() => {
+    if (!recommendationDraftRestoredRef.current || recommendationDraft === null) return;
+    localStorage.setItem(recommendationDraftStorageKey, JSON.stringify([...recommendationDraft]));
+  }, [recommendationDraft, recommendationDraftStorageKey]);
+  const recommendationHasUnsavedChanges = recommendationAutoSaveState === "pending" || recommendationAutoSaveState === "saving" || recommendationAutoSaveState === "error";
+  recommendationUnsavedRef.current = recommendationHasUnsavedChanges;
+  const navigationGuardActive = isUploading || recoveryBusy || recommendationHasUnsavedChanges;
 
   const requestInternalNavigation = useCallback((href: string) => {
-    if (uploadInProgressRef.current) {
+    if (uploadInProgressRef.current || recommendationHasUnsavedChanges) {
       setPendingNavigationHref(href);
       return;
     }
     router.push(href);
-  }, [router]);
+  }, [recommendationHasUnsavedChanges, router]);
 
   useEffect(() => {
     if (!navigationGuardActive) setPendingNavigationHref(null);
@@ -1287,6 +1349,15 @@ export default function ProjectDetailPage() {
     () => new Set(photos.filter((photo) => photo.photographerRecommended).map((photo) => photo.id)),
     [photos],
   );
+  const recommendedGroupCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const photo of photos) {
+      if (!photo.photographerRecommended || !photo.similarityGroupId) continue;
+      counts.set(photo.similarityGroupId, (counts.get(photo.similarityGroupId) ?? 0) + 1);
+    }
+    return counts;
+  }, [photos]);
+  const recommendationEditActive = recommendationDraft !== null && !recommendationTrayCollapsed;
 
   const dismissRecommendationGuide = useCallback(() => {
     setShowRecommendationGuide(false);
@@ -1309,7 +1380,7 @@ export default function ProjectDetailPage() {
         body: JSON.stringify({ photo_ids: [...nextIds] }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error ?? "추천 저장에 실패했습니다.");
+      if (!response.ok) throw new Error(data.error ?? "작가 추천을 저장하지 못했습니다.");
       setPhotos((current) => current.map((photo) => ({
         ...photo,
         photographerRecommended: nextIds.has(photo.id),
@@ -1320,19 +1391,69 @@ export default function ProjectDetailPage() {
       }
       setToast(successMessage);
       if (nextIds.size > 0) dismissRecommendationGuide();
+      return true;
     } catch (error) {
-      setToast(error instanceof Error ? error.message : "추천 저장에 실패했습니다.");
+      setToast(error instanceof Error ? error.message : "작가 추천을 저장하지 못했습니다.");
+      return false;
     } finally {
       setRecommendationSaving(false);
     }
   }, [dismissRecommendationGuide, id, recommendationSaving]);
 
+  const flushRecommendationAutoSave = useCallback(async () => {
+    recommendationAutoSaveRequestedRef.current = true;
+    if (recommendationAutoSaveRunningRef.current) return;
+    recommendationAutoSaveRunningRef.current = true;
+    while (recommendationAutoSaveRequestedRef.current) {
+      recommendationAutoSaveRequestedRef.current = false;
+      const snapshot = recommendationDraftLatestRef.current;
+      if (!snapshot) break;
+      const signature = [...snapshot].sort().join("|");
+      if (signature === recommendationSavedSignatureRef.current) {
+        localStorage.removeItem(recommendationDraftStorageKey);
+        setRecommendationAutoSaveState("saved");
+        continue;
+      }
+      setRecommendationAutoSaveState("saving");
+      try {
+        const response = await fetch(`/api/photographer/projects/${id}/recommendations`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ photo_ids: [...snapshot] }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error ?? "작가 추천을 저장하지 못했습니다.");
+        recommendationSavedSignatureRef.current = signature;
+        setPhotos((current) => current.map((photo) => ({ ...photo, photographerRecommended: snapshot.has(photo.id) })));
+        if (snapshot.size > 0) dismissRecommendationGuide();
+        const latestSignature = [...(recommendationDraftLatestRef.current ?? [])].sort().join("|");
+        if (latestSignature !== signature) {
+          recommendationAutoSaveRequestedRef.current = true;
+        } else {
+          localStorage.removeItem(recommendationDraftStorageKey);
+          setRecommendationAutoSaveState("saved");
+        }
+      } catch (error) {
+        setRecommendationAutoSaveState("error");
+        setToast(error instanceof Error ? error.message : "작가 추천을 저장하지 못했습니다.");
+        break;
+      }
+    }
+    recommendationAutoSaveRunningRef.current = false;
+  }, [dismissRecommendationGuide, id, recommendationDraftStorageKey]);
+
+  useEffect(() => {
+    if (recommendationDraft === null || recommendationAutoSaveState !== "pending") return;
+    const timer = window.setTimeout(() => void flushRecommendationAutoSave(), 450);
+    return () => window.clearTimeout(timer);
+  }, [flushRecommendationAutoSave, recommendationAutoSaveState, recommendationDraft]);
+
   const galleryPhotos = useMemo(() => {
-    const sourcePhotos = showRecommendedOnly ? displayPhotos : groupedDisplayPhotos;
+    const sourcePhotos = recommendationEditActive ? displayPhotos.filter(photo => !photo.isPending && (!trayOnly || recommendationDraft!.has(photo.id))) : showRecommendedOnly ? displayPhotos : groupedDisplayPhotos;
     const searched = photoSearch.trim()
       ? sourcePhotos.filter((photo) => matchesFilenameQuery(photo.originalFilename ?? "", photoSearch))
       : sourcePhotos;
-    const recommendationFiltered = showRecommendedOnly ? searched.filter(photo => recommendedPhotoIds.has(photo.id)) : searched;
+    const recommendationFiltered = !recommendationEditActive && showRecommendedOnly ? searched.filter(photo => recommendedPhotoIds.has(photo.id)) : searched;
     const filtered = qualityFilter.size === 0
       ? recommendationFiltered
       : recommendationFiltered.filter((photo) =>
@@ -1354,7 +1475,7 @@ export default function ProjectDetailPage() {
         { numeric: true, sensitivity: "base" },
       );
     });
-  }, [displayPhotos, groupedDisplayPhotos, photoSearch, photoSort, qualityFilter, showRecommendedOnly, recommendedPhotoIds]);
+  }, [displayPhotos, groupedDisplayPhotos, photoSearch, photoSort, qualityFilter, showRecommendedOnly, recommendedPhotoIds, recommendationDraft, recommendationEditActive, trayOnly]);
 
   /** 상세 뷰어의 전체 filmstrip에서는 그룹마다 대표 썸네일 하나만 남긴다.
    * 검색/정렬 결과에 대표컷이 없으면 현재 결과의 첫 멤버를 대신 사용해 검색 맥락을 보존한다. */
@@ -1705,7 +1826,7 @@ export default function ProjectDetailPage() {
   // Next.js 내부 링크 이동은 beforeunload를 거치지 않으므로 업로드 세션 ref로 별도 확인한다.
   useEffect(() => {
     const handler = (event: MouseEvent) => {
-      if (!uploadInProgressRef.current) return;
+      if (!uploadInProgressRef.current && !recommendationUnsavedRef.current) return;
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
       if (!anchor || anchor.target === "_blank" || anchor.hasAttribute("download")) return;
@@ -1726,7 +1847,7 @@ export default function ProjectDetailPage() {
         navigationPopBypassRef.current = false;
         return;
       }
-      if (!uploadInProgressRef.current || !uploadHistoryGuardRef.current) return;
+      if ((!uploadInProgressRef.current && !recommendationUnsavedRef.current) || !uploadHistoryGuardRef.current) return;
       setPendingNavigationHref(BROWSER_BACK_TARGET);
       navigationPopBypassRef.current = true;
       window.history.forward();
@@ -2933,10 +3054,10 @@ export default function ProjectDetailPage() {
   };
 
   const handleEnableClientAccess = async (requestDeadline: string) => {
-    if (!project) return;
+    if (!project) return false;
     const m = project.photoCount;
     const n = project.requiredCount;
-    if (project.status !== "preparing" || m < n) return;
+    if (project.status !== "preparing" || m < n) return false;
     // 고객 갤러리에 들어갈 preview 등록까지만 기다린다. 전달용 원본 PUT은 별도 queue에서
     // 계속 진행하며 고객 셀렉 시작을 막지 않는다.
     const uploadStillActive =
@@ -2948,7 +3069,7 @@ export default function ProjectDetailPage() {
       queuedPreviews.length > 0;
     if (uploadStillActive) {
       setToast("셀렉용 사진 저장이 끝난 뒤 고객 링크를 활성화할 수 있습니다.");
-      return;
+      return false;
     }
     setInviteActivating(true);
     try {
@@ -2961,7 +3082,7 @@ export default function ProjectDetailPage() {
         const deadlineData = await deadlineResponse.json().catch(() => ({})) as { error?: string };
         if (!deadlineResponse.ok) {
           setToast(deadlineData.error ?? "셀렉 마감일 저장에 실패했습니다.");
-          return;
+          return false;
         }
         setProject((current) => current ? { ...current, deadline: requestDeadline } : current);
       }
@@ -2987,7 +3108,7 @@ export default function ProjectDetailPage() {
         setInviteShareModalOpen(true);
         setToast("셀렉 요청을 시작했습니다.");
         router.refresh();
-        return;
+        return true;
       }
       setToast(data.error ?? "초대 링크 활성화에 실패했습니다.");
     } catch (e) {
@@ -2995,6 +3116,7 @@ export default function ProjectDetailPage() {
     } finally {
       setInviteActivating(false);
     }
+    return false;
   };
 
   const handleStartClipAnalysis = async () => {
@@ -3120,7 +3242,7 @@ export default function ProjectDetailPage() {
     queuedPreviews.length > 0;
   // 헤더 초대 버튼이 지금 실제로 눌러 실행할 수 있는 상태인지 — design-system.md §23:
   // 실행 불가 상태는 Primary(orange fill)가 아니라 Secondary(Neutral Surface fill)로 표현한다.
-  const inviteButtonReady = isInviteActive || (M >= N && !uploadBlockingInvite);
+  const inviteButtonReady = isInviteActive || (M >= N && !uploadBlockingInvite && !recommendationHasUnsavedChanges);
   const uploadCopy = uploadSnapshot ? describeUpload(uploadSnapshot, project.includeOriginal ?? false) : null;
   const showServerWorking = uploadCopy?.checking ?? false;
   const uploadStatusLabel = uploadStopRequested ? "업로드 중단 중" : uploadCopy?.label ?? "사진 준비 중";
@@ -4012,7 +4134,7 @@ export default function ProjectDetailPage() {
                 mobileSquareMedia
                 thumbQueue={thumbQueue}
                 getPhotoKey={(photo) => photo.originalFilename ? `upload:${photo.originalFilename}` : photo.id}
-                onPhotoClick={handleOpenPhotoViewer}
+                onPhotoClick={recommendationEditActive ? (index) => toggleTrayPhoto(galleryPhotos[index].id) : handleOpenPhotoViewer}
                 showQualityBadges
                 showOriginalUploadBadges={project.includeOriginal
                   && uploadPhase === "idle"
@@ -4028,17 +4150,21 @@ export default function ProjectDetailPage() {
                 // 더 이상 의미 없음(모바일은 풀 크기 1이라 기존과 동일하게 단일 하이라이트 유지)
                 compressingPhotoId={isMobile && compressingIndex >= 0 && queuedPreviews[compressingIndex] ? queuedPreviews[compressingIndex].tempId : null}
                 readonly={isMobile ? !mobilePhotoManageMode : true}
-                selectedPhotoIds={selectedPhotoIds}
-                onToggleSelected={togglePhotoSelected}
-                onDragSelectionChange={!isMobile && photoUploadAllowed && !isUploading && !deletingId ? setSelectedPhotoIds : undefined}
+                selectedPhotoIds={recommendationEditActive ? recommendationDraft ?? selectedPhotoIds : selectedPhotoIds}
+                onToggleSelected={recommendationEditActive ? toggleTrayPhoto : togglePhotoSelected}
+                selectionMark={recommendationEditActive ? "recommendation" : "check"}
+                onEmptyClick={recommendationEditActive ? collapseRecommendationTray : undefined}
+                selectionDisabled={recommendationEditActive && recommendationSaving}
+                onDragSelectionChange={!recommendationEditActive && !isMobile && photoUploadAllowed && !isUploading && !deletingId ? setSelectedPhotoIds : undefined}
                 selectionOnHover={!isMobile && photoUploadAllowed && !isUploading && !deletingId}
                 recommendedPhotoIds={recommendedPhotoIds}
-                mobileManageMode={isMobile && mobilePhotoManageMode}
+                recommendedGroupCounts={recommendedGroupCounts}
+                mobileManageMode={isMobile && (mobilePhotoManageMode || recommendationEditActive)}
                 mobileSelectionVisible={isMobile && photoUploadAllowed && !isUploading}
-                onPhotoLongPress={isMobile && photoUploadAllowed && !isUploading ? enterMobilePhotoManageMode : undefined}
+                onPhotoLongPress={recommendationEditActive ? toggleTrayPhoto : isMobile && photoUploadAllowed && !isUploading ? enterMobilePhotoManageMode : undefined}
                 compact={isMobile}
                 leadingCell={
-                  photoUploadAllowed && isMobile && !mobilePhotoManageMode ? (
+                  photoUploadAllowed && !recommendationEditActive && isMobile && !mobilePhotoManageMode ? (
                     <UploadTile
                       isUploading={isUploading}
                       overallProgress={overallProgress}
@@ -4129,6 +4255,60 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
+      {photoUploadAllowed && !isUploading && photos.length > 0 && (
+        <section aria-label="작가 추천" className={recommendationEditActive
+          ? `sticky bottom-0 z-30 mx-3 mb-3 shrink-0 rounded-xl border border-border-subtle bg-surface px-4 py-3 shadow-lg md:mx-8 ${recommendationTrayClosing ? themeStyles.recommendationTrayClosing : themeStyles.recommendationTrayOpen}`
+          : "fixed bottom-24 right-3 z-30 shrink-0 md:right-8"}>
+          {recommendationEditActive ? <>
+            <div className="flex items-center gap-2.5 xl:flex-wrap xl:gap-y-3">
+              <RecommendationMark size={18} aria-hidden />
+              <strong className="whitespace-nowrap text-sm text-foreground">작가 추천 편집 · {recommendationDraft.size}장</strong>
+              <span className={`hidden truncate text-xs xl:mr-auto xl:block ${recommendationAutoSaveState === "error" ? "text-danger" : "text-muted-foreground"}`}>
+                {recommendationAutoSaveState === "pending" || recommendationAutoSaveState === "saving"
+                  ? "저장 중…"
+                  : recommendationAutoSaveState === "error"
+                    ? "저장하지 못했어요"
+                    : "자동 저장됨"}
+              </span>
+              <div className="order-2 hidden min-h-14 min-w-0 basis-full items-center gap-2 xl:flex">
+                {recommendationDraft.size === 0 && <span className="text-xs text-muted-foreground">사진을 선택하면 여기에 표시됩니다.</span>}
+                {photos.filter(photo => recommendationDraft.has(photo.id)).slice(0, 10).map(photo => <button key={photo.id} type="button" aria-label={`${photo.originalFilename ?? "사진"} 추천 해제`} onClick={() => toggleTrayPhoto(photo.id)} className="relative size-14 shrink-0 overflow-hidden rounded-lg">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photo.url} alt="" className="h-full w-full object-cover" />
+                  <span className="absolute right-0 top-0 rounded-bl bg-black/60 p-0.5 text-white"><X size={11} /></span>
+                </button>)}
+                {recommendationDraft.size > 0 && <button type="button" onClick={() => { setTrayOnly(!trayOnly); setPhotoSearch(""); setQualityFilter(new Set()); }} className="ml-2 inline-flex h-9 shrink-0 items-center gap-2 border-l border-border-subtle pl-3 pr-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground">
+                  {recommendationDraft.size > 10 && <span className="rounded-md bg-surface-raised px-1.5 py-1">+{recommendationDraft.size - 10}</span>}
+                  <span>{trayOnly ? "전체 보기" : "작가 추천만 보기"}</span>
+                </button>}
+              </div>
+              <PhotographerLightButton className="xl:hidden" variant="secondary" onClick={() => { setTrayOnly(!trayOnly); setPhotoSearch(""); setQualityFilter(new Set()); }} aria-pressed={trayOnly}>{trayOnly ? "전체" : "추천만"}</PhotographerLightButton>
+              {recommendationAutoSaveState === "error" && <PhotographerLightButton variant="secondary" onClick={() => void flushRecommendationAutoSave()}>다시 저장</PhotographerLightButton>}
+              <button type="button" aria-label="작가 추천 최소화" onClick={collapseRecommendationTray} className="grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-surface-raised hover:text-foreground">
+                <ChevronDown size={18} className="rotate-180" />
+              </button>
+            </div>
+          </> : <button type="button" aria-label={recommendationDraft ? "작가 추천 펼치기" : "작가 추천 편집"} disabled={!!deletingId} className="flex h-14 items-center gap-3 rounded-2xl border border-border-subtle bg-surface px-4 text-foreground shadow-[0_8px_24px_rgba(2,56,82,0.12)] transition-[background-color,border-color,box-shadow,transform] hover:border-border-strong hover:bg-surface-raised hover:shadow-[0_10px_28px_rgba(2,56,82,0.16)] active:scale-[0.98] disabled:opacity-50" onClick={() => {
+            if (recommendationDraft) {
+              setRecommendationTrayClosing(false); setRecommendationTrayCollapsed(false); setSelectedPhotoIds(new Set()); setMobilePhotoManageMode(false);
+              return;
+            }
+            const initialRecommendations = new Set(recommendedPhotoIds);
+            recommendationSavedSignatureRef.current = [...initialRecommendations].sort().join("|");
+            recommendationDraftLatestRef.current = initialRecommendations;
+            setRecommendationDraft(initialRecommendations); setRecommendationAutoSaveState("saved"); setRecommendationTrayCollapsed(isMobile); setTrayOnly(false); setToast("");
+            setShowRecommendedOnly(false); setPhotoSearch(""); setQualityFilter(new Set());
+            setSelectedPhotoIds(new Set()); setMobilePhotoManageMode(false); dismissRecommendationGuide();
+          }}>
+            <RecommendationMark size={20} className="shrink-0" aria-hidden />
+            {recommendedPhotoIds.size === 0 && !recommendationDraft
+              ? <strong className="whitespace-nowrap text-sm">작가 추천 시작하기</strong>
+              : <><strong className="whitespace-nowrap text-sm">{recommendationDraft ? "작가 추천 편집 중" : "작가 추천"}</strong><span className="whitespace-nowrap text-sm font-semibold text-muted-foreground">{(recommendationDraft ?? recommendedPhotoIds).size}장</span></>}
+            <ChevronDown size={18} className="ml-1 shrink-0 rotate-180 text-muted-foreground" aria-hidden />
+          </button>}
+        </section>
+      )}
+
       {/* 업로드 화면의 주요 행동도 생성·수정 화면과 동일한 공통 하단 액션 영역에서 관리한다.
         * 업로드 중에는 "사진 추가"·초대 버튼 둘 다 어차피 비활성이라(§isUploading), 그 자리에
         * "사진 업로드 중…"이라는 죽은 문구만 있었다 — 그 자리를 실제 진행률로 채운다.
@@ -4136,7 +4316,7 @@ export default function ProjectDetailPage() {
         * 보여주고 있었다(§prj-gallery-analysis). */}
       <PhotographerFormActionBar
         maxWidth={1920}
-        className="shrink-0"
+        className={recommendationEditActive ? "hidden" : "shrink-0"}
         leading={photoSelectionActive ? (
           <p className="text-sm font-bold text-foreground">{selectedPhotoIds.size.toLocaleString()}장 선택됨</p>
         ) : isUploading ? (
@@ -4179,8 +4359,9 @@ export default function ProjectDetailPage() {
           </div>
         )}
         actions={photoSelectionActive ? (<>
-          <PhotographerLightButton
+          {!(recommendationDraft && recommendationTrayCollapsed) && <PhotographerLightButton
             type="button"
+            variant={selectedPhotosAreRecommended ? "secondary" : "primary"}
             onClick={updateSelectedRecommendations}
             disabled={selectedPhotoIds.size === 0 || recommendationSaving || !!deletingId}
             pending={recommendationSaving}
@@ -4188,20 +4369,52 @@ export default function ProjectDetailPage() {
             className="h-12 w-full px-5 text-[14px] md:w-auto"
           >
             <RecommendationMark size={16} aria-hidden />
-            {selectedPhotosAreRecommended ? "추천에서 제외" : "고객에게 추천"}
-          </PhotographerLightButton>
-          <PhotographerLightButton
+            {selectedPhotosAreRecommended ? "추천 해제" : "고객에게 추천"}
+          </PhotographerLightButton>}
+          {recommendationDraft && recommendationTrayCollapsed ? <PhotographerLightButton
             type="button"
             variant="danger"
-            onClick={() => setDeleteConfirmTarget({ kind: "selected", count: selectedPhotoIds.size })}
             disabled={selectedPhotoIds.size === 0 || deletingId === "__selected__"}
+            onClick={() => setDeleteConfirmTarget({ kind: "selected", count: selectedPhotoIds.size })}
             className="h-12 w-full px-5 text-[14px] md:w-auto"
           >
-            <Trash2 size={16} />
-            {selectedPhotoIds.size > 0
-              ? `선택한 사진 ${selectedPhotoIds.size.toLocaleString()}장 삭제`
-              : "삭제할 사진을 선택하세요"}
-          </PhotographerLightButton>
+            <Trash2 size={16} aria-hidden />
+            선택한 사진 {selectedPhotoIds.size.toLocaleString()}장 삭제
+          </PhotographerLightButton> : <details
+            className="group relative shrink-0"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") event.currentTarget.removeAttribute("open");
+            }}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) event.currentTarget.removeAttribute("open");
+            }}
+          >
+            <summary
+              aria-label="선택 사진 작업 더보기"
+              aria-disabled={selectedPhotoIds.size === 0 || deletingId === "__selected__"}
+              onClick={(event) => {
+                if (selectedPhotoIds.size === 0 || deletingId === "__selected__") event.preventDefault();
+              }}
+              className="flex h-12 w-12 cursor-pointer list-none items-center justify-center rounded-lg border border-border-subtle bg-surface text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground aria-disabled:cursor-not-allowed aria-disabled:opacity-40 [&::-webkit-details-marker]:hidden"
+            >
+              <MoreHorizontal size={20} aria-hidden />
+            </summary>
+            <div role="menu" className="absolute bottom-[calc(100%+8px)] right-0 z-50 min-w-[190px] rounded-xl border border-border-subtle bg-surface p-1.5 shadow-lg">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={(event) => {
+                  event.currentTarget.closest("details")?.removeAttribute("open");
+                  setDeleteConfirmTarget({ kind: "selected", count: selectedPhotoIds.size });
+                }}
+                disabled={selectedPhotoIds.size === 0 || deletingId === "__selected__"}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[13px] font-semibold text-danger transition-colors hover:bg-danger/8 disabled:opacity-40"
+              >
+                <Trash2 size={15} aria-hidden />
+                사진 {selectedPhotoIds.size.toLocaleString()}장 삭제
+              </button>
+            </div>
+          </details>}
           </>
         ) : isPreviewUploading ? (
           <PhotographerLightButton
@@ -4229,7 +4442,7 @@ export default function ProjectDetailPage() {
               onClick={isInviteActive
                 ? () => setInviteShareModalOpen(true)
                 : () => setSelectionRequestModalOpen(true)}
-              disabled={!isInviteActive && (inviteActivating || uploadBlockingInvite || M < N)}
+              disabled={!isInviteActive && (inviteActivating || uploadBlockingInvite || recommendationHasUnsavedChanges || M < N)}
               className="min-w-[129px]"
             >
               {isInviteActive ? (isMobile ? "링크 공유" : "초대 링크 공유") : "셀렉 요청하기"}
@@ -4253,13 +4466,15 @@ export default function ProjectDetailPage() {
               onClick={isInviteActive
                 ? () => setInviteShareModalOpen(true)
                 : () => setSelectionRequestModalOpen(true)}
-              disabled={!isInviteActive && (inviteActivating || uploadBlockingInvite || M < N)}
+              disabled={!isInviteActive && (inviteActivating || uploadBlockingInvite || recommendationHasUnsavedChanges || M < N)}
               className="min-w-[129px]"
             >
               {isInviteActive
                 ? (isMobile ? "링크 공유" : "초대 링크 공유")
                 : inviteActivating
                   ? "처리 중…"
+                  : recommendationHasUnsavedChanges
+                    ? (recommendationAutoSaveState === "error" ? "추천 저장 확인" : "추천 저장 중…")
                   : uploadBlockingInvite
                     ? (isMobile ? "업로드 중" : "사진 업로드 중…")
                     : M < N
@@ -4620,10 +4835,10 @@ export default function ProjectDetailPage() {
             window.history.go(window.history.state?.acutUploadGuard ? -2 : -1);
           } else if (href) router.push(href);
         }}
-        title="사진 업로드가 진행 중입니다"
-        description="지금 이동하면 진행 중인 사진 업로드가 중단됩니다."
-        detail="완료되지 않은 사진은 이 화면에서 다시 선택해 업로드해야 합니다."
-        cancelLabel="업로드 계속"
+        title={recommendationHasUnsavedChanges ? "작가 추천 저장이 끝나지 않았어요" : "사진 업로드가 진행 중입니다"}
+        description={recommendationHasUnsavedChanges ? "변경 내용은 브라우저에 보관되어 있지만 서버 저장이 아직 완료되지 않았습니다." : "지금 이동하면 진행 중인 사진 업로드가 중단됩니다."}
+        detail={recommendationHasUnsavedChanges ? "현재 화면에서 저장 완료를 확인한 뒤 이동해 주세요." : "완료되지 않은 사진은 이 화면에서 다시 선택해 업로드해야 합니다."}
+        cancelLabel={recommendationHasUnsavedChanges ? "저장 기다리기" : "업로드 계속"}
         confirmLabel="그래도 이동"
         tone="danger"
         compact
@@ -4640,12 +4855,11 @@ export default function ProjectDetailPage() {
         recommendedCount={recommendedPhotoIds.size}
         recommendedPhotos={photos.filter((photo) => recommendedPhotoIds.has(photo.id))}
         includeOriginal={project.includeOriginal}
-        originalUploadInProgress={project.includeOriginal && photos.some((photo) => photo.originalStatus !== "completed")}
         initialDeadline={project.deadline?.slice(0, 10) ?? ""}
         inviteUrl={inviteUrl}
         accessPin={project.accessPin}
         pending={inviteActivating}
-        onRequest={handleEnableClientAccess}
+        onRequest={(deadline) => { void handleEnableClientAccess(deadline); }}
         onSavePin={handleSavePin}
         onReviewRecommendations={() => {
           setSelectionRequestModalOpen(false);
