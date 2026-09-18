@@ -7,7 +7,7 @@
  */
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CustomerEntryShell, CustomerEntryHeader } from "@/components/customer/CustomerEntryShell";
+import { BrandLogoBar } from "@/components/BrandLogo";
 import ui from "../_lib/ui.module.css";
 
 const SHOOT_TYPES = ["웨딩", "돌·성장", "가족", "프로필", "커플·우정", "행사"];
@@ -39,8 +39,11 @@ export default function NewCustomerProjectPage() {
   }
 
   return (
-    <CustomerEntryShell>
-      <CustomerEntryHeader />
+    <div className={ui.shell}>
+      <header className={ui.brandbar}>
+        <BrandLogoBar size="sm" variant="customerEntry" />
+      </header>
+      <div className={ui.shellMain}>
       <div className={ui.page} style={{ minHeight: "unset" }}>
         <div className={ui.header}>
           <h1 className={ui.title}>새 프로젝트</h1>
@@ -89,6 +92,7 @@ export default function NewCustomerProjectPage() {
           </button>
         </div>
       </div>
-    </CustomerEntryShell>
+      </div>
+    </div>
   );
 }

@@ -3,6 +3,34 @@
  *  터치 타겟 최소 44px, accent #ff4d00) CustomerEntryShell과 같은 리터럴 값을 쓴다 —
  * 그 컴포넌트도 --customer-* CSS 변수 대신 고정 hex를 쓰는 관례라 여기서도 맞춘다. */
 
+/* 실제 서비스 화면(src/app/c/[token]/confirmed/page.tsx)과 동일한 패턴 — PC에서도
+ * 흰 배경 전체 + 콘텐츠 칼럼만 375px로 제한한다(그레이 배경에 뜨는 모바일 카드 아님). */
+.shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: #191918;
+  font-family: Pretendard, "Pretendard Variable", -apple-system, sans-serif;
+}
+.brandbar {
+  height: calc(56px + env(safe-area-inset-top));
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+  padding: env(safe-area-inset-top) 20px 12px;
+  background: #fff;
+  border-bottom: 1px solid #f1f2f3;
+}
+.shellMain {
+  width: min(100%, 375px);
+  margin: 0 auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
 .page {
   display: flex;
   flex-direction: column;

@@ -17,7 +17,7 @@
 > **Figma reference:** `Untitled` frames `#56108` (`1:12208`), `#55882` (`1:21160`), `#55883` (`1:22161`), `#56109` (`1:13236`)  
 > **Reference routes:** `/c/[token]`, `/c/[token]/pin`, `/c/[token]/gallery`, `/c/[token]/viewer/[photoId]`, `/c/[token]/review`  
 > **Scope:** 고객 링크의 모바일 최초 진입, PIN, 잘못된 링크, 셀렉·보정본 검토 인트로, 갤러리·상세보기  
-> **PC:** 셀렉·보정본 검토 인트로와 셀렉 갤러리(§10 PC composition)는 라이트로 구현됐고, 사진 상세보기(§11 PC composition)는 모바일과 같은 다크 사진 워크스페이스 톤을 유지한다. 완료 목록 등 그 외 화면은 375px 모바일 캔버스를 중앙 정렬한 상태를 유지한다(planned).
+> **PC:** 셀렉·보정본 검토 인트로와 셀렉 갤러리(§10 PC composition)는 라이트로 구현됐고, 사진 상세보기(§11 PC composition)는 모바일과 같은 다크 사진 워크스페이스 톤을 유지한다. 완료(`/c/[token]/confirmed`) 등 잔여 화면은 이미 구현돼 있으며, PC에서도 회색 배경에 375px 모바일 카드를 띄우는 방식이 아니라 흰 배경 전체를 유지한 채 콘텐츠 칼럼만 `width:min(100%,375px)`로 제한한다(2026-09-19 정정 — 아래 문구는 예전에 실제로는 잘못 반영됐던 내용이었다). 회색 캔버스+그림자 박스(`CustomerEntryShell` 기본 variant)는 잘못된 링크 등 극히 일부 예외 화면에만 쓰인다. 납품(`/c/[token]/delivered`)처럼 콘텐츠가 넓은 화면은 375px 제한 없이 자체 최대 폭(최대 1120px)을 쓴다.
 
 ## 1. 문서 역할과 Source of Truth
 
@@ -47,7 +47,7 @@ Source of Truth 우선순위:
 | 셀렉 인트로 PC composition | Figma 없음 | implemented | `/c/[token]`, `status=selecting`, 1024px 이상 |
 | 셀렉 갤러리 PC composition | Figma 없음 | implemented | `/c/[token]/gallery`, 768px 이상 |
 | 상세보기 PC composition | Figma 없음 | implemented | `/c/[token]/viewer/[photoId]`, 768px 이상 |
-| PC composition (그 외 화면) | Figma 없음 | planned | 완료 목록 등 |
+| PC composition (완료·납품 등 나머지 화면) | Figma 없음 | implemented — 화면별 자체 레이아웃(375px 콘텐츠 칼럼 또는 넓은 컨테이너), 회색 모바일 캔버스 아님 | `/c/[token]/confirmed`, `/c/[token]/delivered` 등 |
 
 ## 3. Mobile frame contract
 

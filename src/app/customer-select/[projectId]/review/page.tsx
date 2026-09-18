@@ -2,7 +2,7 @@
 
 /** S7 — 최종 검토. */
 import { useParams, useRouter } from "next/navigation";
-import { CustomerEntryShell, CustomerEntryHeader } from "@/components/customer/CustomerEntryShell";
+import { BrandLogoBar } from "@/components/BrandLogo";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import {
   PARTICIPANTS,
@@ -28,15 +28,20 @@ export default function CustomerReviewPage() {
   // 하이드레이션 전 첫 프레임 — mock-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
   if (!hydrated) {
     return (
-      <CustomerEntryShell>
-        <CustomerEntryHeader />
-      </CustomerEntryShell>
+      <div className={ui.shell}>
+        <header className={ui.brandbar}>
+          <BrandLogoBar size="sm" variant="customerEntry" />
+        </header>
+      </div>
     );
   }
 
   return (
-    <CustomerEntryShell>
-      <CustomerEntryHeader />
+    <div className={ui.shell}>
+      <header className={ui.brandbar}>
+        <BrandLogoBar size="sm" variant="customerEntry" />
+      </header>
+      <div className={ui.shellMain}>
       <div className={ui.page} style={{ minHeight: "unset" }}>
         <div className={ui.header}>
           <button type="button" className={ui.back} onClick={() => router.back()}>
@@ -141,6 +146,7 @@ export default function CustomerReviewPage() {
           </button>
         </div>
       </div>
-    </CustomerEntryShell>
+      </div>
+    </div>
   );
 }

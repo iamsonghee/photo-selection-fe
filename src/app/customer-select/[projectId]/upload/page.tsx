@@ -8,7 +8,7 @@
  */
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { CustomerEntryShell, CustomerEntryHeader } from "@/components/customer/CustomerEntryShell";
+import { BrandLogoBar } from "@/components/BrandLogo";
 import { generateMockPhotos, useCustomerSelectStore } from "../../_lib/mock-store";
 import ui from "../../_lib/ui.module.css";
 
@@ -41,15 +41,20 @@ export default function CustomerUploadPage() {
   // 같은 빈 값으로 그린 뒤, 로드가 끝나면 실제 값으로 바뀐다(mock-store.tsx 참고).
   if (!hydrated) {
     return (
-      <CustomerEntryShell>
-        <CustomerEntryHeader />
-      </CustomerEntryShell>
+      <div className={ui.shell}>
+        <header className={ui.brandbar}>
+          <BrandLogoBar size="sm" variant="customerEntry" />
+        </header>
+      </div>
     );
   }
 
   return (
-    <CustomerEntryShell>
-      <CustomerEntryHeader />
+    <div className={ui.shell}>
+      <header className={ui.brandbar}>
+        <BrandLogoBar size="sm" variant="customerEntry" />
+      </header>
+      <div className={ui.shellMain}>
       <div className={ui.page} style={{ minHeight: "unset" }}>
         <div className={ui.header}>
           <h1 className={ui.title}>{displayName}</h1>
@@ -118,6 +123,7 @@ export default function CustomerUploadPage() {
           </button>
         </div>
       </div>
-    </CustomerEntryShell>
+      </div>
+    </div>
   );
 }
