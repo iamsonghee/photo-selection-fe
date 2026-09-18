@@ -77,7 +77,7 @@
 - **성공 시 기대 결과**:
   - PIN 없는 프로젝트는 현재 요청에서 서명 쿠키를 발급하고 추가 redirect 없이 계속 렌더한다. PIN 보호 프로젝트만 `/c/[token]/pin?from=...`으로 이동한다.
   - `editing`/`editing_v2` → `/locked`, `confirmed` → `/confirmed`, `delivered` → `/delivered`로 서버에서 즉시 이동한다.
-  - `selecting`은 Figma `#56108` 기반 라이트 인트로를 표시한다. 작가가 지정한 `cover_photo_id`의 preview를 모바일 전체 폭 hero로 사용하고 중앙 기준으로 잘라 표시한다. 미지정 또는 삭제된 경우 첫 사진으로 폴백하며 presign 실패 시 light brand placeholder를 유지한다. 작가 프로필, 고객명, 전체 사진 수, 필수 선택 수, 선택 마감일/D-day, `사진 N장 셀렉하기` CTA를 노출한다. D-day는 3일 이내 주황색, 당일·초과는 빨간색으로 강조하지만 서버 차단 조건은 아니므로 지난 경우에도 `D+N`으로 표시하고 CTA를 막지 않는다. 원본 포함 프로젝트는 같은 하단 action 영역에서 `원본 다운로드 받기`로 기존 다운로드 modal을 연다. PC는 viewport 전체를 대표 사진과 안내/CTA로 나누는 split composition을 사용한다.
+  - `selecting`은 Figma `#56108` 기반 라이트 인트로를 표시한다. 작가가 지정한 `cover_photo_id`의 preview를 모바일 전체 폭 hero로 사용하고 중앙 기준으로 잘라 표시한다. 미지정 또는 삭제된 경우 첫 사진으로 폴백하며 presign 실패 시 light brand placeholder를 유지한다. 작가 프로필, 고객명, 전체 사진 수, 필수 선택 수, 선택 마감일/D-day, `사진 N장 셀렉하기` CTA를 노출한다. 소개글·인스타그램·포트폴리오 중 하나라도 등록돼 있으면 사진 위 작가 정보에 `작가 소개` 진입점을 표시하고, PC에서는 작가 정보 옆 팝오버, 모바일에서는 하단 시트로 등록된 항목만 보여준다. 외부 링크는 HTTP(S) 주소만 새 탭으로 연다. D-day는 3일 이내 주황색, 당일·초과는 빨간색으로 강조하지만 서버 차단 조건은 아니므로 지난 경우에도 `D+N`으로 표시하고 CTA를 막지 않는다. 원본 포함 프로젝트는 같은 하단 action 영역에서 `원본 다운로드 받기`로 기존 다운로드 modal을 연다. PC는 viewport 전체를 대표 사진과 안내/CTA로 나누는 split composition을 사용한다.
 - **실패 및 경계 상황**:
   - 존재하지 않는 `access_token` → `project`가 `null` → "존재하지 않는 초대 링크입니다 / URL을 다시 확인해주세요" 화면(`InvitePageClient.tsx`).
   - `project.status === "preparing"`(작가가 아직 초대 링크를 활성화하지 않음)인 경우 정확히 어떤 화면이 보이는지는 코드상 명시적 분기가 없어 소개 화면이 그대로 노출될 것으로 보임 — 사진이 없는 상태에서의 UX는 **확인 필요**(직접 브라우저 확인 권장).

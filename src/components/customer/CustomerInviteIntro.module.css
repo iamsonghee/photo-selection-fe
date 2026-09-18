@@ -79,6 +79,39 @@
   color: #fff;
 }
 
+.creatorButton,
+.creatorIdentity {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+}
+
+.creatorButton {
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.creatorButton:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 4px;
+}
+
+.creatorAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  margin-left: 2px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .avatar {
   width: 30px;
   height: 30px;
@@ -96,6 +129,60 @@
   line-height: 23px;
   letter-spacing: -0.027em;
 }
+
+.profileDialog {
+  width: 100%;
+  max-width: none;
+  margin: auto 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #191918;
+}
+
+.profileDialog::backdrop { background: rgba(16, 18, 20, 0.42); }
+
+.profileSheet {
+  position: relative;
+  width: 100%;
+  padding: 14px 24px calc(26px + env(safe-area-inset-bottom, 0px));
+  border-radius: 24px 24px 0 0;
+  background: #fff;
+  box-shadow: 0 -16px 44px rgba(18, 22, 26, 0.2);
+}
+
+.profileHandle {
+  display: block;
+  width: 38px;
+  height: 4px;
+  margin: 0 auto 18px;
+  border-radius: 999px;
+  background: #d9dcde;
+}
+
+.profileClose {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f3f4;
+  color: #54585b;
+  cursor: pointer;
+}
+
+.profileHeading { display: flex; align-items: center; gap: 14px; padding-right: 44px; }
+.profileAvatar { width: 56px; height: 56px; flex: 0 0 56px; border: 1px solid #e3e5e6; border-radius: 50%; background: #fff; object-fit: cover; }
+.profileEyebrow { margin: 0 0 3px; color: #92979a; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; }
+.profileTitle { margin: 0; font-size: 19px; font-weight: 700; line-height: 1.35; letter-spacing: -0.025em; }
+.profileBio { margin: 20px 0 0; color: #505457; font-size: 15px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.profileLinks { display: flex; gap: 8px; margin-top: 20px; }
+.profileLinks a { display: inline-flex; min-height: 42px; flex: 1; align-items: center; justify-content: center; gap: 7px; border: 1px solid #e0e3e5; border-radius: 12px; color: #303336; font-size: 14px; font-weight: 600; text-decoration: none; }
+.profileLinks a:focus-visible { outline: 2px solid #ff4d00; outline-offset: 2px; }
 
 .copy {
   display: flex;
@@ -185,6 +272,28 @@
     font-size: 17px;
     line-height: 25px;
   }
+
+  .creatorButton,
+  .creatorIdentity { gap: 12px; }
+
+  .creatorAction { font-size: 13px; }
+
+  .profileDialog {
+    width: 360px;
+    margin: auto auto 92px 40px;
+  }
+
+  .profileDialog::backdrop { background: rgba(16, 18, 20, 0.16); }
+
+  .profileSheet {
+    padding: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 20px;
+    box-shadow: 0 18px 52px rgba(15, 18, 20, 0.28);
+  }
+
+  .profileHandle { display: none; }
+  .profileClose { top: 18px; right: 18px; }
 
   .copy {
     width: min(100%, 560px);

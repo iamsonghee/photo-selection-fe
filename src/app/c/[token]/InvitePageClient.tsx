@@ -16,7 +16,13 @@ import { CustomerEntryHeader, CustomerEntryShell } from "@/components/customer/C
 import { customerDDay } from "@/lib/customer-dday";
 import styles from "./customer-entry.module.css";
 
-type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
+type PhotographerInfo = {
+  name: string | null;
+  profile_image_url: string | null;
+  bio: string | null;
+  instagram_url: string | null;
+  portfolio_url: string | null;
+} | null;
 
 /* ── Loading ── */
 function LoadingScreen() {
@@ -44,7 +50,13 @@ export default function InvitePageClient() {
     if (!token) return;
     fetch(`/api/c/photographer?token=${encodeURIComponent(token)}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => data && setPhotographer({ name: data.name ?? null, profile_image_url: data.profile_image_url ?? null }))
+      .then((data) => data && setPhotographer({
+        name: data.name ?? null,
+        profile_image_url: data.profile_image_url ?? null,
+        bio: data.bio ?? null,
+        instagram_url: data.instagram_url ?? null,
+        portfolio_url: data.portfolio_url ?? null,
+      }))
       .catch(() => {});
   }, [token]);
 
@@ -118,6 +130,9 @@ export default function InvitePageClient() {
     heroAlt: `${project.name} 대표 사진`,
     photographerLabel,
     photographerAvatarUrl: avatarUrl,
+    photographerBio: photographer?.bio,
+    photographerInstagramUrl: photographer?.instagram_url,
+    photographerPortfolioUrl: photographer?.portfolio_url,
   };
 
   if (project.status === "selecting") {

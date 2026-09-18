@@ -70,6 +70,24 @@ test.describe("고객 — 초대 링크", () => {
     await expect(page).toHaveURL(/\/gallery/, { timeout: 20_000 });
   });
 
+  test("작가 프로필에서 소개와 등록된 외부 링크를 확인한다", async ({ page }) => {
+    await page.route("**/api/c/photographer?*", (route) => route.fulfill({ json: {
+      name: "에이컷 스튜디오",
+      profile_image_url: null,
+      bio: "자연스러운 순간을 기록합니다.",
+      instagram_url: "https://instagram.com/acut",
+      portfolio_url: "https://example.com/portfolio",
+    } }));
+    await page.goto(`/c/${project.accessToken}`);
+
+    await page.getByRole("button", { name: "에이컷 스튜디오 작가 소개 보기" }).click();
+    const dialog = page.getByRole("dialog", { name: "에이컷 스튜디오 작가" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("자연스러운 순간을 기록합니다.")).toBeVisible();
+    await expect(dialog.getByRole("link", { name: "Instagram" })).toHaveAttribute("href", "https://instagram.com/acut");
+    await expect(dialog.getByRole("link", { name: "Portfolio" })).toHaveAttribute("href", "https://example.com/portfolio");
+  });
+
   test("I2: 잘못된 토큰 → 에러 화면", async ({ page }) => {
     await page.goto("/c/00000000-0000-0000-0000-000000000000");
     await page.waitForLoadState("networkidle");
@@ -130,6 +148,25 @@ test.describe("고객 — 초대 링크 모바일", () => {
   const mobileDevice = { ...devices["iPhone 13"] };
   Reflect.deleteProperty(mobileDevice, "defaultBrowserType");
   test.use(mobileDevice);
+
+  test("작가 소개를 화면 하단 시트로 연다", async ({ page }) => {
+    await page.route("**/api/c/photographer?*", (route) => route.fulfill({ json: {
+      name: "에이컷 스튜디오",
+      profile_image_url: null,
+      bio: "자연스러운 순간을 기록합니다.",
+      instagram_url: null,
+      portfolio_url: null,
+    } }));
+    await page.goto(`/c/${project.accessToken}`);
+
+    await page.getByRole("button", { name: "에이컷 스튜디오 작가 소개 보기" }).click();
+    const dialog = page.getByRole("dialog", { name: "에이컷 스튜디오 작가" });
+    const box = await dialog.boundingBox();
+    const viewport = page.viewportSize();
+    expect(box).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    expect(Math.abs(box!.y + box!.height - viewport!.height)).toBeLessThanOrEqual(1);
+  });
 
   test("핵심 선택 정보와 CTA가 첫 화면에 노출된다", async ({ page }) => {
     await page.goto(`/c/${project.accessToken}`);
