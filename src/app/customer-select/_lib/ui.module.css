@@ -1,3 +1,5 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css");
+
 /* 고객 셀렉 전용 화면 톤 — docs/customer-design.md §4 수치를 그대로 따른다.
  * (Entry title 24/36 SemiBold, description 14/21, primary CTA 16/24 Bold, 좌우 여백 24px,
  *  터치 타겟 최소 44px, accent #ff4d00) CustomerEntryShell과 같은 리터럴 값을 쓴다 —
