@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateTokenAndProject, confirmProjectAdmin } from "@/lib/customer-api-server";
+import { confirmProjectAdmin } from "@/lib/customer-api-server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { checkPinAuth } from "@/lib/customer-auth-server";
+import { getPinAuthorizedProject } from "@/lib/customer-auth-server";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,10 +13,10 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const pinErr = await checkPinAuth(req, token);
-    if (pinErr) return pinErr;
-    const project = await validateTokenAndProject(token, project_id);
-    if (!project) {
+    const auth = await getPinAuthorizedProject(req, token);
+    if (auth.error) return auth.error;
+    const project = auth.project;
+    if (!project || project.id !== project_id) {
       return NextResponse.json({ error: "Invalid token or project" }, { status: 401 });
     }
     if (project.status !== "selecting") {

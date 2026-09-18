@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getPhotographerIdFromSession } from "@/lib/photographer-session-auth";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { callPresignApi } from "@/lib/presign-server";
 import { buildContentDisposition } from "@/lib/content-disposition-server";
@@ -32,21 +32,6 @@ function buildPreviewFilename(originalFilename: string | null, number: number): 
   const dot = filename.lastIndexOf(".");
   const stem = dot > 0 ? filename.slice(0, dot) : filename;
   return `${stem || fallback}_preview.jpg`;
-}
-
-async function getPhotographerIdFromSession(): Promise<string | null> {
-  const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user?.id) return null;
-  const { data } = await supabase
-    .from("photographers")
-    .select("id")
-    .eq("auth_id", session.user.id)
-    .limit(1)
-    .single();
-  return data?.id ?? null;
 }
 
 /**

@@ -51,11 +51,14 @@ export type OriginalPhotoGalleryProps = {
   compressingPhotoId?: string | null;
   selectedPhotoIds?: Set<string>;
   onToggleSelected?: (photoId: string, options?: { range?: boolean }) => void;
+  selectionMark?: "check" | "recommendation";
   /** PC 갤러리 빈 공간에서 시작하는 범위 선택. */
   onDragSelectionChange?: (photoIds: Set<string>) => void;
+  onEmptyClick?: () => void;
   /** PC에서 카드 hover 시 작업 대상을 고르는 체크박스를 발견 가능하게 표시한다. */
   selectionOnHover?: boolean;
   recommendedPhotoIds?: Set<string>;
+  recommendedGroupCounts?: Map<string, number>;
   selectionDisabled?: boolean;
   /** 모바일 사진 관리 모드. 켜지면 사진 탭이 상세보기가 아닌 선택 토글로 동작한다. */
   mobileManageMode?: boolean;
@@ -82,6 +85,12 @@ export type OriginalPhotoGalleryProps = {
   /** 업로드 중 임시 사진과 저장 완료 사진이 같은 카드로 이어질 때 사용할 안정적인 key. */
   getPhotoKey?: (photo: Photo, index: number) => string;
 };
+
+function SelectionMark({ recommendation, size = 13 }: { recommendation?: boolean; size?: number }) {
+  return recommendation
+    ? <RecommendationMark data-selection-recommendation-mark size={size} />
+    : <Check size={size} strokeWidth={3} />;
+}
 
 function fileName(photo: Photo, index: number) {
   return getPhotoDisplayFilename(photo, index);
@@ -232,7 +241,7 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
         <div data-original-photo-filename-row className={styles.nameRow}>
           {!props.readonly ? (
             <button type="button" className={styles.selectButton} aria-label={`${name} ${selected ? "선택 해제" : "선택"}`} aria-pressed={selected} disabled={photo.isPending} onClick={() => !photo.isPending && props.onToggleSelected?.(photo.id)}>
-              {selected ? <Check size={13} strokeWidth={3} /> : null}
+              {selected ? <SelectionMark recommendation={props.selectionMark === "recommendation"} /> : null}
             </button>
           ) : null}
           <TruncatedTextTooltip text={name} className={styles.photoFilename} />
@@ -259,7 +268,7 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
             aria-label={`${name} ${selected ? "선택 해제" : "선택"}`}
             aria-pressed={selected}
             onClick={(event) => { event.stopPropagation(); props.onToggleSelected?.(photo.id, { range: event.shiftKey }); }}>
-            <span className={styles.hoverSelectFace}>{selected ? <Check strokeWidth={3} /> : null}</span>
+            <span className={styles.hoverSelectFace}>{selected ? <SelectionMark recommendation={props.selectionMark === "recommendation"} /> : null}</span>
           </button>
         ) : null}
         {props.mobileSelectionVisible && !photo.isPending ? (
@@ -275,7 +284,7 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
               else props.onPhotoLongPress?.(photo.id);
             }}
           >
-            <span className={styles.mobileSelectionFace}>{selected ? <Check size={13} strokeWidth={3} /> : null}</span>
+            <span className={styles.mobileSelectionFace}>{selected ? <SelectionMark recommendation={props.selectionMark === "recommendation"} /> : null}</span>
           </button>
         ) : null}
         {photo.isUploading || props.compressingPhotoId === photo.id ? <span className="absolute right-2 top-2 z-[6] text-accent"><Loader2 size={16} className="animate-spin" /></span> : null}
@@ -298,6 +307,7 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
         ) : null}
         {props.showSimilarityGroups && (representative || expanded) && group && group.photoCount > 1 ? (
           <SimilarityGroupBadge count={group.photoCount} expanded={expanded}
+            recommendedCount={expanded ? 0 : props.recommendedGroupCounts?.get(group.id)}
             label={`묶음 ${Array.from(props.groupsById!.keys()).indexOf(group.id) + 1}`}
             onClick={(event) => { event.stopPropagation(); props.onGroupBadgeClick?.(event, group.id); }} />
         ) : null}
@@ -497,10 +507,13 @@ function GridGallery(props: OriginalPhotoGalleryProps) {
       ref={containerRef}
       onPointerDownCapture={() => { suppressReleaseClick.current = false; }}
       onClickCapture={(event) => {
-        if (!suppressReleaseClick.current) return;
-        suppressReleaseClick.current = false;
-        event.preventDefault();
-        event.stopPropagation();
+        if (suppressReleaseClick.current) {
+          suppressReleaseClick.current = false;
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        if (event.target instanceof Element && !event.target.closest("article, button, input, select, a")) props.onEmptyClick?.();
       }}
       data-photo-gallery-variant={props.variant ?? "original"}
       data-selection-active={props.selectionOnHover && (props.selectedPhotoIds?.size ?? 0) > 0 ? "true" : undefined}
@@ -592,7 +605,9 @@ function ListGallery(props: OriginalPhotoGalleryProps) {
         ? styles.listFinal
       : "";
   return (
-    <div data-original-photo-list data-selection-active={props.selectionOnHover && (props.selectedPhotoIds?.size ?? 0) > 0 ? "true" : undefined} className={`${styles.listShell} ${selectionVariant ? styles.listShellSelection : ""} ${retouchedVariant ? styles.listShellRetouched : ""} ${props.mobileSelectionVisible ? styles.listShellMobileSelectable : ""}`}>
+    <div data-original-photo-list onClick={(event) => {
+      if (event.target instanceof Element && !event.target.closest("[data-original-photo-list-row], button, input, select, a")) props.onEmptyClick?.();
+    }} data-selection-active={props.selectionOnHover && (props.selectedPhotoIds?.size ?? 0) > 0 ? "true" : undefined} className={`${styles.listShell} ${selectionVariant ? styles.listShellSelection : ""} ${retouchedVariant ? styles.listShellRetouched : ""} ${props.mobileSelectionVisible ? styles.listShellMobileSelectable : ""}`}>
       <div className={styles.listTable} role="table" aria-label={selectionVariant ? "고객 셀렉 사진 목록" : finalVariant ? "최종본 사진 목록" : retouchedVariant ? "보정본 사진 목록" : "원본 사진 목록"}>
         <div className={`${styles.listHeader} ${readonlyClass} ${listVariantClass}`} role="row">
           {mobileRetouchedList ? <>
@@ -677,7 +692,7 @@ function ListGallery(props: OriginalPhotoGalleryProps) {
                       if (!selectionId) return;
                       if (props.mobileSelectionVisible && !props.mobileManageMode) props.onPhotoLongPress?.(selectionId);
                       else props.onToggleSelected?.(selectionId, { range: event.shiftKey });
-                    }}>{selected ? <Check size={13} strokeWidth={3} /> : null}</button> : null}
+                    }}>{selected ? <SelectionMark recommendation={props.selectionMark === "recommendation"} /> : null}</button> : null}
                     <div className={styles.listFile} role="cell">
                       <button data-original-photo-list-thumbnail type="button" className={styles.listThumbnail} onClick={(event) => props.selectionOnHover && (event.shiftKey || event.metaKey || event.ctrlKey) ? props.onToggleSelected?.(photo.id, { range: event.shiftKey }) : props.onPhotoClick(row.index)} aria-label={`${name} 상세 보기`}><QueuedImage photo={photo} scrollRef={props.scrollRef} thumbQueue={props.thumbQueue} /></button>
                       <TruncatedTextTooltip text={name} className={styles.listFilename} />
@@ -685,7 +700,7 @@ function ListGallery(props: OriginalPhotoGalleryProps) {
                       {(props.recommendedPhotoIds?.has(photo.id) ?? photo.photographerRecommended) ? (
                         <span className={styles.listRecommendBadge}><RecommendationMark size={12} aria-hidden />작가 추천</span>
                       ) : null}
-                      {props.showSimilarityGroups && group && group.photoCount > 1 ? <SimilarityGroupBadge inline count={group.photoCount} expanded={Boolean(props.expandedGroups?.has(group.id))} onClick={(event) => { event.stopPropagation(); props.onGroupBadgeClick?.(event, group.id); }} /> : null}
+                      {props.showSimilarityGroups && group && group.photoCount > 1 ? <SimilarityGroupBadge inline count={group.photoCount} expanded={Boolean(props.expandedGroups?.has(group.id))} recommendedCount={props.expandedGroups?.has(group.id) ? 0 : props.recommendedGroupCounts?.get(group.id)} onClick={(event) => { event.stopPropagation(); props.onGroupBadgeClick?.(event, group.id); }} /> : null}
                     </div>
                     {retouchedVariant ? <>
                       <div className={styles.listFile} role="cell">

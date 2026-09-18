@@ -50,6 +50,27 @@
 .workspace [data-upload-header-mode="compact"] .expandedHeader { grid-template-rows: 0fr; opacity: 0; }
 .workspace [data-upload-header-mode="compact"] .compactHeader { height: 48px; opacity: 1; }
 
+.recommendationTrayOpen {
+  transform-origin: bottom right;
+  animation: recommendation-tray-open 180ms ease-out both;
+}
+
+.recommendationTrayClosing {
+  transform-origin: bottom right;
+  pointer-events: none;
+  animation: recommendation-tray-close 160ms ease-in both;
+}
+
+@keyframes recommendation-tray-open {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes recommendation-tray-close {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(10px) scale(0.98); }
+}
+
 @media (max-width: 768px) {
   .compactHeader { padding: 0 16px; gap: 8px; }
   .compactHeader strong { font-size: 13px; }
@@ -57,4 +78,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .expandedHeader, .compactHeader { transition: none; }
+  .recommendationTrayOpen, .recommendationTrayClosing { animation: none; }
 }

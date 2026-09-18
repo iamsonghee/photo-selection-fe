@@ -433,17 +433,26 @@ export default function ViewerPage() {
     setParticipant(readParticipant(token));
   }, [token]);
 
-  /* 공유 명단(색 → 이름)은 다른 기기가 바꿀 수 있으므로 사진이 바뀔 때마다 최신값을 읽는다. */
+  /* 공유 명단(색 → 이름)은 진입 시와 다른 탭에서 돌아올 때 갱신한다.
+   * 사진을 넘길 때마다 재조회하지 않으면서도 다른 기기의 변경을 반영할 수 있다. */
   useEffect(() => {
     if (!token || !project?.id) return;
     let alive = true;
-    void fetchRoster(token, project.id).then((next) => {
-      if (alive) setRoster(next);
-    });
+    const refresh = () => {
+      void fetchRoster(token, project.id).then((next) => {
+        if (alive) setRoster(next);
+      });
+    };
+    const onVisible = () => {
+      if (!document.hidden) refresh();
+    };
+    refresh();
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       alive = false;
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [token, project?.id, activePhotoId]);
+  }, [token, project?.id]);
 
   /** 프로젝트에서 이미 쓰인 색 = 참여 중인 사람들(별도 명단 저장 없이 태그에서 역산) */
   const usedColors = useMemo(() => getUsedColors(photoStates), [photoStates]);

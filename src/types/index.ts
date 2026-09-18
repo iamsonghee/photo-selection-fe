@@ -123,8 +123,11 @@ export interface Project {
   originalArchiveStatus?: "pending" | "processing" | "ready" | "failed" | null;
   /** 초대 링크 활성화(다운로드 30일 기산) 시각 — 최초 1회만 기록, 재전달로 초기화 안 됨 */
   originalDownloadStartedAt?: string | null;
-  /** 런타임 전용 — photos 테이블에서 조회한 첫 번째 사진 썸네일 URL */
+  /** 런타임 전용 — photos 테이블에서 조회한 첫 번째 사진 썸네일 URL. 52px급 등 작은 썸네일에 쓴다. */
   thumbnailUrl?: string | null;
+  /** 런타임 전용 — 위와 같은 사진의 프리뷰(고화질) URL. 카드가 커서 썸네일을 확대하면 화소가
+   *  깨지는 자리(대시보드 히어로/최근 프로젝트 카드 등)에 쓴다. 프리뷰가 없으면 썸네일과 같다. */
+  thumbnailPreviewUrl?: string | null;
   /** 런타임 전용 — 원본이 미전송/실패 상태로 남아 복구가 필요한 사진 수 */
   originalRecoveryCount?: number;
   /** 고객 진입 화면의 대표 사진. 미지정 시 첫 번째 사진을 사용한다. */

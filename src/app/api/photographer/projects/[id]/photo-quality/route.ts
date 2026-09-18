@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getPhotographerIdFromSession } from "@/lib/photographer-session-auth";
 import { getAdminClient } from "@/lib/supabase-admin";
 import {
   buildQualityFlagMap,
@@ -19,21 +19,6 @@ import {
  * 관리자 전용이 아니다 — 품질 표시는 이제 모든 작가가 쓰는 기능이라 세션 + 소유권만 확인한다
  * (같은 이유로 일반 경로가 된 `gemini-analysis` 라우트와 같은 검증).
  */
-async function getPhotographerIdFromSession(): Promise<string | null> {
-  const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user?.id) return null;
-  const { data } = await supabase
-    .from("photographers")
-    .select("id")
-    .eq("auth_id", session.user.id)
-    .limit(1)
-    .single();
-  return data?.id ?? null;
-}
-
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }

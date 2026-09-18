@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateTokenAndProject } from "@/lib/customer-api-server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { checkPinAuth } from "@/lib/customer-auth-server";
+import { getPinAuthorizedProject } from "@/lib/customer-auth-server";
 import type { ColorTag } from "@/types";
 
 const VALID_COLORS: readonly ColorTag[] = ["red", "yellow", "green", "blue", "purple"];
@@ -19,10 +18,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "token, project_id required" }, { status: 400 });
   }
 
-  const pinErr = await checkPinAuth(req, token);
-  if (pinErr) return pinErr;
-  const project = await validateTokenAndProject(token, projectId);
-  if (!project) {
+  const auth = await getPinAuthorizedProject(req, token);
+  if (auth.error) return auth.error;
+  if (!auth.project || auth.project.id !== projectId) {
     return NextResponse.json({ error: "Invalid token or project" }, { status: 401 });
   }
 
@@ -51,10 +49,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid color" }, { status: 400 });
     }
 
-    const pinErr = await checkPinAuth(req, token);
-    if (pinErr) return pinErr;
-    const project = await validateTokenAndProject(token, projectId);
-    if (!project) {
+    const auth = await getPinAuthorizedProject(req, token);
+    if (auth.error) return auth.error;
+    if (!auth.project || auth.project.id !== projectId) {
       return NextResponse.json({ error: "Invalid token or project" }, { status: 401 });
     }
 

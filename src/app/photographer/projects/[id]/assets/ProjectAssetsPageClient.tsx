@@ -203,6 +203,14 @@ export default function ProjectAssetsPageClient({
     () => new Set(displayPhotos.filter((photo) => photo.photographerRecommended).map((photo) => photo.id)),
     [displayPhotos],
   );
+  const recommendedGroupCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const photo of displayPhotos) {
+      if (!photo.photographerRecommended || !photo.similarityGroupId) continue;
+      counts.set(photo.similarityGroupId, (counts.get(photo.similarityGroupId) ?? 0) + 1);
+    }
+    return counts;
+  }, [displayPhotos]);
   const recommendedCount = recommendedPhotoIds.size;
 
   useEffect(() => {
@@ -842,6 +850,7 @@ export default function ProjectAssetsPageClient({
             variant={activeTab === "original" ? "original" : "selection"}
             showQualityBadges={activeTab === "original"}
             recommendedPhotoIds={activeTab === "original" ? recommendedPhotoIds : undefined}
+            recommendedGroupCounts={activeTab === "original" ? recommendedGroupCounts : undefined}
             mobileMinCols={activeTab === "original" ? 3 : 2}
             mobileGridGap={6}
             showMobileFilename={activeTab === "original"}

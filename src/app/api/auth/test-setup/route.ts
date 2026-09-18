@@ -26,6 +26,7 @@ type Action =
   // AI 유사컷 그룹 리뷰 모드 E2E용 — clip-service 분석을 실제로 돌리지 않고 photo_groups
   // 행 + photos.similarity_group_id를 직접 세팅해 "이미 그룹이 있는 상태"만 재현한다.
   | "seed_photo_group"
+  | "seed_recommendations"
   | "seed_selections"
   | "seed_photo_version";
 
@@ -218,6 +219,14 @@ export async function POST(req: Request) {
       .in("id", body.photoIds);
     if (photosError) return NextResponse.json({ error: photosError.message }, { status: 500 });
     return NextResponse.json({ ok: true, groupId: group.id });
+  }
+
+  if (action === "seed_recommendations") {
+    const photoIds = body.photoIds ?? [];
+    if (!body.projectId || photoIds.length === 0) return NextResponse.json({ error: "projectId and photoIds are required" }, { status: 400 });
+    const { error } = await admin.from("photos").update({ is_photographer_recommended: true }).eq("project_id", body.projectId).in("id", photoIds);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
   }
 
   if (action === "seed_selections") {

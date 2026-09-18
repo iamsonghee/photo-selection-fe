@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { checkPinAuth } from "@/lib/customer-auth-server";
+import { getPinAuthorizedProject } from "@/lib/customer-auth-server";
 
 /**
  * GET /api/c/photographer?token=
- * access_token으로 project 조회 → photographer_id로 photographers 조회 (service role).
+ * access_token으로 인증된 project에서 photographer_id를 얻어 photographers 조회 (service role).
  * 반환: { name, profile_image_url, bio, instagram_url, portfolio_url }
  */
 export async function GET(req: NextRequest) {
@@ -13,22 +13,14 @@ export async function GET(req: NextRequest) {
     if (!token?.trim()) {
       return NextResponse.json({ error: "token required" }, { status: 400 });
     }
-    const pinErr = await checkPinAuth(req, token);
-    if (pinErr) return pinErr;
-
-    const admin = getAdminClient();
-    const { data: project, error: projectError } = await admin
-      .from("projects")
-      .select("photographer_id")
-      .eq("access_token", token.trim())
-      .limit(1)
-      .single();
-
-    if (projectError || !project) {
+    const auth = await getPinAuthorizedProject(req, token);
+    if (auth.error) return auth.error;
+    if (!auth.project) {
       return NextResponse.json({ error: "Invalid token" }, { status: 404 });
     }
 
-    const photographerId = (project as { photographer_id: string }).photographer_id;
+    const admin = getAdminClient();
+    const photographerId = auth.project.photographerId;
     const { data: photographer, error: photographerError } = await admin
       .from("photographers")
       .select("name, profile_image_url, bio, instagram_url, portfolio_url")

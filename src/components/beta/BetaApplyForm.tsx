@@ -343,7 +343,7 @@ function BetaApplyFormFields({ email }: { email: string }) {
           onChange={(e) => setPrivacyConsent(e.target.checked)}
           className="mt-0.5"
         />
-        개인정보 수집·이용에 동의합니다 (필수)
+        <span><a className="underline" href="/privacy" target="_blank" rel="noreferrer">개인정보처리방침</a>에 동의합니다 (필수)</span>
       </label>
       <label className="flex items-start gap-2 text-sm text-foreground">
         <input

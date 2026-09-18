@@ -1,52 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import {
-  getProjectByToken,
-  getPhotosWithSelectionsAdmin,
-} from "@/lib/customer-api-server";
-import {
-  getProjectByToken as getProjectByTokenMock,
-  getPhotosByProject,
-} from "@/lib/mock-data";
-import { checkPinAuth } from "@/lib/customer-auth-server";
-import type { PhotoGroupInfo } from "@/types";
+import { getPhotosWithSelectionsAdmin } from "@/lib/customer-api-server";
+import { getPinAuthorizedProject } from "@/lib/customer-auth-server";
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
   if (!token?.trim()) {
     return NextResponse.json({ error: "token required" }, { status: 400 });
   }
-  const pinErr = await checkPinAuth(req, token);
-  if (pinErr) return pinErr;
+  const auth = await getPinAuthorizedProject(req, token);
+  if (auth.error) return auth.error;
+  if (!auth.project) {
+    return NextResponse.json({ error: "Invalid token", project: null }, { status: 404 });
+  }
   try {
     const admin = getAdminClient();
-    let project = await getProjectByToken(admin, token);
-    let photos: Awaited<ReturnType<typeof getPhotosWithSelectionsAdmin>>["photos"];
-    let selectedIds: Set<string>;
-    let photoStates: Record<string, { rating?: number; color?: import("@/types").ColorTag[]; comment?: string }>;
-    let photoGroups: PhotoGroupInfo[];
-
-    if (project) {
-      const result = await getPhotosWithSelectionsAdmin(admin, project.id);
-      photos = result.photos;
-      selectedIds = result.selectedIds;
-      photoStates = result.photoStates;
-      photoGroups = result.photoGroups;
-    } else {
-      // 목업: DB에 없으면 mock 데이터 사용 (보정본 검토 등)
-      const mockProject = getProjectByTokenMock(token);
-      if (!mockProject) {
-        return NextResponse.json({ error: "Invalid token", project: null }, { status: 404 });
-      }
-      project = mockProject;
-      const allPhotos = getPhotosByProject(project.id);
-      photos = allPhotos;
-      selectedIds = new Set(
-        allPhotos.filter((p) => p.selected).map((p) => p.id)
-      );
-      photoStates = {};
-      photoGroups = [];
-    }
+    const project = auth.project;
+    const { photos, selectedIds, photoStates, photoGroups } =
+      await getPhotosWithSelectionsAdmin(admin, project.id);
 
     return NextResponse.json({
       project,

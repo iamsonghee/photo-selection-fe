@@ -49,26 +49,22 @@ export async function GET() {
       settings
     );
 
-    let current: number;
-    if (policy.tier === "admin") {
-      current = 0;
-    } else {
-      const { count } = await admin
-        .from("projects")
-        .select("id", { count: "exact", head: true })
-        .eq("photographer_id", data.id);
-      current = count ?? 0;
-    }
-
-    // 가입 전 신청 심사 상태(축 A) — 승인 대기 배너 노출 판단용. 관리자는 조회하지 않는다(불필요).
+    let current = 0;
     let betaApplicationStatus: "applied" | "reviewing" | "on_hold" | "approved" | "rejected" | null = null;
     if (policy.tier !== "admin") {
-      const { data: applicationRow } = await admin
-        .from("beta_applications")
-        .select("status")
-        .eq("matched_photographer_id", data.id)
-        .maybeSingle();
-      betaApplicationStatus = applicationRow?.status ?? null;
+      const [projectCountRes, applicationRes] = await Promise.all([
+        admin
+          .from("projects")
+          .select("id", { count: "exact", head: true })
+          .eq("photographer_id", data.id),
+        admin
+          .from("beta_applications")
+          .select("status")
+          .eq("matched_photographer_id", data.id)
+          .maybeSingle(),
+      ]);
+      current = projectCountRes.count ?? 0;
+      betaApplicationStatus = applicationRes.data?.status ?? null;
     }
 
     return NextResponse.json({

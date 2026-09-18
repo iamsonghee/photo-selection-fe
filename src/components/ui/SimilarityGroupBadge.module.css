@@ -5,11 +5,12 @@
 .button:hover::before { background: rgba(24,30,34,.96); }
 .button:focus-visible { outline: 2px solid white; outline-offset: -2px; }
 .selected { padding: 3px 6px; border-radius: 4px; background: rgba(24,30,34,.82); color: white; font: 500 10px/1.2 Pretendard, sans-serif; }
+.recommended { display:inline-flex; align-items:center; gap:3px; padding:3px 6px; border-radius:4px; background:rgba(24,30,34,.82); color:white; font:600 10px/1.2 Pretendard,sans-serif; }
 @media (max-width: 767px) {
   .wrap { right: 2px; bottom: 0; }
   .inline { right: auto; }
   .button { min-height: 44px; padding-inline: 6px; gap: 3px; font-size: 10px; }
   .button::before { inset-block: 8px; }
   .word { display: none; }
-  .selected { font-size: 9px; margin-bottom: -5px; }
+  .selected, .recommended { font-size: 9px; margin-bottom: -5px; }
 }

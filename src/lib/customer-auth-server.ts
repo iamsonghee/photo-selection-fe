@@ -1,6 +1,11 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
+import { mapProjectRow } from "@/lib/customer-api-server";
+import type { Database } from "@/types/supabase";
+import type { Project } from "@/types";
+
+type ProjectsRow = Database["public"]["Tables"]["projects"]["Row"];
 
 const COOKIE_TTL_SECONDS = 86400; // 24 hours
 
@@ -58,20 +63,15 @@ export async function checkPinAuth(
   return result.error;
 }
 
-export type PinAuthorizedProject = {
-  id: string;
-  access_pin: string | null;
-};
-
 /**
- * PIN 인증과 프로젝트 식별을 한 번의 DB 조회로 처리한다.
- * 프로젝트 id가 필요한 API가 checkPinAuth 뒤에 token→project를 다시 조회하던 왕복을
- * 피할 수 있도록 인증된 프로젝트를 함께 반환한다.
+ * PIN 인증과 프로젝트 조회를 한 번의 DB 조회로 처리한다.
+ * 프로젝트 데이터가 필요한 API가 checkPinAuth 뒤에 token→project를 다시 조회하던 왕복을
+ * 피할 수 있도록, 인증에 쓴 그 행을 그대로 전체 Project로 매핑해 반환한다.
  */
 export async function getPinAuthorizedProject(
   req: NextRequest,
   token: string
-): Promise<{ project: PinAuthorizedProject | null; error: NextResponse | null }> {
+): Promise<{ project: Project | null; error: NextResponse | null }> {
   const cookieName = `pin_verified_${token}`;
   const cookieValue = req.cookies.get(cookieName)?.value;
   if (!cookieValue) {
@@ -82,25 +82,24 @@ export async function getPinAuthorizedProject(
   }
 
   const admin = getAdminClient();
-  const { data: project, error } = await admin
+  const { data: row, error } = await admin
     .from("projects")
-    .select("id, access_pin")
+    .select("*")
     .eq("access_token", token)
     .limit(1)
     .maybeSingle();
-  if (error || !project) {
+  if (error || !row) {
     return {
       project: null,
       error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     };
   }
-  const authorizedProject = project as PinAuthorizedProject;
-  const accessPin = authorizedProject.access_pin;
-  if (!verifyPinCookie(token, cookieValue, accessPin)) {
+  const project = mapProjectRow(row as ProjectsRow);
+  if (!verifyPinCookie(token, cookieValue, project.accessPin ?? null)) {
     return {
       project: null,
       error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     };
   }
-  return { project: authorizedProject, error: null };
+  return { project, error: null };
 }

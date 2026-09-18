@@ -2126,8 +2126,12 @@ export default function WorkflowPageClient({
               <span className="text-[12px] text-disabled-foreground" aria-hidden>·</span>
               <button type="button" data-retouch-round="v2" data-viewed={stageTab === "v2" ? "true" : "false"} aria-current="step" aria-pressed={stageTab === "v2"} onClick={() => selectRound("v2")} className={`flex h-8 items-center gap-1.5 px-2 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 ${stageTab === "v2" ? "font-bold text-accent" : "font-semibold text-foreground"}`}>
                 <span>재보정</span>
-                <span className="h-1.5 w-1.5 rounded-full bg-cyan" aria-hidden />
-                <span className="text-[10px] font-medium text-cyan">진행 중</span>
+                {isV2ProjectPhase && (
+                  <>
+                    <span className="h-1.5 w-1.5 rounded-full bg-cyan" aria-hidden />
+                    <span className="text-[10px] font-medium text-cyan">진행 중</span>
+                  </>
+                )}
               </button>
             </div>
             <button type="button" data-mobile-retouch-stage-trigger onClick={() => setMobileRoundOpen(true)} className="flex h-10 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-foreground md:hidden" aria-haspopup="dialog" aria-expanded={mobileRoundOpen}>

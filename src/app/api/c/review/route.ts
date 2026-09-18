@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { getReviewDataByToken, getProjectByToken } from "@/lib/customer-api-server";
-import { checkPinAuth } from "@/lib/customer-auth-server";
+import { getReviewDataByToken } from "@/lib/customer-api-server";
+import { getPinAuthorizedProject } from "@/lib/customer-auth-server";
 
 /** GET /api/c/review?token= — 보정본 검토 데이터 (project, photos with version URLs, existing reviews) */
 export async function GET(req: NextRequest) {
@@ -9,15 +9,15 @@ export async function GET(req: NextRequest) {
   if (!token?.trim()) {
     return NextResponse.json({ error: "token required" }, { status: 400 });
   }
-  const pinErr = await checkPinAuth(req, token);
-  if (pinErr) return pinErr;
+  const auth = await getPinAuthorizedProject(req, token);
+  if (auth.error) return auth.error;
   try {
     const admin = getAdminClient();
-    const data = await getReviewDataByToken(admin, token);
+    const data = await getReviewDataByToken(admin, token, auth.project);
     if (data) {
       return NextResponse.json(data);
     }
-    const project = await getProjectByToken(admin, token);
+    const project = auth.project;
     if (project?.status === "reviewing_v1" || project?.status === "reviewing_v2") {
       return NextResponse.json({ project, photos: [] });
     }

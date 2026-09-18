@@ -39,9 +39,12 @@ function DeadlineMeta({ deadline, compact = false }: {
   </span>;
 }
 
-function ProjectThumbnail({ project, className = "" }: { project: Project; className?: string }) {
-  return project.thumbnailUrl
-    ? <img className={className} src={project.thumbnailUrl} alt="" loading="lazy"/>
+/** preview: 카드가 커서 썸네일을 확대하면 화소가 깨지는 자리(히어로/최근 프로젝트)에서 true로 준다.
+ *  52px급 등 작은 자리는 기본값(썸네일)이 대역폭상 더 낫다. */
+function ProjectThumbnail({ project, className = "", preview = false }: { project: Project; className?: string; preview?: boolean }) {
+  const src = preview ? (project.thumbnailPreviewUrl ?? project.thumbnailUrl) : project.thumbnailUrl;
+  return src
+    ? <img className={className} src={src} alt="" loading="lazy"/>
     : <span className={`${styles.placeholder} ${className}`}>{project.name.slice(0, 2)}</span>;
 }
 
@@ -86,7 +89,7 @@ function FeaturedTask({ project }: { project: Project }) {
   const action = getAction(project);
   return <article className={styles.featuredTask} data-actor={actor}>
     <Link className={styles.featuredMedia} href={`/photographer/projects/${project.id}`} prefetch={false} aria-label={`${project.name} 프로젝트 보기`}>
-      <ProjectThumbnail project={project}/>
+      <ProjectThumbnail project={project} preview/>
     </Link>
     <div className={styles.featuredBody}>
       <div className={styles.featuredTopline}>
@@ -196,7 +199,7 @@ export function DashboardOverview({ projects, logs, logsError, onRetryLogs, onCr
         <section aria-label="최근 변경 프로젝트">
           <div className={styles.sectionHeading}><div className={styles.sectionTitleGroup}><h2>최근 변경 프로젝트</h2><p>사진으로 프로젝트를 빠르게 찾아보세요.</p></div><Link href="/photographer/projects">전체 보기<ArrowRight size={13}/></Link></div>
           <div className={styles.recentGrid}>{recent.slice(0, 3).map(project => <Link href={`/photographer/projects/${project.id}`} prefetch={false} key={project.id} className={styles.recentCard}>
-            <div className={styles.recentMedia}><ProjectThumbnail project={project}/><span className={styles.actor} data-actor={getProjectActor(project.status)}><i/>{getDisplayStatusLabel(project.status, project.photoCount)}</span></div>
+            <div className={styles.recentMedia}><ProjectThumbnail project={project} preview/><span className={styles.actor} data-actor={getProjectActor(project.status)}><i/>{getDisplayStatusLabel(project.status, project.photoCount)}</span></div>
             <div className={styles.recentBody}><strong>{project.name}</strong><OriginalUploadWarningBadge count={project.originalRecoveryCount}/><ProjectMeta project={project}/><small>{dateText(project.updatedAt)} 변경</small></div>
           </Link>)}</div>
         </section>

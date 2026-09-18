@@ -17,9 +17,6 @@ import { getActiveDeadline } from "@/lib/project-deadline";
 import { dday as getSharedDday, getProjectActor } from "@/lib/project-actor";
 import { ProjectLimitModal } from "@/components/photographer/ProjectLimitModal";
 import { useNewProjectGate } from "@/hooks/useNewProjectGate";
-import {
-  PhotographerLightPageFrame,
-} from "@/components/layout/PhotographerLightPageHeader";
 import { formatProjectDisplayId } from "@/components/photographer/ProjectIdText";
 import { DesktopProjectList } from "./DesktopProjectList";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -376,7 +373,11 @@ export default function ProjectsPage() {
     <ProjectLimitModal info={limitInfo} onClose={closeLimitModal} />
     <div className={`${styles.lightTheme} hidden md:block min-h-screen bg-background text-foreground`}>
       {loading ? <div className="py-24 flex justify-center"><PageLoader /></div> : projects.length === 0 ? (
-        <PhotographerLightPageFrame><FirstProjectOnboarding onCreateProject={handleNewProject} headingLevel="h1"/></PhotographerLightPageFrame>
+        // 대시보드의 빈 상태(EmptyDashboard)와 같은 위치(화면 중앙)에 오도록 맞춘다 —
+        // PhotographerLightPageFrame은 좌측 상단 시작 좌표라 여기 그대로 쓰면 좌상단에 붙는다.
+        <div className="flex min-h-[calc(100dvh-4rem)] w-full items-center justify-center px-6 py-16 md:min-h-screen md:px-10 md:py-20">
+          <FirstProjectOnboarding onCreateProject={handleNewProject} headingLevel="h1" className="md:-translate-y-8"/>
+        </div>
       ) : <DesktopProjectList
         projects={filtered} total={projects.length}
         counts={{ all:tabCounts.all, mine:quickCounts.mine, waiting:quickCounts.waiting, completed:tabCounts.completed }}

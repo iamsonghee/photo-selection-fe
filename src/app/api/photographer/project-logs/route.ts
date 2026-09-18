@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getPhotographerIdFromSession } from "@/lib/photographer-session-auth";
 import { getAdminClient } from "@/lib/supabase-admin";
 
 const ACTIONS = [
@@ -23,21 +23,6 @@ export interface ProjectLogApiItem {
   customerName: string;
   action: ProjectLogAction;
   createdAt: string;
-}
-
-async function getPhotographerIdFromSession(): Promise<string | null> {
-  const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user?.id) return null;
-  const { data } = await supabase
-    .from("photographers")
-    .select("id")
-    .eq("auth_id", session.user.id)
-    .limit(1)
-    .single();
-  return data?.id ?? null;
 }
 
 /** GET: 현재 작가의 활동 로그. `?project_id=` 로 특정 프로젝트만 (최대 12건), 없으면 전체 최대 10건 */

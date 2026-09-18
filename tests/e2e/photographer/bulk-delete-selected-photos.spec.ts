@@ -40,14 +40,15 @@ test("선택한 여러 사진을 단일 bulk API로 삭제한다", async ({ page
   const before = await beforeResponse.json() as { photos: Array<{ id: string }> };
   expect(before.photos).toHaveLength(2);
 
-  const photoChecks = page.locator('[data-original-photo-card] button[aria-label$=" 선택"]:not([disabled])');
-  await expect(photoChecks).toHaveCount(2);
-  await page.locator("[data-original-photo-card]").first().hover();
-  await photoChecks.nth(0).click();
-  await photoChecks.first().click();
+  const photoCards = page.locator("[data-original-photo-card]");
+  await expect(photoCards).toHaveCount(2);
+  await photoCards.nth(0).getByRole("button", { name: / 선택$/ }).dispatchEvent("click");
+  await expect(page.getByText("1장 선택됨", { exact: true })).toBeVisible();
+  await photoCards.nth(1).getByRole("button", { name: / 선택$/ }).dispatchEvent("click");
   await expect(page.getByText("2장 선택됨", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "선택한 사진 2장 삭제", exact: true }).click();
+  await page.locator('summary[aria-label="선택 사진 작업 더보기"]').click();
+  await page.getByRole("menuitem", { name: "사진 2장 삭제", exact: true }).click();
   const deleteDialog = page.getByRole("dialog").filter({ hasText: "원본 2장을 삭제할까요?" });
   await expect(deleteDialog.getByText("원본 2장을 삭제할까요?", { exact: true })).toBeVisible();
 

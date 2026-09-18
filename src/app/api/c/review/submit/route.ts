@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { getProjectByToken, getReviewDataByToken } from "@/lib/customer-api-server";
+import { getReviewDataByToken } from "@/lib/customer-api-server";
 import { submitVersionReviews } from "@/lib/db";
-import { checkPinAuth } from "@/lib/customer-auth-server";
+import { getPinAuthorizedProject } from "@/lib/customer-auth-server";
 import { validateReviewSubmission } from "@/lib/review-submission-validation";
 
 /** POST /api/c/review/submit — 고객 검토 최종 제출 (version_reviews 일괄 INSERT + project status 업데이트) */
@@ -15,11 +15,11 @@ export async function POST(req: NextRequest) {
     if (!token?.trim()) {
       return NextResponse.json({ error: "token required" }, { status: 400 });
     }
-    const pinErr = await checkPinAuth(req, token);
-    if (pinErr) return pinErr;
+    const auth = await getPinAuthorizedProject(req, token);
+    if (auth.error) return auth.error;
 
     const admin = getAdminClient();
-    const project = await getProjectByToken(admin, token);
+    const project = auth.project;
     if (!project) {
       return NextResponse.json({ error: "Invalid token" }, { status: 404 });
     }
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const reviewData = await getReviewDataByToken(admin, token);
+    const reviewData = await getReviewDataByToken(admin, token, project);
     if (!reviewData) {
       return NextResponse.json({ error: "검토 데이터를 불러오지 못했습니다." }, { status: 409 });
     }

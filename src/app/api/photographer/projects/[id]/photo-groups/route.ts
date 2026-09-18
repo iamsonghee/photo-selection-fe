@@ -1,22 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getPhotographerIdFromSession } from "@/lib/photographer-session-auth";
 import { getAdminClient } from "@/lib/supabase-admin";
 import type { PhotoGroupInfo } from "@/types";
-
-async function getPhotographerIdFromSession(): Promise<string | null> {
-  const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user?.id) return null;
-  const { data } = await supabase
-    .from("photographers")
-    .select("id")
-    .eq("auth_id", session.user.id)
-    .limit(1)
-    .single();
-  return data?.id ?? null;
-}
 
 async function assertProjectOwnership(
   projectId: string,

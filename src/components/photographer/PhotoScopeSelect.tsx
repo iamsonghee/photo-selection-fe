@@ -44,7 +44,7 @@ export function PhotoScopeSelect({ totalCount, recommendedCount, recommendedOnly
     <div ref={rootRef} className={styles.root}>
       <button
         type="button"
-        className={`${styles.trigger} ${recommendedOnly ? styles.triggerActive : ""}`}
+        className={styles.trigger}
         aria-label={`보기 범위: ${recommendedOnly ? "추천한 사진" : "전체 사진"}`}
         aria-haspopup="menu"
         aria-expanded={open}

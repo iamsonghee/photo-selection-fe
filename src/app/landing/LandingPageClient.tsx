@@ -67,6 +67,8 @@ export function LandingPageClient({ limits }: { limits: PlanLimits }) {
               <BrandLogoBar size="sm" variant="customerEntry" />
               <p>사진에 집중할 수 있도록.</p>
               <Link prefetch={false} href="/beta/apply">클로즈드 베타 신청<ArrowRight size={14} /></Link>
+              <Link prefetch={false} href="/terms">이용약관</Link>
+              <Link prefetch={false} href="/privacy">개인정보처리방침</Link>
               <small>© {new Date().getFullYear()} A-CUT</small>
             </div>
             <small className="ac-footer-business">

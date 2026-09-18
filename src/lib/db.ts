@@ -185,15 +185,15 @@ export async function getProjectsByPhotographerId(
   const coverPhotoIds = projects.flatMap((project) => project.coverPhotoId ? [project.coverPhotoId] : []);
   const firstThumbRequest = supabase
     .from("photos")
-    .select("project_id, r2_thumb_url")
+    .select("project_id, r2_thumb_url, r2_preview_url")
     .in("project_id", projectIds)
     .eq("number", 1);
   const coverThumbRequest = coverPhotoIds.length > 0
     ? supabase
         .from("photos")
-        .select("id, project_id, r2_thumb_url")
+        .select("id, project_id, r2_thumb_url, r2_preview_url")
         .in("id", coverPhotoIds)
-    : Promise.resolve({ data: [] as Array<{ id: string; project_id: string; r2_thumb_url: string }> });
+    : Promise.resolve({ data: [] as Array<{ id: string; project_id: string; r2_thumb_url: string; r2_preview_url: string | null }> });
   const recoveryCountRequest = Promise.all(projects.filter(project => project.includeOriginal).map(async project => {
     const { count } = await supabase
       .from("photos")
@@ -208,22 +208,31 @@ export async function getProjectsByPhotographerId(
     recoveryCountRequest,
   ]);
 
+  // 작은 카드(52px급)는 원래 썸네일로 충분하지만, 카드가 큰 자리(대시보드 히어로/최근 프로젝트)에
+  // 같은 썸네일을 확대해 쓰면 화소가 깨져 보인다 — 그 자리에서만 쓸 프리뷰(고화질) URL을 함께
+  // 내려준다. 프리뷰가 없으면 썸네일과 같은 값이 된다(mapPhotoRow의 previewUrl 폴백과 같은 패턴).
   const thumbMap: Record<string, string> = Object.fromEntries(
     (thumbData ?? []).map((r) => [r.project_id, r.r2_thumb_url])
   );
+  const previewMap: Record<string, string> = Object.fromEntries(
+    (thumbData ?? []).map((r) => [r.project_id, r.r2_preview_url ?? r.r2_thumb_url])
+  );
   const coverThumbMap = new Map<string, string>();
+  const coverPreviewMap = new Map<string, string>();
   const recoveryCountMap = new Map(recoveryCounts);
   const projectById = new Map(projects.map(project => [project.id, project]));
   for (const row of coverThumbData ?? []) {
     // API가 같은 프로젝트의 사진만 저장하지만, 목록 조회에서도 교차 프로젝트 값을 방어한다.
     if (projectById.get(row.project_id)?.coverPhotoId === row.id) {
       coverThumbMap.set(row.project_id, row.r2_thumb_url);
+      coverPreviewMap.set(row.project_id, row.r2_preview_url ?? row.r2_thumb_url);
     }
   }
 
   return projects.map((project) => ({
     ...project,
     thumbnailUrl: coverThumbMap.get(project.id) ?? thumbMap[project.id] ?? null,
+    thumbnailPreviewUrl: coverPreviewMap.get(project.id) ?? previewMap[project.id] ?? null,
     originalRecoveryCount: recoveryCountMap.get(project.id) ?? 0,
   }));
 }

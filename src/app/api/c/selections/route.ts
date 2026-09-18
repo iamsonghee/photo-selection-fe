@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  validateTokenAndProject,
   assertPhotoBelongsToProject,
   upsertSelectionAdmin,
   setSelectionStatesAdmin,
@@ -8,7 +7,7 @@ import {
   getSelectionsOnlyAdmin,
 } from "@/lib/customer-api-server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { checkPinAuth } from "@/lib/customer-auth-server";
+import { getPinAuthorizedProject } from "@/lib/customer-auth-server";
 import type { ColorTag } from "@/types";
 
 const VALID_COLORS: readonly ColorTag[] = ["red", "yellow", "green", "blue", "purple"];
@@ -30,10 +29,10 @@ export async function POST(req: NextRequest) {
       );
     }
     // ── 공통 선행 검증(is_selected/rating/comment/color_op 전부 적용) ──────────
-    const pinErr = await checkPinAuth(req, token);
-    if (pinErr) return pinErr;
-    const project = await validateTokenAndProject(token, project_id);
-    if (!project) {
+    const auth = await getPinAuthorizedProject(req, token);
+    if (auth.error) return auth.error;
+    const project = auth.project;
+    if (!project || project.id !== project_id) {
       return NextResponse.json({ error: "Invalid token or project" }, { status: 401 });
     }
     const admin = getAdminClient();
@@ -149,10 +148,9 @@ export async function GET(req: NextRequest) {
         { status: 400 }
       );
     }
-    const pinErr = await checkPinAuth(req, token);
-    if (pinErr) return pinErr;
-    const project = await validateTokenAndProject(token, projectId);
-    if (!project) {
+    const auth = await getPinAuthorizedProject(req, token);
+    if (auth.error) return auth.error;
+    if (!auth.project || auth.project.id !== projectId) {
       return NextResponse.json({ error: "Invalid token or project" }, { status: 401 });
     }
     const admin = getAdminClient();

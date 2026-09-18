@@ -705,6 +705,14 @@ test.describe("작가 — 프로젝트 관리", () => {
         },
       });
       expect(seedSelectionsResponse.ok()).toBe(true);
+      const seedRecommendationResponse = await page.request.post("/api/auth/test-setup", {
+        data: {
+          action: "seed_recommendations",
+          projectId: selectingProject.projectId,
+          photoIds: [selectingProject.photoIds![1]],
+        },
+      });
+      expect(seedRecommendationResponse.ok()).toBe(true);
       const sortedComment = "정렬 후에도 카드 간격 유지";
       const commentedPhotoId = selectingProject.photoIds![2];
       await page.route("**/rest/v1/selections?**", async (route) => {
@@ -729,11 +737,12 @@ test.describe("작가 — 프로젝트 관리", () => {
       await expect(page.getByRole("tab", { name: /원본/ })).toHaveAttribute("aria-selected", "true");
       await expect(page.getByText("전체 원본", { exact: true })).toHaveCount(0);
       await expect(page.getByText("고객 공유 완료 · 읽기 전용", { exact: true })).toHaveCount(0);
-      const similarityResultButton = page.getByRole("button", { name: /유사컷 1개 그룹 묶어보기/ });
+      const similarityResultButton = page.locator("span:visible").filter({ hasText: /^유사컷 묶어보기$/ });
       await expect(similarityResultButton).toBeVisible();
       await similarityResultButton.click();
       const similarityGroupBadge = page.getByRole("button", { name: /유사컷 3장 펼치기/ });
       await expect(similarityGroupBadge).toBeVisible();
+      await expect(page.getByLabel("작가 추천 1장")).toBeVisible();
       await similarityGroupBadge.click();
       await expect(page.getByRole("button", { name: /유사컷 3장 접기/ })).toHaveCount(3);
       await expect(page.locator("[data-original-photo-card] [data-photo-thumbnail-selection-ring]")).toHaveCount(0);
@@ -1149,12 +1158,10 @@ test.describe("작가 — 프로젝트 관리", () => {
       await expect(mobileSelectionRequestDialog.getByText("셀렉 요청", { exact: true })).toBeVisible();
       await expect(mobileSelectionRequestDialog.locator("[data-mobile-selection-summary]")).toBeVisible();
       await expect(mobileSelectionRequestDialog.getByText("고객 접속 정보", { exact: true })).toBeHidden();
-      await expect(mobileSelectionRequestDialog.getByRole("button", { name: "+3일" })).toBeVisible();
-      await expect(mobileSelectionRequestDialog.getByRole("button", { name: "+5일" })).toBeHidden();
-      await expect(mobileSelectionRequestDialog.getByRole("button", { name: "+7일" })).toBeVisible();
-      await expect(mobileSelectionRequestDialog.getByRole("button", { name: "+15일" })).toBeVisible();
-      await expect(mobileSelectionRequestDialog.getByRole("button", { name: "+30일" })).toBeHidden();
-      await expect(mobileSelectionRequestDialog.getByText("요청 후 원본 사진을 변경할 수 없음을 확인했어요", { exact: true })).toBeVisible();
+      await expect(mobileSelectionRequestDialog.getByRole("button", { name: "3일 후" })).toBeHidden();
+      await expect(mobileSelectionRequestDialog.getByRole("button", { name: "7일 후" })).toBeHidden();
+      await expect(mobileSelectionRequestDialog.getByRole("button", { name: "15일 후" })).toBeHidden();
+      await expect(mobileSelectionRequestDialog.getByText("요청 후 사진 구성을 변경할 수 없음을 확인했어요", { exact: true })).toBeVisible();
       await expect(mobileSelectionRequestDialog.getByRole("button", { name: "취소", exact: true })).toBeHidden();
       await expect(mobileSelectionRequestDialog.getByRole("button", { name: /장 셀렉 요청하기/ })).toBeVisible();
       const selectionRequestGeometry = await mobileSelectionRequestDialog.evaluate((element) => ({
@@ -1189,15 +1196,19 @@ test.describe("작가 — 프로젝트 관리", () => {
       await expect(mobileManageHeader.getByLabel("1장 선택됨")).toBeVisible();
       const selectedCheckbox = page.locator("[data-mobile-selection-checkbox]").first();
       await expect(selectedCheckbox).toBeVisible();
-      await expect(selectedCheckbox).toHaveCSS("width", "22px");
-      await expect(selectedCheckbox).toHaveCSS("height", "22px");
-      await expect(page.getByRole("button", { name: "선택한 사진 1장 삭제" })).toBeVisible();
+      await expect(selectedCheckbox).toHaveCSS("width", "44px");
+      await expect(selectedCheckbox).toHaveCSS("height", "44px");
+      const selectedCheckboxFace = selectedCheckbox.locator("span");
+      expect((await selectedCheckboxFace.boundingBox())!.width).toBeLessThanOrEqual(24);
+      const selectedActionsMenu = page.locator('summary[aria-label="선택 사진 작업 더보기"]');
+      await selectedActionsMenu.click();
+      await expect(page.getByRole("menuitem", { name: "사진 1장 삭제" })).toBeVisible();
       await expect(page.getByRole("button", { name: "취소", exact: true })).toHaveCount(1);
       const selectedPhotoButton = page.locator("[data-original-photo-media] > button[aria-pressed='true']").first();
       const selectedInsetBorder = selectedPhotoButton.locator("..").locator("[data-photo-thumbnail-selection-ring]");
       await expect(selectedInsetBorder).toBeVisible();
       await expect(selectedInsetBorder).toHaveCSS("box-shadow", /2px inset/);
-      await page.getByRole("button", { name: "선택한 사진 1장 삭제" }).click();
+      await page.getByRole("menuitem", { name: "사진 1장 삭제" }).click();
       const selectedDeleteDialog = page.getByRole("dialog").last();
       await expect(selectedDeleteDialog).toBeVisible();
       await expect(selectedDeleteDialog).toContainText("원본 1장을 삭제할까요?");
@@ -1206,18 +1217,11 @@ test.describe("작가 — 프로젝트 관리", () => {
       await selectedDeleteDialog.getByRole("button", { name: "취소", exact: true }).click();
       await selectedPhotoButton.click();
       await expect(mobileManageHeader.getByLabel("0장 선택됨")).toBeVisible();
-      await expect(page.getByRole("button", { name: "삭제할 사진을 선택하세요" })).toBeDisabled();
-      const zeroSelectionToast = page.getByText("삭제할 사진을 선택하세요.", { exact: true });
-      await expect(zeroSelectionToast).toBeVisible();
-      const zeroSelectionToastBox = await zeroSelectionToast.boundingBox();
-      const managementActionBarBox = await page.locator("[data-photographer-page-action-bar]").boundingBox();
-      expect(zeroSelectionToastBox).not.toBeNull();
-      expect(managementActionBarBox).not.toBeNull();
-      expect(zeroSelectionToastBox!.y + zeroSelectionToastBox!.height).toBeLessThanOrEqual(managementActionBarBox!.y);
+      await expect(selectedActionsMenu).toHaveAttribute("aria-disabled", "true");
       await page.getByRole("button", { name: "취소", exact: true }).first().click();
       await expect(page.locator("[data-mobile-photo-manage-mode]")).toHaveCount(0);
 
-      await expect(page.getByRole("button", { name: "전체삭제" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "전체삭제" })).toHaveCount(0);
       await expect(page.getByLabel("사진 관리 메뉴")).toHaveCount(0);
 
       const uploadScrollBeforeHeaderTest = page.locator(".prj-photo-scroll-mobile-pad");

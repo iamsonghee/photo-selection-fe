@@ -225,7 +225,7 @@ export function FocusProjectCard({ project }: { project: Project }) {
             <div className={`${styles.thumbnail} relative w-[114px] h-[76px] lg:w-[195px] lg:h-[130px] shrink-0 rounded-xl border border-border-subtle overflow-hidden`}>
               {project.thumbnailUrl ? (
                 <img
-                  src={project.thumbnailUrl}
+                  src={project.thumbnailPreviewUrl ?? project.thumbnailUrl}
                   alt=""
                   className="w-full h-full object-cover object-center"
                 />

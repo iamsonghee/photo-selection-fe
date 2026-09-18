@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { checkPinAuth } from "@/lib/customer-auth-server";
+import { getPinAuthorizedProject } from "@/lib/customer-auth-server";
 import { getOriginalDownloadInfo } from "@/lib/customer-api-server";
 
 /**
@@ -16,12 +16,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "token required" }, { status: 400 });
   }
 
-  const pinErr = await checkPinAuth(req, token);
-  if (pinErr) return pinErr;
+  const auth = await getPinAuthorizedProject(req, token);
+  if (auth.error) return auth.error;
 
   try {
     const admin = getAdminClient();
-    const info = await getOriginalDownloadInfo(admin, token);
+    const info = await getOriginalDownloadInfo(admin, token, auth.project);
     if (!info) {
       return NextResponse.json({ error: "Invalid token" }, { status: 404 });
     }

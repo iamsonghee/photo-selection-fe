@@ -1,11 +1,6 @@
 /* Photographer Light UI가 공유하는 단일 Light Theme token source.
    Dashboard / Project List / Project Create의 route-scoped *.module.css는
    이 클래스를 composes로 재사용한다 — 페이지 전용 token/class는 각 route module에 그대로 남긴다. */
-:global(:root) {
-  /* Root overscroll canvas cannot inherit tokens from a descendant main. */
-  --photographer-light-canvas: #f5f8f8;
-}
-
 .lightTheme {
   color-scheme: light;
   color: var(--foreground);

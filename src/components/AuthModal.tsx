@@ -302,9 +302,9 @@ export function AuthModal({ isOpen, onClose, redirectPath }: AuthModalProps) {
           <div className="auth-modal-footer">
             <p className="auth-modal-terms">
               로그인 시{" "}
-              <a href="#" className="auth-modal-terms-link">이용약관</a>
+              <a href="/terms" className="auth-modal-terms-link">이용약관</a>
               {" "}및{" "}
-              <a href="#" className="auth-modal-terms-link">개인정보처리방침</a>에 동의합니다
+              <a href="/privacy" className="auth-modal-terms-link">개인정보처리방침</a>에 동의합니다
             </p>
           </div>
         </div>

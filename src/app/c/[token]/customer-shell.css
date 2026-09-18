@@ -28,7 +28,7 @@
  * 비치지 않게 한다 — 작가 쪽 photographer-light-shell과 같은 모양의 fix다.
  * 값은 --customer-canvas 변수를 그대로 쓰지 않고 직접 적었다 — 그 변수는 .customer-app-shell
  * (html/body보다 아래, 자손)에 스코프돼 있어 조상인 html/body에서는 보이지 않는다
- * (작가 쪽 PhotographerLightTheme.module.css의 같은 주석 참고 — 거기도 이 이유로
+ * (작가 쪽 photographer.css의 같은 주석 참고 — 거기도 이 이유로
  * --photographer-light-canvas를 :root에 따로 선언해 뒀다). */
 html:has(.customer-light-shell),
 body:has(.customer-light-shell),

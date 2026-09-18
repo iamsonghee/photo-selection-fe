@@ -18,7 +18,7 @@ type ProjectsRow = Database["public"]["Tables"]["projects"]["Row"];
 type PhotosRow = Database["public"]["Tables"]["photos"]["Row"];
 type SelectionsRow = Database["public"]["Tables"]["selections"]["Row"];
 
-function mapProjectRow(row: ProjectsRow): Project {
+export function mapProjectRow(row: ProjectsRow): Project {
   const r = row as ProjectsRow & {
     customer_cancel_count?: number | null;
     max_revision_count?: number | null;
@@ -366,12 +366,17 @@ export interface ReviewDataResponse {
   photos: ReviewPhotoItem[];
 }
 
-/** access_token으로 프로젝트 + 현재 버전의 photo_versions + version_reviews 조회 */
+/**
+ * access_token으로 프로젝트 + 현재 버전의 photo_versions + version_reviews 조회.
+ * 호출부가 이미 인증 과정에서 project를 가져온 경우(getPinAuthorizedProject 등)
+ * `preloadedProject`로 넘기면 동일한 project row를 또 조회하지 않는다.
+ */
 export async function getReviewDataByToken(
   admin: SupabaseClient,
-  token: string
+  token: string,
+  preloadedProject?: Project | null
 ): Promise<ReviewDataResponse | null> {
-  const project = await getProjectByToken(admin, token);
+  const project = preloadedProject ?? (await getProjectByToken(admin, token));
   if (!project) return null;
   if (project.status !== "reviewing_v1" && project.status !== "reviewing_v2") return null;
 
@@ -384,19 +389,24 @@ export async function getReviewDataByToken(
   const photoIds = (selections ?? []).map((s: { photo_id: string }) => s.photo_id);
   if (photoIds.length === 0) return { project, photos: [] };
 
-  const { data: photosRows, error: photosErr } = await admin
-    .from("photos")
-    .select("id, number, r2_thumb_url, r2_preview_url, original_filename")
-    .in("id", photoIds)
-    .order("number", { ascending: true });
+  // photos와 photo_versions는 둘 다 photoIds에만 의존하는 독립 조회라 병렬로 실행한다.
+  const [photosRes, pvRes] = await Promise.all([
+    admin
+      .from("photos")
+      .select("id, number, r2_thumb_url, r2_preview_url, original_filename")
+      .in("id", photoIds)
+      .order("number", { ascending: true }),
+    admin
+      .from("photo_versions")
+      .select("id, photo_id, r2_url, r2_thumb_url, created_at")
+      .in("photo_id", photoIds)
+      .eq("version", version)
+      .order("created_at", { ascending: false }),
+  ]);
+  const { data: photosRows, error: photosErr } = photosRes;
   if (photosErr || !photosRows?.length) return { project, photos: [] };
 
-  const { data: pvRowsRaw, error: pvErr } = await admin
-    .from("photo_versions")
-    .select("id, photo_id, r2_url, r2_thumb_url, created_at")
-    .in("photo_id", photoIds)
-    .eq("version", version)
-    .order("created_at", { ascending: false });
+  const { data: pvRowsRaw, error: pvErr } = pvRes;
   if (pvErr) return { project, photos: [] };
 
   // 사진당 동일 version 행이 여러 개면(재업로드) 최신 행만 사용. 무작위 행이면
@@ -511,9 +521,10 @@ export interface OriginalDownloadInfo {
  */
 export async function getOriginalDownloadInfo(
   admin: SupabaseClient,
-  token: string
+  token: string,
+  preloadedProject?: Project | null
 ): Promise<OriginalDownloadInfo | null> {
-  const project = await getProjectByToken(admin, token);
+  const project = preloadedProject ?? (await getProjectByToken(admin, token));
   if (!project) return null;
 
   if (!project.includeOriginal) {
