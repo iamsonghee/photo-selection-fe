@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { normalizeExternalHttpUrl } from "@/lib/photographer";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 
@@ -141,7 +142,13 @@ export async function PATCH(req: NextRequest) {
     else if (body.bio === null) payload.bio = null;
     if (typeof body.instagram_url === "string") payload.instagram_url = body.instagram_url;
     else if (body.instagram_url === null) payload.instagram_url = null;
-    if (typeof body.portfolio_url === "string") payload.portfolio_url = body.portfolio_url;
+    if (typeof body.portfolio_url === "string") {
+      const portfolioUrl = normalizeExternalHttpUrl(body.portfolio_url);
+      if (body.portfolio_url.trim() && !portfolioUrl) {
+        return NextResponse.json({ error: "포트폴리오 주소를 확인해주세요." }, { status: 400 });
+      }
+      payload.portfolio_url = portfolioUrl;
+    }
     else if (body.portfolio_url === null) payload.portfolio_url = null;
     if (typeof body.profile_image_url === "string") payload.profile_image_url = body.profile_image_url;
     else if (body.profile_image_url === null) payload.profile_image_url = null;

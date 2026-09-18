@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronRight, Globe2, Instagram, X } from "lucide-react";
 import { CustomerEntryHeader, CustomerEntryShell } from "./CustomerEntryShell";
-import { DEFAULT_PROFILE_IMAGE } from "@/lib/photographer";
+import { DEFAULT_PROFILE_IMAGE, normalizeExternalHttpUrl } from "@/lib/photographer";
 import styles from "./CustomerInviteIntro.module.css";
 
 const AVATAR_FALLBACK = DEFAULT_PROFILE_IMAGE;
@@ -42,8 +42,8 @@ export function CustomerInviteIntro({
     ? photographerAvatarUrl
     : AVATAR_FALLBACK;
   const bio = photographerBio?.trim() || null;
-  const instagramUrl = safeExternalUrl(photographerInstagramUrl);
-  const portfolioUrl = safeExternalUrl(photographerPortfolioUrl);
+  const instagramUrl = normalizeExternalHttpUrl(photographerInstagramUrl);
+  const portfolioUrl = normalizeExternalHttpUrl(photographerPortfolioUrl);
   const hasProfileDetails = Boolean(bio || instagramUrl || portfolioUrl);
 
   useEffect(() => {
@@ -179,14 +179,4 @@ function ProfileIdentity({ avatarSrc, label, onAvatarError }: {
       <span className={styles.creatorName}>{label}</span>
     </>
   );
-}
-
-function safeExternalUrl(value: string | null | undefined): string | null {
-  if (!value?.trim()) return null;
-  try {
-    const url = new URL(value.trim());
-    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
-  } catch {
-    return null;
-  }
 }

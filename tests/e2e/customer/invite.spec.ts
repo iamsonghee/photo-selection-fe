@@ -76,7 +76,7 @@ test.describe("고객 — 초대 링크", () => {
       profile_image_url: null,
       bio: "자연스러운 순간을 기록합니다.",
       instagram_url: "https://instagram.com/acut",
-      portfolio_url: "https://example.com/portfolio",
+      portfolio_url: "example.com/portfolio",
     } }));
     await page.goto(`/c/${project.accessToken}`);
 
