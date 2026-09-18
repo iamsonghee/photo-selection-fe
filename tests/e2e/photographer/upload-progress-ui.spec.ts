@@ -12,7 +12,9 @@ for (const viewport of scenarios) {
     test.setTimeout(60_000);
     let allowConfirm = () => {};
     let allowPreview = () => {};
+    let allowThumbnail = () => {};
     let finalized = false, recovered = false, previewRegistered = false, selectionActivated = false;
+    const verifyThumbnailTransition = viewport.width === 1440 && !viewport.fallback && !viewport.retry;
     const context = await browser.newContext({
       viewport,
       baseURL: testInfo.project.use.baseURL,
@@ -48,11 +50,18 @@ for (const viewport of scenarios) {
       await page.route("**/rest/v1/photos?**", route => route.fulfill({ json:
         previewRegistered && new URL(route.request().url()).searchParams.get("offset") === "0" ? [{
           id: "uploading-original", project_id: projectId, number: 1,
-          r2_thumb_url: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+          r2_thumb_url: verifyThumbnailTransition ? "http://localhost:3001/__upload-test/confirmed-thumb" : "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
           r2_preview_url: null, original_filename: "sample.jpg", original_status: "awaiting_upload",
         }] : [],
       }));
-      await page.route("**/rest/v1/photos?**", route => route.fulfill({ json: [] }));
+      const thumbnailGate = new Promise<void>(resolve => { allowThumbnail = resolve; });
+      await page.route("**/__upload-test/confirmed-thumb", async route => {
+        await thumbnailGate;
+        await route.fulfill({
+          contentType: "image/gif",
+          body: Buffer.from("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", "base64"),
+        });
+      });
       await page.route("**/api/photographer/quota", route => route.fulfill({ json: {
         tier: "beta", current: 1, max: 50, maxPhotosPerProject: 1000, betaStatus: "approved",
       } }));
@@ -143,6 +152,8 @@ for (const viewport of scenarios) {
         const retryButton = page.locator(".prj-mobile-progress").getByRole("button", { name: "실패 원본 1장 재시도" });
         await expect(retryButton).toBeVisible({ timeout: 30_000 });
         expect(await page.evaluate(() => (window as unknown as { putCount: number }).putCount)).toBe(5);
+        const aiDialog = page.getByRole("dialog", { name: "AI가 정리를 도와드릴까요?" });
+        if (await aiDialog.isVisible()) await aiDialog.getByRole("button", { name: "건너뛰기" }).click();
         await page.getByRole("button", { name: "업로드 오류 닫기", exact: true }).filter({ visible: true }).click();
         await expect(page.locator(".prj-mobile-progress")).toHaveCSS("opacity", "1");
         await expect(retryButton).toBeVisible();
@@ -173,9 +184,10 @@ for (const viewport of scenarios) {
       await advance(0.25);
       await expect(status).toContainText(/원본 전송 중 · 2[45]%/, { timeout: 20_000 });
       await expect(status).toContainText("0/1장 저장 완료");
-      await expect(page.getByText("납품용 원본 업로드 중", { exact: true })).toBeVisible();
-      await expect(page.getByText(/현재 보이는 사진은 셀렉용 미리보기입니다/)).toBeVisible();
+      await expect(page.locator("[data-original-upload-intro]")).toBeVisible();
+      await expect(page.locator("[data-original-upload-notice]")).toBeVisible();
       await expect(page.getByText("원본 누락", { exact: true })).toHaveCount(0);
+      await expect(page.locator("[data-original-upload-intro]")).toHaveCSS("visibility", "hidden", { timeout: 4000 });
       await advance(0.75);
       await expect(status).toContainText(/7[45]%/);
       await expect(page.getByRole("button", { name: "셀렉 요청하기", exact: true })).toBeEnabled({ timeout: 15000 });
@@ -200,6 +212,12 @@ for (const viewport of scenarios) {
       await page.screenshot({ path: testInfo.outputPath(`upload-${viewport.width}.png`) });
       allowConfirm();
       await expect(page.getByText("업로드 완료!", { exact: true })).toBeVisible({ timeout: 15000 });
+      if (verifyThumbnailTransition) {
+        await expect(page.locator("[data-photo-transition-image]")).toHaveCount(1);
+        await expect(page.locator("[data-photo-displayed-image]")).toHaveCSS("opacity", "1");
+        allowThumbnail();
+        await expect(page.locator("[data-photo-transition-image]")).toHaveCount(0);
+      }
       const reports = await page.evaluate(() => (window as unknown as { uploadReports: Array<{
         outcome: string;
         device: string;
@@ -217,6 +235,7 @@ for (const viewport of scenarios) {
     } finally {
       allowPreview();
       allowConfirm();
+      allowThumbnail();
       await context.close().catch(() => {});
     }
   });

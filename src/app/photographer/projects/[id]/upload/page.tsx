@@ -3180,6 +3180,9 @@ export default function ProjectDetailPage() {
         @keyframes prj-bar-indeterminate-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
         @keyframes prj-bar-indet-sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
         @keyframes prj-compress-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.85; } }
+        @keyframes prj-original-upload-intro { 0%, 72% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+        .prj-original-upload-intro { animation: prj-original-upload-intro 2400ms ease both; }
+        @media (prefers-reduced-motion: reduce) { .prj-original-upload-intro { animation-duration: 1ms; } }
         .prj-compressing-overlay { position: absolute; inset: 0; z-index: 11; background: rgba(var(--accent-rgb), 0.15); display: flex; align-items: center; justify-content: center; animation: prj-compress-pulse 0.9s ease-in-out infinite; }
         .prj-scroll::-webkit-scrollbar { width: 4px; }
         .prj-scroll::-webkit-scrollbar-track { background: ${SURFACE_2}; }
@@ -3881,7 +3884,24 @@ export default function ProjectDetailPage() {
             onDragLeave={!mobilePhotoManageMode && !isMobileUploadClient() && photoUploadAllowed && uploadPhase === "idle" ? onDragLeave : undefined}
           >
             {isOriginalUploading && (
-              <div className="sticky top-3 z-30 mx-auto mb-3 w-[calc(100%_-_24px)] max-w-3xl px-3 md:top-4 md:mb-4" role="status" aria-live="polite">
+              <div
+                data-original-upload-intro
+                className="prj-original-upload-intro pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-[rgba(2,56,82,0.14)] px-4 backdrop-blur-[1px]"
+                aria-hidden
+              >
+                <div className="flex max-w-md items-start gap-3 rounded-xl border border-warning/35 bg-[color-mix(in_srgb,var(--surface)_94%,var(--warning))] px-4 py-3.5 shadow-[0_12px_36px_rgba(2,56,82,0.2)] md:items-center">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-warning/15 text-warning">
+                    <Upload size={17} aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <strong className="block text-sm font-bold leading-5 text-foreground">납품용 원본 업로드 중</strong>
+                    <span className="mt-0.5 block text-xs font-medium leading-5 text-muted-foreground">현재 보이는 사진은 셀렉용 미리보기입니다. 원본 업로드가 끝날 때까지 화면을 유지해 주세요.</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            {isOriginalUploading && (
+              <div data-original-upload-notice className="sticky top-3 z-30 mx-auto mb-3 w-[calc(100%_-_24px)] max-w-3xl px-3 md:top-4 md:mb-4" role="status" aria-live="polite">
                 <div className="flex items-start gap-3 rounded-xl border border-warning/35 bg-[color-mix(in_srgb,var(--surface)_92%,var(--warning))] px-3.5 py-3 shadow-[0_8px_24px_rgba(2,56,82,0.14)] md:items-center md:px-4">
                   <span className="grid size-8 shrink-0 place-items-center rounded-full bg-warning/15 text-warning">
                     <Upload size={16} aria-hidden />
@@ -3956,6 +3976,7 @@ export default function ProjectDetailPage() {
                 mobileGridGap={6}
                 mobileSquareMedia
                 thumbQueue={thumbQueue}
+                getPhotoKey={(photo) => photo.originalFilename ? `upload:${photo.originalFilename}` : photo.id}
                 onPhotoClick={handleOpenPhotoViewer}
                 showQualityBadges
                 showOriginalUploadBadges={project.includeOriginal && !navigationGuardActive}

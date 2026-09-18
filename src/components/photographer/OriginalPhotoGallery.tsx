@@ -79,6 +79,8 @@ export type OriginalPhotoGalleryProps = {
   renderMissingRetouched?: (photo: Photo) => ReactNode;
   getRetouchedStatus?: (photo: Photo) => ReactNode;
   getSelectionId?: (photo: Photo) => string | null;
+  /** 업로드 중 임시 사진과 저장 완료 사진이 같은 카드로 이어질 때 사용할 안정적인 key. */
+  getPhotoKey?: (photo: Photo, index: number) => string;
 };
 
 function fileName(photo: Photo, index: number) {
@@ -107,9 +109,7 @@ function QueuedImage({ photo, scrollRef, thumbQueue }: { photo: Photo; scrollRef
   const { displayedUrl, loadedUrl, transitionUrl, transitionReady } = preview;
   const displayedLoaded = loadedUrl === displayedUrl;
 
-  if (!photo.isPending && (displayedUrl !== photo.url || transitionUrl !== null || transitionReady)) {
-    setPreview({ displayedUrl: photo.url, loadedUrl, transitionUrl: null, transitionReady: false });
-  } else if (photo.isPending && photo.url !== displayedUrl && photo.url !== transitionUrl) {
+  if (photo.url !== displayedUrl && photo.url !== transitionUrl) {
     setPreview((current) => ({ ...current, transitionUrl: photo.url, transitionReady: false }));
   }
 
@@ -129,6 +129,7 @@ function QueuedImage({ photo, scrollRef, thumbQueue }: { photo: Photo; scrollRef
         // eslint-disable-next-line @next/next/no-img-element
         <img
           ref={imgRef}
+          data-photo-displayed-image
           src={displayedUrl}
           alt=""
           loading={photo.isPending ? "eager" : "lazy"}
@@ -139,10 +140,11 @@ function QueuedImage({ photo, scrollRef, thumbQueue }: { photo: Photo; scrollRef
           style={{ opacity: displayedLoaded && !transitionReady ? 1 : 0, transition: "opacity 180ms ease-out, transform 180ms ease-out" }}
         />
       ) : null}
-      {photo.isPending && transitionUrl ? (
+      {transitionUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={transitionUrl}
+          data-photo-transition-image
           alt=""
           loading="eager"
           decoding="async"
@@ -152,11 +154,15 @@ function QueuedImage({ photo, scrollRef, thumbQueue }: { photo: Photo; scrollRef
             if (transitionReady) return;
             setPreview((current) => ({ ...current, transitionReady: true }));
             transitionTimerRef.current = window.setTimeout(() => {
-              setPreview((current) => ({ ...current, displayedUrl: transitionUrl, loadedUrl: transitionUrl, transitionUrl: null, transitionReady: false }));
+              setPreview((current) => current.transitionUrl === transitionUrl
+                ? { ...current, displayedUrl: transitionUrl, loadedUrl: transitionUrl, transitionUrl: null, transitionReady: false }
+                : current);
               transitionTimerRef.current = null;
             }, 180);
           }}
-          onError={() => setPreview((current) => ({ ...current, transitionUrl: null, transitionReady: false }))}
+          onError={() => setPreview((current) => current.transitionUrl === transitionUrl
+            ? { ...current, transitionUrl: null, transitionReady: false }
+            : current)}
         />
       ) : null}
     </div>
@@ -514,7 +520,7 @@ function GridGallery(props: OriginalPhotoGalleryProps) {
             }
             const photoIndex = hasLeadingCell ? cellIndex - 1 : cellIndex;
             const photo = props.photos[photoIndex];
-            if (photo) cells.push(<GridPhoto key={photo.id} photo={photo} index={photoIndex} props={gridProps} />);
+            if (photo) cells.push(<GridPhoto key={props.getPhotoKey?.(photo, photoIndex) ?? photo.id} photo={photo} index={photoIndex} props={gridProps} />);
           }
           return <div key={row.key} data-original-photo-row style={{ position: "absolute", top: 0, left: 0, display: "grid", width: "100%", height: row.size, gridTemplateColumns: `repeat(${layout.cols}, minmax(0, 1fr))`, gap: layout.gap, transform: `translateY(${row.start}px)`, overflow: "hidden" }}>{cells}</div>;
         })}
@@ -627,8 +633,9 @@ function ListGallery(props: OriginalPhotoGalleryProps) {
             const retouchedPhoto = retouchedVariant ? props.getRetouchedPhoto?.(photo) : null;
             const finalPhoto = finalVariant ? props.getRetouchedPhoto?.(photo) : null;
             const retouchedFilename = retouchedVariant || finalVariant ? (props.getRetouchedFilename?.(photo) || "") : "";
+            const photoKey = props.getPhotoKey?.(photo, row.index) ?? photo.id;
             if (mobileRetouchedList) return (
-              <div key={photo.id} ref={virtualizer.measureElement} data-index={row.index} data-original-photo-list-row data-retouched-mapping-row="true" role="row" className={styles.mobileMappingRow}
+              <div key={photoKey} ref={virtualizer.measureElement} data-index={row.index} data-original-photo-list-row data-retouched-mapping-row="true" role="row" className={styles.mobileMappingRow}
                 style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${row.start - scrollMargin}px)`, "--mapping-media-height": `${mobileMediaHeight}px` } as React.CSSProperties}>
                 <div role="cell" className={styles.mobileMappingCell}>
                   <PhotoAssetPreview filename={name} mediaProps={{ className: styles.mobileMappingMedia }}>
@@ -654,7 +661,7 @@ function ListGallery(props: OriginalPhotoGalleryProps) {
               </div>
             );
             return (
-              <div key={photo.id} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: row.size, transform: `translateY(${row.start - scrollMargin}px)` }}>
+              <div key={photoKey} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: row.size, transform: `translateY(${row.start - scrollMargin}px)` }}>
                 <div data-original-photo-list-row data-retouched-mapping-row={retouchedVariant ? "true" : undefined} className={`${styles.listRow} ${readonlyClass} ${listVariantClass} ${selected ? styles.listRowSelected : ""}`} role="row">
                   {finalVariant ? <>
                     <button data-original-photo-list-thumbnail type="button" className={styles.listThumbnail} onClick={() => props.onPhotoClick(row.index)} aria-label={`${retouchedFilename || name} 상세 보기`}>
