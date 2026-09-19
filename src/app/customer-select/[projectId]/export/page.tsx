@@ -10,6 +10,8 @@
 import { useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
+import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
+import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import { useCustomerSelectStore } from "../../_lib/real-store";
 import ui from "../../_lib/ui.module.css";
@@ -89,31 +91,14 @@ export default function CustomerExportPage() {
           </div>
           <span className={ui.supportText}>ⓘ 이 목업은 복사만 시연합니다. CSV·TXT 다운로드는 실제 서비스에서 제공됩니다.</span>
         </div>
-        <div className={`${ui.ctaDock} ${ui.ctaDockRow}`} style={{ alignItems: "center" }}>
-          <span className={ui.bodyText} style={{ flex: 1, fontSize: 12.5 }}>
-            전달하셨나요?
-          </span>
-          <button
-            type="button"
-            className={`${ui.btn} ${ui.btnSm}`}
-            style={{ width: "auto", padding: "0 16px" }}
-            onClick={() => update({ exported: true })}
-          >
-            {project.exported ? "전달 완료됨 ✓" : "전달 완료로 표시"}
-          </button>
-        </div>
-        {project.exported && (
-          <div style={{ padding: "0 24px 20px" }}>
-            <button
-              type="button"
-              className={`${ui.btn} ${ui.btnSm}`}
-              style={{ width: "100%" }}
-              onClick={() => router.push(`/customer-select/${projectId}/retouch/upload${shareToken ? `?share_token=${shareToken}` : ""}`)}
-            >
-              보정본 받으셨나요? 업로드하기 →
-            </button>
-          </div>
-        )}
+        <PhotographerPageActionBar
+          maxWidth={1120}
+          leading={<p className="text-sm text-muted-foreground">전달하셨나요?</p>}
+          actions={<>
+            <PhotographerLightButton variant="secondary" onClick={() => update({ exported: true })}>{project.exported ? "전달 완료됨 ✓" : "전달 완료로 표시"}</PhotographerLightButton>
+            {project.exported ? <PhotographerLightButton onClick={() => router.push(`/customer-select/${projectId}/retouch/upload${shareToken ? `?share_token=${shareToken}` : ""}`)}>보정본 업로드하기</PhotographerLightButton> : null}
+          </>}
+        />
       </div>
       </div>
     </div>

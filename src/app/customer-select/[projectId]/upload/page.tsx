@@ -9,6 +9,8 @@ import { useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { BrandLogoBar } from "@/components/BrandLogo";
+import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
+import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { compressImagesInParallel } from "@/lib/upload-client-compress";
 import { UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
 import { useCustomerSelectStore } from "../../_lib/real-store";
@@ -162,16 +164,15 @@ export default function CustomerUploadPage() {
           )}
           {error && <span className={ui.bannerHeadWarn}>{error}</span>}
         </div>
-        <div className={ui.ctaDock}>
-          <button
-            type="button"
-            className={`${ui.btn} ${ui.btnPrimary}`}
+        <PhotographerPageActionBar
+          maxWidth={1120}
+          actions={<PhotographerLightButton
             disabled={project.photoCount === 0 || uploading}
             onClick={() => router.push(`/customer-select/${projectId}/select${shareToken ? `?share_token=${shareToken}` : ""}`)}
           >
             셀렉 시작하기{project.photoCount > 0 ? ` (${project.photoCount}장)` : ""}
-          </button>
-        </div>
+          </PhotographerLightButton>}
+        />
       </div>
       </div>
     </div>

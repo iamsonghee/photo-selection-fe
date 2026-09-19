@@ -1,12 +1,11 @@
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css");
 
-/* 고객 셀렉 전용 화면 톤 — docs/customer-design.md §4 수치를 그대로 따른다.
+/* 셀프 고객 페이지 전용 화면 톤 — docs/customer-design.md §4 수치를 그대로 따른다.
  * (Entry title 24/36 SemiBold, description 14/21, primary CTA 16/24 Bold, 좌우 여백 24px,
  *  터치 타겟 최소 44px, accent #ff4d00) CustomerEntryShell과 같은 리터럴 값을 쓴다 —
  * 그 컴포넌트도 --customer-* CSS 변수 대신 고정 hex를 쓰는 관례라 여기서도 맞춘다. */
 
-/* 실제 서비스 화면(src/app/c/[token]/confirmed/page.tsx)과 동일한 패턴 — PC에서도
- * 흰 배경 전체 + 콘텐츠 칼럼만 375px로 제한한다(그레이 배경에 뜨는 모바일 카드 아님). */
+/* 모바일은 단일 칼럼, PC는 ACUT Light 작업면과 공통 하단 액션바 구조를 사용한다. */
 .shell {
   min-height: 100dvh;
   display: flex;
@@ -186,20 +185,6 @@
   font-size: 13.5px;
 }
 
-.ctaDock {
-  padding: 14px 24px 22px;
-  border-top: 1px solid #dde1e4;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: #fff;
-  position: sticky;
-  bottom: 0;
-}
-.ctaDockRow {
-  flex-direction: row;
-}
-
 .statPill {
   border-radius: 12px;
   background: #f7f6f4;
@@ -303,40 +288,24 @@
     border-color: var(--border-subtle, #e7ecee);
   }
   .shellMain {
-    width: min(calc(100% - 64px), 1120px);
-    margin: 32px auto;
+    width: 100%;
+    margin: 0;
   }
   .page {
-    min-height: calc(100dvh - 128px);
-    overflow: hidden;
-    border: 1px solid var(--border-subtle, #e7ecee);
-    border-radius: 18px;
-    background: var(--surface, #fff);
-    box-shadow: 0 12px 36px rgba(2, 56, 82, 0.06);
+    min-height: calc(100dvh - 64px);
   }
   .header {
-    padding: 26px 32px 10px;
+    width: min(calc(100% - 64px), 1120px);
+    margin: 0 auto;
+    padding: 32px 0 10px;
   }
   .title {
     color: var(--foreground, #023852);
     font-size: 20px;
   }
   .body {
-    padding: 16px 32px 32px;
-  }
-  .ctaDock {
-    position: static;
-    flex-direction: row;
-    justify-content: flex-end;
-    margin-top: auto;
-    padding: 20px 32px;
-    border-color: var(--border-subtle, #e7ecee);
-  }
-  .ctaDock .btn {
-    width: auto;
-    min-width: 200px;
-  }
-  .ctaDockRow {
-    flex-direction: row;
+    width: min(calc(100% - 64px), 1120px);
+    margin: 0 auto;
+    padding: 16px 0 40px;
   }
 }

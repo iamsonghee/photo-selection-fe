@@ -3,6 +3,8 @@
 /** S7 — 최종 검토. */
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
+import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
+import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import {
   activeParticipants,
@@ -132,20 +134,13 @@ export default function CustomerReviewPage() {
             )}
           </div>
         </div>
-        <div className={`${ui.ctaDock} ${ui.ctaDockRow}`}>
-          <button type="button" className={ui.btn} style={{ flex: 1 }} onClick={() => router.push(`/customer-select/${projectId}/select${shareToken ? `?share_token=${shareToken}` : ""}`)}>
-            ← 더 고르기
-          </button>
-          <button
-            type="button"
-            className={`${ui.btn} ${ui.btnPrimary}`}
-            style={{ flex: 2 }}
-            disabled={selected.length === 0}
-            onClick={() => router.push(`/customer-select/${projectId}/export${shareToken ? `?share_token=${shareToken}` : ""}`)}
-          >
-            전달 내용 만들기
-          </button>
-        </div>
+        <PhotographerPageActionBar
+          maxWidth={1120}
+          actions={<>
+            <PhotographerLightButton variant="secondary" onClick={() => router.push(`/customer-select/${projectId}/select${shareToken ? `?share_token=${shareToken}` : ""}`)}>더 고르기</PhotographerLightButton>
+            <PhotographerLightButton disabled={selected.length === 0} onClick={() => router.push(`/customer-select/${projectId}/export${shareToken ? `?share_token=${shareToken}` : ""}`)}>전달 내용 만들기</PhotographerLightButton>
+          </>}
+        />
       </div>
       </div>
     </div>

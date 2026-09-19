@@ -4,6 +4,8 @@
 import { useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
+import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
+import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { useHoldPreview } from "@/hooks/useHoldPreview";
 import { useRetouchData, setRetouchDecision, latestVersion, type RetouchPhoto, type RetouchVersion } from "../../../_lib/retouch-store";
 import ui from "../../../_lib/ui.module.css";
@@ -144,16 +146,12 @@ export default function RetouchComparePage() {
               ))}
             </div>
           </div>
-          <div className={ui.ctaDock}>
-            <button
-              type="button"
-              className={`${ui.btn} ${ui.btnPrimary}`}
+          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton
               disabled={!allReviewed}
               onClick={() => router.push(`/customer-select/${projectId}/retouch/export${shareToken ? `?share_token=${shareToken}` : ""}`)}
             >
               검토 마치기{!allReviewed && withVersion.length > 0 ? ` (${withVersion.length - reviewed}장 남음)` : ""}
-            </button>
-          </div>
+            </PhotographerLightButton>} />
         </div>
       </div>
     </div>

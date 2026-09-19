@@ -3,6 +3,8 @@
 /** S13 — 완료. */
 import { useParams, useSearchParams } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
+import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
+import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { useRetouchData, markRetouchDone, latestVersion } from "../../_lib/retouch-store";
 import ui from "../../_lib/ui.module.css";
 
@@ -55,11 +57,7 @@ export default function CustomerDonePage() {
               새 보정본을 받으면 언제든 업로드해서 이어서 진행할 수 있어요.
             </p>
           </div>
-          <div className={ui.ctaDock}>
-            <button type="button" className={`${ui.btn} ${ui.btnPrimary}`} disabled={retouchDone} onClick={handleDone}>
-              {retouchDone ? "완료로 표시됨 ✓" : "완료로 표시"}
-            </button>
-          </div>
+          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton disabled={retouchDone} onClick={handleDone}>{retouchDone ? "완료로 표시됨 ✓" : "완료로 표시"}</PhotographerLightButton>} />
         </div>
       </div>
     </div>

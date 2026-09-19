@@ -7,6 +7,8 @@
 import { useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
+import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
+import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { buildVersionMapping, type MappingResult } from "@/lib/version-mapping";
 import { compressImagesInParallel } from "@/lib/upload-client-compress";
 import { UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
@@ -155,11 +157,7 @@ export default function RetouchUploadPage() {
             )}
             {error && <span className={ui.bannerHeadWarn}>{error}</span>}
           </div>
-          <div className={ui.ctaDock}>
-            <button type="button" className={`${ui.btn} ${ui.btnPrimary}`} disabled={files.length === 0 || uploading} onClick={handleConfirm}>
-              {uploading ? "업로드 중…" : "매칭 확인하고 검토 시작"}
-            </button>
-          </div>
+          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton pending={uploading} pendingLabel="업로드 중…" disabled={files.length === 0} onClick={handleConfirm}>매칭 확인하고 검토 시작</PhotographerLightButton>} />
         </div>
       </div>
     </div>

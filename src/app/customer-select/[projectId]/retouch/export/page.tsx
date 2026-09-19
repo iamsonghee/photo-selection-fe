@@ -4,6 +4,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
+import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
+import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { useRetouchData, latestVersion } from "../../../_lib/retouch-store";
 import ui from "../../../_lib/ui.module.css";
 
@@ -81,11 +83,7 @@ export default function RetouchExportPage() {
               </button>
             </div>
           </div>
-          <div className={ui.ctaDock}>
-            <button type="button" className={`${ui.btn} ${ui.btnPrimary}`} onClick={() => router.push(`/customer-select/${projectId}/retouch/upload${shareToken ? `?share_token=${shareToken}` : ""}`)}>
-              다음 보정본 기다리기
-            </button>
-          </div>
+          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton onClick={() => router.push(`/customer-select/${projectId}/retouch/upload${shareToken ? `?share_token=${shareToken}` : ""}`)}>다음 보정본 기다리기</PhotographerLightButton>} />
         </div>
       </div>
     </div>
