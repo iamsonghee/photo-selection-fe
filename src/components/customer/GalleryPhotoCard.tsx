@@ -10,11 +10,13 @@ import { PhotoThumbnailFrame } from "@/components/ui/PhotoThumbnailFrame";
 import { COLOR_OPTIONS, getPhotoDisplayName } from "@/lib/gallery-filter";
 import { useQueuedThumbSrc, type ThumbLoadQueue } from "@/lib/thumb-load-queue";
 import type { Photo, StarRating, ColorTag } from "@/types";
+import "./GalleryPhotoCard.css";
 
 const EMPTY_COLOR_TAGS: ColorTag[] = [];
 
 type GalleryPhotoCardProps = {
   token: string;
+  href?: string;
   photo: Photo;
   selected: boolean;
   checkDisabled?: boolean;
@@ -49,6 +51,7 @@ type GalleryPhotoCardProps = {
 
 function GalleryPhotoCardImpl({
   token,
+  href,
   photo,
   selected,
   checkDisabled = false,
@@ -158,7 +161,7 @@ function GalleryPhotoCardImpl({
   const card = (
     <Link
       ref={cellRef}
-      href={`/c/${token}/viewer/${photo.id}${viewerQueryString}`}
+      href={href ?? `/c/${token}/viewer/${photo.id}${viewerQueryString}`}
       onClick={(e) => onPhotoClick(e, photo.id)}
       data-photo-id={photo.id}
       className={`gl-photo-card${selected ? " gl-selected" : ""}${inExpandedGroup ? " gl-in-expanded-group" : ""}`}

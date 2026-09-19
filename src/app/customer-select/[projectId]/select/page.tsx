@@ -15,9 +15,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getFilteredPhotos, getPhotoDisplayName, type GalleryFilterState } from "@/lib/gallery-filter";
 import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
+import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
+import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import type { ColorTag, StarRating } from "@/types";
 import {
-  COLOR_PALETTE,
   activeParticipants,
   disagreementIds,
   reviewedPhotoIds,
@@ -54,6 +55,7 @@ export default function CustomerSelectGalleryPage() {
   const [tab, setTab] = useState<Tab>("all");
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [thumbQueue] = useState(() => createThumbLoadQueue(12));
 
   async function handleShare() {
     try {
@@ -205,48 +207,30 @@ export default function CustomerSelectGalleryPage() {
                 const state = project.photoStates[p.id];
                 const colors = state?.color ?? [];
                 return (
-                  <button
+                  <GalleryPhotoCard
                     key={p.id}
-                    type="button"
-                    onClick={() => setOpenPhotoId(p.id)}
-                    className={`${ui.selectCard} ${isSel ? ui.selectCardSelected : ""}`}
-                  >
-                    <img src={p.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                    {state?.comment && <span style={{ position: "absolute", top: 5, left: 5, fontSize: 11 }}>💬</span>}
-                    <span
-                      role="checkbox"
-                      aria-checked={isSel}
-                      aria-label="선택"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleSelect(p.id);
-                      }}
-                      style={{
-                        position: "absolute",
-                        bottom: 5,
-                        right: 5,
-                        width: 22,
-                        height: 22,
-                        borderRadius: "50%",
-                        border: "1.5px solid #fff",
-                        background: isSel ? "#ff4d00" : "rgba(20,18,16,.35)",
-                        color: "#fff",
-                        fontSize: 12,
-                        display: "grid",
-                        placeItems: "center",
-                      }}
-                    >
-                      {isSel ? "✓" : ""}
-                    </span>
-                    {colors.length > 0 && (
-                      <span style={{ position: "absolute", bottom: 5, left: 5, display: "flex", gap: 3 }}>
-                        {colors.map((c) => {
-                          const p2 = COLOR_PALETTE.find((x) => x.id === c);
-                          return <i key={c} style={{ width: 8, height: 8, borderRadius: "50%", background: p2?.hex ?? "#999", border: "1.3px solid rgba(255,255,255,.85)" }} />;
-                        })}
-                      </span>
-                    )}
-                  </button>
+                    token={projectId}
+                    href="#"
+                    photo={p}
+                    selected={isSel}
+                    rating={state?.rating}
+                    colorTags={colors}
+                    hasComment={Boolean(state?.comment)}
+                    showGroupBadge={false}
+                    restCount={0}
+                    totalCount={0}
+                    selectedCount={0}
+                    isGroupExpanded={false}
+                    presignedThumb={p.url}
+                    thumbQueue={thumbQueue}
+                    viewerQueryString=""
+                    density={3}
+                    onPhotoClick={(event) => { event.preventDefault(); setOpenPhotoId(p.id); }}
+                    onCheckClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleSelect(p.id); }}
+                    onGroupBadgeClick={() => {}}
+                    onRate={(photoId, rating) => setStar(photoId, (rating ?? 0) as StarRating | 0)}
+                    onThumbError={() => {}}
+                  />
                 );
               })}
             </div>
