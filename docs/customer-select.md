@@ -48,9 +48,9 @@ service-role 클라이언트로 수행한다(`project_participants`와 동일 �
 
 ## 4. 업로드 아키텍처
 
-- **클라이언트 압축**: 작가 업로드 화면의 `lib/upload-client-compress.ts`(`compressImagesInParallel`)를 그대로 재사용한다. identity 비의존으로 설계돼 있어 그대로 가져다 썼다 — 1600px/0.82 압축(`UPLOAD_INTERMEDIATE_MAX_EDGE/QUALITY`). 처음 구현 때 이 재사용을 빠뜨려 원본을 무압축 전송하던 버그가 있었다(2026-09-19 수정, 실측: 5.2MB/3000×2000 → 985KB/1600×1067).
+- **클라이언트 압축**: 작가 업로드 화면의 `lib/upload-client-compress.ts`(`compressImagesInParallel`)를 그대로 재사용한다. identity 비의존으로 설계돼 있어 그대로 가져다 썼다 — 1600px/0.82 압축(`UPLOAD_INTERMEDIATE_MAX_EDGE/QUALITY`). 20장씩 압축 후 즉시 전송해 대량 선택 시 압축 결과 전체가 메모리에 쌓이지 않는다.
 - **BE 엔드포인트**: `POST /api/customer-upload/photos`(원본), `POST /api/customer-upload/retouched`(보정본) — 둘 다 `app/routers/customer_upload.py`. 작가 업로드(`/api/upload/photos`)는 `get_current_photographer`·베타 쿼터·`original_jobs`(납품 원본 보관) 등 작가 생애주기에 강하게 결합돼 있어 재사용하지 않고, 썸네일·프리뷰 생성 로직(`_make_thumb_and_preview_sync`)만 가져다 썼다.
-- **상한**: 프로젝트당 2,000장 — 등급별 쿼터 테이블 없이 상수 하나(`MAX_PHOTOS_PER_CUSTOMER_PROJECT`).
+- **상한**: 프로젝트당 5,000장 — 등급별 쿼터 테이블 없이 상수 하나(`MAX_PHOTOS_PER_CUSTOMER_PROJECT`).
 - **보정본 파일명 매칭**: 작가 플로우의 `lib/version-mapping.ts`(`buildVersionMapping` — 정확일치 → 접미사 제거 후 일치)를 그대로 재사용. 실패분은 화면에서 드롭다운으로 수동 지정.
 - **저장 실패 대응**: `real-store.tsx`의 셀렉/찜/별점/코멘트 저장은 최대 3회 재시도(backoff) 후에도 실패하면 낙관적 업데이트를 되돌리고 배너로 안내한다. 작가 플로우의 `SelectionContext.tsx`(폴링·필드별 버전 관리를 포함한 978줄)를 통째로 재사용하려 했으나 API 계약이 달라(`/api/c/**` 전제) 재사용 범위가 예상(~60줄)보다 훨씬 작았다 — 핵심 보장(실패가 조용히 사라지지 않는 것)만 축소 이식했다. 다른 참가자의 변경사항을 실시간으로 반영하는 폴링은 아직 없다(각 화면이 마운트 시 재조회하는 수준).
 
