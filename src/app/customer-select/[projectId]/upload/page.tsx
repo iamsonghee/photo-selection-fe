@@ -7,11 +7,11 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, Eye, ImagePlus, Layers3, Loader2, Trash2, UploadCloud } from "lucide-react";
+import { ChevronLeft, ImagePlus, Loader2, Trash2, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
-import { PhotographerModal } from "@/components/ui/PhotographerModal";
+import { AiAnalysisPromptModal } from "@/components/photographer/AiAnalysisPromptModal";
 import { PhotographerPhotoGallery } from "@/components/photographer/OriginalPhotoGallery";
 import { OriginalPhotoViewer } from "@/components/photographer/OriginalPhotoViewer";
 import { PhotoSortSelect } from "@/components/photographer/PhotoSortSelect";
@@ -326,29 +326,18 @@ export default function CustomerUploadPage() {
 
       {viewerIndex >= 0 ? <OriginalPhotoViewer photos={viewerPhotos} activeIndex={viewerIndex} onActiveIndexChange={(index) => setViewerPhotoId(viewerPhotos[index]?.id ?? null)} onClose={() => setViewerPhotoId(null)} /> : null}
 
-      <PhotographerModal
+      <AiAnalysisPromptModal
         open={aiPromptOpen}
         onClose={() => setAiPromptOpen(false)}
-        maxWidth={412}
-        variant="confirmation"
-        title="AI가 사진 정리를 도와드릴까요?"
         description={`사진 ${progress.toLocaleString()}장 업로드가 완료되었습니다.`}
-        footer={<div className="flex gap-2">
-          <PhotographerLightButton variant="secondary" size="confirmation" className="flex-1" onClick={() => setAiPromptOpen(false)}>건너뛰기</PhotographerLightButton>
-          <PhotographerLightButton size="confirmation" className="flex-1" pending={aiStarting} pendingLabel="시작 중" disabled={!aiWantSimilar && !aiWantQuality} onClick={startAiAnalysis}>분석 시작</PhotographerLightButton>
-        </div>}
-      >
-        <div className="flex flex-col gap-2">
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border-subtle p-4">
-            <input type="checkbox" className="mt-1 accent-[var(--accent)]" checked={aiWantSimilar} onChange={(event) => setAiWantSimilar(event.target.checked)} />
-            <Layers3 size={19} className="mt-0.5 text-accent" /><span><strong className="block text-sm text-foreground">유사컷 묶기</strong><small className="mt-1 block text-xs text-muted-foreground">연속 촬영된 비슷한 사진을 자동으로 묶습니다.</small></span>
-          </label>
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border-subtle p-4">
-            <input type="checkbox" className="mt-1 accent-[var(--accent)]" checked={aiWantQuality} onChange={(event) => setAiWantQuality(event.target.checked)} />
-            <Eye size={19} className="mt-0.5 text-accent" /><span><strong className="block text-sm text-foreground">눈 감음·흐림 확인</strong><small className="mt-1 block text-xs text-muted-foreground">검토가 필요한 사진을 표시합니다.</small></span>
-          </label>
-        </div>
-      </PhotographerModal>
+        similar={aiWantSimilar}
+        quality={aiWantQuality}
+        onSimilarChange={setAiWantSimilar}
+        onQualityChange={setAiWantQuality}
+        onSkip={() => setAiPromptOpen(false)}
+        onStart={startAiAnalysis}
+        pending={aiStarting}
+      />
     </CustomerSelectShell>
   );
 }
