@@ -8,7 +8,7 @@
  * 실제 서비스 구현 때 위 기존 로직을 연결한다.
  */
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import { useCustomerSelectStore } from "../../_lib/real-store";
@@ -27,6 +27,8 @@ function buildExportText(
 }
 
 export default function CustomerExportPage() {
+  const { projectId } = useParams<{ projectId: string }>();
+  const shareToken = useSearchParams().get("share_token");
   const router = useRouter();
   const { project, hydrated, update } = useCustomerSelectStore();
   const [copyState, setCopyState] = useState<"idle" | "ok" | "fail">("idle");
@@ -100,6 +102,18 @@ export default function CustomerExportPage() {
             {project.exported ? "전달 완료됨 ✓" : "전달 완료로 표시"}
           </button>
         </div>
+        {project.exported && (
+          <div style={{ padding: "0 24px 20px" }}>
+            <button
+              type="button"
+              className={`${ui.btn} ${ui.btnSm}`}
+              style={{ width: "100%" }}
+              onClick={() => router.push(`/customer-select/${projectId}/retouch/upload${shareToken ? `?share_token=${shareToken}` : ""}`)}
+            >
+              보정본 받으셨나요? 업로드하기 →
+            </button>
+          </div>
+        )}
       </div>
       </div>
     </div>

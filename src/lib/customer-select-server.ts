@@ -25,6 +25,7 @@ export interface CustomerProjectRow {
   photo_count: number;
   share_token: string;
   exported: boolean;
+  retouch_done: boolean;
 }
 
 /** 소유자(세션) 또는 참가자(share_token) 중 하나라도 맞으면 프로젝트를 반환한다. */
@@ -35,7 +36,7 @@ export async function resolveCustomerProjectAccess(
 ): Promise<{ project: CustomerProjectRow; isOwner: boolean } | NextResponse> {
   const { data: project, error } = await admin
     .from("customer_projects")
-    .select("id, owner_id, name, shoot_type, target_count, photo_count, share_token, exported")
+    .select("id, owner_id, name, shoot_type, target_count, photo_count, share_token, exported, retouch_done")
     .eq("id", projectId)
     .maybeSingle();
   if (error || !project) {
