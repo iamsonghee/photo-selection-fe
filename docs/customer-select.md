@@ -90,6 +90,7 @@ service-role 클라이언트로 수행한다(`project_participants`와 동일 �
 상단 divider는 화면 전체 폭을 사용한다.
 사진 업로드 화면은 생성 화면과 같은 `CustomerSelectShell`·`PhotographerLightPageFrame`·
 `ProjectFormSection`을 사용하며, 드롭존과 진행 상태만 업로드 도메인 UI로 유지한다.
+업로드 중 장수와 진행률은 작가 업로드와 동일하게 공통 하단 액션바의 상태 영역에 표시한다.
 
 ## 6. 참고
 

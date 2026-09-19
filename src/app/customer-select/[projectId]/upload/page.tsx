@@ -7,7 +7,7 @@
  */
 import { useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { UploadCloud } from "lucide-react";
+import { Loader2, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PhotographerLightPageFrame } from "@/components/layout/PhotographerLightPageHeader";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
@@ -89,6 +89,20 @@ export default function CustomerUploadPage() {
   }
 
   const displayName = project.name || "이름 없는 프로젝트";
+  const uploadStatus = uploading ? (
+    <div className="flex items-center gap-3" role="status" aria-live="polite">
+      <Loader2 size={22} className="shrink-0 animate-spin text-accent" aria-hidden />
+      <div>
+        <p className="text-sm font-bold text-foreground">{progress === 0 ? "사진 준비 중" : "사진 업로드 중"}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{progress.toLocaleString()} / {total.toLocaleString()}장 · {total ? Math.round((progress / total) * 100) : 0}%</p>
+      </div>
+    </div>
+  ) : (
+    <div>
+      <p className="text-sm font-bold text-foreground">사진 {project.photoCount.toLocaleString()}장</p>
+      <p className="mt-1 text-xs text-muted-foreground">업로드한 순서와 원본 파일명은 그대로 유지됩니다.</p>
+    </div>
+  );
 
   if (!hydrated) {
     return (
@@ -119,12 +133,7 @@ export default function CustomerUploadPage() {
                 <PhotographerLightButton onClick={() => inputRef.current?.click()} disabled={uploading}>{project.photoCount > 0 ? "사진 더 올리기" : "사진 선택"}</PhotographerLightButton>
               </div>
 
-              {uploading ? (
-                <div className="rounded-xl border border-border-subtle bg-surface px-4 py-4" role="status" aria-live="polite">
-                  <div className="flex justify-between text-[13px] font-semibold text-muted-foreground"><span>{progress} / {total}장</span><span>업로드 중…</span></div>
-                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-raised"><div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${total ? (progress / total) * 100 : 0}%` }} /></div>
-                </div>
-              ) : project.photoCount > 0 ? (
+              {!uploading && project.photoCount > 0 ? (
                 <p className="rounded-xl bg-customer-soft px-4 py-3 text-[14px] font-semibold text-primary">사진 {project.photoCount}장을 올렸습니다. 사진을 더 추가하거나 셀렉을 시작할 수 있어요.</p>
               ) : null}
               {error ? <p role="alert" className="text-[13px] font-semibold text-danger">{error}</p> : null}
@@ -133,8 +142,9 @@ export default function CustomerUploadPage() {
         </PhotographerLightPageFrame>
         <PhotographerPageActionBar
           maxWidth={1120}
-          leading={<p className="text-sm text-muted-foreground">업로드한 순서와 원본 파일명은 그대로 유지됩니다.</p>}
-          actions={<PhotographerLightButton disabled={project.photoCount === 0 || uploading} onClick={() => router.push(`/customer-select/${projectId}/select${shareToken ? `?share_token=${shareToken}` : ""}`)}>셀렉 시작하기{project.photoCount > 0 ? ` (${project.photoCount}장)` : ""}</PhotographerLightButton>}
+          leading={uploadStatus}
+          mobileLeading={uploadStatus}
+          actions={uploading ? null : <PhotographerLightButton disabled={project.photoCount === 0} onClick={() => router.push(`/customer-select/${projectId}/select${shareToken ? `?share_token=${shareToken}` : ""}`)}>셀렉 시작하기{project.photoCount > 0 ? ` (${project.photoCount}장)` : ""}</PhotographerLightButton>}
         />
       </div>
     </CustomerSelectShell>
