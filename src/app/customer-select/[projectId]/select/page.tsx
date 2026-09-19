@@ -13,11 +13,12 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { getFilteredPhotos, getPhotoDisplayName, type GalleryFilterState } from "@/lib/gallery-filter";
+import { getFilteredPhotos, type GalleryFilterState } from "@/lib/gallery-filter";
 import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
+import { LockedPhotoViewer } from "@/components/customer/LockedPhotoViewer";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
-import type { ColorTag, StarRating } from "@/types";
+import type { StarRating } from "@/types";
 import {
   activeParticipants,
   disagreementIds,
@@ -264,89 +265,22 @@ export default function CustomerSelectGalleryPage() {
         />
       </div>
 
-      {/* 상세 모달 */}
-      {openPhoto && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setOpenPhotoId(null)}
-          style={{ position: "fixed", inset: 0, background: "rgba(10,9,8,.6)", zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", width: "100%", maxWidth: 480, borderRadius: "16px 16px 0 0", maxHeight: "88vh", overflowY: "auto" }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: "1px solid #dde1e4" }}>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: "#8b8985" }}>{getPhotoDisplayName(openPhoto)}</span>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: "#8b8985" }}>
-                {openIndex + 1} / {project.photos.length}
-              </span>
-              <span style={{ flex: 1 }} />
-              <button type="button" onClick={() => setOpenPhotoId(null)} style={{ background: "none", border: 0, fontSize: 20, color: "#8b8985" }}>
-                ✕
-              </button>
-            </div>
-            <div style={{ aspectRatio: "4/3" }}>
-              <img src={openPhoto.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-            </div>
-            <div style={{ padding: "14px 16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-              <div style={{ display: "flex", gap: 4 }}>
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setStar(openPhoto.id, (project.photoStates[openPhoto.id]?.rating === n ? 0 : n) as StarRating | 0)}
-                    style={{ background: "none", border: 0, fontSize: 22, padding: 0, color: (project.photoStates[openPhoto.id]?.rating ?? 0) >= n ? "#ff4d00" : "#dde1e4" }}
-                  >
-                    ★
-                  </button>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                {activeParticipants(project).map((p) => {
-                  const mineColor = p.id === currentIdentity;
-                  const on = project.photoStates[openPhoto.id]?.color?.includes(p.id as ColorTag);
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      disabled={!mineColor}
-                      onClick={() => toggleLike(openPhoto.id, p.id as ColorTag)}
-                      title={`${p.name}${mineColor ? " (나)" : ""}`}
-                      style={{
-                        width: 30,
-                        height: 30,
-                        borderRadius: "50%",
-                        background: p.hex,
-                        opacity: mineColor ? 1 : 0.35,
-                        border: on ? "2px solid #191918" : "2px solid #dde1e4",
-                        cursor: mineColor ? "pointer" : "default",
-                      }}
-                    />
-                  );
-                })}
-              </div>
-              <button
-                type="button"
-                className={`${ui.btn} ${selectedIds.has(openPhoto.id) ? ui.btnPrimary : ""}`}
-                onClick={() => toggleSelect(openPhoto.id)}
-              >
-                {selectedIds.has(openPhoto.id) ? "✓ 선택됨 (취소하려면 다시 클릭)" : "선택하기"}
-              </button>
-              <div className={ui.field}>
-                <span className={ui.label}>보정 요청</span>
-                <textarea
-                  defaultValue={project.photoStates[openPhoto.id]?.comment ?? ""}
-                  onBlur={(e) => setComment(openPhoto.id, e.target.value)}
-                  placeholder="예: 얼굴 밝기만 살짝 올려주세요"
-                  rows={3}
-                  style={{ border: "1px solid #dde1e4", borderRadius: 8, padding: "10px 12px", fontSize: 13.5, resize: "vertical", fontFamily: "inherit" }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {openPhoto && <LockedPhotoViewer
+        token=""
+        photos={project.photos}
+        initialIndex={openIndex}
+        sectionLabel="사진 셀렉"
+        selectedPhotoIds={selectedIds}
+        comments={project.photoStates}
+        ratings={Object.fromEntries(Object.entries(project.photoStates).map(([id, state]) => [id, state.rating]))}
+        colorTags={Object.fromEntries(Object.entries(project.photoStates).map(([id, state]) => [id, state.color]))}
+        currentIdentity={currentIdentity}
+        onToggleSelect={toggleSelect}
+        onRate={(photoId, rating) => setStar(photoId, rating)}
+        onToggleLike={toggleLike}
+        onComment={setComment}
+        onClose={() => setOpenPhotoId(null)}
+      />}
     </div>
   );
 }

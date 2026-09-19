@@ -95,7 +95,7 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 | 프로젝트 목록 | `/customer-select` | 작가 대시보드/목록 | 구현됨, 카드·상태 표현 추가 점검 필요 |
 | 프로젝트 생성 | `/customer-select/new` | 작가 프로젝트 생성 | 공통 폼 적용됨 |
 | 사진 업로드·관리 | `/customer-select/[projectId]/upload` | 작가 원본 업로드 | 공통 갤러리·뷰어·액션바 적용됨 |
-| 셀렉 갤러리 | `/customer-select/[projectId]/select` | `/c/[token]/gallery` | 카드·확정 풋터 공유, 헤더·필터·상세 뷰어 추가 통합 필요 |
+| 셀렉 갤러리 | `/customer-select/[projectId]/select` | `/c/[token]/gallery` | 카드·다크 상세 뷰어·확정 풋터 공유, 헤더·필터 추가 통합 필요 |
 | 최종 검토 | `/customer-select/[projectId]/review` | `/c/[token]/review` | 기능 구현됨, UI 정렬 필요 |
 | 작가 전달 | `/customer-select/[projectId]/export` | 프로젝트 결과 내보내기 | 기능 일부 구현, 실제 파일 다운로드 미구현 |
 | 보정본 업로드 | `/customer-select/[projectId]/retouch/upload` | 작가 보정본 업로드 | 기능 구현됨, UI 정렬 필요 |
@@ -107,7 +107,7 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 
 ### 현재 UI 정리 순서
 
-1. 셀렉 갤러리의 헤더·필터·상세 뷰어를 작가 고객 갤러리와 통합
+1. 셀렉 갤러리의 헤더·필터를 작가 고객 갤러리와 통합
 2. 최종 검토 화면을 기존 고객 검토 카드·뷰어로 교체
 3. 보정본 업로드·비교 화면을 기존 보정 플로우 컴포넌트로 교체
 4. 전달·완료 화면의 임시 `ui.module.css` 의존 제거

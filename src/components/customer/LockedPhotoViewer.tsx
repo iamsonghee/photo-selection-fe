@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, X } from "lucide-react";
+import { ChevronLeft, MessageSquare, Star, X } from "lucide-react";
 import { MobileViewerPinchPhoto } from "@/components/MobileViewerPinchPhoto";
 import { PhotoFocusOverlay } from "@/components/customer/PhotoFocusOverlay";
 import { PrevNextButton } from "@/components/PrevNextButton";
 import { useAdjacentImagePreload } from "@/lib/use-adjacent-image-preload";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
-import type { Photo } from "@/types";
+import type { ColorTag, Photo, StarRating } from "@/types";
 
 type Props = {
   token: string;
@@ -19,6 +19,13 @@ type Props = {
   selectedPhotoIds: Set<string>;
   comments: Record<string, { comment?: string }>;
   onClose: () => void;
+  ratings?: Record<string, StarRating | undefined>;
+  colorTags?: Record<string, ColorTag[] | undefined>;
+  currentIdentity?: ColorTag;
+  onToggleSelect?: (photoId: string) => void;
+  onRate?: (photoId: string, rating: StarRating | 0) => void;
+  onToggleLike?: (photoId: string, identity: ColorTag) => void;
+  onComment?: (photoId: string, comment: string) => void;
 };
 
 type PresignedPreview = { url: string; expiresAt: number };
@@ -27,7 +34,7 @@ function displayName(photo: Photo): string {
   return photo.originalFilename?.split("/").pop() ?? `#${photo.orderIndex}`;
 }
 
-export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, selectedPhotoIds, comments, onClose }: Props) {
+export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, selectedPhotoIds, comments, onClose, ratings, colorTags, currentIdentity, onToggleSelect, onRate, onToggleLike, onComment }: Props) {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [zoomed, setZoomed] = useState(false);
   const [presignedPreviews, setPresignedPreviews] = useState<Map<string, PresignedPreview>>(new Map());
@@ -93,10 +100,22 @@ export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, s
     document.body.style.overflow = "hidden";
     const handleKeyDown = (event: KeyboardEvent) => {
       if (focusOpen) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
       if (hasShortcutModifier(event)) return; // 윈도우 Alt+←/→(뒤로/앞으로 가기)와 겹치지 않게
       if (event.key === "Escape") {
         event.preventDefault();
         onClose();
+      } else if (event.code === "Space" && current && onToggleSelect) {
+        event.preventDefault();
+        onToggleSelect(current.id);
+      } else if (/^[1-5]$/.test(event.key) && current && onRate) {
+        event.preventDefault();
+        const value = Number(event.key) as StarRating;
+        onRate(current.id, ratings?.[current.id] === value ? 0 : value);
+      } else if (event.key.toLowerCase() === "f" && current && currentIdentity && onToggleLike) {
+        event.preventDefault();
+        onToggleLike(current.id, currentIdentity);
       } else if (event.key === "ArrowLeft" && photos.length > 1) {
         event.preventDefault();
         goPrev();
@@ -111,7 +130,7 @@ export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, s
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
       previouslyFocused?.focus();
     };
-  }, [focusOpen, goNext, goPrev, onClose, photos.length]);
+  }, [current, currentIdentity, focusOpen, goNext, goPrev, onClose, onRate, onToggleLike, onToggleSelect, photos.length, ratings]);
 
   if (!current || typeof document === "undefined") return null;
 
@@ -120,6 +139,9 @@ export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, s
   const currentSrc = presignedPreviews.get(current.id)?.url ?? viewerImageUrl(current);
   const selected = selectedPhotoIds.has(current.id);
   const comment = comments[current.id]?.comment?.trim() ?? "";
+  const editable = Boolean(onToggleSelect || onRate || onToggleLike || onComment);
+  const rating = ratings?.[current.id] ?? 0;
+  const liked = currentIdentity ? colorTags?.[current.id]?.includes(currentIdentity) ?? false : false;
 
   return createPortal(
     <div
@@ -189,6 +211,8 @@ export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, s
           src={currentSrc}
           alt={filename}
           showBadge={false}
+          selected={selected}
+          onToggleSelect={onToggleSelect ? () => onToggleSelect(current.id) : undefined}
           onZoomStateChange={setZoomed}
           /* 다른 고객 뷰어와 같은 동작 — 탭/클릭하면 사진만 남는 전체화면 */
           onSingleTap={() => setFocusOpen(true)}
@@ -201,10 +225,13 @@ export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, s
         )}
       </main>
 
-      <footer className="locked-viewer-footer relative z-10 flex items-center bg-black px-5 pb-[calc(24px+env(safe-area-inset-bottom))] pt-2 md:min-h-12 md:justify-center md:border-t md:border-white/10 md:bg-black/70 md:px-4 md:py-0 md:text-xs md:text-white/55">
-        <div className={`locked-viewer-comment ${comment ? "has-comment" : ""}`}>
-          {comment || "코멘트 없음"}
-        </div>
+      <footer className={`locked-viewer-footer relative z-10 flex items-center bg-black px-5 pb-[calc(24px+env(safe-area-inset-bottom))] pt-2 md:min-h-12 md:border-t md:border-white/10 md:bg-black/70 md:px-4 md:py-2 md:text-xs md:text-white/55 ${editable ? "justify-between gap-3 max-md:flex-col max-md:items-stretch" : "md:justify-center"}`}>
+        {editable ? <div className="flex min-w-0 flex-1 items-center gap-2 max-md:flex-wrap">
+          {onRate ? <div className="flex shrink-0" aria-label="별점">{([1, 2, 3, 4, 5] as const).map((value) => <button key={value} type="button" className="grid size-9 place-items-center max-md:size-8" aria-label={`${value}점`} onClick={() => onRate(current.id, rating === value ? 0 : value)}><Star size={20} fill={value <= rating ? "#ff4d00" : "none"} color={value <= rating ? "#ff4d00" : "#777b7f"} /></button>)}</div> : null}
+          {onComment ? <label className="relative min-w-0 flex-1 max-md:order-last max-md:basis-full"><MessageSquare size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/45" /><input key={current.id} defaultValue={comment} onBlur={(event) => onComment(current.id, event.target.value)} placeholder="코멘트를 남기세요" className="h-10 w-full rounded-lg border border-white/20 bg-white/10 pl-9 pr-3 text-sm text-white outline-none focus:border-accent" /></label> : null}
+          {onToggleLike && currentIdentity ? <button type="button" aria-pressed={liked} onClick={() => onToggleLike(current.id, currentIdentity)} className={`h-10 shrink-0 rounded-lg px-4 text-sm font-bold ${liked ? "bg-accent text-white" : "bg-white/10 text-white"}`}>{liked ? "찜함" : "찜"}</button> : null}
+          {onToggleSelect ? <button type="button" aria-pressed={selected} onClick={() => onToggleSelect(current.id)} className={`h-10 shrink-0 rounded-lg px-4 text-sm font-bold ${selected ? "bg-accent text-white" : "bg-white/10 text-white"}`}>{selected ? "선택됨" : "선택"}</button> : null}
+        </div> : <div className={`locked-viewer-comment ${comment ? "has-comment" : ""}`}>{comment || "코멘트 없음"}</div>}
         <span className="hidden md:inline">{activeIndex + 1} / {photos.length}</span>
         {hasMultiple && <span className="ml-3 hidden text-white/35 md:inline">← → 이전·다음</span>}
       </footer>
