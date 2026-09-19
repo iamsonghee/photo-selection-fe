@@ -54,7 +54,7 @@ export function NewCustomerProjectForm() {
 
   return (
     <>
-      <PhotographerLightPageFrame className="pb-8">
+      <PhotographerLightPageFrame className="flex-1 pb-8">
         <div className="mx-auto max-w-[840px]">
           <ProjectFormPageHeading
             title="새 프로젝트 만들기"

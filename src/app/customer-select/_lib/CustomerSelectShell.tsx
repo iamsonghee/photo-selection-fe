@@ -5,7 +5,7 @@ import theme from "@/styles/AcutLightTheme.module.css";
 
 export function CustomerSelectShell({ children, navigation = true }: { children: ReactNode; navigation?: boolean }) {
   return (
-    <div className={`${theme.lightTheme} min-h-dvh bg-background text-foreground`}>
+    <div className={`${theme.lightTheme} flex min-h-dvh flex-col bg-background text-foreground`}>
       <header className="border-b border-border-subtle bg-surface">
         <div className="mx-auto flex h-16 w-full max-w-[1504px] items-center gap-6 px-5 md:px-8">
           <BrandLogoBar href="/customer-select" variant="default" />
