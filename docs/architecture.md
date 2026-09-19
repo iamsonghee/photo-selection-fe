@@ -681,7 +681,7 @@ sequenceDiagram
    - R2 key: `photos/{photographer_id}/{project_id}/{client_upload_id.hex}_(thumb|preview).jpg`. 논리 업로드 항목마다 고정되고 응답 유실 재시도만 동일 바이트로 덮어쓰므로 `Cache-Control: public, max-age=31536000, immutable`을 유지한다.
    - 요청에 포함된 모든 파일의 처리가 끝난 뒤 `insert_photos_with_numbers` RPC가 `photos.number` 할당, `photos` INSERT, 원본 포함 시 `original_jobs` INSERT를 한 트랜잭션에서 수행한다. 동일 `(project_id, client_upload_id)`가 이미 있으면 기존 행을 반환하고 번호·`photo_count`·job을 추가하지 않는다. replay 발생은 `admin_audit_logs.action='upload_idempotency_replay'`로 기록한다.
    - `projects.photo_count` 갱신.
-   - 업로드 한도: 프로젝트당 최대 `app_settings.beta_max_photos_per_project`장(관리자는 무제한, §6.3).
+   - 업로드 한도: 유효한 베타는 `app_settings.beta_max_photos_per_project`, 일반 또는 기간이 끝난 베타는 `app_settings.general_max_photos_per_project`, 관리자는 무제한(§6.3). 업로드 화면도 `/api/photographer/quota`의 동일한 계정별 한도를 사용한다.
    - 모든 업로드의 FormData에 `original_filenames/original_file_sizes/original_last_modifieds/original_content_types`와 `source_widths/source_heights`를 포함해 `photos.source_*` 목록 메타데이터를 저장한다. 픽셀 크기는 기존 클라이언트 압축 디코딩에서 얻은 경우 전송하고, 압축을 생략한 경우 서버의 기존 썸네일 디코딩 결과로 채운다.
    - **`include_original=true`일 때 추가 흐름**:
      - 같은 원본 파일 메타데이터를 `original_jobs` 복구 매칭에도 사용한다.
