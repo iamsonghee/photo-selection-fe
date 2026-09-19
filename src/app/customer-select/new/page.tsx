@@ -1,12 +1,9 @@
 "use client";
 
-/**
- * S3 — 프로젝트 생성.
- * 실제 API 연동 전 목업 단계라 프로젝트를 서버에 만들지 않고, 브라우저에서 id만 생성해
- * 바로 업로드 화면으로 넘어간다(단계 5 범위: 목업 데이터로 화면·인터랙션 확인).
- */
-import { useState } from "react";
+/** S3 — 프로젝트 생성. 로그인한 소유자만 접근하며, 실제 API로 프로젝트를 만든다(단계 6). */
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import ui from "../_lib/ui.module.css";
 
@@ -14,28 +11,59 @@ const SHOOT_TYPES = ["웨딩", "돌·성장", "가족", "프로필", "커플·�
 
 export default function NewCustomerProjectPage() {
   const router = useRouter();
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [name, setName] = useState("");
   const [shootType, setShootType] = useState("돌·성장");
   const [target, setTarget] = useState(30);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    createClient()
+      .auth.getUser()
+      .then(({ data }) => {
+        if (cancelled) return;
+        if (!data.user) {
+          router.replace("/customer-select/login");
+          return;
+        }
+        setCheckingAuth(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const canSubmit = name.trim().length > 0 && !submitting;
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!canSubmit) return;
     setSubmitting(true);
-    const projectId = `demo-${Date.now().toString(36)}`;
-    // 생성 직후 필요한 값만 sessionStorage에 남기고, 실제 project 레코드는
-    // upload 페이지 진입 시 mock-store가 만든다(이름/유형/목표 수는 여기서 미리 전달).
+    setError(null);
     try {
-      window.sessionStorage.setItem(
-        `acut:customer-select:draft:${projectId}`,
-        JSON.stringify({ name: name.trim(), shootType, target })
-      );
-    } catch {
-      /* 저장소 접근 불가 — 업로드 화면에서 기본값으로 대체된다 */
+      const res = await fetch("/api/customer-select/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), shootType, target }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "생성 실패");
+      router.push(`/customer-select/${data.id}/upload`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "생성 실패");
+      setSubmitting(false);
     }
-    router.push(`/customer-select/${projectId}/upload`);
+  }
+
+  if (checkingAuth) {
+    return (
+      <div className={ui.shell}>
+        <header className={ui.brandbar}>
+          <BrandLogoBar size="sm" variant="customerEntry" />
+        </header>
+      </div>
+    );
   }
 
   return (
@@ -85,6 +113,7 @@ export default function NewCustomerProjectPage() {
             />
             <span className={ui.hint}>ⓘ 참고용이에요. 더 골라도, 덜 골라도 괜찮아요.</span>
           </div>
+          {error && <span className={ui.bannerHeadWarn}>{error}</span>}
         </div>
         <div className={ui.ctaDock}>
           <button type="button" className={`${ui.btn} ${ui.btnPrimary}`} disabled={!canSubmit} onClick={handleCreate}>

@@ -1,21 +1,22 @@
 "use client";
 
 /** S7 — 최종 검토. */
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import {
-  PARTICIPANTS,
+  activeParticipants,
   bothDone,
   requestedPhotoIds,
   tasteMatchPct,
   useCustomerSelectStore,
-} from "../../_lib/mock-store";
+} from "../../_lib/real-store";
 import ui from "../../_lib/ui.module.css";
 
 export default function CustomerReviewPage() {
   const params = useParams();
   const projectId = params.projectId as string;
+  const shareToken = useSearchParams().get("share_token");
   const router = useRouter();
   const { project, hydrated } = useCustomerSelectStore();
 
@@ -23,9 +24,9 @@ export default function CustomerReviewPage() {
   const requested = requestedPhotoIds(project);
   const match = tasteMatchPct(project);
   const done = bothDone(project);
-  const waiting = PARTICIPANTS.filter((p) => !project.participantDone[p.id]);
+  const waiting = activeParticipants(project).filter((p) => !project.participantDone[p.id]);
 
-  // 하이드레이션 전 첫 프레임 — mock-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
+  // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
   if (!hydrated) {
     return (
       <div className={ui.shell}>
@@ -132,7 +133,7 @@ export default function CustomerReviewPage() {
           </div>
         </div>
         <div className={`${ui.ctaDock} ${ui.ctaDockRow}`}>
-          <button type="button" className={ui.btn} style={{ flex: 1 }} onClick={() => router.push(`/customer-select/${projectId}/select`)}>
+          <button type="button" className={ui.btn} style={{ flex: 1 }} onClick={() => router.push(`/customer-select/${projectId}/select${shareToken ? `?share_token=${shareToken}` : ""}`)}>
             ← 더 고르기
           </button>
           <button
@@ -140,7 +141,7 @@ export default function CustomerReviewPage() {
             className={`${ui.btn} ${ui.btnPrimary}`}
             style={{ flex: 2 }}
             disabled={selected.length === 0}
-            onClick={() => router.push(`/customer-select/${projectId}/export`)}
+            onClick={() => router.push(`/customer-select/${projectId}/export${shareToken ? `?share_token=${shareToken}` : ""}`)}
           >
             전달 내용 만들기
           </button>

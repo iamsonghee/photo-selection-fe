@@ -12,19 +12,20 @@
  * 필터링은 기존 `@/lib/gallery-filter`의 순수 함수를 그대로 쓴다(재사용 대상으로 이미 검증됨).
  */
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getFilteredPhotos, getPhotoDisplayName, type GalleryFilterState } from "@/lib/gallery-filter";
 import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
 import type { ColorTag, StarRating } from "@/types";
 import {
-  PARTICIPANTS,
+  COLOR_PALETTE,
+  activeParticipants,
   disagreementIds,
   reviewedPhotoIds,
   tasteMatchPct,
   bothDone,
   useCustomerSelectStore,
-} from "../../_lib/mock-store";
-import { DevIdentitySwitcher } from "../../_lib/DevIdentitySwitcher";
+} from "../../_lib/real-store";
+import { NicknamePrompt } from "../../_lib/NicknamePrompt";
 import ui from "../../_lib/ui.module.css";
 
 type Tab = "all" | "selected" | "disagree" | "mine";
@@ -46,11 +47,23 @@ export default function CustomerSelectGalleryPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const router = useRouter();
-  const { project, hydrated, currentIdentity, toggleSelect, toggleLike, setStar, setComment, toggleDone } =
+  const shareToken = useSearchParams().get("share_token");
+  const { project, hydrated, currentIdentity, shareUrl, toggleSelect, toggleLike, setStar, setComment, toggleDone } =
     useCustomerSelectStore();
 
   const [tab, setTab] = useState<Tab>("all");
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
+
+  async function handleShare() {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      window.prompt("아래 링크를 복사해서 공유하세요", shareUrl);
+    }
+  }
 
   const selectedIds = useMemo(() => new Set(project.selectedIds), [project.selectedIds]);
   const disagree = useMemo(() => new Set(disagreementIds(project)), [project]);
@@ -101,21 +114,21 @@ export default function CustomerSelectGalleryPage() {
   }
   const info = metaInfo();
 
-  // 하이드레이션 전 첫 프레임 — mock-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
+  // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
   if (!hydrated) {
     return <div style={{ minHeight: "100dvh", background: "#f3f4f5" }} />;
   }
 
   return (
     <div style={{ minHeight: "100dvh", background: "#f3f4f5", fontFamily: "'Pretendard','Pretendard Variable',-apple-system,sans-serif" }}>
-      <DevIdentitySwitcher />
+      <NicknamePrompt projectId={projectId} />
       <div style={{ maxWidth: 1440, margin: "0 auto", background: "#fff", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
         {/* 헤더 */}
         <div style={{ padding: "14px 20px 10px", borderBottom: "1px solid #dde1e4", display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <strong style={{ fontSize: 15, color: "#191918" }}>{project.name || "이름 없는 프로젝트"}</strong>
             <span style={{ flex: 1 }} />
-            {PARTICIPANTS.map((p) => {
+            {activeParticipants(project).map((p) => {
               const isDone = project.participantDone[p.id];
               return (
                 <span
@@ -199,7 +212,6 @@ export default function CustomerSelectGalleryPage() {
                       background: "#eee",
                     }}
                   >
-                    {/* 목업 단계: 실사진 대신 색상 그라디언트 placeholder (mock-store 참고) */}
                     <img src={p.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                     {state?.comment && <span style={{ position: "absolute", top: 5, left: 5, fontSize: 11 }}>💬</span>}
                     <span
@@ -230,7 +242,7 @@ export default function CustomerSelectGalleryPage() {
                     {colors.length > 0 && (
                       <span style={{ position: "absolute", bottom: 5, left: 5, display: "flex", gap: 3 }}>
                         {colors.map((c) => {
-                          const p2 = PARTICIPANTS.find((x) => x.id === c);
+                          const p2 = COLOR_PALETTE.find((x) => x.id === c);
                           return <i key={c} style={{ width: 8, height: 8, borderRadius: "50%", background: p2?.hex ?? "#999", border: "1.3px solid rgba(255,255,255,.85)" }} />;
                         })}
                       </span>
@@ -248,9 +260,9 @@ export default function CustomerSelectGalleryPage() {
             type="button"
             className={`${ui.btn} ${ui.btnSm}`}
             style={{ width: "auto", padding: "0 16px" }}
-            onClick={() => window.alert("공유 링크 화면은 이번 단계 범위 밖이에요 (단계 1 S14 참고)")}
+            onClick={handleShare}
           >
-            공유
+            {shareCopied ? "링크 복사됨 ✓" : "공유"}
           </button>
           <button type="button" className={`${ui.btn} ${ui.btnSm}`} style={{ width: "auto", padding: "0 16px" }} onClick={() => toggleDone(currentIdentity)}>
             {project.participantDone[currentIdentity] ? "다시 고를래요" : "다 골랐어요"}
@@ -261,7 +273,7 @@ export default function CustomerSelectGalleryPage() {
           N={target}
           position="static"
           disabled={selectedCount === 0}
-          onConfirm={() => router.push(`/customer-select/${projectId}/review`)}
+          onConfirm={() => router.push(`/customer-select/${projectId}/review${shareToken ? `?share_token=${shareToken}` : ""}`)}
           buttonLabel="선택 확정하기"
           theme="customerLight"
           mobileGallery
@@ -308,7 +320,7 @@ export default function CustomerSelectGalleryPage() {
                 ))}
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                {PARTICIPANTS.map((p) => {
+                {activeParticipants(project).map((p) => {
                   const mineColor = p.id === currentIdentity;
                   const on = project.photoStates[openPhoto.id]?.color?.includes(p.id as ColorTag);
                   return (

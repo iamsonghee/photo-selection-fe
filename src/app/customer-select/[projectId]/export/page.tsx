@@ -11,7 +11,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
-import { useCustomerSelectStore } from "../../_lib/mock-store";
+import { useCustomerSelectStore } from "../../_lib/real-store";
 import ui from "../../_lib/ui.module.css";
 
 function buildExportText(
@@ -47,7 +47,7 @@ export default function CustomerExportPage() {
     setTimeout(() => setCopyState("idle"), 2000);
   }
 
-  // 하이드레이션 전 첫 프레임 — mock-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
+  // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
   if (!hydrated) {
     return (
       <div className={ui.shell}>

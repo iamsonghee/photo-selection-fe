@@ -1,4 +1,5 @@
-import { CustomerSelectStoreProvider } from "../_lib/mock-store";
+import { Suspense } from "react";
+import { CustomerSelectStoreProvider } from "../_lib/real-store";
 
 export default async function CustomerSelectProjectLayout({
   children,
@@ -8,5 +9,9 @@ export default async function CustomerSelectProjectLayout({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
-  return <CustomerSelectStoreProvider projectId={projectId}>{children}</CustomerSelectStoreProvider>;
+  return (
+    <Suspense fallback={null}>
+      <CustomerSelectStoreProvider projectId={projectId}>{children}</CustomerSelectStoreProvider>
+    </Suspense>
+  );
 }
