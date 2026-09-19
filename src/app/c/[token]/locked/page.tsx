@@ -353,8 +353,7 @@ function LockedMobileGallery({ token, selectedPhotos, allPhotos, selectedIds, co
 }
 
 export default function LockedPage() {
-  /* 모바일·PC 모두 라이트 화면이다 — body 바탕까지 흰색으로 바꿔 러버밴드·주소창 전환에서
-   * 검은 바탕이 드러나지 않게 한다(갤러리·검토 목록과 같은 처리). */
+  /* 모바일·PC 모두 순백 캔버스를 overscroll 영역까지 유지한다. */
   useCustomerLightCanvas();
   const params  = useParams();
   const router  = useRouter();

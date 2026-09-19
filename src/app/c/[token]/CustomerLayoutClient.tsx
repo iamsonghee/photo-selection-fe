@@ -14,13 +14,7 @@ export default function CustomerLayoutClient({
   const params = useParams();
   const pathname = usePathname();
   const token = (params?.token as string) ?? "";
-  // 라이트 화면(갤러리·locked·PIN 등)은 흰 바탕인데, body/html은 전역 Dark 배경을 쓴다.
-  // 모바일 러버밴드 overscroll이나 주소창 접힘으로 100dvh가 실제보다 잠깐 작아질 때
-  // 그 틈으로 body의 검은 바탕이 비친다 — 예전엔 화면마다 useCustomerLightCanvas() 훅을
-  // 불러 body만 손으로 흰색으로 바꿨는데, 그 화면 목록에 새 라이트 화면을 추가할 때마다
-  // 잊기 쉬운 opt-in이었다(실제로 초대·확정·PIN 화면 세 곳이 빠져 있었다). 작가 쪽
-  // (PhotographerDesktopShell/isPhotographerLightRoute)처럼 라우트 하나로 판정해 셸에서
-  // 한 번에 켠다 — 새 라이트 화면은 여기 목록에만 추가하면 된다.
+  // 순백 캔버스를 쓰는 라우트는 셸에서 한 번 판정해 overscroll 영역까지 같은 색을 유지한다.
   const isLight = isCustomerLightRoute(pathname);
 
   return (

@@ -443,7 +443,7 @@ function ReviewGalleryView({
         .rgv-head-count { font: 700 15px/1 Pretendard, sans-serif; color: var(--accent); font-variant-numeric: tabular-nums; }
         .rgv-head-count span { font-weight: 600; font-size: 12px; color: var(--customer-ink-secondary); }
 
-        /* 안쪽 스크롤러의 러버밴드가 문서로 번지지 않게 한다(번지면 body의 검은 바탕이 보인다) */
+        /* 안쪽 스크롤러의 러버밴드가 문서로 번지지 않게 한다. */
         .rgv-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
         .rgv-inner {
           /* 갤러리 격자와 같은 좌우 여백(20px) */

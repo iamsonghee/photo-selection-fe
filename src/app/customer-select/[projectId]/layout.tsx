@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { CustomerSelectStoreProvider } from "../_lib/real-store";
+import theme from "@/styles/AcutLightTheme.module.css";
 
 export default async function CustomerSelectProjectLayout({
   children,
@@ -10,8 +11,10 @@ export default async function CustomerSelectProjectLayout({
 }) {
   const { projectId } = await params;
   return (
-    <Suspense fallback={null}>
-      <CustomerSelectStoreProvider projectId={projectId}>{children}</CustomerSelectStoreProvider>
-    </Suspense>
+    <div className={theme.lightTheme}>
+      <Suspense fallback={null}>
+        <CustomerSelectStoreProvider projectId={projectId}>{children}</CustomerSelectStoreProvider>
+      </Suspense>
+    </div>
   );
 }

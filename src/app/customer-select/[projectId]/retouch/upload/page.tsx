@@ -82,7 +82,7 @@ export default function RetouchUploadPage() {
     return (
       <div className={ui.shell}>
         <header className={ui.brandbar}>
-          <BrandLogoBar size="sm" variant="customerEntry" />
+          <BrandLogoBar size="sm" href="/customer-select" variant="default" />
         </header>
       </div>
     );
@@ -91,7 +91,7 @@ export default function RetouchUploadPage() {
   return (
     <div className={ui.shell}>
       <header className={ui.brandbar}>
-        <BrandLogoBar size="sm" variant="customerEntry" />
+        <BrandLogoBar size="sm" href="/customer-select" variant="default" />
       </header>
       <div className={ui.shellMain}>
         <div className={ui.page} style={{ minHeight: "unset" }}>

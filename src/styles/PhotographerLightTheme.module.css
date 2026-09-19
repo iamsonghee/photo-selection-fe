@@ -6,7 +6,7 @@
   color: var(--foreground);
   font-family: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 
-  --background: var(--photographer-light-canvas);
+  --background: var(--acut-canvas);
   --foreground: #023852;
   --muted-foreground: rgba(2, 56, 82, 0.68);
   --subtle-foreground: rgba(2, 56, 82, 0.52);

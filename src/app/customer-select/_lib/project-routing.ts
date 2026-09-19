@@ -1,0 +1,24 @@
+export type CustomerProjectSummary = {
+  id: string;
+  name: string;
+  shoot_type: string | null;
+  target_count: number;
+  photo_count: number;
+  exported: boolean;
+  retouch_done: boolean;
+  created_at: string;
+};
+
+export function customerProjectDestination(project: CustomerProjectSummary) {
+  if (project.retouch_done) return `/customer-select/${project.id}/done`;
+  if (project.exported) return `/customer-select/${project.id}/retouch/upload`;
+  if (project.photo_count > 0) return `/customer-select/${project.id}/select`;
+  return `/customer-select/${project.id}/upload`;
+}
+
+export function customerProjectStatus(project: CustomerProjectSummary) {
+  if (project.retouch_done) return "완료";
+  if (project.exported) return "보정본 대기";
+  if (project.photo_count > 0) return "셀렉 진행";
+  return "사진 업로드 전";
+}

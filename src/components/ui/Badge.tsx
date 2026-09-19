@@ -18,8 +18,7 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   icon?: ReactNode;
   /** "customerLight" = 고객 라이트 화면(갤러리·검토 목록·잠금 갤러리)에서 쓰는 팔레트.
    * attention/status 톤은 반투명 틴트라 흰 배경에서도 그대로 읽히지만, `time`만은
-   * 불투명한 다크 토큰(bg-surface-raised)이라 흰 배경에서 "어두운 칩에 회색 글씨"가 된다.
-   * 그래서 이 테마에서는 `time`만 갈아 끼운다(기본값은 다크 그대로라 다른 호출부는 영향 없음). */
+   * 화면별 대비가 필요한 `time` 배지만 고객 팔레트로 갈아 끼운다. */
   theme?: "workspace" | "customerLight";
 }
 

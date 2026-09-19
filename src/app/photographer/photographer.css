@@ -1,30 +1,21 @@
 @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap");
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css");
 
-:root {
-  /* Root overscroll canvas cannot inherit tokens from a descendant main. */
-  --photographer-light-canvas: #f5f8f8;
-}
-
 .photographer-app {
   font-family: "Pretendard", system-ui, sans-serif;
 }
 
-/* Light 운영 화면의 persistent transition canvas.
-   route page가 교체되거나 photographer/loading.tsx가 표시되는 순간에도
-   Dark global token이 비치지 않도록 공통 shell에서 먼저 제공한다. */
+/* Light 운영 화면의 persistent transition canvas. */
 .photographer-light-shell {
   background: var(--background);
   color: var(--foreground);
 }
 
-/* macOS trackpad/Safari의 rubber-band overscroll에서는 main 바깥의 root canvas가
-   노출된다. Light route가 존재할 때 html/body/Photographer root까지 같은 색으로
-   맞춰 빈 영역을 끌어내려도 전역 Dark background가 보이지 않게 한다. */
+/* macOS trackpad/Safari rubber-band overscroll에서도 공통 ACUT canvas를 유지한다. */
 html:has(.photographer-light-shell),
 body:has(.photographer-light-shell),
 .photographer-app:has(.photographer-light-shell) {
-  background-color: var(--photographer-light-canvas);
+  background-color: var(--acut-canvas);
 }
 
 .photographer-app .font-display-ps {

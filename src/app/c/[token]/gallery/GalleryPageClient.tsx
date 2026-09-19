@@ -95,7 +95,7 @@ type GridLayout = { cols: number; gap: number; rowHeight: number; overscan: numb
 const DEFAULT_LAYOUT: GridLayout = { cols: 4, gap: GRID_GAP, rowHeight: Math.ceil(GRID_MIN_CELL / DESKTOP_CARD_ASPECT) + GRID_GAP, overscan: 6 };
 
 export default function GalleryPageClient() {
-  /* 셀렉 갤러리도 라이트 화면이다 — 모바일 러버밴드/주소창 전환 때 body의 검은 바탕이 비치지 않게 한다 */
+  /* 셀렉 갤러리의 순백 캔버스를 모바일 overscroll 영역까지 유지한다. */
   useCustomerLightCanvas();
   const params       = useParams();
   const router       = useRouter();
@@ -1087,8 +1087,7 @@ export default function GalleryPageClient() {
           .gl-grid-main { padding: 0 20px !important; }
 
           /* 카드 구조는 PC와 같다(카드 = 사진 1:1, 파일명·별점은 사진 위 그라데이션).
-           * 배경은 흰 카드 + 얇은 구분선 — 기본값 var(--surface)는 다크 토큰(#15161a)이라
-           * 라이트 갤러리에서 사진이 로딩되기 전/실패했을 때 검은 사각형이 뜬다. */
+           * 배경은 흰 카드 + 얇은 구분선을 명시한다. */
           .gl-photo-card {
             border-radius: 4px; transition: none;
             background: #fff; border: 1px solid var(--customer-divider); box-sizing: border-box;

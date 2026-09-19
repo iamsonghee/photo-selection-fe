@@ -1,0 +1,2 @@
+/* Shared A-CUT light-theme entry point. Keep the existing photographer import working. */
+.lightTheme { composes: lightTheme from "./PhotographerLightTheme.module.css"; }
