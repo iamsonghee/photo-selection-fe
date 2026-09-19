@@ -20,6 +20,7 @@ import { compressImagesInParallel } from "@/lib/upload-client-compress";
 import { UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
+import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAssetHeader";
 import type { Photo, PhotoGroupInfo } from "@/types";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import { useCustomerSelectStore } from "../../_lib/real-store";
@@ -54,6 +55,7 @@ export default function CustomerUploadPage() {
   const galleryScrollRef = useRef<HTMLDivElement>(null);
   const previewUrlsRef = useRef<string[]>([]);
   const deleteSelectedPhotosRef = useRef<() => Promise<void>>(async () => {});
+  const { compact: compactHeader, handleScroll: handleGalleryScroll } = useCollapsibleAssetHeaderController({ compactOnly: true });
 
   useEffect(() => () => previewUrlsRef.current.forEach(URL.revokeObjectURL), []);
 
@@ -276,12 +278,12 @@ export default function CustomerUploadPage() {
       <div className="flex h-[calc(100dvh-64px)] min-h-0 flex-1 flex-col overflow-hidden">
         <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden onChange={(event) => handleFiles(event.target.files)} />
 
-        <header className="shrink-0 border-b border-border-subtle bg-background px-4 py-3 md:px-8">
+        <header data-upload-header-mode={compactHeader ? "compact" : "expanded"} className={`shrink-0 overflow-hidden border-b border-border-subtle bg-background px-4 transition-[padding] duration-200 md:px-8 ${compactHeader ? "py-1" : "py-3"}`}>
           <div className="mx-auto flex max-w-[1504px] items-center gap-3">
-            <button type="button" onClick={() => router.push("/customer-select")} className="grid size-10 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-surface-raised hover:text-foreground" aria-label="프로젝트 목록으로"><ChevronLeft size={19} /></button>
+            <button type="button" onClick={() => router.push("/customer-select")} className={`grid shrink-0 place-items-center rounded-lg text-muted-foreground transition-[width,height] hover:bg-surface-raised hover:text-foreground ${compactHeader ? "size-9" : "size-10"}`} aria-label="프로젝트 목록으로"><ChevronLeft size={19} /></button>
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-[18px] font-bold text-foreground md:text-[20px]">{displayName}</h1>
-              <p className="mt-0.5 text-[12px] text-muted-foreground">사진 업로드 · 최대 2,000장</p>
+              <h1 className={`truncate font-bold text-foreground transition-[font-size] ${compactHeader ? "text-[14px]" : "text-[18px] md:text-[20px]"}`}>{displayName}</h1>
+              {!compactHeader ? <p className="mt-0.5 text-[12px] text-muted-foreground">사진 업로드 · 최대 2,000장</p> : null}
             </div>
             <PhotographerLightButton variant="outline" size="toolbar" onClick={() => inputRef.current?.click()} disabled={uploading}><ImagePlus size={16} />사진 추가</PhotographerLightButton>
           </div>
@@ -300,7 +302,13 @@ export default function CustomerUploadPage() {
 
         <main
           ref={galleryScrollRef}
+          tabIndex={-1}
+          aria-label="업로드 사진 갤러리"
           className="min-h-0 flex-1 overflow-y-auto bg-background"
+          onPointerDownCapture={(event) => {
+            if (event.target instanceof Element && !event.target.closest("article, button, input, select, a")) event.currentTarget.focus({ preventScroll: true });
+          }}
+          onScroll={handleGalleryScroll}
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => { event.preventDefault(); if (!uploading) void handleFiles(event.dataTransfer.files); }}
         >
@@ -341,6 +349,7 @@ export default function CustomerUploadPage() {
         <PhotographerPageActionBar
           maxWidth={1504}
           className="shrink-0"
+          viewportFixed
           leading={uploadStatus}
           mobileLeading={uploadStatus}
           actions={uploading ? null : <>
