@@ -19,6 +19,7 @@ import { ProjectAssetToolbarSummary } from "@/components/photographer/ProjectAss
 import { compressImagesInParallel } from "@/lib/upload-client-compress";
 import { UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
+import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
 import type { Photo, PhotoGroupInfo } from "@/types";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import { useCustomerSelectStore } from "../../_lib/real-store";
@@ -52,6 +53,7 @@ export default function CustomerUploadPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const galleryScrollRef = useRef<HTMLDivElement>(null);
   const previewUrlsRef = useRef<string[]>([]);
+  const deleteSelectedPhotosRef = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => () => previewUrlsRef.current.forEach(URL.revokeObjectURL), []);
 
@@ -202,6 +204,30 @@ export default function CustomerUploadPage() {
       setDeleting(false);
     }
   }
+  deleteSelectedPhotosRef.current = deleteSelectedPhotos;
+
+  useEffect(() => {
+    if (uploading || deleting || aiPromptOpen || viewerPhotoId) return;
+    const handleShortcut = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        setSelectedPhotoIds(new Set(project.photos.map((photo) => photo.id)));
+        return;
+      }
+      if (hasShortcutModifier(event)) return;
+      if (event.key === "Escape" && selectedPhotoIds.size) {
+        event.preventDefault();
+        setSelectedPhotoIds(new Set());
+      } else if ((event.key === "Delete" || event.key === "Backspace") && selectedPhotoIds.size) {
+        event.preventDefault();
+        void deleteSelectedPhotosRef.current();
+      }
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [aiPromptOpen, deleting, project.photos, selectedPhotoIds, uploading, viewerPhotoId]);
 
   const displayName = project.name || "이름 없는 프로젝트";
   const displayedPhotos = useMemo(() => [...project.photos, ...pendingPhotos], [project.photos, pendingPhotos]);
