@@ -7,14 +7,14 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ImagePlus, LayoutGrid, List, Loader2, UploadCloud } from "lucide-react";
+import { ChevronLeft, ImagePlus, Loader2, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { PhotographerPhotoGallery } from "@/components/photographer/OriginalPhotoGallery";
 import { OriginalPhotoViewer } from "@/components/photographer/OriginalPhotoViewer";
 import { PhotoSortSelect } from "@/components/photographer/PhotoSortSelect";
-import { ProjectAssetToolbarSummary, ProjectAssetToolbarViewToggle } from "@/components/photographer/ProjectAssetWorkspaceToolbar";
+import { ProjectAssetToolbarSummary } from "@/components/photographer/ProjectAssetWorkspaceToolbar";
 import { compressImagesInParallel } from "@/lib/upload-client-compress";
 import { UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
@@ -38,7 +38,6 @@ export default function CustomerUploadPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingPhotos, setPendingPhotos] = useState<Photo[]>([]);
-  const [viewMode, setViewMode] = useState<"gallery" | "list">("gallery");
   const [sort, setSort] = useState<"order-asc" | "order-desc" | "name-asc">("order-asc");
   const [viewerPhotoId, setViewerPhotoId] = useState<string | null>(null);
   const [thumbQueue] = useState(() => createThumbLoadQueue(12));
@@ -181,11 +180,6 @@ export default function CustomerUploadPage() {
             <ProjectAssetToolbarSummary label="업로드 사진" count={`${displayedPhotos.length.toLocaleString()}장`} meta={uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : undefined} />
             <div className="flex items-center gap-1.5">
               <PhotoSortSelect value={sort} onChange={setSort} options={[{ value: "order-asc", label: "업로드 순" }, { value: "order-desc", label: "최근 순" }, { value: "name-asc", label: "파일명 순" }]} />
-              <ProjectAssetToolbarViewToggle value={viewMode} onChange={setViewMode} />
-              <div className="hidden overflow-hidden rounded-lg border border-border-subtle bg-surface-raised p-0.5 md:flex" aria-label="보기 방식">
-                <button type="button" aria-label="갤러리로 보기" aria-pressed={viewMode === "gallery"} onClick={() => setViewMode("gallery")} className={`grid size-9 place-items-center rounded-md ${viewMode === "gallery" ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><LayoutGrid size={17} /></button>
-                <button type="button" aria-label="목록으로 보기" aria-pressed={viewMode === "list"} onClick={() => setViewMode("list")} className={`grid size-9 place-items-center rounded-md ${viewMode === "list" ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><List size={17} /></button>
-              </div>
             </div>
           </div>
         </div>
@@ -209,7 +203,7 @@ export default function CustomerUploadPage() {
             <PhotographerPhotoGallery
               scrollRef={galleryScrollRef}
               photos={sortedPhotos}
-              viewMode={viewMode === "gallery" ? "grid" : "list"}
+              viewMode="grid"
               thumbQueue={thumbQueue}
               readonly
               mobileMinCols={2}
