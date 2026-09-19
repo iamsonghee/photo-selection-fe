@@ -1,103 +1,225 @@
-# 셀프 고객 셀렉 서비스 (2026-09-19)
+# 셀프 고객 서비스 — 제품·구현 기준
 
-> 작가가 A-CUT을 쓰지 않는 경우, 고객이 직접 촬영본을 올려 셀렉하고 파일명·보정요청을 외부
-> 작가에게 전달하는 별도 이용 흐름. `feature/customer-select` 브랜치에서 구현, `main` 미병합.
-> 이 문서는 기획 초안이 아니라 **실제 구현된 코드를 기준**으로 작성했다 — 초기 기획 문서
-> (`customer-select-step1.md`, 세션 스크래치패드)와 갈라진 지점은 각 절에 명시했다.
+> 고객이 A-CUT을 사용하는 작가 없이 직접 촬영본을 업로드하고, 함께 사진을 고른 뒤 외부
+> 작가에게 파일명과 보정 요청을 전달하는 서비스다. 경로는 `/customer-select/**`이며 문서와
+> 대화에서는 반드시 **셀프 고객 서비스**라고 부른다. 기존 `/c/[token]/**`는 **작가 고객 페이지**다.
 
-## 1. 왜 별도 시스템인가
+## 1. 이 문서의 역할
 
-기존 `projects`/`photos`/`selections`(작가 플로우)와 소유권·인증·생애주기 모델이 근본적으로
-다르다: 소유자가 링크+PIN이 아니라 로그인 계정, 확정 후 잠금이 없음(자유롭게 되돌리기),
-원본을 보관하지 않음(고객 기기에 이미 있음), 재보정 횟수 제한 없음(외부 작가와의 계약
-사항이라 A-CUT이 강제하지 않음). 그래서 `customer_projects`/`customer_photos`/
-`customer_selections`/`customer_photo_versions`/`customer_project_participants`를 완전히
-분리된 테이블로 새로 만들었다(작가 테이블에 컬럼을 얹거나 합성 소유자 계정에 귀속시키는
-방식은 검토 후 기각 — 단계 0 분석 참고).
+이 문서는 셀프 고객 서비스의 단일 구현 기준이다. 초기 목업이나 화면별 임시 구현을 정답으로
+취급하지 않는다. 판단 우선순위는 다음과 같다.
 
-## 2. 데이터 모델
+1. 기존 ACUT에서 운영 중인 같은 목적의 화면과 공통 컴포넌트
+2. 셀프 고객 서비스의 데이터·인증·생애주기 차이
+3. 현재 코드와 실제 브라우저 동작
+4. 이 문서의 요구사항과 상태표
+5. 초기 목업·스크래치 문서
 
-초기 마이그레이션: `supabase/migrations/20260919*.sql` (5개, 프로덕션 적용 완료).
-추가 프로젝트 정보는 `20260920000000_add_customer_project_details.sql`에 있으며,
-CLI 이력과 맞지 않으므로 `supabase db push`가 아니라 대시보드 SQL Editor 또는
-Management API로 이 파일만 실행한다.
+목업은 사용자 흐름과 필요한 정보의 참고 자료일 뿐, 레이아웃·카드·모달·헤더·푸터를 새로
+만드는 근거가 아니다. 같은 목적의 ACUT 화면이 있으면 그 화면과 컴포넌트를 먼저 재사용하고,
+API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀프 고객용으로 분리한다.
 
-- **`customer_projects`**: `owner_id`(auth.users 참조), `name`, `shoot_type`, `shoot_date`·`selection_deadline`·`studio_name`(선택 입력), `target_count`(참고용 가이드, 강제 아님), `photo_count`, `share_token`(hex, 참가자 인증용), `exported`, `retouch_done`
-- **`customer_photos`**: 원본 파일명 유지, `thumb_url`/`preview_url`(BE 업로드 응답을 그대로 저장 — R2_PUBLIC_URL이 설정돼 있어 presign 단계 불필요)
-- **`customer_selections`**: 사진당 1행. `rating`/`comment`는 프로젝트 공용, `color_tags`(text[])로 참가자별 찜 여부만 구분 — 작가 플로우의 `selections.color_tags`와 같은 설계
-- **`customer_photo_versions`**: 사진 1장에 여러 회차의 보정본(무제한 재보정 — 작가 플로우 v1/v2 상한과 다름). `round`/`decision`(pending·confirmed·redo)/`redo_reason`
-- **`customer_project_participants`**: `project_participants`(작가 플로우)와 동일 패턴 — 색=참가자 슬롯, 표시용 닉네임 + 완료 표시. 계정 없는 참가자를 서버가 식별할 수 없어 이 방식이 그대로 유효
+## 2. 제품 정의
 
-모든 테이블은 RLS만 켜고 정책은 두지 않는다 — 읽기/쓰기는 전부 Next.js API 라우트가
-service-role 클라이언트로 수행한다(`project_participants`와 동일 관례).
+셀프 고객 서비스의 사용자는 사진을 맡긴 고객이면서 프로젝트 소유자다. 고객은 촬영본을 직접
+보유하고 있으므로 A-CUT은 셀렉과 의사소통에 필요한 썸네일·프리뷰만 관리한다.
 
-동시성: `customer_selections.color_tags` 추가/제거는 `toggle_customer_selection_color` RPC로
-원자 처리한다. 여러 참가자가 동시에 같은 사진에 서로 다른 색을 찜하는 것이 이 기능의 핵심
-시나리오라, 전체 배열을 통째로 재전송하는 방식(작가 플로우가 2026-07-29에 겪은 lost-update
-버그와 같은 클래스)을 처음부터 쓰지 않았다.
+핵심 흐름은 다음과 같다.
 
-## 3. 인증 모델
+1. 로그인하고 프로젝트를 만든다.
+2. 셀렉용 사진을 업로드한다.
+3. 본인 또는 공유 링크 참가자가 찜·별점·코멘트와 최종 셀렉을 남긴다.
+4. 선택 파일명과 보정 요청을 외부 작가에게 전달한다.
+5. 외부에서 받은 보정본을 다시 올려 비교·확정하거나 재보정을 요청한다.
 
-- **소유자**: 기존 작가 로그인과 동일한 Supabase Auth(Google/Kakao) — `src/app/customer-select/login/page.tsx`가 별도 화면으로 `signInWithOAuth`를 호출한다. 기존 `AuthModal`(사이버펑크 톤)은 이 서비스의 "단순한 소비자 UI" 목표와 톤이 맞지 않아 재사용하지 않았다.
-- **참가자(공유 링크)**: 로그인하지 않는다. `customer_projects.share_token`을 URL 쿼리(`?share_token=`)로 들고 다니며, 최초 방문 시 아직 안 쓰인 색 슬롯을 자동 배정받고 `localStorage`(`acut:customer-select:identity:{projectId}`)에 저장해 재방문 시 복원한다. 닉네임은 접속 직후 배너로 물어보되 스킵 가능(`NicknamePrompt.tsx`).
-- Next.js API 라우트는 소유자 세션(쿠키) 또는 `share_token` 둘 중 하나로 접근을 허용한다(`resolveCustomerProjectAccess`, `src/lib/customer-select-server.ts`). BE 업로드 엔드포인트는 소유자 Supabase JWT(Bearer) 또는 `share_token` 폼필드로 같은 판단을 한다(`app/routers/customer_upload.py`).
+### 명시적 비범위
 
-**기획 초안과의 차이**: 원래 초안은 참가자 전용 경로를 `/cs/[token]/**`로 분리하는 안이었으나,
-실제로는 소유자와 같은 `/customer-select/[projectId]/**` 경로에 `share_token` 쿼리만 추가하는
-방식으로 구현했다 — 페이지 컴포넌트를 이중으로 만들 필요가 없어 더 단순하다.
+- 납품용 원본 업로드·원본 아카이브·원본 복구
+- 작가 계정, 작가 등급, 작가별 업로드 쿼터
+- 작가 추천 사진과 작가 초대 생애주기
+- 기존 `projects`/`photos` 상태 머신에 셀프 고객 프로젝트를 편입하는 것
 
-## 4. 업로드 아키텍처
+셀프 고객의 사진은 언제나 **셀렉용 사진**이다. UI·API·문서에서 이를 작가 화면의 “납품용
+원본”과 혼용하지 않는다.
 
-- **클라이언트 압축**: 작가 업로드 화면의 `lib/upload-client-compress.ts`(`compressImagesInParallel`)를 그대로 재사용한다. identity 비의존으로 설계돼 있어 그대로 가져다 썼다 — 1600px/0.82 압축(`UPLOAD_INTERMEDIATE_MAX_EDGE/QUALITY`). 20장씩 압축 후 즉시 전송해 대량 선택 시 압축 결과 전체가 메모리에 쌓이지 않는다.
-- **BE 엔드포인트**: `POST/DELETE /api/customer-upload/photos`(셀렉용 사진 업로드·삭제), `POST /api/customer-upload/retouched`(보정본) — 모두 `app/routers/customer_upload.py`. 작가 업로드(`/api/upload/photos`)는 `get_current_photographer`·베타 등급 쿼터·`original_jobs`(납품 원본 보관) 등 작가 프로젝트 생애주기에 강하게 결합돼 있어 재사용하지 않고, 갤러리·드래그 선택 UI와 이미지 처리 유틸만 공유한다.
-- **상한**: 프로젝트당 2,000장 — 등급별 쿼터 테이블 없이 상수 하나(`MAX_PHOTOS_PER_CUSTOMER_PROJECT`).
-- **AI 분석**: 업로드 완료 모달에서 유사컷 묶기와 눈 감음·흐림 확인을 선택 실행한다. 작가 분석의 Gemini 클라이언트·그룹핑 알고리즘은 재사용하지만 저장소는 `customer_ai_*`/`customer_photo_groups`/`customer_quality_assessments`로 분리한다. 실행 중에는 업로드 툴바에 상태를 표시하고 완료 후 갤러리를 갱신한다.
-- **보정본 파일명 매칭**: 작가 플로우의 `lib/version-mapping.ts`(`buildVersionMapping` — 정확일치 → 접미사 제거 후 일치)를 그대로 재사용. 실패분은 화면에서 드롭다운으로 수동 지정.
-- **저장 실패 대응**: `real-store.tsx`의 셀렉/찜/별점/코멘트 저장은 최대 3회 재시도(backoff) 후에도 실패하면 낙관적 업데이트를 되돌리고 배너로 안내한다. 작가 플로우의 `SelectionContext.tsx`(폴링·필드별 버전 관리를 포함한 978줄)를 통째로 재사용하려 했으나 API 계약이 달라(`/api/c/**` 전제) 재사용 범위가 예상(~60줄)보다 훨씬 작았다 — 핵심 보장(실패가 조용히 사라지지 않는 것)만 축소 이식했다. 다른 참가자의 변경사항을 실시간으로 반영하는 폴링은 아직 없다(각 화면이 마운트 시 재조회하는 수준).
+## 3. 화면 설계 원칙
 
-## 5. 화면과 라우트 (실제 구현 기준)
+### 3.1 새 디자인을 만들지 않는다
 
-| 화면 | 경로 | 상태 |
+- 로그인·프로젝트 목록·프로젝트 생성: Photographer Light의 셸, 폼, 버튼, 액션바를 따른다.
+- 사진 업로드·관리: 작가 원본 업로드의 작업면, 가상화 갤러리, 선택·삭제, 정렬, 뷰어,
+  헤더 축소, 하단 고정 액션바를 따른다.
+- 사진 셀렉: 작가 고객 페이지의 셀렉 갤러리 카드, 필터, 상세 뷰어, 확정 풋터를 따른다.
+- 보정본 검토: 작가 고객 페이지의 보정본 검토 카드·상세 비교·판정 UI를 따른다.
+- 확인 모달·버튼·배지·빈 화면은 기존 공통 컴포넌트를 사용한다.
+
+셀프 고객 전용 컴포넌트는 인증 문구, 참가자 상태, 외부 작가 전달 등 도메인 차이가 있는 경우에만
+허용한다. 기존 컴포넌트를 복사해 이름만 바꾸지 않는다.
+
+### 3.2 대량 사진 작업면
+
+- 프로젝트당 상한은 **2,000장**이다.
+- PC에서는 사진 작업면이 가용 폭을 사용하며 모바일 폭 카드로 제한하지 않는다.
+- 상단 헤더·도구와 하단 주요 행동은 고정하고 갤러리만 독립 스크롤한다.
+- 갤러리는 가상화하고, 화면 근처 이미지만 제한된 동시성으로 로드한다.
+- 업로드는 20장씩 `압축 → 전송`해 전체 압축 결과를 메모리에 쌓지 않는다.
+- 파일명은 검색·정렬 또는 상세 식별에 필요한 곳에서만 표시한다.
+
+### 3.3 공통 컴포넌트 계약
+
+| 목적 | 기준 화면 | 사용해야 할 공통 코드 |
 |---|---|---|
-| 로그인 | `/customer-select/login` | 구현됨 |
-| 프로젝트 생성 | `/customer-select/new` | 구현됨 |
-| 사진 업로드 | `/customer-select/[projectId]/upload` | 구현됨 |
-| 셀렉 갤러리 | `/customer-select/[projectId]/select` | 구현됨 |
-| 최종 검토 | `/customer-select/[projectId]/review` | 구현됨 |
-| 작가 전달 결과 | `/customer-select/[projectId]/export` | 구현됨 |
-| 보정본 업로드+매칭 | `/customer-select/[projectId]/retouch/upload` | 구현됨 |
-| 원본·보정본 비교 | `/customer-select/[projectId]/retouch/compare` | 구현됨 |
-| 재보정 요청 전달 | `/customer-select/[projectId]/retouch/export` | 구현됨 |
-| 완료 | `/customer-select/[projectId]/done` | 구현됨 |
-| 내 프로젝트 목록(초안 S2) | `/customer-select` | 구현됨 — 로그인 후 기본 착지점, 상태별 다음 작업으로 이동 |
-| 프로젝트 설정/삭제(초안 S9) | — | **미구현** |
-| 공유 링크 관리 화면(초안 S14) | — | **미구현** — 링크는 셀렉 갤러리의 "공유" 버튼으로 즉시 클립보드 복사만 제공, 발급 중지·재발급 UI 없음 |
-| 실시간 참여 표시(1차 재미 요소) | — | **미구현** — 마일스톤·취향 일치율·의견 갈린 사진 필터는 구현, "접속 중" 배지는 없음 |
-| CSV/TXT 실제 다운로드 | — | **미구현** — 전달 화면에 버튼만 있고 비활성(복사만 실동작), 기존 `ProjectAssetsPageClient.tsx`의 `csvEscape`·`downloadTextFile` 로직을 그대로 옮기면 됨(단계 0 조사 결과) |
+| 페이지 셸·브랜드 | Photographer Light | `CustomerSelectShell`, `AcutLightTheme.module.css` |
+| 프로젝트 폼 | 작가 프로젝트 생성 | `ProjectFormFields`, `PhotographerLightPageFrame` |
+| 버튼·하단 행동 | 작가 Light 화면 | `PhotographerLightButton`, `PhotographerFormActionBar` |
+| 업로드 갤러리 | 작가 원본 업로드 | `PhotographerPhotoGallery`, `OriginalPhotoViewer` |
+| 헤더 축소 | 작가 원본 업로드 | `useCollapsibleAssetHeaderController` |
+| AI 제안 모달 | 작가 원본 업로드 | `AiAnalysisPromptModal` |
+| 고객 셀렉 카드 | 작가 고객 갤러리 | `GalleryPhotoCard` |
+| 셀렉 확정 풋터 | 작가 고객 갤러리 | `SelectionConfirmFooter` |
+| 이미지 로딩 | 양쪽 갤러리 | `createThumbLoadQueue` |
+| 파일 압축 | 작가 업로드 | `compressImagesInParallel` |
+| 보정본 파일 매칭 | 작가 보정본 업로드 | `buildVersionMapping` |
 
-접근·삭제 정책과 보관 만료 정책은 아직 정해지지 않았다 — Step 6/7 완료 보고에서
-남은 항목으로 표시했던 것과 동일하게 유효하다.
+공통 UI에 기능이 부족하면 우선 공통 컴포넌트를 확장한다. 셀프 고객 페이지 안에 비슷한 UI를
+다시 만들지 않는다.
 
-### 5.1 공통 ACUT 화면 기반 (2026-09-19)
+## 4. 화면별 목표와 현재 상태
 
-로그인·프로젝트 목록·새 프로젝트 화면은 작가 Light UI의 브랜드 토큰을
-`AcutLightTheme.module.css`로 공유한다. 고객 셀렉 전용으로 새 디자인 시스템을 복제하지 않고,
-참가자 상태·셀렉 갤러리 같은 도메인 UI만 전용으로 유지한다. PC는 `max-width: 1504px`
-작업 영역, 모바일은 단일 칼럼으로 반응형 배치한다. 로그인 후에는 새 프로젝트로 즉시
-보내지 않고 `/customer-select` 목록으로 이동한다. 전역 `body`도 ACUT 라이트 캔버스를
-기본값으로 사용하므로 고객 셀렉 화면이 별도의 다크 배경을 덮는 구조가 아니다.
-프로젝트 생성과 이후 업로드·검토·전달·보정본 흐름의 하단 행동 영역은
-`PhotographerFormActionBar`를 공유한다. 본문만 화면별 최대 폭에 맞추고 액션바의 surface와
-상단 divider는 화면 전체 폭을 사용한다.
-사진 업로드 화면은 `CustomerSelectShell` 안에서 작가 화면의 가상화 갤러리
-`PhotographerPhotoGallery`와 드래그 범위 선택을 재사용한다. 파일 드롭 업로드와 선택 삭제는
-셀프 고객 API 계약만 별도로 연결하며, 업로드 중 장수와 진행률은 공통 하단 액션바에 표시한다.
-선택한 파일은 `PhotographerPhotoGallery`에 로컬 blob 미리보기로 즉시 추가하고,
-`isPending`·`isUploading` 상태로 사진별 준비·전송 현황을 표시한다.
+`구현됨`은 기능이 존재한다는 뜻이며, `정렬 필요`는 초기 목업 기반 UI가 남아 공통 화면으로
+교체해야 한다는 뜻이다.
 
-## 6. 참고
+| 화면 | 경로 | 기준 화면 | 현재 상태 |
+|---|---|---|---|
+| 로그인 | `/customer-select/login` | Photographer Light 인증 | 구현됨 |
+| 프로젝트 목록 | `/customer-select` | 작가 대시보드/목록 | 구현됨, 카드·상태 표현 추가 점검 필요 |
+| 프로젝트 생성 | `/customer-select/new` | 작가 프로젝트 생성 | 공통 폼 적용됨 |
+| 사진 업로드·관리 | `/customer-select/[projectId]/upload` | 작가 원본 업로드 | 공통 갤러리·뷰어·액션바 적용됨 |
+| 셀렉 갤러리 | `/customer-select/[projectId]/select` | `/c/[token]/gallery` | 카드·확정 풋터 공유, 헤더·필터·상세 뷰어 추가 통합 필요 |
+| 최종 검토 | `/customer-select/[projectId]/review` | `/c/[token]/review` | 기능 구현됨, UI 정렬 필요 |
+| 작가 전달 | `/customer-select/[projectId]/export` | 프로젝트 결과 내보내기 | 기능 일부 구현, 실제 파일 다운로드 미구현 |
+| 보정본 업로드 | `/customer-select/[projectId]/retouch/upload` | 작가 보정본 업로드 | 기능 구현됨, UI 정렬 필요 |
+| 보정본 비교 | `/customer-select/[projectId]/retouch/compare` | 고객 보정본 상세 검토 | 기능 구현됨, 공통 뷰어 통합 필요 |
+| 재보정 전달 | `/customer-select/[projectId]/retouch/export` | 고객 재보정 결과 | 기능 구현됨, UI 정렬 필요 |
+| 완료 | `/customer-select/[projectId]/done` | 고객 완료 화면 | 기능 구현됨, UI 정렬 필요 |
+| 프로젝트 설정·삭제 | 미정 | 작가 프로젝트 설정 | 미구현 |
+| 공유 링크 관리 | 미정 | 작가 고객 링크 관리 | 미구현 |
 
-- 원래 기획 초안 전체(사용자 여정, 화면별 예외 처리, 미결정 질문 목록)는 세션 스크래치패드
-  `customer-select-step1.md`에 있다 — 저장소에 반영되지 않은 임시 파일이라 이 문서와 내용이
-  갈리면 **이 문서(및 실제 코드)를 신뢰**한다.
-- 관련 절: `architecture.md`의 "셀프 고객 셀렉 서비스" 절, `user-flow.md`의 같은 절.
+### 현재 UI 정리 순서
+
+1. 셀렉 갤러리의 헤더·필터·상세 뷰어를 작가 고객 갤러리와 통합
+2. 최종 검토 화면을 기존 고객 검토 카드·뷰어로 교체
+3. 보정본 업로드·비교 화면을 기존 보정 플로우 컴포넌트로 교체
+4. 전달·완료 화면의 임시 `ui.module.css` 의존 제거
+5. 프로젝트 목록·설정·공유 링크 관리 완성
+
+## 5. 데이터 모델
+
+작가 프로젝트와 소유권·인증·보관 정책이 다르므로 데이터는 분리한다.
+
+- `customer_projects`: 소유자, 프로젝트 정보, 목표 장수, 사진 수, 공유 토큰, 전달·보정 완료 플래그
+- `customer_photos`: 셀렉용 썸네일·프리뷰, 원본 파일명, 표시 순서, 유사컷 그룹
+- `customer_selections`: 공용 최종 선택·별점·코멘트와 참가자별 찜 색상
+- `customer_project_participants`: 비로그인 참가자의 색 슬롯·닉네임·완료 여부
+- `customer_photo_versions`: 사진별 보정본 회차와 확정·재보정 결정
+- `customer_ai_runs`, `customer_ai_embeddings`, `customer_photo_groups`,
+  `customer_quality_assessments`: 셀프 고객 사진의 유사컷·품질 분석
+
+모든 테이블은 RLS를 켜고 브라우저에서 직접 쓰지 않는다. Next.js API 또는 BE가 service role로
+처리한다. 참가자별 찜 변경은 `toggle_customer_selection_color` RPC로 원자 처리한다.
+
+## 6. 인증·권한
+
+- 소유자는 Supabase Auth의 Google/Kakao 로그인을 사용한다.
+- 참가자는 계정 없이 `share_token` 쿼리로 접근한다.
+- 참가자 색 슬롯은 브라우저의 `acut:customer-select:identity:{projectId}`에 저장한다.
+- Next.js API는 소유자 세션 또는 유효한 공유 토큰을 검사한다.
+- 업로드 BE는 소유자 JWT 또는 공유 토큰을 검사한다.
+
+공유 토큰은 참여 링크이지 강한 본인 인증 수단이 아니다. 링크 중지·재발급 UI가 생기기 전까지
+유출 대응 수단이 부족하다는 점을 운영상 명시한다.
+
+## 7. 업로드·삭제·AI
+
+- 셀렉용 이미지는 브라우저에서 1600px/0.82 JPEG 수준으로 축소한 뒤 20장 단위로 전송한다.
+- BE는 썸네일과 프리뷰만 R2에 저장하고 `customer_photos`를 만든다.
+- 파일 드롭, 개별 체크, 빈 영역 드래그 선택, `Cmd/Ctrl+A`, `Delete/Backspace`, `Esc`를 지원한다.
+- 삭제 시 사진 행의 cascade 데이터와 썸네일·프리뷰·보정본 R2 객체를 정리한다.
+- 업로드 완료 후 `AiAnalysisPromptModal`에서 유사컷 또는 눈 감음·흐림 분석을 선택한다.
+- AI 모델 호출과 그룹핑 알고리즘은 clip-service의 기존 구현을 재사용하지만 결과 테이블은 작가
+  프로젝트와 분리한다.
+
+테스트 기간에는 셀렉을 시작한 뒤에도 사진을 추가 업로드할 수 있다. 운영 전 정책은 다음이
+기본안이다.
+
+- 셀렉 진행 중 추가 업로드 허용
+- 선택 기록이 있는 사진 삭제 시 강한 확인 또는 제한
+- 셀렉 완료 후 업로드·삭제 잠금
+
+마지막 두 항목은 아직 확정·구현되지 않았다.
+
+## 8. 프로젝트 상태
+
+현재 별도 status 컬럼 없이 플래그와 사진 수로 목록의 다음 위치를 계산한다.
+
+| 조건 | 표시 상태 | 기본 이동 |
+|---|---|---|
+| `photo_count = 0` | 사진 업로드 전 | 업로드 |
+| `photo_count > 0`, `exported = false` | 셀렉 진행 | 셀렉 갤러리 |
+| `exported = true`, `retouch_done = false` | 보정본 대기 | 보정본 업로드 |
+| `retouch_done = true` | 완료 | 완료 화면 |
+
+이 구조는 간단하지만 검토 중·재보정 요청 중 같은 세부 상태를 표현하지 못한다. 실제 목록 UX에서
+구분이 필요해질 때만 명시적 status 도입을 검토한다.
+
+## 9. 운영·마이그레이션 안전 규칙
+
+작업 위치:
+
+- FE: `/Users/mykia/photo-selection/customer-select-worktree`
+- BE·clip-service: `/Users/mykia/photo-selection/customer-select-be-worktree`
+- 브랜치: 둘 다 `feature/customer-select`
+
+푸시·PR·머지는 명시적 승인 후에만 한다. 커밋은 작업 단위로 수시 진행한다.
+
+적용 완료 마이그레이션:
+
+- `20260919000000_add_customer_select_tables.sql`
+- `20260919010000_add_customer_selection_color_toggle.sql`
+- `20260919020000_add_customer_photos_urls.sql`
+- `20260919030000_fix_customer_projects_share_token_encoding.sql`
+- `20260919040000_add_customer_photo_versions.sql`
+- `20260920000000_add_customer_project_details.sql`
+- `20260920010000_add_customer_ai_analysis.sql`
+
+Supabase CLI의 마이그레이션 이력은 비어 있어 `supabase db push`를 실행하면 과거 파일 전체를
+재실행하려 한다. **`supabase db push`는 사용하지 않는다.** 새 SQL은 Dashboard SQL Editor 또는
+Management API `/database/query`로 해당 파일만 실행한다.
+
+로컬 테스트 기본값은 BE `8001`, FE `3002`, `BACKEND_URL=http://localhost:8001`이다. 서버를
+종료하기 전에 `ps` 또는 `lsof`로 포트 소유 프로세스를 확인한다.
+
+## 10. 남은 작업
+
+- 셀렉·검토·보정 화면의 공통 컴포넌트 통합
+- 프로젝트 설정·삭제
+- 공유 링크 중지·재발급·복사 관리 화면
+- 참여자 변경사항 실시간 반영 또는 짧은 폴링
+- CSV/TXT 실제 다운로드
+- 선택 기록이 있는 사진의 삭제 정책
+- 셀렉 완료 후 사진 변경 잠금 정책
+- 2,000장 업로드·스크롤·AI 분석 실측
+- 보정본 전체 흐름의 프로덕션 수준 회귀 검증
+- clip-service 변경 배포 검증
+
+## 11. 완료 조건
+
+셀프 고객 서비스가 완료됐다고 판단하려면 다음을 모두 만족해야 한다.
+
+- 모든 화면이 위 재사용 계약을 따르고 목업 전용 UI 복제가 남아 있지 않다.
+- 2,000장 프로젝트에서 업로드·스크롤·선택·삭제가 안정적으로 동작한다.
+- 소유자와 공유 참가자의 권한 경계가 검증된다.
+- 셀렉·찜·별점·코멘트가 실패 시 조용히 유실되지 않는다.
+- AI 분석 실패·재시도·완료 결과가 사용자에게 보인다.
+- 전달 파일 다운로드와 보정본 왕복 흐름이 실제 파일로 검증된다.
+- 프로덕션 마이그레이션·배포·회귀 테스트 절차가 기록된다.
