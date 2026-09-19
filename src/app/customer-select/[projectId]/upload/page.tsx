@@ -7,7 +7,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ImagePlus, Loader2, UploadCloud } from "lucide-react";
+import { ChevronLeft, ImagePlus, Loader2, Trash2, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -38,6 +38,8 @@ export default function CustomerUploadPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingPhotos, setPendingPhotos] = useState<Photo[]>([]);
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
   const [sort, setSort] = useState<"order-asc" | "order-desc" | "name-asc">("order-asc");
   const [viewerPhotoId, setViewerPhotoId] = useState<string | null>(null);
   const [thumbQueue] = useState(() => createThumbLoadQueue(12));
@@ -127,6 +129,30 @@ export default function CustomerUploadPage() {
     setUploading(false);
   }
 
+  async function deleteSelectedPhotos() {
+    if (!selectedPhotoIds.size || !window.confirm(`선택한 사진 ${selectedPhotoIds.size.toLocaleString()}장을 삭제할까요?`)) return;
+    setDeleting(true);
+    setError(null);
+    const {
+      data: { session },
+    } = await createClient().auth.getSession();
+    try {
+      const res = await fetch("/api/customer-select/upload/photos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+        body: JSON.stringify({ project_id: projectId, photo_ids: [...selectedPhotoIds], share_token: shareToken }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "사진 삭제 실패");
+      setSelectedPhotoIds(new Set());
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "사진을 삭제하지 못했습니다.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const displayName = project.name || "이름 없는 프로젝트";
   const displayedPhotos = useMemo(() => [...project.photos, ...pendingPhotos], [project.photos, pendingPhotos]);
   const sortedPhotos = useMemo(() => [...displayedPhotos].sort((a, b) => {
@@ -206,6 +232,15 @@ export default function CustomerUploadPage() {
               viewMode="grid"
               thumbQueue={thumbQueue}
               readonly
+              selectedPhotoIds={selectedPhotoIds}
+              selectionOnHover
+              onToggleSelected={(photoId) => setSelectedPhotoIds((current) => {
+                const next = new Set(current);
+                if (next.has(photoId)) next.delete(photoId); else next.add(photoId);
+                return next;
+              })}
+              onDragSelectionChange={setSelectedPhotoIds}
+              onEmptyClick={() => setSelectedPhotoIds(new Set())}
               mobileMinCols={2}
               mobileSquareMedia
               showMobileFilename
@@ -219,7 +254,10 @@ export default function CustomerUploadPage() {
           className="shrink-0"
           leading={uploadStatus}
           mobileLeading={uploadStatus}
-          actions={uploading ? null : <PhotographerLightButton disabled={project.photoCount === 0} onClick={() => router.push(`/customer-select/${projectId}/select${shareToken ? `?share_token=${shareToken}` : ""}`)}>셀렉 시작하기{project.photoCount > 0 ? ` (${project.photoCount}장)` : ""}</PhotographerLightButton>}
+          actions={uploading ? null : <>
+            {selectedPhotoIds.size > 0 ? <PhotographerLightButton variant="danger" pending={deleting} pendingLabel="삭제 중" onClick={deleteSelectedPhotos}><Trash2 size={16} />선택 삭제 ({selectedPhotoIds.size.toLocaleString()})</PhotographerLightButton> : null}
+            <PhotographerLightButton disabled={project.photoCount === 0 || deleting} onClick={() => router.push(`/customer-select/${projectId}/select${shareToken ? `?share_token=${shareToken}` : ""}`)}>셀렉 시작하기{project.photoCount > 0 ? ` (${project.photoCount}장)` : ""}</PhotographerLightButton>
+          </>}
         />
       </div>
 

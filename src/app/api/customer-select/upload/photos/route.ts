@@ -14,3 +14,15 @@ export async function POST(req: Request) {
   const text = await res.text();
   return new Response(text, { status: res.status, headers: { "Content-Type": "application/json" } });
 }
+
+export async function DELETE(req: Request) {
+  const auth = req.headers.get("Authorization") ?? "";
+  const body = await req.text();
+  const res = await fetch(`${BACKEND_URL}/api/customer-upload/photos`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", ...(auth ? { Authorization: auth } : {}) },
+    body,
+  });
+  const text = await res.text();
+  return new Response(text, { status: res.status, headers: { "Content-Type": "application/json" } });
+}
