@@ -21,6 +21,9 @@ export interface CustomerProjectRow {
   owner_id: string;
   name: string;
   shoot_type: string | null;
+  shoot_date: string | null;
+  selection_deadline: string | null;
+  studio_name: string | null;
   target_count: number;
   photo_count: number;
   share_token: string;
@@ -36,7 +39,7 @@ export async function resolveCustomerProjectAccess(
 ): Promise<{ project: CustomerProjectRow; isOwner: boolean } | NextResponse> {
   const { data: project, error } = await admin
     .from("customer_projects")
-    .select("id, owner_id, name, shoot_type, target_count, photo_count, share_token, exported, retouch_done")
+    .select("id, owner_id, name, shoot_type, shoot_date, selection_deadline, studio_name, target_count, photo_count, share_token, exported, retouch_done")
     .eq("id", projectId)
     .maybeSingle();
   if (error || !project) {
@@ -118,6 +121,9 @@ export function buildProjectView(
     id: project.id,
     name: project.name,
     shootType: project.shoot_type ?? "",
+    shootDate: project.shoot_date,
+    selectionDeadline: project.selection_deadline,
+    studioName: project.studio_name,
     target: project.target_count,
     photoCount: project.photo_count,
     uploaded: project.photo_count > 0,

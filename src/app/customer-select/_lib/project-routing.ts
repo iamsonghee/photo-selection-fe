@@ -2,6 +2,9 @@ export type CustomerProjectSummary = {
   id: string;
   name: string;
   shoot_type: string | null;
+  shoot_date: string | null;
+  selection_deadline: string | null;
+  studio_name: string | null;
   target_count: number;
   photo_count: number;
   exported: boolean;

@@ -67,11 +67,13 @@ export function ProjectFormSection({
   title,
   description,
   children,
+  required = true,
 }: {
   number: string;
   title: string;
   description: string;
   children: ReactNode;
+  required?: boolean;
 }) {
   return (
     <section data-project-form-section className="flex flex-col gap-4 overflow-hidden rounded-2xl border border-surface-raised bg-surface px-4 py-4 md:gap-6 md:px-8 md:py-6">
@@ -86,7 +88,7 @@ export function ProjectFormSection({
           </div>
         </div>
         <span className="shrink-0 whitespace-nowrap text-[12px] font-semibold text-subtle-foreground md:text-[14px]">
-          <span className="text-accent">*</span> <span className="md:hidden">필수</span><span className="hidden md:inline">필수입력</span>
+          {required ? <><span className="text-accent">*</span> <span className="md:hidden">필수</span><span className="hidden md:inline">필수입력</span></> : "선택입력"}
         </span>
       </div>
       {children}

@@ -12,7 +12,7 @@ export default async function CustomerSelectHomePage() {
 
   const { data, error } = await getAdminClient()
     .from("customer_projects")
-    .select("id, name, shoot_type, target_count, photo_count, exported, retouch_done, created_at")
+    .select("id, name, shoot_type, shoot_date, selection_deadline, studio_name, target_count, photo_count, exported, retouch_done, created_at")
     .eq("owner_id", ownerId)
     .order("created_at", { ascending: false });
   const projects = (data ?? []) as CustomerProjectSummary[];
@@ -44,7 +44,8 @@ export default async function CustomerSelectHomePage() {
                     <strong className="min-w-0 truncate text-[17px] font-bold">{project.name}</strong>
                     <span className="shrink-0 rounded-md bg-customer-soft px-2 py-1 text-[11px] font-bold text-primary">{customerProjectStatus(project)}</span>
                   </div>
-                  <p className="mt-3 text-[13px] text-muted-foreground">{project.shoot_type ?? "촬영"} · {project.photo_count}장 · 목표 {project.target_count}장</p>
+                  <p className="mt-3 text-[13px] text-muted-foreground">{[project.studio_name, project.shoot_type ?? "촬영", project.shoot_date?.replaceAll("-", ".")].filter(Boolean).join(" · ")}</p>
+                  <p className="mt-1 text-[12px] text-subtle-foreground">{project.photo_count}장 · 목표 {project.target_count}장{project.selection_deadline ? ` · 셀렉 마감 ${project.selection_deadline.replaceAll("-", ".")}` : ""}</p>
                 </div>
               </Link>
             ))}

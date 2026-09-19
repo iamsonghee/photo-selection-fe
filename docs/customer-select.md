@@ -17,9 +17,12 @@
 
 ## 2. 데이터 모델
 
-마이그레이션: `supabase/migrations/20260919*.sql` (5개, 순서대로 적용).
+초기 마이그레이션: `supabase/migrations/20260919*.sql` (5개, 프로덕션 적용 완료).
+추가 프로젝트 정보는 `20260920000000_add_customer_project_details.sql`에 있으며,
+CLI 이력과 맞지 않으므로 `supabase db push`가 아니라 대시보드 SQL Editor 또는
+Management API로 이 파일만 실행한다.
 
-- **`customer_projects`**: `owner_id`(auth.users 참조), `name`, `shoot_type`, `target_count`(참고용 가이드, 강제 아님), `photo_count`, `share_token`(hex, 참가자 인증용), `exported`, `retouch_done`
+- **`customer_projects`**: `owner_id`(auth.users 참조), `name`, `shoot_type`, `shoot_date`·`selection_deadline`·`studio_name`(선택 입력), `target_count`(참고용 가이드, 강제 아님), `photo_count`, `share_token`(hex, 참가자 인증용), `exported`, `retouch_done`
 - **`customer_photos`**: 원본 파일명 유지, `thumb_url`/`preview_url`(BE 업로드 응답을 그대로 저장 — R2_PUBLIC_URL이 설정돼 있어 presign 단계 불필요)
 - **`customer_selections`**: 사진당 1행. `rating`/`comment`는 프로젝트 공용, `color_tags`(text[])로 참가자별 찜 여부만 구분 — 작가 플로우의 `selections.color_tags`와 같은 설계
 - **`customer_photo_versions`**: 사진 1장에 여러 회차의 보정본(무제한 재보정 — 작가 플로우 v1/v2 상한과 다름). `round`/`decision`(pending·confirmed·redo)/`redo_reason`

@@ -8,6 +8,7 @@ import { PhotographerFormActionBar } from "@/components/photographer/Photographe
 import {
   PROJECT_FORM_INPUT_CLASS,
   ProjectFormField,
+  ProjectFormDateInput,
   ProjectFormInput,
   ProjectFormPageHeading,
   ProjectFormSection,
@@ -20,6 +21,9 @@ export function NewCustomerProjectForm() {
   const [name, setName] = useState("");
   const [shootType, setShootType] = useState<string | null>(null);
   const [target, setTarget] = useState("30");
+  const [shootDate, setShootDate] = useState("");
+  const [selectionDeadline, setSelectionDeadline] = useState("");
+  const [studioName, setStudioName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -41,7 +45,14 @@ export function NewCustomerProjectForm() {
       const res = await fetch("/api/customer-select/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), shootType, target: Number(target) }),
+        body: JSON.stringify({
+          name: name.trim(),
+          shootType,
+          target: Number(target),
+          shootDate: shootDate || null,
+          selectionDeadline: selectionDeadline || null,
+          studioName: studioName.trim() || null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "생성 실패");
@@ -95,6 +106,37 @@ export function NewCustomerProjectForm() {
                 </div>
               </ProjectFormField>
             </div>
+            </ProjectFormSection>
+
+            <ProjectFormSection number="02" title="일정 및 작가 정보" description="프로젝트를 찾고 전달할 때 필요한 정보를 선택해서 입력해 주세요." required={false}>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <ProjectFormField label="촬영일">
+                  <ProjectFormDateInput
+                    className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(shootDate) })}`}
+                    value={shootDate}
+                    onChange={(event) => setShootDate(event.target.value)}
+                    onClick={(event) => event.currentTarget.showPicker?.()}
+                  />
+                </ProjectFormField>
+                <ProjectFormField label="셀렉 마감일">
+                  <ProjectFormDateInput
+                    className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(selectionDeadline) })}`}
+                    value={selectionDeadline}
+                    min={shootDate || undefined}
+                    onChange={(event) => setSelectionDeadline(event.target.value)}
+                    onClick={(event) => event.currentTarget.showPicker?.()}
+                  />
+                </ProjectFormField>
+              </div>
+              <ProjectFormField label="작가·스튜디오명">
+                <ProjectFormInput
+                  maxLength={100}
+                  className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(studioName) })}`}
+                  value={studioName}
+                  onChange={(event) => setStudioName(event.target.value)}
+                  placeholder="예: 오렌지스튜디오"
+                />
+              </ProjectFormField>
             </ProjectFormSection>
           </div>
         </div>
