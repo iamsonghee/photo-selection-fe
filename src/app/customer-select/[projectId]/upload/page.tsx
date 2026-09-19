@@ -1,18 +1,23 @@
 "use client";
 
 /**
- * S4 — 사진 업로드. 원본 파일명을 유지한 채 브라우저에서 직접 서버(BE 커스텀 업로드
- * 엔드포인트)로 올린다 — 압축 없이 그대로 전송하고, 썸네일·프리뷰 생성은 BE가 담당한다
- * (원본 파일 리사이즈 파이프라인은 작가 플로우 전용이라 여기서는 재사용하지 않음, 단계 6 결정).
+ * S4 — 사진 업로드. 원본 파일명은 유지하되, 전송 전 브라우저에서 해상도·용량을 줄인다 —
+ * 작가 업로드 화면이 쓰는 압축 유틸(upload-client-compress.ts)이 identity 비의존이라
+ * 그대로 재사용한다(단계 0 분석 결과). 압축된 결과만 BE로 전송, 썸네일·프리뷰 생성은 BE 담당.
  */
 import { useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { BrandLogoBar } from "@/components/BrandLogo";
+import { compressImagesInParallel } from "@/lib/upload-client-compress";
+import { UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
 import { useCustomerSelectStore } from "../../_lib/real-store";
 import ui from "../../_lib/ui.module.css";
 
 const BATCH_SIZE = 20;
+// ponytail: 작가 화면의 PC/모바일 적응형 동시성 대신 고정값 하나만 쓴다 — 고객 프로젝트는
+// 동시 대량 업로드 규모가 작아 그 정교함이 필요 없다. 문제가 실측되면 그때 분리한다.
+const COMPRESS_POOL_SIZE = 3;
 
 export default function CustomerUploadPage() {
   const params = useParams();
@@ -38,7 +43,18 @@ export default function CustomerUploadPage() {
     } = await createClient().auth.getSession();
     const authHeader: Record<string, string> = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
 
-    const list = Array.from(files);
+    let list: File[];
+    try {
+      list = await compressImagesInParallel(
+        Array.from(files),
+        new AbortController().signal,
+        COMPRESS_POOL_SIZE,
+        { maxEdge: UPLOAD_INTERMEDIATE_MAX_EDGE, jpegQuality: UPLOAD_INTERMEDIATE_JPEG_QUALITY }
+      );
+    } catch {
+      list = Array.from(files); // 압축 실패 시 원본 그대로 업로드(작가 화면과 동일한 폴백 원칙)
+    }
+
     let uploaded = 0;
     for (let i = 0; i < list.length; i += BATCH_SIZE) {
       const batch = list.slice(i, i + BATCH_SIZE);
