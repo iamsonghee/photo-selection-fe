@@ -196,11 +196,14 @@ export default function NewProjectPage() {
   // 한도 초과 — 폼 대신 안내 화면 바로 표시(서버도 동일하게 검증하지만, 폼을 채우기 전에 미리 안내)
   if (atLimit) {
     const heading = quota.tier === "beta" ? "베타 프로젝트 한도 도달" : wasBetaBeforeGeneral ? "베타 이용 기간 종료" : "무료 체험 한도 도달";
+    const canApply = quota.tier === "general"
+      && !wasBetaBeforeGeneral
+      && quota.betaApplicationStatus === null;
     const desc = quota.tier === "beta"
       ? <>베타 기간 중 최대 {quota.max}개의 프로젝트를 생성할 수 있습니다.<br />현재 <strong className="text-foreground">{quota.current} / {quota.max}개</strong> 사용 중입니다.</>
       : wasBetaBeforeGeneral
         ? <>베타 이용 기간이 종료되었습니다.<br />기존 프로젝트는 계속 이용하실 수 있습니다.</>
-        : <>무료 체험에서는 프로젝트 {quota.max}개까지 생성할 수 있습니다.<br />더 이용하시려면 베타 참여를 문의해주세요.</>;
+        : <>무료 체험에서는 프로젝트 {quota.max}개까지 생성할 수 있습니다.<br />현재 <strong className="text-foreground">{quota.current} / {quota.max}개</strong> 사용 중입니다.</>;
     return (
       <div
         className={`${themeStyles.lightTheme} min-h-screen bg-background text-foreground`}
@@ -226,13 +229,34 @@ export default function NewProjectPage() {
             <h2 className="text-xl font-bold text-foreground mb-2">{heading}</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => router.push("/photographer/projects")}
-            className="px-6 py-2.5 bg-accent text-[var(--accent-foreground)] text-sm font-bold rounded-xl hover:bg-[#ff5e1a] transition-colors"
-          >
-            프로젝트 목록으로
-          </button>
+          {quota.betaApplicationStatus !== null && quota.betaApplicationStatus !== "rejected" ? (
+            <BetaApprovalBanner
+              tier={quota.tier}
+              betaApplicationStatus={quota.betaApplicationStatus}
+              maxProjects={quota.max ?? 0}
+              maxPhotosPerProject={quota.maxPhotosPerProject ?? 0}
+            />
+          ) : quota.betaApplicationStatus === "rejected" ? (
+            <p className="text-sm text-muted-foreground">베타 신청 결과는 안내받은 내용을 확인해 주세요.</p>
+          ) : null}
+          <div className="flex flex-wrap justify-center gap-2">
+            <PhotographerLightButton
+              type="button"
+              variant={canApply ? "secondary" : "primary"}
+              onClick={() => router.push("/photographer/projects")}
+            >
+              프로젝트 목록으로
+            </PhotographerLightButton>
+            {canApply ? (
+              <PhotographerLightButton
+                type="button"
+                variant="primary"
+                onClick={() => router.push("/beta/apply")}
+              >
+                베타 참여 신청하기
+              </PhotographerLightButton>
+            ) : null}
+          </div>
         </div>
       </div>
     );

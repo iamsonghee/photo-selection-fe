@@ -3,11 +3,14 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuota } from "@/contexts/QuotaContext";
+import type { PhotographerQuota } from "@/app/api/photographer/quota/route";
 
 export type ProjectLimitInfo = {
   tier: "admin" | "beta" | "general";
   current: number;
   max: number;
+  betaStatus: PhotographerQuota["betaStatus"];
+  betaApplicationStatus: PhotographerQuota["betaApplicationStatus"];
 };
 
 /**
@@ -25,7 +28,13 @@ export function useNewProjectGate() {
   const handleNewProject = useCallback(async () => {
     const data = await refetch();
     if (data?.max !== null && data?.max !== undefined && data.current >= data.max) {
-      setLimitInfo({ tier: data.tier, current: data.current, max: data.max });
+      setLimitInfo({
+        tier: data.tier,
+        current: data.current,
+        max: data.max,
+        betaStatus: data.betaStatus,
+        betaApplicationStatus: data.betaApplicationStatus,
+      });
       return;
     }
     router.push("/photographer/projects/new");
