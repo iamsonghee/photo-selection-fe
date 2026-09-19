@@ -267,15 +267,15 @@ export default function CustomerUploadPage() {
 
   if (!hydrated) {
     return (
-      <CustomerSelectShell>
+      <CustomerSelectShell viewportLocked>
         <main className="grid flex-1 place-items-center"><span className="size-6 animate-spin rounded-full border-2 border-accent/20 border-t-accent" /></main>
       </CustomerSelectShell>
     );
   }
 
   return (
-    <CustomerSelectShell>
-      <div className="flex h-[calc(100dvh-64px)] min-h-0 flex-1 flex-col overflow-hidden">
+    <CustomerSelectShell viewportLocked>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden onChange={(event) => handleFiles(event.target.files)} />
 
         <header data-upload-header-mode={compactHeader ? "compact" : "expanded"} className={`shrink-0 overflow-hidden border-b border-border-subtle bg-background px-4 transition-[padding] duration-200 md:px-8 ${compactHeader ? "py-1" : "py-3"}`}>

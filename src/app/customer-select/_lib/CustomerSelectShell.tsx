@@ -3,10 +3,10 @@ import type { ReactNode } from "react";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import theme from "@/styles/AcutLightTheme.module.css";
 
-export function CustomerSelectShell({ children, navigation = true }: { children: ReactNode; navigation?: boolean }) {
+export function CustomerSelectShell({ children, navigation = true, viewportLocked = false }: { children: ReactNode; navigation?: boolean; viewportLocked?: boolean }) {
   return (
-    <div className={`${theme.lightTheme} flex min-h-dvh flex-col bg-background text-foreground`}>
-      <header className="border-b border-border-subtle bg-surface">
+    <div className={`${theme.lightTheme} flex min-h-dvh flex-col bg-background text-foreground ${viewportLocked ? "h-dvh overflow-hidden" : ""}`}>
+      <header className="shrink-0 border-b border-border-subtle bg-surface">
         <div className="mx-auto flex h-16 w-full max-w-[1504px] items-center gap-6 px-5 md:px-8">
           <BrandLogoBar href="/customer-select" variant="default" />
           {navigation ? (
