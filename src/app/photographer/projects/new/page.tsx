@@ -93,7 +93,9 @@ export default function NewProjectPage() {
     if (!profile || defaultsAppliedRef.current) return;
     defaultsAppliedRef.current = true;
     setIncludeOriginal(profile.defaultIncludeOriginal);
-    setDeadline(format(addDays(new Date(), profile.defaultSelectionDeadlineDays), "yyyy-MM-dd"));
+    if (profile.defaultSelectionDeadlineDays !== null) {
+      setDeadline(format(addDays(new Date(), profile.defaultSelectionDeadlineDays), "yyyy-MM-dd"));
+    }
   }, [profile]);
 
   const handleSubmit = async (goToUpload: boolean) => {
@@ -408,20 +410,6 @@ export default function NewProjectPage() {
                 onCheckedChange={setIncludeOriginal}
                 ariaLabel="원본 다운로드 허용"
               />
-
-              {profile ? (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-raised px-4 py-3 text-xs text-muted-foreground">
-                  <span>
-                    셀렉 마감 {profile.defaultSelectionDeadlineDays}일
-                    {includeOriginal
-                      ? ` · ${profile.defaultUploadStrategy === "preview_first" ? "빠른 셀렉 요청" : "원본까지 준비 후 요청"}`
-                      : ""}
-                  </span>
-                  <button type="button" className="font-bold text-accent" onClick={() => router.push("/photographer/settings")}>
-                    기본 설정 변경
-                  </button>
-                </div>
-              ) : null}
 
               <ProjectPinControl value={accessPin} onChange={setAccessPin} />
             </ProjectFormSection>

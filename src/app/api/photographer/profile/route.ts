@@ -23,7 +23,7 @@ export interface PhotographerProfile {
   instagramUrl: string | null;
   portfolioUrl: string | null;
   contactPhone: string | null;
-  defaultSelectionDeadlineDays: number;
+  defaultSelectionDeadlineDays: number | null;
   defaultIncludeOriginal: boolean;
   defaultUploadStrategy: "preview_first" | "parallel";
   createdAt: string;
@@ -108,7 +108,7 @@ export async function GET() {
       instagramUrl: (row.instagram_url as string | null) ?? null,
       portfolioUrl: (row.portfolio_url as string | null) ?? null,
       contactPhone: (row.contact_phone as string | null) ?? null,
-      defaultSelectionDeadlineDays: (row.default_selection_deadline_days as number | null) ?? 30,
+      defaultSelectionDeadlineDays: (row.default_selection_deadline_days as number | null) ?? null,
       defaultIncludeOriginal: (row.default_include_original as boolean | null) ?? false,
       defaultUploadStrategy: row.default_upload_strategy === "preview_first" ? "preview_first" : "parallel",
       createdAt: row.created_at as string,
@@ -155,7 +155,7 @@ export async function PATCH(req: NextRequest) {
     if (typeof body.contact_phone === "string") payload.contact_phone = body.contact_phone;
     else if (body.contact_phone === null) payload.contact_phone = null;
     if ("default_selection_deadline_days" in body) {
-      if (!Number.isInteger(body.default_selection_deadline_days) || body.default_selection_deadline_days < 1 || body.default_selection_deadline_days > 365) {
+      if (body.default_selection_deadline_days !== null && (!Number.isInteger(body.default_selection_deadline_days) || body.default_selection_deadline_days < 1 || body.default_selection_deadline_days > 365)) {
         return NextResponse.json({ error: "셀렉 마감 기본 기간은 1~365일로 입력해주세요." }, { status: 400 });
       }
       payload.default_selection_deadline_days = body.default_selection_deadline_days;

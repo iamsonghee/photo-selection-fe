@@ -131,7 +131,7 @@ export default function SettingsPage() {
   const [editPhone, setEditPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [defaultDeadlineDays, setDefaultDeadlineDays] = useState("30");
+  const [defaultDeadlineDays, setDefaultDeadlineDays] = useState("");
   const [defaultIncludeOriginal, setDefaultIncludeOriginal] = useState(false);
   const [defaultUploadStrategy, setDefaultUploadStrategy] = useState<"preview_first" | "parallel">("parallel");
   const [savingDefaults, setSavingDefaults] = useState(false);
@@ -158,7 +158,7 @@ export default function SettingsPage() {
     );
     setEditPortfolio(ctxProfile.portfolioUrl ?? "");
     setEditPhone(ctxProfile.contactPhone ?? "");
-    setDefaultDeadlineDays(String(ctxProfile.defaultSelectionDeadlineDays));
+    setDefaultDeadlineDays(ctxProfile.defaultSelectionDeadlineDays === null ? "" : String(ctxProfile.defaultSelectionDeadlineDays));
     setDefaultIncludeOriginal(ctxProfile.defaultIncludeOriginal);
     setDefaultUploadStrategy(ctxProfile.defaultUploadStrategy);
   }, [ctxProfile, profile]);
@@ -230,8 +230,8 @@ export default function SettingsPage() {
 
   const handleDefaultsSave = async () => {
     if (!profile) return;
-    const days = Number(defaultDeadlineDays);
-    if (!Number.isInteger(days) || days < 1 || days > 365) {
+    const days = defaultDeadlineDays === "" ? null : Number(defaultDeadlineDays);
+    if (days !== null && (!Number.isInteger(days) || days < 1 || days > 365)) {
       setDefaultsError("셀렉 마감 기본 기간은 1~365일로 입력해주세요.");
       return;
     }
