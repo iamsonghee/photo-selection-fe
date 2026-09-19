@@ -120,7 +120,7 @@ export default function CustomerSelectGalleryPage() {
   }
 
   return (
-    <div style={{ minHeight: "100dvh", background: "#f3f4f5", fontFamily: "'Pretendard','Pretendard Variable',-apple-system,sans-serif" }}>
+    <div className={ui.selectWorkspace}>
       <NicknamePrompt projectId={projectId} />
       {saveError && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 20px", background: "#fff0ea", borderBottom: "1px solid #ffd9c2", fontSize: 12.5, color: "#ff4d00", fontWeight: 600 }}>
@@ -130,11 +130,11 @@ export default function CustomerSelectGalleryPage() {
           </button>
         </div>
       )}
-      <div style={{ maxWidth: 1440, margin: "0 auto", background: "#fff", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
+      <div className={ui.selectFrame}>
         {/* 헤더 */}
-        <div style={{ padding: "14px 20px 10px", borderBottom: "1px solid #dde1e4", display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <strong style={{ fontSize: 15, color: "#191918" }}>{project.name || "이름 없는 프로젝트"}</strong>
+        <div className={ui.selectHeader}>
+          <div className={ui.selectHeaderTop}>
+            <strong className={ui.selectProjectName}>{project.name || "이름 없는 프로젝트"}</strong>
             <span style={{ flex: 1 }} />
             {activeParticipants(project).map((p) => {
               const isDone = project.participantDone[p.id];
@@ -159,24 +159,24 @@ export default function CustomerSelectGalleryPage() {
               );
             })}
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: "#5f5e5b" }}>
+          <div className={ui.selectStats}>
             <span>
               선택 <strong style={{ color: "#191918", fontSize: 14 }}>{selectedCount}</strong> / {target}장
             </span>
             <span>검토 {reviewedCount} / {project.photos.length}</span>
           </div>
-          <div style={{ height: 6, borderRadius: 999, background: "#ecebe8", overflow: "hidden" }}>
+          <div className={ui.selectProgress}>
             <div style={{ width: `${Math.min(100, (reviewedCount / Math.max(1, project.photos.length)) * 100)}%`, height: "100%", background: "#ff4d00" }} />
           </div>
           {match !== null && (
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
+            <div className={ui.selectInsights}>
               <span style={{ color: "#0f8a5f", fontWeight: 700 }}>
                 {justHit ? `🎉 ${justHit}장 검토 완료!` : disagreeCount ? `의견 갈린 사진 ${disagreeCount}장` : ""}
               </span>
               <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#ff4d00", fontWeight: 700 }}>취향 일치율 {match}%</span>
             </div>
           )}
-          <div className={ui.chipRow} style={{ flexWrap: "nowrap", overflowX: "auto", paddingBottom: 2 }}>
+          <div className={ui.selectTabs}>
             <button type="button" className={`${ui.chip} ${tab === "all" ? ui.chipOn : ""}`} onClick={() => setTab("all")}>
               전체 {project.photos.length}
             </button>
@@ -193,13 +193,13 @@ export default function CustomerSelectGalleryPage() {
         </div>
 
         {/* 그리드 */}
-        <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
+        <div className={ui.selectGallery}>
           {list.length === 0 ? (
             <p className={ui.supportText} style={{ textAlign: "center", padding: "40px 10px" }}>
               조건에 맞는 사진이 없어요
             </p>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 }}>
+            <div className={ui.selectGrid}>
               {list.map((p) => {
                 const isSel = selectedIds.has(p.id);
                 const state = project.photoStates[p.id];
@@ -209,16 +209,7 @@ export default function CustomerSelectGalleryPage() {
                     key={p.id}
                     type="button"
                     onClick={() => setOpenPhotoId(p.id)}
-                    style={{
-                      aspectRatio: "1",
-                      borderRadius: 4,
-                      overflow: "hidden",
-                      position: "relative",
-                      border: isSel ? "2.5px solid #ff4d00" : "2.5px solid transparent",
-                      padding: 0,
-                      cursor: "pointer",
-                      background: "#eee",
-                    }}
+                    className={`${ui.selectCard} ${isSel ? ui.selectCardSelected : ""}`}
                   >
                     <img src={p.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                     {state?.comment && <span style={{ position: "absolute", top: 5, left: 5, fontSize: 11 }}>💬</span>}
@@ -263,7 +254,7 @@ export default function CustomerSelectGalleryPage() {
         </div>
 
         {/* 하단 액션 — 기존 SelectionConfirmFooter 재사용(customerLight 테마) */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 20px 10px", justifyContent: "flex-end" }}>
+        <div className={ui.selectActions}>
           <button
             type="button"
             className={`${ui.btn} ${ui.btnSm}`}
