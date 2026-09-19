@@ -86,6 +86,8 @@ interface StoreValue {
   toggleDone: (identity: ColorTag) => void;
   setNickname: (nickname: string) => void;
   refresh: () => Promise<void>;
+  saveError: string | null;
+  clearSaveError: () => void;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -112,13 +114,32 @@ export function CustomerSelectStoreProvider({
     return (await res.json()) as { project: ProjectView; isOwner: boolean };
   }, [projectId, shareToken]);
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  /**
+   * 저장 실패 시 최대 2회 재시도(짧은 backoff) 후에도 실패하면 낙관적 업데이트를
+   * 되돌리고 사용자에게 알린다 — 네트워크가 끊겨도 변경이 조용히 유실되지 않게 하는
+   * 최소한의 보장이다(SelectionContext.tsx의 flushPatch/flushSelection과 같은 원칙,
+   * 다만 폴링·버전 관리 없이 "이번 요청 하나"의 성공/실패만 다룬다 — 1차 범위에 맞춘 축소판).
+   */
   const apiPost = useCallback(
-    async (path: string, body: Record<string, unknown>) => {
-      await fetch(`/api/customer-select/projects/${projectId}${path}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(shareToken ? { ...body, share_token: shareToken } : body),
-      }).catch(() => {});
+    async (path: string, body: Record<string, unknown>, onFinalFailure?: () => void) => {
+      const payload = JSON.stringify(shareToken ? { ...body, share_token: shareToken } : body);
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const res = await fetch(`/api/customer-select/projects/${projectId}${path}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: payload,
+          });
+          if (res.ok) return;
+        } catch {
+          /* 네트워크 오류 — 아래에서 재시도 */
+        }
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+      }
+      onFinalFailure?.();
+      setSaveError("저장하지 못했습니다. 인터넷 연결을 확인해 주세요.");
     },
     [projectId, shareToken]
   );
@@ -178,61 +199,87 @@ export function CustomerSelectStoreProvider({
 
   const toggleSelect = useCallback(
     (photoId: string) => {
+      const hadBefore = project.selectedIds.includes(photoId);
       setProject((prev) => {
         const has = prev.selectedIds.includes(photoId);
         const next = has ? prev.selectedIds.filter((id) => id !== photoId) : [...prev.selectedIds, photoId];
-        apiPost("/selections", { photo_id: photoId, is_selected: !has });
         return { ...prev, selectedIds: next };
       });
+      apiPost("/selections", { photo_id: photoId, is_selected: !hadBefore }, () => {
+        setProject((prev) => ({
+          ...prev,
+          selectedIds: hadBefore ? [...prev.selectedIds, photoId] : prev.selectedIds.filter((id) => id !== photoId),
+        }));
+      });
     },
-    [apiPost]
+    [apiPost, project.selectedIds]
   );
 
   const toggleLike = useCallback(
     (photoId: string, identity: ColorTag) => {
+      const hadBefore = project.photoStates[photoId]?.color?.includes(identity) ?? false;
       setProject((prev) => {
         const current = prev.photoStates[photoId]?.color ?? [];
-        const has = current.includes(identity);
-        const nextColor = has ? current.filter((c) => c !== identity) : [...current, identity];
-        apiPost("/selections", { photo_id: photoId, color_op: { color: identity, add: !has } });
+        const nextColor = hadBefore ? current.filter((c) => c !== identity) : [...current, identity];
         return { ...prev, photoStates: { ...prev.photoStates, [photoId]: { ...prev.photoStates[photoId], color: nextColor } } };
       });
+      // 색상은 서버 RPC가 원자적으로 병합하므로 최종 실패해도 "이번 시도"만 되돌린다 —
+      // 그 사이 다른 색을 추가했을 수 있는 다른 필드는 건드리지 않는다.
+      apiPost("/selections", { photo_id: photoId, color_op: { color: identity, add: !hadBefore } }, () => {
+        setProject((prev) => {
+          const current = prev.photoStates[photoId]?.color ?? [];
+          const reverted = hadBefore ? [...current, identity] : current.filter((c) => c !== identity);
+          return { ...prev, photoStates: { ...prev.photoStates, [photoId]: { ...prev.photoStates[photoId], color: reverted } } };
+        });
+      });
     },
-    [apiPost]
+    [apiPost, project.photoStates]
   );
 
   const setStar = useCallback(
     (photoId: string, star: StarRating | 0) => {
+      const prevRating = project.photoStates[photoId]?.rating;
       setProject((prev) => ({
         ...prev,
         photoStates: { ...prev.photoStates, [photoId]: { ...prev.photoStates[photoId], rating: star === 0 ? undefined : star } },
       }));
-      apiPost("/selections", { photo_id: photoId, rating: star === 0 ? null : star });
+      apiPost("/selections", { photo_id: photoId, rating: star === 0 ? null : star }, () => {
+        setProject((prev) => ({
+          ...prev,
+          photoStates: { ...prev.photoStates, [photoId]: { ...prev.photoStates[photoId], rating: prevRating } },
+        }));
+      });
     },
-    [apiPost]
+    [apiPost, project.photoStates]
   );
 
   const setComment = useCallback(
     (photoId: string, text: string) => {
+      const prevComment = project.photoStates[photoId]?.comment;
       const trimmed = text.trim() || undefined;
       setProject((prev) => ({
         ...prev,
         photoStates: { ...prev.photoStates, [photoId]: { ...prev.photoStates[photoId], comment: trimmed } },
       }));
-      apiPost("/selections", { photo_id: photoId, comment: trimmed ?? null });
+      apiPost("/selections", { photo_id: photoId, comment: trimmed ?? null }, () => {
+        setProject((prev) => ({
+          ...prev,
+          photoStates: { ...prev.photoStates, [photoId]: { ...prev.photoStates[photoId], comment: prevComment } },
+        }));
+      });
     },
-    [apiPost]
+    [apiPost, project.photoStates]
   );
 
   const toggleDone = useCallback(
     (identity: ColorTag) => {
-      setProject((prev) => {
-        const next = !prev.participantDone[identity];
-        apiPost("/participants", { color: identity, done: next });
-        return { ...prev, participantDone: { ...prev.participantDone, [identity]: next } };
+      const prevDone = project.participantDone[identity];
+      setProject((prev) => ({ ...prev, participantDone: { ...prev.participantDone, [identity]: !prevDone } }));
+      apiPost("/participants", { color: identity, done: !prevDone }, () => {
+        setProject((prev) => ({ ...prev, participantDone: { ...prev.participantDone, [identity]: prevDone } }));
       });
     },
-    [apiPost]
+    [apiPost, project.participantDone]
   );
 
   const setNickname = useCallback(
@@ -248,9 +295,14 @@ export function CustomerSelectStoreProvider({
     return `${window.location.origin}/customer-select/${projectId}/select?share_token=${project.shareToken}`;
   }, [projectId, project.shareToken]);
 
+  const clearSaveError = useCallback(() => setSaveError(null), []);
+
   const value = useMemo<StoreValue>(
-    () => ({ project, hydrated, isOwner, currentIdentity, shareUrl, update, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, refresh }),
-    [project, hydrated, isOwner, currentIdentity, shareUrl, update, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, refresh]
+    () => ({
+      project, hydrated, isOwner, currentIdentity, shareUrl, update, toggleSelect, toggleLike,
+      setStar, setComment, toggleDone, setNickname, refresh, saveError, clearSaveError,
+    }),
+    [project, hydrated, isOwner, currentIdentity, shareUrl, update, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, refresh, saveError, clearSaveError]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

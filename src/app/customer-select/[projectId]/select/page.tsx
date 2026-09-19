@@ -48,7 +48,7 @@ export default function CustomerSelectGalleryPage() {
   const projectId = params.projectId as string;
   const router = useRouter();
   const shareToken = useSearchParams().get("share_token");
-  const { project, hydrated, currentIdentity, shareUrl, toggleSelect, toggleLike, setStar, setComment, toggleDone } =
+  const { project, hydrated, currentIdentity, shareUrl, toggleSelect, toggleLike, setStar, setComment, toggleDone, saveError, clearSaveError } =
     useCustomerSelectStore();
 
   const [tab, setTab] = useState<Tab>("all");
@@ -122,6 +122,14 @@ export default function CustomerSelectGalleryPage() {
   return (
     <div style={{ minHeight: "100dvh", background: "#f3f4f5", fontFamily: "'Pretendard','Pretendard Variable',-apple-system,sans-serif" }}>
       <NicknamePrompt projectId={projectId} />
+      {saveError && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 20px", background: "#fff0ea", borderBottom: "1px solid #ffd9c2", fontSize: 12.5, color: "#ff4d00", fontWeight: 600 }}>
+          <span style={{ flex: 1 }}>{saveError}</span>
+          <button type="button" onClick={clearSaveError} style={{ border: "none", background: "transparent", color: "#ff4d00", fontSize: 12.5, fontWeight: 700 }}>
+            닫기
+          </button>
+        </div>
+      )}
       <div style={{ maxWidth: 1440, margin: "0 auto", background: "#fff", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
         {/* 헤더 */}
         <div style={{ padding: "14px 20px 10px", borderBottom: "1px solid #dde1e4", display: "flex", flexDirection: "column", gap: 10 }}>
