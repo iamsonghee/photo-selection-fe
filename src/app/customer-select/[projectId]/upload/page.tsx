@@ -170,7 +170,7 @@ export default function CustomerUploadPage() {
             <button type="button" onClick={() => router.push("/customer-select")} className="grid size-10 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-surface-raised hover:text-foreground" aria-label="프로젝트 목록으로"><ChevronLeft size={19} /></button>
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-[18px] font-bold text-foreground md:text-[20px]">{displayName}</h1>
-              <p className="mt-0.5 text-[12px] text-muted-foreground">사진 업로드 · 최대 5,000장</p>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">사진 업로드 · 최대 2,000장</p>
             </div>
             <PhotographerLightButton variant="outline" size="toolbar" onClick={() => inputRef.current?.click()} disabled={uploading}><ImagePlus size={16} />사진 추가</PhotographerLightButton>
           </div>
