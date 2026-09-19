@@ -91,6 +91,8 @@ service-role 클라이언트로 수행한다(`project_participants`와 동일 �
 사진 업로드 화면은 생성 화면과 같은 `CustomerSelectShell`·`PhotographerLightPageFrame`·
 `ProjectFormSection`을 사용하며, 드롭존과 진행 상태만 업로드 도메인 UI로 유지한다.
 업로드 중 장수와 진행률은 작가 업로드와 동일하게 공통 하단 액션바의 상태 영역에 표시한다.
+선택한 파일은 `PhotographerPhotoGallery`에 로컬 blob 미리보기로 즉시 추가하고,
+`isPending`·`isUploading` 상태로 사진별 준비·전송 현황을 표시한다.
 
 ## 6. 참고
 
