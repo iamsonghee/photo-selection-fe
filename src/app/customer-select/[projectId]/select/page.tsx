@@ -13,11 +13,13 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { getFilteredPhotos, getPhotoDisplayName, type GalleryFilterState } from "@/lib/gallery-filter";
+import { getFilteredPhotos, type GalleryFilterState } from "@/lib/gallery-filter";
 import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
+import CustomerSelectionViewer, { type CustomerSelectionViewerAdapter } from "@/components/customer/CustomerSelectionViewer";
+import { SelectionContextOverride, type SelectionContextValue } from "@/contexts/SelectionContext";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
-import type { ColorTag, StarRating } from "@/types";
+import type { Project, StarRating } from "@/types";
 import {
   activeParticipants,
   disagreementIds,
@@ -49,7 +51,7 @@ export default function CustomerSelectGalleryPage() {
   const projectId = params.projectId as string;
   const router = useRouter();
   const shareToken = useSearchParams().get("share_token");
-  const { project, hydrated, currentIdentity, shareUrl, toggleSelect, toggleLike, setStar, setComment, toggleDone, saveError, clearSaveError } =
+  const { project, hydrated, currentIdentity, shareUrl, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, saveError, clearSaveError } =
     useCustomerSelectStore();
 
   const [tab, setTab] = useState<Tab>("all");
@@ -90,8 +92,55 @@ export default function CustomerSelectGalleryPage() {
   const selectedCount = project.selectedIds.length;
   const done = bothDone(project);
 
-  const openPhoto = openPhotoId ? project.photos.find((p) => p.id === openPhotoId) ?? null : null;
-  const openIndex = openPhoto ? project.photos.findIndex((p) => p.id === openPhoto.id) : -1;
+  const viewerSelection = useMemo<SelectionContextValue>(() => ({
+    project: {
+      id: project.id,
+      name: project.name,
+      requiredCount: project.target,
+      photoCount: project.photoCount,
+      status: "selecting",
+    } as Project,
+    photos: project.photos,
+    photoGroups: [],
+    selectedIds,
+    photoStates: project.photoStates,
+    Y: selectedCount,
+    N: project.target,
+    toggle: (photoId) => {
+      const selected = selectedIds.has(photoId);
+      toggleSelect(photoId);
+      return selected ? "deselected" : "selected";
+    },
+    includeRecommendations: async () => "failed",
+    selectionSaving: false,
+    isSelected: (photoId) => selectedIds.has(photoId),
+    updatePhotoState: (photoId, patch) => {
+      if ("rating" in patch) setStar(photoId, (patch.rating ?? 0) as StarRating | 0);
+      if ("comment" in patch) setComment(photoId, patch.comment ?? "");
+    },
+    toggleColor: toggleLike,
+    projectId,
+    projectStatus: "selecting",
+    loading: false,
+    commentSaveStates: {},
+    saveError,
+    clearSaveError,
+  }), [project, selectedIds, selectedCount, toggleSelect, setStar, setComment, toggleLike, projectId, saveError, clearSaveError]);
+
+  const viewerAdapter = useMemo<CustomerSelectionViewerAdapter | null>(() => openPhotoId ? ({
+    token: projectId,
+    photoId: openPhotoId,
+    participant: {
+      color: currentIdentity,
+      initial: (project.participantNicknames[currentIdentity] || "나").slice(0, 2),
+    },
+    roster: project.participantNicknames,
+    viewerHref: (photoId) => `#photo-${photoId}`,
+    galleryHref: "#",
+    onClose: () => setOpenPhotoId(null),
+    onReview: () => router.push(`/customer-select/${projectId}/review${shareToken ? `?share_token=${shareToken}` : ""}`),
+    onSaveParticipant: (participant) => setNickname(participant.initial),
+  }) : null, [openPhotoId, projectId, currentIdentity, project.participantNicknames, router, shareToken, setNickname]);
 
   // 마일스톤 토스트는 세션당 한 번만 — 넘어선 기준값을 로컬 상태에만 기록한다
   // (목업 범위: 화면 검증이 목적이라 영속은 불필요).
@@ -264,88 +313,10 @@ export default function CustomerSelectGalleryPage() {
         />
       </div>
 
-      {/* 상세 모달 */}
-      {openPhoto && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setOpenPhotoId(null)}
-          style={{ position: "fixed", inset: 0, background: "rgba(10,9,8,.6)", zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", width: "100%", maxWidth: 480, borderRadius: "16px 16px 0 0", maxHeight: "88vh", overflowY: "auto" }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: "1px solid #dde1e4" }}>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: "#8b8985" }}>{getPhotoDisplayName(openPhoto)}</span>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: "#8b8985" }}>
-                {openIndex + 1} / {project.photos.length}
-              </span>
-              <span style={{ flex: 1 }} />
-              <button type="button" onClick={() => setOpenPhotoId(null)} style={{ background: "none", border: 0, fontSize: 20, color: "#8b8985" }}>
-                ✕
-              </button>
-            </div>
-            <div style={{ aspectRatio: "4/3" }}>
-              <img src={openPhoto.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-            </div>
-            <div style={{ padding: "14px 16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-              <div style={{ display: "flex", gap: 4 }}>
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setStar(openPhoto.id, (project.photoStates[openPhoto.id]?.rating === n ? 0 : n) as StarRating | 0)}
-                    style={{ background: "none", border: 0, fontSize: 22, padding: 0, color: (project.photoStates[openPhoto.id]?.rating ?? 0) >= n ? "#ff4d00" : "#dde1e4" }}
-                  >
-                    ★
-                  </button>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                {activeParticipants(project).map((p) => {
-                  const mineColor = p.id === currentIdentity;
-                  const on = project.photoStates[openPhoto.id]?.color?.includes(p.id as ColorTag);
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      disabled={!mineColor}
-                      onClick={() => toggleLike(openPhoto.id, p.id as ColorTag)}
-                      title={`${p.name}${mineColor ? " (나)" : ""}`}
-                      style={{
-                        width: 30,
-                        height: 30,
-                        borderRadius: "50%",
-                        background: p.hex,
-                        opacity: mineColor ? 1 : 0.35,
-                        border: on ? "2px solid #191918" : "2px solid #dde1e4",
-                        cursor: mineColor ? "pointer" : "default",
-                      }}
-                    />
-                  );
-                })}
-              </div>
-              <button
-                type="button"
-                className={`${ui.btn} ${selectedIds.has(openPhoto.id) ? ui.btnPrimary : ""}`}
-                onClick={() => toggleSelect(openPhoto.id)}
-              >
-                {selectedIds.has(openPhoto.id) ? "✓ 선택됨 (취소하려면 다시 클릭)" : "선택하기"}
-              </button>
-              <div className={ui.field}>
-                <span className={ui.label}>보정 요청</span>
-                <textarea
-                  defaultValue={project.photoStates[openPhoto.id]?.comment ?? ""}
-                  onBlur={(e) => setComment(openPhoto.id, e.target.value)}
-                  placeholder="예: 얼굴 밝기만 살짝 올려주세요"
-                  rows={3}
-                  style={{ border: "1px solid #dde1e4", borderRadius: 8, padding: "10px 12px", fontSize: 13.5, resize: "vertical", fontFamily: "inherit" }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+      {viewerAdapter && (
+        <SelectionContextOverride value={viewerSelection}>
+          <CustomerSelectionViewer adapter={viewerAdapter} />
+        </SelectionContextOverride>
       )}
     </div>
   );

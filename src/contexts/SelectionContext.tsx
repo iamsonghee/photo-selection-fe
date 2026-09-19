@@ -161,7 +161,7 @@ export type PhotoState = {
 export type { CommentSaveStatus };
 export type SelectionToggleResult = "selected" | "deselected" | "limit-reached" | "unavailable";
 
-type SelectionContextValue = {
+export type SelectionContextValue = {
   project: import("@/types").Project | null;
   photos: import("@/types").Photo[];
   photoGroups: PhotoGroupInfo[];
@@ -184,6 +184,17 @@ type SelectionContextValue = {
 };
 
 const SelectionContext = createContext<SelectionContextValue | null>(null);
+
+/** 같은 셀렉 UI를 다른 인증/저장 모델에서 쓸 때 데이터 계층만 교체한다. */
+export function SelectionContextOverride({
+  value,
+  children,
+}: {
+  value: SelectionContextValue;
+  children: React.ReactNode;
+}) {
+  return <SelectionContext.Provider value={value}>{children}</SelectionContext.Provider>;
+}
 
 export function useSelection() {
   const ctx = useContext(SelectionContext);
