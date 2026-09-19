@@ -7,14 +7,16 @@
  */
 import { useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { BrandLogoBar } from "@/components/BrandLogo";
+import { PhotographerLightPageFrame } from "@/components/layout/PhotographerLightPageHeader";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { ProjectFormPageHeading, ProjectFormSection } from "@/components/photographer/ProjectFormFields";
 import { compressImagesInParallel } from "@/lib/upload-client-compress";
 import { UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
+import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import { useCustomerSelectStore } from "../../_lib/real-store";
-import ui from "../../_lib/ui.module.css";
 
 const BATCH_SIZE = 20;
 // ponytail: 작가 화면의 PC/모바일 적응형 동시성 대신 고정값 하나만 쓴다 — 고객 프로젝트는
@@ -90,91 +92,51 @@ export default function CustomerUploadPage() {
 
   if (!hydrated) {
     return (
-      <div className={ui.shell}>
-        <header className={ui.brandbar}>
-          <BrandLogoBar size="sm" href="/customer-select" variant="default" />
-        </header>
-      </div>
+      <CustomerSelectShell>
+        <main className="grid flex-1 place-items-center"><span className="size-6 animate-spin rounded-full border-2 border-accent/20 border-t-accent" /></main>
+      </CustomerSelectShell>
     );
   }
 
   return (
-    <div className={ui.shell}>
-      <header className={ui.brandbar}>
-        <BrandLogoBar size="sm" href="/customer-select" variant="default" />
-      </header>
-      <div className={ui.shellMain}>
-      <div className={ui.page} style={{ minHeight: "unset" }}>
-        <div className={ui.header}>
-          <h1 className={ui.title}>{displayName}</h1>
-        </div>
-        <div className={ui.body}>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-            multiple
-            hidden
-            onChange={(e) => handleFiles(e.target.files)}
-          />
-          {!uploading && project.photoCount === 0 && (
-            <div
-              style={{
-                border: "1.5px dashed #dde1e4",
-                borderRadius: 18,
-                padding: "38px 18px",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 14,
-                textAlign: "center",
-                background: "#f7f6f4",
-              }}
-            >
-              <div style={{ width: 52, height: 52, borderRadius: 14, background: "#fff0ea", color: "#ff4d00", display: "grid", placeItems: "center", fontSize: 22 }}>
-                ⬆
+    <CustomerSelectShell>
+      <div className="flex min-h-[calc(100dvh-64px)] flex-1 flex-col">
+        <PhotographerLightPageFrame className="flex-1 pb-8">
+          <div className="mx-auto max-w-[1120px]">
+            <ProjectFormPageHeading title="사진 업로드" description={`${displayName} 프로젝트의 촬영본을 올려주세요.`} onBack={() => router.push("/customer-select")} />
+            <ProjectFormSection number="01" title="촬영본 업로드" description="원본 파일명을 유지한 채 셀렉용 사진을 준비합니다.">
+              <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden onChange={(event) => handleFiles(event.target.files)} />
+              <div
+                className="flex min-h-[280px] flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border-strong bg-surface-raised/55 px-5 py-10 text-center transition-colors hover:border-accent/45"
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => { event.preventDefault(); void handleFiles(event.dataTransfer.files); }}
+              >
+                <span className="grid size-14 place-items-center rounded-2xl bg-customer-soft text-primary"><UploadCloud size={26} strokeWidth={1.8} /></span>
+                <div>
+                  <p className="text-[16px] font-bold text-foreground">사진을 끌어다 놓거나 직접 선택하세요</p>
+                  <p className="mt-1.5 text-[13px] text-muted-foreground">JPG · PNG · WebP · HEIC · 최대 2,000장</p>
+                </div>
+                <PhotographerLightButton onClick={() => inputRef.current?.click()} disabled={uploading}>{project.photoCount > 0 ? "사진 더 올리기" : "사진 선택"}</PhotographerLightButton>
               </div>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>여기로 사진을 끌어다 놓으세요</div>
-              <button type="button" className={`${ui.btn} ${ui.btnPrimary} ${ui.btnSm}`} style={{ width: 200 }} onClick={() => inputRef.current?.click()}>
-                사진 선택
-              </button>
-              <span className={ui.supportText}>JPG · PNG · HEIC · 최대 2,000장</span>
-            </div>
-          )}
 
-          {uploading && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#5f5e5b" }}>
-                <span>{progress} / {total}장</span>
-                <span>{progress >= total ? "완료" : "업로드 중…"}</span>
-              </div>
-              <div style={{ height: 6, borderRadius: 999, background: "#ecebe8", overflow: "hidden" }}>
-                <div style={{ width: `${total ? (progress / total) * 100 : 0}%`, height: "100%", background: "#ff4d00", transition: "width .2s linear" }} />
-              </div>
-            </div>
-          )}
-
-          {!uploading && project.photoCount > 0 && (
-            <>
-              <p className={ui.bodyText}>사진 {project.photoCount}장을 올렸어요. 이제 마음에 드는 사진을 골라주세요.</p>
-              <button type="button" className={`${ui.btn} ${ui.btnSm}`} style={{ width: 160 }} onClick={() => inputRef.current?.click()}>
-                사진 더 올리기
-              </button>
-            </>
-          )}
-          {error && <span className={ui.bannerHeadWarn}>{error}</span>}
-        </div>
+              {uploading ? (
+                <div className="rounded-xl border border-border-subtle bg-surface px-4 py-4" role="status" aria-live="polite">
+                  <div className="flex justify-between text-[13px] font-semibold text-muted-foreground"><span>{progress} / {total}장</span><span>업로드 중…</span></div>
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-raised"><div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${total ? (progress / total) * 100 : 0}%` }} /></div>
+                </div>
+              ) : project.photoCount > 0 ? (
+                <p className="rounded-xl bg-customer-soft px-4 py-3 text-[14px] font-semibold text-primary">사진 {project.photoCount}장을 올렸습니다. 사진을 더 추가하거나 셀렉을 시작할 수 있어요.</p>
+              ) : null}
+              {error ? <p role="alert" className="text-[13px] font-semibold text-danger">{error}</p> : null}
+            </ProjectFormSection>
+          </div>
+        </PhotographerLightPageFrame>
         <PhotographerPageActionBar
           maxWidth={1120}
-          actions={<PhotographerLightButton
-            disabled={project.photoCount === 0 || uploading}
-            onClick={() => router.push(`/customer-select/${projectId}/select${shareToken ? `?share_token=${shareToken}` : ""}`)}
-          >
-            셀렉 시작하기{project.photoCount > 0 ? ` (${project.photoCount}장)` : ""}
-          </PhotographerLightButton>}
+          leading={<p className="text-sm text-muted-foreground">업로드한 순서와 원본 파일명은 그대로 유지됩니다.</p>}
+          actions={<PhotographerLightButton disabled={project.photoCount === 0 || uploading} onClick={() => router.push(`/customer-select/${projectId}/select${shareToken ? `?share_token=${shareToken}` : ""}`)}>셀렉 시작하기{project.photoCount > 0 ? ` (${project.photoCount}장)` : ""}</PhotographerLightButton>}
         />
       </div>
-      </div>
-    </div>
+    </CustomerSelectShell>
   );
 }

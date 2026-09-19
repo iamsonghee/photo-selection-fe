@@ -88,6 +88,8 @@ service-role 클라이언트로 수행한다(`project_participants`와 동일 �
 프로젝트 생성과 이후 업로드·검토·전달·보정본 흐름의 하단 행동 영역은
 `PhotographerFormActionBar`를 공유한다. 본문만 화면별 최대 폭에 맞추고 액션바의 surface와
 상단 divider는 화면 전체 폭을 사용한다.
+사진 업로드 화면은 생성 화면과 같은 `CustomerSelectShell`·`PhotographerLightPageFrame`·
+`ProjectFormSection`을 사용하며, 드롭존과 진행 상태만 업로드 도메인 UI로 유지한다.
 
 ## 6. 참고
 
