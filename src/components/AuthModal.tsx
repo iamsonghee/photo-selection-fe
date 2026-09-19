@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { GOOGLE_OAUTH_QUERY_PARAMS } from "@/lib/google-oauth";
+import { useOAuthLogin } from "@/hooks/useOAuthLogin";
 import {
   clearPostLoginRedirect,
   DEFAULT_POST_LOGIN_PATH,
@@ -22,13 +21,11 @@ function isKakaoInAppBrowser(): boolean {
 }
 
 export function AuthModal({ isOpen, onClose, redirectPath }: AuthModalProps) {
-  const [loading, setLoading] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { loading, error, login, reset: resetOAuth } = useOAuthLogin();
   const [closing, setClosing] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 600);
   const [isKakao] = useState(isKakaoInAppBrowser);
   const [urlCopied, setUrlCopied] = useState(false);
-  const supabase = createClient();
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth <= 600);
@@ -51,13 +48,12 @@ export function AuthModal({ isOpen, onClose, redirectPath }: AuthModalProps) {
     setTimeout(
       () => {
         setClosing(false);
-        setError(null);
-        setLoading(null);
+        resetOAuth();
         onClose();
       },
       isMobile ? 350 : 400,
     );
-  }, [onClose, isMobile]);
+  }, [onClose, isMobile, resetOAuth]);
 
   // ESC key
   useEffect(() => {
@@ -81,16 +77,10 @@ export function AuthModal({ isOpen, onClose, redirectPath }: AuthModalProps) {
     };
   }, [isOpen]);
 
-  // ── Auth handlers (identical logic to /auth page) ────────────────────────
-  // redirectTo URL 자체는 절대 바꾸지 않는다 — Supabase의 Redirect URLs 허용 목록과 정확히
-  // 일치해야 하는데, 쿼리스트링을 붙이면 그 목록과 달라져 콜백이 거부될 수 있다(대시보드 설정
-  // 변경이 필요한 외부 의존성이 생김). 대신 "로그인 후 어디로 갈지"는 sessionStorage에 남겨두고
-  // 항상 도착하는 기본 목적지(/photographer/dashboard)에서 소비한다(src/lib/post-login-redirect.ts).
-  function buildRedirectTo(): string | undefined {
-    if (typeof window === "undefined") return undefined;
-    return `${window.location.origin}/auth/callback`;
-  }
-
+  // signInWithOAuth 호출 자체는 useOAuthLogin(고객 셀렉 로그인 화면과 공유)이 담당한다.
+  // redirectTo URL은 항상 `/auth/callback` 그대로다 — Supabase의 Redirect URLs 허용
+  // 목록과 정확히 일치해야 하므로, "로그인 후 어디로 갈지"는 sessionStorage에 남겨두고
+  // 항상 도착하는 기본 목적지(/photographer/dashboard)에서 소비한다(post-login-redirect.ts).
   function preparePostLoginRedirect(): void {
     if (redirectPath && redirectPath !== DEFAULT_POST_LOGIN_PATH) {
       setPostLoginRedirect(redirectPath);
@@ -100,82 +90,15 @@ export function AuthModal({ isOpen, onClose, redirectPath }: AuthModalProps) {
     clearPostLoginRedirect();
   }
 
-  const handleGoogleLogin = async () => {
-    setError(null);
-    setLoading("google");
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-    if (!url || !key || url.includes("placeholder") || key.includes("placeholder")) {
-      setError(
-        "NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY를 .env.local에 설정한 뒤 개발 서버를 재시작해 주세요.",
-      );
-      setLoading(null);
-      return;
-    }
+  const handleGoogleLogin = () => {
     preparePostLoginRedirect();
-    try {
-      const { data, error: err } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: buildRedirectTo(),
-          queryParams: GOOGLE_OAUTH_QUERY_PARAMS,
-        },
-      });
-      if (err) {
-        setError(err.message);
-        setLoading(null);
-        return;
-      }
-      if (data?.url) {
-        window.location.href = data.url;
-      } else {
-        setError("로그인 URL을 받지 못했습니다. Supabase Google Provider 설정을 확인하세요.");
-        setLoading(null);
-      }
-    } catch {
-      setError("로그인 중 오류가 발생했습니다.");
-      setLoading(null);
-    }
+    login("google");
   };
 
-  const handleKakaoLogin = async () => {
-    setError(null);
-    setLoading("kakao");
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-    if (!url || !key || url.includes("placeholder") || key.includes("placeholder")) {
-      setError(
-        "NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY를 .env.local에 설정한 뒤 개발 서버를 재시작해 주세요.",
-      );
-      setLoading(null);
-      return;
-    }
+  const handleKakaoLogin = () => {
     preparePostLoginRedirect();
-    try {
-      const { data, error: err } = await supabase.auth.signInWithOAuth({
-        provider: "kakao",
-        options: {
-          redirectTo: buildRedirectTo(),
-          scopes: "profile_nickname profile_image",
-        },
-      });
-      if (err) {
-        setError(err.message);
-        setLoading(null);
-        return;
-      }
-      if (data?.url) {
-        window.location.href = data.url;
-      } else {
-        setError("로그인 URL을 받지 못했습니다. Supabase Kakao Provider 설정을 확인하세요.");
-        setLoading(null);
-      }
-    } catch {
-      setError("로그인 중 오류가 발생했습니다.");
-      setLoading(null);
-    }
+    login("kakao");
   };
-  // ─────────────────────────────────────────────────────────────────────────
 
   if (!isOpen && !closing) return null;
 
