@@ -7,10 +7,11 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ImagePlus, Loader2, Trash2, UploadCloud } from "lucide-react";
+import { ChevronLeft, Eye, ImagePlus, Layers3, Loader2, Trash2, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { PhotographerModal } from "@/components/ui/PhotographerModal";
 import { PhotographerPhotoGallery } from "@/components/photographer/OriginalPhotoGallery";
 import { OriginalPhotoViewer } from "@/components/photographer/OriginalPhotoViewer";
 import { PhotoSortSelect } from "@/components/photographer/PhotoSortSelect";
@@ -18,7 +19,7 @@ import { ProjectAssetToolbarSummary } from "@/components/photographer/ProjectAss
 import { compressImagesInParallel } from "@/lib/upload-client-compress";
 import { UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
-import type { Photo } from "@/types";
+import type { Photo, PhotoGroupInfo } from "@/types";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import { useCustomerSelectStore } from "../../_lib/real-store";
 
@@ -40,6 +41,11 @@ export default function CustomerUploadPage() {
   const [pendingPhotos, setPendingPhotos] = useState<Photo[]>([]);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [aiPromptOpen, setAiPromptOpen] = useState(false);
+  const [aiWantSimilar, setAiWantSimilar] = useState(true);
+  const [aiWantQuality, setAiWantQuality] = useState(false);
+  const [aiStarting, setAiStarting] = useState(false);
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [sort, setSort] = useState<"order-asc" | "order-desc" | "name-asc">("order-asc");
   const [viewerPhotoId, setViewerPhotoId] = useState<string | null>(null);
   const [thumbQueue] = useState(() => createThumbLoadQueue(12));
@@ -127,6 +133,50 @@ export default function CustomerUploadPage() {
     previewUrlsRef.current.forEach(URL.revokeObjectURL);
     previewUrlsRef.current = [];
     setUploading(false);
+    if (uploaded > 0) setAiPromptOpen(true);
+  }
+
+  async function startAiAnalysis() {
+    setAiStarting(true);
+    const suffix = shareToken ? `?share_token=${encodeURIComponent(shareToken)}` : "";
+    try {
+      const requests = [
+        aiWantSimilar && fetch(`/api/customer-select/projects/${projectId}/ai/similarity${suffix}`, { method: "POST" }),
+        aiWantQuality && fetch(`/api/customer-select/projects/${projectId}/ai/quality${suffix}`, { method: "POST" }),
+      ].filter(Boolean) as Promise<Response>[];
+      const responses = await Promise.all(requests);
+      const failed = responses.find((response) => !response.ok);
+      if (failed) {
+        const data = await failed.json().catch(() => ({}));
+        throw new Error(data.error ?? data.detail ?? "분석 시작 실패");
+      }
+      setAiPromptOpen(false);
+      setAiAnalyzing(true);
+      void pollAiAnalysis([aiWantSimilar && "similarity", aiWantQuality && "quality"].filter(Boolean) as string[]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "AI 분석을 시작하지 못했습니다.");
+    } finally {
+      setAiStarting(false);
+    }
+  }
+
+  async function pollAiAnalysis(kinds: string[]) {
+    const suffix = shareToken ? `?share_token=${encodeURIComponent(shareToken)}` : "";
+    for (let attempt = 0; attempt < 150; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 4000));
+      const statuses = await Promise.all(kinds.map(async (kind) => {
+        const response = await fetch(`/api/customer-select/projects/${projectId}/ai/${kind}${suffix}`);
+        if (!response.ok) return "failed";
+        return (await response.json()).status as string | null;
+      }));
+      if (statuses.every((status) => status !== "processing")) {
+        setAiAnalyzing(false);
+        await refresh();
+        if (statuses.includes("failed")) setError("일부 AI 분석을 완료하지 못했습니다.");
+        return;
+      }
+    }
+    setAiAnalyzing(false);
   }
 
   async function deleteSelectedPhotos() {
@@ -161,6 +211,16 @@ export default function CustomerUploadPage() {
     return a.orderIndex - b.orderIndex;
   }), [displayedPhotos, sort]);
   const viewerPhotos = sortedPhotos.filter((photo) => !photo.isPending);
+  const groupsById = useMemo(() => {
+    const groups = new Map<string, PhotoGroupInfo>();
+    for (const photo of sortedPhotos) {
+      if (!photo.similarityGroupId) continue;
+      const group = groups.get(photo.similarityGroupId);
+      if (group) group.photoCount += 1;
+      else groups.set(photo.similarityGroupId, { id: photo.similarityGroupId, representativePhotoId: photo.id, photoCount: 1 });
+    }
+    return groups;
+  }, [sortedPhotos]);
   const viewerIndex = viewerPhotoId ? viewerPhotos.findIndex((photo) => photo.id === viewerPhotoId) : -1;
   const uploadStatus = uploading ? (
     <div className="flex items-center gap-3" role="status" aria-live="polite">
@@ -203,7 +263,7 @@ export default function CustomerUploadPage() {
 
         <div className="shrink-0 border-b border-border-subtle bg-surface px-4 md:px-8">
           <div className="mx-auto flex min-h-12 max-w-[1504px] items-center justify-between gap-3">
-            <ProjectAssetToolbarSummary label="업로드 사진" count={`${displayedPhotos.length.toLocaleString()}장`} meta={uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : undefined} />
+            <ProjectAssetToolbarSummary label="업로드 사진" count={`${displayedPhotos.length.toLocaleString()}장`} meta={uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : aiAnalyzing ? "AI 분석 중" : undefined} />
             <div className="flex items-center gap-1.5">
               <PhotoSortSelect value={sort} onChange={setSort} options={[{ value: "order-asc", label: "업로드 순" }, { value: "order-desc", label: "최근 순" }, { value: "name-asc", label: "파일명 순" }]} />
             </div>
@@ -234,6 +294,9 @@ export default function CustomerUploadPage() {
               readonly
               selectedPhotoIds={selectedPhotoIds}
               selectionOnHover
+              groupsById={groupsById}
+              showSimilarityGroups
+              showQualityBadges
               onToggleSelected={(photoId) => setSelectedPhotoIds((current) => {
                 const next = new Set(current);
                 if (next.has(photoId)) next.delete(photoId); else next.add(photoId);
@@ -262,6 +325,30 @@ export default function CustomerUploadPage() {
       </div>
 
       {viewerIndex >= 0 ? <OriginalPhotoViewer photos={viewerPhotos} activeIndex={viewerIndex} onActiveIndexChange={(index) => setViewerPhotoId(viewerPhotos[index]?.id ?? null)} onClose={() => setViewerPhotoId(null)} /> : null}
+
+      <PhotographerModal
+        open={aiPromptOpen}
+        onClose={() => setAiPromptOpen(false)}
+        maxWidth={412}
+        variant="confirmation"
+        title="AI가 사진 정리를 도와드릴까요?"
+        description={`사진 ${progress.toLocaleString()}장 업로드가 완료되었습니다.`}
+        footer={<div className="flex gap-2">
+          <PhotographerLightButton variant="secondary" size="confirmation" className="flex-1" onClick={() => setAiPromptOpen(false)}>건너뛰기</PhotographerLightButton>
+          <PhotographerLightButton size="confirmation" className="flex-1" pending={aiStarting} pendingLabel="시작 중" disabled={!aiWantSimilar && !aiWantQuality} onClick={startAiAnalysis}>분석 시작</PhotographerLightButton>
+        </div>}
+      >
+        <div className="flex flex-col gap-2">
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border-subtle p-4">
+            <input type="checkbox" className="mt-1 accent-[var(--accent)]" checked={aiWantSimilar} onChange={(event) => setAiWantSimilar(event.target.checked)} />
+            <Layers3 size={19} className="mt-0.5 text-accent" /><span><strong className="block text-sm text-foreground">유사컷 묶기</strong><small className="mt-1 block text-xs text-muted-foreground">연속 촬영된 비슷한 사진을 자동으로 묶습니다.</small></span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border-subtle p-4">
+            <input type="checkbox" className="mt-1 accent-[var(--accent)]" checked={aiWantQuality} onChange={(event) => setAiWantQuality(event.target.checked)} />
+            <Eye size={19} className="mt-0.5 text-accent" /><span><strong className="block text-sm text-foreground">눈 감음·흐림 확인</strong><small className="mt-1 block text-xs text-muted-foreground">검토가 필요한 사진을 표시합니다.</small></span>
+          </label>
+        </div>
+      </PhotographerModal>
     </CustomerSelectShell>
   );
 }

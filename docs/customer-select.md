@@ -51,6 +51,7 @@ service-role 클라이언트로 수행한다(`project_participants`와 동일 �
 - **클라이언트 압축**: 작가 업로드 화면의 `lib/upload-client-compress.ts`(`compressImagesInParallel`)를 그대로 재사용한다. identity 비의존으로 설계돼 있어 그대로 가져다 썼다 — 1600px/0.82 압축(`UPLOAD_INTERMEDIATE_MAX_EDGE/QUALITY`). 20장씩 압축 후 즉시 전송해 대량 선택 시 압축 결과 전체가 메모리에 쌓이지 않는다.
 - **BE 엔드포인트**: `POST/DELETE /api/customer-upload/photos`(셀렉용 사진 업로드·삭제), `POST /api/customer-upload/retouched`(보정본) — 모두 `app/routers/customer_upload.py`. 작가 업로드(`/api/upload/photos`)는 `get_current_photographer`·베타 등급 쿼터·`original_jobs`(납품 원본 보관) 등 작가 프로젝트 생애주기에 강하게 결합돼 있어 재사용하지 않고, 갤러리·드래그 선택 UI와 이미지 처리 유틸만 공유한다.
 - **상한**: 프로젝트당 2,000장 — 등급별 쿼터 테이블 없이 상수 하나(`MAX_PHOTOS_PER_CUSTOMER_PROJECT`).
+- **AI 분석**: 업로드 완료 모달에서 유사컷 묶기와 눈 감음·흐림 확인을 선택 실행한다. 작가 분석의 Gemini 클라이언트·그룹핑 알고리즘은 재사용하지만 저장소는 `customer_ai_*`/`customer_photo_groups`/`customer_quality_assessments`로 분리한다. 실행 중에는 업로드 툴바에 상태를 표시하고 완료 후 갤러리를 갱신한다.
 - **보정본 파일명 매칭**: 작가 플로우의 `lib/version-mapping.ts`(`buildVersionMapping` — 정확일치 → 접미사 제거 후 일치)를 그대로 재사용. 실패분은 화면에서 드롭다운으로 수동 지정.
 - **저장 실패 대응**: `real-store.tsx`의 셀렉/찜/별점/코멘트 저장은 최대 3회 재시도(backoff) 후에도 실패하면 낙관적 업데이트를 되돌리고 배너로 안내한다. 작가 플로우의 `SelectionContext.tsx`(폴링·필드별 버전 관리를 포함한 978줄)를 통째로 재사용하려 했으나 API 계약이 달라(`/api/c/**` 전제) 재사용 범위가 예상(~60줄)보다 훨씬 작았다 — 핵심 보장(실패가 조용히 사라지지 않는 것)만 축소 이식했다. 다른 참가자의 변경사항을 실시간으로 반영하는 폴링은 아직 없다(각 화면이 마운트 시 재조회하는 수준).
 

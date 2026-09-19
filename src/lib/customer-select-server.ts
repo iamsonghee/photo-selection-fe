@@ -65,6 +65,15 @@ interface CustomerPhotoRow {
   order_index: number;
   thumb_url: string | null;
   preview_url: string | null;
+  similarity_group_id: string | null;
+}
+
+interface CustomerQualityRow {
+  photo_id: string;
+  eyes_closed: string;
+  blur_or_shake: string;
+  focus_issue: string;
+  primary_subject_detected: boolean | null;
 }
 
 interface CustomerSelectionRow {
@@ -81,7 +90,7 @@ interface CustomerParticipantRow {
   done: boolean;
 }
 
-export function toPhoto(row: CustomerPhotoRow, projectId: string): Photo {
+export function toPhoto(row: CustomerPhotoRow, projectId: string, quality?: CustomerQualityRow): Photo {
   return {
     id: row.id,
     projectId,
@@ -89,6 +98,10 @@ export function toPhoto(row: CustomerPhotoRow, projectId: string): Photo {
     url: row.thumb_url ?? "",
     previewUrl: row.preview_url,
     originalFilename: row.filename,
+    similarityGroupId: row.similarity_group_id,
+    isBlurry: quality ? [quality.blur_or_shake, quality.focus_issue].some((value) => value === "possible" || value === "likely") : null,
+    faceDetected: quality?.primary_subject_detected ?? null,
+    eyesClosed: quality ? quality.eyes_closed === "possible" || quality.eyes_closed === "likely" : null,
   };
 }
 
@@ -97,7 +110,8 @@ export function buildProjectView(
   project: CustomerProjectRow,
   photos: CustomerPhotoRow[],
   selections: CustomerSelectionRow[],
-  participants: CustomerParticipantRow[]
+  participants: CustomerParticipantRow[],
+  quality: CustomerQualityRow[] = []
 ) {
   const selectionByPhoto = new Map(selections.map((s) => [s.photo_id, s]));
   const selectedIds: string[] = [];
@@ -117,6 +131,7 @@ export function buildProjectView(
     participantNicknames[p.color] = p.nickname;
   }
   void selectionByPhoto;
+  const qualityByPhoto = new Map(quality.map((row) => [row.photo_id, row]));
   return {
     id: project.id,
     name: project.name,
@@ -130,7 +145,7 @@ export function buildProjectView(
     photos: photos
       .slice()
       .sort((a, b) => a.order_index - b.order_index)
-      .map((p) => toPhoto(p, project.id)),
+      .map((p) => toPhoto(p, project.id, qualityByPhoto.get(p.id))),
     selectedIds,
     photoStates,
     participantDone,

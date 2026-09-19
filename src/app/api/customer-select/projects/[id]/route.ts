@@ -12,17 +12,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (access instanceof NextResponse) return access;
   const { project } = access;
 
-  const [photosRes, selectionsRes, participantsRes] = await Promise.all([
-    admin.from("customer_photos").select("id, filename, order_index, thumb_url, preview_url").eq("project_id", id),
+  const [photosRes, selectionsRes, participantsRes, qualityRes] = await Promise.all([
+    admin.from("customer_photos").select("id, filename, order_index, thumb_url, preview_url, similarity_group_id").eq("project_id", id),
     admin.from("customer_selections").select("photo_id, rating, color_tags, comment, is_selected").eq("project_id", id),
     admin.from("customer_project_participants").select("color, nickname, done").eq("project_id", id),
+    admin.from("customer_quality_assessments").select("photo_id, eyes_closed, blur_or_shake, focus_issue, primary_subject_detected").eq("project_id", id),
   ]);
-  if (photosRes.error || selectionsRes.error || participantsRes.error) {
+  if (photosRes.error || selectionsRes.error || participantsRes.error || qualityRes.error) {
     return NextResponse.json({ error: "조회 실패" }, { status: 500 });
   }
   return NextResponse.json(
     {
-      project: buildProjectView(project, photosRes.data ?? [], selectionsRes.data ?? [], participantsRes.data ?? []),
+      project: buildProjectView(project, photosRes.data ?? [], selectionsRes.data ?? [], participantsRes.data ?? [], qualityRes.data ?? []),
       isOwner: access.isOwner,
     },
     { headers: { "Cache-Control": "no-store" } }
