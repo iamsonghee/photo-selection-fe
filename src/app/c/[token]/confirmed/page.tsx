@@ -121,14 +121,16 @@ export default function ConfirmedPage() {
 
         <Link href={`/c/${token}/locked`} className="confirmed-primary">선택한 사진 보기</Link>
 
-        <section className="confirmed-download" aria-label="원본 다운로드 정보">
-          <h2>전체 원본 다운로드</h2>
-          <OriginalDownloadEntry token={token} variant="summary" />
-          <p className="confirmed-download-note">
-            <Monitor size={15} strokeWidth={1.8} aria-hidden />
-            파일 용량으로 인해 PC에서 다운로드하는 것을 권장해요.
-          </p>
-        </section>
+        {project.includeOriginal && (
+          <section className="confirmed-download" aria-label="원본 다운로드 정보">
+            <h2>전체 원본 다운로드</h2>
+            <OriginalDownloadEntry token={token} variant="summary" />
+            <p className="confirmed-download-note">
+              <Monitor size={15} strokeWidth={1.8} aria-hidden />
+              파일 용량으로 인해 PC에서 다운로드하는 것을 권장해요.
+            </p>
+          </section>
+        )}
 
         {project.status === "confirmed" && (
           <button
