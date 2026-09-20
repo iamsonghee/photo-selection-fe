@@ -3,7 +3,8 @@
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { Check, RefreshCw, Clock, Lock, ChevronLeft, CheckCircle2, ChevronDown, Search, X } from "lucide-react";
 import { formatKstDateTime } from "@/lib/kst-date";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
@@ -125,6 +126,105 @@ function UnselectedPhotoCard({ photo, onOpen }: { photo: Photo; onOpen?: () => v
   );
 }
 
+const GRID_MIN_CELL = 180;
+const GRID_GAP = 12;
+
+/**
+ * 원본 그리드 가상화(화면 + overscan 범위만 실제 DOM에 렌더).
+ * `unselected`(선택하지 않은 원본)는 프로젝트 전체 사진 수만큼(수천 장까지) 커질 수 있는데,
+ * 가상화 없이 전부 <img>로 마운트하면 모바일에서 이미지 디코딩 메모리 압박으로 일부가
+ * 조용히 빈 칸으로 남는다(실사용자 리포트로 확인, 2026-09-20). 메인 갤러리(GalleryPageClient)가
+ * 이미 같은 문제를 `@tanstack/react-virtual`로 풀어둔 패턴을 그대로 옮겨온다 — 이 페이지는
+ * 필터·presign 큐가 없어 컬럼/행 계산만 가져오면 충분하다.
+ */
+function VirtualizedPhotoGrid({
+  items,
+  hasFilenameRow,
+  renderItem,
+}: {
+  items: Photo[];
+  /** 카드에 파일명 줄이 붙는지(onOpen 유무로 프로젝트 전체가 동일) — 행 높이 추정에 필요. */
+  hasFilenameRow: boolean;
+  renderItem: (photo: Photo, index: number) => React.ReactNode;
+}) {
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [layout, setLayout] = useState({ cols: 4, rowHeight: 220 });
+  const [scrollMargin, setScrollMargin] = useState(0);
+
+  useLayoutEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const update = () => {
+      const width = el.clientWidth;
+      if (width <= 0) return;
+      const cols = Math.max(1, Math.floor((width + GRID_GAP) / (GRID_MIN_CELL + GRID_GAP)));
+      const cellSize = (width - GRID_GAP * (cols - 1)) / cols;
+      // 카드 p-2(8px 상하) + (파일명 줄이 있으면 gap-2 8px + text-[11px] 한 줄 ~16px).
+      const cardExtra = hasFilenameRow ? 40 : 16;
+      const rowHeight = Math.ceil(cellSize) + cardExtra + GRID_GAP;
+      setLayout((prev) => (prev.cols === cols && prev.rowHeight === rowHeight ? prev : { cols, rowHeight }));
+      const rect = el.getBoundingClientRect();
+      setScrollMargin(rect.top + window.scrollY);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [hasFilenameRow]);
+
+  const rowCount = layout.cols > 0 ? Math.ceil(items.length / layout.cols) : 0;
+  const rowVirtualizer = useWindowVirtualizer({
+    count: rowCount,
+    estimateSize: () => layout.rowHeight,
+    overscan: 6,
+    scrollMargin,
+  });
+
+  useEffect(() => {
+    rowVirtualizer.measure();
+    // layout이 바뀌면(rowHeight/cols) 명시적으로 재측정해야 한다 — virtualizer는 함수
+    // 참조가 그대로면 자동 remeasure하지 않는다(GalleryPageClient와 동일 이유).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout.cols, layout.rowHeight]);
+
+  const virtualRows = rowVirtualizer.getVirtualItems();
+
+  return (
+    <div ref={gridRef} style={{ position: "relative", width: "100%", height: rowVirtualizer.getTotalSize() }}>
+      {virtualRows.map((vRow) => {
+        const rowStart = vRow.index * layout.cols;
+        const cells: React.ReactNode[] = [];
+        for (let c = 0; c < layout.cols; c++) {
+          const index = rowStart + c;
+          if (index >= items.length) break;
+          cells.push(renderItem(items[index], index));
+        }
+        return (
+          <div
+            key={vRow.key}
+            style={{
+              position: "absolute", top: 0, left: 0, width: "100%",
+              height: Math.max(vRow.size - GRID_GAP, 0),
+              transform: `translateY(${vRow.start - scrollMargin}px)`,
+              display: "grid",
+              gridTemplateColumns: `repeat(${layout.cols}, 1fr)`,
+              gap: GRID_GAP,
+              alignItems: "start",
+              boxSizing: "border-box",
+            }}
+          >
+            {cells}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ── 섹션 헤더 ── */
 const SECTION_DOT = {
   brand: "var(--accent)",
@@ -144,6 +244,89 @@ function SectionHeader({ label, count, tone }: { label: string; count: number; t
     </div>
   );
 }
+
+/**
+ * 실제 버그의 진짜 원인 — `LockedMobileGallery`가 실제 모바일 화면(`md:hidden`으로
+ * 항상 마운트)이고, 위 `VirtualizedPhotoGrid`는 이 너비에서 `hidden md:block`으로
+ * 숨어 있어 실제로는 렌더되지 않는다. 밀도(2~5열)마다 카드 높이가 달라 고정 상수로
+ * 추정하는 대신, react-virtual의 동적 측정(measureElement)으로 실제 렌더된 행 높이를
+ * 그때그때 보정한다 — 열 폭 계산이 필요 없어(그리드 자체가 CSS `fr` 단위) 위쪽 데스크톱
+ * 버전보다 오히려 더 단순하다.
+ */
+function VirtualizedRowGrid({
+  items,
+  columns,
+  gap,
+  renderItem,
+}: {
+  items: Photo[];
+  columns: number;
+  gap: number;
+  renderItem: (photo: Photo, index: number) => React.ReactNode;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+
+  useLayoutEffect(() => {
+    const el = parentRef.current;
+    if (!el) return;
+    const update = () => setScrollMargin(el.getBoundingClientRect().top + window.scrollY);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [columns]);
+
+  const rowCount = columns > 0 ? Math.ceil(items.length / columns) : 0;
+  const rowVirtualizer = useWindowVirtualizer({
+    count: rowCount,
+    estimateSize: () => 160,
+    overscan: 6,
+    scrollMargin,
+  });
+
+  useEffect(() => {
+    rowVirtualizer.measure();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [columns, items.length]);
+
+  const virtualRows = rowVirtualizer.getVirtualItems();
+
+  return (
+    <div ref={parentRef} style={{ position: "relative", width: "100%", height: rowVirtualizer.getTotalSize() }}>
+      {virtualRows.map((vRow) => {
+        const rowStart = vRow.index * columns;
+        const cells: React.ReactNode[] = [];
+        for (let c = 0; c < columns; c++) {
+          const index = rowStart + c;
+          if (index >= items.length) break;
+          cells.push(renderItem(items[index], index));
+        }
+        return (
+          <div
+            key={vRow.key}
+            ref={rowVirtualizer.measureElement}
+            data-index={vRow.index}
+            style={{
+              position: "absolute", top: 0, left: 0, width: "100%",
+              transform: `translateY(${vRow.start - scrollMargin}px)`,
+              display: "grid",
+              gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+              gap,
+              paddingBottom: gap,
+              boxSizing: "border-box",
+            }}
+          >
+            {cells}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** 밀도별 그리드 gap — 예전 CSS(`.locked-density-N .locked-mobile-grid`)에 있던 값을 그대로 JS로 옮겼다.
+ * gap을 이제 VirtualizedRowGrid에 직접 넘겨야 해서(행마다 별도 grid이므로 CSS만으로는 못 정함). */
+const DENSITY_GAP: Record<2 | 3 | 4 | 5, number> = { 2: 10, 3: 8, 4: 6, 5: 4 };
 
 type LockedMobileGalleryProps = {
   token: string;
@@ -264,45 +447,49 @@ function LockedMobileGallery({ token, selectedPhotos, allPhotos, selectedIds, co
         </label>
       )}
 
-      <main
-        ref={gridRef}
-        className="locked-mobile-grid"
-        style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
-      >
-        {visiblePhotos.map((photo, index) => {
-          const filename = photo.originalFilename?.split("/").pop() ?? `#${photo.orderIndex}`;
-          const comment = comments[photo.id]?.comment?.trim() ?? "";
-          return (
-            <button
-              key={photo.id}
-              type="button"
-              className="locked-mobile-card"
-              onClick={() => {
-                if (Date.now() < suppressClickUntilRef.current) return;
-                onOpen(visiblePhotos, index, scope === "selected" ? "선택된 원본" : "원본");
-              }}
-              aria-label={`${filename} 상세보기${selectedIds.has(photo.id) ? ", 선택됨" : ""}`}
-            >
-              <span className="locked-mobile-image">
-                {photo.url ? <img src={photo.url} alt="" loading="lazy" decoding="async" /> : <span className="locked-mobile-placeholder">NO IMG</span>}
-                {scope === "original" && selectedIds.has(photo.id) && (
-                  <span className="locked-mobile-selected-check" aria-hidden>
-                    <Check size={12} strokeWidth={3} />
+      <main ref={gridRef} className="locked-mobile-grid-wrap">
+        {visiblePhotos.length > 0 ? (
+          <VirtualizedRowGrid
+            items={visiblePhotos}
+            columns={columns}
+            gap={DENSITY_GAP[columns]}
+            renderItem={(photo, index) => {
+              const filename = photo.originalFilename?.split("/").pop() ?? `#${photo.orderIndex}`;
+              const comment = comments[photo.id]?.comment?.trim() ?? "";
+              return (
+                <button
+                  key={photo.id}
+                  type="button"
+                  className="locked-mobile-card"
+                  onClick={() => {
+                    if (Date.now() < suppressClickUntilRef.current) return;
+                    onOpen(visiblePhotos, index, scope === "selected" ? "선택된 원본" : "원본");
+                  }}
+                  aria-label={`${filename} 상세보기${selectedIds.has(photo.id) ? ", 선택됨" : ""}`}
+                >
+                  <span className="locked-mobile-image">
+                    {photo.url ? <img src={photo.url} alt="" loading="lazy" decoding="async" /> : <span className="locked-mobile-placeholder">NO IMG</span>}
+                    {scope === "original" && selectedIds.has(photo.id) && (
+                      <span className="locked-mobile-selected-check" aria-hidden>
+                        <Check size={12} strokeWidth={3} />
+                      </span>
+                    )}
                   </span>
-                )}
-              </span>
-              <span className="locked-mobile-meta">
-                {/* 파일명은 평소 감춘다 — 격자에서 읽는 것은 사진과 코멘트이고 이름은 상세보기가 말한다.
-                  * 두 경우에만 되살린다:
-                  *  1) 검색 중 — 파일명이 곧 작업의 대상이라 안 보이면 무엇이 왜 걸렸는지 알 수 없다.
-                  *  2) 상세보기를 열 수 없는 상태 — 그러면 격자가 이름이 나올 유일한 자리다. */}
-                {(normalizedQuery || !canOpenDetail) && <strong>{filename}</strong>}
-                {scope === "selected" && <small className={comment ? "has-comment" : ""}>{comment || "코멘트 없음"}</small>}
-              </span>
-            </button>
-          );
-        })}
-        {visiblePhotos.length === 0 && <p className="locked-mobile-empty">검색 결과가 없습니다.</p>}
+                  <span className="locked-mobile-meta">
+                    {/* 파일명은 평소 감춘다 — 격자에서 읽는 것은 사진과 코멘트이고 이름은 상세보기가 말한다.
+                      * 두 경우에만 되살린다:
+                      *  1) 검색 중 — 파일명이 곧 작업의 대상이라 안 보이면 무엇이 왜 걸렸는지 알 수 없다.
+                      *  2) 상세보기를 열 수 없는 상태 — 그러면 격자가 이름이 나올 유일한 자리다. */}
+                    {(normalizedQuery || !canOpenDetail) && <strong>{filename}</strong>}
+                    {scope === "selected" && <small className={comment ? "has-comment" : ""}>{comment || "코멘트 없음"}</small>}
+                  </span>
+                </button>
+              );
+            }}
+          />
+        ) : (
+          <p className="locked-mobile-empty">검색 결과가 없습니다.</p>
+        )}
       </main>
 
       <style>{`
@@ -323,7 +510,7 @@ function LockedMobileGallery({ token, selectedPhotos, allPhotos, selectedIds, co
         .locked-mobile-search-toggle { width: 30px; height: 30px; padding: 0; border: 1px solid #bfbfbf; border-radius: 4px; background: #fff; color: #7d7a75; display: grid; place-items: center; }
         .locked-mobile-search { height: 42px; margin: 0 20px 8px; padding: 0 12px; border: 1px solid #c6cbd0; border-radius: 6px; display: flex; align-items: center; gap: 8px; color: #7d7a75; }
         .locked-mobile-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #191918; font-size: 13px; }
-        .locked-mobile-grid { display: grid; gap: 8px; padding: 0 20px 20px; align-content: start; touch-action: pan-y; }
+        .locked-mobile-grid-wrap { padding: 0 20px 20px; touch-action: pan-y; }
         .locked-mobile-card { min-width: 0; padding: 4px 4px 8px; overflow: hidden; border: 1.5px solid #fff; border-radius: 4px; background: #f1f3f6; color: #191918; text-align: left; }
         .locked-mobile-image { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: 3px; background: #aab0b8; display: block; }
         .locked-density-2 .locked-mobile-image { aspect-ratio: 151.5 / 103.479; }
@@ -339,14 +526,10 @@ function LockedMobileGallery({ token, selectedPhotos, allPhotos, selectedIds, co
         .locked-mobile-meta strong { overflow: hidden; font-size: 10px; line-height: 16px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
         .locked-mobile-meta small { overflow: hidden; color: #787878; font-size: 8px; line-height: 14px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
         .locked-mobile-meta small.has-comment { color: #ff4d00; }
-        .locked-density-2 .locked-mobile-grid { gap: 10px; }
         .locked-density-3 .locked-mobile-image { aspect-ratio: 106.333 / 103.479; }
         .locked-density-4 .locked-mobile-image { aspect-ratio: 79.25 / 79; }
-        .locked-density-3 .locked-mobile-grid { gap: 8px; }
-        .locked-density-4 .locked-mobile-grid { gap: 6px; }
-        .locked-density-5 .locked-mobile-grid { gap: 4px; }
         .locked-density-3 .locked-mobile-card, .locked-density-4 .locked-mobile-card, .locked-density-5 .locked-mobile-card { padding: 0; }
-        .locked-mobile-empty { grid-column: 1 / -1; margin: 80px 0; color: #7d7a75; font-size: 13px; text-align: center; }
+        .locked-mobile-empty { margin: 80px 0; color: #7d7a75; font-size: 13px; text-align: center; }
       `}</style>
     </div>
   );
@@ -563,30 +746,34 @@ export default function LockedPage() {
           <div className="flex flex-col gap-6">
             <section>
               <SectionHeader label="선택된 원본" count={photos.length} tone="brand" />
-              <div className="lk-grid">
-                {photos.map((photo, index) => (
+              <VirtualizedPhotoGrid
+                items={photos}
+                hasFilenameRow={!canViewOriginals}
+                renderItem={(photo, index) => (
                   <SimplePhotoCard
                     key={photo.id}
                     photo={photo}
                     comment={photoStates[photo.id]?.comment ?? undefined}
                     onOpen={canViewOriginals ? () => setViewer({ photos, initialIndex: index, sectionLabel: "선택된 원본" }) : undefined}
                   />
-                ))}
-              </div>
+                )}
+              />
             </section>
 
             {showUnselected && (
               <section>
                 <SectionHeader label="선택하지 않은 원본" count={unselected.length} tone="muted" />
-                <div className="lk-grid">
-                  {unselected.map((photo, index) => (
+                <VirtualizedPhotoGrid
+                  items={unselected}
+                  hasFilenameRow={!canViewOriginals}
+                  renderItem={(photo, index) => (
                     <UnselectedPhotoCard
                       key={photo.id}
                       photo={photo}
                       onOpen={canViewOriginals ? () => setViewer({ photos: unselected, initialIndex: index, sectionLabel: "선택하지 않은 원본" }) : undefined}
                     />
-                  ))}
-                </div>
+                  )}
+                />
               </section>
             )}
           </div>
