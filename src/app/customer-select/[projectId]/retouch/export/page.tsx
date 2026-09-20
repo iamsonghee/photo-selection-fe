@@ -46,7 +46,7 @@ export default function RetouchExportPage() {
   }
 
   if (loading || redoList.length === 0) {
-    return <SystemLoadingScreen title={loading ? "재보정 요청을 불러오고 있어요" : "완료 화면으로 이동하고 있어요"} />;
+    return <SystemLoadingScreen title={loading ? "재보정 요청을 불러오고 있어요" : "완료 화면으로 이동하고 있어요"} homeHref="/customer-select" />;
   }
 
   return (

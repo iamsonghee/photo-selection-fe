@@ -21,7 +21,7 @@ export default function CustomerDonePage() {
   }
 
   if (loading) {
-    return <SystemLoadingScreen title="완료 상태를 확인하고 있어요" />;
+    return <SystemLoadingScreen title="완료 상태를 확인하고 있어요" homeHref="/customer-select" />;
   }
 
   return (

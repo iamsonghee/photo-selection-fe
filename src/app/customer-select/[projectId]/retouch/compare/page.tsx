@@ -107,7 +107,7 @@ export default function RetouchComparePage() {
   }
 
   if (loading) {
-    return <SystemLoadingScreen title="보정본을 불러오고 있어요" />;
+    return <SystemLoadingScreen title="보정본을 불러오고 있어요" homeHref="/customer-select" />;
   }
 
   return (

@@ -53,7 +53,7 @@ export default function CustomerExportPage() {
 
   // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
   if (!hydrated) {
-    return <SystemLoadingScreen title="전달 내용을 준비하고 있어요" />;
+    return <SystemLoadingScreen title="전달 내용을 준비하고 있어요" homeHref="/customer-select" />;
   }
 
   return (

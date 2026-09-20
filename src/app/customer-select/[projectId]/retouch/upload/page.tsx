@@ -81,7 +81,7 @@ export default function RetouchUploadPage() {
   }
 
   if (loading) {
-    return <SystemLoadingScreen title="보정본 정보를 불러오고 있어요" />;
+    return <SystemLoadingScreen title="보정본 정보를 불러오고 있어요" homeHref="/customer-select" />;
   }
 
   return (

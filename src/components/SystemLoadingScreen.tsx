@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 /**
  * 전체 화면 로딩 표시 — 고객·작가 화면이 공유하는 **단일** 진행 상태 컴포넌트.
  *
@@ -24,9 +26,11 @@
 export function SystemLoadingScreen({
   title = "페이지를 준비하고 있어요",
   description = "잠시만 기다려 주세요",
+  homeHref,
 }: {
   title?: string;
   description?: string;
+  homeHref?: string;
 }) {
   return (
     <div className="sls-root" role="status" aria-live="polite" aria-label={title}>
@@ -54,6 +58,8 @@ export function SystemLoadingScreen({
           font-family: 'Space Grotesk', sans-serif; font-size: 25px; line-height: 1; font-weight: 900;
           animation: sls-mark 1.8s ease-in-out infinite;
         }
+        .sls-home { border-radius: 13px; text-decoration: none; }
+        .sls-home:focus-visible { outline: 2px solid #ff4d00; outline-offset: 3px; }
         .sls-title { margin: 22px 0 0; font-size: 16px; line-height: 24px; font-weight: 700; letter-spacing: -.4px; }
         .sls-description { margin: 5px 0 0; color: #838b94; font-size: 12px; line-height: 19px; }
         .sls-track { width: 112px; height: 3px; margin-top: 24px; border-radius: 999px; overflow: hidden; background: #eef0f2; }
@@ -64,7 +70,11 @@ export function SystemLoadingScreen({
         }
       `}</style>
       <div className="sls-content">
-        <div className="sls-mark" aria-hidden>A</div>
+        {homeHref ? (
+          <Link href={homeHref} className="sls-home" aria-label="메인페이지로 이동">
+            <div className="sls-mark" aria-hidden>A</div>
+          </Link>
+        ) : <div className="sls-mark" aria-hidden>A</div>}
         <p className="sls-title">{title}</p>
         <p className="sls-description">{description}</p>
         <div className="sls-track" aria-hidden><div className="sls-progress" /></div>

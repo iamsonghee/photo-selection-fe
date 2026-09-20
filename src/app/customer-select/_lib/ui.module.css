@@ -249,6 +249,8 @@
 .selectHeader { flex: none; padding: 12px 24px 10px; border-bottom: 1px solid #e5e5e5; background: rgba(255,255,255,.98); box-shadow: 0 4px 16px rgba(25,25,24,.035); z-index: 20; }
 .selectHeaderTop { display: flex; align-items: center; gap: 12px; min-height: 40px; }
 .selectTitleGroup { min-width: 180px; display: flex; align-items: center; gap: 10px; }
+.selectBrandLink { flex: 0 0 auto; border-radius: 8px; text-decoration: none; }
+.selectBrandLink:focus-visible { outline: 2px solid #ff4d00; outline-offset: 2px; }
 .selectBrandMark { width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center; border-radius: 7px; background: #ff4d00; color: #fff; font-size: 14px; font-weight: 800; }
 .selectTitleGroup > div { min-width: 0; display: flex; flex-direction: column; }
 .selectEyebrow { color: #8b8985; font-size: 10px; line-height: 13px; }

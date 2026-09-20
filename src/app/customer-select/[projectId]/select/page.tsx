@@ -14,6 +14,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { AlertTriangle, CheckCircle2, EyeOff, Grid2X2, Share2, SlidersHorizontal, Star } from "lucide-react";
 import { getFilteredPhotos, type GalleryFilterState, type QualityFilterFlag } from "@/lib/gallery-filter";
 import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
@@ -22,6 +23,7 @@ import CustomerSelectionViewer, { type CustomerSelectionViewerAdapter } from "@/
 import { PhotoSortSelect } from "@/components/photographer/PhotoSortSelect";
 import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { SimilarityToggleButton } from "@/components/ui/SimilarityToggleButton";
+import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { SelectionContextOverride, type SelectionContextValue } from "@/contexts/SelectionContext";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import type { Project, SortOrder, StarRating } from "@/types";
@@ -251,7 +253,7 @@ export default function CustomerSelectGalleryPage() {
 
   // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
   if (!hydrated) {
-    return <div style={{ minHeight: "100dvh", background: "#f3f4f5" }} />;
+    return <SystemLoadingScreen title="셀렉 갤러리를 불러오고 있어요" homeHref="/customer-select" />;
   }
 
   return (
@@ -269,7 +271,9 @@ export default function CustomerSelectGalleryPage() {
         <div className={`${ui.selectHeader} ${compactHeader ? ui.selectHeaderCompact : ""}`}>
           <div className={ui.selectHeaderTop}>
             <div className={ui.selectTitleGroup}>
-              <span className={ui.selectBrandMark} aria-hidden>A</span>
+              <Link href="/customer-select" className={ui.selectBrandLink} aria-label="셀프 고객 메인으로 이동">
+                <span className={ui.selectBrandMark} aria-hidden>A</span>
+              </Link>
               <div>
                 <span className={ui.selectEyebrow}>사진 셀렉</span>
                 <strong className={ui.selectProjectName}>{project.name || "이름 없는 프로젝트"}</strong>
