@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { useRetouchData, markRetouchDone, latestVersion } from "../../_lib/retouch-store";
 import ui from "../../_lib/ui.module.css";
 
@@ -21,13 +22,7 @@ export default function CustomerDonePage() {
   }
 
   if (loading) {
-    return (
-      <div className={ui.shell}>
-        <header className={ui.brandbar}>
-          <BrandLogoBar size="sm" href="/customer-select" variant="default" />
-        </header>
-      </div>
-    );
+    return <SystemLoadingScreen title="완료 상태를 확인하고 있어요" />;
   }
 
   return (
@@ -36,7 +31,7 @@ export default function CustomerDonePage() {
         <BrandLogoBar size="sm" href="/customer-select" variant="default" />
       </header>
       <div className={ui.shellMain}>
-        <div className={ui.page} style={{ minHeight: "unset" }}>
+        <div className={ui.page}>
           <div className={ui.header}>
             <h1 className={ui.title}>완료</h1>
           </div>
@@ -49,7 +44,7 @@ export default function CustomerDonePage() {
             <p className={ui.entryTitle} style={{ textAlign: "center" }}>
               {retouchDone ? "모든 보정이 완료됐어요" : "확정된 보정본을 확인해주세요"}
             </p>
-            <div className={ui.statPill}>
+            <div className={ui.statPill} style={{ flex: "none" }}>
               <span className={ui.n}>{confirmedCount}장</span>
               <span className={ui.l}>확정된 사진</span>
             </div>

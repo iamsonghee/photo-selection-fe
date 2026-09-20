@@ -9,6 +9,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { buildVersionMapping, type MappingResult } from "@/lib/version-mapping";
 import { compressImagesInParallel } from "@/lib/upload-client-compress";
 import { UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
@@ -81,13 +82,7 @@ export default function RetouchUploadPage() {
   }
 
   if (loading) {
-    return (
-      <div className={ui.shell}>
-        <header className={ui.brandbar}>
-          <BrandLogoBar size="sm" href="/customer-select" variant="default" />
-        </header>
-      </div>
-    );
+    return <SystemLoadingScreen title="보정본 정보를 불러오고 있어요" />;
   }
 
   return (
@@ -96,7 +91,7 @@ export default function RetouchUploadPage() {
         <BrandLogoBar size="sm" href="/customer-select" variant="default" />
       </header>
       <div className={ui.shellMain}>
-        <div className={ui.page} style={{ minHeight: "unset" }}>
+        <div className={ui.page}>
           <div className={ui.header}>
             <button type="button" className={ui.back} onClick={() => router.back()}>
               ←

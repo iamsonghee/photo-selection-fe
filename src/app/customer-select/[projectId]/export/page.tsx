@@ -12,6 +12,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import { useCustomerSelectStore } from "../../_lib/real-store";
 import ui from "../../_lib/ui.module.css";
@@ -53,13 +54,7 @@ export default function CustomerExportPage() {
 
   // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
   if (!hydrated) {
-    return (
-      <div className={ui.shell}>
-        <header className={ui.brandbar}>
-          <BrandLogoBar size="sm" href="/customer-select" variant="default" />
-        </header>
-      </div>
-    );
+    return <SystemLoadingScreen title="전달 내용을 준비하고 있어요" />;
   }
 
   return (
@@ -68,7 +63,7 @@ export default function CustomerExportPage() {
         <BrandLogoBar size="sm" href="/customer-select" variant="default" />
       </header>
       <div className={ui.shellMain}>
-      <div className={ui.page} style={{ minHeight: "unset" }}>
+      <div className={ui.page}>
         <div className={ui.header}>
           <button type="button" className={ui.back} onClick={() => router.back()}>
             ←

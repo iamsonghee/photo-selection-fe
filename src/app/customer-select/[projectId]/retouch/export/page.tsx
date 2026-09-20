@@ -6,6 +6,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { useRetouchData, latestVersion } from "../../../_lib/retouch-store";
 import ui from "../../../_lib/ui.module.css";
 
@@ -46,13 +47,7 @@ export default function RetouchExportPage() {
   }
 
   if (loading || redoList.length === 0) {
-    return (
-      <div className={ui.shell}>
-        <header className={ui.brandbar}>
-          <BrandLogoBar size="sm" href="/customer-select" variant="default" />
-        </header>
-      </div>
-    );
+    return <SystemLoadingScreen title={loading ? "재보정 요청을 불러오고 있어요" : "완료 화면으로 이동하고 있어요"} />;
   }
 
   return (
@@ -61,7 +56,7 @@ export default function RetouchExportPage() {
         <BrandLogoBar size="sm" href="/customer-select" variant="default" />
       </header>
       <div className={ui.shellMain}>
-        <div className={ui.page} style={{ minHeight: "unset" }}>
+        <div className={ui.page}>
           <div className={ui.header}>
             <button type="button" className={ui.back} onClick={() => router.back()}>
               ←

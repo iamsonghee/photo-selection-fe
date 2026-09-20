@@ -6,6 +6,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { useHoldPreview } from "@/hooks/useHoldPreview";
 import { useRetouchData, setRetouchDecision, latestVersion, type RetouchPhoto, type RetouchVersion } from "../../../_lib/retouch-store";
 import ui from "../../../_lib/ui.module.css";
@@ -107,13 +108,7 @@ export default function RetouchComparePage() {
   }
 
   if (loading) {
-    return (
-      <div className={ui.shell}>
-        <header className={ui.brandbar}>
-          <BrandLogoBar size="sm" href="/customer-select" variant="default" />
-        </header>
-      </div>
-    );
+    return <SystemLoadingScreen title="보정본을 불러오고 있어요" />;
   }
 
   return (
@@ -122,7 +117,7 @@ export default function RetouchComparePage() {
         <BrandLogoBar size="sm" href="/customer-select" variant="default" />
       </header>
       <div className={ui.shellMain}>
-        <div className={ui.page} style={{ minHeight: "unset" }}>
+        <div className={ui.page}>
           <div className={ui.header}>
             <button type="button" className={ui.back} onClick={() => router.back()}>
               ←
@@ -130,7 +125,7 @@ export default function RetouchComparePage() {
             <h1 className={ui.title}>보정본 검토</h1>
           </div>
           <div className={ui.body}>
-            <div className={ui.statPill}>
+            <div className={ui.statPill} style={{ flex: "none" }}>
               <span className={ui.n}>{reviewed} / {withVersion.length}</span>
               <span className={ui.l}>검토 완료</span>
             </div>
@@ -144,6 +139,19 @@ export default function RetouchComparePage() {
               {withVersion.map(({ photo, version }) => (
                 <CompareCard key={photo.id} photo={photo} version={version} onDecide={(d, r) => handleDecide(version.id, d, r)} />
               ))}
+              {withVersion.length === 0 && (
+                <div className={`${ui.banner} ${ui.bannerWarn}`}>
+                  <span className={ui.bannerHeadWarn}>검토할 보정본이 없어요</span>
+                  <span className={ui.bodyText}>보정본을 먼저 업로드한 뒤 다시 확인해 주세요.</span>
+                  <button
+                    type="button"
+                    className={`${ui.btn} ${ui.btnSm}`}
+                    onClick={() => router.push(`/customer-select/${projectId}/retouch/upload${shareToken ? `?share_token=${shareToken}` : ""}`)}
+                  >
+                    보정본 업로드로 이동
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton

@@ -791,7 +791,16 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
   return (
     <div
       className="fs-page-root"
-      style={{ background: "#0f1113", height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column", position: "relative" }}
+      style={{
+        background: "#0f1113",
+        height: "100vh",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        position: adapter ? "fixed" : "relative",
+        inset: adapter ? 0 : undefined,
+        zIndex: adapter ? 100 : undefined,
+      }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >

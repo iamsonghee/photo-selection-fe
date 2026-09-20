@@ -127,7 +127,7 @@ export function CustomerSelectStoreProvider({
       const payload = JSON.stringify(shareToken ? { ...body, share_token: shareToken } : body);
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          const res = await fetch(`/api/customer-select/projects/${projectId}${path}`, {
+          const res = await fetch(`/api/customer-select/projects/${projectId}${path}${shareToken ? `?share_token=${encodeURIComponent(shareToken)}` : ""}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: payload,

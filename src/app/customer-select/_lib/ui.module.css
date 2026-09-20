@@ -249,6 +249,8 @@
 .selectHeader { flex: none; padding: 16px 24px 12px; border-bottom: 1px solid #e5e5e5; background: rgba(255,255,255,.97); box-shadow: 0 4px 16px rgba(25,25,24,.035); z-index: 20; }
 .selectHeaderTop { display: flex; align-items: center; gap: 10px; min-height: 32px; }
 .selectProjectName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; letter-spacing: -.35px; }
+.selectParticipants { display: flex; min-width: 0; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.selectParticipants::-webkit-scrollbar { display: none; }
 .selectStats { display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; color: #737373; }
 .selectProgress { height: 4px; margin-top: 7px; overflow: hidden; border-radius: 999px; background: #ededed; }
 .selectInsights { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; }
@@ -259,7 +261,9 @@
 .selectActions { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 10px 24px; border-top: 1px solid #e5e5e5; background: #fff; }
 @media (max-width: 767px) {
   .selectHeader { padding: 10px 12px 8px; }
+  .selectHeaderTop { flex-wrap: wrap; }
   .selectProjectName { font-size: 15px; }
+  .selectParticipants { order: 3; width: 100%; }
   .selectInsights { display: none; }
   .selectTabs { margin-top: 8px; }
   .selectGallery { padding: 8px; }

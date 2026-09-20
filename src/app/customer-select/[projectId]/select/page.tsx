@@ -187,28 +187,31 @@ export default function CustomerSelectGalleryPage() {
           <div className={ui.selectHeaderTop}>
             <strong className={ui.selectProjectName}>{project.name || "이름 없는 프로젝트"}</strong>
             <span style={{ flex: 1 }} />
-            {activeParticipants(project).map((p) => {
-              const isDone = project.participantDone[p.id];
-              return (
-                <span
-                  key={p.id}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "5px 11px",
-                    borderRadius: 999,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    background: isDone ? "#e7f5ee" : "#f7f6f4",
-                    color: isDone ? "#0f8a5f" : "#5f5e5b",
-                  }}
-                >
-                  <i style={{ width: 8, height: 8, borderRadius: "50%", background: p.hex, display: "block" }} />
-                  {p.name} {isDone ? "✓완료" : "●고르는 중"}
-                </span>
-              );
-            })}
+            <div className={ui.selectParticipants}>
+              {activeParticipants(project).map((p) => {
+                const isDone = project.participantDone[p.id];
+                return (
+                  <span
+                    key={p.id}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "5px 11px",
+                      borderRadius: 999,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      background: isDone ? "#e7f5ee" : "#f7f6f4",
+                      color: isDone ? "#0f8a5f" : "#5f5e5b",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <i style={{ width: 8, height: 8, borderRadius: "50%", background: p.hex, display: "block" }} />
+                    {p.name} {isDone ? "✓완료" : "●고르는 중"}
+                  </span>
+                );
+              })}
+            </div>
           </div>
           <div className={ui.selectStats}>
             <span>
