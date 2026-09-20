@@ -36,12 +36,14 @@
 .sectionTitleGroup p { margin-top:5px; color:var(--muted-foreground); font-size:12px; word-break:keep-all; }
 
 /* 대표 사진은 최우선 프로젝트에서만 크게 쓰고 나머지 작업은 빠르게 훑는 목록으로 낮춘다. */
-/* 이미지 칸은 grid stretch로 세로를 꽉 채운다(= aspect-ratio는 실질적으로 무시됨) — 그래서
- * 폭 자체를 넓혀야 사진이 가로로 넓게, 빈틈 없이 보인다(2026-09-20 사용자 피드백: 여백 대신
- * 꽉 찬 와이드 이미지를 원함). */
+/* 폭만 넓혀 사진이 가로로 넓게, 빈틈 없이 보이게 한다(2026-09-20 사용자 피드백). 높이는 운영
+ * 배포 버전 그대로 유지해야 해서(같은 요청) 예전 aspect-ratio:1이 실제로 만들어내던 값을
+ * 고정 높이로 옮겼다 — 이 대시보드는 PC 전용이라 실사용 폭에서 예전 clamp(240px,28%,280px)는
+ * 거의 항상 상한 280px로 고정 렌더링되고 있었다(1920px 폭 실측 확인). aspect-ratio를 그대로
+ * 두면 폭을 넓힌 만큼 정사각형도 커져 높이가 같이 늘어나므로, 높이는 폭과 분리해 고정한다. */
 .featuredTask { display:grid; grid-template-columns:clamp(320px,38%,420px) minmax(0,1fr); overflow:hidden; border:1px solid color-mix(in srgb,var(--accent) 18%,var(--border-subtle)); border-radius:16px; background:var(--surface); box-shadow:0 12px 32px color-mix(in srgb,var(--foreground) 5%,transparent); }
 .featuredTask[data-actor=customer] { border-color:color-mix(in srgb,var(--customer-foreground) 25%,var(--border-subtle)); }
-.featuredMedia { display:block; width:100%; height:100%; overflow:hidden; background:var(--surface-raised); }
+.featuredMedia { display:block; width:100%; height:280px; overflow:hidden; background:var(--surface-raised); }
 .featuredMedia img,.featuredMedia .placeholder { display:grid; width:100%; height:100%; border-radius:0; object-fit:cover; object-position:center; transition:transform .24s ease; }
 .featuredTask:hover .featuredMedia img { transform:scale(1.025); }
 .featuredBody { display:flex; flex-direction:column; min-width:0; padding:24px 26px; }
