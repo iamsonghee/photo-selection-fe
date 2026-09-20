@@ -6,7 +6,7 @@ import { resolveCustomerProjectAccess, shareTokenFromRequest } from "@/lib/custo
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: projectId } = await params;
   const admin = getAdminClient();
-  const access = await resolveCustomerProjectAccess(admin, projectId, shareTokenFromRequest(req));
+  const access = await resolveCustomerProjectAccess(admin, projectId, shareTokenFromRequest(req, projectId));
   if (access instanceof NextResponse) return access;
 
   const body = await req.json().catch(() => ({}));

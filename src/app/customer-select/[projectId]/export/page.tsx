@@ -8,7 +8,7 @@
  * 실제 서비스 구현 때 위 기존 로직을 연결한다.
  */
 import { useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -31,7 +31,6 @@ function buildExportText(
 
 export default function CustomerExportPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const shareToken = useSearchParams().get("share_token");
   const router = useRouter();
   const { project, hydrated, update } = useCustomerSelectStore();
   const [copyState, setCopyState] = useState<"idle" | "ok" | "fail">("idle");
@@ -91,7 +90,7 @@ export default function CustomerExportPage() {
           leading={<p className="text-sm text-muted-foreground">전달하셨나요?</p>}
           actions={<>
             <PhotographerLightButton variant="secondary" onClick={() => update({ exported: true })}>{project.exported ? "전달 완료됨 ✓" : "전달 완료로 표시"}</PhotographerLightButton>
-            {project.exported ? <PhotographerLightButton onClick={() => router.push(`/customer-select/${projectId}/retouch/upload${shareToken ? `?share_token=${shareToken}` : ""}`)}>보정본 업로드하기</PhotographerLightButton> : null}
+            {project.exported ? <PhotographerLightButton onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>보정본 업로드하기</PhotographerLightButton> : null}
           </>}
         />
       </div>

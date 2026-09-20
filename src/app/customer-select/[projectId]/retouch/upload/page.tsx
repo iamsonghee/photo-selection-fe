@@ -5,7 +5,7 @@
  * 그대로 재사용한다(단계 1 결정) — 정확일치 → 접미사 제거 매칭, 실패분은 수동 지정.
  */
 import { useMemo, useRef, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -18,9 +18,8 @@ import ui from "../../../_lib/ui.module.css";
 
 export default function RetouchUploadPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const shareToken = useSearchParams().get("share_token");
   const router = useRouter();
-  const { photos, loading, refresh } = useRetouchData(projectId, shareToken);
+  const { photos, loading, refresh } = useRetouchData(projectId);
 
   const [files, setFiles] = useState<File[]>([]);
   const [mapping, setMapping] = useState<MappingResult<RetouchPhoto>[]>([]);
@@ -71,9 +70,9 @@ export default function RetouchUploadPage() {
       } catch {
         compressed = pairs.map((p) => p.file);
       }
-      await uploadRetouched(projectId, shareToken, compressed, pairs.map((p) => p.photoId));
+      await uploadRetouched(projectId, compressed, pairs.map((p) => p.photoId));
       await refresh();
-      router.push(`/customer-select/${projectId}/retouch/compare${shareToken ? `?share_token=${shareToken}` : ""}`);
+      router.push(`/customer-select/${projectId}/retouch/compare`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "업로드 실패");
     } finally {

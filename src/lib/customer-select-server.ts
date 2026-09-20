@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { customerShareCookieName } from "@/lib/customer-select-share-auth";
 import type { ColorTag, Photo, StarRating } from "@/types";
 
 export async function getCurrentCustomerAuthId(): Promise<string | null> {
@@ -55,8 +56,13 @@ export async function resolveCustomerProjectAccess(
   return NextResponse.json({ error: "이 프로젝트에 접근할 권한이 없습니다." }, { status: 403 });
 }
 
-export function shareTokenFromRequest(req: NextRequest): string | null {
-  return req.nextUrl.searchParams.get("share_token") ?? req.headers.get("x-share-token");
+export function shareTokenFromRequest(req: NextRequest, projectId: string): string | null {
+  return (
+    req.nextUrl.searchParams.get("share_token") ??
+    req.headers.get("x-share-token") ??
+    req.cookies.get(customerShareCookieName(projectId))?.value ??
+    null
+  );
 }
 
 interface CustomerPhotoRow {

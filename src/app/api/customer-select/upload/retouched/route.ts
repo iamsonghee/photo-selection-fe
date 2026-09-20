@@ -1,11 +1,19 @@
+import { NextRequest } from "next/server";
+import { shareTokenFromRequest } from "@/lib/customer-select-server";
+
 const BACKEND_URL = process.env.BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export const maxDuration = 60;
 
 /** 순수 프록시 — /api/customer-select/upload/photos와 동일 패턴, 대상 엔드포인트만 다르다. */
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   const auth = req.headers.get("Authorization") ?? "";
   const formData = await req.formData();
+  const projectId = formData.get("project_id");
+  if (typeof projectId === "string" && !formData.has("share_token")) {
+    const shareToken = shareTokenFromRequest(req, projectId);
+    if (shareToken) formData.append("share_token", shareToken);
+  }
   const res = await fetch(`${BACKEND_URL}/api/customer-upload/retouched`, {
     method: "POST",
     headers: auth ? { Authorization: auth } : {},

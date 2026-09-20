@@ -1,7 +1,7 @@
 "use client";
 
 /** S13 — 완료. */
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -11,13 +11,12 @@ import ui from "../../_lib/ui.module.css";
 
 export default function CustomerDonePage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const shareToken = useSearchParams().get("share_token");
-  const { photos, retouchDone, loading, refresh } = useRetouchData(projectId, shareToken);
+  const { photos, retouchDone, loading, refresh } = useRetouchData(projectId);
 
   const confirmedCount = photos.filter((p) => latestVersion(p)?.decision === "confirmed").length;
 
   async function handleDone() {
-    await markRetouchDone(projectId, shareToken, true);
+    await markRetouchDone(projectId, true);
     await refresh();
   }
 

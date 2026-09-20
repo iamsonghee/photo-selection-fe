@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { isAdminEmail } from "@/lib/admin-emails";
+import {
+  CUSTOMER_SHARE_COOKIE_MAX_AGE,
+  customerProjectIdFromPath,
+  customerShareCookieName,
+} from "@/lib/customer-select-share-auth";
 
 const COOKIE_TTL_SECONDS = 86400;
 
@@ -153,6 +158,47 @@ async function getCustomerPin(token: string): Promise<CustomerPinLookup> {
   return { found: true, accessPin: rows[0].access_pin };
 }
 
+async function isValidCustomerShareToken(projectId: string, shareToken: string): Promise<boolean> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) throw new Error("Supabase admin env is not set");
+
+  const endpoint = new URL("/rest/v1/customer_projects", url);
+  endpoint.searchParams.set("select", "id");
+  endpoint.searchParams.set("id", `eq.${projectId}`);
+  endpoint.searchParams.set("share_token", `eq.${shareToken}`);
+  endpoint.searchParams.set("limit", "1");
+  const response = await fetch(endpoint, {
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+    },
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`customer share token lookup failed: ${response.status}`);
+  return ((await response.json()) as Array<{ id: string }>).length > 0;
+}
+
+async function exchangeCustomerShareToken(req: NextRequest, projectId: string, shareToken: string): Promise<NextResponse> {
+  const cleanUrl = req.nextUrl.clone();
+  cleanUrl.searchParams.delete("share_token");
+
+  const isProjectId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(projectId);
+  if (!isProjectId || shareToken.length > 256 || !(await isValidCustomerShareToken(projectId, shareToken))) {
+    return NextResponse.redirect(cleanUrl);
+  }
+
+  const response = NextResponse.redirect(cleanUrl);
+  response.cookies.set(customerShareCookieName(projectId), shareToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: CUSTOMER_SHARE_COOKIE_MAX_AGE,
+    path: "/",
+  });
+  return response;
+}
+
 export async function middleware(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
 
@@ -162,6 +208,17 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     url.protocol = "https";
     url.host = "acut.kr";
     return NextResponse.redirect(url, 308);
+  }
+
+  const customerProjectId = customerProjectIdFromPath(pathname);
+  const customerShareToken = req.nextUrl.searchParams.get("share_token");
+  if (customerProjectId && customerShareToken) {
+    try {
+      return await exchangeCustomerShareToken(req, customerProjectId, customerShareToken);
+    } catch (error) {
+      console.error("[middleware/customer-share-token]", error);
+      return NextResponse.json({ error: "공유 링크를 확인하지 못했습니다." }, { status: 503 });
+    }
   }
 
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {

@@ -6,7 +6,7 @@
  * 그대로 재사용한다(단계 0 분석 결과). 압축된 결과만 BE로 전송, 썸네일·프리뷰 생성은 BE 담당.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft, ImagePlus, Loader2, Trash2, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
@@ -33,7 +33,6 @@ const COMPRESS_POOL_SIZE = 3;
 export default function CustomerUploadPage() {
   const params = useParams();
   const projectId = params.projectId as string;
-  const shareToken = useSearchParams().get("share_token");
   const router = useRouter();
   const { project, hydrated, refresh } = useCustomerSelectStore();
   const [progress, setProgress] = useState(0);
@@ -110,7 +109,6 @@ export default function CustomerUploadPage() {
 
       const formData = new FormData();
       formData.append("project_id", projectId);
-      if (shareToken) formData.append("share_token", shareToken);
       batch.forEach((f) => formData.append("files", f));
       try {
         const res = await fetch("/api/customer-select/upload/photos", { method: "POST", headers: authHeader, body: formData });
@@ -142,11 +140,10 @@ export default function CustomerUploadPage() {
 
   async function startAiAnalysis() {
     setAiStarting(true);
-    const suffix = shareToken ? `?share_token=${encodeURIComponent(shareToken)}` : "";
     try {
       const requests = [
-        aiWantSimilar && fetch(`/api/customer-select/projects/${projectId}/ai/similarity${suffix}`, { method: "POST" }),
-        aiWantQuality && fetch(`/api/customer-select/projects/${projectId}/ai/quality${suffix}`, { method: "POST" }),
+        aiWantSimilar && fetch(`/api/customer-select/projects/${projectId}/ai/similarity`, { method: "POST" }),
+        aiWantQuality && fetch(`/api/customer-select/projects/${projectId}/ai/quality`, { method: "POST" }),
       ].filter(Boolean) as Promise<Response>[];
       const responses = await Promise.all(requests);
       const failed = responses.find((response) => !response.ok);
@@ -165,11 +162,10 @@ export default function CustomerUploadPage() {
   }
 
   async function pollAiAnalysis(kinds: string[]) {
-    const suffix = shareToken ? `?share_token=${encodeURIComponent(shareToken)}` : "";
     for (let attempt = 0; attempt < 150; attempt += 1) {
       await new Promise((resolve) => window.setTimeout(resolve, 4000));
       const statuses = await Promise.all(kinds.map(async (kind) => {
-        const response = await fetch(`/api/customer-select/projects/${projectId}/ai/${kind}${suffix}`);
+        const response = await fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`);
         if (!response.ok) return "failed";
         return (await response.json()).status as string | null;
       }));
@@ -194,7 +190,7 @@ export default function CustomerUploadPage() {
       const res = await fetch("/api/customer-select/upload/photos", {
         method: "DELETE",
         headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
-        body: JSON.stringify({ project_id: projectId, photo_ids: [...selectedPhotoIds], share_token: shareToken }),
+        body: JSON.stringify({ project_id: projectId, photo_ids: [...selectedPhotoIds] }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "사진 삭제 실패");
@@ -354,7 +350,7 @@ export default function CustomerUploadPage() {
           mobileLeading={uploadStatus}
           actions={uploading ? null : <>
             {selectedPhotoIds.size > 0 ? <PhotographerLightButton variant="danger" pending={deleting} pendingLabel="삭제 중" onClick={deleteSelectedPhotos}><Trash2 size={16} />선택 삭제 ({selectedPhotoIds.size.toLocaleString()})</PhotographerLightButton> : null}
-            <PhotographerLightButton disabled={project.photoCount === 0 || deleting} onClick={() => router.push(`/customer-select/${projectId}/select${shareToken ? `?share_token=${shareToken}` : ""}`)}>셀렉 시작하기{project.photoCount > 0 ? ` (${project.photoCount}장)` : ""}</PhotographerLightButton>
+            <PhotographerLightButton disabled={project.photoCount === 0 || deleting} onClick={() => router.push(`/customer-select/${projectId}/select`)}>셀렉 시작하기{project.photoCount > 0 ? ` (${project.photoCount}장)` : ""}</PhotographerLightButton>
           </>}
         />
       </div>

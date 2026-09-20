@@ -2,7 +2,7 @@
 
 /** S11 — 원본·보정본 비교 검토. 누르는 동안 원본 표시는 기존 useHoldPreview를 재사용한다. */
 import { useMemo, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -90,9 +90,8 @@ function CompareCard({
 
 export default function RetouchComparePage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const shareToken = useSearchParams().get("share_token");
   const router = useRouter();
-  const { photos, loading, refresh } = useRetouchData(projectId, shareToken);
+  const { photos, loading, refresh } = useRetouchData(projectId);
 
   const withVersion = useMemo(
     () => photos.map((p) => ({ photo: p, version: latestVersion(p) })).filter((x): x is { photo: RetouchPhoto; version: RetouchVersion } => !!x.version),
@@ -103,7 +102,7 @@ export default function RetouchComparePage() {
   const allReviewed = withVersion.length > 0 && reviewed === withVersion.length;
 
   async function handleDecide(versionId: string, decision: "confirmed" | "redo", reason?: string) {
-    await setRetouchDecision(projectId, shareToken, versionId, decision, reason);
+    await setRetouchDecision(projectId, versionId, decision, reason);
     await refresh();
   }
 
@@ -146,7 +145,7 @@ export default function RetouchComparePage() {
                   <button
                     type="button"
                     className={`${ui.btn} ${ui.btnSm}`}
-                    onClick={() => router.push(`/customer-select/${projectId}/retouch/upload${shareToken ? `?share_token=${shareToken}` : ""}`)}
+                    onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}
                   >
                     보정본 업로드로 이동
                   </button>
@@ -156,7 +155,7 @@ export default function RetouchComparePage() {
           </div>
           <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton
               disabled={!allReviewed}
-              onClick={() => router.push(`/customer-select/${projectId}/retouch/export${shareToken ? `?share_token=${shareToken}` : ""}`)}
+              onClick={() => router.push(`/customer-select/${projectId}/retouch/export`)}
             >
               검토 마치기{!allReviewed && withVersion.length > 0 ? ` (${withVersion.length - reviewed}장 남음)` : ""}
             </PhotographerLightButton>} />

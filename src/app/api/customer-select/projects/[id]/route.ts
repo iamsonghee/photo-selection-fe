@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const admin = getAdminClient();
-  const access = await resolveCustomerProjectAccess(admin, id, shareTokenFromRequest(req));
+  const access = await resolveCustomerProjectAccess(admin, id, shareTokenFromRequest(req, id));
   if (access instanceof NextResponse) return access;
   const { project } = access;
 
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const admin = getAdminClient();
-  const access = await resolveCustomerProjectAccess(admin, id, shareTokenFromRequest(req));
+  const access = await resolveCustomerProjectAccess(admin, id, shareTokenFromRequest(req, id));
   if (access instanceof NextResponse) return access;
 
   const body = await req.json().catch(() => ({}));

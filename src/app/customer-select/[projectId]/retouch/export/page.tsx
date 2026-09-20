@@ -2,7 +2,7 @@
 
 /** S12 — 재보정 요청 전달. 1차 S8과 같은 형식(복사/CSV/TXT — 복사만 실동작, 나머지는 실제 서비스에서). */
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -12,9 +12,8 @@ import ui from "../../../_lib/ui.module.css";
 
 export default function RetouchExportPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const shareToken = useSearchParams().get("share_token");
   const router = useRouter();
-  const { photos, loading } = useRetouchData(projectId, shareToken);
+  const { photos, loading } = useRetouchData(projectId);
   const [copyState, setCopyState] = useState<"idle" | "ok" | "fail">("idle");
 
   const redoList = useMemo(() => {
@@ -23,7 +22,7 @@ export default function RetouchExportPage() {
       .filter((x) => x.version?.decision === "redo") as { photo: (typeof photos)[number]; version: NonNullable<ReturnType<typeof latestVersion>> }[];
   }, [photos]);
 
-  const doneHref = `/customer-select/${projectId}/done${shareToken ? `?share_token=${shareToken}` : ""}`;
+  const doneHref = `/customer-select/${projectId}/done`;
 
   useEffect(() => {
     // 재보정 0건이면 S13으로 바로 이동(단계 1 결정).
@@ -78,7 +77,7 @@ export default function RetouchExportPage() {
               </button>
             </div>
           </div>
-          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton onClick={() => router.push(`/customer-select/${projectId}/retouch/upload${shareToken ? `?share_token=${shareToken}` : ""}`)}>다음 보정본 기다리기</PhotographerLightButton>} />
+          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>다음 보정본 기다리기</PhotographerLightButton>} />
         </div>
       </div>
     </div>

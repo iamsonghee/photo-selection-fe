@@ -1,7 +1,7 @@
 "use client";
 
 /** S7 — 최종 검토. */
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -19,7 +19,6 @@ import ui from "../../_lib/ui.module.css";
 export default function CustomerReviewPage() {
   const params = useParams();
   const projectId = params.projectId as string;
-  const shareToken = useSearchParams().get("share_token");
   const router = useRouter();
   const { project, hydrated } = useCustomerSelectStore();
 
@@ -132,8 +131,8 @@ export default function CustomerReviewPage() {
         <PhotographerPageActionBar
           maxWidth={1120}
           actions={<>
-            <PhotographerLightButton variant="secondary" onClick={() => router.push(`/customer-select/${projectId}/select${shareToken ? `?share_token=${shareToken}` : ""}`)}>더 고르기</PhotographerLightButton>
-            <PhotographerLightButton disabled={selected.length === 0} onClick={() => router.push(`/customer-select/${projectId}/export${shareToken ? `?share_token=${shareToken}` : ""}`)}>전달 내용 만들기</PhotographerLightButton>
+            <PhotographerLightButton variant="secondary" onClick={() => router.push(`/customer-select/${projectId}/select`)}>더 고르기</PhotographerLightButton>
+            <PhotographerLightButton disabled={selected.length === 0} onClick={() => router.push(`/customer-select/${projectId}/export`)}>전달 내용 만들기</PhotographerLightButton>
           </>}
         />
       </div>

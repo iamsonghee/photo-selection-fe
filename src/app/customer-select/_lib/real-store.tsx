@@ -7,7 +7,6 @@
  * 공유 링크 참가자는 로그인하지 않음).
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import type { ColorTag, Photo, StarRating } from "@/types";
 
 export const COLOR_PALETTE: { id: ColorTag; hex: string }[] = [
@@ -99,8 +98,6 @@ export function CustomerSelectStoreProvider({
   projectId: string;
   children: React.ReactNode;
 }) {
-  const searchParams = useSearchParams();
-  const shareToken = searchParams.get("share_token");
   const [project, setProject] = useState<ProjectView>(() => emptyProject(projectId));
   const [hydrated, setHydrated] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
@@ -108,11 +105,10 @@ export function CustomerSelectStoreProvider({
   const claimedRef = useRef(false);
 
   const apiGet = useCallback(async () => {
-    const qs = shareToken ? `?share_token=${encodeURIComponent(shareToken)}` : "";
-    const res = await fetch(`/api/customer-select/projects/${projectId}${qs}`, { cache: "no-store" });
+    const res = await fetch(`/api/customer-select/projects/${projectId}`, { cache: "no-store" });
     if (!res.ok) return null;
     return (await res.json()) as { project: ProjectView; isOwner: boolean };
-  }, [projectId, shareToken]);
+  }, [projectId]);
 
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -124,10 +120,10 @@ export function CustomerSelectStoreProvider({
    */
   const apiPost = useCallback(
     async (path: string, body: Record<string, unknown>, onFinalFailure?: () => void) => {
-      const payload = JSON.stringify(shareToken ? { ...body, share_token: shareToken } : body);
+      const payload = JSON.stringify(body);
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          const res = await fetch(`/api/customer-select/projects/${projectId}${path}${shareToken ? `?share_token=${encodeURIComponent(shareToken)}` : ""}`, {
+          const res = await fetch(`/api/customer-select/projects/${projectId}${path}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: payload,
@@ -141,7 +137,7 @@ export function CustomerSelectStoreProvider({
       onFinalFailure?.();
       setSaveError("저장하지 못했습니다. 인터넷 연결을 확인해 주세요.");
     },
-    [projectId, shareToken]
+    [projectId]
   );
 
   const refresh = useCallback(async () => {
@@ -187,14 +183,14 @@ export function CustomerSelectStoreProvider({
     (patch: { exported?: boolean }) => {
       setProject((prev) => ({ ...prev, ...patch }));
       if (typeof patch.exported === "boolean") {
-        fetch(`/api/customer-select/projects/${projectId}${shareToken ? `?share_token=${encodeURIComponent(shareToken)}` : ""}`, {
+        fetch(`/api/customer-select/projects/${projectId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ exported: patch.exported }),
         }).catch(() => {});
       }
     },
-    [projectId, shareToken]
+    [projectId]
   );
 
   const toggleSelect = useCallback(

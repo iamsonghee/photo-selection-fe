@@ -6,7 +6,7 @@ const CLIP_SERVICE_URL = process.env.CLIP_SERVICE_URL ?? "";
 const CLIP_INTERNAL_TOKEN = process.env.CLIP_INTERNAL_TOKEN ?? "";
 
 async function authorize(req: NextRequest, id: string) {
-  return resolveCustomerProjectAccess(getAdminClient(), id, shareTokenFromRequest(req));
+  return resolveCustomerProjectAccess(getAdminClient(), id, shareTokenFromRequest(req, id));
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string; kind: string }> }) {

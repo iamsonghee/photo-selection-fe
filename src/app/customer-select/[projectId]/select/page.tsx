@@ -12,7 +12,7 @@
  * 필터링은 기존 `@/lib/gallery-filter`의 순수 함수를 그대로 쓴다(재사용 대상으로 이미 검증됨).
  */
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { getFilteredPhotos, type GalleryFilterState } from "@/lib/gallery-filter";
 import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
@@ -50,7 +50,6 @@ export default function CustomerSelectGalleryPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const router = useRouter();
-  const shareToken = useSearchParams().get("share_token");
   const { project, hydrated, currentIdentity, shareUrl, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, saveError, clearSaveError } =
     useCustomerSelectStore();
 
@@ -138,9 +137,9 @@ export default function CustomerSelectGalleryPage() {
     viewerHref: (photoId) => `#photo-${photoId}`,
     galleryHref: "#",
     onClose: () => setOpenPhotoId(null),
-    onReview: () => router.push(`/customer-select/${projectId}/review${shareToken ? `?share_token=${shareToken}` : ""}`),
+    onReview: () => router.push(`/customer-select/${projectId}/review`),
     onSaveParticipant: (participant) => setNickname(participant.initial),
-  }) : null, [openPhotoId, projectId, currentIdentity, project.participantNicknames, router, shareToken, setNickname]);
+  }) : null, [openPhotoId, projectId, currentIdentity, project.participantNicknames, router, setNickname]);
 
   // 마일스톤 토스트는 세션당 한 번만 — 넘어선 기준값을 로컬 상태에만 기록한다
   // (목업 범위: 화면 검증이 목적이라 영속은 불필요).
@@ -308,7 +307,7 @@ export default function CustomerSelectGalleryPage() {
           N={target}
           position="static"
           disabled={selectedCount === 0}
-          onConfirm={() => router.push(`/customer-select/${projectId}/review${shareToken ? `?share_token=${shareToken}` : ""}`)}
+          onConfirm={() => router.push(`/customer-select/${projectId}/review`)}
           buttonLabel="선택 확정하기"
           theme="customerLight"
           mobileGallery
