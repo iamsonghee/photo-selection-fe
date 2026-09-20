@@ -36,9 +36,11 @@
 .sectionTitleGroup p { margin-top:5px; color:var(--muted-foreground); font-size:12px; word-break:keep-all; }
 
 /* 대표 사진은 최우선 프로젝트에서만 크게 쓰고 나머지 작업은 빠르게 훑는 목록으로 낮춘다. */
-.featuredTask { display:grid; grid-template-columns:clamp(240px,28%,280px) minmax(0,1fr); overflow:hidden; border:1px solid color-mix(in srgb,var(--accent) 18%,var(--border-subtle)); border-radius:16px; background:var(--surface); box-shadow:0 12px 32px color-mix(in srgb,var(--foreground) 5%,transparent); }
+.featuredTask { display:grid; grid-template-columns:clamp(240px,28%,280px) minmax(0,1fr); align-items:start; overflow:hidden; border:1px solid color-mix(in srgb,var(--accent) 18%,var(--border-subtle)); border-radius:16px; background:var(--surface); box-shadow:0 12px 32px color-mix(in srgb,var(--foreground) 5%,transparent); }
 .featuredTask[data-actor=customer] { border-color:color-mix(in srgb,var(--customer-foreground) 25%,var(--border-subtle)); }
-.featuredMedia { display:block; width:100%; aspect-ratio:1; overflow:hidden; background:var(--surface-raised); }
+/* 아래 최근 프로젝트 카드(.recentMedia)와 같은 16:9 — 정사각형은 우측 본문 대비 이미지가
+ * 필요 이상으로 세로로 길어져 오른쪽 여백만 늘리는 결과였다(2026-09-20 사용자 피드백). */
+.featuredMedia { display:block; width:100%; aspect-ratio:16/9; overflow:hidden; background:var(--surface-raised); }
 .featuredMedia img,.featuredMedia .placeholder { display:grid; width:100%; height:100%; border-radius:0; object-fit:cover; object-position:center; transition:transform .24s ease; }
 .featuredTask:hover .featuredMedia img { transform:scale(1.025); }
 .featuredBody { display:flex; flex-direction:column; min-width:0; padding:24px 26px; }
