@@ -21,11 +21,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (photosRes.error || selectionsRes.error || participantsRes.error || qualityRes.error) {
     return NextResponse.json({ error: "조회 실패" }, { status: 500 });
   }
+  const projectView = buildProjectView(project, photosRes.data ?? [], selectionsRes.data ?? [], participantsRes.data ?? [], qualityRes.data ?? []);
+  if (!access.isOwner) projectView.shareToken = "";
   return NextResponse.json(
-    {
-      project: buildProjectView(project, photosRes.data ?? [], selectionsRes.data ?? [], participantsRes.data ?? [], qualityRes.data ?? []),
-      isOwner: access.isOwner,
-    },
+    { project: projectView, isOwner: access.isOwner },
     { headers: { "Cache-Control": "no-store" } }
   );
 }

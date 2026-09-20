@@ -11,52 +11,70 @@
  *
  * 필터링은 기존 `@/lib/gallery-filter`의 순수 함수를 그대로 쓴다(재사용 대상으로 이미 검증됨).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useParams, useRouter } from "next/navigation";
-import { getFilteredPhotos, type GalleryFilterState } from "@/lib/gallery-filter";
+import { AlertTriangle, CheckCircle2, EyeOff, Grid2X2, Share2, SlidersHorizontal, Star } from "lucide-react";
+import { getFilteredPhotos, type GalleryFilterState, type QualityFilterFlag } from "@/lib/gallery-filter";
 import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
 import CustomerSelectionViewer, { type CustomerSelectionViewerAdapter } from "@/components/customer/CustomerSelectionViewer";
+import { PhotoSortSelect } from "@/components/photographer/PhotoSortSelect";
+import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
+import { SimilarityToggleButton } from "@/components/ui/SimilarityToggleButton";
 import { SelectionContextOverride, type SelectionContextValue } from "@/contexts/SelectionContext";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
-import type { Project, StarRating } from "@/types";
+import type { Project, SortOrder, StarRating } from "@/types";
 import {
   activeParticipants,
   disagreementIds,
-  reviewedPhotoIds,
-  tasteMatchPct,
-  bothDone,
   useCustomerSelectStore,
 } from "../../_lib/real-store";
+import { collapseSimilarityGroups } from "../../_lib/gallery-view";
 import { NicknamePrompt } from "../../_lib/NicknamePrompt";
 import ui from "../../_lib/ui.module.css";
 
 type Tab = "all" | "selected" | "disagree" | "mine";
 
-const EMPTY_FILTER: GalleryFilterState = {
-  starFilter: "all",
-  colorFilter: "all",
-  colorFilterMode: "any",
-  selectedFilter: "all",
-  sortOrder: "oldest",
-  nameFilter: "",
-  qualityFilter: [],
-  groupedView: false,
-};
+type MobileColumns = 2 | 3 | 4;
+type GridLayout = { cols: number; gap: number; rowHeight: number };
 
-const MILESTONES = [100, 400];
+const DESKTOP_GRID_MIN_CELL = 180;
+const DESKTOP_GRID_GAP = 12;
+const MOBILE_GRID: Record<MobileColumns, { gap: number; aspect: number }> = {
+  2: { gap: 10, aspect: 4 / 3 },
+  3: { gap: 8, aspect: 1 },
+  4: { gap: 6, aspect: 1 },
+};
+const SORT_OPTIONS: ReadonlyArray<{ value: SortOrder; label: string }> = [
+  { value: "oldest", label: "번호순" },
+  { value: "filename", label: "파일명순" },
+  { value: "newest", label: "최신순" },
+];
 
 export default function CustomerSelectGalleryPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const router = useRouter();
-  const { project, hydrated, currentIdentity, shareUrl, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, saveError, clearSaveError } =
+  const { project, hydrated, isOwner, currentIdentity, shareUrl, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, saveError, clearSaveError } =
     useCustomerSelectStore();
 
   const [tab, setTab] = useState<Tab>("all");
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [thumbQueue] = useState(() => createThumbLoadQueue(12));
+  const [nameFilter, setNameFilter] = useState("");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("oldest");
+  const [starFilter, setStarFilter] = useState<StarRating | "all">("all");
+  const [qualityFilter, setQualityFilter] = useState<QualityFilterFlag[]>([]);
+  const [groupedView, setGroupedView] = useState(false);
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => new Set());
+  const [mobileColumns, setMobileColumns] = useState<MobileColumns>(2);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [compactHeader, setCompactHeader] = useState(false);
+  const [layout, setLayout] = useState<GridLayout>({ cols: 4, gap: DESKTOP_GRID_GAP, rowHeight: DESKTOP_GRID_MIN_CELL + DESKTOP_GRID_GAP });
+  const galleryRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   async function handleShare() {
     try {
@@ -70,6 +88,7 @@ export default function CustomerSelectGalleryPage() {
 
   const selectedIds = useMemo(() => new Set(project.selectedIds), [project.selectedIds]);
   const disagree = useMemo(() => new Set(disagreementIds(project)), [project]);
+  const participants = useMemo(() => activeParticipants(project), [project]);
 
   const baseList = useMemo(() => {
     if (tab === "selected") return project.photos.filter((p) => selectedIds.has(p.id));
@@ -78,18 +97,53 @@ export default function CustomerSelectGalleryPage() {
     return project.photos;
   }, [tab, project.photos, project.photoStates, selectedIds, disagree, currentIdentity]);
 
+  const filterState = useMemo<GalleryFilterState>(() => ({
+    starFilter,
+    colorFilter: "all",
+    colorFilterMode: "any",
+    selectedFilter: "all",
+    sortOrder,
+    nameFilter,
+    qualityFilter,
+    groupedView,
+  }), [groupedView, nameFilter, qualityFilter, sortOrder, starFilter]);
+  const filteredList = useMemo(
+    () => getFilteredPhotos(baseList, selectedIds, project.photoStates, filterState),
+    [baseList, selectedIds, project.photoStates, filterState]
+  );
+  const groupMembers = useMemo(() => {
+    const groups = new Map<string, typeof filteredList>();
+    filteredList.forEach((photo) => {
+      if (!photo.similarityGroupId) return;
+      const members = groups.get(photo.similarityGroupId) ?? [];
+      members.push(photo);
+      groups.set(photo.similarityGroupId, members);
+    });
+    return groups;
+  }, [filteredList]);
+  const similarityGroupCount = useMemo(
+    () => Array.from(groupMembers.values()).filter((members) => members.length > 1).length,
+    [groupMembers]
+  );
+  const groupOrdinal = useMemo(() => {
+    const ordinals = new Map<string, number>();
+    let index = 0;
+    groupMembers.forEach((members, groupId) => {
+      if (members.length > 1) ordinals.set(groupId, ++index);
+    });
+    return ordinals;
+  }, [groupMembers]);
   const list = useMemo(
-    () => getFilteredPhotos(baseList, selectedIds, project.photoStates, EMPTY_FILTER),
-    [baseList, selectedIds, project.photoStates]
+    () => groupedView ? collapseSimilarityGroups(filteredList, expandedGroupIds) : filteredList,
+    [expandedGroupIds, filteredList, groupedView]
   );
 
-  const reviewedCount = reviewedPhotoIds(project).length;
-  const match = tasteMatchPct(project);
   const disagreeCount = disagreementIds(project).length;
   const myLikeCount = Object.values(project.photoStates).filter((s) => s.color?.includes(currentIdentity)).length;
   const target = project.target || 1;
   const selectedCount = project.selectedIds.length;
-  const done = bothDone(project);
+  const hasBlurryPhotos = project.photos.some((photo) => photo.isBlurry === true);
+  const hasEyesClosedPhotos = project.photos.some((photo) => photo.faceDetected === true && photo.eyesClosed === true);
 
   const viewerSelection = useMemo<SelectionContextValue>(() => ({
     project: {
@@ -141,28 +195,59 @@ export default function CustomerSelectGalleryPage() {
     onSaveParticipant: (participant) => setNickname(participant.initial),
   }) : null, [openPhotoId, projectId, currentIdentity, project.participantNicknames, router, setNickname]);
 
-  // 마일스톤 토스트는 세션당 한 번만 — 넘어선 기준값을 로컬 상태에만 기록한다
-  // (목업 범위: 화면 검증이 목적이라 영속은 불필요).
-  const [shownMilestones, setShownMilestones] = useState<number[]>([]);
-  const [justHit, setJustHit] = useState<number | null>(null);
-  useEffect(() => {
-    const next = MILESTONES.find((m) => reviewedCount >= m && !shownMilestones.includes(m));
-    if (!next) return;
-    setShownMilestones((prev) => [...prev, next]);
-    setJustHit(next);
-    const timer = setTimeout(() => setJustHit(null), 3000);
-    return () => clearTimeout(timer);
-    // shownMilestones를 deps에 넣으면 자기 자신의 갱신으로 재실행되므로 reviewedCount만 감시한다.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reviewedCount]);
+  useLayoutEffect(() => {
+    const grid = gridRef.current;
+    if (!grid) return;
+    const update = () => {
+      const width = grid.clientWidth;
+      if (!width) return;
+      const mobile = window.innerWidth <= 767;
+      const spec = MOBILE_GRID[mobileColumns];
+      const gap = mobile ? spec.gap : DESKTOP_GRID_GAP;
+      const cols = mobile ? mobileColumns : Math.max(1, Math.floor((width + gap) / (DESKTOP_GRID_MIN_CELL + gap)));
+      const cellWidth = (width - gap * (cols - 1)) / cols;
+      const rowHeight = Math.ceil(cellWidth / (mobile ? spec.aspect : 1)) + gap;
+      setLayout((current) => current.cols === cols && current.gap === gap && current.rowHeight === rowHeight
+        ? current
+        : { cols, gap, rowHeight });
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(grid);
+    window.addEventListener("resize", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [hydrated, mobileColumns]);
 
-  function metaInfo() {
-    if (done) return { text: "🎉 모두 다 골랐어요! 최종 검토로 이동해보세요", tone: "ok" as const };
-    if (selectedCount < target) return { text: `목표보다 ${target - selectedCount}장 적어요`, tone: "warn" as const };
-    if (selectedCount > target) return { text: `목표보다 ${selectedCount - target}장 많아요`, tone: "warn" as const };
-    return { text: "목표 수에 딱 맞아요", tone: "ok" as const };
+  const rowCount = Math.ceil(list.length / layout.cols);
+  const virtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => galleryRef.current,
+    estimateSize: () => layout.rowHeight,
+    overscan: 6,
+  });
+
+  useEffect(() => {
+    virtualizer.measure();
+    // virtualizer 참조는 렌더마다 달라질 수 있어 실제 행 높이만 추적한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout.rowHeight]);
+
+  useEffect(() => {
+    galleryRef.current?.scrollTo({ top: 0 });
+  }, [tab, nameFilter, sortOrder, starFilter, qualityFilter, groupedView, mobileColumns]);
+
+  function toggleQuality(flag: QualityFilterFlag) {
+    setQualityFilter((current) => current.includes(flag) ? current.filter((item) => item !== flag) : [...current, flag]);
   }
-  const info = metaInfo();
+
+  const footerMeta = selectedCount < target
+    ? `목표보다 ${target - selectedCount}장 적어요`
+    : selectedCount > target
+      ? `목표보다 ${selectedCount - target}장 많아요`
+      : "목표 수에 맞게 골랐어요";
 
   // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
   if (!hydrated) {
@@ -181,137 +266,145 @@ export default function CustomerSelectGalleryPage() {
         </div>
       )}
       <div className={ui.selectFrame}>
-        {/* 헤더 */}
-        <div className={ui.selectHeader}>
+        <div className={`${ui.selectHeader} ${compactHeader ? ui.selectHeaderCompact : ""}`}>
           <div className={ui.selectHeaderTop}>
-            <strong className={ui.selectProjectName}>{project.name || "이름 없는 프로젝트"}</strong>
-            <span style={{ flex: 1 }} />
+            <div className={ui.selectTitleGroup}>
+              <span className={ui.selectBrandMark} aria-hidden>A</span>
+              <div>
+                <span className={ui.selectEyebrow}>사진 셀렉</span>
+                <strong className={ui.selectProjectName}>{project.name || "이름 없는 프로젝트"}</strong>
+              </div>
+            </div>
             <div className={ui.selectParticipants}>
-              {activeParticipants(project).map((p) => {
+              {participants.map((p) => {
                 const isDone = project.participantDone[p.id];
                 return (
-                  <span
-                    key={p.id}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      padding: "5px 11px",
-                      borderRadius: 999,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      background: isDone ? "#e7f5ee" : "#f7f6f4",
-                      color: isDone ? "#0f8a5f" : "#5f5e5b",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    <i style={{ width: 8, height: 8, borderRadius: "50%", background: p.hex, display: "block" }} />
-                    {p.name} {isDone ? "✓완료" : "●고르는 중"}
+                  <span key={p.id} className={`${ui.participantPill} ${isDone ? ui.participantDone : ""}`}>
+                    <i style={{ background: p.hex }} />
+                    {p.name} {isDone ? "완료" : "고르는 중"}
                   </span>
                 );
               })}
             </div>
-          </div>
-          <div className={ui.selectStats}>
-            <span>
-              선택 <strong style={{ color: "#191918", fontSize: 14 }}>{selectedCount}</strong> / {target}장
-            </span>
-            <span>검토 {reviewedCount} / {project.photos.length}</span>
-          </div>
-          <div className={ui.selectProgress}>
-            <div style={{ width: `${Math.min(100, (reviewedCount / Math.max(1, project.photos.length)) * 100)}%`, height: "100%", background: "#ff4d00" }} />
-          </div>
-          {match !== null && (
-            <div className={ui.selectInsights}>
-              <span style={{ color: "#0f8a5f", fontWeight: 700 }}>
-                {justHit ? `🎉 ${justHit}장 검토 완료!` : disagreeCount ? `의견 갈린 사진 ${disagreeCount}장` : ""}
-              </span>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#ff4d00", fontWeight: 700 }}>취향 일치율 {match}%</span>
+            <div className={ui.selectHeaderActions}>
+              {participants.length > 1 ? (
+                <button type="button" className={`${ui.selectHeaderButton} ${ui.selectDoneButton}`} aria-pressed={Boolean(project.participantDone[currentIdentity])} onClick={() => toggleDone(currentIdentity)}>
+                  <CheckCircle2 size={15} aria-hidden />
+                  {project.participantDone[currentIdentity] ? "선택 다시 열기" : "내 선택 완료"}
+                </button>
+              ) : null}
+              {isOwner ? (
+                <button type="button" className={ui.selectHeaderButton} onClick={handleShare}>
+                  <Share2 size={15} aria-hidden />
+                  {shareCopied ? "복사됨" : "공유"}
+                </button>
+              ) : null}
             </div>
-          )}
-          <div className={ui.selectTabs}>
-            <button type="button" className={`${ui.chip} ${tab === "all" ? ui.chipOn : ""}`} onClick={() => setTab("all")}>
-              전체 {project.photos.length}
-            </button>
-            <button type="button" className={`${ui.chip} ${tab === "selected" ? ui.chipOn : ""}`} onClick={() => setTab("selected")}>
-              선택 {selectedCount}
-            </button>
-            <button type="button" className={`${ui.chip} ${tab === "disagree" ? ui.chipOn : ""}`} onClick={() => setTab("disagree")}>
-              의견 갈림 {disagreeCount}
-            </button>
-            <button type="button" className={`${ui.chip} ${tab === "mine" ? ui.chipOn : ""}`} onClick={() => setTab("mine")}>
-              내 찜 {myLikeCount}
-            </button>
+          </div>
+
+          <div className={ui.selectToolbarMain}>
+            <div className={ui.selectTabs} role="group" aria-label="사진 보기 범위">
+              <button type="button" aria-pressed={tab === "all"} className={`${ui.chip} ${tab === "all" ? ui.chipOn : ""}`} onClick={() => setTab("all")}>전체 {project.photos.length}</button>
+              <button type="button" aria-pressed={tab === "selected"} className={`${ui.chip} ${tab === "selected" ? ui.chipOn : ""}`} onClick={() => setTab("selected")}>선택 {selectedCount}</button>
+              {participants.length > 1 ? <button type="button" aria-pressed={tab === "disagree"} className={`${ui.chip} ${tab === "disagree" ? ui.chipOn : ""}`} onClick={() => setTab("disagree")}>의견 갈림 {disagreeCount}</button> : null}
+              <button type="button" aria-pressed={tab === "mine"} className={`${ui.chip} ${tab === "mine" ? ui.chipOn : ""}`} onClick={() => setTab("mine")}>내 찜 {myLikeCount}</button>
+            </div>
+            <div className={ui.selectMobileTools}>
+              <button type="button" className={ui.selectIconButton} aria-label={`현재 ${mobileColumns}열, 사진 크기 변경`} onClick={() => setMobileColumns((value) => value === 4 ? 2 : (value + 1) as MobileColumns)}>
+                <Grid2X2 size={17} aria-hidden /><span>{mobileColumns}</span>
+              </button>
+              <button type="button" className={`${ui.selectIconButton} ${filtersOpen ? ui.selectIconButtonOn : ""}`} aria-label="검색 및 필터" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((value) => !value)}>
+                <SlidersHorizontal size={17} aria-hidden />
+              </button>
+            </div>
+          </div>
+
+          <div className={`${ui.selectFilterTools} ${filtersOpen ? ui.selectFilterToolsOpen : ""}`}>
+            <FilenameSearchInput value={nameFilter} onChange={setNameFilter} className={ui.selectSearch} style={{ "--fsi-width": "220px" } as React.CSSProperties} />
+            <PhotoSortSelect value={sortOrder} options={SORT_OPTIONS} onChange={setSortOrder} />
+            <div className={ui.selectStarFilter} role="group" aria-label="별점 필터">
+              {([1, 2, 3, 4, 5] as const).map((star) => (
+                <button key={star} type="button" aria-label={`별점 ${star}점 이상`} aria-pressed={starFilter === star} onClick={() => setStarFilter((current) => current === star ? "all" : star)}>
+                  <Star size={17} fill={starFilter !== "all" && star <= starFilter ? "currentColor" : "none"} aria-hidden />
+                </button>
+              ))}
+            </div>
+            {hasBlurryPhotos ? <button type="button" className={`${ui.selectFilterButton} ${qualityFilter.includes("blurry") ? ui.selectFilterButtonOn : ""}`} aria-pressed={qualityFilter.includes("blurry")} onClick={() => toggleQuality("blurry")}><AlertTriangle size={14} aria-hidden />흐림</button> : null}
+            {hasEyesClosedPhotos ? <button type="button" className={`${ui.selectFilterButton} ${qualityFilter.includes("eyesClosed") ? ui.selectFilterButtonOn : ""}`} aria-pressed={qualityFilter.includes("eyesClosed")} onClick={() => toggleQuality("eyesClosed")}><EyeOff size={14} aria-hidden />눈감음</button> : null}
+            {similarityGroupCount > 0 ? <SimilarityToggleButton active={groupedView} count={similarityGroupCount} size="compact" onClick={() => { setGroupedView((value) => !value); setExpandedGroupIds(new Set()); }} /> : null}
           </div>
         </div>
 
-        {/* 그리드 */}
-        <div className={ui.selectGallery}>
-          {list.length === 0 ? (
-            <p className={ui.supportText} style={{ textAlign: "center", padding: "40px 10px" }}>
-              조건에 맞는 사진이 없어요
-            </p>
-          ) : (
-            <div className={ui.selectGrid}>
-              {list.map((p) => {
-                const isSel = selectedIds.has(p.id);
-                const state = project.photoStates[p.id];
-                const colors = state?.color ?? [];
-                return (
-                  <GalleryPhotoCard
-                    key={p.id}
-                    token={projectId}
-                    href="#"
-                    photo={p}
-                    selected={isSel}
-                    rating={state?.rating}
-                    colorTags={colors}
-                    hasComment={Boolean(state?.comment)}
-                    showGroupBadge={false}
-                    restCount={0}
-                    totalCount={0}
-                    selectedCount={0}
-                    isGroupExpanded={false}
-                    presignedThumb={p.url}
-                    thumbQueue={thumbQueue}
-                    viewerQueryString=""
-                    density={3}
-                    onPhotoClick={(event) => { event.preventDefault(); setOpenPhotoId(p.id); }}
-                    onCheckClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleSelect(p.id); }}
-                    onGroupBadgeClick={() => {}}
-                    onRate={(photoId, rating) => setStar(photoId, (rating ?? 0) as StarRating | 0)}
-                    onThumbError={() => {}}
-                  />
-                );
-              })}
-            </div>
-          )}
+        <div ref={galleryRef} className={ui.selectGallery} onScroll={(event) => setCompactHeader(event.currentTarget.scrollTop > 72)}>
+          <div ref={gridRef} className={`${ui.selectGrid} ${ui[`selectDensity${mobileColumns}`]}`} style={{ height: list.length ? virtualizer.getTotalSize() : "100%" }}>
+            {list.length === 0 ? (
+              <div className={ui.selectEmpty}>
+                <strong>조건에 맞는 사진이 없어요</strong>
+                <span>검색어나 필터를 바꿔보세요.</span>
+                <button type="button" onClick={() => { setTab("all"); setNameFilter(""); setStarFilter("all"); setQualityFilter([]); }}>필터 초기화</button>
+              </div>
+            ) : virtualizer.getVirtualItems().map((row) => (
+              <div key={row.key} className={ui.selectGridRow} style={{ height: Math.max(0, row.size - layout.gap), gridTemplateColumns: `repeat(${layout.cols}, minmax(0, 1fr))`, gap: layout.gap, transform: `translateY(${row.start}px)` }}>
+                {Array.from({ length: layout.cols }, (_, column) => list[row.index * layout.cols + column]).filter(Boolean).map((photo) => {
+                  const state = project.photoStates[photo.id];
+                  const groupId = photo.similarityGroupId;
+                  const members = groupId ? groupMembers.get(groupId) ?? [] : [];
+                  const groupExpanded = Boolean(groupId && expandedGroupIds.has(groupId));
+                  return (
+                    <GalleryPhotoCard
+                      key={photo.id}
+                      token={projectId}
+                      href="#"
+                      photo={photo}
+                      selected={selectedIds.has(photo.id)}
+                      rating={state?.rating}
+                      colorTags={state?.color ?? []}
+                      hasComment={Boolean(state?.comment)}
+                      showGroupBadge={groupedView && members.length > 1 && !groupExpanded}
+                      groupId={groupId ?? undefined}
+                      groupLabel={groupId && groupOrdinal.has(groupId) ? `묶음 ${groupOrdinal.get(groupId)}` : undefined}
+                      restCount={Math.max(0, members.length - 1)}
+                      totalCount={members.length}
+                      selectedCount={members.filter((member) => selectedIds.has(member.id)).length}
+                      isGroupExpanded={groupExpanded}
+                      inExpandedGroup={groupExpanded}
+                      presignedThumb={photo.url}
+                      thumbQueue={thumbQueue}
+                      viewerQueryString=""
+                      density={layout.cols}
+                      onPhotoClick={(event) => { event.preventDefault(); setOpenPhotoId(photo.id); }}
+                      onCheckClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleSelect(photo.id); }}
+                      onGroupBadgeClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (!groupId) return;
+                        setExpandedGroupIds((current) => {
+                          const next = new Set(current);
+                          if (next.has(groupId)) next.delete(groupId); else next.add(groupId);
+                          return next;
+                        });
+                      }}
+                      onRate={(photoId, rating) => setStar(photoId, (rating ?? 0) as StarRating | 0)}
+                      onThumbError={() => {}}
+                    />
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* 하단 액션 — 기존 SelectionConfirmFooter 재사용(customerLight 테마) */}
-        <div className={ui.selectActions}>
-          <button
-            type="button"
-            className={`${ui.btn} ${ui.btnSm}`}
-            style={{ width: "auto", padding: "0 16px" }}
-            onClick={handleShare}
-          >
-            {shareCopied ? "링크 복사됨 ✓" : "공유"}
-          </button>
-          <button type="button" className={`${ui.btn} ${ui.btnSm}`} style={{ width: "auto", padding: "0 16px" }} onClick={() => toggleDone(currentIdentity)}>
-            {project.participantDone[currentIdentity] ? "다시 고를래요" : "다 골랐어요"}
-          </button>
-        </div>
         <SelectionConfirmFooter
           Y={selectedCount}
           N={target}
           position="static"
           disabled={selectedCount === 0}
           onConfirm={() => router.push(`/customer-select/${projectId}/review`)}
-          buttonLabel="선택 확정하기"
+          buttonLabel="최종 검토하기"
+          progressLabel="선택한 사진"
           theme="customerLight"
           mobileGallery
-          metaText={info.text}
+          metaText={footerMeta}
         />
       </div>
 
