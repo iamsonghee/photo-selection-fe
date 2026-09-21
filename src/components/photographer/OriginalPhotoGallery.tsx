@@ -42,6 +42,8 @@ export type OriginalPhotoGalleryProps = {
   mobileSquareMedia?: boolean;
   /** 모바일 grid에서도 PC와 같은 이미지 상단 파일명 행을 유지한다. */
   showMobileFilename?: boolean;
+  /** PC grid의 파일명 행. 기본값은 기존 동작을 보존하는 true. */
+  showFilename?: boolean;
   compact?: boolean;
   leadingCell?: React.ReactNode;
   groupsById?: Map<string, PhotoGroupInfo>;
@@ -237,7 +239,7 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
   return (
     <article data-original-photo-card className={`${styles.gridCell} ${selectionVariant ? styles.gridCellSelection : ""} ${props.showMobileFilename ? styles.gridCellMobileFilename : ""} ${props.mobileSquareMedia ? styles.gridCellMobileSquare : ""} ${props.mobileManageMode ? styles.gridCellMobileManage : ""} ${props.mobileSelectionVisible ? styles.gridCellMobileSelectable : ""} ${selected ? styles.gridCellSelected : ""} ${expanded ? styles.gridCellExpanded : ""}`}>
       <PhotoAssetPreview filename={name} active={selected}
-        header={selectionVariant ? undefined : !props.compact ? (
+        header={selectionVariant ? undefined : !props.compact && props.showFilename !== false ? (
         <div data-original-photo-filename-row className={styles.nameRow}>
           {!props.readonly ? (
             <button type="button" className={styles.selectButton} aria-label={`${name} ${selected ? "선택 해제" : "선택"}`} aria-pressed={selected} disabled={photo.isPending} onClick={() => !photo.isPending && props.onToggleSelected?.(photo.id)}>
@@ -357,7 +359,7 @@ function GridGallery(props: OriginalPhotoGalleryProps) {
         ? props.compact ? 6 : props.showMobileFilename ? 22 : 6
         : null;
       const mediaWidth = mobileSquareChrome === null ? cellWidth : Math.max(0, cellWidth - 4);
-      const metadataHeight = mobileSquareChrome ?? (props.compact
+      const metadataHeight = mobileSquareChrome ?? (props.compact || props.showFilename === false
         ? 0
         : props.variant === "selection"
           ? isMobile ? 23 : 27
@@ -394,7 +396,7 @@ function GridGallery(props: OriginalPhotoGalleryProps) {
       if (secondFrame) window.cancelAnimationFrame(secondFrame);
       window.clearTimeout(transitionTimer);
     };
-  }, [props.active, props.compact, props.minCols, props.mobileGridGap, props.mobileMinCols, props.mobileSquareMedia, props.showMobileFilename, props.variant]);
+  }, [props.active, props.compact, props.minCols, props.mobileGridGap, props.mobileMinCols, props.mobileSquareMedia, props.showFilename, props.showMobileFilename, props.variant]);
 
   const hasLeadingCell = Boolean(props.leadingCell);
   const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
