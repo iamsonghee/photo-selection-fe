@@ -1067,7 +1067,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
         .fv-title { min-width: 0; flex: 1; display: flex; flex-direction: column; justify-content: center; }
         .fv-selection-count { min-width: 0; font: 600 17px/22px Pretendard, sans-serif; letter-spacing: -.2px; white-space: nowrap; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
         /* 보조 줄 — 사진 위에 얹히므로 그림자로 대비를 준다. 길면 잘라낸다(전체는 title 속성으로 남는다). */
-        .fv-filename { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px/13px 'Space Mono', Pretendard, sans-serif; color: rgba(255,255,255,.62); text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+        .fv-filename { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12px/15px 'Space Mono', Pretendard, sans-serif; color: rgba(255,255,255,.86); text-shadow: 0 1px 3px rgba(0,0,0,.9); }
         .fv-selection-count strong { color: #ff4d00; font-weight: 700; }
         /* 신원 칩 — 이름·색은 사진마다 바뀌는 값이 아니라 "이 세션에서 나는 누구"라 앱바에 둔다.
          * 파일명·진행 바를 걷어낸 자리라 새 공간을 쓰지 않는다. */
@@ -1254,14 +1254,14 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
               <p style={{
                 fontFamily: "Pretendard, 'Noto Sans KR', sans-serif",
                 fontSize: 12,
-                color: "var(--muted-foreground)",
+                color: "rgba(255,255,255,.72)",
                 margin: 0,
                 lineHeight: 1.3,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}>
-                {filename}{project?.name ? ` · ${project.name}` : ""}
+                파일명 · {filename}{project?.name ? ` · ${project.name}` : ""}
                 {current.photographerRecommended && <span className="ml-2 inline-flex items-center gap-1"><RecommendationMark size={12} />작가 추천</span>}
               </p>
             </div>
@@ -1755,7 +1755,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                 <span className="fv-selection-count">
                   <strong>{Y}</strong> / {N}장 선택
                 </span>
-                <span className="fv-filename" title={filename}>{filename}{current.photographerRecommended && <span className="ml-2 inline-flex items-center gap-1"><RecommendationMark size={12} />작가 추천</span>}</span>
+                <span className="fv-filename" title={filename}>파일명 · {filename}{current.photographerRecommended && <span className="ml-2 inline-flex items-center gap-1"><RecommendationMark size={12} />작가 추천</span>}</span>
               </span>
               {/* 이름·색은 "이 세션에서 내가 누구인가"라 사진마다 바뀌는 값이 아니다 —
                 * 사진별 컨트롤 행이 아니라 앱바에 두고, 아래 찜 버튼은 순수 토글로 남긴다.
