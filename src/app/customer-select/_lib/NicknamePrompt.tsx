@@ -1,59 +1,54 @@
 "use client";
 
-/** 접속 즉시 닉네임 설정 배너 — 스킵 가능(단계 1 결정: "접속 즉시 + 스킵 허용"). */
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { Pencil, X } from "lucide-react";
 import { useCustomerSelectStore } from "./real-store";
+import ui from "./ui.module.css";
 
-function skipKey(projectId: string) {
-  return `acut:customer-select:nickname-skipped:${projectId}`;
-}
-
-export function NicknamePrompt({ projectId }: { projectId: string }) {
+export function NicknamePrompt({ hex, isDone }: { hex: string; isDone: boolean }) {
   const { project, currentIdentity, setNickname } = useCustomerSelectStore();
-  const [value, setValue] = useState("");
-  const [skipped, setSkipped] = useState(() => {
-    try {
-      return window.sessionStorage.getItem(skipKey(projectId)) === "1";
-    } catch {
-      return false;
-    }
-  });
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const nickname = project.participantNicknames[currentIdentity]?.trim() ?? "";
+  const [value, setValue] = useState(nickname);
 
-  const nickname = project.participantNicknames[currentIdentity];
-  if (nickname || skipped) return null;
+  function open() {
+    setValue(nickname);
+    dialogRef.current?.showModal();
+  }
 
-  function skip() {
-    try {
-      window.sessionStorage.setItem(skipKey(projectId), "1");
-    } catch {
-      /* 저장소 접근 불가 — 다음에 다시 물어봐도 괜찮음 */
-    }
-    setSkipped(true);
+  function save() {
+    const next = value.trim();
+    if (!next) return;
+    setNickname(next);
+    dialogRef.current?.close();
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", background: "#fff0ea", borderBottom: "1px solid #ffd9c2" }}>
-      <span style={{ fontSize: 13, color: "#191918", fontWeight: 600, whiteSpace: "nowrap" }}>닉네임을 알려주세요</span>
-      <input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="예: 신랑"
-        maxLength={20}
-        style={{ flex: 1, height: 32, border: "1px solid #dde1e4", borderRadius: 8, padding: "0 10px", fontSize: 13 }}
-      />
-      <button
-        type="button"
-        onClick={() => {
-          if (value.trim()) setNickname(value.trim());
-          skip();
-        }}
-        style={{ height: 32, padding: "0 12px", borderRadius: 8, border: "none", background: "#ff4d00", color: "#fff", fontSize: 12.5, fontWeight: 700 }}
-      >
-        확인
+    <>
+      <button type="button" className={`${ui.participantPill} ${ui.nicknameTrigger} ${isDone ? ui.participantDone : ""} ${nickname ? "" : ui.nicknameMissing}`} onClick={open} aria-label={nickname ? `내 이름 ${nickname} 수정` : "내 이름 설정"}>
+        <i style={{ background: hex }} />
+        {nickname ? `${nickname} ${isDone ? "완료" : "고르는 중"}` : "이름 설정"}
+        <Pencil size={11} aria-hidden />
       </button>
-      <button type="button" onClick={skip} style={{ height: 32, padding: "0 10px", borderRadius: 8, border: "none", background: "transparent", color: "#8b8985", fontSize: 12.5 }}>
-        건너뛰기
-      </button>
-    </div>
+      <dialog ref={dialogRef} className={ui.nicknameDialog} onClick={(event) => { if (event.target === event.currentTarget) event.currentTarget.close(); }}>
+        <form method="dialog" onSubmit={(event) => { event.preventDefault(); save(); }}>
+          <div className={ui.nicknameDialogHeader}>
+            <div>
+              <strong>{nickname ? "이름 수정" : "이름 설정"}</strong>
+              <span>함께 고르는 사람에게 표시할 이름이에요.</span>
+            </div>
+            <button type="button" aria-label="닫기" onClick={() => dialogRef.current?.close()}><X size={18} /></button>
+          </div>
+          <label className={ui.nicknameField}>
+            <span>닉네임</span>
+            <input value={value} onChange={(event) => setValue(event.target.value)} placeholder="예: 신랑" maxLength={20} autoFocus />
+          </label>
+          <div className={ui.nicknameActions}>
+            <button type="button" onClick={() => dialogRef.current?.close()}>취소</button>
+            <button type="submit" disabled={!value.trim()}>저장</button>
+          </div>
+        </form>
+      </dialog>
+    </>
   );
 }

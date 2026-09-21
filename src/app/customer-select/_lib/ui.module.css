@@ -261,6 +261,24 @@
 .participantPill { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border-radius: 999px; background: #f7f6f4; color: #5f5e5b; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .participantPill i { width: 7px; height: 7px; border-radius: 50%; display: block; }
 .participantDone { background: #e7f5ee; color: #0f8a5f; }
+.nicknameTrigger { border: 1px solid transparent; font-family: inherit; cursor: pointer; }
+.nicknameMissing { border-color: #ff4d00; background: #fff3ed; color: #d84100; }
+.nicknameDialog { width: min(400px, calc(100vw - 32px)); margin: auto; padding: 0; border: 0; border-radius: 14px; background: #fff; color: #191918; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+.nicknameDialog::backdrop { background: rgba(0,0,0,.48); }
+.nicknameDialog form { padding: 22px; }
+.nicknameDialogHeader { display: flex; align-items: flex-start; gap: 16px; }
+.nicknameDialogHeader > div { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.nicknameDialogHeader strong { font-size: 18px; line-height: 24px; }
+.nicknameDialogHeader span { color: #6f747b; font-size: 12px; line-height: 18px; }
+.nicknameDialogHeader button { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: #5f5e5b; display: grid; place-items: center; }
+.nicknameField { margin-top: 20px; display: flex; flex-direction: column; gap: 7px; }
+.nicknameField span { font-size: 12px; font-weight: 700; }
+.nicknameField input { width: 100%; height: 42px; padding: 0 12px; border: 1px solid #c6cbd0; border-radius: 8px; background: #fff; color: #191918; font: 14px/1 Pretendard, sans-serif; outline: none; }
+.nicknameField input:focus { border-color: #ff4d00; box-shadow: 0 0 0 3px rgba(255,77,0,.12); }
+.nicknameActions { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.nicknameActions button { height: 42px; border: 1px solid #dde1e4; border-radius: 8px; background: #fff; color: #4f5358; font-weight: 700; }
+.nicknameActions button[type="submit"] { border-color: #ff4d00; background: #ff4d00; color: #fff; }
+.nicknameActions button:disabled { border-color: #e4e7e9; background: #e4e7e9; color: #9ba0a6; }
 .selectHeaderActions { display: flex; gap: 6px; flex: none; }
 .selectHeaderButton, .selectIconButton, .selectFilterButton { min-height: 34px; padding: 0 11px; border: 1px solid #dde1e4; border-radius: 7px; background: #fff; color: #4f5358; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: 600 12px/1 Pretendard, sans-serif; white-space: nowrap; }
 .selectHeaderButton:hover, .selectFilterButton:hover { border-color: #b9bdc2; }
@@ -291,6 +309,8 @@
 .selectEmpty span { font-size: 13px; }
 .selectEmpty button { margin-top: 10px; height: 38px; padding: 0 16px; border: 1px solid #dde1e4; border-radius: 7px; background: #fff; color: #191918; font-weight: 600; }
 @media (max-width: 767px) {
+  .nicknameDialog { width: 100%; max-width: none; margin: auto 0 0; border-radius: 14px 14px 0 0; padding-bottom: env(safe-area-inset-bottom); }
+  .nicknameDialog form { padding: 20px; }
   .selectDesktopOnly { display: none; }
   .selectHeader { display: block; padding: 7px 10px; transition: padding 160ms ease; }
   .selectHeaderTop { min-height: 38px; gap: 7px; flex-wrap: wrap; }

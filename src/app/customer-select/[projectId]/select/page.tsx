@@ -299,7 +299,6 @@ export default function CustomerSelectGalleryPage() {
 
   return (
     <div className={ui.selectWorkspace}>
-      <NicknamePrompt projectId={projectId} />
       {saveError && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 20px", background: "#fff0ea", borderBottom: "1px solid #ffd9c2", fontSize: 12.5, color: "#ff4d00", fontWeight: 600 }}>
           <span style={{ flex: 1 }}>{saveError}</span>
@@ -359,7 +358,9 @@ export default function CustomerSelectGalleryPage() {
             onJumpToLast={() => virtualizer.scrollToIndex(Math.max(0, rowCount - 1), { align: "end" })}
             summaryContent={<>
               <div className={ui.selectParticipants}>
-                {participants.map((participant) => <span key={participant.id} className={`${ui.participantPill} ${project.participantDone[participant.id] ? ui.participantDone : ""}`}><i style={{ background: participant.hex }} />{participant.name} {project.participantDone[participant.id] ? "완료" : "고르는 중"}</span>)}
+                {participants.map((participant) => participant.id === currentIdentity
+                  ? <NicknamePrompt key={participant.id} hex={participant.hex} isDone={Boolean(project.participantDone[participant.id])} />
+                  : <span key={participant.id} className={`${ui.participantPill} ${project.participantDone[participant.id] ? ui.participantDone : ""}`}><i style={{ background: participant.hex }} />{participant.name} {project.participantDone[participant.id] ? "완료" : "고르는 중"}</span>)}
               </div>
               <div className={ui.selectHeaderActions}>
                 {participants.length > 1 && <button type="button" className={`${ui.selectHeaderButton} ${ui.selectDoneButton}`} aria-pressed={Boolean(project.participantDone[currentIdentity])} onClick={() => toggleDone(currentIdentity)}><CheckCircle2 size={15} />{project.participantDone[currentIdentity] ? "선택 다시 열기" : "내 선택 완료"}</button>}
@@ -383,6 +384,7 @@ export default function CustomerSelectGalleryPage() {
             <div className={ui.selectParticipants}>
               {participants.map((p) => {
                 const isDone = project.participantDone[p.id];
+                if (p.id === currentIdentity) return <NicknamePrompt key={p.id} hex={p.hex} isDone={Boolean(isDone)} />;
                 return (
                   <span key={p.id} className={`${ui.participantPill} ${isDone ? ui.participantDone : ""}`}>
                     <i style={{ background: p.hex }} />
