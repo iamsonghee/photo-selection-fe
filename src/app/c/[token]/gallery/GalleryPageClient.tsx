@@ -866,92 +866,7 @@ export default function GalleryPageClient() {
           background-size: 40px 40px;
           pointer-events: none; z-index: 0; opacity: 0.5;
         }
-        .gl-photo-card {
-          position: relative;
-          aspect-ratio: 1 / 1;
-          background: var(--surface);
-          border: 0;
-          border-radius: 4px;
-          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-          cursor: pointer; overflow: hidden;
-          display: block; text-decoration: none;
-        }
-        .gl-card-media { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: 3px; }
-        .gl-card-placeholder { width: 100%; height: 100%; background: var(--surface); }
-        /* 코멘트가 있는 사진 표식. 색은 중립 흰색이다 — 주황은 "선택/제출 + 별점"의 색이라(§색 규칙)
-         * 여기에 쓰면 "골랐다"와 같은 무게로 읽힌다. 사진 위에 얹히므로 그림자로 대비를 준다. */
-        .gl-comment-indicator {
-          display: inline-grid; place-items: center; flex: 0 0 13px;
-          width: 13px; height: 13px; color: #fff;
-          filter: drop-shadow(0 1px 2px rgba(0,0,0,.5));
-        }
-        .gl-comment-indicator svg { display: block; }
-        .gl-photo-card img {
-          width: 100%; height: 100%; object-fit: cover;
-          transition: transform 0.6s ease; display: block;
-        }
-        .gl-photo-card:hover img { transform: scale(1.05); }
-        .gl-photo-card.gl-selected .gl-check-box {
-          background: var(--accent) !important; border-color: var(--accent) !important;
-        }
-
-        .gl-card-overlay {
-          position: absolute; inset: 0;
-          background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.3) 40%, transparent 70%);
-          opacity: 1; z-index: 15; pointer-events: none;
-          padding: 10px; display: flex; flex-direction: column; justify-content: flex-end;
-        }
-        .gl-card-overlay .gl-overlay-interactive { pointer-events: auto; }
-        .gl-rating-summary { display:none; }
-        @media (min-width: 768px) {
-          .gl-photo-card { aspect-ratio: 1; }
-          /* PC 카드에서는 빈 별 다섯 개도 작아 보이지 않도록 클릭 영역과 선을 함께 키운다. */
-          .gl-rating-row button { width:22px; height:24px; display:grid; place-items:center; }
-          .gl-rating-row svg { width:16px; height:16px; }
-        }
-        /* 파일명 검색·정렬이 켜진 동안에만 나타난다 — 평소 격자에는 파일명이 없다.
-         * 사진 위에 얹히므로 카드 높이가 변하지 않고, 따라서 가상 스크롤 행 높이도 그대로다. */
-        .gl-overlay-filename {
-          margin: 0 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-          color: rgba(255,255,255,.82); font: 9px/1.2 'Space Mono', 'Noto Sans KR', sans-serif;
-          text-shadow: 0 1px 3px rgba(0,0,0,.8);
-        }
         .gl-mobile-filter-backdrop, .gl-mobile-filter-sheet, .gl-mobile-similarity-hint { display: none; }
-        .gl-recommended-badge { position:absolute; top:10px; left:42px; z-index:20; display:flex; align-items:center; gap:3px; padding:3px 6px; border-radius:999px; background:rgba(0,0,0,.58); color:#fff; font-size:10px; font-weight:700; pointer-events:none; }
-
-        .gl-check-box {
-          position: absolute; top: 10px; left: 10px;
-          width: 22px; height: 22px;
-          border: 1.5px solid rgba(255,255,255,0.4);
-          display: flex; align-items: center; justify-content: center;
-          z-index: 20; transition: all 0.2s ease;
-          background: rgba(0,0,0,0.35);
-        }
-        .gl-group-media { outline: 1px solid rgba(90,110,120,.4); outline-offset: -1px; }
-        .gl-in-expanded-group { background: var(--customer-divider); }
-        .gl-group-stack { border-bottom: 4px double rgba(255,255,255,.8); }
-        .gl-group-badge {
-          position: absolute; bottom: 8px; right: 8px;
-          min-width: 22px; height: 20px; padding: 0 6px;
-          background: rgba(0,0,0,0.7); border: 1px solid #FF4D00;
-          color: #FF4D00; font-family: 'Space Mono', monospace;
-          font-size: 10px; font-weight: 700; white-space: nowrap;
-          display: flex; align-items: center; justify-content: center;
-          z-index: 20; cursor: pointer; transition: all 0.15s ease;
-        }
-        .gl-group-badge:hover { background: #FF4D00; color: #000; }
-
-        .gl-quality-badge {
-          position: absolute; top: 10px; right: 10px;
-          width: 22px; height: 20px;
-          background: rgba(0,0,0,0.7); border: 1px solid #FFB800;
-          color: #FFB800;
-          display: flex; align-items: center; justify-content: center;
-          z-index: 20; pointer-events: none;
-        }
-        .gl-quality-badge-eyes {
-          border-color: #4DA3FF; color: #4DA3FF;
-        }
 
         .gl-btn-confirm {
           background: var(--accent); color: #000; font-weight: 900;
@@ -1087,85 +1002,6 @@ export default function GalleryPageClient() {
           }
           .gl-grid-main { padding: 0 20px !important; }
 
-          /* 카드 구조는 PC와 같다(카드 = 사진 1:1, 파일명·별점은 사진 위 그라데이션).
-           * 배경은 흰 카드 + 얇은 구분선을 명시한다. */
-          .gl-photo-card {
-            border-radius: 4px; transition: none;
-            background: #fff; border: 1px solid var(--customer-divider); box-sizing: border-box;
-          }
-          .gl-card-placeholder { background: #f1f3f6; }
-
-          /* 파일명을 걷어내면서 카드 상자(.gl-card-shell)도 함께 없앴다 — 상자는 사진과 파일명 줄을
-           * 한 덩어리로 묶으려고 둔 것이라 파일명이 사라지면 남는 게 사진뿐이다.
-           * 그래서 선택 표시도 3·4열·검토 목록·잠금 갤러리와 같은 사진 안쪽 링으로 돌아간다
-           * (2열만 상자 테두리로 알리면 밀도를 바꿀 때 선택 표시가 다른 것으로 바뀌어 보인다). */
-          .gl-photo-card:hover img { transform: none; }
-          .gl-card-media { border-radius: 3px; }
-          .gl-card-overlay { padding: 5px !important; background: none; }
-          .gl-card-overlay .gl-overlay-interactive button { font-size: 8px !important; }
-          /* 코멘트 표식과 찜 dot이 나란히 서므로 무게를 맞춘다 — 예전에는 14px 외곽선 아이콘 옆에
-           * 5px 채운 원이라 2.8배 차이가 났다. */
-          .gl-card-overlay .gl-color-dot { width: 7px !important; height: 7px !important; }
-
-          /* 체크박스 크기 */
-          .gl-check-box { width: 44px !important; height: 44px !important; top: 0 !important; left: 0 !important; border: 0 !important; background: transparent !important; justify-content: flex-start; align-items: flex-start; padding: 9px 0 0 9px; }
-          .gl-check-box::before { content: ''; position: absolute; left: 6px; top: 6px; width: 18px; height: 18px; border: 1px solid rgba(255,255,255,.72); background: rgba(255,255,255,.92); box-sizing: border-box; }
-          .gl-photo-card.gl-selected .gl-check-box { background: transparent !important; border-color: transparent !important; }
-          .gl-photo-card.gl-selected .gl-check-box::before { background: #ff4d00; border-color: #ff4d00; }
-          .gl-check-box svg { position: relative; z-index: 1; }
-          .gl-quality-badge { width: 18px !important; height: 18px !important; top: 6px !important; right: 6px !important; }
-          .gl-group-badge { min-width: 18px; height: 16px; right: 5px; bottom: 5px; padding: 0 4px; border: 0; border-radius: 2px; background: rgba(0,0,0,.45); color: #fff; font-size: 8px; }
-
-          /* 비율은 모든 밀도에서 1:1 — 형제 화면(검토 목록·잠금 갤러리)과 같은 값이다.
-           * 2열이 사진을 가장 크게 보는 밀도인데 거기서 가장 많이 잘리던(1.46:1 가로 crop) 것을 없앤다. */
-          .gl-density-2 .gl-photo-card { aspect-ratio: 4 / 3; }
-          .gl-density-3 .gl-photo-card,
-          .gl-density-4 .gl-photo-card { aspect-ratio: 1 / 1; }
-
-          /* 검색·정렬이 켜졌을 때만 나타나는 파일명 — 4열은 8px 글자가 뭉개져 읽히지 않고
-           * 그라데이션도 없어 사진에 그대로 묻히므로 그때는 감춘다. */
-          .gl-density-2 .gl-overlay-filename { font-size: 9px; }
-          .gl-density-3 .gl-overlay-filename { font-size: 8px; margin-bottom: 2px; }
-          .gl-density-4 .gl-overlay-filename { display: none; }
-
-          /* 그라데이션은 별점·표식이 얹히는 2·3열에만 */
-          .gl-density-2 .gl-card-overlay,
-          .gl-density-3 .gl-card-overlay { background: linear-gradient(to top, rgba(0,0,0,.62), rgba(0,0,0,.18) 42%, transparent 68%); }
-          .gl-density-2 .gl-overlay-interactive { height: 16px; min-height: 16px !important; align-items: center !important; }
-          .gl-density-2 .gl-rating-row, .gl-density-2 .gl-marker-row { height: 16px; align-items: center; }
-          .gl-density-2 .gl-overlay-interactive button {
-            width: 16px; height: 16px; display: grid; place-items: center;
-            font-size: 12px !important; line-height: 16px !important;
-          }
-          .gl-density-2 .gl-comment-indicator {
-            width: 13px !important; height: 13px !important; flex: 0 0 13px;
-            transform: translateY(-1px);
-          }
-          .gl-density-2 .gl-check-box { top: 2px !important; left: 2px !important; }
-
-          /* 별점·코멘트·색은 3열까지 유지한다 — 밀도는 "한 번에 몇 장을 보나"이지 기능 스위치가 아니다.
-           * 4열은 별 하나가 8px 밑이라 누를 수도 읽을 수도 없어 그때만 감춘다. */
-          .gl-density-3 .gl-overlay-interactive { height: 14px; min-height: 14px !important; align-items: center !important; }
-          .gl-density-3 .gl-rating-row, .gl-density-3 .gl-marker-row { height: 14px; align-items: center; }
-          .gl-density-3 .gl-overlay-interactive button {
-            width: 13px; height: 13px; display: grid; place-items: center;
-            font-size: 10px !important; line-height: 13px !important;
-          }
-          .gl-density-3 .gl-comment-indicator {
-            width: 11px !important; height: 11px !important; flex: 0 0 11px;
-            transform: translateY(-1px);
-          }
-          /* 작은 모바일 카드에서는 조작 대신 평가 결과만 표시한다. 상세에서 별점을 바꾼다. */
-          .gl-density-3 .gl-rating-row, .gl-density-4 .gl-rating-row { display:none !important; }
-          .gl-density-3 .gl-rating-summary, .gl-density-4 .gl-rating-summary { display:inline-flex; align-items:center; gap:3px; color:#fff; font-size:11px; line-height:16px; }
-          .gl-density-4 .gl-card-overlay { display:flex; padding:4px; background:linear-gradient(to top,rgba(0,0,0,.6),transparent 60%); }
-          .gl-density-4 .gl-marker-row { display:none !important; }
-          .gl-density-4 .gl-check-box { top: 0 !important; left: 0 !important; padding: 6px 0 0 6px; }
-          .gl-density-4 .gl-check-box::before { left: 5px; top: 5px; width: 12px; height: 12px; }
-          .gl-density-4 .gl-check-box svg { width: 8px; height: 8px; }
-          .gl-density-4 .gl-quality-badge { display: none; }
-          .gl-photo-card.gl-selected .gl-card-media img { filter: brightness(.8); }
-
           .gl-mobile-filter-backdrop { display: block; position: fixed; inset: 0; z-index: 80; border: 0; background: rgba(0,0,0,.48); padding: 0; }
           .gl-mobile-filter-sheet { display: block; position: fixed; left: 50%; bottom: 0; z-index: 81; width: min(100%, 375px); transform: translateX(-50%); border-radius: 8px 8px 0 0; background: #fff; padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -8px 30px rgba(0,0,0,.12); }
           .gl-mobile-filter-sheet-header { height: 58px; padding: 20px 20px 0; display: flex; align-items: center; justify-content: space-between; }
@@ -1207,7 +1043,6 @@ export default function GalleryPageClient() {
            * 고객 라이트 토큰으로 override한다. 그리드 컬럼 계산(JS)과 카드 구조는 그대로 둔다. */
           .gl-grid-bg { display: none; }
           .gl-page-wrapper { background: var(--customer-canvas) !important; }
-          .gl-photo-card, .gl-card-placeholder { background: var(--customer-divider); }
         }
       `}</style>
 

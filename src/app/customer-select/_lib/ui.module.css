@@ -311,7 +311,7 @@
 .selectStarFilter button { width: 25px; height: 30px; padding: 0; border: 0; background: transparent; color: #c6cbd0; display: grid; place-items: center; }
 .selectStarFilter button[aria-pressed="true"], .selectStarFilter button:has(~ button[aria-pressed="true"]) { color: #ff4d00; }
 .selectGallery { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; background: #f7f7f7; padding: 16px 24px 24px; }
-.selectGrid { position: relative; width: 100%; min-height: 100%; }
+.selectGrid { position: relative; width: 100%; max-width: calc(var(--customer-gallery-max-width, 1440px) - 48px); min-height: 100%; margin: 0 auto; }
 .selectGridRow { position: absolute; top: 0; left: 0; width: 100%; display: grid; overflow: hidden; }
 .selectEmpty { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; color: #5f5e5b; text-align: center; }
 .selectEmpty strong { color: #191918; font-size: 17px; }
@@ -347,6 +347,7 @@
   .selectHeaderCompact .selectToolbarMain { margin-top: 0; }
   .selectHeaderCompact .selectFilterToolsOpen { display: flex; }
   .selectGallery { padding: 8px; }
+  .selectGrid { max-width: none; }
   .selectDensity2 :global(.gl-photo-card) { aspect-ratio: 4 / 3; }
 }
 

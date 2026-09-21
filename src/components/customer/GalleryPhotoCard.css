@@ -1,6 +1,63 @@
-.gl-photo-card{position:relative;display:block;aspect-ratio:1;background:#eee;border:1px solid #e5e5e5;border-radius:4px;overflow:hidden;text-decoration:none;cursor:pointer;box-sizing:border-box}
-.gl-card-media{position:relative;width:100%;height:100%;overflow:hidden;border-radius:3px}.gl-card-placeholder{width:100%;height:100%;background:#f1f3f6}.gl-photo-card img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s ease}.gl-photo-card:hover img{transform:scale(1.03)}
-.gl-card-overlay{position:absolute;inset:0;z-index:15;display:flex;flex-direction:column;justify-content:flex-end;padding:7px;background:linear-gradient(to top,rgba(0,0,0,.72),rgba(0,0,0,.22) 32%,transparent 58%);pointer-events:none}.gl-card-overlay .gl-overlay-interactive{pointer-events:auto}.gl-rating-summary{display:none}.gl-comment-indicator{display:inline-grid;place-items:center;color:#fff;filter:drop-shadow(0 1px 2px #0008)}
-.gl-check-box{position:absolute;left:0;top:0;z-index:20;width:44px;height:44px;border:0;background:transparent;display:flex;align-items:flex-start;justify-content:flex-start;padding:9px 0 0 9px;cursor:pointer}.gl-check-box::before{content:"";position:absolute;left:6px;top:6px;width:20px;height:20px;border:2px solid #fff;background:#ffffffeb;box-sizing:border-box;box-shadow:0 1px 4px #0008}.gl-check-box svg{position:relative;z-index:1;margin:1px}.gl-photo-card.gl-selected .gl-check-box::before{background:#ff4d00;border-color:#ff4d00}.gl-photo-card.gl-selected .gl-card-media img{filter:brightness(.8)}
-.gl-quality-badge{position:absolute;right:6px;top:6px;z-index:20;display:flex;width:18px;height:18px;align-items:center;justify-content:center;background:#000b;border:1px solid #ffb800;color:#ffb800}.gl-group-badge{position:absolute;right:5px;bottom:5px;z-index:20;min-width:18px;height:16px;padding:0 4px;border:0;border-radius:2px;background:#0008;color:#fff;font-size:8px}.gl-group-stack{border-bottom:4px double #fffc}
-@media(max-width:767px){.gl-photo-card:hover img{transform:none}.gl-rating-row{display:none!important}.gl-rating-summary{display:inline-flex;align-items:center;gap:3px;color:#fff;font-size:11px}.gl-photo-card{aspect-ratio:1}}
+.gl-photo-card { position: relative; display: block; aspect-ratio: 1; overflow: hidden; box-sizing: border-box; border: 0; border-radius: 4px; background: var(--customer-divider, #e5e5e5); text-decoration: none; cursor: pointer; }
+.gl-card-media { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: 3px; }
+.gl-card-placeholder { width: 100%; height: 100%; background: var(--customer-divider, #f1f3f6); }
+.gl-photo-card img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .6s ease; }
+.gl-photo-card:hover img { transform: scale(1.05); }
+.gl-card-overlay { position: absolute; inset: 0; z-index: 15; display: flex; flex-direction: column; justify-content: flex-end; padding: 10px; background: linear-gradient(to top, rgba(0,0,0,.75), rgba(0,0,0,.3) 40%, transparent 70%); pointer-events: none; }
+.gl-card-overlay .gl-overlay-interactive { pointer-events: auto; }
+.gl-overlay-filename { margin: 0 0 4px; overflow: hidden; color: rgba(255,255,255,.82); font: 9px/1.2 "Space Mono", "Noto Sans KR", sans-serif; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0,0,0,.8); white-space: nowrap; }
+.gl-rating-summary { display: none; }
+.gl-comment-indicator { display: inline-grid; width: 13px; height: 13px; place-items: center; flex: 0 0 13px; color: #fff; filter: drop-shadow(0 1px 2px #0008); }
+.gl-comment-indicator svg { display: block; }
+.gl-recommended-badge { position: absolute; top: 10px; left: 42px; z-index: 20; display: flex; align-items: center; gap: 3px; padding: 3px 6px; border-radius: 999px; background: #0009; color: #fff; font-size: 10px; font-weight: 700; pointer-events: none; }
+
+/* 44px 조작 영역 안에 20px 표시만 둬 밝은 사진에서도 누르기 쉽고 선명하게 보인다. */
+.gl-check-box { position: absolute; left: 0; top: 0; z-index: 20; width: 44px; height: 44px; padding: 9px 0 0 9px; border: 0; background: transparent; display: flex; align-items: flex-start; justify-content: flex-start; cursor: pointer; }
+.gl-check-box::before { content: ""; position: absolute; left: 6px; top: 6px; width: 20px; height: 20px; box-sizing: border-box; border: 2px solid #fff; background: #ffffffeb; box-shadow: 0 1px 4px #0008; }
+.gl-check-box svg { position: relative; z-index: 1; margin: 1px; }
+.gl-photo-card.gl-selected .gl-check-box::before { border-color: #ff4d00; background: #ff4d00; }
+.gl-photo-card.gl-selected .gl-card-media img { filter: brightness(.8); }
+
+.gl-quality-badge { position: absolute; right: 10px; top: 10px; z-index: 20; display: flex; width: 22px; height: 20px; align-items: center; justify-content: center; border: 1px solid #ffb800; background: #000b; color: #ffb800; pointer-events: none; }
+.gl-quality-badge-eyes { border-color: #4da3ff; color: #4da3ff; }
+.gl-group-media { outline: 1px solid rgba(90,110,120,.4); outline-offset: -1px; }
+.gl-in-expanded-group { background: var(--customer-divider); }
+.gl-group-stack { border-bottom: 4px double #fffc; }
+.gl-group-badge { position: absolute; right: 8px; bottom: 8px; z-index: 20; min-width: 22px; height: 20px; padding: 0 6px; border: 1px solid #ff4d00; background: #000b; color: #ff4d00; display: flex; align-items: center; justify-content: center; font: 700 10px/1 "Space Mono", monospace; white-space: nowrap; cursor: pointer; }
+.gl-group-badge:hover { background: #ff4d00; color: #000; }
+
+@media (min-width: 768px) {
+  .gl-rating-row button { width: 22px; height: 24px; display: grid; place-items: center; }
+  .gl-rating-row svg { width: 16px; height: 16px; }
+}
+
+@media (max-width: 767px) {
+  .gl-photo-card { border: 1px solid var(--customer-divider); background: #fff; transition: none; }
+  .gl-photo-card:hover img { transform: none; }
+  .gl-card-placeholder { background: #f1f3f6; }
+  .gl-card-overlay { padding: 5px; background: none; }
+  .gl-card-overlay .gl-overlay-interactive button { font-size: 8px !important; }
+  .gl-card-overlay .gl-color-dot { width: 7px !important; height: 7px !important; }
+  .gl-quality-badge { right: 6px !important; top: 6px !important; width: 18px; height: 18px; }
+  .gl-group-badge { right: 5px; bottom: 5px; min-width: 18px; height: 16px; padding: 0 4px; border: 0; border-radius: 2px; background: #0007; color: #fff; font-size: 8px; }
+  .gl-density-2 .gl-photo-card { aspect-ratio: 4 / 3; }
+  .gl-density-3 .gl-photo-card, .gl-density-4 .gl-photo-card { aspect-ratio: 1; }
+  .gl-density-2 .gl-overlay-filename { font-size: 9px; }
+  .gl-density-3 .gl-overlay-filename { margin-bottom: 2px; font-size: 8px; }
+  .gl-density-4 .gl-overlay-filename { display: none; }
+  .gl-density-2 .gl-card-overlay, .gl-density-3 .gl-card-overlay { background: linear-gradient(to top, rgba(0,0,0,.62), rgba(0,0,0,.18) 42%, transparent 68%); }
+  .gl-density-2 .gl-overlay-interactive { min-height: 16px !important; align-items: center !important; }
+  .gl-density-2 .gl-rating-row { display: flex !important; }
+  .gl-density-2 .gl-rating-row, .gl-density-2 .gl-marker-row { height: 16px; align-items: center; }
+  .gl-density-2 .gl-overlay-interactive button { width: 16px; height: 16px; display: grid; place-items: center; font-size: 12px !important; line-height: 16px !important; }
+  .gl-density-3 .gl-overlay-interactive { min-height: 14px !important; align-items: center !important; }
+  .gl-density-3 .gl-rating-row, .gl-density-3 .gl-marker-row { height: 14px; align-items: center; }
+  .gl-density-3 .gl-rating-row, .gl-density-4 .gl-rating-row { display: none !important; }
+  .gl-density-3 .gl-rating-summary, .gl-density-4 .gl-rating-summary { display: inline-flex; align-items: center; gap: 3px; color: #fff; font-size: 11px; line-height: 16px; }
+  .gl-density-4 .gl-card-overlay { display: flex; padding: 4px; background: linear-gradient(to top, #0009, transparent 60%); }
+  .gl-density-4 .gl-marker-row { display: none !important; }
+  .gl-density-4 .gl-check-box { padding: 6px 0 0 6px; }
+  .gl-density-4 .gl-check-box::before { left: 5px; top: 5px; width: 12px; height: 12px; border-width: 1px; }
+  .gl-density-4 .gl-check-box svg { width: 8px; height: 8px; margin: 0; }
+  .gl-density-4 .gl-quality-badge { display: none; }
+}

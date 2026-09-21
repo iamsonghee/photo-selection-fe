@@ -448,7 +448,7 @@ export default function CustomerSelectGalleryPage() {
 
         <GalleryMobileFilterSheet open={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={resetFilters} starFilter={starFilter} onStarFilterChange={setStarFilter} colorFilter={colorFilter} colorOptions={colorOptions} onColorFilterChange={setColorFilter} colorFilterMode={colorFilterMode} onColorFilterModeChange={setColorFilterMode} hasBlurryPhotos={hasBlurryPhotos} hasEyesClosedPhotos={hasEyesClosedPhotos} qualityFilter={qualityFilterSet} onToggleQualityFilter={toggleQuality} />
 
-        <div ref={galleryRef} className={ui.selectGallery} onScroll={(event) => setCompactHeader(event.currentTarget.scrollTop > 72)}>
+        <div ref={galleryRef} className={`${ui.selectGallery} gl-density-${mobileColumns}`} onScroll={(event) => setCompactHeader(event.currentTarget.scrollTop > 72)}>
           <div ref={gridRef} className={`${ui.selectGrid} ${ui[`selectDensity${mobileColumns}`]}`} style={{ height: list.length ? virtualizer.getTotalSize() : "100%" }}>
             {list.length === 0 ? (
               <div className={ui.selectEmpty}>
