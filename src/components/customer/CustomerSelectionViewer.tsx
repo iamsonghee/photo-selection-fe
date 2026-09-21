@@ -323,7 +323,31 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
   const mobileFilmstripRef = useRef<HTMLDivElement>(null);
   const mobileCommentRef = useRef<HTMLTextAreaElement>(null);
   const pcCommentRef = useRef<HTMLTextAreaElement>(null);
+  const desktopImageFrameRef = useRef<HTMLDivElement>(null);
+  const desktopImageRef = useRef<HTMLImageElement>(null);
+  const [desktopCheckPosition, setDesktopCheckPosition] = useState<{ left: number; top: number } | null>(null);
   const filmstripSeenRef = useRef(false); // 마운트 후 첫 실행 여부 추적
+
+  const measureDesktopImage = useCallback(() => {
+    const stage = desktopImageFrameRef.current;
+    const image = desktopImageRef.current;
+    if (!stage || !image || image.clientWidth <= 0 || image.clientHeight <= 0) return;
+    const stageRect = stage.getBoundingClientRect();
+    const imageRect = image.getBoundingClientRect();
+    setDesktopCheckPosition({ left: imageRect.left - stageRect.left + 5, top: imageRect.top - stageRect.top + 5 });
+  }, []);
+
+  useLayoutEffect(() => {
+    setDesktopCheckPosition(null);
+    const frame = requestAnimationFrame(measureDesktopImage);
+    const stage = desktopImageFrameRef.current;
+    const image = desktopImageRef.current;
+    if (!stage || !image || typeof ResizeObserver === "undefined") return () => cancelAnimationFrame(frame);
+    const observer = new ResizeObserver(measureDesktopImage);
+    observer.observe(stage);
+    observer.observe(image);
+    return () => { cancelAnimationFrame(frame); observer.disconnect(); };
+  }, [activePhotoId, measureDesktopImage]);
 
   /* ── PC 필름스트립 윈도우 렌더링 ──────────────────────────────────────
    * 예전엔 filteredPhotos 전체를 실 DOM으로 그렸다 — 베타 사용자 프로젝트 사진 한도가
@@ -1317,12 +1341,14 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
           />
 
           {/* Image frame */}
-          <div style={{ position: "relative", height: "100%", display: "flex", alignItems: "center" }}
+          <div ref={desktopImageFrameRef} style={{ position: "relative", height: "100%", display: "flex", alignItems: "center" }}
             onContextMenu={viewerImageDownloadBlocked ? (e) => e.preventDefault() : undefined}>
             {viewerSrc ? (
               <img
+                ref={desktopImageRef}
                 src={viewerSrc}
                 alt={filename}
+                onLoad={measureDesktopImage}
                 {...viewerImageBlockDownloadHandlers}
                 style={{
                   maxHeight: "100%",
@@ -1340,8 +1366,8 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
             ) : (
               <div style={{ color: "var(--muted-foreground)", padding: 16 }}>사진 없음</div>
             )}
-            {/* 선택 체크박스 — 헤더/HUD의 별도 CTA 대신 사진 좌측 상단에 배치 */}
-            {viewerSrc && (
+            {/* contain으로 생긴 여백이 아니라 실측한 사진 좌상단에 체크박스를 고정한다. */}
+            {viewerSrc && desktopCheckPosition && (
               <button
                 type="button"
                 onClick={toggleSelect}
@@ -1350,8 +1376,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                 className="fv-photo-checkbox"
                 style={{
                   position: "absolute",
-                  top: 8,
-                  left: 8,
+                  ...desktopCheckPosition,
                   width: 44,
                   height: 44,
                   display: "flex",
@@ -1372,7 +1397,6 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    /* 갤러리 카드·모바일 뷰어와 같은 규칙 — 미선택은 흰 채움이라 어두운 사진에서도 빈 체크박스로 읽힌다 */
                     background: isCurrentSelected ? "var(--accent)" : "rgba(255,255,255,0.92)",
                     border: isCurrentSelected ? "2px solid var(--accent)" : "2px solid rgba(255,255,255,0.95)",
                     boxShadow: isCurrentSelected
