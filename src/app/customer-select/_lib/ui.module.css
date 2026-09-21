@@ -246,7 +246,8 @@
 
 .selectWorkspace { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; background: #f7f7f7; color: #191918; font-family: Pretendard, "Pretendard Variable", -apple-system, sans-serif; }
 .selectFrame { width: 100%; min-height: 0; margin: 0 auto; flex: 1; display: flex; flex-direction: column; background: #fff; }
-.selectHeader { flex: none; padding: 12px 24px 10px; border-bottom: 1px solid #e5e5e5; background: rgba(255,255,255,.98); box-shadow: 0 4px 16px rgba(25,25,24,.035); z-index: 20; }
+.selectDesktopOnly { display: block; flex: none; }
+.selectHeader { display: none; flex: none; padding: 12px 24px 10px; border-bottom: 1px solid #e5e5e5; background: rgba(255,255,255,.98); box-shadow: 0 4px 16px rgba(25,25,24,.035); z-index: 20; }
 .selectHeaderTop { display: flex; align-items: center; gap: 12px; min-height: 40px; }
 .selectTitleGroup { min-width: 180px; display: flex; align-items: center; gap: 10px; }
 .selectBrandLink { flex: 0 0 auto; border-radius: 8px; text-decoration: none; }
@@ -271,7 +272,12 @@
 .selectMobileTools { display: none; margin-left: auto; gap: 4px; }
 .selectIconButton { width: 38px; padding: 0; position: relative; }
 .selectIconButton span { position: absolute; right: 3px; bottom: 2px; font-size: 8px; }
+.selectFilterCount { position: absolute; top: -5px; right: -5px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: #ff4d00; color: #fff; font-size: 10px; line-height: 17px; }
 .selectIconButtonOn { border-color: #ff4d00; background: #fff3ed; color: #d84100; }
+.selectMobileSearch { margin-top: 7px; padding-top: 7px; border-top: 1px solid #eef0f2; }
+.selectActiveFilters { margin-top: 7px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.selectActiveFilters::-webkit-scrollbar { display: none; }
+.selectActiveFilters button { height: 28px; flex: none; padding: 0 8px 0 10px; border: 1px solid #838b94; border-radius: 999px; background: #fff; color: #191918; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; }
 .selectFilterTools { display: flex; align-items: center; gap: 7px; margin-top: 9px; }
 .selectSearch { flex: 0 1 220px; }
 .selectStarFilter { height: 34px; display: flex; align-items: center; gap: 0; padding: 0 5px; border: 1px solid #dde1e4; border-radius: 7px; background: #fff; }
@@ -285,7 +291,8 @@
 .selectEmpty span { font-size: 13px; }
 .selectEmpty button { margin-top: 10px; height: 38px; padding: 0 16px; border: 1px solid #dde1e4; border-radius: 7px; background: #fff; color: #191918; font-weight: 600; }
 @media (max-width: 767px) {
-  .selectHeader { padding: 7px 10px; transition: padding 160ms ease; }
+  .selectDesktopOnly { display: none; }
+  .selectHeader { display: block; padding: 7px 10px; transition: padding 160ms ease; }
   .selectHeaderTop { min-height: 38px; gap: 7px; flex-wrap: wrap; }
   .selectTitleGroup { min-width: 0; flex: 1; }
   .selectBrandMark { width: 26px; height: 26px; flex-basis: 26px; }

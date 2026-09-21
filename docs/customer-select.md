@@ -78,6 +78,8 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 | 헤더 축소 | 작가 원본 업로드 | `useCollapsibleAssetHeaderController` |
 | AI 제안 모달 | 작가 원본 업로드 | `AiAnalysisPromptModal` |
 | 고객 셀렉 카드 | 작가 고객 갤러리 | `GalleryPhotoCard` |
+| 셀렉 PC 필터·헤더 | 작가 고객 갤러리 | `GalleryDesktopHeader` |
+| 셀렉 모바일 필터 시트 | 작가 고객 갤러리 | `GalleryMobileFilterSheet` |
 | 셀렉 확정 풋터 | 작가 고객 갤러리 | `SelectionConfirmFooter` |
 | 이미지 로딩 | 양쪽 갤러리 | `createThumbLoadQueue` |
 | 파일 압축 | 작가 업로드 | `compressImagesInParallel` |
@@ -97,7 +99,7 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 | 프로젝트 목록 | `/customer-select` | 작가 대시보드/목록 | 구현됨, 카드·상태 표현 추가 점검 필요 |
 | 프로젝트 생성 | `/customer-select/new` | 작가 프로젝트 생성 | 공통 폼 적용됨 |
 | 사진 업로드·관리 | `/customer-select/[projectId]/upload` | 작가 원본 업로드 | 공통 갤러리·뷰어·액션바 적용됨 |
-| 셀렉 갤러리 | `/customer-select/[projectId]/select` | `/c/[token]/gallery` | 가상화 그리드·검색·정렬·별점/품질 필터·유사컷·밀도·상세 뷰어·단일 확정 풋터 적용됨 |
+| 셀렉 갤러리 | `/customer-select/[projectId]/select` | `/c/[token]/gallery` | 공용 PC 필터·모바일 필터 시트·카드·상세 뷰어·확정 풋터 적용됨. 참여자별 찜(ANY/ALL), 적용 필터 칩, 검색 시 파일명, 처음/끝 이동, 모바일 밀도·탐색 위치 유지 지원 |
 | 최종 검토 | `/customer-select/[projectId]/review` | `/c/[token]/review` | 기능 구현됨, UI 정렬 필요 |
 | 작가 전달 | `/customer-select/[projectId]/export` | 프로젝트 결과 내보내기 | 기능 일부 구현, 실제 파일 다운로드 미구현 |
 | 보정본 업로드 | `/customer-select/[projectId]/retouch/upload` | 작가 보정본 업로드 | 기능 구현됨, UI 정렬 필요 |

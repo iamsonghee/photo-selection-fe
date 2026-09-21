@@ -14,6 +14,7 @@ import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDi
 import { SelectionLimitSnackbar } from "@/components/customer/SelectionLimitSnackbar";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
 import { GalleryDesktopHeader } from "@/components/customer/GalleryDesktopHeader";
+import { GalleryMobileFilterSheet } from "@/components/customer/GalleryMobileFilterSheet";
 import { RecommendationMark } from "@/components/RecommendationMark";
 import {
   fetchRoster,
@@ -1375,69 +1376,22 @@ export default function GalleryPageClient() {
           </>
         )}
 
-        {mobileFiltersOpen && (
-          <>
-            <button type="button" className="gl-mobile-filter-backdrop" aria-label="필터 닫기" onClick={() => setMobileFiltersOpen(false)} />
-            <section className="gl-mobile-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-filter-title">
-              <div className="gl-mobile-filter-sheet-header">
-                <h2 id="mobile-filter-title" className="gl-mobile-filter-sheet-title">필터 설정</h2>
-                <button type="button" className="gl-mobile-filter-reset" onClick={clearMobileFilters}>필터 초기화</button>
-              </div>
-              <div className="gl-mobile-filter-sheet-body">
-                <div className="gl-mobile-filter-section">
-                  <h3>별점</h3>
-                  {/* PC 헤더(gld-stars)와 같은 방식 — 숫자별 박스 대신 별을 눌러 그 점수까지
-                    * 채우는 "≥" 등급 입력으로 통일한다. */}
-                  <div className="gl-mobile-stars">
-                    <span className="gl-mobile-stars-op" style={{ color: starFilter > 0 ? "#ff4d00" : undefined }}>≥</span>
-                    {([1, 2, 3, 4, 5] as const).map((star) => {
-                      const filled = star <= starFilter;
-                      return (
-                        <button
-                          key={star}
-                          type="button"
-                          className="gl-mobile-star-btn"
-                          aria-label={`별점 ${star}점 이상 필터`}
-                          aria-pressed={starFilter === star}
-                          onClick={() => setStarFilter((current) => current === star ? 0 : star)}
-                        >
-                          <Star size={26} fill={filled ? "currentColor" : "none"} strokeWidth={2} style={{ color: filled ? "#ff4d00" : "#c6cbd0" }} />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="gl-mobile-filter-section">
-                  <h3>찜</h3>
-                  <div className="gl-mobile-filter-options">
-                    {colorFilterOptions.length === 0 ? (
-                      <p className="gl-mobile-filter-empty">아직 찜한 사람이 없어요</p>
-                    ) : (
-                      colorFilterOptions.map((option) => {
-                        const active = colorFilter.includes(option.key);
-                        return (
-                          <button key={option.key} type="button" className={`gl-mobile-filter-option${active ? " gl-mobile-filter-option-active" : ""}`} aria-pressed={active} onClick={() => setColorFilter((current) => current.includes(option.key) ? current.filter((item) => item !== option.key) : [...current, option.key])}>
-                            <span className="gl-mobile-filter-option-dot" style={{ background: option.hex }} /><span>{option.label}</span>
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                  {colorFilter.length > 1 && (
-                    <div className="gl-mobile-filter-mode" role="radiogroup" aria-label="찜 조건">
-                      <button type="button" role="radio" aria-checked={colorFilterMode === "any"}
-                        className={colorFilterMode === "any" ? "gl-mobile-filter-mode-active" : ""}
-                        onClick={() => setColorFilterMode("any")}>한 명이라도 찜</button>
-                      <button type="button" role="radio" aria-checked={colorFilterMode === "all"}
-                        className={colorFilterMode === "all" ? "gl-mobile-filter-mode-active" : ""}
-                        onClick={() => setColorFilterMode("all")}>모두 찜</button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </section>
-          </>
-        )}
+        <GalleryMobileFilterSheet
+          open={mobileFiltersOpen}
+          onClose={() => setMobileFiltersOpen(false)}
+          onReset={clearMobileFilters}
+          starFilter={starFilter}
+          onStarFilterChange={setStarFilter}
+          colorFilter={colorFilter}
+          colorOptions={colorFilterOptions}
+          onColorFilterChange={setColorFilter}
+          colorFilterMode={colorFilterMode}
+          onColorFilterModeChange={setColorFilterMode}
+          hasBlurryPhotos={hasBlurryPhotos}
+          hasEyesClosedPhotos={hasEyesClosedPhotos}
+          qualityFilter={qualityFilter}
+          onToggleQualityFilter={toggleQualityFilter}
+        />
 
         {/* ── Gallery Grid (가상화: 화면 + overscan 범위만 실제 DOM에 렌더) ── */}
         <main className="gl-grid-main" style={{ position: "relative", zIndex: 10, maxWidth: "var(--customer-gallery-max-width, 1440px)", margin: "0 auto", padding: "0 24px" }}>

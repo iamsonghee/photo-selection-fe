@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Star, ChevronsDown, ChevronsUp, Layers, RotateCcw } from "lucide-react";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
@@ -18,6 +18,8 @@ const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
 
 interface GalleryDesktopHeaderProps {
   token: string;
+  homeHref?: string;
+  position?: "fixed" | "static";
   projectName: string;
   photographerName: string | null;
   deadlineLabel: string;
@@ -57,12 +59,18 @@ interface GalleryDesktopHeaderProps {
   onSearchValueChange: (value: string) => void;
   onJumpToFirst: () => void;
   onJumpToLast: () => void;
+  tabs?: ReadonlyArray<{ value: string; label: string }>;
+  activeTab?: string;
+  onActiveTabChange?: (value: string) => void;
+  summaryContent?: ReactNode;
 }
 
 /** 고객 셀렉 갤러리 PC(≥768px) 헤더 · 툴바 — docs/customer-design.md §10 "PC composition" 참조.
  * 필터·정렬·검색은 상시 노출하며 가용 폭에 따라 그룹 단위로 줄바꿈한다. */
 export function GalleryDesktopHeader({
   token,
+  homeHref,
+  position = "fixed",
   projectName,
   photographerName,
   deadlineLabel,
@@ -98,23 +106,34 @@ export function GalleryDesktopHeader({
   onSearchValueChange,
   onJumpToFirst,
   onJumpToLast,
+  tabs,
+  activeTab,
+  onActiveTabChange,
+  summaryContent,
 }: GalleryDesktopHeaderProps) {
   const headerRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const header = headerRef.current;
     if (!header) return;
     // 필터 칩이 늘어나도 사진 첫 행을 가리지 않도록 실제 헤더 높이를 전달한다.
+    if (position !== "fixed") return;
     const observer = new ResizeObserver(() => {
       document.documentElement.style.setProperty("--selection-header-height", `${header.offsetHeight}px`);
     });
     observer.observe(header);
     return () => { observer.disconnect(); document.documentElement.style.removeProperty("--selection-header-height"); };
-  }, []);
+  }, [position]);
+  const visibleTabs = tabs ?? [
+    { value: "all", label: "전체 사진" },
+    ...(recommendedCount > 0 ? [{ value: "recommended", label: `작가 추천 ${recommendedCount}` }] : []),
+    { value: "selected", label: "내가 선택한 사진" },
+  ];
+  const selectedTab = activeTab ?? tabFilter;
   return (
-    <header className="gld-header" ref={headerRef}>
+    <header className={`gld-header${position === "static" ? " gld-header-static" : ""}`} ref={headerRef}>
       <div className="gld-top">
         <div className="gld-brand-group">
-          <Link href={token ? `/c/${token}` : "#"} aria-label="처음 화면으로" className="gld-brand-mark">
+          <Link href={homeHref ?? (token ? `/c/${token}` : "#")} aria-label="처음 화면으로" className="gld-brand-mark">
             A
           </Link>
           <div>
@@ -131,6 +150,7 @@ export function GalleryDesktopHeader({
         </div>
 
         <div className="gld-summary-group">
+          {summaryContent ?? <>
           {photographerName && (
             <>
               <div className="gld-photographer">
@@ -146,20 +166,21 @@ export function GalleryDesktopHeader({
               {Y} <span>/ {N}</span>
             </span>
           </div>
+          </>}
         </div>
       </div>
 
       <div className="gld-filter-bar-wrap">
         <div className="gld-filter-bar">
           <div className="gld-filter-left">
-            {(["all", ...(recommendedCount > 0 ? ["recommended"] as const : []), "selected"] as const).map((value) => (
+            {visibleTabs.map(({ value, label }) => (
               <button
                 key={value}
                 type="button"
-                onClick={() => onTabFilterChange(value)}
-                className={`gld-tab${tabFilter === value ? " gld-tab-active" : ""}`}
+                onClick={() => onActiveTabChange ? onActiveTabChange(value) : onTabFilterChange(value as TabFilter)}
+                className={`gld-tab${selectedTab === value ? " gld-tab-active" : ""}`}
               >
-                {value === "all" ? "전체 사진" : value === "recommended" ? `작가 추천 ${recommendedCount}` : "내가 선택한 사진"}
+                {label}
               </button>
             ))}
 
@@ -321,6 +342,7 @@ export function GalleryDesktopHeader({
           background: var(--customer-canvas);
           border-bottom: 1px solid var(--customer-divider);
         }
+        .gld-header-static { position: relative; flex: none; }
 
         .gld-top {
           max-width: var(--customer-gallery-max-width, 1440px);
