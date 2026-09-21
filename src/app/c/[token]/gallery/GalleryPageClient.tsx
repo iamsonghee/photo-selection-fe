@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, Search, SlidersHorizontal, Star, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useSelection } from "@/contexts/SelectionContext";
@@ -15,6 +15,7 @@ import { SelectionLimitSnackbar } from "@/components/customer/SelectionLimitSnac
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
 import { GalleryDesktopHeader } from "@/components/customer/GalleryDesktopHeader";
 import { GalleryMobileFilterSheet } from "@/components/customer/GalleryMobileFilterSheet";
+import { GalleryMobileToolbar } from "@/components/customer/GalleryMobileToolbar";
 import { RecommendationMark } from "@/components/RecommendationMark";
 import {
   fetchRoster,
@@ -25,7 +26,6 @@ import {
 } from "@/lib/customer-participant";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
-import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { SimilarityToggleButton } from "@/components/ui/SimilarityToggleButton";
 import {
   appendGalleryScrollQuery,
@@ -866,7 +866,7 @@ export default function GalleryPageClient() {
           background-size: 40px 40px;
           pointer-events: none; z-index: 0; opacity: 0.5;
         }
-        .gl-mobile-filter-backdrop, .gl-mobile-filter-sheet, .gl-mobile-similarity-hint { display: none; }
+        .gl-mobile-similarity-hint { display: none; }
 
         .gl-btn-confirm {
           background: var(--accent); color: #000; font-weight: 900;
@@ -928,62 +928,15 @@ export default function GalleryPageClient() {
           .gl-mobile-brand-home.is-compact span { width: 24px; height: 24px; border-radius: 6px; font-size: 13px; }
           .gl-mobile-title strong { font-size: 16px; line-height: 24px; letter-spacing: -0.32px; }
           .gl-mobile-deadline { display: flex; align-items: center; gap: 6px; font: 500 12px/18px Pretendard, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: 0; color: var(--customer-ink-secondary); white-space: nowrap; }
-          .gl-mobile-toolbar { height: 48px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff; transition: height 200ms ease; }
-          .gl-mobile-toolbar-leading { min-width: 0; display: flex; align-items: center; gap: 4px; }
           .gl-mobile-header-compact .gl-mobile-appbar { height: 0; opacity: 0; transform: translateY(-10px); pointer-events: none; }
-          .gl-mobile-header-compact .gl-mobile-toolbar { height: 56px; }
-          .gl-mobile-filter-trigger { min-width: 0; height: 38px; padding: 0 10px; border: 1px solid #e3e6e8; border-radius: 999px; background: #f6f7f8; display: flex; align-items: center; gap: 5px; color: #191918; font: inherit; }
-          .gl-mobile-filter-trigger-active { border-color: #ffc6ad; background: #fff0e8; color: #d84100; }
-          .gl-mobile-filter-trigger strong, .gl-mobile-filter-trigger span { font-size: 12px; line-height: 19px; white-space: nowrap; }
-          .gl-mobile-filter-trigger strong { overflow: hidden; text-overflow: ellipsis; }
-          .gl-mobile-filter-trigger svg { flex: 0 0 auto; }
-          .gl-mobile-filter-trigger[aria-expanded="true"] > svg:last-child { transform: rotate(180deg); }
-          .gl-mobile-scope-cue { animation: gl-scope-cue 650ms ease 350ms 1; }
-          @keyframes gl-scope-cue { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(2px); } }
-          @media (max-width: 359px) {
-            .gl-mobile-toolbar { padding: 0 10px; gap: 4px; }
-            .gl-mobile-filter-trigger { gap: 3px; }
-            .gl-mobile-toolbar-actions { gap: 4px !important; }
-          }
-          .gl-mobile-filter-trigger span { color: #6f6f6f; font-weight: 600; }
-          .gl-mobile-filter-trigger-active span { color: #d84100; }
-          .gl-mobile-scope-options { padding: 10px 20px 20px; }
-          .gl-mobile-scope-option { width: 100%; height: 52px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; display: flex; align-items: center; justify-content: space-between; color: #26282c; font: 14px/20px Pretendard, sans-serif; }
-          .gl-mobile-scope-option-label { display: flex; align-items: center; gap: 7px; font-weight: 600; }
-          .gl-mobile-scope-option-count { color: #7d7a75; font-variant-numeric: tabular-nums; }
-          .gl-mobile-scope-option-active { background: #fff0e8; color: #d84100; }
-          .gl-mobile-scope-option-active .gl-mobile-scope-option-count { color: #d84100; font-weight: 700; }
-          .gl-mobile-toolbar-actions { display: flex; gap: 8px; }
           .gl-mobile-tool-wrap { position: relative; }
           /* 버튼 상자는 덜어내되 터치 높이는 유지해 텍스트와 같은 무게로 정렬한다. */
-          .gl-mobile-tool-btn { width: 34px; height: 44px; border: 0; border-radius: 6px; background: transparent; color: #6f747b; display: grid; place-items: center; padding: 0; }
-          .gl-mobile-tool-btn-active { background: #fff0e8; color: #ff4d00; }
           .gl-mobile-similarity-toggle { border:0 !important; background:transparent !important; height:44px !important; padding:0 5px !important; font-size:12px !important; }
           .gl-mobile-similarity-toggle[aria-pressed="true"] { background:#fff0e8 !important; }
-          .gl-mobile-tool-btn:focus-visible, .gl-mobile-similarity-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
-          .gl-mobile-density-icon { width: 15px; height: 14px; display: grid; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 2px; }
-          .gl-mobile-density-icon span { min-width: 0; min-height: 0; border: 1px solid currentColor; border-radius: 1px; }
+          .gl-mobile-similarity-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
           .gl-mobile-similarity-hint { position: absolute; top: 38px; right: 0; z-index: 5; width: 218px; min-height: 44px; box-sizing: border-box; padding: 9px 34px 9px 12px; border-radius: 7px; background: rgba(25,25,24,.95); color: #fff; display: flex; align-items: center; box-shadow: 0 8px 24px rgba(0,0,0,.2); font: 500 11px/17px Pretendard, sans-serif; letter-spacing: -.2px; }
           .gl-mobile-similarity-hint::before { content: ''; position: absolute; top: -5px; right: 28px; width: 10px; height: 10px; transform: rotate(45deg); background: rgba(25,25,24,.95); }
           .gl-mobile-similarity-hint button { position: absolute; top: 3px; right: 3px; width: 32px; height: 38px; padding: 0; border: 0; background: transparent; color: rgba(255,255,255,.65); display: grid; place-items: center; }
-          .gl-mobile-filter-count { position: absolute; top: -6px; right: -6px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 999px; background: #ff4d00; color: #fff; font-size: 8px; line-height: 14px; font-weight: 700; text-align: center; pointer-events: none; }
-          .gl-mobile-search-row { height: 51px; padding: 7px 20px 8px; background: #fff; }
-          .gl-mobile-active-filters { min-height: 37px; padding: 4px 20px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; background: #fff; }
-          .gl-mobile-active-filters::-webkit-scrollbar { display: none; }
-          .gl-mobile-filter-chip { height: 29px; padding: 0 8px 0 12px; border: 1px solid #838b94; border-radius: 999px; background: #fff; color: #191918; display: flex; align-items: center; gap: 5px; flex: 0 0 auto; font: 12px/19px Pretendard, sans-serif; }
-          .gl-mobile-filter-chip-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
-          /* .gl-mobile-filter-options가 grid-template-columns: repeat(5, 1fr)라, 이 문구도
-           * 한 칸(1/5 폭)에 갇혀 여백이 있는데도 줄바꿈됐다 — 전체 폭을 쓰게 한다. */
-          .gl-mobile-filter-empty { grid-column: 1 / -1; margin: 0; padding: 4px 2px; color: #6f747b; font: 12px/19px Pretendard, sans-serif; white-space: nowrap; }
-          /* 두 명 이상을 고르면 "누구 하나라도" 와 "둘 다"가 전혀 다른 결과라 명시적으로 고르게 한다 */
-          .gl-mobile-filter-mode { margin-top: 10px; display: flex; gap: 6px; }
-          .gl-mobile-filter-mode button {
-            flex: 1; min-height: 38px; padding: 0 10px;
-            border: 1px solid #dde1e4; border-radius: 8px; background: #fff;
-            font: 500 13px/18px Pretendard, sans-serif; color: #5f5e5b;
-          }
-          .gl-mobile-filter-mode-active { border-color: #ff4d00 !important; background: #fff5f0 !important; color: #191918 !important; font-weight: 600 !important; }
-
           /* 그리드 — 열 수/간격은 JS에서 뷰포트 폭 기준으로 계산(가상화) */
           .gl-page-wrapper { padding-top: calc(99px + env(safe-area-inset-top)) !important; padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important; transition: padding-top 200ms ease; }
           .gl-page-wrapper .ac-confirm-footer-gallery .ac-confirm-footer-inner { height: calc(100px + env(safe-area-inset-bottom)) !important; grid-template-rows: 24px 48px !important; }
@@ -996,27 +949,10 @@ export default function GalleryPageClient() {
           .gl-page-wrapper.gl-mobile-header-compact.gl-mobile-filter-active { padding-top: calc(93px + env(safe-area-inset-top)) !important; }
 
           @media (prefers-reduced-motion: reduce) {
-            .gl-mobile-appbar, .gl-mobile-toolbar, .gl-page-wrapper { transition: none; }
+            .gl-mobile-appbar, .gl-page-wrapper { transition: none; }
             .gl-mobile-brand-home span { transition: none; }
-            .gl-mobile-scope-cue { animation: none; }
           }
           .gl-grid-main { padding: 0 20px !important; }
-
-          .gl-mobile-filter-backdrop { display: block; position: fixed; inset: 0; z-index: 80; border: 0; background: rgba(0,0,0,.48); padding: 0; }
-          .gl-mobile-filter-sheet { display: block; position: fixed; left: 50%; bottom: 0; z-index: 81; width: min(100%, 375px); transform: translateX(-50%); border-radius: 8px 8px 0 0; background: #fff; padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -8px 30px rgba(0,0,0,.12); }
-          .gl-mobile-filter-sheet-header { height: 58px; padding: 20px 20px 0; display: flex; align-items: center; justify-content: space-between; }
-          .gl-mobile-filter-sheet-title { margin: 0; color: #191918; font-size: 18px; line-height: 30px; font-weight: 700; letter-spacing: -.6px; }
-          .gl-mobile-filter-reset { border: 0; background: transparent; color: #838b94; font: 12px/24px Pretendard, sans-serif; text-decoration: underline; padding: 0; }
-          .gl-mobile-filter-sheet-body { padding: 20px; }
-          .gl-mobile-filter-section + .gl-mobile-filter-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid #eef0f2; }
-          .gl-mobile-filter-section h3 { margin: 0 0 10px; color: rgba(0,0,0,.9); font-size: 14px; line-height: 24px; font-weight: 500; letter-spacing: -.45px; }
-          .gl-mobile-filter-options { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
-          .gl-mobile-filter-option { height: 39px; min-width: 0; padding: 0 4px; border: 1px solid #c6cbd0; border-radius: 4px; background: #fff; color: #191918; display: flex; align-items: center; justify-content: center; gap: 4px; font: 12px/19px Pretendard, sans-serif; }
-          .gl-mobile-filter-option-active { border-color: #ff4d00; background: #fff0e8; }
-          .gl-mobile-stars { display: flex; align-items: center; gap: 4px; padding: 2px 0; }
-          .gl-mobile-stars-op { margin-right: 4px; color: #aab0b8; font: 700 16px/1 Pretendard, sans-serif; }
-          .gl-mobile-star-btn { padding: 4px; border: 0; background: transparent; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-          .gl-mobile-filter-option-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
 
           .gl-empty-mobile { min-height: 478px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 20px; color: #191918; }
           .gl-empty-mobile-icon { width: 58px; height: 58px; border-radius: 12px; background: #f1f3f6; color: #aab0b8; display: grid; place-items: center; margin-bottom: 16px; }
@@ -1064,95 +1000,37 @@ export default function GalleryPageClient() {
               {dDayLabel && <Badge tone={dDayTone} theme="customerLight" className="font-mono">{dDayLabel}</Badge>}
             </div>
           </div>
-          <div className="gl-mobile-toolbar">
-            <div className="gl-mobile-toolbar-leading">
-              {mobileHeaderCompact && <CustomerGalleryHomeMark token={token} compact />}
-              <button type="button" className={`gl-mobile-filter-trigger${tabFilter !== "all" ? " gl-mobile-filter-trigger-active" : ""}`} aria-expanded={mobileScopeOpen} aria-haspopup="dialog" onClick={() => { setMobileScopeOpen((value) => !value); setMobileSearchOpen(false); setMobileFiltersOpen(false); }}>
-                {tabFilter === "recommended" && <RecommendationMark size={12} aria-hidden />}
-                <strong>{tabFilter === "selected" ? "내가 선택한 사진" : tabFilter === "recommended" ? "작가 추천" : "전체 사진"}</strong>
-                <span>{tabFilter === "selected" ? Y : tabFilter === "recommended" ? recommendedCount : photos.length}장</span>
-                <ChevronDown className={tabFilter === "recommended" && !mobileScopeOpen ? "gl-mobile-scope-cue" : undefined} size={13} strokeWidth={1.8} />
-              </button>
-            </div>
-            <div className="gl-mobile-toolbar-actions">
-              {showSimilarityToggle && (
-                <div className="gl-mobile-tool-wrap">
-                  <SimilarityToggleButton
-                    className="gl-mobile-similarity-toggle"
-                    size="compact"
-                    active={similarityToggleOn}
-                    count={photoGroups.length}
-                    onClick={() => {
-                      dismissSimilarityHint();
-                      setSimilarityToggleOn((value) => !value);
-                      setMobileSearchOpen(false);
-                      setMobileFiltersOpen(false);
-                      setMobileScopeOpen(false);
-                    }}
-                  />
-                  {similarityHintVisible && (
-                    <aside className="gl-mobile-similarity-hint" role="status">
-                      비슷한 사진을 묶어서 볼 수 있어요
-                      <button type="button" onClick={dismissSimilarityHint} aria-label="유사컷 안내 닫기"><X size={14} /></button>
-                    </aside>
-                  )}
-                </div>
-              )}
-              <button
-                type="button"
-                className="gl-mobile-tool-btn"
-                onClick={() => {
-                  const nextColumns = mobileColumns === 4
-                    ? 2
-                    : (mobileColumns + 1) as MobileGalleryColumns;
-                  applyMobileColumns(nextColumns);
-                  setMobileSearchOpen(false);
-                  setMobileFiltersOpen(false);
-                  setMobileScopeOpen(false);
-                }}
-                aria-label={`현재 ${mobileColumns}열, 누르면 ${mobileColumns === 4 ? 2 : mobileColumns + 1}열로 변경`}
-                title={`${mobileColumns}열 보기`}
-              >
-                <span
-                  className="gl-mobile-density-icon"
-                  style={{ gridTemplateColumns: `repeat(${mobileColumns}, minmax(0, 1fr))` }}
-                  aria-hidden="true"
-                >
-                  {Array.from({ length: mobileColumns * 2 }, (_, index) => <span key={index} />)}
-                </span>
-              </button>
-              <div className="gl-mobile-tool-wrap">
-                <button type="button" className={`gl-mobile-tool-btn${mobileFiltersOpen ? " gl-mobile-tool-btn-active" : ""}`} onClick={() => { setMobileFiltersOpen(true); setMobileSearchOpen(false); setMobileScopeOpen(false); }} aria-label="사진 필터 설정" aria-expanded={mobileFiltersOpen}>
-                  <SlidersHorizontal size={14} strokeWidth={1.5} />
-                </button>
-                {activeMobileFilterCount > 0 && <span className="gl-mobile-filter-count">{activeMobileFilterCount}</span>}
-              </div>
-              <button type="button" className={`gl-mobile-tool-btn${mobileSearchOpen ? " gl-mobile-tool-btn-active" : ""}`} onClick={() => { setMobileSearchOpen((value) => !value); setMobileFiltersOpen(false); setMobileScopeOpen(false); }} aria-label="파일명 검색" aria-expanded={mobileSearchOpen}>
-                <Search size={14} strokeWidth={1.7} />
-              </button>
-            </div>
-          </div>
-          {mobileSearchOpen && (
-            <div className="gl-mobile-search-row">
-              <FilenameSearchInput
-                value={searchValue}
-                onChange={setSearchValue}
-                ariaLabel="파일명으로 필터링"
-                autoFocus
-                style={{ "--fsi-height": "36px", "--fsi-border-color": "#ff4d00", "--fsi-radius": "4px" } as React.CSSProperties}
-              />
-            </div>
-          )}
-          {mobileFilterChipsVisible && (
-            <div className="gl-mobile-active-filters" aria-label="적용 중인 필터">
-              {starFilter > 0 && <button type="button" className="gl-mobile-filter-chip" onClick={() => setStarFilter(0)}><Star size={13} fill="#FF4D00" color="#FF4D00" /><span>{starFilter}점</span><X size={14} /></button>}
-              {colorFilter.map((color) => <button key={color} type="button" className="gl-mobile-filter-chip" onClick={() => setColorFilter((current) => current.filter((item) => item !== color))}><span className="gl-mobile-filter-chip-dot" style={{ background: COLOR_OPTIONS.find((option) => option.key === color)?.hex }} /><span>{colorLabel(color)}</span><X size={14} /></button>)}
-              {colorFilter.length > 1 && colorFilterMode === "all" && <button type="button" className="gl-mobile-filter-chip" onClick={() => setColorFilterMode("any")}><span>모두 찜</span><X size={14} /></button>}
-              {searchValue.trim() && <button type="button" className="gl-mobile-filter-chip" onClick={() => setSearchValue("")}><Search size={13} /><span>{searchValue.trim()}</span><X size={14} /></button>}
-              {qualityFilter.has("blurry") && <button type="button" className="gl-mobile-filter-chip" onClick={() => toggleQualityFilter("blurry")}><span>흐림</span><X size={14} /></button>}
-              {qualityFilter.has("eyesClosed") && <button type="button" className="gl-mobile-filter-chip" onClick={() => toggleQualityFilter("eyesClosed")}><span>눈감음</span><X size={14} /></button>}
-            </div>
-          )}
+          <GalleryMobileToolbar
+            leading={mobileHeaderCompact ? <CustomerGalleryHomeMark token={token} compact /> : undefined}
+            compact={mobileHeaderCompact}
+            scopeOptions={[
+              { value: "all", label: "전체 사진", count: photos.length },
+              ...(recommendedCount > 0 ? [{ value: "recommended", label: "작가 추천", count: recommendedCount, icon: <RecommendationMark key="recommendation" size={12} aria-hidden /> }] : []),
+              { value: "selected", label: "내가 선택한 사진", count: Y },
+            ]}
+            scopeValue={tabFilter}
+            scopeOpen={mobileScopeOpen}
+            onScopeOpenChange={(open) => { setMobileScopeOpen(open); if (open) { setMobileSearchOpen(false); setMobileFiltersOpen(false); } }}
+            onScopeChange={(value) => value === "selected" ? showSelectedPhotos() : setTabFilter(value as TabFilter)}
+            columns={mobileColumns}
+            onColumnsChange={(columns) => { applyMobileColumns(columns); setMobileSearchOpen(false); setMobileFiltersOpen(false); setMobileScopeOpen(false); }}
+            extraAction={showSimilarityToggle ? <div className="gl-mobile-tool-wrap"><SimilarityToggleButton className="gl-mobile-similarity-toggle" size="compact" active={similarityToggleOn} count={photoGroups.length} onClick={() => { dismissSimilarityHint(); setSimilarityToggleOn((value) => !value); setMobileSearchOpen(false); setMobileFiltersOpen(false); setMobileScopeOpen(false); }} />{similarityHintVisible && <aside className="gl-mobile-similarity-hint" role="status">비슷한 사진을 묶어서 볼 수 있어요<button type="button" onClick={dismissSimilarityHint} aria-label="유사컷 안내 닫기"><X size={14} /></button></aside>}</div> : undefined}
+            filtersOpen={mobileFiltersOpen}
+            onOpenFilters={() => { setMobileFiltersOpen(true); setMobileSearchOpen(false); setMobileScopeOpen(false); }}
+            activeFilterCount={activeMobileFilterCount}
+            searchOpen={mobileSearchOpen}
+            onSearchOpenChange={(open) => { setMobileSearchOpen(open); setMobileFiltersOpen(false); setMobileScopeOpen(false); }}
+            searchValue={searchValue}
+            onSearchValueChange={setSearchValue}
+            activeFilters={[
+              ...(starFilter > 0 ? [{ key: "star", label: `${starFilter}점`, icon: "star" as const, onRemove: () => setStarFilter(0) }] : []),
+              ...colorFilter.map((color) => ({ key: `color-${color}`, label: colorLabel(color), color: COLOR_OPTIONS.find((option) => option.key === color)?.hex, onRemove: () => setColorFilter((current) => current.filter((item) => item !== color)) })),
+              ...(colorFilter.length > 1 && colorFilterMode === "all" ? [{ key: "color-mode", label: "모두 찜", onRemove: () => setColorFilterMode("any") }] : []),
+              ...(searchValue.trim() ? [{ key: "search", label: searchValue.trim(), icon: "search" as const, onRemove: () => setSearchValue("") }] : []),
+              ...(qualityFilter.has("blurry") ? [{ key: "blurry", label: "흐림", onRemove: () => toggleQualityFilter("blurry") }] : []),
+              ...(qualityFilter.has("eyesClosed") ? [{ key: "eyesClosed", label: "눈감음", onRemove: () => toggleQualityFilter("eyesClosed") }] : []),
+            ]}
+          />
         </header>
 
         <GalleryDesktopHeader
@@ -1193,23 +1071,6 @@ export default function GalleryPageClient() {
           onJumpToFirst={handleJumpToFirst}
           onJumpToLast={handleJumpToLast}
         />
-
-        {mobileScopeOpen && (
-          <>
-            <button type="button" className="gl-mobile-filter-backdrop" aria-label="사진 보기 선택 닫기" onClick={() => setMobileScopeOpen(false)} />
-            <section className="gl-mobile-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-scope-title">
-              <div className="gl-mobile-filter-sheet-header">
-                <h2 id="mobile-scope-title" className="gl-mobile-filter-sheet-title">사진 보기</h2>
-                <button type="button" className="gl-mobile-tool-btn" aria-label="사진 보기 선택 닫기" onClick={() => setMobileScopeOpen(false)}><X size={18} /></button>
-              </div>
-              <div className="gl-mobile-scope-options" role="radiogroup" aria-label="사진 보기 범위">
-                <button type="button" role="radio" aria-checked={tabFilter === "all"} className={`gl-mobile-scope-option${tabFilter === "all" ? " gl-mobile-scope-option-active" : ""}`} onClick={() => { setTabFilter("all"); setMobileScopeOpen(false); }}><span className="gl-mobile-scope-option-label">전체 사진</span><span className="gl-mobile-scope-option-count">{photos.length}장</span></button>
-                {recommendedCount > 0 && <button type="button" role="radio" aria-checked={tabFilter === "recommended"} className={`gl-mobile-scope-option${tabFilter === "recommended" ? " gl-mobile-scope-option-active" : ""}`} onClick={() => { setTabFilter("recommended"); setMobileScopeOpen(false); }}><span className="gl-mobile-scope-option-label"><RecommendationMark size={13} aria-hidden />작가 추천</span><span className="gl-mobile-scope-option-count">{recommendedCount}장</span></button>}
-                <button type="button" role="radio" aria-checked={tabFilter === "selected"} className={`gl-mobile-scope-option${tabFilter === "selected" ? " gl-mobile-scope-option-active" : ""}`} onClick={() => { showSelectedPhotos(); setMobileScopeOpen(false); }}><span className="gl-mobile-scope-option-label">내가 선택한 사진</span><span className="gl-mobile-scope-option-count">{Y}장</span></button>
-              </div>
-            </section>
-          </>
-        )}
 
         <GalleryMobileFilterSheet
           open={mobileFiltersOpen}

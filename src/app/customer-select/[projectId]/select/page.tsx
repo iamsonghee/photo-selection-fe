@@ -15,14 +15,14 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Grid2X2, Search, Share2, SlidersHorizontal, X } from "lucide-react";
+import { CheckCircle2, Layers, Share2 } from "lucide-react";
 import { getFilteredPhotos, type GalleryFilterState, type QualityFilterFlag } from "@/lib/gallery-filter";
 import { GalleryDesktopHeader } from "@/components/customer/GalleryDesktopHeader";
 import { GalleryMobileFilterSheet } from "@/components/customer/GalleryMobileFilterSheet";
 import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
+import { GalleryMobileToolbar } from "@/components/customer/GalleryMobileToolbar";
 import CustomerSelectionViewer, { type CustomerSelectionViewerAdapter } from "@/components/customer/CustomerSelectionViewer";
-import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { SelectionContextOverride, type SelectionContextValue } from "@/contexts/SelectionContext";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
@@ -72,6 +72,7 @@ export default function CustomerSelectGalleryPage() {
   const [mobileColumns, setMobileColumns] = useState<MobileColumns>(2);
   const [desktopDensity, setDesktopDensity] = useState<DesktopDensity>("standard");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [scopeOpen, setScopeOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [compactHeader, setCompactHeader] = useState(false);
   const [layout, setLayout] = useState<GridLayout>({ cols: 4, gap: DESKTOP_GRID_GAP, rowHeight: DESKTOP_GRID_MIN_CELL.standard + DESKTOP_GRID_GAP });
@@ -418,32 +419,36 @@ export default function CustomerSelectGalleryPage() {
             </div>
           </div>
 
-          <div className={ui.selectToolbarMain}>
-            <div className={ui.selectTabs} role="group" aria-label="사진 보기 범위">
-              <button type="button" aria-pressed={tab === "all"} className={`${ui.chip} ${tab === "all" ? ui.chipOn : ""}`} onClick={() => setTab("all")}>전체 {project.photos.length}</button>
-              <button type="button" aria-pressed={tab === "selected"} className={`${ui.chip} ${tab === "selected" ? ui.chipOn : ""}`} onClick={() => setTab("selected")}>최종 선택 {selectedCount}</button>
-              {participants.length > 1 ? <button type="button" aria-pressed={tab === "disagree"} className={`${ui.chip} ${tab === "disagree" ? ui.chipOn : ""}`} onClick={() => setTab("disagree")}>의견 갈림 {disagreeCount}</button> : null}
-            </div>
-            <div className={ui.selectMobileTools}>
-              <button type="button" className={ui.selectIconButton} aria-label={`현재 ${mobileColumns}열, 사진 크기 변경`} onClick={() => applyMobileColumns(mobileColumns === 4 ? 2 : (mobileColumns + 1) as MobileColumns)}>
-                <Grid2X2 size={17} aria-hidden /><span>{mobileColumns}</span>
-              </button>
-              <button type="button" className={`${ui.selectIconButton} ${filtersOpen ? ui.selectIconButtonOn : ""}`} aria-label="사진 필터" aria-expanded={filtersOpen} onClick={() => { setFiltersOpen(true); setSearchOpen(false); }}>
-                <SlidersHorizontal size={17} aria-hidden />
-                {activeFilterCount > 0 && <b className={ui.selectFilterCount}>{activeFilterCount}</b>}
-              </button>
-              <button type="button" className={`${ui.selectIconButton} ${searchOpen ? ui.selectIconButtonOn : ""}`} aria-label="파일명 검색" aria-expanded={searchOpen} onClick={() => { setSearchOpen((value) => !value); setFiltersOpen(false); }}>
-                <Search size={17} aria-hidden />
-              </button>
-            </div>
-          </div>
-          {searchOpen && <div className={ui.selectMobileSearch}><FilenameSearchInput value={nameFilter} onChange={setNameFilter} autoFocus ariaLabel="파일명으로 필터링" /></div>}
-          {activeFilterCount > 0 && !searchOpen && <div className={ui.selectActiveFilters} aria-label="적용 중인 필터">
-            {starFilter > 0 && <button type="button" onClick={() => setStarFilter(0)}>{starFilter}점 이상 <X size={13} /></button>}
-            {colorFilter.map((color) => <button key={color} type="button" onClick={() => setColorFilter((current) => current.filter((item) => item !== color))}>{colorLabel(color)} <X size={13} /></button>)}
-            {qualityFilter.map((quality) => <button key={quality} type="button" onClick={() => toggleQuality(quality)}>{quality === "blurry" ? "흐림" : "눈감음"} <X size={13} /></button>)}
-            {nameFilter.trim() && <button type="button" onClick={() => setNameFilter("")}>{nameFilter.trim()} <X size={13} /></button>}
-          </div>}
+          <GalleryMobileToolbar
+            leading={compactHeader ? <Link href="/customer-select" className={ui.selectBrandLink} aria-label="셀프 고객 메인으로 이동"><span className={ui.selectBrandMark} aria-hidden>A</span></Link> : undefined}
+            compact={compactHeader}
+            scopeOptions={[
+              { value: "all", label: "전체 사진", count: project.photos.length },
+              { value: "selected", label: "최종 선택", count: selectedCount },
+              ...(participants.length > 1 ? [{ value: "disagree", label: "의견 갈림", count: disagreeCount }] : []),
+            ]}
+            scopeValue={tab}
+            scopeOpen={scopeOpen}
+            onScopeOpenChange={(open) => { setScopeOpen(open); if (open) { setSearchOpen(false); setFiltersOpen(false); } }}
+            onScopeChange={(value) => setTab(value as Tab)}
+            columns={mobileColumns}
+            onColumnsChange={(columns) => { applyMobileColumns(columns); setScopeOpen(false); setSearchOpen(false); setFiltersOpen(false); }}
+            extraAction={similarityGroupCount > 0 ? <button type="button" className="gmc-tool-btn" aria-label="유사컷 묶어보기" aria-pressed={groupedView} onClick={() => { setGroupedView((value) => !value); setExpandedGroupIds(new Set()); }}><Layers size={15} /></button> : undefined}
+            filtersOpen={filtersOpen}
+            onOpenFilters={() => { setFiltersOpen(true); setSearchOpen(false); setScopeOpen(false); }}
+            activeFilterCount={activeFilterCount}
+            searchOpen={searchOpen}
+            onSearchOpenChange={(open) => { setSearchOpen(open); setFiltersOpen(false); setScopeOpen(false); }}
+            searchValue={nameFilter}
+            onSearchValueChange={setNameFilter}
+            activeFilters={[
+              ...(starFilter > 0 ? [{ key: "star", label: `${starFilter}점 이상`, icon: "star" as const, onRemove: () => setStarFilter(0) }] : []),
+              ...colorFilter.map((color) => ({ key: `color-${color}`, label: colorLabel(color), color: colorOptions.find((option) => option.key === color)?.hex, onRemove: () => setColorFilter((current) => current.filter((item) => item !== color)) })),
+              ...(colorFilter.length > 1 && colorFilterMode === "all" ? [{ key: "color-mode", label: "모두 찜", onRemove: () => setColorFilterMode("any") }] : []),
+              ...qualityFilter.map((quality) => ({ key: quality, label: quality === "blurry" ? "흐림" : "눈감음", onRemove: () => toggleQuality(quality) })),
+              ...(nameFilter.trim() ? [{ key: "search", label: nameFilter.trim(), icon: "search" as const, onRemove: () => setNameFilter("") }] : []),
+            ]}
+          />
         </div>
 
         <GalleryMobileFilterSheet open={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={resetFilters} starFilter={starFilter} onStarFilterChange={setStarFilter} colorFilter={colorFilter} colorOptions={colorOptions} onColorFilterChange={setColorFilter} colorFilterMode={colorFilterMode} onColorFilterModeChange={setColorFilterMode} hasBlurryPhotos={hasBlurryPhotos} hasEyesClosedPhotos={hasEyesClosedPhotos} qualityFilter={qualityFilterSet} onToggleQualityFilter={toggleQuality} />

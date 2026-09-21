@@ -285,31 +285,13 @@
 .nicknameActions button[type="submit"] { border-color: #ff4d00; background: #ff4d00; color: #fff; }
 .nicknameActions button:disabled { border-color: #e4e7e9; background: #e4e7e9; color: #9ba0a6; }
 .selectHeaderActions { display: flex; gap: 6px; flex: none; }
-.selectHeaderButton, .selectIconButton, .selectFilterButton { min-height: 34px; padding: 0 11px; border: 1px solid #dde1e4; border-radius: 7px; background: #fff; color: #4f5358; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: 600 12px/1 Pretendard, sans-serif; white-space: nowrap; }
-.selectHeaderButton:hover, .selectFilterButton:hover { border-color: #b9bdc2; }
-.selectHeaderButton[aria-pressed="true"], .selectFilterButtonOn { border-color: #ff4d00; background: #fff3ed; color: #d84100; }
-.selectToolbarMain { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
-.selectTabs { min-width: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
-.selectTabs::-webkit-scrollbar { display: none; }
-.selectTabs .chip { flex: none; height: 34px; padding-inline: 13px; border-width: 1px; border-radius: 7px; font-size: 12px; }
-.selectMobileTools { display: none; margin-left: auto; gap: 4px; }
-.selectIconButton { width: 38px; padding: 0; position: relative; }
-.selectIconButton span { position: absolute; right: 3px; bottom: 2px; font-size: 8px; }
-.selectFilterCount { position: absolute; top: -5px; right: -5px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: #ff4d00; color: #fff; font-size: 10px; line-height: 17px; }
-.selectIconButtonOn { border-color: #ff4d00; background: #fff3ed; color: #d84100; }
+.selectHeaderButton { min-height: 34px; padding: 0 11px; border: 1px solid #dde1e4; border-radius: 7px; background: #fff; color: #4f5358; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: 600 12px/1 Pretendard, sans-serif; white-space: nowrap; }
+.selectHeaderButton:hover { border-color: #b9bdc2; }
+.selectHeaderButton[aria-pressed="true"] { border-color: #ff4d00; background: #fff3ed; color: #d84100; }
 .selectDesktopDensity { display: inline-flex; overflow: hidden; border: 1px solid #dde1e4; border-radius: 6px; }
 .selectDesktopDensity button { height: 26px; padding: 0 7px; border: 0; border-left: 1px solid #dde1e4; background: #fff; color: #747a81; font: 600 10px/1 Pretendard, sans-serif; cursor: pointer; }
 .selectDesktopDensity button:first-child { border-left: 0; }
 .selectDesktopDensity button[aria-pressed="true"] { background: #26282c; color: #fff; }
-.selectMobileSearch { margin-top: 7px; padding-top: 7px; border-top: 1px solid #eef0f2; }
-.selectActiveFilters { margin-top: 7px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
-.selectActiveFilters::-webkit-scrollbar { display: none; }
-.selectActiveFilters button { height: 28px; flex: none; padding: 0 8px 0 10px; border: 1px solid #838b94; border-radius: 999px; background: #fff; color: #191918; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; }
-.selectFilterTools { display: flex; align-items: center; gap: 7px; margin-top: 9px; }
-.selectSearch { flex: 0 1 220px; }
-.selectStarFilter { height: 34px; display: flex; align-items: center; gap: 0; padding: 0 5px; border: 1px solid #dde1e4; border-radius: 7px; background: #fff; }
-.selectStarFilter button { width: 25px; height: 30px; padding: 0; border: 0; background: transparent; color: #c6cbd0; display: grid; place-items: center; }
-.selectStarFilter button[aria-pressed="true"], .selectStarFilter button:has(~ button[aria-pressed="true"]) { color: #ff4d00; }
 .selectGallery { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; background: #f7f7f7; padding: 16px 24px 24px; }
 .selectGrid { position: relative; width: 100%; max-width: calc(var(--customer-gallery-max-width, 1440px) - 48px); min-height: 100%; margin: 0 auto; }
 .selectGridRow { position: absolute; top: 0; left: 0; width: 100%; display: grid; overflow: hidden; }
@@ -321,8 +303,8 @@
   .nicknameDialog { width: 100%; max-width: none; margin: auto 0 0; border-radius: 14px 14px 0 0; padding-bottom: env(safe-area-inset-bottom); }
   .nicknameDialog form { padding: 20px; }
   .selectDesktopOnly { display: none; }
-  .selectHeader { display: block; padding: 7px 10px; transition: padding 160ms ease; }
-  .selectHeaderTop { min-height: 38px; gap: 7px; flex-wrap: wrap; }
+  .selectHeader { display: block; padding: 7px 0 0; transition: padding 160ms ease; }
+  .selectHeaderTop { min-height: 38px; padding: 0 10px; gap: 7px; flex-wrap: wrap; }
   .selectTitleGroup { min-width: 0; flex: 1; }
   .selectBrandMark { width: 26px; height: 26px; flex-basis: 26px; }
   .selectEyebrow { display: none; }
@@ -334,19 +316,8 @@
   .selectHeaderButton:not([aria-pressed="true"]) { font-size: 0; }
   .selectHeaderButton[aria-pressed="true"] { width: auto; padding: 0 8px; font-size: 10px; }
   .selectDoneButton { width: auto !important; padding: 0 8px !important; font-size: 10px !important; }
-  .selectToolbarMain { margin-top: 7px; }
-  .selectTabs { flex: 1; }
-  .selectTabs .chip { height: 32px; padding-inline: 10px; }
-  .selectMobileTools { display: flex; }
-  .selectFilterTools { display: none; margin-top: 7px; padding-top: 7px; border-top: 1px solid #eef0f2; flex-wrap: wrap; }
-  .selectFilterToolsOpen { display: flex; }
-  .selectSearch { flex: 1 1 100%; }
-  .selectStarFilter { flex: 1; justify-content: center; }
-  .selectFilterButton { min-height: 34px; padding-inline: 9px; }
   .selectHeaderCompact .selectHeaderTop { display: none; }
-  .selectHeaderCompact .selectToolbarMain { margin-top: 0; }
-  .selectHeaderCompact .selectFilterToolsOpen { display: flex; }
-  .selectGallery { padding: 8px; }
+  .selectGallery { padding: 8px 20px; }
   .selectGrid { max-width: none; }
   .selectDensity2 :global(.gl-photo-card) { aspect-ratio: 4 / 3; }
 }

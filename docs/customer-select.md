@@ -79,6 +79,7 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 | AI 제안 모달 | 작가 원본 업로드 | `AiAnalysisPromptModal` |
 | 고객 셀렉 카드 | 작가 고객 갤러리 | `GalleryPhotoCard` + `GalleryPhotoCard.css`를 두 경로가 그대로 사용하며 페이지별 카드 override를 두지 않음 |
 | 셀렉 PC 필터·헤더 | 작가 고객 갤러리 | `GalleryDesktopHeader` |
+| 셀렉 모바일 보기·검색·필터 툴바 | 작가 고객 갤러리 | `GalleryMobileToolbar` |
 | 셀렉 모바일 필터 시트 | 작가 고객 갤러리 | `GalleryMobileFilterSheet` |
 | 셀렉 확정 풋터 | 작가 고객 갤러리 | `SelectionConfirmFooter` |
 | 이미지 로딩 | 양쪽 갤러리 | `createThumbLoadQueue` |
@@ -99,7 +100,7 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 | 프로젝트 목록 | `/customer-select` | 작가 대시보드/목록 | 구현됨. 업로드 전 ACUT 마크, 업로드 후 첫 사진의 프리뷰(없으면 썸네일)를 카드 대표 이미지로 사용 |
 | 프로젝트 생성 | `/customer-select/new` | 작가 프로젝트 생성 | 공통 폼 적용됨 |
 | 사진 업로드·관리 | `/customer-select/[projectId]/upload` | 작가 원본 업로드 | 공통 갤러리·뷰어·액션바 적용됨 |
-| 셀렉 갤러리 | `/customer-select/[projectId]/select` | `/c/[token]/gallery` | 공용 PC 필터·모바일 필터 시트·카드 CSS·상세 뷰어·확정 풋터 적용됨. PC 격자는 양쪽 모두 최대 1440px 셸과 좌우 24px 여백을 기준으로 계산한다. `최종 선택`과 참여자별 `찜`을 분리하며 찜은 색상 필터(ANY/ALL)에서만 다룬다. PC 필터는 보기·조건·찜·정렬/탐색·검색으로 구분하고 사진 크기 3단계, 적용 필터 칩, 검색 시 파일명, 처음/끝 이동을 지원한다. 모바일은 밀도·탐색 위치를 유지한다. 닉네임은 상단 배너가 아니라 내 참여자 칩에서 설정·수정하며, 하단에는 남은 수량과 `최종 검토하기` 행동을 항상 표시한다. |
+| 셀렉 갤러리 | `/customer-select/[projectId]/select` | `/c/[token]/gallery` | 공용 PC 필터·모바일 보기/검색/필터 툴바·모바일 필터 시트·카드 CSS·상세 뷰어·확정 풋터 적용됨. PC 격자는 양쪽 모두 최대 1440px 셸과 좌우 24px, 모바일 격자는 좌우 20px를 기준으로 계산한다. `최종 선택`과 참여자별 `찜`을 분리하며 찜은 색상 필터(ANY/ALL)에서만 다룬다. PC 필터는 보기·조건·찜·정렬/탐색·검색으로 구분하고 사진 크기 3단계, 적용 필터 칩, 검색 시 파일명, 처음/끝 이동을 지원한다. 모바일은 2/3/4열 밀도·탐색 위치를 유지한다. 닉네임은 상단 배너가 아니라 내 참여자 칩에서 설정·수정하며, 하단에는 남은 수량과 `최종 검토하기` 행동을 항상 표시한다. |
 | 최종 검토 | `/customer-select/[projectId]/review` | `/c/[token]/review` | 기능 구현됨, UI 정렬 필요 |
 | 작가 전달 | `/customer-select/[projectId]/export` | 프로젝트 결과 내보내기 | 기능 일부 구현, 실제 파일 다운로드 미구현 |
 | 보정본 업로드 | `/customer-select/[projectId]/retouch/upload` | 작가 보정본 업로드 | 기능 구현됨, UI 정렬 필요 |
