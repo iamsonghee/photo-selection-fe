@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Pencil, X } from "lucide-react";
+import { COLOR_LABELS } from "@/lib/gallery-filter";
 import { useCustomerSelectStore } from "./real-store";
 import ui from "./ui.module.css";
 
@@ -38,6 +39,11 @@ export function NicknamePrompt({ hex, isDone }: { hex: string; isDone: boolean }
               <span>함께 고르는 사람에게 표시할 이름이에요.</span>
             </div>
             <button type="button" aria-label="닫기" onClick={() => dialogRef.current?.close()}><X size={18} /></button>
+          </div>
+          <div className={ui.nicknameColor} aria-label={`내 컬러 ${COLOR_LABELS[currentIdentity]}`}>
+            <i style={{ background: hex }} />
+            <span><strong>내 컬러</strong> · {COLOR_LABELS[currentIdentity]}</span>
+            <small>변경할 수 없어요</small>
           </div>
           <label className={ui.nicknameField}>
             <span>닉네임</span>
