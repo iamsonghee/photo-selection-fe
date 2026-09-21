@@ -23,6 +23,7 @@ type GalleryPhotoCardProps = {
   recommended?: boolean;
   rating?: StarRating;
   colorTags?: ColorTag[];
+  colorLabel?: (color: ColorTag) => string;
   hasComment?: boolean;
   showGroupBadge: boolean;
   groupId?: string;
@@ -58,6 +59,7 @@ function GalleryPhotoCardImpl({
   recommended = false,
   rating,
   colorTags = EMPTY_COLOR_TAGS,
+  colorLabel,
   hasComment = false,
   showGroupBadge,
   groupId,
@@ -151,7 +153,8 @@ function GalleryPhotoCardImpl({
         )}
         {colorTags.map((tag) => {
           const hex = COLOR_OPTIONS.find((c) => c.key === tag)?.hex;
-          return hex ? <span key={tag} className="gl-color-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: hex, display: "block", flexShrink: 0 }} /> : null;
+          const label = colorLabel?.(tag) ?? "참가자 찜";
+          return hex ? <span key={tag} className="gl-color-dot" role="img" aria-label={label} title={label} style={{ width: 7, height: 7, borderRadius: "50%", background: hex, display: "block", flexShrink: 0 }} /> : null;
         })}
       </div>
     </div>

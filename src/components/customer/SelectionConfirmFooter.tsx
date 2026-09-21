@@ -88,6 +88,8 @@ export function SelectionConfirmFooter({
           background: var(--customer-control);
           color: #fff;
           border-radius: 8px;
+          min-width: 148px;
+          justify-content: center;
         }
         .ac-confirm-footer-light .ac-confirm-footer-btn:disabled {
           background: var(--customer-divider);
@@ -180,9 +182,9 @@ export function SelectionConfirmFooter({
             margin: "0 auto",
             height: 72,
             padding: "0 24px",
-            display: "flex",
+            display: "grid",
+            gridTemplateColumns: showProgress ? "minmax(220px, 1fr) auto" : "1fr",
             alignItems: "center",
-            justifyContent: "space-between",
             gap: 24,
           }}
         >

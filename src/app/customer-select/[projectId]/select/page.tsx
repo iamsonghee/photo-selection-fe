@@ -36,12 +36,13 @@ import { collapseSimilarityGroups } from "../../_lib/gallery-view";
 import { NicknamePrompt } from "../../_lib/NicknamePrompt";
 import ui from "../../_lib/ui.module.css";
 
-type Tab = "all" | "selected" | "disagree" | "mine";
+type Tab = "all" | "selected" | "disagree";
 
 type MobileColumns = 2 | 3 | 4;
+type DesktopDensity = "compact" | "standard" | "large";
 type GridLayout = { cols: number; gap: number; rowHeight: number };
 
-const DESKTOP_GRID_MIN_CELL = 180;
+const DESKTOP_GRID_MIN_CELL: Record<DesktopDensity, number> = { compact: 150, standard: 180, large: 230 };
 const DESKTOP_GRID_GAP = 12;
 const MOBILE_GRID: Record<MobileColumns, { gap: number; aspect: number }> = {
   2: { gap: 10, aspect: 4 / 3 },
@@ -69,10 +70,11 @@ export default function CustomerSelectGalleryPage() {
   const [groupedView, setGroupedView] = useState(false);
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => new Set());
   const [mobileColumns, setMobileColumns] = useState<MobileColumns>(2);
+  const [desktopDensity, setDesktopDensity] = useState<DesktopDensity>("standard");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [compactHeader, setCompactHeader] = useState(false);
-  const [layout, setLayout] = useState<GridLayout>({ cols: 4, gap: DESKTOP_GRID_GAP, rowHeight: DESKTOP_GRID_MIN_CELL + DESKTOP_GRID_GAP });
+  const [layout, setLayout] = useState<GridLayout>({ cols: 4, gap: DESKTOP_GRID_GAP, rowHeight: DESKTOP_GRID_MIN_CELL.standard + DESKTOP_GRID_GAP });
   const galleryRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const densityAnchorIdRef = useRef<string | null>(null);
@@ -96,9 +98,8 @@ export default function CustomerSelectGalleryPage() {
   const baseList = useMemo(() => {
     if (tab === "selected") return project.photos.filter((p) => selectedIds.has(p.id));
     if (tab === "disagree") return project.photos.filter((p) => disagree.has(p.id));
-    if (tab === "mine") return project.photos.filter((p) => project.photoStates[p.id]?.color?.includes(currentIdentity));
     return project.photos;
-  }, [tab, project.photos, project.photoStates, selectedIds, disagree, currentIdentity]);
+  }, [tab, project.photos, selectedIds, disagree]);
 
   const filterState = useMemo<GalleryFilterState>(() => ({
     starFilter: starFilter === 0 ? "all" : starFilter as StarRating,
@@ -142,7 +143,6 @@ export default function CustomerSelectGalleryPage() {
   );
 
   const disagreeCount = disagreementIds(project).length;
-  const myLikeCount = Object.values(project.photoStates).filter((s) => s.color?.includes(currentIdentity)).length;
   const target = project.target || 1;
   const selectedCount = project.selectedIds.length;
   const hasBlurryPhotos = project.photos.some((photo) => photo.isBlurry === true);
@@ -209,7 +209,7 @@ export default function CustomerSelectGalleryPage() {
       const mobile = window.innerWidth <= 767;
       const spec = MOBILE_GRID[mobileColumns];
       const gap = mobile ? spec.gap : DESKTOP_GRID_GAP;
-      const cols = mobile ? mobileColumns : Math.max(1, Math.floor((width + gap) / (DESKTOP_GRID_MIN_CELL + gap)));
+      const cols = mobile ? mobileColumns : Math.max(1, Math.floor((width + gap) / (DESKTOP_GRID_MIN_CELL[desktopDensity] + gap)));
       const cellWidth = (width - gap * (cols - 1)) / cols;
       const rowHeight = Math.ceil(cellWidth / (mobile ? spec.aspect : 1)) + gap;
       setLayout((current) => current.cols === cols && current.gap === gap && current.rowHeight === rowHeight
@@ -224,7 +224,7 @@ export default function CustomerSelectGalleryPage() {
       observer.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, [hydrated, mobileColumns]);
+  }, [desktopDensity, hydrated, mobileColumns]);
 
   const rowCount = Math.ceil(list.length / layout.cols);
   const virtualizer = useVirtualizer({
@@ -248,6 +248,8 @@ export default function CustomerSelectGalleryPage() {
     try {
       const stored = Number(sessionStorage.getItem(`ps:self-gallery-density:${projectId}`));
       if (stored >= 2 && stored <= 4) setMobileColumns(stored as MobileColumns);
+      const desktopStored = sessionStorage.getItem(`ps:self-gallery-desktop-density:${projectId}`);
+      if (desktopStored === "compact" || desktopStored === "standard" || desktopStored === "large") setDesktopDensity(desktopStored);
     } catch {}
   }, [projectId]);
 
@@ -273,6 +275,11 @@ export default function CustomerSelectGalleryPage() {
     try { sessionStorage.setItem(`ps:self-gallery-density:${projectId}`, String(next)); } catch {}
   }
 
+  function applyDesktopDensity(next: DesktopDensity) {
+    setDesktopDensity(next);
+    try { sessionStorage.setItem(`ps:self-gallery-desktop-density:${projectId}`, next); } catch {}
+  }
+
   function toggleQuality(flag: QualityFilterFlag) {
     setQualityFilter((current) => current.includes(flag) ? current.filter((item) => item !== flag) : [...current, flag]);
   }
@@ -287,9 +294,9 @@ export default function CustomerSelectGalleryPage() {
   }
 
   const footerMeta = selectedCount < target
-    ? `목표보다 ${target - selectedCount}장 적어요`
+    ? `${target - selectedCount}장 더 선택해 주세요`
     : selectedCount > target
-      ? `목표보다 ${selectedCount - target}장 많아요`
+      ? `${selectedCount - target}장 더 선택했어요`
       : "목표 수에 맞게 골랐어요";
 
   // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
@@ -325,9 +332,8 @@ export default function CustomerSelectGalleryPage() {
             onTabFilterChange={() => {}}
             tabs={[
               { value: "all", label: `전체 사진 ${project.photos.length}` },
-              { value: "selected", label: `선택 ${selectedCount}` },
+              { value: "selected", label: `최종 선택 ${selectedCount}` },
               ...(participants.length > 1 ? [{ value: "disagree", label: `의견 갈림 ${disagreeCount}` }] : []),
-              { value: "mine", label: `내 찜 ${myLikeCount}` },
             ]}
             activeTab={tab}
             onActiveTabChange={(value) => setTab(value as Tab)}
@@ -356,6 +362,9 @@ export default function CustomerSelectGalleryPage() {
             onSearchValueChange={setNameFilter}
             onJumpToFirst={() => virtualizer.scrollToIndex(0)}
             onJumpToLast={() => virtualizer.scrollToIndex(Math.max(0, rowCount - 1), { align: "end" })}
+            densityControl={<div className={ui.selectDesktopDensity} role="group" aria-label="사진 크기">
+              {(["compact", "standard", "large"] as const).map((density, index) => <button key={density} type="button" aria-pressed={desktopDensity === density} title={`${["작게", "보통", "크게"][index]} 보기`} onClick={() => applyDesktopDensity(density)}>{["작게", "보통", "크게"][index]}</button>)}
+            </div>}
             summaryContent={<>
               <div className={ui.selectParticipants}>
                 {participants.map((participant) => participant.id === currentIdentity
@@ -412,9 +421,8 @@ export default function CustomerSelectGalleryPage() {
           <div className={ui.selectToolbarMain}>
             <div className={ui.selectTabs} role="group" aria-label="사진 보기 범위">
               <button type="button" aria-pressed={tab === "all"} className={`${ui.chip} ${tab === "all" ? ui.chipOn : ""}`} onClick={() => setTab("all")}>전체 {project.photos.length}</button>
-              <button type="button" aria-pressed={tab === "selected"} className={`${ui.chip} ${tab === "selected" ? ui.chipOn : ""}`} onClick={() => setTab("selected")}>선택 {selectedCount}</button>
+              <button type="button" aria-pressed={tab === "selected"} className={`${ui.chip} ${tab === "selected" ? ui.chipOn : ""}`} onClick={() => setTab("selected")}>최종 선택 {selectedCount}</button>
               {participants.length > 1 ? <button type="button" aria-pressed={tab === "disagree"} className={`${ui.chip} ${tab === "disagree" ? ui.chipOn : ""}`} onClick={() => setTab("disagree")}>의견 갈림 {disagreeCount}</button> : null}
-              <button type="button" aria-pressed={tab === "mine"} className={`${ui.chip} ${tab === "mine" ? ui.chipOn : ""}`} onClick={() => setTab("mine")}>내 찜 {myLikeCount}</button>
             </div>
             <div className={ui.selectMobileTools}>
               <button type="button" className={ui.selectIconButton} aria-label={`현재 ${mobileColumns}열, 사진 크기 변경`} onClick={() => applyMobileColumns(mobileColumns === 4 ? 2 : (mobileColumns + 1) as MobileColumns)}>
@@ -464,6 +472,7 @@ export default function CustomerSelectGalleryPage() {
                       selected={selectedIds.has(photo.id)}
                       rating={state?.rating}
                       colorTags={state?.color ?? []}
+                      colorLabel={colorLabel}
                       hasComment={Boolean(state?.comment)}
                       showGroupBadge={groupedView && members.length > 1 && !groupExpanded}
                       groupId={groupId ?? undefined}

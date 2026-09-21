@@ -63,6 +63,7 @@ interface GalleryDesktopHeaderProps {
   activeTab?: string;
   onActiveTabChange?: (value: string) => void;
   summaryContent?: ReactNode;
+  densityControl?: ReactNode;
 }
 
 /** 고객 셀렉 갤러리 PC(≥768px) 헤더 · 툴바 — docs/customer-design.md §10 "PC composition" 참조.
@@ -110,6 +111,7 @@ export function GalleryDesktopHeader({
   activeTab,
   onActiveTabChange,
   summaryContent,
+  densityControl,
 }: GalleryDesktopHeaderProps) {
   const headerRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -129,6 +131,7 @@ export function GalleryDesktopHeader({
     { value: "selected", label: "내가 선택한 사진" },
   ];
   const selectedTab = activeTab ?? tabFilter;
+  const filtersActive = starFilter > 0 || colorFilter.length > 0 || qualityFilter.size > 0 || Boolean(searchValue.trim());
   return (
     <header className={`gld-header${position === "static" ? " gld-header-static" : ""}`} ref={headerRef}>
       <div className="gld-top">
@@ -172,80 +175,48 @@ export function GalleryDesktopHeader({
 
       <div className="gld-filter-bar-wrap">
         <div className="gld-filter-bar">
-          <div className="gld-filter-left">
-            {visibleTabs.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => onActiveTabChange ? onActiveTabChange(value) : onTabFilterChange(value as TabFilter)}
-                className={`gld-tab${selectedTab === value ? " gld-tab-active" : ""}`}
-              >
-                {label}
-              </button>
-            ))}
-
-          </div>
-          {showSimilarityToggle && <button type="button" className={`gld-toggle${similarityToggleOn ? " gld-toggle-active" : ""}`} aria-pressed={similarityToggleOn} onClick={() => onSimilarityToggleChange(!similarityToggleOn)}><Layers size={15} aria-hidden />유사컷 묶어보기</button>}
-          {/* PC에서는 조건을 바로 조정하며, 좁아지면 도구 그룹 단위로 다음 줄에 배치한다. */}
-            <div className="gld-inline-tools" role="group" aria-label="사진 필터와 검색">
+          <div className="gld-tool-group gld-scope-group">
+            <span className="gld-tool-label">보기</span>
             <div className="gld-filter-left">
-            <div className="gld-stars">
-              <span className="gld-stars-op" style={{ color: starFilter > 0 ? "var(--accent)" : undefined }}>
-                ≥
-              </span>
-              {([1, 2, 3, 4, 5] as const).map((s) => {
-                const filled = s <= (hoverStar || starFilter);
-                const previewing = hoverStar > 0;
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    className="gld-star-btn"
-                    aria-label={`별점 ${s}점 이상 필터`}
-                    aria-pressed={starFilter === s}
-                    style={{
-                      color: filled ? (previewing ? "rgba(255,77,0,.7)" : "#FF4D00") : undefined,
-                      transform: hoverStar === s ? "scale(1.2)" : "scale(1)",
-                    }}
-                    onClick={() => {
-                      onStarFilterChange(starFilter === s ? 0 : s);
-                      onHoverStarChange(0);
-                    }}
-                    onMouseEnter={() => onHoverStarChange(s)}
-                    onMouseLeave={() => onHoverStarChange(0)}
-                    onPointerDown={() => onHoverStarChange(s)}
-                  >
-                    <Star size={18} fill={filled ? "currentColor" : "none"} strokeWidth={2} aria-hidden="true" style={{ display: "block", flexShrink: 0 }} />
-                  </button>
-                );
-              })}
+              {visibleTabs.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onActiveTabChange ? onActiveTabChange(value) : onTabFilterChange(value as TabFilter)}
+                  className={`gld-tab${selectedTab === value ? " gld-tab-active" : ""}`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-
-            {hasBlurryPhotos && (
-              <button
-                type="button"
-                onClick={() => onToggleQualityFilter("blurry")}
-                className={`gld-toggle${qualityFilter.has("blurry") ? " gld-toggle-active gld-toggle-warning" : ""}`}
-                aria-pressed={qualityFilter.has("blurry")}
-              >
-                흐림만
-              </button>
-            )}
-            {hasEyesClosedPhotos && (
-              <button
-                type="button"
-                onClick={() => onToggleQualityFilter("eyesClosed")}
-                className={`gld-toggle${qualityFilter.has("eyesClosed") ? " gld-toggle-active gld-toggle-info" : ""}`}
-                aria-pressed={qualityFilter.has("eyesClosed")}
-              >
-                눈감음만
-              </button>
-            )}
+          </div>
+          <div className="gld-tool-group">
+            <span className="gld-tool-label">조건</span>
+            <div className="gld-filter-left">
+              <div className="gld-stars" aria-label="별점 필터">
+                <span className="gld-stars-label">별점</span>
+                <span className="gld-stars-op" style={{ color: starFilter > 0 ? "var(--accent)" : undefined }}>≥</span>
+                {([1, 2, 3, 4, 5] as const).map((s) => {
+                  const filled = s <= (hoverStar || starFilter);
+                  const previewing = hoverStar > 0;
+                  return <button key={s} type="button" className="gld-star-btn" aria-label={`별점 ${s}점 이상 필터`} aria-pressed={starFilter === s}
+                    style={{ color: filled ? (previewing ? "rgba(255,77,0,.7)" : "#FF4D00") : undefined, transform: hoverStar === s ? "scale(1.2)" : "scale(1)" }}
+                    onClick={() => { onStarFilterChange(starFilter === s ? 0 : s); onHoverStarChange(0); }}
+                    onMouseEnter={() => onHoverStarChange(s)} onMouseLeave={() => onHoverStarChange(0)} onPointerDown={() => onHoverStarChange(s)}>
+                    <Star size={18} fill={filled ? "currentColor" : "none"} strokeWidth={2} aria-hidden="true" />
+                  </button>;
+                })}
+              </div>
+              {showSimilarityToggle && <button type="button" className={`gld-toggle${similarityToggleOn ? " gld-toggle-active" : ""}`} aria-pressed={similarityToggleOn} onClick={() => onSimilarityToggleChange(!similarityToggleOn)}><Layers size={15} aria-hidden />유사컷</button>}
+              {hasBlurryPhotos && <button type="button" onClick={() => onToggleQualityFilter("blurry")} className={`gld-toggle${qualityFilter.has("blurry") ? " gld-toggle-active gld-toggle-warning" : ""}`} aria-pressed={qualityFilter.has("blurry")}>흐림만</button>}
+              {hasEyesClosedPhotos && <button type="button" onClick={() => onToggleQualityFilter("eyesClosed")} className={`gld-toggle${qualityFilter.has("eyesClosed") ? " gld-toggle-active gld-toggle-info" : ""}`} aria-pressed={qualityFilter.has("eyesClosed")}>눈감음만</button>}
+            </div>
           </div>
 
-          <div className="gld-filter-right">
-            {usedColors.length > 0 && <span className="gld-colors-label">찜</span>}
-            <div className="gld-colors">
+          {usedColors.length > 0 && <div className="gld-tool-group">
+            <span className="gld-tool-label">찜</span>
+            <div className="gld-filter-right">
+              <div className="gld-colors">
               {COLOR_OPTIONS.filter((option) => usedColors.includes(option.key)).map((option) => {
                 const isActive = colorFilter.includes(option.key);
                 const label = colorLabel(option.key);
@@ -275,7 +246,7 @@ export function GalleryDesktopHeader({
                   </button>
                 );
               })}
-            </div>
+              </div>
 
             {/* 색 = 사람이라 둘 이상 고르면 "누구 하나라도"와 "둘 다"가 다른 질문이 된다 */}
             {colorFilter.length > 1 && (
@@ -290,10 +261,12 @@ export function GalleryDesktopHeader({
               </button>
             )}
 
-            <button type="button" title="초기화" aria-label="필터 초기화" onClick={onResetFilters} className="gld-icon-btn">
-              <RotateCcw size={13} strokeWidth={1.8} />
-            </button>
+            </div>
+          </div>}
 
+          <div className="gld-tool-group">
+            <span className="gld-tool-label">정렬·탐색</span>
+            <div className="gld-filter-right">
             <select
               value={sortOrder}
               onChange={(event) => onSortOrderChange(event.target.value as SortOrder)}
@@ -314,7 +287,12 @@ export function GalleryDesktopHeader({
                 <ChevronsDown size={14} strokeWidth={1.8} />
               </button>
             </div>
+            {densityControl}
+            </div>
+          </div>
 
+          <div className="gld-tool-group gld-search-group">
+            <span className="gld-tool-label">검색</span>
             <FilenameSearchInput
               value={searchValue}
               onChange={onSearchValueChange}
@@ -322,9 +300,12 @@ export function GalleryDesktopHeader({
               style={{ "--fsi-height": "32px", "--fsi-width": "auto", "--fsi-input-width": "180px" } as React.CSSProperties}
             />
           </div>
+
+          <button type="button" title="필터 초기화" aria-label="필터 초기화" onClick={onResetFilters} disabled={!filtersActive} className={`gld-reset-btn${filtersActive ? " gld-reset-btn-active" : ""}`}>
+            <RotateCcw size={13} strokeWidth={1.8} /> 초기화
+          </button>
           </div>
-        </div>
-        {(starFilter > 0 || colorFilter.length > 0 || qualityFilter.size > 0 || searchValue.trim()) && <div className="gld-active-filters" aria-label="적용 중인 필터">
+        {filtersActive && <div className="gld-active-filters" aria-label="적용 중인 필터">
           {starFilter > 0 && <button onClick={() => onStarFilterChange(0)}>{starFilter}점 이상 ×</button>}
           {colorFilter.map(color => <button key={color} onClick={() => onColorFilterChange(colorFilter.filter(value => value !== color))}>{colorLabel(color)} ×</button>)}
           {Array.from(qualityFilter).map(key => <button key={key} onClick={() => onToggleQualityFilter(key)}>{key === "blurry" ? "흐림" : "눈감음"} ×</button>)}
@@ -461,9 +442,32 @@ export function GalleryDesktopHeader({
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 16px;
+          gap: 10px 16px;
           position: relative;
+          flex-wrap: wrap;
+          padding-top: 8px;
+          padding-bottom: 8px;
         }
+
+        .gld-tool-group {
+          min-height: 36px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding-right: 14px;
+          border-right: 1px solid var(--customer-divider);
+        }
+        .gld-tool-label,
+        .gld-stars-label {
+          flex-shrink: 0;
+          color: #8b9096;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: .02em;
+          white-space: nowrap;
+        }
+        .gld-stars-label { margin-right: 2px; }
+        .gld-search-group { margin-left: auto; }
 
         .gld-filter-left,
         .gld-filter-right {
@@ -649,7 +653,37 @@ export function GalleryDesktopHeader({
         .gld-jump-group {
           display: flex;
           align-items: center;
-          gap: 4px;
+          gap: 0;
+          border: 1px solid var(--customer-divider);
+          border-radius: 6px;
+          overflow: hidden;
+        }
+        .gld-jump-group .gld-icon-btn {
+          border: 0;
+          border-radius: 0;
+        }
+        .gld-jump-group .gld-icon-btn + .gld-icon-btn {
+          border-left: 1px solid var(--customer-divider);
+        }
+        .gld-reset-btn {
+          min-height: 28px;
+          padding: 0 8px;
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          border: 1px solid transparent;
+          border-radius: 6px;
+          background: transparent;
+          color: #b1b5ba;
+          font-family: inherit;
+          font-size: 11px;
+          font-weight: 600;
+        }
+        .gld-reset-btn-active {
+          color: var(--accent);
+          border-color: #ffd4c2;
+          background: #fff5f0;
+          cursor: pointer;
         }
 
         @media (max-width: 767px) {
@@ -657,10 +691,10 @@ export function GalleryDesktopHeader({
             display: none !important;
           }
         }
-        .gld-filter-bar { justify-content: flex-start; flex-wrap:wrap; padding-top:8px; padding-bottom:8px; gap:12px; }
-        .gld-inline-tools { flex:1 1 640px; min-width:0; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 16px; }
-        .gld-inline-tools .gld-filter-left, .gld-inline-tools .gld-filter-right { flex-wrap:wrap; }
-        .gld-inline-tools .gld-star-btn { width:24px; height:32px; }
+        .gld-filter-bar { justify-content: flex-start; }
+        .gld-filter-left, .gld-filter-right { flex-wrap:wrap; }
+        .gld-scope-group { flex: 0 1 auto; }
+        @media (max-width: 1180px) { .gld-search-group { margin-left: 0; } }
         .gld-active-filters { max-width:1440px; margin:auto; background:var(--customer-canvas); display:flex; flex-wrap:wrap; gap:8px; padding:8px 24px; }
         .gld-active-filters button { border:1px solid var(--customer-divider); border-radius:16px; padding:5px 10px; font-size:12px; }
       `}</style>

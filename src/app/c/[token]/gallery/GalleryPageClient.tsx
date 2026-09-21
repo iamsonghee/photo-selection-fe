@@ -1431,6 +1431,7 @@ export default function GalleryPageClient() {
                     recommended={photo.photographerRecommended}
                     rating={rating}
                     colorTags={colorTags}
+                    colorLabel={colorLabel}
                     hasComment={Boolean(state?.comment?.trim())}
                     showGroupBadge={showGroupBadge}
                     groupId={group?.id}
