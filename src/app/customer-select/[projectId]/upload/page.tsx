@@ -22,6 +22,7 @@ import { UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
 import { getPhotoDisplayName, matchesFilenameQuery } from "@/lib/gallery-filter";
+import { estimateUploadRemainingSeconds, formatUploadRemainingTime, type UploadTimingSample } from "@/lib/upload-time-estimate";
 import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAssetHeader";
 import type { Photo, PhotoGroupInfo } from "@/types";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
@@ -42,6 +43,7 @@ export default function CustomerUploadPage() {
   const [total, setTotal] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [uploadPhase, setUploadPhase] = useState<"compressing" | "uploading" | null>(null);
+  const [estimatedRemainingSeconds, setEstimatedRemainingSeconds] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingPhotos, setPendingPhotos] = useState<Photo[]>([]);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
@@ -63,6 +65,7 @@ export default function CustomerUploadPage() {
   const deleteSelectedPhotosRef = useRef<() => Promise<void>>(async () => {});
   const uploadAbortRef = useRef<AbortController | null>(null);
   const cancelRequestedRef = useRef(false);
+  const uploadTimingSamplesRef = useRef<UploadTimingSample[]>([]);
   const { compact: compactHeader, handleScroll: handleGalleryScroll } = useCollapsibleAssetHeaderController({ compactOnly: true });
 
   useEffect(() => () => {
@@ -89,6 +92,8 @@ export default function CustomerUploadPage() {
     setTotal(selectedFiles.length);
     setProgress(0);
     setUploadPhase("compressing");
+    setEstimatedRemainingSeconds(null);
+    uploadTimingSamplesRef.current = [];
     clearPendingPreviews();
     const controller = new AbortController();
     uploadAbortRef.current = controller;
@@ -118,6 +123,7 @@ export default function CustomerUploadPage() {
     let uploaded = 0;
     const failedFiles: File[] = [];
     for (let i = 0; i < selectedFiles.length; i += BATCH_SIZE) {
+      const batchStartedAt = performance.now();
       const rawBatch = selectedFiles.slice(i, i + BATCH_SIZE);
       const batchIds = new Set(pending.slice(i, i + BATCH_SIZE).map((photo) => photo.id));
       setPendingPhotos((current) => current.map((photo) => batchIds.has(photo.id) ? { ...photo, isUploading: true } : photo));
@@ -159,11 +165,20 @@ export default function CustomerUploadPage() {
           : e instanceof Error ? e.message : "업로드 중 오류가 발생했습니다.");
         setUploading(false);
         setUploadPhase(null);
+        setEstimatedRemainingSeconds(null);
         uploadAbortRef.current = null;
         await refresh();
         clearPendingPreviews();
         return;
       }
+      uploadTimingSamplesRef.current = [
+        ...uploadTimingSamplesRef.current,
+        { milliseconds: performance.now() - batchStartedAt, photoCount: rawBatch.length },
+      ].slice(-3);
+      setEstimatedRemainingSeconds(estimateUploadRemainingSeconds(
+        uploadTimingSamplesRef.current,
+        selectedFiles.length - i - rawBatch.length
+      ));
       setProgress(uploaded);
       setPendingPhotos((current) => current.map((photo) => batchIds.has(photo.id) ? { ...photo, isUploading: false } : photo));
     }
@@ -171,6 +186,7 @@ export default function CustomerUploadPage() {
     clearPendingPreviews();
     setUploading(false);
     setUploadPhase(null);
+    setEstimatedRemainingSeconds(null);
     uploadAbortRef.current = null;
     setRetryFiles(failedFiles);
     if (failedFiles.length > 0) {
@@ -309,7 +325,7 @@ export default function CustomerUploadPage() {
       <Loader2 size={22} className="shrink-0 animate-spin text-accent" aria-hidden />
       <div>
         <p className="text-sm font-bold text-foreground">{uploadPhase === "compressing" ? "사진 압축 중" : "사진 업로드 중"}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{progress.toLocaleString()} / {total.toLocaleString()}장 · {total ? Math.round((progress / total) * 100) : 0}%</p>
+        <p className="mt-1 text-xs text-muted-foreground">{progress.toLocaleString()} / {total.toLocaleString()}장 · {total ? Math.round((progress / total) * 100) : 0}% · {estimatedRemainingSeconds === null ? "예상 시간 계산 중" : formatUploadRemainingTime(estimatedRemainingSeconds)}</p>
       </div>
     </div>
   ) : (
