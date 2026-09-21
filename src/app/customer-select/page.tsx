@@ -1,6 +1,7 @@
 import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
-import { FolderPlus, ImageIcon } from "lucide-react";
+import { FolderPlus } from "lucide-react";
 import { getCurrentCustomerAuthId } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "./_lib/CustomerSelectShell";
@@ -10,12 +11,25 @@ export default async function CustomerSelectHomePage() {
   const ownerId = await getCurrentCustomerAuthId();
   if (!ownerId) redirect("/customer-select/login");
 
-  const { data, error } = await getAdminClient()
+  const admin = getAdminClient();
+  const { data, error } = await admin
     .from("customer_projects")
     .select("id, name, shoot_type, shoot_date, selection_deadline, studio_name, target_count, photo_count, exported, retouch_done, created_at")
     .eq("owner_id", ownerId)
     .order("created_at", { ascending: false });
   const projects = (data ?? []) as CustomerProjectSummary[];
+  const projectIdsWithPhotos = projects.filter((project) => project.photo_count > 0).map((project) => project.id);
+  const firstPhotoResults = await Promise.all(projectIdsWithPhotos.map((projectId) => admin
+    .from("customer_photos")
+    .select("project_id, thumb_url, preview_url")
+    .eq("project_id", projectId)
+    .order("order_index", { ascending: true })
+    .limit(1)
+    .maybeSingle()));
+  const coverByProject = new Map<string, string>();
+  for (const { data: photo } of firstPhotoResults) {
+    if (photo && (photo.preview_url || photo.thumb_url)) coverByProject.set(photo.project_id, photo.preview_url ?? photo.thumb_url!);
+  }
 
   return (
     <CustomerSelectShell>
@@ -36,9 +50,15 @@ export default async function CustomerSelectHomePage() {
           </section>
         ) : (
           <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="프로젝트 목록">
-            {projects.map((project) => (
+            {projects.map((project) => {
+              const coverUrl = coverByProject.get(project.id);
+              return (
               <Link key={project.id} href={customerProjectDestination(project)} className="group overflow-hidden rounded-2xl border border-border-subtle bg-surface transition hover:-translate-y-0.5 hover:border-border-strong hover:shadow-[0_12px_32px_rgba(2,56,82,0.08)]">
-                <div className="grid aspect-[16/8] place-items-center bg-surface-raised text-subtle-foreground"><ImageIcon size={34} strokeWidth={1.5} /></div>
+                <div className="relative grid aspect-[16/8] place-items-center overflow-hidden bg-surface-raised">
+                  {coverUrl
+                    ? <Image src={coverUrl} alt="" fill unoptimized sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover object-center" />
+                    : <Image src="/brand/a-cut-mark.svg" alt="" width={64} height={64} className="rounded-xl" />}
+                </div>
                 <div className="p-5">
                   <div className="flex items-center justify-between gap-3">
                     <strong className="min-w-0 truncate text-[17px] font-bold">{project.name}</strong>
@@ -48,7 +68,8 @@ export default async function CustomerSelectHomePage() {
                   <p className="mt-1 text-[12px] text-subtle-foreground">{project.photo_count}장 · 목표 {project.target_count}장{project.selection_deadline ? ` · 셀렉 마감 ${project.selection_deadline.replaceAll("-", ".")}` : ""}</p>
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </section>
         )}
       </main>
