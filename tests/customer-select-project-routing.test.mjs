@@ -14,6 +14,8 @@ const project = (overrides = {}) => ({
   target_count: 30,
   photo_count: 0,
   exported: false,
+  delivery_count: 0,
+  last_delivered_at: null,
   retouch_done: false,
   created_at: "2026-09-19T00:00:00Z",
   ...overrides,
@@ -21,6 +23,8 @@ const project = (overrides = {}) => ({
 
 assert.equal(customerProjectDestination(project()), "/customer-select/project-1/upload");
 assert.equal(customerProjectDestination(project({ photo_count: 10 })), "/customer-select/project-1/select");
-assert.equal(customerProjectDestination(project({ exported: true })), "/customer-select/project-1/retouch/upload");
+assert.equal(customerProjectDestination(project({ exported: true })), "/customer-select/project-1/export");
 assert.equal(customerProjectDestination(project({ retouch_done: true })), "/customer-select/project-1/done");
 assert.equal(customerProjectStatus(project({ retouch_done: true })), "완료");
+assert.equal(customerProjectStatus(project({ exported: true })), "전달 완료");
+assert.equal(customerProjectStatus(project({ photo_count: 10, delivery_count: 1 })), "재선택 중");

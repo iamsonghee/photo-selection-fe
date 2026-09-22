@@ -15,7 +15,7 @@ export default async function CustomerSelectHomePage() {
   const admin = getAdminClient();
   const { data, error } = await admin
     .from("customer_projects")
-    .select("id, name, shoot_type, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, target_count, photo_count, exported, retouch_done, created_at")
+    .select("id, name, shoot_type, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, target_count, photo_count, exported, delivery_count, last_delivered_at, retouch_done, created_at")
     .eq("owner_id", ownerId)
     .order("created_at", { ascending: false });
   const projects = (data ?? []) as CustomerProjectSummary[];
@@ -75,7 +75,7 @@ export default async function CustomerSelectHomePage() {
               </Link>
               <div className="flex items-center justify-between border-t border-border-subtle px-5 py-3 text-sm font-semibold">
                 <Link href={`/customer-select/${project.id}`} className="py-2 text-muted-foreground">프로젝트 현황</Link>
-                <Link href={customerProjectDestination(project)} className="py-2 text-accent">{project.retouch_done ? "완료 내용 보기" : project.exported ? "보정본 검토" : project.photo_count ? "이어서 고르기" : "사진 올리기"} →</Link>
+                <Link href={customerProjectDestination(project)} className="py-2 text-accent">{project.retouch_done ? "완료 내용 보기" : project.exported ? "전달 내용 보기" : project.photo_count ? "이어서 고르기" : "사진 올리기"} →</Link>
               </div>
               <Link href={`/customer-select/${project.id}/settings`} aria-label={`${project.name} 설정`} title="프로젝트 설정" className="absolute right-3 top-3 grid size-10 place-items-center rounded-full border border-white/70 bg-white/90 text-foreground shadow-sm backdrop-blur transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"><Settings size={17} strokeWidth={1.8} /></Link>
               </article>

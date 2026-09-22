@@ -42,9 +42,35 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json().catch(() => ({}));
   if (!access.isOwner) return NextResponse.json({ error: "프로젝트 소유자만 수정할 수 있습니다." }, { status: 403 });
   if (typeof body.exported === "boolean" && body.name === undefined) {
-    const { error } = await admin.from("customer_projects").update({ exported: body.exported }).eq("id", id);
+    if (body.exported === access.project.exported) {
+      return NextResponse.json({ project: {
+        exported: access.project.exported,
+        deliveryCount: access.project.delivery_count,
+        lastDeliveredAt: access.project.last_delivered_at,
+      } });
+    }
+    if (!body.exported && access.project.retouch_done) {
+      return NextResponse.json({ error: "보정본 검토까지 완료한 프로젝트는 다시 선택할 수 없습니다." }, { status: 409 });
+    }
+    if (body.exported) {
+      const { count } = await admin.from("customer_selections").select("photo_id", { count: "exact", head: true }).eq("project_id", id).eq("is_selected", true);
+      if (!count) return NextResponse.json({ error: "전달할 사진을 먼저 선택해 주세요." }, { status: 400 });
+    }
+    const update = body.exported ? {
+      exported: true,
+      delivery_count: access.project.delivery_count + 1,
+      last_delivered_at: new Date().toISOString(),
+    } : { exported: false };
+    const { data, error } = await admin.from("customer_projects")
+      .update(update)
+      .eq("id", id)
+      .eq("owner_id", access.project.owner_id)
+      .eq("exported", access.project.exported)
+      .select("exported, delivery_count, last_delivered_at")
+      .maybeSingle();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true });
+    if (!data) return NextResponse.json({ error: "상태가 변경되었습니다. 새로고침 후 다시 시도해 주세요." }, { status: 409 });
+    return NextResponse.json({ project: { exported: data.exported, deliveryCount: data.delivery_count, lastDeliveredAt: data.last_delivered_at } });
   }
 
   const name = typeof body.name === "string" ? body.name.trim() : "";

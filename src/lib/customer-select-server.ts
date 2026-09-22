@@ -33,6 +33,8 @@ export interface CustomerProjectRow {
   share_token: string;
   sharing_enabled: boolean;
   exported: boolean;
+  delivery_count: number;
+  last_delivered_at: string | null;
   retouch_done: boolean;
 }
 
@@ -44,7 +46,7 @@ export async function resolveCustomerProjectAccess(
 ): Promise<{ project: CustomerProjectRow; isOwner: boolean } | NextResponse> {
   const { data: project, error } = await admin
     .from("customer_projects")
-    .select("id, owner_id, name, shoot_type, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, target_count, photo_count, share_token, sharing_enabled, exported, retouch_done")
+    .select("id, owner_id, name, shoot_type, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, target_count, photo_count, share_token, sharing_enabled, exported, delivery_count, last_delivered_at, retouch_done")
     .eq("id", projectId)
     .maybeSingle();
   if (error || !project) {
@@ -181,6 +183,8 @@ export function buildProjectView(
     participantDone,
     participantNicknames,
     exported: project.exported,
+    deliveryCount: project.delivery_count,
+    lastDeliveredAt: project.last_delivered_at,
     shareToken: project.share_token,
     shareEnabled: project.sharing_enabled,
   };

@@ -81,6 +81,10 @@ export default function CustomerSelectGalleryPage() {
   const gridRef = useRef<HTMLDivElement>(null);
   const densityAnchorIdRef = useRef<string | null>(null);
 
+  useEffect(() => {
+    if (hydrated && isOwner && project.exported) router.replace(`/customer-select/${projectId}/export`);
+  }, [hydrated, isOwner, project.exported, projectId, router]);
+
   async function handleShare() {
     if (!shareUrl) {
       router.push(`/customer-select/${projectId}/settings#sharing`);

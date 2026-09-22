@@ -51,6 +51,7 @@ export default function CustomerUploadPage() {
   const projectId = params.projectId as string;
   const router = useRouter();
   const { project, hydrated, refresh } = useCustomerSelectStore();
+  const photoSetLocked = project.exported || project.deliveryCount > 0;
   const [progress, setProgress] = useState(0);
   const [total, setTotal] = useState(0);
   const [uploading, setUploading] = useState(false);
@@ -100,8 +101,8 @@ export default function CustomerUploadPage() {
 
   async function handleFiles(selectedFiles: File[]) {
     if (selectedFiles.length === 0 || uploading || uploadStartingRef.current) return;
-    if (project.exported) {
-      setError("전달을 완료한 프로젝트에는 사진을 추가할 수 없습니다.");
+    if (photoSetLocked) {
+      setError("한 번 전달한 프로젝트의 사진 구성은 변경할 수 없습니다.");
       return;
     }
     uploadStartingRef.current = true;
@@ -280,7 +281,7 @@ export default function CustomerUploadPage() {
   }
 
   async function requestDeleteSelectedPhotos() {
-    if (!selectedPhotoIds.size || project.exported || checkingDelete) return;
+    if (!selectedPhotoIds.size || photoSetLocked || checkingDelete) return;
     const photoIds = [...selectedPhotoIds];
     setCheckingDelete(true);
     setError(null);
@@ -330,7 +331,7 @@ export default function CustomerUploadPage() {
   deleteSelectedPhotosRef.current = requestDeleteSelectedPhotos;
 
   useEffect(() => {
-    if (uploading || deleting || aiPromptOpen || viewerPhotoId || project.exported) return;
+    if (uploading || deleting || aiPromptOpen || viewerPhotoId || photoSetLocked) return;
     const handleShortcut = (event: KeyboardEvent) => {
       const target = event.target;
       if (target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
@@ -350,7 +351,7 @@ export default function CustomerUploadPage() {
     };
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [aiPromptOpen, deleting, project.exported, project.photos, selectedPhotoIds, uploading, viewerPhotoId]);
+  }, [aiPromptOpen, deleting, photoSetLocked, project.photos, selectedPhotoIds, uploading, viewerPhotoId]);
 
   useEffect(() => {
     if (!uploading) return;
@@ -360,7 +361,6 @@ export default function CustomerUploadPage() {
   }, [uploading]);
 
   const displayName = project.name || "이름 없는 프로젝트";
-  const photoSetLocked = project.exported;
   const displayedPhotos = useMemo(() => [...project.photos, ...pendingPhotos], [project.photos, pendingPhotos]);
   const sortedPhotos = useMemo(() => [...displayedPhotos].sort((a, b) => {
     if (sort === "order-desc") return b.orderIndex - a.orderIndex;

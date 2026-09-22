@@ -14,14 +14,14 @@ export default async function CustomerProjectOverview({ params }: { params: Prom
   const { projectId } = await params;
   const admin = getAdminClient();
   const { data, error } = await admin.from("customer_projects")
-    .select("id, name, shoot_type, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, target_count, photo_count, sharing_enabled, exported, retouch_done, created_at")
+    .select("id, name, shoot_type, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, target_count, photo_count, sharing_enabled, exported, delivery_count, last_delivered_at, retouch_done, created_at")
     .eq("id", projectId).eq("owner_id", ownerId).maybeSingle();
   if (error) throw new Error("프로젝트 현황을 불러오지 못했어요.");
   if (!data) notFound();
   const project = data as CustomerProjectSummary;
   const { count, error: selectionError } = await admin.from("customer_selections")
     .select("photo_id", { count: "exact", head: true }).eq("project_id", projectId).eq("is_selected", true);
-  const action = project.retouch_done ? "완료 내용 보기" : project.exported ? "보정본 검토 이어가기" : project.photo_count ? "이어서 고르기" : "사진 올리기";
+  const action = project.retouch_done ? "완료 내용 보기" : project.exported ? "전달 내용 보기" : project.photo_count ? "이어서 고르기" : "사진 올리기";
   const info = [["촬영 종류", projectShootTypeLabel(project.shoot_type)], ["촬영일", project.shoot_date], ["선택 마감일", project.selection_deadline], ["스튜디오·업체", project.studio_name], ["담당 작가", project.photographer_name], ["촬영 지역", project.shoot_region], ["촬영 장소", project.shoot_location]];
 
   return <CustomerSelectShell>

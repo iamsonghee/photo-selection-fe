@@ -37,6 +37,8 @@ export interface ProjectView {
   participantDone: Record<string, boolean>;
   participantNicknames: Record<string, string>;
   exported: boolean;
+  deliveryCount: number;
+  lastDeliveredAt?: string | null;
   shareToken: string;
   shareEnabled: boolean;
 }
@@ -56,6 +58,7 @@ function emptyProject(id: string): ProjectView {
     participantDone: {},
     participantNicknames: {},
     exported: false,
+    deliveryCount: 0,
     shareToken: "",
     shareEnabled: false,
   };
@@ -99,7 +102,7 @@ interface StoreValue {
   participantReady: boolean;
   accessDenied: boolean;
   shareUrl: string;
-  update: (patch: { exported?: boolean }) => void;
+  update: (patch: { exported?: boolean }) => Promise<boolean>;
   toggleSelect: (photoId: string) => void;
   toggleLike: (photoId: string, identity: ColorTag) => void;
   setStar: (photoId: string, star: StarRating | 0) => void;
@@ -214,16 +217,19 @@ export function CustomerSelectStoreProvider({
   }, [projectId]);
 
   const update = useCallback(
-    (patch: { exported?: boolean }) => {
-      if (!isOwner) return;
-      setProject((prev) => ({ ...prev, ...patch }));
+    async (patch: { exported?: boolean }) => {
+      if (!isOwner) return false;
       if (typeof patch.exported === "boolean") {
-        fetch(`/api/customer-select/projects/${projectId}`, {
+        const response = await fetch(`/api/customer-select/projects/${projectId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ exported: patch.exported }),
-        }).catch(() => {});
+        }).catch(() => null);
+        if (!response?.ok) return false;
+        const data = await response.json().catch(() => ({}));
+        setProject((prev) => ({ ...prev, ...patch, ...data.project }));
       }
+      return true;
     },
     [isOwner, projectId]
   );

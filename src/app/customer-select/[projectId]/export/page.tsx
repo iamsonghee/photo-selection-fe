@@ -13,6 +13,7 @@ import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import { useCustomerSelectStore } from "../../_lib/real-store";
 import ui from "../../_lib/ui.module.css";
@@ -34,6 +35,9 @@ export default function CustomerExportPage() {
   const router = useRouter();
   const { project, hydrated, isOwner, update } = useCustomerSelectStore();
   const [copyState, setCopyState] = useState<"idle" | "ok" | "fail">("idle");
+  const [reopenConfirm, setReopenConfirm] = useState(false);
+  const [changingState, setChangingState] = useState(false);
+  const [stateError, setStateError] = useState<string | null>(null);
 
   const selected = project.photos
     .filter((p) => project.selectedIds.includes(p.id))
@@ -59,6 +63,18 @@ export default function CustomerExportPage() {
       setCopyState("fail");
     }
     setTimeout(() => setCopyState("idle"), 2000);
+  }
+
+  async function setDelivered(exported: boolean) {
+    setChangingState(true);
+    setStateError(null);
+    const updated = await update({ exported });
+    setChangingState(false);
+    if (!updated) {
+      setStateError("상태를 변경하지 못했어요. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+    if (!exported) router.push(`/customer-select/${projectId}/select`);
   }
 
   // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
@@ -97,14 +113,26 @@ export default function CustomerExportPage() {
         </div>
         <PhotographerPageActionBar
           maxWidth={1120}
-          leading={<p className="text-sm text-muted-foreground">전달하셨나요?</p>}
+          leading={<div><p className="text-sm font-semibold text-foreground">{project.exported ? "전달 완료" : project.deliveryCount > 0 ? "다시 선택 중" : "전달하셨나요?"}</p>{project.lastDeliveredAt ? <p className="mt-1 text-xs text-muted-foreground">최근 전달 {new Date(project.lastDeliveredAt).toLocaleString("ko-KR")} · 총 {project.deliveryCount.toLocaleString()}회</p> : null}{stateError ? <p role="alert" className="mt-1 text-xs font-semibold text-danger">{stateError}</p> : null}</div>}
           actions={<>
-            <PhotographerLightButton variant="secondary" onClick={() => update({ exported: true })}>{project.exported ? "전달 완료됨 ✓" : "전달 완료로 표시"}</PhotographerLightButton>
+            {project.exported
+              ? <PhotographerLightButton variant="secondary" onClick={() => setReopenConfirm(true)}>다시 선택하기</PhotographerLightButton>
+              : <PhotographerLightButton pending={changingState} pendingLabel="저장 중…" onClick={() => void setDelivered(true)}>{project.deliveryCount > 0 ? "다시 전달 완료" : "전달 완료로 표시"}</PhotographerLightButton>}
             {project.exported ? <PhotographerLightButton onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>보정본 업로드하기</PhotographerLightButton> : null}
           </>}
         />
       </div>
       </div>
+      {reopenConfirm ? <SelectionConfirmDialog
+        title="사진을 다시 선택할까요?"
+        description={<>전달 완료 상태가 해제되고 선택 화면으로 돌아갑니다.<br />현재 선택은 그대로 유지돼요.</>}
+        confirmLabel="다시 선택하기"
+        busyLabel="여는 중…"
+        confirming={changingState}
+        error={stateError}
+        onCancel={() => { if (!changingState) { setReopenConfirm(false); setStateError(null); } }}
+        onConfirm={() => void setDelivered(false)}
+      /> : null}
     </div>
   );
 }
