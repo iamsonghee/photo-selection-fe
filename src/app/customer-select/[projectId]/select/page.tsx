@@ -34,6 +34,7 @@ import {
 } from "../../_lib/real-store";
 import { collapseSimilarityGroups } from "../../_lib/gallery-view";
 import { NicknamePrompt } from "../../_lib/NicknamePrompt";
+import { ParticipantJoinScreen } from "../../_lib/ParticipantJoinScreen";
 import ui from "../../_lib/ui.module.css";
 
 type Tab = "all" | "selected" | "disagree";
@@ -53,7 +54,7 @@ export default function CustomerSelectGalleryPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const router = useRouter();
-  const { project, hydrated, isOwner, currentIdentity, shareUrl, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, saveError, clearSaveError } =
+  const { project, hydrated, isOwner, currentIdentity, participantReady, shareUrl, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, saveError, clearSaveError } =
     useCustomerSelectStore();
 
   const [tab, setTab] = useState<Tab>("all");
@@ -308,6 +309,7 @@ export default function CustomerSelectGalleryPage() {
   if (!hydrated) {
     return <SystemLoadingScreen title="셀렉 갤러리를 불러오고 있어요" homeHref="/customer-select" />;
   }
+  if (!isOwner && !participantReady) return <ParticipantJoinScreen />;
 
   return (
     <div className={ui.selectWorkspace}>

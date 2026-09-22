@@ -94,6 +94,7 @@ interface StoreValue {
   hydrated: boolean;
   isOwner: boolean;
   currentIdentity: ColorTag;
+  participantReady: boolean;
   shareUrl: string;
   update: (patch: { exported?: boolean }) => void;
   toggleSelect: (photoId: string) => void;
@@ -102,6 +103,7 @@ interface StoreValue {
   setComment: (photoId: string, text: string) => void;
   toggleDone: (identity: ColorTag) => void;
   setNickname: (nickname: string) => void;
+  joinParticipant: (nickname: string, color: ColorTag) => Promise<string | null>;
   refresh: () => Promise<ProjectView | undefined>;
   saveError: string | null;
   clearSaveError: () => void;
@@ -120,6 +122,7 @@ export function CustomerSelectStoreProvider({
   const [hydrated, setHydrated] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [currentIdentity, setCurrentIdentityState] = useState<ColorTag>("red");
+  const [participantReady, setParticipantReady] = useState(false);
   const claimedRef = useRef(false);
 
   const apiGet = useCallback(async () => {
@@ -178,6 +181,13 @@ export function CustomerSelectStoreProvider({
       setIsOwner(data.isOwner);
 
       const stored = loadStoredIdentity(projectId);
+      const storedIsActive = Boolean(stored && Object.prototype.hasOwnProperty.call(data.project.participantNicknames, stored));
+      if (!data.isOwner && !storedIsActive) {
+        setProject(data.project);
+        setParticipantReady(false);
+        setHydrated(true);
+        return;
+      }
       let identity = stored;
       if (!identity && !claimedRef.current) {
         claimedRef.current = true;
@@ -190,6 +200,7 @@ export function CustomerSelectStoreProvider({
       setProject(withCurrentOpinions(data.project, identity));
       // 저장된 색도 서버 참가자 행이 삭제됐을 수 있으므로 멱등적으로 복구한다.
       await apiPost("/participants", { color: identity });
+      setParticipantReady(true);
       if (!cancelled) setHydrated(true);
     })();
     return () => {
@@ -323,6 +334,33 @@ export function CustomerSelectStoreProvider({
     [apiPost, currentIdentity]
   );
 
+  const joinParticipant = useCallback(async (nickname: string, color: ColorTag) => {
+    try {
+      const response = await fetch(`/api/customer-select/projects/${projectId}/participants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ color, nickname, claim: true }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const latest = await apiGet();
+        if (latest) setProject(latest.project);
+        return typeof result.error === "string" ? result.error : "참여 정보를 저장하지 못했어요.";
+      }
+      saveStoredIdentity(projectId, color);
+      setCurrentIdentityState(color);
+      setProject((prev) => withCurrentOpinions({
+        ...prev,
+        participantNicknames: { ...prev.participantNicknames, [color]: nickname.trim() },
+        participantDone: { ...prev.participantDone, [color]: false },
+      }, color));
+      setParticipantReady(true);
+      return null;
+    } catch {
+      return "인터넷 연결을 확인하고 다시 시도해 주세요.";
+    }
+  }, [apiGet, projectId]);
+
   const shareUrl = useMemo(() => {
     if (typeof window === "undefined" || !project.shareToken) return "";
     return `${window.location.origin}/customer-select/${projectId}/select?share_token=${project.shareToken}`;
@@ -332,10 +370,10 @@ export function CustomerSelectStoreProvider({
 
   const value = useMemo<StoreValue>(
     () => ({
-      project, hydrated, isOwner, currentIdentity, shareUrl, update, toggleSelect, toggleLike,
-      setStar, setComment, toggleDone, setNickname, refresh, saveError, clearSaveError,
+      project, hydrated, isOwner, currentIdentity, participantReady, shareUrl, update, toggleSelect, toggleLike,
+      setStar, setComment, toggleDone, setNickname, joinParticipant, refresh, saveError, clearSaveError,
     }),
-    [project, hydrated, isOwner, currentIdentity, shareUrl, update, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, refresh, saveError, clearSaveError]
+    [project, hydrated, isOwner, currentIdentity, participantReady, shareUrl, update, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, refresh, saveError, clearSaveError]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

@@ -244,6 +244,38 @@
   margin: 0;
 }
 
+.joinShell { min-height: 100dvh; background: #f3f6f7; color: #191918; font-family: Pretendard, "Pretendard Variable", -apple-system, sans-serif; }
+.joinBrand { height: 64px; display: flex; align-items: center; padding: 0 max(32px, calc((100vw - 1504px) / 2)); border-bottom: 1px solid #e7ecee; background: #fff; }
+.joinMain { min-height: calc(100dvh - 64px); padding: 48px 20px; display: grid; place-items: start center; box-sizing: border-box; }
+.joinCard { width: min(100%, 460px); padding: 34px; border: 1px solid #e1e6e8; border-radius: 18px; background: #fff; box-shadow: 0 14px 42px rgba(2,56,82,.08); }
+.joinEyebrow { color: #ff4d00; font-size: 12px; font-weight: 800; }
+.joinCard h1 { margin: 10px 0 10px; color: #023852; font-size: 28px; line-height: 1.35; letter-spacing: -.04em; }
+.joinCard > p { margin: 0 0 28px; color: #697177; font-size: 14px; line-height: 1.65; }
+.joinField { display: flex; flex-direction: column; gap: 8px; }
+.joinField > span, .joinColors legend { color: #34383c; font-size: 12px; font-weight: 800; }
+.joinField input { width: 100%; height: 48px; padding: 0 14px; border: 1px solid #cfd5d8; border-radius: 9px; background: #fff; color: #191918; font: 15px/1 Pretendard, sans-serif; outline: none; }
+.joinField input:focus { border-color: #ff4d00; box-shadow: 0 0 0 3px rgba(255,77,0,.12); }
+.joinColors { margin: 22px 0 26px; padding: 0; border: 0; }
+.joinColors legend { margin-bottom: 9px; }
+.joinColors > div { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
+.joinColors button { min-width: 0; height: 64px; padding: 7px 3px; border: 1px solid #dce1e3; border-radius: 9px; background: #fff; color: #5f666b; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; font: 600 10px/1 Pretendard, sans-serif; }
+.joinColors button i { width: 20px; height: 20px; border-radius: 50%; box-shadow: 0 0 0 2px #fff, 0 0 0 3px #dce1e3; }
+.joinColors button[aria-pressed="true"] { border-color: #ff4d00; background: #fff5f0; color: #d84100; }
+.joinColors button[aria-pressed="true"] i { box-shadow: 0 0 0 2px #fff, 0 0 0 3px #ff4d00; }
+.joinColors button:disabled { opacity: .36; cursor: not-allowed; }
+.joinColors small { display: block; margin-top: 9px; color: #858b90; font-size: 11px; line-height: 1.5; }
+.joinError { margin: -12px 0 14px !important; color: #c43700 !important; font-size: 12px !important; }
+.joinFull { padding: 18px; border-radius: 10px; background: #f7f6f4; display: flex; flex-direction: column; gap: 6px; }
+.joinFull strong { color: #191918; font-size: 15px; }
+.joinFull span { color: #696d70; font-size: 13px; line-height: 1.55; }
+
+@media (max-width: 767px) {
+  .joinBrand { height: 56px; padding: 0 20px; }
+  .joinMain { min-height: calc(100dvh - 56px); padding: 28px 20px; background: #fff; }
+  .joinCard { padding: 0; border: 0; border-radius: 0; box-shadow: none; }
+  .joinCard h1 { font-size: 25px; }
+}
+
 .selectWorkspace { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; background: #f7f7f7; color: #191918; font-family: Pretendard, "Pretendard Variable", -apple-system, sans-serif; }
 .selectFrame { width: 100%; min-height: 0; margin: 0 auto; flex: 1; display: flex; flex-direction: column; background: #fff; }
 .selectDesktopOnly { display: block; flex: none; }
