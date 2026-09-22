@@ -1,6 +1,7 @@
 "use client";
 
 /** S7 — 최종 검토. */
+import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
@@ -20,7 +21,11 @@ export default function CustomerReviewPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const router = useRouter();
-  const { project, hydrated } = useCustomerSelectStore();
+  const { project, hydrated, isOwner } = useCustomerSelectStore();
+
+  useEffect(() => {
+    if (hydrated && !isOwner) router.replace(`/customer-select/${projectId}/select`);
+  }, [hydrated, isOwner, projectId, router]);
 
   const selected = project.photos.filter((p) => project.selectedIds.includes(p.id));
   const requested = requestedPhotoIds(project);
@@ -29,7 +34,7 @@ export default function CustomerReviewPage() {
   const waiting = activeParticipants(project).filter((p) => !project.participantDone[p.id]);
 
   // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
-  if (!hydrated) {
+  if (!hydrated || !isOwner) {
     return <SystemLoadingScreen title="셀렉 결과를 불러오고 있어요" homeHref="/customer-select" />;
   }
 
@@ -117,10 +122,14 @@ export default function CustomerReviewPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {requested.map((id) => {
                   const p = project.photos.find((x) => x.id === id)!;
+                  const comments = Object.entries(project.participantOpinions[id] ?? {})
+                    .filter(([, opinion]) => Boolean(opinion?.comment))
+                    .map(([color, opinion]) => `${project.participantNicknames[color] || "참가자"}: ${opinion?.comment}`);
+                  if (!comments.length && project.photoStates[id]?.comment) comments.push(`기존 의견: ${project.photoStates[id].comment}`);
                   return (
                     <div key={id} className={ui.reqItem}>
                       <span className="fn">{getPhotoDisplayName(p)}</span>
-                      <span className="tx">{project.photoStates[id]?.comment}</span>
+                      <span className="tx">{comments.join(" · ")}</span>
                     </div>
                   );
                 })}

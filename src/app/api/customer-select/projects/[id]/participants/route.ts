@@ -20,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const update: Record<string, unknown> = { project_id: projectId, color };
   if (typeof nickname === "string") update.nickname = nickname.slice(0, 20);
   if (typeof done === "boolean") update.done = done;
-  const { error } = await admin.from("customer_project_participants").upsert(update, { onConflict: "project_id,color" });
+  const { error } = await admin.from("customer_project_participants").upsert([update], { onConflict: "project_id,color", defaultToNull: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

@@ -33,6 +33,7 @@ export interface ProjectView {
   photos: Photo[];
   selectedIds: string[];
   photoStates: Record<string, { rating?: StarRating; color?: ColorTag[]; comment?: string }>;
+  participantOpinions: Record<string, Partial<Record<ColorTag, { rating?: StarRating; comment?: string }>>>;
   participantDone: Record<string, boolean>;
   participantNicknames: Record<string, string>;
   exported: boolean;
@@ -50,11 +51,22 @@ function emptyProject(id: string): ProjectView {
     photos: [],
     selectedIds: [],
     photoStates: {},
+    participantOpinions: {},
     participantDone: {},
     participantNicknames: {},
     exported: false,
     shareToken: "",
   };
+}
+
+function withCurrentOpinions(project: ProjectView, identity: ColorTag): ProjectView {
+  const photoStates = { ...project.photoStates };
+  for (const [photoId, opinions] of Object.entries(project.participantOpinions)) {
+    const own = opinions[identity];
+    if (!own) continue;
+    photoStates[photoId] = { ...photoStates[photoId], rating: own.rating, comment: own.comment };
+  }
+  return { ...project, photoStates };
 }
 
 function identityKey(projectId: string) {
@@ -149,10 +161,10 @@ export function CustomerSelectStoreProvider({
   const refresh = useCallback(async () => {
     const data = await apiGet();
     if (!data) return;
-    setProject(data.project);
+    setProject(withCurrentOpinions(data.project, currentIdentity));
     setIsOwner(data.isOwner);
     return data.project;
-  }, [apiGet]);
+  }, [apiGet, currentIdentity]);
 
   // 마운트 시 한 번: 프로젝트를 불러오고, 이 브라우저의 참가자 슬롯(색)을 정하거나 새로 배정한다.
   useEffect(() => {
@@ -163,20 +175,21 @@ export function CustomerSelectStoreProvider({
         setHydrated(true);
         return;
       }
-      setProject(data.project);
       setIsOwner(data.isOwner);
 
       const stored = loadStoredIdentity(projectId);
-      if (stored) {
-        setCurrentIdentityState(stored);
-      } else if (!claimedRef.current) {
+      let identity = stored;
+      if (!identity && !claimedRef.current) {
         claimedRef.current = true;
         const taken = new Set(Object.keys(data.project.participantNicknames));
-        const next = COLOR_PALETTE.find((c) => !taken.has(c.id))?.id ?? "red";
-        saveStoredIdentity(projectId, next);
-        setCurrentIdentityState(next);
-        await apiPost("/participants", { color: next, nickname: "" });
+        identity = COLOR_PALETTE.find((c) => !taken.has(c.id))?.id ?? "red";
+        saveStoredIdentity(projectId, identity);
       }
+      identity ??= "red";
+      setCurrentIdentityState(identity);
+      setProject(withCurrentOpinions(data.project, identity));
+      // 저장된 색도 서버 참가자 행이 삭제됐을 수 있으므로 멱등적으로 복구한다.
+      await apiPost("/participants", { color: identity });
       if (!cancelled) setHydrated(true);
     })();
     return () => {
@@ -187,6 +200,7 @@ export function CustomerSelectStoreProvider({
 
   const update = useCallback(
     (patch: { exported?: boolean }) => {
+      if (!isOwner) return;
       setProject((prev) => ({ ...prev, ...patch }));
       if (typeof patch.exported === "boolean") {
         fetch(`/api/customer-select/projects/${projectId}`, {
@@ -196,11 +210,12 @@ export function CustomerSelectStoreProvider({
         }).catch(() => {});
       }
     },
-    [projectId]
+    [isOwner, projectId]
   );
 
   const toggleSelect = useCallback(
     (photoId: string) => {
+      if (!isOwner) return;
       const hadBefore = project.selectedIds.includes(photoId);
       setProject((prev) => {
         const has = prev.selectedIds.includes(photoId);
@@ -214,7 +229,7 @@ export function CustomerSelectStoreProvider({
         }));
       });
     },
-    [apiPost, project.selectedIds]
+    [apiPost, isOwner, project.selectedIds]
   );
 
   const toggleLike = useCallback(
@@ -244,15 +259,23 @@ export function CustomerSelectStoreProvider({
       setProject((prev) => ({
         ...prev,
         photoStates: { ...prev.photoStates, [photoId]: { ...prev.photoStates[photoId], rating: star === 0 ? undefined : star } },
+        participantOpinions: {
+          ...prev.participantOpinions,
+          [photoId]: { ...prev.participantOpinions[photoId], [currentIdentity]: { ...prev.participantOpinions[photoId]?.[currentIdentity], rating: star === 0 ? undefined : star } },
+        },
       }));
-      apiPost("/selections", { photo_id: photoId, rating: star === 0 ? null : star }, () => {
+      apiPost("/selections", { photo_id: photoId, participant_color: currentIdentity, rating: star === 0 ? null : star }, () => {
         setProject((prev) => ({
           ...prev,
           photoStates: { ...prev.photoStates, [photoId]: { ...prev.photoStates[photoId], rating: prevRating } },
+          participantOpinions: {
+            ...prev.participantOpinions,
+            [photoId]: { ...prev.participantOpinions[photoId], [currentIdentity]: { ...prev.participantOpinions[photoId]?.[currentIdentity], rating: prevRating } },
+          },
         }));
       });
     },
-    [apiPost, project.photoStates]
+    [apiPost, currentIdentity, project.photoStates]
   );
 
   const setComment = useCallback(
@@ -262,15 +285,23 @@ export function CustomerSelectStoreProvider({
       setProject((prev) => ({
         ...prev,
         photoStates: { ...prev.photoStates, [photoId]: { ...prev.photoStates[photoId], comment: trimmed } },
+        participantOpinions: {
+          ...prev.participantOpinions,
+          [photoId]: { ...prev.participantOpinions[photoId], [currentIdentity]: { ...prev.participantOpinions[photoId]?.[currentIdentity], comment: trimmed } },
+        },
       }));
-      apiPost("/selections", { photo_id: photoId, comment: trimmed ?? null }, () => {
+      apiPost("/selections", { photo_id: photoId, participant_color: currentIdentity, comment: trimmed ?? null }, () => {
         setProject((prev) => ({
           ...prev,
           photoStates: { ...prev.photoStates, [photoId]: { ...prev.photoStates[photoId], comment: prevComment } },
+          participantOpinions: {
+            ...prev.participantOpinions,
+            [photoId]: { ...prev.participantOpinions[photoId], [currentIdentity]: { ...prev.participantOpinions[photoId]?.[currentIdentity], comment: prevComment } },
+          },
         }));
       });
     },
-    [apiPost, project.photoStates]
+    [apiPost, currentIdentity, project.photoStates]
   );
 
   const toggleDone = useCallback(
@@ -335,6 +366,9 @@ export function reviewedPhotoIds(project: ProjectView): string[] {
   Object.entries(project.photoStates).forEach(([id, s]) => {
     if (s.rating || s.comment || (s.color && s.color.length > 0)) set.add(id);
   });
+  Object.entries(project.participantOpinions).forEach(([id, opinions]) => {
+    if (Object.values(opinions).some((opinion) => opinion?.rating || opinion?.comment)) set.add(id);
+  });
   return Array.from(set);
 }
 
@@ -374,7 +408,9 @@ export function bothDone(project: ProjectView): boolean {
 }
 
 export function requestedPhotoIds(project: ProjectView): string[] {
-  return Object.entries(project.photoStates)
-    .filter(([, s]) => !!s.comment)
-    .map(([id]) => id);
+  const ids = new Set(Object.entries(project.photoStates).filter(([, state]) => Boolean(state.comment)).map(([id]) => id));
+  Object.entries(project.participantOpinions)
+    .filter(([, opinions]) => Object.values(opinions).some((opinion) => Boolean(opinion?.comment)))
+    .forEach(([id]) => ids.add(id));
+  return Array.from(ids);
 }

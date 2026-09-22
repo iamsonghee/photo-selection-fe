@@ -199,7 +199,11 @@ export default function CustomerSelectGalleryPage() {
     onClose: () => setOpenPhotoId(null),
     onReview: () => router.push(`/customer-select/${projectId}/review`),
     onSaveParticipant: (participant) => setNickname(participant.initial),
-  }) : null, [openPhotoId, projectId, currentIdentity, project.participantNicknames, router, setNickname]);
+    canEditFinalSelection: isOwner,
+    opinionsForPhoto: (photoId) => Object.entries(project.participantOpinions[photoId] ?? {}).flatMap(([color, opinion]) =>
+      opinion && (opinion.rating || opinion.comment) ? [{ color: color as ColorTag, name: project.participantNicknames[color] || "참가자", ...opinion }] : []
+    ),
+  }) : null, [openPhotoId, projectId, currentIdentity, project.participantNicknames, project.participantOpinions, isOwner, router, setNickname]);
 
   useLayoutEffect(() => {
     const grid = gridRef.current;
@@ -475,10 +479,11 @@ export default function CustomerSelectGalleryPage() {
                       href="#"
                       photo={photo}
                       selected={selectedIds.has(photo.id)}
+                      showCheck={isOwner}
                       rating={state?.rating}
                       colorTags={state?.color ?? []}
                       colorLabel={colorLabel}
-                      hasComment={Boolean(state?.comment)}
+                      hasComment={Boolean(state?.comment) || Object.values(project.participantOpinions[photo.id] ?? {}).some((opinion) => Boolean(opinion?.comment))}
                       showGroupBadge={groupedView && members.length > 1 && !groupExpanded}
                       groupId={groupId ?? undefined}
                       groupLabel={groupId && groupOrdinal.has(groupId) ? `묶음 ${groupOrdinal.get(groupId)}` : undefined}
@@ -518,10 +523,10 @@ export default function CustomerSelectGalleryPage() {
           Y={selectedCount}
           N={target}
           position="static"
-          disabled={selectedCount === 0}
-          onConfirm={() => router.push(`/customer-select/${projectId}/review`)}
-          buttonLabel="최종 검토하기"
-          progressLabel={selectedCount < target ? `${target - selectedCount}장 더 골라주세요` : "선택한 사진"}
+          disabled={isOwner ? selectedCount === 0 : false}
+          onConfirm={() => isOwner ? router.push(`/customer-select/${projectId}/review`) : toggleDone(currentIdentity)}
+          buttonLabel={isOwner ? "최종 검토하기" : project.participantDone[currentIdentity] ? "의견 다시 열기" : "내 의견 완료"}
+          progressLabel={isOwner ? (selectedCount < target ? `${target - selectedCount}장 더 골라주세요` : "선택한 사진") : "최종 선택은 소유자가 결정해요"}
           theme="customerLight"
           mobileGallery
           metaText={footerMeta}

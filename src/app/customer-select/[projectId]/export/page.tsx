@@ -7,7 +7,7 @@
  * 같은 형식의 텍스트를 만들고 클립보드 복사까지만 실제로 동작시킨다 — 파일 다운로드는
  * 실제 서비스 구현 때 위 기존 로직을 연결한다.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
@@ -32,14 +32,24 @@ function buildExportText(
 export default function CustomerExportPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const router = useRouter();
-  const { project, hydrated, update } = useCustomerSelectStore();
+  const { project, hydrated, isOwner, update } = useCustomerSelectStore();
   const [copyState, setCopyState] = useState<"idle" | "ok" | "fail">("idle");
 
   const selected = project.photos
     .filter((p) => project.selectedIds.includes(p.id))
     .map((p) => ({ id: p.id, name: getPhotoDisplayName(p) }));
-  const comments = Object.fromEntries(Object.entries(project.photoStates).map(([id, s]) => [id, s.comment]));
+  const comments = Object.fromEntries(project.photos.map(({ id }) => [
+    id,
+    Object.entries(project.participantOpinions[id] ?? {})
+      .filter(([, opinion]) => Boolean(opinion?.comment))
+      .map(([color, opinion]) => `${project.participantNicknames[color] || "참가자"}: ${opinion?.comment}`)
+      .join(" · ") || project.photoStates[id]?.comment,
+  ]));
   const text = buildExportText(selected, comments);
+
+  useEffect(() => {
+    if (hydrated && !isOwner) router.replace(`/customer-select/${projectId}/select`);
+  }, [hydrated, isOwner, projectId, router]);
 
   async function handleCopy() {
     try {
@@ -52,7 +62,7 @@ export default function CustomerExportPage() {
   }
 
   // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
-  if (!hydrated) {
+  if (!hydrated || !isOwner) {
     return <SystemLoadingScreen title="전달 내용을 준비하고 있어요" homeHref="/customer-select" />;
   }
 

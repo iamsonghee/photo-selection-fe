@@ -69,7 +69,22 @@ export type CustomerSelectionViewerAdapter = {
   onClose?: () => void;
   onReview?: () => void;
   onSaveParticipant?: (participant: Participant) => void;
+  canEditFinalSelection?: boolean;
+  opinionsForPhoto?: (photoId: string) => Array<{ color: ColorTag; name: string; rating?: StarRating; comment?: string }>;
 };
+
+function ParticipantOpinions({ opinions, myColor }: { opinions: Array<{ color: ColorTag; name: string; rating?: StarRating; comment?: string }>; myColor?: ColorTag }) {
+  const others = opinions.filter((opinion) => opinion.color !== myColor);
+  if (!others.length) return null;
+  return <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 82, overflowY: "auto", padding: "8px 0" }} aria-label="다른 참여자 의견">
+    {others.map((opinion) => <div key={opinion.color} style={{ display: "flex", alignItems: "flex-start", gap: 8, color: "rgba(255,255,255,.82)", fontSize: 12, lineHeight: 1.4 }}>
+      <span style={{ width: 8, height: 8, marginTop: 4, borderRadius: "50%", flexShrink: 0, background: COLOR_OPTIONS.find((item) => item.key === opinion.color)?.hex ?? "#999" }} />
+      <strong style={{ flexShrink: 0 }}>{opinion.name || "참가자"}</strong>
+      {opinion.rating ? <span aria-label={`별점 ${opinion.rating}점`}>{"★".repeat(opinion.rating)}</span> : null}
+      {opinion.comment ? <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{opinion.comment}</span> : null}
+    </div>)}
+  </div>;
+}
 
 export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelectionViewerAdapter } = {}) {
   const params = useParams();
@@ -316,6 +331,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
   const [showShortcuts,  setShowShortcuts]  = useState(false);
 
   const N = project?.requiredCount ?? 0;
+  const canEditFinalSelection = adapter?.canEditFinalSelection ?? true;
   const canConfirm = N > 0 && Y === N && !selectionSaving;
   const queryString = searchParams.toString() ? `?${searchParams.toString()}` : "";
 
@@ -574,14 +590,14 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
   }, [current?.id, draftComment, isCommentEditing, photoStates, saveComment]);
 
   const toggleSelect = useCallback((): SelectionToggleResult => {
-    if (!current) return "unavailable";
+    if (!current || !canEditFinalSelection) return "unavailable";
     const result = toggle(current.id);
     if (result === "limit-reached") {
       triggerSelectionHaptic("limit");
       setSelectionLimitNoticeKey((value) => (value ?? 0) + 1);
     }
     return result;
-  }, [current, toggle]);
+  }, [canEditFinalSelection, current, toggle]);
 
   const showSelectedPhotos = useCallback(() => {
     setSelectionLimitNoticeKey(null);
@@ -743,11 +759,11 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
       /* 색은 참가자 식별자이므로 남의 색을 찍을 수 있는 색별 단축키 대신 "내 찜" 하나만 둔다 */
       case "KeyF": toggleMyMark(); break;
       /* 선택은 keyup에서 한 번만 바꾸되, keydown의 기본 스크롤은 여기서 먼저 막는다. */
-      case "Space": e.preventDefault(); break;
+      case "Space": if (canEditFinalSelection) e.preventDefault(); break;
       case "ArrowLeft":  e.preventDefault(); goPrevWrap(); break;
       case "ArrowRight": e.preventDefault(); goNextWrap(); break;
     }
-  }, [adapter, focusOpen, setStar, toggleMyMark, goPrevWrap, goNextWrap, showShortcuts, router, token, searchParams, activePhotoId]);
+  }, [adapter, canEditFinalSelection, focusOpen, setStar, toggleMyMark, goPrevWrap, goNextWrap, showShortcuts, router, token, searchParams, activePhotoId]);
 
   useEffect(() => {
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -757,7 +773,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
       // keyup은 브라우저가 repeat을 설정하지 않지만(누르고 있는 동안은 keydown만 반복),
       // 방어적으로 가드를 남겨둔다 — 실제 겹친 요청 방지는 SelectionContext의
       // photoId별 저장 큐(flushSelection)가 담당한다.
-      if (e.code === "Space" && !e.repeat) { e.preventDefault(); e.stopPropagation(); toggleSelect(); }
+      if (canEditFinalSelection && e.code === "Space" && !e.repeat) { e.preventDefault(); e.stopPropagation(); toggleSelect(); }
     };
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     window.addEventListener("keyup", handleKeyUp, { capture: true });
@@ -765,7 +781,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
       window.removeEventListener("keyup", handleKeyUp, { capture: true });
     };
-  }, [focusOpen, handleKeyDown, toggleSelect]);
+  }, [canEditFinalSelection, focusOpen, handleKeyDown, toggleSelect]);
 
   useEffect(() => {
     if (!project) return;
@@ -803,12 +819,17 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
   // photoId(라우트 파라미터)는 최초 진입 사진 id에 고정돼 있음(navigateTo가 history.replaceState만
   // 사용) — 필름스트립/화살표로 다른 사진을 보다가 닫으면 activePhotoId를 써야 실제로 보던 사진으로 돌아간다.
   const galleryHref        = adapter?.galleryHref ?? buildGalleryHrefWithFocus(token, searchParams, activePhotoId);
+  const participantOpinions = adapter?.opinionsForPhoto?.(current.id) ?? [];
 
   // 고객 상세뷰어의 완료 동작은 고정된 하단에서 제공해 선택 시 사진 높이가 변하지 않는다.
-  const selectionCompletion = (
+  const selectionCompletion = canEditFinalSelection ? (
     <div className="fs-completion" aria-label="셀렉 진행">
       <span aria-live="polite">{Y} / {N}장 선택{canConfirm ? " 완료" : Y > N ? ` · ${Y - N}장 줄여주세요` : ` · ${Math.max(0, N - Y)}장 남음`}</span>
       <button type="button" disabled={selectionSaving} onClick={() => adapter?.onReview ? adapter.onReview() : router.push(`/c/${token}/gallery?selected=${canConfirm ? "selected" : "all"}&grouped=0`)}>{selectionSaving ? "선택 저장 중…" : canConfirm ? `선택한 ${Y}장 확인하기` : "전체 사진에서 더 고르기"}</button>
+    </div>
+  ) : (
+    <div className="fs-completion" aria-label="최종 선택 현황">
+      <span>{Y} / {N}장 최종 선택 · 소유자가 결정해요</span>
     </div>
   );
 
@@ -1367,7 +1388,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
               <div style={{ color: "var(--muted-foreground)", padding: 16 }}>사진 없음</div>
             )}
             {/* contain으로 생긴 여백이 아니라 실측한 사진 좌상단에 체크박스를 고정한다. */}
-            {viewerSrc && desktopCheckPosition && (
+            {canEditFinalSelection && viewerSrc && desktopCheckPosition && (
               <button
                 type="button"
                 onClick={toggleSelect}
@@ -1588,6 +1609,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                 </span>
               </button>
             )}
+            <ParticipantOpinions opinions={participantOpinions} myColor={participant?.color} />
           </div>
         </section>
 
@@ -1598,7 +1620,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
           * 바뀌면서 정작 셀렉을 취소할 방법이 다시 작은 체크박스뿐이 된다(한 버튼에 두 역할 금지).
           * 미선택 상자를 흰 채움으로 두는 것은 갤러리 카드·모바일 뷰어와 같은 규칙이고,
           * 주황은 "선택됨" 전용이라 선택된 상태에서만 쓴다. */}
-        <button
+        {canEditFinalSelection && <button
           type="button"
           className={`fs-select-big${isCurrentSelected ? " is-selected" : ""}`}
           aria-pressed={isCurrentSelected}
@@ -1619,7 +1641,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                   : "Space 키로도 선택할 수 있어요"}
             </small>
           </span>
-        </button>
+        </button>}
 
         {/* 유사컷 미니 스트립 (PC 펼침) */}
         {groupingActive && expandedGroupId && (
@@ -1735,7 +1757,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                  * 함께 사라져 "사진만" 남는다 — 집중 모드의 목적이 그것이다. */
                 showBadge
                 selected={isCurrentSelected}
-                onToggleSelect={() => {
+                onToggleSelect={canEditFinalSelection ? () => {
                   const result = toggleSelect();
                   if (result === "selected" || result === "deselected") triggerSelectionHaptic("change");
                   if (result === "selected") {
@@ -1746,7 +1768,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                     if (selectionFeedbackTimerRef.current) clearTimeout(selectionFeedbackTimerRef.current);
                     selectionFeedbackTimerRef.current = setTimeout(() => setSelectionFeedback(null), 360);
                   }
-                }}
+                } : undefined}
                 selectionFlashKey={selectionFeedback?.photoId === current.id ? selectionFeedback.key : 0}
                 marks={otherMarkChips}
                 onZoomStateChange={(zoomed) => { mobileImageZoomedRef.current = zoomed; }}
@@ -1946,6 +1968,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
             </div>
             </div>
           </section>
+          <ParticipantOpinions opinions={participantOpinions} myColor={participant?.color} />
           {selectionCompletion}
         </div>
 

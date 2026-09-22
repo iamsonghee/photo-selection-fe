@@ -14,16 +14,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (access instanceof NextResponse) return access;
   const { project } = access;
 
-  const [photosRes, selectionsRes, participantsRes, qualityRes] = await Promise.all([
+  const [photosRes, selectionsRes, participantsRes, qualityRes, opinionsRes] = await Promise.all([
     admin.from("customer_photos").select("id, filename, order_index, thumb_url, preview_url, similarity_group_id").eq("project_id", id),
     admin.from("customer_selections").select("photo_id, rating, color_tags, comment, is_selected").eq("project_id", id),
     admin.from("customer_project_participants").select("color, nickname, done").eq("project_id", id),
     admin.from("customer_quality_assessments").select("photo_id, eyes_closed, blur_or_shake, focus_issue, primary_subject_detected").eq("project_id", id),
+    admin.from("customer_participant_opinions").select("photo_id, participant_color, rating, comment").eq("project_id", id),
   ]);
-  if (photosRes.error || selectionsRes.error || participantsRes.error || qualityRes.error) {
+  if (photosRes.error || selectionsRes.error || participantsRes.error || qualityRes.error || opinionsRes.error) {
     return NextResponse.json({ error: "조회 실패" }, { status: 500 });
   }
-  const projectView = buildProjectView(project, photosRes.data ?? [], selectionsRes.data ?? [], participantsRes.data ?? [], qualityRes.data ?? []);
+  const projectView = buildProjectView(project, photosRes.data ?? [], selectionsRes.data ?? [], participantsRes.data ?? [], qualityRes.data ?? [], opinionsRes.data ?? []);
   if (!access.isOwner) projectView.shareToken = "";
   return NextResponse.json(
     { project: projectView, isOwner: access.isOwner },
@@ -39,12 +40,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (access instanceof NextResponse) return access;
 
   const body = await req.json().catch(() => ({}));
+  if (!access.isOwner) return NextResponse.json({ error: "프로젝트 소유자만 수정할 수 있습니다." }, { status: 403 });
   if (typeof body.exported === "boolean" && body.name === undefined) {
     const { error } = await admin.from("customer_projects").update({ exported: body.exported }).eq("id", id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
-  if (!access.isOwner) return NextResponse.json({ error: "프로젝트 소유자만 수정할 수 있습니다." }, { status: 403 });
 
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const shootType = isProjectShootType(body.shootType) ? body.shootType : null;

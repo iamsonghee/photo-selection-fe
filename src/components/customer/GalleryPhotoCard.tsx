@@ -20,6 +20,7 @@ type GalleryPhotoCardProps = {
   photo: Photo;
   selected: boolean;
   checkDisabled?: boolean;
+  showCheck?: boolean;
   recommended?: boolean;
   rating?: StarRating;
   colorTags?: ColorTag[];
@@ -56,6 +57,7 @@ function GalleryPhotoCardImpl({
   photo,
   selected,
   checkDisabled = false,
+  showCheck = true,
   recommended = false,
   rating,
   colorTags = EMPTY_COLOR_TAGS,
@@ -196,7 +198,7 @@ function GalleryPhotoCardImpl({
           <div className="gl-card-placeholder" aria-hidden />
         )}
 
-        <button
+        {showCheck && <button
         type="button"
         onClick={(e) => onCheckClick(e, photo.id)}
         disabled={checkDisabled}
@@ -208,7 +210,7 @@ function GalleryPhotoCardImpl({
             <polyline points="20 6 9 17 4 12" />
           </svg>
         )}
-        </button>
+        </button>}
         {recommended && (
           <span className="gl-recommended-badge" title="작가 추천">
             <RecommendationMark size={12} /> 작가 추천

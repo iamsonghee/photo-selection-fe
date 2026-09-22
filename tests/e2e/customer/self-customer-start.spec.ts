@@ -46,7 +46,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
   await page.route("**/api/customer-select/projects/*", async (route) => {
     await route.fulfill({ json: { isOwner: true, project: {
       id: "limit-check", name: "업로드 한도 확인", photoCount: 1999, target: 30,
-      photos: [], selectedIds: [], photoStates: {}, participantDone: {}, participantNicknames: { red: "테스트" }, shareToken: "", exported: false,
+      photos: [], selectedIds: [], photoStates: {}, participantOpinions: {}, participantDone: {}, participantNicknames: { red: "테스트" }, shareToken: "", exported: false,
     } } });
   });
   await page.route("**/api/customer-select/projects/*/participants", async (route) => { await route.fulfill({ json: { ok: true } }); });

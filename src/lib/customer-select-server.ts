@@ -99,6 +99,13 @@ interface CustomerParticipantRow {
   done: boolean;
 }
 
+interface CustomerParticipantOpinionRow {
+  photo_id: string;
+  participant_color: string;
+  rating: number | null;
+  comment: string | null;
+}
+
 export function toPhoto(row: CustomerPhotoRow, projectId: string, quality?: CustomerQualityRow): Photo {
   return {
     id: row.id,
@@ -120,7 +127,8 @@ export function buildProjectView(
   photos: CustomerPhotoRow[],
   selections: CustomerSelectionRow[],
   participants: CustomerParticipantRow[],
-  quality: CustomerQualityRow[] = []
+  quality: CustomerQualityRow[] = [],
+  opinions: CustomerParticipantOpinionRow[] = []
 ) {
   const selectionByPhoto = new Map(selections.map((s) => [s.photo_id, s]));
   const selectedIds: string[] = [];
@@ -138,6 +146,14 @@ export function buildProjectView(
   for (const p of participants) {
     participantDone[p.color] = p.done;
     participantNicknames[p.color] = p.nickname;
+  }
+  const participantOpinions: Record<string, Record<string, { rating?: StarRating; comment?: string }>> = {};
+  for (const opinion of opinions) {
+    participantOpinions[opinion.photo_id] ??= {};
+    participantOpinions[opinion.photo_id][opinion.participant_color] = {
+      rating: (opinion.rating ?? undefined) as StarRating | undefined,
+      comment: opinion.comment ?? undefined,
+    };
   }
   void selectionByPhoto;
   const qualityByPhoto = new Map(quality.map((row) => [row.photo_id, row]));
@@ -160,6 +176,7 @@ export function buildProjectView(
       .map((p) => toPhoto(p, project.id, qualityByPhoto.get(p.id))),
     selectedIds,
     photoStates,
+    participantOpinions,
     participantDone,
     participantNicknames,
     exported: project.exported,
