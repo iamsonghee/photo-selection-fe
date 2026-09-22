@@ -79,20 +79,20 @@ export function FeedbackButton({
         onClick={() => setOpen(true)}
         className={triggerClassName}
         role={triggerRole}
-        aria-label="문의하기"
-        title="문의하기"
+        aria-label="A-CUT에 의견 보내기"
+        title="A-CUT에 의견 보내기"
       >
         <span className={iconClassName} aria-hidden>
           <MessageCircle size={20} strokeWidth={2} />
         </span>
-        <span className={textClassName}>문의하기</span>
+        <span className={textClassName}>A-CUT에 의견 보내기</span>
       </button>
 
       <PhotographerModal
         open={open}
         onClose={close}
         closeDisabled={submitting}
-        title="문의하기"
+        title="A-CUT에 의견 보내기"
         description="사용 중 불편했던 점이나 필요한 기능을 알려주세요."
         maxWidth={420}
         footer={done ? (
