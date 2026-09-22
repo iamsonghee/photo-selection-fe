@@ -10,7 +10,8 @@
 2026-09-22 촬영 분석 필드 계획: `customer_projects`의 기존 `studio_name`을 스튜디오·업체명으로
 정의하고 `photographer_name`, `shoot_region`, `shoot_location`을 추가한다. 생성·설정 API는 공통
 촬영 종류 코드(`wedding`, `family`, `graduation`, `profile`, `etc`)만 받고 촬영 종류를 필수로
-검증한다. 기존 행의 `shoot_type NULL`은 유지해 마이그레이션 후 기존 프로젝트가 차단되지 않게 한다.
+검증한다. 기존 행에는 현재 코드 외 촬영 종류가 있어 DB CHECK 제약은 추가하지 않는다. 기존 값을
+정규화하기 전까지 API를 쓰는 신규 생성·설정 요청에만 허용 코드 검증을 적용한다.
 
 작가가 A-CUT을 쓰지 않는 경우를 위한 별도 이용 흐름을 `feature/customer-select` 브랜치에
 추가했다(`main` 미병합). 소유자가 고객 계정(Google/Kakao 로그인)이고, 공유 링크로 들어오는

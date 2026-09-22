@@ -246,7 +246,7 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 
 적용 대기 마이그레이션:
 
-- `20260922000000_add_customer_project_analytics_fields.sql` — 담당 작가·촬영 지역·장소 및 촬영 종류 제약
+- `20260922000000_add_customer_project_analytics_fields.sql` — 담당 작가·촬영 지역·장소 필드
 
 Supabase CLI의 마이그레이션 이력은 비어 있어 `supabase db push`를 실행하면 과거 파일 전체를
 재실행하려 한다. **`supabase db push`는 사용하지 않는다.** 새 SQL은 Dashboard SQL Editor 또는
