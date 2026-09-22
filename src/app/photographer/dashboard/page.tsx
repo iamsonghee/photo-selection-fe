@@ -23,7 +23,6 @@ import { DashboardOverview } from "./DashboardOverview";
 
 
 import { BetaApprovalBanner, type BetaApplicationStatus } from "@/components/photographer/BetaApprovalBanner";
-import { ProfileCompletionBanner } from "@/components/photographer/ProfileCompletionBanner";
 import {
   consumePostLoginRedirect,
   DEFAULT_POST_LOGIN_PATH,
@@ -183,10 +182,7 @@ export default function DashboardPage() {
   return <div className={themeStyles.lightTheme} data-dashboard-theme="light">
     <BetaWelcomeModal open={showBetaWelcome} onClose={() => setShowBetaWelcome(false)} userName={userName}/>
     <DashboardOverview projects={projects} logs={logs} logsError={logsError} onRetryLogs={() => setReload(v => v+1)} onCreate={handleNewProject} userName={userName}
-      banner={<div className="flex flex-col gap-3">
-        <ProfileCompletionBanner profile={profile} />
-        <BetaApprovalBanner tier={tier} betaApplicationStatus={betaApplicationStatus} maxProjects={maxProjects} maxPhotosPerProject={maxPhotosPerProject}/>
-      </div>}
+      banner={<BetaApprovalBanner tier={tier} betaApplicationStatus={betaApplicationStatus} maxProjects={maxProjects} maxPhotosPerProject={maxPhotosPerProject}/>}
       quota={quota}/>
     <ProjectLimitModal info={limitInfo} onClose={closeLimitModal}/>
   </div>;

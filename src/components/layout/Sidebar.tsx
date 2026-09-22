@@ -67,6 +67,10 @@ export function Sidebar({
   const { profile } = useProfile();
   const { quota } = useQuota();
   const displayName = profile?.name?.trim() || profile?.email?.split("@")[0] || "사용자";
+  // 이름·소개·사진 중 하나라도 비어있으면 아바타에 점 뱃지를 표시한다 — 고객이 초대 링크에서
+  // "담당 작가"로만 보게 되는 원인(ProfileCompletionBanner와 같은 판단 기준, 2026-09-22 상단
+  // 배너에서 사이드바 방식으로 교체).
+  const profileIncomplete = !!profile && (!profile.name?.trim() || !profile.bio?.trim() || !profile.profileImageUrl);
   const tierLabel = quota ? TIER_LABEL[quota.tier] : null;
   const usagePct =
     quota && quota.max ? Math.min(100, Math.round((quota.current / quota.max) * 100)) : 0;
@@ -261,19 +265,24 @@ export function Sidebar({
             }}
             className={[styles.profileTrigger, collapsed ? styles.profileTriggerCollapsed : ""].filter(Boolean).join(" ")}
           >
-            <div
-              className={styles.profileAvatar}
-              style={{ borderColor: "var(--acb-border)", background: "var(--surface)" }}
-            >
-              {profile?.profileImageUrl ? (
-                <img
-                  src={getProfileImageUrl(profile.profileImageUrl)}
-                  alt=""
-                  className="w-full h-full object-cover"
-                  onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PROFILE_IMAGE; }}
-                />
-              ) : (
-                <img src={DEFAULT_PROFILE_IMAGE} alt="" className="h-full w-full object-cover" />
+            <div className={styles.profileAvatar}>
+              <div
+                className={styles.profileAvatarFrame}
+                style={{ borderColor: "var(--acb-border)", background: "var(--surface)" }}
+              >
+                {profile?.profileImageUrl ? (
+                  <img
+                    src={getProfileImageUrl(profile.profileImageUrl)}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PROFILE_IMAGE; }}
+                  />
+                ) : (
+                  <img src={DEFAULT_PROFILE_IMAGE} alt="" className="h-full w-full object-cover" />
+                )}
+              </div>
+              {profileIncomplete && (
+                <span className={styles.profileAvatarBadge} title="프로필을 완성해주세요" aria-label="프로필 미완성" />
               )}
             </div>
             {!collapsed && (
