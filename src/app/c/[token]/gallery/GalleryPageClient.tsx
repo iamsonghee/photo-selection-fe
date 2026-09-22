@@ -1113,6 +1113,9 @@ export default function GalleryPageClient() {
           .gl-photo-card.gl-selected .gl-check-box { background: transparent !important; border-color: transparent !important; }
           .gl-photo-card.gl-selected .gl-check-box::before { background: #ff4d00; border-color: #ff4d00; }
           .gl-check-box svg { position: relative; z-index: 1; }
+          /* 체크박스는 44px 탭영역 안에 18px 시각박스(::before)를 inset해 그리므로
+           * 뱃지도 그 시각박스와 같은 top(6px)에 맞춰야 상하가 정렬된다. */
+          .gl-recommended-badge { top: 6px !important; left: 34px !important; }
           .gl-quality-badge { width: 18px !important; height: 18px !important; top: 6px !important; right: 6px !important; }
           .gl-group-badge { min-width: 18px; height: 16px; right: 5px; bottom: 5px; padding: 0 4px; border: 0; border-radius: 2px; background: rgba(0,0,0,.45); color: #fff; font-size: 8px; }
 
@@ -1142,6 +1145,7 @@ export default function GalleryPageClient() {
             transform: translateY(-1px);
           }
           .gl-density-2 .gl-check-box { top: 2px !important; left: 2px !important; }
+          .gl-density-2 .gl-recommended-badge { top: 8px !important; left: 36px !important; }
 
           /* 별점·코멘트·색은 3열까지 유지한다 — 밀도는 "한 번에 몇 장을 보나"이지 기능 스위치가 아니다.
            * 4열은 별 하나가 8px 밑이라 누를 수도 읽을 수도 없어 그때만 감춘다. */
@@ -1163,6 +1167,7 @@ export default function GalleryPageClient() {
           .gl-density-4 .gl-check-box { top: 0 !important; left: 0 !important; padding: 6px 0 0 6px; }
           .gl-density-4 .gl-check-box::before { left: 5px; top: 5px; width: 12px; height: 12px; }
           .gl-density-4 .gl-check-box svg { width: 8px; height: 8px; }
+          .gl-density-4 .gl-recommended-badge { top: 5px !important; left: 23px !important; }
           .gl-density-4 .gl-quality-badge { display: none; }
           .gl-photo-card.gl-selected .gl-card-media img { filter: brightness(.8); }
 
