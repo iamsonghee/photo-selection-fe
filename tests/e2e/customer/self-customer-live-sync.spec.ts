@@ -3,7 +3,7 @@ import { loginAsPhotographer } from "../../helpers/auth";
 
 test("selection and participant completion sync between sessions without a reload", async ({ browser }) => {
   const ownerContext = await browser.newContext();
-  const participantContext = await browser.newContext();
+  const participantContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const owner = await ownerContext.newPage();
   const participant = await participantContext.newPage();
   await loginAsPhotographer(owner);
@@ -15,7 +15,7 @@ test("selection and participant completion sync between sessions without a reloa
   const online = new Set<string>();
   const views: Record<string, string | null> = {};
   const project = () => ({
-    id: "live-sync", name: "실시간 확인", shootType: "wedding", target: 30, photoCount: 1, uploaded: true,
+    id: "live-sync", name: "실시간 확인", shootType: "wedding", target: 30, photoCount: 1, uploaded: true, realtimeKey: "live-sync-e2e",
     photos: [{ id: "p1", projectId: "live-sync", orderIndex: 0, url: "", previewUrl: "", originalFilename: "A001.jpg" }],
     selectedIds: selected ? ["p1"] : [], photoStates: {}, participantOpinions: {},
     participantDone: { red: false, blue: participantDone }, participantNicknames: { red: "소유자", blue: "동행" },
@@ -65,6 +65,14 @@ test("selection and participant completion sync between sessions without a reloa
   const samePhoto = owner.getByRole("button", { name: "동행님이 보는 A001.jpg 열기" }).first();
   await expect(samePhoto).toBeVisible({ timeout: 5000 });
   await samePhoto.click();
+  await participant.getByRole("button", { name: "대화 열기" }).click();
+  await participant.getByLabel("일회성 메시지").fill("이 사진 같이 볼까요?");
+  await expect(owner.getByRole("complementary", { name: "일회성 대화" })).toHaveAttribute("data-chat-connected", "true", { timeout: 10000 });
+  const send = participant.getByRole("button", { name: "메시지 보내기" });
+  await expect(send).toBeEnabled({ timeout: 10000 });
+  await send.click();
+  await expect(owner.getByText("이 사진 같이 볼까요?", { exact: true })).toBeVisible({ timeout: 10000 });
+  await expect(owner.getByText("이 사진 같이 볼까요?", { exact: true })).toBeHidden({ timeout: 10000 });
 
   await ownerContext.close();
   await participantContext.close();

@@ -4,6 +4,7 @@
  * 그 파일의 헬퍼를 재사용하지 않는다(단계 0 분석 결과).
  */
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { customerShareCookieName } from "@/lib/customer-select-share-auth";
@@ -190,6 +191,7 @@ export function buildProjectView(
     lastDeliveredAt: project.last_delivered_at,
     onlineParticipants: [],
     participantViews: {},
+    realtimeKey: createHash("sha256").update(project.share_token).digest("hex"),
     shareToken: project.share_token,
     shareEnabled: project.sharing_enabled,
   };

@@ -345,6 +345,25 @@
 .selectEmpty strong { color: #191918; font-size: 17px; }
 .selectEmpty span { font-size: 13px; }
 .selectEmpty button { margin-top: 10px; height: 38px; padding: 0 16px; border: 1px solid #dde1e4; border-radius: 7px; background: #fff; color: #191918; font-weight: 600; }
+.ephemeralChat { position: fixed; right: 24px; bottom: 88px; z-index: 60; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+.ephemeralChatElevated { z-index: 220; }
+.ephemeralMessages { width: min(320px, calc(100vw - 40px)); display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.ephemeralMessage { max-width: 100%; padding: 10px 12px; border: 1px solid #dfe4e6; border-radius: 12px 12px 3px 12px; background: #fff; box-shadow: 0 8px 24px rgba(2,56,82,.12); display: flex; align-items: flex-start; gap: 8px; color: #34383c; font-size: 13px; line-height: 1.45; pointer-events: auto; animation: ephemeralMessageIn 160ms ease-out; }
+.ephemeralMessage i { width: 9px; height: 9px; margin-top: 5px; border-radius: 50%; flex: none; }
+.ephemeralMessage span { min-width: 0; overflow-wrap: anywhere; }
+.ephemeralMessage strong { margin-right: 6px; color: #191918; }
+.ephemeralComposer { width: min(320px, calc(100vw - 40px)); padding: 14px; border: 1px solid #dfe4e6; border-radius: 12px; background: #fff; box-shadow: 0 12px 32px rgba(2,56,82,.16); pointer-events: auto; }
+.ephemeralComposer > div { display: flex; align-items: center; justify-content: space-between; }
+.ephemeralComposer > div strong { color: #191918; font-size: 14px; }
+.ephemeralComposer > div button { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #6f747b; display: grid; place-items: center; }
+.ephemeralComposer p { margin: 2px 0 10px; color: #858b90; font-size: 11px; }
+.ephemeralComposer form { display: grid; grid-template-columns: 1fr 38px; gap: 7px; }
+.ephemeralComposer input { min-width: 0; height: 38px; padding: 0 11px; border: 1px solid #cfd5d8; border-radius: 8px; color: #191918; font: 13px/1 Pretendard, sans-serif; outline: none; }
+.ephemeralComposer input:focus { border-color: #ff4d00; box-shadow: 0 0 0 3px rgba(255,77,0,.12); }
+.ephemeralComposer form button { height: 38px; padding: 0; border: 0; border-radius: 8px; background: #ff4d00; color: #fff; display: grid; place-items: center; }
+.ephemeralComposer form button:disabled { background: #dde1e4; color: #aab0b8; }
+.ephemeralChatTrigger { min-width: 86px; height: 42px; padding: 0 15px; border: 1px solid #d8dddf; border-radius: 999px; background: #fff; box-shadow: 0 8px 22px rgba(2,56,82,.14); color: #34383c; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font: 700 12px/1 Pretendard, sans-serif; pointer-events: auto; }
+@keyframes ephemeralMessageIn { from { opacity: 0; transform: translateY(5px); } }
 @media (max-width: 767px) {
   .nicknameDialog { width: 100%; max-width: none; margin: auto 0 0; border-radius: 14px 14px 0 0; padding-bottom: env(safe-area-inset-bottom); }
   .nicknameDialog form { padding: 20px; }
@@ -366,6 +385,9 @@
   .selectGallery { padding: 8px 20px; }
   .selectGrid { max-width: none; }
   .selectDensity2 :global(.gl-photo-card) { aspect-ratio: 4 / 3; }
+  .ephemeralChat { right: 14px; bottom: calc(112px + env(safe-area-inset-bottom)); }
+  .ephemeralChatTrigger { min-width: 42px; width: 42px; padding: 0; }
+  .ephemeralChatTrigger span { display: none; }
 }
 
 .reqItem {

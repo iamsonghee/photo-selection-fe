@@ -38,6 +38,7 @@ export interface ProjectView {
   participantNicknames: Record<string, string>;
   onlineParticipants: ColorTag[];
   participantViews: Partial<Record<ColorTag, string | null>>;
+  realtimeKey: string;
   exported: boolean;
   deliveryCount: number;
   lastDeliveredAt?: string | null;
@@ -63,6 +64,7 @@ function emptyProject(id: string): ProjectView {
     participantNicknames: {},
     onlineParticipants: [],
     participantViews: {},
+    realtimeKey: "",
     exported: false,
     deliveryCount: 0,
     shareToken: "",

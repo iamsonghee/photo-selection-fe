@@ -35,6 +35,7 @@ import {
 import { collapseSimilarityGroups } from "../../_lib/gallery-view";
 import { NicknamePrompt } from "../../_lib/NicknamePrompt";
 import { ParticipantAccessEndedScreen, ParticipantJoinScreen } from "../../_lib/ParticipantJoinScreen";
+import { EphemeralChat } from "../../_lib/EphemeralChat";
 import ui from "../../_lib/ui.module.css";
 
 type Tab = "all" | "selected" | "disagree";
@@ -567,6 +568,13 @@ export default function CustomerSelectGalleryPage() {
         />
       </div>
 
+      {participants.length > 1 ? <EphemeralChat
+        channelKey={project.realtimeKey}
+        currentIdentity={currentIdentity}
+        nicknames={project.participantNicknames}
+        hasRecipient={project.onlineParticipants?.some((color) => color !== currentIdentity) ?? false}
+        elevated={Boolean(openPhotoId)}
+      /> : null}
       {viewerAdapter && (
         <SelectionContextOverride value={viewerSelection}>
           <CustomerSelectionViewer adapter={viewerAdapter} />
