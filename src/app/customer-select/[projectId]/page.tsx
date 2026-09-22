@@ -14,7 +14,7 @@ export default async function CustomerProjectOverview({ params }: { params: Prom
   const { projectId } = await params;
   const admin = getAdminClient();
   const { data, error } = await admin.from("customer_projects")
-    .select("id, name, shoot_type, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, target_count, photo_count, exported, retouch_done, created_at")
+    .select("id, name, shoot_type, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, target_count, photo_count, sharing_enabled, exported, retouch_done, created_at")
     .eq("id", projectId).eq("owner_id", ownerId).maybeSingle();
   if (error) throw new Error("프로젝트 현황을 불러오지 못했어요.");
   if (!data) notFound();
@@ -40,6 +40,7 @@ export default async function CustomerProjectOverview({ params }: { params: Prom
       <div className="mt-5 flex flex-wrap gap-3">
         <Link href={`/customer-select/${projectId}/upload`} className="rounded-xl border border-border-subtle bg-surface px-5 py-3 text-sm font-semibold">사진 관리</Link>
         {project.photo_count > 0 && <Link href={`/customer-select/${projectId}/select`} className="rounded-xl border border-border-subtle bg-surface px-5 py-3 text-sm font-semibold">사진 고르기</Link>}
+        <Link href={`/customer-select/${projectId}/settings#sharing`} className="rounded-xl border border-border-subtle bg-surface px-5 py-3 text-sm font-semibold">초대 링크 {data.sharing_enabled ? "관리" : "만들기"}</Link>
         {project.exported && <Link href={`/customer-select/${projectId}/export`} className="rounded-xl border border-border-subtle bg-surface px-5 py-3 text-sm font-semibold">현재 전달 내용</Link>}
       </div>
       <dl className="mt-8 grid gap-5 text-sm sm:grid-cols-2 lg:grid-cols-4">

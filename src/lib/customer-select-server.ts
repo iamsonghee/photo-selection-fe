@@ -31,6 +31,7 @@ export interface CustomerProjectRow {
   target_count: number;
   photo_count: number;
   share_token: string;
+  sharing_enabled: boolean;
   exported: boolean;
   retouch_done: boolean;
 }
@@ -43,7 +44,7 @@ export async function resolveCustomerProjectAccess(
 ): Promise<{ project: CustomerProjectRow; isOwner: boolean } | NextResponse> {
   const { data: project, error } = await admin
     .from("customer_projects")
-    .select("id, owner_id, name, shoot_type, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, target_count, photo_count, share_token, exported, retouch_done")
+    .select("id, owner_id, name, shoot_type, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, target_count, photo_count, share_token, sharing_enabled, exported, retouch_done")
     .eq("id", projectId)
     .maybeSingle();
   if (error || !project) {
@@ -53,7 +54,7 @@ export async function resolveCustomerProjectAccess(
   if (authId && authId === project.owner_id) {
     return { project, isOwner: true };
   }
-  if (shareToken && shareToken === project.share_token) {
+  if (project.sharing_enabled && shareToken && shareToken === project.share_token) {
     return { project, isOwner: false };
   }
   return NextResponse.json({ error: "이 프로젝트에 접근할 권한이 없습니다." }, { status: 403 });
@@ -181,5 +182,6 @@ export function buildProjectView(
     participantNicknames,
     exported: project.exported,
     shareToken: project.share_token,
+    shareEnabled: project.sharing_enabled,
   };
 }

@@ -136,7 +136,7 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 | 재보정 전달 | `/customer-select/[projectId]/retouch/export` | 고객 재보정 결과 | 기능 구현됨, UI 정렬 필요 |
 | 완료 | `/customer-select/[projectId]/done` | 고객 완료 화면 | 기능 구현됨, UI 정렬 필요 |
 | 프로젝트 설정·삭제 | `/customer-select/[projectId]/settings` | 작가 프로젝트 설정 | 목록 카드 설정 버튼에서 진입. 기본정보·목표 수정을 지원하고, 소유자만 DB 파생 데이터와 R2 이미지를 함께 삭제 가능 |
-| 공유 링크 관리 | 미정 | 작가 고객 링크 관리 | 미구현 |
+| 공유 링크 관리 | `/customer-select/[projectId]/settings#sharing` | 작가 고객 링크 관리 | 소유자 전용. 링크 복사·즉시 중지·재발급을 지원하며 중지/재발급 시 기존 링크와 참여자 쿠키를 거부한다. 기존 셀렉·의견 기록은 보존한다. |
 
 ### 작업 순서
 
@@ -149,6 +149,7 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 작가 프로젝트와 소유권·인증·보관 정책이 다르므로 데이터는 분리한다.
 
 - `customer_projects`: 소유자, 프로젝트 정보, 목표 장수, 사진 수, 공유 토큰, 전달·보정 완료 플래그
+- `customer_projects.sharing_enabled`: 현재 공유 토큰의 활성 여부. 중지하면 기존 쿠키도 거부
 - `customer_projects` 촬영 분석 필드: `shoot_type`(필수 입력), `shoot_date`, `studio_name`,
   `photographer_name`, `shoot_region`, `shoot_location`(선택 입력)
 - `customer_photos`: 셀렉용 썸네일·프리뷰, 원본 파일명, 표시 순서, 유사컷 그룹
@@ -170,17 +171,18 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 - 토큰 교환 직후 같은 화면의 `share_token` 없는 URL로 리다이렉트하며, 이후 화면 이동과 API
   요청에는 토큰을 쿼리나 요청 본문으로 전달하지 않는다.
 - 공유 링크 복사와 원문 토큰 조회는 프로젝트 소유자에게만 제공한다.
+- 공유 중지는 현재 토큰을 비활성화하고, 재발급은 새 토큰으로 교체한다. 두 작업 모두 기존 링크와
+  발급된 참여자 쿠키를 즉시 무효화하지만 참가자의 찜·별점·의견 기록은 삭제하지 않는다.
 - 참가자 색 슬롯은 브라우저의 `acut:customer-select:identity:{projectId}`에 저장한다.
 - 최초 참가자는 닉네임과 아직 사용하지 않은 색을 직접 고른다. 색 선점은 DB의
   `(project_id, color)` 고유 키로 동시에 요청해도 한 명만 성공하며, 5개가 모두 사용 중이면 입장을 막는다.
 - Next.js API는 소유자 세션 또는 프로젝트별 공유 쿠키의 유효한 토큰을 검사한다.
 - 공유 참가자는 본인 색 슬롯의 찜·별점·의견·완료 상태만 UI에서 변경한다. 의견은 같은 프로젝트
   참여자에게 공개된다. 최종 선택·최종 검토·전달 상태 변경은 소유자만 가능하다.
-- 업로드 프록시는 공유 쿠키를 읽어 BE 요청에만 토큰을 전달하고, BE는 소유자 JWT 또는 공유
-  토큰을 검사한다.
+- 사진 업로드·삭제·보정본 관리는 소유자 JWT만 허용한다. 공유 토큰은 셀렉 협업 권한으로만 사용한다.
 
-공유 토큰은 참여 링크이지 강한 본인 인증 수단이 아니다. 링크 중지·재발급 UI가 생기기 전까지
-유출 대응 수단이 부족하다는 점을 운영상 명시한다.
+공유 토큰은 참여 링크이지 강한 본인 인증 수단이 아니다. 유출이 의심되면 설정에서 공유를
+중지하거나 링크를 재발급한다.
 
 ## 7. 업로드·삭제·AI
 
@@ -248,10 +250,12 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 - `20260919040000_add_customer_photo_versions.sql`
 - `20260920000000_add_customer_project_details.sql`
 - `20260920010000_add_customer_ai_analysis.sql`
+- `20260922000000_add_customer_project_analytics_fields.sql`
 
 적용 대기 마이그레이션:
 
-- `20260922000000_add_customer_project_analytics_fields.sql` — 담당 작가·촬영 지역·장소 필드
+- `20260922010000_add_customer_participant_opinions.sql` — 참가자별 별점·공개 의견
+- `20260922020000_add_customer_project_sharing_state.sql` — 공유 중지·재발급 상태
 
 Supabase CLI의 마이그레이션 이력은 비어 있어 `supabase db push`를 실행하면 과거 파일 전체를
 재실행하려 한다. **`supabase db push`는 사용하지 않는다.** 새 SQL은 Dashboard SQL Editor 또는
@@ -263,7 +267,6 @@ Management API `/database/query`로 해당 파일만 실행한다.
 ## 10. 남은 작업
 
 - 셀렉·검토·보정 화면의 공통 컴포넌트 통합
-- 공유 링크 중지·재발급·복사 관리 화면
 - 참여자 변경사항 실시간 반영 또는 짧은 폴링
 - CSV/TXT 실제 다운로드
 - 선택 기록이 있는 사진의 삭제 정책

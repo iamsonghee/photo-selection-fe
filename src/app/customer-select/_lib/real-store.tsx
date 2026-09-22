@@ -38,6 +38,7 @@ export interface ProjectView {
   participantNicknames: Record<string, string>;
   exported: boolean;
   shareToken: string;
+  shareEnabled: boolean;
 }
 
 function emptyProject(id: string): ProjectView {
@@ -56,6 +57,7 @@ function emptyProject(id: string): ProjectView {
     participantNicknames: {},
     exported: false,
     shareToken: "",
+    shareEnabled: false,
   };
 }
 
@@ -95,6 +97,7 @@ interface StoreValue {
   isOwner: boolean;
   currentIdentity: ColorTag;
   participantReady: boolean;
+  accessDenied: boolean;
   shareUrl: string;
   update: (patch: { exported?: boolean }) => void;
   toggleSelect: (photoId: string) => void;
@@ -123,11 +126,16 @@ export function CustomerSelectStoreProvider({
   const [isOwner, setIsOwner] = useState(false);
   const [currentIdentity, setCurrentIdentityState] = useState<ColorTag>("red");
   const [participantReady, setParticipantReady] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
   const claimedRef = useRef(false);
 
   const apiGet = useCallback(async () => {
     const res = await fetch(`/api/customer-select/projects/${projectId}`, { cache: "no-store" });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (res.status === 403 || res.status === 404) setAccessDenied(true);
+      return null;
+    }
+    setAccessDenied(false);
     return (await res.json()) as { project: ProjectView; isOwner: boolean };
   }, [projectId]);
 
@@ -362,18 +370,18 @@ export function CustomerSelectStoreProvider({
   }, [apiGet, projectId]);
 
   const shareUrl = useMemo(() => {
-    if (typeof window === "undefined" || !project.shareToken) return "";
+    if (typeof window === "undefined" || !project.shareEnabled || !project.shareToken) return "";
     return `${window.location.origin}/customer-select/${projectId}/select?share_token=${project.shareToken}`;
-  }, [projectId, project.shareToken]);
+  }, [projectId, project.shareEnabled, project.shareToken]);
 
   const clearSaveError = useCallback(() => setSaveError(null), []);
 
   const value = useMemo<StoreValue>(
     () => ({
-      project, hydrated, isOwner, currentIdentity, participantReady, shareUrl, update, toggleSelect, toggleLike,
+      project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, update, toggleSelect, toggleLike,
       setStar, setComment, toggleDone, setNickname, joinParticipant, refresh, saveError, clearSaveError,
     }),
-    [project, hydrated, isOwner, currentIdentity, participantReady, shareUrl, update, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, refresh, saveError, clearSaveError]
+    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, update, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, refresh, saveError, clearSaveError]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

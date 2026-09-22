@@ -34,7 +34,7 @@ import {
 } from "../../_lib/real-store";
 import { collapseSimilarityGroups } from "../../_lib/gallery-view";
 import { NicknamePrompt } from "../../_lib/NicknamePrompt";
-import { ParticipantJoinScreen } from "../../_lib/ParticipantJoinScreen";
+import { ParticipantAccessEndedScreen, ParticipantJoinScreen } from "../../_lib/ParticipantJoinScreen";
 import ui from "../../_lib/ui.module.css";
 
 type Tab = "all" | "selected" | "disagree";
@@ -54,7 +54,7 @@ export default function CustomerSelectGalleryPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const router = useRouter();
-  const { project, hydrated, isOwner, currentIdentity, participantReady, shareUrl, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, saveError, clearSaveError } =
+  const { project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, saveError, clearSaveError } =
     useCustomerSelectStore();
 
   const [tab, setTab] = useState<Tab>("all");
@@ -82,6 +82,10 @@ export default function CustomerSelectGalleryPage() {
   const densityAnchorIdRef = useRef<string | null>(null);
 
   async function handleShare() {
+    if (!shareUrl) {
+      router.push(`/customer-select/${projectId}/settings#sharing`);
+      return;
+    }
     try {
       await navigator.clipboard.writeText(shareUrl);
       setShareCopied(true);
@@ -309,6 +313,7 @@ export default function CustomerSelectGalleryPage() {
   if (!hydrated) {
     return <SystemLoadingScreen title="셀렉 갤러리를 불러오고 있어요" homeHref="/customer-select" />;
   }
+  if (accessDenied) return <ParticipantAccessEndedScreen />;
   if (!isOwner && !participantReady) return <ParticipantJoinScreen />;
 
   return (
@@ -380,7 +385,7 @@ export default function CustomerSelectGalleryPage() {
               </div>
               <div className={ui.selectHeaderActions}>
                 {participants.length > 1 && <button type="button" className={`${ui.selectHeaderButton} ${ui.selectDoneButton}`} aria-pressed={Boolean(project.participantDone[currentIdentity])} onClick={() => toggleDone(currentIdentity)}><CheckCircle2 size={15} />{project.participantDone[currentIdentity] ? "선택 다시 열기" : "내 선택 완료"}</button>}
-                {isOwner && <button type="button" className={ui.selectHeaderButton} onClick={handleShare}><Share2 size={15} />{shareCopied ? "복사됨" : "공유"}</button>}
+                {isOwner && <button type="button" className={ui.selectHeaderButton} onClick={handleShare}><Share2 size={15} />{project.shareEnabled ? (shareCopied ? "복사됨" : "공유") : "공유 중지됨"}</button>}
                 <div className="gld-selected"><span className="gld-selected-label">선택</span><span className="gld-selected-count">{selectedCount} <span>/ {target}</span></span></div>
               </div>
             </>}
@@ -419,7 +424,7 @@ export default function CustomerSelectGalleryPage() {
               {isOwner ? (
                 <button type="button" className={ui.selectHeaderButton} onClick={handleShare}>
                   <Share2 size={15} aria-hidden />
-                  {shareCopied ? "복사됨" : "공유"}
+                  {project.shareEnabled ? (shareCopied ? "복사됨" : "공유") : "공유 중지됨"}
                 </button>
               ) : null}
             </div>

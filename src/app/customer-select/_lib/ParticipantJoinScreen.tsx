@@ -58,3 +58,16 @@ export function ParticipantJoinScreen() {
     </main>
   </div>;
 }
+
+export function ParticipantAccessEndedScreen() {
+  return <div className={ui.joinShell}>
+    <header className={ui.joinBrand}><BrandLogoBar size="sm" href="/" variant="default" /></header>
+    <main className={ui.joinMain}>
+      <div className={ui.joinCard}>
+        <span className={ui.joinEyebrow}>사진 셀렉 초대</span>
+        <h1>이 초대 링크는<br />더 이상 사용할 수 없어요</h1>
+        <p>프로젝트를 만든 사람이 공유를 중지했거나 새 링크를 발급했어요. 새로운 초대 링크를 요청해 주세요.</p>
+      </div>
+    </main>
+  </div>;
+}

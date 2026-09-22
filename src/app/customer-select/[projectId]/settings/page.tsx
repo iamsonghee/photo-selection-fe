@@ -8,7 +8,7 @@ export default async function CustomerProjectSettingsPage({ params }: { params: 
   const ownerId = await getCurrentCustomerAuthId();
   if (!ownerId) redirect("/customer-select/login");
   const { projectId } = await params;
-  const { data: project } = await getAdminClient().from("customer_projects").select("id, name, shoot_type, target_count, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, photo_count").eq("id", projectId).eq("owner_id", ownerId).maybeSingle();
+  const { data: project } = await getAdminClient().from("customer_projects").select("id, name, shoot_type, target_count, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, photo_count, share_token, sharing_enabled").eq("id", projectId).eq("owner_id", ownerId).maybeSingle();
   if (!project) notFound();
   return <CustomerSelectShell><EditCustomerProjectForm project={project} /></CustomerSelectShell>;
 }

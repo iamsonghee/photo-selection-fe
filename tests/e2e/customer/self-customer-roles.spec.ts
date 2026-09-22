@@ -14,7 +14,7 @@ test("shared participant can leave opinions but cannot change the final selectio
       selectedIds: ["p1"], photoStates: { p1: { color: ["blue"] } },
       participantOpinions: { p1: { blue: { rating: 4, comment: "표정이 좋아요" } } },
       participantDone: { red: false, blue: false }, participantNicknames: { red: "나", blue: "동행" },
-      shareToken: "", exported: false,
+      shareToken: "", shareEnabled: true, exported: false,
     } } });
   });
   await page.route("**/api/customer-select/projects/role-check/participants", async (route) => route.fulfill({ json: { ok: true } }));
@@ -50,7 +50,7 @@ test("first-time participant chooses an available color before entering", async 
       id: "join-check", name: "우리 웨딩", shootType: "wedding", target: 30, photoCount: 1, uploaded: true,
       photos: [{ id: "p1", projectId: "join-check", orderIndex: 0, url: "", previewUrl: "", originalFilename: "A001.jpg" }],
       selectedIds: [], photoStates: {}, participantOpinions: {}, participantDone: { blue: false },
-      participantNicknames: { blue: "신랑" }, shareToken: "", exported: false,
+      participantNicknames: { blue: "신랑" }, shareToken: "", shareEnabled: true, exported: false,
     } } });
   });
   await page.route("**/api/customer-select/projects/join-check/participants", async (route) => {
@@ -67,4 +67,14 @@ test("first-time participant chooses an available color before entering", async 
   await expect(page.getByText("우리 웨딩").first()).toBeVisible();
   expect(claim).toMatchObject({ claim: true, color: "red", nickname: "신부" });
   expect(await page.evaluate(() => localStorage.getItem("acut:customer-select:identity:join-check"))).toBe("red");
+});
+
+test("stopped or replaced invite shows an access-ended screen", async ({ page }) => {
+  await loginAsPhotographer(page);
+  await page.route("**/api/customer-select/projects/stopped-share", async (route) => {
+    await route.fulfill({ status: 403, json: { error: "이 프로젝트에 접근할 권한이 없습니다." } });
+  });
+  await page.goto("/customer-select/stopped-share/select");
+  await expect(page.getByRole("heading", { name: /더 이상 사용할 수 없어요/ })).toBeVisible();
+  await expect(page.getByText("새로운 초대 링크를 요청해 주세요", { exact: false })).toBeVisible();
 });

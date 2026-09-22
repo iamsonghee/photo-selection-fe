@@ -167,6 +167,7 @@ async function isValidCustomerShareToken(projectId: string, shareToken: string):
   endpoint.searchParams.set("select", "id");
   endpoint.searchParams.set("id", `eq.${projectId}`);
   endpoint.searchParams.set("share_token", `eq.${shareToken}`);
+  endpoint.searchParams.set("sharing_enabled", "eq.true");
   endpoint.searchParams.set("limit", "1");
   const response = await fetch(endpoint, {
     headers: {

@@ -16,6 +16,7 @@ import {
   ProjectShootTypeSelector,
   projectFormInputStateClass,
 } from "@/components/photographer/ProjectFormFields";
+import { CustomerShareLinkManager } from "./CustomerShareLinkManager";
 
 type EditableProject = {
   id: string;
@@ -29,6 +30,8 @@ type EditableProject = {
   shoot_region: string | null;
   shoot_location: string | null;
   photo_count: number;
+  share_token: string;
+  sharing_enabled: boolean;
 };
 
 export function EditCustomerProjectForm({ project }: { project: EditableProject }) {
@@ -113,6 +116,8 @@ export function EditCustomerProjectForm({ project }: { project: EditableProject 
               <ProjectFormField label="촬영 장소"><ProjectFormInput maxLength={150} className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(shootLocation) })}`} value={shootLocation} onChange={(event) => setShootLocation(event.target.value)} /></ProjectFormField>
             </div>
           </ProjectFormSection>
+
+          <CustomerShareLinkManager projectId={project.id} initialToken={project.share_token} initialEnabled={project.sharing_enabled} />
 
           <section className="rounded-2xl border border-danger/25 bg-surface p-5 sm:p-6">
             <h2 className="text-[16px] font-bold text-foreground">프로젝트 삭제</h2>
