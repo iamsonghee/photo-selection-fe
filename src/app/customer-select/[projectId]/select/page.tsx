@@ -54,7 +54,7 @@ export default function CustomerSelectGalleryPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const router = useRouter();
-  const { project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, saveError, clearSaveError } =
+  const { project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, saveError, clearSaveError } =
     useCustomerSelectStore();
 
   const [tab, setTab] = useState<Tab>("all");
@@ -322,6 +322,11 @@ export default function CustomerSelectGalleryPage() {
 
   return (
     <div className={ui.selectWorkspace}>
+      {syncStatus !== "connected" && (
+        <div role="status" className={syncStatus === "offline" ? "border-b border-danger/20 bg-danger/8 px-5 py-2 text-center text-xs font-semibold text-danger" : "border-b border-border-subtle bg-surface px-5 py-2 text-center text-xs font-semibold text-muted-foreground"}>
+          {syncStatus === "offline" ? "연결이 불안정해요. 변경 내용을 다시 동기화하고 있습니다." : "함께 고르는 내용을 동기화하고 있어요…"}
+        </div>
+      )}
       {saveError && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 20px", background: "#fff0ea", borderBottom: "1px solid #ffd9c2", fontSize: 12.5, color: "#ff4d00", fontWeight: 600 }}>
           <span style={{ flex: 1 }}>{saveError}</span>

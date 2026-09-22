@@ -18,6 +18,10 @@ test("shared participant can leave opinions but cannot change the final selectio
     } } });
   });
   await page.route("**/api/customer-select/projects/role-check/participants", async (route) => route.fulfill({ json: { ok: true } }));
+  await page.route("**/api/customer-select/projects/role-check/sync", async (route) => route.fulfill({ json: {
+    selectedIds: ["p1"], photoStates: { p1: { color: ["blue"] } }, participantOpinions: { p1: { blue: { rating: 4, comment: "표정이 좋아요" } } },
+    participantDone: { red: false, blue: false }, participantNicknames: { red: "나", blue: "동행" }, exported: false, deliveryCount: 0, lastDeliveredAt: null,
+  } }));
   await page.route("**/api/customer-select/projects/role-check/selections", async (route) => {
     writes.push(route.request().postDataJSON());
     await route.fulfill({ json: { ok: true } });
@@ -57,6 +61,9 @@ test("first-time participant chooses an available color before entering", async 
     claim = route.request().postDataJSON();
     await route.fulfill({ json: { ok: true } });
   });
+  await page.route("**/api/customer-select/projects/join-check/sync", async (route) => route.fulfill({ json: {
+    selectedIds: [], photoStates: {}, participantOpinions: {}, participantDone: { blue: false }, participantNicknames: { blue: "신랑" }, exported: false, deliveryCount: 0, lastDeliveredAt: null,
+  } }));
 
   await page.goto("/customer-select/join-check/select");
   await expect(page.getByRole("heading", { name: /함께 참여해 주세요/ })).toBeVisible();
@@ -88,6 +95,9 @@ test("participant can continue the same identity on another device", async ({ pa
     participantWrites++;
     await route.fulfill({ json: { ok: true } });
   });
+  await page.route("**/api/customer-select/projects/resume-check/sync", async (route) => route.fulfill({ json: {
+    selectedIds: [], photoStates: {}, participantOpinions: {}, participantDone: { red: false, blue: false }, participantNicknames: { red: "소유자", blue: "신랑" }, exported: false, deliveryCount: 0, lastDeliveredAt: null,
+  } }));
 
   await page.goto("/customer-select/resume-check/select");
   await page.getByRole("button", { name: /신랑.*이어서 참여/ }).click();

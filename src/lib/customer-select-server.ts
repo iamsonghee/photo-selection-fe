@@ -109,6 +109,38 @@ interface CustomerParticipantOpinionRow {
   comment: string | null;
 }
 
+export function buildCustomerCollaborationState(
+  selections: CustomerSelectionRow[],
+  participants: CustomerParticipantRow[],
+  opinions: CustomerParticipantOpinionRow[]
+) {
+  const selectedIds: string[] = [];
+  const photoStates: Record<string, { rating?: StarRating; color?: ColorTag[]; comment?: string }> = {};
+  for (const selection of selections) {
+    if (selection.is_selected) selectedIds.push(selection.photo_id);
+    photoStates[selection.photo_id] = {
+      rating: (selection.rating ?? undefined) as StarRating | undefined,
+      color: (selection.color_tags ?? []) as ColorTag[],
+      comment: selection.comment ?? undefined,
+    };
+  }
+  const participantDone: Record<string, boolean> = {};
+  const participantNicknames: Record<string, string> = {};
+  for (const participant of participants) {
+    participantDone[participant.color] = participant.done;
+    participantNicknames[participant.color] = participant.nickname;
+  }
+  const participantOpinions: Record<string, Record<string, { rating?: StarRating; comment?: string }>> = {};
+  for (const opinion of opinions) {
+    participantOpinions[opinion.photo_id] ??= {};
+    participantOpinions[opinion.photo_id][opinion.participant_color] = {
+      rating: (opinion.rating ?? undefined) as StarRating | undefined,
+      comment: opinion.comment ?? undefined,
+    };
+  }
+  return { selectedIds, photoStates, participantOpinions, participantDone, participantNicknames };
+}
+
 export function toPhoto(row: CustomerPhotoRow, projectId: string, quality?: CustomerQualityRow): Photo {
   return {
     id: row.id,
@@ -133,32 +165,7 @@ export function buildProjectView(
   quality: CustomerQualityRow[] = [],
   opinions: CustomerParticipantOpinionRow[] = []
 ) {
-  const selectionByPhoto = new Map(selections.map((s) => [s.photo_id, s]));
-  const selectedIds: string[] = [];
-  const photoStates: Record<string, { rating?: StarRating; color?: ColorTag[]; comment?: string }> = {};
-  for (const sel of selections) {
-    if (sel.is_selected) selectedIds.push(sel.photo_id);
-    photoStates[sel.photo_id] = {
-      rating: (sel.rating ?? undefined) as StarRating | undefined,
-      color: (sel.color_tags ?? []) as ColorTag[],
-      comment: sel.comment ?? undefined,
-    };
-  }
-  const participantDone: Record<string, boolean> = {};
-  const participantNicknames: Record<string, string> = {};
-  for (const p of participants) {
-    participantDone[p.color] = p.done;
-    participantNicknames[p.color] = p.nickname;
-  }
-  const participantOpinions: Record<string, Record<string, { rating?: StarRating; comment?: string }>> = {};
-  for (const opinion of opinions) {
-    participantOpinions[opinion.photo_id] ??= {};
-    participantOpinions[opinion.photo_id][opinion.participant_color] = {
-      rating: (opinion.rating ?? undefined) as StarRating | undefined,
-      comment: opinion.comment ?? undefined,
-    };
-  }
-  void selectionByPhoto;
+  const collaboration = buildCustomerCollaborationState(selections, participants, opinions);
   const qualityByPhoto = new Map(quality.map((row) => [row.photo_id, row]));
   return {
     id: project.id,
@@ -177,11 +184,7 @@ export function buildProjectView(
       .slice()
       .sort((a, b) => a.order_index - b.order_index)
       .map((p) => toPhoto(p, project.id, qualityByPhoto.get(p.id))),
-    selectedIds,
-    photoStates,
-    participantOpinions,
-    participantDone,
-    participantNicknames,
+    ...collaboration,
     exported: project.exported,
     deliveryCount: project.delivery_count,
     lastDeliveredAt: project.last_delivered_at,

@@ -15,7 +15,7 @@ import { PhotographerLightButton } from "@/components/photographer/PhotographerL
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
-import { useCustomerSelectStore } from "../../_lib/real-store";
+import { activeParticipants, useCustomerSelectStore } from "../../_lib/real-store";
 import ui from "../../_lib/ui.module.css";
 
 function buildExportText(
@@ -33,9 +33,10 @@ function buildExportText(
 export default function CustomerExportPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const router = useRouter();
-  const { project, hydrated, isOwner, update } = useCustomerSelectStore();
+  const { project, hydrated, isOwner, currentIdentity, syncStatus, update } = useCustomerSelectStore();
   const [copyState, setCopyState] = useState<"idle" | "ok" | "fail">("idle");
   const [reopenConfirm, setReopenConfirm] = useState(false);
+  const [deliverConfirm, setDeliverConfirm] = useState(false);
   const [changingState, setChangingState] = useState(false);
   const [stateError, setStateError] = useState<string | null>(null);
 
@@ -50,6 +51,7 @@ export default function CustomerExportPage() {
       .join(" · ") || project.photoStates[id]?.comment,
   ]));
   const text = buildExportText(selected, comments);
+  const waiting = activeParticipants(project).filter((participant) => participant.id !== currentIdentity && !project.participantDone[participant.id]);
 
   useEffect(() => {
     if (hydrated && !isOwner) router.replace(`/customer-select/${projectId}/select`);
@@ -74,6 +76,8 @@ export default function CustomerExportPage() {
       setStateError("상태를 변경하지 못했어요. 잠시 후 다시 시도해 주세요.");
       return;
     }
+    setDeliverConfirm(false);
+    setReopenConfirm(false);
     if (!exported) router.push(`/customer-select/${projectId}/select`);
   }
 
@@ -113,11 +117,11 @@ export default function CustomerExportPage() {
         </div>
         <PhotographerPageActionBar
           maxWidth={1120}
-          leading={<div><p className="text-sm font-semibold text-foreground">{project.exported ? "전달 완료" : project.deliveryCount > 0 ? "다시 선택 중" : "전달하셨나요?"}</p>{project.lastDeliveredAt ? <p className="mt-1 text-xs text-muted-foreground">최근 전달 {new Date(project.lastDeliveredAt).toLocaleString("ko-KR")} · 총 {project.deliveryCount.toLocaleString()}회</p> : null}{stateError ? <p role="alert" className="mt-1 text-xs font-semibold text-danger">{stateError}</p> : null}</div>}
+          leading={<div><p className="text-sm font-semibold text-foreground">{project.exported ? "셀렉 전달 완료" : project.deliveryCount > 0 ? "다시 선택 중" : "작가에게 전달하셨나요?"}</p>{waiting.length > 0 && !project.exported ? <p className="mt-1 text-xs font-semibold text-danger">{waiting.map((participant) => participant.name).join(", ")}님이 아직 고르는 중이에요.</p> : null}{project.lastDeliveredAt ? <p className="mt-1 text-xs text-muted-foreground">최근 전달 {new Date(project.lastDeliveredAt).toLocaleString("ko-KR")} · 총 {project.deliveryCount.toLocaleString()}회</p> : null}{syncStatus !== "connected" ? <p className="mt-1 text-xs font-semibold text-danger">최신 참여 상태를 확인하고 있어요.</p> : null}{stateError ? <p role="alert" className="mt-1 text-xs font-semibold text-danger">{stateError}</p> : null}</div>}
           actions={<>
             {project.exported
               ? <PhotographerLightButton variant="secondary" onClick={() => setReopenConfirm(true)}>다시 선택하기</PhotographerLightButton>
-              : <PhotographerLightButton pending={changingState} pendingLabel="저장 중…" onClick={() => void setDelivered(true)}>{project.deliveryCount > 0 ? "다시 전달 완료" : "전달 완료로 표시"}</PhotographerLightButton>}
+              : <PhotographerLightButton disabled={syncStatus !== "connected"} pending={changingState} pendingLabel="저장 중…" onClick={() => waiting.length ? setDeliverConfirm(true) : void setDelivered(true)}>{project.deliveryCount > 0 ? "수정한 결과를 다시 전달했어요" : "작가에게 전달했어요"}</PhotographerLightButton>}
             {project.exported ? <PhotographerLightButton onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>보정본 업로드하기</PhotographerLightButton> : null}
           </>}
         />
@@ -132,6 +136,16 @@ export default function CustomerExportPage() {
         error={stateError}
         onCancel={() => { if (!changingState) { setReopenConfirm(false); setStateError(null); } }}
         onConfirm={() => void setDelivered(false)}
+      /> : null}
+      {deliverConfirm ? <SelectionConfirmDialog
+        title="아직 고르는 사람이 있어요"
+        description={<>{waiting.map((participant) => participant.name).join(", ")}님이 아직 완료하지 않았어요.<br />그래도 현재 선택 결과를 전달할까요?</>}
+        confirmLabel="그래도 전달하기"
+        busyLabel="저장 중…"
+        confirming={changingState}
+        error={stateError}
+        onCancel={() => { if (!changingState) { setDeliverConfirm(false); setStateError(null); } }}
+        onConfirm={() => void setDelivered(true)}
       /> : null}
     </div>
   );

@@ -21,7 +21,7 @@ export default function CustomerReviewPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const router = useRouter();
-  const { project, hydrated, isOwner } = useCustomerSelectStore();
+  const { project, hydrated, isOwner, currentIdentity, syncStatus } = useCustomerSelectStore();
 
   useEffect(() => {
     if (hydrated && !isOwner) router.replace(`/customer-select/${projectId}/select`);
@@ -31,7 +31,7 @@ export default function CustomerReviewPage() {
   const requested = requestedPhotoIds(project);
   const match = tasteMatchPct(project);
   const done = bothDone(project);
-  const waiting = activeParticipants(project).filter((p) => !project.participantDone[p.id]);
+  const waiting = activeParticipants(project).filter((p) => p.id !== currentIdentity && !project.participantDone[p.id]);
 
   // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
   if (!hydrated || !isOwner) {
@@ -52,6 +52,7 @@ export default function CustomerReviewPage() {
           <h1 className={ui.title}>최종 검토</h1>
         </div>
         <div className={ui.body}>
+          {syncStatus !== "connected" && <div className={`${ui.banner} ${ui.bannerWarn}`}><span className={ui.bannerHeadWarn}>{syncStatus === "offline" ? "최신 참여 상태를 확인하지 못하고 있어요" : "최신 참여 상태를 확인하고 있어요"}</span><span className={ui.bodyText}>연결되면 전달 단계를 계속할 수 있어요.</span></div>}
           <div style={{ display: "flex", gap: 8 }}>
             <div className={ui.statPill}>
               <span className={ui.n}>{selected.length}장</span>
@@ -141,7 +142,7 @@ export default function CustomerReviewPage() {
           maxWidth={1120}
           actions={<>
             <PhotographerLightButton variant="secondary" onClick={() => router.push(`/customer-select/${projectId}/select`)}>더 고르기</PhotographerLightButton>
-            <PhotographerLightButton disabled={selected.length === 0} onClick={() => router.push(`/customer-select/${projectId}/export`)}>전달 내용 만들기</PhotographerLightButton>
+            <PhotographerLightButton disabled={selected.length === 0 || syncStatus !== "connected"} onClick={() => router.push(`/customer-select/${projectId}/export`)}>전달 내용 만들기</PhotographerLightButton>
           </>}
         />
       </div>

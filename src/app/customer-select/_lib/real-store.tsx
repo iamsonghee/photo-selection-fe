@@ -6,7 +6,7 @@
  * 프로젝트에서 어떤 색으로 참여 중인가"를 localStorage에 남기는 방식이다(단계 1 결정 —
  * 공유 링크 참가자는 로그인하지 않음).
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ColorTag, Photo, StarRating } from "@/types";
 
 export const COLOR_PALETTE: { id: ColorTag; hex: string }[] = [
@@ -102,6 +102,7 @@ interface StoreValue {
   participantReady: boolean;
   accessDenied: boolean;
   shareUrl: string;
+  syncStatus: "syncing" | "connected" | "offline";
   update: (patch: { exported?: boolean }) => Promise<boolean>;
   toggleSelect: (photoId: string) => void;
   toggleLike: (photoId: string, identity: ColorTag) => void;
@@ -131,6 +132,8 @@ export function CustomerSelectStoreProvider({
   const [currentIdentity, setCurrentIdentityState] = useState<ColorTag>("red");
   const [participantReady, setParticipantReady] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"syncing" | "connected" | "offline">("syncing");
+  const writesInFlightRef = useRef(0);
 
   const apiGet = useCallback(async () => {
     const res = await fetch(`/api/customer-select/projects/${projectId}`, { cache: "no-store" });
@@ -153,21 +156,27 @@ export function CustomerSelectStoreProvider({
   const apiPost = useCallback(
     async (path: string, body: Record<string, unknown>, onFinalFailure?: () => void) => {
       const payload = JSON.stringify(body);
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          const res = await fetch(`/api/customer-select/projects/${projectId}${path}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: payload,
-          });
-          if (res.ok) return;
-        } catch {
-          /* 네트워크 오류 — 아래에서 재시도 */
+      writesInFlightRef.current += 1;
+      try {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const res = await fetch(`/api/customer-select/projects/${projectId}${path}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: payload,
+            });
+            if (res.ok) return true;
+          } catch {
+            /* 네트워크 오류 — 아래에서 재시도 */
+          }
+          if (attempt < 2) await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
         }
-        if (attempt < 2) await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+        onFinalFailure?.();
+        setSaveError("저장하지 못했습니다. 인터넷 연결을 확인해 주세요.");
+        return false;
+      } finally {
+        writesInFlightRef.current -= 1;
       }
-      onFinalFailure?.();
-      setSaveError("저장하지 못했습니다. 인터넷 연결을 확인해 주세요.");
     },
     [projectId]
   );
@@ -216,18 +225,64 @@ export function CustomerSelectStoreProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
+  useEffect(() => {
+    if (!hydrated || accessDenied) return;
+    let cancelled = false;
+    let failures = 0;
+    let polling = false;
+    const poll = async () => {
+      if (document.hidden || writesInFlightRef.current > 0 || polling) return;
+      polling = true;
+      try {
+        const response = await fetch(`/api/customer-select/projects/${projectId}/sync`, { cache: "no-store" });
+        if (response.status === 403 || response.status === 404) {
+          setAccessDenied(true);
+          return;
+        }
+        if (!response.ok) throw new Error("sync failed");
+        const state = await response.json() as Pick<ProjectView, "selectedIds" | "photoStates" | "participantOpinions" | "participantDone" | "participantNicknames" | "exported" | "deliveryCount" | "lastDeliveredAt">;
+        if (!Array.isArray(state.selectedIds) || !state.photoStates || !state.participantOpinions || !state.participantDone || !state.participantNicknames || typeof state.exported !== "boolean") {
+          throw new Error("invalid sync response");
+        }
+        if (cancelled || writesInFlightRef.current > 0) return;
+        setProject((current) => withCurrentOpinions({ ...current, ...state }, currentIdentity));
+        failures = 0;
+        setSyncStatus("connected");
+      } catch {
+        failures += 1;
+        if (failures >= 2) setSyncStatus("offline");
+      } finally {
+        polling = false;
+      }
+    };
+    void poll();
+    const interval = window.setInterval(() => void poll(), 2000);
+    const onVisible = () => { if (!document.hidden) void poll(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [accessDenied, currentIdentity, hydrated, projectId]);
+
   const update = useCallback(
     async (patch: { exported?: boolean }) => {
       if (!isOwner) return false;
       if (typeof patch.exported === "boolean") {
-        const response = await fetch(`/api/customer-select/projects/${projectId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ exported: patch.exported }),
-        }).catch(() => null);
-        if (!response?.ok) return false;
-        const data = await response.json().catch(() => ({}));
-        setProject((prev) => ({ ...prev, ...patch, ...data.project }));
+        writesInFlightRef.current += 1;
+        try {
+          const response = await fetch(`/api/customer-select/projects/${projectId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ exported: patch.exported }),
+          }).catch(() => null);
+          if (!response?.ok) return false;
+          const data = await response.json().catch(() => ({}));
+          setProject((prev) => ({ ...prev, ...patch, ...data.project }));
+        } finally {
+          writesInFlightRef.current -= 1;
+        }
       }
       return true;
     },
@@ -345,6 +400,7 @@ export function CustomerSelectStoreProvider({
   );
 
   const joinParticipant = useCallback(async (nickname: string, color: ColorTag) => {
+    writesInFlightRef.current += 1;
     try {
       const response = await fetch(`/api/customer-select/projects/${projectId}/participants`, {
         method: "POST",
@@ -368,6 +424,8 @@ export function CustomerSelectStoreProvider({
       return null;
     } catch {
       return "인터넷 연결을 확인하고 다시 시도해 주세요.";
+    } finally {
+      writesInFlightRef.current -= 1;
     }
   }, [apiGet, projectId]);
 
@@ -388,10 +446,10 @@ export function CustomerSelectStoreProvider({
 
   const value = useMemo<StoreValue>(
     () => ({
-      project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, update, toggleSelect, toggleLike,
+      project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, update, toggleSelect, toggleLike,
       setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, saveError, clearSaveError,
     }),
-    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, update, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, saveError, clearSaveError]
+    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, update, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, saveError, clearSaveError]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
