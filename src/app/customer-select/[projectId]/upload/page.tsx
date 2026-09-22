@@ -29,11 +29,22 @@ import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAsset
 import type { Photo, PhotoGroupInfo } from "@/types";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import { useCustomerSelectStore } from "../../_lib/real-store";
+import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
 
 const BATCH_SIZE = 20;
 // ponytail: 작가 화면의 PC/모바일 적응형 동시성 대신 보수적인 고정값 하나만 쓴다.
 // 단말별 실측에서 병목이 확인되면 그때 분리한다.
 const COMPRESS_POOL_SIZE = 3;
+
+type DeleteImpact = {
+  photoCount: number;
+  finalSelections: number;
+  likes: number;
+  ratings: number;
+  comments: number;
+  aiPhotos: number;
+  retouchedVersions: number;
+};
 
 export default function CustomerUploadPage() {
   const params = useParams();
@@ -52,6 +63,10 @@ export default function CustomerUploadPage() {
   const [pendingPhotos, setPendingPhotos] = useState<Photo[]>([]);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [checkingDelete, setCheckingDelete] = useState(false);
+  const [deleteImpact, setDeleteImpact] = useState<DeleteImpact | null>(null);
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [aiPromptOpen, setAiPromptOpen] = useState(false);
   const [aiWantSimilar, setAiWantSimilar] = useState(true);
   const [aiWantQuality, setAiWantQuality] = useState(false);
@@ -85,6 +100,10 @@ export default function CustomerUploadPage() {
 
   async function handleFiles(selectedFiles: File[]) {
     if (selectedFiles.length === 0 || uploading || uploadStartingRef.current) return;
+    if (project.exported) {
+      setError("전달을 완료한 프로젝트에는 사진을 추가할 수 없습니다.");
+      return;
+    }
     uploadStartingRef.current = true;
     setCheckingCapacity(true);
     setNeedsReselection(false);
@@ -260,10 +279,33 @@ export default function CustomerUploadPage() {
     setAiAnalyzing(false);
   }
 
-  async function deleteSelectedPhotos() {
-    if (!selectedPhotoIds.size || !window.confirm(`선택한 사진 ${selectedPhotoIds.size.toLocaleString()}장을 삭제할까요?`)) return;
-    setDeleting(true);
+  async function requestDeleteSelectedPhotos() {
+    if (!selectedPhotoIds.size || project.exported || checkingDelete) return;
+    const photoIds = [...selectedPhotoIds];
+    setCheckingDelete(true);
     setError(null);
+    try {
+      const response = await fetch(`/api/customer-select/projects/${projectId}/delete-impact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photo_ids: photoIds }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "삭제 영향을 확인하지 못했습니다.");
+      setPendingDeleteIds(photoIds);
+      setDeleteImpact(data as DeleteImpact);
+      setDeleteError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "삭제 영향을 확인하지 못했습니다.");
+    } finally {
+      setCheckingDelete(false);
+    }
+  }
+
+  async function deleteSelectedPhotos() {
+    if (!pendingDeleteIds.length || !deleteImpact) return;
+    setDeleting(true);
+    setDeleteError(null);
     const {
       data: { session },
     } = await createClient().auth.getSession();
@@ -271,22 +313,24 @@ export default function CustomerUploadPage() {
       const res = await fetch("/api/customer-select/upload/photos", {
         method: "DELETE",
         headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
-        body: JSON.stringify({ project_id: projectId, photo_ids: [...selectedPhotoIds] }),
+        body: JSON.stringify({ project_id: projectId, photo_ids: pendingDeleteIds }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "사진 삭제 실패");
       setSelectedPhotoIds(new Set());
+      setPendingDeleteIds([]);
+      setDeleteImpact(null);
       await refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "사진을 삭제하지 못했습니다.");
+      setDeleteError(e instanceof Error ? e.message : "사진을 삭제하지 못했습니다.");
     } finally {
       setDeleting(false);
     }
   }
-  deleteSelectedPhotosRef.current = deleteSelectedPhotos;
+  deleteSelectedPhotosRef.current = requestDeleteSelectedPhotos;
 
   useEffect(() => {
-    if (uploading || deleting || aiPromptOpen || viewerPhotoId) return;
+    if (uploading || deleting || aiPromptOpen || viewerPhotoId || project.exported) return;
     const handleShortcut = (event: KeyboardEvent) => {
       const target = event.target;
       if (target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
@@ -306,7 +350,7 @@ export default function CustomerUploadPage() {
     };
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [aiPromptOpen, deleting, project.photos, selectedPhotoIds, uploading, viewerPhotoId]);
+  }, [aiPromptOpen, deleting, project.exported, project.photos, selectedPhotoIds, uploading, viewerPhotoId]);
 
   useEffect(() => {
     if (!uploading) return;
@@ -316,6 +360,7 @@ export default function CustomerUploadPage() {
   }, [uploading]);
 
   const displayName = project.name || "이름 없는 프로젝트";
+  const photoSetLocked = project.exported;
   const displayedPhotos = useMemo(() => [...project.photos, ...pendingPhotos], [project.photos, pendingPhotos]);
   const sortedPhotos = useMemo(() => [...displayedPhotos].sort((a, b) => {
     if (sort === "order-desc") return b.orderIndex - a.orderIndex;
@@ -338,6 +383,14 @@ export default function CustomerUploadPage() {
     return groups;
   }, [visiblePhotos]);
   const viewerIndex = viewerPhotoId ? viewerPhotos.findIndex((photo) => photo.id === viewerPhotoId) : -1;
+  const deleteImpactItems = deleteImpact ? [
+    deleteImpact.finalSelections && `최종 선택 ${deleteImpact.finalSelections.toLocaleString()}건`,
+    deleteImpact.likes && `찜 ${deleteImpact.likes.toLocaleString()}건`,
+    deleteImpact.ratings && `별점 ${deleteImpact.ratings.toLocaleString()}건`,
+    deleteImpact.comments && `의견 ${deleteImpact.comments.toLocaleString()}건`,
+    deleteImpact.aiPhotos && `AI 분석 ${deleteImpact.aiPhotos.toLocaleString()}장`,
+    deleteImpact.retouchedVersions && `보정본 ${deleteImpact.retouchedVersions.toLocaleString()}개`,
+  ].filter(Boolean) as string[] : [];
   const uploadStatus = uploading ? (
     <div className="flex items-center gap-3" role="status" aria-live="polite">
       <Loader2 size={22} className="shrink-0 animate-spin text-accent" aria-hidden />
@@ -380,7 +433,7 @@ export default function CustomerUploadPage() {
             <Link href={`/customer-select/${projectId}`} className="shrink-0 rounded-lg px-2 py-3 text-sm font-semibold text-muted-foreground">현황</Link>
             <div className="col-span-3 flex items-center justify-end gap-2 md:contents">
             <PhotographerLightButton variant="outline" size="toolbar" className="max-md:size-11 max-md:px-0" onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : "AI 분석 시작"}><Sparkles size={16} /><span className="max-md:hidden">{aiAnalyzing ? "분석 중" : "AI 분석"}</span></PhotographerLightButton>
-            <PhotographerLightButton variant="outline" size="toolbar" className="max-md:px-3" onClick={() => inputRef.current?.click()} disabled={uploading}><ImagePlus size={16} />사진 추가</PhotographerLightButton>
+            <PhotographerLightButton variant="outline" size="toolbar" className="max-md:px-3" onClick={() => inputRef.current?.click()} disabled={uploading || photoSetLocked}><ImagePlus size={16} />사진 추가</PhotographerLightButton>
             </div>
           </div>
         </header>
@@ -396,6 +449,7 @@ export default function CustomerUploadPage() {
         </div>
 
         {checkingCapacity ? <p role="status" className="px-5 py-2 text-sm text-muted-foreground">업로드 가능한 장수를 확인하고 있어요…</p> : null}
+        {photoSetLocked ? <div role="status" className="shrink-0 border-b border-accent/15 bg-customer-soft px-5 py-2.5 text-[13px] font-semibold text-foreground md:px-8">작가에게 전달한 사진 구성을 보호하고 있어요. 현재 전달 내용은 그대로 확인할 수 있습니다.</div> : null}
         {error ? <div role="alert" className="shrink-0 border-b border-danger/20 bg-danger/8 px-5 py-2.5 text-[13px] font-semibold text-danger md:px-8">{error}{needsReselection ? <button type="button" onClick={() => inputRef.current?.click()} className="ml-3 min-h-11 underline">파일 다시 선택</button> : null}</div> : null}
 
         <main
@@ -407,15 +461,15 @@ export default function CustomerUploadPage() {
             if (event.target instanceof Element && !event.target.closest("article, button, input, select, a")) event.currentTarget.focus({ preventScroll: true });
           }}
           onScroll={handleGalleryScroll}
-          onDragEnter={(event) => { event.preventDefault(); if (!uploading) setDragActive(true); }}
+          onDragEnter={(event) => { event.preventDefault(); if (!uploading && !photoSetLocked) setDragActive(true); }}
           onDragOver={(event) => event.preventDefault()}
           onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragActive(false); }}
-          onDrop={(event) => { event.preventDefault(); setDragActive(false); if (!uploading) void handleFiles(Array.from(event.dataTransfer.files)); }}
+          onDrop={(event) => { event.preventDefault(); setDragActive(false); if (!uploading && !photoSetLocked) void handleFiles(Array.from(event.dataTransfer.files)); }}
         >
           {dragActive ? <div className="pointer-events-none absolute inset-3 z-30 grid place-items-center rounded-2xl border-2 border-dashed border-accent bg-background/90 text-center shadow-lg"><span><UploadCloud className="mx-auto mb-3 text-accent" size={30} /><strong className="text-base text-foreground">여기에 놓아 사진 추가</strong></span></div> : null}
           {displayedPhotos.length === 0 ? (
             <div className="grid min-h-full place-items-center p-5">
-              <button type="button" onClick={() => inputRef.current?.click()} className="flex min-h-[260px] w-full max-w-[720px] flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border-strong bg-surface text-center transition-colors hover:border-accent/45 hover:bg-surface-raised/45">
+              <button type="button" disabled={photoSetLocked} onClick={() => inputRef.current?.click()} className="flex min-h-[260px] w-full max-w-[720px] flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border-strong bg-surface text-center transition-colors hover:border-accent/45 hover:bg-surface-raised/45 disabled:cursor-not-allowed disabled:opacity-60">
                 <span className="grid size-14 place-items-center rounded-2xl bg-customer-soft text-primary"><UploadCloud size={26} strokeWidth={1.8} /></span>
                 <span><strong className="block text-[16px] text-foreground">사진을 끌어다 놓거나 선택하세요</strong><small className="mt-1.5 block text-[13px] text-muted-foreground">JPG · PNG · WebP · HEIC · 최대 {MAX_PHOTOS.toLocaleString()}장</small><small className="mt-2 block px-4 text-[13px] text-muted-foreground">선택용 이미지를 저장해요. 원본 파일은 직접 보관해 주세요.</small></span>
               </button>
@@ -432,17 +486,17 @@ export default function CustomerUploadPage() {
               thumbQueue={thumbQueue}
               readonly
               selectedPhotoIds={selectedPhotoIds}
-              selectionOnHover
-              mobileSelectionVisible
+              selectionOnHover={!photoSetLocked}
+              mobileSelectionVisible={!photoSetLocked}
               groupsById={groupsById}
               showSimilarityGroups
               showQualityBadges
-              onToggleSelected={(photoId) => setSelectedPhotoIds((current) => {
+              onToggleSelected={photoSetLocked ? undefined : (photoId) => setSelectedPhotoIds((current) => {
                 const next = new Set(current);
                 if (next.has(photoId)) next.delete(photoId); else next.add(photoId);
                 return next;
               })}
-              onDragSelectionChange={setSelectedPhotoIds}
+              onDragSelectionChange={photoSetLocked ? undefined : setSelectedPhotoIds}
               onEmptyClick={() => setSelectedPhotoIds(new Set())}
               minCols={6}
               mobileMinCols={3}
@@ -460,9 +514,9 @@ export default function CustomerUploadPage() {
           leading={uploadStatus}
           mobileLeading={uploadStatus}
           actions={uploading ? <PhotographerLightButton variant="secondary" onClick={cancelUpload}>업로드 중단</PhotographerLightButton> : <>
-            {retryFiles.length > 0 ? <PhotographerLightButton variant="secondary" onClick={() => void handleFiles(retryFiles)}>실패 {retryFiles.length.toLocaleString()}장 다시 시도</PhotographerLightButton> : null}
-            {selectedPhotoIds.size > 0 ? <PhotographerLightButton variant="danger" pending={deleting} pendingLabel="삭제 중" onClick={deleteSelectedPhotos}><Trash2 size={16} />선택 삭제 ({selectedPhotoIds.size.toLocaleString()})</PhotographerLightButton> : null}
-            <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={() => router.push(`/customer-select/${projectId}/select`)}>사진 고르기{project.photoCount > 0 ? ` (${project.photoCount}장)` : ""}</PhotographerLightButton>
+            {!photoSetLocked && retryFiles.length > 0 ? <PhotographerLightButton variant="secondary" onClick={() => void handleFiles(retryFiles)}>실패 {retryFiles.length.toLocaleString()}장 다시 시도</PhotographerLightButton> : null}
+            {!photoSetLocked && selectedPhotoIds.size > 0 ? <PhotographerLightButton variant="danger" pending={checkingDelete} pendingLabel="확인 중" onClick={requestDeleteSelectedPhotos}><Trash2 size={16} />선택 삭제 ({selectedPhotoIds.size.toLocaleString()})</PhotographerLightButton> : null}
+            <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={() => router.push(photoSetLocked ? `/customer-select/${projectId}/export` : `/customer-select/${projectId}/select`)}>{photoSetLocked ? "현재 전달 내용 보기" : <>사진 고르기{project.photoCount > 0 ? ` (${project.photoCount}장)` : ""}</>}</PhotographerLightButton>
           </>}
         />
       </div>
@@ -481,6 +535,18 @@ export default function CustomerUploadPage() {
         onStart={startAiAnalysis}
         pending={aiStarting}
       />
+
+      {deleteImpact ? <SelectionConfirmDialog
+        title="이 사진들을 삭제할까요?"
+        description={<>{deleteImpact.photoCount.toLocaleString()}장의 사진이 삭제됩니다.{deleteImpactItems.length ? <><br />연결된 {deleteImpactItems.join(" · ")}도 함께 삭제되며 되돌릴 수 없어요.</> : <> 되돌릴 수 없어요.</>}</>}
+        confirmLabel="삭제하기"
+        busyLabel="삭제 중…"
+        confirming={deleting}
+        error={deleteError}
+        danger
+        onCancel={() => { if (!deleting) { setDeleteImpact(null); setPendingDeleteIds([]); setDeleteError(null); } }}
+        onConfirm={deleteSelectedPhotos}
+      /> : null}
     </CustomerSelectShell>
   );
 }
