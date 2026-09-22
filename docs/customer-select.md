@@ -107,7 +107,7 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 | 보정본 비교 | `/customer-select/[projectId]/retouch/compare` | 고객 보정본 상세 검토 | 기능 구현됨, 공통 뷰어 통합 필요 |
 | 재보정 전달 | `/customer-select/[projectId]/retouch/export` | 고객 재보정 결과 | 기능 구현됨, UI 정렬 필요 |
 | 완료 | `/customer-select/[projectId]/done` | 고객 완료 화면 | 기능 구현됨, UI 정렬 필요 |
-| 프로젝트 설정·삭제 | 미정 | 작가 프로젝트 설정 | 미구현 |
+| 프로젝트 설정·삭제 | `/customer-select/[projectId]/settings` | 작가 프로젝트 설정 | 목록 카드 설정 버튼에서 진입. 기본정보·목표 수정을 지원하고, 소유자만 DB 파생 데이터와 R2 이미지를 함께 삭제 가능 |
 | 공유 링크 관리 | 미정 | 작가 고객 링크 관리 | 미구현 |
 
 ### 현재 UI 정리 순서
@@ -222,7 +222,6 @@ Management API `/database/query`로 해당 파일만 실행한다.
 ## 10. 남은 작업
 
 - 셀렉·검토·보정 화면의 공통 컴포넌트 통합
-- 프로젝트 설정·삭제
 - 공유 링크 중지·재발급·복사 관리 화면
 - 참여자 변경사항 실시간 반영 또는 짧은 폴링
 - CSV/TXT 실제 다운로드

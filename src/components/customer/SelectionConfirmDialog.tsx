@@ -19,6 +19,7 @@ type Props = {
   busyLabel?: string;
   confirming: boolean;
   error?: string | null;
+  danger?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 };
@@ -31,6 +32,7 @@ export function SelectionConfirmDialog({
   busyLabel,
   confirming,
   error,
+  danger = false,
   onCancel,
   onConfirm,
 }: Props) {
@@ -80,7 +82,7 @@ export function SelectionConfirmDialog({
           <button type="button" className="selection-confirm-cancel" onClick={onCancel} disabled={confirming}>
             취소
           </button>
-          <button type="button" className="selection-confirm-submit" onClick={onConfirm} disabled={confirming}>
+          <button type="button" className={`selection-confirm-submit${danger ? " selection-confirm-danger" : ""}`} onClick={onConfirm} disabled={confirming}>
             {confirming ? (busyLabel ?? "확정 중...") : (confirmLabel ?? "확정하기")}
           </button>
         </div>
@@ -135,6 +137,7 @@ export function SelectionConfirmDialog({
         .selection-confirm-dialog button:disabled { cursor: wait; opacity: 0.58; }
         .selection-confirm-cancel { border: 1px solid #d9d9d9; background: #fff; color: #191918; }
         .selection-confirm-submit { border: 1px solid #ff4d00; background: #ff4d00; color: #fff; font-weight: 700; }
+        .selection-confirm-danger { border-color: #d92d20; background: #d92d20; }
         @media (min-width: 768px) {
           .selection-confirm-dialog { width: min(360px, calc(100vw - 48px)); }
         }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import { FolderPlus } from "lucide-react";
+import { FolderPlus, Settings } from "lucide-react";
 import { getCurrentCustomerAuthId } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "./_lib/CustomerSelectShell";
@@ -53,7 +53,8 @@ export default async function CustomerSelectHomePage() {
             {projects.map((project) => {
               const coverUrl = coverByProject.get(project.id);
               return (
-              <Link key={project.id} href={customerProjectDestination(project)} className="group overflow-hidden rounded-2xl border border-border-subtle bg-surface transition hover:-translate-y-0.5 hover:border-border-strong hover:shadow-[0_12px_32px_rgba(2,56,82,0.08)]">
+              <article key={project.id} className="group relative overflow-hidden rounded-2xl border border-border-subtle bg-surface transition hover:-translate-y-0.5 hover:border-border-strong hover:shadow-[0_12px_32px_rgba(2,56,82,0.08)]">
+              <Link href={customerProjectDestination(project)} className="block">
                 <div className="relative grid aspect-[16/8] place-items-center overflow-hidden bg-surface-raised">
                   {coverUrl
                     ? <Image src={coverUrl} alt="" fill unoptimized sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover object-center" />
@@ -68,6 +69,8 @@ export default async function CustomerSelectHomePage() {
                   <p className="mt-1 text-[12px] text-subtle-foreground">{project.photo_count}장 · 목표 {project.target_count}장{project.selection_deadline ? ` · 셀렉 마감 ${project.selection_deadline.replaceAll("-", ".")}` : ""}</p>
                 </div>
               </Link>
+              <Link href={`/customer-select/${project.id}/settings`} aria-label={`${project.name} 설정`} title="프로젝트 설정" className="absolute right-3 top-3 grid size-10 place-items-center rounded-full border border-white/70 bg-white/90 text-foreground shadow-sm backdrop-blur transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"><Settings size={17} strokeWidth={1.8} /></Link>
+              </article>
               );
             })}
           </section>
