@@ -716,7 +716,12 @@ export function ProjectNexusPageClient() {
               setShowDeleteModal(true);
             }}
           >
-            <ProjectMemoField key={project.id} projectId={project.id} initialValue={project.photographerNote ?? null} />
+            <ProjectMemoField
+              key={project.id}
+              projectId={project.id}
+              initialValue={project.photographerNote ?? null}
+              onSaved={(note) => setProject((current) => current ? { ...current, photographerNote: note } : current)}
+            />
           </ProjectInformationCard>
         </div>
 

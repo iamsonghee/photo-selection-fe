@@ -9,7 +9,18 @@ type SaveStatus = "idle" | "saving" | "saved" | "error";
 const AUTOSAVE_DELAY_MS = 800;
 
 /** 작가만 보는 프로젝트 메모 — 입력을 멈추면 자동 저장된다. 고객 화면에는 절대 노출되지 않는다. */
-export function ProjectMemoField({ projectId, initialValue }: { projectId: string; initialValue: string | null }) {
+export function ProjectMemoField({
+  projectId,
+  initialValue,
+  onSaved,
+}: {
+  projectId: string;
+  initialValue: string | null;
+  /** DB 저장 성공 시 부모의 project 상태도 갱신한다 — 그래야 정보 수정 모달을 열고 닫아
+   *  이 컴포넌트가 리마운트돼도(상세 화면이 editMode에서 통째로 언마운트됨) 방금 저장한
+   *  값이 initialValue로 되돌아오지 않는다. */
+  onSaved: (note: string) => void;
+}) {
   const [value, setValue] = useState(initialValue ?? "");
   const [status, setStatus] = useState<SaveStatus>("idle");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -26,6 +37,7 @@ export function ProjectMemoField({ projectId, initialValue }: { projectId: strin
       try {
         await updateProject(projectId, { photographerNote: next.trim() || null });
         savedValueRef.current = next;
+        onSaved(next);
         setStatus("saved");
       } catch {
         setStatus("error");
