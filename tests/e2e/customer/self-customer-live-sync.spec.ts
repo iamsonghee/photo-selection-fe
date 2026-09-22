@@ -56,3 +56,39 @@ test("selection and participant completion sync between sessions without a reloa
   await ownerContext.close();
   await participantContext.close();
 });
+
+test("delivery refreshes collaboration state immediately before completion", async ({ page }) => {
+  await loginAsPhotographer(page);
+  let syncCalls = 0;
+  let requiredSyncCalls = 0;
+  await page.route("**/api/customer-select/projects/delivery-sync", async (route) => {
+    if (route.request().method() === "PATCH") {
+      await route.fulfill(syncCalls >= requiredSyncCalls
+        ? { json: { project: { exported: true, deliveryCount: 1, lastDeliveredAt: "2026-09-22T00:00:00Z" } } }
+        : { status: 409, json: { error: "sync required" } });
+      return;
+    }
+    await route.fulfill({ json: { isOwner: true, project: {
+      id: "delivery-sync", name: "전달 확인", shootType: "wedding", target: 1, photoCount: 1, uploaded: true,
+      photos: [{ id: "p1", projectId: "delivery-sync", orderIndex: 0, url: "", previewUrl: "", originalFilename: "A001.jpg" }],
+      selectedIds: ["p1"], photoStates: {}, participantOpinions: {}, participantDone: { red: false, blue: true },
+      participantNicknames: { red: "소유자", blue: "동행" }, shareToken: "", shareEnabled: true,
+      exported: false, deliveryCount: 0, lastDeliveredAt: null,
+    } } });
+  });
+  await page.route("**/api/customer-select/projects/delivery-sync/participants", async (route) => route.fulfill({ json: { ok: true } }));
+  await page.route("**/api/customer-select/projects/delivery-sync/sync", async (route) => {
+    syncCalls += 1;
+    await route.fulfill({ json: {
+      selectedIds: ["p1"], photoStates: {}, participantOpinions: {}, participantDone: { red: false, blue: true },
+      participantNicknames: { red: "소유자", blue: "동행" }, exported: false, deliveryCount: 0, lastDeliveredAt: null,
+    } });
+  });
+
+  await page.goto("/customer-select/delivery-sync/export");
+  const deliver = page.getByRole("button", { name: "작가에게 전달했어요" });
+  await expect(deliver).toBeEnabled();
+  requiredSyncCalls = syncCalls + 1;
+  await deliver.click();
+  await expect(page.getByText("셀렉 전달 완료")).toBeVisible();
+});

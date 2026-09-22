@@ -33,11 +33,12 @@ function buildExportText(
 export default function CustomerExportPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const router = useRouter();
-  const { project, hydrated, isOwner, currentIdentity, syncStatus, update } = useCustomerSelectStore();
+  const { project, hydrated, isOwner, currentIdentity, syncStatus, syncNow, update } = useCustomerSelectStore();
   const [copyState, setCopyState] = useState<"idle" | "ok" | "fail">("idle");
   const [reopenConfirm, setReopenConfirm] = useState(false);
   const [deliverConfirm, setDeliverConfirm] = useState(false);
   const [changingState, setChangingState] = useState(false);
+  const [checkingLatest, setCheckingLatest] = useState(false);
   const [stateError, setStateError] = useState<string | null>(null);
 
   const selected = project.photos
@@ -81,6 +82,25 @@ export default function CustomerExportPage() {
     if (!exported) router.push(`/customer-select/${projectId}/select`);
   }
 
+  async function requestDelivery(confirmed: boolean) {
+    setCheckingLatest(true);
+    setStateError(null);
+    const latest = await syncNow();
+    setCheckingLatest(false);
+    if (!latest) {
+      setStateError("최신 참여 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+    const latestWaiting = Object.entries(latest.participantNicknames)
+      .filter(([color]) => color !== currentIdentity && !latest.participantDone[color])
+      .map(([, nickname]) => nickname || "참가자");
+    if (latestWaiting.length && !confirmed) {
+      setDeliverConfirm(true);
+      return;
+    }
+    await setDelivered(true);
+  }
+
   // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
   if (!hydrated || !isOwner) {
     return <SystemLoadingScreen title="전달 내용을 준비하고 있어요" homeHref="/customer-select" />;
@@ -121,7 +141,7 @@ export default function CustomerExportPage() {
           actions={<>
             {project.exported
               ? <PhotographerLightButton variant="secondary" onClick={() => setReopenConfirm(true)}>다시 선택하기</PhotographerLightButton>
-              : <PhotographerLightButton disabled={syncStatus !== "connected"} pending={changingState} pendingLabel="저장 중…" onClick={() => waiting.length ? setDeliverConfirm(true) : void setDelivered(true)}>{project.deliveryCount > 0 ? "수정한 결과를 다시 전달했어요" : "작가에게 전달했어요"}</PhotographerLightButton>}
+              : <PhotographerLightButton disabled={syncStatus !== "connected"} pending={changingState || checkingLatest} pendingLabel={checkingLatest ? "최신 상태 확인 중…" : "저장 중…"} onClick={() => void requestDelivery(false)}>{project.deliveryCount > 0 ? "수정한 결과를 다시 전달했어요" : "작가에게 전달했어요"}</PhotographerLightButton>}
             {project.exported ? <PhotographerLightButton onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>보정본 업로드하기</PhotographerLightButton> : null}
           </>}
         />
@@ -132,7 +152,7 @@ export default function CustomerExportPage() {
         description={<>전달 완료 상태가 해제되고 선택 화면으로 돌아갑니다.<br />현재 선택은 그대로 유지돼요.</>}
         confirmLabel="다시 선택하기"
         busyLabel="여는 중…"
-        confirming={changingState}
+        confirming={changingState || checkingLatest}
         error={stateError}
         onCancel={() => { if (!changingState) { setReopenConfirm(false); setStateError(null); } }}
         onConfirm={() => void setDelivered(false)}
@@ -145,7 +165,7 @@ export default function CustomerExportPage() {
         confirming={changingState}
         error={stateError}
         onCancel={() => { if (!changingState) { setDeliverConfirm(false); setStateError(null); } }}
-        onConfirm={() => void setDelivered(true)}
+        onConfirm={() => void requestDelivery(true)}
       /> : null}
     </div>
   );

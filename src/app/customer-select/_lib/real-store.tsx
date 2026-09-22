@@ -43,6 +43,8 @@ export interface ProjectView {
   shareEnabled: boolean;
 }
 
+type CollaborationState = Pick<ProjectView, "selectedIds" | "photoStates" | "participantOpinions" | "participantDone" | "participantNicknames" | "exported" | "deliveryCount" | "lastDeliveredAt">;
+
 function emptyProject(id: string): ProjectView {
   return {
     id,
@@ -103,6 +105,7 @@ interface StoreValue {
   accessDenied: boolean;
   shareUrl: string;
   syncStatus: "syncing" | "connected" | "offline";
+  syncNow: () => Promise<CollaborationState | null>;
   update: (patch: { exported?: boolean }) => Promise<boolean>;
   toggleSelect: (photoId: string) => void;
   toggleLike: (photoId: string, identity: ColorTag) => void;
@@ -134,6 +137,7 @@ export function CustomerSelectStoreProvider({
   const [accessDenied, setAccessDenied] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"syncing" | "connected" | "offline">("syncing");
   const writesInFlightRef = useRef(0);
+  const syncInFlightRef = useRef<Promise<CollaborationState | null> | null>(null);
 
   const apiGet = useCallback(async () => {
     const res = await fetch(`/api/customer-select/projects/${projectId}`, { cache: "no-store" });
@@ -225,34 +229,47 @@ export function CustomerSelectStoreProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  useEffect(() => {
-    if (!hydrated || accessDenied) return;
-    let cancelled = false;
-    let failures = 0;
-    let polling = false;
-    const poll = async () => {
-      if (document.hidden || writesInFlightRef.current > 0 || polling) return;
-      polling = true;
+  const syncNow = useCallback((): Promise<CollaborationState | null> => {
+    if (writesInFlightRef.current > 0) return Promise.resolve(null);
+    if (syncInFlightRef.current) return syncInFlightRef.current;
+    const request = (async () => {
       try {
         const response = await fetch(`/api/customer-select/projects/${projectId}/sync`, { cache: "no-store" });
         if (response.status === 403 || response.status === 404) {
           setAccessDenied(true);
-          return;
+          return null;
         }
         if (!response.ok) throw new Error("sync failed");
-        const state = await response.json() as Pick<ProjectView, "selectedIds" | "photoStates" | "participantOpinions" | "participantDone" | "participantNicknames" | "exported" | "deliveryCount" | "lastDeliveredAt">;
+        const state = await response.json() as CollaborationState;
         if (!Array.isArray(state.selectedIds) || !state.photoStates || !state.participantOpinions || !state.participantDone || !state.participantNicknames || typeof state.exported !== "boolean") {
           throw new Error("invalid sync response");
         }
-        if (cancelled || writesInFlightRef.current > 0) return;
+        if (writesInFlightRef.current > 0) return null;
         setProject((current) => withCurrentOpinions({ ...current, ...state }, currentIdentity));
-        failures = 0;
         setSyncStatus("connected");
+        return state;
       } catch {
+        return null;
+      } finally {
+        syncInFlightRef.current = null;
+      }
+    })();
+    syncInFlightRef.current = request;
+    return request;
+  }, [currentIdentity, projectId]);
+
+  useEffect(() => {
+    if (!hydrated || accessDenied) return;
+    let cancelled = false;
+    let failures = 0;
+    const poll = async () => {
+      if (document.hidden || writesInFlightRef.current > 0) return;
+      const state = await syncNow();
+      if (cancelled) return;
+      if (state) failures = 0;
+      else {
         failures += 1;
         if (failures >= 2) setSyncStatus("offline");
-      } finally {
-        polling = false;
       }
     };
     void poll();
@@ -264,7 +281,7 @@ export function CustomerSelectStoreProvider({
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [accessDenied, currentIdentity, hydrated, projectId]);
+  }, [accessDenied, hydrated, syncNow]);
 
   const update = useCallback(
     async (patch: { exported?: boolean }) => {
@@ -446,10 +463,10 @@ export function CustomerSelectStoreProvider({
 
   const value = useMemo<StoreValue>(
     () => ({
-      project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, update, toggleSelect, toggleLike,
+      project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, update, toggleSelect, toggleLike,
       setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, saveError, clearSaveError,
     }),
-    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, update, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, saveError, clearSaveError]
+    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, update, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, saveError, clearSaveError]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
