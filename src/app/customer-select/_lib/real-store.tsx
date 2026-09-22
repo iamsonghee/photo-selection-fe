@@ -21,6 +21,12 @@ export interface ProjectView {
   id: string;
   name: string;
   shootType: string;
+  shootDate?: string | null;
+  selectionDeadline?: string | null;
+  studioName?: string | null;
+  photographerName?: string | null;
+  shootRegion?: string | null;
+  shootLocation?: string | null;
   target: number;
   photoCount: number;
   uploaded: boolean;

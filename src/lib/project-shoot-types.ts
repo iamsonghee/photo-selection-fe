@@ -9,3 +9,11 @@ export const SHOOT_TYPES: { value: string; label: string; icon: LucideIcon }[] =
   { value: "profile", label: "프로필·증명", icon: Briefcase },
   { value: "etc", label: "기타", icon: Camera },
 ];
+
+export function isProjectShootType(value: unknown): value is string {
+  return typeof value === "string" && SHOOT_TYPES.some((type) => type.value === value);
+}
+
+export function projectShootTypeLabel(value: string | null): string {
+  return SHOOT_TYPES.find((type) => type.value === value)?.label ?? "촬영 종류 미입력";
+}

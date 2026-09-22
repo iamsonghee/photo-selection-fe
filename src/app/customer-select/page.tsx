@@ -6,6 +6,7 @@ import { getCurrentCustomerAuthId } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "./_lib/CustomerSelectShell";
 import { customerProjectDestination, customerProjectStatus, type CustomerProjectSummary } from "./_lib/project-routing";
+import { projectShootTypeLabel } from "@/lib/project-shoot-types";
 
 export default async function CustomerSelectHomePage() {
   const ownerId = await getCurrentCustomerAuthId();
@@ -14,7 +15,7 @@ export default async function CustomerSelectHomePage() {
   const admin = getAdminClient();
   const { data, error } = await admin
     .from("customer_projects")
-    .select("id, name, shoot_type, shoot_date, selection_deadline, studio_name, target_count, photo_count, exported, retouch_done, created_at")
+    .select("id, name, shoot_type, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, target_count, photo_count, exported, retouch_done, created_at")
     .eq("owner_id", ownerId)
     .order("created_at", { ascending: false });
   const projects = (data ?? []) as CustomerProjectSummary[];
@@ -68,8 +69,8 @@ export default async function CustomerSelectHomePage() {
                     <strong className="min-w-0 truncate text-[17px] font-bold">{project.name}</strong>
                     <span className="shrink-0 rounded-md bg-customer-soft px-2 py-1 text-[11px] font-bold text-primary">{customerProjectStatus(project)}</span>
                   </div>
-                  <p className="mt-3 text-[13px] text-muted-foreground">{[project.studio_name, project.shoot_type ?? "촬영", project.shoot_date?.replaceAll("-", ".")].filter(Boolean).join(" · ")}</p>
-                  <p className="mt-1 text-[13px] text-muted-foreground">사진 {project.photo_count.toLocaleString()}장 · {selectedByProject.get(project.id) === null ? "선택 수 확인 불가" : `${selectedByProject.get(project.id)}장 선택`} · 목표 {project.target_count}장(참고)</p>
+                  <p className="mt-3 text-[13px] text-muted-foreground">{[project.studio_name, projectShootTypeLabel(project.shoot_type), project.shoot_date?.replaceAll("-", ".")].filter(Boolean).join(" · ")}</p>
+                  <p className="mt-1 text-[13px] text-muted-foreground">사진 {project.photo_count.toLocaleString()}장 · {selectedByProject.get(project.id) === null ? "선택 수 확인 불가" : `${selectedByProject.get(project.id)}장 선택`} · 보정 예정 {project.target_count}장</p>
                 </div>
               </Link>
               <div className="flex items-center justify-between border-t border-border-subtle px-5 py-3 text-sm font-semibold">
