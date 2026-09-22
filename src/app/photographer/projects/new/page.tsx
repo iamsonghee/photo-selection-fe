@@ -7,6 +7,7 @@
  * ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS customer_phone text;
  * ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS photo_count_expected int4;
  * ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS location text;
+ * ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS photographer_note text;
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -71,6 +72,7 @@ export default function NewProjectPage() {
     format(addDays(new Date(), DEFAULT_DEADLINE_DAYS), "yyyy-MM-dd")
   );
   const [location,      setLocation]      = useState("");
+  const [photographerNote, setPhotographerNote] = useState("");
   const [accessPin,     setAccessPin]     = useState("");
   const [maxRevisionCount, setMaxRevisionCount] = useState<0 | 1 | 2>(2);
   const [includeOriginal, setIncludeOriginal] = useState(false);
@@ -144,6 +146,7 @@ export default function NewProjectPage() {
           max_revision_count: maxRevisionCount,
           location: location.trim() || null,
           include_original: finalIncludeOriginal,
+          photographer_note: photographerNote.trim() || null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -385,6 +388,15 @@ export default function NewProjectPage() {
                   />
                 </ProjectFormField>
               </div>
+
+              <ProjectFormField label="메모" info="작가만 볼 수 있어요. 고객에게는 보이지 않습니다.">
+                <textarea
+                  className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(photographerNote) })} min-h-[72px] resize-none`}
+                  value={photographerNote}
+                  onChange={(e) => setPhotographerNote(e.target.value)}
+                  placeholder="예: 신부 대기실에서 촬영, 실내 조명 어두움"
+                />
+              </ProjectFormField>
             </ProjectFormSection>
 
             <ProjectFormSection

@@ -136,6 +136,8 @@ export interface Project {
   originalRecoveryCount?: number;
   /** 고객 진입 화면의 대표 사진. 미지정 시 첫 번째 사진을 사용한다. */
   coverPhotoId?: string | null;
+  /** 작가만 보는 메모 — 고객에게는 절대 노출되지 않음 */
+  photographerNote?: string | null;
   createdAt: string;
   updatedAt: string;
 }

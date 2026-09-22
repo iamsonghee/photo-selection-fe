@@ -25,6 +25,7 @@ import { FieldInfoTip } from "@/components/ui/FieldInfoTip";
 import { PhotographerConfirmDialog } from "@/components/ui/PhotographerConfirmDialog";
 import { isValidKoreanPhone } from "@/lib/phone";
 import { ProjectInformationCard } from "@/components/photographer/project-detail/ProjectInformationCard";
+import { ProjectMemoField } from "@/components/photographer/project-detail/ProjectMemoField";
 import { ProjectWorkPanel } from "@/components/photographer/project-detail/ProjectWorkPanel";
 import { ProjectProgressCard } from "@/components/photographer/project-detail/ProjectProgressCard";
 import { formatProjectDisplayId } from "@/components/photographer/ProjectIdText";
@@ -714,7 +715,9 @@ export function ProjectNexusPageClient() {
               setDeleteError("");
               setShowDeleteModal(true);
             }}
-          />
+          >
+            <ProjectMemoField key={project.id} projectId={project.id} initialValue={project.photographerNote ?? null} />
+          </ProjectInformationCard>
         </div>
 
         {/* 현재 작업과 고객 전달 도구를 같은 열에 모아 다음 행동을 먼저 읽게 한다. */}

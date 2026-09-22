@@ -115,6 +115,7 @@ export async function POST(req: NextRequest) {
       max_revision_count,
       location,
       include_original,
+      photographer_note,
     } = body ?? {};
 
     if (
@@ -146,6 +147,7 @@ export async function POST(req: NextRequest) {
         ...(customer_phone ? { customer_phone } : {}),
         ...(access_pin ? { access_pin } : {}),
         ...(location ? { location } : {}),
+        ...(typeof photographer_note === "string" && photographer_note.trim() ? { photographer_note: photographer_note.trim() } : {}),
         include_original: typeof include_original === "boolean" ? include_original : photographer.defaultIncludeOriginal,
         ...(photographer.defaultSelectionDeadlineDays === null ? {} : { selection_deadline_days: photographer.defaultSelectionDeadlineDays }),
         upload_strategy: photographer.defaultUploadStrategy,
