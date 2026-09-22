@@ -7,6 +7,8 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { CUSTOMER_PHOTO_LIMIT as MAX_PHOTOS, uploadLimitError } from "../../_lib/upload-limit";
 import { ChevronLeft, ImagePlus, Loader2, Sparkles, Trash2, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
@@ -29,7 +31,6 @@ import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import { useCustomerSelectStore } from "../../_lib/real-store";
 
 const BATCH_SIZE = 20;
-const MAX_PHOTOS = 2000;
 // ponytail: 작가 화면의 PC/모바일 적응형 동시성 대신 보수적인 고정값 하나만 쓴다.
 // 단말별 실측에서 병목이 확인되면 그때 분리한다.
 const COMPRESS_POOL_SIZE = 3;
@@ -42,6 +43,9 @@ export default function CustomerUploadPage() {
   const [progress, setProgress] = useState(0);
   const [total, setTotal] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [checkingCapacity, setCheckingCapacity] = useState(false);
+  const [needsReselection, setNeedsReselection] = useState(false);
+  const uploadStartingRef = useRef(false);
   const [uploadPhase, setUploadPhase] = useState<"compressing" | "uploading" | null>(null);
   const [estimatedRemainingSeconds, setEstimatedRemainingSeconds] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,11 +84,25 @@ export default function CustomerUploadPage() {
   }
 
   async function handleFiles(selectedFiles: File[]) {
-    if (selectedFiles.length === 0 || uploading) return;
-    const remainingCapacity = Math.max(0, MAX_PHOTOS - project.photoCount);
-    if (selectedFiles.length > remainingCapacity) {
-      setError(`현재 ${project.photoCount.toLocaleString()}장입니다. ${remainingCapacity.toLocaleString()}장까지 추가할 수 있어요.`);
+    if (selectedFiles.length === 0 || uploading || uploadStartingRef.current) return;
+    uploadStartingRef.current = true;
+    setCheckingCapacity(true);
+    setNeedsReselection(false);
+    try {
+      const latest = await refresh();
+      if (!latest) throw new Error("사진 수를 확인하지 못했어요. 잠시 후 다시 선택해 주세요.");
+      const limitError = uploadLimitError(latest.photoCount, selectedFiles.length);
+      if (limitError) {
+        setError(limitError);
+        setNeedsReselection(true);
+        return;
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "사진 수를 확인하지 못했어요.");
       return;
+    } finally {
+      uploadStartingRef.current = false;
+      setCheckingCapacity(false);
     }
     setUploading(true);
     setError(null);
@@ -158,7 +176,7 @@ export default function CustomerUploadPage() {
         failedFiles.push(...rawBatch.filter((file) => rejectedNames.has(file.name)));
         uploaded += data.uploaded ?? Math.max(0, batch.length - rejectedNames.size);
       } catch (e) {
-        const remainingFiles = selectedFiles.slice(i);
+        const remainingFiles = [...failedFiles, ...selectedFiles.slice(i)];
         setRetryFiles(remainingFiles);
         setError(cancelRequestedRef.current
           ? `업로드를 중단했습니다. 남은 ${remainingFiles.length.toLocaleString()}장을 다시 시도할 수 있어요.`
@@ -353,14 +371,17 @@ export default function CustomerUploadPage() {
         }} />
 
         <header data-upload-header-mode={compactHeader ? "compact" : "expanded"} className={`shrink-0 overflow-hidden border-b border-border-subtle bg-background px-4 transition-[padding] duration-200 md:px-8 ${compactHeader ? "py-1" : "py-3"}`}>
-          <div className="mx-auto flex max-w-[1504px] items-center gap-3">
+          <div className="mx-auto grid max-w-[1504px] grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-2 md:flex md:gap-3">
             <button type="button" onClick={() => router.push("/customer-select")} className={`grid shrink-0 place-items-center rounded-lg text-muted-foreground transition-[width,height] hover:bg-surface-raised hover:text-foreground ${compactHeader ? "size-9" : "size-10"}`} aria-label="프로젝트 목록으로"><ChevronLeft size={19} /></button>
             <div className="min-w-0 flex-1">
               <h1 className={`truncate font-bold text-foreground transition-[font-size] ${compactHeader ? "text-[14px]" : "text-[18px] md:text-[20px]"}`}>{displayName}</h1>
-              {!compactHeader ? <p className="mt-0.5 text-[12px] text-muted-foreground">사진 업로드 · {Math.max(0, MAX_PHOTOS - project.photoCount).toLocaleString()}장 추가 가능</p> : null}
+              {!compactHeader ? <p className="mt-0.5 text-[12px] text-muted-foreground">{project.photoCount.toLocaleString()} / {MAX_PHOTOS.toLocaleString()}장 · {Math.max(0, MAX_PHOTOS - project.photoCount).toLocaleString()}장 추가 가능</p> : null}
             </div>
+            <Link href={`/customer-select/${projectId}`} className="shrink-0 rounded-lg px-2 py-3 text-sm font-semibold text-muted-foreground">현황</Link>
+            <div className="col-span-3 flex items-center justify-end gap-2 md:contents">
             <PhotographerLightButton variant="outline" size="toolbar" className="max-md:size-11 max-md:px-0" onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : "AI 분석 시작"}><Sparkles size={16} /><span className="max-md:hidden">{aiAnalyzing ? "분석 중" : "AI 분석"}</span></PhotographerLightButton>
             <PhotographerLightButton variant="outline" size="toolbar" className="max-md:px-3" onClick={() => inputRef.current?.click()} disabled={uploading}><ImagePlus size={16} />사진 추가</PhotographerLightButton>
+            </div>
           </div>
         </header>
 
@@ -374,7 +395,8 @@ export default function CustomerUploadPage() {
           </div>
         </div>
 
-        {error ? <p role="alert" className="shrink-0 border-b border-danger/20 bg-danger/8 px-5 py-2.5 text-[13px] font-semibold text-danger md:px-8">{error}</p> : null}
+        {checkingCapacity ? <p role="status" className="px-5 py-2 text-sm text-muted-foreground">업로드 가능한 장수를 확인하고 있어요…</p> : null}
+        {error ? <div role="alert" className="shrink-0 border-b border-danger/20 bg-danger/8 px-5 py-2.5 text-[13px] font-semibold text-danger md:px-8">{error}{needsReselection ? <button type="button" onClick={() => inputRef.current?.click()} className="ml-3 min-h-11 underline">파일 다시 선택</button> : null}</div> : null}
 
         <main
           ref={galleryScrollRef}
@@ -395,7 +417,7 @@ export default function CustomerUploadPage() {
             <div className="grid min-h-full place-items-center p-5">
               <button type="button" onClick={() => inputRef.current?.click()} className="flex min-h-[260px] w-full max-w-[720px] flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border-strong bg-surface text-center transition-colors hover:border-accent/45 hover:bg-surface-raised/45">
                 <span className="grid size-14 place-items-center rounded-2xl bg-customer-soft text-primary"><UploadCloud size={26} strokeWidth={1.8} /></span>
-                <span><strong className="block text-[16px] text-foreground">사진을 끌어다 놓거나 선택하세요</strong><small className="mt-1.5 block text-[13px] text-muted-foreground">JPG · PNG · WebP · HEIC</small></span>
+                <span><strong className="block text-[16px] text-foreground">사진을 끌어다 놓거나 선택하세요</strong><small className="mt-1.5 block text-[13px] text-muted-foreground">JPG · PNG · WebP · HEIC · 최대 {MAX_PHOTOS.toLocaleString()}장</small><small className="mt-2 block px-4 text-[13px] text-muted-foreground">선택용 이미지를 저장해요. 원본 파일은 직접 보관해 주세요.</small></span>
               </button>
             </div>
           ) : visiblePhotos.length === 0 ? (
@@ -440,7 +462,7 @@ export default function CustomerUploadPage() {
           actions={uploading ? <PhotographerLightButton variant="secondary" onClick={cancelUpload}>업로드 중단</PhotographerLightButton> : <>
             {retryFiles.length > 0 ? <PhotographerLightButton variant="secondary" onClick={() => void handleFiles(retryFiles)}>실패 {retryFiles.length.toLocaleString()}장 다시 시도</PhotographerLightButton> : null}
             {selectedPhotoIds.size > 0 ? <PhotographerLightButton variant="danger" pending={deleting} pendingLabel="삭제 중" onClick={deleteSelectedPhotos}><Trash2 size={16} />선택 삭제 ({selectedPhotoIds.size.toLocaleString()})</PhotographerLightButton> : null}
-            <PhotographerLightButton disabled={project.photoCount === 0 || deleting} onClick={() => router.push(`/customer-select/${projectId}/select`)}>셀렉 시작하기{project.photoCount > 0 ? ` (${project.photoCount}장)` : ""}</PhotographerLightButton>
+            <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={() => router.push(`/customer-select/${projectId}/select`)}>사진 고르기{project.photoCount > 0 ? ` (${project.photoCount}장)` : ""}</PhotographerLightButton>
           </>}
         />
       </div>

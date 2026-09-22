@@ -84,7 +84,7 @@ interface StoreValue {
   setComment: (photoId: string, text: string) => void;
   toggleDone: (identity: ColorTag) => void;
   setNickname: (nickname: string) => void;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<ProjectView | undefined>;
   saveError: string | null;
   clearSaveError: () => void;
 }
@@ -145,7 +145,7 @@ export function CustomerSelectStoreProvider({
     if (!data) return;
     setProject(data.project);
     setIsOwner(data.isOwner);
-    return;
+    return data.project;
   }, [apiGet]);
 
   // 마운트 시 한 번: 프로젝트를 불러오고, 이 브라우저의 참가자 슬롯(색)을 정하거나 새로 배정한다.

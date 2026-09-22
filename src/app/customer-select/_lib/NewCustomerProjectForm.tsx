@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { CUSTOMER_PHOTO_LIMIT } from "./upload-limit";
 import { PhotographerLightPageFrame } from "@/components/layout/PhotographerLightPageHeader";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { PhotographerFormActionBar } from "@/components/photographer/PhotographerFormActionBar";
@@ -68,8 +69,8 @@ export function NewCustomerProjectForm() {
       <PhotographerLightPageFrame className="flex-1 pb-8">
         <div className="mx-auto max-w-[840px]">
           <ProjectFormPageHeading
-            title="새 프로젝트 만들기"
-            description="프로젝트 기본 정보와 목표 셀렉 수를 설정해 주세요."
+            title="어떤 사진을 골라볼까요?"
+            description="이름과 참고 목표를 정하고 사진을 올려보세요."
             onBack={() => router.push("/customer-select")}
           />
           <div className="flex flex-col gap-5">
@@ -87,12 +88,8 @@ export function NewCustomerProjectForm() {
               </ProjectFormField>
             </div>
 
-            <ProjectFormField group label="촬영 유형">
-              <ProjectShootTypeSelector value={shootType} onChange={setShootType} />
-            </ProjectFormField>
-
             <div id="field-target" className="max-w-[360px]">
-              <ProjectFormField error={fieldErrors.target} label="목표 셀렉 수" required hint="참고용 기준이에요. 목표보다 더 고르거나 덜 골라도 괜찮아요.">
+              <ProjectFormField error={fieldErrors.target} label="고를 사진 수" required hint="참고 목표예요. 더 고르거나 덜 골라도 괜찮아요.">
                 <div className="relative">
                   <ProjectFormInput
                     className={`${PROJECT_FORM_INPUT_CLASS} pr-12 text-right md:pr-12 ${projectFormInputStateClass({ hasValue: Boolean(target), error: Boolean(fieldErrors.target) })}`}
@@ -108,7 +105,12 @@ export function NewCustomerProjectForm() {
             </div>
             </ProjectFormSection>
 
-            <ProjectFormSection number="02" title="일정 및 작가 정보" description="프로젝트를 찾고 전달할 때 필요한 정보를 선택해서 입력해 주세요." required={false}>
+            <details className="rounded-2xl border border-border-subtle bg-surface">
+              <summary className="cursor-pointer px-5 py-4 text-sm font-semibold focus-visible:outline-accent">촬영일·마감일 등 추가 정보 <span className="font-normal text-muted-foreground">(선택)</span></summary>
+            <ProjectFormSection number="02" title="일정 및 작가 정보" description="나중에 설정에서 수정할 수 있어요." required={false}>
+              <ProjectFormField group label="촬영 유형">
+                <ProjectShootTypeSelector value={shootType} onChange={setShootType} />
+              </ProjectFormField>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <ProjectFormField label="촬영일">
                   <ProjectFormDateInput
@@ -138,6 +140,11 @@ export function NewCustomerProjectForm() {
                 />
               </ProjectFormField>
             </ProjectFormSection>
+            </details>
+            <div className="text-sm leading-6 text-muted-foreground">
+              <p>프로젝트당 최대 {CUSTOMER_PHOTO_LIMIT.toLocaleString()}장까지 올릴 수 있어요.</p>
+              <p>원본 파일은 직접 보관해 주세요. 사진 선택용 이미지를 저장해요.</p>
+            </div>
           </div>
         </div>
       </PhotographerLightPageFrame>
