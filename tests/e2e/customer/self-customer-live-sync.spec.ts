@@ -84,7 +84,7 @@ test("delivery refreshes collaboration state immediately before completion", asy
     await route.fulfill({ json: { isOwner: true, project: {
       id: "delivery-sync", name: "전달 확인", shootType: "wedding", target: 1, photoCount: 1, uploaded: true,
       photos: [{ id: "p1", projectId: "delivery-sync", orderIndex: 0, url: "", previewUrl: "", originalFilename: "A001.jpg" }],
-      selectedIds: ["p1"], photoStates: {}, participantOpinions: {}, participantDone: { red: false, blue: true },
+      selectedIds: ["p1"], photoStates: {}, participantOpinions: { p1: { blue: { comment: '좋아요, "밝게"' } } }, participantDone: { red: false, blue: true },
       participantNicknames: { red: "소유자", blue: "동행" }, shareToken: "", shareEnabled: true,
       exported: false, deliveryCount: 0, lastDeliveredAt: null,
     } } });
@@ -94,12 +94,30 @@ test("delivery refreshes collaboration state immediately before completion", asy
   await page.route("**/api/customer-select/projects/delivery-sync/sync", async (route) => {
     syncCalls += 1;
     await route.fulfill({ json: {
-      selectedIds: ["p1"], photoStates: {}, participantOpinions: {}, participantDone: { red: false, blue: true },
+      selectedIds: ["p1"], photoStates: {}, participantOpinions: { p1: { blue: { comment: '좋아요, "밝게"' } } }, participantDone: { red: false, blue: true },
       participantNicknames: { red: "소유자", blue: "동행" }, onlineParticipants: ["red", "blue"], participantViews: {}, exported: false, deliveryCount: 0, lastDeliveredAt: null,
     } });
   });
 
   await page.goto("/customer-select/delivery-sync/export");
+  const [csvDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "CSV 다운로드" }).click(),
+  ]);
+  expect(csvDownload.suggestedFilename()).toBe("전달 확인_selections.csv");
+  let csv = "";
+  for await (const chunk of await csvDownload.createReadStream()) csv += chunk.toString();
+  expect(csv).toBe('파일명,코멘트\nA001.jpg,"동행: 좋아요, ""밝게"""');
+
+  const [txtDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "TXT 다운로드" }).click(),
+  ]);
+  expect(txtDownload.suggestedFilename()).toBe("전달 확인_selections.txt");
+  let txt = "";
+  for await (const chunk of await txtDownload.createReadStream()) txt += chunk.toString();
+  expect(txt).toBe("A001.jpg");
+
   const deliver = page.getByRole("button", { name: "작가에게 전달했어요" });
   await expect(deliver).toBeEnabled();
   requiredSyncCalls = syncCalls + 1;

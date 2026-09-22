@@ -35,6 +35,7 @@ import { useAdjacentImagePreload } from "@/lib/use-adjacent-image-preload";
 import { viewerImageUrl } from "@/lib/viewer-image-url";
 import { buildGroupsById, buildMembersByGroup, buildPhotoIdSet } from "@/lib/photo-groups";
 import { downloadSelectedPhotosToDirectory } from "@/lib/selected-photo-download";
+import { csvEscape, downloadTextFile, sanitizeFilenamePart } from "@/lib/text-file-download";
 import { useCollapsibleAssetHeader } from "@/hooks/useCollapsibleAssetHeader";
 import type { Photo, PhotoGroupInfo } from "@/types";
 import styles from "../results/ResultsTheme.module.css";
@@ -43,27 +44,6 @@ type ViewMode = "gallery" | "list";
 type SortMode = "filename-asc" | "uploaded-desc" | "uploaded-asc" | "comment-first";
 type QualityFilter = "eyesClosed" | "blurry";
 export type ResultsTab = "original" | "selected";
-
-function sanitizeFilenamePart(value: string) {
-  return value.replace(/[\\/:*?"<>|]/g, "_").trim();
-}
-
-function csvEscape(value: string) {
-  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
-}
-
-function downloadTextFile(filename: string, text: string, mime: string) {
-  const blob = new Blob([text], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
 
 function getDisplayFilename(photo: Photo) {
   return getPhotoDisplayFilename(photo);
