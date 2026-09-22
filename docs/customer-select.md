@@ -161,6 +161,8 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 - `customer_selections`: 소유자 최종 선택과 참가자별 찜 색상
 - `customer_participant_opinions`: 사진별 참가자 개인 별점·공개 의견
 - `customer_project_participants`: 비로그인 참가자의 색 슬롯·닉네임·완료 여부
+- `customer_participant_presence`: 참여자별 최근 heartbeat 시각. 30초 이내 갱신된 참여자를
+  온라인으로 표시하며 프로젝트·참여자 삭제 시 함께 정리
 - `customer_photo_versions`: 사진별 보정본 회차와 확정·재보정 결정
 - `customer_ai_runs`, `customer_ai_embeddings`, `customer_photo_groups`,
   `customer_quality_assessments`: 셀프 고객 사진의 유사컷·품질 분석
@@ -235,6 +237,14 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
   참여자가 있으면 최신 명단으로 재확인하며, 확인창에서 확정할 때도 다시 조회한 뒤 전달한다.
 - 온라인 표시·함께 보기·따라가기·임시 대화는 고빈도 양방향 계층이 필요한 다음 협업 작업이다.
 
+### 7.2 접속 상태
+
+- 선택 화면이 보이는 동안 참여자 색 단위로 10초마다 heartbeat를 저장한다. 숨겨진 탭은 갱신하지
+  않고 다시 보이면 즉시 갱신한다.
+- 최근 30초 안에 heartbeat가 있는 참여자는 PC·모바일 참여자 칩에 `온라인`으로 표시한다.
+- 현재 단계는 누가 접속 중인지에만 집중해 여러 탭·기기를 개별 세션으로 구분하지 않는다.
+  화면 따라가기에서 세션 구분이 필요해질 때 별도 세션 ID를 추가한다.
+
 테스트 기간에는 셀렉을 시작한 뒤에도 사진을 추가 업로드할 수 있다. 운영 전 정책은 다음이
 기본안이다.
 
@@ -284,7 +294,7 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 
 적용 대기 마이그레이션:
 
-- 없음
+- `20260922050000_add_customer_participant_presence.sql`
 
 Supabase CLI의 마이그레이션 이력은 비어 있어 `supabase db push`를 실행하면 과거 파일 전체를
 재실행하려 한다. **`supabase db push`는 사용하지 않는다.** 새 SQL은 Dashboard SQL Editor 또는
@@ -296,7 +306,7 @@ Management API `/database/query`로 해당 파일만 실행한다.
 ## 10. 남은 작업
 
 - 셀렉·검토·보정 화면의 공통 컴포넌트 통합
-- 온라인 참여 표시·함께 보기·따라가기·임시 대화
+- 함께 보기·따라가기·임시 대화
 - CSV/TXT 실제 다운로드
 - 2,000장 업로드·스크롤·AI 분석 실측
 - 보정본 전체 흐름의 프로덕션 수준 회귀 검증

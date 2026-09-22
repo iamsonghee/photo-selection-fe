@@ -36,6 +36,7 @@ export interface ProjectView {
   participantOpinions: Record<string, Partial<Record<ColorTag, { rating?: StarRating; comment?: string }>>>;
   participantDone: Record<string, boolean>;
   participantNicknames: Record<string, string>;
+  onlineParticipants: ColorTag[];
   exported: boolean;
   deliveryCount: number;
   lastDeliveredAt?: string | null;
@@ -43,7 +44,7 @@ export interface ProjectView {
   shareEnabled: boolean;
 }
 
-type CollaborationState = Pick<ProjectView, "selectedIds" | "photoStates" | "participantOpinions" | "participantDone" | "participantNicknames" | "exported" | "deliveryCount" | "lastDeliveredAt">;
+type CollaborationState = Pick<ProjectView, "selectedIds" | "photoStates" | "participantOpinions" | "participantDone" | "participantNicknames" | "onlineParticipants" | "exported" | "deliveryCount" | "lastDeliveredAt">;
 
 function emptyProject(id: string): ProjectView {
   return {
@@ -59,6 +60,7 @@ function emptyProject(id: string): ProjectView {
     participantOpinions: {},
     participantDone: {},
     participantNicknames: {},
+    onlineParticipants: [],
     exported: false,
     deliveryCount: 0,
     shareToken: "",
@@ -241,7 +243,7 @@ export function CustomerSelectStoreProvider({
         }
         if (!response.ok) throw new Error("sync failed");
         const state = await response.json() as CollaborationState;
-        if (!Array.isArray(state.selectedIds) || !state.photoStates || !state.participantOpinions || !state.participantDone || !state.participantNicknames || typeof state.exported !== "boolean") {
+        if (!Array.isArray(state.selectedIds) || !state.photoStates || !state.participantOpinions || !state.participantDone || !state.participantNicknames || !Array.isArray(state.onlineParticipants) || typeof state.exported !== "boolean") {
           throw new Error("invalid sync response");
         }
         if (writesInFlightRef.current > 0) return null;
@@ -282,6 +284,26 @@ export function CustomerSelectStoreProvider({
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [accessDenied, hydrated, syncNow]);
+
+  useEffect(() => {
+    if (!hydrated || accessDenied || !participantReady) return;
+    const heartbeat = () => {
+      if (document.hidden) return;
+      void fetch(`/api/customer-select/projects/${projectId}/presence`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ color: currentIdentity }),
+      });
+    };
+    heartbeat();
+    const interval = window.setInterval(heartbeat, 10_000);
+    const onVisible = () => { if (!document.hidden) heartbeat(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [accessDenied, currentIdentity, hydrated, participantReady, projectId]);
 
   const update = useCallback(
     async (patch: { exported?: boolean }) => {

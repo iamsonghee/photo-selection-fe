@@ -304,6 +304,7 @@
 .participantPill { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border-radius: 999px; background: #f7f6f4; color: #5f5e5b; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .participantPill i { width: 7px; height: 7px; border-radius: 50%; display: block; }
 .participantDone { background: #e7f5ee; color: #0f8a5f; }
+.participantOnline { color: #0f8a5f; font-size: 9px; font-weight: 800; }
 .nicknameTrigger { border: 1px solid transparent; font-family: inherit; cursor: pointer; }
 .nicknameMissing { border-color: #ff4d00; background: #fff3ed; color: #d84100; }
 .nicknameDialog { width: min(400px, calc(100vw - 32px)); margin: auto; padding: 0; border: 0; border-radius: 14px; background: #fff; color: #191918; box-shadow: 0 20px 60px rgba(0,0,0,.2); }

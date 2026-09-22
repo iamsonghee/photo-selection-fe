@@ -12,6 +12,7 @@ test("selection and participant completion sync between sessions without a reloa
 
   let participantDone = false;
   let selected = false;
+  const online = new Set<string>();
   const project = () => ({
     id: "live-sync", name: "실시간 확인", shootType: "wedding", target: 30, photoCount: 1, uploaded: true,
     photos: [{ id: "p1", projectId: "live-sync", orderIndex: 0, url: "", previewUrl: "", originalFilename: "A001.jpg" }],
@@ -22,7 +23,7 @@ test("selection and participant completion sync between sessions without a reloa
   const collaboration = () => ({
     selectedIds: selected ? ["p1"] : [], photoStates: {}, participantOpinions: {},
     participantDone: { red: false, blue: participantDone }, participantNicknames: { red: "소유자", blue: "동행" },
-    exported: false, deliveryCount: 0, lastDeliveredAt: null,
+    onlineParticipants: [...online], exported: false, deliveryCount: 0, lastDeliveredAt: null,
   });
 
   async function mock(page: Page, isOwner: boolean) {
@@ -31,6 +32,10 @@ test("selection and participant completion sync between sessions without a reloa
       await route.fulfill({ json: { isOwner, project: project() } });
     });
     await page.route("**/api/customer-select/projects/live-sync/sync", async (route) => route.fulfill({ json: collaboration() }));
+    await page.route("**/api/customer-select/projects/live-sync/presence", async (route) => {
+      online.add(route.request().postDataJSON().color);
+      await route.fulfill({ json: { ok: true } });
+    });
     await page.route("**/api/customer-select/projects/live-sync/participants", async (route) => {
       const body = route.request().postDataJSON();
       if (body.color === "blue" && body.done === true) participantDone = true;
@@ -50,6 +55,7 @@ test("selection and participant completion sync between sessions without a reloa
   await expect(owner.getByText("동행 고르는 중").first()).toBeVisible();
   await participant.getByRole("button", { name: "내 의견 완료" }).click();
   await expect(owner.getByText("동행 완료").first()).toBeVisible({ timeout: 5000 });
+  await expect(owner.locator('[class*="participantPill"]').filter({ hasText: "동행" }).first()).toContainText("온라인", { timeout: 5000 });
   await owner.locator('[data-photo-id="p1"] .gl-check-box').click();
   await expect(participant.locator(".gld-selected-count").first()).toContainText("1", { timeout: 5000 });
 
@@ -77,11 +83,12 @@ test("delivery refreshes collaboration state immediately before completion", asy
     } } });
   });
   await page.route("**/api/customer-select/projects/delivery-sync/participants", async (route) => route.fulfill({ json: { ok: true } }));
+  await page.route("**/api/customer-select/projects/delivery-sync/presence", async (route) => route.fulfill({ json: { ok: true } }));
   await page.route("**/api/customer-select/projects/delivery-sync/sync", async (route) => {
     syncCalls += 1;
     await route.fulfill({ json: {
       selectedIds: ["p1"], photoStates: {}, participantOpinions: {}, participantDone: { red: false, blue: true },
-      participantNicknames: { red: "소유자", blue: "동행" }, exported: false, deliveryCount: 0, lastDeliveredAt: null,
+      participantNicknames: { red: "소유자", blue: "동행" }, onlineParticipants: ["red", "blue"], exported: false, deliveryCount: 0, lastDeliveredAt: null,
     } });
   });
 

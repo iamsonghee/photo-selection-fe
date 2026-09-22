@@ -102,6 +102,7 @@ export default function CustomerSelectGalleryPage() {
   const selectedIds = useMemo(() => new Set(project.selectedIds), [project.selectedIds]);
   const disagree = useMemo(() => new Set(disagreementIds(project)), [project]);
   const participants = useMemo(() => activeParticipants(project), [project]);
+  const onlineParticipants = useMemo(() => new Set(project.onlineParticipants ?? []), [project.onlineParticipants]);
   const colorLabel = useCallback((color: ColorTag) => color === currentIdentity ? "내 찜" : `${project.participantNicknames[color] || "참가자"} 찜`, [currentIdentity, project.participantNicknames]);
   const colorOptions = useMemo(() => participants.map((participant) => ({ key: participant.id, hex: participant.hex, label: colorLabel(participant.id) })), [participants, colorLabel]);
 
@@ -389,8 +390,8 @@ export default function CustomerSelectGalleryPage() {
             summaryContent={<>
               <div className={ui.selectParticipants}>
                 {participants.map((participant) => participant.id === currentIdentity
-                  ? <NicknamePrompt key={participant.id} hex={participant.hex} isDone={Boolean(project.participantDone[participant.id])} />
-                  : <span key={participant.id} className={`${ui.participantPill} ${project.participantDone[participant.id] ? ui.participantDone : ""}`}><i style={{ background: participant.hex }} />{participant.name} {project.participantDone[participant.id] ? "완료" : "고르는 중"}</span>)}
+                  ? <NicknamePrompt key={participant.id} hex={participant.hex} isDone={Boolean(project.participantDone[participant.id])} online={onlineParticipants.has(participant.id)} />
+                  : <span key={participant.id} className={`${ui.participantPill} ${project.participantDone[participant.id] ? ui.participantDone : ""}`}><i style={{ background: participant.hex }} />{participant.name} {project.participantDone[participant.id] ? "완료" : "고르는 중"}{onlineParticipants.has(participant.id) ? <span className={ui.participantOnline}>온라인</span> : null}</span>)}
               </div>
               <div className={ui.selectHeaderActions}>
                 {participants.length > 1 && <button type="button" className={`${ui.selectHeaderButton} ${ui.selectDoneButton}`} aria-pressed={Boolean(project.participantDone[currentIdentity])} onClick={() => toggleDone(currentIdentity)}><CheckCircle2 size={15} />{project.participantDone[currentIdentity] ? "선택 다시 열기" : "내 선택 완료"}</button>}
@@ -414,11 +415,12 @@ export default function CustomerSelectGalleryPage() {
             <div className={ui.selectParticipants}>
               {participants.map((p) => {
                 const isDone = project.participantDone[p.id];
-                if (p.id === currentIdentity) return <NicknamePrompt key={p.id} hex={p.hex} isDone={Boolean(isDone)} />;
+                if (p.id === currentIdentity) return <NicknamePrompt key={p.id} hex={p.hex} isDone={Boolean(isDone)} online={onlineParticipants.has(p.id)} />;
                 return (
                   <span key={p.id} className={`${ui.participantPill} ${isDone ? ui.participantDone : ""}`}>
                     <i style={{ background: p.hex }} />
                     {p.name} {isDone ? "완료" : "고르는 중"}
+                    {onlineParticipants.has(p.id) ? <span className={ui.participantOnline}>온라인</span> : null}
                   </span>
                 );
               })}

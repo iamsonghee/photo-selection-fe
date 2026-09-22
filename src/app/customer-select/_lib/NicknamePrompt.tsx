@@ -6,7 +6,7 @@ import { COLOR_LABELS } from "@/lib/gallery-filter";
 import { useCustomerSelectStore } from "./real-store";
 import ui from "./ui.module.css";
 
-export function NicknamePrompt({ hex, isDone }: { hex: string; isDone: boolean }) {
+export function NicknamePrompt({ hex, isDone, online }: { hex: string; isDone: boolean; online: boolean }) {
   const { project, currentIdentity, setNickname } = useCustomerSelectStore();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const nickname = project.participantNicknames[currentIdentity]?.trim() ?? "";
@@ -29,6 +29,7 @@ export function NicknamePrompt({ hex, isDone }: { hex: string; isDone: boolean }
       <button type="button" className={`${ui.participantPill} ${ui.nicknameTrigger} ${isDone ? ui.participantDone : ""} ${nickname ? "" : ui.nicknameMissing}`} onClick={open} aria-label={nickname ? `내 이름 ${nickname} 수정` : "내 이름 설정"}>
         <i style={{ background: hex }} />
         {nickname ? `${nickname} ${isDone ? "완료" : "고르는 중"}` : "이름 설정"}
+        {online ? <span className={ui.participantOnline}>온라인</span> : null}
         <Pencil size={11} aria-hidden />
       </button>
       <dialog ref={dialogRef} className={ui.nicknameDialog} onClick={(event) => { if (event.target === event.currentTarget) event.currentTarget.close(); }}>
