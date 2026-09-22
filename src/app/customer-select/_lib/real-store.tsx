@@ -37,6 +37,7 @@ export interface ProjectView {
   participantDone: Record<string, boolean>;
   participantNicknames: Record<string, string>;
   onlineParticipants: ColorTag[];
+  participantViews: Partial<Record<ColorTag, string | null>>;
   exported: boolean;
   deliveryCount: number;
   lastDeliveredAt?: string | null;
@@ -44,7 +45,7 @@ export interface ProjectView {
   shareEnabled: boolean;
 }
 
-type CollaborationState = Pick<ProjectView, "selectedIds" | "photoStates" | "participantOpinions" | "participantDone" | "participantNicknames" | "onlineParticipants" | "exported" | "deliveryCount" | "lastDeliveredAt">;
+type CollaborationState = Pick<ProjectView, "selectedIds" | "photoStates" | "participantOpinions" | "participantDone" | "participantNicknames" | "onlineParticipants" | "participantViews" | "exported" | "deliveryCount" | "lastDeliveredAt">;
 
 function emptyProject(id: string): ProjectView {
   return {
@@ -61,6 +62,7 @@ function emptyProject(id: string): ProjectView {
     participantDone: {},
     participantNicknames: {},
     onlineParticipants: [],
+    participantViews: {},
     exported: false,
     deliveryCount: 0,
     shareToken: "",
@@ -108,6 +110,7 @@ interface StoreValue {
   shareUrl: string;
   syncStatus: "syncing" | "connected" | "offline";
   syncNow: () => Promise<CollaborationState | null>;
+  setViewingPhoto: (photoId: string | null) => void;
   update: (patch: { exported?: boolean }) => Promise<boolean>;
   toggleSelect: (photoId: string) => void;
   toggleLike: (photoId: string, identity: ColorTag) => void;
@@ -243,7 +246,7 @@ export function CustomerSelectStoreProvider({
         }
         if (!response.ok) throw new Error("sync failed");
         const state = await response.json() as CollaborationState;
-        if (!Array.isArray(state.selectedIds) || !state.photoStates || !state.participantOpinions || !state.participantDone || !state.participantNicknames || !Array.isArray(state.onlineParticipants) || typeof state.exported !== "boolean") {
+        if (!Array.isArray(state.selectedIds) || !state.photoStates || !state.participantOpinions || !state.participantDone || !state.participantNicknames || !Array.isArray(state.onlineParticipants) || !state.participantViews || typeof state.exported !== "boolean") {
           throw new Error("invalid sync response");
         }
         if (writesInFlightRef.current > 0) return null;
@@ -304,6 +307,18 @@ export function CustomerSelectStoreProvider({
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [accessDenied, currentIdentity, hydrated, participantReady, projectId]);
+
+  const setViewingPhoto = useCallback((photoId: string | null) => {
+    setProject((current) => ({
+      ...current,
+      participantViews: { ...current.participantViews, [currentIdentity]: photoId },
+    }));
+    void fetch(`/api/customer-select/projects/${projectId}/presence`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ color: currentIdentity, current_photo_id: photoId }),
+    });
+  }, [currentIdentity, projectId]);
 
   const update = useCallback(
     async (patch: { exported?: boolean }) => {
@@ -485,10 +500,10 @@ export function CustomerSelectStoreProvider({
 
   const value = useMemo<StoreValue>(
     () => ({
-      project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, update, toggleSelect, toggleLike,
+      project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, setViewingPhoto, update, toggleSelect, toggleLike,
       setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, saveError, clearSaveError,
     }),
-    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, update, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, saveError, clearSaveError]
+    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, setViewingPhoto, update, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, saveError, clearSaveError]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

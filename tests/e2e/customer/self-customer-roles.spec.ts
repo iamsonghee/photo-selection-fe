@@ -20,7 +20,7 @@ test("shared participant can leave opinions but cannot change the final selectio
   await page.route("**/api/customer-select/projects/role-check/participants", async (route) => route.fulfill({ json: { ok: true } }));
   await page.route("**/api/customer-select/projects/role-check/sync", async (route) => route.fulfill({ json: {
     selectedIds: ["p1"], photoStates: { p1: { color: ["blue"] } }, participantOpinions: { p1: { blue: { rating: 4, comment: "표정이 좋아요" } } },
-    participantDone: { red: false, blue: false }, participantNicknames: { red: "나", blue: "동행" }, onlineParticipants: [], exported: false, deliveryCount: 0, lastDeliveredAt: null,
+    participantDone: { red: false, blue: false }, participantNicknames: { red: "나", blue: "동행" }, onlineParticipants: [], participantViews: {}, exported: false, deliveryCount: 0, lastDeliveredAt: null,
   } }));
   await page.route("**/api/customer-select/projects/role-check/selections", async (route) => {
     writes.push(route.request().postDataJSON());
@@ -62,7 +62,7 @@ test("first-time participant chooses an available color before entering", async 
     await route.fulfill({ json: { ok: true } });
   });
   await page.route("**/api/customer-select/projects/join-check/sync", async (route) => route.fulfill({ json: {
-    selectedIds: [], photoStates: {}, participantOpinions: {}, participantDone: { blue: false }, participantNicknames: { blue: "신랑" }, onlineParticipants: [], exported: false, deliveryCount: 0, lastDeliveredAt: null,
+    selectedIds: [], photoStates: {}, participantOpinions: {}, participantDone: { blue: false }, participantNicknames: { blue: "신랑" }, onlineParticipants: [], participantViews: {}, exported: false, deliveryCount: 0, lastDeliveredAt: null,
   } }));
 
   await page.goto("/customer-select/join-check/select");
@@ -71,7 +71,7 @@ test("first-time participant chooses an available color before entering", async 
   await page.getByPlaceholder("예: 신랑, 엄마").fill("신부");
   await page.getByRole("button", { name: "사진 고르기 시작" }).click();
 
-  await expect(page.getByText("우리 웨딩").first()).toBeVisible();
+  await expect(page.getByText("우리 웨딩").last()).toBeVisible();
   expect(claim).toMatchObject({ claim: true, color: "red", nickname: "신부" });
   expect(await page.evaluate(() => localStorage.getItem("acut:customer-select:identity:join-check"))).toBe("red");
 });
@@ -96,7 +96,7 @@ test("participant can continue the same identity on another device", async ({ pa
     await route.fulfill({ json: { ok: true } });
   });
   await page.route("**/api/customer-select/projects/resume-check/sync", async (route) => route.fulfill({ json: {
-    selectedIds: [], photoStates: {}, participantOpinions: {}, participantDone: { red: false, blue: false }, participantNicknames: { red: "소유자", blue: "신랑" }, onlineParticipants: [], exported: false, deliveryCount: 0, lastDeliveredAt: null,
+    selectedIds: [], photoStates: {}, participantOpinions: {}, participantDone: { red: false, blue: false }, participantNicknames: { red: "소유자", blue: "신랑" }, onlineParticipants: [], participantViews: {}, exported: false, deliveryCount: 0, lastDeliveredAt: null,
   } }));
 
   await page.goto("/customer-select/resume-check/select");

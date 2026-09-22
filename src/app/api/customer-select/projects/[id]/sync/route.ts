@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     admin.from("customer_selections").select("photo_id, rating, color_tags, comment, is_selected").eq("project_id", id),
     admin.from("customer_project_participants").select("color, nickname, done").eq("project_id", id),
     admin.from("customer_participant_opinions").select("photo_id, participant_color, rating, comment").eq("project_id", id),
-    admin.from("customer_participant_presence").select("participant_color").eq("project_id", id).gte("last_seen_at", new Date(Date.now() - 30_000).toISOString()),
+    admin.from("customer_participant_presence").select("participant_color, current_photo_id").eq("project_id", id).gte("last_seen_at", new Date(Date.now() - 30_000).toISOString()),
   ]);
   if (selections.error || participants.error || opinions.error || presence.error) {
     return NextResponse.json({ error: "동기화 상태를 불러오지 못했습니다." }, { status: 500 });
@@ -25,5 +25,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     deliveryCount: access.project.delivery_count,
     lastDeliveredAt: access.project.last_delivered_at,
     onlineParticipants: [...new Set((presence.data ?? []).map((row) => row.participant_color))],
+    participantViews: Object.fromEntries((presence.data ?? []).map((row) => [row.participant_color, row.current_photo_id])),
   }, { headers: { "Cache-Control": "no-store" } });
 }

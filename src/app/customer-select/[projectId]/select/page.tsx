@@ -16,7 +16,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, Layers, Share2 } from "lucide-react";
-import { getFilteredPhotos, type GalleryFilterState, type QualityFilterFlag } from "@/lib/gallery-filter";
+import { getFilteredPhotos, getPhotoDisplayName, type GalleryFilterState, type QualityFilterFlag } from "@/lib/gallery-filter";
 import { GalleryDesktopHeader } from "@/components/customer/GalleryDesktopHeader";
 import { GalleryMobileFilterSheet } from "@/components/customer/GalleryMobileFilterSheet";
 import { SelectionConfirmFooter } from "@/components/customer/SelectionConfirmFooter";
@@ -54,7 +54,7 @@ export default function CustomerSelectGalleryPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const router = useRouter();
-  const { project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, saveError, clearSaveError } =
+  const { project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, setViewingPhoto, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, saveError, clearSaveError } =
     useCustomerSelectStore();
 
   const [tab, setTab] = useState<Tab>("all");
@@ -103,6 +103,10 @@ export default function CustomerSelectGalleryPage() {
   const disagree = useMemo(() => new Set(disagreementIds(project)), [project]);
   const participants = useMemo(() => activeParticipants(project), [project]);
   const onlineParticipants = useMemo(() => new Set(project.onlineParticipants ?? []), [project.onlineParticipants]);
+  const viewingNames = useMemo(() => Object.fromEntries(Object.entries(project.participantViews ?? {}).flatMap(([color, photoId]) => {
+    const photo = project.photos.find((item) => item.id === photoId);
+    return photo ? [[color, getPhotoDisplayName(photo)]] : [];
+  })), [project.participantViews, project.photos]);
   const colorLabel = useCallback((color: ColorTag) => color === currentIdentity ? "내 찜" : `${project.participantNicknames[color] || "참가자"} 찜`, [currentIdentity, project.participantNicknames]);
   const colorOptions = useMemo(() => participants.map((participant) => ({ key: participant.id, hex: participant.hex, label: colorLabel(participant.id) })), [participants, colorLabel]);
 
@@ -160,6 +164,14 @@ export default function CustomerSelectGalleryPage() {
   const hasEyesClosedPhotos = project.photos.some((photo) => photo.faceDetected === true && photo.eyesClosed === true);
   const qualityFilterSet = useMemo(() => new Set(qualityFilter), [qualityFilter]);
   const activeFilterCount = (starFilter > 0 ? 1 : 0) + colorFilter.length + qualityFilter.length + (nameFilter.trim() ? 1 : 0);
+
+  useEffect(() => {
+    if (!hydrated || !participantReady) return;
+    const timer = window.setTimeout(() => setViewingPhoto(openPhotoId), 250);
+    return () => window.clearTimeout(timer);
+  }, [hydrated, openPhotoId, participantReady, setViewingPhoto]);
+
+  useEffect(() => () => setViewingPhoto(null), [setViewingPhoto]);
 
   const viewerSelection = useMemo<SelectionContextValue>(() => ({
     project: {
@@ -391,7 +403,9 @@ export default function CustomerSelectGalleryPage() {
               <div className={ui.selectParticipants}>
                 {participants.map((participant) => participant.id === currentIdentity
                   ? <NicknamePrompt key={participant.id} hex={participant.hex} isDone={Boolean(project.participantDone[participant.id])} online={onlineParticipants.has(participant.id)} />
-                  : <span key={participant.id} className={`${ui.participantPill} ${project.participantDone[participant.id] ? ui.participantDone : ""}`}><i style={{ background: participant.hex }} />{participant.name} {project.participantDone[participant.id] ? "완료" : "고르는 중"}{onlineParticipants.has(participant.id) ? <span className={ui.participantOnline}>온라인</span> : null}</span>)}
+                  : viewingNames[participant.id] && onlineParticipants.has(participant.id)
+                    ? <button key={participant.id} type="button" className={`${ui.participantPill} ${ui.participantViewTarget} ${project.participantDone[participant.id] ? ui.participantDone : ""}`} onClick={() => setOpenPhotoId(project.participantViews[participant.id] ?? null)} aria-label={`${participant.name}님이 보는 ${viewingNames[participant.id]} 열기`}><i style={{ background: participant.hex }} />{participant.name} · {viewingNames[participant.id]}<span className={ui.participantOnline}>보는 중</span></button>
+                    : <span key={participant.id} className={`${ui.participantPill} ${project.participantDone[participant.id] ? ui.participantDone : ""}`}><i style={{ background: participant.hex }} />{participant.name} {project.participantDone[participant.id] ? "완료" : "고르는 중"}{onlineParticipants.has(participant.id) ? <span className={ui.participantOnline}>온라인</span> : null}</span>)}
               </div>
               <div className={ui.selectHeaderActions}>
                 {participants.length > 1 && <button type="button" className={`${ui.selectHeaderButton} ${ui.selectDoneButton}`} aria-pressed={Boolean(project.participantDone[currentIdentity])} onClick={() => toggleDone(currentIdentity)}><CheckCircle2 size={15} />{project.participantDone[currentIdentity] ? "선택 다시 열기" : "내 선택 완료"}</button>}
@@ -416,6 +430,8 @@ export default function CustomerSelectGalleryPage() {
               {participants.map((p) => {
                 const isDone = project.participantDone[p.id];
                 if (p.id === currentIdentity) return <NicknamePrompt key={p.id} hex={p.hex} isDone={Boolean(isDone)} online={onlineParticipants.has(p.id)} />;
+                const viewingName = viewingNames[p.id];
+                if (viewingName && onlineParticipants.has(p.id)) return <button key={p.id} type="button" className={`${ui.participantPill} ${ui.participantViewTarget} ${isDone ? ui.participantDone : ""}`} onClick={() => setOpenPhotoId(project.participantViews[p.id] ?? null)} aria-label={`${p.name}님이 보는 ${viewingName} 열기`}><i style={{ background: p.hex }} />{p.name} · {viewingName}<span className={ui.participantOnline}>보는 중</span></button>;
                 return (
                   <span key={p.id} className={`${ui.participantPill} ${isDone ? ui.participantDone : ""}`}>
                     <i style={{ background: p.hex }} />

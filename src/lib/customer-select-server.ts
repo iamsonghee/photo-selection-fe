@@ -189,6 +189,7 @@ export function buildProjectView(
     deliveryCount: project.delivery_count,
     lastDeliveredAt: project.last_delivered_at,
     onlineParticipants: [],
+    participantViews: {},
     shareToken: project.share_token,
     shareEnabled: project.sharing_enabled,
   };
