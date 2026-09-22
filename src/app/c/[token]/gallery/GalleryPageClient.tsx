@@ -939,9 +939,6 @@ export default function GalleryPageClient() {
           .gl-mobile-similarity-hint button { position: absolute; top: 3px; right: 3px; width: 32px; height: 38px; padding: 0; border: 0; background: transparent; color: rgba(255,255,255,.65); display: grid; place-items: center; }
           /* 그리드 — 열 수/간격은 JS에서 뷰포트 폭 기준으로 계산(가상화) */
           .gl-page-wrapper { padding-top: calc(99px + env(safe-area-inset-top)) !important; padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important; transition: padding-top 200ms ease; }
-          .gl-page-wrapper .ac-confirm-footer-gallery .ac-confirm-footer-inner { height: calc(100px + env(safe-area-inset-bottom)) !important; grid-template-rows: 24px 48px !important; }
-          .gl-page-wrapper .ac-confirm-footer-gallery .ac-confirm-footer-progress { gap: 4px !important; }
-          .gl-page-wrapper .ac-confirm-footer-gallery .ac-confirm-footer-progress-label { display: flex !important; font-size: 11px !important; letter-spacing: 0; }
           .gl-page-wrapper.gl-mobile-search-expanded { padding-top: calc(150px + env(safe-area-inset-top)) !important; }
           .gl-page-wrapper.gl-mobile-filter-active { padding-top: calc(136px + env(safe-area-inset-top)) !important; }
           .gl-page-wrapper.gl-mobile-header-compact { padding-top: calc(56px + env(safe-area-inset-top)) !important; }

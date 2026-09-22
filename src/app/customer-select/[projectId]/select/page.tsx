@@ -521,7 +521,7 @@ export default function CustomerSelectGalleryPage() {
           disabled={selectedCount === 0}
           onConfirm={() => router.push(`/customer-select/${projectId}/review`)}
           buttonLabel="최종 검토하기"
-          progressLabel="선택한 사진"
+          progressLabel={selectedCount < target ? `${target - selectedCount}장 더 골라주세요` : "선택한 사진"}
           theme="customerLight"
           mobileGallery
           metaText={footerMeta}

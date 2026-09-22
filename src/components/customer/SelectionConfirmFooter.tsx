@@ -119,22 +119,28 @@ export function SelectionConfirmFooter({
           }
           .ac-confirm-footer-gallery .ac-confirm-footer-inner {
             box-sizing: border-box;
-            height: calc(80px + env(safe-area-inset-bottom)) !important;
+            height: calc(100px + env(safe-area-inset-bottom)) !important;
             max-width: none !important;
             padding: 8px 20px calc(12px + env(safe-area-inset-bottom)) !important;
             display: grid !important;
             grid-template-columns: 1fr !important;
-            grid-template-rows: 4px 48px !important;
+            grid-template-rows: 24px 48px !important;
             gap: 8px !important;
             background: #fff;
           }
-          .ac-confirm-footer-gallery .ac-confirm-footer-progress { gap: 0 !important; }
+          .ac-confirm-footer-gallery .ac-confirm-footer-progress { gap: 4px !important; }
           .ac-confirm-footer-gallery .ac-confirm-footer-progress-label {
-            display: none !important;
+            display: flex !important;
+            align-items: center;
+            font-family: Pretendard, sans-serif !important;
+            font-size: 13px !important;
+            font-weight: 600;
+            letter-spacing: 0 !important;
+            text-transform: none !important;
           }
           .ac-confirm-footer-gallery .ac-confirm-footer-progress-label span:first-child { color: #26282c !important; }
-          .ac-confirm-footer-gallery .ac-confirm-footer-progress-label span:last-child { color: #26282c !important; }
-          .ac-confirm-footer-gallery .ac-confirm-footer-current { color: #ff4d00; font-weight: 700; }
+          .ac-confirm-footer-gallery .ac-confirm-footer-progress-label span:last-child { color: #26282c !important; font-size: 14px; }
+          .ac-confirm-footer-gallery .ac-confirm-footer-current { color: #ff4d00; font-size: 15px; font-weight: 800; }
           .ac-confirm-footer-gallery .ac-confirm-footer-track {
             height: 4px !important;
             border-radius: 999px;
