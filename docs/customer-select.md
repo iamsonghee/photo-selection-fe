@@ -251,11 +251,12 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 - `20260920000000_add_customer_project_details.sql`
 - `20260920010000_add_customer_ai_analysis.sql`
 - `20260922000000_add_customer_project_analytics_fields.sql`
+- `20260922010000_add_customer_participant_opinions.sql`
+- `20260922020000_add_customer_project_sharing_state.sql`
 
 적용 대기 마이그레이션:
 
-- `20260922010000_add_customer_participant_opinions.sql` — 참가자별 별점·공개 의견
-- `20260922020000_add_customer_project_sharing_state.sql` — 공유 중지·재발급 상태
+- 없음
 
 Supabase CLI의 마이그레이션 이력은 비어 있어 `supabase db push`를 실행하면 과거 파일 전체를
 재실행하려 한다. **`supabase db push`는 사용하지 않는다.** 새 SQL은 Dashboard SQL Editor 또는
