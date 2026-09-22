@@ -36,7 +36,7 @@ function LogoMark({
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: variant === "customerEntry" ? "#ff4d00" : ACCENT,
-        color: variant === "customerEntry" ? "#fff" : "#000",
+        color: "#fff",
         fontWeight: variant === "customerEntry" ? 800 : 700,
         fontSize,
         borderRadius: variant === "customerEntry" ? 6.72 : 2,
