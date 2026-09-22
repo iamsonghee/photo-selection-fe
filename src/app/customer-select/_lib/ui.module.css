@@ -251,6 +251,17 @@
 .joinEyebrow { color: #ff4d00; font-size: 12px; font-weight: 800; }
 .joinCard h1 { margin: 10px 0 10px; color: #023852; font-size: 28px; line-height: 1.35; letter-spacing: -.04em; }
 .joinCard > p { margin: 0 0 28px; color: #697177; font-size: 14px; line-height: 1.65; }
+.joinResume { margin-bottom: 24px; display: flex; flex-direction: column; gap: 6px; }
+.joinResume > strong { color: #34383c; font-size: 13px; }
+.joinResume > span { color: #858b90; font-size: 11px; line-height: 1.5; }
+.joinResume > div { margin-top: 5px; display: flex; flex-direction: column; gap: 7px; }
+.joinResume button { width: 100%; min-height: 48px; padding: 0 12px; border: 1px solid #dce1e3; border-radius: 9px; background: #fff; display: flex; align-items: center; gap: 9px; color: #34383c; font-family: inherit; }
+.joinResume button:hover { border-color: #ff4d00; background: #fff8f4; }
+.joinResume button i { width: 16px; height: 16px; border-radius: 50%; flex: none; }
+.joinResume button span { min-width: 0; flex: 1; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; }
+.joinResume button small { color: #ff4d00; font-size: 11px; font-weight: 700; }
+.joinDivider { margin: 0 0 22px; display: flex; align-items: center; gap: 10px; color: #969b9f; font-size: 10px; }
+.joinDivider::before, .joinDivider::after { content: ""; height: 1px; flex: 1; background: #e7eaec; }
 .joinField { display: flex; flex-direction: column; gap: 8px; }
 .joinField > span, .joinColors legend { color: #34383c; font-size: 12px; font-weight: 800; }
 .joinField input { width: 100%; height: 48px; padding: 0 14px; border: 1px solid #cfd5d8; border-radius: 9px; background: #fff; color: #191918; font: 15px/1 Pretendard, sans-serif; outline: none; }

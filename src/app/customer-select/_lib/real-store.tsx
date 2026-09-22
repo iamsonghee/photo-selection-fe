@@ -6,7 +6,7 @@
  * 프로젝트에서 어떤 색으로 참여 중인가"를 localStorage에 남기는 방식이다(단계 1 결정 —
  * 공유 링크 참가자는 로그인하지 않음).
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ColorTag, Photo, StarRating } from "@/types";
 
 export const COLOR_PALETTE: { id: ColorTag; hex: string }[] = [
@@ -107,6 +107,7 @@ interface StoreValue {
   toggleDone: (identity: ColorTag) => void;
   setNickname: (nickname: string) => void;
   joinParticipant: (nickname: string, color: ColorTag) => Promise<string | null>;
+  resumeParticipant: (color: ColorTag) => void;
   refresh: () => Promise<ProjectView | undefined>;
   saveError: string | null;
   clearSaveError: () => void;
@@ -127,7 +128,6 @@ export function CustomerSelectStoreProvider({
   const [currentIdentity, setCurrentIdentityState] = useState<ColorTag>("red");
   const [participantReady, setParticipantReady] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
-  const claimedRef = useRef(false);
 
   const apiGet = useCallback(async () => {
     const res = await fetch(`/api/customer-select/projects/${projectId}`, { cache: "no-store" });
@@ -196,14 +196,10 @@ export function CustomerSelectStoreProvider({
         setHydrated(true);
         return;
       }
-      let identity = stored;
-      if (!identity && !claimedRef.current) {
-        claimedRef.current = true;
-        const taken = new Set(Object.keys(data.project.participantNicknames));
-        identity = COLOR_PALETTE.find((c) => !taken.has(c.id))?.id ?? "red";
-        saveStoredIdentity(projectId, identity);
-      }
+      // 소유자는 공유 링크를 열기 전에 항상 첫 슬롯(red)을 만들므로, 새 기기에서도 같은 색을 쓴다.
+      let identity = storedIsActive ? stored : data.isOwner ? "red" : null;
       identity ??= "red";
+      saveStoredIdentity(projectId, identity);
       setCurrentIdentityState(identity);
       setProject(withCurrentOpinions(data.project, identity));
       // 저장된 색도 서버 참가자 행이 삭제됐을 수 있으므로 멱등적으로 복구한다.
@@ -369,6 +365,14 @@ export function CustomerSelectStoreProvider({
     }
   }, [apiGet, projectId]);
 
+  const resumeParticipant = useCallback((color: ColorTag) => {
+    if (!Object.prototype.hasOwnProperty.call(project.participantNicknames, color)) return;
+    saveStoredIdentity(projectId, color);
+    setCurrentIdentityState(color);
+    setProject((prev) => withCurrentOpinions(prev, color));
+    setParticipantReady(true);
+  }, [project.participantNicknames, projectId]);
+
   const shareUrl = useMemo(() => {
     if (typeof window === "undefined" || !project.shareEnabled || !project.shareToken) return "";
     return `${window.location.origin}/customer-select/${projectId}/select?share_token=${project.shareToken}`;
@@ -379,9 +383,9 @@ export function CustomerSelectStoreProvider({
   const value = useMemo<StoreValue>(
     () => ({
       project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, update, toggleSelect, toggleLike,
-      setStar, setComment, toggleDone, setNickname, joinParticipant, refresh, saveError, clearSaveError,
+      setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, saveError, clearSaveError,
     }),
-    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, update, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, refresh, saveError, clearSaveError]
+    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, update, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, saveError, clearSaveError]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

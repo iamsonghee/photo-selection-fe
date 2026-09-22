@@ -60,13 +60,44 @@ test("first-time participant chooses an available color before entering", async 
 
   await page.goto("/customer-select/join-check/select");
   await expect(page.getByRole("heading", { name: /함께 참여해 주세요/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "신랑" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "신랑", exact: true })).toBeDisabled();
   await page.getByPlaceholder("예: 신랑, 엄마").fill("신부");
   await page.getByRole("button", { name: "사진 고르기 시작" }).click();
 
   await expect(page.getByText("우리 웨딩").first()).toBeVisible();
   expect(claim).toMatchObject({ claim: true, color: "red", nickname: "신부" });
   expect(await page.evaluate(() => localStorage.getItem("acut:customer-select:identity:join-check"))).toBe("red");
+});
+
+test("participant can continue the same identity on another device", async ({ page }) => {
+  await loginAsPhotographer(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => localStorage.removeItem("acut:customer-select:identity:resume-check"));
+  let participantWrites = 0;
+
+  await page.route("**/api/customer-select/projects/resume-check", async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    await route.fulfill({ json: { isOwner: false, project: {
+      id: "resume-check", name: "가족 사진", shootType: "family", target: 20, photoCount: 1, uploaded: true,
+      photos: [{ id: "p1", projectId: "resume-check", orderIndex: 0, url: "", previewUrl: "", originalFilename: "A001.jpg" }],
+      selectedIds: [], photoStates: {}, participantOpinions: {}, participantDone: { red: false, blue: false },
+      participantNicknames: { red: "소유자", blue: "신랑" }, shareToken: "", shareEnabled: true, exported: false,
+    } } });
+  });
+  await page.route("**/api/customer-select/projects/resume-check/participants", async (route) => {
+    participantWrites++;
+    await route.fulfill({ json: { ok: true } });
+  });
+
+  await page.goto("/customer-select/resume-check/select");
+  await page.getByRole("button", { name: /신랑.*이어서 참여/ }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("신랑님으로 이어서 참여할까요?")).toBeVisible();
+  await dialog.getByRole("button", { name: "이어서 참여", exact: true }).click();
+
+  await expect(page.getByText("가족 사진").last()).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("acut:customer-select:identity:resume-check"))).toBe("blue");
+  expect(participantWrites).toBe(0);
 });
 
 test("stopped or replaced invite shows an access-ended screen", async ({ page }) => {
