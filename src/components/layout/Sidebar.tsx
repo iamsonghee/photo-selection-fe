@@ -265,24 +265,19 @@ export function Sidebar({
             }}
             className={[styles.profileTrigger, collapsed ? styles.profileTriggerCollapsed : ""].filter(Boolean).join(" ")}
           >
-            <div className={styles.profileAvatar}>
-              <div
-                className={styles.profileAvatarFrame}
-                style={{ borderColor: "var(--acb-border)", background: "var(--surface)" }}
-              >
-                {profile?.profileImageUrl ? (
-                  <img
-                    src={getProfileImageUrl(profile.profileImageUrl)}
-                    alt=""
-                    className="w-full h-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PROFILE_IMAGE; }}
-                  />
-                ) : (
-                  <img src={DEFAULT_PROFILE_IMAGE} alt="" className="h-full w-full object-cover" />
-                )}
-              </div>
-              {profileIncomplete && (
-                <span className={styles.profileAvatarBadge} title="프로필을 완성해주세요" aria-label="프로필 미완성" />
+            <div
+              className={styles.profileAvatar}
+              style={{ borderColor: "var(--acb-border)", background: "var(--surface)" }}
+            >
+              {profile?.profileImageUrl ? (
+                <img
+                  src={getProfileImageUrl(profile.profileImageUrl)}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PROFILE_IMAGE; }}
+                />
+              ) : (
+                <img src={DEFAULT_PROFILE_IMAGE} alt="" className="h-full w-full object-cover" />
               )}
             </div>
             {!collapsed && (
@@ -293,12 +288,14 @@ export function Sidebar({
                 >
                   {displayName} 작가님
                 </p>
-                {tierLabel && (
+                {(tierLabel || profileIncomplete) && (
                   <p
-                    className="mt-0.5 text-[12px] leading-[18px] tracking-[-0.25px] text-muted-foreground"
+                    className="mt-0.5 flex items-center gap-1 text-[12px] leading-[18px] tracking-[-0.25px] text-muted-foreground"
                     style={{ fontFamily: "inherit" }}
                   >
-                    {tierLabel}
+                    {tierLabel && <span>{tierLabel}</span>}
+                    {tierLabel && profileIncomplete && <span aria-hidden>·</span>}
+                    {profileIncomplete && <span style={{ color: "var(--accent)", fontWeight: 600 }}>프로필 미완성</span>}
                   </p>
                 )}
               </div>
