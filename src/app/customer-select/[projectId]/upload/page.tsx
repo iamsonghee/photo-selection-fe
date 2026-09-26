@@ -46,6 +46,15 @@ type DeleteImpact = {
   retouchedVersions: number;
 };
 
+type AccountUsage = { photoCount: number; limit: number; remaining: number };
+
+async function getAccountUsage(): Promise<AccountUsage> {
+  const response = await fetch("/api/customer-select/usage", { cache: "no-store" });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error ?? "사진 이용량을 확인하지 못했어요.");
+  return data as AccountUsage;
+}
+
 export default function CustomerUploadPage() {
   const params = useParams();
   const projectId = params.projectId as string;
@@ -56,6 +65,7 @@ export default function CustomerUploadPage() {
   const [total, setTotal] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [checkingCapacity, setCheckingCapacity] = useState(false);
+  const [accountUsage, setAccountUsage] = useState<AccountUsage | null>(null);
   const [needsReselection, setNeedsReselection] = useState(false);
   const uploadStartingRef = useRef(false);
   const [uploadPhase, setUploadPhase] = useState<"compressing" | "uploading" | null>(null);
@@ -93,6 +103,11 @@ export default function CustomerUploadPage() {
     previewUrlsRef.current.forEach(URL.revokeObjectURL);
   }, []);
 
+  useEffect(() => {
+    if (!hydrated) return;
+    void getAccountUsage().then(setAccountUsage).catch(() => undefined);
+  }, [hydrated]);
+
   function clearPendingPreviews() {
     previewUrlsRef.current.forEach(URL.revokeObjectURL);
     previewUrlsRef.current = [];
@@ -109,9 +124,9 @@ export default function CustomerUploadPage() {
     setCheckingCapacity(true);
     setNeedsReselection(false);
     try {
-      const latest = await refresh();
-      if (!latest) throw new Error("사진 수를 확인하지 못했어요. 잠시 후 다시 선택해 주세요.");
-      const limitError = uploadLimitError(latest.photoCount, selectedFiles.length);
+      const [, usage] = await Promise.all([refresh(), getAccountUsage()]);
+      setAccountUsage(usage);
+      const limitError = uploadLimitError(usage.photoCount, selectedFiles.length);
       if (limitError) {
         setError(limitError);
         setNeedsReselection(true);
@@ -205,7 +220,7 @@ export default function CustomerUploadPage() {
         setUploadPhase(null);
         setEstimatedRemainingSeconds(null);
         uploadAbortRef.current = null;
-        await refresh();
+        await Promise.all([refresh(), getAccountUsage().then(setAccountUsage)]);
         clearPendingPreviews();
         return;
       }
@@ -220,7 +235,7 @@ export default function CustomerUploadPage() {
       setProgress(uploaded);
       setPendingPhotos((current) => current.map((photo) => batchIds.has(photo.id) ? { ...photo, isUploading: false } : photo));
     }
-    await refresh();
+    await Promise.all([refresh(), getAccountUsage().then(setAccountUsage)]);
     clearPendingPreviews();
     setUploading(false);
     setUploadPhase(null);
@@ -321,7 +336,7 @@ export default function CustomerUploadPage() {
       setSelectedPhotoIds(new Set());
       setPendingDeleteIds([]);
       setDeleteImpact(null);
-      await refresh();
+      await Promise.all([refresh(), getAccountUsage().then(setAccountUsage)]);
     } catch (e) {
       setDeleteError(e instanceof Error ? e.message : "사진을 삭제하지 못했습니다.");
     } finally {
@@ -428,7 +443,7 @@ export default function CustomerUploadPage() {
             <button type="button" onClick={() => router.push("/customer-select")} className={`grid shrink-0 place-items-center rounded-lg text-muted-foreground transition-[width,height] hover:bg-surface-raised hover:text-foreground ${compactHeader ? "size-9" : "size-10"}`} aria-label="프로젝트 목록으로"><ChevronLeft size={19} /></button>
             <div className="min-w-0 flex-1">
               <h1 className={`truncate font-bold text-foreground transition-[font-size] ${compactHeader ? "text-[14px]" : "text-[18px] md:text-[20px]"}`}>{displayName}</h1>
-              {!compactHeader ? <p className="mt-0.5 text-[12px] text-muted-foreground">{project.photoCount.toLocaleString()} / {MAX_PHOTOS.toLocaleString()}장 · {Math.max(0, MAX_PHOTOS - project.photoCount).toLocaleString()}장 추가 가능</p> : null}
+              {!compactHeader ? <p className="mt-0.5 text-[12px] text-muted-foreground">전체 {accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${MAX_PHOTOS.toLocaleString()}장 · ${accountUsage.remaining.toLocaleString()}장 추가 가능` : "사진 이용량 확인 중"}</p> : null}
             </div>
             <Link href={`/customer-select/${projectId}`} className="shrink-0 rounded-lg px-2 py-3 text-sm font-semibold text-muted-foreground">현황</Link>
             <div className="col-span-3 flex items-center justify-end gap-2 md:contents">

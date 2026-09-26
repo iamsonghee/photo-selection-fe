@@ -161,7 +161,7 @@ export function NewCustomerProjectForm() {
             </ProjectFormSection>
             </details>
             <div className="text-sm leading-6 text-muted-foreground">
-              <p>프로젝트당 최대 {CUSTOMER_PHOTO_LIMIT.toLocaleString()}장까지 올릴 수 있어요.</p>
+              <p>모든 프로젝트를 합해 최대 {CUSTOMER_PHOTO_LIMIT.toLocaleString()}장까지 저장할 수 있어요.</p>
               <p>원본 파일은 직접 보관해 주세요. 사진 선택용 이미지를 저장해요.</p>
             </div>
           </div>

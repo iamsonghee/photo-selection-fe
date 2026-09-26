@@ -3,6 +3,7 @@ import { uploadLimitError } from "../src/app/customer-select/_lib/upload-limit.t
 
 assert.equal(uploadLimitError(1999, 1), null);
 assert.match(uploadLimitError(1999, 2), /다시 선택/);
+assert.match(uploadLimitError(1999, 2), /셀프 고객 전체/);
 assert.match(uploadLimitError(2000, 1), /0장까지/);
 assert.equal(uploadLimitError(0, 2000), null);
 assert.match(uploadLimitError(0, 2001), /업로드하지 않았습니다/);

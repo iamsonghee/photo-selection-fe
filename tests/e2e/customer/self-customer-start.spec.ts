@@ -21,10 +21,11 @@ test("self customer start screens and over-limit selection", async ({ page }, te
   }
   await page.goto("/customer-select");
   await expect(page.getByText(/미입력/)).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "전체 사진 이용량" })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("projects-mobile.png"), fullPage: true });
   const overview = page.getByRole("link", { name: "프로젝트 현황", exact: true }).first();
   if (await overview.count()) {
-    await expect(page.getByRole("article").first().getByText(/[\d,]+장 남음/)).toBeVisible();
+    await expect(page.getByRole("article").first().getByText(/장 남음/)).toHaveCount(0);
     await overview.click();
     await expect(page.getByRole("region", { name: "프로젝트 진행 현황" })).toBeVisible();
     await expect(page.getByRole("link", { name: "새 프로젝트" })).toHaveCount(0);
@@ -51,6 +52,9 @@ test("self customer start screens and over-limit selection", async ({ page }, te
   // Isolate upload preflight: no photos or participant records are written.
   let uploadRequests = 0;
   await page.route("**/api/customer-select/upload/photos", async (route) => { uploadRequests++; await route.abort(); });
+  await page.route("**/api/customer-select/usage", async (route) => {
+    await route.fulfill({ json: { photoCount: 1999, limit: 2000, remaining: 1 } });
+  });
   await page.route("**/api/customer-select/projects/*", async (route) => {
     await route.fulfill({ json: { isOwner: true, project: {
       id: "limit-check", name: "업로드 한도 확인", photoCount: 1999, target: 30,

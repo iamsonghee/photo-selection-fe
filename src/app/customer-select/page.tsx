@@ -20,6 +20,8 @@ export default async function CustomerSelectHomePage() {
     .eq("owner_id", ownerId)
     .order("created_at", { ascending: false });
   const projects = (data ?? []) as CustomerProjectSummary[];
+  const accountPhotoCount = projects.reduce((sum, project) => sum + Math.max(0, project.photo_count), 0);
+  const remainingPhotoCount = Math.max(0, CUSTOMER_PHOTO_LIMIT - accountPhotoCount);
   const projectIdsWithPhotos = projects.filter((project) => project.photo_count > 0).map((project) => project.id);
   const selectedCounts = await Promise.all(projects.map((project) => admin.from("customer_selections")
     .select("photo_id", { count: "exact", head: true }).eq("project_id", project.id).eq("is_selected", true)));
@@ -42,6 +44,21 @@ export default async function CustomerSelectHomePage() {
         <h1 className="text-[26px] font-bold tracking-[-0.04em] md:text-[30px]">내 셀렉 프로젝트</h1>
         <p className="mt-2 text-[14px] text-muted-foreground">사진을 올리고 함께 고른 뒤, 선택한 결과를 작가에게 전달하세요.</p>
 
+        {!error ? (
+          <section className="mt-7 rounded-2xl border border-border-subtle bg-surface p-5 md:flex md:items-center md:gap-8" aria-label="전체 사진 이용량">
+            <div className="flex items-end justify-between gap-4 md:w-72 md:shrink-0">
+              <div>
+                <p className="text-[13px] font-semibold text-muted-foreground">전체 사진 이용량</p>
+                <p className="mt-1 text-[22px] font-bold tracking-[-0.03em] text-foreground">{accountPhotoCount.toLocaleString()} <span className="text-[15px] font-semibold text-muted-foreground">/ {CUSTOMER_PHOTO_LIMIT.toLocaleString()}장</span></p>
+              </div>
+              <p className="pb-0.5 text-[13px] font-semibold text-accent">{remainingPhotoCount.toLocaleString()}장 남음</p>
+            </div>
+            <div className="mt-4 h-2 flex-1 overflow-hidden rounded-full bg-surface-raised md:mt-0" role="progressbar" aria-label="전체 사진 이용량" aria-valuemin={0} aria-valuemax={CUSTOMER_PHOTO_LIMIT} aria-valuenow={Math.min(accountPhotoCount, CUSTOMER_PHOTO_LIMIT)}>
+              <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${Math.min(100, accountPhotoCount / CUSTOMER_PHOTO_LIMIT * 100)}%` }} />
+            </div>
+          </section>
+        ) : null}
+
         {error ? (
           <div className="mt-8 rounded-xl border border-danger/20 bg-surface p-6 text-[14px] text-danger">프로젝트를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</div>
         ) : projects.length === 0 ? (
@@ -54,10 +71,9 @@ export default async function CustomerSelectHomePage() {
             </div>
           </section>
         ) : (
-          <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="프로젝트 목록">
+          <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="프로젝트 목록">
             {projects.map((project) => {
               const coverUrl = coverByProject.get(project.id);
-              const remainingPhotoCount = Math.max(0, CUSTOMER_PHOTO_LIMIT - project.photo_count);
               return (
               <article key={project.id} className="group relative overflow-hidden rounded-2xl border border-border-subtle bg-surface transition hover:-translate-y-0.5 hover:border-border-strong hover:shadow-[0_12px_32px_rgba(2,56,82,0.08)]">
               <Link href={`/customer-select/${project.id}`} className="block" aria-label={`${project.name} 프로젝트 현황`}>
@@ -72,7 +88,7 @@ export default async function CustomerSelectHomePage() {
                     <span className="shrink-0 rounded-md bg-customer-soft px-2 py-1 text-[11px] font-bold text-primary">{customerProjectStatus(project)}</span>
                   </div>
                   <p className="mt-3 text-[13px] text-muted-foreground">{[project.studio_name, isProjectShootType(project.shoot_type) ? projectShootTypeLabel(project.shoot_type) : null, project.shoot_date?.replaceAll("-", ".")].filter(Boolean).join(" · ")}</p>
-                  <p className="mt-2 text-[13px] font-semibold text-foreground">사진 {project.photo_count.toLocaleString()} / {CUSTOMER_PHOTO_LIMIT.toLocaleString()}장 · {remainingPhotoCount.toLocaleString()}장 남음</p>
+                  <p className="mt-2 text-[13px] font-semibold text-foreground">사진 {project.photo_count.toLocaleString()}장</p>
                   <p className="mt-1 text-[13px] text-muted-foreground">{selectedByProject.get(project.id) === null ? "선택 수 확인 불가" : `${selectedByProject.get(project.id)}장 선택`} · 목표 {project.target_count.toLocaleString()}장</p>
                 </div>
               </Link>
