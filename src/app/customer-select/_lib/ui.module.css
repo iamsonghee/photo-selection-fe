@@ -1,13 +1,13 @@
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css");
 
-/* 셀프 고객 페이지 전용 화면 톤 — docs/customer-design.md §4 수치를 그대로 따른다.
- * (Entry title 24/36 SemiBold, description 14/21, primary CTA 16/24 Bold, 좌우 여백 24px,
+/* 셀프 고객 페이지 전용 화면 톤 — docs/customer-design.md §4의 타이포그래피와 색상을 따른다.
+ * (Entry title 24/36 SemiBold, description 14/21, primary CTA 16/24 Bold,
  *  터치 타겟 최소 44px, accent #ff4d00) CustomerEntryShell과 같은 리터럴 값을 쓴다 —
  * 그 컴포넌트도 --customer-* CSS 변수 대신 고정 hex를 쓰는 관례라 여기서도 맞춘다. */
 
 /* 모바일은 단일 칼럼, PC는 ACUT Light 작업면과 공통 하단 액션바 구조를 사용한다. */
 .shellMain {
-  width: min(100%, 375px);
+  width: 100%;
   margin: 0 auto;
   flex: 1;
   display: flex;
@@ -25,7 +25,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 24px 8px;
+  padding: 14px 20px 8px;
 }
 .back {
   width: 44px;
@@ -47,7 +47,7 @@
 }
 
 .body {
-  padding: 6px 24px 24px;
+  padding: 6px 20px 24px;
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -228,7 +228,7 @@
 }
 
 .joinShell { min-height: 100dvh; background: #f3f6f7; color: #191918; font-family: Pretendard, "Pretendard Variable", -apple-system, sans-serif; }
-.joinBrand { height: 64px; display: flex; align-items: center; padding: 0 max(32px, calc((100vw - 1504px) / 2)); border-bottom: 1px solid #e7ecee; background: #fff; }
+.joinBrand { height: 64px; display: flex; align-items: center; padding: 0 max(32px, calc((100vw - 1440px) / 2)); border-bottom: 1px solid #e7ecee; background: #fff; }
 .joinMain { min-height: calc(100dvh - 64px); padding: 48px 20px; display: grid; place-items: start center; box-sizing: border-box; }
 .joinCard { width: min(100%, 460px); padding: 34px; border: 1px solid #e1e6e8; border-radius: 18px; background: #fff; box-shadow: 0 14px 42px rgba(2,56,82,.08); }
 .joinEyebrow { color: #ff4d00; font-size: 12px; font-weight: 800; }
@@ -270,7 +270,7 @@
   .joinCard h1 { font-size: 25px; }
 }
 
-.selectWorkspace { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; background: #f7f7f7; color: #191918; font-family: Pretendard, "Pretendard Variable", -apple-system, sans-serif; }
+.selectWorkspace { --customer-gallery-max-width: 1504px; --customer-gallery-content-max-width: 1440px; --customer-gallery-gutter: 32px; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; background: #f7f7f7; color: #191918; font-family: Pretendard, "Pretendard Variable", -apple-system, sans-serif; }
 .selectFrame { width: 100%; min-height: 0; margin: 0 auto; flex: 1; display: flex; flex-direction: column; background: #fff; }
 .selectDesktopOnly { display: block; flex: none; }
 .selectHeader { display: none; flex: none; padding: 12px 24px 10px; border-bottom: 1px solid #e5e5e5; background: rgba(255,255,255,.98); box-shadow: 0 4px 16px rgba(25,25,24,.035); z-index: 20; }
@@ -321,8 +321,8 @@
 .selectDesktopDensity button { height: 26px; padding: 0 7px; border: 0; border-left: 1px solid #dde1e4; background: #fff; color: #747a81; font: 600 10px/1 Pretendard, sans-serif; cursor: pointer; }
 .selectDesktopDensity button:first-child { border-left: 0; }
 .selectDesktopDensity button[aria-pressed="true"] { background: #26282c; color: #fff; }
-.selectGallery { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; background: #f7f7f7; padding: 16px 24px 24px; }
-.selectGrid { position: relative; width: 100%; max-width: calc(var(--customer-gallery-max-width, 1440px) - 48px); min-height: 100%; margin: 0 auto; }
+.selectGallery { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; background: #f7f7f7; padding: 16px var(--customer-gallery-gutter, 24px) 24px; }
+.selectGrid { position: relative; width: 100%; max-width: var(--customer-gallery-content-max-width, 1392px); min-height: 100%; margin: 0 auto; }
 .selectGridRow { position: absolute; top: 0; left: 0; width: 100%; display: grid; overflow: hidden; }
 .selectEmpty { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; color: #5f5e5b; text-align: center; }
 .selectEmpty strong { color: #191918; font-size: 17px; }
@@ -348,6 +348,7 @@
 .ephemeralChatTrigger { min-width: 86px; height: 42px; padding: 0 15px; border: 1px solid #d8dddf; border-radius: 999px; background: #fff; box-shadow: 0 8px 22px rgba(2,56,82,.14); color: #34383c; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font: 700 12px/1 Pretendard, sans-serif; pointer-events: auto; }
 @keyframes ephemeralMessageIn { from { opacity: 0; transform: translateY(5px); } }
 @media (max-width: 767px) {
+  .selectWorkspace { --customer-gallery-gutter: 20px; }
   .nicknameDialog { width: 100%; max-width: none; margin: auto 0 0; border-radius: 14px 14px 0 0; padding-bottom: env(safe-area-inset-bottom); }
   .nicknameDialog form { padding: 20px; }
   .selectDesktopOnly { display: none; }
@@ -438,26 +439,26 @@
 
 /* PC uses the same roomy A-CUT work surface; mobile keeps the original single-column flow. */
 @media (min-width: 768px) {
-  .shellMain {
-    width: 100%;
-    margin: 0;
-  }
   .page {
     min-height: calc(100dvh - 64px);
   }
   .header {
-    width: min(calc(100% - 64px), 1120px);
+    width: 100%;
+    max-width: 1120px;
     margin: 0 auto;
-    padding: 32px 0 10px;
+    padding: 32px 32px 10px;
+    box-sizing: border-box;
   }
   .title {
     color: var(--foreground, #023852);
     font-size: 20px;
   }
   .body {
-    width: min(calc(100% - 64px), 1120px);
+    width: 100%;
+    max-width: 1120px;
     margin: 0 auto;
-    padding: 16px 0 40px;
+    padding: 16px 32px 40px;
+    box-sizing: border-box;
   }
   .reviewGrid {
     grid-template-columns: repeat(8, minmax(0, 1fr));

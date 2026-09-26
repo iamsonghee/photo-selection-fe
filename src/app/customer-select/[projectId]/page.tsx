@@ -56,7 +56,7 @@ export default async function CustomerProjectOverview({ params }: { params: Prom
   ].filter((item): item is [string, string] => Boolean(item[1]));
 
   return <CustomerSelectShell navigation={false}>
-    <main className="mx-auto w-full max-w-[960px] flex-1 px-5 py-8 md:px-8 md:py-10">
+    <main className="mx-auto w-full max-w-[1120px] flex-1 px-5 py-8 md:px-8 md:py-10">
       <Link href="/customer-select" className="text-sm text-muted-foreground">← 내 프로젝트</Link>
       <div className="mt-5 flex items-center justify-between gap-4">
         <h1 className="min-w-0 break-words text-2xl font-bold md:text-3xl">{project.name}</h1>

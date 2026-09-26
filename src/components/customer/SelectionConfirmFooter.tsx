@@ -187,7 +187,7 @@ export function SelectionConfirmFooter({
             maxWidth: "var(--customer-gallery-max-width, 1440px)",
             margin: "0 auto",
             height: 72,
-            padding: "0 24px",
+            padding: "0 var(--customer-gallery-gutter, 24px)",
             display: "grid",
             gridTemplateColumns: showProgress ? "minmax(220px, 1fr) auto" : "1fr",
             alignItems: "center",

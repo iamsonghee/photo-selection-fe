@@ -438,8 +438,8 @@ export default function CustomerUploadPage() {
           void handleFiles(files);
         }} />
 
-        <header data-upload-header-mode={compactHeader ? "compact" : "expanded"} className={`shrink-0 overflow-hidden border-b border-border-subtle bg-background px-4 transition-[padding] duration-200 md:px-8 ${compactHeader ? "py-1" : "py-3"}`}>
-          <div className="mx-auto grid max-w-[1504px] grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-2 md:flex md:gap-3">
+        <header data-upload-header-mode={compactHeader ? "compact" : "expanded"} className={`shrink-0 overflow-hidden border-b border-border-subtle bg-background transition-[padding] duration-200 ${compactHeader ? "py-1" : "py-3"}`}>
+          <div className="mx-auto grid w-full max-w-[1504px] grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-2 px-5 md:flex md:gap-3 md:px-8">
             <button type="button" onClick={() => router.push("/customer-select")} className={`grid shrink-0 place-items-center rounded-lg text-muted-foreground transition-[width,height] hover:bg-surface-raised hover:text-foreground ${compactHeader ? "size-9" : "size-10"}`} aria-label="프로젝트 목록으로"><ChevronLeft size={19} /></button>
             <div className="min-w-0 flex-1">
               <h1 className={`truncate font-bold text-foreground transition-[font-size] ${compactHeader ? "text-[14px]" : "text-[18px] md:text-[20px]"}`}>{displayName}</h1>
@@ -453,8 +453,8 @@ export default function CustomerUploadPage() {
           </div>
         </header>
 
-        <div className="shrink-0 border-b border-border-subtle bg-surface px-4 md:px-8">
-          <div className="mx-auto flex min-h-12 max-w-[1504px] items-center justify-between gap-3 py-1.5 max-md:flex-wrap max-md:gap-1.5">
+        <div className="shrink-0 border-b border-border-subtle bg-surface">
+          <div className="mx-auto flex min-h-12 w-full max-w-[1504px] items-center justify-between gap-3 px-5 py-1.5 max-md:flex-wrap max-md:gap-1.5 md:px-8">
             <ProjectAssetToolbarSummary label="업로드 사진" count={nameFilter.trim() ? `${visiblePhotos.length.toLocaleString()} / ${displayedPhotos.length.toLocaleString()}장` : `${displayedPhotos.length.toLocaleString()}장`} meta={uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : aiAnalyzing ? "AI 분석 중" : undefined} />
             <div className="flex min-w-0 items-center gap-1.5 max-md:w-full">
               <FilenameSearchInput value={nameFilter} onChange={setNameFilter} placeholder="파일명 검색" className="max-md:flex-1" style={{ "--fsi-width": "220px" } as React.CSSProperties} />

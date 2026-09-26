@@ -329,7 +329,7 @@ export function GalleryDesktopHeader({
           max-width: var(--customer-gallery-max-width, 1440px);
           margin: 0 auto;
           height: 64px;
-          padding: 0 24px;
+          padding: 0 var(--customer-gallery-gutter, 24px);
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -438,7 +438,7 @@ export function GalleryDesktopHeader({
           max-width: var(--customer-gallery-max-width, 1440px);
           margin: 0 auto;
           min-height: 52px;
-          padding: 0 24px;
+          padding: 0 var(--customer-gallery-gutter, 24px);
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -695,7 +695,7 @@ export function GalleryDesktopHeader({
         .gld-filter-left, .gld-filter-right { flex-wrap:wrap; }
         .gld-scope-group { flex: 0 1 auto; }
         @media (max-width: 1180px) { .gld-search-group { margin-left: 0; } }
-        .gld-active-filters { max-width:1440px; margin:auto; background:var(--customer-canvas); display:flex; flex-wrap:wrap; gap:8px; padding:8px 24px; }
+        .gld-active-filters { max-width:var(--customer-gallery-max-width, 1440px); margin:auto; background:var(--customer-canvas); display:flex; flex-wrap:wrap; gap:8px; padding:8px var(--customer-gallery-gutter, 24px); }
         .gld-active-filters button { border:1px solid var(--customer-divider); border-radius:16px; padding:5px 10px; font-size:12px; }
       `}</style>
     </header>
