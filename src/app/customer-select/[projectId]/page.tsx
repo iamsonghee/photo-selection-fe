@@ -19,34 +19,84 @@ export default async function CustomerProjectOverview({ params }: { params: Prom
   if (error) throw new Error("프로젝트 현황을 불러오지 못했어요.");
   if (!data) notFound();
   const project = data as CustomerProjectSummary;
+  const sharingEnabled = Boolean(data.sharing_enabled);
   const { count, error: selectionError } = await admin.from("customer_selections")
     .select("photo_id", { count: "exact", head: true }).eq("project_id", projectId).eq("is_selected", true);
-  const action = project.retouch_done ? "완료 내용 보기" : project.exported ? "전달 내용 보기" : project.photo_count ? "이어서 고르기" : "사진 올리기";
-  const info = [["촬영 종류", projectShootTypeLabel(project.shoot_type)], ["촬영일", project.shoot_date], ["선택 마감일", project.selection_deadline], ["스튜디오·업체", project.studio_name], ["담당 작가", project.photographer_name], ["촬영 지역", project.shoot_region], ["촬영 장소", project.shoot_location]];
+  const selectedCount = selectionError ? null : count ?? 0;
+  const action = project.retouch_done ? "완료 내용 보기" : project.exported ? "전달 내용 보기" : project.photo_count ? selectedCount ? "이어서 고르기" : "사진 고르기" : "사진 올리기";
+  const nextStep = project.retouch_done
+    ? "모든 보정 확인이 완료됐어요."
+    : project.exported
+      ? "작가님께 전달한 선택 결과를 확인할 수 있어요."
+      : project.photo_count === 0
+        ? "사진을 올리면 바로 선택을 시작할 수 있어요."
+        : selectedCount
+          ? "고르던 위치부터 사진 선택을 이어가세요."
+          : "사진 업로드가 끝났어요. 이제 전달할 사진을 골라주세요.";
+  const selectionProgress = selectedCount === null || project.target_count <= 0 ? 0 : Math.min(100, Math.round((selectedCount / project.target_count) * 100));
+  const info = [
+    ["촬영 종류", project.shoot_type ? projectShootTypeLabel(project.shoot_type) : null],
+    ["촬영일", project.shoot_date],
+    ["선택 마감일", project.selection_deadline],
+    ["스튜디오·업체", project.studio_name],
+    ["담당 작가", project.photographer_name],
+    ["촬영 지역", project.shoot_region],
+    ["촬영 장소", project.shoot_location],
+  ].filter((item): item is [string, string] => Boolean(item[1]));
 
-  return <CustomerSelectShell>
-    <main className="mx-auto w-full max-w-[1120px] flex-1 px-5 py-8 md:px-8 md:py-10">
+  return <CustomerSelectShell navigation={false}>
+    <main className="mx-auto w-full max-w-[960px] flex-1 px-5 py-8 md:px-8 md:py-10">
       <Link href="/customer-select" className="text-sm text-muted-foreground">← 내 프로젝트</Link>
-      <div className="mt-5 flex items-start justify-between gap-4">
+      <div className="mt-5 flex items-center justify-between gap-4">
         <h1 className="min-w-0 break-words text-2xl font-bold md:text-3xl">{project.name}</h1>
-        <Link href={`/customer-select/${projectId}/settings`} className="shrink-0 rounded-lg border border-border-subtle bg-surface px-4 py-3 text-sm font-semibold">설정</Link>
+        <Link href={`/customer-select/${projectId}/settings`} className="shrink-0 rounded-lg border border-border-subtle bg-surface px-4 py-2.5 text-sm font-semibold hover:border-border-strong"><span className="hidden sm:inline">프로젝트 </span>설정</Link>
       </div>
-      <section className="mt-6 rounded-2xl border border-border-subtle bg-surface p-6 md:p-8" aria-label="프로젝트 진행 현황">
-        <p className="font-semibold text-accent">{customerProjectStatus(project)}</p>
-        <p className="mt-3 text-xl font-bold">{project.photo_count.toLocaleString()}장 중 {selectionError ? "선택 수 확인 불가" : `${(count ?? 0).toLocaleString()}장 선택`}</p>
-        <p className="mt-2 text-sm text-muted-foreground">작가님과 약속한 보정 장수 {project.target_count}장 · 선택 장수가 달라도 전달할 수 있어요.</p>
-        <p className="mt-4 text-sm text-muted-foreground">업로드 {project.photo_count.toLocaleString()} / {CUSTOMER_PHOTO_LIMIT.toLocaleString()}장 · {Math.max(0, CUSTOMER_PHOTO_LIMIT - project.photo_count).toLocaleString()}장 추가 가능</p>
+      <section className="mt-6 rounded-2xl border border-border-subtle bg-surface p-5 md:p-7" aria-label="프로젝트 진행 현황">
+        <p className="text-sm font-bold text-accent">{customerProjectStatus(project)}</p>
+        <h2 className="mt-2 text-lg font-bold tracking-[-0.02em] md:text-xl">{nextStep}</h2>
+
+        <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border-subtle bg-border-subtle md:grid-cols-4">
+          {[
+            ["업로드 사진", `${project.photo_count.toLocaleString()}장`],
+            ["최종 선택", selectedCount === null ? "확인 불가" : `${selectedCount.toLocaleString()}장`],
+            ["목표", `${project.target_count.toLocaleString()}장`],
+            ["추가 업로드", `${Math.max(0, CUSTOMER_PHOTO_LIMIT - project.photo_count).toLocaleString()}장`],
+          ].map(([label, value]) => <div key={label} className="bg-surface-raised px-4 py-4"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 text-lg font-bold">{value}</dd></div>)}
+        </dl>
+
+        {!project.exported && !project.retouch_done && project.photo_count > 0 && selectedCount !== null ? <div className="mt-5">
+          <div className="flex items-center justify-between gap-4 text-xs text-muted-foreground">
+            <span>선택 현황</span>
+            <span>{selectedCount.toLocaleString()}장 선택 · 목표 {project.target_count.toLocaleString()}장</span>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-border-subtle" role="progressbar" aria-label="선택 현황" aria-valuemin={0} aria-valuemax={project.target_count} aria-valuenow={Math.min(selectedCount, project.target_count)}>
+            <div className="h-full rounded-full bg-accent" style={{ width: `${selectionProgress}%` }} />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">목표 장수는 안내 기준이며, 선택 장수가 달라도 전달할 수 있어요.</p>
+        </div> : null}
       </section>
-      <div className="mt-5 flex flex-wrap gap-3">
-        <Link href={`/customer-select/${projectId}/upload`} className="rounded-xl border border-border-subtle bg-surface px-5 py-3 text-sm font-semibold">사진 관리</Link>
-        {project.photo_count > 0 && <Link href={`/customer-select/${projectId}/select`} className="rounded-xl border border-border-subtle bg-surface px-5 py-3 text-sm font-semibold">사진 고르기</Link>}
-        <Link href={`/customer-select/${projectId}/settings#sharing`} className="rounded-xl border border-border-subtle bg-surface px-5 py-3 text-sm font-semibold">초대 링크 {data.sharing_enabled ? "관리" : "만들기"}</Link>
-        {project.exported && <Link href={`/customer-select/${projectId}/export`} className="rounded-xl border border-border-subtle bg-surface px-5 py-3 text-sm font-semibold">현재 전달 내용</Link>}
+
+      <div className="mt-5 flex flex-wrap gap-3" aria-label="프로젝트 관리">
+        {project.photo_count > 0 ? <Link href={`/customer-select/${projectId}/upload`} className="rounded-xl border border-border-subtle bg-surface px-5 py-3 text-sm font-semibold hover:border-border-strong">사진 관리</Link> : null}
+        <Link href={`/customer-select/${projectId}/settings#sharing`} className="rounded-xl border border-border-subtle bg-surface px-5 py-3 text-sm font-semibold hover:border-border-strong">{sharingEnabled ? "초대 링크 관리" : "함께 고를 사람 초대"}</Link>
       </div>
-      <dl className="mt-8 grid gap-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
-        {info.map(([label, value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 break-words font-semibold">{value || "미입력"}</dd></div>)}
-      </dl>
+
+      <section className="mt-8 rounded-2xl border border-border-subtle bg-surface p-5 md:p-6" aria-labelledby="shoot-info-title">
+        <div className="flex items-center justify-between gap-4">
+          <h2 id="shoot-info-title" className="font-bold">촬영 정보</h2>
+          <Link href={`/customer-select/${projectId}/settings`} className="text-sm font-semibold text-accent">수정</Link>
+        </div>
+        <dl className="mt-5 grid gap-x-8 gap-y-5 text-sm sm:grid-cols-2 md:grid-cols-3">
+          {info.map(([label, value]) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words font-semibold">{value}</dd></div>)}
+        </dl>
+        {info.length === 1 ? <Link href={`/customer-select/${projectId}/settings`} className="mt-5 inline-flex text-sm font-semibold text-accent">촬영일·업체·장소 추가하기 →</Link> : null}
+      </section>
     </main>
-    <PhotographerPageActionBar maxWidth={1120} mobileFixed actions={<Link href={customerProjectDestination(project)} className="block w-full rounded-xl bg-accent px-6 py-3.5 text-center font-bold text-white sm:w-auto">{action}</Link>} />
+    <PhotographerPageActionBar
+      maxWidth={960}
+      mobileFixed
+      leading={<div><p className="text-sm font-semibold">{project.photo_count.toLocaleString()}장 중 {selectedCount === null ? "선택 수 확인 불가" : `${selectedCount.toLocaleString()}장 선택`}</p><p className="mt-1 text-xs text-muted-foreground">목표 {project.target_count.toLocaleString()}장</p></div>}
+      actions={<Link href={customerProjectDestination(project)} className="block w-full rounded-xl bg-accent px-6 py-3.5 text-center font-bold text-white sm:w-auto">{action}</Link>}
+    />
   </CustomerSelectShell>;
 }
