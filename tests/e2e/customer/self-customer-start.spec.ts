@@ -22,6 +22,11 @@ test("self customer start screens and over-limit selection", async ({ page }, te
   await page.goto("/customer-select");
   await expect(page.getByText(/미입력/)).toHaveCount(0);
   await expect(page.getByRole("region", { name: "전체 사진 이용량" })).toBeVisible();
+  const accountMenu = page.locator('summary[aria-label="계정 메뉴"]');
+  await expect(accountMenu).toBeVisible();
+  await accountMenu.click();
+  await expect(page.locator("details").filter({ has: accountMenu }).getByRole("button", { name: "로그아웃" })).toBeVisible();
+  await accountMenu.click();
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await page.screenshot({ path: testInfo.outputPath(`projects-${width}.png`), fullPage: true });

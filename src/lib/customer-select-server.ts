@@ -5,17 +5,21 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
-import { SupabaseClient } from "@supabase/supabase-js";
+import { SupabaseClient, type User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { customerShareCookieName } from "@/lib/customer-select-share-auth";
 import type { ColorTag, Photo, StarRating } from "@/types";
 
-export async function getCurrentCustomerAuthId(): Promise<string | null> {
+export async function getCurrentCustomerAuthUser(): Promise<User | null> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return user?.id ?? null;
+  return user;
+}
+
+export async function getCurrentCustomerAuthId(): Promise<string | null> {
+  return (await getCurrentCustomerAuthUser())?.id ?? null;
 }
 
 export interface CustomerProjectRow {

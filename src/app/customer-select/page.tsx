@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { FolderPlus } from "lucide-react";
-import { getCurrentCustomerAuthId } from "@/lib/customer-select-server";
+import { getCurrentCustomerAuthUser } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "./_lib/CustomerSelectShell";
 import { customerProjectAction, customerProjectDestination, customerProjectStatus, filterCustomerProjects, type CustomerProjectFilter, type CustomerProjectSummary } from "./_lib/project-routing";
@@ -10,8 +10,9 @@ import { isProjectShootType, projectShootTypeLabel } from "@/lib/project-shoot-t
 import { CUSTOMER_PHOTO_LIMIT } from "./_lib/upload-limit";
 
 export default async function CustomerSelectHomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const ownerId = await getCurrentCustomerAuthId();
-  if (!ownerId) redirect("/customer-select/login");
+  const user = await getCurrentCustomerAuthUser();
+  if (!user) redirect("/customer-select/login");
+  const ownerId = user.id;
   const params = await searchParams;
 
   const admin = getAdminClient();
@@ -43,9 +44,21 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
   for (const { data: photo } of firstPhotoResults) {
     if (photo && (photo.preview_url || photo.thumb_url)) coverByProject.set(photo.project_id, photo.preview_url ?? photo.thumb_url!);
   }
+  const displayName = String(user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email?.split("@")[0] ?? "사용자");
+  const avatarUrl = user.user_metadata?.avatar_url ?? user.user_metadata?.picture;
 
   return (
-    <CustomerSelectShell navigation={!error && projects.length > 0}>
+    <CustomerSelectShell
+      navigation={!error && projects.length > 0}
+      account={{
+        displayName,
+        email: user.email ?? "",
+        avatarUrl: typeof avatarUrl === "string" ? avatarUrl : null,
+        provider: typeof user.app_metadata?.provider === "string" ? user.app_metadata.provider : null,
+        photoCount: accountPhotoCount,
+        photoLimit: CUSTOMER_PHOTO_LIMIT,
+      }}
+    >
       <main className="mx-auto w-full max-w-[1504px] px-5 py-8 md:px-8 md:py-10">
         <div className="lg:flex lg:items-center lg:justify-between lg:gap-10">
           <div className="flex items-center gap-3">
