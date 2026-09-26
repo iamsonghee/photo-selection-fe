@@ -29,6 +29,7 @@ export default function CustomerExportPage() {
   const router = useRouter();
   const { project, hydrated, isOwner, currentIdentity, syncStatus, syncNow, update } = useCustomerSelectStore();
   const [copyState, setCopyState] = useState<"idle" | "ok" | "fail">("idle");
+  const [linkCopyState, setLinkCopyState] = useState<"idle" | "loading" | "ok" | "fail">("idle");
   const [reopenConfirm, setReopenConfirm] = useState(false);
   const [deliverConfirm, setDeliverConfirm] = useState(false);
   const [changingState, setChangingState] = useState(false);
@@ -61,6 +62,20 @@ export default function CustomerExportPage() {
       setCopyState("fail");
     }
     setTimeout(() => setCopyState("idle"), 2000);
+  }
+
+  async function handleResultLinkCopy() {
+    setLinkCopyState("loading");
+    try {
+      const response = await fetch(`/api/customer-select/projects/${projectId}/result-link`);
+      const result = await response.json();
+      if (!response.ok || !result.url) throw new Error(result.error || "결과 링크를 만들지 못했습니다.");
+      await navigator.clipboard.writeText(`${window.location.origin}${result.url}`);
+      setLinkCopyState("ok");
+    } catch {
+      setLinkCopyState("fail");
+    }
+    setTimeout(() => setLinkCopyState("idle"), 2000);
   }
 
   function handleDownloadCsv() {
@@ -138,6 +153,15 @@ export default function CustomerExportPage() {
             </button>
           </div>
           <span className={ui.supportText}>CSV에는 참여자 의견이 함께 담기고, TXT에는 파일명만 담겨요.</span>
+          {project.exported ? (
+            <div className={`${ui.banner} ${ui.bannerOk}`}>
+              <strong className={ui.bannerHeadOk}>작가님이 링크로 바로 확인할 수 있어요</strong>
+              <span className={ui.supportText}>선택 사진과 의견을 읽기 전용으로 보여주며, 다시 전달하면 같은 링크에 최신 결과가 반영돼요.</span>
+              <button type="button" className={`${ui.btn} ${ui.btnSm}`} disabled={linkCopyState === "loading"} onClick={() => void handleResultLinkCopy()}>
+                {linkCopyState === "loading" ? "링크 만드는 중…" : linkCopyState === "ok" ? "링크를 복사했어요 ✓" : linkCopyState === "fail" ? "복사하지 못했어요" : "작가용 결과 링크 복사"}
+              </button>
+            </div>
+          ) : null}
         </div>
         <PhotographerPageActionBar
           maxWidth={1120}
