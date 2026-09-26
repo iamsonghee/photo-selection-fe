@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import { FolderPlus, Plus } from "lucide-react";
+import { FolderPlus } from "lucide-react";
 import { getCurrentCustomerAuthId } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "./_lib/CustomerSelectShell";
@@ -51,7 +51,6 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
           <div className="flex items-center gap-3">
             <h1 className="text-[26px] font-bold tracking-[-0.04em] md:text-[30px]">내 프로젝트</h1>
             <span className="text-[15px] font-semibold text-muted-foreground" aria-label={`${projects.length.toLocaleString()}개 프로젝트`}>{projects.length.toLocaleString()}</span>
-            {!error && projects.length > 0 ? <Link href="/customer-select/new" className="hidden min-h-10 items-center gap-1.5 rounded-lg bg-accent px-4 text-[13px] font-bold text-white shadow-[0_6px_16px_rgba(255,82,22,0.16)] transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 lg:inline-flex"><Plus size={16} strokeWidth={2.4} />새 프로젝트</Link> : null}
           </div>
 
           {!error ? (
