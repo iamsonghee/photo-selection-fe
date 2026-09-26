@@ -26,9 +26,9 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await overview.click();
     await expect(page.getByRole("region", { name: "프로젝트 진행 현황" })).toBeVisible();
     await expect(page.getByRole("link", { name: "새 프로젝트" })).toHaveCount(0);
-    await expect(page.getByText("업로드 사진", { exact: true })).toBeVisible();
+    await expect(page.getByText("올린 사진", { exact: true })).toBeVisible();
     await expect(page.getByText("최종 선택", { exact: true })).toBeVisible();
-    await expect(page.getByText("추가 업로드", { exact: true })).toBeVisible();
+    await expect(page.getByText("추가 가능", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "촬영 정보" })).toBeVisible();
     await expect(page.getByText(/미입력/)).toHaveCount(0);
     for (const width of [1440, 390]) {

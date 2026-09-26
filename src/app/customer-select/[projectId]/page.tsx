@@ -57,10 +57,10 @@ export default async function CustomerProjectOverview({ params }: { params: Prom
 
         <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border-subtle bg-border-subtle md:grid-cols-4">
           {[
-            ["업로드 사진", `${project.photo_count.toLocaleString()}장`],
+            ["올린 사진", `${project.photo_count.toLocaleString()}장`],
             ["최종 선택", selectedCount === null ? "확인 불가" : `${selectedCount.toLocaleString()}장`],
             ["목표", `${project.target_count.toLocaleString()}장`],
-            ["추가 업로드", `${Math.max(0, CUSTOMER_PHOTO_LIMIT - project.photo_count).toLocaleString()}장`],
+            ["추가 가능", `${Math.max(0, CUSTOMER_PHOTO_LIMIT - project.photo_count).toLocaleString()}장`],
           ].map(([label, value]) => <div key={label} className="bg-surface-raised px-4 py-4"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 text-lg font-bold">{value}</dd></div>)}
         </dl>
 
