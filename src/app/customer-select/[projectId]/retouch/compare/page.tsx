@@ -3,22 +3,26 @@
 /** S11 — 원본·보정본 비교 검토. 누르는 동안 원본 표시는 기존 useHoldPreview를 재사용한다. */
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { PhotoFocusOverlay } from "@/components/customer/PhotoFocusOverlay";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { useHoldPreview } from "@/hooks/useHoldPreview";
 import { useRetouchData, setRetouchDecision, latestVersion, type RetouchPhoto, type RetouchVersion } from "../../../_lib/retouch-store";
+import { RetouchErrorScreen } from "../../../_lib/RetouchErrorScreen";
+import { CustomerSelectShell } from "../../../_lib/CustomerSelectShell";
 import ui from "../../../_lib/ui.module.css";
 
 function CompareCard({
   photo,
   version,
   onDecide,
+  onOpen,
 }: {
   photo: RetouchPhoto;
   version: RetouchVersion;
   onDecide: (decision: "confirmed" | "redo", reason?: string) => void;
+  onOpen: () => void;
 }) {
   const [reasonOpen, setReasonOpen] = useState(false);
   const [reason, setReason] = useState(version.redoReason ?? "");
@@ -38,6 +42,18 @@ function CompareCard({
         <span style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(20,18,16,.6)", color: "#fff", fontSize: 10.5, padding: "3px 8px", borderRadius: 999 }}>
           누르면 원본 보기
         </span>
+        <button
+          type="button"
+          aria-label={`${photo.filename} 크게 보기`}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen();
+          }}
+          style={{ position: "absolute", top: 4, right: 4, width: 44, height: 44, border: 0, borderRadius: 22, background: "rgba(20,18,16,.6)", color: "#fff", fontSize: 18, cursor: "zoom-in" }}
+        >
+          ⛶
+        </button>
       </div>
       <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
         <span className={ui.supportText}>{photo.filename}</span>
@@ -91,7 +107,10 @@ function CompareCard({
 export default function RetouchComparePage() {
   const { projectId } = useParams<{ projectId: string }>();
   const router = useRouter();
-  const { photos, loading, refresh } = useRetouchData(projectId);
+  const { photos, error: loadError, loading, refresh } = useRetouchData(projectId);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savingVersionId, setSavingVersionId] = useState<string | null>(null);
+  const [focusVersionId, setFocusVersionId] = useState<string | null>(null);
 
   const withVersion = useMemo(
     () => photos.map((p) => ({ photo: p, version: latestVersion(p) })).filter((x): x is { photo: RetouchPhoto; version: RetouchVersion } => !!x.version),
@@ -99,23 +118,32 @@ export default function RetouchComparePage() {
   );
   const withoutVersion = photos.filter((p) => latestVersion(p) === null);
   const reviewed = withVersion.filter((x) => x.version.decision !== "pending").length;
-  const allReviewed = withVersion.length > 0 && reviewed === withVersion.length;
+  const allReviewed = withVersion.length > 0 && withoutVersion.length === 0 && reviewed === withVersion.length;
+  const focusIndex = withVersion.findIndex((item) => item.version.id === focusVersionId);
+  const focused = focusIndex >= 0 ? withVersion[focusIndex] : null;
 
   async function handleDecide(versionId: string, decision: "confirmed" | "redo", reason?: string) {
-    await setRetouchDecision(projectId, versionId, decision, reason);
-    await refresh();
+    if (savingVersionId) return;
+    setSavingVersionId(versionId);
+    setSaveError(null);
+    try {
+      await setRetouchDecision(projectId, versionId, decision, reason);
+      await refresh();
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : "검토 결과를 저장하지 못했어요.");
+    } finally {
+      setSavingVersionId(null);
+    }
   }
 
   if (loading) {
     return <SystemLoadingScreen title="보정본을 불러오고 있어요" homeHref="/customer-select" />;
   }
+  if (loadError) return <RetouchErrorScreen message={loadError} />;
 
   return (
-    <div className={ui.shell}>
-      <header className={ui.brandbar}>
-        <BrandLogoBar size="sm" href="/customer-select" variant="default" />
-      </header>
-      <div className={ui.shellMain}>
+    <CustomerSelectShell navigation={false}>
+      <main className={ui.shellMain}>
         <div className={ui.page}>
           <div className={ui.header}>
             <button type="button" className={ui.back} onClick={() => router.back()}>
@@ -134,9 +162,16 @@ export default function RetouchComparePage() {
                 <span className={ui.bodyText}>도착하면 업로드 화면에서 이어서 올려주세요.</span>
               </div>
             )}
+            {saveError && <span role="alert" className={ui.bannerHeadWarn}>{saveError}</span>}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {withVersion.map(({ photo, version }) => (
-                <CompareCard key={photo.id} photo={photo} version={version} onDecide={(d, r) => handleDecide(version.id, d, r)} />
+                <CompareCard
+                  key={photo.id}
+                  photo={photo}
+                  version={version}
+                  onDecide={(d, r) => handleDecide(version.id, d, r)}
+                  onOpen={() => setFocusVersionId(version.id)}
+                />
               ))}
               {withVersion.length === 0 && (
                 <div className={`${ui.banner} ${ui.bannerWarn}`}>
@@ -154,13 +189,22 @@ export default function RetouchComparePage() {
             </div>
           </div>
           <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton
-              disabled={!allReviewed}
+              disabled={!allReviewed || Boolean(savingVersionId)}
               onClick={() => router.push(`/customer-select/${projectId}/retouch/export`)}
             >
               검토 마치기{!allReviewed && withVersion.length > 0 ? ` (${withVersion.length - reviewed}장 남음)` : ""}
             </PhotographerLightButton>} />
+          <PhotoFocusOverlay
+            open={Boolean(focused)}
+            src={focused?.version.previewUrl ?? focused?.version.thumbUrl ?? focused?.photo.previewUrl ?? focused?.photo.url ?? ""}
+            originalSrc={focused?.photo.previewUrl ?? focused?.photo.url}
+            alt={focused?.photo.filename ?? "보정본"}
+            onClose={() => setFocusVersionId(null)}
+            onPrev={focusIndex > 0 ? () => setFocusVersionId(withVersion[focusIndex - 1].version.id) : undefined}
+            onNext={focusIndex >= 0 && focusIndex < withVersion.length - 1 ? () => setFocusVersionId(withVersion[focusIndex + 1].version.id) : undefined}
+          />
         </div>
-      </div>
-    </div>
+      </main>
+    </CustomerSelectShell>
   );
 }

@@ -345,11 +345,11 @@ export default function CustomerSelectGalleryPage() {
     setQualityFilter([]);
   }
 
-  const footerMeta = selectedCount < target
-    ? `${target - selectedCount}장 더 선택해 주세요`
-    : selectedCount > target
-      ? `${selectedCount - target}장 더 선택했어요`
-      : "목표 수에 맞게 골랐어요";
+  const footerMeta = isOwner
+    ? `${selectedCount}장 선택 · 목표 ${target}장`
+    : project.participantDone[currentIdentity]
+      ? "내 의견을 제출했어요"
+      : "찜과 의견을 남긴 뒤 완료해 주세요";
 
   // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
   if (!hydrated) {
@@ -593,7 +593,7 @@ export default function CustomerSelectGalleryPage() {
           disabled={isOwner ? selectedCount === 0 : false}
           onConfirm={() => isOwner ? router.push(`/customer-select/${projectId}/review`) : toggleDone(currentIdentity)}
           buttonLabel={isOwner ? "최종 검토하기" : project.participantDone[currentIdentity] ? "의견 다시 열기" : "내 의견 완료"}
-          progressLabel={isOwner ? (selectedCount < target ? `${target - selectedCount}장 더 골라주세요` : "선택한 사진") : "최종 선택은 소유자가 결정해요"}
+          progressLabel={isOwner ? "선택한 사진" : "최종 선택은 소유자가 결정해요"}
           theme="customerLight"
           mobileGallery
           metaText={footerMeta}

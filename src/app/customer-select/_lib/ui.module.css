@@ -6,23 +6,6 @@
  * 그 컴포넌트도 --customer-* CSS 변수 대신 고정 hex를 쓰는 관례라 여기서도 맞춘다. */
 
 /* 모바일은 단일 칼럼, PC는 ACUT Light 작업면과 공통 하단 액션바 구조를 사용한다. */
-.shell {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-  color: #191918;
-  font-family: Pretendard, "Pretendard Variable", -apple-system, sans-serif;
-}
-.brandbar {
-  height: calc(56px + env(safe-area-inset-top));
-  box-sizing: border-box;
-  display: flex;
-  align-items: flex-end;
-  padding: env(safe-area-inset-top) 20px 12px;
-  background: #fff;
-  border-bottom: 1px solid #f1f2f3;
-}
 .shellMain {
   width: min(100%, 375px);
   margin: 0 auto;
@@ -35,7 +18,7 @@
 .page {
   display: flex;
   flex-direction: column;
-  min-height: calc(100dvh - 56px - env(safe-area-inset-top));
+  min-height: calc(100dvh - 64px);
 }
 
 .header {
@@ -45,8 +28,8 @@
   padding: 14px 24px 8px;
 }
 .back {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 1px solid #dde1e4;
   background: #fff;
@@ -173,7 +156,7 @@
   opacity: 0.38;
 }
 .btnSm {
-  height: 40px;
+  min-height: 44px;
   font-size: 13px;
   border-radius: 10px;
 }
@@ -422,17 +405,39 @@
   color: #191918;
 }
 
+.reviewGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.reviewThumbButton {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: #eee;
+  cursor: zoom-in;
+}
+.reviewThumb {
+  aspect-ratio: 1;
+  border-radius: inherit;
+}
+.reviewThumb img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.reviewThumb > span:not([data-photo-thumbnail-selection-ring]) {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 7;
+  font-size: 11px;
+}
+
 /* PC uses the same roomy A-CUT work surface; mobile keeps the original single-column flow. */
 @media (min-width: 768px) {
-  .shell {
-    background: var(--background, #eef3f4);
-  }
-  .brandbar {
-    height: 64px;
-    align-items: center;
-    padding: 0 max(32px, calc((100vw - 1504px) / 2));
-    border-color: var(--border-subtle, #e7ecee);
-  }
   .shellMain {
     width: 100%;
     margin: 0;
@@ -453,5 +458,9 @@
     width: min(calc(100% - 64px), 1120px);
     margin: 0 auto;
     padding: 16px 0 40px;
+  }
+  .reviewGrid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 8px;
   }
 }

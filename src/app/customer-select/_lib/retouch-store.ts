@@ -27,12 +27,16 @@ export interface RetouchPhoto {
 export function useRetouchData(projectId: string) {
   const [photos, setPhotos] = useState<RetouchPhoto[]>([]);
   const [retouchDone, setRetouchDone] = useState(false);
+  const [isOwner, setIsOwner] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchOnce = useCallback(async () => {
     const res = await fetch(`/api/customer-select/projects/${projectId}/retouch`, { cache: "no-store" });
-    if (!res.ok) return null;
-    return res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error ?? "보정본 정보를 불러오지 못했어요.");
+    if (!data.isOwner) throw new Error("프로젝트 소유자만 보정본을 관리할 수 있어요.");
+    return data;
   }, [projectId]);
 
   // 마운트/projectId 변경 시 최초 조회 — real-store.tsx와 같은 패턴(effect 안에서 직접
@@ -40,13 +44,17 @@ export function useRetouchData(projectId: string) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const data = await fetchOnce();
-      if (cancelled) return;
-      if (data) {
+      try {
+        const data = await fetchOnce();
+        if (cancelled) return;
         setPhotos(data.photos ?? []);
         setRetouchDone(!!data.retouchDone);
+        setIsOwner(true);
+        setError(null);
+      } catch (cause) {
+        if (!cancelled) setError(cause instanceof Error ? cause.message : "보정본 정보를 불러오지 못했어요.");
       }
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -55,13 +63,13 @@ export function useRetouchData(projectId: string) {
 
   const refresh = useCallback(async () => {
     const data = await fetchOnce();
-    if (data) {
-      setPhotos(data.photos ?? []);
-      setRetouchDone(!!data.retouchDone);
-    }
+    setPhotos(data.photos ?? []);
+    setRetouchDone(!!data.retouchDone);
+    setIsOwner(true);
+    setError(null);
   }, [fetchOnce]);
 
-  return { photos, retouchDone, loading, refresh };
+  return { photos, retouchDone, isOwner, error, loading, refresh };
 }
 
 async function authHeaders(): Promise<Record<string, string>> {
@@ -108,11 +116,15 @@ export async function setRetouchDecision(
 }
 
 export async function markRetouchDone(projectId: string, retouchDone: boolean) {
-  await fetch(`/api/customer-select/projects/${projectId}/retouch`, {
+  const res = await fetch(`/api/customer-select/projects/${projectId}/retouch`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ retouchDone }),
   });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error ?? "완료 상태를 저장하지 못했어요.");
+  }
 }
 
 /** 사진마다 최신 회차(가장 큰 round)의 버전만 반환 — 비교/내보내기 화면은 최신 회차 기준으로 판단한다. */

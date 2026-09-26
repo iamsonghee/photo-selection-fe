@@ -54,6 +54,13 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   await page.goto("/customer-select/core-flow/select");
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
   const galleryTexts = await page.locator("body").innerText();
+  if (viewport === "desktop") expect(galleryTexts).toContain(`${selectedCount}장 선택 · 목표 10장`);
+  else {
+    expect(galleryTexts).toContain("선택한 사진");
+    expect(galleryTexts).toContain(`${selectedCount} / 10`);
+  }
+  expect(galleryTexts).not.toContain("더 골라주세요");
+  expect(galleryTexts).not.toContain("더 선택해 주세요");
   const confirm = page.getByRole("button", { name: "최종 검토하기" });
   const confirmBox = await confirm.boundingBox();
   const overflow = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth }));
@@ -78,6 +85,9 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   }));
   const reviewOverflow = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth }));
   await page.screenshot({ path: `test-results/core-flow-${viewport}-${selectedCount}-review.png`, fullPage: true });
+  await page.getByRole("button", { name: "CORE_001.jpg 크게 보기" }).click();
+  await expect(page.getByRole("dialog", { name: "CORE_001.jpg 크게 보기" })).toBeVisible();
+  await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "전달 내용 만들기" }).click();
   await expect(page.getByRole("heading", { name: "작가님께 전달하기" })).toBeVisible();

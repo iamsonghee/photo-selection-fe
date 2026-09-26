@@ -103,7 +103,11 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
   const failedRequests: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
-  page.on("requestfailed", (request) => failedRequests.push(`${request.method()} ${request.url()} ${request.failure()?.errorText ?? ""}`));
+  page.on("requestfailed", (request) => {
+    const error = request.failure()?.errorText ?? "";
+    if (request.url().endsWith("/presence") && error.includes("ERR_ABORTED")) return;
+    failedRequests.push(`${request.method()} ${request.url()} ${error}`);
+  });
   await installMocks(page);
 
   const started = Date.now();

@@ -1,11 +1,12 @@
 "use client";
 
 /** S7 — 최종 검토. */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { PhotoFocusOverlay } from "@/components/customer/PhotoFocusOverlay";
+import { PhotoThumbnailFrame } from "@/components/ui/PhotoThumbnailFrame";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import {
@@ -15,6 +16,7 @@ import {
   tasteMatchPct,
   useCustomerSelectStore,
 } from "../../_lib/real-store";
+import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import ui from "../../_lib/ui.module.css";
 
 export default function CustomerReviewPage() {
@@ -22,6 +24,7 @@ export default function CustomerReviewPage() {
   const projectId = params.projectId as string;
   const router = useRouter();
   const { project, hydrated, isOwner, currentIdentity, syncStatus } = useCustomerSelectStore();
+  const [focusIndex, setFocusIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (hydrated && !isOwner) router.replace(`/customer-select/${projectId}/select`);
@@ -39,11 +42,8 @@ export default function CustomerReviewPage() {
   }
 
   return (
-    <div className={ui.shell}>
-      <header className={ui.brandbar}>
-        <BrandLogoBar size="sm" href="/customer-select" variant="default" />
-      </header>
-      <div className={ui.shellMain}>
+    <CustomerSelectShell navigation={false}>
+      <main className={ui.shellMain}>
       <div className={ui.page}>
         <div className={ui.header}>
           <button type="button" className={ui.back} onClick={() => router.back()}>
@@ -83,14 +83,14 @@ export default function CustomerReviewPage() {
             <p className={ui.label} style={{ marginBottom: 8 }}>
               선택한 사진
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+            <div className={ui.reviewGrid}>
               {selected.slice(0, 12).map((p) => (
-                <div key={p.id} style={{ aspectRatio: "1", borderRadius: 4, overflow: "hidden", position: "relative", background: "#eee" }}>
-                  <img src={p.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  {project.photoStates[p.id]?.comment && (
-                    <span style={{ position: "absolute", top: 4, left: 4, fontSize: 11 }}>💬</span>
-                  )}
-                </div>
+                <button key={p.id} type="button" className={ui.reviewThumbButton} aria-label={`${getPhotoDisplayName(p)} 크게 보기`} onClick={() => setFocusIndex(selected.indexOf(p))}>
+                  <PhotoThumbnailFrame active className={ui.reviewThumb}>
+                    <img src={p.url} alt="" />
+                    {project.photoStates[p.id]?.comment && <span>💬</span>}
+                  </PhotoThumbnailFrame>
+                </button>
               ))}
               {selected.length > 12 && (
                 <div
@@ -145,8 +145,16 @@ export default function CustomerReviewPage() {
             <PhotographerLightButton disabled={selected.length === 0 || syncStatus !== "connected"} onClick={() => router.push(`/customer-select/${projectId}/export`)}>전달 내용 만들기</PhotographerLightButton>
           </>}
         />
+        <PhotoFocusOverlay
+          open={focusIndex !== null}
+          src={focusIndex !== null ? selected[focusIndex]?.previewUrl ?? selected[focusIndex]?.url ?? "" : ""}
+          alt={focusIndex !== null && selected[focusIndex] ? getPhotoDisplayName(selected[focusIndex]) : "선택 사진"}
+          onClose={() => setFocusIndex(null)}
+          onPrev={focusIndex !== null && focusIndex > 0 ? () => setFocusIndex(focusIndex - 1) : undefined}
+          onNext={focusIndex !== null && focusIndex < Math.min(selected.length, 12) - 1 ? () => setFocusIndex(focusIndex + 1) : undefined}
+        />
       </div>
-      </div>
-    </div>
+      </main>
+    </CustomerSelectShell>
   );
 }

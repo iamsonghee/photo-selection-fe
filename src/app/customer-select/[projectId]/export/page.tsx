@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
@@ -11,6 +10,7 @@ import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import { csvEscape, downloadTextFile, sanitizeFilenamePart } from "@/lib/text-file-download";
 import { activeParticipants, useCustomerSelectStore } from "../../_lib/real-store";
 import ui from "../../_lib/ui.module.css";
+import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 
 function buildExportText(
   selected: { id: string; name: string }[],
@@ -126,11 +126,9 @@ export default function CustomerExportPage() {
   }
 
   return (
-    <div className={ui.shell}>
-      <header className={ui.brandbar}>
-        <BrandLogoBar size="sm" href="/customer-select" variant="default" />
-      </header>
-      <div className={ui.shellMain}>
+    <>
+    <CustomerSelectShell navigation={false}>
+      <main className={ui.shellMain}>
       <div className={ui.page}>
         <div className={ui.header}>
           <button type="button" className={ui.back} onClick={() => router.back()}>
@@ -174,7 +172,8 @@ export default function CustomerExportPage() {
           </>}
         />
       </div>
-      </div>
+      </main>
+    </CustomerSelectShell>
       {reopenConfirm ? <SelectionConfirmDialog
         title="사진을 다시 선택할까요?"
         description={<>전달 완료 상태가 해제되고 선택 화면으로 돌아갑니다.<br />현재 선택은 그대로 유지돼요.</>}
@@ -195,6 +194,6 @@ export default function CustomerExportPage() {
         onCancel={() => { if (!changingState) { setDeliverConfirm(false); setStateError(null); } }}
         onConfirm={() => void requestDelivery(true)}
       /> : null}
-    </div>
+    </>
   );
 }

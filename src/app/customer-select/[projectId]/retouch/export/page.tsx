@@ -1,19 +1,21 @@
 "use client";
 
-/** S12 — 재보정 요청 전달. 1차 S8과 같은 형식(복사/CSV/TXT — 복사만 실동작, 나머지는 실제 서비스에서). */
+/** S12 — 재보정 요청 전달. 1차 S8과 같은 형식(복사/CSV/TXT). */
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { BrandLogoBar } from "@/components/BrandLogo";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { csvEscape, downloadTextFile } from "@/lib/text-file-download";
 import { useRetouchData, latestVersion } from "../../../_lib/retouch-store";
+import { RetouchErrorScreen } from "../../../_lib/RetouchErrorScreen";
+import { CustomerSelectShell } from "../../../_lib/CustomerSelectShell";
 import ui from "../../../_lib/ui.module.css";
 
 export default function RetouchExportPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const router = useRouter();
-  const { photos, loading } = useRetouchData(projectId);
+  const { photos, error: loadError, loading } = useRetouchData(projectId);
   const [copyState, setCopyState] = useState<"idle" | "ok" | "fail">("idle");
 
   const redoList = useMemo(() => {
@@ -45,16 +47,23 @@ export default function RetouchExportPage() {
     setTimeout(() => setCopyState("idle"), 2000);
   }
 
+  function handleDownloadCsv() {
+    const rows = redoList.map(({ photo, version }) => `${csvEscape(photo.filename)},${csvEscape(version.redoReason ?? "")}`);
+    downloadTextFile("재보정_요청.csv", ["파일명,재보정 요청", ...rows].join("\n"), "text/csv;charset=utf-8");
+  }
+
+  function handleDownloadTxt() {
+    downloadTextFile("재보정_요청.txt", redoList.map(({ photo, version }) => `${photo.filename} — ${version.redoReason ?? ""}`).join("\n"), "text/plain;charset=utf-8");
+  }
+
+  if (loadError) return <RetouchErrorScreen message={loadError} />;
   if (loading || redoList.length === 0) {
     return <SystemLoadingScreen title={loading ? "재보정 요청을 불러오고 있어요" : "완료 화면으로 이동하고 있어요"} homeHref="/customer-select" />;
   }
 
   return (
-    <div className={ui.shell}>
-      <header className={ui.brandbar}>
-        <BrandLogoBar size="sm" href="/customer-select" variant="default" />
-      </header>
-      <div className={ui.shellMain}>
+    <CustomerSelectShell navigation={false}>
+      <main className={ui.shellMain}>
         <div className={ui.page}>
           <div className={ui.header}>
             <button type="button" className={ui.back} onClick={() => router.back()}>
@@ -69,17 +78,17 @@ export default function RetouchExportPage() {
               <button type="button" className={`${ui.btn} ${ui.btnPrimary} ${ui.btnSm}`} style={{ flex: 1 }} onClick={handleCopy}>
                 {copyState === "ok" ? "복사했어요 ✓" : copyState === "fail" ? "복사 실패" : "📋 복사하기"}
               </button>
-              <button type="button" className={`${ui.btn} ${ui.btnSm}`} style={{ flex: 1 }} disabled title="실제 서비스에서 파일로 받을 수 있어요">
+              <button type="button" className={`${ui.btn} ${ui.btnSm}`} style={{ flex: 1 }} aria-label="CSV 다운로드" onClick={handleDownloadCsv}>
                 CSV
               </button>
-              <button type="button" className={`${ui.btn} ${ui.btnSm}`} style={{ flex: 1 }} disabled title="실제 서비스에서 파일로 받을 수 있어요">
+              <button type="button" className={`${ui.btn} ${ui.btnSm}`} style={{ flex: 1 }} aria-label="TXT 다운로드" onClick={handleDownloadTxt}>
                 TXT
               </button>
             </div>
           </div>
           <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>다음 보정본 기다리기</PhotographerLightButton>} />
         </div>
-      </div>
-    </div>
+      </main>
+    </CustomerSelectShell>
   );
 }

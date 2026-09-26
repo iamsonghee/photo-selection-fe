@@ -2,34 +2,45 @@
 
 /** S13 — 완료. */
 import { useParams } from "next/navigation";
-import { BrandLogoBar } from "@/components/BrandLogo";
+import { useState } from "react";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { useRetouchData, markRetouchDone, latestVersion } from "../../_lib/retouch-store";
+import { RetouchErrorScreen } from "../../_lib/RetouchErrorScreen";
+import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import ui from "../../_lib/ui.module.css";
 
 export default function CustomerDonePage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { photos, retouchDone, loading, refresh } = useRetouchData(projectId);
+  const { photos, retouchDone, error: loadError, loading, refresh } = useRetouchData(projectId);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const confirmedCount = photos.filter((p) => latestVersion(p)?.decision === "confirmed").length;
 
   async function handleDone() {
-    await markRetouchDone(projectId, true);
-    await refresh();
+    if (saving) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await markRetouchDone(projectId, true);
+      await refresh();
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : "완료 상태를 저장하지 못했어요.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (loading) {
     return <SystemLoadingScreen title="완료 상태를 확인하고 있어요" homeHref="/customer-select" />;
   }
+  if (loadError) return <RetouchErrorScreen message={loadError} />;
 
   return (
-    <div className={ui.shell}>
-      <header className={ui.brandbar}>
-        <BrandLogoBar size="sm" href="/customer-select" variant="default" />
-      </header>
-      <div className={ui.shellMain}>
+    <CustomerSelectShell navigation={false}>
+      <main className={ui.shellMain}>
         <div className={ui.page}>
           <div className={ui.header}>
             <h1 className={ui.title}>완료</h1>
@@ -50,10 +61,11 @@ export default function CustomerDonePage() {
             <p className={ui.supportText} style={{ textAlign: "center" }}>
               새 보정본을 받으면 언제든 업로드해서 이어서 진행할 수 있어요.
             </p>
+            {saveError && <p role="alert" className={ui.bannerHeadWarn}>{saveError}</p>}
           </div>
-          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton disabled={retouchDone} onClick={handleDone}>{retouchDone ? "완료로 표시됨 ✓" : "완료로 표시"}</PhotographerLightButton>} />
+          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton disabled={retouchDone} pending={saving} pendingLabel="저장 중…" onClick={handleDone}>{retouchDone ? "완료로 표시됨 ✓" : "완료로 표시"}</PhotographerLightButton>} />
         </div>
-      </div>
-    </div>
+      </main>
+    </CustomerSelectShell>
   );
 }
