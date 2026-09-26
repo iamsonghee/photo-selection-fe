@@ -53,7 +53,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
       await page.screenshot({ path: testInfo.outputPath(`overview-${width}.png`), fullPage: true });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     }
-    await page.getByRole("link", { name: "설정", exact: true }).click();
+    await page.getByRole("link", { name: "프로젝트 수정", exact: true }).click();
     await expect(page.getByRole("heading", { name: "프로젝트 설정" })).toBeVisible();
     await expect(page.getByText("담당 작가명", { exact: true })).toBeVisible();
     await expect(page.getByText("촬영 지역", { exact: true })).toBeVisible();

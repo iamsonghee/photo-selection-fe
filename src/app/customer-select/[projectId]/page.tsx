@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Pencil } from "lucide-react";
 import { getCurrentCustomerAuthId } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "../_lib/CustomerSelectShell";
@@ -61,7 +62,7 @@ export default async function CustomerProjectOverview({ params }: { params: Prom
       <Link href="/customer-select" className="text-sm text-muted-foreground">← 내 프로젝트</Link>
       <div className="mt-5 flex items-center justify-between gap-4">
         <h1 className="min-w-0 break-words text-2xl font-bold md:text-3xl">{project.name}</h1>
-        <Link href={`/customer-select/${projectId}/settings`} className="shrink-0 rounded-lg border border-border-subtle bg-surface px-4 py-2.5 text-sm font-semibold hover:border-border-strong"><span className="hidden sm:inline">프로젝트 </span>설정</Link>
+        <Link href={`/customer-select/${projectId}/settings`} aria-label="프로젝트 수정" className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35"><Pencil size={15} aria-hidden /><span className="hidden sm:inline">프로젝트 </span>수정</Link>
       </div>
       <section className="mt-6 rounded-2xl border border-border-subtle bg-surface p-5 md:p-7" aria-label="프로젝트 진행 현황">
         <p className="text-sm font-bold text-accent">{customerProjectStatus(project, selectedCount)}</p>
