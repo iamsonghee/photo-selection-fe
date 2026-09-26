@@ -11,8 +11,8 @@ export function CustomerSelectShell({ children, navigation = true, viewportLocke
         <div className="mx-auto flex h-16 w-full max-w-[1504px] items-center gap-6 px-5 md:px-8">
           <BrandLogoBar href="/customer-select" variant="default" />
           {navigation ? (
-            <nav aria-label="고객 셀렉 메뉴">
-              <Link href="/customer-select/new" className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-accent/25 bg-surface px-3 text-[13px] font-bold text-accent transition-colors hover:border-accent hover:bg-customer-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35"><Plus size={15} strokeWidth={2.4} />새 프로젝트</Link>
+            <nav className="ml-auto" aria-label="고객 셀렉 메뉴">
+              <Link href="/customer-select/new" className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-accent px-3.5 text-[13px] font-bold text-white transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35"><Plus size={15} strokeWidth={2.4} />새 프로젝트</Link>
             </nav>
           ) : null}
         </div>
