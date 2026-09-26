@@ -32,7 +32,7 @@ import {
   disagreementIds,
   useCustomerSelectStore,
 } from "../../_lib/real-store";
-import { collapseSimilarityGroups } from "../../_lib/gallery-view";
+import { collapseSimilarityGroups, galleryAnchorPhotoId } from "../../_lib/gallery-view";
 import { NicknamePrompt } from "../../_lib/NicknamePrompt";
 import { ParticipantAccessEndedScreen, ParticipantJoinScreen } from "../../_lib/ParticipantJoinScreen";
 import { EphemeralChat } from "../../_lib/EphemeralChat";
@@ -81,6 +81,8 @@ export default function CustomerSelectGalleryPage() {
   const galleryRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const densityAnchorIdRef = useRef<string | null>(null);
+  const restoredPositionKeyRef = useRef("");
+  const positionKey = `ps:self-gallery-position:${projectId}`;
 
   useEffect(() => {
     if (hydrated && isOwner && project.exported) router.replace(`/customer-select/${projectId}/export`);
@@ -271,6 +273,28 @@ export default function CustomerSelectGalleryPage() {
   useEffect(() => {
     galleryRef.current?.scrollTo({ top: 0 });
   }, [tab, nameFilter, sortOrder, starFilter, colorFilter, colorFilterMode, qualityFilter, groupedView]);
+
+  useEffect(() => {
+    if (!hydrated || !participantReady || !list.length || restoredPositionKeyRef.current === positionKey) return;
+    let firstFrame = 0;
+    let secondFrame = 0;
+    firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        let anchorId: string | null = null;
+        try { anchorId = sessionStorage.getItem(positionKey); } catch {}
+        restoredPositionKeyRef.current = positionKey;
+        if (!anchorId) return;
+        const index = list.findIndex((photo) => photo.id === anchorId);
+        if (index >= 0) virtualizer.scrollToIndex(Math.floor(index / layout.cols), { align: "start" });
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
+    // virtualizer는 렌더마다 새 참조라 실제 복원 조건만 추적한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, participantReady, positionKey, list, layout.cols, layout.rowHeight, mobileColumns, desktopDensity]);
 
   useEffect(() => {
     try {
@@ -492,7 +516,15 @@ export default function CustomerSelectGalleryPage() {
 
         <GalleryMobileFilterSheet open={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={resetFilters} starFilter={starFilter} onStarFilterChange={setStarFilter} colorFilter={colorFilter} colorOptions={colorOptions} onColorFilterChange={setColorFilter} colorFilterMode={colorFilterMode} onColorFilterModeChange={setColorFilterMode} hasBlurryPhotos={hasBlurryPhotos} hasEyesClosedPhotos={hasEyesClosedPhotos} qualityFilter={qualityFilterSet} onToggleQualityFilter={toggleQuality} />
 
-        <div ref={galleryRef} className={`${ui.selectGallery} gl-density-${mobileColumns}`} onScroll={(event) => setCompactHeader(event.currentTarget.scrollTop > 72)}>
+        <div ref={galleryRef} className={`${ui.selectGallery} gl-density-${mobileColumns}`} onScroll={(event) => {
+          const scrollTop = event.currentTarget.scrollTop;
+          setCompactHeader(scrollTop > 72);
+          if (restoredPositionKeyRef.current !== positionKey) return;
+          const anchorId = galleryAnchorPhotoId(list, scrollTop, layout.cols, layout.rowHeight);
+          if (anchorId) {
+            try { sessionStorage.setItem(positionKey, anchorId); } catch {}
+          }
+        }}>
           <div ref={gridRef} className={`${ui.selectGrid} ${ui[`selectDensity${mobileColumns}`]}`} style={{ height: list.length ? virtualizer.getTotalSize() : "100%" }}>
             {list.length === 0 ? (
               <div className={ui.selectEmpty}>

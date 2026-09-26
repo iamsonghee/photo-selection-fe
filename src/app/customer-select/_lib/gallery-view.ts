@@ -11,3 +11,15 @@ export function collapseSimilarityGroups(photos: Photo[], expandedGroupIds: Read
     return true;
   });
 }
+
+/** 현재 스크롤 행의 첫 사진. 열 수가 달라져도 이 id로 같은 위치를 다시 찾는다. */
+export function galleryAnchorPhotoId(
+  photos: Pick<Photo, "id">[],
+  scrollTop: number,
+  columns: number,
+  rowHeight: number,
+): string | null {
+  if (!photos.length || columns < 1 || rowHeight <= 0) return null;
+  const index = Math.floor(Math.max(0, scrollTop) / rowHeight) * columns;
+  return photos[Math.min(index, photos.length - 1)]?.id ?? null;
+}
