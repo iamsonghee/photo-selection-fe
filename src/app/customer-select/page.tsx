@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import { FolderPlus } from "lucide-react";
+import { FolderPlus, Plus } from "lucide-react";
 import { getCurrentCustomerAuthUser } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "./_lib/CustomerSelectShell";
@@ -49,7 +49,7 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
 
   return (
     <CustomerSelectShell
-      navigation={!error && projects.length > 0}
+      navigation={false}
       account={{
         displayName,
         email: user.email ?? "",
@@ -151,6 +151,10 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
           </>
         )}
       </main>
+      {!error && projects.length > 0 ? <Link href="/customer-select/new" aria-label="새 프로젝트" title="새 프로젝트" className="group fixed bottom-[calc(20px+env(safe-area-inset-bottom))] right-5 z-40 grid size-14 place-items-center rounded-full bg-accent text-white shadow-[0_12px_28px_rgba(255,82,22,0.3)] transition-[transform,background-color] hover:scale-105 hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/25 md:bottom-7 md:right-8">
+        <Plus size={26} strokeWidth={2.2} />
+        <span className="pointer-events-none absolute right-full mr-3 hidden whitespace-nowrap rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background opacity-0 shadow-lg transition-opacity group-hover:opacity-100 md:block">새 프로젝트</span>
+      </Link> : null}
     </CustomerSelectShell>
   );
 }

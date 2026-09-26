@@ -34,6 +34,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
   }
   const overview = page.getByRole("link", { name: /프로젝트 현황$/ }).first();
   if (await overview.count()) {
+    await expect(page.getByRole("link", { name: "새 프로젝트" })).toBeVisible();
     await expect(page.getByRole("article").first().getByText(/장 남음/)).toHaveCount(0);
     await overview.click();
     await expect(page.getByRole("region", { name: "프로젝트 진행 현황" })).toBeVisible();

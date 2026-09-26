@@ -5,7 +5,7 @@ import { BrandLogoBar } from "@/components/BrandLogo";
 import theme from "@/styles/AcutLightTheme.module.css";
 import { CustomerAccountMenu, type CustomerAccountSummary } from "./CustomerAccountMenu";
 
-export function CustomerSelectShell({ children, navigation = true, viewportLocked = false, account }: { children: ReactNode; navigation?: boolean; viewportLocked?: boolean; account?: CustomerAccountSummary }) {
+export function CustomerSelectShell({ children, navigation = false, viewportLocked = false, account }: { children: ReactNode; navigation?: boolean; viewportLocked?: boolean; account?: CustomerAccountSummary }) {
   return (
     <div className={`${theme.lightTheme} flex min-h-dvh flex-col bg-background text-foreground ${viewportLocked ? "h-dvh overflow-hidden" : ""}`}>
       <header className="shrink-0 border-b border-border-subtle bg-surface">
