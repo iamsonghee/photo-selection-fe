@@ -4,6 +4,7 @@ import { getCurrentCustomerAuthId } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "../_lib/CustomerSelectShell";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
+import { PhotographerLightLinkButton } from "@/components/photographer/PhotographerLightButton";
 import { customerProjectAction, customerProjectDestination, customerProjectStatus, type CustomerProjectSummary } from "../_lib/project-routing";
 import { isProjectShootType, projectShootTypeLabel } from "@/lib/project-shoot-types";
 import { CustomerShareLinkField } from "../_lib/CustomerShareLinkField";
@@ -122,10 +123,10 @@ export default async function CustomerProjectOverview({ params }: { params: Prom
       </section>
     </main>
     <PhotographerPageActionBar
-      maxWidth={960}
+      maxWidth={1120}
       mobileFixed
       leading={<div><p className="text-sm font-semibold">{project.photo_count.toLocaleString()}장 중 {selectedCount === null ? "선택 수 확인 불가" : `${selectedCount.toLocaleString()}장 선택`}</p><p className="mt-1 text-xs text-muted-foreground">목표 {project.target_count.toLocaleString()}장</p></div>}
-      actions={<Link href={customerProjectDestination(project)} className="block w-full rounded-xl bg-accent px-6 py-3.5 text-center font-bold text-white sm:w-auto">{action}</Link>}
+      actions={<PhotographerLightLinkButton href={customerProjectDestination(project)} className="w-full sm:w-auto">{action}</PhotographerLightLinkButton>}
     />
   </CustomerSelectShell>;
 }

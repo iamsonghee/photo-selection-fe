@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { forwardRef } from "react";
-import type { ButtonHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, ComponentProps } from "react";
 import styles from "./PhotographerLightButton.module.css";
 
 export type PhotographerLightButtonVariant = "primary" | "secondary" | "danger" | "outline";
@@ -39,6 +40,12 @@ const VARIANT_CLASSES: Record<PhotographerLightButtonVariant, string> = {
     "bg-danger hover:bg-danger/90 text-white focus-visible:ring-danger/35",
 };
 
+function buttonClassName(variant: PhotographerLightButtonVariant, size: PhotographerLightButtonSize, className: string) {
+  return `${styles.button} relative ${BASE} ${SIZE_CLASSES[size]} ${VARIANT_CLASSES[variant]} ${
+    size === "toolbar" ? "font-semibold" : size === "work-panel" || variant === "primary" || variant === "danger" ? "font-bold" : "font-normal"
+  } ${className}`;
+}
+
 export const PhotographerLightButton = forwardRef<HTMLButtonElement, PhotographerLightButtonProps>(
   ({ variant = "primary", size = "regular", pending = false, pendingLabel, children, disabled, type = "button", className = "", ...props }, ref) => (
     <button
@@ -50,9 +57,7 @@ export const PhotographerLightButton = forwardRef<HTMLButtonElement, Photographe
       aria-busy={pending || props["aria-busy"] || undefined}
       data-variant={variant}
       data-button-size={size}
-      className={`${styles.button} relative ${BASE} ${SIZE_CLASSES[size]} ${VARIANT_CLASSES[variant]} ${
-        size === "toolbar" ? "font-semibold" : size === "work-panel" || variant === "primary" || variant === "danger" ? "font-bold" : "font-normal"
-      } ${className}`}
+      className={buttonClassName(variant, size, className)}
     >
       {pending && pendingLabel ? <>
         <span aria-hidden className="invisible">{children}</span>
@@ -65,3 +70,12 @@ export const PhotographerLightButton = forwardRef<HTMLButtonElement, Photographe
   )
 );
 PhotographerLightButton.displayName = "PhotographerLightButton";
+
+type PhotographerLightLinkButtonProps = ComponentProps<typeof Link> & {
+  variant?: PhotographerLightButtonVariant;
+  size?: PhotographerLightButtonSize;
+};
+
+export function PhotographerLightLinkButton({ variant = "primary", size = "regular", className = "", ...props }: PhotographerLightLinkButtonProps) {
+  return <Link {...props} data-variant={variant} data-button-size={size} className={buttonClassName(variant, size, className)} />;
+}
