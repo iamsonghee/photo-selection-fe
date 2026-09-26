@@ -15,6 +15,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const admin = getAdminClient();
   const access = await resolveCustomerProjectAccess(admin, projectId, shareTokenFromRequest(req, projectId));
   if (access instanceof NextResponse) return access;
+  if (access.project.exported) return NextResponse.json({ error: "다시 선택하기를 먼저 눌러주세요." }, { status: 409 });
 
   const body = await req.json().catch(() => ({}));
   const { photo_id, rating, comment, is_selected, color_op, participant_color } = body as {
@@ -52,7 +53,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (typeof is_selected === "boolean") {
     if (!access.isOwner) return NextResponse.json({ error: "최종 선택은 프로젝트 소유자만 변경할 수 있습니다." }, { status: 403 });
-    if (access.project.exported) return NextResponse.json({ error: "다시 선택하기를 먼저 눌러주세요." }, { status: 409 });
     const { error } = await admin.from("customer_selections").upsert(
       [{ project_id: projectId, photo_id, is_selected }],
       { onConflict: "project_id,photo_id", defaultToNull: false }
