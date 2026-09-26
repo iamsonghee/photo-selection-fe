@@ -63,21 +63,17 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
         <div className="lg:flex lg:items-center lg:justify-between lg:gap-10">
           <div className="flex items-center gap-3">
             <h1 className="text-[26px] font-bold tracking-[-0.04em] md:text-[30px]">내 프로젝트</h1>
-            <span className="text-[15px] font-semibold text-muted-foreground" aria-label={`${projects.length.toLocaleString()}개 프로젝트`}>{projects.length.toLocaleString()}</span>
+            <span className="text-[14px] font-semibold text-muted-foreground">{projects.length.toLocaleString()}개</span>
           </div>
 
           {!error ? (
-            <section className="mt-5 rounded-2xl border border-border-subtle bg-surface px-4 py-3 shadow-[0_8px_24px_rgba(2,56,82,0.05)] lg:mt-0 lg:w-80 lg:shrink-0" aria-label="전체 사진 이용량">
-              <div className="flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold text-muted-foreground">전체 사진 · 모든 프로젝트 합산</p>
-                  <p className="mt-1 text-[20px] font-bold tracking-[-0.03em] text-foreground">{accountPhotoCount.toLocaleString()} <span className="text-[13px] font-semibold text-muted-foreground">/ {CUSTOMER_PHOTO_LIMIT.toLocaleString()}장</span></p>
-                </div>
-                <p className="shrink-0 text-[12px] font-semibold text-accent">{remainingPhotoCount.toLocaleString()}장 남음</p>
-              </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-raised" role="progressbar" aria-label="전체 사진 이용량" aria-valuemin={0} aria-valuemax={CUSTOMER_PHOTO_LIMIT} aria-valuenow={Math.min(accountPhotoCount, CUSTOMER_PHOTO_LIMIT)}>
+            <section className="mt-4 flex items-center gap-3 border-b border-border-subtle pb-3 lg:mt-0 lg:border-0 lg:pb-0" aria-label="전체 사진 이용량">
+              <p className="shrink-0 text-[12px] font-semibold text-muted-foreground">전체 사진</p>
+              <p className="shrink-0 text-[15px] font-bold tracking-[-0.02em] text-foreground">{accountPhotoCount.toLocaleString()} <span className="text-[12px] font-semibold text-muted-foreground">/ {CUSTOMER_PHOTO_LIMIT.toLocaleString()}장</span></p>
+              <div className="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-border-subtle lg:w-24 lg:flex-none" role="progressbar" aria-label="전체 사진 이용량" aria-valuemin={0} aria-valuemax={CUSTOMER_PHOTO_LIMIT} aria-valuenow={Math.min(accountPhotoCount, CUSTOMER_PHOTO_LIMIT)}>
                 <div className="h-full min-w-1 rounded-full bg-accent transition-[width]" style={{ width: `${Math.min(100, accountPhotoCount / CUSTOMER_PHOTO_LIMIT * 100)}%` }} />
               </div>
+              <p className="shrink-0 text-[12px] font-semibold text-accent">{remainingPhotoCount.toLocaleString()}장 남음</p>
             </section>
           ) : null}
         </div>
@@ -130,7 +126,7 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
                     ? <Image src={coverUrl} alt="" fill unoptimized sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover object-center" />
                     : <Image src="/brand/a-cut-mark.svg" alt="" width={64} height={64} className="rounded-xl" />}
                 </div>
-                <div className="px-5 pb-2 pt-4">
+                <div className="px-5 py-4">
                   <div className="flex items-center justify-between gap-3">
                     <strong className="min-w-0 truncate text-[17px] font-bold">{project.name}</strong>
                     <span className="flex shrink-0 items-center gap-1.5 text-[12px] font-bold text-primary"><span className={`size-1.5 rounded-full ${project.photo_count === 0 ? "bg-muted-foreground" : "bg-primary"}`} aria-hidden="true" />{status}</span>
@@ -145,8 +141,8 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
                   </p>
                 </div>
               </Link>
-              <div className="flex justify-end px-5 pb-4 pt-2">
-                <Link href={customerProjectDestination(project)} className="inline-flex min-h-9 items-center rounded-lg border border-accent/20 bg-customer-soft px-3.5 text-[13px] font-bold text-accent transition-colors hover:border-accent hover:bg-accent hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35">{customerProjectAction(project, selectedCount)} →</Link>
+              <div className="flex justify-end border-t border-border-subtle px-5 py-3">
+                <Link href={customerProjectDestination(project)} className="inline-flex min-h-8 items-center text-[13px] font-bold text-accent hover:text-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35">{customerProjectAction(project, selectedCount)} →</Link>
               </div>
               </article>
               );
