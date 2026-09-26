@@ -52,6 +52,13 @@ test("self customer start screens and over-limit selection", async ({ page }, te
   await page.route("**/api/customer-select/projects/*/participants", async (route) => { await route.fulfill({ json: { ok: true } }); });
   await page.goto("/customer-select/limit-check/upload");
   await expect(page.getByRole("heading", { name: "업로드 한도 확인" })).toBeVisible();
+  await page.getByRole("button", { name: "AI 분석 시작" }).click();
+  const aiDialog = page.getByRole("dialog", { name: "AI가 정리를 도와드릴까요?" });
+  await expect(aiDialog).toBeVisible();
+  for (const label of ["건너뛰기", "분석 시작"]) {
+    expect(await aiDialog.getByRole("button", { name: label }).evaluate((button) => getComputedStyle(button).fontFamily)).toContain("Pretendard");
+  }
+  await aiDialog.getByRole("button", { name: "건너뛰기" }).click();
   await page.locator('input[type="file"]').setInputFiles([
     { name: "one.jpg", mimeType: "image/jpeg", buffer: Buffer.from("unused") },
     { name: "two.jpg", mimeType: "image/jpeg", buffer: Buffer.from("unused") },
