@@ -485,14 +485,14 @@ test("V11: 셀렉 상세는 PC와 모바일에서 고정된 확정 동작을 제
   expect(href).toBeTruthy();
   await page.goto(href!);
   const desktop = page.locator(".fs-selection-strip");
-  await expect(desktop.getByRole("button", { name: "셀렉 확정하기" })).toBeDisabled();
+  await expect(desktop.getByRole("button", { name: "전체 사진에서 더 고르기" })).toBeEnabled();
   const before = await desktop.boundingBox();
   await page.keyboard.press("Space");
-  await expect(desktop.getByRole("button", { name: "셀렉 확정하기" })).toBeEnabled();
+  await expect(desktop.getByRole("button", { name: "선택한 1장 확인하기" })).toBeEnabled();
   expect((await desktop.boundingBox())!.height).toBe(before!.height);
   await page.setViewportSize({ width: 390, height: 844 });
-  const mobileButton = page.locator(".fv-mobile").getByRole("button", { name: "셀렉 확정하기" });
+  const mobileButton = page.locator(".fv-mobile").getByRole("button", { name: "선택한 1장 확인하기" });
   await expect(mobileButton).toBeInViewport();
   await mobileButton.click();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page).toHaveURL(/\/gallery\?.*selected=selected/);
 });

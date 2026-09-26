@@ -332,7 +332,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
 
   const N = project?.requiredCount ?? 0;
   const canEditFinalSelection = adapter?.canEditFinalSelection ?? true;
-  const canConfirm = N > 0 && Y === N && !selectionSaving;
+  const targetMatched = N > 0 && Y === N;
   const queryString = searchParams.toString() ? `?${searchParams.toString()}` : "";
 
   const filmstripRef     = useRef<HTMLDivElement>(null);
@@ -824,8 +824,8 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
   // 고객 상세뷰어의 완료 동작은 고정된 하단에서 제공해 선택 시 사진 높이가 변하지 않는다.
   const selectionCompletion = canEditFinalSelection ? (
     <div className="fs-completion" aria-label="셀렉 진행">
-      <span aria-live="polite">{Y} / {N}장 선택{canConfirm ? " 완료" : Y > N ? ` · ${Y - N}장 줄여주세요` : ` · ${Math.max(0, N - Y)}장 남음`}</span>
-      <button type="button" disabled={selectionSaving} onClick={() => adapter?.onReview ? adapter.onReview() : router.push(`/c/${token}/gallery?selected=${canConfirm ? "selected" : "all"}&grouped=0`)}>{selectionSaving ? "선택 저장 중…" : canConfirm ? `선택한 ${Y}장 확인하기` : "전체 사진에서 더 고르기"}</button>
+      <span aria-live="polite">{adapter ? `${Y}장 선택 · 목표 ${N}장` : `${Y} / ${N}장 선택${targetMatched ? " 완료" : Y > N ? ` · ${Y - N}장 줄여주세요` : ` · ${Math.max(0, N - Y)}장 남음`}`}</span>
+      <button type="button" disabled={selectionSaving || (Boolean(adapter) && Y === 0)} onClick={() => adapter?.onReview ? adapter.onReview() : router.push(`/c/${token}/gallery?selected=${targetMatched ? "selected" : "all"}&grouped=0`)}>{selectionSaving ? "선택 저장 중…" : adapter ? "최종 검토하기" : targetMatched ? `선택한 ${Y}장 확인하기` : "전체 사진에서 더 고르기"}</button>
     </div>
   ) : (
     <div className="fs-completion" aria-label="최종 선택 현황">
@@ -1634,7 +1634,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
             <small>
               {isCurrentSelected
                 ? "다시 누르면 선택 해제 · Space"
-                : canConfirm
+                : !adapter && targetMatched
                   /* 한도에 찼을 때 — 누르면 기존 한도 스낵바가 뜨지만, 이렇게 큰 버튼이
                    * 아무 설명 없이 거절하면 고장으로 읽힌다. 먼저 할 일을 문구로 말한다. */
                   ? `${N}장을 모두 골랐어요 · 바꾸려면 다른 사진을 먼저 해제하세요`

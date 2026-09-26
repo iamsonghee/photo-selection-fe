@@ -273,7 +273,7 @@ test.describe("고객 — 갤러리 (사진 선택)", () => {
     await expect(page).toHaveURL(/\/gallery/);
   });
 
-  test("S5: N장 선택 완료 → 확정 버튼으로 확인 모달 표시", async ({ page }) => {
+  test("S5: N장 선택 완료 → 선택 사진 검토 후 보정 요청 모달 표시", async ({ page }) => {
     await openGallery(page);
     const selectionButtons = page.getByRole("button", { name: "선택", exact: true });
     const N = project.requiredCount ?? 3;
@@ -285,11 +285,13 @@ test.describe("고객 — 갤러리 (사진 선택)", () => {
       await page.waitForTimeout(500);
     }
     // 확정 버튼 활성화 및 확인 모달 표시 (SelectionConfirmFooter 고정 하단)
-    const confirmBtn = page.getByRole("button", { name: "셀렉 확정하기" });
+    const confirmBtn = page.getByRole("button", { name: `선택한 ${N}장 확인하기` });
     await expect(confirmBtn).toBeEnabled({ timeout: 10_000 });
     await confirmBtn.click();
+    await expect(page).toHaveURL(/selected=selected/);
+    await page.getByRole("button", { name: "보정 요청하기", exact: true }).click();
 
-    const confirmDialog = page.getByRole("dialog", { name: "사진 셀렉을 확정할까요?" });
+    const confirmDialog = page.getByRole("dialog", { name: `선택한 ${N}장으로 보정을 요청할까요?` });
     await expect(confirmDialog).toBeVisible();
     await expect(page.locator(".selection-confirm-backdrop")).toHaveCSS("position", "fixed");
     await expect(page.locator(".selection-confirm-backdrop")).toHaveCSS("background-color", "rgba(0, 0, 0, 0.5)");
@@ -349,6 +351,6 @@ test.describe("고객 — 갤러리 (사진 선택)", () => {
 
     await page.getByRole("button", { name: "선택한 사진 보기", exact: true }).click();
     await expect(page).toHaveURL(/selected=selected/);
-    await expect(page.getByRole("button", { name: new RegExp(`선택됨 ${requiredCount}장`) })).toBeVisible();
+    await expect(page.getByRole("button", { name: new RegExp(`내가 선택한 사진 ${requiredCount}장`) })).toBeVisible();
   });
 });
