@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import { FolderPlus } from "lucide-react";
+import { FolderPlus, Plus } from "lucide-react";
 import { getCurrentCustomerAuthId } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "./_lib/CustomerSelectShell";
@@ -39,11 +39,14 @@ export default async function CustomerSelectHomePage() {
   }
 
   return (
-    <CustomerSelectShell>
+    <CustomerSelectShell navigation={!error && projects.length > 0}>
       <main className="mx-auto w-full max-w-[1504px] px-5 py-8 md:px-8 md:py-10">
         <div className="lg:flex lg:items-start lg:justify-between lg:gap-10">
           <div>
-            <h1 className="text-[26px] font-bold tracking-[-0.04em] md:text-[30px]">내 셀렉 프로젝트</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-[26px] font-bold tracking-[-0.04em] md:text-[30px]">내 셀렉 프로젝트</h1>
+              {!error && projects.length > 0 ? <Link href="/customer-select/new" className="hidden min-h-10 items-center gap-1.5 rounded-lg bg-accent px-4 text-[13px] font-bold text-white shadow-[0_6px_16px_rgba(255,82,22,0.16)] transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 lg:inline-flex"><Plus size={16} strokeWidth={2.4} />새 프로젝트</Link> : null}
+            </div>
             <p className="mt-2 text-[14px] text-muted-foreground">사진을 올리고 함께 고른 뒤, 선택한 결과를 작가에게 전달하세요.</p>
           </div>
 
