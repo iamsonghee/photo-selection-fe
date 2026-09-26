@@ -4,7 +4,7 @@ import { getCurrentCustomerAuthId } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "../_lib/CustomerSelectShell";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
-import { customerProjectDestination, customerProjectStatus, type CustomerProjectSummary } from "../_lib/project-routing";
+import { customerProjectAction, customerProjectDestination, customerProjectStatus, type CustomerProjectSummary } from "../_lib/project-routing";
 import { isProjectShootType, projectShootTypeLabel } from "@/lib/project-shoot-types";
 
 export default async function CustomerProjectOverview({ params }: { params: Promise<{ projectId: string }> }) {
@@ -22,7 +22,7 @@ export default async function CustomerProjectOverview({ params }: { params: Prom
   const { count, error: selectionError } = await admin.from("customer_selections")
     .select("photo_id", { count: "exact", head: true }).eq("project_id", projectId).eq("is_selected", true);
   const selectedCount = selectionError ? null : count ?? 0;
-  const action = project.retouch_done ? "완료 내용 보기" : project.exported ? "전달 내용 보기" : project.photo_count ? selectedCount ? "이어서 고르기" : "사진 고르기" : "사진 올리기";
+  const action = customerProjectAction(project, selectedCount);
   const nextStep = project.retouch_done
     ? "모든 보정 확인이 완료됐어요."
     : project.exported
@@ -51,7 +51,7 @@ export default async function CustomerProjectOverview({ params }: { params: Prom
         <Link href={`/customer-select/${projectId}/settings`} className="shrink-0 rounded-lg border border-border-subtle bg-surface px-4 py-2.5 text-sm font-semibold hover:border-border-strong"><span className="hidden sm:inline">프로젝트 </span>설정</Link>
       </div>
       <section className="mt-6 rounded-2xl border border-border-subtle bg-surface p-5 md:p-7" aria-label="프로젝트 진행 현황">
-        <p className="text-sm font-bold text-accent">{customerProjectStatus(project)}</p>
+        <p className="text-sm font-bold text-accent">{customerProjectStatus(project, selectedCount)}</p>
         <h2 className="mt-2 text-lg font-bold tracking-[-0.02em] md:text-xl">{nextStep}</h2>
 
         <dl className="mt-6 grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-border-subtle bg-border-subtle">

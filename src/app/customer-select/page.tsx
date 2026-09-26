@@ -5,13 +5,14 @@ import { FolderPlus, Plus } from "lucide-react";
 import { getCurrentCustomerAuthId } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "./_lib/CustomerSelectShell";
-import { customerProjectDestination, customerProjectStatus, type CustomerProjectSummary } from "./_lib/project-routing";
+import { customerProjectAction, customerProjectDestination, customerProjectStatus, filterCustomerProjects, type CustomerProjectFilter, type CustomerProjectSummary } from "./_lib/project-routing";
 import { isProjectShootType, projectShootTypeLabel } from "@/lib/project-shoot-types";
 import { CUSTOMER_PHOTO_LIMIT } from "./_lib/upload-limit";
 
-export default async function CustomerSelectHomePage() {
+export default async function CustomerSelectHomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const ownerId = await getCurrentCustomerAuthId();
   if (!ownerId) redirect("/customer-select/login");
+  const params = await searchParams;
 
   const admin = getAdminClient();
   const { data, error } = await admin
@@ -26,6 +27,11 @@ export default async function CustomerSelectHomePage() {
   const selectedCounts = await Promise.all(projects.map((project) => admin.from("customer_selections")
     .select("photo_id", { count: "exact", head: true }).eq("project_id", project.id).eq("is_selected", true)));
   const selectedByProject = new Map(projects.map((project, index) => [project.id, selectedCounts[index].error ? null : selectedCounts[index].count ?? 0]));
+  const filtersEnabled = projects.length >= 8;
+  const query = filtersEnabled && typeof params.q === "string" ? params.q : "";
+  const statusFilter: CustomerProjectFilter = filtersEnabled && typeof params.status === "string" && ["active", "delivered", "done"].includes(params.status)
+    ? params.status as CustomerProjectFilter : "all";
+  const filteredProjects = filterCustomerProjects(projects, query, statusFilter);
   const firstPhotoResults = await Promise.all(projectIdsWithPhotos.map((projectId) => admin
     .from("customer_photos")
     .select("project_id, thumb_url, preview_url")
@@ -41,21 +47,18 @@ export default async function CustomerSelectHomePage() {
   return (
     <CustomerSelectShell navigation={!error && projects.length > 0}>
       <main className="mx-auto w-full max-w-[1504px] px-5 py-8 md:px-8 md:py-10">
-        <div className="lg:flex lg:items-start lg:justify-between lg:gap-10">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-[26px] font-bold tracking-[-0.04em] md:text-[30px]">내 셀렉 프로젝트</h1>
-              {!error && projects.length > 0 ? <Link href="/customer-select/new" className="hidden min-h-10 items-center gap-1.5 rounded-lg bg-accent px-4 text-[13px] font-bold text-white shadow-[0_6px_16px_rgba(255,82,22,0.16)] transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 lg:inline-flex"><Plus size={16} strokeWidth={2.4} />새 프로젝트</Link> : null}
-            </div>
-            <p className="mt-2 text-[14px] text-muted-foreground">사진을 올리고 함께 고른 뒤, 선택한 결과를 작가에게 전달하세요.</p>
+        <div className="lg:flex lg:items-center lg:justify-between lg:gap-10">
+          <div className="flex items-center gap-3">
+            <h1 className="text-[26px] font-bold tracking-[-0.04em] md:text-[30px]">내 프로젝트</h1>
+            <span className="text-[15px] font-semibold text-muted-foreground" aria-label={`${projects.length.toLocaleString()}개 프로젝트`}>{projects.length.toLocaleString()}</span>
+            {!error && projects.length > 0 ? <Link href="/customer-select/new" className="hidden min-h-10 items-center gap-1.5 rounded-lg bg-accent px-4 text-[13px] font-bold text-white shadow-[0_6px_16px_rgba(255,82,22,0.16)] transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 lg:inline-flex"><Plus size={16} strokeWidth={2.4} />새 프로젝트</Link> : null}
           </div>
 
           {!error ? (
-            <section className="mt-5 rounded-2xl border border-border-subtle bg-surface px-4 py-3.5 shadow-[0_8px_24px_rgba(2,56,82,0.05)] lg:mt-0 lg:w-80 lg:shrink-0" aria-label="전체 사진 이용량">
+            <section className="mt-5 rounded-2xl border border-border-subtle bg-surface px-4 py-3 shadow-[0_8px_24px_rgba(2,56,82,0.05)] lg:mt-0 lg:w-80 lg:shrink-0" aria-label="전체 사진 이용량">
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-[12px] font-bold text-foreground">전체 사진 이용량</p>
-                  <p className="mt-0.5 text-[10px] font-medium text-muted-foreground">모든 프로젝트 합산</p>
+                  <p className="text-[11px] font-semibold text-muted-foreground">전체 사진 · 모든 프로젝트 합산</p>
                   <p className="mt-1 text-[20px] font-bold tracking-[-0.03em] text-foreground">{accountPhotoCount.toLocaleString()} <span className="text-[13px] font-semibold text-muted-foreground">/ {CUSTOMER_PHOTO_LIMIT.toLocaleString()}장</span></p>
                 </div>
                 <p className="shrink-0 text-[12px] font-semibold text-accent">{remainingPhotoCount.toLocaleString()}장 남음</p>
@@ -79,30 +82,49 @@ export default async function CustomerSelectHomePage() {
             </div>
           </section>
         ) : (
-          <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="프로젝트 목록">
-            {projects.map((project) => {
+          <>
+          {filtersEnabled ? <form className="mt-6 flex flex-col gap-2 rounded-xl border border-border-subtle bg-surface p-3 sm:flex-row" action="/customer-select">
+            <label className="min-w-0 flex-1">
+              <span className="sr-only">프로젝트 검색</span>
+              <input name="q" defaultValue={query} placeholder="프로젝트명, 업체, 작가 검색" className="h-10 w-full rounded-lg border border-border-subtle bg-background px-3 text-sm outline-none focus:border-accent" />
+            </label>
+            <label>
+              <span className="sr-only">진행 상태</span>
+              <select name="status" defaultValue={statusFilter} className="h-10 w-full rounded-lg border border-border-subtle bg-background px-3 text-sm outline-none focus:border-accent sm:w-32">
+                <option value="all">전체 상태</option>
+                <option value="active">진행 중</option>
+                <option value="delivered">전달 완료</option>
+                <option value="done">보정 완료</option>
+              </select>
+            </label>
+            <button type="submit" className="h-10 rounded-lg border border-border-subtle px-4 text-sm font-semibold hover:border-border-strong">찾기</button>
+            {query || statusFilter !== "all" ? <Link href="/customer-select" className="grid h-10 place-items-center px-2 text-sm text-muted-foreground">초기화</Link> : null}
+          </form> : null}
+          {filteredProjects.length > 0 ? <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="프로젝트 목록">
+            {filteredProjects.map((project) => {
               const coverUrl = coverByProject.get(project.id);
               const selectedCount = selectedByProject.get(project.id);
+              const status = customerProjectStatus(project, selectedCount);
               const projectMeta = [
                 isProjectShootType(project.shoot_type) ? projectShootTypeLabel(project.shoot_type) : null,
                 project.shoot_date?.replaceAll("-", "."),
                 project.studio_name,
               ].filter(Boolean).join(" · ");
               return (
-              <article key={project.id} className="group relative overflow-hidden rounded-2xl border border-border-subtle bg-surface transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(2,56,82,0.08)] focus-within:ring-2 focus-within:ring-accent/25">
-              <Link href={`/customer-select/${project.id}`} className="block focus-visible:outline-none" aria-label={`${project.name} 프로젝트 현황`}>
+              <article key={project.id} className="group relative overflow-hidden rounded-2xl border border-border-subtle bg-surface transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(2,56,82,0.08)]">
+              <Link href={`/customer-select/${project.id}`} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/35" aria-label={`${project.name} 프로젝트 현황`}>
                 <div className="relative grid aspect-[4/3] place-items-center overflow-hidden bg-surface-raised">
                   {coverUrl
                     ? <Image src={coverUrl} alt="" fill unoptimized sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover object-center" />
                     : <Image src="/brand/a-cut-mark.svg" alt="" width={64} height={64} className="rounded-xl" />}
                 </div>
-                <div className="px-5 pb-4 pt-4">
+                <div className="px-5 pb-2 pt-4">
                   <div className="flex items-center justify-between gap-3">
                     <strong className="min-w-0 truncate text-[17px] font-bold">{project.name}</strong>
-                    <span className="shrink-0 rounded-full bg-customer-soft px-2.5 py-1.5 text-[12px] font-bold text-primary">{customerProjectStatus(project)}</span>
+                    <span className="flex shrink-0 items-center gap-1.5 text-[12px] font-bold text-primary"><span className={`size-1.5 rounded-full ${project.photo_count === 0 ? "bg-muted-foreground" : "bg-primary"}`} aria-hidden="true" />{status}</span>
                   </div>
-                  {projectMeta ? <p className="mt-2 truncate text-[13px] text-muted-foreground">{projectMeta}</p> : null}
-                  <p className="mt-3 text-[13px] text-muted-foreground">
+                  {projectMeta ? <p className="mt-2 truncate text-[14px] text-muted-foreground">{projectMeta}</p> : null}
+                  <p className="mt-3 text-[14px] text-muted-foreground">
                     <span className="font-semibold text-foreground">사진 {project.photo_count.toLocaleString()}장</span>
                     <span aria-hidden="true"> · </span>
                     {typeof selectedCount === "number" ? `선택 ${selectedCount.toLocaleString()}장` : "선택 수 확인 불가"}
@@ -111,13 +133,14 @@ export default async function CustomerSelectHomePage() {
                   </p>
                 </div>
               </Link>
-              <div className="flex justify-end border-t border-border-subtle px-4 py-2.5">
-                <Link href={customerProjectDestination(project)} className="inline-flex min-h-9 items-center rounded-lg bg-accent px-3.5 text-[13px] font-bold text-white transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35">{project.retouch_done ? "완료 내용 보기" : project.exported ? "전달 내용 보기" : project.photo_count ? "이어서 고르기" : "사진 올리기"} →</Link>
+              <div className="flex justify-end px-5 pb-4 pt-2">
+                <Link href={customerProjectDestination(project)} className="inline-flex min-h-9 items-center rounded-lg border border-accent/20 bg-customer-soft px-3.5 text-[13px] font-bold text-accent transition-colors hover:border-accent hover:bg-accent hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35">{customerProjectAction(project, selectedCount)} →</Link>
               </div>
               </article>
               );
             })}
-          </section>
+          </section> : <section className="mt-6 rounded-2xl border border-border-subtle bg-surface px-6 py-16 text-center"><h2 className="font-bold">조건에 맞는 프로젝트가 없어요</h2><Link href="/customer-select" className="mt-3 inline-flex text-sm font-semibold text-accent">전체 프로젝트 보기</Link></section>}
+          </>
         )}
       </main>
     </CustomerSelectShell>

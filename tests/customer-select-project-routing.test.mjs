@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { customerProjectDestination, customerProjectStatus } from "../src/app/customer-select/_lib/project-routing.ts";
+import { customerProjectAction, customerProjectDestination, customerProjectStatus, filterCustomerProjects } from "../src/app/customer-select/_lib/project-routing.ts";
 
 const project = (overrides = {}) => ({
   id: "project-1",
@@ -29,4 +29,17 @@ assert.equal(customerProjectStatus(project({ retouch_done: true })), "보정 완
 assert.equal(customerProjectStatus(project({ exported: true })), "전달 완료");
 assert.equal(customerProjectStatus(project({ photo_count: 10, delivery_count: 1 })), "재선택 중");
 assert.equal(customerProjectStatus(project({ photo_count: 10 })), "선택 중");
+assert.equal(customerProjectStatus(project({ photo_count: 10 }), 0), "선택 시작 전");
 assert.equal(customerProjectStatus(project()), "사진 준비");
+assert.equal(customerProjectAction(project()), "사진 올리기");
+assert.equal(customerProjectAction(project({ photo_count: 10 }), 0), "사진 고르기");
+assert.equal(customerProjectAction(project({ photo_count: 10 }), 1), "이어서 고르기");
+assert.equal(customerProjectAction(project({ exported: true }), 1), "전달 내용 보기");
+
+const projects = [
+  project({ id: "active", name: "우리 웨딩", studio_name: "ACUT" }),
+  project({ id: "delivered", name: "가족", exported: true }),
+  project({ id: "done", name: "프로필", retouch_done: true }),
+];
+assert.deepEqual(filterCustomerProjects(projects, "acut", "all").map(({ id }) => id), ["active"]);
+assert.deepEqual(filterCustomerProjects(projects, "", "delivered").map(({ id }) => id), ["delivered"]);
