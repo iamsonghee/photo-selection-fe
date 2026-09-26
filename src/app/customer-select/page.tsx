@@ -59,7 +59,7 @@ export default async function CustomerSelectHomePage() {
               return (
               <article key={project.id} className="group relative overflow-hidden rounded-2xl border border-border-subtle bg-surface transition hover:-translate-y-0.5 hover:border-border-strong hover:shadow-[0_12px_32px_rgba(2,56,82,0.08)]">
               <Link href={`/customer-select/${project.id}`} className="block" aria-label={`${project.name} 프로젝트 현황`}>
-                <div className="relative grid aspect-[16/8] place-items-center overflow-hidden bg-surface-raised">
+                <div className="relative grid aspect-[4/3] place-items-center overflow-hidden bg-surface-raised">
                   {coverUrl
                     ? <Image src={coverUrl} alt="" fill unoptimized sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover object-center" />
                     : <Image src="/brand/a-cut-mark.svg" alt="" width={64} height={64} className="rounded-xl" />}
