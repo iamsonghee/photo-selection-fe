@@ -10,7 +10,10 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await page.goto("/customer-select/new");
     await expect(page.getByRole("heading", { name: "어떤 사진을 골라볼까요?" })).toBeVisible();
     await expect(page.getByRole("button", { name: "웨딩" })).toBeVisible();
-    await expect(page.locator('input[inputmode="numeric"]')).toHaveValue("30");
+    const targetInput = page.locator('input[inputmode="numeric"]');
+    await expect(targetInput).toHaveValue("");
+    await targetInput.fill("2000");
+    expect(await targetInput.evaluate((input) => Number.parseFloat(getComputedStyle(input).paddingRight))).toBeGreaterThanOrEqual(56);
     await expect(page.getByText("작가님과 약속한 장수를 입력해 주세요.", { exact: false })).toBeVisible();
     await expect(page.locator("details")).not.toHaveAttribute("open", "");
     await page.locator("summary").click();

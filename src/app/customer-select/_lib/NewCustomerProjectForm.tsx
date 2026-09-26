@@ -21,7 +21,7 @@ export function NewCustomerProjectForm() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [shootType, setShootType] = useState<string | null>(null);
-  const [target, setTarget] = useState("30");
+  const [target, setTarget] = useState("");
   const [shootDate, setShootDate] = useState("");
   const [selectionDeadline, setSelectionDeadline] = useState("");
   const [studioName, setStudioName] = useState("");
@@ -105,7 +105,7 @@ export function NewCustomerProjectForm() {
               <ProjectFormField error={fieldErrors.target} label="보정받을 사진 수" required hint="작가님과 약속한 장수를 입력해 주세요. 실제 선택 장수가 달라도 전달할 수 있어요.">
                 <div className="relative">
                   <ProjectFormInput
-                    className={`${PROJECT_FORM_INPUT_CLASS} pr-12 text-right md:pr-12 ${projectFormInputStateClass({ hasValue: Boolean(target), error: Boolean(fieldErrors.target) })}`}
+                    className={`${PROJECT_FORM_INPUT_CLASS} !pr-14 text-right ${projectFormInputStateClass({ hasValue: Boolean(target), error: Boolean(fieldErrors.target) })}`}
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
