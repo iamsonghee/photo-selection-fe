@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Copy, Link2, RefreshCw, Unlink } from "lucide-react";
+import { RefreshCw, Unlink } from "lucide-react";
 import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { CustomerShareLinkField } from "./CustomerShareLinkField";
 
 type ShareAction = "disable" | "rotate";
 
@@ -14,18 +15,6 @@ export function CustomerShareLinkManager({ projectId, initialToken, initialEnabl
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const [message, setMessage] = useState<string | null>(null);
-  const relativeUrl = `/customer-select/${projectId}/select?share_token=${token}`;
-
-  async function copyLink() {
-    const url = `${window.location.origin}${relativeUrl}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setMessage("초대 링크를 복사했어요.");
-    } catch {
-      window.prompt("아래 링크를 복사해 주세요", url);
-    }
-  }
-
   async function applyAction() {
     if (!confirmAction || busyRef.current) return;
     busyRef.current = true;
@@ -61,11 +50,7 @@ export function CustomerShareLinkManager({ projectId, initialToken, initialEnabl
         <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${enabled ? "bg-emerald-50 text-emerald-700" : "bg-surface-raised text-muted-foreground"}`}>{enabled ? "공유 중" : "공유 중지"}</span>
       </div>
 
-      {enabled ? <div className="mt-5 flex min-w-0 items-center gap-2 rounded-xl border border-border-subtle bg-surface-raised p-2 pl-4">
-        <Link2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-        <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground">{relativeUrl}</span>
-        <button type="button" onClick={copyLink} className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-foreground px-4 text-xs font-bold text-background"><Copy className="h-4 w-4" />복사</button>
-      </div> : <div className="mt-5 rounded-xl bg-surface-raised px-4 py-3 text-[13px] leading-5 text-muted-foreground">기존 링크와 참여자의 접속이 차단된 상태예요. 기존 셀렉과 의견 기록은 그대로 보존됩니다.</div>}
+      {enabled ? <div className="mt-5"><CustomerShareLinkField projectId={projectId} token={token} /></div> : <div className="mt-5 rounded-xl bg-surface-raised px-4 py-3 text-[13px] leading-5 text-muted-foreground">기존 링크와 참여자의 접속이 차단된 상태예요. 기존 셀렉과 의견 기록은 그대로 보존됩니다.</div>}
 
       <div className="mt-4 flex flex-wrap gap-2">
         <PhotographerLightButton variant="secondary" onClick={() => setConfirmAction("rotate")}><RefreshCw className="h-4 w-4" />{enabled ? "링크 재발급" : "새 링크 만들기"}</PhotographerLightButton>

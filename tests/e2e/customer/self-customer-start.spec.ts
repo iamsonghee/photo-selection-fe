@@ -42,6 +42,10 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await expect(page.getByText("올린 사진", { exact: true })).toBeVisible();
     await expect(page.getByText("최종 선택", { exact: true })).toBeVisible();
     await expect(page.getByText("추가 가능", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "보기·정리" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "함께 고르기" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "사진 관리" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "초대 링크 관리" })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "촬영 정보" })).toBeVisible();
     await expect(page.getByText(/미입력/)).toHaveCount(0);
     for (const width of [1440, 390]) {
@@ -49,7 +53,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
       await page.screenshot({ path: testInfo.outputPath(`overview-${width}.png`), fullPage: true });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     }
-    await page.getByRole("link", { name: "설정" }).click();
+    await page.getByRole("link", { name: "설정", exact: true }).click();
     await expect(page.getByRole("heading", { name: "프로젝트 설정" })).toBeVisible();
     await expect(page.getByText("담당 작가명", { exact: true })).toBeVisible();
     await expect(page.getByText("촬영 지역", { exact: true })).toBeVisible();
