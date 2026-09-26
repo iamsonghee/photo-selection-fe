@@ -6,7 +6,8 @@ import { getCurrentCustomerAuthId } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "./_lib/CustomerSelectShell";
 import { customerProjectDestination, customerProjectStatus, type CustomerProjectSummary } from "./_lib/project-routing";
-import { projectShootTypeLabel } from "@/lib/project-shoot-types";
+import { isProjectShootType, projectShootTypeLabel } from "@/lib/project-shoot-types";
+import { CUSTOMER_PHOTO_LIMIT } from "./_lib/upload-limit";
 
 export default async function CustomerSelectHomePage() {
   const ownerId = await getCurrentCustomerAuthId();
@@ -56,6 +57,7 @@ export default async function CustomerSelectHomePage() {
           <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="프로젝트 목록">
             {projects.map((project) => {
               const coverUrl = coverByProject.get(project.id);
+              const remainingPhotoCount = Math.max(0, CUSTOMER_PHOTO_LIMIT - project.photo_count);
               return (
               <article key={project.id} className="group relative overflow-hidden rounded-2xl border border-border-subtle bg-surface transition hover:-translate-y-0.5 hover:border-border-strong hover:shadow-[0_12px_32px_rgba(2,56,82,0.08)]">
               <Link href={`/customer-select/${project.id}`} className="block" aria-label={`${project.name} 프로젝트 현황`}>
@@ -69,8 +71,9 @@ export default async function CustomerSelectHomePage() {
                     <strong className="min-w-0 truncate text-[17px] font-bold">{project.name}</strong>
                     <span className="shrink-0 rounded-md bg-customer-soft px-2 py-1 text-[11px] font-bold text-primary">{customerProjectStatus(project)}</span>
                   </div>
-                  <p className="mt-3 text-[13px] text-muted-foreground">{[project.studio_name, projectShootTypeLabel(project.shoot_type), project.shoot_date?.replaceAll("-", ".")].filter(Boolean).join(" · ")}</p>
+                  <p className="mt-3 text-[13px] text-muted-foreground">{[project.studio_name, isProjectShootType(project.shoot_type) ? projectShootTypeLabel(project.shoot_type) : null, project.shoot_date?.replaceAll("-", ".")].filter(Boolean).join(" · ")}</p>
                   <p className="mt-1 text-[13px] text-muted-foreground">사진 {project.photo_count.toLocaleString()}장 · {selectedByProject.get(project.id) === null ? "선택 수 확인 불가" : `${selectedByProject.get(project.id)}장 선택`} · 보정 예정 {project.target_count}장</p>
+                  <p className="mt-1 text-[12px] text-subtle-foreground">프로젝트당 {CUSTOMER_PHOTO_LIMIT.toLocaleString()}장 중 {remainingPhotoCount.toLocaleString()}장 추가 가능</p>
                 </div>
               </Link>
               <div className="flex items-center justify-between border-t border-border-subtle px-5 py-3 text-sm font-semibold">

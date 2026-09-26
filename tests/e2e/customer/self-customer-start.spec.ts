@@ -20,6 +20,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
   await page.goto("/customer-select");
+  await expect(page.getByText(/미입력/)).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath("projects-mobile.png"), fullPage: true });
   const overview = page.getByRole("link", { name: "프로젝트 현황", exact: true }).first();
   if (await overview.count()) {
@@ -28,7 +29,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await expect(page.getByRole("link", { name: "새 프로젝트" })).toHaveCount(0);
     await expect(page.getByText("올린 사진", { exact: true })).toBeVisible();
     await expect(page.getByText("최종 선택", { exact: true })).toBeVisible();
-    await expect(page.getByText("추가 가능", { exact: true })).toBeVisible();
+    await expect(page.getByText("추가 가능", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "촬영 정보" })).toBeVisible();
     await expect(page.getByText(/미입력/)).toHaveCount(0);
     for (const width of [1440, 390]) {

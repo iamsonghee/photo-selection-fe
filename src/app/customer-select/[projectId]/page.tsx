@@ -4,9 +4,8 @@ import { getCurrentCustomerAuthId } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "../_lib/CustomerSelectShell";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
-import { CUSTOMER_PHOTO_LIMIT } from "../_lib/upload-limit";
 import { customerProjectDestination, customerProjectStatus, type CustomerProjectSummary } from "../_lib/project-routing";
-import { projectShootTypeLabel } from "@/lib/project-shoot-types";
+import { isProjectShootType, projectShootTypeLabel } from "@/lib/project-shoot-types";
 
 export default async function CustomerProjectOverview({ params }: { params: Promise<{ projectId: string }> }) {
   const ownerId = await getCurrentCustomerAuthId();
@@ -35,7 +34,7 @@ export default async function CustomerProjectOverview({ params }: { params: Prom
           : "사진 업로드가 끝났어요. 이제 전달할 사진을 골라주세요.";
   const selectionProgress = selectedCount === null || project.target_count <= 0 ? 0 : Math.min(100, Math.round((selectedCount / project.target_count) * 100));
   const info = [
-    ["촬영 종류", project.shoot_type ? projectShootTypeLabel(project.shoot_type) : null],
+    ["촬영 종류", isProjectShootType(project.shoot_type) ? projectShootTypeLabel(project.shoot_type) : null],
     ["촬영일", project.shoot_date],
     ["선택 마감일", project.selection_deadline],
     ["스튜디오·업체", project.studio_name],
@@ -55,12 +54,11 @@ export default async function CustomerProjectOverview({ params }: { params: Prom
         <p className="text-sm font-bold text-accent">{customerProjectStatus(project)}</p>
         <h2 className="mt-2 text-lg font-bold tracking-[-0.02em] md:text-xl">{nextStep}</h2>
 
-        <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border-subtle bg-border-subtle md:grid-cols-4">
+        <dl className="mt-6 grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-border-subtle bg-border-subtle">
           {[
             ["올린 사진", `${project.photo_count.toLocaleString()}장`],
             ["최종 선택", selectedCount === null ? "확인 불가" : `${selectedCount.toLocaleString()}장`],
             ["목표", `${project.target_count.toLocaleString()}장`],
-            ["추가 가능", `${Math.max(0, CUSTOMER_PHOTO_LIMIT - project.photo_count).toLocaleString()}장`],
           ].map(([label, value]) => <div key={label} className="bg-surface-raised px-4 py-4"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 text-lg font-bold">{value}</dd></div>)}
         </dl>
 
