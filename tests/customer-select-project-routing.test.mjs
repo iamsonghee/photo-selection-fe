@@ -25,6 +25,8 @@ assert.equal(customerProjectDestination(project()), "/customer-select/project-1/
 assert.equal(customerProjectDestination(project({ photo_count: 10 })), "/customer-select/project-1/select");
 assert.equal(customerProjectDestination(project({ exported: true })), "/customer-select/project-1/export");
 assert.equal(customerProjectDestination(project({ retouch_done: true })), "/customer-select/project-1/done");
-assert.equal(customerProjectStatus(project({ retouch_done: true })), "완료");
+assert.equal(customerProjectStatus(project({ retouch_done: true })), "보정 완료");
 assert.equal(customerProjectStatus(project({ exported: true })), "전달 완료");
 assert.equal(customerProjectStatus(project({ photo_count: 10, delivery_count: 1 })), "재선택 중");
+assert.equal(customerProjectStatus(project({ photo_count: 10 })), "선택 중");
+assert.equal(customerProjectStatus(project()), "사진 준비");

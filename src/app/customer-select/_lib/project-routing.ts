@@ -25,9 +25,9 @@ export function customerProjectDestination(project: CustomerProjectSummary) {
 }
 
 export function customerProjectStatus(project: CustomerProjectSummary) {
-  if (project.retouch_done) return "완료";
+  if (project.retouch_done) return "보정 완료";
   if (project.exported) return "전달 완료";
   if (project.delivery_count > 0) return "재선택 중";
-  if (project.photo_count > 0) return "셀렉 진행";
-  return "사진 업로드 전";
+  if (project.photo_count > 0) return "선택 중";
+  return "사진 준비";
 }

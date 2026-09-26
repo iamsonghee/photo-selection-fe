@@ -22,8 +22,12 @@ test("self customer start screens and over-limit selection", async ({ page }, te
   await page.goto("/customer-select");
   await expect(page.getByText(/미입력/)).toHaveCount(0);
   await expect(page.getByRole("region", { name: "전체 사진 이용량" })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath("projects-mobile.png"), fullPage: true });
-  const overview = page.getByRole("link", { name: "프로젝트 현황", exact: true }).first();
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.screenshot({ path: testInfo.outputPath(`projects-${width}.png`), fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  const overview = page.getByRole("link", { name: /프로젝트 현황$/ }).first();
   if (await overview.count()) {
     await expect(page.getByRole("article").first().getByText(/장 남음/)).toHaveCount(0);
     await overview.click();

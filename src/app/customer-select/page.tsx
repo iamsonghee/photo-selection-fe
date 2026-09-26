@@ -51,7 +51,8 @@ export default async function CustomerSelectHomePage() {
             <section className="mt-5 rounded-2xl border border-border-subtle bg-surface px-4 py-3.5 shadow-[0_8px_24px_rgba(2,56,82,0.05)] lg:mt-0 lg:w-80 lg:shrink-0" aria-label="전체 사진 이용량">
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold text-muted-foreground">전체 사진 이용량 · 모든 프로젝트 합산</p>
+                  <p className="text-[12px] font-bold text-foreground">전체 사진 이용량</p>
+                  <p className="mt-0.5 text-[10px] font-medium text-muted-foreground">모든 프로젝트 합산</p>
                   <p className="mt-1 text-[20px] font-bold tracking-[-0.03em] text-foreground">{accountPhotoCount.toLocaleString()} <span className="text-[13px] font-semibold text-muted-foreground">/ {CUSTOMER_PHOTO_LIMIT.toLocaleString()}장</span></p>
                 </div>
                 <p className="shrink-0 text-[12px] font-semibold text-accent">{remainingPhotoCount.toLocaleString()}장 남음</p>
@@ -78,27 +79,37 @@ export default async function CustomerSelectHomePage() {
           <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="프로젝트 목록">
             {projects.map((project) => {
               const coverUrl = coverByProject.get(project.id);
+              const selectedCount = selectedByProject.get(project.id);
+              const projectMeta = [
+                isProjectShootType(project.shoot_type) ? projectShootTypeLabel(project.shoot_type) : null,
+                project.shoot_date?.replaceAll("-", "."),
+                project.studio_name,
+              ].filter(Boolean).join(" · ");
               return (
-              <article key={project.id} className="group relative overflow-hidden rounded-2xl border border-border-subtle bg-surface transition hover:-translate-y-0.5 hover:border-border-strong hover:shadow-[0_12px_32px_rgba(2,56,82,0.08)]">
-              <Link href={`/customer-select/${project.id}`} className="block" aria-label={`${project.name} 프로젝트 현황`}>
+              <article key={project.id} className="group relative overflow-hidden rounded-2xl border border-border-subtle bg-surface transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(2,56,82,0.08)] focus-within:ring-2 focus-within:ring-accent/25">
+              <Link href={`/customer-select/${project.id}`} className="block focus-visible:outline-none" aria-label={`${project.name} 프로젝트 현황`}>
                 <div className="relative grid aspect-[4/3] place-items-center overflow-hidden bg-surface-raised">
                   {coverUrl
                     ? <Image src={coverUrl} alt="" fill unoptimized sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover object-center" />
                     : <Image src="/brand/a-cut-mark.svg" alt="" width={64} height={64} className="rounded-xl" />}
                 </div>
-                <div className="p-5">
+                <div className="px-5 pb-4 pt-4">
                   <div className="flex items-center justify-between gap-3">
                     <strong className="min-w-0 truncate text-[17px] font-bold">{project.name}</strong>
-                    <span className="shrink-0 rounded-md bg-customer-soft px-2 py-1 text-[11px] font-bold text-primary">{customerProjectStatus(project)}</span>
+                    <span className="shrink-0 rounded-full bg-customer-soft px-2.5 py-1.5 text-[12px] font-bold text-primary">{customerProjectStatus(project)}</span>
                   </div>
-                  <p className="mt-3 text-[13px] text-muted-foreground">{[project.studio_name, isProjectShootType(project.shoot_type) ? projectShootTypeLabel(project.shoot_type) : null, project.shoot_date?.replaceAll("-", ".")].filter(Boolean).join(" · ")}</p>
-                  <p className="mt-2 text-[13px] font-semibold text-foreground">사진 {project.photo_count.toLocaleString()}장</p>
-                  <p className="mt-1 text-[13px] text-muted-foreground">{selectedByProject.get(project.id) === null ? "선택 수 확인 불가" : `${selectedByProject.get(project.id)}장 선택`} · 목표 {project.target_count.toLocaleString()}장</p>
+                  {projectMeta ? <p className="mt-2 truncate text-[13px] text-muted-foreground">{projectMeta}</p> : null}
+                  <p className="mt-3 text-[13px] text-muted-foreground">
+                    <span className="font-semibold text-foreground">사진 {project.photo_count.toLocaleString()}장</span>
+                    <span aria-hidden="true"> · </span>
+                    {typeof selectedCount === "number" ? `선택 ${selectedCount.toLocaleString()}장` : "선택 수 확인 불가"}
+                    <span aria-hidden="true"> · </span>
+                    보정 목표 {project.target_count.toLocaleString()}장
+                  </p>
                 </div>
               </Link>
-              <div className="flex items-center justify-between border-t border-border-subtle px-5 py-3 text-sm font-semibold">
-                <Link href={`/customer-select/${project.id}`} className="py-2 text-muted-foreground">프로젝트 현황</Link>
-                <Link href={customerProjectDestination(project)} className="py-2 text-accent">{project.retouch_done ? "완료 내용 보기" : project.exported ? "전달 내용 보기" : project.photo_count ? "이어서 고르기" : "사진 올리기"} →</Link>
+              <div className="flex justify-end border-t border-border-subtle px-4 py-2.5">
+                <Link href={customerProjectDestination(project)} className="inline-flex min-h-9 items-center rounded-lg bg-accent px-3.5 text-[13px] font-bold text-white transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35">{project.retouch_done ? "완료 내용 보기" : project.exported ? "전달 내용 보기" : project.photo_count ? "이어서 고르기" : "사진 올리기"} →</Link>
               </div>
               </article>
               );
