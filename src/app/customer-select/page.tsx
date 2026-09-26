@@ -72,8 +72,8 @@ export default async function CustomerSelectHomePage() {
                     <span className="shrink-0 rounded-md bg-customer-soft px-2 py-1 text-[11px] font-bold text-primary">{customerProjectStatus(project)}</span>
                   </div>
                   <p className="mt-3 text-[13px] text-muted-foreground">{[project.studio_name, isProjectShootType(project.shoot_type) ? projectShootTypeLabel(project.shoot_type) : null, project.shoot_date?.replaceAll("-", ".")].filter(Boolean).join(" · ")}</p>
-                  <p className="mt-1 text-[13px] text-muted-foreground">사진 {project.photo_count.toLocaleString()}장 · {selectedByProject.get(project.id) === null ? "선택 수 확인 불가" : `${selectedByProject.get(project.id)}장 선택`} · 보정 예정 {project.target_count}장</p>
-                  <p className="mt-1 text-[12px] text-subtle-foreground">프로젝트당 {CUSTOMER_PHOTO_LIMIT.toLocaleString()}장 중 {remainingPhotoCount.toLocaleString()}장 추가 가능</p>
+                  <p className="mt-2 text-[13px] font-semibold text-foreground">사진 {project.photo_count.toLocaleString()} / {CUSTOMER_PHOTO_LIMIT.toLocaleString()}장 · {remainingPhotoCount.toLocaleString()}장 남음</p>
+                  <p className="mt-1 text-[13px] text-muted-foreground">{selectedByProject.get(project.id) === null ? "선택 수 확인 불가" : `${selectedByProject.get(project.id)}장 선택`} · 목표 {project.target_count.toLocaleString()}장</p>
                 </div>
               </Link>
               <div className="flex items-center justify-between border-t border-border-subtle px-5 py-3 text-sm font-semibold">
