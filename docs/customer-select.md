@@ -317,11 +317,10 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 - `20260922020000_add_customer_project_sharing_state.sql`
 - `20260922030000_track_customer_upload_usage.sql`
 - `20260922040000_add_customer_delivery_tracking.sql`
-
-적용 대기 마이그레이션:
-
 - `20260922050000_add_customer_participant_presence.sql`
 - `20260922060000_add_customer_participant_view.sql`
+
+적용 대기 마이그레이션: 없음.
 
 Supabase CLI의 마이그레이션 이력은 비어 있어 `supabase db push`를 실행하면 과거 파일 전체를
 재실행하려 한다. **`supabase db push`는 사용하지 않는다.** 새 SQL은 Dashboard SQL Editor 또는
@@ -364,3 +363,8 @@ Management API `/database/query`로 해당 파일만 실행한다.
 2026-09-26: 후보 정리 추가 범위는 마지막 위치 복원만 유지하기로 했다. 프로젝트별 현재 행의 첫
 사진 ID를 세션에 저장하고 열 수가 달라져도 해당 사진의 행으로 복원한다. 실제 40장 프로젝트에서
 PC와 모바일 모두 중간 위치로 이동한 뒤 새로고침해 같은 사진 기준점이 유지됨을 확인했다.
+
+2026-09-26: 실제 공유 링크를 PC·모바일의 새 브라우저 세션에서 두 차례 검증했다. 토큰 교환 후
+URL 제거, HttpOnly 쿠키의 새 탭·새로고침 유지, 공유 중지 후 기존 쿠키·링크 차단, 재발급 링크
+진입이 정상 동작했다. 참가자의 프로젝트 수정·공유 관리·결과 링크·AI 분석 시작·보정 판단·완료
+변경은 모두 403으로 차단되며, 공유 중지 확인을 빠르게 두 번 눌러도 요청은 한 번만 전송된다.

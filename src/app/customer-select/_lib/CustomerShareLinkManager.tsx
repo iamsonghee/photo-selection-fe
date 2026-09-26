@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Copy, Link2, RefreshCw, Unlink } from "lucide-react";
 import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -12,6 +12,7 @@ export function CustomerShareLinkManager({ projectId, initialToken, initialEnabl
   const [enabled, setEnabled] = useState(initialEnabled);
   const [confirmAction, setConfirmAction] = useState<ShareAction | null>(null);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const [message, setMessage] = useState<string | null>(null);
   const relativeUrl = `/customer-select/${projectId}/select?share_token=${token}`;
 
@@ -26,7 +27,8 @@ export function CustomerShareLinkManager({ projectId, initialToken, initialEnabl
   }
 
   async function applyAction() {
-    if (!confirmAction) return;
+    if (!confirmAction || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setMessage(null);
     try {
@@ -44,6 +46,7 @@ export function CustomerShareLinkManager({ projectId, initialToken, initialEnabl
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "공유 링크를 변경하지 못했어요.");
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }

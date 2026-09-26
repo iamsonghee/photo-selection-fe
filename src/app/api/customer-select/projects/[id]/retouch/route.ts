@@ -86,6 +86,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const admin = getAdminClient();
   const access = await resolveCustomerProjectAccess(admin, id, shareTokenFromRequest(req, id));
   if (access instanceof NextResponse) return access;
+  if (!access.isOwner) return NextResponse.json({ error: "프로젝트 소유자만 완료 상태를 변경할 수 있습니다." }, { status: 403 });
   const body = await req.json().catch(() => ({}));
   if (typeof body.retouchDone !== "boolean") {
     return NextResponse.json({ error: "retouchDone(boolean) 필드가 필요합니다." }, { status: 400 });

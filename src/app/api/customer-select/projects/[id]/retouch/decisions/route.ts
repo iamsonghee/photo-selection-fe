@@ -8,6 +8,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const admin = getAdminClient();
   const access = await resolveCustomerProjectAccess(admin, projectId, shareTokenFromRequest(req, projectId));
   if (access instanceof NextResponse) return access;
+  if (!access.isOwner) return NextResponse.json({ error: "프로젝트 소유자만 보정본을 검토할 수 있습니다." }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
   const { version_id, decision, redo_reason } = body as {
