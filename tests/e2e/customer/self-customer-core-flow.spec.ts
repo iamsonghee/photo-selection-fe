@@ -112,6 +112,29 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
     csv: csv.suggestedFilename(), txt: txt.suggestedFilename(), consoleErrors, pageErrors, failedRequests }));
 }
 
+test("delivered project skips the selection gallery while redirecting", async ({ page }) => {
+  await page.addInitScript(() => {
+    const state = window as typeof window & { __sawSelectionGallery?: boolean };
+    state.__sawSelectionGallery = false;
+    new MutationObserver(() => {
+      if (document.querySelector("[data-photo-id]")) state.__sawSelectionGallery = true;
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await loginAsPhotographer(page);
+  const delivered = { ...project(7), id: "delivered", exported: true };
+  await page.route("**/api/customer-select/projects/delivered**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/participants")) return route.fulfill({ json: { ok: true } });
+    if (route.request().method() === "GET") return route.fulfill({ json: { isOwner: true, project: delivered } });
+    return route.fulfill({ json: { ok: true } });
+  });
+
+  await page.goto("/customer-select/delivered/select");
+  await expect(page).toHaveURL(/\/customer-select\/delivered\/export$/);
+  await expect(page.getByRole("heading", { name: "작가님께 전달하기" })).toBeVisible();
+  expect(await page.evaluate(() => (window as typeof window & { __sawSelectionGallery?: boolean }).__sawSelectionGallery)).toBe(false);
+});
+
 for (const selectedCount of [7, 12]) {
   for (const config of [{ name: "desktop", width: 1440, height: 900 }, { name: "mobile", width: 390, height: 844 }]) {
     test(`${selectedCount}/10 ${config.name} core flow`, async ({ browser }) => {

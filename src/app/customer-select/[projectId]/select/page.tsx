@@ -352,8 +352,8 @@ export default function CustomerSelectGalleryPage() {
       : "찜과 의견을 남긴 뒤 완료해 주세요";
 
   // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
-  if (!hydrated) {
-    return <SystemLoadingScreen title="셀렉 갤러리를 불러오고 있어요" homeHref="/customer-select" />;
+  if (!hydrated || (isOwner && project.exported)) {
+    return <SystemLoadingScreen title={project.exported ? "전달 내용을 불러오고 있어요" : "셀렉 갤러리를 불러오고 있어요"} homeHref="/customer-select" />;
   }
   if (accessDenied) return <ParticipantAccessEndedScreen />;
   if (!isOwner && !participantReady) return <ParticipantJoinScreen />;
