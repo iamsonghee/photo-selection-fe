@@ -41,23 +41,27 @@ export default async function CustomerSelectHomePage() {
   return (
     <CustomerSelectShell>
       <main className="mx-auto w-full max-w-[1504px] px-5 py-8 md:px-8 md:py-10">
-        <h1 className="text-[26px] font-bold tracking-[-0.04em] md:text-[30px]">내 셀렉 프로젝트</h1>
-        <p className="mt-2 text-[14px] text-muted-foreground">사진을 올리고 함께 고른 뒤, 선택한 결과를 작가에게 전달하세요.</p>
+        <div className="lg:flex lg:items-start lg:justify-between lg:gap-10">
+          <div>
+            <h1 className="text-[26px] font-bold tracking-[-0.04em] md:text-[30px]">내 셀렉 프로젝트</h1>
+            <p className="mt-2 text-[14px] text-muted-foreground">사진을 올리고 함께 고른 뒤, 선택한 결과를 작가에게 전달하세요.</p>
+          </div>
 
-        {!error ? (
-          <section className="mt-7 rounded-2xl border border-border-subtle bg-surface p-5 md:flex md:items-center md:gap-8" aria-label="전체 사진 이용량">
-            <div className="flex items-end justify-between gap-4 md:w-72 md:shrink-0">
-              <div>
-                <p className="text-[13px] font-semibold text-muted-foreground">전체 사진 이용량</p>
-                <p className="mt-1 text-[22px] font-bold tracking-[-0.03em] text-foreground">{accountPhotoCount.toLocaleString()} <span className="text-[15px] font-semibold text-muted-foreground">/ {CUSTOMER_PHOTO_LIMIT.toLocaleString()}장</span></p>
+          {!error ? (
+            <section className="mt-5 rounded-2xl border border-border-subtle bg-surface px-4 py-3.5 shadow-[0_8px_24px_rgba(2,56,82,0.05)] lg:mt-0 lg:w-80 lg:shrink-0" aria-label="전체 사진 이용량">
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-muted-foreground">전체 사진 이용량 · 모든 프로젝트 합산</p>
+                  <p className="mt-1 text-[20px] font-bold tracking-[-0.03em] text-foreground">{accountPhotoCount.toLocaleString()} <span className="text-[13px] font-semibold text-muted-foreground">/ {CUSTOMER_PHOTO_LIMIT.toLocaleString()}장</span></p>
+                </div>
+                <p className="shrink-0 text-[12px] font-semibold text-accent">{remainingPhotoCount.toLocaleString()}장 남음</p>
               </div>
-              <p className="pb-0.5 text-[13px] font-semibold text-accent">{remainingPhotoCount.toLocaleString()}장 남음</p>
-            </div>
-            <div className="mt-4 h-2 flex-1 overflow-hidden rounded-full bg-surface-raised md:mt-0" role="progressbar" aria-label="전체 사진 이용량" aria-valuemin={0} aria-valuemax={CUSTOMER_PHOTO_LIMIT} aria-valuenow={Math.min(accountPhotoCount, CUSTOMER_PHOTO_LIMIT)}>
-              <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${Math.min(100, accountPhotoCount / CUSTOMER_PHOTO_LIMIT * 100)}%` }} />
-            </div>
-          </section>
-        ) : null}
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-raised" role="progressbar" aria-label="전체 사진 이용량" aria-valuemin={0} aria-valuemax={CUSTOMER_PHOTO_LIMIT} aria-valuenow={Math.min(accountPhotoCount, CUSTOMER_PHOTO_LIMIT)}>
+                <div className="h-full min-w-1 rounded-full bg-accent transition-[width]" style={{ width: `${Math.min(100, accountPhotoCount / CUSTOMER_PHOTO_LIMIT * 100)}%` }} />
+              </div>
+            </section>
+          ) : null}
+        </div>
 
         {error ? (
           <div className="mt-8 rounded-xl border border-danger/20 bg-surface p-6 text-[14px] text-danger">프로젝트를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</div>

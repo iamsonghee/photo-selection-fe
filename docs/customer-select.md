@@ -324,10 +324,9 @@ API 계약이나 권한 모델이 달라 재사용할 수 없는 부분만 셀�
 - `20260922040000_add_customer_delivery_tracking.sql`
 - `20260922050000_add_customer_participant_presence.sql`
 - `20260922060000_add_customer_participant_view.sql`
-
-적용 대기 마이그레이션:
-
 - `20260927000000_enforce_customer_account_photo_limit.sql`
+
+적용 대기 마이그레이션: 없음.
 
 Supabase CLI의 마이그레이션 이력은 비어 있어 `supabase db push`를 실행하면 과거 파일 전체를
 재실행하려 한다. **`supabase db push`는 사용하지 않는다.** 새 SQL은 Dashboard SQL Editor 또는
