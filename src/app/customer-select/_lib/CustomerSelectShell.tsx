@@ -9,7 +9,7 @@ export function CustomerSelectShell({ children, navigation = false, viewportLock
   return (
     <div className={`${theme.lightTheme} flex min-h-dvh flex-col bg-background text-foreground ${viewportLocked ? "h-dvh overflow-hidden" : ""}`}>
       <header className="shrink-0 border-b border-border-subtle bg-surface">
-        <div className="mx-auto flex h-16 w-full max-w-[1504px] items-center gap-6 px-5 md:px-8">
+        <div className="flex h-16 w-full items-center gap-6 px-5 md:px-8">
           <BrandLogoBar href="/customer-select" variant="default" />
           {account || navigation ? <div className="ml-auto flex items-center gap-2">
             {account ? <CustomerAccountMenu account={account} /> : null}

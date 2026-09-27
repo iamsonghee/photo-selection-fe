@@ -32,6 +32,13 @@ test("self customer start screens and over-limit selection", async ({ page }, te
   await accountMenu.click();
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
+    const padding = width >= 768 ? 32 : 20;
+    const [logoBox, accountBox] = await Promise.all([
+      page.getByRole("img", { name: "A-CUT" }).boundingBox(),
+      accountMenu.boundingBox(),
+    ]);
+    expect(logoBox?.x).toBeCloseTo(padding, 0);
+    expect((accountBox?.x ?? 0) + (accountBox?.width ?? 0)).toBeCloseTo(width - padding, 0);
     await page.screenshot({ path: testInfo.outputPath(`projects-${width}.png`), fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
