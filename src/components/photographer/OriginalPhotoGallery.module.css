@@ -15,6 +15,7 @@
 .gridCellSelected { background: transparent; }
 
 .gridCellExpanded { background: var(--surface-raised, #edf1f2); }
+.leadingCellMedia { width: 100%; overflow: hidden; border-radius: 8px; aspect-ratio: 218.32 / 150.7; }
 .groupMedia { outline: 1px solid rgba(90,110,120,.35); outline-offset: -1px; }
 .groupStack { border-bottom: 4px double rgba(255,255,255,.8); }
 
@@ -322,6 +323,7 @@
     line-height: 16px;
   }
   .gridCellMobileSquare .mediaButton { aspect-ratio: 1 / 1; }
+  .gridCellMobileSquare .leadingCellMedia { aspect-ratio: 1 / 1; }
 
   @media (prefers-reduced-motion: reduce) {
     .image { transition: none; }

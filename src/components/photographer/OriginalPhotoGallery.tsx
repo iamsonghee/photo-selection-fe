@@ -532,7 +532,11 @@ function GridGallery(props: OriginalPhotoGalleryProps) {
             const cellIndex = row.index * layout.cols + column;
             if (cellIndex >= cellCount) break;
             if (hasLeadingCell && cellIndex === 0) {
-              cells.push(cloneElement(props.leadingCell as React.ReactElement, { key: "leading-cell" }));
+              cells.push(
+                <div key="leading-cell" data-original-photo-leading-cell className={`${styles.gridCell} ${props.mobileSquareMedia ? styles.gridCellMobileSquare : ""}`}>
+                  <div className={styles.leadingCellMedia}>{cloneElement(props.leadingCell as React.ReactElement)}</div>
+                </div>,
+              );
               continue;
             }
             const photoIndex = hasLeadingCell ? cellIndex - 1 : cellIndex;

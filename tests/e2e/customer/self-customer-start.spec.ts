@@ -74,11 +74,13 @@ test("self customer start screens and over-limit selection", async ({ page }, te
       await expect(gallery).toBeVisible();
       expect(await gallery.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft))).toBe(galleryPadding);
       const addBox = await page.getByRole("button", { name: "사진 추가하기" }).boundingBox();
+      const photoBox = await page.locator("[data-original-photo-media]").first().boundingBox();
       await expect(page.getByRole("button", { name: "프로젝트 현황으로" })).toHaveCount(0);
       await expect(page.locator("[data-compact-project-title]")).toBeVisible();
       if (width >= 768) expect((await page.getByRole("button", { name: "AI 분석 시작" }).boundingBox())?.height).toBe(36);
       if (width < 768) await expect(page.locator("[data-mobile-selection-checkbox]").first()).toBeVisible();
-      expect(addBox?.x).toBeCloseTo(galleryPadding, 0);
+      expect(addBox?.width).toBeCloseTo(photoBox?.width ?? 0, 0);
+      expect(addBox?.height).toBeCloseTo(photoBox?.height ?? 0, 0);
       await page.screenshot({ path: testInfo.outputPath(`upload-${width}.png`), fullPage: true });
     }
     await page.getByRole("button", { name: "검색 및 정렬 설정" }).click();
