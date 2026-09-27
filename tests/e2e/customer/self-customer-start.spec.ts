@@ -66,18 +66,20 @@ test("self customer start screens and over-limit selection", async ({ page }, te
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     }
     await page.getByRole("link", { name: "올린 사진 보기" }).click();
-    await expect(page.getByRole("button", { name: "프로젝트 현황으로" })).toBeVisible();
+    await expect(page.locator("[data-compact-project-title]")).toBeVisible();
     await expect(page.getByRole("button", { name: "사진 고르기", exact: true })).toBeVisible();
     for (const [width, headerPadding, galleryPadding] of [[1792, 32, 32], [390, 20, 12]] as const) {
       await page.setViewportSize({ width, height: 900 });
       const gallery = page.locator('[data-photo-gallery-variant="original"]');
       await expect(gallery).toBeVisible();
       expect(await gallery.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft))).toBe(galleryPadding);
-      const [backBox, addBox] = await Promise.all([
-        page.getByRole("button", { name: "프로젝트 현황으로" }).boundingBox(),
-        page.getByRole("button", { name: "사진 추가하기" }).boundingBox(),
-      ]);
-      expect(backBox?.x).toBeCloseTo(headerPadding, 0);
+      const addBox = await page.getByRole("button", { name: "사진 추가하기" }).boundingBox();
+      if (width >= 768) {
+        expect((await page.getByRole("button", { name: "프로젝트 현황으로" }).boundingBox())?.x).toBeCloseTo(headerPadding, 0);
+      } else {
+        await expect(page.getByRole("button", { name: "프로젝트 현황으로" })).toHaveCount(0);
+        await expect(page.locator("[data-compact-project-title]")).toBeVisible();
+      }
       expect(addBox?.x).toBeCloseTo(galleryPadding, 0);
       await page.screenshot({ path: testInfo.outputPath(`upload-${width}.png`), fullPage: true });
     }
@@ -97,17 +99,14 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await expect(page.locator("[data-mobile-selection-checkbox]")).toHaveCount(0);
     await page.setViewportSize({ width: 390, height: 400 });
     const uploadGallery = page.getByRole("main", { name: "업로드 사진 갤러리" });
-    await expect.poll(() => uploadGallery.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeGreaterThan(200);
-    await uploadGallery.evaluate((element) => { element.scrollTop = 100; element.dispatchEvent(new Event("scroll")); });
     const shellHeader = page.locator('[data-customer-shell-header-mode="compact"]');
     await expect(shellHeader).toBeVisible();
     await expect(shellHeader.locator("[data-brand-wordmark]")).toBeHidden();
     await expect(page.locator("[data-compact-project-title]")).toBeVisible();
     await expect(page.locator("[data-upload-project-context]")).toHaveCount(0);
     await expect.poll(() => shellHeader.locator(":scope > div").evaluate((element) => element.getBoundingClientRect().height)).toBe(48);
-    await uploadGallery.evaluate((element) => { element.scrollTop = 0; element.dispatchEvent(new Event("scroll")); });
-    await expect(page.locator('[data-customer-shell-header-mode="expanded"]')).toBeVisible();
     await page.setViewportSize({ width: 800, height: 300 });
+    await expect(page.locator('[data-customer-shell-header-mode="expanded"]')).toBeVisible();
     await uploadGallery.evaluate((element) => {
       const spacer = document.createElement("div");
       spacer.style.height = "1000px";

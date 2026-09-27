@@ -103,6 +103,7 @@ export default function CustomerUploadPage() {
   const uploadTimingSamplesRef = useRef<UploadTimingSample[]>([]);
   const aiPollingRef = useRef(false);
   const { compact: compactHeader, handleScroll: handleGalleryScroll } = useCollapsibleAssetHeaderController({ compactOnly: true });
+  const compactUploadHeader = isMobile || compactHeader;
 
   useEffect(() => () => {
     uploadAbortRef.current?.abort();
@@ -475,7 +476,7 @@ export default function CustomerUploadPage() {
   return (
     <CustomerSelectShell
       viewportLocked
-      compactHeader={compactHeader}
+      compactHeader={compactUploadHeader}
       compactTitle={<Link href={`/customer-select/${projectId}`} className="block max-w-[calc(100vw-72px)] truncate text-[14px] font-bold tracking-[-0.02em] text-foreground hover:text-accent md:max-w-[min(40vw,520px)]">{displayName}</Link>}
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -485,8 +486,8 @@ export default function CustomerUploadPage() {
           void handleFiles(files);
         }} />
 
-        <header data-upload-header-mode={compactHeader ? "compact" : "expanded"} className="shrink-0 border-b border-border-subtle bg-surface">
-          {!compactHeader ? <div data-upload-project-context className="grid w-full grid-cols-[36px_minmax(0,1fr)] items-center gap-1 px-5 py-1.5 md:flex md:gap-2 md:px-8">
+        <header data-upload-header-mode={compactUploadHeader ? "compact" : "expanded"} className="shrink-0 border-b border-border-subtle bg-surface">
+          {!compactUploadHeader ? <div data-upload-project-context className="grid w-full grid-cols-[36px_minmax(0,1fr)] items-center gap-1 px-5 py-1.5 md:flex md:gap-2 md:px-8">
             <button type="button" onClick={() => router.push(`/customer-select/${projectId}`)} className="grid size-10 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-surface-raised hover:text-foreground" aria-label="프로젝트 현황으로"><ChevronLeft size={19} /></button>
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-[17px] font-bold tracking-[-0.025em] text-foreground md:text-[19px]">{displayName}</h1>
