@@ -53,6 +53,7 @@ export default function CustomerReviewPage() {
   const visibleSelected = showAllSelected || !collapseSelected ? selected : selected.slice(0, INITIAL_VISIBLE_PHOTOS);
   const requested = requestedPhotoIds(project);
   const match = tasteMatchPct(project);
+  const reviewMeta = [requested.length > 0 ? `보정 요청 ${requested.length.toLocaleString()}장` : "", match !== null ? `취향 일치 ${match}%` : ""].filter(Boolean).join(" · ");
   const done = bothDone(project);
   const waiting = activeParticipants(project).filter((p) => p.id !== currentIdentity && !project.participantDone[p.id]);
   const exportSelection = selected.map((photo) => ({ id: photo.id, name: getPhotoDisplayName(photo) }));
@@ -109,9 +110,8 @@ export default function CustomerReviewPage() {
           </button>
           <div className={ui.reviewTitleGroup}>
             <h2 className={ui.title}>최종 검토</h2>
-            <p>{selected.length.toLocaleString()}장 선택{requested.length > 0 ? ` · 보정 요청 ${requested.length.toLocaleString()}장` : ""}{match !== null ? ` · 취향 일치 ${match}%` : ""}</p>
+            {reviewMeta ? <p>{reviewMeta}</p> : null}
           </div>
-          <button type="button" className={ui.reviewEdit} onClick={() => router.push(`/customer-select/${projectId}/select`)}>선택 수정</button>
         </div>
         <div className={ui.body}>
           {syncStatus !== "connected" && <div className={`${ui.banner} ${ui.bannerWarn}`}><span className={ui.bannerHeadWarn}>{syncStatus === "offline" ? "최신 참여 상태를 확인하지 못하고 있어요" : "최신 참여 상태를 확인하고 있어요"}</span><span className={ui.bodyText}>연결되면 전달 단계를 계속할 수 있어요.</span></div>}
@@ -126,9 +126,10 @@ export default function CustomerReviewPage() {
           )}
 
           <section>
-            <p className={ui.label} style={{ marginBottom: 8 }}>
-              선택한 사진
-            </p>
+            <div className={ui.reviewSectionHeading}>
+              <h3>선택한 사진 <span>{selected.length.toLocaleString()}장</span></h3>
+              <button type="button" className={ui.reviewEdit} onClick={() => router.push(`/customer-select/${projectId}/select`)}>사진 다시 고르기</button>
+            </div>
             <div className={ui.reviewGrid}>
               {visibleSelected.map((p, index) => (
                 <button key={p.id} type="button" className={ui.reviewThumbButton} aria-label={`${getPhotoDisplayName(p)} 크게 보기`} onClick={() => setFocusIndex(index)}>
