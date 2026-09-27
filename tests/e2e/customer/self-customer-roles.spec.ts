@@ -44,15 +44,18 @@ test("shared participant can leave opinions but cannot change the final selectio
 
 test("first-time participant chooses an available color before entering", async ({ page }) => {
   await loginAsPhotographer(page);
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.addInitScript(() => localStorage.removeItem("acut:customer-select:identity:join-check"));
 
   let claim: Record<string, unknown> | null = null;
+  const photos = Array.from({ length: 24 }, (_, index) => ({
+    id: `p${index + 1}`, projectId: "join-check", orderIndex: index, url: "", previewUrl: "", originalFilename: `A${index + 1}.jpg`,
+  }));
   await page.route("**/api/customer-select/projects/join-check", async (route) => {
     if (route.request().method() !== "GET") return route.fallback();
     await route.fulfill({ json: { isOwner: false, project: {
-      id: "join-check", name: "우리 웨딩", shootType: "wedding", target: 30, photoCount: 1, uploaded: true,
-      photos: [{ id: "p1", projectId: "join-check", orderIndex: 0, url: "", previewUrl: "", originalFilename: "A001.jpg" }],
+      id: "join-check", name: "우리 웨딩", shootType: "wedding", target: 30, photoCount: photos.length, uploaded: true,
+      photos,
       selectedIds: [], photoStates: {}, participantOpinions: {}, participantDone: { blue: false },
       participantNicknames: { blue: "신랑" }, shareToken: "", shareEnabled: true, exported: false,
     } } });
@@ -71,7 +74,12 @@ test("first-time participant chooses an available color before entering", async 
   await page.getByPlaceholder("예: 신랑, 엄마").fill("신부");
   await page.getByRole("button", { name: "사진 고르기 시작" }).click();
 
-  await expect(page.getByText("우리 웨딩").last()).toBeVisible();
+  await expect(page.locator('[data-photo-id="p1"]')).toBeVisible();
+  await expect(page.locator("[data-photo-id]")).toHaveCount(24);
+  await expect.poll(() => page.locator("[data-photo-id]").evaluateAll((cards) => {
+    const firstTop = cards[0]?.getBoundingClientRect().top;
+    return cards.filter((card) => Math.abs(card.getBoundingClientRect().top - firstTop) < 1).length;
+  })).toBe(7);
   expect(claim).toMatchObject({ claim: true, color: "red", nickname: "신부" });
   expect(await page.evaluate(() => localStorage.getItem("acut:customer-select:identity:join-check"))).toBe("red");
 });

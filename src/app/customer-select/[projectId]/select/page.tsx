@@ -253,7 +253,7 @@ export default function CustomerSelectGalleryPage() {
       observer.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, [desktopDensity, hydrated, mobileColumns]);
+  }, [desktopDensity, hydrated, mobileColumns, participantReady]);
 
   const rowCount = Math.ceil(list.length / layout.cols);
   const virtualizer = useVirtualizer({
