@@ -94,6 +94,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await firstCheckbox.click();
     await expect(firstCheckbox).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("button", { name: "선택 삭제 (1)" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "사진 고르기", exact: true })).toHaveCount(0);
     await page.setViewportSize({ width: 390, height: 400 });
     const uploadGallery = page.getByRole("main", { name: "업로드 사진 갤러리" });
     const shellHeader = page.locator('[data-customer-shell-header-mode="compact"]');
