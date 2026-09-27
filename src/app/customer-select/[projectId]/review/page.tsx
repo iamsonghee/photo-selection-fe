@@ -39,7 +39,6 @@ export default function CustomerReviewPage() {
   const router = useRouter();
   const { project, hydrated, isOwner, currentIdentity, syncStatus, syncNow, update } = useCustomerSelectStore();
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
-  const [copyState, setCopyState] = useState<"idle" | "ok" | "fail">("idle");
   const [linkCopyState, setLinkCopyState] = useState<"idle" | "loading" | "ok" | "fail">("idle");
   const [reopenConfirm, setReopenConfirm] = useState(false);
   const [deliverConfirm, setDeliverConfirm] = useState(false);
@@ -67,17 +66,7 @@ export default function CustomerReviewPage() {
   const exportText = buildExportText(exportSelection, comments);
   const exportBaseName = `${sanitizeFilenamePart(project.name || "사진셀렉")}_selections`;
 
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(exportText);
-      setCopyState("ok");
-    } catch {
-      setCopyState("fail");
-    }
-    setTimeout(() => setCopyState("idle"), 2000);
-  }
-
-  async function handleResultLinkCopy() {
+  async function copyResultLink() {
     setLinkCopyState("loading");
     try {
       const response = await fetch(`/api/customer-select/projects/${projectId}/result-link`);
@@ -107,14 +96,19 @@ export default function CustomerReviewPage() {
     setChangingState(false);
     if (!updated) {
       setStateError("상태를 변경하지 못했어요. 잠시 후 다시 시도해 주세요.");
-      return;
+      return false;
     }
     setDeliverConfirm(false);
     setReopenConfirm(false);
     if (!exported) router.push(`/customer-select/${projectId}/select`);
+    return true;
   }
 
-  async function requestDelivery(confirmed: boolean) {
+  async function requestLinkCopy(confirmed: boolean) {
+    if (project.exported) {
+      await copyResultLink();
+      return;
+    }
     setCheckingLatest(true);
     setStateError(null);
     const latest = await syncNow();
@@ -130,7 +124,7 @@ export default function CustomerReviewPage() {
       setDeliverConfirm(true);
       return;
     }
-    await setDelivered(true);
+    if (await setDelivered(true)) await copyResultLink();
   }
 
   // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
@@ -239,26 +233,26 @@ export default function CustomerReviewPage() {
           <hr className={ui.divider} />
 
           <div>
-            <p className={ui.label} style={{ marginBottom: 8 }}>작가에게 전달할 내용</p>
-            <p className={ui.bodyText} style={{ marginBottom: 8 }}>파일명 목록을 복사하거나 파일로 받아 작가님께 보내주세요.</p>
-            <pre className={ui.exportBlock}>{exportText}</pre>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" className={`${ui.btn} ${ui.btnPrimary} ${ui.btnSm}`} style={{ flex: 1 }} onClick={handleCopy}>
-                {copyState === "ok" ? "복사했어요 ✓" : copyState === "fail" ? "복사 실패" : "📋 복사하기"}
-              </button>
-              <button type="button" className={`${ui.btn} ${ui.btnSm}`} style={{ flex: 1 }} aria-label="CSV 다운로드" onClick={handleDownloadCsv}>CSV</button>
-              <button type="button" className={`${ui.btn} ${ui.btnSm}`} style={{ flex: 1 }} aria-label="TXT 다운로드" onClick={handleDownloadTxt}>TXT</button>
-            </div>
-            <span className={ui.supportText}>CSV에는 참여자 의견이 함께 담기고, TXT에는 파일명만 담겨요.</span>
+            <p className={ui.label} style={{ marginBottom: 8 }}>작가에게 전달하기</p>
+            <p className={ui.bodyText}>링크를 복사해 작가님께 보내주세요. 다시 전달하면 같은 링크에 최신 결과가 반영돼요.</p>
+            <button type="button" className={`${ui.btn} ${ui.btnPrimary}`} style={{ width: "100%", marginTop: 12 }} disabled={linkCopyState === "loading" || changingState || checkingLatest || syncStatus !== "connected"} onClick={() => void requestLinkCopy(false)}>
+              {linkCopyState === "loading" || changingState || checkingLatest ? "링크 복사 중…" : linkCopyState === "ok" ? "복사했어요 ✓" : linkCopyState === "fail" ? "다시 복사하기" : "링크 복사"}
+            </button>
+            <details style={{ marginTop: 16 }}>
+              <summary className={ui.supportText} style={{ cursor: "pointer" }}>파일로 내보내기</summary>
+              <pre className={ui.exportBlock} style={{ marginTop: 8 }}>{exportText}</pre>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button" className={`${ui.btn} ${ui.btnSm}`} style={{ flex: 1 }} aria-label="CSV 다운로드" onClick={handleDownloadCsv}>CSV 다운로드</button>
+                <button type="button" className={`${ui.btn} ${ui.btnSm}`} style={{ flex: 1 }} aria-label="TXT 다운로드" onClick={handleDownloadTxt}>TXT 다운로드</button>
+              </div>
+              <span className={ui.supportText}>CSV에는 참여자 의견이 함께 담기고, TXT에는 파일명만 담겨요.</span>
+            </details>
           </div>
 
           {project.exported ? (
             <div className={`${ui.banner} ${ui.bannerOk}`}>
-              <strong className={ui.bannerHeadOk}>작가님이 링크로 바로 확인할 수 있어요</strong>
-              <span className={ui.supportText}>선택 사진과 의견을 읽기 전용으로 보여주며, 다시 전달하면 같은 링크에 최신 결과가 반영돼요.</span>
-              <button type="button" className={`${ui.btn} ${ui.btnSm}`} disabled={linkCopyState === "loading"} onClick={() => void handleResultLinkCopy()}>
-                {linkCopyState === "loading" ? "링크 만드는 중…" : linkCopyState === "ok" ? "링크를 복사했어요 ✓" : linkCopyState === "fail" ? "복사하지 못했어요" : "작가용 결과 링크 복사"}
-              </button>
+              <strong className={ui.bannerHeadOk}>작가에게 전달할 준비가 됐어요</strong>
+              <span className={ui.supportText}>선택 사진과 의견을 읽기 전용 링크에서 확인할 수 있어요.</span>
             </div>
           ) : null}
         </div>
@@ -268,7 +262,7 @@ export default function CustomerReviewPage() {
           actions={<>
             {project.exported
               ? <PhotographerLightButton variant="secondary" onClick={() => setReopenConfirm(true)}>다시 선택하기</PhotographerLightButton>
-              : <><PhotographerLightButton variant="secondary" onClick={() => router.push(`/customer-select/${projectId}/select`)}>더 고르기</PhotographerLightButton><PhotographerLightButton disabled={selected.length === 0 || syncStatus !== "connected"} pending={changingState || checkingLatest} pendingLabel={checkingLatest ? "최신 상태 확인 중…" : "저장 중…"} onClick={() => void requestDelivery(false)}>{project.deliveryCount > 0 ? "수정한 결과를 다시 전달했어요" : "작가에게 전달했어요"}</PhotographerLightButton></>}
+              : <PhotographerLightButton variant="secondary" onClick={() => router.push(`/customer-select/${projectId}/select`)}>더 고르기</PhotographerLightButton>}
             {project.exported ? <PhotographerLightButton onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>보정본 업로드하기</PhotographerLightButton> : null}
           </>}
         />
@@ -301,7 +295,7 @@ export default function CustomerReviewPage() {
         confirming={changingState}
         error={stateError}
         onCancel={() => { if (!changingState) { setDeliverConfirm(false); setStateError(null); } }}
-        onConfirm={() => void requestDelivery(true)}
+        onConfirm={() => void requestLinkCopy(true)}
       /> : null}
     </>
   );
