@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { CUSTOMER_PHOTO_LIMIT as MAX_PHOTOS, uploadLimitError } from "../../_lib/upload-limit";
-import { SlidersHorizontal, Sparkles, Trash2, UploadCloud } from "lucide-react";
+import { Loader2, SlidersHorizontal, Sparkles, Trash2, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -488,7 +488,7 @@ export default function CustomerUploadPage() {
             <>
               <div className="flex min-w-0 flex-1 items-center justify-between gap-2 md:flex-none md:justify-start">
                 <ProjectAssetToolbarSummary label={nameFilter.trim() ? "검색 결과" : "사진"} count={`${visiblePhotos.length.toLocaleString()}장`} meta={displayedPhotos.length > 0 ? <span className="max-md:hidden">{uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 분석 완료" : "드래그하거나 체크해 여러 장 선택"}</span> : undefined} />
-                <div className="hidden md:block"><PhotographerLightButton variant="outline" size="toolbar" className="!border-transparent !bg-accent/[0.09] !text-accent hover:!bg-accent/[0.16]" onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}><Sparkles size={16} />{aiAnalyzing ? "분석 중" : aiCompleted ? "다시 분석" : "AI 분석"}</PhotographerLightButton></div>
+                <div className="hidden md:block"><PhotographerLightButton variant="outline" size="toolbar" className="!h-9 !border-transparent !bg-accent/[0.09] !px-3 !text-[12px] !text-accent hover:!bg-accent/[0.16]" onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}>{aiAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}{aiAnalyzing ? "분석 중" : aiCompleted ? "다시 분석" : "AI 분석"}</PhotographerLightButton></div>
                 <div className="flex shrink-0 items-center md:hidden">
                   <ProjectAssetMobileContextAction active={aiCompleted} onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}><Sparkles size={14} />{aiAnalyzing ? "분석 중" : "AI"}</ProjectAssetMobileContextAction>
                   <ProjectAssetMobileIconButton className="relative" onClick={() => setMobileToolsOpen(true)} aria-label="검색 및 정렬 설정" aria-haspopup="dialog" aria-expanded={mobileToolsOpen}>

@@ -76,6 +76,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
       const addBox = await page.getByRole("button", { name: "사진 추가하기" }).boundingBox();
       await expect(page.getByRole("button", { name: "프로젝트 현황으로" })).toHaveCount(0);
       await expect(page.locator("[data-compact-project-title]")).toBeVisible();
+      if (width >= 768) expect((await page.getByRole("button", { name: "AI 분석 시작" }).boundingBox())?.height).toBe(36);
       if (width < 768) await expect(page.locator("[data-mobile-selection-checkbox]").first()).toBeVisible();
       expect(addBox?.x).toBeCloseTo(galleryPadding, 0);
       await page.screenshot({ path: testInfo.outputPath(`upload-${width}.png`), fullPage: true });
