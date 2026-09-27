@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { CUSTOMER_PHOTO_LIMIT as MAX_PHOTOS, uploadLimitError } from "../../_lib/upload-limit";
-import { CheckSquare, ChevronLeft, SlidersHorizontal, Sparkles, Trash2, UploadCloud } from "lucide-react";
+import { CheckSquare, SlidersHorizontal, Sparkles, Trash2, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -477,7 +477,8 @@ export default function CustomerUploadPage() {
     <CustomerSelectShell
       viewportLocked
       compactHeader={compactUploadHeader}
-      compactTitle={<Link href={`/customer-select/${projectId}`} className="block max-w-[calc(100vw-72px)] truncate text-[14px] font-bold tracking-[-0.02em] text-foreground hover:text-accent md:max-w-[min(40vw,520px)]">{displayName}</Link>}
+      compactTitle={<h1><Link href={`/customer-select/${projectId}`} className="block max-w-[calc(100vw-72px)] truncate text-[14px] font-bold tracking-[-0.02em] text-foreground hover:text-accent md:max-w-[min(40vw,520px)] md:text-[16px]">{displayName}</Link></h1>}
+      headerMeta={<div className="flex items-baseline gap-2 text-[12px] text-muted-foreground" aria-label="전체 사진 이용량"><span>전체 이용량</span><strong className="text-[13px] font-semibold tabular-nums text-foreground">{accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${MAX_PHOTOS.toLocaleString()}장` : "확인 중"}</strong></div>}
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden onChange={(event) => {
@@ -487,20 +488,14 @@ export default function CustomerUploadPage() {
         }} />
 
         <header data-upload-header-mode={compactUploadHeader ? "compact" : "expanded"} className="shrink-0 border-b border-border-subtle bg-surface">
-          {!compactUploadHeader ? <div data-upload-project-context className="grid w-full grid-cols-[36px_minmax(0,1fr)] items-center gap-1 px-5 py-1.5 md:flex md:gap-2 md:px-8">
-            <button type="button" onClick={() => router.push(`/customer-select/${projectId}`)} className="grid size-10 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-surface-raised hover:text-foreground" aria-label="프로젝트 현황으로"><ChevronLeft size={19} /></button>
-            <div className="min-w-0 flex-1">
-              <h1 className="truncate text-[17px] font-bold tracking-[-0.025em] text-foreground md:text-[19px]">{displayName}</h1>
-              <p className="mt-0.5 text-[12px] text-muted-foreground">전체 이용량 {accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${MAX_PHOTOS.toLocaleString()}장 · ${accountUsage.remaining.toLocaleString()}장 남음` : "확인 중"}</p>
-            </div>
-          </div> : null}
-          <div className="flex min-h-11 w-full items-center justify-between gap-3 border-t border-border-subtle px-3 py-0 md:px-8 md:py-1">
+          <div className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-0 md:min-h-[52px] md:px-8 md:py-1">
             {mobileManageMode ? <div className="flex min-h-11 w-full items-center justify-between md:hidden">
               <div className="flex items-center gap-2"><strong className="text-[15px] text-foreground">사진 선택</strong><span className="rounded-full bg-accent/10 px-2 py-1 text-xs font-bold tabular-nums text-accent">{selectedPhotoIds.size.toLocaleString()}장</span></div>
               <button type="button" className="min-h-11 px-1 text-[13px] font-semibold text-muted-foreground" onClick={() => { setSelectedPhotoIds(new Set()); setMobileManageMode(false); }} aria-label="사진 선택 취소">취소</button>
             </div> : <>
               <div className="flex min-w-0 flex-1 items-center justify-between gap-2 md:flex-none md:justify-start">
                 <ProjectAssetToolbarSummary label={nameFilter.trim() ? "검색 결과" : "사진"} count={`${visiblePhotos.length.toLocaleString()}장`} meta={displayedPhotos.length > 0 ? <span className="max-md:hidden">{uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 분석 완료" : "드래그하거나 체크해 여러 장 선택"}</span> : undefined} />
+                <div className="hidden md:block"><PhotographerLightButton variant="outline" size="toolbar" className="!border-transparent !bg-accent/[0.09] !text-accent hover:!bg-accent/[0.16]" onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}><Sparkles size={16} />{aiAnalyzing ? "분석 중" : aiCompleted ? "다시 분석" : "AI 분석"}</PhotographerLightButton></div>
                 <div className="flex shrink-0 items-center md:hidden">
                   <ProjectAssetMobileContextAction active={aiCompleted} onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}><Sparkles size={14} />{aiAnalyzing ? "분석 중" : "AI"}</ProjectAssetMobileContextAction>
                   <ProjectAssetMobileIconButton className="relative" onClick={() => setMobileToolsOpen(true)} aria-label="검색 및 정렬 설정" aria-haspopup="dialog" aria-expanded={mobileToolsOpen}>
@@ -511,7 +506,6 @@ export default function CustomerUploadPage() {
                 </div>
               </div>
               <div className="hidden min-w-0 items-center gap-1.5 md:flex">
-                <PhotographerLightButton variant="outline" size="toolbar" className="!border-transparent !bg-accent/[0.09] !text-accent hover:!bg-accent/[0.16]" onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}><Sparkles size={16} />{aiAnalyzing ? "분석 중" : aiCompleted ? "다시 분석" : "AI 분석"}</PhotographerLightButton>
                 <FilenameSearchInput value={nameFilter} onChange={setNameFilter} placeholder="파일명 검색" className="max-md:flex-1" style={{ "--fsi-width": "220px" } as React.CSSProperties} />
                 <PhotoSortSelect value={sort} onChange={setSort} options={[{ value: "order-asc", label: "업로드 순" }, { value: "order-desc", label: "최근 순" }, { value: "name-asc", label: "파일명 순" }]} />
               </div>
