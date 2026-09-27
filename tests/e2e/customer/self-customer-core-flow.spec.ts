@@ -4,7 +4,7 @@ import { loginAsPhotographer } from "../../helpers/auth";
 const PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
 function project(selectedCount: number) {
-  const photos = Array.from({ length: 16 }, (_, index) => ({
+  const photos = Array.from({ length: 24 }, (_, index) => ({
     id: `p${index + 1}`,
     projectId: "core-flow",
     orderIndex: index,
@@ -81,12 +81,18 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   await expect(page).toHaveURL(/\/customer-select\/core-flow\/review/);
   await expect(page.getByRole("heading", { name: "핵심 흐름 QA", exact: true })).toBeVisible();
   const reviewTexts = await page.locator("body").innerText();
-  await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(Math.min(selectedCount, 12));
+  const initialVisibleCount = viewport === "mobile" ? 8 : 15;
+  const rowSize = viewport === "mobile" ? 2 : 5;
+  const collapsed = selectedCount - initialVisibleCount > rowSize;
+  await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(collapsed ? initialVisibleCount : selectedCount);
   const firstSelectedPhoto = page.getByRole("button", { name: /크게 보기$/ }).first().locator("img");
   const firstSelectedPhotoBox = await firstSelectedPhoto.boundingBox();
-  if (selectedCount > 12) {
-    await page.getByRole("button", { name: `나머지 ${selectedCount - 12}장 더보기` }).click();
+  if (collapsed) {
+    await page.getByRole("button", { name: `사진 ${selectedCount - initialVisibleCount}장 더 보기` }).click();
     await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(selectedCount);
+    await page.getByRole("button", { name: "사진 접기" }).click();
+    await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(initialVisibleCount);
+    await page.getByRole("button", { name: `사진 ${selectedCount - initialVisibleCount}장 더 보기` }).click();
   }
   const reviewPageBox = await page.locator('[class*="page"]').first().boundingBox();
   const reviewCardBoxes = await page.locator("img").evaluateAll((images) => images.map((image) => {
@@ -146,7 +152,7 @@ test("legacy exported project can continue selecting", async ({ page }) => {
   expect(await page.evaluate(() => (window as typeof window & { __sawSelectionGallery?: boolean }).__sawSelectionGallery)).toBe(true);
 });
 
-for (const selectedCount of [7, 16]) {
+for (const selectedCount of [7, 24]) {
   for (const config of [{ name: "desktop", width: 1440, height: 900 }, { name: "mobile", width: 390, height: 844 }]) {
     test(`${selectedCount}/10 ${config.name} core flow`, async ({ browser }) => {
       const context = await browser.newContext({ viewport: { width: config.width, height: config.height }, acceptDownloads: true });
