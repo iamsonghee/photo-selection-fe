@@ -9,15 +9,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { CUSTOMER_PHOTO_LIMIT as MAX_PHOTOS, uploadLimitError } from "../../_lib/upload-limit";
-import { ChevronLeft, ImagePlus, Loader2, Sparkles, Trash2, UploadCloud } from "lucide-react";
+import { CheckSquare, ChevronLeft, SlidersHorizontal, Sparkles, Trash2, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { AiAnalysisPromptModal } from "@/components/photographer/AiAnalysisPromptModal";
 import { PhotographerPhotoGallery } from "@/components/photographer/OriginalPhotoGallery";
 import { OriginalPhotoViewer } from "@/components/photographer/OriginalPhotoViewer";
+import { PhotoUploadTile } from "@/components/photographer/PhotoUploadTile";
 import { PhotoSortSelect } from "@/components/photographer/PhotoSortSelect";
-import { ProjectAssetToolbarSummary } from "@/components/photographer/ProjectAssetWorkspaceToolbar";
+import { ProjectAssetMobileContextAction, ProjectAssetMobileIconButton, ProjectAssetMobileSheet, ProjectAssetToolbarSummary } from "@/components/photographer/ProjectAssetWorkspaceToolbar";
 import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { compressImagesInParallel } from "@/lib/upload-client-compress";
 import { UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
@@ -75,6 +76,7 @@ export default function CustomerUploadPage() {
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
   const [isMobile, setIsMobile] = useState(false);
   const [mobileManageMode, setMobileManageMode] = useState(false);
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [checkingDelete, setCheckingDelete] = useState(false);
   const [deleteImpact, setDeleteImpact] = useState<DeleteImpact | null>(null);
@@ -451,7 +453,10 @@ export default function CustomerUploadPage() {
   ].filter(Boolean) as string[] : [];
   const uploadStatus = uploading ? (
     <div className="flex items-center gap-3" role="status" aria-live="polite">
-      <Loader2 size={22} className="shrink-0 animate-spin text-accent" aria-hidden />
+      <svg className="size-[22px] shrink-0 -rotate-90" viewBox="0 0 20 20" aria-hidden>
+        <circle cx="10" cy="10" r="8" fill="none" stroke="var(--border)" strokeWidth="2.5" />
+        <circle cx="10" cy="10" r="8" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="50.27" strokeDashoffset={50.27 * (1 - (total ? progress / total : 0))} />
+      </svg>
       <div>
         <p className="text-sm font-bold text-foreground">{uploadPhase === "compressing" ? "사진 압축 중" : "사진 업로드 중"}</p>
         <p className="mt-1 text-xs text-muted-foreground">{progress.toLocaleString()} / {total.toLocaleString()}장 · {total ? Math.round((progress / total) * 100) : 0}% · {estimatedRemainingSeconds === null ? "예상 시간 계산 중" : formatUploadRemainingTime(estimatedRemainingSeconds)}</p>
@@ -488,19 +493,24 @@ export default function CustomerUploadPage() {
               <p className="mt-0.5 text-[12px] text-muted-foreground">전체 이용량 {accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${MAX_PHOTOS.toLocaleString()}장 · ${accountUsage.remaining.toLocaleString()}장 남음` : "확인 중"}</p>
             </div>
           </div> : null}
-          <div className="flex min-h-11 w-full items-center justify-between gap-3 border-t border-border-subtle px-5 py-1 max-md:flex-wrap max-md:gap-1.5 md:px-8">
+          <div className="flex min-h-11 w-full items-center justify-between gap-3 border-t border-border-subtle px-3 py-0 md:px-8 md:py-1">
             {mobileManageMode ? <div className="flex min-h-11 w-full items-center justify-between md:hidden">
               <div className="flex items-center gap-2"><strong className="text-[15px] text-foreground">사진 선택</strong><span className="rounded-full bg-accent/10 px-2 py-1 text-xs font-bold tabular-nums text-accent">{selectedPhotoIds.size.toLocaleString()}장</span></div>
               <button type="button" className="min-h-11 px-1 text-[13px] font-semibold text-muted-foreground" onClick={() => { setSelectedPhotoIds(new Set()); setMobileManageMode(false); }} aria-label="사진 선택 취소">취소</button>
             </div> : <>
-              <div className="flex min-w-0 items-center justify-between gap-3 max-md:w-full md:justify-start">
-                <ProjectAssetToolbarSummary label="사진" count={nameFilter.trim() ? `${visiblePhotos.length.toLocaleString()} / ${displayedPhotos.length.toLocaleString()}장` : `${displayedPhotos.length.toLocaleString()}장`} meta={displayedPhotos.length > 0 ? <span className="max-md:hidden">{uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 분석 완료" : "드래그하거나 체크해 여러 장 선택"}</span> : undefined} />
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <PhotographerLightButton variant="outline" size="toolbar" className="!border-transparent !bg-accent/[0.09] !text-accent hover:!bg-accent/[0.16] max-md:h-9 max-md:px-2.5 max-md:text-xs" onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}><Sparkles size={16} />{aiAnalyzing ? "분석 중" : aiCompleted ? "다시 분석" : "AI 분석"}</PhotographerLightButton>
-                  {!photoSetLocked && displayedPhotos.length > 0 ? <button type="button" className="min-h-9 rounded-md px-2.5 text-xs font-semibold text-muted-foreground hover:bg-surface-raised hover:text-foreground md:hidden" onClick={() => setMobileManageMode(true)} aria-label="삭제할 사진 선택">선택</button> : null}
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-2 md:flex-none md:justify-start">
+                <ProjectAssetToolbarSummary label={nameFilter.trim() ? "검색 결과" : "사진"} count={`${visiblePhotos.length.toLocaleString()}장`} meta={displayedPhotos.length > 0 ? <span className="max-md:hidden">{uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 분석 완료" : "드래그하거나 체크해 여러 장 선택"}</span> : undefined} />
+                <div className="flex shrink-0 items-center md:hidden">
+                  <ProjectAssetMobileContextAction active={aiCompleted} onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}><Sparkles size={14} />{aiAnalyzing ? "분석 중" : "AI"}</ProjectAssetMobileContextAction>
+                  <ProjectAssetMobileIconButton className="relative" onClick={() => setMobileToolsOpen(true)} aria-label="검색 및 정렬 설정" aria-haspopup="dialog" aria-expanded={mobileToolsOpen}>
+                    <SlidersHorizontal size={18} aria-hidden />
+                    {nameFilter.trim() || sort !== "order-asc" ? <span className="absolute right-0.5 top-0.5 min-w-4 rounded-full bg-accent px-1 text-center text-[10px] font-bold leading-4 text-white">{Number(Boolean(nameFilter.trim())) + Number(sort !== "order-asc")}</span> : null}
+                  </ProjectAssetMobileIconButton>
+                  {!photoSetLocked && displayedPhotos.length > 0 ? <ProjectAssetMobileIconButton onClick={() => setMobileManageMode(true)} aria-label="삭제할 사진 선택"><CheckSquare size={18} aria-hidden /></ProjectAssetMobileIconButton> : null}
                 </div>
               </div>
-              <div className="flex min-w-0 items-center gap-1.5 max-md:w-full">
+              <div className="hidden min-w-0 items-center gap-1.5 md:flex">
+                <PhotographerLightButton variant="outline" size="toolbar" className="!border-transparent !bg-accent/[0.09] !text-accent hover:!bg-accent/[0.16]" onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}><Sparkles size={16} />{aiAnalyzing ? "분석 중" : aiCompleted ? "다시 분석" : "AI 분석"}</PhotographerLightButton>
                 <FilenameSearchInput value={nameFilter} onChange={setNameFilter} placeholder="파일명 검색" className="max-md:flex-1" style={{ "--fsi-width": "220px" } as React.CSSProperties} />
                 <PhotoSortSelect value={sort} onChange={setSort} options={[{ value: "order-asc", label: "업로드 순" }, { value: "order-desc", label: "최근 순" }, { value: "name-asc", label: "파일명 순" }]} />
               </div>
@@ -510,7 +520,7 @@ export default function CustomerUploadPage() {
 
         {checkingCapacity ? <p role="status" className="px-5 py-2 text-sm text-muted-foreground">업로드 가능한 장수를 확인하고 있어요…</p> : null}
         {photoSetLocked ? <div role="status" className="shrink-0 border-b border-accent/15 bg-customer-soft px-5 py-2.5 text-[13px] font-semibold text-foreground md:px-8">작가에게 전달한 사진 구성을 보호하고 있어요. 현재 전달 내용은 그대로 확인할 수 있습니다.</div> : null}
-        {error ? <div role="alert" className="shrink-0 border-b border-danger/20 bg-danger/8 px-5 py-2.5 text-[13px] font-semibold text-danger md:px-8">{error}{needsReselection ? <button type="button" onClick={() => inputRef.current?.click()} className="ml-3 min-h-11 underline">파일 다시 선택</button> : null}</div> : null}
+        {error ? <div role="alert" className="hidden shrink-0 border-b border-danger/20 bg-danger/8 px-8 py-2.5 text-[13px] font-semibold text-danger md:block">{error}{needsReselection ? <button type="button" onClick={() => inputRef.current?.click()} className="ml-3 min-h-11 underline">파일 다시 선택</button> : null}</div> : null}
 
         <main
           ref={galleryScrollRef}
@@ -521,17 +531,18 @@ export default function CustomerUploadPage() {
             if (event.target instanceof Element && !event.target.closest("article, button, input, select, a")) event.currentTarget.focus({ preventScroll: true });
           }}
           onScroll={handleGalleryScroll}
-          onDragEnter={(event) => { event.preventDefault(); if (!uploading && !photoSetLocked) setDragActive(true); }}
+          onDragEnter={(event) => { event.preventDefault(); if (!isMobile && !uploading && !photoSetLocked) setDragActive(true); }}
           onDragOver={(event) => event.preventDefault()}
           onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragActive(false); }}
-          onDrop={(event) => { event.preventDefault(); setDragActive(false); if (!uploading && !photoSetLocked) void handleFiles(Array.from(event.dataTransfer.files)); }}
+          onDrop={(event) => { event.preventDefault(); setDragActive(false); if (!isMobile && !uploading && !photoSetLocked) void handleFiles(Array.from(event.dataTransfer.files)); }}
         >
+          {error ? <div role="alert" className="sticky top-2 z-30 mx-3 flex items-center justify-between gap-2 rounded-lg border border-danger/20 bg-surface px-3 py-2 text-[12px] font-semibold text-danger shadow-md md:hidden"><span className="min-w-0">{error}</span>{needsReselection ? <button type="button" onClick={() => inputRef.current?.click()} className="shrink-0 px-1 py-2 underline">다시 선택</button> : null}</div> : null}
           {dragActive ? <div className="pointer-events-none absolute inset-3 z-30 grid place-items-center rounded-2xl border-2 border-dashed border-accent bg-background/90 text-center shadow-lg"><span><UploadCloud className="mx-auto mb-3 text-accent" size={30} /><strong className="text-base text-foreground">여기에 놓아 사진 추가</strong></span></div> : null}
           {displayedPhotos.length === 0 ? (
             <div className="grid min-h-full place-items-center p-5">
               <button type="button" disabled={photoSetLocked} onClick={() => inputRef.current?.click()} className="flex min-h-[260px] w-full max-w-[720px] flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border-strong bg-surface text-center transition-colors hover:border-accent/45 hover:bg-surface-raised/45 disabled:cursor-not-allowed disabled:opacity-60">
                 <span className="grid size-14 place-items-center rounded-2xl bg-customer-soft text-primary"><UploadCloud size={26} strokeWidth={1.8} /></span>
-                <span><strong className="block text-[16px] text-foreground">사진을 끌어다 놓거나 선택하세요</strong><small className="mt-1.5 block text-[13px] text-muted-foreground">JPG · PNG · WebP · HEIC · 최대 {MAX_PHOTOS.toLocaleString()}장</small><small className="mt-2 block px-4 text-[13px] text-muted-foreground">선택용 이미지를 저장해요. 원본 파일은 직접 보관해 주세요.</small></span>
+                <span><strong className="block text-[16px] text-foreground"><span className="md:hidden">사진을 선택하세요</span><span className="hidden md:inline">사진을 끌어다 놓거나 선택하세요</span></strong><small className="mt-1.5 block text-[13px] text-muted-foreground">JPG · PNG · WebP · HEIC · 최대 {MAX_PHOTOS.toLocaleString()}장</small><small className="mt-2 block px-4 text-[13px] text-muted-foreground">선택용 이미지를 저장해요. 원본 파일은 직접 보관해 주세요.</small></span>
               </button>
             </div>
           ) : visiblePhotos.length === 0 ? (
@@ -571,7 +582,7 @@ export default function CustomerUploadPage() {
               mobileSquareMedia
               compact={isMobile}
               showFilename={false}
-              leadingCell={!photoSetLocked && !mobileManageMode ? <button type="button" disabled={uploading || checkingCapacity} onClick={() => inputRef.current?.click()} aria-label="사진 추가하기" className="flex h-full min-h-0 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-accent/25 bg-accent/[0.04] px-2 text-accent transition-colors hover:border-accent/45 hover:bg-accent/[0.08] disabled:cursor-wait disabled:opacity-60"><span className="grid size-8 place-items-center rounded-full border border-accent/20 bg-surface">{uploading ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={17} />}</span><strong className="text-xs font-bold">{uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장` : "사진 추가"}</strong></button> : undefined}
+              leadingCell={!photoSetLocked && !mobileManageMode ? <PhotoUploadTile isUploading={uploading || checkingCapacity} progress={total ? Math.round((progress / total) * 100) : 0} serverWorking={checkingCapacity} hasPhotos={displayedPhotos.length > 0} onClick={() => inputRef.current?.click()} /> : undefined}
               onPhotoClick={(index) => { const photo = visiblePhotos[index]; if (photo && !photo.isPending) setViewerPhotoId(photo.id); }}
             />
           )}
@@ -580,6 +591,7 @@ export default function CustomerUploadPage() {
         <PhotographerPageActionBar
           className="shrink-0"
           viewportFixed
+          compactMobile
           leading={uploadStatus}
           mobileLeading={uploadStatus}
           actions={uploading ? <PhotographerLightButton variant="secondary" onClick={cancelUpload}>업로드 중단</PhotographerLightButton> : mobileManageMode ? <PhotographerLightButton variant="danger" pending={checkingDelete} pendingLabel="확인 중" disabled={selectedPhotoIds.size === 0} onClick={requestDeleteSelectedPhotos}><Trash2 size={16} />선택한 사진 {selectedPhotoIds.size.toLocaleString()}장 삭제</PhotographerLightButton> : <>
@@ -588,6 +600,29 @@ export default function CustomerUploadPage() {
             <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={() => router.push(photoSetLocked ? `/customer-select/${projectId}/export` : `/customer-select/${projectId}/select`)}>{photoSetLocked ? "현재 전달 내용 보기" : "사진 고르기"}</PhotographerLightButton>
           </>}
         />
+
+        <ProjectAssetMobileSheet
+          open={mobileToolsOpen}
+          onClose={() => setMobileToolsOpen(false)}
+          title="사진 찾기"
+          titleId="customer-upload-mobile-tools-title"
+          closeLabel="검색 및 정렬 설정 닫기"
+          headerAction={<button type="button" disabled={!nameFilter.trim() && sort === "order-asc"} onClick={() => { setNameFilter(""); setSort("order-asc"); }} className="h-9 px-2 text-[12px] font-medium text-muted-foreground underline underline-offset-2 disabled:no-underline disabled:opacity-40">초기화</button>}
+        >
+          <div className="space-y-5 py-5">
+            <section aria-labelledby="customer-upload-mobile-search-title">
+              <h3 id="customer-upload-mobile-search-title" className="mb-2 text-[14px] font-semibold text-foreground">파일명 검색</h3>
+              <FilenameSearchInput value={nameFilter} onChange={setNameFilter} placeholder="파일명 검색" autoFocus style={{ "--fsi-height": "48px", "--fsi-radius": "8px" } as React.CSSProperties} />
+            </section>
+            <section className="border-t border-border-subtle pt-5" aria-labelledby="customer-upload-mobile-sort-title">
+              <h3 id="customer-upload-mobile-sort-title" className="mb-2 text-[14px] font-semibold text-foreground">정렬</h3>
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label="사진 정렬 방식">
+                {([['order-asc', '업로드 순'], ['order-desc', '최근 순'], ['name-asc', '파일명 순']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={sort === value} onClick={() => setSort(value)} className={`h-11 rounded-lg border text-[14px] font-semibold transition-colors ${sort === value ? "border-accent bg-accent/10 text-accent" : "border-border bg-surface text-foreground"}`}>{label}</button>)}
+              </div>
+            </section>
+          </div>
+          <button type="button" onClick={() => setMobileToolsOpen(false)} className="h-12 w-full rounded-lg bg-accent text-[15px] font-bold text-white hover:bg-[var(--accent-hover)]">완료</button>
+        </ProjectAssetMobileSheet>
       </div>
 
       {viewerIndex >= 0 ? <OriginalPhotoViewer photos={viewerPhotos} activeIndex={viewerIndex} onActiveIndexChange={(index) => setViewerPhotoId(viewerPhotos[index]?.id ?? null)} onClose={() => setViewerPhotoId(null)} /> : null}

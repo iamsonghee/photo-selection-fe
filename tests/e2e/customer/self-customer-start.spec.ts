@@ -80,6 +80,11 @@ test("self customer start screens and over-limit selection", async ({ page }, te
       expect(addBox?.x).toBeCloseTo(galleryPadding, 0);
       await page.screenshot({ path: testInfo.outputPath(`upload-${width}.png`), fullPage: true });
     }
+    await page.getByRole("button", { name: "검색 및 정렬 설정" }).click();
+    const mobileTools = page.getByRole("dialog", { name: "사진 찾기" });
+    await expect(mobileTools.getByRole("textbox", { name: "파일명으로 필터링" })).toBeVisible();
+    await expect(mobileTools.getByRole("button", { name: "업로드 순" })).toHaveAttribute("aria-pressed", "true");
+    await mobileTools.getByRole("button", { name: "완료" }).click();
     await expect(page.locator("[data-mobile-selection-checkbox]")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "삭제할 사진 선택" })).toBeVisible();
     const firstPhoto = page.locator('[data-original-photo-card] button[aria-label$="상세 보기"]').first();

@@ -43,6 +43,7 @@ import { PhotographerConfirmDialog } from "@/components/ui/PhotographerConfirmDi
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { PhotographerFormActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { OriginalPhotoGallery } from "@/components/photographer/OriginalPhotoGallery";
+import { PhotoUploadTile } from "@/components/photographer/PhotoUploadTile";
 import { OriginalPhotoViewer } from "@/components/photographer/OriginalPhotoViewer";
 import { PhotoAnalysisFilterGroup } from "@/components/photographer/PhotoAnalysisFilterGroup";
 import { PhotoScopeSelect } from "@/components/photographer/PhotoScopeSelect";
@@ -654,110 +655,6 @@ function isAuthLikeStatus(status: number) {
 function isAuthLikeDetail(detail: string | null) {
   if (!detail) return false;
   return /인증|Token|Invalid token|JWKS|Unauthorized/i.test(detail);
-}
-
-/**
- * 모바일 그리드 첫 셀 — 사진 추가 CTA.
- * 기존 prj-data-cell과 동일한 정사각 1px 보더 + paddingBottom 100% 형태를 유지하되,
- * border-style만 dashed로 두어 그리드와 톤을 통일.
- */
-function UploadTile({
-  isUploading,
-  overallProgress,
-  showServerWorking,
-  hasPhotos,
-  isPreparing,
-  onClick,
-}: {
-  isUploading: boolean;
-  overallProgress: number;
-  showServerWorking: boolean;
-  hasPhotos: boolean;
-  isPreparing: boolean;
-  onClick: () => void;
-}) {
-  const label = isPreparing
-    ? "사진 가져오는 중..."
-    : isUploading
-      ? showServerWorking
-        ? "처리 중..."
-        : `${overallProgress}%`
-      : hasPhotos
-        ? "+ 사진 추가"
-        : "사진 선택";
-
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={() => { if (!isUploading) onClick(); }}
-      onKeyDown={(e) => {
-        if (isUploading) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      className="prj-upload-tile"
-      style={{
-        background: "var(--background)",
-        border: `1px dashed ${(isUploading || isPreparing) ? ACCENT : "var(--border)"}`,
-        overflow: "hidden",
-        position: "relative",
-        display: "flex",
-        flexDirection: "column",
-        cursor: (isUploading || isPreparing) ? "wait" : "pointer",
-        transition: "border-color 0.2s, background 0.2s",
-      }}
-      aria-label={isUploading ? `업로드 중 ${overallProgress}%` : "사진 추가하기"}
-    >
-      <div style={{ position: "relative", width: "100%", paddingBottom: "100%", background: (isUploading || isPreparing) ? ACCENT_DIM : "rgba(var(--accent-rgb), 0.04)" }}>
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            padding: 8,
-          }}
-        >
-          <div
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: "50%",
-              border: `1px solid ${(isUploading || isPreparing) ? ACCENT : "var(--border)"}`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: (isUploading || isPreparing) ? "rgba(var(--accent-rgb), 0.08)" : "transparent",
-            }}
-          >
-            {(isUploading || isPreparing)
-              ? <Loader2 size={14} color={ACCENT} style={{ animation: "spin 1s linear infinite" }} />
-              : <ImagePlus size={14} color={ACCENT} />}
-          </div>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 500,
-              color: (isUploading || isPreparing) ? ACCENT : "var(--subtle-foreground)",
-              textAlign: "center",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              maxWidth: "100%",
-            }}
-          >
-            {label}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // Figma #56069: 사진이 한 장도 없을 때(preparing, 0장)의 첫 화면 — 아이콘+안내문구+파일조건+버튼을
@@ -4171,12 +4068,12 @@ export default function ProjectDetailPage() {
                 compact={isMobile}
                 leadingCell={
                   photoUploadAllowed && !recommendationEditActive && isMobile && !mobilePhotoManageMode ? (
-                    <UploadTile
+                    <PhotoUploadTile
                       isUploading={isUploading}
-                      overallProgress={overallProgress}
-                      showServerWorking={showServerWorking}
+                      progress={overallProgress}
+                      serverWorking={showServerWorking}
                       hasPhotos={displayPhotos.length > 0}
-                      isPreparing={isPreparingFiles}
+                      preparing={isPreparingFiles}
                       onClick={requestOpenFilePicker}
                     />
                   ) : undefined
