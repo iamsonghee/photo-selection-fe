@@ -8,7 +8,8 @@ export function csvEscape(value: string) {
 }
 
 export function downloadTextFile(filename: string, text: string, mime: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: mime }));
+  const content = mime.startsWith("text/csv") && !text.startsWith("\uFEFF") ? `\uFEFF${text}` : text;
+  const url = URL.createObjectURL(new Blob([content], { type: mime }));
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;

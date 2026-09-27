@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import { loginAsPhotographer } from "../../helpers/auth";
 
 const PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
@@ -110,6 +111,7 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   const txtBox = await page.getByRole("button", { name: "TXT 다운로드" }).boundingBox();
   const [csv] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "CSV 다운로드" }).click()]);
   const [txt] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "TXT 다운로드" }).click()]);
+  const csvBytes = await readFile(await csv.path());
   await page.screenshot({ path: `test-results/core-flow-${viewport}-${selectedCount}-review-export.png`, fullPage: true });
 
   expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.innerWidth);
@@ -118,6 +120,8 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   expect(viewerReviewBox?.height).toBeGreaterThanOrEqual(40);
   expect(csvBox?.height).toBeGreaterThanOrEqual(40);
   expect(txtBox?.height).toBeGreaterThanOrEqual(40);
+  expect([...csvBytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  expect(csvBytes.toString("utf8")).toContain("파일명,코멘트");
   expect(Math.abs((firstSelectedPhotoBox?.width ?? 0) - (firstSelectedPhotoBox?.height ?? 0))).toBeLessThanOrEqual(1);
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
