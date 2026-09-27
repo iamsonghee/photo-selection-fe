@@ -5,7 +5,7 @@ import { RecommendationMark } from "@/components/RecommendationMark";
 import { memo, useState } from "react";
 import { SimilarityGroupBadge } from "@/components/ui/SimilarityGroupBadge";
 import Link from "next/link";
-import { Star, AlertTriangle, EyeOff, MessageSquare } from "lucide-react";
+import { Star, AlertTriangle, Check, EyeOff, MessageSquare } from "lucide-react";
 import { PhotoThumbnailFrame } from "@/components/ui/PhotoThumbnailFrame";
 import { COLOR_OPTIONS, getPhotoDisplayName } from "@/lib/gallery-filter";
 import { useQueuedThumbSrc, type ThumbLoadQueue } from "@/lib/thumb-load-queue";
@@ -205,11 +205,7 @@ function GalleryPhotoCardImpl({
         aria-label={selected ? "선택 해제" : "선택"}
         className="gl-check-box"
       >
-        {selected && (
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={4}>
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        )}
+        {selected && <Check size={13} strokeWidth={3} aria-hidden />}
         </button>}
         {recommended && (
           <span className="gl-recommended-badge" title="작가 추천">

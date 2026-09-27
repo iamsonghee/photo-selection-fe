@@ -162,7 +162,12 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
   await expect(targetCard).toBeVisible();
   await expect(page.locator("[data-photo-id]")).toHaveCount(1);
   await targetCard.getByRole("button", { name: "선택" }).click();
-  await expect(targetCard.getByRole("button", { name: "선택 해제" })).toBeVisible();
+  const selectedCheck = targetCard.getByRole("button", { name: "선택 해제" });
+  await expect(selectedCheck).toBeVisible();
+  expect(await selectedCheck.evaluate((element) => {
+    const face = getComputedStyle(element, "::before");
+    return [face.left, face.top, face.borderRadius];
+  })).toEqual(["8px", "8px", "4px"]);
   await targetCard.click({ position: { x: 40, y: 60 } });
   await expect(page.locator(".fs-page-root")).toBeVisible();
   await expect(page.getByText(/파일명 · PHOTO_1999/).filter({ visible: true })).toBeVisible();
