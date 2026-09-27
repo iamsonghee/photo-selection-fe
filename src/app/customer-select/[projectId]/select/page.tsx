@@ -15,7 +15,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Layers, Share2 } from "lucide-react";
+import { Layers, Share2 } from "lucide-react";
 import { getFilteredPhotos, getPhotoDisplayName, type GalleryFilterState, type QualityFilterFlag } from "@/lib/gallery-filter";
 import { GalleryDesktopHeader } from "@/components/customer/GalleryDesktopHeader";
 import { GalleryMobileFilterSheet } from "@/components/customer/GalleryMobileFilterSheet";
@@ -362,7 +362,7 @@ export default function CustomerSelectGalleryPage() {
         ? <NicknamePrompt key={participant.id} hex={participant.hex} isDone={Boolean(project.participantDone[participant.id])} online={onlineParticipants.has(participant.id)} />
         : viewingNames[participant.id] && onlineParticipants.has(participant.id)
           ? <button key={participant.id} type="button" className={`${ui.participantPill} ${ui.participantViewTarget} ${project.participantDone[participant.id] ? ui.participantDone : ""}`} onClick={() => setOpenPhotoId(project.participantViews[participant.id] ?? null)} aria-label={`${participant.name}님이 보는 ${viewingNames[participant.id]} 열기`}><i style={{ background: participant.hex }} />{participant.name} · {viewingNames[participant.id]}<span className={ui.participantOnline}>보는 중</span></button>
-          : <span key={participant.id} className={`${ui.participantPill} ${project.participantDone[participant.id] ? ui.participantDone : ""}`}><i style={{ background: participant.hex }} />{participant.name} {project.participantDone[participant.id] ? "완료" : "고르는 중"}{onlineParticipants.has(participant.id) ? <span className={ui.participantOnline}>온라인</span> : null}</span>)}</div><div className={ui.selectHeaderActions}>{participants.length > 1 && <button type="button" className={`${ui.selectHeaderButton} ${ui.selectDoneButton}`} aria-pressed={Boolean(project.participantDone[currentIdentity])} onClick={() => toggleDone(currentIdentity)}><CheckCircle2 size={15} />{project.participantDone[currentIdentity] ? "선택 다시 열기" : "내 선택 완료"}</button>}{isOwner && <button type="button" className={ui.selectHeaderButton} onClick={handleShare}><Share2 size={15} />{project.shareEnabled ? (shareCopied ? "복사됨" : "공유") : "공유 중지됨"}</button>}<div className="gld-selected"><span className="gld-selected-label">선택</span><span className="gld-selected-count">{selectedCount} <span>/ {target}</span></span></div></div></div>}
+          : <span key={participant.id} className={`${ui.participantPill} ${project.participantDone[participant.id] ? ui.participantDone : ""}`}><i style={{ background: participant.hex }} />{participant.name} {project.participantDone[participant.id] ? "완료" : "고르는 중"}{onlineParticipants.has(participant.id) ? <span className={ui.participantOnline}>온라인</span> : null}</span>)}</div><div className={ui.selectHeaderActions}>{isOwner && <button type="button" className={ui.selectHeaderButton} onClick={handleShare}><Share2 size={15} />{project.shareEnabled ? (shareCopied ? "복사됨" : "공유") : "공유 중지됨"}</button>}<div className="gld-selected"><span className="gld-selected-label">선택</span><span className="gld-selected-count">{selectedCount} <span>/ {target}</span></span></div></div></div>}
     >
     <div className={ui.selectWorkspace}>
       {syncStatus !== "connected" && (
@@ -448,12 +448,6 @@ export default function CustomerSelectGalleryPage() {
               })}
             </div>
             <div className={ui.selectHeaderActions}>
-              {participants.length > 1 ? (
-                <button type="button" className={`${ui.selectHeaderButton} ${ui.selectDoneButton}`} aria-pressed={Boolean(project.participantDone[currentIdentity])} onClick={() => toggleDone(currentIdentity)}>
-                  <CheckCircle2 size={15} aria-hidden />
-                  {project.participantDone[currentIdentity] ? "선택 다시 열기" : "내 선택 완료"}
-                </button>
-              ) : null}
               {isOwner ? (
                 <button type="button" className={ui.selectHeaderButton} onClick={handleShare}>
                   <Share2 size={15} aria-hidden />

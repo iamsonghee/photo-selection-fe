@@ -409,7 +409,6 @@
   .selectHeaderButton { width: 36px; min-height: 36px; padding: 0; }
   .selectHeaderButton:not([aria-pressed="true"]) { font-size: 0; }
   .selectHeaderButton[aria-pressed="true"] { width: auto; padding: 0 8px; font-size: 10px; }
-  .selectDoneButton { width: auto !important; padding: 0 8px !important; font-size: 10px !important; }
   .selectHeaderCompact .selectHeaderTop { display: none; }
   .selectGallery { padding: 8px 20px; }
   .selectGrid { max-width: none; }

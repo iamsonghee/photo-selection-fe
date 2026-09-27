@@ -64,6 +64,7 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   }
   expect(galleryTexts).not.toContain("더 골라주세요");
   expect(galleryTexts).not.toContain("더 선택해 주세요");
+  expect(galleryTexts).not.toContain("내 선택 완료");
   const confirm = page.getByRole("button", { name: "최종 검토하기" });
   const confirmBox = await confirm.boundingBox();
   const overflow = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth }));

@@ -31,6 +31,7 @@ test("shared participant can leave opinions but cannot change the final selectio
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/customer-select/role-check/select");
     await expect(page.getByRole("button", { name: "내 의견 완료" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "내 선택 완료" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "최종 검토하기" })).toHaveCount(0);
     await expect(page.locator('[data-photo-id="p1"] .gl-check-box')).toHaveCount(0);
 
