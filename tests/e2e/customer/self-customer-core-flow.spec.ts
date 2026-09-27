@@ -11,7 +11,7 @@ function project(selectedCount: number) {
     orderIndex: index,
     url: PIXEL,
     previewUrl: PIXEL,
-    originalFilename: `CORE_${String(index + 1).padStart(3, "0")}.jpg`,
+    originalFilename: index === 1 ? "유사컷02.jpg".normalize("NFD") : `CORE_${String(index + 1).padStart(3, "0")}.jpg`,
   }));
   return {
     id: "core-flow", name: "핵심 흐름 QA", shootType: "wedding", target: 10,
@@ -112,6 +112,7 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   const [csv] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "CSV 다운로드" }).click()]);
   const [txt] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "TXT 다운로드" }).click()]);
   const csvBytes = await readFile(await csv.path());
+  const csvText = csvBytes.toString("utf8");
   await page.screenshot({ path: `test-results/core-flow-${viewport}-${selectedCount}-review-export.png`, fullPage: true });
 
   expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.innerWidth);
@@ -121,7 +122,9 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   expect(csvBox?.height).toBeGreaterThanOrEqual(40);
   expect(txtBox?.height).toBeGreaterThanOrEqual(40);
   expect([...csvBytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
-  expect(csvBytes.toString("utf8")).toContain("파일명,코멘트");
+  expect(csvText).toContain("파일명,코멘트");
+  expect(csvText).toContain("유사컷02.jpg");
+  expect(csvText).not.toContain("유사컷02.jpg".normalize("NFD"));
   expect(Math.abs((firstSelectedPhotoBox?.width ?? 0) - (firstSelectedPhotoBox?.height ?? 0))).toBeLessThanOrEqual(1);
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);

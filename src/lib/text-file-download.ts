@@ -8,11 +8,12 @@ export function csvEscape(value: string) {
 }
 
 export function downloadTextFile(filename: string, text: string, mime: string) {
-  const content = mime.startsWith("text/csv") && !text.startsWith("\uFEFF") ? `\uFEFF${text}` : text;
+  const normalizedText = text.normalize("NFC");
+  const content = mime.startsWith("text/csv") && !normalizedText.startsWith("\uFEFF") ? `\uFEFF${normalizedText}` : normalizedText;
   const url = URL.createObjectURL(new Blob([content], { type: mime }));
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = filename;
+  anchor.download = filename.normalize("NFC");
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
