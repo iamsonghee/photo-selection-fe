@@ -6,6 +6,7 @@
  * 그대로 재사용한다(단계 0 분석 결과). 압축된 결과만 BE로 전송, 썸네일·프리뷰 생성은 BE 담당.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { CUSTOMER_PHOTO_LIMIT as MAX_PHOTOS, uploadLimitError } from "../../_lib/upload-limit";
 import { ChevronLeft, ImagePlus, Loader2, Sparkles, Trash2, UploadCloud } from "lucide-react";
@@ -467,7 +468,11 @@ export default function CustomerUploadPage() {
   }
 
   return (
-    <CustomerSelectShell viewportLocked compactHeader={compactHeader}>
+    <CustomerSelectShell
+      viewportLocked
+      compactHeader={compactHeader}
+      compactTitle={<Link href={`/customer-select/${projectId}`} className="block max-w-[min(40vw,520px)] truncate text-[14px] font-bold tracking-[-0.02em] text-foreground hover:text-accent">{displayName}</Link>}
+    >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden onChange={(event) => {
           const files = Array.from(event.currentTarget.files ?? []);
@@ -476,7 +481,7 @@ export default function CustomerUploadPage() {
         }} />
 
         <header data-upload-header-mode={compactHeader ? "compact" : "expanded"} className="shrink-0 border-b border-border-subtle bg-surface">
-          <div className={`grid w-full grid-cols-[36px_minmax(0,1fr)] items-center gap-1 px-5 transition-[padding-block] duration-200 md:flex md:gap-2 md:px-8 ${compactHeader ? "py-1" : "py-1.5"}`}>
+          <div className={`grid w-full grid-cols-[36px_minmax(0,1fr)] items-center gap-1 px-5 transition-[padding-block] duration-200 md:flex md:gap-2 md:px-8 ${compactHeader ? "py-1 md:hidden" : "py-1.5"}`}>
             <button type="button" onClick={() => router.push(`/customer-select/${projectId}`)} className={`grid shrink-0 place-items-center rounded-lg text-muted-foreground transition-[width,height] hover:bg-surface-raised hover:text-foreground ${compactHeader ? "size-9" : "size-10"}`} aria-label="프로젝트 현황으로"><ChevronLeft size={19} /></button>
             <div className="min-w-0 flex-1">
               <h1 className={`truncate font-bold tracking-[-0.025em] text-foreground transition-[font-size] ${compactHeader ? "text-[14px]" : "text-[17px] md:text-[19px]"}`}>{displayName}</h1>
