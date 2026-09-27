@@ -2,6 +2,7 @@
 
 /** S7 — 최종 검토. */
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronDown, ChevronLeft, ChevronUp, FileSpreadsheet, FileText } from "lucide-react";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -95,7 +96,11 @@ export default function CustomerReviewPage() {
 
   return (
     <>
-    <CustomerSelectShell navigation={false}>
+    <CustomerSelectShell
+      navigation={false}
+      compactHeader
+      compactTitle={<h1><Link href="/customer-select" className="block max-w-[calc(100vw-156px)] truncate text-[14px] font-bold tracking-[-0.02em] text-foreground hover:text-accent md:max-w-[min(32vw,420px)] md:text-[16px]">{project.name || "이름 없는 프로젝트"}</Link></h1>}
+    >
       <main className={ui.shellMain}>
       <div className={ui.page}>
         <div className={ui.header}>
@@ -103,8 +108,8 @@ export default function CustomerReviewPage() {
             <ChevronLeft size={22} strokeWidth={1.8} aria-hidden />
           </button>
           <div className={ui.reviewTitleGroup}>
-            <h1 className={ui.title}>{project.name}</h1>
-            <p>최종 검토 · {selected.length.toLocaleString()}장 선택{requested.length > 0 ? ` · 보정 요청 ${requested.length.toLocaleString()}장` : ""}{match !== null ? ` · 취향 일치 ${match}%` : ""}</p>
+            <h2 className={ui.title}>최종 검토</h2>
+            <p>{selected.length.toLocaleString()}장 선택{requested.length > 0 ? ` · 보정 요청 ${requested.length.toLocaleString()}장` : ""}{match !== null ? ` · 취향 일치 ${match}%` : ""}</p>
           </div>
           <button type="button" className={ui.reviewEdit} onClick={() => router.push(`/customer-select/${projectId}/select`)}>선택 수정</button>
         </div>
