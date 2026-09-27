@@ -18,6 +18,7 @@ type Props = {
   sectionLabel: string;
   selectedPhotoIds: Set<string>;
   comments: Record<string, { comment?: string }>;
+  showCommentOnDesktop?: boolean;
   onClose: () => void;
 };
 
@@ -27,7 +28,7 @@ function displayName(photo: Photo): string {
   return photo.originalFilename?.split("/").pop() ?? `#${photo.orderIndex}`;
 }
 
-export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, selectedPhotoIds, comments, onClose }: Props) {
+export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, selectedPhotoIds, comments, showCommentOnDesktop = false, onClose }: Props) {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [zoomed, setZoomed] = useState(false);
   const [presignedPreviews, setPresignedPreviews] = useState<Map<string, PresignedPreview>>(new Map());
@@ -202,7 +203,7 @@ export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, s
       </main>
 
       <footer className="locked-viewer-footer relative z-10 flex items-center bg-black px-5 pb-[calc(24px+env(safe-area-inset-bottom))] pt-2 md:min-h-12 md:justify-center md:border-t md:border-white/10 md:bg-black/70 md:px-4 md:py-0 md:text-xs md:text-white/55">
-        <div className={`locked-viewer-comment ${comment ? "has-comment" : ""}`}>
+        <div className={`locked-viewer-comment ${comment ? "has-comment" : ""} ${showCommentOnDesktop ? "show-desktop" : ""}`}>
           {comment || "코멘트 없음"}
         </div>
         <span className="hidden md:inline">{activeIndex + 1} / {photos.length}</span>
@@ -225,14 +226,13 @@ export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, s
           display: flex;
           align-items: center;
           padding: 0 16px;
-          overflow: hidden;
+          overflow-y: auto;
           border: 0.8px solid #bfbfbf;
           border-radius: 8px;
           background: #181818;
           color: #c0c0c0;
           font: 400 15px/24px Pretendard, sans-serif;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          white-space: normal;
         }
         .locked-viewer-comment.has-comment { border-color: #ff4d00; color: #fff; }
         .locked-viewer-arrows button { background: rgba(0,0,0,.18) !important; border-color: rgba(255,255,255,.12) !important; }
@@ -242,6 +242,7 @@ export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, s
           .locked-viewer-stage { padding: 0; }
           .locked-viewer-footer { min-height: 48px; }
           .locked-viewer-comment { display: none; }
+          .locked-viewer-comment.show-desktop { display: flex; width: min(720px, calc(100vw - 260px)); max-height: 112px; margin-right: 24px; padding: 8px 14px; }
         }
       `}</style>
     </div>,
