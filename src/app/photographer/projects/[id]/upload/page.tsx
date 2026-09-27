@@ -60,6 +60,10 @@ import { matchesFilenameQuery } from "@/lib/gallery-filter";
 import { selectPhotoRange } from "@/lib/drag-selection";
 import { useQuota } from "@/contexts/QuotaContext";
 import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAssetHeader";
+import {
+  clearPhotographerMobileProjectContext,
+  publishPhotographerMobileProjectContext,
+} from "@/lib/photographer-mobile-project-context";
 import themeStyles from "./UploadTheme.module.css";
 
 // ---------- constants ----------
@@ -1111,6 +1115,14 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     if (quota?.tier === "admin") setIsAdminTier(true);
   }, [quota]);
+
+  /** 모바일 상단바가 축소 시 A 로고+프로젝트명만 보여주도록 — assets/[tab]과 동일한 공통 규칙 */
+  useEffect(() => {
+    if (!project) return;
+    const context = { projectName: project.name, customerName: project.customerName };
+    publishPhotographerMobileProjectContext(context);
+    return () => clearPhotographerMobileProjectContext(context);
+  }, [project?.name, project?.customerName]);
 
   const overallProgress = uploadSnapshot?.percent ?? uploadProgress;
   const isPreviewUploading = uploadPhase === "sending" || uploadPhase === "processing";
@@ -3501,12 +3513,7 @@ export default function ProjectDetailPage() {
         data-upload-header-mode={immersiveUploadHeader ? "immersive" : compactUploadHeader ? "compact" : "expanded"}
         className="relative z-20 shrink-0 bg-background"
       >
-        {/* 축소 상태에서도 프로젝트 이동과 현재 위치를 유지한다. */}
-        <div className={themeStyles.compactHeader} aria-hidden={!compactUploadHeader} inert={!compactUploadHeader}>
-          <button type="button" onClick={() => requestInternalNavigation(`/photographer/projects/${id}`)} aria-label="프로젝트 상세로 돌아가기">←</button>
-          <span title={project.name}>{project.name}</span>
-          <strong>원본 업로드</strong>
-        </div>
+        {/* 축소 시 뒤로가기·프로젝트명은 공용 MobileHeader가 이미 보여주므로 여기서는 중복 표시하지 않는다. */}
         <div className={themeStyles.expandedHeader} aria-hidden={compactUploadHeader} inert={compactUploadHeader}>
         <div className={themeStyles.expandedHeaderInner}>
         <PhotographerLightPageFrame

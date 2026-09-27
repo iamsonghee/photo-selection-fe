@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useProfile } from "@/contexts/ProfileContext";
 import { DEFAULT_PROFILE_IMAGE, getProfileImageUrl } from "@/lib/photographer";
@@ -83,10 +82,10 @@ export function MobileHeader({ light = false }: { light?: boolean }) {
       data-project-context-visible={compactProjectHeader ? "true" : "false"}
       className={`${light ? lightThemeStyles.lightTheme : ""} photographer-mobile-header ${visuallyCompact ? "is-compact" : ""} ${assetImmersive ? "is-asset-immersive" : ""} fixed left-0 right-0 top-0 z-50 box-border flex items-center justify-between ${assetProjectBase ? "gap-1 px-2" : "gap-3 px-5"} border-b-0 bg-background/95 backdrop-blur-md md:hidden`}
     >
-      <Link href={assetProjectBase ?? "/photographer/projects"} aria-label={assetProjectBase ? "프로젝트 상세로 돌아가기" : "A-CUT 프로젝트"} className={`flex min-h-11 shrink-0 items-center rounded-lg transition-[gap] duration-200 motion-reduce:transition-none ${compactProjectHeader ? "gap-0" : "gap-2"}`}>
-        {assetProjectBase ? <span className="grid h-11 w-11 place-items-center"><ChevronLeft size={20} strokeWidth={2} aria-hidden /></span> : <div className={`flex items-center justify-center rounded bg-accent font-black tracking-tighter text-white transition-[width,height,font-size] duration-200 ${visuallyCompact ? "h-6 w-6 text-xs" : "h-[26px] w-[26px] text-[13px]"}`}>
+      <Link href="/photographer/projects" aria-label="A-CUT 프로젝트 목록" className={`flex min-h-11 shrink-0 items-center rounded-lg transition-[gap] duration-200 motion-reduce:transition-none ${compactProjectHeader ? "gap-0" : "gap-2"}`}>
+        <div className={`flex items-center justify-center rounded bg-accent font-black tracking-tighter text-white transition-[width,height,font-size] duration-200 ${visuallyCompact ? "h-6 w-6 text-xs" : "h-[26px] w-[26px] text-[13px]"}`}>
           A
-        </div>}
+        </div>
         <span
           aria-hidden={compactProjectHeader}
           className={`overflow-hidden whitespace-nowrap font-bold tracking-tight text-foreground transition-[max-width,opacity,font-size] duration-200 motion-reduce:transition-none ${
@@ -102,17 +101,18 @@ export function MobileHeader({ light = false }: { light?: boolean }) {
       </Link>
 
       {projectContext ? (
-        <p
+        <Link
+          href={assetProjectBase ?? "/photographer/projects"}
           data-mobile-project-header-context
-          aria-label={projectContext.projectName}
+          aria-label={`${projectContext.projectName} 프로젝트 상세로 이동`}
           aria-hidden={!compactProjectHeader}
+          tabIndex={compactProjectHeader ? undefined : -1}
           className={`flex min-w-0 items-center overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 motion-reduce:transition-none ${
             compactProjectHeader ? "flex-1 max-w-full opacity-100" : "pointer-events-none max-w-0 opacity-0"
           }`}
         >
           <span className="min-w-0 truncate text-[15px] font-semibold leading-5 tracking-[-0.35px] text-foreground" title={projectContext.projectName}>{projectContext.projectName}</span>
-
-        </p>
+        </Link>
       ) : null}
 
       <Link
