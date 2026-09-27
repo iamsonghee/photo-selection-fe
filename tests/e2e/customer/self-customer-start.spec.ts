@@ -60,11 +60,16 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await page.getByRole("link", { name: "올린 사진 보기" }).click();
     await expect(page.getByRole("button", { name: "프로젝트 현황으로" })).toBeVisible();
     await expect(page.getByRole("button", { name: "사진 고르기", exact: true })).toBeVisible();
-    for (const [width, padding] of [[1440, 32], [390, 20]] as const) {
+    for (const [width, padding] of [[1792, 32], [390, 20]] as const) {
       await page.setViewportSize({ width, height: 900 });
       const gallery = page.locator('[data-photo-gallery-variant="original"]');
       await expect(gallery).toBeVisible();
       expect(await gallery.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft))).toBe(padding);
+      const [logoBox, backBox] = await Promise.all([
+        page.getByRole("img", { name: "A-CUT" }).boundingBox(),
+        page.getByRole("button", { name: "프로젝트 현황으로" }).boundingBox(),
+      ]);
+      expect(backBox?.x).toBeCloseTo(logoBox?.x ?? 0, 0);
       await page.screenshot({ path: testInfo.outputPath(`upload-${width}.png`), fullPage: true });
     }
     await page.getByRole("button", { name: "프로젝트 현황으로" }).click();

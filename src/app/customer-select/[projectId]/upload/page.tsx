@@ -465,7 +465,7 @@ export default function CustomerUploadPage() {
         }} />
 
         <header data-upload-header-mode={compactHeader ? "compact" : "expanded"} className={`shrink-0 overflow-hidden border-b border-border-subtle bg-background transition-[padding] duration-200 ${compactHeader ? "py-1" : "py-2"}`}>
-          <div className="grid w-full grid-cols-[36px_minmax(0,1fr)] items-center gap-2 px-5 md:flex md:gap-3 md:px-8">
+          <div className="mx-auto grid w-full max-w-[1504px] grid-cols-[36px_minmax(0,1fr)] items-center gap-2 px-5 md:flex md:gap-3 md:px-8">
             <button type="button" onClick={() => router.push(`/customer-select/${projectId}`)} className={`grid shrink-0 place-items-center rounded-lg text-muted-foreground transition-[width,height] hover:bg-surface-raised hover:text-foreground ${compactHeader ? "size-9" : "size-10"}`} aria-label="프로젝트 현황으로"><ChevronLeft size={19} /></button>
             <div className="min-w-0 flex-1">
               <h1 className={`truncate font-bold text-foreground transition-[font-size] ${compactHeader ? "text-[14px]" : "text-[18px]"}`}>{displayName}</h1>
