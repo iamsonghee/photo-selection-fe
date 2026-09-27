@@ -115,7 +115,7 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
   await expect(page.locator("[data-photo-id]").first()).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("[data-customer-shell-header-mode]")).toBeVisible();
   await expect(page.locator(".gld-brand-mark")).toBeHidden();
-  expect((await page.locator('[class*="selectGrid"]').first().boundingBox())?.x).toBe(viewport === "desktop" ? 12 : 8);
+  expect((await page.locator('[class*="selectGrid"]').first().boundingBox())?.x).toBe(viewport === "desktop" ? 24 : 20);
   const firstCardMs = Date.now() - started;
   const initialCards = await page.locator("[data-photo-id]").count();
   let maxCards = initialCards;
