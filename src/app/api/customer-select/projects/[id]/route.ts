@@ -19,7 +19,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     admin.from("customer_selections").select("photo_id, rating, color_tags, comment, is_selected").eq("project_id", id),
     admin.from("customer_project_participants").select("color, nickname, done").eq("project_id", id),
     admin.from("customer_quality_assessments").select("photo_id, eyes_closed, blur_or_shake, focus_issue, primary_subject_detected").eq("project_id", id),
-    admin.from("customer_participant_opinions").select("photo_id, participant_color, rating, comment").eq("project_id", id),
+    admin.from("customer_participant_opinions").select("photo_id, participant_color, rating").eq("project_id", id),
   ]);
   if (photosRes.error || selectionsRes.error || participantsRes.error || qualityRes.error || opinionsRes.error) {
     return NextResponse.json({ error: "조회 실패" }, { status: 500 });

@@ -111,7 +111,6 @@ interface CustomerParticipantOpinionRow {
   photo_id: string;
   participant_color: string;
   rating: number | null;
-  comment: string | null;
 }
 
 export function buildCustomerCollaborationState(
@@ -135,12 +134,11 @@ export function buildCustomerCollaborationState(
     participantDone[participant.color] = participant.done;
     participantNicknames[participant.color] = participant.nickname;
   }
-  const participantOpinions: Record<string, Record<string, { rating?: StarRating; comment?: string }>> = {};
+  const participantOpinions: Record<string, Record<string, { rating?: StarRating }>> = {};
   for (const opinion of opinions) {
     participantOpinions[opinion.photo_id] ??= {};
     participantOpinions[opinion.photo_id][opinion.participant_color] = {
       rating: (opinion.rating ?? undefined) as StarRating | undefined,
-      comment: opinion.comment ?? undefined,
     };
   }
   return { selectedIds, photoStates, participantOpinions, participantDone, participantNicknames };

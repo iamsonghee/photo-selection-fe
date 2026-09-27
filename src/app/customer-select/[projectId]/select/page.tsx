@@ -221,7 +221,7 @@ export default function CustomerSelectGalleryPage() {
     onSaveParticipant: (participant) => setNickname(participant.initial),
     canEditFinalSelection: isOwner,
     opinionsForPhoto: (photoId) => Object.entries(project.participantOpinions[photoId] ?? {}).flatMap(([color, opinion]) =>
-      opinion && (opinion.rating || opinion.comment) ? [{ color: color as ColorTag, name: project.participantNicknames[color] || "참가자", ...opinion }] : []
+      opinion?.rating ? [{ color: color as ColorTag, name: project.participantNicknames[color] || "참가자", rating: opinion.rating }] : []
     ),
   }) : null, [openPhotoId, projectId, currentIdentity, project.participantNicknames, project.participantOpinions, isOwner, router, setNickname]);
 
@@ -523,7 +523,7 @@ export default function CustomerSelectGalleryPage() {
                       rating={state?.rating}
                       colorTags={state?.color ?? []}
                       colorLabel={colorLabel}
-                      hasComment={Boolean(state?.comment) || Object.values(project.participantOpinions[photo.id] ?? {}).some((opinion) => Boolean(opinion?.comment))}
+                      hasComment={Boolean(state?.comment)}
                       showGroupBadge={groupedView && members.length > 1 && !groupExpanded}
                       groupId={groupId ?? undefined}
                       groupLabel={groupId && groupOrdinal.has(groupId) ? `묶음 ${groupOrdinal.get(groupId)}` : undefined}

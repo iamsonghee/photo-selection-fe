@@ -6,7 +6,8 @@ import type { ColorTag } from "@/types";
 const VALID_COLORS: readonly ColorTag[] = ["red", "yellow", "green", "blue", "purple"];
 
 /**
- * POST: 사진 하나의 셀렉 상태 변경. 최종 선택은 소유자만, 별점/의견은 참가자별로 저장한다.
+ * POST: 사진 하나의 셀렉 상태 변경. 최종 선택은 소유자만, 별점은 참가자별로,
+ * 작가 전달 메모는 프로젝트 참여자가 함께 수정하는 사진당 공용 값으로 저장한다.
  * color_op(찜 추가/제거)는 여러 참가자 동시 조작 시 lost-update를 피하려고
  * 원자적 RPC(toggle_customer_selection_color)로 처리한다(작가 플로우와 동일 패턴).
  */
@@ -58,21 +59,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  if (rating !== undefined || comment !== undefined) {
+  if (comment !== undefined) {
+    if (comment !== null && (typeof comment !== "string" || comment.length > 100)) {
+      return NextResponse.json({ error: "작가 전달 메모는 100자 이하여야 합니다." }, { status: 400 });
+    }
+    const { error } = await admin.from("customer_selections").upsert(
+      [{ project_id: projectId, photo_id, comment }],
+      { onConflict: "project_id,photo_id", defaultToNull: false }
+    );
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (rating !== undefined) {
     if (!VALID_COLORS.includes(participant_color as ColorTag)) {
       return NextResponse.json({ error: "participant_color가 필요합니다." }, { status: 400 });
     }
     if (rating !== undefined && rating !== null && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
       return NextResponse.json({ error: "별점은 1~5 사이여야 합니다." }, { status: 400 });
     }
-    if (comment !== undefined && comment !== null && (typeof comment !== "string" || comment.length > 150)) {
-      return NextResponse.json({ error: "의견은 150자 이하여야 합니다." }, { status: 400 });
-    }
     const participant = await admin.from("customer_project_participants").select("color").eq("project_id", projectId).eq("color", participant_color).maybeSingle();
     if (!participant.data) return NextResponse.json({ error: "참여자 정보를 먼저 등록해 주세요." }, { status: 403 });
     const update: Record<string, unknown> = { project_id: projectId, photo_id, participant_color };
-    if (rating !== undefined) update.rating = rating;
-    if (comment !== undefined) update.comment = comment;
+    update.rating = rating;
     const { error } = await admin.from("customer_participant_opinions").upsert([update], { onConflict: "project_id,photo_id,participant_color", defaultToNull: false });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }

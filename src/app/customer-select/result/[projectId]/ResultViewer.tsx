@@ -26,7 +26,7 @@ export default function ResultViewer({ project, photos, comments }: Props) {
 
   function downloadCsv() {
     const rows = photos.map((photo) => [csvEscape(getPhotoDisplayName(photo)), csvEscape(comments[photo.id]?.comment ?? "")].join(","));
-    downloadTextFile(`${baseName}.csv`, ["파일명,코멘트", ...rows].join("\n"), "text/csv;charset=utf-8");
+    downloadTextFile(`${baseName}.csv`, ["파일명,작가 전달 메모", ...rows].join("\n"), "text/csv;charset=utf-8");
   }
 
   function downloadTxt() {
@@ -48,7 +48,7 @@ export default function ResultViewer({ project, photos, comments }: Props) {
             <p className="text-xs font-bold text-accent">셀렉 결과</p>
             <h1 className="mt-2 text-[26px] font-bold tracking-[-0.04em] md:text-[32px]">{project.name}</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              선택 {photos.length.toLocaleString()}장 · 코멘트 {commentedPhotos.length.toLocaleString()}장 · 요청 기준 {project.target.toLocaleString()}장
+              선택 {photos.length.toLocaleString()}장 · 전달 메모 {commentedPhotos.length.toLocaleString()}장 · 요청 기준 {project.target.toLocaleString()}장
             </p>
           </div>
           <div className="flex gap-2">
@@ -59,21 +59,21 @@ export default function ResultViewer({ project, photos, comments }: Props) {
 
         <div className="mt-5 flex items-center gap-2" role="group" aria-label="사진 필터">
           <button type="button" aria-pressed={!commentOnly} onClick={() => setCommentOnly(false)} className={`h-9 rounded-full border px-4 text-[13px] font-semibold transition-colors ${!commentOnly ? "border-foreground bg-foreground text-white" : "border-border-subtle bg-white text-muted-foreground hover:border-border-strong"}`}>전체 {photos.length.toLocaleString()}</button>
-          <button type="button" aria-pressed={commentOnly} disabled={commentedPhotos.length === 0} onClick={() => setCommentOnly(true)} className={`h-9 rounded-full border px-4 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${commentOnly ? "border-accent bg-accent text-white" : "border-border-subtle bg-white text-muted-foreground hover:border-border-strong"}`}><MessageSquare size={14} className="mr-1.5 inline" aria-hidden />코멘트 있는 사진 {commentedPhotos.length.toLocaleString()}</button>
+          <button type="button" aria-pressed={commentOnly} disabled={commentedPhotos.length === 0} onClick={() => setCommentOnly(true)} className={`h-9 rounded-full border px-4 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${commentOnly ? "border-accent bg-accent text-white" : "border-border-subtle bg-white text-muted-foreground hover:border-border-strong"}`}><MessageSquare size={14} className="mr-1.5 inline" aria-hidden />전달 메모 있는 사진 {commentedPhotos.length.toLocaleString()}</button>
         </div>
 
         <section className="mt-5 grid grid-cols-2 items-start gap-2 sm:grid-cols-3 md:grid-cols-4 md:gap-3 lg:grid-cols-5 xl:grid-cols-6" aria-label="선택된 사진">
           {visiblePhotos.map((photo, index) => {
             const comment = comments[photo.id]?.comment;
             return (
-              <button key={photo.id} type="button" className="group min-w-0 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40" onClick={() => setViewerIndex(index)} aria-label={`${getPhotoDisplayName(photo)} 상세보기${comment ? `, 코멘트 ${comment}` : ""}`}>
+              <button key={photo.id} type="button" className="group min-w-0 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40" onClick={() => setViewerIndex(index)} aria-label={`${getPhotoDisplayName(photo)} 상세보기${comment ? `, 작가 전달 메모 ${comment}` : ""}`}>
                 <PhotoThumbnailFrame className="relative aspect-square overflow-hidden rounded-lg bg-border-subtle">
                   <Image className="object-cover transition-transform duration-300 group-hover:scale-[1.02]" src={photo.url} alt={getPhotoDisplayName(photo)} fill unoptimized sizes="(min-width: 1280px) 16vw, (min-width: 768px) 25vw, 50vw" draggable={false} />
                 </PhotoThumbnailFrame>
                 <div className="px-0.5 pt-2">
                   <p className="truncate font-mono text-[11px] text-muted-foreground">{getPhotoDisplayName(photo)}</p>
                   {comment ? <div className="mt-1.5 rounded-lg border border-border-subtle border-l-2 border-l-accent/60 bg-surface-raised px-2.5 py-2">
-                    <span className="flex items-center gap-1 text-[10px] font-bold text-accent"><MessageSquare size={12} aria-hidden />고객 코멘트</span>
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-accent"><MessageSquare size={12} aria-hidden />작가 전달 메모</span>
                     <p className="mt-1 line-clamp-2 break-words text-[12px] leading-[18px] text-foreground" title={comment}>{comment}</p>
                   </div>
                   : null}

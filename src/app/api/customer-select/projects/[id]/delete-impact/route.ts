@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const [photos, selections, opinions, quality, versions] = await Promise.all([
     admin.from("customer_photos").select("id, similarity_group_id").eq("project_id", id).in("id", photoIds),
     admin.from("customer_selections").select("photo_id, rating, color_tags, comment, is_selected").eq("project_id", id).in("photo_id", photoIds),
-    admin.from("customer_participant_opinions").select("photo_id, rating, comment").eq("project_id", id).in("photo_id", photoIds),
+    admin.from("customer_participant_opinions").select("photo_id, rating").eq("project_id", id).in("photo_id", photoIds),
     admin.from("customer_quality_assessments").select("photo_id").eq("project_id", id).in("photo_id", photoIds),
     admin.from("customer_photo_versions").select("id, photo_id").in("photo_id", photoIds),
   ]);
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     finalSelections: selectionRows.filter((row) => row.is_selected).length,
     likes: selectionRows.reduce((sum, row) => sum + (Array.isArray(row.color_tags) ? row.color_tags.length : 0), 0),
     ratings: selectionRows.filter((row) => row.rating).length + opinionRows.filter((row) => row.rating).length,
-    comments: selectionRows.filter((row) => row.comment?.trim()).length + opinionRows.filter((row) => row.comment?.trim()).length,
+    comments: selectionRows.filter((row) => row.comment?.trim()).length,
     aiPhotos: aiPhotoIds.size,
     retouchedVersions: versions.data?.length ?? 0,
   });

@@ -49,7 +49,7 @@ import { MobileViewerPinchPhoto } from "@/components/MobileViewerPinchPhoto";
 import { triggerSelectionHaptic } from "@/lib/selection-feedback";
 import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
 
-const COMMENT_MAX_LENGTH = 150;
+const COMMENT_MAX_LENGTH = 100;
 const PREVIEW_URL_CACHE_MAX = 100;
 const PREVIEW_DECODE_CACHE_MAX = 6;
 const PREVIEW_EXPIRY_SAFETY_SECONDS = 60;
@@ -70,18 +70,17 @@ export type CustomerSelectionViewerAdapter = {
   onReview?: () => void;
   onSaveParticipant?: (participant: Participant) => void;
   canEditFinalSelection?: boolean;
-  opinionsForPhoto?: (photoId: string) => Array<{ color: ColorTag; name: string; rating?: StarRating; comment?: string }>;
+  opinionsForPhoto?: (photoId: string) => Array<{ color: ColorTag; name: string; rating?: StarRating }>;
 };
 
-function ParticipantOpinions({ opinions, myColor }: { opinions: Array<{ color: ColorTag; name: string; rating?: StarRating; comment?: string }>; myColor?: ColorTag }) {
+function ParticipantOpinions({ opinions, myColor }: { opinions: Array<{ color: ColorTag; name: string; rating?: StarRating }>; myColor?: ColorTag }) {
   const others = opinions.filter((opinion) => opinion.color !== myColor);
   if (!others.length) return null;
-  return <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 82, overflowY: "auto", padding: "8px 0" }} aria-label="다른 참여자 의견">
+  return <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 82, overflowY: "auto", padding: "8px 0" }} aria-label="다른 참여자 별점">
     {others.map((opinion) => <div key={opinion.color} style={{ display: "flex", alignItems: "flex-start", gap: 8, color: "rgba(255,255,255,.82)", fontSize: 12, lineHeight: 1.4 }}>
       <span style={{ width: 8, height: 8, marginTop: 4, borderRadius: "50%", flexShrink: 0, background: COLOR_OPTIONS.find((item) => item.key === opinion.color)?.hex ?? "#999" }} />
       <strong style={{ flexShrink: 0 }}>{opinion.name || "참가자"}</strong>
       {opinion.rating ? <span aria-label={`별점 ${opinion.rating}점`}>{"★".repeat(opinion.rating)}</span> : null}
-      {opinion.comment ? <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{opinion.comment}</span> : null}
     </div>)}
   </div>;
 }
@@ -337,8 +336,8 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
 
   const filmstripRef     = useRef<HTMLDivElement>(null);
   const mobileFilmstripRef = useRef<HTMLDivElement>(null);
-  const mobileCommentRef = useRef<HTMLTextAreaElement>(null);
-  const pcCommentRef = useRef<HTMLTextAreaElement>(null);
+  const mobileCommentRef = useRef<HTMLInputElement>(null);
+  const pcCommentRef = useRef<HTMLInputElement>(null);
   const desktopImageFrameRef = useRef<HTMLDivElement>(null);
   const desktopImageRef = useRef<HTMLImageElement>(null);
   const [desktopCheckPosition, setDesktopCheckPosition] = useState<{ left: number; top: number } | null>(null);
@@ -677,14 +676,13 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
     return () => clearTimeout(timer);
   }, [isCommentEditing]);
 
-  /** 코멘트 시트 열기 — 하단 아이콘 버튼과 "위로 스와이프" 제스처가 함께 쓴다. */
+  /** 공용 작가 전달 메모 열기 — 하단 아이콘 버튼과 "위로 스와이프" 제스처가 함께 쓴다. */
   const openCommentEditor = useCallback(() => {
     setIsCommentEditing(true);
     requestAnimationFrame(() => mobileCommentRef.current?.focus());
   }, []);
 
-  /** PC 패널의 "사진별 요청"도 평소엔 접어 버튼만 두고, 눌렀을 때만 입력창을 편다 —
-   *  항상 펼쳐진 textarea가 사진마다 코멘트 작성을 은근히 유도하는 느낌이 있었다. */
+  /** PC 패널의 공용 작가 전달 메모는 평소엔 접어 버튼만 두고, 눌렀을 때만 입력창을 편다. */
   const openPcCommentEditor = useCallback(() => {
     setIsCommentEditing(true);
     requestAnimationFrame(() => pcCommentRef.current?.focus());
@@ -996,7 +994,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
         .fs-comment-input:focus { border-color: rgba(var(--accent-rgb), 0.4); }
         .fs-comment-input-wrap { position: relative; display: flex; align-items: center; min-width: 0; }
         .fs-comment-input-icon { position: absolute; left: 14px; color: #d6d6d6; pointer-events: none; }
-        /* 평소엔 이 버튼만 두고, 눌렀을 때만 위 textarea가 펼쳐진다 — §openPcCommentEditor */
+        /* 평소엔 이 버튼만 두고, 눌렀을 때만 위 입력창이 펼쳐진다 — §openPcCommentEditor */
         .fs-comment-toggle {
           display: flex; align-items: center; gap: 8px;
           width: 100%; min-height: 40px; padding: 0 14px;
@@ -1238,7 +1236,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
         .fv-comment-fab-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 110px; }
         .fv-comment-fab:focus-visible, .fv-mark-toggle:focus-visible, .fv-group-pill:focus-visible { outline: 2px solid #fff; outline-offset: -2px; border-radius: 999px; }
         .fv-comment-sheet { position: fixed; left: 50%; bottom: 0; z-index: 80; width: min(100%, 375px); transform: translateX(-50%); background: #fff; color: #191918; box-shadow: 0 -4px 8px rgba(0,0,0,.12); border-radius: 12px 12px 0 0; padding: 16px 20px calc(20px + env(safe-area-inset-bottom)); }
-        .fv-comment-sheet textarea { width: 100%; min-height: 72px; max-height: 144px; padding: 0; resize: none; border: 0; outline: 0; background: transparent; color: #191918; font: 400 15px/24px Pretendard, sans-serif; letter-spacing: -.36px; }
+        .fv-comment-sheet input { width: 100%; height: 40px; padding: 0; border: 0; outline: 0; background: transparent; color: #191918; font: 400 15px/24px Pretendard, sans-serif; letter-spacing: -.36px; }
         .fv-comment-sheet-actions { min-height: 36px; margin-top: 4px; display: flex; align-items: center; justify-content: space-between; }
         .fv-comment-save { width: 48px; height: 36px; padding: 0; border: 0; border-radius: 8px; background: #ff4d00; color: #fff; display: grid; place-items: center; }
         @media (prefers-reduced-motion: reduce) {
@@ -1562,7 +1560,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
               )}
             </div>
 
-            <span className="fs-panel-label" style={{ marginTop: 8 }}>사진별 요청</span>
+            <span className="fs-panel-label" style={{ marginTop: 8 }}>작가 전달 메모 · 모두 함께 수정</span>
             {isCommentEditing ? (
             <div style={{ display: "flex", alignItems: "flex-end", gap: 12, minWidth: 0 }}>
               <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "stretch", gap: 4, minWidth: 0 }}>
@@ -1571,19 +1569,21 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                 </div>
                 <div className="fs-comment-input-wrap">
                   <MessageSquare size={14} strokeWidth={1.8} className="fs-comment-input-icon" aria-hidden />
-                  <textarea
+                  <input
+                    type="text"
                     ref={pcCommentRef}
                     className="fs-comment-input"
                     value={draftComment}
+                    maxLength={COMMENT_MAX_LENGTH}
                     onChange={(e) => setDraftComment(e.target.value.slice(0, COMMENT_MAX_LENGTH))}
                     onBlur={() => { setIsCommentEditing(false); saveComment(); }}
                     onKeyDown={(e) => {
                       if (e.nativeEvent.isComposing) return;
-                      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") (e.target as HTMLTextAreaElement).blur();
+                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                     }}
-                    placeholder="사진별 요청을 입력해 주세요."
-                    aria-label="사진별 요청"
-                    style={{ width: "100%", padding: "11px 14px 11px 36px", minHeight: 88, borderRadius: 8, minWidth: 0 }}
+                    placeholder="작가에게 전달할 내용을 입력해 주세요."
+                    aria-label="작가 전달 메모"
+                    style={{ width: "100%", padding: "11px 14px 11px 36px", height: 42, borderRadius: 8, minWidth: 0 }}
                   />
                 </div>
               </div>
@@ -1595,17 +1595,17 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                 onClick={commentSaveStatus === "error" ? saveComment : openPcCommentEditor}
                 aria-label={
                   commentSaveStatus === "error"
-                    ? "사진별 요청 저장 실패, 다시 시도"
+                    ? "작가 전달 메모 저장 실패, 다시 시도"
                     : draftComment.trim()
-                      ? `사진별 요청 수정: ${draftComment.trim()}`
-                      : "사진별 요청 남기기"
+                      ? `작가 전달 메모 수정: ${draftComment.trim()}`
+                      : "작가 전달 메모 남기기"
                 }
               >
                 <MessageSquare size={14} strokeWidth={1.8} style={{ flexShrink: 0 }} aria-hidden />
                 <span className="fs-comment-toggle-text">
                   {commentSaveStatus === "error"
                     ? "저장 실패 · 다시 시도"
-                    : draftComment.trim() || "요청이 있다면 남겨주세요"}
+                    : draftComment.trim() || "작가에게 전달할 메모를 남겨주세요"}
                 </span>
               </button>
             )}
@@ -1931,7 +1931,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                   onClick={saveComment}
                   onTouchStart={(event) => event.stopPropagation()}
                   onTouchEnd={(event) => event.stopPropagation()}
-                  aria-label="코멘트 저장 실패, 다시 시도"
+                  aria-label="작가 전달 메모 저장 실패, 다시 시도"
                 >
                   <MessageSquare size={16} strokeWidth={1.8} style={{ flexShrink: 0 }} aria-hidden />
                   <span className="fv-comment-fab-text">저장 실패 · 재시도</span>
@@ -1943,7 +1943,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                   onClick={openCommentEditor}
                   onTouchStart={(event) => event.stopPropagation()}
                   onTouchEnd={(event) => event.stopPropagation()}
-                  aria-label={draftComment.trim() ? `코멘트 수정: ${draftComment.trim()}` : "코멘트 남기기"}
+                  aria-label={draftComment.trim() ? `작가 전달 메모 수정: ${draftComment.trim()}` : "작가 전달 메모 남기기"}
                 >
                   <MessageSquare size={16} strokeWidth={1.8} style={{ flexShrink: 0 }} aria-hidden />
                   {/* 3글자짜리 잘린 미리보기는 폭만 먹고 못 읽는다 — 유무만 점으로 알리고 내용은 시트에서 본다 */}
@@ -1978,7 +1978,8 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
             onTouchStart={(event) => event.stopPropagation()}
             onTouchEnd={(event) => event.stopPropagation()}
           >
-            <textarea
+            <input
+              type="text"
               ref={mobileCommentRef}
               autoFocus
               maxLength={COMMENT_MAX_LENGTH}
@@ -1988,8 +1989,8 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                 setIsCommentEditing(false);
                 saveComment();
               }}
-              placeholder="코멘트를 남기세요..."
-              aria-label="사진 코멘트"
+              placeholder="작가에게 전달할 메모를 입력하세요"
+              aria-label="작가 전달 메모"
             />
             <div className="fv-comment-sheet-actions">
               <span aria-live="polite">
@@ -2007,7 +2008,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                     setIsCommentEditing(false);
                   }
                 }}
-                aria-label="코멘트 저장"
+                aria-label="작가 전달 메모 저장"
               >
                 <Check size={17} strokeWidth={2.5} />
               </button>

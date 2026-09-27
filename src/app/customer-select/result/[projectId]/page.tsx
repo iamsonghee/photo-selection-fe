@@ -41,25 +41,12 @@ export default async function CustomerResultPage({ params }: { params: Promise<{
   const photoIds = (selections ?? []).map((row) => row.photo_id);
   if (selectionError || photoIds.length === 0) return <MessagePage title="선택된 사진이 없어요" description="고객에게 선택 결과를 다시 확인해달라고 요청해주세요." />;
 
-  const [photosResult, participantsResult, opinionsResult] = await Promise.all([
-    admin.from("customer_photos").select("id, filename, order_index, thumb_url, preview_url, similarity_group_id").eq("project_id", projectId).in("id", photoIds),
-    admin.from("customer_project_participants").select("color, nickname").eq("project_id", projectId),
-    admin.from("customer_participant_opinions").select("photo_id, participant_color, comment").eq("project_id", projectId).in("photo_id", photoIds).not("comment", "is", null),
-  ]);
-  if (photosResult.error || participantsResult.error || opinionsResult.error) {
+  const photosResult = await admin.from("customer_photos").select("id, filename, order_index, thumb_url, preview_url, similarity_group_id").eq("project_id", projectId).in("id", photoIds);
+  if (photosResult.error) {
     return <MessagePage title="결과를 불러오지 못했어요" description="잠시 후 다시 시도해주세요." />;
   }
 
-  const nicknames = new Map((participantsResult.data ?? []).map((row) => [row.color, row.nickname || "참가자"]));
-  const legacyComments = new Map((selections ?? []).map((row) => [row.photo_id, row.comment ?? ""]));
-  const comments: Record<string, { comment?: string }> = {};
-  for (const photoId of photoIds) {
-    const participantComments = (opinionsResult.data ?? [])
-      .filter((row) => row.photo_id === photoId && row.comment?.trim())
-      .map((row) => `${nicknames.get(row.participant_color) ?? "참가자"}: ${row.comment!.trim()}`);
-    const comment = participantComments.join(" · ") || legacyComments.get(photoId);
-    if (comment) comments[photoId] = { comment };
-  }
+  const comments = Object.fromEntries((selections ?? []).filter((row) => row.comment?.trim()).map((row) => [row.photo_id, { comment: row.comment!.trim() }]));
   const photos = (photosResult.data ?? []).sort((a, b) => a.order_index - b.order_index).map((row) => toPhoto(row, projectId));
 
   return (

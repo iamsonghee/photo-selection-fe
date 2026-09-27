@@ -17,7 +17,7 @@ function project(selectedCount: number) {
     id: "core-flow", name: "핵심 흐름 QA", shootType: "wedding", target: 10,
     photoCount: photos.length, uploaded: true, realtimeKey: "core-flow-qa", photos,
     selectedIds: photos.slice(0, selectedCount).map((photo) => photo.id),
-    photoStates: {}, participantOpinions: { p1: { blue: { rating: 4, comment: "표정이 좋아요" } } },
+    photoStates: { p1: { comment: "표정이 좋아요" } }, participantOpinions: { p1: { blue: { rating: 4 } } },
     participantDone: { red: false, blue: true }, participantNicknames: { red: "소유자", blue: "동행" },
     onlineParticipants: ["red", "blue"], participantViews: {}, shareToken: "", shareEnabled: true,
     exported: false, deliveryCount: 0, lastDeliveredAt: null,
@@ -37,6 +37,11 @@ async function mock(page: Page, selectedCount: number) {
     } });
     if (path.endsWith("/presence") || path.endsWith("/participants")) return route.fulfill({ json: { ok: true } });
     if (path.endsWith("/result-link")) return route.fulfill({ json: { url: "/customer-select/result/core-flow?result_token=fake" } });
+    if (path.endsWith("/selections") && request.method() === "POST") {
+      const body = request.postDataJSON();
+      if (body.photo_id === "p1" && Object.prototype.hasOwnProperty.call(body, "comment")) data.photoStates.p1 = { comment: body.comment ?? "" };
+      return route.fulfill({ json: { ok: true } });
+    }
     if (path.endsWith("/projects/core-flow") && request.method() === "PATCH") return route.fulfill({ json: { project: { ...data, exported: true } } });
     if (path.endsWith("/projects/core-flow") && request.method() === "GET") return route.fulfill({ json: { isOwner: true, project: data } });
     return route.fulfill({ json: { ok: true } });
@@ -80,14 +85,14 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   expect(viewerTexts).not.toContain("장 남음");
   expect(viewerTexts).not.toContain("전체 사진에서 더 고르기");
   if (viewport === "desktop") {
-    await page.getByRole("button", { name: "사진별 요청 남기기" }).click();
-    await page.getByRole("textbox", { name: "사진별 요청" }).fill("자동 저장 확인");
+    await page.getByRole("button", { name: /작가 전달 메모 수정/ }).click();
+    await page.getByRole("textbox", { name: "작가 전달 메모" }).fill("자동 저장 확인");
   } else {
-    await page.getByRole("button", { name: "코멘트 남기기" }).click();
-    await page.getByRole("textbox", { name: "사진 코멘트" }).fill("자동 저장 확인");
+    await page.getByRole("button", { name: /작가 전달 메모 수정/ }).click();
+    await page.getByRole("textbox", { name: "작가 전달 메모" }).fill("자동 저장 확인");
   }
   await expect(page.locator('span:visible', { hasText: "✓ 저장됨" })).toBeVisible();
-  if (viewport === "mobile") await page.getByRole("textbox", { name: "사진 코멘트" }).blur();
+  if (viewport === "mobile") await page.getByRole("textbox", { name: "작가 전달 메모" }).blur();
   await viewerReview.click();
   await expect(page).toHaveURL(/\/customer-select\/core-flow\/review/);
   await expect(page.getByRole("heading", { name: "핵심 흐름 QA", exact: true })).toBeVisible();
@@ -132,7 +137,7 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   expect(csvBox?.height).toBeGreaterThanOrEqual(40);
   expect(txtBox?.height).toBeGreaterThanOrEqual(40);
   expect([...csvBytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
-  expect(csvText).toContain("파일명,코멘트");
+  expect(csvText).toContain("파일명,작가 전달 메모");
   expect(csvText).toContain("유사컷02.jpg");
   expect(csvText).not.toContain("유사컷02.jpg".normalize("NFD"));
   expect(Math.abs((firstSelectedPhotoBox?.width ?? 0) - (firstSelectedPhotoBox?.height ?? 0))).toBeLessThanOrEqual(1);

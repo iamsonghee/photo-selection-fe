@@ -13,7 +13,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const [selections, participants, opinions, presence] = await Promise.all([
     admin.from("customer_selections").select("photo_id, rating, color_tags, comment, is_selected").eq("project_id", id),
     admin.from("customer_project_participants").select("color, nickname, done").eq("project_id", id),
-    admin.from("customer_participant_opinions").select("photo_id, participant_color, rating, comment").eq("project_id", id),
+    admin.from("customer_participant_opinions").select("photo_id, participant_color, rating").eq("project_id", id),
     admin.from("customer_participant_presence").select("participant_color, current_photo_id").eq("project_id", id).gte("last_seen_at", new Date(Date.now() - 30_000).toISOString()),
   ]);
   if (selections.error || participants.error || opinions.error || presence.error) {

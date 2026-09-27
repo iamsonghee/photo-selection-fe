@@ -29,8 +29,8 @@ async function identifyAs(context: BrowserContext, color: string, initial: strin
 }
 
 async function openPcComment(page: Page) {
-  await page.getByRole("button", { name: /사진별 요청 (남기기|수정)/ }).click();
-  return page.getByRole("textbox", { name: "사진별 요청" });
+  await page.getByRole("button", { name: /작가 전달 메모 (남기기|수정)/ }).click();
+  return page.getByRole("textbox", { name: "작가 전달 메모" });
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -140,7 +140,7 @@ test("C3: 다른 탭의 코멘트가 5초 폴링 후 현재 뷰어 입력창에 
   await commentB.fill(remoteComment);
   await commentB.blur();
 
-  const remoteCommentButton = pageA.getByRole("button", { name: `사진별 요청 수정: ${remoteComment}` });
+  const remoteCommentButton = pageA.getByRole("button", { name: `작가 전달 메모 수정: ${remoteComment}` });
   await expect(remoteCommentButton).toBeVisible({ timeout: 8_000 });
   const commentA = await openPcComment(pageA);
   await expect(commentA).toHaveValue(remoteComment);
@@ -169,7 +169,7 @@ test("C4: 코멘트 저장 실패 → 오류를 알리고 서버 값은 유지�
   await comment.blur();
 
   await expect(page.getByText("저장에 실패했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "사진별 요청 저장 실패, 다시 시도" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "작가 전달 메모 저장 실패, 다시 시도" })).toBeVisible();
   const saved = await page.request.get(
     `/api/c/selections?token=${encodeURIComponent(project.accessToken)}&project_id=${encodeURIComponent(project.projectId)}`
   );

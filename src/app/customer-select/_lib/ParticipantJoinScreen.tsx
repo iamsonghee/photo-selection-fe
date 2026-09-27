@@ -38,7 +38,7 @@ export function ParticipantJoinScreen() {
       <form className={ui.joinCard} onSubmit={submit}>
         <span className={ui.joinEyebrow}>사진 셀렉 초대</span>
         <h1>{project.name || "사진 셀렉"}에<br />함께 참여해 주세요</h1>
-        <p>찜과 의견은 함께 고르는 사람에게 표시돼요. 최종 사진은 프로젝트를 만든 사람이 결정합니다.</p>
+        <p>찜과 별점은 서로 볼 수 있고, 작가에게 남길 메모는 함께 수정해요. 최종 사진은 프로젝트를 만든 사람이 결정합니다.</p>
 
         {existing.length > 0 && <section className={ui.joinResume}>
           <strong>이미 참여했다면</strong>

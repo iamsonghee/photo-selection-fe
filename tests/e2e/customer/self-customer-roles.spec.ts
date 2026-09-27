@@ -11,15 +11,15 @@ test("shared participant can leave opinions but cannot change the final selectio
     await route.fulfill({ json: { isOwner: false, project: {
       id: "role-check", name: "권한 확인", shootType: "wedding", target: 30, photoCount: 1, uploaded: true,
       photos: [{ id: "p1", projectId: "role-check", orderIndex: 0, url: "", previewUrl: "", originalFilename: "A001.jpg" }],
-      selectedIds: ["p1"], photoStates: { p1: { color: ["blue"] } },
-      participantOpinions: { p1: { blue: { rating: 4, comment: "표정이 좋아요" } } },
+      selectedIds: ["p1"], photoStates: { p1: { color: ["blue"], comment: "표정이 좋아요" } },
+      participantOpinions: { p1: { blue: { rating: 4 } } },
       participantDone: { red: false, blue: false }, participantNicknames: { red: "나", blue: "동행" },
       shareToken: "", shareEnabled: true, exported: false,
     } } });
   });
   await page.route("**/api/customer-select/projects/role-check/participants", async (route) => route.fulfill({ json: { ok: true } }));
   await page.route("**/api/customer-select/projects/role-check/sync", async (route) => route.fulfill({ json: {
-    selectedIds: ["p1"], photoStates: { p1: { color: ["blue"] } }, participantOpinions: { p1: { blue: { rating: 4, comment: "표정이 좋아요" } } },
+    selectedIds: ["p1"], photoStates: { p1: { color: ["blue"], comment: "표정이 좋아요" } }, participantOpinions: { p1: { blue: { rating: 4 } } },
     participantDone: { red: false, blue: false }, participantNicknames: { red: "나", blue: "동행" }, onlineParticipants: [], participantViews: {}, exported: false, deliveryCount: 0, lastDeliveredAt: null,
   } }));
   await page.route("**/api/customer-select/projects/role-check/selections", async (route) => {
@@ -36,7 +36,7 @@ test("shared participant can leave opinions but cannot change the final selectio
     await expect(page.locator('[data-photo-id="p1"] .gl-check-box')).toHaveCount(0);
 
     await page.locator('[data-photo-id="p1"]').click();
-    await expect(width < 768 ? page.getByText("표정이 좋아요").last() : page.getByText("표정이 좋아요").first()).toBeVisible();
+    await expect(page.locator('button:visible[aria-label="작가 전달 메모 수정: 표정이 좋아요"]')).toBeVisible();
     await expect(page.getByRole("button", { name: "사진 선택 해제" })).toHaveCount(0);
     await page.keyboard.press("Space");
   }

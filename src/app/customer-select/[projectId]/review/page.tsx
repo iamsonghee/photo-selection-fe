@@ -53,17 +53,11 @@ export default function CustomerReviewPage() {
   const visibleSelected = showAllSelected || !collapseSelected ? selected : selected.slice(0, INITIAL_VISIBLE_PHOTOS);
   const requested = requestedPhotoIds(project);
   const match = tasteMatchPct(project);
-  const reviewMeta = [requested.length > 0 ? `보정 요청 ${requested.length.toLocaleString()}장` : "", match !== null ? `취향 일치 ${match}%` : ""].filter(Boolean).join(" · ");
+  const reviewMeta = [requested.length > 0 ? `전달 메모 ${requested.length.toLocaleString()}장` : "", match !== null ? `취향 일치 ${match}%` : ""].filter(Boolean).join(" · ");
   const done = bothDone(project);
   const waiting = activeParticipants(project).filter((p) => p.id !== currentIdentity && !project.participantDone[p.id]);
   const exportSelection = selected.map((photo) => ({ id: photo.id, name: getPhotoDisplayName(photo) }));
-  const comments = Object.fromEntries(project.photos.map(({ id }) => [
-    id,
-    Object.entries(project.participantOpinions[id] ?? {})
-      .filter(([, opinion]) => Boolean(opinion?.comment))
-      .map(([color, opinion]) => `${project.participantNicknames[color] || "참가자"}: ${opinion?.comment}`)
-      .join(" · ") || project.photoStates[id]?.comment,
-  ]));
+  const comments = Object.fromEntries(project.photos.map(({ id }) => [id, project.photoStates[id]?.comment]));
   const exportText = buildExportText(exportSelection, comments);
   const exportBaseName = `${sanitizeFilenamePart(project.name || "사진셀렉")}_selections`;
 
@@ -83,7 +77,7 @@ export default function CustomerReviewPage() {
 
   function handleDownloadCsv() {
     const rows = exportSelection.map(({ id, name }) => [csvEscape(name), csvEscape(comments[id] ?? "")].join(","));
-    downloadTextFile(`${exportBaseName}.csv`, ["파일명,코멘트", ...rows].join("\n"), "text/csv;charset=utf-8");
+    downloadTextFile(`${exportBaseName}.csv`, ["파일명,작가 전달 메모", ...rows].join("\n"), "text/csv;charset=utf-8");
   }
 
   function handleDownloadTxt() {
@@ -135,7 +129,7 @@ export default function CustomerReviewPage() {
                 <button key={p.id} type="button" className={ui.reviewThumbButton} aria-label={`${getPhotoDisplayName(p)} 크게 보기`} onClick={() => setFocusIndex(index)}>
                   <PhotoThumbnailFrame className={ui.reviewThumb}>
                     <img src={p.url} alt="" />
-                    {project.photoStates[p.id]?.comment && <span className={ui.reviewCommentBadge} aria-label="보정 요청 있음">요청</span>}
+                    {project.photoStates[p.id]?.comment && <span className={ui.reviewCommentBadge} aria-label="작가 전달 메모 있음">메모</span>}
                   </PhotoThumbnailFrame>
                   <span className={ui.reviewFilename}>{getPhotoDisplayName(p)}</span>
                 </button>
@@ -151,21 +145,18 @@ export default function CustomerReviewPage() {
 
           {requested.length > 0 ? <section className={ui.reviewSection}>
             <p className={ui.label} style={{ marginBottom: 8 }}>
-              보정 요청이 있는 사진
+              작가 전달 메모가 있는 사진
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {requested.map((id) => {
                   const p = project.photos.find((x) => x.id === id)!;
-                  const comments = Object.entries(project.participantOpinions[id] ?? {})
-                    .filter(([, opinion]) => Boolean(opinion?.comment))
-                    .map(([color, opinion]) => `${project.participantNicknames[color] || "참가자"}: ${opinion?.comment}`);
-                  if (!comments.length && project.photoStates[id]?.comment) comments.push(`기존 의견: ${project.photoStates[id].comment}`);
+                  const comment = project.photoStates[id]?.comment;
                   return (
                     <div key={id} className={ui.reqItem}>
                       <img src={p.previewUrl ?? p.url} alt="" />
                       <span>
                         <span className={ui.reqFilename}>{getPhotoDisplayName(p)}</span>
-                        <span className={ui.reqText}>{comments.join(" · ")}</span>
+                        <span className={ui.reqText}>{comment}</span>
                       </span>
                     </div>
                   );
@@ -192,7 +183,7 @@ export default function CustomerReviewPage() {
                 <PhotographerLightButton variant="outline" size="toolbar" aria-label="CSV 다운로드" onClick={handleDownloadCsv}><FileSpreadsheet size={16} aria-hidden />CSV 다운로드</PhotographerLightButton>
                 <PhotographerLightButton variant="outline" size="toolbar" aria-label="TXT 다운로드" onClick={handleDownloadTxt}><FileText size={16} aria-hidden />TXT 다운로드</PhotographerLightButton>
               </div>
-              <span className={ui.supportText}>CSV에는 참여자 의견이 함께 담기고, TXT에는 파일명만 담겨요.</span>
+              <span className={ui.supportText}>CSV에는 작가 전달 메모가 함께 담기고, TXT에는 파일명만 담겨요.</span>
             </details>
           </section>
 

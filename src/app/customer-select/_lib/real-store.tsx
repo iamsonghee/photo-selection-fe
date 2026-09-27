@@ -34,7 +34,7 @@ export interface ProjectView {
   photos: Photo[];
   selectedIds: string[];
   photoStates: Record<string, { rating?: StarRating; color?: ColorTag[]; comment?: string }>;
-  participantOpinions: Record<string, Partial<Record<ColorTag, { rating?: StarRating; comment?: string }>>>;
+  participantOpinions: Record<string, Partial<Record<ColorTag, { rating?: StarRating }>>>;
   participantDone: Record<string, boolean>;
   participantNicknames: Record<string, string>;
   onlineParticipants: ColorTag[];
@@ -78,7 +78,7 @@ function withCurrentOpinions(project: ProjectView, identity: ColorTag): ProjectV
   for (const [photoId, opinions] of Object.entries(project.participantOpinions)) {
     const own = opinions[identity];
     if (!own) continue;
-    photoStates[photoId] = { ...photoStates[photoId], rating: own.rating, comment: own.comment };
+    photoStates[photoId] = { ...photoStates[photoId], rating: own.rating };
   }
   return { ...project, photoStates };
 }
@@ -418,25 +418,17 @@ export function CustomerSelectStoreProvider({
       setProject((prev) => ({
         ...prev,
         photoStates: { ...prev.photoStates, [photoId]: { ...prev.photoStates[photoId], comment: trimmed } },
-        participantOpinions: {
-          ...prev.participantOpinions,
-          [photoId]: { ...prev.participantOpinions[photoId], [currentIdentity]: { ...prev.participantOpinions[photoId]?.[currentIdentity], comment: trimmed } },
-        },
       }));
-      void apiPost("/selections", { photo_id: photoId, participant_color: currentIdentity, comment: trimmed ?? null }, () => {
+      void apiPost("/selections", { photo_id: photoId, comment: trimmed ?? null }, () => {
         setProject((prev) => ({
           ...prev,
           photoStates: { ...prev.photoStates, [photoId]: { ...prev.photoStates[photoId], comment: prevComment } },
-          participantOpinions: {
-            ...prev.participantOpinions,
-            [photoId]: { ...prev.participantOpinions[photoId], [currentIdentity]: { ...prev.participantOpinions[photoId]?.[currentIdentity], comment: prevComment } },
-          },
         }));
       }).then((saved) => {
         if (commentWriteVersionsRef.current[photoId] === version) setCommentSaveStatus(photoId, saved ? "saved" : "error");
       });
     },
-    [apiPost, currentIdentity, project.photoStates, setCommentSaveStatus]
+    [apiPost, project.photoStates, setCommentSaveStatus]
   );
 
   const toggleDone = useCallback(
@@ -534,17 +526,6 @@ export function activeParticipants(project: ProjectView): { id: ColorTag; name: 
   }));
 }
 
-export function reviewedPhotoIds(project: ProjectView): string[] {
-  const set = new Set<string>(project.selectedIds);
-  Object.entries(project.photoStates).forEach(([id, s]) => {
-    if (s.rating || s.comment || (s.color && s.color.length > 0)) set.add(id);
-  });
-  Object.entries(project.participantOpinions).forEach(([id, opinions]) => {
-    if (Object.values(opinions).some((opinion) => opinion?.rating || opinion?.comment)) set.add(id);
-  });
-  return Array.from(set);
-}
-
 export function likedBy(project: ProjectView, identity: ColorTag): string[] {
   return Object.entries(project.photoStates)
     .filter(([, s]) => s.color?.includes(identity))
@@ -576,9 +557,5 @@ export function bothDone(project: ProjectView): boolean {
 }
 
 export function requestedPhotoIds(project: ProjectView): string[] {
-  const ids = new Set(Object.entries(project.photoStates).filter(([, state]) => Boolean(state.comment)).map(([id]) => id));
-  Object.entries(project.participantOpinions)
-    .filter(([, opinions]) => Object.values(opinions).some((opinion) => Boolean(opinion?.comment)))
-    .forEach(([id]) => ids.add(id));
-  return Array.from(ids);
+  return Object.entries(project.photoStates).filter(([, state]) => Boolean(state.comment)).map(([id]) => id);
 }

@@ -197,7 +197,7 @@ test.describe("고객 — 갤러리 (사진 선택)", () => {
     const firstFrame = firstCard.locator("[data-photo-thumbnail-frame]");
     await expect(pageWrapper).toHaveClass(/gl-density-2/);
     await expect(page.getByText("두 손가락으로 사진 크기를 조절해 보세요")).toHaveCount(0);
-    const commentIndicator = page.getByRole("img", { name: "코멘트 있음" });
+    const commentIndicator = firstCard.locator(".gl-comment-indicator");
     const colorDot = firstCard.locator(".gl-color-dot").first();
     await expect(commentIndicator).toBeVisible();
     await expect(colorDot).toBeVisible();
@@ -211,18 +211,18 @@ test.describe("고객 — 갤러리 (사진 선택)", () => {
 
     await page.getByRole("button", { name: "현재 2열, 누르면 3열로 변경" }).click();
     await expect(pageWrapper).toHaveClass(/gl-density-3/);
-    await expect(page.getByRole("img", { name: "코멘트 있음" })).toBeHidden();
-    await expect(firstCard).toHaveCSS("border-top-width", "0px");
+    await expect(commentIndicator).toBeVisible();
+    await expect(firstCard).toHaveCSS("border-top-width", "1px");
     await expect(firstFrame).toHaveCSS("border-top-width", "0px");
 
     await page.getByRole("button", { name: "현재 3열, 누르면 4열로 변경" }).click();
     await expect(pageWrapper).toHaveClass(/gl-density-4/);
-    await expect(firstCard).toHaveCSS("border-top-width", "0px");
+    await expect(firstCard).toHaveCSS("border-top-width", "1px");
     await expect(firstFrame).toHaveCSS("border-top-width", "0px");
 
     await page.getByRole("button", { name: "현재 4열, 누르면 2열로 변경" }).click();
     await expect(pageWrapper).toHaveClass(/gl-density-2/);
-    await expect(page.getByRole("img", { name: "코멘트 있음" })).toBeVisible();
+    await expect(commentIndicator).toBeVisible();
   });
 
   test("S1-3: 모바일 하단 선택 영역은 진행선과 48px CTA로 압축한다", async ({ page }) => {

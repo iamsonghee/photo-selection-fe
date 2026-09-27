@@ -12,17 +12,18 @@ test("selection and participant completion sync between sessions without a reloa
 
   let participantDone = false;
   let selected = false;
+  let sharedComment = "";
   const online = new Set<string>();
   const views: Record<string, string | null> = {};
   const project = () => ({
     id: "live-sync", name: "실시간 확인", shootType: "wedding", target: 30, photoCount: 1, uploaded: true, realtimeKey: "live-sync-e2e",
     photos: [{ id: "p1", projectId: "live-sync", orderIndex: 0, url: "", previewUrl: "", originalFilename: "A001.jpg" }],
-    selectedIds: selected ? ["p1"] : [], photoStates: {}, participantOpinions: {},
+    selectedIds: selected ? ["p1"] : [], photoStates: sharedComment ? { p1: { comment: sharedComment } } : {}, participantOpinions: {},
     participantDone: { red: false, blue: participantDone }, participantNicknames: { red: "소유자", blue: "동행" },
     shareToken: "", shareEnabled: true, exported: false, deliveryCount: 0, lastDeliveredAt: null,
   });
   const collaboration = () => ({
-    selectedIds: selected ? ["p1"] : [], photoStates: {}, participantOpinions: {},
+    selectedIds: selected ? ["p1"] : [], photoStates: sharedComment ? { p1: { comment: sharedComment } } : {}, participantOpinions: {},
     participantDone: { red: false, blue: participantDone }, participantNicknames: { red: "소유자", blue: "동행" },
     onlineParticipants: [...online], participantViews: { ...views }, exported: false, deliveryCount: 0, lastDeliveredAt: null,
   });
@@ -47,6 +48,7 @@ test("selection and participant completion sync between sessions without a reloa
     await page.route("**/api/customer-select/projects/live-sync/selections", async (route) => {
       const body = route.request().postDataJSON();
       if (typeof body.is_selected === "boolean") selected = body.is_selected;
+      if (Object.prototype.hasOwnProperty.call(body, "comment")) sharedComment = body.comment ?? "";
       await route.fulfill({ json: { ok: true } });
     });
   }
@@ -65,6 +67,10 @@ test("selection and participant completion sync between sessions without a reloa
   const samePhoto = owner.getByRole("button", { name: "동행님이 보는 A001.jpg 열기" }).first();
   await expect(samePhoto).toBeVisible({ timeout: 5000 });
   await samePhoto.click();
+  await participant.getByRole("button", { name: "작가 전달 메모 남기기" }).click();
+  await participant.getByRole("textbox", { name: "작가 전달 메모" }).fill("조금 밝게 부탁드려요");
+  await participant.getByRole("textbox", { name: "작가 전달 메모" }).blur();
+  await expect(owner.locator('button:visible[aria-label="작가 전달 메모 수정: 조금 밝게 부탁드려요"]')).toBeVisible({ timeout: 5000 });
   await participant.getByRole("button", { name: "대화 열기" }).click();
   await participant.getByLabel("일회성 메시지").fill("이 사진 같이 볼까요?");
   await expect(owner.getByRole("complementary", { name: "일회성 대화" })).toHaveAttribute("data-chat-connected", "true", { timeout: 10000 });
@@ -91,7 +97,7 @@ test("result link copy does not complete or lock the project", async ({ page }) 
     await route.fulfill({ json: { isOwner: true, project: {
       id: "delivery-sync", name: "전달 확인", shootType: "wedding", target: 1, photoCount: 1, uploaded: true,
       photos: [{ id: "p1", projectId: "delivery-sync", orderIndex: 0, url: "", previewUrl: "", originalFilename: "A001.jpg" }],
-      selectedIds: ["p1"], photoStates: {}, participantOpinions: { p1: { blue: { comment: '좋아요, "밝게"' } } }, participantDone: { red: false, blue: true },
+      selectedIds: ["p1"], photoStates: { p1: { comment: '좋아요, "밝게"' } }, participantOpinions: {}, participantDone: { red: false, blue: true },
       participantNicknames: { red: "소유자", blue: "동행" }, shareToken: "", shareEnabled: true,
       exported: false, deliveryCount: 0, lastDeliveredAt: null,
     } } });
@@ -100,7 +106,7 @@ test("result link copy does not complete or lock the project", async ({ page }) 
   await page.route("**/api/customer-select/projects/delivery-sync/presence", async (route) => route.fulfill({ json: { ok: true } }));
   await page.route("**/api/customer-select/projects/delivery-sync/sync", async (route) => {
     await route.fulfill({ json: {
-      selectedIds: ["p1"], photoStates: {}, participantOpinions: { p1: { blue: { comment: '좋아요, "밝게"' } } }, participantDone: { red: false, blue: true },
+      selectedIds: ["p1"], photoStates: { p1: { comment: '좋아요, "밝게"' } }, participantOpinions: {}, participantDone: { red: false, blue: true },
       participantNicknames: { red: "소유자", blue: "동행" }, onlineParticipants: ["red", "blue"], participantViews: {}, exported: false, deliveryCount: 0, lastDeliveredAt: null,
     } });
   });
@@ -118,7 +124,7 @@ test("result link copy does not complete or lock the project", async ({ page }) 
   expect(csvDownload.suggestedFilename()).toBe("전달 확인_selections.csv");
   let csv = "";
   for await (const chunk of await csvDownload.createReadStream()) csv += chunk.toString();
-  expect(csv).toBe('파일명,코멘트\nA001.jpg,"동행: 좋아요, ""밝게"""');
+  expect(csv).toBe('\ufeff파일명,작가 전달 메모\nA001.jpg,"좋아요, ""밝게"""');
 
   const [txtDownload] = await Promise.all([
     page.waitForEvent("download"),

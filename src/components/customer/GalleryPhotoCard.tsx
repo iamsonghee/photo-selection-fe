@@ -149,7 +149,7 @@ function GalleryPhotoCardImpl({
       </div>
       <div className="gl-marker-row" style={{ display: "flex", gap: 4, alignItems: "center" }}>
         {hasComment && (
-          <span className="gl-comment-indicator" role="img" aria-label="코멘트 있음" title="코멘트 있음">
+          <span className="gl-comment-indicator" role="img" aria-label="작가 전달 메모 있음" title="작가 전달 메모 있음">
             <MessageSquare size={13} strokeWidth={2} aria-hidden />
           </span>
         )}
