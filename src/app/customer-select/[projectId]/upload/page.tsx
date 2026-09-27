@@ -463,16 +463,22 @@ export default function CustomerUploadPage() {
           <div className={`grid w-full grid-cols-[36px_minmax(0,1fr)] items-center gap-1 px-5 transition-[padding-block] duration-200 md:flex md:gap-2 md:px-8 ${compactHeader ? "py-1" : "py-1.5"}`}>
             <button type="button" onClick={() => router.push(`/customer-select/${projectId}`)} className={`grid shrink-0 place-items-center rounded-lg text-muted-foreground transition-[width,height] hover:bg-surface-raised hover:text-foreground ${compactHeader ? "size-9" : "size-10"}`} aria-label="프로젝트 현황으로"><ChevronLeft size={19} /></button>
             <div className="min-w-0 flex-1">
-              <h1 className={`truncate font-bold tracking-[-0.025em] text-foreground transition-[font-size] ${compactHeader ? "text-[14px]" : "text-[18px] md:text-[19px]"}`}>{displayName}</h1>
+              <h1 className={`truncate font-bold tracking-[-0.025em] text-foreground transition-[font-size] ${compactHeader ? "text-[14px]" : "text-[17px] md:text-[19px]"}`}>{displayName}</h1>
               {!compactHeader ? <p className="mt-0.5 text-[12px] text-muted-foreground">전체 이용량 {accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${MAX_PHOTOS.toLocaleString()}장 · ${accountUsage.remaining.toLocaleString()}장 남음` : "확인 중"}</p> : null}
             </div>
-            <div className="col-span-2 flex items-center justify-end gap-2 md:contents">
+            <div className="hidden items-center justify-end gap-2 md:contents">
             <PhotographerLightButton variant="outline" size="toolbar" className="max-md:size-11 max-md:px-0" onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}><Sparkles size={16} /><span className="max-md:hidden">{aiAnalyzing ? "분석 중" : aiCompleted ? "다시 분석" : "AI 분석"}</span></PhotographerLightButton>
             <PhotographerLightButton size="toolbar" className="max-md:px-3" onClick={() => inputRef.current?.click()} disabled={uploading || photoSetLocked}><ImagePlus size={16} />사진 추가</PhotographerLightButton>
             </div>
           </div>
           <div className="flex min-h-11 w-full items-center justify-between gap-3 border-t border-border-subtle px-5 py-1 max-md:flex-wrap max-md:gap-1.5 md:px-8">
-            <ProjectAssetToolbarSummary label="사진" count={nameFilter.trim() ? `${visiblePhotos.length.toLocaleString()} / ${displayedPhotos.length.toLocaleString()}장` : `${displayedPhotos.length.toLocaleString()}장`} meta={uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 분석 완료" : displayedPhotos.length > 0 ? <span className="max-md:hidden">드래그하거나 체크해 여러 장 선택</span> : undefined} />
+            <div className="flex min-w-0 items-center justify-between gap-2 max-md:w-full">
+              <ProjectAssetToolbarSummary label="사진" count={nameFilter.trim() ? `${visiblePhotos.length.toLocaleString()} / ${displayedPhotos.length.toLocaleString()}장` : `${displayedPhotos.length.toLocaleString()}장`} meta={uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 분석 완료" : displayedPhotos.length > 0 ? <span className="max-md:hidden">드래그하거나 체크해 여러 장 선택</span> : undefined} />
+              <div className="flex shrink-0 items-center gap-1.5 md:hidden">
+                <PhotographerLightButton variant="outline" size="toolbar" className="px-3" onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}><Sparkles size={16} />{aiAnalyzing ? "분석 중" : aiCompleted ? "다시 분석" : "AI 분석"}</PhotographerLightButton>
+                <PhotographerLightButton size="toolbar" className="px-3" onClick={() => inputRef.current?.click()} disabled={uploading || photoSetLocked}><ImagePlus size={16} />사진 추가</PhotographerLightButton>
+              </div>
+            </div>
             <div className="flex min-w-0 items-center gap-1.5 max-md:w-full">
               <FilenameSearchInput value={nameFilter} onChange={setNameFilter} placeholder="파일명 검색" className="max-md:flex-1" style={{ "--fsi-width": "220px" } as React.CSSProperties} />
               <PhotoSortSelect value={sort} onChange={setSort} options={[{ value: "order-asc", label: "업로드 순" }, { value: "order-desc", label: "최근 순" }, { value: "name-asc", label: "파일명 순" }]} />
