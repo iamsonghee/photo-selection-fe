@@ -24,6 +24,7 @@ import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
 import { GalleryMobileToolbar } from "@/components/customer/GalleryMobileToolbar";
 import CustomerSelectionViewer, { type CustomerSelectionViewerAdapter } from "@/components/customer/CustomerSelectionViewer";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { useDesktopViewport } from "@/hooks/useDesktopViewport";
 import { SelectionContextOverride, type SelectionContextValue } from "@/contexts/SelectionContext";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import type { ColorTag, Project, SortOrder, StarRating } from "@/types";
@@ -36,6 +37,7 @@ import { collapseSimilarityGroups, galleryAnchorPhotoId } from "../../_lib/galle
 import { NicknamePrompt } from "../../_lib/NicknamePrompt";
 import { ParticipantAccessEndedScreen, ParticipantJoinScreen } from "../../_lib/ParticipantJoinScreen";
 import { EphemeralChat } from "../../_lib/EphemeralChat";
+import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import ui from "../../_lib/ui.module.css";
 
 type Tab = "all" | "selected" | "disagree";
@@ -55,6 +57,7 @@ export default function CustomerSelectGalleryPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const router = useRouter();
+  const desktop = useDesktopViewport();
   const { project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, setViewingPhoto, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, saveError, clearSaveError } =
     useCustomerSelectStore();
 
@@ -359,6 +362,16 @@ export default function CustomerSelectGalleryPage() {
   if (!isOwner && !participantReady) return <ParticipantJoinScreen />;
 
   return (
+    <CustomerSelectShell
+      viewportLocked
+      compactHeader={!desktop || compactHeader}
+      compactTitle={<h1><Link href="/customer-select" className="block max-w-[calc(100vw-72px)] truncate text-[14px] font-bold tracking-[-0.02em] text-foreground hover:text-accent md:max-w-[min(32vw,420px)] md:text-[16px]">{project.name || "이름 없는 프로젝트"}</Link></h1>}
+      headerMeta={<div className="flex items-center gap-3"><div className={ui.selectParticipants}>{participants.map((participant) => participant.id === currentIdentity
+        ? <NicknamePrompt key={participant.id} hex={participant.hex} isDone={Boolean(project.participantDone[participant.id])} online={onlineParticipants.has(participant.id)} />
+        : viewingNames[participant.id] && onlineParticipants.has(participant.id)
+          ? <button key={participant.id} type="button" className={`${ui.participantPill} ${ui.participantViewTarget} ${project.participantDone[participant.id] ? ui.participantDone : ""}`} onClick={() => setOpenPhotoId(project.participantViews[participant.id] ?? null)} aria-label={`${participant.name}님이 보는 ${viewingNames[participant.id]} 열기`}><i style={{ background: participant.hex }} />{participant.name} · {viewingNames[participant.id]}<span className={ui.participantOnline}>보는 중</span></button>
+          : <span key={participant.id} className={`${ui.participantPill} ${project.participantDone[participant.id] ? ui.participantDone : ""}`}><i style={{ background: participant.hex }} />{participant.name} {project.participantDone[participant.id] ? "완료" : "고르는 중"}{onlineParticipants.has(participant.id) ? <span className={ui.participantOnline}>온라인</span> : null}</span>)}</div><div className={ui.selectHeaderActions}>{participants.length > 1 && <button type="button" className={`${ui.selectHeaderButton} ${ui.selectDoneButton}`} aria-pressed={Boolean(project.participantDone[currentIdentity])} onClick={() => toggleDone(currentIdentity)}><CheckCircle2 size={15} />{project.participantDone[currentIdentity] ? "선택 다시 열기" : "내 선택 완료"}</button>}{isOwner && <button type="button" className={ui.selectHeaderButton} onClick={handleShare}><Share2 size={15} />{project.shareEnabled ? (shareCopied ? "복사됨" : "공유") : "공유 중지됨"}</button>}<div className="gld-selected"><span className="gld-selected-label">선택</span><span className="gld-selected-count">{selectedCount} <span>/ {target}</span></span></div></div></div>}
+    >
     <div className={ui.selectWorkspace}>
       {syncStatus !== "connected" && (
         <div role="status" className={syncStatus === "offline" ? "border-b border-danger/20 bg-danger/8 px-5 py-2 text-center text-xs font-semibold text-danger" : "border-b border-border-subtle bg-surface px-5 py-2 text-center text-xs font-semibold text-muted-foreground"}>
@@ -424,33 +437,10 @@ export default function CustomerSelectGalleryPage() {
             densityControl={<div className={ui.selectDesktopDensity} role="group" aria-label="사진 크기">
               {(["compact", "standard", "large"] as const).map((density, index) => <button key={density} type="button" aria-pressed={desktopDensity === density} title={`${["작게", "보통", "크게"][index]} 보기`} onClick={() => applyDesktopDensity(density)}>{["작게", "보통", "크게"][index]}</button>)}
             </div>}
-            summaryContent={<>
-              <div className={ui.selectParticipants}>
-                {participants.map((participant) => participant.id === currentIdentity
-                  ? <NicknamePrompt key={participant.id} hex={participant.hex} isDone={Boolean(project.participantDone[participant.id])} online={onlineParticipants.has(participant.id)} />
-                  : viewingNames[participant.id] && onlineParticipants.has(participant.id)
-                    ? <button key={participant.id} type="button" className={`${ui.participantPill} ${ui.participantViewTarget} ${project.participantDone[participant.id] ? ui.participantDone : ""}`} onClick={() => setOpenPhotoId(project.participantViews[participant.id] ?? null)} aria-label={`${participant.name}님이 보는 ${viewingNames[participant.id]} 열기`}><i style={{ background: participant.hex }} />{participant.name} · {viewingNames[participant.id]}<span className={ui.participantOnline}>보는 중</span></button>
-                    : <span key={participant.id} className={`${ui.participantPill} ${project.participantDone[participant.id] ? ui.participantDone : ""}`}><i style={{ background: participant.hex }} />{participant.name} {project.participantDone[participant.id] ? "완료" : "고르는 중"}{onlineParticipants.has(participant.id) ? <span className={ui.participantOnline}>온라인</span> : null}</span>)}
-              </div>
-              <div className={ui.selectHeaderActions}>
-                {participants.length > 1 && <button type="button" className={`${ui.selectHeaderButton} ${ui.selectDoneButton}`} aria-pressed={Boolean(project.participantDone[currentIdentity])} onClick={() => toggleDone(currentIdentity)}><CheckCircle2 size={15} />{project.participantDone[currentIdentity] ? "선택 다시 열기" : "내 선택 완료"}</button>}
-                {isOwner && <button type="button" className={ui.selectHeaderButton} onClick={handleShare}><Share2 size={15} />{project.shareEnabled ? (shareCopied ? "복사됨" : "공유") : "공유 중지됨"}</button>}
-                <div className="gld-selected"><span className="gld-selected-label">선택</span><span className="gld-selected-count">{selectedCount} <span>/ {target}</span></span></div>
-              </div>
-            </>}
           />
         </div>
         <div className={`${ui.selectHeader} ${compactHeader ? ui.selectHeaderCompact : ""}`}>
           <div className={ui.selectHeaderTop}>
-            <div className={ui.selectTitleGroup}>
-              <Link href="/customer-select" className={ui.selectBrandLink} aria-label="셀프 고객 메인으로 이동">
-                <span className={ui.selectBrandMark} aria-hidden>A</span>
-              </Link>
-              <div>
-                <span className={ui.selectEyebrow}>사진 셀렉</span>
-                <strong className={ui.selectProjectName}>{project.name || "이름 없는 프로젝트"}</strong>
-              </div>
-            </div>
             <div className={ui.selectParticipants}>
               {participants.map((p) => {
                 const isDone = project.participantDone[p.id];
@@ -483,7 +473,6 @@ export default function CustomerSelectGalleryPage() {
           </div>
 
           <GalleryMobileToolbar
-            leading={compactHeader ? <Link href="/customer-select" className={ui.selectBrandLink} aria-label="셀프 고객 메인으로 이동"><span className={ui.selectBrandMark} aria-hidden>A</span></Link> : undefined}
             compact={compactHeader}
             scopeOptions={[
               { value: "all", label: "전체 사진", count: project.photos.length },
@@ -613,5 +602,6 @@ export default function CustomerSelectGalleryPage() {
         </SelectionContextOverride>
       )}
     </div>
+    </CustomerSelectShell>
   );
 }
