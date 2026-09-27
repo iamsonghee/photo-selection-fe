@@ -78,15 +78,14 @@ test("selection and participant completion sync between sessions without a reloa
   await participantContext.close();
 });
 
-test("delivery refreshes collaboration state immediately before completion", async ({ page }) => {
+test("result link copy does not complete or lock the project", async ({ page }) => {
   await loginAsPhotographer(page);
-  let syncCalls = 0;
-  let requiredSyncCalls = 0;
+  let projectPatches = 0;
+  let resultLinkCalls = 0;
   await page.route("**/api/customer-select/projects/delivery-sync", async (route) => {
     if (route.request().method() === "PATCH") {
-      await route.fulfill(syncCalls >= requiredSyncCalls
-        ? { json: { project: { exported: true, deliveryCount: 1, lastDeliveredAt: "2026-09-22T00:00:00Z" } } }
-        : { status: 409, json: { error: "sync required" } });
+      projectPatches += 1;
+      await route.fulfill({ json: { ok: true } });
       return;
     }
     await route.fulfill({ json: { isOwner: true, project: {
@@ -100,14 +99,18 @@ test("delivery refreshes collaboration state immediately before completion", asy
   await page.route("**/api/customer-select/projects/delivery-sync/participants", async (route) => route.fulfill({ json: { ok: true } }));
   await page.route("**/api/customer-select/projects/delivery-sync/presence", async (route) => route.fulfill({ json: { ok: true } }));
   await page.route("**/api/customer-select/projects/delivery-sync/sync", async (route) => {
-    syncCalls += 1;
     await route.fulfill({ json: {
       selectedIds: ["p1"], photoStates: {}, participantOpinions: { p1: { blue: { comment: '좋아요, "밝게"' } } }, participantDone: { red: false, blue: true },
       participantNicknames: { red: "소유자", blue: "동행" }, onlineParticipants: ["red", "blue"], participantViews: {}, exported: false, deliveryCount: 0, lastDeliveredAt: null,
     } });
   });
+  await page.route("**/api/customer-select/projects/delivery-sync/result-link", async (route) => {
+    resultLinkCalls += 1;
+    await route.fulfill({ json: { url: "/customer-select/result/delivery-sync/access?result_token=fake" } });
+  });
 
   await page.goto("/customer-select/delivery-sync/export");
+  await page.getByText("파일로 내보내기").click();
   const [csvDownload] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "CSV 다운로드" }).click(),
@@ -126,9 +129,9 @@ test("delivery refreshes collaboration state immediately before completion", asy
   for await (const chunk of await txtDownload.createReadStream()) txt += chunk.toString();
   expect(txt).toBe("A001.jpg");
 
-  const deliver = page.getByRole("button", { name: "작가에게 전달했어요" });
-  await expect(deliver).toBeEnabled();
-  requiredSyncCalls = syncCalls + 1;
-  await deliver.click();
-  await expect(page.getByText("셀렉 전달 완료")).toBeVisible();
+  const copyLink = page.getByRole("button", { name: "링크 복사" });
+  await expect(copyLink).toBeEnabled();
+  await copyLink.click();
+  await expect.poll(() => resultLinkCalls).toBe(1);
+  expect(projectPatches).toBe(0);
 });

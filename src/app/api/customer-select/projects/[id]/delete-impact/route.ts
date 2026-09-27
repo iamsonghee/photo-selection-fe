@@ -8,7 +8,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const access = await resolveCustomerProjectAccess(admin, id, shareTokenFromRequest(req, id));
   if (access instanceof NextResponse) return access;
   if (!access.isOwner) return NextResponse.json({ error: "프로젝트 소유자만 사진을 삭제할 수 있습니다." }, { status: 403 });
-  if (access.project.exported) return NextResponse.json({ error: "전달을 완료한 프로젝트의 사진은 삭제할 수 없습니다." }, { status: 409 });
 
   const body = await req.json().catch(() => ({}));
   const photoIds = Array.isArray(body.photo_ids)

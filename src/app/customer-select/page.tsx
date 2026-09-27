@@ -30,7 +30,7 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
   const selectedByProject = new Map(projects.map((project, index) => [project.id, selectedCounts[index].error ? null : selectedCounts[index].count ?? 0]));
   const filtersEnabled = projects.length >= 8;
   const query = filtersEnabled && typeof params.q === "string" ? params.q : "";
-  const statusFilter: CustomerProjectFilter = filtersEnabled && typeof params.status === "string" && ["active", "delivered", "done"].includes(params.status)
+  const statusFilter: CustomerProjectFilter = filtersEnabled && typeof params.status === "string" && ["active", "done"].includes(params.status)
     ? params.status as CustomerProjectFilter : "all";
   const filteredProjects = filterCustomerProjects(projects, query, statusFilter);
   const firstPhotoResults = await Promise.all(projectIdsWithPhotos.map((projectId) => admin
@@ -101,7 +101,6 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
               <select name="status" defaultValue={statusFilter} className="h-10 w-full rounded-lg border border-border-subtle bg-background px-3 text-sm outline-none focus:border-accent sm:w-32">
                 <option value="all">전체 상태</option>
                 <option value="active">진행 중</option>
-                <option value="delivered">전달 완료</option>
                 <option value="done">보정 완료</option>
               </select>
             </label>

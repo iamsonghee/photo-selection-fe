@@ -113,7 +113,6 @@ interface StoreValue {
   syncStatus: "syncing" | "connected" | "offline";
   syncNow: () => Promise<CollaborationState | null>;
   setViewingPhoto: (photoId: string | null) => void;
-  update: (patch: { exported?: boolean }) => Promise<boolean>;
   toggleSelect: (photoId: string) => void;
   toggleLike: (photoId: string, identity: ColorTag) => void;
   setStar: (photoId: string, star: StarRating | 0) => void;
@@ -322,29 +321,6 @@ export function CustomerSelectStoreProvider({
     });
   }, [currentIdentity, projectId]);
 
-  const update = useCallback(
-    async (patch: { exported?: boolean }) => {
-      if (!isOwner) return false;
-      if (typeof patch.exported === "boolean") {
-        writesInFlightRef.current += 1;
-        try {
-          const response = await fetch(`/api/customer-select/projects/${projectId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ exported: patch.exported }),
-          }).catch(() => null);
-          if (!response?.ok) return false;
-          const data = await response.json().catch(() => ({}));
-          setProject((prev) => ({ ...prev, ...patch, ...data.project }));
-        } finally {
-          writesInFlightRef.current -= 1;
-        }
-      }
-      return true;
-    },
-    [isOwner, projectId]
-  );
-
   const toggleSelect = useCallback(
     (photoId: string) => {
       if (!isOwner) return;
@@ -502,10 +478,10 @@ export function CustomerSelectStoreProvider({
 
   const value = useMemo<StoreValue>(
     () => ({
-      project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, setViewingPhoto, update, toggleSelect, toggleLike,
+      project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, setViewingPhoto, toggleSelect, toggleLike,
       setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, saveError, clearSaveError,
     }),
-    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, setViewingPhoto, update, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, saveError, clearSaveError]
+    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, setViewingPhoto, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, saveError, clearSaveError]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

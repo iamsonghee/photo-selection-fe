@@ -61,7 +61,6 @@ export default function CustomerUploadPage() {
   const projectId = params.projectId as string;
   const router = useRouter();
   const { project, hydrated, refresh } = useCustomerSelectStore();
-  const photoSetLocked = project.exported || project.deliveryCount > 0;
   const [progress, setProgress] = useState(0);
   const [total, setTotal] = useState(0);
   const [uploading, setUploading] = useState(false);
@@ -150,10 +149,6 @@ export default function CustomerUploadPage() {
 
   async function handleFiles(selectedFiles: File[]) {
     if (selectedFiles.length === 0 || uploading || uploadStartingRef.current) return;
-    if (photoSetLocked) {
-      setError("한 번 전달한 프로젝트의 사진 구성은 변경할 수 없습니다.");
-      return;
-    }
     uploadStartingRef.current = true;
     setCheckingCapacity(true);
     setNeedsReselection(false);
@@ -338,7 +333,7 @@ export default function CustomerUploadPage() {
   }
 
   async function requestDeleteSelectedPhotos() {
-    if (!selectedPhotoIds.size || photoSetLocked || checkingDelete) return;
+    if (!selectedPhotoIds.size || checkingDelete) return;
     const photoIds = [...selectedPhotoIds];
     setCheckingDelete(true);
     setError(null);
@@ -388,7 +383,7 @@ export default function CustomerUploadPage() {
   deleteSelectedPhotosRef.current = requestDeleteSelectedPhotos;
 
   useEffect(() => {
-    if (uploading || deleting || aiPromptOpen || viewerPhotoId || photoSetLocked) return;
+    if (uploading || deleting || aiPromptOpen || viewerPhotoId) return;
     const handleShortcut = (event: KeyboardEvent) => {
       const target = event.target;
       if (target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
@@ -408,7 +403,7 @@ export default function CustomerUploadPage() {
     };
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [aiPromptOpen, deleting, photoSetLocked, project.photos, selectedPhotoIds, uploading, viewerPhotoId]);
+  }, [aiPromptOpen, deleting, project.photos, selectedPhotoIds, uploading, viewerPhotoId]);
 
   useEffect(() => {
     if (!uploading) return;
@@ -506,7 +501,6 @@ export default function CustomerUploadPage() {
         </header>
 
         {checkingCapacity ? <p role="status" className="px-5 py-2 text-sm text-muted-foreground">업로드 가능한 장수를 확인하고 있어요…</p> : null}
-        {photoSetLocked ? <div role="status" className="shrink-0 border-b border-accent/15 bg-customer-soft px-5 py-2.5 text-[13px] font-semibold text-foreground md:px-8">작가에게 전달한 사진 구성을 보호하고 있어요. 현재 전달 내용은 그대로 확인할 수 있습니다.</div> : null}
         {error ? <div role="alert" className="hidden shrink-0 border-b border-danger/20 bg-danger/8 px-8 py-2.5 text-[13px] font-semibold text-danger md:block">{error}{needsReselection ? <button type="button" onClick={() => inputRef.current?.click()} className="ml-3 min-h-11 underline">파일 다시 선택</button> : null}</div> : null}
 
         <main
@@ -518,16 +512,16 @@ export default function CustomerUploadPage() {
             if (event.target instanceof Element && !event.target.closest("article, button, input, select, a")) event.currentTarget.focus({ preventScroll: true });
           }}
           onScroll={handleGalleryScroll}
-          onDragEnter={(event) => { event.preventDefault(); if (!isMobile && !uploading && !photoSetLocked) setDragActive(true); }}
+          onDragEnter={(event) => { event.preventDefault(); if (!isMobile && !uploading) setDragActive(true); }}
           onDragOver={(event) => event.preventDefault()}
           onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragActive(false); }}
-          onDrop={(event) => { event.preventDefault(); setDragActive(false); if (!isMobile && !uploading && !photoSetLocked) void handleFiles(Array.from(event.dataTransfer.files)); }}
+          onDrop={(event) => { event.preventDefault(); setDragActive(false); if (!isMobile && !uploading) void handleFiles(Array.from(event.dataTransfer.files)); }}
         >
           {error ? <div role="alert" className="sticky top-2 z-30 mx-3 flex items-center justify-between gap-2 rounded-lg border border-danger/20 bg-surface px-3 py-2 text-[12px] font-semibold text-danger shadow-md md:hidden"><span className="min-w-0">{error}</span>{needsReselection ? <button type="button" onClick={() => inputRef.current?.click()} className="shrink-0 px-1 py-2 underline">다시 선택</button> : null}</div> : null}
           {dragActive ? <div className="pointer-events-none absolute inset-3 z-30 grid place-items-center rounded-2xl border-2 border-dashed border-accent bg-background/90 text-center shadow-lg"><span><UploadCloud className="mx-auto mb-3 text-accent" size={30} /><strong className="text-base text-foreground">여기에 놓아 사진 추가</strong></span></div> : null}
           {displayedPhotos.length === 0 ? (
             <div className="grid min-h-full place-items-center p-5">
-              <button type="button" disabled={photoSetLocked} onClick={() => inputRef.current?.click()} className="flex min-h-[260px] w-full max-w-[720px] flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border-strong bg-surface text-center transition-colors hover:border-accent/45 hover:bg-surface-raised/45 disabled:cursor-not-allowed disabled:opacity-60">
+              <button type="button" onClick={() => inputRef.current?.click()} className="flex min-h-[260px] w-full max-w-[720px] flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border-strong bg-surface text-center transition-colors hover:border-accent/45 hover:bg-surface-raised/45">
                 <span className="grid size-14 place-items-center rounded-2xl bg-customer-soft text-primary"><UploadCloud size={26} strokeWidth={1.8} /></span>
                 <span><strong className="block text-[16px] text-foreground"><span className="md:hidden">사진을 선택하세요</span><span className="hidden md:inline">사진을 끌어다 놓거나 선택하세요</span></strong><small className="mt-1.5 block text-[13px] text-muted-foreground">JPG · PNG · WebP · HEIC · 최대 {MAX_PHOTOS.toLocaleString()}장</small><small className="mt-2 block px-4 text-[13px] text-muted-foreground">선택용 이미지를 저장해요. 원본 파일은 직접 보관해 주세요.</small></span>
               </button>
@@ -544,17 +538,17 @@ export default function CustomerUploadPage() {
               thumbQueue={thumbQueue}
               readonly
               selectedPhotoIds={selectedPhotoIds}
-              selectionOnHover={!isMobile && !photoSetLocked}
-              mobileSelectionVisible={!photoSetLocked && !uploading}
+              selectionOnHover={!isMobile}
+              mobileSelectionVisible={!uploading}
               groupsById={groupsById}
               showSimilarityGroups
               showQualityBadges
-              onToggleSelected={photoSetLocked ? undefined : (photoId) => setSelectedPhotoIds((current) => {
+              onToggleSelected={(photoId) => setSelectedPhotoIds((current) => {
                 const next = new Set(current);
                 if (next.has(photoId)) next.delete(photoId); else next.add(photoId);
                 return next;
               })}
-              onPhotoLongPress={photoSetLocked || uploading ? undefined : (photoId) => {
+              onPhotoLongPress={uploading ? undefined : (photoId) => {
                 if (!isMobile) return;
                 setSelectedPhotoIds((current) => {
                   const next = new Set(current);
@@ -562,7 +556,7 @@ export default function CustomerUploadPage() {
                   return next;
                 });
               }}
-              onDragSelectionChange={photoSetLocked || isMobile ? undefined : setSelectedPhotoIds}
+              onDragSelectionChange={isMobile ? undefined : setSelectedPhotoIds}
               onEmptyClick={() => setSelectedPhotoIds(new Set())}
               minCols={6}
               mobileMinCols={3}
@@ -571,7 +565,7 @@ export default function CustomerUploadPage() {
               mobileSquareMedia
               compact={isMobile}
               showFilename={false}
-              leadingCell={!photoSetLocked ? <PhotoUploadTile isUploading={uploading || checkingCapacity} progress={total ? Math.round((progress / total) * 100) : 0} serverWorking={checkingCapacity} hasPhotos={displayedPhotos.length > 0} onClick={() => inputRef.current?.click()} /> : undefined}
+              leadingCell={<PhotoUploadTile isUploading={uploading || checkingCapacity} progress={total ? Math.round((progress / total) * 100) : 0} serverWorking={checkingCapacity} hasPhotos={displayedPhotos.length > 0} onClick={() => inputRef.current?.click()} />}
               onPhotoClick={(index) => { const photo = visiblePhotos[index]; if (photo && !photo.isPending) setViewerPhotoId(photo.id); }}
             />
           )}
@@ -584,9 +578,9 @@ export default function CustomerUploadPage() {
           leading={uploadStatus}
           mobileLeading={uploadStatus}
           actions={uploading ? <PhotographerLightButton variant="secondary" onClick={cancelUpload}>업로드 중단</PhotographerLightButton> : <>
-            {!photoSetLocked && retryFiles.length > 0 ? <PhotographerLightButton variant="secondary" onClick={() => void handleFiles(retryFiles)}>실패 {retryFiles.length.toLocaleString()}장 다시 시도</PhotographerLightButton> : null}
-            {!photoSetLocked && selectedPhotoIds.size > 0 ? <PhotographerLightButton variant="danger" pending={checkingDelete} pendingLabel="확인 중" onClick={requestDeleteSelectedPhotos}><Trash2 size={16} />선택 삭제 ({selectedPhotoIds.size.toLocaleString()})</PhotographerLightButton> : null}
-            {selectedPhotoIds.size === 0 ? <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={() => router.push(photoSetLocked ? `/customer-select/${projectId}/review` : `/customer-select/${projectId}/select`)}>{photoSetLocked ? "현재 전달 내용 보기" : "사진 고르기"}</PhotographerLightButton> : null}
+            {retryFiles.length > 0 ? <PhotographerLightButton variant="secondary" onClick={() => void handleFiles(retryFiles)}>실패 {retryFiles.length.toLocaleString()}장 다시 시도</PhotographerLightButton> : null}
+            {selectedPhotoIds.size > 0 ? <PhotographerLightButton variant="danger" pending={checkingDelete} pendingLabel="확인 중" onClick={requestDeleteSelectedPhotos}><Trash2 size={16} />선택 삭제 ({selectedPhotoIds.size.toLocaleString()})</PhotographerLightButton> : null}
+            {selectedPhotoIds.size === 0 ? <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={() => router.push(`/customer-select/${projectId}/select`)}>사진 고르기</PhotographerLightButton> : null}
           </>}
         />
 

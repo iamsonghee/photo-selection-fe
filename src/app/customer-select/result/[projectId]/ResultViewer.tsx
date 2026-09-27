@@ -12,7 +12,7 @@ import type { Photo } from "@/types";
 import "@/components/customer/GalleryPhotoCard.css";
 
 type Props = {
-  project: { name: string; target: number; deliveredAt: string | null };
+  project: { name: string; target: number };
   photos: Photo[];
   comments: Record<string, { comment?: string }>;
 };
@@ -42,11 +42,10 @@ export default function ResultViewer({ project, photos, comments }: Props) {
       <main className="mx-auto w-full max-w-[1504px] px-5 py-7 md:px-8 md:py-10">
         <div className="flex flex-col gap-5 border-b border-border-subtle pb-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-xs font-bold text-accent">최종 셀렉 결과</p>
+            <p className="text-xs font-bold text-accent">셀렉 결과</p>
             <h1 className="mt-2 text-[26px] font-bold tracking-[-0.04em] md:text-[32px]">{project.name}</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               선택 {photos.length.toLocaleString()}장 · 요청 기준 {project.target.toLocaleString()}장
-              {project.deliveredAt ? ` · ${new Date(project.deliveredAt).toLocaleDateString("ko-KR")} 전달` : ""}
             </p>
           </div>
           <div className="flex gap-2">
@@ -80,7 +79,7 @@ export default function ResultViewer({ project, photos, comments }: Props) {
           token=""
           photos={photos}
           initialIndex={viewerIndex}
-          sectionLabel="최종 셀렉 결과"
+          sectionLabel="셀렉 결과"
           selectedPhotoIds={new Set(photos.map((photo) => photo.id))}
           comments={comments}
           onClose={() => setViewerIndex(null)}

@@ -46,9 +46,11 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
   const failedRequests: string[] = [];
+  const projectStatePatches: string[] = [];
   page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("requestfailed", (request) => failedRequests.push(`${request.method()} ${request.url()} ${request.failure()?.errorText ?? ""}`));
+  page.on("request", (request) => { if (request.method() === "PATCH" && new URL(request.url()).pathname.endsWith("/projects/core-flow")) projectStatePatches.push(request.url()); });
   await loginAsPhotographer(page);
   await mock(page, selectedCount);
   await page.goto("/customer-select/core-flow/select");
@@ -92,6 +94,8 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
 
   await page.getByText("파일로 내보내기").click();
   const exportTexts = await page.locator("body").innerText();
+  await page.getByRole("button", { name: "링크 복사" }).click();
+  expect(projectStatePatches).toEqual([]);
   const csvBox = await page.getByRole("button", { name: "CSV 다운로드" }).boundingBox();
   const txtBox = await page.getByRole("button", { name: "TXT 다운로드" }).boundingBox();
   const [csv] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "CSV 다운로드" }).click()]);
@@ -112,7 +116,7 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
     csv: csv.suggestedFilename(), txt: txt.suggestedFilename(), consoleErrors, pageErrors, failedRequests }));
 }
 
-test("delivered project skips the selection gallery while redirecting", async ({ page }) => {
+test("legacy exported project can continue selecting", async ({ page }) => {
   await page.addInitScript(() => {
     const state = window as typeof window & { __sawSelectionGallery?: boolean };
     state.__sawSelectionGallery = false;
@@ -130,9 +134,9 @@ test("delivered project skips the selection gallery while redirecting", async ({
   });
 
   await page.goto("/customer-select/delivered/select");
-  await expect(page).toHaveURL(/\/customer-select\/delivered\/review$/);
-  await expect(page.getByRole("heading", { name: "핵심 흐름 QA", exact: true })).toBeVisible();
-  expect(await page.evaluate(() => (window as typeof window & { __sawSelectionGallery?: boolean }).__sawSelectionGallery)).toBe(false);
+  await expect(page).toHaveURL(/\/customer-select\/delivered\/select$/);
+  await expect(page.locator("[data-photo-id]").first()).toBeVisible();
+  expect(await page.evaluate(() => (window as typeof window & { __sawSelectionGallery?: boolean }).__sawSelectionGallery)).toBe(true);
 });
 
 for (const selectedCount of [7, 12]) {

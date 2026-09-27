@@ -29,18 +29,17 @@ export default async function CustomerResultPage({ params }: { params: Promise<{
 
   const admin = getAdminClient();
   const { data: project } = await admin.from("customer_projects")
-    .select("id, name, target_count, exported, last_delivered_at")
+    .select("id, name, target_count")
     .eq("id", projectId)
     .maybeSingle();
   if (!project) return <MessagePage title="결과를 찾을 수 없어요" description="프로젝트가 삭제되었거나 사용할 수 없는 링크입니다." />;
-  if (!project.exported) return <MessagePage title="선택 결과를 수정하고 있어요" description="고객이 다시 전달을 완료하면 이 링크에서 최신 결과를 확인할 수 있습니다." />;
 
   const { data: selections, error: selectionError } = await admin.from("customer_selections")
     .select("photo_id, comment")
     .eq("project_id", projectId)
     .eq("is_selected", true);
   const photoIds = (selections ?? []).map((row) => row.photo_id);
-  if (selectionError || photoIds.length === 0) return <MessagePage title="전달된 사진이 없어요" description="고객에게 선택 결과를 다시 확인해달라고 요청해주세요." />;
+  if (selectionError || photoIds.length === 0) return <MessagePage title="선택된 사진이 없어요" description="고객에게 선택 결과를 다시 확인해달라고 요청해주세요." />;
 
   const [photosResult, participantsResult, opinionsResult] = await Promise.all([
     admin.from("customer_photos").select("id, filename, order_index, thumb_url, preview_url, similarity_group_id").eq("project_id", projectId).in("id", photoIds),
@@ -66,7 +65,7 @@ export default async function CustomerResultPage({ params }: { params: Promise<{
   return (
     <div className={theme.lightTheme}>
       <ResultViewer
-        project={{ name: project.name, target: project.target_count, deliveredAt: project.last_delivered_at }}
+        project={{ name: project.name, target: project.target_count }}
         photos={photos}
         comments={comments}
       />

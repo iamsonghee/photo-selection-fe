@@ -11,8 +11,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const admin = getAdminClient();
   const access = await resolveCustomerProjectAccess(admin, projectId, shareTokenFromRequest(req, projectId));
   if (access instanceof NextResponse) return access;
-  if (access.project.exported) return NextResponse.json({ error: "다시 선택하기를 먼저 눌러주세요." }, { status: 409 });
-
   const body = await req.json().catch(() => ({}));
   const { color, nickname, done, claim } = body as { color?: string; nickname?: string; done?: boolean; claim?: boolean };
   if (!VALID_COLORS.includes(color as ColorTag)) {

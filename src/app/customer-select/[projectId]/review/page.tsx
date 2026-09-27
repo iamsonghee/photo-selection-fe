@@ -8,7 +8,6 @@ import { PhotographerLightButton } from "@/components/photographer/PhotographerL
 import { PhotoFocusOverlay } from "@/components/customer/PhotoFocusOverlay";
 import { PhotoThumbnailFrame } from "@/components/ui/PhotoThumbnailFrame";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
-import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import { csvEscape, downloadTextFile, sanitizeFilenamePart } from "@/lib/text-file-download";
 import {
@@ -37,14 +36,9 @@ export default function CustomerReviewPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const router = useRouter();
-  const { project, hydrated, isOwner, currentIdentity, syncStatus, syncNow, update } = useCustomerSelectStore();
+  const { project, hydrated, isOwner, currentIdentity, syncStatus } = useCustomerSelectStore();
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
   const [linkCopyState, setLinkCopyState] = useState<"idle" | "loading" | "ok" | "fail">("idle");
-  const [reopenConfirm, setReopenConfirm] = useState(false);
-  const [deliverConfirm, setDeliverConfirm] = useState(false);
-  const [changingState, setChangingState] = useState(false);
-  const [checkingLatest, setCheckingLatest] = useState(false);
-  const [stateError, setStateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (hydrated && !isOwner) router.replace(`/customer-select/${projectId}/select`);
@@ -89,44 +83,6 @@ export default function CustomerReviewPage() {
     downloadTextFile(`${exportBaseName}.txt`, exportSelection.map(({ name }) => name).join("\n"), "text/plain;charset=utf-8");
   }
 
-  async function setDelivered(exported: boolean) {
-    setChangingState(true);
-    setStateError(null);
-    const updated = await update({ exported });
-    setChangingState(false);
-    if (!updated) {
-      setStateError("상태를 변경하지 못했어요. 잠시 후 다시 시도해 주세요.");
-      return false;
-    }
-    setDeliverConfirm(false);
-    setReopenConfirm(false);
-    if (!exported) router.push(`/customer-select/${projectId}/select`);
-    return true;
-  }
-
-  async function requestLinkCopy(confirmed: boolean) {
-    if (project.exported) {
-      await copyResultLink();
-      return;
-    }
-    setCheckingLatest(true);
-    setStateError(null);
-    const latest = await syncNow();
-    setCheckingLatest(false);
-    if (!latest) {
-      setStateError("최신 참여 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.");
-      return;
-    }
-    const latestWaiting = Object.entries(latest.participantNicknames)
-      .filter(([color]) => color !== currentIdentity && !latest.participantDone[color])
-      .map(([, nickname]) => nickname || "참가자");
-    if (latestWaiting.length && !confirmed) {
-      setDeliverConfirm(true);
-      return;
-    }
-    if (await setDelivered(true)) await copyResultLink();
-  }
-
   // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
   if (!hydrated || !isOwner) {
     return <SystemLoadingScreen title="셀렉 결과를 불러오고 있어요" homeHref="/customer-select" />;
@@ -145,7 +101,7 @@ export default function CustomerReviewPage() {
             <h1 className={ui.title}>{project.name}</h1>
             <p>최종 검토 · {selected.length.toLocaleString()}장 선택{requested.length > 0 ? ` · 보정 요청 ${requested.length.toLocaleString()}장` : ""}{match !== null ? ` · 취향 일치 ${match}%` : ""}</p>
           </div>
-          <button type="button" className={ui.reviewEdit} onClick={() => project.exported ? setReopenConfirm(true) : router.push(`/customer-select/${projectId}/select`)}>선택 수정</button>
+          <button type="button" className={ui.reviewEdit} onClick={() => router.push(`/customer-select/${projectId}/select`)}>선택 수정</button>
         </div>
         <div className={ui.body}>
           {syncStatus !== "connected" && <div className={`${ui.banner} ${ui.bannerWarn}`}><span className={ui.bannerHeadWarn}>{syncStatus === "offline" ? "최신 참여 상태를 확인하지 못하고 있어요" : "최신 참여 상태를 확인하고 있어요"}</span><span className={ui.bodyText}>연결되면 전달 단계를 계속할 수 있어요.</span></div>}
@@ -203,16 +159,13 @@ export default function CustomerReviewPage() {
           <section className={ui.deliveryCard}>
             <div className={ui.deliveryHeading}>
               <h2>작가에게 전달하기</h2>
-              {project.exported ? <span>전달 완료</span> : null}
             </div>
             <div className={ui.deliveryMain}>
               <div>
                 <p className={ui.bodyText}>링크를 복사해 작가님께 보내주세요. 같은 링크에 최신 결과가 반영돼요.</p>
-                {project.lastDeliveredAt ? <p className={ui.deliveryMeta}>최근 전달 {new Date(project.lastDeliveredAt).toLocaleString("ko-KR")} · 총 {project.deliveryCount.toLocaleString()}회</p> : null}
-                {stateError ? <p role="alert" className={ui.deliveryError}>{stateError}</p> : null}
               </div>
-              <button type="button" className={`${ui.btn} ${ui.btnPrimary} ${ui.deliveryPrimary}`} disabled={selected.length === 0 || linkCopyState === "loading" || changingState || checkingLatest || syncStatus !== "connected"} onClick={() => void requestLinkCopy(false)}>
-                {linkCopyState === "loading" || changingState || checkingLatest ? "링크 복사 중…" : linkCopyState === "ok" ? "복사했어요 ✓" : linkCopyState === "fail" ? "다시 복사하기" : "링크 복사"}
+              <button type="button" className={`${ui.btn} ${ui.btnPrimary} ${ui.deliveryPrimary}`} disabled={selected.length === 0 || linkCopyState === "loading" || syncStatus !== "connected"} onClick={() => void copyResultLink()}>
+                {linkCopyState === "loading" ? "링크 복사 중…" : linkCopyState === "ok" ? "복사했어요 ✓" : linkCopyState === "fail" ? "다시 복사하기" : "링크 복사"}
               </button>
             </div>
             <details className={ui.exportDetails}>
@@ -226,10 +179,10 @@ export default function CustomerReviewPage() {
             </details>
           </section>
 
-          {project.exported ? <section className={ui.nextStepCard}>
+          <section className={ui.nextStepCard}>
             <div><h2>보정본도 확인할까요?</h2><p>선택한 사진의 보정본을 올려 함께 비교할 수 있어요.</p></div>
             <PhotographerLightButton variant="outline" onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>보정본 업로드</PhotographerLightButton>
-          </section> : null}
+          </section>
         </div>
         <PhotoFocusOverlay
           open={focusIndex !== null}
@@ -242,26 +195,6 @@ export default function CustomerReviewPage() {
       </div>
       </main>
     </CustomerSelectShell>
-      {reopenConfirm ? <SelectionConfirmDialog
-        title="사진을 다시 선택할까요?"
-        description={<>전달 완료 상태가 해제되고 선택 화면으로 돌아갑니다.<br />현재 선택은 그대로 유지돼요.</>}
-        confirmLabel="다시 선택하기"
-        busyLabel="여는 중…"
-        confirming={changingState || checkingLatest}
-        error={stateError}
-        onCancel={() => { if (!changingState) { setReopenConfirm(false); setStateError(null); } }}
-        onConfirm={() => void setDelivered(false)}
-      /> : null}
-      {deliverConfirm ? <SelectionConfirmDialog
-        title="아직 고르는 사람이 있어요"
-        description={<>{waiting.map((participant) => participant.name).join(", ")}님이 아직 완료하지 않았어요.<br />그래도 현재 선택 결과를 전달할까요?</>}
-        confirmLabel="그래도 전달하기"
-        busyLabel="저장 중…"
-        confirming={changingState}
-        error={stateError}
-        onCancel={() => { if (!changingState) { setDeliverConfirm(false); setStateError(null); } }}
-        onConfirm={() => void requestLinkCopy(true)}
-      /> : null}
     </>
   );
 }

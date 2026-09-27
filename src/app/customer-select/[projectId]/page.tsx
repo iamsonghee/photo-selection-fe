@@ -39,9 +39,7 @@ export default async function CustomerProjectOverview({ params }: { params: Prom
   const action = customerProjectAction(project, selectedCount);
   const nextStep = project.retouch_done
     ? "모든 보정 확인이 완료됐어요."
-    : project.exported
-      ? "작가님께 전달한 선택 결과를 확인할 수 있어요."
-      : project.photo_count === 0
+    : project.photo_count === 0
         ? "사진을 올리면 바로 선택을 시작할 수 있어요."
         : selectedCount
           ? "고르던 위치부터 사진 선택을 이어가세요."
@@ -77,7 +75,7 @@ export default async function CustomerProjectOverview({ params }: { params: Prom
           <div className="bg-surface-raised px-4 py-4"><dt className="text-xs text-muted-foreground">보정 목표</dt><dd className="mt-1 text-lg font-bold">{project.target_count.toLocaleString()}장</dd></div>
         </dl>
 
-        {!project.exported && !project.retouch_done && project.photo_count > 0 && selectedCount !== null ? <div className="mt-5">
+        {!project.retouch_done && project.photo_count > 0 && selectedCount !== null ? <div className="mt-5">
           <div className="flex items-center justify-between gap-4 text-xs text-muted-foreground">
             <span>선택 현황</span>
             <span>{selectedCount.toLocaleString()} / {project.target_count.toLocaleString()}장</span>

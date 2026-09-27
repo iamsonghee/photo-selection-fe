@@ -526,28 +526,12 @@
   font-size: 15px;
   font-weight: 700;
 }
-.deliveryHeading > span {
-  color: #0f8a5f;
-  font-size: 12px;
-  font-weight: 700;
-}
 .deliveryMain {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 .deliveryMain > div { min-width: 0; }
-.deliveryMeta {
-  margin: 8px 0 0;
-  color: #8b8985;
-  font-size: 12px;
-}
-.deliveryError {
-  margin: 8px 0 0;
-  color: #c43314;
-  font-size: 12px;
-  font-weight: 600;
-}
 .deliveryPrimary {
   flex-shrink: 0;
 }
