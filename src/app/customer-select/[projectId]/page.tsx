@@ -72,7 +72,7 @@ export default async function CustomerProjectOverview({ params }: { params: Prom
           <div className="bg-surface-raised px-4 py-4">
             <dt className="text-xs text-muted-foreground">올린 사진</dt>
             <dd className="mt-1 text-lg font-bold">{project.photo_count.toLocaleString()}장</dd>
-            {project.photo_count > 0 ? <Link href={`/customer-select/${projectId}/upload`} className="mt-2 inline-flex text-xs font-semibold text-accent">보기·정리 →</Link> : null}
+            {project.photo_count > 0 ? <Link href={`/customer-select/${projectId}/upload`} className="mt-2 inline-flex text-xs font-semibold text-accent">올린 사진 보기 →</Link> : null}
           </div>
           <div className="bg-surface-raised px-4 py-4"><dt className="text-xs text-muted-foreground">최종 선택</dt><dd className="mt-1 text-lg font-bold">{selectedCount === null ? "확인 불가" : `${selectedCount.toLocaleString()}장`}</dd></div>
           <div className="bg-surface-raised px-4 py-4"><dt className="text-xs text-muted-foreground">보정 목표</dt><dd className="mt-1 text-lg font-bold">{project.target_count.toLocaleString()}장</dd></div>
