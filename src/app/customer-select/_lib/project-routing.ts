@@ -19,7 +19,7 @@ export type CustomerProjectSummary = {
 
 export function customerProjectDestination(project: CustomerProjectSummary) {
   if (project.retouch_done) return `/customer-select/${project.id}/done`;
-  if (project.exported) return `/customer-select/${project.id}/export`;
+  if (project.exported) return `/customer-select/${project.id}/review`;
   if (project.photo_count > 0) return `/customer-select/${project.id}/select`;
   return `/customer-select/${project.id}/upload`;
 }

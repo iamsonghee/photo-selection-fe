@@ -88,7 +88,7 @@ export default function CustomerSelectGalleryPage() {
   const positionKey = `ps:self-gallery-position:${projectId}`;
 
   useEffect(() => {
-    if (hydrated && isOwner && project.exported) router.replace(`/customer-select/${projectId}/export`);
+    if (hydrated && isOwner && project.exported) router.replace(`/customer-select/${projectId}/review`);
   }, [hydrated, isOwner, project.exported, projectId, router]);
 
   async function handleShare() {

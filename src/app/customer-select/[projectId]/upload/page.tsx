@@ -586,7 +586,7 @@ export default function CustomerUploadPage() {
           actions={uploading ? <PhotographerLightButton variant="secondary" onClick={cancelUpload}>업로드 중단</PhotographerLightButton> : <>
             {!photoSetLocked && retryFiles.length > 0 ? <PhotographerLightButton variant="secondary" onClick={() => void handleFiles(retryFiles)}>실패 {retryFiles.length.toLocaleString()}장 다시 시도</PhotographerLightButton> : null}
             {!photoSetLocked && selectedPhotoIds.size > 0 ? <PhotographerLightButton variant="danger" pending={checkingDelete} pendingLabel="확인 중" onClick={requestDeleteSelectedPhotos}><Trash2 size={16} />선택 삭제 ({selectedPhotoIds.size.toLocaleString()})</PhotographerLightButton> : null}
-            {selectedPhotoIds.size === 0 ? <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={() => router.push(photoSetLocked ? `/customer-select/${projectId}/export` : `/customer-select/${projectId}/select`)}>{photoSetLocked ? "현재 전달 내용 보기" : "사진 고르기"}</PhotographerLightButton> : null}
+            {selectedPhotoIds.size === 0 ? <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={() => router.push(photoSetLocked ? `/customer-select/${projectId}/review` : `/customer-select/${projectId}/select`)}>{photoSetLocked ? "현재 전달 내용 보기" : "사진 고르기"}</PhotographerLightButton> : null}
           </>}
         />
 
