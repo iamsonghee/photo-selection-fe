@@ -65,11 +65,12 @@ test("self customer start screens and over-limit selection", async ({ page }, te
       const gallery = page.locator('[data-photo-gallery-variant="original"]');
       await expect(gallery).toBeVisible();
       expect(await gallery.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft))).toBe(padding);
-      const [logoBox, backBox] = await Promise.all([
-        page.getByRole("img", { name: "A-CUT" }).boundingBox(),
+      const [backBox, addBox] = await Promise.all([
         page.getByRole("button", { name: "프로젝트 현황으로" }).boundingBox(),
+        page.getByRole("button", { name: "사진 추가" }).boundingBox(),
       ]);
-      expect(backBox?.x).toBeCloseTo(logoBox?.x ?? 0, 0);
+      expect(backBox?.x).toBeCloseTo(padding, 0);
+      expect((addBox?.x ?? 0) + (addBox?.width ?? 0)).toBeCloseTo(width - padding, 0);
       await page.screenshot({ path: testInfo.outputPath(`upload-${width}.png`), fullPage: true });
     }
     await page.getByRole("button", { name: "프로젝트 현황으로" }).click();

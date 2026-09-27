@@ -440,12 +440,7 @@ export default function CustomerUploadPage() {
         <p className="mt-1 text-xs text-muted-foreground">{progress.toLocaleString()} / {total.toLocaleString()}장 · {total ? Math.round((progress / total) * 100) : 0}% · {estimatedRemainingSeconds === null ? "예상 시간 계산 중" : formatUploadRemainingTime(estimatedRemainingSeconds)}</p>
       </div>
     </div>
-  ) : (
-    <div>
-      <p className="text-sm font-bold text-foreground">사진 {project.photoCount.toLocaleString()}장</p>
-      <p className="mt-1 text-xs text-muted-foreground">업로드한 순서와 원본 파일명은 그대로 유지됩니다.</p>
-    </div>
-  );
+  ) : undefined;
 
   if (!hydrated) {
     return (
@@ -464,11 +459,11 @@ export default function CustomerUploadPage() {
           void handleFiles(files);
         }} />
 
-        <header data-upload-header-mode={compactHeader ? "compact" : "expanded"} className={`shrink-0 overflow-hidden border-b border-border-subtle bg-background transition-[padding] duration-200 ${compactHeader ? "py-1" : "py-2"}`}>
-          <div className="mx-auto grid w-full max-w-[1504px] grid-cols-[36px_minmax(0,1fr)] items-center gap-2 px-5 md:flex md:gap-3 md:px-8">
+        <header data-upload-header-mode={compactHeader ? "compact" : "expanded"} className="shrink-0 border-b border-border-subtle bg-surface">
+          <div className={`grid w-full grid-cols-[36px_minmax(0,1fr)] items-center gap-1 px-5 transition-[padding-block] duration-200 md:flex md:gap-2 md:px-8 ${compactHeader ? "py-1" : "py-1.5"}`}>
             <button type="button" onClick={() => router.push(`/customer-select/${projectId}`)} className={`grid shrink-0 place-items-center rounded-lg text-muted-foreground transition-[width,height] hover:bg-surface-raised hover:text-foreground ${compactHeader ? "size-9" : "size-10"}`} aria-label="프로젝트 현황으로"><ChevronLeft size={19} /></button>
             <div className="min-w-0 flex-1">
-              <h1 className={`truncate font-bold text-foreground transition-[font-size] ${compactHeader ? "text-[14px]" : "text-[18px]"}`}>{displayName}</h1>
+              <h1 className={`truncate font-bold tracking-[-0.025em] text-foreground transition-[font-size] ${compactHeader ? "text-[14px]" : "text-[18px] md:text-[19px]"}`}>{displayName}</h1>
               {!compactHeader ? <p className="mt-0.5 text-[12px] text-muted-foreground">전체 이용량 {accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${MAX_PHOTOS.toLocaleString()}장 · ${accountUsage.remaining.toLocaleString()}장 남음` : "확인 중"}</p> : null}
             </div>
             <div className="col-span-2 flex items-center justify-end gap-2 md:contents">
@@ -476,17 +471,14 @@ export default function CustomerUploadPage() {
             <PhotographerLightButton size="toolbar" className="max-md:px-3" onClick={() => inputRef.current?.click()} disabled={uploading || photoSetLocked}><ImagePlus size={16} />사진 추가</PhotographerLightButton>
             </div>
           </div>
-        </header>
-
-        <div className="shrink-0 border-b border-border-subtle bg-surface">
-          <div className="flex min-h-12 w-full items-center justify-between gap-3 px-5 py-1.5 max-md:flex-wrap max-md:gap-1.5 md:px-8">
+          <div className="flex min-h-11 w-full items-center justify-between gap-3 border-t border-border-subtle px-5 py-1 max-md:flex-wrap max-md:gap-1.5 md:px-8">
             <ProjectAssetToolbarSummary label="사진" count={nameFilter.trim() ? `${visiblePhotos.length.toLocaleString()} / ${displayedPhotos.length.toLocaleString()}장` : `${displayedPhotos.length.toLocaleString()}장`} meta={uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 분석 완료" : displayedPhotos.length > 0 ? <span className="max-md:hidden">드래그하거나 체크해 여러 장 선택</span> : undefined} />
             <div className="flex min-w-0 items-center gap-1.5 max-md:w-full">
               <FilenameSearchInput value={nameFilter} onChange={setNameFilter} placeholder="파일명 검색" className="max-md:flex-1" style={{ "--fsi-width": "220px" } as React.CSSProperties} />
               <PhotoSortSelect value={sort} onChange={setSort} options={[{ value: "order-asc", label: "업로드 순" }, { value: "order-desc", label: "최근 순" }, { value: "name-asc", label: "파일명 순" }]} />
             </div>
           </div>
-        </div>
+        </header>
 
         {checkingCapacity ? <p role="status" className="px-5 py-2 text-sm text-muted-foreground">업로드 가능한 장수를 확인하고 있어요…</p> : null}
         {photoSetLocked ? <div role="status" className="shrink-0 border-b border-accent/15 bg-customer-soft px-5 py-2.5 text-[13px] font-semibold text-foreground md:px-8">작가에게 전달한 사진 구성을 보호하고 있어요. 현재 전달 내용은 그대로 확인할 수 있습니다.</div> : null}
