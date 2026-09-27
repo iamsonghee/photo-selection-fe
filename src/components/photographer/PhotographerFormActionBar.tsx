@@ -7,7 +7,7 @@ type Props = {
   leading?: ReactNode;
   error?: ReactNode;
   mobileLeading?: ReactNode;
-  maxWidth: number;
+  maxWidth?: number;
   className?: string;
   mobileFixed?: boolean;
   viewportFixed?: boolean;
@@ -63,7 +63,7 @@ export function PhotographerFormActionBar({
         style={viewportFixed ? position : undefined}
         className={`${viewportFixed ? "fixed bottom-0 z-40" : mobileFixed ? "fixed inset-x-0 bottom-0 z-40 md:sticky md:inset-x-auto md:z-20" : "sticky bottom-0 z-20"} border-t border-border-subtle bg-surface shadow-[0_-6px_18px_rgba(2,56,82,0.06)] pb-[env(safe-area-inset-bottom,0px)] md:pb-0 ${className}`}
       >
-        <div className="px-4 md:px-8">
+        <div className="px-5 md:px-8">
           {error ? <p role="alert" className="mx-auto pt-3 text-sm text-danger" style={{ maxWidth }}>{error}</p> : null}
           <div
             className={`mx-auto flex min-h-[64px] flex-col gap-3 py-3 sm:min-h-[80px] sm:flex-row sm:items-center sm:gap-4 sm:py-4 ${

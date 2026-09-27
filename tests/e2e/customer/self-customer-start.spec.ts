@@ -57,6 +57,18 @@ test("self customer start screens and over-limit selection", async ({ page }, te
       await page.screenshot({ path: testInfo.outputPath(`overview-${width}.png`), fullPage: true });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     }
+    await page.getByRole("link", { name: "올린 사진 보기" }).click();
+    await expect(page.getByRole("button", { name: "프로젝트 현황으로" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "사진 고르기", exact: true })).toBeVisible();
+    for (const [width, padding] of [[1440, 32], [390, 20]] as const) {
+      await page.setViewportSize({ width, height: 900 });
+      const gallery = page.locator('[data-photo-gallery-variant="original"]');
+      await expect(gallery).toBeVisible();
+      expect(await gallery.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft))).toBe(padding);
+      await page.screenshot({ path: testInfo.outputPath(`upload-${width}.png`), fullPage: true });
+    }
+    await page.getByRole("button", { name: "프로젝트 현황으로" }).click();
+    await expect(page.getByRole("region", { name: "프로젝트 진행 현황" })).toBeVisible();
     await page.getByRole("link", { name: "프로젝트 수정", exact: true }).click();
     await expect(page.getByRole("heading", { name: "프로젝트 설정" })).toBeVisible();
     await expect(page.getByText("담당 작가명", { exact: true })).toBeVisible();

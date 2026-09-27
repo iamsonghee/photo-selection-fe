@@ -35,6 +35,8 @@ export type OriginalPhotoGalleryProps = {
   active?: boolean;
   readonly?: boolean;
   minCols?: number;
+  desktopPaddingX?: number;
+  mobilePaddingX?: number;
   /** 특정 모바일 workspace에서만 강제할 최소 열 수와 간격. Desktop 공통 geometry는 유지한다. */
   mobileMinCols?: number;
   mobileGridGap?: number;
@@ -333,7 +335,7 @@ function GridGallery(props: OriginalPhotoGalleryProps) {
   const [layout, setLayout] = useState({
     cols: 4,
     rowHeight: 190,
-    paddingX: props.compact ? 12 : PHOTO_GRID_MOBILE_PADDING_X,
+    paddingX: props.compact ? 12 : props.mobilePaddingX ?? PHOTO_GRID_MOBILE_PADDING_X,
     gap: PHOTO_GRID_GAP,
   });
   useLayoutEffect(() => {
@@ -344,8 +346,8 @@ function GridGallery(props: OriginalPhotoGalleryProps) {
       const paddingX = props.compact
         ? 12
         : isMobile
-          ? props.mobileSquareMedia ? 12 : PHOTO_GRID_MOBILE_PADDING_X
-          : PHOTO_GRID_DESKTOP_PADDING_X;
+          ? props.mobilePaddingX ?? (props.mobileSquareMedia ? 12 : PHOTO_GRID_MOBILE_PADDING_X)
+          : props.desktopPaddingX ?? PHOTO_GRID_DESKTOP_PADDING_X;
       const width = container.clientWidth - paddingX * 2;
       if (width <= 0) return;
       const gap = isMobile ? props.mobileGridGap ?? PHOTO_GRID_GAP : PHOTO_GRID_GAP;
@@ -396,7 +398,7 @@ function GridGallery(props: OriginalPhotoGalleryProps) {
       if (secondFrame) window.cancelAnimationFrame(secondFrame);
       window.clearTimeout(transitionTimer);
     };
-  }, [props.active, props.compact, props.minCols, props.mobileGridGap, props.mobileMinCols, props.mobileSquareMedia, props.showFilename, props.showMobileFilename, props.variant]);
+  }, [props.active, props.compact, props.desktopPaddingX, props.minCols, props.mobileGridGap, props.mobileMinCols, props.mobilePaddingX, props.mobileSquareMedia, props.showFilename, props.showMobileFilename, props.variant]);
 
   const hasLeadingCell = Boolean(props.leadingCell);
   const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);

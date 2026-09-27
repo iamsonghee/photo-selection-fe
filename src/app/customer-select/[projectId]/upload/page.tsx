@@ -7,7 +7,6 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { CUSTOMER_PHOTO_LIMIT as MAX_PHOTOS, uploadLimitError } from "../../_lib/upload-limit";
 import { ChevronLeft, ImagePlus, Loader2, Sparkles, Trash2, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -83,6 +82,7 @@ export default function CustomerUploadPage() {
   const [aiWantQuality, setAiWantQuality] = useState(false);
   const [aiStarting, setAiStarting] = useState(false);
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [aiCompleted, setAiCompleted] = useState(false);
   const [sort, setSort] = useState<"order-asc" | "order-desc" | "name-asc">("order-asc");
   const [nameFilter, setNameFilter] = useState("");
   const [retryFiles, setRetryFiles] = useState<File[]>([]);
@@ -96,6 +96,7 @@ export default function CustomerUploadPage() {
   const uploadAbortRef = useRef<AbortController | null>(null);
   const cancelRequestedRef = useRef(false);
   const uploadTimingSamplesRef = useRef<UploadTimingSample[]>([]);
+  const aiPollingRef = useRef(false);
   const { compact: compactHeader, handleScroll: handleGalleryScroll } = useCollapsibleAssetHeaderController({ compactOnly: true });
 
   useEffect(() => () => {
@@ -107,6 +108,23 @@ export default function CustomerUploadPage() {
     if (!hydrated) return;
     void getAccountUsage().then(setAccountUsage).catch(() => undefined);
   }, [hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    void Promise.all(["similarity", "quality"].map(async (kind) => {
+      const response = await fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`);
+      return response.ok ? (await response.json()).status as string | null : null;
+    })).then((statuses) => {
+      const processingKinds = ["similarity", "quality"].filter((_, index) => statuses[index] === "processing");
+      setAiCompleted(statuses.includes("completed"));
+      if (processingKinds.length > 0) {
+        setAiAnalyzing(true);
+        void pollAiAnalysis(processingKinds);
+      }
+    }).catch(() => undefined);
+    // pollAiAnalysis only depends on the current project and store refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, projectId]);
 
   function clearPendingPreviews() {
     previewUrlsRef.current.forEach(URL.revokeObjectURL);
@@ -268,6 +286,7 @@ export default function CustomerUploadPage() {
         throw new Error(data.error ?? data.detail ?? "분석 시작 실패");
       }
       setAiPromptOpen(false);
+      setAiCompleted(false);
       setAiAnalyzing(true);
       void pollAiAnalysis([aiWantSimilar && "similarity", aiWantQuality && "quality"].filter(Boolean) as string[]);
     } catch (e) {
@@ -278,21 +297,28 @@ export default function CustomerUploadPage() {
   }
 
   async function pollAiAnalysis(kinds: string[]) {
-    for (let attempt = 0; attempt < 150; attempt += 1) {
-      await new Promise((resolve) => window.setTimeout(resolve, 4000));
-      const statuses = await Promise.all(kinds.map(async (kind) => {
-        const response = await fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`);
-        if (!response.ok) return "failed";
-        return (await response.json()).status as string | null;
-      }));
-      if (statuses.every((status) => status !== "processing")) {
-        setAiAnalyzing(false);
-        await refresh();
-        if (statuses.includes("failed")) setError("일부 AI 분석을 완료하지 못했습니다.");
-        return;
+    if (aiPollingRef.current) return;
+    aiPollingRef.current = true;
+    try {
+      for (let attempt = 0; attempt < 150; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 4000));
+        const statuses = await Promise.all(kinds.map(async (kind) => {
+          const response = await fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`);
+          if (!response.ok) return "failed";
+          return (await response.json()).status as string | null;
+        }));
+        if (statuses.every((status) => status !== "processing")) {
+          setAiAnalyzing(false);
+          await refresh();
+          if (statuses.includes("failed")) setError("일부 AI 분석을 완료하지 못했습니다.");
+          else setAiCompleted(true);
+          return;
+        }
       }
+      setAiAnalyzing(false);
+    } finally {
+      aiPollingRef.current = false;
     }
-    setAiAnalyzing(false);
   }
 
   async function requestDeleteSelectedPhotos() {
@@ -438,24 +464,23 @@ export default function CustomerUploadPage() {
           void handleFiles(files);
         }} />
 
-        <header data-upload-header-mode={compactHeader ? "compact" : "expanded"} className={`shrink-0 overflow-hidden border-b border-border-subtle bg-background transition-[padding] duration-200 ${compactHeader ? "py-1" : "py-3"}`}>
-          <div className="mx-auto grid w-full max-w-[1504px] grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-2 px-5 md:flex md:gap-3 md:px-8">
-            <button type="button" onClick={() => router.push("/customer-select")} className={`grid shrink-0 place-items-center rounded-lg text-muted-foreground transition-[width,height] hover:bg-surface-raised hover:text-foreground ${compactHeader ? "size-9" : "size-10"}`} aria-label="프로젝트 목록으로"><ChevronLeft size={19} /></button>
+        <header data-upload-header-mode={compactHeader ? "compact" : "expanded"} className={`shrink-0 overflow-hidden border-b border-border-subtle bg-background transition-[padding] duration-200 ${compactHeader ? "py-1" : "py-2"}`}>
+          <div className="grid w-full grid-cols-[36px_minmax(0,1fr)] items-center gap-2 px-5 md:flex md:gap-3 md:px-8">
+            <button type="button" onClick={() => router.push(`/customer-select/${projectId}`)} className={`grid shrink-0 place-items-center rounded-lg text-muted-foreground transition-[width,height] hover:bg-surface-raised hover:text-foreground ${compactHeader ? "size-9" : "size-10"}`} aria-label="프로젝트 현황으로"><ChevronLeft size={19} /></button>
             <div className="min-w-0 flex-1">
-              <h1 className={`truncate font-bold text-foreground transition-[font-size] ${compactHeader ? "text-[14px]" : "text-[18px] md:text-[20px]"}`}>{displayName}</h1>
-              {!compactHeader ? <p className="mt-0.5 text-[12px] text-muted-foreground">전체 {accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${MAX_PHOTOS.toLocaleString()}장 · ${accountUsage.remaining.toLocaleString()}장 추가 가능` : "사진 이용량 확인 중"}</p> : null}
+              <h1 className={`truncate font-bold text-foreground transition-[font-size] ${compactHeader ? "text-[14px]" : "text-[18px]"}`}>{displayName}</h1>
+              {!compactHeader ? <p className="mt-0.5 text-[12px] text-muted-foreground">전체 이용량 {accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${MAX_PHOTOS.toLocaleString()}장 · ${accountUsage.remaining.toLocaleString()}장 남음` : "확인 중"}</p> : null}
             </div>
-            <Link href={`/customer-select/${projectId}`} className="shrink-0 rounded-lg px-2 py-3 text-sm font-semibold text-muted-foreground">현황</Link>
-            <div className="col-span-3 flex items-center justify-end gap-2 md:contents">
-            <PhotographerLightButton variant="outline" size="toolbar" className="max-md:size-11 max-md:px-0" onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : "AI 분석 시작"}><Sparkles size={16} /><span className="max-md:hidden">{aiAnalyzing ? "분석 중" : "AI 분석"}</span></PhotographerLightButton>
-            <PhotographerLightButton variant="outline" size="toolbar" className="max-md:px-3" onClick={() => inputRef.current?.click()} disabled={uploading || photoSetLocked}><ImagePlus size={16} />사진 추가</PhotographerLightButton>
+            <div className="col-span-2 flex items-center justify-end gap-2 md:contents">
+            <PhotographerLightButton variant="outline" size="toolbar" className="max-md:size-11 max-md:px-0" onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}><Sparkles size={16} /><span className="max-md:hidden">{aiAnalyzing ? "분석 중" : aiCompleted ? "다시 분석" : "AI 분석"}</span></PhotographerLightButton>
+            <PhotographerLightButton size="toolbar" className="max-md:px-3" onClick={() => inputRef.current?.click()} disabled={uploading || photoSetLocked}><ImagePlus size={16} />사진 추가</PhotographerLightButton>
             </div>
           </div>
         </header>
 
         <div className="shrink-0 border-b border-border-subtle bg-surface">
-          <div className="mx-auto flex min-h-12 w-full max-w-[1504px] items-center justify-between gap-3 px-5 py-1.5 max-md:flex-wrap max-md:gap-1.5 md:px-8">
-            <ProjectAssetToolbarSummary label="업로드 사진" count={nameFilter.trim() ? `${visiblePhotos.length.toLocaleString()} / ${displayedPhotos.length.toLocaleString()}장` : `${displayedPhotos.length.toLocaleString()}장`} meta={uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : aiAnalyzing ? "AI 분석 중" : undefined} />
+          <div className="flex min-h-12 w-full items-center justify-between gap-3 px-5 py-1.5 max-md:flex-wrap max-md:gap-1.5 md:px-8">
+            <ProjectAssetToolbarSummary label="사진" count={nameFilter.trim() ? `${visiblePhotos.length.toLocaleString()} / ${displayedPhotos.length.toLocaleString()}장` : `${displayedPhotos.length.toLocaleString()}장`} meta={uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 분석 완료" : displayedPhotos.length > 0 ? <span className="max-md:hidden">드래그하거나 체크해 여러 장 선택</span> : undefined} />
             <div className="flex min-w-0 items-center gap-1.5 max-md:w-full">
               <FilenameSearchInput value={nameFilter} onChange={setNameFilter} placeholder="파일명 검색" className="max-md:flex-1" style={{ "--fsi-width": "220px" } as React.CSSProperties} />
               <PhotoSortSelect value={sort} onChange={setSort} options={[{ value: "order-asc", label: "업로드 순" }, { value: "order-desc", label: "최근 순" }, { value: "name-asc", label: "파일명 순" }]} />
@@ -515,6 +540,8 @@ export default function CustomerUploadPage() {
               onEmptyClick={() => setSelectedPhotoIds(new Set())}
               minCols={6}
               mobileMinCols={3}
+              desktopPaddingX={32}
+              mobilePaddingX={20}
               mobileSquareMedia
               showFilename={false}
               onPhotoClick={(index) => { const photo = visiblePhotos[index]; if (photo && !photo.isPending) setViewerPhotoId(photo.id); }}
@@ -523,7 +550,6 @@ export default function CustomerUploadPage() {
         </main>
 
         <PhotographerPageActionBar
-          maxWidth={1504}
           className="shrink-0"
           viewportFixed
           leading={uploadStatus}
@@ -531,7 +557,7 @@ export default function CustomerUploadPage() {
           actions={uploading ? <PhotographerLightButton variant="secondary" onClick={cancelUpload}>업로드 중단</PhotographerLightButton> : <>
             {!photoSetLocked && retryFiles.length > 0 ? <PhotographerLightButton variant="secondary" onClick={() => void handleFiles(retryFiles)}>실패 {retryFiles.length.toLocaleString()}장 다시 시도</PhotographerLightButton> : null}
             {!photoSetLocked && selectedPhotoIds.size > 0 ? <PhotographerLightButton variant="danger" pending={checkingDelete} pendingLabel="확인 중" onClick={requestDeleteSelectedPhotos}><Trash2 size={16} />선택 삭제 ({selectedPhotoIds.size.toLocaleString()})</PhotographerLightButton> : null}
-            <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={() => router.push(photoSetLocked ? `/customer-select/${projectId}/export` : `/customer-select/${projectId}/select`)}>{photoSetLocked ? "현재 전달 내용 보기" : <>사진 고르기{project.photoCount > 0 ? ` (${project.photoCount}장)` : ""}</>}</PhotographerLightButton>
+            <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={() => router.push(photoSetLocked ? `/customer-select/${projectId}/export` : `/customer-select/${projectId}/select`)}>{photoSetLocked ? "현재 전달 내용 보기" : "사진 고르기"}</PhotographerLightButton>
           </>}
         />
       </div>
