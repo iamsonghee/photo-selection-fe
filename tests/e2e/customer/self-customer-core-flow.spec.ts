@@ -78,6 +78,15 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   expect(viewerTexts).not.toContain("줄여주세요");
   expect(viewerTexts).not.toContain("장 남음");
   expect(viewerTexts).not.toContain("전체 사진에서 더 고르기");
+  if (viewport === "desktop") {
+    await page.getByRole("button", { name: "사진별 요청 남기기" }).click();
+    await page.getByRole("textbox", { name: "사진별 요청" }).fill("자동 저장 확인");
+  } else {
+    await page.getByRole("button", { name: "코멘트 남기기" }).click();
+    await page.getByRole("textbox", { name: "사진 코멘트" }).fill("자동 저장 확인");
+  }
+  await expect(page.locator('span:visible', { hasText: "✓ 저장됨" })).toBeVisible();
+  if (viewport === "mobile") await page.getByRole("textbox", { name: "사진 코멘트" }).blur();
   await viewerReview.click();
   await expect(page).toHaveURL(/\/customer-select\/core-flow\/review/);
   await expect(page.getByRole("heading", { name: "핵심 흐름 QA", exact: true })).toBeVisible();

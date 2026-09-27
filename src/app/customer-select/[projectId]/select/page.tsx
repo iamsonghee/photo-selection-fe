@@ -57,7 +57,7 @@ export default function CustomerSelectGalleryPage() {
   const projectId = params.projectId as string;
   const router = useRouter();
   const desktop = useDesktopViewport();
-  const { project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, setViewingPhoto, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, saveError, clearSaveError } =
+  const { project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, setViewingPhoto, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, commentSaveStates, saveError, clearSaveError } =
     useCustomerSelectStore();
 
   const [tab, setTab] = useState<Tab>("all");
@@ -201,10 +201,10 @@ export default function CustomerSelectGalleryPage() {
     projectId,
     projectStatus: "selecting",
     loading: false,
-    commentSaveStates: {},
+    commentSaveStates,
     saveError,
     clearSaveError,
-  }), [project, selectedIds, selectedCount, toggleSelect, setStar, setComment, toggleLike, projectId, saveError, clearSaveError]);
+  }), [project, selectedIds, selectedCount, toggleSelect, setStar, setComment, toggleLike, projectId, commentSaveStates, saveError, clearSaveError]);
 
   const viewerAdapter = useMemo<CustomerSelectionViewerAdapter | null>(() => openPhotoId ? ({
     token: projectId,

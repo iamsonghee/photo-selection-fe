@@ -1993,7 +1993,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
             />
             <div className="fv-comment-sheet-actions">
               <span aria-live="polite">
-                {commentSaveStatus === "saving" ? "저장 중..." : `${draftComment.length}/${COMMENT_MAX_LENGTH}`}
+                {commentSaveStatus === "saving" ? "저장 중…" : commentSaveStatus === "saved" ? "✓ 저장됨" : commentSaveStatus === "error" ? "저장 실패" : `${draftComment.length}/${COMMENT_MAX_LENGTH}`}
               </span>
               <button
                 type="button"

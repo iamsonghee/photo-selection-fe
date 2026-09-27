@@ -7,6 +7,7 @@
  * 공유 링크 참가자는 로그인하지 않음).
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import type { CommentSaveStatus } from "@/lib/comment-save-status";
 import type { ColorTag, Photo, StarRating } from "@/types";
 
 export const COLOR_PALETTE: { id: ColorTag; hex: string }[] = [
@@ -122,6 +123,7 @@ interface StoreValue {
   joinParticipant: (nickname: string, color: ColorTag) => Promise<string | null>;
   resumeParticipant: (color: ColorTag) => void;
   refresh: () => Promise<ProjectView | undefined>;
+  commentSaveStates: Record<string, CommentSaveStatus>;
   saveError: string | null;
   clearSaveError: () => void;
 }
@@ -156,6 +158,26 @@ export function CustomerSelectStoreProvider({
   }, [projectId]);
 
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [commentSaveStates, setCommentSaveStates] = useState<Record<string, CommentSaveStatus>>({});
+  const commentWriteVersionsRef = useRef<Record<string, number>>({});
+  const commentSavedTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const setCommentSaveStatus = useCallback((photoId: string, status: CommentSaveStatus) => {
+    const existingTimer = commentSavedTimersRef.current.get(photoId);
+    if (existingTimer) clearTimeout(existingTimer);
+    setCommentSaveStates((current) => ({ ...current, [photoId]: status }));
+    if (status === "saved") {
+      const timer = setTimeout(() => {
+        commentSavedTimersRef.current.delete(photoId);
+        setCommentSaveStates((current) => current[photoId] === "saved" ? { ...current, [photoId]: "idle" } : current);
+      }, 2000);
+      commentSavedTimersRef.current.set(photoId, timer);
+    }
+  }, []);
+
+  useEffect(() => () => {
+    commentSavedTimersRef.current.forEach(clearTimeout);
+  }, []);
 
   /**
    * 저장 실패 시 최대 2회 재시도(짧은 backoff) 후에도 실패하면 낙관적 업데이트를
@@ -390,6 +412,9 @@ export function CustomerSelectStoreProvider({
     (photoId: string, text: string) => {
       const prevComment = project.photoStates[photoId]?.comment;
       const trimmed = text.trim() || undefined;
+      const version = (commentWriteVersionsRef.current[photoId] ?? 0) + 1;
+      commentWriteVersionsRef.current[photoId] = version;
+      setCommentSaveStatus(photoId, "saving");
       setProject((prev) => ({
         ...prev,
         photoStates: { ...prev.photoStates, [photoId]: { ...prev.photoStates[photoId], comment: trimmed } },
@@ -398,7 +423,7 @@ export function CustomerSelectStoreProvider({
           [photoId]: { ...prev.participantOpinions[photoId], [currentIdentity]: { ...prev.participantOpinions[photoId]?.[currentIdentity], comment: trimmed } },
         },
       }));
-      apiPost("/selections", { photo_id: photoId, participant_color: currentIdentity, comment: trimmed ?? null }, () => {
+      void apiPost("/selections", { photo_id: photoId, participant_color: currentIdentity, comment: trimmed ?? null }, () => {
         setProject((prev) => ({
           ...prev,
           photoStates: { ...prev.photoStates, [photoId]: { ...prev.photoStates[photoId], comment: prevComment } },
@@ -407,9 +432,11 @@ export function CustomerSelectStoreProvider({
             [photoId]: { ...prev.participantOpinions[photoId], [currentIdentity]: { ...prev.participantOpinions[photoId]?.[currentIdentity], comment: prevComment } },
           },
         }));
+      }).then((saved) => {
+        if (commentWriteVersionsRef.current[photoId] === version) setCommentSaveStatus(photoId, saved ? "saved" : "error");
       });
     },
-    [apiPost, currentIdentity, project.photoStates]
+    [apiPost, currentIdentity, project.photoStates, setCommentSaveStatus]
   );
 
   const toggleDone = useCallback(
@@ -479,9 +506,9 @@ export function CustomerSelectStoreProvider({
   const value = useMemo<StoreValue>(
     () => ({
       project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, setViewingPhoto, toggleSelect, toggleLike,
-      setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, saveError, clearSaveError,
+      setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, commentSaveStates, saveError, clearSaveError,
     }),
-    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, setViewingPhoto, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, saveError, clearSaveError]
+    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, setViewingPhoto, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, commentSaveStates, saveError, clearSaveError]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
