@@ -565,6 +565,11 @@
 .exportDetails .exportBlock {
   margin-top: 10px;
 }
+.exportActions {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 6px;
+}
 .nextStepCard {
   padding: 16px 18px;
   border: 1px solid #dde1e4;
@@ -618,6 +623,7 @@
 }
 
 @media (max-width: 767px) {
+  .exportActions > button { flex: 1; }
   .nextStepCard { align-items: stretch; flex-direction: column; }
   .nextStepCard button { width: 100%; }
 }

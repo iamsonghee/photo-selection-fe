@@ -3,7 +3,7 @@
 /** S7 — 최종 검토. */
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, FileSpreadsheet, FileText } from "lucide-react";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { PhotoFocusOverlay } from "@/components/customer/PhotoFocusOverlay";
 import { PhotoThumbnailFrame } from "@/components/ui/PhotoThumbnailFrame";
@@ -180,9 +180,9 @@ export default function CustomerReviewPage() {
             <details className={ui.exportDetails}>
               <summary>파일로 내보내기</summary>
               <pre className={ui.exportBlock}>{exportText}</pre>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button type="button" className={`${ui.btn} ${ui.btnSm}`} style={{ flex: 1 }} aria-label="CSV 다운로드" onClick={handleDownloadCsv}>CSV 다운로드</button>
-                <button type="button" className={`${ui.btn} ${ui.btnSm}`} style={{ flex: 1 }} aria-label="TXT 다운로드" onClick={handleDownloadTxt}>TXT 다운로드</button>
+              <div className={ui.exportActions}>
+                <PhotographerLightButton variant="outline" size="toolbar" aria-label="CSV 다운로드" onClick={handleDownloadCsv}><FileSpreadsheet size={16} aria-hidden />CSV 다운로드</PhotographerLightButton>
+                <PhotographerLightButton variant="outline" size="toolbar" aria-label="TXT 다운로드" onClick={handleDownloadTxt}><FileText size={16} aria-hidden />TXT 다운로드</PhotographerLightButton>
               </div>
               <span className={ui.supportText}>CSV에는 참여자 의견이 함께 담기고, TXT에는 파일명만 담겨요.</span>
             </details>
