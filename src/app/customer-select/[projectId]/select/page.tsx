@@ -109,7 +109,7 @@ export default function CustomerSelectGalleryPage() {
     const photo = project.photos.find((item) => item.id === photoId);
     return photo ? [[color, getPhotoDisplayName(photo)]] : [];
   })), [project.participantViews, project.photos]);
-  const colorLabel = useCallback((color: ColorTag) => color === currentIdentity ? "내 찜" : `${project.participantNicknames[color] || "참가자"} 찜`, [currentIdentity, project.participantNicknames]);
+  const colorLabel = useCallback((color: ColorTag) => `${project.participantNicknames[color] || "참가자"}${color === currentIdentity ? " (나)" : ""} 찜`, [currentIdentity, project.participantNicknames]);
   const colorOptions = useMemo(() => participants.map((participant) => ({ key: participant.id, hex: participant.hex, label: colorLabel(participant.id) })), [participants, colorLabel]);
 
   const baseList = useMemo(() => {

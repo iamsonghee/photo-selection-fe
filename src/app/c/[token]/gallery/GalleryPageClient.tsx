@@ -117,7 +117,7 @@ export default function GalleryPageClient() {
   const [colorFilter,   setColorFilter]   = useState<ColorTag[]>(Array.isArray(initialFilterState.colorFilter) ? initialFilterState.colorFilter : []);
   /** 두 명 이상을 고를 때 "한 명이라도 찜"(any) / "모두 찜"(all) 중 무엇으로 볼지 */
   const [colorFilterMode, setColorFilterMode] = useState<"any" | "all">(initialFilterState.colorFilterMode);
-  /** 색 = 참가자 슬롯. 내 색은 "내 찜"으로 표시하고, 실제 쓰인 색만 필터에 노출한다. */
+  /** 색 = 참가자 슬롯. 실제 쓰인 색만 필터에 노출한다. */
   const [participant, setParticipant] = useState<Participant | null>(null);
   /** 서버에 저장된 (색 → 표시 이름). 이름이 있으면 "빨강 찜" 대신 그 이름으로 부른다. */
   const [roster, setRoster] = useState<ParticipantRoster>({});
@@ -154,11 +154,11 @@ export default function GalleryPageClient() {
     return () => { alive = false; };
   }, [token, project?.id]);
 
-  /** 필터·칩에서 색을 부르는 이름. 내 색이면 "내 찜", 이름이 등록돼 있으면 "OO 찜", 없으면 색 이름. */
+  /** 필터·칩에서 색을 부르는 이름. 본인도 닉네임을 보여주되 "(나)"로 구분한다. */
   const colorLabel = useCallback(
     (key: ColorTag) => {
-      if (key === participant?.color) return "내 찜";
       const name = roster[key];
+      if (key === participant?.color) return `${name || COLOR_LABELS[key]} (나) 찜`;
       return name ? `${name} 찜` : `${COLOR_LABELS[key]} 찜`;
     },
     [participant, roster],

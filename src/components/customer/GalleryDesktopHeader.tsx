@@ -39,7 +39,7 @@ interface GalleryDesktopHeaderProps {
   usedColors: ColorTag[];
   /** 이 기기의 색 — 점에 별도 테두리를 준다 */
   myColor: ColorTag | null;
-  /** 색을 부르는 이름("내 찜" / "신랑 찜" / "빨강 찜") — 참가자 명단을 아는 부모가 만들어 넘긴다 */
+  /** 색을 부르는 이름("쏭쏭 (나) 찜" / "신랑 찜" / "빨강 찜") — 참가자 명단을 아는 부모가 만들어 넘긴다 */
   colorLabel: (key: ColorTag) => string;
   /** 색 2개 이상일 때 "한 명이라도 찜"(any) / "모두 찜"(all) */
   colorFilterMode: "any" | "all";
@@ -220,7 +220,7 @@ export function GalleryDesktopHeader({
               {COLOR_OPTIONS.filter((option) => usedColors.includes(option.key)).map((option) => {
                 const isActive = colorFilter.includes(option.key);
                 const label = colorLabel(option.key);
-                /* 라벨엔 이미 "찜"이 붙어 있다("내 찜"/"민 찜") — 그룹 제목으로 한 번 더 말했으니
+                /* 라벨엔 이미 "찜"이 붙어 있다("민 (나) 찜"/"쏭쏭 찜") — 그룹 제목으로 한 번 더 말했으니
                  * 칩 안에서는 사람을 가리키는 부분만 남긴다. */
                 const chipText = label.replace(/\s*찜$/, "");
                 return (
