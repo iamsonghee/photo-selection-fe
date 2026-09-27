@@ -30,7 +30,7 @@ export function CustomerShareLinkField({ projectId, token, allowShare = false }:
   return <div>
     <div className="flex min-w-0 items-center gap-2 rounded-xl border border-border-subtle bg-surface-raised p-2 pl-4">
       <Link2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-      <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground">A-CUT 초대 링크 · 주소의 보안 토큰은 숨겨져 있어요</span>
+      <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground" title={relativeUrl}>{relativeUrl}</span>
       {allowShare ? <button type="button" onClick={shareLink} className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-border-subtle bg-surface px-3 text-xs font-bold text-foreground hover:border-border-strong"><Share2 className="size-4" />공유</button> : null}
       <button type="button" onClick={copyLink} className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-foreground px-3 text-xs font-bold text-background"><Copy className="size-4" />복사</button>
     </div>

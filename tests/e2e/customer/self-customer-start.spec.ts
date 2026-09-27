@@ -47,6 +47,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await expect(page.getByText("추가 가능", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "보기·정리" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "함께 고르기" })).toBeVisible();
+    await expect(page.getByText(/share_token=/)).toBeVisible();
     await expect(page.getByRole("link", { name: "사진 관리" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "초대 링크 관리" })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "촬영 정보" })).toBeVisible();
