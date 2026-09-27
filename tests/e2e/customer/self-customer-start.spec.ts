@@ -60,19 +60,28 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await page.getByRole("link", { name: "올린 사진 보기" }).click();
     await expect(page.getByRole("button", { name: "프로젝트 현황으로" })).toBeVisible();
     await expect(page.getByRole("button", { name: "사진 고르기", exact: true })).toBeVisible();
-    for (const [width, padding] of [[1792, 32], [390, 20]] as const) {
+    for (const [width, headerPadding, galleryPadding] of [[1792, 32, 32], [390, 20, 12]] as const) {
       await page.setViewportSize({ width, height: 900 });
       const gallery = page.locator('[data-photo-gallery-variant="original"]');
       await expect(gallery).toBeVisible();
-      expect(await gallery.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft))).toBe(padding);
+      expect(await gallery.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft))).toBe(galleryPadding);
       const [backBox, addBox] = await Promise.all([
         page.getByRole("button", { name: "프로젝트 현황으로" }).boundingBox(),
-        page.getByRole("button", { name: "사진 추가" }).boundingBox(),
+        page.getByRole("button", { name: "사진 추가하기" }).boundingBox(),
       ]);
-      expect(backBox?.x).toBeCloseTo(padding, 0);
-      expect((addBox?.x ?? 0) + (addBox?.width ?? 0)).toBeCloseTo(width - padding, 0);
+      expect(backBox?.x).toBeCloseTo(headerPadding, 0);
+      expect(addBox?.x).toBeCloseTo(galleryPadding, 0);
       await page.screenshot({ path: testInfo.outputPath(`upload-${width}.png`), fullPage: true });
     }
+    await expect(page.locator("[data-mobile-selection-checkbox]")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "삭제할 사진 선택" })).toBeVisible();
+    const firstPhoto = page.locator('[data-original-photo-card] button[aria-label$="상세 보기"]').first();
+    await firstPhoto.dispatchEvent("pointerdown", { button: 0, pointerType: "touch", clientX: 80, clientY: 300 });
+    await page.waitForTimeout(500);
+    await expect(page.getByText("사진 선택", { exact: true })).toBeVisible();
+    await expect(page.locator("[data-mobile-selection-checkbox]").first()).toBeVisible();
+    await page.getByRole("button", { name: "사진 선택 취소" }).click();
+    await expect(page.locator("[data-mobile-selection-checkbox]")).toHaveCount(0);
     await page.getByRole("button", { name: "프로젝트 현황으로" }).click();
     await expect(page.getByRole("region", { name: "프로젝트 진행 현황" })).toBeVisible();
     await page.getByRole("link", { name: "프로젝트 수정", exact: true }).click();
