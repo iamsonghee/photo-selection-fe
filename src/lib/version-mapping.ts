@@ -16,6 +16,7 @@ export type MappingResult<T extends MappingTarget> = {
 
 export function normalizeFilename(name: string): string {
   return (name ?? "")
+    .normalize("NFC")
     .trim()
     .toLowerCase()
     .replace(/\s+/g, " ")

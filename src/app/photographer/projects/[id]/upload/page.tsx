@@ -2165,7 +2165,7 @@ export default function ProjectDetailPage() {
             // 원본 납품 여부와 무관하게 목록용 원본 메타데이터는 항상 보존한다.
             // width/height=0은 기존 압축 단계에서 치수를 얻지 못한 경우이며,
             // 서버가 썸네일 생성 시 이미 디코딩한 입력 치수로 채운다.
-            f.append("original_filenames", sourceFile.name);
+            f.append("original_filenames", sourceFile.name.normalize("NFC"));
             f.append("original_file_sizes", String(sourceFile.size));
             f.append("original_last_modifieds", String(sourceFile.lastModified));
             f.append("original_content_types", sourceFile.type === "image/jpg" ? "image/jpeg" : sourceFile.type || "");

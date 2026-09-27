@@ -40,7 +40,7 @@ export async function uploadDeliveryVersions(params: {
       version: params.version,
       items: params.files.map(({ photoId, file }) => ({
         photo_id: photoId,
-        filename: file.name,
+        filename: file.name.normalize("NFC"),
         content_type: inferredContentType(file),
         byte_size: file.size,
       })),
