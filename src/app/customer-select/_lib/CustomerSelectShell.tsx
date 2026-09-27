@@ -11,7 +11,7 @@ export function CustomerSelectShell({ children, navigation = false, viewportLock
       <header data-customer-shell-header-mode={compactHeader ? "compact" : "expanded"} className="shrink-0 border-b border-border-subtle bg-surface">
         <div className={`flex w-full items-center px-5 transition-[height] duration-200 md:px-8 ${compactHeader ? "h-12 gap-3" : "h-16 gap-6"}`}>
           <BrandLogoBar href="/customer-select" size={compactHeader ? "sm" : "md"} variant="default" markOnly={compactHeader} />
-          {compactHeader && compactTitle ? <div data-compact-project-title className="hidden min-w-0 md:block">{compactTitle}</div> : null}
+          {compactHeader && compactTitle ? <div data-compact-project-title className="min-w-0">{compactTitle}</div> : null}
           {account || navigation ? <div className="ml-auto flex items-center gap-2">
             {account ? <CustomerAccountMenu account={account} /> : null}
             {navigation ? <nav aria-label="고객 셀렉 메뉴">

@@ -471,7 +471,7 @@ export default function CustomerUploadPage() {
     <CustomerSelectShell
       viewportLocked
       compactHeader={compactHeader}
-      compactTitle={<Link href={`/customer-select/${projectId}`} className="block max-w-[min(40vw,520px)] truncate text-[14px] font-bold tracking-[-0.02em] text-foreground hover:text-accent">{displayName}</Link>}
+      compactTitle={<Link href={`/customer-select/${projectId}`} className="block max-w-[calc(100vw-72px)] truncate text-[14px] font-bold tracking-[-0.02em] text-foreground hover:text-accent md:max-w-[min(40vw,520px)]">{displayName}</Link>}
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden onChange={(event) => {
@@ -481,13 +481,13 @@ export default function CustomerUploadPage() {
         }} />
 
         <header data-upload-header-mode={compactHeader ? "compact" : "expanded"} className="shrink-0 border-b border-border-subtle bg-surface">
-          <div className={`grid w-full grid-cols-[36px_minmax(0,1fr)] items-center gap-1 px-5 transition-[padding-block] duration-200 md:flex md:gap-2 md:px-8 ${compactHeader ? "py-1 md:hidden" : "py-1.5"}`}>
-            <button type="button" onClick={() => router.push(`/customer-select/${projectId}`)} className={`grid shrink-0 place-items-center rounded-lg text-muted-foreground transition-[width,height] hover:bg-surface-raised hover:text-foreground ${compactHeader ? "size-9" : "size-10"}`} aria-label="프로젝트 현황으로"><ChevronLeft size={19} /></button>
+          {!compactHeader ? <div data-upload-project-context className="grid w-full grid-cols-[36px_minmax(0,1fr)] items-center gap-1 px-5 py-1.5 md:flex md:gap-2 md:px-8">
+            <button type="button" onClick={() => router.push(`/customer-select/${projectId}`)} className="grid size-10 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-surface-raised hover:text-foreground" aria-label="프로젝트 현황으로"><ChevronLeft size={19} /></button>
             <div className="min-w-0 flex-1">
-              <h1 className={`truncate font-bold tracking-[-0.025em] text-foreground transition-[font-size] ${compactHeader ? "text-[14px]" : "text-[17px] md:text-[19px]"}`}>{displayName}</h1>
-              {!compactHeader ? <p className="mt-0.5 text-[12px] text-muted-foreground">전체 이용량 {accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${MAX_PHOTOS.toLocaleString()}장 · ${accountUsage.remaining.toLocaleString()}장 남음` : "확인 중"}</p> : null}
+              <h1 className="truncate text-[17px] font-bold tracking-[-0.025em] text-foreground md:text-[19px]">{displayName}</h1>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">전체 이용량 {accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${MAX_PHOTOS.toLocaleString()}장 · ${accountUsage.remaining.toLocaleString()}장 남음` : "확인 중"}</p>
             </div>
-          </div>
+          </div> : null}
           <div className="flex min-h-11 w-full items-center justify-between gap-3 border-t border-border-subtle px-5 py-1 max-md:flex-wrap max-md:gap-1.5 md:px-8">
             {mobileManageMode ? <div className="flex min-h-11 w-full items-center justify-between md:hidden">
               <div className="flex items-center gap-2"><strong className="text-[15px] text-foreground">사진 선택</strong><span className="rounded-full bg-accent/10 px-2 py-1 text-xs font-bold tabular-nums text-accent">{selectedPhotoIds.size.toLocaleString()}장</span></div>

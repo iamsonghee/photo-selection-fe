@@ -96,6 +96,8 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     const shellHeader = page.locator('[data-customer-shell-header-mode="compact"]');
     await expect(shellHeader).toBeVisible();
     await expect(shellHeader.locator("[data-brand-wordmark]")).toBeHidden();
+    await expect(page.locator("[data-compact-project-title]")).toBeVisible();
+    await expect(page.locator("[data-upload-project-context]")).toHaveCount(0);
     await expect.poll(() => shellHeader.locator(":scope > div").evaluate((element) => element.getBoundingClientRect().height)).toBe(48);
     await uploadGallery.evaluate((element) => { element.scrollTop = 0; element.dispatchEvent(new Event("scroll")); });
     await expect(page.locator('[data-customer-shell-header-mode="expanded"]')).toBeVisible();
@@ -109,7 +111,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     });
     await expect(page.locator("[data-compact-project-title]")).toBeVisible();
     await expect(page.locator('[data-customer-shell-header-mode="compact"] [data-brand-wordmark]')).toHaveCount(0);
-    await expect(page.locator('[data-upload-header-mode="compact"] > div').first()).toBeHidden();
+    await expect(page.locator("[data-upload-project-context]")).toHaveCount(0);
     await uploadGallery.evaluate((element) => { element.scrollTop = 0; element.dispatchEvent(new Event("scroll")); });
     await page.getByRole("button", { name: "프로젝트 현황으로" }).click();
     await expect(page.getByRole("region", { name: "프로젝트 진행 현황" })).toBeVisible();
