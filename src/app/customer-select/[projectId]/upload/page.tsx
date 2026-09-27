@@ -554,7 +554,7 @@ export default function CustomerUploadPage() {
               selectedPhotoIds={selectedPhotoIds}
               selectionOnHover={!isMobile && !photoSetLocked}
               mobileManageMode={mobileManageMode}
-              mobileSelectionVisible={mobileManageMode}
+              mobileSelectionVisible={!photoSetLocked && !uploading}
               groupsById={groupsById}
               showSimilarityGroups
               showQualityBadges

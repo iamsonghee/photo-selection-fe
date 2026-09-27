@@ -76,6 +76,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
       const addBox = await page.getByRole("button", { name: "사진 추가하기" }).boundingBox();
       await expect(page.getByRole("button", { name: "프로젝트 현황으로" })).toHaveCount(0);
       await expect(page.locator("[data-compact-project-title]")).toBeVisible();
+      if (width < 768) await expect(page.locator("[data-mobile-selection-checkbox]").first()).toBeVisible();
       expect(addBox?.x).toBeCloseTo(galleryPadding, 0);
       await page.screenshot({ path: testInfo.outputPath(`upload-${width}.png`), fullPage: true });
     }
@@ -84,15 +85,13 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await expect(mobileTools.getByRole("textbox", { name: "파일명으로 필터링" })).toBeVisible();
     await expect(mobileTools.getByRole("button", { name: "업로드 순" })).toHaveAttribute("aria-pressed", "true");
     await mobileTools.getByRole("button", { name: "완료" }).click();
-    await expect(page.locator("[data-mobile-selection-checkbox]")).toHaveCount(0);
+    await expect(page.locator("[data-mobile-selection-checkbox]").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "삭제할 사진 선택" })).toBeVisible();
-    const firstPhoto = page.locator('[data-original-photo-card] button[aria-label$="상세 보기"]').first();
-    await firstPhoto.dispatchEvent("pointerdown", { button: 0, pointerType: "touch", clientX: 80, clientY: 300 });
-    await page.waitForTimeout(500);
+    await page.locator("[data-mobile-selection-checkbox]").first().click();
     await expect(page.getByText("사진 선택", { exact: true })).toBeVisible();
     await expect(page.locator("[data-mobile-selection-checkbox]").first()).toBeVisible();
     await page.getByRole("button", { name: "사진 선택 취소" }).click();
-    await expect(page.locator("[data-mobile-selection-checkbox]")).toHaveCount(0);
+    await expect(page.locator("[data-mobile-selection-checkbox]").first()).toBeVisible();
     await page.setViewportSize({ width: 390, height: 400 });
     const uploadGallery = page.getByRole("main", { name: "업로드 사진 갤러리" });
     const shellHeader = page.locator('[data-customer-shell-header-mode="compact"]');
