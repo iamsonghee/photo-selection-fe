@@ -81,7 +81,13 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   await expect(page).toHaveURL(/\/customer-select\/core-flow\/review/);
   await expect(page.getByRole("heading", { name: "핵심 흐름 QA", exact: true })).toBeVisible();
   const reviewTexts = await page.locator("body").innerText();
-  await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(selectedCount);
+  await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(Math.min(selectedCount, 12));
+  const firstSelectedPhoto = page.getByRole("button", { name: /크게 보기$/ }).first().locator("img");
+  const firstSelectedPhotoBox = await firstSelectedPhoto.boundingBox();
+  if (selectedCount > 12) {
+    await page.getByRole("button", { name: `나머지 ${selectedCount - 12}장 더보기` }).click();
+    await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(selectedCount);
+  }
   const reviewPageBox = await page.locator('[class*="page"]').first().boundingBox();
   const reviewCardBoxes = await page.locator("img").evaluateAll((images) => images.map((image) => {
     const r = image.getBoundingClientRect(); return { width: r.width, height: r.height };
@@ -108,6 +114,7 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   expect(viewerReviewBox?.height).toBeGreaterThanOrEqual(40);
   expect(csvBox?.height).toBeGreaterThanOrEqual(40);
   expect(txtBox?.height).toBeGreaterThanOrEqual(40);
+  expect(Math.abs((firstSelectedPhotoBox?.width ?? 0) - (firstSelectedPhotoBox?.height ?? 0))).toBeLessThanOrEqual(1);
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
 
@@ -139,7 +146,7 @@ test("legacy exported project can continue selecting", async ({ page }) => {
   expect(await page.evaluate(() => (window as typeof window & { __sawSelectionGallery?: boolean }).__sawSelectionGallery)).toBe(true);
 });
 
-for (const selectedCount of [7, 12]) {
+for (const selectedCount of [7, 16]) {
   for (const config of [{ name: "desktop", width: 1440, height: 900 }, { name: "mobile", width: 390, height: 844 }]) {
     test(`${selectedCount}/10 ${config.name} core flow`, async ({ browser }) => {
       const context = await browser.newContext({ viewport: { width: config.width, height: config.height }, acceptDownloads: true });

@@ -20,6 +20,8 @@ import {
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import ui from "../../_lib/ui.module.css";
 
+const INITIAL_VISIBLE_PHOTOS = 12;
+
 function buildExportText(
   selected: { id: string; name: string }[],
   comments: Record<string, string | undefined>
@@ -38,6 +40,7 @@ export default function CustomerReviewPage() {
   const router = useRouter();
   const { project, hydrated, isOwner, currentIdentity, syncStatus } = useCustomerSelectStore();
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
+  const [showAllSelected, setShowAllSelected] = useState(false);
   const [linkCopyState, setLinkCopyState] = useState<"idle" | "loading" | "ok" | "fail">("idle");
 
   useEffect(() => {
@@ -45,6 +48,7 @@ export default function CustomerReviewPage() {
   }, [hydrated, isOwner, projectId, router]);
 
   const selected = project.photos.filter((p) => project.selectedIds.includes(p.id));
+  const visibleSelected = showAllSelected ? selected : selected.slice(0, INITIAL_VISIBLE_PHOTOS);
   const requested = requestedPhotoIds(project);
   const match = tasteMatchPct(project);
   const done = bothDone(project);
@@ -120,7 +124,7 @@ export default function CustomerReviewPage() {
               선택한 사진
             </p>
             <div className={ui.reviewGrid}>
-              {selected.map((p, index) => (
+              {visibleSelected.map((p, index) => (
                 <button key={p.id} type="button" className={ui.reviewThumbButton} aria-label={`${getPhotoDisplayName(p)} 크게 보기`} onClick={() => setFocusIndex(index)}>
                   <PhotoThumbnailFrame className={ui.reviewThumb}>
                     <img src={p.url} alt="" />
@@ -130,6 +134,11 @@ export default function CustomerReviewPage() {
                 </button>
               ))}
             </div>
+            {!showAllSelected && selected.length > INITIAL_VISIBLE_PHOTOS && (
+              <button type="button" className={ui.reviewMore} onClick={() => setShowAllSelected(true)}>
+                나머지 {(selected.length - INITIAL_VISIBLE_PHOTOS).toLocaleString()}장 더보기
+              </button>
+            )}
           </section>
 
           {requested.length > 0 ? <section className={ui.reviewSection}>

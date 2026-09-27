@@ -467,7 +467,7 @@
   outline-offset: 2px;
 }
 .reviewThumb {
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 1;
   border-radius: inherit;
   overflow: hidden;
   background: #ecefee;
@@ -488,6 +488,24 @@
   height: 100%;
   display: block;
   object-fit: cover;
+}
+.reviewMore {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 16px;
+  border: 1px solid #dde1e4;
+  border-radius: 10px;
+  background: #fff;
+  color: #023852;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.reviewMore:hover { border-color: #b9c4c9; }
+.reviewMore:focus-visible {
+  outline: 2px solid #ff4d00;
+  outline-offset: 2px;
 }
 .reviewCommentBadge {
   position: absolute;
