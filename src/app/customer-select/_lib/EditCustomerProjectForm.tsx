@@ -121,7 +121,7 @@ export function EditCustomerProjectForm({ project }: { project: EditableProject 
           <CustomerShareLinkManager projectId={project.id} initialToken={project.share_token} initialEnabled={project.sharing_enabled} />
 
           <details className="group overflow-hidden rounded-2xl border border-border-subtle bg-surface">
-            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 text-[14px] font-semibold text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/35 sm:px-6 [&::-webkit-details-marker]:hidden">
+            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 text-[14px] font-semibold text-danger transition-colors hover:bg-danger/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-danger/35 sm:px-6 [&::-webkit-details-marker]:hidden">
               프로젝트 삭제
               <ChevronDown size={17} className="shrink-0 transition-transform group-open:rotate-180" aria-hidden />
             </summary>
