@@ -62,7 +62,12 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await expect(page.getByText("담당 작가명", { exact: true })).toBeVisible();
     await expect(page.getByText("촬영 지역", { exact: true })).toBeVisible();
     await expect(page.getByText("촬영 장소", { exact: true })).toBeVisible();
+    const deleteSection = page.locator("details").filter({ hasText: "프로젝트 삭제" });
+    await expect(deleteSection).not.toHaveAttribute("open", "");
+    await expect(deleteSection.getByRole("button", { name: "프로젝트 삭제", exact: true })).not.toBeVisible();
     await page.screenshot({ path: testInfo.outputPath("settings-mobile.png"), fullPage: true });
+    await deleteSection.locator("summary").click();
+    await expect(deleteSection.getByRole("button", { name: "프로젝트 삭제", exact: true })).toBeVisible();
   } else {
     testInfo.annotations.push({ type: "coverage", description: "No existing test-owner project: overview requires separate verification." });
   }

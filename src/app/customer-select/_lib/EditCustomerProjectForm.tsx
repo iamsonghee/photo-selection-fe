@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ChevronDown } from "lucide-react";
 import { PhotographerLightPageFrame } from "@/components/layout/PhotographerLightPageHeader";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { PhotographerFormActionBar } from "@/components/photographer/PhotographerFormActionBar";
@@ -119,11 +120,16 @@ export function EditCustomerProjectForm({ project }: { project: EditableProject 
 
           <CustomerShareLinkManager projectId={project.id} initialToken={project.share_token} initialEnabled={project.sharing_enabled} />
 
-          <section className="rounded-2xl border border-danger/25 bg-surface p-5 sm:p-6">
-            <h2 className="text-[16px] font-bold text-foreground">프로젝트 삭제</h2>
-            <p className="mt-2 text-[13px] leading-5 text-muted-foreground">업로드한 사진 {project.photo_count.toLocaleString()}장과 셀렉·보정 기록이 모두 삭제되며 복구할 수 없습니다.</p>
-            <PhotographerLightButton variant="danger" className="mt-5" onClick={() => setConfirmDelete(true)}>프로젝트 삭제</PhotographerLightButton>
-          </section>
+          <details className="group overflow-hidden rounded-2xl border border-border-subtle bg-surface">
+            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 text-[14px] font-semibold text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/35 sm:px-6 [&::-webkit-details-marker]:hidden">
+              프로젝트 삭제
+              <ChevronDown size={17} className="shrink-0 transition-transform group-open:rotate-180" aria-hidden />
+            </summary>
+            <div className="border-t border-danger/20 px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
+              <p className="text-[13px] leading-5 text-muted-foreground">업로드한 사진 {project.photo_count.toLocaleString()}장과 셀렉·보정 기록이 모두 삭제되며 복구할 수 없습니다.</p>
+              <PhotographerLightButton variant="danger" className="mt-4" onClick={() => setConfirmDelete(true)}>프로젝트 삭제</PhotographerLightButton>
+            </div>
+          </details>
         </div>
       </div>
     </PhotographerLightPageFrame>
