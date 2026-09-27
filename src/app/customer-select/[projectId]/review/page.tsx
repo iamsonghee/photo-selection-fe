@@ -20,6 +20,8 @@ import {
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import ui from "../../_lib/ui.module.css";
 
+const INITIAL_VISIBLE_PHOTOS = 10;
+
 function buildExportText(
   selected: { id: string; name: string }[],
   comments: Record<string, string | undefined>
@@ -38,7 +40,6 @@ export default function CustomerReviewPage() {
   const router = useRouter();
   const { project, hydrated, isOwner, currentIdentity, syncStatus } = useCustomerSelectStore();
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
   const [showAllSelected, setShowAllSelected] = useState(false);
   const [linkCopyState, setLinkCopyState] = useState<"idle" | "loading" | "ok" | "fail">("idle");
 
@@ -46,18 +47,9 @@ export default function CustomerReviewPage() {
     if (hydrated && !isOwner) router.replace(`/customer-select/${projectId}/select`);
   }, [hydrated, isOwner, projectId, router]);
 
-  useEffect(() => {
-    const query = window.matchMedia("(max-width: 767px)");
-    const update = () => setIsMobile(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-
   const selected = project.photos.filter((p) => project.selectedIds.includes(p.id));
-  const initialVisibleCount = isMobile ? 8 : 15;
-  const collapseSelected = selected.length - initialVisibleCount > (isMobile ? 2 : 5);
-  const visibleSelected = showAllSelected || !collapseSelected ? selected : selected.slice(0, initialVisibleCount);
+  const collapseSelected = selected.length > INITIAL_VISIBLE_PHOTOS;
+  const visibleSelected = showAllSelected || !collapseSelected ? selected : selected.slice(0, INITIAL_VISIBLE_PHOTOS);
   const requested = requestedPhotoIds(project);
   const match = tasteMatchPct(project);
   const done = bothDone(project);
@@ -146,7 +138,7 @@ export default function CustomerReviewPage() {
             {collapseSelected && (
               <button type="button" className={ui.reviewMore} aria-expanded={showAllSelected} onClick={() => setShowAllSelected((current) => !current)}>
                 {showAllSelected ? <ChevronUp size={16} aria-hidden /> : <ChevronDown size={16} aria-hidden />}
-                {showAllSelected ? "사진 접기" : `사진 ${(selected.length - initialVisibleCount).toLocaleString()}장 더 보기`}
+                {showAllSelected ? "사진 접기" : `사진 ${(selected.length - INITIAL_VISIBLE_PHOTOS).toLocaleString()}장 더 보기`}
               </button>
             )}
           </section>

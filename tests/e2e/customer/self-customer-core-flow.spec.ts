@@ -81,18 +81,16 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   await expect(page).toHaveURL(/\/customer-select\/core-flow\/review/);
   await expect(page.getByRole("heading", { name: "핵심 흐름 QA", exact: true })).toBeVisible();
   const reviewTexts = await page.locator("body").innerText();
-  const initialVisibleCount = viewport === "mobile" ? 8 : 15;
-  const rowSize = viewport === "mobile" ? 2 : 5;
-  const collapsed = selectedCount - initialVisibleCount > rowSize;
-  await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(collapsed ? initialVisibleCount : selectedCount);
+  const collapsed = selectedCount > 10;
+  await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(collapsed ? 10 : selectedCount);
   const firstSelectedPhoto = page.getByRole("button", { name: /크게 보기$/ }).first().locator("img");
   const firstSelectedPhotoBox = await firstSelectedPhoto.boundingBox();
   if (collapsed) {
-    await page.getByRole("button", { name: `사진 ${selectedCount - initialVisibleCount}장 더 보기` }).click();
+    await page.getByRole("button", { name: `사진 ${selectedCount - 10}장 더 보기` }).click();
     await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(selectedCount);
     await page.getByRole("button", { name: "사진 접기" }).click();
-    await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(initialVisibleCount);
-    await page.getByRole("button", { name: `사진 ${selectedCount - initialVisibleCount}장 더 보기` }).click();
+    await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(10);
+    await page.getByRole("button", { name: `사진 ${selectedCount - 10}장 더 보기` }).click();
   }
   const reviewPageBox = await page.locator('[class*="page"]').first().boundingBox();
   const reviewCardBoxes = await page.locator("img").evaluateAll((images) => images.map((image) => {
