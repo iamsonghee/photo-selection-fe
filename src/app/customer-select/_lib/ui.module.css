@@ -606,7 +606,7 @@
     box-sizing: border-box;
   }
   .reviewGrid {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 220px));
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 18px 12px;
   }
   .deliveryMain {
