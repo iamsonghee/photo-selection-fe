@@ -5,12 +5,12 @@ import { BrandLogoBar } from "@/components/BrandLogo";
 import theme from "@/styles/AcutLightTheme.module.css";
 import { CustomerAccountMenu, type CustomerAccountSummary } from "./CustomerAccountMenu";
 
-export function CustomerSelectShell({ children, navigation = false, viewportLocked = false, account }: { children: ReactNode; navigation?: boolean; viewportLocked?: boolean; account?: CustomerAccountSummary }) {
+export function CustomerSelectShell({ children, navigation = false, viewportLocked = false, compactHeader = false, account }: { children: ReactNode; navigation?: boolean; viewportLocked?: boolean; compactHeader?: boolean; account?: CustomerAccountSummary }) {
   return (
     <div className={`${theme.lightTheme} flex min-h-dvh flex-col bg-background text-foreground ${viewportLocked ? "h-dvh overflow-hidden" : ""}`}>
-      <header className="shrink-0 border-b border-border-subtle bg-surface">
-        <div className="flex h-16 w-full items-center gap-6 px-5 md:px-8">
-          <BrandLogoBar href="/customer-select" variant="default" />
+      <header data-customer-shell-header-mode={compactHeader ? "compact" : "expanded"} className="shrink-0 border-b border-border-subtle bg-surface">
+        <div className={`flex w-full items-center gap-6 px-5 transition-[height] duration-200 md:px-8 ${compactHeader ? "h-12" : "h-16"}`}>
+          <BrandLogoBar href="/customer-select" size={compactHeader ? "sm" : "md"} variant="default" mobileMarkOnly={compactHeader} />
           {account || navigation ? <div className="ml-auto flex items-center gap-2">
             {account ? <CustomerAccountMenu account={account} /> : null}
             {navigation ? <nav aria-label="고객 셀렉 메뉴">

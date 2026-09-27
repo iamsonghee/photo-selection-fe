@@ -467,7 +467,7 @@ export default function CustomerUploadPage() {
   }
 
   return (
-    <CustomerSelectShell viewportLocked>
+    <CustomerSelectShell viewportLocked compactHeader={compactHeader}>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden onChange={(event) => {
           const files = Array.from(event.currentTarget.files ?? []);

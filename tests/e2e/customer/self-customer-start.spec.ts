@@ -89,6 +89,16 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await expect(page.locator("[data-mobile-selection-checkbox]").first()).toBeVisible();
     await page.getByRole("button", { name: "사진 선택 취소" }).click();
     await expect(page.locator("[data-mobile-selection-checkbox]")).toHaveCount(0);
+    await page.setViewportSize({ width: 390, height: 400 });
+    const uploadGallery = page.getByRole("main", { name: "업로드 사진 갤러리" });
+    await expect.poll(() => uploadGallery.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeGreaterThan(200);
+    await uploadGallery.evaluate((element) => { element.scrollTop = 100; element.dispatchEvent(new Event("scroll")); });
+    const shellHeader = page.locator('[data-customer-shell-header-mode="compact"]');
+    await expect(shellHeader).toBeVisible();
+    await expect(shellHeader.locator("[data-brand-wordmark]")).toBeHidden();
+    await expect.poll(() => shellHeader.locator(":scope > div").evaluate((element) => element.getBoundingClientRect().height)).toBe(48);
+    await uploadGallery.evaluate((element) => { element.scrollTop = 0; element.dispatchEvent(new Event("scroll")); });
+    await expect(page.locator('[data-customer-shell-header-mode="expanded"]')).toBeVisible();
     await page.getByRole("button", { name: "프로젝트 현황으로" }).click();
     await expect(page.getByRole("region", { name: "프로젝트 진행 현황" })).toBeVisible();
     await page.getByRole("link", { name: "프로젝트 수정", exact: true }).click();

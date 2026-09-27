@@ -80,12 +80,14 @@ export const BrandLogoBar = memo(function BrandLogoBar({
   href,
   priority = false,
   variant = "default",
+  mobileMarkOnly = false,
 }: {
   size?: BrandLogoSize;
   className?: string;
   href?: string;
   priority?: boolean;
   variant?: BrandLogoVariant;
+  mobileMarkOnly?: boolean;
 }) {
   void priority;
   const s = variant === "customerEntry"
@@ -99,7 +101,7 @@ export const BrandLogoBar = memo(function BrandLogoBar({
       style={{ gap: s.gap }}
     >
       <LogoMark size={s.mark} fontSize={s.markFont} variant={variant} />
-      <LogoWordmark fontSize={s.text} variant={variant} />
+      <span data-brand-wordmark className={mobileMarkOnly ? "max-md:hidden" : ""}><LogoWordmark fontSize={s.text} variant={variant} /></span>
     </div>
   );
   if (href) {
