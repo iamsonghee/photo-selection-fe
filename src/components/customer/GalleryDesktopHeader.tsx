@@ -588,7 +588,7 @@ export function GalleryDesktopHeader({
           font-family: inherit;
         }
         .gld-color-chip-active {
-          color: var(--customer-ink);
+          color: #fff;
           border-color: var(--customer-ink);
           background: var(--customer-control);
         }
