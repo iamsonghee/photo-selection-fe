@@ -77,8 +77,9 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   expect(viewerTexts).not.toContain("전체 사진에서 더 고르기");
   await viewerReview.click();
   await expect(page).toHaveURL(/\/customer-select\/core-flow\/review/);
-  await expect(page.getByRole("heading", { name: "최종 검토" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "최종 검토", exact: true })).toBeVisible();
   const reviewTexts = await page.locator("body").innerText();
+  await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(selectedCount);
   const reviewPageBox = await page.locator('[class*="page"]').first().boundingBox();
   const reviewCardBoxes = await page.locator("img").evaluateAll((images) => images.map((image) => {
     const r = image.getBoundingClientRect(); return { width: r.width, height: r.height };
@@ -89,14 +90,13 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   await expect(page.getByRole("dialog", { name: "CORE_001.jpg 크게 보기" })).toBeVisible();
   await page.keyboard.press("Escape");
 
-  await page.getByRole("button", { name: "전달 내용 만들기" }).click();
-  await expect(page.getByRole("heading", { name: "작가님께 전달하기" })).toBeVisible();
+  await page.getByText("파일로 내보내기").click();
   const exportTexts = await page.locator("body").innerText();
   const csvBox = await page.getByRole("button", { name: "CSV 다운로드" }).boundingBox();
   const txtBox = await page.getByRole("button", { name: "TXT 다운로드" }).boundingBox();
   const [csv] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "CSV 다운로드" }).click()]);
   const [txt] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "TXT 다운로드" }).click()]);
-  await page.screenshot({ path: `test-results/core-flow-${viewport}-${selectedCount}-export.png`, fullPage: true });
+  await page.screenshot({ path: `test-results/core-flow-${viewport}-${selectedCount}-review-export.png`, fullPage: true });
 
   expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.innerWidth);
   expect(reviewOverflow.scrollWidth).toBeLessThanOrEqual(reviewOverflow.innerWidth);
@@ -130,8 +130,8 @@ test("delivered project skips the selection gallery while redirecting", async ({
   });
 
   await page.goto("/customer-select/delivered/select");
-  await expect(page).toHaveURL(/\/customer-select\/delivered\/export$/);
-  await expect(page.getByRole("heading", { name: "작가님께 전달하기" })).toBeVisible();
+  await expect(page).toHaveURL(/\/customer-select\/delivered\/review$/);
+  await expect(page.getByRole("heading", { name: "최종 검토", exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as typeof window & { __sawSelectionGallery?: boolean }).__sawSelectionGallery)).toBe(false);
 });
 

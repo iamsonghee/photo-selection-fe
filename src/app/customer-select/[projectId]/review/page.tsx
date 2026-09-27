@@ -3,7 +3,6 @@
 /** S7 — 최종 검토. */
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { PhotoFocusOverlay } from "@/components/customer/PhotoFocusOverlay";
 import { PhotoThumbnailFrame } from "@/components/ui/PhotoThumbnailFrame";
@@ -141,25 +140,22 @@ export default function CustomerReviewPage() {
           <button type="button" className={ui.back} onClick={() => router.back()}>
             ←
           </button>
-          <h1 className={ui.title}>최종 검토·전달</h1>
+          <div className={ui.reviewTitleGroup}>
+            <span>{project.name}</span>
+            <h1 className={ui.title}>최종 검토</h1>
+          </div>
+          <div className={ui.reviewHeaderAction}>
+            {project.exported
+              ? <PhotographerLightButton variant="secondary" onClick={() => setReopenConfirm(true)}>다시 선택하기</PhotographerLightButton>
+              : <PhotographerLightButton variant="secondary" onClick={() => router.push(`/customer-select/${projectId}/select`)}>더 고르기</PhotographerLightButton>}
+          </div>
         </div>
         <div className={ui.body}>
           {syncStatus !== "connected" && <div className={`${ui.banner} ${ui.bannerWarn}`}><span className={ui.bannerHeadWarn}>{syncStatus === "offline" ? "최신 참여 상태를 확인하지 못하고 있어요" : "최신 참여 상태를 확인하고 있어요"}</span><span className={ui.bodyText}>연결되면 전달 단계를 계속할 수 있어요.</span></div>}
-          <div style={{ display: "flex", gap: 8 }}>
-            <div className={ui.statPill}>
-              <span className={ui.n}>{selected.length}장</span>
-              <span className={ui.l}>선택한 사진</span>
-            </div>
-            <div className={ui.statPill}>
-              <span className={ui.n}>{requested.length}장</span>
-              <span className={ui.l}>보정 요청</span>
-            </div>
-            {match !== null && (
-              <div className={`${ui.statPill} ${ui.statPillAccent}`}>
-                <span className={ui.n}>{match}%</span>
-                <span className={ui.l}>취향 일치율</span>
-              </div>
-            )}
+          <div className={ui.reviewSummary} aria-label="최종 선택 요약">
+            <span><strong>{selected.length}장</strong> 선택</span>
+            <span><strong>{requested.length}장</strong> 보정 요청</span>
+            {match !== null ? <span><strong>{match}%</strong> 취향 일치</span> : null}
           </div>
 
           {!done && waiting.length > 0 && (
@@ -176,30 +172,14 @@ export default function CustomerReviewPage() {
               선택한 사진
             </p>
             <div className={ui.reviewGrid}>
-              {selected.slice(0, 12).map((p) => (
-                <button key={p.id} type="button" className={ui.reviewThumbButton} aria-label={`${getPhotoDisplayName(p)} 크게 보기`} onClick={() => setFocusIndex(selected.indexOf(p))}>
-                  <PhotoThumbnailFrame active className={ui.reviewThumb}>
+              {selected.map((p, index) => (
+                <button key={p.id} type="button" className={ui.reviewThumbButton} aria-label={`${getPhotoDisplayName(p)} 크게 보기`} onClick={() => setFocusIndex(index)}>
+                  <PhotoThumbnailFrame className={ui.reviewThumb}>
                     <img src={p.url} alt="" />
-                    {project.photoStates[p.id]?.comment && <span>💬</span>}
+                    {project.photoStates[p.id]?.comment && <span className={ui.reviewCommentBadge} aria-label="보정 요청 있음">요청</span>}
                   </PhotoThumbnailFrame>
                 </button>
               ))}
-              {selected.length > 12 && (
-                <div
-                  style={{
-                    aspectRatio: "1",
-                    borderRadius: 4,
-                    background: "#f7f6f4",
-                    display: "grid",
-                    placeItems: "center",
-                    fontFamily: "'JetBrains Mono',monospace",
-                    fontSize: 12,
-                    color: "#8b8985",
-                  }}
-                >
-                  +{selected.length - 12}
-                </div>
-              )}
             </div>
           </div>
 
@@ -221,8 +201,11 @@ export default function CustomerReviewPage() {
                   if (!comments.length && project.photoStates[id]?.comment) comments.push(`기존 의견: ${project.photoStates[id].comment}`);
                   return (
                     <div key={id} className={ui.reqItem}>
-                      <span className="fn">{getPhotoDisplayName(p)}</span>
-                      <span className="tx">{comments.join(" · ")}</span>
+                      <img src={p.previewUrl ?? p.url} alt="" />
+                      <span>
+                        <span className={ui.reqFilename}>{getPhotoDisplayName(p)}</span>
+                        <span className={ui.reqText}>{comments.join(" · ")}</span>
+                      </span>
                     </div>
                   );
                 })}
@@ -232,47 +215,36 @@ export default function CustomerReviewPage() {
 
           <hr className={ui.divider} />
 
-          <div>
-            <p className={ui.label} style={{ marginBottom: 8 }}>작가에게 전달하기</p>
+          <section className={ui.deliveryCard}>
+            <div className={ui.deliveryHeading}>
+              <p className={ui.label}>작가에게 전달하기</p>
+              {project.exported ? <span>전달 완료</span> : null}
+            </div>
             <p className={ui.bodyText}>링크를 복사해 작가님께 보내주세요. 다시 전달하면 같은 링크에 최신 결과가 반영돼요.</p>
-            <button type="button" className={`${ui.btn} ${ui.btnPrimary}`} style={{ width: "100%", marginTop: 12 }} disabled={linkCopyState === "loading" || changingState || checkingLatest || syncStatus !== "connected"} onClick={() => void requestLinkCopy(false)}>
+            {project.lastDeliveredAt ? <p className={ui.deliveryMeta}>최근 전달 {new Date(project.lastDeliveredAt).toLocaleString("ko-KR")} · 총 {project.deliveryCount.toLocaleString()}회</p> : null}
+            {stateError ? <p role="alert" className={ui.deliveryError}>{stateError}</p> : null}
+            <button type="button" className={`${ui.btn} ${ui.btnPrimary} ${ui.deliveryPrimary}`} disabled={selected.length === 0 || linkCopyState === "loading" || changingState || checkingLatest || syncStatus !== "connected"} onClick={() => void requestLinkCopy(false)}>
               {linkCopyState === "loading" || changingState || checkingLatest ? "링크 복사 중…" : linkCopyState === "ok" ? "복사했어요 ✓" : linkCopyState === "fail" ? "다시 복사하기" : "링크 복사"}
             </button>
-            <details style={{ marginTop: 16 }}>
-              <summary className={ui.supportText} style={{ cursor: "pointer" }}>파일로 내보내기</summary>
-              <pre className={ui.exportBlock} style={{ marginTop: 8 }}>{exportText}</pre>
+            {project.exported ? <div className={ui.deliveryActions}><PhotographerLightButton onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>보정본 업로드하기</PhotographerLightButton></div> : null}
+            <details className={ui.exportDetails}>
+              <summary>파일로 내보내기</summary>
+              <pre className={ui.exportBlock}>{exportText}</pre>
               <div style={{ display: "flex", gap: 8 }}>
                 <button type="button" className={`${ui.btn} ${ui.btnSm}`} style={{ flex: 1 }} aria-label="CSV 다운로드" onClick={handleDownloadCsv}>CSV 다운로드</button>
                 <button type="button" className={`${ui.btn} ${ui.btnSm}`} style={{ flex: 1 }} aria-label="TXT 다운로드" onClick={handleDownloadTxt}>TXT 다운로드</button>
               </div>
               <span className={ui.supportText}>CSV에는 참여자 의견이 함께 담기고, TXT에는 파일명만 담겨요.</span>
             </details>
-          </div>
-
-          {project.exported ? (
-            <div className={`${ui.banner} ${ui.bannerOk}`}>
-              <strong className={ui.bannerHeadOk}>작가에게 전달할 준비가 됐어요</strong>
-              <span className={ui.supportText}>선택 사진과 의견을 읽기 전용 링크에서 확인할 수 있어요.</span>
-            </div>
-          ) : null}
+          </section>
         </div>
-        <PhotographerPageActionBar
-          maxWidth={1120}
-          leading={<div><p className="text-sm font-semibold text-foreground">{project.exported ? "셀렉 전달 완료" : project.deliveryCount > 0 ? "다시 선택 중" : "작가에게 전달하셨나요?"}</p>{waiting.length > 0 && !project.exported ? <p className="mt-1 text-xs font-semibold text-danger">{waiting.map((participant) => participant.name).join(", ")}님이 아직 고르는 중이에요.</p> : null}{project.lastDeliveredAt ? <p className="mt-1 text-xs text-muted-foreground">최근 전달 {new Date(project.lastDeliveredAt).toLocaleString("ko-KR")} · 총 {project.deliveryCount.toLocaleString()}회</p> : null}{syncStatus !== "connected" ? <p className="mt-1 text-xs font-semibold text-danger">최신 참여 상태를 확인하고 있어요.</p> : null}{stateError ? <p role="alert" className="mt-1 text-xs font-semibold text-danger">{stateError}</p> : null}</div>}
-          actions={<>
-            {project.exported
-              ? <PhotographerLightButton variant="secondary" onClick={() => setReopenConfirm(true)}>다시 선택하기</PhotographerLightButton>
-              : <PhotographerLightButton variant="secondary" onClick={() => router.push(`/customer-select/${projectId}/select`)}>더 고르기</PhotographerLightButton>}
-            {project.exported ? <PhotographerLightButton onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>보정본 업로드하기</PhotographerLightButton> : null}
-          </>}
-        />
         <PhotoFocusOverlay
           open={focusIndex !== null}
           src={focusIndex !== null ? selected[focusIndex]?.previewUrl ?? selected[focusIndex]?.url ?? "" : ""}
           alt={focusIndex !== null && selected[focusIndex] ? getPhotoDisplayName(selected[focusIndex]) : "선택 사진"}
           onClose={() => setFocusIndex(null)}
           onPrev={focusIndex !== null && focusIndex > 0 ? () => setFocusIndex(focusIndex - 1) : undefined}
-          onNext={focusIndex !== null && focusIndex < Math.min(selected.length, 12) - 1 ? () => setFocusIndex(focusIndex + 1) : undefined}
+          onNext={focusIndex !== null && focusIndex < selected.length - 1 ? () => setFocusIndex(focusIndex + 1) : undefined}
         />
       </div>
       </main>
