@@ -86,12 +86,11 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await expect(mobileTools.getByRole("button", { name: "업로드 순" })).toHaveAttribute("aria-pressed", "true");
     await mobileTools.getByRole("button", { name: "완료" }).click();
     await expect(page.locator("[data-mobile-selection-checkbox]").first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "삭제할 사진 선택" })).toBeVisible();
-    await page.locator("[data-mobile-selection-checkbox]").first().click();
-    await expect(page.getByText("사진 선택", { exact: true })).toBeVisible();
-    await expect(page.locator("[data-mobile-selection-checkbox]").first()).toBeVisible();
-    await page.getByRole("button", { name: "사진 선택 취소" }).click();
-    await expect(page.locator("[data-mobile-selection-checkbox]").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "삭제할 사진 선택" })).toHaveCount(0);
+    const firstCheckbox = page.locator("[data-mobile-selection-checkbox]").first();
+    await firstCheckbox.click();
+    await expect(firstCheckbox).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "선택 삭제 (1)" })).toBeVisible();
     await page.setViewportSize({ width: 390, height: 400 });
     const uploadGallery = page.getByRole("main", { name: "업로드 사진 갤러리" });
     const shellHeader = page.locator('[data-customer-shell-header-mode="compact"]');

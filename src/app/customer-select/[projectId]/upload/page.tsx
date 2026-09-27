@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { CUSTOMER_PHOTO_LIMIT as MAX_PHOTOS, uploadLimitError } from "../../_lib/upload-limit";
-import { CheckSquare, SlidersHorizontal, Sparkles, Trash2, UploadCloud } from "lucide-react";
+import { SlidersHorizontal, Sparkles, Trash2, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -75,7 +75,6 @@ export default function CustomerUploadPage() {
   const [pendingPhotos, setPendingPhotos] = useState<Photo[]>([]);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
   const [isMobile, setIsMobile] = useState(false);
-  const [mobileManageMode, setMobileManageMode] = useState(false);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [checkingDelete, setCheckingDelete] = useState(false);
@@ -114,7 +113,6 @@ export default function CustomerUploadPage() {
     const query = window.matchMedia("(max-width: 767px)");
     const update = () => {
       setIsMobile(query.matches);
-      setMobileManageMode(false);
       setSelectedPhotoIds(new Set());
     };
     update();
@@ -378,7 +376,6 @@ export default function CustomerUploadPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "사진 삭제 실패");
       setSelectedPhotoIds(new Set());
-      setMobileManageMode(false);
       setPendingDeleteIds([]);
       setDeleteImpact(null);
       await Promise.all([refresh(), getAccountUsage().then(setAccountUsage)]);
@@ -404,7 +401,6 @@ export default function CustomerUploadPage() {
       if (event.key === "Escape" && selectedPhotoIds.size) {
         event.preventDefault();
         setSelectedPhotoIds(new Set());
-        setMobileManageMode(false);
       } else if ((event.key === "Delete" || event.key === "Backspace") && selectedPhotoIds.size) {
         event.preventDefault();
         void deleteSelectedPhotosRef.current();
@@ -489,10 +485,7 @@ export default function CustomerUploadPage() {
 
         <header data-upload-header-mode={compactUploadHeader ? "compact" : "expanded"} className="shrink-0 border-b border-border-subtle bg-surface">
           <div className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-0 md:min-h-[52px] md:px-8 md:py-1">
-            {mobileManageMode ? <div className="flex min-h-11 w-full items-center justify-between md:hidden">
-              <div className="flex items-center gap-2"><strong className="text-[15px] text-foreground">사진 선택</strong><span className="rounded-full bg-accent/10 px-2 py-1 text-xs font-bold tabular-nums text-accent">{selectedPhotoIds.size.toLocaleString()}장</span></div>
-              <button type="button" className="min-h-11 px-1 text-[13px] font-semibold text-muted-foreground" onClick={() => { setSelectedPhotoIds(new Set()); setMobileManageMode(false); }} aria-label="사진 선택 취소">취소</button>
-            </div> : <>
+            <>
               <div className="flex min-w-0 flex-1 items-center justify-between gap-2 md:flex-none md:justify-start">
                 <ProjectAssetToolbarSummary label={nameFilter.trim() ? "검색 결과" : "사진"} count={`${visiblePhotos.length.toLocaleString()}장`} meta={displayedPhotos.length > 0 ? <span className="max-md:hidden">{uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 분석 완료" : "드래그하거나 체크해 여러 장 선택"}</span> : undefined} />
                 <div className="hidden md:block"><PhotographerLightButton variant="outline" size="toolbar" className="!border-transparent !bg-accent/[0.09] !text-accent hover:!bg-accent/[0.16]" onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}><Sparkles size={16} />{aiAnalyzing ? "분석 중" : aiCompleted ? "다시 분석" : "AI 분석"}</PhotographerLightButton></div>
@@ -502,14 +495,13 @@ export default function CustomerUploadPage() {
                     <SlidersHorizontal size={18} aria-hidden />
                     {nameFilter.trim() || sort !== "order-asc" ? <span className="absolute right-0.5 top-0.5 min-w-4 rounded-full bg-accent px-1 text-center text-[10px] font-bold leading-4 text-white">{Number(Boolean(nameFilter.trim())) + Number(sort !== "order-asc")}</span> : null}
                   </ProjectAssetMobileIconButton>
-                  {!photoSetLocked && displayedPhotos.length > 0 ? <ProjectAssetMobileIconButton onClick={() => setMobileManageMode(true)} aria-label="삭제할 사진 선택"><CheckSquare size={18} aria-hidden /></ProjectAssetMobileIconButton> : null}
                 </div>
               </div>
               <div className="hidden min-w-0 items-center gap-1.5 md:flex">
                 <FilenameSearchInput value={nameFilter} onChange={setNameFilter} placeholder="파일명 검색" className="max-md:flex-1" style={{ "--fsi-width": "220px" } as React.CSSProperties} />
                 <PhotoSortSelect value={sort} onChange={setSort} options={[{ value: "order-asc", label: "업로드 순" }, { value: "order-desc", label: "최근 순" }, { value: "name-asc", label: "파일명 순" }]} />
               </div>
-            </>}
+            </>
           </div>
         </header>
 
@@ -553,7 +545,6 @@ export default function CustomerUploadPage() {
               readonly
               selectedPhotoIds={selectedPhotoIds}
               selectionOnHover={!isMobile && !photoSetLocked}
-              mobileManageMode={mobileManageMode}
               mobileSelectionVisible={!photoSetLocked && !uploading}
               groupsById={groupsById}
               showSimilarityGroups
@@ -565,8 +556,11 @@ export default function CustomerUploadPage() {
               })}
               onPhotoLongPress={photoSetLocked || uploading ? undefined : (photoId) => {
                 if (!isMobile) return;
-                setSelectedPhotoIds(new Set([photoId]));
-                setMobileManageMode(true);
+                setSelectedPhotoIds((current) => {
+                  const next = new Set(current);
+                  if (next.has(photoId)) next.delete(photoId); else next.add(photoId);
+                  return next;
+                });
               }}
               onDragSelectionChange={photoSetLocked || isMobile ? undefined : setSelectedPhotoIds}
               onEmptyClick={() => setSelectedPhotoIds(new Set())}
@@ -577,7 +571,7 @@ export default function CustomerUploadPage() {
               mobileSquareMedia
               compact={isMobile}
               showFilename={false}
-              leadingCell={!photoSetLocked && !mobileManageMode ? <PhotoUploadTile isUploading={uploading || checkingCapacity} progress={total ? Math.round((progress / total) * 100) : 0} serverWorking={checkingCapacity} hasPhotos={displayedPhotos.length > 0} onClick={() => inputRef.current?.click()} /> : undefined}
+              leadingCell={!photoSetLocked ? <PhotoUploadTile isUploading={uploading || checkingCapacity} progress={total ? Math.round((progress / total) * 100) : 0} serverWorking={checkingCapacity} hasPhotos={displayedPhotos.length > 0} onClick={() => inputRef.current?.click()} /> : undefined}
               onPhotoClick={(index) => { const photo = visiblePhotos[index]; if (photo && !photo.isPending) setViewerPhotoId(photo.id); }}
             />
           )}
@@ -589,7 +583,7 @@ export default function CustomerUploadPage() {
           compactMobile
           leading={uploadStatus}
           mobileLeading={uploadStatus}
-          actions={uploading ? <PhotographerLightButton variant="secondary" onClick={cancelUpload}>업로드 중단</PhotographerLightButton> : mobileManageMode ? <PhotographerLightButton variant="danger" pending={checkingDelete} pendingLabel="확인 중" disabled={selectedPhotoIds.size === 0} onClick={requestDeleteSelectedPhotos}><Trash2 size={16} />선택한 사진 {selectedPhotoIds.size.toLocaleString()}장 삭제</PhotographerLightButton> : <>
+          actions={uploading ? <PhotographerLightButton variant="secondary" onClick={cancelUpload}>업로드 중단</PhotographerLightButton> : <>
             {!photoSetLocked && retryFiles.length > 0 ? <PhotographerLightButton variant="secondary" onClick={() => void handleFiles(retryFiles)}>실패 {retryFiles.length.toLocaleString()}장 다시 시도</PhotographerLightButton> : null}
             {!photoSetLocked && selectedPhotoIds.size > 0 ? <PhotographerLightButton variant="danger" pending={checkingDelete} pendingLabel="확인 중" onClick={requestDeleteSelectedPhotos}><Trash2 size={16} />선택 삭제 ({selectedPhotoIds.size.toLocaleString()})</PhotographerLightButton> : null}
             <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={() => router.push(photoSetLocked ? `/customer-select/${projectId}/export` : `/customer-select/${projectId}/select`)}>{photoSetLocked ? "현재 전달 내용 보기" : "사진 고르기"}</PhotographerLightButton>
