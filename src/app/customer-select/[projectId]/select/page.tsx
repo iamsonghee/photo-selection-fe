@@ -30,7 +30,6 @@ import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import type { ColorTag, Project, SortOrder, StarRating } from "@/types";
 import {
   activeParticipants,
-  disagreementIds,
   useCustomerSelectStore,
 } from "../../_lib/real-store";
 import { collapseSimilarityGroups, galleryAnchorPhotoId } from "../../_lib/gallery-view";
@@ -40,7 +39,7 @@ import { EphemeralChat } from "../../_lib/EphemeralChat";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import ui from "../../_lib/ui.module.css";
 
-type Tab = "all" | "selected" | "disagree";
+type Tab = "all" | "selected";
 
 type MobileColumns = 2 | 3 | 4;
 type DesktopDensity = "compact" | "standard" | "large";
@@ -102,7 +101,6 @@ export default function CustomerSelectGalleryPage() {
   }
 
   const selectedIds = useMemo(() => new Set(project.selectedIds), [project.selectedIds]);
-  const disagree = useMemo(() => new Set(disagreementIds(project)), [project]);
   const participants = useMemo(() => activeParticipants(project), [project]);
   const onlineParticipants = useMemo(() => new Set(project.onlineParticipants ?? []), [project.onlineParticipants]);
   const viewingNames = useMemo(() => Object.fromEntries(Object.entries(project.participantViews ?? {}).flatMap(([color, photoId]) => {
@@ -114,9 +112,8 @@ export default function CustomerSelectGalleryPage() {
 
   const baseList = useMemo(() => {
     if (tab === "selected") return project.photos.filter((p) => selectedIds.has(p.id));
-    if (tab === "disagree") return project.photos.filter((p) => disagree.has(p.id));
     return project.photos;
-  }, [tab, project.photos, selectedIds, disagree]);
+  }, [tab, project.photos, selectedIds]);
 
   const filterState = useMemo<GalleryFilterState>(() => ({
     starFilter: starFilter === 0 ? "all" : starFilter as StarRating,
@@ -159,7 +156,6 @@ export default function CustomerSelectGalleryPage() {
     [expandedGroupIds, filteredList, groupedView]
   );
 
-  const disagreeCount = disagreementIds(project).length;
   const target = project.target || 1;
   const selectedCount = project.selectedIds.length;
   const hasBlurryPhotos = project.photos.some((photo) => photo.isBlurry === true);
@@ -401,7 +397,6 @@ export default function CustomerSelectGalleryPage() {
             tabs={[
               { value: "all", label: `전체 사진 ${project.photos.length}` },
               { value: "selected", label: `최종 선택 ${selectedCount}` },
-              ...(participants.length > 1 ? [{ value: "disagree", label: `의견 갈림 ${disagreeCount}` }] : []),
             ]}
             activeTab={tab}
             onActiveTabChange={(value) => setTab(value as Tab)}
@@ -473,7 +468,6 @@ export default function CustomerSelectGalleryPage() {
             scopeOptions={[
               { value: "all", label: "전체 사진", count: project.photos.length },
               { value: "selected", label: "최종 선택", count: selectedCount },
-              ...(participants.length > 1 ? [{ value: "disagree", label: "의견 갈림", count: disagreeCount }] : []),
             ]}
             scopeValue={tab}
             scopeOpen={scopeOpen}

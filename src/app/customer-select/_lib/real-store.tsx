@@ -536,11 +536,6 @@ export function likedByAll(project: ProjectView): string[] {
   return likedByEither(project).filter((id) => colors.every((c) => project.photoStates[id]?.color?.includes(c)));
 }
 
-export function disagreementIds(project: ProjectView): string[] {
-  const both = new Set(likedByAll(project));
-  return likedByEither(project).filter((id) => !both.has(id));
-}
-
 export function tasteMatchPct(project: ProjectView): number | null {
   if (activeColors(project).length < 2) return null;
   const either = likedByEither(project).length;
