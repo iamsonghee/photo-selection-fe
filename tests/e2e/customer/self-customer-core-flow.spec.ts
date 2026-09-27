@@ -77,7 +77,7 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   expect(viewerTexts).not.toContain("전체 사진에서 더 고르기");
   await viewerReview.click();
   await expect(page).toHaveURL(/\/customer-select\/core-flow\/review/);
-  await expect(page.getByRole("heading", { name: "최종 검토", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "핵심 흐름 QA", exact: true })).toBeVisible();
   const reviewTexts = await page.locator("body").innerText();
   await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(selectedCount);
   const reviewPageBox = await page.locator('[class*="page"]').first().boundingBox();
@@ -131,7 +131,7 @@ test("delivered project skips the selection gallery while redirecting", async ({
 
   await page.goto("/customer-select/delivered/select");
   await expect(page).toHaveURL(/\/customer-select\/delivered\/review$/);
-  await expect(page.getByRole("heading", { name: "최종 검토", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "핵심 흐름 QA", exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as typeof window & { __sawSelectionGallery?: boolean }).__sawSelectionGallery)).toBe(false);
 });
 

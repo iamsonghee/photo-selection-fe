@@ -3,6 +3,7 @@
 /** S7 — 최종 검토. */
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { PhotoFocusOverlay } from "@/components/customer/PhotoFocusOverlay";
 import { PhotoThumbnailFrame } from "@/components/ui/PhotoThumbnailFrame";
@@ -137,26 +138,17 @@ export default function CustomerReviewPage() {
       <main className={ui.shellMain}>
       <div className={ui.page}>
         <div className={ui.header}>
-          <button type="button" className={ui.back} onClick={() => router.back()}>
-            ←
+          <button type="button" className={ui.back} aria-label="이전 화면" onClick={() => router.back()}>
+            <ChevronLeft size={22} strokeWidth={1.8} aria-hidden />
           </button>
           <div className={ui.reviewTitleGroup}>
-            <span>{project.name}</span>
-            <h1 className={ui.title}>최종 검토</h1>
+            <h1 className={ui.title}>{project.name}</h1>
+            <p>최종 검토 · {selected.length.toLocaleString()}장 선택{requested.length > 0 ? ` · 보정 요청 ${requested.length.toLocaleString()}장` : ""}{match !== null ? ` · 취향 일치 ${match}%` : ""}</p>
           </div>
-          <div className={ui.reviewHeaderAction}>
-            {project.exported
-              ? <PhotographerLightButton variant="secondary" onClick={() => setReopenConfirm(true)}>다시 선택하기</PhotographerLightButton>
-              : <PhotographerLightButton variant="secondary" onClick={() => router.push(`/customer-select/${projectId}/select`)}>더 고르기</PhotographerLightButton>}
-          </div>
+          <button type="button" className={ui.reviewEdit} onClick={() => project.exported ? setReopenConfirm(true) : router.push(`/customer-select/${projectId}/select`)}>선택 수정</button>
         </div>
         <div className={ui.body}>
           {syncStatus !== "connected" && <div className={`${ui.banner} ${ui.bannerWarn}`}><span className={ui.bannerHeadWarn}>{syncStatus === "offline" ? "최신 참여 상태를 확인하지 못하고 있어요" : "최신 참여 상태를 확인하고 있어요"}</span><span className={ui.bodyText}>연결되면 전달 단계를 계속할 수 있어요.</span></div>}
-          <div className={ui.reviewSummary} aria-label="최종 선택 요약">
-            <span><strong>{selected.length}장</strong> 선택</span>
-            <span><strong>{requested.length}장</strong> 보정 요청</span>
-            {match !== null ? <span><strong>{match}%</strong> 취향 일치</span> : null}
-          </div>
 
           {!done && waiting.length > 0 && (
             <div className={`${ui.banner} ${ui.bannerWarn}`}>
@@ -167,7 +159,7 @@ export default function CustomerReviewPage() {
             </div>
           )}
 
-          <div>
+          <section>
             <p className={ui.label} style={{ marginBottom: 8 }}>
               선택한 사진
             </p>
@@ -178,21 +170,17 @@ export default function CustomerReviewPage() {
                     <img src={p.url} alt="" />
                     {project.photoStates[p.id]?.comment && <span className={ui.reviewCommentBadge} aria-label="보정 요청 있음">요청</span>}
                   </PhotoThumbnailFrame>
+                  <span className={ui.reviewFilename}>{getPhotoDisplayName(p)}</span>
                 </button>
               ))}
             </div>
-          </div>
+          </section>
 
-          <hr className={ui.divider} />
-
-          <div>
+          {requested.length > 0 ? <section className={ui.reviewSection}>
             <p className={ui.label} style={{ marginBottom: 8 }}>
               보정 요청이 있는 사진
             </p>
-            {requested.length === 0 ? (
-              <p className={ui.bodyText}>아직 작성한 보정 요청이 없어요.</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {requested.map((id) => {
                   const p = project.photos.find((x) => x.id === id)!;
                   const comments = Object.entries(project.participantOpinions[id] ?? {})
@@ -209,24 +197,24 @@ export default function CustomerReviewPage() {
                     </div>
                   );
                 })}
-              </div>
-            )}
-          </div>
-
-          <hr className={ui.divider} />
+            </div>
+          </section> : null}
 
           <section className={ui.deliveryCard}>
             <div className={ui.deliveryHeading}>
-              <p className={ui.label}>작가에게 전달하기</p>
+              <h2>작가에게 전달하기</h2>
               {project.exported ? <span>전달 완료</span> : null}
             </div>
-            <p className={ui.bodyText}>링크를 복사해 작가님께 보내주세요. 다시 전달하면 같은 링크에 최신 결과가 반영돼요.</p>
-            {project.lastDeliveredAt ? <p className={ui.deliveryMeta}>최근 전달 {new Date(project.lastDeliveredAt).toLocaleString("ko-KR")} · 총 {project.deliveryCount.toLocaleString()}회</p> : null}
-            {stateError ? <p role="alert" className={ui.deliveryError}>{stateError}</p> : null}
-            <button type="button" className={`${ui.btn} ${ui.btnPrimary} ${ui.deliveryPrimary}`} disabled={selected.length === 0 || linkCopyState === "loading" || changingState || checkingLatest || syncStatus !== "connected"} onClick={() => void requestLinkCopy(false)}>
-              {linkCopyState === "loading" || changingState || checkingLatest ? "링크 복사 중…" : linkCopyState === "ok" ? "복사했어요 ✓" : linkCopyState === "fail" ? "다시 복사하기" : "링크 복사"}
-            </button>
-            {project.exported ? <div className={ui.deliveryActions}><PhotographerLightButton onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>보정본 업로드하기</PhotographerLightButton></div> : null}
+            <div className={ui.deliveryMain}>
+              <div>
+                <p className={ui.bodyText}>링크를 복사해 작가님께 보내주세요. 같은 링크에 최신 결과가 반영돼요.</p>
+                {project.lastDeliveredAt ? <p className={ui.deliveryMeta}>최근 전달 {new Date(project.lastDeliveredAt).toLocaleString("ko-KR")} · 총 {project.deliveryCount.toLocaleString()}회</p> : null}
+                {stateError ? <p role="alert" className={ui.deliveryError}>{stateError}</p> : null}
+              </div>
+              <button type="button" className={`${ui.btn} ${ui.btnPrimary} ${ui.deliveryPrimary}`} disabled={selected.length === 0 || linkCopyState === "loading" || changingState || checkingLatest || syncStatus !== "connected"} onClick={() => void requestLinkCopy(false)}>
+                {linkCopyState === "loading" || changingState || checkingLatest ? "링크 복사 중…" : linkCopyState === "ok" ? "복사했어요 ✓" : linkCopyState === "fail" ? "다시 복사하기" : "링크 복사"}
+              </button>
+            </div>
             <details className={ui.exportDetails}>
               <summary>파일로 내보내기</summary>
               <pre className={ui.exportBlock}>{exportText}</pre>
@@ -237,6 +225,11 @@ export default function CustomerReviewPage() {
               <span className={ui.supportText}>CSV에는 참여자 의견이 함께 담기고, TXT에는 파일명만 담겨요.</span>
             </details>
           </section>
+
+          {project.exported ? <section className={ui.nextStepCard}>
+            <div><h2>보정본도 확인할까요?</h2><p>선택한 사진의 보정본을 올려 함께 비교할 수 있어요.</p></div>
+            <PhotographerLightButton variant="outline" onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>보정본 업로드</PhotographerLightButton>
+          </section> : null}
         </div>
         <PhotoFocusOverlay
           open={focusIndex !== null}

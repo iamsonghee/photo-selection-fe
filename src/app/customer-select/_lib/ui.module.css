@@ -24,21 +24,21 @@
 .header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 20px 8px;
+  gap: 8px;
+  padding: 18px 20px 12px;
 }
 .back {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 1px solid #dde1e4;
-  background: #fff;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
   display: grid;
   place-items: center;
-  color: #5f5e5b;
-  font-size: 15px;
+  color: #607d8b;
   flex-shrink: 0;
 }
+.back:hover { background: #edf1f2; color: #023852; }
 .title {
   font-size: 15px;
   font-weight: 700;
@@ -49,20 +49,29 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
-.reviewTitleGroup > span {
+.reviewTitleGroup > p {
+  margin: 0;
   overflow: hidden;
   color: #8b8985;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 12px;
+  line-height: 17px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.reviewHeaderAction {
+.reviewEdit {
   margin-left: auto;
   flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: #607d8b;
+  font-size: 13px;
+  font-weight: 600;
 }
+.reviewEdit:hover { color: #ff4d00; }
 
 .body {
   padding: 6px 20px 24px;
@@ -393,32 +402,6 @@
   .ephemeralChatTrigger span { display: none; }
 }
 
-.reviewSummary {
-  min-height: 48px;
-  padding: 0 14px;
-  border: 1px solid #e4e8ea;
-  border-radius: 12px;
-  background: #fff;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 0;
-  color: #5f5e5b;
-  font-size: 13px;
-}
-.reviewSummary > span {
-  padding: 0 12px;
-  border-left: 1px solid #dde1e4;
-}
-.reviewSummary > span:first-child {
-  padding-left: 0;
-  border-left: 0;
-}
-.reviewSummary strong {
-  color: #023852;
-  font-size: 15px;
-}
-
 .reqItem {
   background: #f7f6f4;
   border-radius: 10px;
@@ -467,15 +450,16 @@
 
 .reviewGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 8px;
 }
 .reviewThumbButton {
   min-width: 0;
   padding: 0;
   border: 0;
-  border-radius: 8px;
-  background: #eee;
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
   cursor: zoom-in;
 }
 .reviewThumbButton:focus-visible {
@@ -483,8 +467,21 @@
   outline-offset: 2px;
 }
 .reviewThumb {
-  aspect-ratio: 1;
+  aspect-ratio: 4 / 3;
   border-radius: inherit;
+  overflow: hidden;
+  background: #ecefee;
+}
+.reviewFilename {
+  display: block;
+  margin-top: 6px;
+  overflow: hidden;
+  color: #607d8b;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .reviewThumb img {
   width: 100%;
@@ -511,6 +508,10 @@
   border-radius: 16px;
   background: #fff;
 }
+.reviewSection {
+  padding-top: 22px;
+  border-top: 1px solid #dde1e4;
+}
 .deliveryHeading {
   margin-bottom: 8px;
   display: flex;
@@ -518,11 +519,24 @@
   justify-content: space-between;
   gap: 12px;
 }
+.deliveryHeading h2,
+.nextStepCard h2 {
+  margin: 0;
+  color: #023852;
+  font-size: 15px;
+  font-weight: 700;
+}
 .deliveryHeading > span {
   color: #0f8a5f;
   font-size: 12px;
   font-weight: 700;
 }
+.deliveryMain {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.deliveryMain > div { min-width: 0; }
 .deliveryMeta {
   margin: 8px 0 0;
   color: #8b8985;
@@ -535,12 +549,7 @@
   font-weight: 600;
 }
 .deliveryPrimary {
-  margin-top: 14px;
-}
-.deliveryActions {
-  margin-top: 8px;
-  display: flex;
-  justify-content: flex-end;
+  flex-shrink: 0;
 }
 .exportDetails {
   margin-top: 16px;
@@ -554,6 +563,22 @@
 .exportDetails .exportBlock {
   margin-top: 10px;
 }
+.nextStepCard {
+  padding: 16px 18px;
+  border: 1px solid #dde1e4;
+  border-radius: 14px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.nextStepCard p {
+  margin: 5px 0 0;
+  color: #607d8b;
+  font-size: 13px;
+  line-height: 19px;
+}
 
 /* PC uses the same roomy A-CUT work surface; mobile keeps the original single-column flow. */
 @media (min-width: 768px) {
@@ -562,28 +587,35 @@
   }
   .header {
     width: 100%;
-    max-width: 1120px;
+    max-width: 1040px;
     margin: 0 auto;
     padding: 32px 32px 10px;
     box-sizing: border-box;
   }
   .title {
     color: var(--foreground, #023852);
-    font-size: 20px;
+    font-size: 22px;
   }
   .body {
     width: 100%;
-    max-width: 1120px;
+    max-width: 1040px;
     margin: 0 auto;
     padding: 16px 32px 40px;
     box-sizing: border-box;
   }
   .reviewGrid {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 220px));
+    gap: 18px 12px;
   }
-  .deliveryPrimary {
-    width: 220px;
-    margin-left: auto;
+  .deliveryMain {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
   }
+  .deliveryPrimary { width: 180px; }
+}
+
+@media (max-width: 767px) {
+  .nextStepCard { align-items: stretch; flex-direction: column; }
+  .nextStepCard button { width: 100%; }
 }
