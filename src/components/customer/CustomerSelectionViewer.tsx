@@ -1560,13 +1560,13 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
               )}
             </div>
 
-            <span className="fs-panel-label" style={{ marginTop: 8 }}>작가 전달 메모 · 모두 함께 수정</span>
+            <div style={{ minHeight: 22, marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
+              <span className="fs-panel-label">작가 전달 메모</span>
+              <CommentSaveIndicator status={commentSaveStatus} onRetry={saveComment} />
+            </div>
             {isCommentEditing ? (
             <div style={{ display: "flex", alignItems: "flex-end", gap: 12, minWidth: 0 }}>
               <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "stretch", gap: 4, minWidth: 0 }}>
-                <div style={{ minHeight: 14, display: "flex", alignItems: "center" }}>
-                  <CommentSaveIndicator status={commentSaveStatus} onRetry={saveComment} />
-                </div>
                 <div className="fs-comment-input-wrap">
                   <MessageSquare size={14} strokeWidth={1.8} className="fs-comment-input-icon" aria-hidden />
                   <input
@@ -1910,6 +1910,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
               })}
             </div>
             <div className="fv-bar-right">
+            <CommentSaveIndicator status={commentSaveStatus} onRetry={saveComment} />
             {showGroupHint && currentGroup && (
               <button
                 type="button"

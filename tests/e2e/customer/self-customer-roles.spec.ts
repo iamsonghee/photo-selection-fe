@@ -37,6 +37,10 @@ test("shared participant can leave opinions but cannot change the final selectio
 
     await page.locator('[data-photo-id="p1"]').click();
     await expect(page.locator('button:visible[aria-label="작가 전달 메모 수정: 표정이 좋아요"]')).toBeVisible();
+    await page.locator('button:visible[aria-label="작가 전달 메모 수정: 표정이 좋아요"]').click();
+    await page.getByRole("textbox", { name: "작가 전달 메모" }).fill("참여자 자동저장 확인");
+    await page.getByRole("textbox", { name: "작가 전달 메모" }).blur();
+    await expect(page.locator('[role="status"]:visible').filter({ hasText: "저장됨" })).toBeVisible();
     await expect(page.getByRole("button", { name: "사진 선택 해제" })).toHaveCount(0);
     await page.keyboard.press("Space");
   }
