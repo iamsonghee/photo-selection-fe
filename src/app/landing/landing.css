@@ -121,6 +121,7 @@ body:has(.ac-landing) {
 .ac-footer { border-top: 1px solid var(--ac-line); background: #fff; }
 .ac-footer-inner { padding-block: 26px; font-size: 13px; }
 .ac-footer-main { display: flex; align-items: center; gap: 24px; }
+.ac-footer-biz { margin-top: 14px; font-size: 12px; color: var(--ac-muted); word-break: keep-all; }
 @media (max-width: 1000px) {
   .ac-preview-sidebar { display: none; }
   .ac-preview-stage { padding-left: 18px; padding-right: 130px; }
