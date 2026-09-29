@@ -105,7 +105,7 @@ export default function TermsPage() {
 
       <section>
         <h2>제16조 운영자 정보</h2>
-        <p>상호: 순한설기<br />대표자: 심효순<br />사업자등록번호: 890-18-01386<br />주소: 경기도 여주시 영릉로35-12<br />문의: <a href="mailto:multihatter@gmail.com">multihatter@gmail.com</a></p>
+        <p>상호: 순한설기<br />대표자: 심효순<br />사업자등록번호: 890-18-01386<br />주소: 경기도 여주시 영릉로35-12<br />전화: 031-885-4355<br />문의: <a href="mailto:multihatter@gmail.com">multihatter@gmail.com</a></p>
       </section>
     </LegalDocument>
   );

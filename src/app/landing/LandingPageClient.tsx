@@ -70,7 +70,7 @@ export function LandingPageClient({ limits }: { limits: PlanLimits }) {
               <Link prefetch={false} href="/privacy">개인정보처리방침</Link>
             </div>
             <p className="ac-footer-biz">
-              상호: 순한설기 · 대표: 심효순 · 사업자등록번호: 890-18-01386 · 주소: 경기도 여주시 영릉로35-12 · 이메일: multihatter@gmail.com
+              상호: 순한설기 · 대표: 심효순 · 사업자등록번호: 890-18-01386 · 주소: 경기도 여주시 영릉로35-12 · 전화: 031-885-4355 · 이메일: multihatter@gmail.com
             </p>
           </div>
         </footer>
