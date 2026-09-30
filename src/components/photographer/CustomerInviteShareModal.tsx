@@ -30,7 +30,7 @@ export function CustomerInviteShareModal({
   title = "링크를 직접 공유해 주세요",
   description,
   closeDisabled = false,
-  autoCloseMs = 5000,
+  autoCloseMs = null,
   onSavePin,
 }: CustomerInviteShareModalProps) {
   const [shareCopied, setShareCopied] = useState<"link" | "pin" | "bundle" | null>(null);
