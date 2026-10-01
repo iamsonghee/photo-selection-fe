@@ -57,6 +57,19 @@
 .timelineScroll :global(.gl-card-media)::after { content: ""; position: absolute; inset: 0; z-index: 10; background: linear-gradient(to top, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.12) 30%, transparent 55%); pointer-events: none; }
 /* 묶음 표지는 오른쪽 아래가 유사컷 배지 자리라 메모·찜 색 점을 왼쪽 아래로 둔다. */
 .timelineScroll :global(.gl-photo-card:has(.gl-group-stack) .gl-overlay-interactive) { justify-content: flex-start !important; }
+/* 고르지 않은 카드의 빈 ✓(참여자는 빈 ♡): PC는 마우스를 올렸거나 키보드로 왔을 때만, 터치 기기는 옅은 테두리만. 고른 것만 늘 보인다. */
+@media (hover: hover) {
+  .timelineScroll :global(.gl-photo-card:not(.gl-selected) .gl-check-box) { opacity: 0; transition: opacity 120ms ease; }
+  .timelineScroll :global(.gl-photo-card:not(.gl-selected):hover .gl-check-box),
+  .timelineScroll :global(.gl-photo-card:not(.gl-selected) .gl-check-box:focus-visible) { opacity: 1; }
+}
+@media (hover: none) {
+  .timelineScroll :global(.gl-photo-card:not(.gl-selected) .gl-check-box)::before { background: rgba(0, 0, 0, 0.12); border-color: rgba(255, 255, 255, 0.9); box-shadow: none; }
+  .timelineScroll :global(.gl-photo-card:not(.gl-selected) .gl-check-heart) { color: #fff; }
+}
+/* 보조 찜(♡)은 ✓보다 작게 — 메인 동작은 ✓. 찜한 ♥는 그대로. */
+.timelineScroll :global(.gl-like-box:not(.gl-liked)) { --gl-check-size: 20px; }
+.timelineScroll :global(.gl-like-box:not(.gl-liked) svg) { transform: scale(0.85); }
 /* 고른 사진도 원래 밝기로 본다(비교가 정확하고 배지·글자가 묻히지 않게). 선택은 ✓·주황 테두리로만 보인다. */
 .timelineScroll :global(.gl-photo-card.gl-selected .gl-card-media img) { filter: none; }
 /* 흔들림·눈 감음 표시: ♡와 같은 크기·중심선의 둥근 칩(중심이 오른쪽 위 ♡ 원과 같은 높이). 둘 다면 나란히. */

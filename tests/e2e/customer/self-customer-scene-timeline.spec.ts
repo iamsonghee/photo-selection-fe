@@ -217,7 +217,7 @@ test("selecting a card pops only at the moment it turns on", async ({ browser })
   await mock(page);
   // 이미 선택돼 있던 사진(p1·p2)이 있는 장면을 열어도 처음 그려질 때 튀지 않는다.
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
-  await expect(page.locator('.gl-photo-card[data-photo-id="p1"]')).toContainText("2장 선택");
+  await expect(page.locator('.gl-photo-card[data-photo-id="p1"]').getByRole("img", { name: "유사컷 3장, 2장 선택" })).toBeVisible();
   await expect(page.locator(".gl-photo-card[data-pop]")).toHaveCount(0);
 
   const card = page.locator('.gl-photo-card[data-photo-id="p5"]');
@@ -239,9 +239,9 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   await mock(page);
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   await expect(page.getByRole("button", { name: "유사컷 묶기" })).toHaveAttribute("aria-pressed", "true");
-  // 묶음 표지에는 누를 수 없는 "유사컷 3장" 표시만 있고, 표지를 누르면(펼치지 않고) 바로 상세가 열린다.
+  // 묶음 표지에는 누를 수 없는 한 줄 배지(⧉ 3)만 있고, 표지를 누르면(펼치지 않고) 바로 상세가 열린다.
   const cover = page.locator('.gl-photo-card[data-photo-id="p8"]');
-  await expect(cover).toContainText("유사컷 3장");
+  await expect(cover.getByRole("img", { name: "유사컷 3장" })).toBeVisible();
   await expect(page.getByRole("button", { name: /유사컷 \d+장 펼치기/ })).toHaveCount(0);
   await expect(page.locator(".gl-quality-badge").first()).toBeVisible();
   await cover.click();
@@ -270,7 +270,7 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=none`);
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "유사컷 묶기" })).toHaveCount(0);
-  await expect(page.getByText("유사컷 3장")).toHaveCount(0);
+  await expect(page.getByRole("img", { name: /유사컷 \d+장/ })).toHaveCount(0);
   await expect(page.locator(".gl-quality-badge")).toHaveCount(0);
   await context.close();
 });
@@ -321,7 +321,7 @@ test("a collapsed cover never looks selected; the badge shows the group's picks"
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   // p1·p2를 고른 첫 묶음(p0~p2)의 표지는 고른 사진(p1)이지만 선택 스타일 없이 배지로만 알린다.
   const cover = page.locator('.gl-photo-card[data-photo-id="p1"]');
-  await expect(cover).toContainText("2장 선택");
+  await expect(cover.getByRole("img", { name: "유사컷 3장, 2장 선택" })).toBeVisible();
   await expect(cover).not.toHaveClass(/gl-selected/);
   // 대신 주황 테두리로 이 묶음에 고른 사진이 있음을 보인다.
   await expect(cover.locator('[data-active="true"]')).toHaveCount(1);
@@ -375,5 +375,25 @@ test("set-aside never hides a photo that is already picked", async ({ browser })
   await expect(page.locator('.gl-photo-card[data-photo-id="p5"]')).toBeVisible();
   await expect(page.getByRole("button", { name: "흔들림·눈 감음 4장 빼는 중" })).toBeVisible();
   await page.getByRole("button", { name: /빼는 중/ }).click();
+  await context.close();
+});
+
+test("only decided marks stay on cards: empty check shows on hover, my own like dot is not repeated", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=none`);
+  const card = page.locator('.gl-photo-card[data-photo-id="p5"]');
+  const check = card.getByRole("button", { name: "선택", exact: true });
+  await page.mouse.move(0, 0);
+  await expect(check).toHaveCSS("opacity", "0");
+  await expect(page.locator('.gl-photo-card[data-photo-id="p1"]').getByRole("button", { name: "선택 해제" })).toHaveCSS("opacity", "1");
+  await card.hover();
+  await expect(check).toHaveCSS("opacity", "1");
+  // 내가 찜하면 ♥만 남고 내 색 점은 따로 보이지 않는다.
+  await card.getByRole("button", { name: "찜하기" }).click();
+  await expect(card.getByRole("button", { name: "찜 해제" })).toBeVisible();
+  await expect(card.locator(".gl-color-dot")).toHaveCount(0);
   await context.close();
 });

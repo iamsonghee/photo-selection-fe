@@ -12,8 +12,11 @@ export function SimilarityGroupBadge({ count, expanded, selectedCount = 0, recom
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void; inline?: boolean;
 }) {
   if (!onClick) return <div className={`${styles.wrap} ${inline ? styles.inline : ""}`}>
-    {selectedCount > 0 && <span className={`${styles.selected} ${styles.selectedAccent}`}>{selectedCount}장 선택</span>}
-    <span className={`${styles.button} ${styles.static}`}><Layers size={13} aria-hidden /><span><span className={styles.word}>유사컷 </span>{count}장</span></span>
+    {/* 한 줄: 유사컷 3장 · 1장 선택(모바일은 '유사컷' 생략) — 묶음 안에 고른 사진이 있으면 주황 */}
+    <span className={`${styles.button} ${styles.static} ${selectedCount > 0 ? styles.staticPicked : ""}`} role="img"
+      aria-label={`유사컷 ${count}장${selectedCount > 0 ? `, ${selectedCount}장 선택` : ""}`}>
+      <Layers size={13} aria-hidden /><span aria-hidden><span className={styles.word}>유사컷 </span>{count}장{selectedCount > 0 && ` · ${selectedCount}장 선택`}</span>
+    </span>
   </div>;
   return <div className={`${styles.wrap} ${inline ? styles.inline : ""}`}>
     {selectedCount > 0 && <span className={styles.selected}>{selectedCount}장 선택</span>}
