@@ -47,6 +47,8 @@
 /* ── 장면 하나씩: 끝에서 당겨 넘기기 ── */
 .sceneEnter { animation: sceneEnter 320ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 @keyframes sceneEnter { from { opacity: 0.3; transform: translateY(36px); } }
+.sceneEnterDown { animation: sceneEnterDown 320ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes sceneEnterDown { from { opacity: 0.3; transform: translateY(-36px); } }
 .pullSettle { transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 .sceneFooter { position: absolute; left: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
 .sceneNext { margin: 0; display: inline-flex; align-items: center; gap: 6px; color: var(--subtle-foreground); font-size: 13px; }
@@ -54,6 +56,7 @@
 .sceneEnd { width: min(520px, 100%); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--surface); color: var(--muted-foreground); font-size: 13px; }
 /* 당긴 만큼 아래에서 드러나는 다음 장면. 원이 다 차면(놓으면 넘어감) 강조색으로 바뀐다. */
 .pullReveal { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; overflow: hidden; color: var(--muted-foreground); font-size: 14px; pointer-events: none; }
+.pullRevealTop { top: 0; bottom: auto; flex-direction: column-reverse; }
 .pullReveal strong { font-weight: 700; color: var(--foreground); }
 .pullRing { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 50%; color: var(--muted-foreground); background: radial-gradient(closest-side, var(--background) 82%, transparent 84%), conic-gradient(var(--accent) calc(var(--pull, 0) * 360deg), var(--border) 0); transition: transform 160ms ease; }
 .pullReady .pullRing { color: #fff; background: var(--accent); transform: scale(1.08); }
@@ -161,7 +164,7 @@
 .likeButton[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .shortcutHint { color: var(--subtle-foreground); font-size: 11px; text-align: center; }
 
-@media (prefers-reduced-motion: reduce) { .sceneEnter { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .sceneEnter, .sceneEnterDown { animation: none; } }
 
 @media (max-width: 767px) {
   .mobilePeople { display: block; flex: none; padding: 8px 20px 4px; background: var(--surface); }

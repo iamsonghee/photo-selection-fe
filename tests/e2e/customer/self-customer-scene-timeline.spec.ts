@@ -93,3 +93,29 @@ test("desktop: pulling past the end of a scene moves to the next scene", async (
   await expect(page.locator('[class*="barMeta"]').first()).toContainText("입장");
   await context.close();
 });
+
+test("desktop: pulling up at the top of a scene goes back to the end of the previous scene", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=1`);
+  const gallery = page.locator('[class*="selectGallery"]').first();
+  await expect(page.locator("[data-photo-id]").first()).toBeVisible();
+  await gallery.evaluate((element) => element.scrollTo({ top: 0 }));
+  const box = (await gallery.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.waitForTimeout(300);
+
+  // 맨 위에서 위로 당기면 이전 장면이 위쪽에 드러난다.
+  await page.mouse.wheel(0, -30);
+  await expect(page.locator('[class*="pullReveal"]')).toContainText("식전·신부 대기실");
+  await expect(page).toHaveURL(/scene=1/);
+
+  // 충분히 당겼다 놓으면 이전 장면의 끝(다음 장면 안내가 보이는 곳)으로 돌아간다.
+  await page.waitForTimeout(300);
+  for (let i = 0; i < 16; i++) { await page.mouse.wheel(0, -60); await page.waitForTimeout(30); }
+  await expect(page).toHaveURL(/scene=0/);
+  await expect(page.locator('[class*="sceneNext"]').filter({ visible: true })).toContainText("입장");
+  await context.close();
+});

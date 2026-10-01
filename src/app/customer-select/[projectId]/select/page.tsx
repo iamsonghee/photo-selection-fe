@@ -65,7 +65,8 @@ function SelectScreen() {
     if (fromUrl !== null && Number.isInteger(Number(fromUrl))) return Number(fromUrl);
     try { const stored = sessionStorage.getItem(lastSceneKey); return stored === null ? null : Number(stored); } catch { return null; }
   });
-  const [enteredByPull, setEnteredByPull] = useState(false);
+  // 당겨서 넘어온 방향: 다음 장면(아래에서 올라옴·처음부터) / 이전 장면(위에서 내려옴·끝부터)
+  const [enteredBy, setEnteredBy] = useState<"next" | "prev" | null>(null);
   // PC 장면 사이드바 접기(기기별 보기 설정). 접으면 작은 퀵메뉴로 바뀐다.
   const railCollapsedKey = "ps:self-select-rail-collapsed";
   const [railCollapsed, setRailCollapsed] = useState(() => {
@@ -102,6 +103,7 @@ function SelectScreen() {
   const sceneIndex = sceneMode ? Math.min(Math.max(chosenScene ?? resumeScene, 0), scenes!.length - 1) : null;
   const scene = sceneIndex === null ? null : scenes![sceneIndex];
   const nextScene = scenes && sceneIndex !== null && sceneIndex < scenes.length - 1 ? scenes[sceneIndex + 1] : null;
+  const prevScene = scenes && sceneIndex !== null && sceneIndex > 0 ? scenes[sceneIndex - 1] : null;
 
   const scenePhotos = useMemo(
     () => scene ? scene.photoIds.flatMap((id) => photoById.get(id) ?? []) : timeOrdered,
@@ -150,14 +152,14 @@ function SelectScreen() {
   }
 
   /** 다른 장면으로 이동. 당겨서 넘어온 장면은 처음부터, 퀵메뉴로 고른 장면은 마지막으로 보던 곳부터 본다. */
-  function goScene(index: number, byPull = false) {
+  function goScene(index: number, byPull: "next" | "prev" | null = null) {
     setScope("all");
     setQuery("");
     setExpanded(new Set());
     setHoldAll(false);
     setSheet(null);
     setChosenScene(index);
-    setEnteredByPull(byPull);
+    setEnteredBy(byPull);
     // 지금 보는 장면을 주소와 이 탭에 남겨 새로고침·재진입 때 같은 장면으로 돌아온다.
     window.history.replaceState(window.history.state, "", `?scene=${index}`);
     try { sessionStorage.setItem(lastSceneKey, String(index)); } catch {}
@@ -365,11 +367,13 @@ function SelectScreen() {
               photos={visible}
               mobileColumns={mobileColumns}
               positionKey={`ps:self-select:${projectId}:${sceneMode ? `s${sceneIndex}` : "all"}:${scope}:${grouped ? 1 : 0}`}
-              startAtTop={enteredByPull}
+              startAt={enteredBy === "next" ? "top" : enteredBy === "prev" ? "bottom" : null}
+              enterFrom={enteredBy === "next" ? "below" : enteredBy === "prev" ? "above" : null}
               renderCard={card}
               empty={<><strong>조건에 맞는 사진이 없어요</strong><span>보기 조건을 바꿔보세요.</span><button type="button" onClick={() => { setScope("all"); setQuery(""); }}>전체 보기</button></>}
               footer={sceneFooter}
-              next={nextScene ? { label: sceneTitle(nextScene), onPass: () => goScene(sceneIndex! + 1, true) } : null}
+              next={nextScene ? { label: sceneTitle(nextScene), onPass: () => goScene(sceneIndex! + 1, "next") } : null}
+              prev={prevScene ? { label: sceneTitle(prevScene), onPass: () => goScene(sceneIndex! - 1, "prev") } : null}
               focus={focus}
             />
 
