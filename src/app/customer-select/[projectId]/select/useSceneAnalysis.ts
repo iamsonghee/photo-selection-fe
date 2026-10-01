@@ -31,11 +31,25 @@ const POLL_MS = 5_000;
 type MockMode = "none" | "analyzing" | "ready" | "failed";
 const MOCK_MODES: readonly string[] = ["none", "analyzing", "ready", "failed"];
 
+const MOCK_SCENE_PHOTOS = 12;
+
+/** 시안 확인용: 촬영 시각으로 장면이 2개 이상 안 나오면(한 번에 찍은 테스트 사진 등) 순서대로 고르게 잘라 장면을 만든다. */
+function mockScenes(photos: Photo[], timeScenes: Scene[] | null): Scene[] | null {
+  if (timeScenes && timeScenes.length > 1) return timeScenes;
+  const count = Math.min(6, Math.floor(photos.length / MOCK_SCENE_PHOTOS));
+  if (count < 2) return timeScenes;
+  const size = Math.ceil(photos.length / count);
+  return Array.from({ length: count }, (_, index) => {
+    const chunk = photos.slice(index * size, (index + 1) * size);
+    return { index, photoIds: chunk.map((photo) => photo.id), start: chunk[0]?.takenAt ?? null, end: chunk.at(-1)?.takenAt ?? null };
+  }).filter((scene) => scene.photoIds.length);
+}
+
 /** AI 장면 이름이 붙기 전까지는 목록 순서대로 이름을 대신 붙인 시안용 결과를 만든다(개발 확인용). */
 function mockNamedScenes(scenes: Scene[] | null, shootType: string): NamedScene[] | null {
   if (!scenes) return null;
   const catalog = customerSceneCatalog(shootType);
-  return scenes.map((scene, index) => ({ ...scene, name: scene.start ? catalog[index] ?? OTHER_SCENE : null }));
+  return scenes.map((scene, index) => ({ ...scene, name: catalog[index] ?? OTHER_SCENE }));
 }
 
 export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: string): SceneAnalysisControl {
@@ -53,7 +67,8 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
   });
   const initialMock = mockParam ?? storedMock;
   const [mock, setMock] = useState<MockMode | null>(initialMock && MOCK_MODES.includes(initialMock) ? initialMock as MockMode : null);
-  const timeScenes = useMemo(() => splitScenes(photos), [photos]);
+  const realTimeScenes = useMemo(() => splitScenes(photos), [photos]);
+  const timeScenes = useMemo(() => (mock ? mockScenes(photos, realTimeScenes) : realTimeScenes), [mock, photos, realTimeScenes]);
   const unnamed = useMemo<NamedScene[] | null>(() => timeScenes?.map((scene) => ({ ...scene, name: null })) ?? null, [timeScenes]);
 
   // 실제 상태(유사컷 분석 상태 API): 진행 중이면 analyzing, 완료면 시간 장면, 실패면 시간 장면+다시 시도, 기록이 없으면 none.

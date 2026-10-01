@@ -30,7 +30,7 @@ test("owner can stop and replace a self-customer invite link", async ({ page, br
     participantContexts.push(oldContext);
     const oldParticipant = await oldContext.newPage();
     await oldParticipant.goto(`${origin}/customer-select/${projectId}/select?share_token=${oldToken}`);
-    await expect(oldParticipant.getByRole("heading", { name: /함께 참여해 주세요/ })).toBeVisible();
+    await expect(oldParticipant.getByText(/사진 고르기에 초대했어요/)).toBeVisible();
 
     await page.goto(`/customer-select/${projectId}/settings#sharing`);
     await expect(page.getByRole("heading", { name: "함께 고르는 사람" })).toBeVisible();
@@ -57,7 +57,7 @@ test("owner can stop and replace a self-customer invite link", async ({ page, br
     participantContexts.push(newContext);
     const newParticipant = await newContext.newPage();
     await newParticipant.goto(`${origin}/customer-select/${projectId}/select?share_token=${newToken}`);
-    await expect(newParticipant.getByRole("heading", { name: /함께 참여해 주세요/ })).toBeVisible();
+    await expect(newParticipant.getByText(/사진 고르기에 초대했어요/)).toBeVisible();
   } finally {
     await Promise.all(participantContexts.map((context) => context.close()));
     const removed = await page.request.delete(`/api/customer-select/projects/${projectId}`);

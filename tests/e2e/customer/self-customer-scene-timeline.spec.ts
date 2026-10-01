@@ -6,8 +6,8 @@ const PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUw
 const pad = (n: number) => String(n).padStart(2, "0");
 
 // 촬영 시각 공백으로 장면 3개가 나오는 사진(오전 11:00 30장, 11:40 30장, 오후 12:30 30장).
-function project() {
-  const photos = [[11, 0], [11, 40], [12, 30]].flatMap(([hour, minute], block) => Array.from({ length: 30 }, (_, i) => {
+function project(blocks: number[][] = [[11, 0], [11, 40], [12, 30]]) {
+  const photos = blocks.flatMap(([hour, minute], block) => Array.from({ length: 30 }, (_, i) => {
     const n = block * 30 + i;
     const seconds = hour * 3600 + minute * 60 + i * 20;
     return {
@@ -23,8 +23,7 @@ function project() {
   };
 }
 
-async function mock(page: Page) {
-  const data = project();
+async function mock(page: Page, data = project()) {
   await page.route(`**/api/customer-select/projects/${PROJECT_ID}**`, async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/sync")) return route.fulfill({ json: { selectedIds: data.selectedIds, photoStates: {}, participantOpinions: {}, participantDone: data.participantDone, participantNicknames: data.participantNicknames, onlineParticipants: [], participantViews: {}, exported: false } });
@@ -94,28 +93,38 @@ test("desktop: pulling past the end of a scene moves to the next scene", async (
   await context.close();
 });
 
-test("desktop: pulling up at the top of a scene goes back to the end of the previous scene", async ({ browser }) => {
+test("desktop: scrolling up past the top flows straight into the end of the previous scene", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=1`);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=2`);
   const gallery = page.locator('[class*="selectGallery"]').first();
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
   await gallery.evaluate((element) => element.scrollTo({ top: 0 }));
   const box = (await gallery.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.waitForTimeout(300);
 
-  // 맨 위에서 위로 당기면 이전 장면이 위쪽에 드러난다.
-  await page.mouse.wheel(0, -30);
-  await expect(page.locator('[class*="pullReveal"]')).toContainText("식전·신부 대기실");
+  // 위로는 당기는 저항 없이 맨 위에서 더 올리면 바로 이전 장면의 끝으로 이어진다.
+  await page.mouse.wheel(0, -60);
   await expect(page).toHaveURL(/scene=1/);
+  await expect(page.locator('[class*="pullReveal"]')).toHaveCount(0);
+  await expect(page.locator('[class*="sceneNext"]').filter({ visible: true })).toContainText("예식");
+  // 연달아 올려도 한 번에 두 장면을 건너뛰지 않는다(새 장면은 끝에서 시작해 위로 계속 스크롤된다).
+  for (let i = 0; i < 3; i++) { await page.mouse.wheel(0, -60); await page.waitForTimeout(40); }
+  await expect(page).toHaveURL(/scene=1/);
+  await context.close();
+});
 
-  // 충분히 당겼다 놓으면 이전 장면의 끝(다음 장면 안내가 보이는 곳)으로 돌아간다.
-  await page.waitForTimeout(300);
-  for (let i = 0; i < 16; i++) { await page.mouse.wheel(0, -60); await page.waitForTimeout(30); }
-  await expect(page).toHaveURL(/scene=0/);
-  await expect(page.locator('[class*="sceneNext"]').filter({ visible: true })).toContainText("입장");
+test("desktop: sample photos shot in one burst are still split into scenes in mock mode", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  // 60장이 20초 간격으로 이어져 촬영 시각만으로는 장면이 하나뿐이다.
+  await mock(page, project([[11, 0], [11, 10]]));
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await expect(page.locator('[class*="barMeta"]').first()).toContainText("식전·신부 대기실");
+  await page.getByRole("button", { name: /^입장/ }).filter({ visible: true }).first().click();
+  await expect(page).toHaveURL(/scene=1/);
   await context.close();
 });
