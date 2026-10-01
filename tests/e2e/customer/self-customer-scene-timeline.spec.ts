@@ -244,3 +244,18 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   await expect(page.locator(".gl-quality-badge")).toHaveCount(0);
   await context.close();
 });
+
+test("detail view walks through photos folded into a similar-cut group", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  // p8~p10은 접혀서 표지(p8)만 보이지만, p7 상세에서 다음으로 가면 p8 → p9 → p10을 모두 지난다.
+  await expect(page.locator('.gl-photo-card[data-photo-id="p9"]')).toHaveCount(0);
+  await page.locator('.gl-photo-card[data-photo-id="p7"]').click();
+  const count = page.locator('[class*="detailCount"]');
+  await expect(count).toContainText("8 / 30");
+  for (const n of [9, 10, 11]) { await page.keyboard.press("ArrowRight"); await expect(count).toContainText(`${n} / 30`); }
+  await context.close();
+});
