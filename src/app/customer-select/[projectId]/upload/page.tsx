@@ -12,7 +12,6 @@ import { CheckCircle2, Loader2, SlidersHorizontal, Sparkles, Trash2, UploadCloud
 import { createClient } from "@/lib/supabase/client";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
-import { AiAnalysisPromptModal } from "@/components/photographer/AiAnalysisPromptModal";
 import { PhotographerPhotoGallery } from "@/components/photographer/OriginalPhotoGallery";
 import { OriginalPhotoViewer } from "@/components/photographer/OriginalPhotoViewer";
 import { PhotoUploadTile } from "@/components/photographer/PhotoUploadTile";
@@ -30,6 +29,7 @@ import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAsset
 import type { Photo, PhotoGroupInfo } from "@/types";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import { ProjectStepHeader } from "../../_lib/ProjectStepHeader";
+import { AiTidySheet, type AiTidyKind } from "../select/AiTidySheet";
 import { useCustomerSelectStore } from "../../_lib/real-store";
 import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
 
@@ -84,9 +84,10 @@ export default function CustomerUploadPage() {
   const [deleteImpact, setDeleteImpact] = useState<DeleteImpact | null>(null);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [aiPromptOpen, setAiPromptOpen] = useState(false);
-  const [aiWantSimilar, setAiWantSimilar] = useState(true);
-  const [aiWantQuality, setAiWantQuality] = useState(true);
+  // AI 정리 시트: 열린 이유가 "정리하고 고르기"면 시작 후 고르기로 이동한다.
+  const [aiSheet, setAiSheet] = useState<null | "here" | "thenSelect">(null);
+  const [aiSheetError, setAiSheetError] = useState<string | null>(null);
+  const aiPromptOpen = aiSheet !== null;
   // 방금 올린 장수. 업로드가 끝나면 모달 대신 하단 바에서 AI 정리와 다음 단계를 함께 제안한다.
   const [justUploaded, setJustUploaded] = useState(0);
   const [aiStarting, setAiStarting] = useState(false);
@@ -288,21 +289,6 @@ export default function CustomerUploadPage() {
       setError(`${uploaded.toLocaleString()}장은 업로드했고 ${failedFiles.length.toLocaleString()}장은 처리하지 못했습니다.`);
     } else if (uploaded > 0) {
       setJustUploaded(uploaded);
-      void autoStartAi();
-    }
-  }
-
-  /** 업로드가 끝나면 묻지 않고 AI 정리(장면·유사컷·흔들림)를 시작한다. 실패해도 고르기는 막지 않고, 상태는 고르기 화면에서 보여준다. */
-  async function autoStartAi() {
-    try {
-      const responses = await Promise.all(["similarity", "quality"].map((kind) => fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`, { method: "POST" })));
-      if (responses.some((response) => response.ok)) {
-        setAiCompleted(false);
-        setAiAnalyzing(true);
-        void pollAiAnalysis(["similarity", "quality"]);
-      }
-    } catch {
-      /* 고르기 화면의 분석 상태에서 다시 시도할 수 있다 */
     }
   }
 
@@ -315,28 +301,21 @@ export default function CustomerUploadPage() {
     uploadAbortRef.current?.abort();
   }
 
-  async function startAiAnalysis(thenSelect = false) {
+  /** 사용자가 시트에서 시작을 누를 때만 AI 정리를 시작한다. 시작하지 못하면 시트에 이유를 보여준다. */
+  async function startTidy(kinds: AiTidyKind[]) {
+    const thenSelect = aiSheet === "thenSelect";
     setAiStarting(true);
+    setAiSheetError(null);
     try {
-      const requests = [
-        aiWantSimilar && fetch(`/api/customer-select/projects/${projectId}/ai/similarity`, { method: "POST" }),
-        aiWantQuality && fetch(`/api/customer-select/projects/${projectId}/ai/quality`, { method: "POST" }),
-      ].filter(Boolean) as Promise<Response>[];
-      const responses = await Promise.all(requests);
-      const failed = responses.find((response) => !response.ok);
-      if (failed) {
-        const data = await failed.json().catch(() => ({}));
-        throw new Error(data.error ?? data.detail ?? "분석 시작 실패");
-      }
-      setAiPromptOpen(false);
+      const responses = await Promise.all(kinds.map((kind) => fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`, { method: "POST" })));
+      if (!responses.some((response) => response.ok)) throw new Error("AI 정리를 시작하지 못했어요. 잠시 후 다시 시도하거나 원본 그대로 골라 주세요.");
+      setAiSheet(null);
       setAiCompleted(false);
       setAiAnalyzing(true);
       if (thenSelect) { router.push(`/customer-select/${projectId}/select`); return; }
-      void pollAiAnalysis([aiWantSimilar && "similarity", aiWantQuality && "quality"].filter(Boolean) as string[]);
+      void pollAiAnalysis(kinds);
     } catch (e) {
-      // AI 정리는 선택 기능이다 — 시작하지 못해도 고르기로 넘어가는 흐름은 막지 않는다.
-      if (thenSelect) { router.push(`/customer-select/${projectId}/select`); return; }
-      setError(e instanceof Error ? e.message : "AI 분석을 시작하지 못했습니다.");
+      setAiSheetError(e instanceof Error && e.message ? e.message : "인터넷 연결을 확인하고 다시 시도해 주세요.");
     } finally {
       setAiStarting(false);
     }
@@ -496,7 +475,9 @@ export default function CustomerUploadPage() {
   const uploadDone = showUploadDone ? (
     <div className="flex min-w-0 flex-col gap-1.5 md:flex-row md:items-center md:gap-5" role="status">
       <p className="flex items-center gap-1.5 text-sm font-bold text-foreground"><CheckCircle2 size={16} className="text-primary" aria-hidden />{justUploaded.toLocaleString()}장 올렸어요</p>
-      {aiAnalyzing && <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Sparkles size={13} className="shrink-0 text-primary" aria-hidden />AI가 장면과 비슷한 사진을 정리하고 있어요. 기다리지 않고 바로 골라도 돼요.</p>}
+      {aiAnalyzing
+        ? <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Sparkles size={13} className="shrink-0 text-primary" aria-hidden />AI가 사진을 정리하고 있어요. 기다리지 않고 바로 골라도 돼요.</p>
+        : <p className="text-xs text-muted-foreground">사진을 다 올렸다면 AI가 장면별로 나누고 비슷한 사진·흔들린 사진을 정리해 드려요.</p>}
     </div>
   ) : undefined;
 
@@ -527,9 +508,9 @@ export default function CustomerUploadPage() {
             <>
               <div className="flex min-w-0 flex-1 items-center justify-between gap-2 md:flex-none md:justify-start">
                 <ProjectAssetToolbarSummary label={nameFilter.trim() ? "검색 결과" : "사진"} count={`${visiblePhotos.length.toLocaleString()}장`} meta={displayedPhotos.length > 0 ? <span className="max-md:hidden">{uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 분석 완료" : "드래그하거나 체크해 여러 장 선택"}</span> : undefined} />
-                <div className="hidden md:block"><PhotographerLightButton variant="outline" size="toolbar" className="!h-9 !border-transparent !bg-accent/[0.09] !px-3 !text-[12px] !text-accent hover:!bg-accent/[0.16]" onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}>{aiAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}{aiAnalyzing ? "분석 중" : aiCompleted ? "다시 분석" : "AI 분석"}</PhotographerLightButton></div>
+                <div className="hidden md:block"><PhotographerLightButton variant="outline" size="toolbar" className="!h-9 !border-transparent !bg-accent/[0.09] !px-3 !text-[12px] !text-accent hover:!bg-accent/[0.16]" onClick={() => { setAiSheetError(null); setAiSheet("here"); }} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}>{aiAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}{aiAnalyzing ? "분석 중" : aiCompleted ? "다시 분석" : "AI 분석"}</PhotographerLightButton></div>
                 <div className="flex shrink-0 items-center md:hidden">
-                  <ProjectAssetMobileContextAction active={aiCompleted} onClick={() => setAiPromptOpen(true)} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}><Sparkles size={14} />{aiAnalyzing ? "분석 중" : "AI"}</ProjectAssetMobileContextAction>
+                  <ProjectAssetMobileContextAction active={aiCompleted} onClick={() => { setAiSheetError(null); setAiSheet("here"); }} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}><Sparkles size={14} />{aiAnalyzing ? "분석 중" : "AI"}</ProjectAssetMobileContextAction>
                   <ProjectAssetMobileIconButton className="relative" onClick={() => setMobileToolsOpen(true)} aria-label="검색 및 정렬 설정" aria-haspopup="dialog" aria-expanded={mobileToolsOpen}>
                     <SlidersHorizontal size={18} aria-hidden />
                     {nameFilter.trim() || sort !== "order-asc" ? <span className="absolute right-0.5 top-0.5 min-w-4 rounded-full bg-accent px-1 text-center text-[10px] font-bold leading-4 text-white">{Number(Boolean(nameFilter.trim())) + Number(sort !== "order-asc")}</span> : null}
@@ -624,7 +605,10 @@ export default function CustomerUploadPage() {
           actions={uploading ? <PhotographerLightButton variant="secondary" onClick={cancelUpload}>업로드 중단</PhotographerLightButton> : <>
             {retryFiles.length > 0 ? <PhotographerLightButton variant="secondary" onClick={() => void handleFiles(retryFiles)}>실패 {retryFiles.length.toLocaleString()}장 다시 시도</PhotographerLightButton> : null}
             {selectedPhotoIds.size > 0 ? <PhotographerLightButton variant="danger" pending={checkingDelete} pendingLabel="확인 중" onClick={requestDeleteSelectedPhotos}><Trash2 size={16} />선택 삭제 ({selectedPhotoIds.size.toLocaleString()})</PhotographerLightButton> : null}
-            {selectedPhotoIds.size === 0 ? <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={goSelect}>고르러 가기 →</PhotographerLightButton> : null}
+            {selectedPhotoIds.size === 0 && showUploadDone && !aiAnalyzing ? <>
+              <PhotographerLightButton variant="outline" onClick={goSelect}>원본 그대로 고르기</PhotographerLightButton>
+              <PhotographerLightButton onClick={() => { setAiSheetError(null); setAiSheet("thenSelect"); }}><Sparkles size={16} />AI로 정리하고 고르기 →</PhotographerLightButton>
+            </> : selectedPhotoIds.size === 0 ? <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={goSelect}>고르러 가기 →</PhotographerLightButton> : null}
           </>}
         />
 
@@ -654,18 +638,7 @@ export default function CustomerUploadPage() {
 
       {viewerIndex >= 0 ? <OriginalPhotoViewer photos={viewerPhotos} activeIndex={viewerIndex} onActiveIndexChange={(index) => setViewerPhotoId(viewerPhotos[index]?.id ?? null)} onClose={() => setViewerPhotoId(null)} /> : null}
 
-      <AiAnalysisPromptModal
-        open={aiPromptOpen}
-        onClose={() => setAiPromptOpen(false)}
-        description={`사진 ${progress.toLocaleString()}장 업로드가 완료되었습니다.`}
-        similar={aiWantSimilar}
-        quality={aiWantQuality}
-        onSimilarChange={setAiWantSimilar}
-        onQualityChange={setAiWantQuality}
-        onSkip={() => setAiPromptOpen(false)}
-        onStart={() => void startAiAnalysis()}
-        pending={aiStarting}
-      />
+      {aiSheet ? <AiTidySheet projectId={projectId} photoCount={project.photoCount} pending={aiStarting} error={aiSheetError} onStart={(kinds) => void startTidy(kinds)} onClose={() => setAiSheet(null)} /> : null}
 
       {deleteImpact ? <SelectionConfirmDialog
         title="이 사진들을 삭제할까요?"

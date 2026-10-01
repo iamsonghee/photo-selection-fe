@@ -5,22 +5,31 @@ import { useSearchParams } from "next/navigation";
 import { splitScenes, type Scene } from "@/lib/customer-scenes";
 import { customerSceneCatalog, OTHER_SCENE } from "@/lib/customer-shoot-scenes";
 import type { Photo } from "@/types";
+import type { AiTidyKind } from "./AiTidySheet";
 
 export type NamedScene = Scene & { name: string | null };
 
 /**
- * 장면 정리 상태.
- * - analyzing: AI가 정리 중 — 장면 없이 전체 시간순으로 고른다(1차 훑어보기).
+ * 장면 정리 상태. AI 정리는 사용자가 시작할 때만 돈다.
+ * - none: 아직 정리하지 않음 — 원본 그대로 촬영 시간순 전체 사진.
+ * - analyzing: 정리 중 — 전체 시간순으로 고르며 기다린다(1차 훑어보기).
  * - ready: AI 장면(이름 있음).
- * - fallback: AI 결과가 없거나 실패 — 촬영 시각 공백으로 나눈 장면(이름 없음). failed면 다시 시도를 안내한다.
+ * - fallback: 정리는 했지만 AI 장면이 없거나 실패 — 촬영 시각 공백으로 나눈 장면(이름 없음). failed면 다시 시도를 안내한다.
  */
 export type SceneAnalysis =
+  | { status: "none"; scenes: null }
   | { status: "analyzing"; progress: { done: number; total: number } | null; scenes: null }
   | { status: "ready"; scenes: NamedScene[] | null }
   | { status: "fallback"; failed: boolean; scenes: NamedScene[] | null };
 
+export type SceneAnalysisControl = SceneAnalysis & {
+  /** 정리를 시작한다. 시작 요청이 받아들여지지 않으면 오류 문구를 돌려준다. */
+  start: (kinds: AiTidyKind[]) => Promise<string | null>;
+};
+
 const POLL_MS = 5_000;
-type MockMode = "analyzing" | "ready" | "failed";
+type MockMode = "none" | "analyzing" | "ready" | "failed";
+const MOCK_MODES: readonly string[] = ["none", "analyzing", "ready", "failed"];
 
 /** AI 장면 이름이 붙기 전까지는 목록 순서대로 이름을 대신 붙인 시안용 결과를 만든다(개발 확인용). */
 function mockNamedScenes(scenes: Scene[] | null, shootType: string): NamedScene[] | null {
@@ -29,7 +38,7 @@ function mockNamedScenes(scenes: Scene[] | null, shootType: string): NamedScene[
   return scenes.map((scene, index) => ({ ...scene, name: scene.start ? catalog[index] ?? OTHER_SCENE : null }));
 }
 
-export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: string): SceneAnalysis & { retry: () => void } {
+export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: string): SceneAnalysisControl {
   const searchParams = useSearchParams();
   // 시안 확인용 `?mockAnalysis=`는 개발 환경에서만 받고, 같은 탭의 다른 화면(보내기)에서도 이어지도록 세션에 기억한다.
   const mockKey = `ps:mock-analysis:${projectId}`;
@@ -42,14 +51,14 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
       return sessionStorage.getItem(mockKey);
     } catch { return mockParam; }
   });
-  const mockValue = mockParam ?? storedMock;
-  const mock = mockValue === "analyzing" || mockValue === "ready" || mockValue === "failed" ? mockValue as MockMode : null;
-  const [pollKey, setPollKey] = useState(0);
+  const initialMock = mockParam ?? storedMock;
+  const [mock, setMock] = useState<MockMode | null>(initialMock && MOCK_MODES.includes(initialMock) ? initialMock as MockMode : null);
   const timeScenes = useMemo(() => splitScenes(photos), [photos]);
   const unnamed = useMemo<NamedScene[] | null>(() => timeScenes?.map((scene) => ({ ...scene, name: null })) ?? null, [timeScenes]);
 
-  // 실제 상태: 유사컷 분석이 진행 중이면 analyzing, 실패면 failed. 서비스가 없으면(로컬 등) 조용히 시간 장면을 쓴다.
-  const [remote, setRemote] = useState<"processing" | "failed" | "idle">("idle");
+  // 실제 상태(유사컷 분석 상태 API): 진행 중이면 analyzing, 완료면 시간 장면, 실패면 시간 장면+다시 시도, 기록이 없으면 none.
+  const [remote, setRemote] = useState<"none" | "processing" | "completed" | "failed">("none");
+  const [pollKey, setPollKey] = useState(0);
   useEffect(() => {
     if (mock) return;
     let cancelled = false;
@@ -59,22 +68,31 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
         const response = await fetch(`/api/customer-select/projects/${projectId}/ai/similarity`, { cache: "no-store" });
         const status = response.ok ? ((await response.json()).status as string | null) : null;
         if (cancelled) return;
-        const next = status === "processing" ? "processing" : status === "failed" ? "failed" : "idle";
+        const next = status === "processing" ? "processing" : status === "failed" ? "failed" : status === "completed" ? "completed" : "none";
         setRemote(next);
         if (next === "processing") timer = window.setTimeout(poll, POLL_MS);
       } catch {
-        if (!cancelled) setRemote("idle");
+        if (!cancelled) setRemote("none");
       }
     };
     void poll();
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [mock, pollKey, projectId]);
 
-  const retry = useCallback(() => {
-    if (mock) return;
-    setRemote("processing");
-    void fetch(`/api/customer-select/projects/${projectId}/ai/similarity`, { method: "POST" })
-      .finally(() => setPollKey((key) => key + 1));
+  const start = useCallback(async (kinds: AiTidyKind[]) => {
+    if (mock) {
+      setMock("analyzing");
+      return null;
+    }
+    try {
+      const responses = await Promise.all(kinds.map((kind) => fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`, { method: "POST" })));
+      if (!responses.some((response) => response.ok)) return "AI 정리를 시작하지 못했어요. 잠시 후 다시 시도해 주세요.";
+      setRemote("processing");
+      setPollKey((key) => key + 1);
+      return null;
+    } catch {
+      return "인터넷 연결을 확인하고 다시 시도해 주세요.";
+    }
   }, [mock, projectId]);
 
   // 시안 확인용: analyzing은 몇 초마다 진행되다가 완료로 바뀐다(완료 안내 흐름 확인).
@@ -90,8 +108,10 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
       mock === "ready" || (mock === "analyzing" && mockDone >= 1) ? { status: "ready", scenes: mockNamedScenes(timeScenes, shootType) }
       : mock === "analyzing" ? { status: "analyzing", progress: { done: Math.round(photos.length * mockDone), total: photos.length }, scenes: null }
       : mock === "failed" ? { status: "fallback", failed: true, scenes: unnamed }
+      : mock === "none" ? { status: "none", scenes: null }
       : remote === "processing" ? { status: "analyzing", progress: null, scenes: null }
-      : { status: "fallback", failed: remote === "failed", scenes: unnamed };
-    return { ...result, retry };
-  }, [mock, mockDone, photos.length, remote, retry, shootType, timeScenes, unnamed]);
+      : remote === "completed" || remote === "failed" ? { status: "fallback", failed: remote === "failed", scenes: unnamed }
+      : { status: "none", scenes: null };
+    return { ...result, start };
+  }, [mock, mockDone, photos.length, remote, shootType, start, timeScenes, unnamed]);
 }

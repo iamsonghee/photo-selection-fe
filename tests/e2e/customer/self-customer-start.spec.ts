@@ -140,12 +140,12 @@ test("self customer start screens and over-limit selection", async ({ page }, te
   await page.goto("/customer-select/limit-check/upload");
   await expect(page.getByRole("heading", { name: "업로드 한도 확인" })).toBeVisible();
   await page.getByRole("button", { name: "AI 분석 시작" }).click();
-  const aiDialog = page.getByRole("dialog", { name: "AI가 정리를 도와드릴까요?" });
+  // AI 정리는 사용자가 시작할 때만 열리고, 장면 나누기는 항상 켜진 채 세부 항목을 고를 수 있다.
+  const aiDialog = page.getByRole("dialog", { name: "AI로 사진 정리" });
   await expect(aiDialog).toBeVisible();
-  for (const label of ["건너뛰기", "분석 시작"]) {
-    expect(await aiDialog.getByRole("button", { name: label }).evaluate((button) => getComputedStyle(button).fontFamily)).toContain("Pretendard");
-  }
-  await aiDialog.getByRole("button", { name: "건너뛰기" }).click();
+  await expect(aiDialog.getByRole("checkbox").first()).toBeDisabled();
+  expect(await aiDialog.getByRole("button", { name: "정리 시작" }).evaluate((button) => getComputedStyle(button).fontFamily)).toContain("Pretendard");
+  await aiDialog.getByRole("button", { name: "닫기" }).click();
   await page.locator('input[type="file"]').setInputFiles([
     { name: "one.jpg", mimeType: "image/jpeg", buffer: Buffer.from("unused") },
     { name: "two.jpg", mimeType: "image/jpeg", buffer: Buffer.from("unused") },

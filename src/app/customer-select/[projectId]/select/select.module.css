@@ -35,6 +35,8 @@
 .analysisActions { flex: none; display: flex; gap: 6px; align-self: center; }
 .analysisFailed { display: flex; align-items: center; gap: 8px; margin-top: 8px !important; color: var(--muted-foreground) !important; font-size: 12px !important; }
 .analysisFailed button { padding: 0; border: 0; background: none; color: var(--foreground); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.aiButton { margin-left: auto; height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--primary) 12%, var(--surface)); color: var(--primary); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.aiButton:hover { background: color-mix(in srgb, var(--primary) 18%, var(--surface)); }
 .allTitle { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; }
 .allTitle small { margin-left: 6px; color: var(--subtle-foreground); font-size: 12px; font-weight: 600; }
 .sceneHeader .textLink { margin-left: auto; }
@@ -93,6 +95,15 @@
 .personRow i { width: 10px; height: 10px; border-radius: 50%; }
 .personRow span { margin-left: auto; color: var(--subtle-foreground); font-size: 12px; }
 .textLink { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--muted-foreground); font: inherit; font-size: 12px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+.tidyOptions { display: flex; flex-direction: column; gap: 2px; }
+.tidyOption { display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border-subtle); cursor: pointer; }
+.tidyOption input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--accent); }
+.tidyOption span { display: flex; flex-direction: column; gap: 2px; }
+.tidyOption strong { font-size: 14px; font-weight: 700; }
+.tidyOption small { color: var(--muted-foreground); font-size: 12px; line-height: 1.45; }
+.tidyOption em { padding: 2px 8px; border-radius: 999px; background: var(--surface-raised); color: var(--muted-foreground); font-size: 11px; font-style: normal; font-weight: 700; }
+.tidyError { color: var(--danger) !important; font-weight: 600; }
 
 /* ── 상세 보기 ── */
 .detail { position: fixed; inset: 0; z-index: 200; display: flex; background: #0e1517; color: #fff; }

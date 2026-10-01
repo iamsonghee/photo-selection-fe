@@ -27,6 +27,7 @@ import { PhotoGrid, type MobileColumns } from "./PhotoGrid";
 import { PhotoDetail } from "./PhotoDetail";
 import { InviteSheet, Sheet } from "./Sheets";
 import { useSceneAnalysis, type NamedScene } from "./useSceneAnalysis";
+import { AiTidySheet, groupSimilarKey, type AiTidyKind } from "./AiTidySheet";
 import s from "./select.module.css";
 
 type Scope = "all" | "picked" | "mine" | "popular" | "quality";
@@ -44,12 +45,16 @@ function SelectScreen() {
 
   const [thumbQueue] = useState(() => createThumbLoadQueue(12));
   const [scope, setScope] = useState<Scope>("all");
-  const [grouped, setGrouped] = useState(true);
+  const [grouped, setGrouped] = useState(() => {
+    try { return localStorage.getItem(groupSimilarKey(projectId)) !== "0"; } catch { return true; }
+  });
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [query, setQuery] = useState("");
   const [mobileColumns, setMobileColumns] = useState<MobileColumns>(2);
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<"invite" | "scenes" | null>(null);
+  const [sheet, setSheet] = useState<"invite" | "scenes" | "ai" | null>(null);
+  const [aiPending, setAiPending] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const photos = project.photos;
   const photoById = useMemo(() => new Map(photos.map((photo) => [photo.id, photo])), [photos]);
@@ -114,6 +119,15 @@ function SelectScreen() {
   const similarOf = useCallback((photo: Photo) => photo.similarityGroupId ? photos.filter((member) => member.similarityGroupId === photo.similarityGroupId) : [], [photos]);
   const pickedInScene = useCallback((target: NamedScene) => target.photoIds.filter((id) => picked.has(id)).length, [picked]);
   const likedInScene = useCallback((target: NamedScene) => target.photoIds.filter((id) => likesOf(id).length > 0).length, [likesOf]);
+
+  async function startTidy(kinds: AiTidyKind[]) {
+    setAiPending(true);
+    setAiError(null);
+    const error = await analysis.start(kinds);
+    setAiPending(false);
+    if (error) setAiError(error);
+    else setSheet(null);
+  }
 
   const goScene = useCallback((index: number | null | "all", mode: "push" | "replace" = "push") => {
     setScope("all");
@@ -324,7 +338,7 @@ function SelectScreen() {
                   <div className={s.overviewHead}>
                     <h2>장면별로 골라볼까요?</h2>
                     <p>{analysis.status === "ready" ? `AI가 ${scenes!.length}개 장면으로 정리했어요.` : analysis.status === "fallback" && analysis.failed ? `AI 정리를 하지 못해서 촬영 시간으로 ${scenes!.length}개 장면으로 나눴어요.` : `촬영 시간으로 ${scenes!.length}개 장면으로 나눴어요.`} {isOwner ? (target ? `약속한 ${target}장을 장면 크기에 맞춰 나눠 안내해요.` : "") : "마음에 드는 사진에 ♡를 눌러주세요."}</p>
-                    {analysis.status === "fallback" && analysis.failed && isOwner && <p className={s.analysisFailed}><button type="button" onClick={analysis.retry}>AI 정리 다시 시도</button></p>}
+                    {analysis.status === "fallback" && analysis.failed && isOwner && <p className={s.analysisFailed}><button type="button" onClick={() => setSheet("ai")}>AI 정리 다시 시도</button></p>}
                     <button type="button" className={s.textLink} onClick={() => goScene("all")}>전체 사진 시간순으로 보기</button>
                   </div>
                   {scenes!.map((item, index) => {
@@ -351,10 +365,12 @@ function SelectScreen() {
                     <span className={s.sceneMeta}>{sceneSub(scene)}</span>
                   </div>
                 )}
-                {!scene && scenes && !analysisBanner && (
+                {!scene && !analysisBanner && (
                   <div className={s.sceneHeader}>
                     <strong className={s.allTitle}>전체 사진 <small>촬영 시간순 · {photos.length.toLocaleString()}장</small></strong>
-                    <button type="button" className={s.textLink} onClick={() => goScene(null, "replace")}>장면별로 보기</button>
+                    {scenes
+                      ? <button type="button" className={s.textLink} onClick={() => goScene(null, "replace")}>장면별로 보기</button>
+                      : analysis.status === "none" && isOwner && photos.length > 0 && <button type="button" className={s.aiButton} onClick={() => { setAiError(null); setSheet("ai"); }}><Sparkles size={14} />AI로 장면 정리</button>}
                   </div>
                 )}
                 <div className={s.tools} style={scene ? undefined : { paddingTop: 10 }}>
@@ -378,6 +394,7 @@ function SelectScreen() {
       </div>
 
       {sheet === "scenes" && scenes && <Sheet title="장면" onClose={() => setSheet(null)}><div className={s.sheetList}>{sceneList}</div><button type="button" className={s.textLink} onClick={() => { setSheet(null); goScene(null, "replace"); }}>장면 한눈에 보기</button></Sheet>}
+      {sheet === "ai" && <AiTidySheet projectId={projectId} photoCount={photos.length} pending={aiPending} error={aiError} onStart={(kinds) => void startTidy(kinds)} onClose={() => setSheet(null)} />}
       {sheet === "invite" && <InviteSheet projectId={projectId} shareToken={project.shareToken} shareEnabled={project.shareEnabled} people={people} online={online} done={project.participantDone} onClose={() => setSheet(null)} />}
 
       {people.length > 1 && <EphemeralChat channelKey={project.realtimeKey} currentIdentity={me} nicknames={project.participantNicknames} hasRecipient={project.onlineParticipants?.some((color) => color !== me) ?? false} elevated={Boolean(openPhotoId)} />}
