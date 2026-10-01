@@ -1,5 +1,6 @@
 "use client";
 
+import { CUSTOMER_SHOOT_TYPES } from "@/lib/customer-shoot-scenes";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CUSTOMER_PHOTO_LIMIT } from "./upload-limit";
@@ -97,7 +98,7 @@ export function NewCustomerProjectForm() {
 
             <div id="field-shootType">
               <ProjectFormField group error={fieldErrors.shootType} label="촬영 종류" required>
-                <ProjectShootTypeSelector value={shootType} onChange={(value) => { setShootType(value); setFieldErrors((current) => ({ ...current, shootType: "" })); }} />
+                <ProjectShootTypeSelector options={CUSTOMER_SHOOT_TYPES} value={shootType} onChange={(value) => { setShootType(value); setFieldErrors((current) => ({ ...current, shootType: "" })); }} />
               </ProjectFormField>
             </div>
 

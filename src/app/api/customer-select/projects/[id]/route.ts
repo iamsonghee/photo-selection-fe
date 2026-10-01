@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { buildProjectView, resolveCustomerProjectAccess, shareTokenFromRequest } from "@/lib/customer-select-server";
 import { createClient } from "@/lib/supabase/server";
-import { isProjectShootType } from "@/lib/project-shoot-types";
+import { isCustomerShootType as isProjectShootType } from "@/lib/customer-shoot-scenes";
 
 export const dynamic = "force-dynamic";
 

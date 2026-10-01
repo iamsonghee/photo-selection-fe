@@ -6,7 +6,7 @@ import { getCurrentCustomerAuthUser } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "./_lib/CustomerSelectShell";
 import { customerProjectAction, customerProjectDestination, customerProjectStatus, filterCustomerProjects, type CustomerProjectFilter, type CustomerProjectSummary } from "./_lib/project-routing";
-import { isProjectShootType, projectShootTypeLabel } from "@/lib/project-shoot-types";
+import { isCustomerShootType as isProjectShootType, customerShootTypeLabel as projectShootTypeLabel } from "@/lib/customer-shoot-scenes";
 import { CUSTOMER_PHOTO_LIMIT } from "./_lib/upload-limit";
 
 export default async function CustomerSelectHomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {

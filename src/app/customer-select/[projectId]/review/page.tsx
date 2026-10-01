@@ -5,7 +5,7 @@
  * 주요 행동(결과 링크 보내기)을 위에 두고, 확인할 점은 막지 않고 링크로만 안내한다.
  * 결과 링크는 항상 최신 선택을 보여주므로 보내기가 선택을 잠그거나 상태를 바꾸지 않는다.
  */
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AlertTriangle, Copy, FileSpreadsheet, FileText, MessageSquare, Send } from "lucide-react";
@@ -13,17 +13,24 @@ import { PhotographerLightButton } from "@/components/photographer/PhotographerL
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import { csvEscape, downloadTextFile, sanitizeFilenamePart } from "@/lib/text-file-download";
-import { formatSceneRange, splitScenes } from "@/lib/customer-scenes";
+import { formatSceneRange } from "@/lib/customer-scenes";
 import type { Photo } from "@/types";
 import { activeParticipants, useCustomerSelectStore } from "../../_lib/real-store";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import { ProjectStepHeader } from "../../_lib/ProjectStepHeader";
 import { PhotoDetail } from "../select/PhotoDetail";
+import { useSceneAnalysis, type NamedScene } from "../select/useSceneAnalysis";
 import s from "./review.module.css";
 
 type Notice = { key: string; text: string; href?: string };
 
 export default function CustomerSendPage() {
+  return <Suspense fallback={<SystemLoadingScreen title="보낼 사진을 불러오고 있어요" homeHref="/customer-select" />}><SendScreen /></Suspense>;
+}
+
+const sceneLabel = (scene: NamedScene) => scene.name ? `${scene.name}${scene.start ? ` (${formatSceneRange(scene)})` : ""}` : formatSceneRange(scene);
+
+function SendScreen() {
   const projectId = useParams().projectId as string;
   const router = useRouter();
   const store = useCustomerSelectStore();
@@ -39,7 +46,7 @@ export default function CustomerSendPage() {
 
   const selectedIds = useMemo(() => new Set(project.selectedIds), [project.selectedIds]);
   const selected = useMemo(() => project.photos.filter((photo) => selectedIds.has(photo.id)), [project.photos, selectedIds]);
-  const scenes = useMemo(() => splitScenes(project.photos), [project.photos]);
+  const { scenes } = useSceneAnalysis(projectId, project.photos, project.shootType);
   const people = useMemo(() => activeParticipants(project), [project]);
   const memoOf = (id: string) => project.photoStates[id]?.comment?.trim() ?? "";
   const memoCount = selected.filter((photo) => memoOf(photo.id)).length;
@@ -47,7 +54,7 @@ export default function CustomerSendPage() {
   const sections = useMemo(() => {
     if (!scenes || scenes.length < 2) return [{ title: "", sceneIndex: null as number | null, photos: selected }];
     return scenes.map((scene, index) => ({
-      title: formatSceneRange(scene),
+      title: sceneLabel(scene),
       sceneIndex: index,
       photos: scene.photoIds.filter((id) => selectedIds.has(id)).flatMap((id) => project.photos.find((photo) => photo.id === id) ?? []),
     })).filter((section) => section.photos.length);
@@ -57,7 +64,7 @@ export default function CustomerSendPage() {
     const list: Notice[] = [];
     const selectHref = (scene?: number) => `/customer-select/${projectId}/select${scene === undefined ? "" : `?scene=${scene}`}`;
     if (scenes && scenes.length > 1) scenes.forEach((scene, index) => {
-      if (!scene.photoIds.some((id) => selectedIds.has(id))) list.push({ key: `scene-${index}`, text: `${formatSceneRange(scene)} 장면에서 아직 고르지 않았어요`, href: selectHref(index) });
+      if (!scene.photoIds.some((id) => selectedIds.has(id))) list.push({ key: `scene-${index}`, text: `${sceneLabel(scene)} 장면에서 아직 고르지 않았어요`, href: selectHref(index) });
     });
     const byGroup = new Map<string, Photo[]>();
     selected.forEach((photo) => { if (photo.similarityGroupId) byGroup.set(photo.similarityGroupId, [...(byGroup.get(photo.similarityGroupId) ?? []), photo]); });

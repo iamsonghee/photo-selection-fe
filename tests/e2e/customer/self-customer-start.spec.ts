@@ -9,7 +9,9 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/customer-select/new");
     await expect(page.getByRole("heading", { name: "어떤 사진을 골라볼까요?" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "웨딩" })).toBeVisible();
+    // 셀프 고객은 장면 구성이 다른 촬영 종류를 나눠 고른다(웨딩 본식/웨딩 촬영 등).
+    await expect(page.getByRole("button", { name: "웨딩 본식" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "돌·백일잔치" })).toBeVisible();
     const targetInput = page.locator('input[inputmode="numeric"]');
     await expect(targetInput).toHaveValue("");
     await targetInput.fill("2000");

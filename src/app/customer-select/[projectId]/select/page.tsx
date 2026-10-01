@@ -8,13 +8,13 @@
  */
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, Grid2x2, Layers, Plus } from "lucide-react";
+import { ChevronDown, Grid2x2, Layers, Plus, Sparkles } from "lucide-react";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
-import { formatSceneRange, sceneTargets, splitScenes, type Scene } from "@/lib/customer-scenes";
+import { formatSceneRange, sceneTargets } from "@/lib/customer-scenes";
 import type { ColorTag, Photo } from "@/types";
 import { activeParticipants, useCustomerSelectStore } from "../../_lib/real-store";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
@@ -26,6 +26,7 @@ import ui from "../../_lib/ui.module.css";
 import { PhotoGrid, type MobileColumns } from "./PhotoGrid";
 import { PhotoDetail } from "./PhotoDetail";
 import { InviteSheet, Sheet } from "./Sheets";
+import { useSceneAnalysis, type NamedScene } from "./useSceneAnalysis";
 import s from "./select.module.css";
 
 type Scope = "all" | "picked" | "mine" | "popular" | "quality";
@@ -52,7 +53,14 @@ function SelectScreen() {
 
   const photos = project.photos;
   const photoById = useMemo(() => new Map(photos.map((photo) => [photo.id, photo])), [photos]);
-  const scenes = useMemo(() => splitScenes(photos), [photos]);
+  const analysis = useSceneAnalysis(projectId, photos, project.shootType);
+  const scenes = analysis.scenes;
+  // 촬영 시간순 전체 목록 — 장면이 없을 때와 AI 정리 중(1차 훑어보기)에 쓴다.
+  const timeOrdered = useMemo(() => [...photos].sort((a, b) => (a.takenAt ?? "").localeCompare(b.takenAt ?? "") || a.orderIndex - b.orderIndex), [photos]);
+  // 정리 중에 들어온 사람은 끝나도 보던 전체 보기를 유지하고, 장면별 보기는 제안만 한다.
+  const [holdAll, setHoldAll] = useState(false);
+  const [promptDismissed, setPromptDismissed] = useState(false);
+  if (analysis.status === "analyzing" && !holdAll) setHoldAll(true);
   const selectedIds = useMemo(() => new Set(project.selectedIds), [project.selectedIds]);
   const likesOf = useCallback((photoId: string) => project.photoStates[photoId]?.color ?? [], [project.photoStates]);
   const myLikes = useMemo(() => new Set(photos.filter((photo) => likesOf(photo.id).includes(me)).map((photo) => photo.id)), [likesOf, me, photos]);
@@ -63,13 +71,14 @@ function SelectScreen() {
   const targets = useMemo(() => scenes ? sceneTargets(scenes.map((scene) => scene.photoIds.length), project.target) : [], [project.target, scenes]);
 
   const sceneParam = searchParams.get("scene");
-  const sceneIndex = scenes && sceneParam !== null && Number(sceneParam) >= 0 && Number(sceneParam) < scenes.length ? Number(sceneParam) : null;
+  const viewAll = !scenes || searchParams.get("view") === "all" || (holdAll && sceneParam === null);
+  const sceneIndex = !viewAll && scenes && sceneParam !== null && Number(sceneParam) >= 0 && Number(sceneParam) < scenes.length ? Number(sceneParam) : null;
   const scene = sceneIndex === null ? null : scenes![sceneIndex];
-  const showOverview = Boolean(scenes) && !scene;
+  const showOverview = Boolean(scenes) && !scene && !viewAll;
 
   const scenePhotos = useMemo(
-    () => scene ? scene.photoIds.flatMap((id) => photoById.get(id) ?? []) : scenes ? [] : photos,
-    [photoById, photos, scene, scenes],
+    () => scene ? scene.photoIds.flatMap((id) => photoById.get(id) ?? []) : viewAll ? timeOrdered : [],
+    [photoById, scene, timeOrdered, viewAll],
   );
   const filtered = useMemo(() => {
     const text = query.trim().toLowerCase();
@@ -103,13 +112,16 @@ function SelectScreen() {
   }, [expanded, filtered, grouped, groupsInView, hasGroups, picked]);
 
   const similarOf = useCallback((photo: Photo) => photo.similarityGroupId ? photos.filter((member) => member.similarityGroupId === photo.similarityGroupId) : [], [photos]);
-  const pickedInScene = useCallback((target: Scene) => target.photoIds.filter((id) => picked.has(id)).length, [picked]);
+  const pickedInScene = useCallback((target: NamedScene) => target.photoIds.filter((id) => picked.has(id)).length, [picked]);
+  const likedInScene = useCallback((target: NamedScene) => target.photoIds.filter((id) => likesOf(id).length > 0).length, [likesOf]);
 
-  const goScene = useCallback((index: number | null, mode: "push" | "replace" = "push") => {
+  const goScene = useCallback((index: number | null | "all", mode: "push" | "replace" = "push") => {
     setScope("all");
     setQuery("");
     setExpanded(new Set());
-    const url = index === null ? `/customer-select/${projectId}/select` : `/customer-select/${projectId}/select?scene=${index}`;
+    setHoldAll(false);
+    const base = `/customer-select/${projectId}/select`;
+    const url = index === null ? base : index === "all" ? `${base}?view=all` : `${base}?scene=${index}`;
     if (mode === "push") router.push(url, { scroll: false }); else router.replace(url, { scroll: false });
   }, [projectId, router]);
 
@@ -134,19 +146,45 @@ function SelectScreen() {
   const myDone = Boolean(project.participantDone[me]);
   const toReview = () => router.push(`/customer-select/${projectId}/review`);
 
-  const sceneTitle = (item: Scene) => scenes && scenes.length > 1 ? formatSceneRange(item) : "전체 사진";
-  const progressText = (item: Scene, index: number) => {
+  // AI 장면은 이름이 제목, 시간대는 보조 정보. 이름이 없으면(시간 장면) 시간대가 제목이다.
+  const sceneTitle = (item: NamedScene) => item.name ?? (scenes && scenes.length > 1 ? formatSceneRange(item) : "전체 사진");
+  const sceneSub = (item: NamedScene) => [item.name && item.start ? formatSceneRange(item) : null, `${item.photoIds.length}장`].filter(Boolean).join(" · ");
+  const progressText = (item: NamedScene, index: number) => {
     const count = pickedInScene(item);
+    const liked = likedInScene(item);
     if (!isOwner) return count ? `♡ 내 찜 ${count}장` : "아직 찜 안 했어요";
-    if (!count) return "아직 안 골랐어요";
-    return targets[index] ? `✓ ${count} / ${targets[index]}장 정도` : `✓ ${count}장`;
+    const likedText = liked ? `♡ ${liked} · ` : "";
+    if (!count) return `${likedText}아직 안 골랐어요`;
+    return `${likedText}${targets[index] ? `✓ ${count} / ${targets[index]}장 정도` : `✓ ${count}장`}`;
   };
-  const sceneDone = (item: Scene, index: number) => isOwner && targets[index] > 0 && pickedInScene(item) >= targets[index];
+  const sceneDone = (item: NamedScene, index: number) => isOwner && targets[index] > 0 && pickedInScene(item) >= targets[index];
+  const analysisBanner = analysis.status === "analyzing" ? (
+    <div className={s.analysis} role="status">
+      <Sparkles size={16} aria-hidden />
+      <div>
+        <strong>AI가 장면을 나누고 있어요{analysis.progress ? ` · ${analysis.progress.done.toLocaleString()} / ${analysis.progress.total.toLocaleString()}장` : ""}</strong>
+        <span>그동안 마음에 드는 사진에 ♡를 눌러 두세요. 정리가 끝나면 장면별로 모아서 보여드릴게요.</span>
+        {analysis.progress && <i style={{ width: `${Math.round((analysis.progress.done / Math.max(1, analysis.progress.total)) * 100)}%` }} />}
+      </div>
+    </div>
+  ) : analysis.status === "ready" && holdAll && !promptDismissed && scenes ? (
+    <div className={s.analysis} role="status">
+      <Sparkles size={16} aria-hidden />
+      <div>
+        <strong>장면 정리가 끝났어요 · {scenes.length}개 장면</strong>
+        <span>{myLikes.size ? `찜한 ${myLikes.size}장도 장면별로 나눠뒀어요.` : "장면별로 나눠서 보면 고르기 쉬워요."}</span>
+      </div>
+      <div className={s.analysisActions}>
+        <PhotographerLightButton size="toolbar" onClick={() => goScene(null, "replace")}>장면별로 보기</PhotographerLightButton>
+        <PhotographerLightButton variant="outline" size="toolbar" onClick={() => setPromptDismissed(true)}>계속 보기</PhotographerLightButton>
+      </div>
+    </div>
+  ) : null;
 
   const sceneList = scenes?.map((item, index) => (
     <button key={index} type="button" className={s.railItem} aria-current={index === sceneIndex} onClick={() => { setSheet(null); goScene(index, sceneIndex === null ? "push" : "replace"); }}>
       <strong>{sceneTitle(item)}</strong>
-      <span>{item.photoIds.length}장</span>
+      <span>{sceneSub(item)}</span>
       <em className={sceneDone(item, index) ? s.done : ""}>{isOwner ? `${pickedInScene(item)}${targets[index] ? `/${targets[index]}` : ""}` : `♡${pickedInScene(item)}`}</em>
     </button>
   ));
@@ -285,7 +323,9 @@ function SelectScreen() {
                 <div className={s.overviewInner}>
                   <div className={s.overviewHead}>
                     <h2>장면별로 골라볼까요?</h2>
-                    <p>촬영 시간으로 {scenes!.length}개 장면으로 나눴어요. {isOwner ? (target ? `약속한 ${target}장을 장면 크기에 맞춰 나눠 안내해요.` : "") : "마음에 드는 사진에 ♡를 눌러주세요."}</p>
+                    <p>{analysis.status === "ready" ? `AI가 ${scenes!.length}개 장면으로 정리했어요.` : analysis.status === "fallback" && analysis.failed ? `AI 정리를 하지 못해서 촬영 시간으로 ${scenes!.length}개 장면으로 나눴어요.` : `촬영 시간으로 ${scenes!.length}개 장면으로 나눴어요.`} {isOwner ? (target ? `약속한 ${target}장을 장면 크기에 맞춰 나눠 안내해요.` : "") : "마음에 드는 사진에 ♡를 눌러주세요."}</p>
+                    {analysis.status === "fallback" && analysis.failed && isOwner && <p className={s.analysisFailed}><button type="button" onClick={analysis.retry}>AI 정리 다시 시도</button></p>}
+                    <button type="button" className={s.textLink} onClick={() => goScene("all")}>전체 사진 시간순으로 보기</button>
                   </div>
                   {scenes!.map((item, index) => {
                     const cover = photoById.get(item.photoIds.find((id) => picked.has(id)) ?? item.photoIds[0]);
@@ -293,7 +333,7 @@ function SelectScreen() {
                     return (
                       <button key={index} type="button" className={s.sceneCard} onClick={() => goScene(index)}>
                         <span className={s.sceneCover}>{cover && <img src={cover.url} alt="" />}</span>
-                        <span className={s.sceneText}><strong>{sceneTitle(item)}</strong><span>{item.photoIds.length}장</span></span>
+                        <span className={s.sceneText}><strong>{sceneTitle(item)}</strong><span>{sceneSub(item)}</span></span>
                         <span className={`${s.sceneProgress} ${sceneDone(item, index) ? s.done : count ? "" : s.empty}`}>{progressText(item, index)}</span>
                       </button>
                     );
@@ -302,12 +342,19 @@ function SelectScreen() {
               </div>
             ) : (
               <>
+                {analysisBanner}
                 {scene && (
                   <div className={s.sceneHeader}>
                     <button type="button" className={s.scenePicker} onClick={() => setSheet("scenes")} aria-label="다른 장면 고르기">
                       <strong>{sceneTitle(scene)}</strong><ChevronDown size={16} /><small>{sceneIndex! + 1} / {scenes!.length}</small>
                     </button>
-                    <span className={s.sceneMeta}>{scene.photoIds.length}장</span>
+                    <span className={s.sceneMeta}>{sceneSub(scene)}</span>
+                  </div>
+                )}
+                {!scene && scenes && !analysisBanner && (
+                  <div className={s.sceneHeader}>
+                    <strong className={s.allTitle}>전체 사진 <small>촬영 시간순 · {photos.length.toLocaleString()}장</small></strong>
+                    <button type="button" className={s.textLink} onClick={() => goScene(null, "replace")}>장면별로 보기</button>
                   </div>
                 )}
                 <div className={s.tools} style={scene ? undefined : { paddingTop: 10 }}>

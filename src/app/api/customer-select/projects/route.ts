@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { getCurrentCustomerAuthId } from "@/lib/customer-select-server";
-import { isProjectShootType } from "@/lib/project-shoot-types";
+import { isCustomerShootType as isProjectShootType } from "@/lib/customer-shoot-scenes";
 
 /** POST: 새 고객 셀렉 프로젝트 생성. 로그인한 소유자만 가능. */
 export async function POST(req: NextRequest) {

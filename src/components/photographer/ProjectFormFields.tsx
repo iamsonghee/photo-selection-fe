@@ -225,13 +225,16 @@ export function ProjectFormError({ children, id }: { children: ReactNode; id?: s
 export function ProjectShootTypeSelector({
   value,
   onChange,
+  options = SHOOT_TYPES,
 }: {
   value: string | null;
   onChange: (value: string | null) => void;
+  /** 기본은 작가 촬영 종류. 셀프 고객처럼 다른 목록을 쓰는 화면만 바꿔 넣는다 */
+  options?: readonly { value: string; label: string; icon: typeof SHOOT_TYPES[number]["icon"] }[];
 }) {
   return (
-    <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:gap-2.5">
-      {SHOOT_TYPES.map(({ value: optionValue, label, icon: Icon }) => {
+    <div className={options.length > SHOOT_TYPES.length ? "grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-2.5" : "flex flex-wrap gap-2 sm:flex-nowrap sm:gap-2.5"}>
+      {options.map(({ value: optionValue, label, icon: Icon }) => {
         const active = value === optionValue;
         return (
           <button

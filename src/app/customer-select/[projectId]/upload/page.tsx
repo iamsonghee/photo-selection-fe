@@ -288,12 +288,26 @@ export default function CustomerUploadPage() {
       setError(`${uploaded.toLocaleString()}장은 업로드했고 ${failedFiles.length.toLocaleString()}장은 처리하지 못했습니다.`);
     } else if (uploaded > 0) {
       setJustUploaded(uploaded);
+      void autoStartAi();
+    }
+  }
+
+  /** 업로드가 끝나면 묻지 않고 AI 정리(장면·유사컷·흔들림)를 시작한다. 실패해도 고르기는 막지 않고, 상태는 고르기 화면에서 보여준다. */
+  async function autoStartAi() {
+    try {
+      const responses = await Promise.all(["similarity", "quality"].map((kind) => fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`, { method: "POST" })));
+      if (responses.some((response) => response.ok)) {
+        setAiCompleted(false);
+        setAiAnalyzing(true);
+        void pollAiAnalysis(["similarity", "quality"]);
+      }
+    } catch {
+      /* 고르기 화면의 분석 상태에서 다시 시도할 수 있다 */
     }
   }
 
   function goSelect() {
-    if (justUploaded > 0 && !aiAnalyzing && (aiWantSimilar || aiWantQuality)) void startAiAnalysis(true);
-    else router.push(`/customer-select/${projectId}/select`);
+    router.push(`/customer-select/${projectId}/select`);
   }
 
   function cancelUpload() {
@@ -482,10 +496,7 @@ export default function CustomerUploadPage() {
   const uploadDone = showUploadDone ? (
     <div className="flex min-w-0 flex-col gap-1.5 md:flex-row md:items-center md:gap-5" role="status">
       <p className="flex items-center gap-1.5 text-sm font-bold text-foreground"><CheckCircle2 size={16} className="text-primary" aria-hidden />{justUploaded.toLocaleString()}장 올렸어요</p>
-      {aiAnalyzing ? <p className="text-xs text-muted-foreground">AI가 사진을 정리하고 있어요. 고르면서 기다려도 돼요.</p> : <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-foreground">
-        <label className="inline-flex items-center gap-1.5"><input type="checkbox" className="size-4 accent-[var(--accent)]" checked={aiWantSimilar} onChange={(event) => setAiWantSimilar(event.target.checked)} />비슷한 사진끼리 묶기</label>
-        <label className="inline-flex items-center gap-1.5"><input type="checkbox" className="size-4 accent-[var(--accent)]" checked={aiWantQuality} onChange={(event) => setAiWantQuality(event.target.checked)} />흔들림·눈 감음 표시</label>
-      </div>}
+      {aiAnalyzing && <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Sparkles size={13} className="shrink-0 text-primary" aria-hidden />AI가 장면과 비슷한 사진을 정리하고 있어요. 기다리지 않고 바로 골라도 돼요.</p>}
     </div>
   ) : undefined;
 
@@ -613,7 +624,7 @@ export default function CustomerUploadPage() {
           actions={uploading ? <PhotographerLightButton variant="secondary" onClick={cancelUpload}>업로드 중단</PhotographerLightButton> : <>
             {retryFiles.length > 0 ? <PhotographerLightButton variant="secondary" onClick={() => void handleFiles(retryFiles)}>실패 {retryFiles.length.toLocaleString()}장 다시 시도</PhotographerLightButton> : null}
             {selectedPhotoIds.size > 0 ? <PhotographerLightButton variant="danger" pending={checkingDelete} pendingLabel="확인 중" onClick={requestDeleteSelectedPhotos}><Trash2 size={16} />선택 삭제 ({selectedPhotoIds.size.toLocaleString()})</PhotographerLightButton> : null}
-            {selectedPhotoIds.size === 0 ? <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} pending={aiStarting} pendingLabel="정리 시작 중" onClick={goSelect}>고르러 가기 →</PhotographerLightButton> : null}
+            {selectedPhotoIds.size === 0 ? <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={goSelect}>고르러 가기 →</PhotographerLightButton> : null}
           </>}
         />
 
