@@ -103,6 +103,8 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
 
   // 실제 상태(유사컷 분석 상태 API): 진행 중이면 analyzing, 완료면 시간 장면, 실패면 시간 장면+다시 시도, 기록이 없으면 none.
   const [remote, setRemote] = useState<"none" | "processing" | "completed" | "failed">("none");
+  // 진행 중인 분석(유사컷·장면 + 흔들림·눈 감음)의 처리 장수 합 — clip-service가 진행하면서 기록한다.
+  const [remoteProgress, setRemoteProgress] = useState<{ done: number; total: number } | null>(null);
   const [pollKey, setPollKey] = useState(0);
   const onCompletedRef = useRef(onCompleted);
   useEffect(() => { onCompletedRef.current = onCompleted; }, [onCompleted]);
@@ -111,17 +113,28 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
     let cancelled = false;
     let timer = 0;
     let wasProcessing = false;
+    type RunStatus = { status: string | null; run?: { image_count?: number; processed_count?: number } | null } | null;
+    const read = async (kind: AiTidyKind): Promise<RunStatus> => {
+      const response = await fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`, { cache: "no-store" });
+      return response.ok ? await response.json() as RunStatus : null;
+    };
     const poll = async () => {
       try {
-        const response = await fetch(`/api/customer-select/projects/${projectId}/ai/similarity`, { cache: "no-store" });
-        const status = response.ok ? ((await response.json()).status as string | null) : null;
+        const [similarity, quality] = await Promise.all([read("similarity"), read("quality")]);
         if (cancelled) return;
+        const status = similarity?.status ?? null;
         const next = status === "processing" ? "processing" : status === "failed" ? "failed" : status === "completed" ? "completed" : "none";
-        // 이 화면에서 정리가 끝나면 새 장면·유사컷·품질 결과를 다시 읽는다.
-        if (wasProcessing && next !== "processing") onCompletedRef.current?.();
-        wasProcessing = next === "processing";
+        const running = [similarity, quality].filter((item) => item?.status === "processing" && (item.run?.image_count ?? 0) > 0);
+        const anyRunning = similarity?.status === "processing" || quality?.status === "processing";
+        // 이 화면에서 정리(품질 판정까지)가 끝나면 새 장면·유사컷·품질 결과를 다시 읽는다.
+        if (wasProcessing && !anyRunning) onCompletedRef.current?.();
+        wasProcessing = anyRunning;
         setRemote(next);
-        if (next === "processing") timer = window.setTimeout(poll, POLL_MS);
+        setRemoteProgress(running.length ? {
+          done: running.reduce((sum, item) => sum + (item!.run?.processed_count ?? 0), 0),
+          total: running.reduce((sum, item) => sum + (item!.run?.image_count ?? 0), 0),
+        } : null);
+        if (anyRunning) timer = window.setTimeout(poll, POLL_MS);
       } catch {
         if (!cancelled) setRemote("none");
       }
@@ -160,11 +173,11 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
       : mock === "analyzing" ? { status: "analyzing", progress: { done: Math.round(photos.length * mockDone), total: photos.length }, scenes: null }
       : mock === "failed" ? { status: "fallback", failed: true, scenes: unnamed }
       : mock === "none" ? { status: "none", scenes: null }
-      : remote === "processing" ? { status: "analyzing", progress: null, scenes: null }
+      : remote === "processing" ? { status: "analyzing", progress: remoteProgress, scenes: null }
       // 저장된 AI 장면(이름 포함)이 있으면 그걸, 없으면(장면 근거 부족·실패) 시각 공백 장면.
       : ai && remote !== "failed" ? { status: "ready", scenes: ai.scenes }
       : remote === "completed" || remote === "failed" ? { status: "fallback", failed: remote === "failed", scenes: ai?.scenes ?? unnamed }
       : { status: "none", scenes: null };
     return { ...result, photos: mock && result.status === "ready" ? mockAiPhotos : photos, newPhotoCount: mock ? 0 : ai?.newCount ?? 0, start };
-  }, [ai, mock, mockAiPhotos, mockDone, photos, remote, shootType, start, timeScenes, unnamed]);
+  }, [ai, mock, mockAiPhotos, mockDone, photos, remote, remoteProgress, shootType, start, timeScenes, unnamed]);
 }

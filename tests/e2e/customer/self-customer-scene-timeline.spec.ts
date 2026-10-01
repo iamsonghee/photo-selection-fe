@@ -583,3 +583,19 @@ test("real AI scenes: named scenes from the server, new photos collected, re-tid
   expect(similarity.sceneNames).toContain("식전·신부 대기실");
   await context.close();
 });
+
+test("analysis banner shows real progress summed across the running runs", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  // 유사컷·장면 90장 중 30장, 흔들림·눈 감음 90장 중 60장 처리 → 90 / 180장.
+  await page.route(`**/api/customer-select/projects/${PROJECT_ID}/ai/*`, (route) => {
+    const kind = new URL(route.request().url()).pathname.split("/").pop();
+    return route.fulfill({ json: { status: "processing", run: { image_count: 90, processed_count: kind === "similarity" ? 30 : 60 } } });
+  });
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=off`);
+  const banner = page.getByRole("status").filter({ hasText: "AI가 장면을 나누고 있어요" });
+  await expect(banner).toContainText("90 / 180장");
+  await context.close();
+});
