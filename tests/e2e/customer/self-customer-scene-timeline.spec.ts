@@ -315,3 +315,15 @@ test("a collapsed cover never looks selected; the badge shows the group's picks"
   await expect(page.locator('.gl-photo-card[data-photo-id="p8"] [data-active="true"]')).toHaveCount(0);
   await context.close();
 });
+
+test("selected photos keep their original brightness", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=none`);
+  const card = page.locator('.gl-photo-card[data-photo-id="p1"]');
+  await expect(card).toHaveClass(/gl-selected/);
+  await expect(card.locator(".gl-card-media img")).toHaveCSS("filter", "none");
+  await context.close();
+});
