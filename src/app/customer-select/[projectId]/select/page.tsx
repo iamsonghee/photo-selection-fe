@@ -158,6 +158,11 @@ function SelectScreen() {
       return covers.get(groupId) === photo.id;
     });
   }, [expanded, filtered, grouped, groupsInView, hasGroups, picked]);
+  // 펼친 묶음 사진이면 그 묶음 키 — 갤러리가 묶음을 새 줄에 나란히 놓고 띠로 감싼다.
+  const bandOf = useCallback((photo: Photo) => {
+    const groupId = photo.similarityGroupId;
+    return grouped && hasGroups && groupId && expanded.has(groupId) && (groupsInView.get(groupId)?.length ?? 0) > 1 ? groupId : null;
+  }, [expanded, grouped, groupsInView, hasGroups]);
   // 펼친 묶음에서 "⧉ 접기" 배지를 달 첫 장(갤러리 순서 기준).
   const firstOfGroup = useMemo(() => {
     const first = new Map<string, string>();
@@ -419,6 +424,7 @@ function SelectScreen() {
               startAt={enteredBy === "next" ? "top" : enteredBy === "prev" ? "bottom" : null}
               enterFrom={enteredBy === "next" ? "below" : null}
               renderCard={card}
+              bandOf={bandOf}
               empty={<><strong>조건에 맞는 사진이 없어요</strong><span>보기 조건을 바꿔보세요.</span><button type="button" onClick={() => { setScope("all"); setQuery(""); }}>전체 보기</button></>}
               footer={sceneFooter}
               next={nextScene ? { label: sceneTitle(nextScene), onPass: () => goScene(sceneIndex! + 1, "next") } : null}

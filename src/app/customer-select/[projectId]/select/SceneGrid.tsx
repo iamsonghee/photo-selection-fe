@@ -29,14 +29,17 @@ const WHEEL_NEW_GESTURE_MS = 140;
 // 맥 마우스처럼 한 칸이 몇 px뿐인 휠도 몇 칸이면 넘어가도록 한 번에 최소 이만큼 당긴다.
 const WHEEL_MIN_STEP = 20;
 
-type Row = { kind: "photos"; photos: Photo[] } | { kind: "footer" };
+/** band: 펼친 유사컷 묶음 키(그 줄은 그 묶음 사진만 담는다). bandStart/bandEnd로 띠의 위·아래 끝을 둥글게 닫는다. */
+type Row = { kind: "photos"; photos: Photo[]; band: string | null; bandStart: boolean; bandEnd: boolean } | { kind: "footer" };
 
 /**
  * 장면 하나의 가상화 사진 격자. 장면 끝에서는 브라우저 스크롤이 스스로 멈추고, 거기서 더 당기면 고무줄처럼
  * 늘어나며 다음 장면이 드러난다. 충분히 당긴 채 놓으면 넘어간다(덜 당기면 원래대로). 위로는 걸림 없이 이전 장면으로 이어진다.
  */
-export function SceneGrid({ photos, mobileColumns, positionKey, startAt, enterFrom, renderCard, empty, footer, next, prev, focus }: {
+export function SceneGrid({ photos, mobileColumns, positionKey, startAt, enterFrom, renderCard, empty, footer, next, prev, focus, bandOf }: {
   photos: Photo[];
+  /** 펼친 유사컷 묶음이면 그 묶음 키. 묶음은 새 줄에서 시작해 묶음 사진만으로 줄을 채우고, 뒤에 하나로 이어진 띠를 깐다. */
+  bandOf?: (photo: Photo) => string | null;
   mobileColumns: MobileColumns;
   positionKey: string;
   /** 당겨서 넘어온 장면은 다음이면 처음부터, 이전이면 끝부터 본다. 없으면 마지막으로 보던 곳. */
@@ -88,10 +91,28 @@ export function SceneGrid({ photos, mobileColumns, positionKey, startAt, enterFr
 
   const rows = useMemo<Row[]>(() => {
     const list: Row[] = [];
-    for (let start = 0; start < photos.length; start += layout.cols) list.push({ kind: "photos", photos: photos.slice(start, start + layout.cols) });
+    let current: Photo[] = [];
+    let currentBand: string | null = null;
+    const flush = () => {
+      if (current.length) list.push({ kind: "photos", photos: current, band: currentBand, bandStart: false, bandEnd: false });
+      current = [];
+    };
+    for (const photo of photos) {
+      const band = bandOf?.(photo) ?? null;
+      // 묶음이 시작·끝나는 곳에서 줄을 바꾼다 — 묶음은 다른 사진과 한 줄에 섞이지 않는다.
+      if (band !== currentBand || current.length === layout.cols) { flush(); currentBand = band; }
+      current.push(photo);
+    }
+    flush();
+    list.forEach((row, index) => {
+      if (row.kind !== "photos" || !row.band) return;
+      const before = list[index - 1], after = list[index + 1];
+      row.bandStart = !(before?.kind === "photos" && before.band === row.band);
+      row.bandEnd = !(after?.kind === "photos" && after.band === row.band);
+    });
     if (footer && photos.length) list.push({ kind: "footer" });
     return list;
-  }, [footer, layout.cols, photos]);
+  }, [bandOf, footer, layout.cols, photos]);
 
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -264,7 +285,13 @@ export function SceneGrid({ photos, mobileColumns, positionKey, startAt, enterFr
             const row = rows[item.index];
             if (row.kind === "footer") return <div key={item.key} className={s.sceneFooter} style={{ top: item.start, height: item.size }}>{footer}</div>;
             return (
-              <div key={item.key} className={ui.selectGridRow} style={{ top: item.start, height: Math.max(0, item.size - layout.gap), gridTemplateColumns: `repeat(${layout.cols}, minmax(0, 1fr))`, gap: layout.gap, "--cell-gap": `${layout.gap}px` } as CSSProperties}>
+              <div key={item.key} className={ui.selectGridRow} style={{ top: item.start, height: Math.max(0, item.size - layout.gap), gridTemplateColumns: `repeat(${layout.cols}, minmax(0, 1fr))`, gap: layout.gap, overflow: row.band ? "visible" : undefined }}>
+                {/* 펼친 묶음의 띠: 묶음 사진이 놓인 칸만큼, 여러 줄이면 줄 사이 간격 가운데서 위아래가 맞붙는다. */}
+                {row.band && <div className={s.groupBand} aria-hidden style={{
+                  gridColumn: `1 / span ${row.photos.length}`, gridRow: 1,
+                  top: row.bandStart ? -5 : -layout.gap / 2, bottom: row.bandEnd ? -5 : -layout.gap / 2,
+                  borderRadius: `${row.bandStart ? 9 : 0}px ${row.bandStart ? 9 : 0}px ${row.bandEnd ? 9 : 0}px ${row.bandEnd ? 9 : 0}px`,
+                }} />}
                 {row.photos.map((photo) => renderCard(photo, layout.cols))}
               </div>
             );

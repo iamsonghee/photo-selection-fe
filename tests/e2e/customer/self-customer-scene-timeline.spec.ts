@@ -453,3 +453,21 @@ test("a single similar-cut group can be expanded from its badge", async ({ brows
   await expect(page.locator('.gl-photo-card[data-photo-id="p10"]')).toHaveCount(0);
   await context.close();
 });
+
+test("an expanded group sits on its own row inside one band", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.locator('.gl-photo-card[data-photo-id="p8"]').getByRole("button", { name: "유사컷 3장 펼치기" }).click();
+  // p8~p10은 같은 줄에 나란히, 앞(p7)·뒤(p11) 사진과는 다른 줄이다.
+  const top = async (id: string) => (await page.locator(`.gl-photo-card[data-photo-id="${id}"]`).boundingBox())!.y;
+  const [y7, y8, y9, y10, y11] = await Promise.all(["p7", "p8", "p9", "p10", "p11"].map(top));
+  expect(y8).toBe(y9);
+  expect(y9).toBe(y10);
+  expect(y7).toBeLessThan(y8);
+  expect(y11).toBeGreaterThan(y10);
+  await expect(page.locator('[class*="groupBand"]')).toHaveCount(1);
+  await context.close();
+});
