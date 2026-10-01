@@ -40,6 +40,8 @@ export interface Photo {
   /** 업로드 압축 전 원본 MIME type / File.lastModified */
   sourceContentType?: string | null;
   sourceLastModified?: number | null;
+  /** 셀프 고객 사진의 원본 촬영 시각(EXIF, 시간대 없는 현지 시각). 장면 구분에 사용 */
+  takenAt?: string | null;
   /** DB created_at — 업로드 일시 */
   createdAt?: string | null;
   selected?: boolean;

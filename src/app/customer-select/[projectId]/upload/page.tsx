@@ -21,6 +21,7 @@ import { PhotoSortSelect } from "@/components/photographer/PhotoSortSelect";
 import { ProjectAssetMobileContextAction, ProjectAssetMobileIconButton, ProjectAssetMobileSheet, ProjectAssetToolbarSummary } from "@/components/photographer/ProjectAssetWorkspaceToolbar";
 import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { compressImagesInParallel } from "@/lib/upload-client-compress";
+import { readTakenAt } from "@/lib/exif-taken-at";
 import { UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
@@ -212,6 +213,8 @@ export default function CustomerUploadPage() {
 
       let batch: File[];
       setUploadPhase("compressing");
+      // 압축이 EXIF를 지우므로 장면 구분용 촬영 시각은 원본에서 먼저 읽는다.
+      const takenAt = await Promise.all(rawBatch.map(readTakenAt));
       try {
         batch = await compressImagesInParallel(
           rawBatch,
@@ -226,6 +229,7 @@ export default function CustomerUploadPage() {
       const formData = new FormData();
       formData.append("project_id", projectId);
       batch.forEach((f) => formData.append("files", f));
+      formData.append("taken_at", JSON.stringify(takenAt));
       setUploadPhase("uploading");
       try {
         const res = await fetch("/api/customer-select/upload/photos", { method: "POST", headers: authHeader, body: formData, signal: controller.signal });

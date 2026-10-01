@@ -15,7 +15,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { project } = access;
 
   const [photosRes, selectionsRes, participantsRes, qualityRes, opinionsRes] = await Promise.all([
-    admin.from("customer_photos").select("id, filename, order_index, thumb_url, preview_url, similarity_group_id").eq("project_id", id),
+    admin.from("customer_photos").select("id, filename, order_index, thumb_url, preview_url, similarity_group_id, taken_at").eq("project_id", id),
     admin.from("customer_selections").select("photo_id, rating, color_tags, comment, is_selected").eq("project_id", id),
     admin.from("customer_project_participants").select("color, nickname, done").eq("project_id", id),
     admin.from("customer_quality_assessments").select("photo_id, eyes_closed, blur_or_shake, focus_issue, primary_subject_detected").eq("project_id", id),

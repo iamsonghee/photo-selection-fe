@@ -83,6 +83,7 @@ interface CustomerPhotoRow {
   thumb_url: string | null;
   preview_url: string | null;
   similarity_group_id: string | null;
+  taken_at?: string | null;
 }
 
 interface CustomerQualityRow {
@@ -153,6 +154,7 @@ export function toPhoto(row: CustomerPhotoRow, projectId: string, quality?: Cust
     previewUrl: row.preview_url,
     originalFilename: row.filename,
     similarityGroupId: row.similarity_group_id,
+    takenAt: row.taken_at ?? null,
     isBlurry: quality ? [quality.blur_or_shake, quality.focus_issue].some((value) => value === "possible" || value === "likely") : null,
     faceDetected: quality?.primary_subject_detected ?? null,
     eyesClosed: quality ? quality.eyes_closed === "possible" || quality.eyes_closed === "likely" : null,

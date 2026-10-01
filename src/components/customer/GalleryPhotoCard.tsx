@@ -5,7 +5,7 @@ import { RecommendationMark } from "@/components/RecommendationMark";
 import { memo, useState } from "react";
 import { SimilarityGroupBadge } from "@/components/ui/SimilarityGroupBadge";
 import Link from "next/link";
-import { Star, AlertTriangle, Check, EyeOff, MessageSquare } from "lucide-react";
+import { Star, AlertTriangle, Check, EyeOff, Heart, MessageSquare } from "lucide-react";
 import { PhotoThumbnailFrame } from "@/components/ui/PhotoThumbnailFrame";
 import { COLOR_OPTIONS, getPhotoDisplayName } from "@/lib/gallery-filter";
 import { useQueuedThumbSrc, type ThumbLoadQueue } from "@/lib/thumb-load-queue";
@@ -21,6 +21,10 @@ type GalleryPhotoCardProps = {
   selected: boolean;
   checkDisabled?: boolean;
   showCheck?: boolean;
+  /** 체크 자리의 동작 모양. 셀프 고객 참여자는 최종 선택 대신 본인 찜을 이 자리에서 누른다 */
+  checkVariant?: "check" | "heart";
+  /** false면 별점 줄을 그리지 않는다(셀프 고객 셀렉은 별점을 쓰지 않는다) */
+  showRating?: boolean;
   recommended?: boolean;
   rating?: StarRating;
   colorTags?: ColorTag[];
@@ -58,6 +62,8 @@ function GalleryPhotoCardImpl({
   selected,
   checkDisabled = false,
   showCheck = true,
+  checkVariant = "check",
+  showRating = true,
   recommended = false,
   rating,
   colorTags = EMPTY_COLOR_TAGS,
@@ -101,6 +107,7 @@ function GalleryPhotoCardImpl({
   /* 별점·코멘트·색 줄 — 사진 위 오버레이와 2열 정보 패널 양쪽에서 같은 것을 쓴다 */
   const controls = (
     <div className="gl-overlay-interactive" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 14 }}>
+      {showRating ? <>
       <span className="gl-rating-summary" aria-label={rating ? `별점 ${rating}점` : "별점 없음"}>
         {rating ? <><Star size={12} fill="#FF4D00" color="#FF4D00" aria-hidden />{rating}</> : null}
       </span>
@@ -147,6 +154,7 @@ function GalleryPhotoCardImpl({
           );
         })}
       </div>
+      </> : <span />}
       <div className="gl-marker-row" style={{ display: "flex", gap: 4, alignItems: "center" }}>
         {hasComment && (
           <span className="gl-comment-indicator" role="img" aria-label="작가 전달 메모 있음" title="작가 전달 메모 있음">
@@ -202,10 +210,13 @@ function GalleryPhotoCardImpl({
         type="button"
         onClick={(e) => onCheckClick(e, photo.id)}
         disabled={checkDisabled}
-        aria-label={selected ? "선택 해제" : "선택"}
-        className="gl-check-box"
+        aria-label={checkVariant === "heart" ? (selected ? "찜 해제" : "찜하기") : selected ? "선택 해제" : "선택"}
+        aria-pressed={checkVariant === "heart" ? selected : undefined}
+        className={`gl-check-box${checkVariant === "heart" ? " gl-check-heart" : ""}`}
       >
-        {selected && <Check size={13} strokeWidth={3} aria-hidden />}
+        {checkVariant === "heart"
+          ? <Heart size={14} strokeWidth={2.4} fill={selected ? "currentColor" : "none"} aria-hidden />
+          : selected && <Check size={13} strokeWidth={3} aria-hidden />}
         </button>}
         {recommended && (
           <span className="gl-recommended-badge" title="작가 추천">
