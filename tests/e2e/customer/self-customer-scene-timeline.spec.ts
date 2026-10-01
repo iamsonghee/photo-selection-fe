@@ -34,7 +34,7 @@ async function mock(page: Page) {
 }
 
 for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "mobile", width: 390, height: 844 }]) {
-  test(`${viewport.name}: scenes form one continuous timeline`, async ({ browser }) => {
+  test(`${viewport.name}: one scene at a time, switched from the quick menu`, async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
     const page = await context.newPage();
     const errors: string[] = [];
@@ -42,32 +42,32 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
     await loginAsPhotographer(page);
     await mock(page);
 
-    // 개발 확인용 AI 장면 결과(시간 장면 + 웨딩 본식 장면 이름)로 개요에서 시작한다.
+    // 장면 개요 없이, 아직 덜 고른 첫 장면에서 바로 시작한다(첫 장면은 목표 3장 중 2장만 고름).
     await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready`);
-    await expect(page.getByRole("heading", { name: "장면별로 골라볼까요?" })).toBeVisible();
-    await page.getByRole("button", { name: /입장/ }).filter({ visible: true }).first().click();
-    await expect(page).toHaveURL(/scene=1/);
+    await expect(page.locator('[class*="barMeta"]').first()).toContainText("식전·신부 대기실");
+    await expect(page.getByRole("heading", { name: "장면별로 골라볼까요?" })).toHaveCount(0);
 
-    // 장면 단독 화면이 아니라 모든 장면이 이어진 타임라인이다: 계속 내리면 경계 카드를 지나 다음 장면이 이어진다.
-    const gallery = page.locator('[class*="selectGallery"]').first();
+    // 퀵메뉴(PC 오른쪽 목록 / 모바일 떠 있는 버튼 → 장면 시트)로 장면을 바꾼다.
+    if (viewport.name === "mobile") await page.getByRole("button", { name: "장면 목록 열기" }).click();
+    await page.getByRole("button", { name: /^입장/ }).filter({ visible: true }).first().click();
+    await expect(page).toHaveURL(/scene=1/);
     await expect(page.locator('[class*="barMeta"]').first()).toContainText("입장");
-    const nextCard = page.locator('[class*="boundaryCard"]').filter({ hasText: "다음 장면" }).filter({ hasText: "예식" });
-    await expect.poll(async () => {
-      await gallery.evaluate((element) => element.scrollBy({ top: element.clientHeight * 0.6 }));
-      return nextCard.count();
-    }).toBe(1);
+
+    // 장면 끝에는 다음 장면 이름만 얇게, 마지막 장면 끝에는 보내기가 있다.
+    const gallery = page.locator('[class*="selectGallery"]').first();
     await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
-    // 스크롤 위치를 따라 현재 장면이 바뀌고 주소에도 남는다.
-    await expect(page).toHaveURL(/scene=2/);
-    await expect(page.locator('[class*="barMeta"]').first()).toContainText("예식");
-    await expect(page.getByText("마지막 장면이에요", { exact: false }).filter({ visible: true })).toHaveCount(1);
+    await expect(page.locator('[class*="sceneNext"]').filter({ visible: true })).toContainText("예식");
+    if (viewport.name === "mobile") await page.getByRole("button", { name: "장면 목록 열기" }).click();
+    await page.getByRole("button", { name: /^예식/ }).filter({ visible: true }).first().click();
+    await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+    await expect(page.getByText("마지막 장면", { exact: false }).filter({ visible: true })).toHaveCount(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(errors).toEqual([]);
     await context.close();
   });
 }
 
-test("desktop: scrolling pauses at a scene boundary and passes after pulling further", async ({ browser }) => {
+test("desktop: pulling past the end of a scene moves to the next scene", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await loginAsPhotographer(page);
@@ -75,23 +75,21 @@ test("desktop: scrolling pauses at a scene boundary and passes after pulling fur
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   const gallery = page.locator('[class*="selectGallery"]').first();
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
+  await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
   const box = (await gallery.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.waitForTimeout(300); // 바닥에 닿은 뒤 새로 시작한 당김만 인정한다(관성 스크롤 구분)
 
-  // 천천히 내리면 경계 카드가 화면에 다 보이는 순간 멈춘다(카드 하단 = 화면 하단선 16px 위).
-  const holding = page.locator("[data-holding]");
-  await expect.poll(async () => { await page.mouse.wheel(0, 80); return holding.count(); }, { timeout: 15_000 }).toBe(1);
-  const card = (await page.locator("[data-holding] [data-boundary-card]").boundingBox())!;
-  expect(Math.round(box.y + box.height - (card.y + card.height))).toBe(16);
-  const heldTop = await gallery.evaluate((element) => element.scrollTop);
+  // 조금 당기면 다음 장면이 드러나지만, 놓으면 제자리로 돌아온다.
+  await page.mouse.wheel(0, 30);
+  await expect(page.locator('[class*="pullReveal"]')).toContainText("입장");
+  await expect(page.locator('[class*="pullReveal"]')).toHaveCount(0);
+  await expect(page).toHaveURL(/scene=0/);
 
-  // 멈춘 동안 조금 더 내리면 스크롤은 그대로이고 진행선(--pull)만 차오른다.
-  await page.mouse.wheel(0, 20);
-  await expect.poll(async () => Number(await holding.evaluate((element) => getComputedStyle(element).getPropertyValue("--pull")))).toBeGreaterThan(0);
-  expect(await gallery.evaluate((element) => element.scrollTop)).toBe(heldTop);
-
-  // 충분히 더 내리면 다음 장면으로 넘어간다.
-  await expect.poll(async () => { await page.mouse.wheel(0, 80); return page.url(); }, { timeout: 10_000 }).toMatch(/scene=1/);
-  await expect(holding).toHaveCount(0);
+  // 충분히 당겼다 놓으면 다음 장면으로 넘어간다.
+  await page.waitForTimeout(300);
+  for (let i = 0; i < 16; i++) { await page.mouse.wheel(0, 60); await page.waitForTimeout(30); }
+  await expect(page).toHaveURL(/scene=1/);
+  await expect(page.locator('[class*="barMeta"]').first()).toContainText("입장");
   await context.close();
 });

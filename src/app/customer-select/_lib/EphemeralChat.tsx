@@ -15,17 +15,28 @@ export function EphemeralChat({
   nicknames,
   hasRecipient,
   elevated = false,
+  open: openProp,
+  onOpenChange,
 }: {
   channelKey: string;
   currentIdentity: ColorTag;
   nicknames: Record<string, string>;
   hasRecipient: boolean;
   elevated?: boolean;
+  /** 퀵메뉴처럼 바깥 버튼으로 여닫을 때 넘긴다. 이때는 자체 대화 버튼을 그리지 않는다. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [supabase] = useState(createClient);
   const [channel, setChannel] = useState<ReturnType<typeof supabase.channel> | null>(null);
   const [connected, setConnected] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : openState;
+  const setOpen = (value: boolean | ((current: boolean) => boolean)) => {
+    const nextValue = typeof value === "function" ? value(open) : value;
+    if (controlled) onOpenChange?.(nextValue); else setOpenState(nextValue);
+  };
   const [text, setText] = useState("");
   const [sendError, setSendError] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -99,9 +110,9 @@ export function EphemeralChat({
           <button type="submit" aria-label="메시지 보내기" disabled={!connected || !hasRecipient || !text.trim()}><Send size={17} /></button>
         </form>
       </div> : null}
-      <button type="button" className={ui.ephemeralChatTrigger} aria-label={open ? "대화 닫기" : "대화 열기"} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+      {controlled ? null : <button type="button" className={ui.ephemeralChatTrigger} aria-label={open ? "대화 닫기" : "대화 열기"} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
         <MessageCircle size={19} /><span>대화</span>
-      </button>
+      </button>}
     </aside>
   );
 }

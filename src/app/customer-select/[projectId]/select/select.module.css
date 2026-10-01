@@ -12,10 +12,6 @@
 
 /* ── 장면 머리글·도구 ── */
 .sceneHeader { flex: none; display: flex; align-items: center; gap: 12px; padding: 12px 32px 8px; background: var(--surface); }
-.scenePicker { min-width: 0; display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--foreground); font: inherit; cursor: pointer; text-align: left; }
-.scenePicker strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; letter-spacing: -0.02em; }
-.scenePicker small { flex: none; color: var(--subtle-foreground); font-size: 12px; font-weight: 600; }
-.sceneMeta { color: var(--muted-foreground); font-size: 12px; white-space: nowrap; }
 .tools { flex: none; display: flex; align-items: center; gap: 6px; padding: 0 32px 10px; background: var(--surface); border-bottom: 1px solid var(--border-subtle); overflow-x: auto; scrollbar-width: none; }
 .tools::-webkit-scrollbar { display: none; }
 .chip { flex: none; height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
@@ -33,83 +29,51 @@
 .analysis span { color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
 .analysis i { display: block; height: 4px; margin-top: 6px; border-radius: 999px; background: var(--primary); transition: width 400ms ease; }
 .analysisActions { flex: none; display: flex; gap: 6px; align-self: center; }
-.analysisFailed { display: flex; align-items: center; gap: 8px; margin-top: 8px !important; color: var(--muted-foreground) !important; font-size: 12px !important; }
-.analysisFailed button { padding: 0; border: 0; background: none; color: var(--foreground); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .aiButton { margin-left: auto; height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--primary) 12%, var(--surface)); color: var(--primary); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .aiButton:hover { background: color-mix(in srgb, var(--primary) 18%, var(--surface)); }
 .allTitle { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; }
 .allTitle small { margin-left: 6px; color: var(--subtle-foreground); font-size: 12px; font-weight: 600; }
 .sceneHeader .textLink { margin-left: auto; }
-.overviewHead .textLink { margin-top: 10px; }
 
 /* ── 본문: PC는 왼쪽 장면 목록 + 격자 ── */
 .body { min-height: 0; flex: 1; display: flex; }
 .main { min-width: 0; min-height: 0; flex: 1; display: flex; flex-direction: column; }
-.rail { flex: none; width: 232px; display: flex; flex-direction: column; border-right: 1px solid var(--border-subtle); background: var(--surface); overflow-y: auto; }
-.railTitle { margin: 16px 16px 8px; color: var(--subtle-foreground); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
-.railItem { margin: 0 8px; padding: 9px 10px; border: 0; border-radius: 8px; background: none; color: var(--muted-foreground); display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font: inherit; text-align: left; cursor: pointer; }
-.railItem:hover { background: var(--surface-raised); }
-.railItem[aria-current="true"] { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); color: var(--foreground); }
-.railItem strong { font-size: 13px; font-weight: 700; color: inherit; }
-.railItem span { grid-column: 1; font-size: 11px; color: var(--subtle-foreground); }
-.railItem em { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-style: normal; font-size: 12px; font-weight: 700; color: var(--muted-foreground); }
-.railItem em.done { color: var(--success); }
-.railFooter { margin-top: auto; padding: 14px 16px; border-top: 1px solid var(--border-subtle); color: var(--muted-foreground); font-size: 12px; }
-.railFooter strong { color: var(--foreground); font-size: 15px; }
 
 /* ── 이어진 타임라인 ── */
 .timeline { position: relative; min-height: 0; flex: 1; display: flex; flex-direction: column; }
 /* 카드 안 z-index(체크 버튼 등)가 위에 붙는 장면 머리글 위로 올라오지 않도록 스크롤 영역을 별도 레이어로 묶는다 */
 .timelineScroll { isolation: isolate; }
-.stickyHeader { position: absolute; top: 0; left: 0; right: 0; z-index: 6; height: 48px; display: flex; align-items: center; padding: 0 24px; border-bottom: 1px solid var(--border-subtle); background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(8px); }
-.timelineHeader { position: absolute; left: 0; width: 100%; display: flex; align-items: flex-end; padding-bottom: 12px; }
-.timelineEmpty { position: absolute; left: 0; width: 100%; display: flex; align-items: center; color: var(--subtle-foreground); font-size: 13px; }
-.timelineBoundary { position: absolute; left: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
-.snapTarget { width: min(560px, 100%); }
-/* 경계 멈춤 표현: 멈추는 순간 살짝 튕기고, 더 내리는 만큼(--pull 0~1) 진행선이 차오르며 카드가 위로 끌린다 */
-/* 진행선·안내는 처음부터 자리를 잡아 둔다 — 멈출 때 카드 높이가 바뀌면 멈춘 위치가 밀려 보인다 */
-.boundaryPull { height: 3px; margin-top: 12px; border-radius: 999px; background: var(--border-subtle); overflow: hidden; }
-.boundaryPull i { display: block; width: calc(var(--pull, 0) * 100%); height: 100%; border-radius: inherit; background: var(--accent); transition: width 90ms linear; }
-.boundaryHint { margin: 8px 0 0; color: var(--subtle-foreground); font-size: 12px; font-weight: 600; transition: color 160ms ease; }
-.timelineBoundary[data-holding] .boundaryCard { border-color: color-mix(in srgb, var(--accent) 45%, var(--surface)); transform: translateY(calc(var(--pull, 0) * -10px)); animation: boundaryBump 320ms ease-out; transition: transform 90ms linear, border-color 160ms ease; }
-.timelineBoundary[data-holding] .boundaryHint { color: var(--accent); font-weight: 700; }
-.timelineBoundary[data-holding] .boundaryNext svg { color: var(--accent); animation: boundaryNudge 1s ease-in-out infinite; }
-@keyframes boundaryBump { 0% { transform: translateY(8px); } 55% { transform: translateY(-4px); } 100% { transform: translateY(0); } }
-@keyframes boundaryNudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
-@media (prefers-reduced-motion: reduce) {
-  .timelineBoundary[data-holding] .boundaryCard, .timelineBoundary[data-holding] .boundaryNext svg { animation: none; }
-}
-.sectionTitle { min-width: 0; display: flex; align-items: baseline; gap: 8px; border: 0; background: none; padding: 0; color: var(--foreground); font: inherit; text-align: left; cursor: pointer; }
-.sectionTitle strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
-.sectionTitle span { flex: none; color: var(--subtle-foreground); font-size: 12px; font-weight: 600; }
-.stickyHeader .sectionTitle strong { font-size: 15px; }
-.boundaryCard { padding: 16px 18px; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--surface); box-shadow: 0 6px 24px rgba(2, 56, 82, 0.06); }
-.boundaryDone { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; }
-.boundaryDone.muted { color: var(--muted-foreground); font-weight: 600; }
-.boundaryDone svg { flex: none; color: var(--success); }
-.boundaryNext { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-subtle); color: var(--muted-foreground); font-size: 13px; }
-.boundaryNext strong { color: var(--foreground); font-size: 15px; font-weight: 700; }
-.boundaryNext svg { margin-left: auto; flex: none; }
-.boundaryNext span, .boundaryNext strong { white-space: nowrap; }
-.boundaryNext { flex-wrap: wrap; row-gap: 4px; }
-.boundaryEnd { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-subtle); color: var(--muted-foreground); font-size: 13px; }
 
-/* ── 장면 개요 ── */
-.overview { min-height: 0; flex: 1; overflow-y: auto; padding: 20px 32px 32px; background: var(--background); }
-.overviewInner { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
-.overviewHead { margin-bottom: 8px; }
-.overviewHead h2 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.03em; }
-.overviewHead p { margin: 4px 0 0; color: var(--muted-foreground); font-size: 13px; }
-.sceneCard { width: 100%; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--surface); color: var(--foreground); display: grid; grid-template-columns: 88px minmax(0, 1fr) auto; align-items: center; gap: 14px; font: inherit; text-align: left; cursor: pointer; }
-.sceneCard:hover { border-color: var(--border-strong); }
-.sceneCover { width: 88px; height: 66px; border-radius: 8px; overflow: hidden; background: var(--surface-raised); }
-.sceneCover img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.sceneText { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.sceneText strong { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
-.sceneText span { color: var(--subtle-foreground); font-size: 12px; }
-.sceneProgress { font-size: 13px; font-weight: 700; color: var(--muted-foreground); white-space: nowrap; }
-.sceneProgress.done { color: var(--success); }
-.sceneProgress.empty { font-weight: 600; color: var(--subtle-foreground); }
+/* ── 장면 하나씩: 끝에서 당겨 넘기기 ── */
+.sceneEnter { animation: sceneEnter 320ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes sceneEnter { from { opacity: 0.3; transform: translateY(36px); } }
+.pullSettle { transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.sceneFooter { position: absolute; left: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
+.sceneNext { margin: 0; display: inline-flex; align-items: center; gap: 6px; color: var(--subtle-foreground); font-size: 13px; }
+.sceneNext strong { color: var(--muted-foreground); font-weight: 700; }
+.sceneEnd { width: min(520px, 100%); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--surface); color: var(--muted-foreground); font-size: 13px; }
+/* 당긴 만큼 아래에서 드러나는 다음 장면. 원이 다 차면(놓으면 넘어감) 강조색으로 바뀐다. */
+.pullReveal { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; overflow: hidden; color: var(--muted-foreground); font-size: 14px; pointer-events: none; }
+.pullReveal strong { font-weight: 700; color: var(--foreground); }
+.pullRing { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 50%; color: var(--muted-foreground); background: radial-gradient(closest-side, var(--background) 82%, transparent 84%), conic-gradient(var(--accent) calc(var(--pull, 0) * 360deg), var(--border) 0); transition: transform 160ms ease; }
+.pullReady .pullRing { color: #fff; background: var(--accent); transform: scale(1.08); }
+.pullReady strong { color: var(--accent); }
+
+/* ── 퀵메뉴: 장면 목차 ── */
+.main { position: relative; }
+.quickMenu { position: absolute; top: 72px; right: 24px; z-index: 5; width: 184px; max-height: calc(100% - 172px); display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--border-subtle); border-radius: 14px; background: color-mix(in srgb, var(--surface) 96%, transparent); box-shadow: 0 10px 30px rgba(2, 56, 82, 0.1); backdrop-filter: blur(8px); }
+.mainWithQuick .timelineScroll { padding-right: 224px; }
+.quickList { min-height: 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.quickItem { width: 100%; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--muted-foreground); display: flex; align-items: center; justify-content: space-between; gap: 8px; font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
+.quickItem span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quickItem em { flex: none; font-style: normal; font-size: 12px; color: var(--subtle-foreground); }
+.quickItem em.done { color: var(--success); }
+.quickItem:hover { background: var(--surface-raised); color: var(--foreground); }
+.quickItem[aria-current="true"] { background: color-mix(in srgb, var(--accent) 9%, var(--surface)); color: var(--foreground); font-weight: 800; }
+.quickNotice { padding: 6px 10px; border: 0; background: none; color: var(--muted-foreground); font: inherit; font-size: 11px; font-weight: 600; text-align: left; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.quickChat { height: 34px; border: 0; border-top: 1px solid var(--border-subtle); border-radius: 0 0 8px 8px; background: none; color: var(--foreground); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.quickChat[aria-pressed="true"] { color: var(--accent); }
+.quickPill { display: none; }
 
 /* ── 하단 바 ── */
 .bottomBar { flex: none; display: flex; align-items: center; gap: 12px; padding: 12px 32px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border-subtle); background: var(--surface); }
@@ -127,7 +91,6 @@
 .sheetBody { overflow-y: auto; padding: 4px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
 .sheetBody p { margin: 0; color: var(--muted-foreground); font-size: 13px; line-height: 1.55; }
 .sheetList { display: flex; flex-direction: column; gap: 2px; }
-.sheetList .railItem { margin: 0; }
 .personRow { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); font-size: 13px; }
 .personRow i { width: 10px; height: 10px; border-radius: 50%; }
 .personRow span { margin-left: auto; color: var(--subtle-foreground); font-size: 12px; }
@@ -175,28 +138,27 @@
 .likeButton[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .shortcutHint { color: var(--subtle-foreground); font-size: 11px; text-align: center; }
 
+@media (prefers-reduced-motion: reduce) { .sceneEnter { animation: none; } }
+
 @media (max-width: 767px) {
   .mobilePeople { display: block; flex: none; padding: 8px 20px 4px; background: var(--surface); }
   .mobilePeople .people { margin-left: 0; }
   .sceneHeader { padding: 10px 20px 6px; }
-  .sceneMeta { display: none; }
   .tools { padding: 0 20px 8px; }
   .search { flex-basis: 140px; }
   .columnsButton { display: inline-flex; }
-  .rail { display: none; }
-  .overview { padding: 16px 20px 24px; }
-  .sceneCard { grid-template-columns: 72px minmax(0, 1fr); gap: 12px; }
-  .sceneCover { width: 72px; height: 72px; }
-  .sceneProgress { grid-column: 2; margin-top: -6px; }
-  .stickyHeader { padding: 0 20px; height: 44px; }
-  /* 대화 버튼(오른쪽 아래, 참여자 2명 이상)이 경계 카드의 화살표를 가리지 않도록 오른쪽을 비워 둔다 */
-  .page[data-chat] .boundaryCard { padding-right: 60px; }
-  /* 좁은 화면에서는 시간대·장수를 둘째 줄로 내려 단어가 중간에서 끊기지 않게 한다 */
-  .boundaryNext span:nth-of-type(2) { order: 3; flex-basis: 100%; }
   .analysis { margin: 10px 20px 0; flex-wrap: wrap; }
   .analysisActions { width: 100%; padding-left: 26px; }
+  .quickMenu { display: none; }
+  .mainWithQuick .timelineScroll { padding-right: 20px; padding-bottom: 72px; }
+  .quickPill { position: absolute; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 6; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--border-subtle); border-radius: 999px; background: color-mix(in srgb, var(--surface) 96%, transparent); box-shadow: 0 8px 24px rgba(2, 56, 82, 0.16); backdrop-filter: blur(8px); }
+  .quickPillScene { max-width: 240px; height: 40px; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--foreground); display: flex; align-items: center; gap: 6px; font: inherit; cursor: pointer; }
+  .quickPillScene i { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--accent); }
+  .quickPillScene strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 800; }
+  .quickPillScene span { flex: none; color: var(--subtle-foreground); font-size: 12px; font-weight: 700; }
+  .quickPillChat { width: 40px; height: 40px; border: 0; border-left: 1px solid var(--border-subtle); border-radius: 0 999px 999px 0; background: none; color: var(--foreground); display: grid; place-items: center; cursor: pointer; }
+  .quickPillChat[aria-pressed="true"] { color: var(--accent); }
   .bottomBar { padding: 10px 20px calc(10px + env(safe-area-inset-bottom)); }
-  .desktopOnly { display: none; }
   .detail { flex-direction: column; overflow-y: auto; }
   .detailStage { flex: none; height: 62dvh; }
   .detailImage { padding: 0 0 8px; }
