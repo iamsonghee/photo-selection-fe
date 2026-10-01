@@ -161,3 +161,35 @@ test("desktop: one continuous scroll moves at most one scene", async ({ browser 
   await expect(page).toHaveURL(/scene=2/);
   await context.close();
 });
+
+test("owner card: like is a secondary hover action on desktop and display-only on mobile", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=1`);
+  const card = page.locator('[data-photo-id="p40"]');
+  const like = card.getByRole("button", { name: "찜하기" });
+  await expect(card).toBeVisible();
+  await expect(like).toHaveCSS("opacity", "0");
+
+  // 마우스를 올리면 ♡가 보이고, 찜해도 최종 선택(✓)은 그대로다.
+  await card.hover();
+  await expect(like).toHaveCSS("opacity", "1");
+  await like.click();
+  await expect(card.getByRole("button", { name: "찜 해제" })).toHaveAttribute("aria-pressed", "true");
+  await expect(card.getByRole("button", { name: "선택", exact: true })).toBeVisible();
+  await page.mouse.move(0, 0);
+  await expect(card.getByRole("button", { name: "찜 해제" })).toHaveCSS("opacity", "1");
+  await context.close();
+
+  // 터치 기기: 찜하지 않은 카드에는 ♡가 없고, 찜은 상세에서 한다.
+  const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const phone = await mobile.newPage();
+  await loginAsPhotographer(phone);
+  await mock(phone);
+  await phone.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=1`);
+  await expect(phone.locator('[data-photo-id="p40"]')).toBeVisible();
+  await expect(phone.locator('[data-photo-id="p40"]').getByRole("button", { name: "찜하기" })).toBeHidden();
+  await mobile.close();
+});

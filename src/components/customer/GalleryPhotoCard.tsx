@@ -50,6 +50,9 @@ type GalleryPhotoCardProps = {
   showFilename?: boolean;
   onPhotoClick: (e: React.MouseEvent, photoId: string) => void;
   onCheckClick: (e: React.MouseEvent, photoId: string) => void;
+  /** 주면 오른쪽 위에 보조 찜(♡) 버튼을 둔다 — 마우스를 올렸을 때만 보이고, 찜한 사진은 항상 ♥ 표시. 터치 기기에서는 표시만 한다 */
+  onLikeClick?: (e: React.MouseEvent, photoId: string) => void;
+  liked?: boolean;
   onGroupBadgeClick: (e: React.MouseEvent, groupId: string) => void;
   onRate: (photoId: string, star: StarRating | undefined) => void;
   onThumbError: (photoId: string) => void;
@@ -82,6 +85,8 @@ function GalleryPhotoCardImpl({
   showFilename = false,
   onPhotoClick,
   onCheckClick,
+  onLikeClick,
+  liked = false,
   onGroupBadgeClick,
   onRate,
   onThumbError,
@@ -217,6 +222,15 @@ function GalleryPhotoCardImpl({
         {checkVariant === "heart"
           ? <Heart size={14} strokeWidth={2.4} fill={selected ? "currentColor" : "none"} aria-hidden />
           : selected && <Check size={13} strokeWidth={3} aria-hidden />}
+        </button>}
+        {showCheck && onLikeClick && <button
+          type="button"
+          onClick={(e) => onLikeClick(e, photo.id)}
+          aria-label={liked ? "찜 해제" : "찜하기"}
+          aria-pressed={liked}
+          className={`gl-like-box gl-check-heart${liked ? " gl-liked" : ""}`}
+        >
+          <Heart size={14} strokeWidth={2.4} fill={liked ? "currentColor" : "none"} aria-hidden />
         </button>}
         {recommended && (
           <span className="gl-recommended-badge" title="작가 추천">

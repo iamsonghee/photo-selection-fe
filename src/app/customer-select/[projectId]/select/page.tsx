@@ -276,6 +276,8 @@ function SelectScreen() {
         showFilename={query.trim().length > 0}
         onPhotoClick={(event) => { event.preventDefault(); if (isCover) toggleGroup(); else setOpenPhotoId(photo.id); }}
         onCheckClick={(event) => { event.preventDefault(); event.stopPropagation(); if (isOwner) store.toggleSelect(photo.id); else store.toggleLike(photo.id, me); }}
+        onLikeClick={isOwner && !isCover ? (event) => { event.preventDefault(); event.stopPropagation(); store.toggleLike(photo.id, me); } : undefined}
+        liked={isOwner && myLikes.has(photo.id)}
         onGroupBadgeClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleGroup(); }}
         onRate={() => {}}
         onThumbError={() => {}}
