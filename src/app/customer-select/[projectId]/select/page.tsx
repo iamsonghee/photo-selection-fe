@@ -344,7 +344,7 @@ function SelectScreen() {
               </div>
             </nav>
           )}
-          <div className={`${s.main} ${sceneMode ? s.mainWithQuick : ""}`}>
+          <div className={`${s.main} ${sceneMode ? s.mainWithQuick : ""} ${sceneMode && railCollapsed ? s.mainFloatNav : ""}`}>
             {analysisBanner}
             {!sceneMode && !analysisBanner && (
               <div className={s.sceneHeader}>
@@ -376,7 +376,24 @@ function SelectScreen() {
             {/* 퀵메뉴: 장면 목차(지금 장면·장면별 고른 수)와 대화. PC는 오른쪽 세로 목록, 모바일은 떠 있는 버튼 → 장면 시트. */}
             {sceneMode && scenes && (
               <>
-                <div className={`${s.quickPill} ${railCollapsed ? s.quickPillDesktop : ""}`}>
+                {/* PC에서 사이드바를 접으면: 왼쪽 가운데 장면 점 메뉴. 올리면 장면 이름이 펼쳐진다. */}
+                {railCollapsed && (
+                  <nav className={s.floatNav} aria-label="장면">
+                    <button type="button" className={s.floatTool} onClick={() => toggleRail(false)} aria-label="장면 목록 펼치기" title="장면 목록 펼치기"><PanelLeftOpen size={16} /><span className={s.floatLabel}>장면 목록 펼치기</span></button>
+                    {scenes.map((item, index) => {
+                      const count = pickedInScene(item);
+                      return (
+                        <button key={index} type="button" className={s.floatItem} aria-current={index === sceneIndex} data-state={sceneDone(index) ? "done" : count ? "some" : undefined} onClick={() => goScene(index)} aria-label={`${sceneTitle(item)} ${sceneCount(index)}`}>
+                          <i aria-hidden />
+                          <span className={s.floatLabel}>{sceneTitle(item)}</span>
+                          <em className={s.floatLabel}>{sceneCount(index)}</em>
+                        </button>
+                      );
+                    })}
+                    {withChat && <button type="button" className={s.floatTool} aria-pressed={chatOpen} onClick={() => setChatOpen((value) => !value)} aria-label={chatOpen ? "대화 닫기" : "대화 열기"}><MessageCircle size={16} /><span className={s.floatLabel}>대화</span></button>}
+                  </nav>
+                )}
+                <div className={s.quickPill}>
                   <button type="button" className={s.quickPillScene} onClick={() => setSheet("scenes")} aria-label="장면 목록 열기">
                     <i aria-hidden />
                     <strong>{sceneTitle(scene!)}</strong>
@@ -384,7 +401,6 @@ function SelectScreen() {
                     <ChevronUp size={15} aria-hidden />
                   </button>
                   {withChat && <button type="button" className={s.quickPillChat} aria-label={chatOpen ? "대화 닫기" : "대화 열기"} aria-pressed={chatOpen} onClick={() => setChatOpen((value) => !value)}><MessageCircle size={17} /></button>}
-                  <button type="button" className={`${s.quickPillChat} ${s.quickPillExpand}`} aria-label="장면 목록 펼치기" title="장면 목록 펼치기" onClick={() => toggleRail(false)}><PanelLeftOpen size={17} /></button>
                 </div>
               </>
             )}

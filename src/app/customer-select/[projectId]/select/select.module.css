@@ -80,15 +80,23 @@
 .quickChat { height: 34px; border: 0; border-radius: 8px; background: none; color: var(--foreground); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .quickChat[aria-pressed="true"] { color: var(--accent); }
 .quickPill { display: none; }
-.quickPillExpand { display: none; }
-.quickPillDesktop { position: absolute; left: 24px; bottom: 92px; z-index: 6; display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--border-subtle); border-radius: 999px; background: color-mix(in srgb, var(--surface) 96%, transparent); box-shadow: 0 8px 24px rgba(2, 56, 82, 0.16); backdrop-filter: blur(8px); }
-.quickPillDesktop .quickPillScene { height: 40px; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--foreground); display: flex; align-items: center; gap: 6px; font: inherit; cursor: pointer; }
-.quickPillDesktop .quickPillScene i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
-.quickPillDesktop .quickPillScene strong { font-size: 14px; font-weight: 800; }
-.quickPillDesktop .quickPillScene span { color: var(--subtle-foreground); font-size: 12px; font-weight: 700; }
-.quickPillDesktop .quickPillChat { width: 40px; height: 40px; border: 0; border-left: 1px solid var(--border-subtle); background: none; color: var(--foreground); display: grid; place-items: center; cursor: pointer; }
-.quickPillDesktop .quickPillChat:last-child { border-radius: 0 999px 999px 0; }
-.quickPillDesktop .quickPillExpand { display: grid; }
+/* 접힌 PC 장면 메뉴: 왼쪽 가운데 점 목록. 마우스를 올리거나 키보드로 들어가면 장면 이름이 펼쳐진다. */
+.floatNav { position: absolute; left: 16px; top: 50%; z-index: 6; transform: translateY(-50%); width: 44px; max-height: calc(100% - 200px); display: flex; flex-direction: column; gap: 2px; padding: 6px; overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 16px; background: color-mix(in srgb, var(--surface) 96%, transparent); box-shadow: 0 10px 30px rgba(2, 56, 82, 0.12); backdrop-filter: blur(8px); transition: width 180ms ease; }
+.floatNav:hover, .floatNav:focus-within { width: 224px; }
+.floatItem, .floatTool { flex: none; height: 32px; padding: 0 8px; border: 0; border-radius: 10px; background: none; color: var(--muted-foreground); display: flex; align-items: center; gap: 12px; font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.floatItem:hover, .floatTool:hover { background: var(--surface-raised); color: var(--foreground); }
+.floatTool svg { flex: none; margin-left: -2px; }
+.floatTool[aria-pressed="true"] { color: var(--accent); }
+.floatItem i { flex: none; width: 8px; height: 8px; margin: 0 4px; border-radius: 50%; background: var(--border-strong); transition: transform 160ms ease; }
+.floatItem[data-state="some"] i { background: var(--muted-foreground); }
+.floatItem[data-state="done"] i { background: var(--success); }
+.floatItem[aria-current="true"] { color: var(--foreground); font-weight: 800; }
+.floatItem[aria-current="true"] i { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.floatItem em { margin-left: auto; font-style: normal; font-size: 12px; color: var(--subtle-foreground); }
+.floatLabel { opacity: 0; transition: opacity 120ms ease; }
+.floatNav:hover .floatLabel, .floatNav:focus-within .floatLabel { opacity: 1; }
+.mainFloatNav .timelineScroll { padding-left: 76px; }
+@media (prefers-reduced-motion: reduce) { .floatNav, .floatLabel { transition: none; } }
 
 /* ── 하단 바 ── */
 .bottomBar { flex: none; display: flex; align-items: center; gap: 12px; padding: 12px 32px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border-subtle); background: var(--surface); }
@@ -164,8 +172,8 @@
   .columnsButton { display: inline-flex; }
   .analysis { margin: 10px 20px 0; flex-wrap: wrap; }
   .analysisActions { width: 100%; padding-left: 26px; }
-  .rail { display: none; }
-  .quickPillExpand, .quickPillDesktop .quickPillExpand { display: none; }
+  .rail, .floatNav { display: none; }
+  .mainFloatNav .timelineScroll { padding-left: 20px; }
   .mainWithQuick .timelineScroll { padding-right: 20px; padding-bottom: 72px; }
   .quickPill { position: absolute; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 6; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--border-subtle); border-radius: 999px; background: color-mix(in srgb, var(--surface) 96%, transparent); box-shadow: 0 8px 24px rgba(2, 56, 82, 0.16); backdrop-filter: blur(8px); }
   .quickPillScene { max-width: 240px; height: 40px; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--foreground); display: flex; align-items: center; gap: 6px; font: inherit; cursor: pointer; }
