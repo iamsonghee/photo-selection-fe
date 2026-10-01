@@ -97,6 +97,9 @@ export default function CustomerUploadPage() {
   const [nameFilter, setNameFilter] = useState("");
   const [retryFiles, setRetryFiles] = useState<File[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  // 업로드 중에 더 끌어다 놓거나 고른 사진: 버리지 않고 모아 두었다가 지금 업로드가 끝나면 이어서 올린다.
+  const queueRef = useRef<File[]>([]);
+  const [queuedCount, setQueuedCount] = useState(0);
   const [viewerPhotoId, setViewerPhotoId] = useState<string | null>(null);
   const [thumbQueue] = useState(() => createThumbLoadQueue(12));
   const inputRef = useRef<HTMLInputElement>(null);
@@ -155,8 +158,14 @@ export default function CustomerUploadPage() {
     setPendingPhotos([]);
   }
 
-  async function handleFiles(selectedFiles: File[]) {
-    if (selectedFiles.length === 0 || uploading || uploadStartingRef.current) return;
+  /** carriedUploaded/carriedFailed: 대기열을 이어 올릴 때 앞 묶음의 결과(완료 안내·다시 시도 목록을 합쳐 보여준다). */
+  async function handleFiles(selectedFiles: File[], carriedUploaded = 0, carriedFailed: File[] = []) {
+    if (selectedFiles.length === 0) return;
+    if (uploading || uploadStartingRef.current) {
+      queueRef.current.push(...selectedFiles);
+      setQueuedCount(queueRef.current.length);
+      return;
+    }
     uploadStartingRef.current = true;
     setCheckingCapacity(true);
     setNeedsReselection(false);
@@ -254,7 +263,9 @@ export default function CustomerUploadPage() {
         failedFiles.push(...rawBatch.filter((file) => rejectedNames.has(file.name)));
         uploaded += data.uploaded ?? Math.max(0, batch.length - rejectedNames.size);
       } catch (e) {
-        const remainingFiles = [...failedFiles, ...selectedFiles.slice(i)];
+        // 중단·오류 때는 대기 중이던 사진도 다시 시도 목록에 넣는다(아무것도 잃지 않게).
+        const remainingFiles = [...carriedFailed, ...failedFiles, ...selectedFiles.slice(i), ...queueRef.current.splice(0)];
+        setQueuedCount(0);
         setRetryFiles(remainingFiles);
         setError(cancelRequestedRef.current
           ? `업로드를 중단했습니다. 남은 ${remainingFiles.length.toLocaleString()}장을 다시 시도할 수 있어요.`
@@ -284,11 +295,20 @@ export default function CustomerUploadPage() {
     setUploadPhase(null);
     setEstimatedRemainingSeconds(null);
     uploadAbortRef.current = null;
-    setRetryFiles(failedFiles);
-    if (failedFiles.length > 0) {
-      setError(`${uploaded.toLocaleString()}장은 업로드했고 ${failedFiles.length.toLocaleString()}장은 처리하지 못했습니다.`);
-    } else if (uploaded > 0) {
-      setJustUploaded(uploaded);
+    const allUploaded = carriedUploaded + uploaded;
+    const allFailed = [...carriedFailed, ...failedFiles];
+    // 업로드 중에 더 넣은 사진이 있으면 이어서 올린다(용량 확인·압축·촬영 시각 읽기를 그대로 다시 거친다).
+    const queued = queueRef.current.splice(0);
+    setQueuedCount(0);
+    if (queued.length) {
+      void handleFiles(queued, allUploaded, allFailed);
+      return;
+    }
+    setRetryFiles(allFailed);
+    if (allFailed.length > 0) {
+      setError(`${allUploaded.toLocaleString()}장은 업로드했고 ${allFailed.length.toLocaleString()}장은 처리하지 못했습니다.`);
+    } else if (allUploaded > 0) {
+      setJustUploaded(allUploaded);
     }
   }
 
@@ -465,7 +485,7 @@ export default function CustomerUploadPage() {
       </svg>
       <div>
         <p className="text-sm font-bold text-foreground">{uploadPhase === "compressing" ? "사진 압축 중" : "사진 업로드 중"}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{progress.toLocaleString()} / {total.toLocaleString()}장 · {total ? Math.round((progress / total) * 100) : 0}% · {estimatedRemainingSeconds === null ? "예상 시간 계산 중" : formatUploadRemainingTime(estimatedRemainingSeconds)}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{progress.toLocaleString()} / {total.toLocaleString()}장 · {total ? Math.round((progress / total) * 100) : 0}% · {estimatedRemainingSeconds === null ? "예상 시간 계산 중" : formatUploadRemainingTime(estimatedRemainingSeconds)}{queuedCount ? ` · 대기 ${queuedCount.toLocaleString()}장` : ""}</p>
         {slowBatch ? <p className="mt-1 text-xs font-semibold text-foreground">서버에서 사진을 정리하고 있어요. 인터넷이 느리면 조금 더 걸릴 수 있어요.</p> : null}
       </div>
     </div>
@@ -537,13 +557,13 @@ export default function CustomerUploadPage() {
             if (event.target instanceof Element && !event.target.closest("article, button, input, select, a")) event.currentTarget.focus({ preventScroll: true });
           }}
           onScroll={handleGalleryScroll}
-          onDragEnter={(event) => { event.preventDefault(); if (!isMobile && !uploading) setDragActive(true); }}
+          onDragEnter={(event) => { event.preventDefault(); if (!isMobile) setDragActive(true); }}
           onDragOver={(event) => event.preventDefault()}
           onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragActive(false); }}
-          onDrop={(event) => { event.preventDefault(); setDragActive(false); if (!isMobile && !uploading) void handleFiles(Array.from(event.dataTransfer.files)); }}
+          onDrop={(event) => { event.preventDefault(); setDragActive(false); if (!isMobile) void handleFiles(Array.from(event.dataTransfer.files)); }}
         >
           {error ? <div role="alert" className="sticky top-2 z-30 mx-3 flex items-center justify-between gap-2 rounded-lg border border-danger/20 bg-surface px-3 py-2 text-[12px] font-semibold text-danger shadow-md md:hidden"><span className="min-w-0">{error}</span>{needsReselection ? <button type="button" onClick={() => inputRef.current?.click()} className="shrink-0 px-1 py-2 underline">다시 선택</button> : null}</div> : null}
-          {dragActive ? <div className="pointer-events-none absolute inset-3 z-30 grid place-items-center rounded-2xl border-2 border-dashed border-accent bg-background/90 text-center shadow-lg"><span><UploadCloud className="mx-auto mb-3 text-accent" size={30} /><strong className="text-base text-foreground">여기에 놓아 사진 추가</strong></span></div> : null}
+          {dragActive ? <div className="pointer-events-none absolute inset-3 z-30 grid place-items-center rounded-2xl border-2 border-dashed border-accent bg-background/90 text-center shadow-lg"><span><UploadCloud className="mx-auto mb-3 text-accent" size={30} /><strong className="text-base text-foreground">{uploading ? "놓으면 지금 업로드가 끝난 뒤 이어서 올려요" : "여기에 놓아 사진 추가"}</strong></span></div> : null}
           {displayedPhotos.length === 0 ? (
             <div className="grid min-h-full place-items-center p-5">
               <button type="button" onClick={() => inputRef.current?.click()} className="flex min-h-[260px] w-full max-w-[720px] flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border-strong bg-surface text-center transition-colors hover:border-accent/45 hover:bg-surface-raised/45">
