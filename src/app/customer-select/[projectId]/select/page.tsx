@@ -147,28 +147,29 @@ function SelectScreen() {
     return groups;
   }, [filtered]);
   const hasGroups = Array.from(groupsInView.values()).some((members) => members.length > 1);
-  // 접힌 묶음의 표지는 고른 사진이 있으면 그 사진, 없으면 (의심 사진을 뒤로 보낸) 첫 사진.
+  // 묶음은 갤러리에서 묶음이 처음 나오는 자리에 모은다 — 접혔으면 표지 한 장(고른 사진, 없으면 의심 사진을 뒤로 보낸 첫 사진),
+  // 펼쳤으면 묶음 사진 전부를 나란히.
+  // (유사컷은 촬영 시각이 연달아 있다는 보장이 없어 시간순 그대로 두면 펼친 묶음 사이에 다른 사진이 끼어든다.)
   const visible = useMemo(() => {
     if (!grouped || !hasGroups) return filtered;
-    const covers = new Map<string, string>();
-    groupsInView.forEach((members, groupId) => covers.set(groupId, (members.find((member) => picked.has(member.id)) ?? members[0]).id));
-    return filtered.filter((photo) => {
+    const placed = new Set<string>();
+    const result: Photo[] = [];
+    for (const photo of filtered) {
       const groupId = photo.similarityGroupId;
-      if (!groupId || expanded.has(groupId) || (groupsInView.get(groupId)?.length ?? 0) < 2) return true;
-      return covers.get(groupId) === photo.id;
-    });
+      const members = groupId ? groupsInView.get(groupId) ?? [] : [];
+      if (!groupId || members.length < 2) { result.push(photo); continue; }
+      if (placed.has(groupId)) continue;
+      placed.add(groupId);
+      if (expanded.has(groupId)) result.push(...members);
+      else result.push(members.find((member) => picked.has(member.id)) ?? members[0]);
+    }
+    return result;
   }, [expanded, filtered, grouped, groupsInView, hasGroups, picked]);
   // 펼친 묶음 사진이면 그 묶음 키 — 갤러리가 묶음을 새 줄에 나란히 놓고 띠로 감싼다.
   const bandOf = useCallback((photo: Photo) => {
     const groupId = photo.similarityGroupId;
     return grouped && hasGroups && groupId && expanded.has(groupId) && (groupsInView.get(groupId)?.length ?? 0) > 1 ? groupId : null;
   }, [expanded, grouped, groupsInView, hasGroups]);
-  // 펼친 묶음에서 "⧉ 접기" 배지를 달 첫 장(갤러리 순서 기준).
-  const firstOfGroup = useMemo(() => {
-    const first = new Map<string, string>();
-    filtered.forEach((photo) => { if (photo.similarityGroupId && !first.has(photo.similarityGroupId)) first.set(photo.similarityGroupId, photo.id); });
-    return first;
-  }, [filtered]);
   // 묶기가 켜져 있으면 표지 한 칸에 든 사진들(상세에서 ↑↓·띠로 본다). 아니면 빈 목록.
   const membersOf = useCallback((photo: Photo) => {
     if (!grouped || !hasGroups || !photo.similarityGroupId || expanded.has(photo.similarityGroupId)) return [];
@@ -306,7 +307,7 @@ function SelectScreen() {
         totalCount={members.length}
         selectedCount={isOwner ? members.filter((member) => picked.has(member.id)).length : 0}
         // 펼친 묶음은 첫 장에만 "⧉ 접기" 배지를 둔다.
-        isGroupExpanded={isOpen && firstOfGroup.get(groupId!) === photo.id}
+        isGroupExpanded={isOpen && members[0]?.id === photo.id}
         inExpandedGroup={isOpen}
         compactGroupBadge
         onGroupBadgeClick={(event) => {

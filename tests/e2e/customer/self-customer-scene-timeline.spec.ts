@@ -445,7 +445,8 @@ test("a single similar-cut group can be expanded from its badge", async ({ brows
   await page.locator('.gl-photo-card[data-photo-id="p9"]').getByRole("button", { name: "선택", exact: true }).click();
   await expect(page.locator('.gl-photo-card[data-photo-id="p9"]')).toHaveClass(/gl-selected/);
   await page.locator('.gl-photo-card[data-photo-id="p9"]').click();
-  await expect(page.locator('[class*="detailCount"]')).toContainText("8 / 24");
+  // 펼친 묶음도 의심 사진(p9, 눈 감음)을 맨 뒤에 둔다: p8, p10, p9 → p9는 9번째.
+  await expect(page.locator('[class*="detailCount"]')).toContainText("9 / 24");
   await expect(page.locator('[class*="detailCount"]')).not.toContainText("비슷한 사진");
   await page.keyboard.press("Escape");
   // 접기
@@ -468,6 +469,25 @@ test("an expanded group sits on its own row inside one band", async ({ browser }
   expect(y9).toBe(y10);
   expect(y7).toBeLessThan(y8);
   expect(y11).toBeGreaterThan(y10);
+  await expect(page.locator('[class*="groupBand"]')).toHaveCount(1);
+  await context.close();
+});
+
+test("an expanded group stays together even when its photos are not consecutive in time", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  // p8은 p8~p10 묶음이지만 촬영 시각이 p12 뒤라, 시간순으로는 p9·p10과 떨어져 있다.
+  const data = project();
+  data.photos[8] = { ...data.photos[8], takenAt: "2026-10-03T11:04:05" };
+  await mock(page, data);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  const badge = page.getByRole("button", { name: "유사컷 3장 펼치기" }).nth(1);
+  await badge.click();
+  const top = async (id: string) => (await page.locator(`.gl-photo-card[data-photo-id="${id}"]`).boundingBox())!.y;
+  const [y8, y9, y10] = await Promise.all(["p8", "p9", "p10"].map(top));
+  expect(y8).toBe(y9);
+  expect(y9).toBe(y10);
   await expect(page.locator('[class*="groupBand"]')).toHaveCount(1);
   await context.close();
 });
