@@ -66,7 +66,8 @@
 .timelineHeader { position: absolute; left: 0; width: 100%; display: flex; align-items: flex-end; padding-bottom: 12px; }
 .timelineEmpty { position: absolute; left: 0; width: 100%; display: flex; align-items: center; color: var(--subtle-foreground); font-size: 13px; }
 .timelineBoundary { position: absolute; left: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
-.snapTarget { width: min(560px, 100%); scroll-snap-align: center; }
+/* 경계 카드가 화면 아래에 막 다 보이는 순간(카드 하단 = 화면 하단선) 살짝 멈춘다 */
+.snapTarget { width: min(560px, 100%); scroll-snap-align: end; scroll-margin-bottom: 16px; }
 .sectionTitle { min-width: 0; display: flex; align-items: baseline; gap: 8px; border: 0; background: none; padding: 0; color: var(--foreground); font: inherit; text-align: left; cursor: pointer; }
 .sectionTitle strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
 .sectionTitle span { flex: none; color: var(--subtle-foreground); font-size: 12px; font-weight: 600; }
