@@ -12,7 +12,7 @@ export function SimilarityGroupBadge({ count, expanded, selectedCount = 0, recom
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void; inline?: boolean;
 }) {
   if (!onClick) return <div className={`${styles.wrap} ${inline ? styles.inline : ""}`}>
-    {selectedCount > 0 && <span className={styles.selected}>{selectedCount}장 선택</span>}
+    {selectedCount > 0 && <span className={`${styles.selected} ${styles.selectedAccent}`}>{selectedCount}장 선택</span>}
     <span className={`${styles.button} ${styles.static}`}><Layers size={13} aria-hidden /><span><span className={styles.word}>유사컷 </span>{count}장</span></span>
   </div>;
   return <div className={`${styles.wrap} ${inline ? styles.inline : ""}`}>

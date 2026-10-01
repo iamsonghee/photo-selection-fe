@@ -199,9 +199,9 @@ test("selecting a card pops only at the moment it turns on", async ({ browser })
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  // 이미 선택돼 있던 사진(p1)은 처음 그려질 때 튀지 않는다.
+  // 이미 선택돼 있던 사진(p1·p2)이 있는 장면을 열어도 처음 그려질 때 튀지 않는다.
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
-  await expect(page.locator('.gl-photo-card[data-photo-id="p1"]')).toHaveClass(/gl-selected/);
+  await expect(page.locator('.gl-photo-card[data-photo-id="p1"]')).toContainText("2장 선택");
   await expect(page.locator(".gl-photo-card[data-pop]")).toHaveCount(0);
 
   const card = page.locator('.gl-photo-card[data-photo-id="p5"]');
@@ -281,5 +281,18 @@ test("detail moves by gallery stops and browses a folded group with up/down and 
   await expect(strip.locator('[class*="stripGroup"]').filter({ hasText: "비슷한 사진 3장" })).toHaveCount(1);
   await strip.getByRole("button", { name: "S_18.jpg 보기" }).click();
   await expect(count).toContainText("13 / 22 · 비슷한 사진 3/3");
+  await context.close();
+});
+
+test("a collapsed cover never looks selected; the badge shows the group's picks", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  // p1·p2를 고른 첫 묶음(p0~p2)의 표지는 고른 사진(p1)이지만 선택 스타일 없이 배지로만 알린다.
+  const cover = page.locator('.gl-photo-card[data-photo-id="p1"]');
+  await expect(cover).toContainText("2장 선택");
+  await expect(cover).not.toHaveClass(/gl-selected/);
   await context.close();
 });

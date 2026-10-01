@@ -254,7 +254,8 @@ function SelectScreen() {
         token={projectId}
         href="#"
         photo={photo}
-        selected={picked.has(photo.id)}
+        // 표지는 "묶음 하나"라 표지 사진의 선택 스타일(어둡게·테두리)을 쓰지 않는다 — 묶음 안 선택 수는 배지로 보인다.
+        selected={!isCover && picked.has(photo.id)}
         showCheck={!isCover && !(columns >= 3 && typeof window !== "undefined" && window.innerWidth <= 767)}
         checkVariant={isOwner ? "check" : "heart"}
         showRating={false}

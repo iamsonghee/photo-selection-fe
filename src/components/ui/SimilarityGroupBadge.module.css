@@ -4,6 +4,8 @@
 .button::before { content: ""; position: absolute; inset: 4px 0; border-radius: inherit; background: rgba(24,30,34,.82); z-index: -1; }
 .button:hover::before { background: rgba(24,30,34,.96); }
 .static { cursor: inherit; pointer-events: none; }
+/* 표시 전용 묶음(셀프 고객 셀렉): 표지는 선택 스타일을 쓰지 않으므로 묶음 안 선택 수를 강조색으로 보인다. */
+.selected.selectedAccent { background: var(--accent, #ff4d00); font-weight: 700; }
 .button:focus-visible { outline: 2px solid white; outline-offset: -2px; }
 .selected { padding: 3px 6px; border-radius: 4px; background: rgba(24,30,34,.82); color: white; font: 500 10px/1.2 Pretendard, sans-serif; }
 .recommended { display:inline-flex; align-items:center; gap:3px; padding:3px 6px; border-radius:4px; background:rgba(24,30,34,.82); color:white; font:600 10px/1.2 Pretendard,sans-serif; }
