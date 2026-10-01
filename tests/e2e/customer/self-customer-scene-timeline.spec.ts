@@ -26,7 +26,7 @@ function project(blocks: number[][] = [[11, 0], [11, 40], [12, 30]]) {
 async function mock(page: Page, data = project()) {
   await page.route(`**/api/customer-select/projects/${PROJECT_ID}**`, async (route) => {
     const path = new URL(route.request().url()).pathname;
-    if (path.endsWith("/sync")) return route.fulfill({ json: { selectedIds: data.selectedIds, photoStates: {}, participantOpinions: {}, participantDone: data.participantDone, participantNicknames: data.participantNicknames, onlineParticipants: [], participantViews: {}, exported: false } });
+    if (path.endsWith("/sync")) return route.fulfill({ json: { selectedIds: data.selectedIds, photoStates: data.photoStates, participantOpinions: {}, participantDone: data.participantDone, participantNicknames: data.participantNicknames, onlineParticipants: [], participantViews: {}, exported: false } });
     if (path.endsWith(`/projects/${PROJECT_ID}`) && route.request().method() === "GET") return route.fulfill({ json: { isOwner: true, project: data } });
     return route.fulfill({ json: { ok: true } });
   });
@@ -217,7 +217,7 @@ test("selecting a card pops only at the moment it turns on", async ({ browser })
   await mock(page);
   // 이미 선택돼 있던 사진(p1·p2)이 있는 장면을 열어도 처음 그려질 때 튀지 않는다.
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
-  await expect(page.locator('.gl-photo-card[data-photo-id="p1"]').getByRole("img", { name: "유사컷 3장, 2장 선택" })).toBeVisible();
+  await expect(page.locator('.gl-photo-card[data-photo-id="p1"]').getByRole("img", { name: "2장 선택" })).toBeVisible();
   await expect(page.locator(".gl-photo-card[data-pop]")).toHaveCount(0);
 
   const card = page.locator('.gl-photo-card[data-photo-id="p5"]');
@@ -239,7 +239,7 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   await mock(page);
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   await expect(page.getByRole("button", { name: "유사컷 묶기" })).toHaveAttribute("aria-pressed", "true");
-  // 묶음 표지에는 누를 수 없는 한 줄 배지(⧉ 3)만 있고, 표지를 누르면(펼치지 않고) 바로 상세가 열린다.
+  // 묶음 표지에는 누를 수 없는 배지(⧉ 3)만 있고, 표지를 누르면(펼치지 않고) 바로 상세가 열린다.
   const cover = page.locator('.gl-photo-card[data-photo-id="p8"]');
   await expect(cover.getByRole("img", { name: "유사컷 3장" })).toBeVisible();
   await expect(page.getByRole("button", { name: /유사컷 \d+장 펼치기/ })).toHaveCount(0);
@@ -321,7 +321,13 @@ test("a collapsed cover never looks selected; the badge shows the group's picks"
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   // p1·p2를 고른 첫 묶음(p0~p2)의 표지는 고른 사진(p1)이지만 선택 스타일 없이 배지로만 알린다.
   const cover = page.locator('.gl-photo-card[data-photo-id="p1"]');
-  await expect(cover.getByRole("img", { name: "유사컷 3장, 2장 선택" })).toBeVisible();
+  // 고른 장수는 ✓ 자리(왼쪽 위)에, 묶음 배지는 ⧉ 3 만.
+  const picks = cover.getByRole("img", { name: "2장 선택" });
+  await expect(picks).toHaveText("2");
+  const [coverBox, picksBox] = [(await cover.boundingBox())!, (await picks.boundingBox())!];
+  expect(picksBox.x - coverBox.x).toBeLessThan(24);
+  expect(picksBox.y - coverBox.y).toBeLessThan(24);
+  await expect(cover.getByRole("img", { name: "유사컷 3장" })).toHaveText("3");
   await expect(cover).not.toHaveClass(/gl-selected/);
   // 대신 주황 테두리로 이 묶음에 고른 사진이 있음을 보인다.
   await expect(cover.locator('[data-active="true"]')).toHaveCount(1);
@@ -395,5 +401,20 @@ test("only decided marks stay on cards: empty check shows on hover, my own like 
   await card.getByRole("button", { name: "찜하기" }).click();
   await expect(card.getByRole("button", { name: "찜 해제" })).toBeVisible();
   await expect(card.locator(".gl-color-dot")).toHaveCount(0);
+  await context.close();
+});
+
+test("like dots collapse to two plus a count when many people liked", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  const data = project();
+  data.participantNicknames = { red: "소유자", blue: "엄마", green: "아빠", yellow: "언니" } as typeof data.participantNicknames;
+  data.photoStates = { p5: { color: ["blue", "green", "yellow"] } } as typeof data.photoStates;
+  await mock(page, data);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=none`);
+  const card = page.locator('.gl-photo-card[data-photo-id="p5"]');
+  await expect(card.locator(".gl-color-dot")).toHaveCount(2);
+  await expect(card.getByRole("img", { name: /^외 1명/ })).toHaveText("+1");
   await context.close();
 });

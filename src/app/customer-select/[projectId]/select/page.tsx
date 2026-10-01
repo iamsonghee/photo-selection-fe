@@ -281,6 +281,7 @@ function SelectScreen() {
         showRating={false}
         // 내 찜은 ♥로 보이므로 색 점은 다른 사람 것만(♥ 버튼이 없는 묶음 표지는 전부).
         colorTags={isCover ? likesOf(photo.id) : likesOf(photo.id).filter((color) => color !== me)}
+        maxColorDots={2}
         colorLabel={(color: ColorTag) => `${project.participantNicknames[color] || "참가자"} 찜`}
         hasComment={Boolean(project.photoStates[photo.id]?.comment)}
         showGroupBadge={isCover}

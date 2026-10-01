@@ -57,6 +57,8 @@ type GalleryPhotoCardProps = {
   popOnSelect?: boolean;
   /** 선택 스타일(✓·어둡게) 없이 주황 테두리만 — 셀프 고객 셀렉의 접힌 묶음 표지에 고른 사진이 있을 때 */
   highlighted?: boolean;
+  /** 주면 찜 색 점을 이 개수까지만 그리고 나머지는 +N으로 줄인다 */
+  maxColorDots?: number;
   /** 없으면 묶음 배지는 표시만 한다 */
   onGroupBadgeClick?: (e: React.MouseEvent, groupId: string) => void;
   onRate: (photoId: string, star: StarRating | undefined) => void;
@@ -94,6 +96,7 @@ function GalleryPhotoCardImpl({
   liked = false,
   popOnSelect = false,
   highlighted = false,
+  maxColorDots,
   onGroupBadgeClick,
   onRate,
   onThumbError,
@@ -173,11 +176,15 @@ function GalleryPhotoCardImpl({
             <MessageSquare size={13} strokeWidth={2} aria-hidden />
           </span>
         )}
-        {colorTags.map((tag) => {
+        {(maxColorDots && colorTags.length > maxColorDots ? colorTags.slice(0, maxColorDots) : colorTags).map((tag) => {
           const hex = COLOR_OPTIONS.find((c) => c.key === tag)?.hex;
           const label = colorLabel?.(tag) ?? "참가자 찜";
           return hex ? <span key={tag} className="gl-color-dot" role="img" aria-label={label} title={label} style={{ width: 7, height: 7, borderRadius: "50%", background: hex, display: "block", flexShrink: 0 }} /> : null;
         })}
+        {maxColorDots && colorTags.length > maxColorDots && (() => {
+          const rest = colorTags.slice(maxColorDots).map((tag) => colorLabel?.(tag) ?? "참가자 찜").join(", ");
+          return <span className="gl-color-more" role="img" aria-label={`외 ${colorTags.length - maxColorDots}명: ${rest}`} title={rest}>+{colorTags.length - maxColorDots}</span>;
+        })()}
       </div>
     </div>
 
@@ -276,6 +283,10 @@ function GalleryPhotoCardImpl({
         </div>
         )}
 
+        {/* 표시 전용 묶음 표지: 묶음 안 고른 장수를 ✓ 자리(왼쪽 위)에 */}
+        {showGroupBadge && !onGroupBadgeClick && selectedCount > 0 && (
+          <span className="gl-group-picks" role="img" aria-label={`${selectedCount}장 선택`}><Check size={12} strokeWidth={3} aria-hidden />{selectedCount}</span>
+        )}
         {(showGroupBadge || inExpandedGroup) && groupId && (
           <SimilarityGroupBadge count={totalCount} expanded={isGroupExpanded} label={groupLabel}
             selectedCount={showGroupBadge ? selectedCount : 0}
