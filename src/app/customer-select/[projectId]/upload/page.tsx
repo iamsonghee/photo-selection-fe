@@ -37,6 +37,8 @@ const BATCH_SIZE = 20;
 // ponytail: 작가 화면의 PC/모바일 적응형 동시성 대신 보수적인 고정값 하나만 쓴다.
 // 단말별 실측에서 병목이 확인되면 그때 분리한다.
 const COMPRESS_POOL_SIZE = 3;
+// 한 묶음의 서버 처리가 이보다 오래 걸리면 멈춘 게 아니라는 안내를 보여준다.
+const SLOW_BATCH_NOTICE_MS = 10_000;
 
 type DeleteImpact = {
   photoCount: number;
@@ -70,6 +72,7 @@ export default function CustomerUploadPage() {
   const [needsReselection, setNeedsReselection] = useState(false);
   const uploadStartingRef = useRef(false);
   const [uploadPhase, setUploadPhase] = useState<"compressing" | "uploading" | null>(null);
+  const [slowBatch, setSlowBatch] = useState(false);
   const [estimatedRemainingSeconds, setEstimatedRemainingSeconds] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingPhotos, setPendingPhotos] = useState<Photo[]>([]);
@@ -235,8 +238,10 @@ export default function CustomerUploadPage() {
       batch.forEach((f) => formData.append("files", f));
       formData.append("taken_at", JSON.stringify(takenAt));
       setUploadPhase("uploading");
+      const slowTimer = window.setTimeout(() => setSlowBatch(true), SLOW_BATCH_NOTICE_MS);
       try {
-        const res = await fetch("/api/customer-select/upload/photos", { method: "POST", headers: authHeader, body: formData, signal: controller.signal });
+        const res = await fetch("/api/customer-select/upload/photos", { method: "POST", headers: authHeader, body: formData, signal: controller.signal })
+          .finally(() => { window.clearTimeout(slowTimer); setSlowBatch(false); });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           const detail = data.detail;
@@ -468,6 +473,7 @@ export default function CustomerUploadPage() {
       <div>
         <p className="text-sm font-bold text-foreground">{uploadPhase === "compressing" ? "사진 압축 중" : "사진 업로드 중"}</p>
         <p className="mt-1 text-xs text-muted-foreground">{progress.toLocaleString()} / {total.toLocaleString()}장 · {total ? Math.round((progress / total) * 100) : 0}% · {estimatedRemainingSeconds === null ? "예상 시간 계산 중" : formatUploadRemainingTime(estimatedRemainingSeconds)}</p>
+        {slowBatch ? <p className="mt-1 text-xs font-semibold text-foreground">서버에서 사진을 정리하고 있어요. 인터넷이 느리면 조금 더 걸릴 수 있어요.</p> : null}
       </div>
     </div>
   ) : undefined;
