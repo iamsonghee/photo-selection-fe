@@ -41,7 +41,7 @@ export function LandingPageClient({ limits }: { limits: PlanLimits }) {
         <a className="ac-skip" href="#landing-main">본문 바로가기</a>
         <header className="ac-header">
           <div className="ac-container ac-header-inner">
-            <BrandLogoBar href="/" variant="customerEntry" />
+            <BrandLogoBar href="/" />
             <nav aria-label="주 메뉴"><Link prefetch={false} href="/beta/apply">베타 신청 <ArrowRight size={14} /></Link></nav>
             <button type="button" className="ac-button ac-button-small" onClick={handleStart}>무료 시작하기<ArrowRight size={15} /></button>
           </div>
@@ -64,7 +64,7 @@ export function LandingPageClient({ limits }: { limits: PlanLimits }) {
         <footer className="ac-footer">
           <div className="ac-container ac-footer-inner">
             <div className="ac-footer-main">
-              <BrandLogoBar size="sm" variant="customerEntry" />
+              <BrandLogoBar />
               <a href="mailto:multihatter@gmail.com">문의</a>
               <Link prefetch={false} href="/terms">이용약관</Link>
               <Link prefetch={false} href="/privacy">개인정보처리방침</Link>

@@ -19,8 +19,8 @@
   --border-strong: color-mix(in srgb, #023852 28%, #ffffff);
   --border-subtle: color-mix(in srgb, #023852 9%, #ffffff);
 
-  --accent: #ff5712;
-  --accent-rgb: 255, 87, 18;
+  --accent: #ff4d00;
+  --accent-rgb: 255, 77, 0;
   --accent-foreground: #ffffff;
   --primary: #079fa0;
   --cyan: #079fa0;

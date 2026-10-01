@@ -23,7 +23,7 @@
 .film-detail label {font-size:18px;display:block;margin-bottom:12px;}
 .film-comment {padding:20px;border:2px solid var(--accent);border-radius:6px;font-size:24px;line-height:1.7;min-height:160px;}
 .film-detail p {margin-top:12px;color:#666;}
-.film-writer {z-index:1;--accent:#ff5712;}
+.film-writer {z-index:1;--accent:#ff4d00;}
 .film-writer-toolbar {height:72px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;}
 .film-writer-toolbar>span {font-size:17px;color:#666;}
 .film-results {display:grid;grid-template-columns:repeat(3,1fr);gap:22px;padding:0 28px;}

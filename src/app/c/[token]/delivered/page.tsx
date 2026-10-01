@@ -69,7 +69,7 @@ export default function DeliveredPage() {
   return (
     <div className={styles.root}>
       <CustomerHeader theme="customerLight">
-        <BrandLogoBar size="sm" href={invitePath} variant="customerEntry" />
+        <BrandLogoBar href={invitePath} />
         <span className="font-mono text-[11px] text-subtle-foreground max-w-[180px] truncate">{project.name}</span>
       </CustomerHeader>
 

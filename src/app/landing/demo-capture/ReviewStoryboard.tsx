@@ -18,7 +18,7 @@ export function ReviewStoryboard() {
  const pointer=time>=1.1&&time<7;
  const photo=getSamplePhoto("10");
  return <main id="demo-film" className="review-board" data-time={time}>
-  <div className="rb-phone"><header><BrandLogoBar variant="customerEntry"/><span>보정본 검토</span></header>
+  <div className="rb-phone"><header><BrandLogoBar /><span>보정본 검토</span></header>
    <div className="rb-file"><ArrowLeft size={16}/><strong>ACUT_0010.jpg</strong><span>{original ? "원본" : "보정본"}</span></div>
    {/* 두 이미지를 같은 크기로 겹쳐 비교 시 레이아웃과 이미지 로딩이 바뀌지 않게 한다. */}
    <div className="rb-photo"><img src={photo.retouchedSrc} alt="보정본"/><img src={photo.originalSrc} alt="원본" style={{opacity:blend}}/></div>

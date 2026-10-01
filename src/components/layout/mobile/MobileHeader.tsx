@@ -83,12 +83,12 @@ export function MobileHeader({ light = false }: { light?: boolean }) {
       className={`${light ? lightThemeStyles.lightTheme : ""} photographer-mobile-header ${visuallyCompact ? "is-compact" : ""} ${assetImmersive ? "is-asset-immersive" : ""} fixed left-0 right-0 top-0 z-50 box-border flex items-center justify-between ${assetProjectBase ? "gap-1 px-2" : "gap-3 px-5"} border-b-0 bg-background/95 backdrop-blur-md md:hidden`}
     >
       <Link href="/photographer/projects" aria-label="A-CUT 프로젝트 목록" className={`flex min-h-11 shrink-0 items-center rounded-lg transition-[gap] duration-200 motion-reduce:transition-none ${compactProjectHeader ? "gap-0" : "gap-2"}`}>
-        <div className={`flex items-center justify-center rounded bg-accent font-black tracking-tighter text-white transition-[width,height,font-size] duration-200 ${visuallyCompact ? "h-6 w-6 text-xs" : "h-[26px] w-[26px] text-[13px]"}`}>
+        <div className={`flex items-center justify-center bg-[#ff4d00] font-extrabold text-white transition-[width,height,font-size] duration-200 ${visuallyCompact ? "h-6 w-6 rounded-[6px] text-xs" : "h-[26px] w-[26px] rounded-[7px] text-[13px]"}`}>
           A
         </div>
         <span
           aria-hidden={compactProjectHeader}
-          className={`overflow-hidden whitespace-nowrap font-bold tracking-tight text-foreground transition-[max-width,opacity,font-size] duration-200 motion-reduce:transition-none ${
+          className={`overflow-hidden whitespace-nowrap font-extrabold tracking-[-0.04em] text-foreground transition-[max-width,opacity,font-size] duration-200 motion-reduce:transition-none ${
             compactProjectHeader
               ? "max-w-0 text-base opacity-0"
               : visuallyCompact
@@ -96,7 +96,7 @@ export function MobileHeader({ light = false }: { light?: boolean }) {
                 : "max-w-20 text-[17px] opacity-100"
           }`}
         >
-          A-CUT.
+          A-CUT<span className="text-[#ff4d00]">.</span>
         </span>
       </Link>
 

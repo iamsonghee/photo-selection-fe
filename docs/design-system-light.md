@@ -116,7 +116,7 @@ Golden 기준 화면은 Dashboard, Photographer Project List, Photographer Proje
 
 | Token | 실제 값 | Semantic role | Usage | Don't |
 |---|---:|---|---|---|
-| `--accent` | `#FF5712` | Brand Primary / Photographer Actor | Primary CTA, FAB, 작가 dot, 현재 navigation indicator, 중요한 progress | 일반 제목·메타·장식 전체를 Orange로 칠하지 않는다 |
+| `--accent` | `#FF4D00` | Brand Primary / Photographer Actor | Primary CTA, FAB, 작가 dot, 현재 navigation indicator, 중요한 progress | 일반 제목·메타·장식 전체를 Orange로 칠하지 않는다 |
 | `--accent-foreground` | `#FFFFFF` | Primary action 위 content | Orange fill 위 텍스트와 아이콘 | Dark 문서의 black-on-orange 값을 Light CTA에 재사용하지 않는다 |
 | `--foreground` | `#023852` | Primary Text / Strong Neutral | 제목, 핵심 값, 주요 문장, navigation emphasis | actor/info처럼 의미색이 필요한 자리를 무조건 Navy로 대체하지 않는다 |
 | `--muted-foreground` | `rgba(2,56,82,.68)` | Secondary Text | 설명, 고객명 기본 표현, action/status 보조 텍스트 | ID·disabled처럼 더 낮은 위계까지 동일 색으로 평탄화하지 않는다 |
@@ -151,7 +151,7 @@ Orange는 가장 먼저 보이는 **행동색**이며 넓은 면적의 기본 su
 
 | 의미 | 실제 표현 | 규칙 |
 |---|---|---|
-| Photographer | `#FF5712` dot/icon/active indicator | 작가가 현재 행동 주체일 때만 사용 |
+| Photographer | `#FF4D00` dot/icon/active indicator | 작가가 현재 행동 주체일 때만 사용 |
 | Customer | `#079FA0` dot/icon/text accent, 필요 시 `#E8F6F1` small halo | 큰 fill 금지. 일반 고객명은 기본적으로 Neutral이며 Focus Card의 teal 고객명은 현재 page-specific |
 | Completed / Passive | `rgba(2,56,82,.52)` | 완료는 새 행동색을 얻지 않으며 CTA를 제거한다 |
 | Critical | `#DC2E2F` | 해당 단계의 기한 초과, 오류, 파괴 행동에만 사용 |
@@ -853,7 +853,7 @@ Shared Page Header (+ Breadcrumb + Overflow)
 
 1. Project ID와 Project List 핵심 interaction은 computed 재검증을 마쳤다. 나머지 typography role도 route별 five-value set을 계속 채집한다. 특히 LNB inherited line-height와 fallback font를 확인한다.
 2. Light LNB는 Pretendard computed 검증을 마쳤다. Dark/legacy Sidebar를 위해 남은 `Inter` loader를 제거할지는 전체 Photographer shell migration에서 결정한다.
-3. `JetBrains Mono`가 ID/숫자 외 Sidebar `MENU`, logo mark에 필요한지 검토한다.
+3. `JetBrains Mono`가 ID/숫자 외 Sidebar `MENU`에 필요한지 검토한다. (logo mark는 2026-10-02 Pretendard로 통일)
 4. 11px Project ID는 Stable role로 확정했다. Project Detail은 12/14/15/16/18/24/28px 명시 scale을 사용하며 Dashboard의 12.5px/21px과 weight 800은 page-specific으로 유지한다.
 5. Customer `#079FA0`와 generic Info semantic을 분리할지 결정한다. 현재 `--primary`, `--success`, `--cyan` alias가 같은 값이다.
 6. Warning `#FAC005`은 Project List D-N 반복 badge에서 제외했다. 실제 임박 warning을 별도 표시할지 다음 운영 화면에서 검증한다. placeholder와 border-strong도 아직 전역 확정하지 않는다.
@@ -873,7 +873,7 @@ Shared Page Header (+ Breadcrumb + Overflow)
 | Topic | 기존 `design-system.md` | Light Golden References | 판단 |
 |---|---|---|---|
 | Theme role | Dark product canvas 중심 | 운영/관리용 Light App route scope | Context별 문서로 병행 |
-| Brand Orange | `#FF4D00` | `#FF5712` | 핵심 충돌. 향후 shared brand primitive audit 필요 |
+| Brand Orange | `#FF4D00` | `#FF4D00` | 2026-10-02 `#FF4D00`으로 통일 완료 |
 | Primary action content | black | white | theme contrast별 semantic token 필요 |
 | Primary text | `#F2F2F4` on dark | Deep Navy `#023852` | theme-specific semantic resolution |
 | Customer actor | Porcelain `#9ECAD0` | Teal `#079FA0`, Mint soft tint | Dashboard·Project List actor semantic으로 반복 검증. Detail에서 최종 확인 |

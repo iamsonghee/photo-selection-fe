@@ -34,7 +34,7 @@ export function CustomerEntryHeader({
 }) {
   return (
     <header className={`${styles.header} ${overlay ? styles.headerOverlay : ""}`}>
-      <BrandLogoBar size="md" href={href} variant="customerEntry" />
+      <BrandLogoBar href={href} />
     </header>
   );
 }

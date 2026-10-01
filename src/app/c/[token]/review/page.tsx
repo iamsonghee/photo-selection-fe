@@ -750,7 +750,7 @@ function DeliveryReceiptView({
           <a
             href={token ? `/c/${token}` : "#"}
             aria-label="처음 화면으로"
-            style={{ display: "inline-flex", alignItems: "center", flexShrink: 0, textDecoration: "none" }}
+            style={{ display: "inline-flex", alignItems: "center", flexShrink: 0, textDecoration: "none", ["--brand-logo-ink" as string]: "var(--foreground)" }}
           >
             <BrandLogoBar size="sm" />
           </a>

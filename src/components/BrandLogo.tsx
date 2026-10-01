@@ -3,94 +3,28 @@
 import Link from "next/link";
 import { memo } from "react";
 
-/** 작가 사이드바(`Sidebar`)와 동일 톤 */
-const ACCENT = "var(--accent)";
-const MARK_FONT = "'JetBrains Mono', 'Space Mono', ui-monospace, monospace";
-const WORD_FONT = "'Space Grotesk', 'Pretendard Variable', system-ui, sans-serif";
+const BRAND_ORANGE = "#ff4d00";
+const FONT = "Pretendard, sans-serif";
 
-export type BrandLogoSize = "sm" | "md" | "lg";
-export type BrandLogoVariant = "default" | "customerEntry";
+export type BrandLogoSize = "sm" | "md";
 
-const BAR: Record<BrandLogoSize, { mark: number; markFont: number; text: number; gap: number }> = {
-  sm: { mark: 20, markFont: 11, text: 14, gap: 8 },
-  md: { mark: 24, markFont: 14, text: 18, gap: 12 },
-  lg: { mark: 28, markFont: 16, text: 22, gap: 12 },
+/** md = 랜딩 헤더 기준 락업, sm은 같은 비율로 축소 */
+const BAR: Record<BrandLogoSize, { mark: number; markFont: number; radius: number; text: number; gap: number }> = {
+  sm: { mark: 20, markFont: 11, radius: 5.4, text: 14.5, gap: 6 },
+  md: { mark: 24.96, markFont: 13.44, radius: 6.72, text: 18.24, gap: 7.2 },
 };
 
-function LogoMark({
-  size,
-  fontSize,
-  variant,
-}: {
-  size: number;
-  fontSize: number;
-  variant: BrandLogoVariant;
-}) {
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        flexShrink: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: variant === "customerEntry" ? "#ff4d00" : ACCENT,
-        color: "#fff",
-        fontWeight: variant === "customerEntry" ? 800 : 700,
-        fontSize,
-        borderRadius: variant === "customerEntry" ? 6.72 : 2,
-        fontFamily: variant === "customerEntry" ? "Pretendard, sans-serif" : MARK_FONT,
-        lineHeight: 1,
-      }}
-    >
-      A
-    </div>
-  );
-}
-
-function LogoWordmark({
-  fontSize,
-  variant,
-}: {
-  fontSize: number;
-  variant: BrandLogoVariant;
-}) {
-  return (
-    <span
-      style={{
-        fontFamily: variant === "customerEntry" ? "Pretendard, sans-serif" : WORD_FONT,
-        fontWeight: variant === "customerEntry" ? 800 : 700,
-        fontSize,
-        letterSpacing: variant === "customerEntry" ? "-0.04em" : "-0.05em",
-        color: variant === "customerEntry" ? "#191918" : "var(--foreground)",
-        whiteSpace: "nowrap",
-        lineHeight: 1,
-      }}
-    >
-      A-CUT{variant === "default" && <span style={{ color: ACCENT }}>.</span>}
-    </span>
-  );
-}
-
-/** 가로형 로고 — 작가 대시보드 사이드바 상단과 동일 락업 */
+/** 가로형 로고 — 서비스 전체 공통 락업. 어두운 배경에서는 `--brand-logo-ink`로 워드마크 색을 바꾼다. */
 export const BrandLogoBar = memo(function BrandLogoBar({
   size = "md",
   className = "",
   href,
-  priority = false,
-  variant = "default",
 }: {
   size?: BrandLogoSize;
   className?: string;
   href?: string;
-  priority?: boolean;
-  variant?: BrandLogoVariant;
 }) {
-  void priority;
-  const s = variant === "customerEntry"
-    ? { mark: 24.96, markFont: 13.44, text: 18.24, gap: 7.2 }
-    : BAR[size];
+  const s = BAR[size];
   const inner = (
     <div
       role="img"
@@ -98,8 +32,38 @@ export const BrandLogoBar = memo(function BrandLogoBar({
       className={`inline-flex shrink-0 items-center ${className}`}
       style={{ gap: s.gap }}
     >
-      <LogoMark size={s.mark} fontSize={s.markFont} variant={variant} />
-      <LogoWordmark fontSize={s.text} variant={variant} />
+      <div
+        style={{
+          width: s.mark,
+          height: s.mark,
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: BRAND_ORANGE,
+          color: "#fff",
+          fontWeight: 800,
+          fontSize: s.markFont,
+          borderRadius: s.radius,
+          fontFamily: FONT,
+          lineHeight: 1,
+        }}
+      >
+        A
+      </div>
+      <span
+        style={{
+          fontFamily: FONT,
+          fontWeight: 800,
+          fontSize: s.text,
+          letterSpacing: "-0.04em",
+          color: "var(--brand-logo-ink, #191918)",
+          whiteSpace: "nowrap",
+          lineHeight: 1,
+        }}
+      >
+        A-CUT<span style={{ color: BRAND_ORANGE }}>.</span>
+      </span>
     </div>
   );
   if (href) {
@@ -111,25 +75,3 @@ export const BrandLogoBar = memo(function BrandLogoBar({
   }
   return inner;
 });
-
-/** 히어로 등 — 동일 락업을 더 크게 */
-export function BrandLogoFull({
-  className = "",
-  maxWidth = 280,
-  priority = false,
-}: {
-  className?: string;
-  maxWidth?: number;
-  priority?: boolean;
-}) {
-  void priority;
-  const s = { mark: 40, markFont: 22, text: 28, gap: 14 };
-  return (
-    <div className={className} style={{ maxWidth }}>
-      <div className="inline-flex items-center" style={{ gap: s.gap }} role="img" aria-label="A-CUT">
-        <LogoMark size={s.mark} fontSize={s.markFont} variant="default" />
-        <LogoWordmark fontSize={s.text} variant="default" />
-      </div>
-    </div>
-  );
-}

@@ -95,7 +95,7 @@ export default function ConfirmedPage() {
   return (
     <div className="confirmed-page">
       <header className="confirmed-brandbar">
-        <BrandLogoBar size="sm" href={token ? `/c/${token}` : undefined} variant="customerEntry" />
+        <BrandLogoBar href={token ? `/c/${token}` : undefined} />
       </header>
 
       <main className="confirmed-main">

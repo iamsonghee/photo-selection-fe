@@ -47,7 +47,7 @@ export function HeroStoryboard() {
     <div className="film-customer-scene">
     <aside className="film-context"><span>고객의 셀렉</span><h1>받은 링크에서,<br />편한 시간에 골라요.</h1><p>사진을 고르고, 사진별 요청을 남기면<br />작가에게 한 번에 전달됩니다.</p><div className="film-picked">{PICKS.map((id, index) => <div key={id} data-selected={!end && count > index}><img src={getSamplePhoto(id).originalSrc} alt="" /><span>{getSamplePhoto(id).filename}</span>{!end && count > index && <Check size={18} />}</div>)}</div><small>{detail ? COMMENT : time >= 8.15 && !end ? "선택한 사진 3장과 요청을 전달했어요." : "선택한 사진과 요청이 함께 전달돼요."}</small></aside>
     <section className="film-screen film-customer">
-      <header><BrandLogoBar variant="customerEntry" /><strong>{SAMPLE_PROJECT.name}</strong></header>
+      <header><BrandLogoBar /><strong>{SAMPLE_PROJECT.name}</strong></header>
       <div className="film-toolbar"><strong>전체 사진 <small>10</small></strong><span>마음에 드는 사진 3장을 선택해 주세요.</span></div>
       <div className="film-gallery">{IDS.map((id, index) => { const sample = getSamplePhoto(id); return <GalleryPhotoCard key={id} token="landing-sample" photo={{ id, projectId: "landing-sample", orderIndex: index, url: sample.originalSrc, originalFilename: sample.filename }} selected={!end && PICKS.slice(0, count).includes(id)} rating={RATINGS[id as keyof typeof RATINGS]} hasComment={!end && time >= 6.4 && id === REQUEST_ID} showGroupBadge={false} restCount={0} totalCount={1} selectedCount={0} isGroupExpanded={false} presignedThumb={sample.originalSrc} thumbQueue={queue} viewerQueryString="" density={2} showFilename onPhotoClick={(e) => e.preventDefault()} onCheckClick={(e) => e.preventDefault()} onGroupBadgeClick={(e) => e.preventDefault()} onRate={noop} onThumbError={noop} />; })}</div>
       <footer><span>선택 <strong>{end ? 0 : count} / 3장</strong></span><button>{!end && time >= 8.15 ? <><Check size={18} />셀렉 제출 완료</> : "셀렉 확정하기"}</button></footer>
@@ -63,7 +63,7 @@ export function HeroStoryboard() {
     {tap && <span className="film-tap" style={{ left: tap[1], top: tap[2], opacity: 1 - (time - tap[0]) / .3, transform: `translate(-50%,-50%) scale(${1 + (time - tap[0]) * 2})` }} />}
     </section></div>
     <section className="film-screen film-writer" style={{ opacity: writerOpacity }} aria-label="작가 셀렉 결과">
-      <nav className="story-sidebar"><BrandLogoBar variant="customerEntry" /><small>WORKSPACE</small><span><LayoutDashboard size={17} /> 대시보드</span><span className="story-nav-active"><FolderOpen size={17} /> 프로젝트</span><div className="story-profile">민서 스튜디오<small>작가 워크스페이스</small></div></nav>
+      <nav className="story-sidebar"><BrandLogoBar /><small>WORKSPACE</small><span><LayoutDashboard size={17} /> 대시보드</span><span className="story-nav-active"><FolderOpen size={17} /> 프로젝트</span><div className="story-profile">민서 스튜디오<small>작가 워크스페이스</small></div></nav>
       <div className="story-workspace"><header><span>프로젝트 / {SAMPLE_PROJECT.name}</span><strong><Check size={14} /> 고객 셀렉 완료</strong></header>
       <div className="story-project-heading"><div><small>고객 · 민서와 지훈</small><h1>셀렉 결과</h1></div><span>선택한 사진 <strong>3장</strong></span></div>
       <div className="film-writer-toolbar"><ProjectAssetTabs projectId="landing-sample" status="editing" activeTab="selected" originalCount={10} selectedCount={3} /><div className="story-tools"><ProjectAssetToolbarButton><Copy size={14} />파일명 복사</ProjectAssetToolbarButton><ProjectAssetToolbarButton><Download size={14} />CSV</ProjectAssetToolbarButton></div></div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronLeft, ChevronUp, LogOut, Settings } from "lucide-react";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -29,13 +29,6 @@ const sidebarSans = Inter({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
   variable: "--acb-sidebar-sans",
-  display: "swap",
-});
-
-const sidebarMono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
-  variable: "--acb-sidebar-mono",
   display: "swap",
 });
 
@@ -159,7 +152,6 @@ export function Sidebar({
         isLightRoute ? styles.rootLight : "",
         collapsed ? styles.rootCollapsed : styles.rootExpanded,
         sidebarSans.variable,
-        sidebarMono.variable,
       ].join(" ")}
       data-photographer-sidebar
       data-sidebar-theme={isLightRoute ? "light" : "dark"}
@@ -198,13 +190,13 @@ export function Sidebar({
         >
           <div
             className={styles.logoMark}
-            style={{ fontFamily: "var(--acb-sidebar-mono), ui-monospace, monospace" }}
+            style={{ fontFamily: "Pretendard, sans-serif" }}
           >
             A
           </div>
           <span
             className={[styles.logoText, collapsed ? styles.logoTextHidden : ""].filter(Boolean).join(" ")}
-            style={{ fontFamily: "var(--acb-sidebar-sans), system-ui, sans-serif" }}
+            style={{ fontFamily: "Pretendard, sans-serif" }}
           >
             A-CUT<span className={styles.logoDot}>.</span>
           </span>
