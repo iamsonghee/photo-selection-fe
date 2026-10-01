@@ -21,8 +21,8 @@ type GalleryPhotoCardProps = {
   selected: boolean;
   checkDisabled?: boolean;
   showCheck?: boolean;
-  /** 체크 자리의 동작 모양. 셀프 고객 참여자는 최종 선택 대신 본인 찜을 이 자리에서 누른다 */
-  checkVariant?: "check" | "heart";
+  /** 최종 선택을 바꿀 수 없는 사람(셀프 고객 참여자): 고른 사진에만 ✓ 표시, 빈 상자·누르기 없음 */
+  checkReadOnly?: boolean;
   /** false면 별점 줄을 그리지 않는다(셀프 고객 셀렉은 별점을 쓰지 않는다) */
   showRating?: boolean;
   recommended?: boolean;
@@ -50,15 +50,20 @@ type GalleryPhotoCardProps = {
   showFilename?: boolean;
   onPhotoClick: (e: React.MouseEvent, photoId: string) => void;
   onCheckClick: (e: React.MouseEvent, photoId: string) => void;
-  /** 주면 오른쪽 위에 보조 찜(♡) 버튼을 둔다 — 마우스를 올렸을 때만 보이고, 찜한 사진은 항상 ♥ 표시. 터치 기기에서는 표시만 한다 */
+  /** 셀프 고객 셀렉의 찜(왼쪽 아래 `♥ N`). 주면 누를 수 있고, 없으면 likeCount만 표시한다. */
   onLikeClick?: (e: React.MouseEvent, photoId: string) => void;
+  /** 내가 찜했는지(♥ 주황) */
   liked?: boolean;
+  /** 찜한 사람 수(나 포함). 1 이상이면 늘 보인다. */
+  likeCount?: number;
+  /** 마우스를 올리면 보일 찜한 사람 이름 */
+  likeNames?: string;
+  /** 찜이 메인 동작(참여자) — 터치 기기에서도 빈 ♡를 보이고 누를 수 있다 */
+  likePrimary?: boolean;
   /** true면 내가 체크로 선택하는 순간에만 체크가 톡 튀고 테두리가 번진다(해제·동기화·다시 그려질 때는 조용) */
   popOnSelect?: boolean;
   /** 선택 스타일(✓·어둡게) 없이 주황 테두리만 — 셀프 고객 셀렉의 접힌 묶음 표지에 고른 사진이 있을 때 */
   highlighted?: boolean;
-  /** 주면 찜 색 점을 이 개수까지만 그리고 나머지는 +N으로 줄인다 */
-  maxColorDots?: number;
   onGroupBadgeClick: (e: React.MouseEvent, groupId: string) => void;
   /** 셀프 고객 셀렉: 묶음 배지를 짧게(⧉ 3 / ⧉ 접기) 쓰고, 표지의 묶음 안 고른 장수는 ✓ 자리(왼쪽 위)에 보인다 */
   compactGroupBadge?: boolean;
@@ -73,7 +78,7 @@ function GalleryPhotoCardImpl({
   selected,
   checkDisabled = false,
   showCheck = true,
-  checkVariant = "check",
+  checkReadOnly = false,
   showRating = true,
   recommended = false,
   rating,
@@ -95,9 +100,11 @@ function GalleryPhotoCardImpl({
   onCheckClick,
   onLikeClick,
   liked = false,
+  likeCount = 0,
+  likeNames,
+  likePrimary = false,
   popOnSelect = false,
   highlighted = false,
-  maxColorDots,
   compactGroupBadge = false,
   onGroupBadgeClick,
   onRate,
@@ -178,15 +185,11 @@ function GalleryPhotoCardImpl({
             <MessageSquare size={13} strokeWidth={2} aria-hidden />
           </span>
         )}
-        {(maxColorDots && colorTags.length > maxColorDots ? colorTags.slice(0, maxColorDots) : colorTags).map((tag) => {
+        {colorTags.map((tag) => {
           const hex = COLOR_OPTIONS.find((c) => c.key === tag)?.hex;
           const label = colorLabel?.(tag) ?? "참가자 찜";
           return hex ? <span key={tag} className="gl-color-dot" role="img" aria-label={label} title={label} style={{ width: 7, height: 7, borderRadius: "50%", background: hex, display: "block", flexShrink: 0 }} /> : null;
         })}
-        {maxColorDots && colorTags.length > maxColorDots && (() => {
-          const rest = colorTags.slice(maxColorDots).map((tag) => colorLabel?.(tag) ?? "참가자 찜").join(", ");
-          return <span className="gl-color-more" role="img" aria-label={`외 ${colorTags.length - maxColorDots}명: ${rest}`} title={rest}>+{colorTags.length - maxColorDots}</span>;
-        })()}
       </div>
     </div>
 
@@ -227,7 +230,8 @@ function GalleryPhotoCardImpl({
           <div className="gl-card-placeholder" aria-hidden />
         )}
 
-        {showCheck && <button
+        {showCheck && checkReadOnly && selected && <span className="gl-check-box" role="img" aria-label="최종 선택"><Check size={13} strokeWidth={3} aria-hidden /></span>}
+        {showCheck && !checkReadOnly && <button
         type="button"
         onClick={(e) => {
           // className은 React가 다시 쓰므로, 애니메이션 표시는 React가 관리하지 않는 data 속성으로 단다.
@@ -241,23 +245,20 @@ function GalleryPhotoCardImpl({
           onCheckClick(e, photo.id);
         }}
         disabled={checkDisabled}
-        aria-label={checkVariant === "heart" ? (selected ? "찜 해제" : "찜하기") : selected ? "선택 해제" : "선택"}
-        aria-pressed={checkVariant === "heart" ? selected : undefined}
-        className={`gl-check-box${checkVariant === "heart" ? " gl-check-heart" : ""}`}
+        aria-label={selected ? "선택 해제" : "선택"}
+        className="gl-check-box"
       >
-        {checkVariant === "heart"
-          ? <Heart size={14} strokeWidth={2.4} fill={selected ? "currentColor" : "none"} aria-hidden />
-          : selected && <Check size={13} strokeWidth={3} aria-hidden />}
+        {selected && <Check size={13} strokeWidth={3} aria-hidden />}
         </button>}
-        {showCheck && onLikeClick && <button
-          type="button"
-          onClick={(e) => onLikeClick(e, photo.id)}
-          aria-label={liked ? "찜 해제" : "찜하기"}
-          aria-pressed={liked}
-          className={`gl-like-box gl-check-heart${liked ? " gl-liked" : ""}`}
-        >
-          <Heart size={14} strokeWidth={2.4} fill={liked ? "currentColor" : "none"} aria-hidden />
-        </button>}
+        {/* 찜: 왼쪽 아래 `♥ N` 하나 — 내가 찜했으면 주황, 숫자는 찜한 사람 수(나 포함). */}
+        {showCheck && (onLikeClick || likeCount > 0) && (() => {
+          const className = `gl-like-box${liked ? " gl-liked" : ""}${likeCount > 0 ? " gl-has-likes" : ""}${likePrimary ? " gl-like-primary" : ""}`;
+          const content = <><Heart size={13} strokeWidth={2.4} fill={liked ? "currentColor" : "none"} aria-hidden />{likeCount > 0 && <span>{likeCount}</span>}</>;
+          const label = `${liked ? "찜 해제" : "찜하기"}${likeCount > 0 ? ` · ${likeCount}명 찜` : ""}`;
+          return onLikeClick
+            ? <button type="button" onClick={(e) => onLikeClick(e, photo.id)} aria-label={label} aria-pressed={liked} title={likeNames} className={className}>{content}</button>
+            : <span role="img" aria-label={`${likeCount}명 찜`} title={likeNames} className={className}>{content}</span>;
+        })()}
         {recommended && (
           <span className="gl-recommended-badge" title="작가 추천">
             <RecommendationMark size={12} /> 작가 추천

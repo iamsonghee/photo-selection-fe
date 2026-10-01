@@ -16,7 +16,7 @@ import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import { formatSceneRange, sceneTargets } from "@/lib/customer-scenes";
-import type { ColorTag, Photo } from "@/types";
+import type { Photo } from "@/types";
 import { activeParticipants, useCustomerSelectStore } from "../../_lib/real-store";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import { ProjectStepHeader } from "../../_lib/ProjectStepHeader";
@@ -290,22 +290,24 @@ function SelectScreen() {
         token={projectId}
         href="#"
         photo={photo}
-        // 표지는 "묶음 하나"라 표지 사진의 선택 스타일(어둡게·테두리)을 쓰지 않는다 — 묶음 안 선택 수는 배지로 보인다.
-        selected={!isCover && picked.has(photo.id)}
-        highlighted={isCover && members.some((member) => picked.has(member.id))}
-        showCheck={!isCover && !(columns >= 3 && typeof window !== "undefined" && window.innerWidth <= 767)}
-        checkVariant={isOwner ? "check" : "heart"}
+        // ✓(왼쪽 위)는 최종 선택 — 소유자는 누르고, 참여자는 소유자가 고른 사진에 표시만 본다.
+        // 표지는 "묶음 하나"라 표지 사진의 선택 스타일을 쓰지 않는다 — 묶음 안 선택 수는 ✓ 자리에 `✓ M`.
+        selected={!isCover && selectedIds.has(photo.id)}
+        highlighted={isCover && members.some((member) => selectedIds.has(member.id))}
+        showCheck={!(columns >= 3 && typeof window !== "undefined" && window.innerWidth <= 767)}
+        checkReadOnly={!isOwner || isCover}
         showRating={false}
-        // 내 찜은 ♥로 보이므로 색 점은 다른 사람 것만(♥ 버튼이 없는 묶음 표지는 전부).
-        colorTags={isCover ? likesOf(photo.id) : likesOf(photo.id).filter((color) => color !== me)}
-        maxColorDots={2}
-        colorLabel={(color: ColorTag) => `${project.participantNicknames[color] || "참가자"} 찜`}
+        // 찜(왼쪽 아래 `♥ N`): 누구에게나 같은 자리·모양. 표지는 묶음 전체 찜 수를 표시만 한다.
+        liked={!isCover && myLikes.has(photo.id)}
+        likeCount={isCover ? members.reduce((sum, member) => sum + likesOf(member.id).length, 0) : likesOf(photo.id).length}
+        likeNames={isCover ? undefined : likesOf(photo.id).map((color) => color === me ? "나" : project.participantNicknames[color] || "참가자").join(", ")}
+        likePrimary={!isOwner}
         hasComment={Boolean(project.photoStates[photo.id]?.comment)}
         showGroupBadge={isCover}
         groupId={groupId}
         restCount={Math.max(0, members.length - 1)}
         totalCount={members.length}
-        selectedCount={isOwner ? members.filter((member) => picked.has(member.id)).length : 0}
+        selectedCount={members.filter((member) => selectedIds.has(member.id)).length}
         // 펼친 묶음은 첫 장에만 "⧉ 접기" 배지를 둔다.
         isGroupExpanded={isOpen && members[0]?.id === photo.id}
         inExpandedGroup={isOpen}
@@ -325,10 +327,9 @@ function SelectScreen() {
         density={columns}
         showFilename={query.trim().length > 0}
         onPhotoClick={(event) => { event.preventDefault(); setOpenPhotoId(photo.id); }}
-        onCheckClick={(event) => { event.preventDefault(); event.stopPropagation(); if (isOwner) store.toggleSelect(photo.id); else store.toggleLike(photo.id, me); }}
-        onLikeClick={isOwner && !isCover ? (event) => { event.preventDefault(); event.stopPropagation(); store.toggleLike(photo.id, me); } : undefined}
-        liked={isOwner && myLikes.has(photo.id)}
-        popOnSelect
+        onCheckClick={(event) => { event.preventDefault(); event.stopPropagation(); store.toggleSelect(photo.id); }}
+        onLikeClick={isCover ? undefined : (event) => { event.preventDefault(); event.stopPropagation(); store.toggleLike(photo.id, me); }}
+        popOnSelect={isOwner}
         onRate={() => {}}
         onThumbError={() => {}}
       />

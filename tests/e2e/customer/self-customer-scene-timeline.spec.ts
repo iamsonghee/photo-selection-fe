@@ -368,8 +368,8 @@ test("owner like sits bottom-left and quality flags stay at the top-right edge",
   await card.hover();
   const like = card.getByRole("button", { name: "찜하기" });
   const [cardBox, likeBox] = [(await card.boundingBox())!, (await like.boundingBox())!];
-  expect(likeBox.x - cardBox.x).toBeLessThan(4);
-  expect(cardBox.y + cardBox.height - (likeBox.y + likeBox.height)).toBeLessThan(4);
+  expect(likeBox.x - cardBox.x).toBeLessThan(12);
+  expect(cardBox.y + cardBox.height - (likeBox.y + likeBox.height)).toBeLessThan(12);
   await like.click();
   await page.mouse.move(0, 0);
   await expect(card.getByRole("button", { name: "찜 해제" })).toHaveAttribute("aria-pressed", "true");
@@ -413,7 +413,7 @@ test("only decided marks stay on cards: empty check shows on hover, my own like 
   await context.close();
 });
 
-test("like dots collapse to two plus a count when many people liked", async ({ browser }) => {
+test("likes show as one heart with a count; names on hover", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await loginAsPhotographer(page);
@@ -423,8 +423,16 @@ test("like dots collapse to two plus a count when many people liked", async ({ b
   await mock(page, data);
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=none`);
   const card = page.locator('.gl-photo-card[data-photo-id="p5"]');
-  await expect(card.locator(".gl-color-dot")).toHaveCount(2);
-  await expect(card.getByRole("img", { name: /^외 1명/ })).toHaveText("+1");
+  await page.mouse.move(0, 0);
+  // 색 점 대신 왼쪽 아래 `♥ 3` — 찜이 있으면 마우스 없이도 보인다.
+  const chip = card.getByRole("button", { name: "찜하기 · 3명 찜" });
+  await expect(chip).toHaveText("3");
+  await expect(chip).toHaveCSS("opacity", "1");
+  await expect(chip).toHaveAttribute("title", "엄마, 아빠, 언니");
+  await expect(card.locator(".gl-color-dot")).toHaveCount(0);
+  // 내가 찜하면 4로 늘고 주황으로 채워진다.
+  await chip.click();
+  await expect(card.getByRole("button", { name: "찜 해제 · 4명 찜" })).toHaveText("4");
   await context.close();
 });
 
