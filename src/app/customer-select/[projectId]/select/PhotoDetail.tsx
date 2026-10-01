@@ -12,6 +12,8 @@ import type { ColorTag, Photo } from "@/types";
 import s from "./select.module.css";
 
 const MEMO_SAVE_DELAY_MS = 600;
+// 필름 띠는 ‹ › 순서 그대로, 지금 사진 앞뒤 이만큼만 그린다(장면·전체 목록이 수천 장일 수 있다).
+const STRIP_RADIUS = 7;
 
 export type Person = { id: ColorTag; name: string; hex: string };
 
@@ -46,6 +48,16 @@ export function PhotoDetail({
   const selected = selectedIds.has(photoId);
   const [zoomed, setZoomed] = useState(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const stripStart = Math.max(0, Math.min(index - STRIP_RADIUS, photos.length - (STRIP_RADIUS * 2 + 1)));
+  // 띠에서 연달아 붙은 같은 유사컷은 한 덩어리로 묶어 보여준다.
+  const stripRuns: Photo[][] = [];
+  for (const item of photos.slice(stripStart, stripStart + STRIP_RADIUS * 2 + 1)) {
+    const last = stripRuns.at(-1);
+    if (last && item.similarityGroupId && last[0].similarityGroupId === item.similarityGroupId) last.push(item);
+    else stripRuns.push([item]);
+  }
+  const currentThumbRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => { currentThumbRef.current?.scrollIntoView({ block: "nearest", inline: "center" }); }, [photoId]);
 
   const go = useCallback((step: number) => {
     const next = photos[index + step];
@@ -139,16 +151,25 @@ export function PhotoDetail({
           {index < photos.length - 1 && <PrevNextButton direction="next" size="lg" align="edge" className={s.detailNav} onClick={() => go(1)} />}
           {quality && <span className={s.quality}>⚠ {quality} · 직접 확인해 주세요</span>}
         </div>
-        {similar.length > 1 && (
+        {/* 필름 띠 = ‹ › 로 넘기는 순서 그대로. PC는 항상, 모바일은 비슷한 사진을 볼 때만(세로 공간이 좁다). */}
+        {photos.length > 1 && (desktop || similar.length > 1) && (
           <div className={s.strip}>
-            <span>비슷한 사진 {similar.length}장</span>
             <div className={s.stripRow}>
-              {similar.map((member) => (
-                <button key={member.id} type="button" aria-current={member.id === photoId} aria-label={`${getPhotoDisplayName(member)} 보기`} onClick={() => onPhotoChange(member.id)}>
-                  <img src={member.url} alt="" draggable={false} />
-                  {selectedIds.has(member.id) && <i><Check size={11} strokeWidth={3} /></i>}
-                </button>
-              ))}
+              {stripRuns.map((run) => {
+                const thumbs = run.map((member) => (
+                  <button key={member.id} ref={member.id === photoId ? currentThumbRef : undefined} type="button" aria-current={member.id === photoId} aria-label={`${getPhotoDisplayName(member)} 보기`} onClick={() => onPhotoChange(member.id)}>
+                    <img src={member.url} alt="" draggable={false} loading="lazy" />
+                    {selectedIds.has(member.id) && <i><Check size={11} strokeWidth={3} /></i>}
+                  </button>
+                ));
+                if (run.length < 2) return thumbs;
+                return (
+                  <div key={run[0].id} className={s.stripGroup} data-current={run.some((member) => member.id === photoId)}>
+                    <div>{thumbs}</div>
+                    <span>비슷한 사진 {similarOf(run[0]).length}장</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

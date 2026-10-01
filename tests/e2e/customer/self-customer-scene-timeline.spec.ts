@@ -257,5 +257,14 @@ test("detail view walks through photos folded into a similar-cut group", async (
   const count = page.locator('[class*="detailCount"]');
   await expect(count).toContainText("8 / 30");
   for (const n of [9, 10, 11]) { await page.keyboard.press("ArrowRight"); await expect(count).toContainText(`${n} / 30`); }
+
+  // 하단 필름 띠도 ‹ › 와 같은 순서(묶음 밖 사진 포함)이고, 유사컷은 띠 위에서 묶음으로 표시된다.
+  const strip = page.locator('[class*="stripRow"]');
+  await expect(strip.getByRole("button", { name: "S_10.jpg 보기" })).toHaveAttribute("aria-current", "true");
+  await expect(strip.getByRole("button", { name: "S_3.jpg 보기" })).toBeVisible();
+  await expect(strip.getByRole("button", { name: "S_17.jpg 보기" })).toBeVisible();
+  await expect(strip.locator('[class*="stripGroup"]').filter({ hasText: "비슷한 사진 3장" })).toHaveCount(2);
+  await strip.getByRole("button", { name: "S_16.jpg 보기" }).click();
+  await expect(count).toContainText("17 / 30");
   await context.close();
 });

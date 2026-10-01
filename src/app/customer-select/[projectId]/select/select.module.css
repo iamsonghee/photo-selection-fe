@@ -140,8 +140,14 @@
 .detailImage img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
 .quality { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 6px 12px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .strip { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 0 16px 14px; }
-.strip > span { color: rgba(255, 255, 255, 0.64); font-size: 12px; font-weight: 600; }
-.stripRow { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.stripRow { display: flex; align-items: flex-start; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+/* 띠 위의 유사컷 묶음: 테두리로 감싸고 아래에 "비슷한 사진 N장". 지금 보는 사진이 든 묶음은 강조색. */
+.stripGroup { flex: none; display: flex; flex-direction: column; gap: 4px; padding: 3px; border: 1.5px solid rgba(255, 255, 255, 0.28); border-radius: 9px; }
+.stripRow > button { margin-top: 4.5px; } /* 묶음 테두리(1.5px)+안쪽 여백(3px)만큼 내려 썸네일 높이를 맞춘다 */
+.stripGroup > div { display: flex; gap: 4px; }
+.stripGroup > span { color: rgba(255, 255, 255, 0.64); font-size: 11px; font-weight: 600; text-align: center; white-space: nowrap; }
+.stripGroup[data-current="true"] { border-color: var(--accent); }
+.stripGroup[data-current="true"] > span { color: #fff; }
 .stripRow button { position: relative; flex: none; width: 56px; height: 56px; padding: 0; border: 2px solid transparent; border-radius: 6px; overflow: hidden; background: rgba(255, 255, 255, 0.08); cursor: pointer; }
 .stripRow button[aria-current="true"] { border-color: #fff; }
 .stripRow img { width: 100%; height: 100%; object-fit: cover; display: block; }
