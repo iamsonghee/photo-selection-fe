@@ -66,3 +66,32 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
     await context.close();
   });
 }
+
+test("desktop: scrolling pauses at a scene boundary and passes after pulling further", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  const gallery = page.locator('[class*="selectGallery"]').first();
+  await expect(page.locator("[data-photo-id]").first()).toBeVisible();
+  const box = (await gallery.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+
+  // 천천히 내리면 경계 카드가 화면에 다 보이는 순간 멈춘다(카드 하단 = 화면 하단선 16px 위).
+  const holding = page.locator("[data-holding]");
+  await expect.poll(async () => { await page.mouse.wheel(0, 80); return holding.count(); }, { timeout: 15_000 }).toBe(1);
+  const card = (await page.locator("[data-holding] [data-boundary-card]").boundingBox())!;
+  expect(Math.round(box.y + box.height - (card.y + card.height))).toBe(16);
+  const heldTop = await gallery.evaluate((element) => element.scrollTop);
+
+  // 멈춘 동안 조금 더 내리면 스크롤은 그대로이고 진행선(--pull)만 차오른다.
+  await page.mouse.wheel(0, 20);
+  await expect.poll(async () => Number(await holding.evaluate((element) => getComputedStyle(element).getPropertyValue("--pull")))).toBeGreaterThan(0);
+  expect(await gallery.evaluate((element) => element.scrollTop)).toBe(heldTop);
+
+  // 충분히 더 내리면 다음 장면으로 넘어간다.
+  await expect.poll(async () => { await page.mouse.wheel(0, 80); return page.url(); }, { timeout: 10_000 }).toMatch(/scene=1/);
+  await expect(holding).toHaveCount(0);
+  await context.close();
+});

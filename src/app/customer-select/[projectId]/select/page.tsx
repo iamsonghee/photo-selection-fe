@@ -83,6 +83,7 @@ function SelectScreen() {
   const initialSection = inTimeline && Number(sceneParam) >= 0 && Number(sceneParam) < scenes!.length ? Number(sceneParam) : null;
   const [currentSection, setCurrentSection] = useState(initialSection ?? 0);
   const [jump, setJump] = useState<{ section: number; nonce: number } | null>(null);
+  const [focus, setFocus] = useState<{ photoId: string; nonce: number } | null>(null);
   const sectionOf = useMemo(() => new Map((scenes ?? []).flatMap((scene, index) => scene.photoIds.map((id) => [id, index] as const))), [scenes]);
 
   const scenePhotos = useMemo(
@@ -319,7 +320,12 @@ function SelectScreen() {
       <div className={s.boundaryCard}>
         <p className={`${s.boundaryDone} ${count ? "" : s.muted}`}>{count ? <CheckCircle2 size={16} aria-hidden /> : null}{done}</p>
         {next ? (
-          <div className={s.boundaryNext}><span>다음 장면</span><strong>{sceneTitle(next)}</strong><span>{sceneSub(next)}</span><ArrowDown size={16} aria-hidden /></div>
+          <>
+            <div className={s.boundaryNext}><span>다음 장면</span><strong>{sceneTitle(next)}</strong><span>{sceneSub(next)}</span><ArrowDown size={16} aria-hidden /></div>
+            {/* 멈춘 채 더 내리면 진행선이 차오르고, 다 차면 다음 장면으로 넘어간다(TimelineGrid가 --pull 값을 준다). */}
+            <div className={s.boundaryPull} aria-hidden><i /></div>
+            <p className={s.boundaryHint} aria-hidden>계속 내리면 {sceneTitle(next)}(으)로 넘어가요</p>
+          </>
         ) : (
           <div className={s.boundaryEnd}>
             <span>마지막 장면이에요 · 전체 {pickedTotal}장 {isOwner ? "선택" : "찜"}</span>
@@ -419,6 +425,7 @@ function SelectScreen() {
                   empty={<><strong>조건에 맞는 사진이 없어요</strong><span>보기 조건을 바꿔보세요.</span><button type="button" onClick={() => { setScope("all"); setQuery(""); }}>전체 보기</button></>}
                   initialSection={initialSection}
                   jump={jump}
+                  focus={focus}
                   onSectionChange={(index) => {
                     setCurrentSection(index);
                     // 지금 보는 장면을 주소에 조용히 남겨 새로고침·뒤로가기 때 같은 장면으로 돌아온다.
@@ -444,7 +451,14 @@ function SelectScreen() {
           photos={filtered.some((photo) => photo.id === openPhotoId) ? filtered : photos}
           photoId={openPhotoId}
           onPhotoChange={setOpenPhotoId}
-          onClose={() => setOpenPhotoId(null)}
+          onClose={() => {
+            // 마지막으로 본 사진이 접힌 유사컷 안에 있으면 그 묶음의 표지 위치로 돌아간다.
+            const last = photoById.get(openPhotoId);
+            const target = visible.some((photo) => photo.id === openPhotoId) ? openPhotoId
+              : visible.find((photo) => last?.similarityGroupId && photo.similarityGroupId === last.similarityGroupId)?.id;
+            if (target) setFocus({ photoId: target, nonce: Date.now() });
+            setOpenPhotoId(null);
+          }}
           isOwner={isOwner}
           myColor={me}
           people={people}

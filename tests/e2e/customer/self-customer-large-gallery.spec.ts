@@ -171,7 +171,11 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
     await expect(page.getByRole("dialog", { name: "PHOTO_0002.jpg 상세 보기" })).toBeVisible();
     await page.getByRole("button", { name: "이전 사진" }).click();
     await expect(page.getByRole("dialog", { name: "PHOTO_0001.jpg 상세 보기" })).toBeVisible();
+    // 상세에서 한참 넘겨 본 뒤 닫으면 마지막으로 본 사진이 화면에 오도록 목록이 따라간다(작가 고객 갤러리와 같은 규칙).
+    for (let i = 0; i < 120; i++) await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("dialog", { name: "PHOTO_0121.jpg 상세 보기" })).toBeVisible();
     await page.keyboard.press("Escape");
+    await expect.poll(() => visiblePhotoIds(page)).toContain("p0121");
   }
 
   await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight * 0.63 }));
