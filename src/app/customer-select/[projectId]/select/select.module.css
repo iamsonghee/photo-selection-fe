@@ -3,7 +3,6 @@
 .page { min-height: 0; flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); }
 
 /* ── 상단: 프로젝트·단계·참여자 ── */
-.topBar { flex: none; display: flex; align-items: center; gap: 16px; padding: 10px 32px; border-bottom: 1px solid var(--border-subtle); background: var(--surface); }
 .titleBlock { min-width: 0; display: flex; align-items: center; gap: 8px; }
 .backLink { flex: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; color: var(--muted-foreground); }
 .backLink:hover { background: var(--surface-raised); color: var(--foreground); }
@@ -18,6 +17,9 @@ a.step:hover { background: var(--surface-raised); color: var(--foreground); }
 .people::-webkit-scrollbar { display: none; }
 .inviteButton { flex: none; height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--foreground); display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .inviteButton:hover { border-color: var(--border-strong); }
+
+.headerTitle { min-width: 0; display: flex; align-items: center; gap: 8px; }
+.mobilePeople { display: none; }
 
 /* ── 장면 머리글·도구 ── */
 .sceneHeader { flex: none; display: flex; align-items: center; gap: 12px; padding: 12px 32px 8px; background: var(--surface); }
@@ -122,10 +124,11 @@ a.step:hover { background: var(--surface-raised); color: var(--foreground); }
 .shortcutHint { color: var(--subtle-foreground); font-size: 11px; text-align: center; }
 
 @media (max-width: 767px) {
-  .topBar { gap: 8px; padding: 6px 12px 6px 8px; flex-wrap: wrap; }
   .title { font-size: 15px; }
   .steps { display: none; }
-  .people { order: 3; width: 100%; margin-left: 0; padding: 0 4px 4px; }
+  .backLink { margin-left: -6px; }
+  .mobilePeople { display: block; flex: none; padding: 8px 20px 4px; background: var(--surface); }
+  .mobilePeople .people { margin-left: 0; }
   .sceneHeader { padding: 10px 20px 6px; }
   .sceneMeta { display: none; }
   .tools { padding: 0 20px 8px; }

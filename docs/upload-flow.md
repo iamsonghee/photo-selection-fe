@@ -11,6 +11,13 @@
 먼저 안내한다. 예상 남은 시간은 첫 배치 완료 후 최근 3개 배치의 `압축+전송` 실측 시간과 장수를
 가중 평균해 분 단위로 표시한다. 새로고침을 넘는 업로드 큐 영속화는 하지 않는다.
 
+장면 구분용 촬영 시각: 브라우저 압축(canvas 재인코딩)이 EXIF를 지우므로, 각 배치를 압축하기 **전에**
+원본 파일 앞 256KB에서 JPEG EXIF `DateTimeOriginal`(없으면 IFD0 `DateTime`, 그것도 없거나 HEIC 등이면
+원본 `File.lastModified`)을 읽는다(`src/lib/exif-taken-at.ts`). 값은 시간대 없는 카메라 현지 시각
+`YYYY-MM-DDTHH:mm:ss`이며 `files`와 같은 순서의 JSON 배열로 `taken_at` 폼 필드에 실어 보낸다. BE는
+형식이 맞는 값만 `customer_photos.taken_at`(timestamp, 시간대 없음)에 저장하고, 틀린 값은 버릴 뿐
+업로드를 실패시키지 않는다(`_parse_taken_at`). 2026-10-01 이전 사진은 NULL이다.
+
 파일 선택·드롭·재시도 전에 FE는 서버의 계정 전체 사진 수를 다시 조회한다. 전체 선택이 남은 한도를
 초과하면 업로드하지 않고 장수를 안내해 재선택을 요청한다. BE도 요청 배치 전체를 검사해 초과 시
 `403 limit_exceeded`로 거절하며 일부 파일을 자동으로 업로드하지 않는다. FE 상수는

@@ -191,7 +191,7 @@ function SelectScreen() {
         groupId={groupId}
         restCount={Math.max(0, members.length - 1)}
         totalCount={members.length}
-        selectedCount={members.filter((member) => picked.has(member.id)).length}
+        selectedCount={isOwner ? members.filter((member) => picked.has(member.id)).length : 0}
         isGroupExpanded={Boolean(groupId && expanded.has(groupId))}
         inExpandedGroup={Boolean(groupId && expanded.has(groupId) && members.length > 1)}
         presignedThumb={photo.url}
@@ -211,7 +211,7 @@ function SelectScreen() {
   const scopeChips: { value: Scope; label: string; show: boolean }[] = [
     { value: "all", label: "전체", show: true },
     { value: "picked", label: isOwner ? "✓ 고른 사진" : "✓ 최종 선택", show: true },
-    { value: "mine", label: "♡ 내 찜", show: isOwner },
+    { value: "mine", label: "♡ 내 찜", show: true },
     { value: "popular", label: "찜 2명 이상", show: people.length > 1 },
     { value: "quality", label: "흔들림·눈 감음 의심", show: hasQuality },
   ];
@@ -251,22 +251,26 @@ function SelectScreen() {
   })();
 
   return (
-    <CustomerSelectShell viewportLocked compactHeader>
-      <div className={s.page}>
-        <div className={s.topBar}>
+    <CustomerSelectShell
+      viewportLocked
+      compactHeader
+      compactTitle={<div className={s.headerTitle}>
           <div className={s.titleBlock}>
-            {isOwner && <Link href={scene ? `/customer-select/${projectId}/select` : "/customer-select"} className={s.backLink} aria-label={scene ? "장면 목록으로" : "내 프로젝트로"} onClick={(event) => { if (scene) { event.preventDefault(); goScene(null, "replace"); } }}><ArrowLeft size={18} /></Link>}
-            <h1 className={s.title}>{project.name || "이름 없는 프로젝트"}</h1>
-          </div>
-          {isOwner && (
-            <nav className={s.steps} aria-label="진행 단계">
-              <Link className={s.step} href={`/customer-select/${projectId}/upload`}>올리기</Link>
-              <span className={`${s.step} ${s.stepCurrent}`} aria-current="step">고르기</span>
-              <Link className={s.step} href={`/customer-select/${projectId}/review`}>보내기</Link>
-            </nav>
-          )}
-          {peopleBar}
+          {isOwner && <Link href={scene ? `/customer-select/${projectId}/select` : "/customer-select"} className={s.backLink} aria-label={scene ? "장면 목록으로" : "내 프로젝트로"} onClick={(event) => { if (scene) { event.preventDefault(); goScene(null, "replace"); } }}><ArrowLeft size={18} /></Link>}
+          <h1 className={s.title}>{project.name || "이름 없는 프로젝트"}</h1>
         </div>
+        {isOwner && (
+          <nav className={s.steps} aria-label="진행 단계">
+            <Link className={s.step} href={`/customer-select/${projectId}/upload`}>올리기</Link>
+            <span className={`${s.step} ${s.stepCurrent}`} aria-current="step">고르기</span>
+            <Link className={s.step} href={`/customer-select/${projectId}/review`}>보내기</Link>
+          </nav>
+        )}
+      </div>}
+      headerMeta={peopleBar}
+    >
+      <div className={s.page}>
+        <div className={s.mobilePeople}>{peopleBar}</div>
 
         {syncStatus === "offline" && <div role="status" className="border-b border-danger/20 bg-danger/8 px-5 py-2 text-center text-xs font-semibold text-danger">연결이 불안정해요. 다시 연결하고 있어요.</div>}
         {saveError && <div role="alert" className="flex items-center gap-2 border-b border-danger/20 bg-danger/8 px-5 py-2 text-xs font-semibold text-danger"><span className="flex-1">{saveError}</span><button type="button" onClick={clearSaveError}>닫기</button></div>}
@@ -333,7 +337,7 @@ function SelectScreen() {
       {sheet === "scenes" && scenes && <Sheet title="장면" onClose={() => setSheet(null)}><div className={s.sheetList}>{sceneList}</div><button type="button" className={s.textLink} onClick={() => { setSheet(null); goScene(null, "replace"); }}>장면 한눈에 보기</button></Sheet>}
       {sheet === "invite" && <InviteSheet projectId={projectId} shareToken={project.shareToken} shareEnabled={project.shareEnabled} people={people} online={online} done={project.participantDone} onClose={() => setSheet(null)} />}
 
-      {people.length > 1 && <EphemeralChat channelKey={project.realtimeKey} currentIdentity={me} nicknames={project.participantNicknames} hasRecipient={project.onlineParticipants?.some((color) => color !== me) ?? false} elevated={Boolean(openPhotoId)} />}
+      {people.length > 1 && !openPhotoId && <EphemeralChat channelKey={project.realtimeKey} currentIdentity={me} nicknames={project.participantNicknames} hasRecipient={project.onlineParticipants?.some((color) => color !== me) ?? false} elevated={Boolean(openPhotoId)} />}
 
       {openPhotoId && (
         <PhotoDetail
