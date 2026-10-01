@@ -131,21 +131,27 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
   await page.waitForTimeout(300);
   await sample();
 
+  const options = page.getByRole("button", { name: "보기 옵션" });
   if (viewport === "mobile") {
-    await page.getByRole("button", { name: /한 줄에 2장/ }).click();
+    await options.click();
+    await page.getByRole("button", { name: "한 줄에 3장" }).click();
     await page.waitForTimeout(250);
-    await page.getByRole("button", { name: /한 줄에 3장/ }).click();
+    await page.getByRole("button", { name: "한 줄에 4장" }).click();
+    await page.keyboard.press("Escape");
   }
   // 흐림(137번째마다 15장) + 눈 감음(211번째마다 10장), 첫 사진이 겹쳐 24장
   // 빼기를 켜고 "따로 보기"로 뺀 사진만 모아 본 뒤, 전체로 돌아와 빼기를 끈다.
-  await page.getByRole("button", { name: "흔들림·눈 감음 빼기" }).click();
+  await options.click();
+  await page.getByRole("switch", { name: /흔들림·눈 감음 빼기/ }).click();
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "따로 보기" }).click();
   await expect(page.locator("[data-photo-id]")).toHaveCount(24);
   await page.getByRole("button", { name: "전체", exact: true }).click();
-  await page.getByRole("button", { name: /흔들림·눈 감음 \d+장 빼는 중/ }).click();
+  await page.getByRole("button", { name: "끄기" }).click();
   await page.waitForTimeout(250);
   await sample();
 
+  await page.getByRole("button", { name: "파일명 검색 열기" }).click();
   const search = page.getByRole("searchbox", { name: "파일명 검색" });
   await search.fill("PHOTO_1999.jpg");
   const targetCard = page.locator('[data-photo-id="p1999"]');
@@ -153,7 +159,9 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
   await expect(page.locator("[data-photo-id]")).toHaveCount(1);
   if (viewport === "mobile") {
     // 3열 이상에서는 체크 버튼 대신 상태만 보여주므로 2열로 돌아와 고른다.
-    await page.getByRole("button", { name: /한 줄에 4장/ }).click();
+    await options.click();
+    await page.getByRole("button", { name: "한 줄에 2장" }).click();
+    await page.keyboard.press("Escape");
   }
   await targetCard.getByRole("button", { name: "선택" }).click();
   const selectedCheck = targetCard.getByRole("button", { name: "선택 해제" });

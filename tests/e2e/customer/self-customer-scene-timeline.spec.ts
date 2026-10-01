@@ -248,7 +248,9 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   await loginAsPhotographer(page);
   await mock(page);
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
-  await expect(page.getByRole("button", { name: "유사컷 묶기" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "보기 옵션" }).click();
+  await expect(page.getByRole("switch", { name: /유사컷 묶기/ })).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("Escape");
   // 묶음 표지의 사진을 누르면(펼치지 않고) 바로 상세가 열린다. 펼치기는 ⧉ 배지로만 한다.
   const cover = page.locator('.gl-photo-card[data-photo-id="p8"]');
   await expect(cover.getByRole("button", { name: "유사컷 3장 펼치기" })).toBeVisible();
@@ -260,25 +262,32 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   await expect(page.locator('.gl-photo-card[data-photo-id="p9"]')).toHaveCount(0);
 
   // 흔들림·눈 감음 빼기: 첫 장면(30장)의 의심 5장(흔들림 3 + 눈 감음 2)을 갤러리에서 뺀다(묶음을 끄고 전체에서).
-  await page.getByRole("button", { name: "유사컷 묶기" }).click();
+  await page.getByRole("button", { name: "보기 옵션" }).click();
+  await page.getByRole("switch", { name: /유사컷 묶기/ }).click();
   await expect(page.locator("[data-photo-id]")).toHaveCount(30);
-  await page.getByRole("button", { name: "흔들림·눈 감음 빼기" }).click();
-  await expect(page.getByRole("button", { name: "흔들림·눈 감음 5장 빼는 중" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("switch", { name: /흔들림·눈 감음 빼기/ }).click();
+  await expect(page.getByRole("switch", { name: /흔들림·눈 감음 빼기/ })).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("Escape");
+  await expect(page.locator('[class*="toolsNote"]')).toContainText("5장 빼고 보는 중");
+  // 켠 옵션 수가 보기 옵션 버튼에 보인다(유사컷 묶기 끔 · 빼기 켬 = 1).
+  await expect(page.getByRole("button", { name: "보기 옵션" })).toHaveText("1");
   await expect(page.locator("[data-photo-id]")).toHaveCount(25);
   await expect(page.locator(".gl-quality-badge")).toHaveCount(0);
   // 따로 보기: 뺀 사진만 모아 보고, 칩 위에 이유가 붙어 있다.
   await page.getByRole("button", { name: "따로 보기" }).click();
   await expect(page.locator("[data-photo-id]")).toHaveCount(5);
   await expect(page.locator(".gl-quality-badge")).toHaveCount(5);
-  await expect(page.getByLabel("눈 감음 의심")).toHaveCount(2);
+  await expect(page.getByLabel("눈 감음 의심", { exact: true })).toHaveCount(2);
   // 다시 켠 채로 들어와도 기억한다(기기별 보기 설정).
   await page.reload();
-  await expect(page.getByRole("button", { name: /흔들림·눈 감음 \d+장 빼는 중/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('[class*="toolsNote"]')).toContainText("빼고 보는 중");
 
   // 정리 전(none)에는 가짜 결과가 붙지 않는다.
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=none`);
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "유사컷 묶기" })).toHaveCount(0);
+  await page.getByRole("button", { name: "보기 옵션" }).click();
+  await expect(page.getByRole("switch", { name: /유사컷 묶기/ })).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: /유사컷 \d+장 펼치기/ })).toHaveCount(0);
   await expect(page.locator(".gl-quality-badge")).toHaveCount(0);
   await context.close();
@@ -383,13 +392,17 @@ test("set-aside never hides a photo that is already picked", async ({ browser })
   await loginAsPhotographer(page);
   await mock(page);
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
-  await page.getByRole("button", { name: "유사컷 묶기" }).click();
+  await page.getByRole("button", { name: "보기 옵션" }).click();
+  await page.getByRole("switch", { name: /유사컷 묶기/ }).click();
+  await page.keyboard.press("Escape");
   // p5(흔들림 의심)를 먼저 고른 뒤 빼기를 켜면 p5는 남는다.
   await page.locator('.gl-photo-card[data-photo-id="p5"]').getByRole("button", { name: "선택", exact: true }).click();
-  await page.getByRole("button", { name: "흔들림·눈 감음 빼기" }).click();
+  await page.getByRole("button", { name: "보기 옵션" }).click();
+  await page.getByRole("switch", { name: /흔들림·눈 감음 빼기/ }).click();
+  await page.keyboard.press("Escape");
   await expect(page.locator('.gl-photo-card[data-photo-id="p5"]')).toBeVisible();
-  await expect(page.getByRole("button", { name: "흔들림·눈 감음 4장 빼는 중" })).toBeVisible();
-  await page.getByRole("button", { name: /빼는 중/ }).click();
+  await expect(page.locator('[class*="toolsNote"]')).toContainText("4장 빼고 보는 중");
+  await page.getByRole("button", { name: "끄기" }).click();
   await context.close();
 });
 
@@ -497,5 +510,35 @@ test("an expanded group stays together even when its photos are not consecutive 
   expect(y8).toBe(y9);
   expect(y9).toBe(y10);
   await expect(page.locator('[class*="groupBand"]')).toHaveCount(1);
+  await context.close();
+});
+
+test("filter bar: scope segments with counts, like scope menu, and scene progress", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  const data = project();
+  data.participantNicknames = { red: "소유자", blue: "엄마" } as typeof data.participantNicknames;
+  data.photoStates = { p3: { color: ["blue"] }, p4: { color: ["blue", "red"] }, p40: { color: ["red"] } } as typeof data.photoStates;
+  await mock(page, data);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=none&scene=0`);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  const scopes = page.getByRole("group", { name: "보기 범위" });
+  // 지금 장면(30장) 기준: 누구든 찜 2장(p3·p4), 고른 사진 2장(p1·p2).
+  await expect(scopes.getByRole("button", { name: "전체", exact: true })).toContainText("30");
+  await expect(scopes.getByRole("button", { name: "♥ 찜한 사진" })).toContainText("2");
+  await expect(scopes.getByRole("button", { name: "✓ 고른 사진" })).toContainText("2");
+  await scopes.getByRole("button", { name: "♥ 찜한 사진" }).click();
+  await expect(page.locator(".gl-photo-card[data-photo-id]")).toHaveCount(2);
+  // ▾ 메뉴에서 내 찜(p4)·2명 이상(p4)으로 좁힌다.
+  await scopes.getByRole("button", { name: "찜 범위 바꾸기" }).click();
+  await page.getByRole("menuitemradio", { name: /내 찜/ }).click();
+  await expect(scopes.getByRole("button", { name: "♡ 내 찜" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".gl-photo-card[data-photo-id]")).toHaveCount(1);
+  // 장면 목록: 장면마다 ♥ 찜 수 · ✓ 고른 수/목표.
+  const rail = page.getByRole("navigation", { name: "장면" }).first();
+  await expect(rail.getByRole("button", { name: /식전·신부 대기실/ })).toContainText("♥2");
+  await expect(rail.getByRole("button", { name: /식전·신부 대기실/ })).toContainText("✓2/3");
+  await expect(rail.getByRole("button", { name: /입장/ })).toContainText("♥1");
   await context.close();
 });

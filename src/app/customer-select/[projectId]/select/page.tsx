@@ -7,9 +7,9 @@
  * 역할마다 메인 동작은 하나다: 소유자는 ✓ 보정 받기, 참여자는 ♡ 찜.
  * 격자는 고르는 곳, 상세는 고민하는 곳. 유사컷 묶음 표지는 바로 고르지 않고 펼쳐서 비교한다.
  */
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowDown, ChevronUp, Grid2x2, Layers, MessageCircle, PanelLeftClose, PanelLeftOpen, Plus, Sparkles } from "lucide-react";
+import { ArrowDown, ChevronDown, ChevronUp, MessageCircle, PanelLeftClose, PanelLeftOpen, Plus, Search, SlidersHorizontal, Sparkles } from "lucide-react";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
@@ -31,7 +31,8 @@ import { useSceneAnalysis, type NamedScene } from "./useSceneAnalysis";
 import { AiTidySheet, groupSimilarKey, setAsideKey, type AiTidyKind } from "./AiTidySheet";
 import s from "./select.module.css";
 
-type Scope = "all" | "picked" | "mine" | "popular" | "quality";
+type Scope = "all" | "picked" | "liked" | "mine" | "popular" | "quality";
+const LIKE_SCOPES: readonly Scope[] = ["liked", "mine", "popular"];
 
 /** AI가 흔들림(흐림) 또는 눈 감음을 의심한 사진. 의도적인 컷일 수 있어 지우지 않고 뒤로만 뺀다. */
 const isFlagged = (photo: Photo) => Boolean(photo.isBlurry || (photo.faceDetected && photo.eyesClosed));
@@ -61,6 +62,18 @@ function SelectScreen() {
     try { localStorage.setItem(setAsideKey(projectId), on ? "1" : "0"); } catch {}
   };
   const [query, setQuery] = useState("");
+  // 툴바 위에 뜨는 작은 메뉴(찜 범위 ▾, 보기 옵션)와 검색 입력창. 바깥을 누르면 메뉴가 닫힌다.
+  const [menu, setMenu] = useState<"like" | "options" | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const toolsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (event: PointerEvent) => { if (!toolsRef.current?.contains(event.target as Node)) setMenu(null); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setMenu(null); };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", onKey); };
+  }, [menu]);
   // 배지(⧉ N)로 펼친 유사컷 묶음. 장면을 바꾸거나 묶기를 다시 켜면 접는다.
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [mobileColumns, setMobileColumns] = useState<MobileColumns>(2);
@@ -124,6 +137,7 @@ function SelectScreen() {
     const text = query.trim().toLowerCase();
     return scenePhotos.filter((photo) => {
       if (scope === "picked" && !selectedIds.has(photo.id)) return false;
+      if (scope === "liked" && !likesOf(photo.id).length) return false;
       if (scope === "mine" && !myLikes.has(photo.id)) return false;
       if (scope === "popular" && likesOf(photo.id).length < 2) return false;
       if (scope === "quality" && !isFlagged(photo)) return false;
@@ -225,9 +239,13 @@ function SelectScreen() {
 
   // AI 장면은 이름이 제목, 시간대는 보조 정보. 이름이 없으면(시간 장면) 시간대가 제목이다.
   const sceneTitle = (item: NamedScene) => item.name ?? (scenes && scenes.length > 1 ? formatSceneRange(item) : "전체 사진");
+  // 장면별 진행: 찜 수(누구든) → 최종 선택 수/목표. 참여자는 내 찜 수만.
+  const likedInScene = (item: NamedScene) => item.photoIds.filter((id) => likesOf(id).length > 0).length;
   const sceneCount = (index: number) => {
     const count = pickedInScene(scenes![index]);
-    return isOwner ? `${count}${targets[index] ? `/${targets[index]}` : ""}` : count ? `♡${count}` : "";
+    if (!isOwner) return count ? `♥${count}` : "";
+    const liked = likedInScene(scenes![index]);
+    return `${liked ? `♥${liked} · ` : ""}✓${count}${targets[index] ? `/${targets[index]}` : ""}`;
   };
   const sceneDone = (index: number) => isOwner && targets[index] > 0 && pickedInScene(scenes![index]) >= targets[index];
 
@@ -260,7 +278,9 @@ function SelectScreen() {
   const sceneItems = scenes?.map((item, index) => (
     <button key={index} type="button" className={s.quickItem} aria-current={index === sceneIndex} onClick={() => goScene(index)}>
       <span>{sceneTitle(item)}</span>
-      <em className={sceneDone(index) ? s.done : ""}>{sceneCount(index)}</em>
+      {isOwner
+        ? <em className={s.sceneProgress}>{likedInScene(item) > 0 && <i>♥{likedInScene(item)}</i>}<b className={sceneDone(index) ? s.done : ""}>✓{pickedInScene(item)}{targets[index] ? `/${targets[index]}` : ""}</b></em>
+        : <em>{sceneCount(index)}</em>}
     </button>
   ));
 
@@ -336,14 +356,16 @@ function SelectScreen() {
     );
   };
 
-  const scopeChips: { value: Scope; label: string; show: boolean }[] = [
-    { value: "all", label: "전체", show: true },
-    { value: "picked", label: isOwner ? "✓ 고른 사진" : "✓ 최종 선택", show: true },
-    { value: "mine", label: "♡ 내 찜", show: true },
-    { value: "popular", label: "찜 2명 이상", show: people.length > 1 },
-    // 의심 사진만 모아 보기는 "빼기" 칩 옆 "따로 보기"로 들어오고, 켜져 있는 동안만 칩으로 보인다.
-    { value: "quality", label: "흔들림·눈 감음 의심만", show: scope === "quality" },
+  // 보기 범위: 붙어 있는 탭 하나(전체 · 찜 ▾ · 고른 사진) — 지금 장면 기준 장수. 찜 세부 범위는 ▾ 메뉴에서.
+  const countIn = (test: (photo: Photo) => boolean) => scenePhotos.filter(test).length;
+  const likeOptions: { value: Scope; label: string; menuLabel: string; count: number; show: boolean }[] = [
+    { value: "liked", label: "♥ 찜한 사진", menuLabel: "누구든 찜", count: countIn((photo) => likesOf(photo.id).length > 0), show: true },
+    { value: "mine", label: "♡ 내 찜", menuLabel: "내 찜", count: countIn((photo) => myLikes.has(photo.id)), show: true },
+    { value: "popular", label: "찜 2명 이상", menuLabel: "2명 이상 찜", count: countIn((photo) => likesOf(photo.id).length >= 2), show: people.length > 1 },
   ];
+  const likeActive = LIKE_SCOPES.includes(scope);
+  const likeOption = likeOptions.find((option) => option.value === (likeActive ? scope : "liked"))!;
+  const optionCount = (hasGroups && grouped ? 1 : 0) + (hasQuality && setAside ? 1 : 0);
 
   // 장면 끝의 얇은 안내: 다음 장면 이름(당기면 넘어간다는 신호), 마지막 장면이면 보내기.
   const sceneFooter = scene ? (nextScene
@@ -410,13 +432,62 @@ function SelectScreen() {
                   : analysis.status === "none" && isOwner && photos.length > 0 && <button type="button" className={s.aiButton} onClick={() => { setAiError(null); setSheet("ai"); }}><Sparkles size={14} />AI로 장면 정리</button>}
               </div>
             )}
-            <div className={s.tools} style={sceneMode || analysisBanner ? { paddingTop: 10 } : undefined}>
-              {scopeChips.filter((chip) => chip.show).map((chip) => <button key={chip.value} type="button" className={s.chip} aria-pressed={scope === chip.value} onClick={() => setScope(chip.value)}>{chip.label}</button>)}
-              {hasQuality && <button type="button" className={s.chip} aria-pressed={setAside} onClick={() => toggleSetAside(!setAside)}>{setAside && setAsideCount ? `흔들림·눈 감음 ${setAsideCount}장 빼는 중` : "흔들림·눈 감음 빼기"}</button>}
-              {setAside && setAsideCount > 0 && <button type="button" className={s.textLink} style={{ alignSelf: "center" }} onClick={() => setScope("quality")}>따로 보기</button>}
-              {hasGroups && <button type="button" className={s.chip} aria-pressed={grouped} onClick={() => { setGrouped((value) => !value); setExpanded(new Set()); }}><Layers size={13} />유사컷 묶기</button>}
-              <input className={s.search} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="파일명 검색" aria-label="파일명 검색" />
-              <button type="button" className={`${s.chip} ${s.columnsButton}`} aria-label={`한 줄에 ${mobileColumns}장 — 바꾸기`} onClick={() => setMobileColumns((value) => (value === 4 ? 2 : value + 1) as MobileColumns)}><Grid2x2 size={13} />{mobileColumns}열</button>
+            <div className={s.toolsWrap} ref={toolsRef}>
+              <div className={s.toolsAnchor}>
+              <div className={s.tools} style={sceneMode || analysisBanner ? { paddingTop: 10 } : undefined}>
+                <div className={s.segments} role="group" aria-label="보기 범위">
+                  <button type="button" aria-pressed={scope === "all"} aria-label="전체" onClick={() => setScope("all")}>전체<b>{scenePhotos.length}</b></button>
+                  <span className={s.segmentSplit}>
+                    <button type="button" aria-pressed={likeActive} aria-label={likeOption.label} onClick={() => setScope(likeOption.value)}>{likeOption.label}<b>{likeOption.count}</b></button>
+                    <button type="button" className={s.segmentCaret} aria-label="찜 범위 바꾸기" aria-haspopup="menu" aria-expanded={menu === "like"} onClick={() => setMenu(menu === "like" ? null : "like")}><ChevronDown size={14} /></button>
+                  </span>
+                  <button type="button" aria-pressed={scope === "picked"} aria-label={isOwner ? "✓ 고른 사진" : "✓ 최종 선택"} onClick={() => setScope("picked")}>{isOwner ? "✓ 고른 사진" : "✓ 최종 선택"}<b>{countIn((photo) => selectedIds.has(photo.id))}</b></button>
+                  {scope === "quality" && <button type="button" aria-pressed aria-label="흔들림·눈 감음 의심만" onClick={() => setScope("all")}>흔들림·눈 감음 의심만<b>{filtered.length}</b></button>}
+                </div>
+                <span className={s.toolsSpacer} />
+                {searchOpen || query
+                  ? <input className={s.search} type="search" value={query} autoFocus onChange={(event) => setQuery(event.target.value)} onBlur={() => { if (!query) setSearchOpen(false); }} placeholder="파일명 검색" aria-label="파일명 검색" />
+                  : <button type="button" className={s.iconTool} aria-label="파일명 검색 열기" title="파일명 검색" onClick={() => setSearchOpen(true)}><Search size={16} /></button>}
+                <button type="button" className={s.iconTool} aria-label="보기 옵션" title="보기 옵션" aria-haspopup="dialog" aria-expanded={menu === "options"} onClick={() => setMenu(menu === "options" ? null : "options")}>
+                  <SlidersHorizontal size={16} />{optionCount > 0 && <i>{optionCount}</i>}
+                </button>
+              </div>
+              {menu === "like" && (
+                <div className={`${s.toolsMenu} ${s.toolsMenuLeft}`} role="menu" aria-label="찜 범위">
+                  {likeOptions.filter((option) => option.show).map((option) => (
+                    <button key={option.value} type="button" role="menuitemradio" aria-checked={likeOption.value === option.value && likeActive} onClick={() => { setScope(option.value); setMenu(null); }}>
+                      <span>{option.menuLabel}</span><b>{option.count}</b>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {menu === "options" && (
+                <div className={s.toolsMenu} role="dialog" aria-label="보기 옵션">
+                  {hasGroups && (
+                    <button type="button" role="switch" aria-checked={grouped} className={s.switchRow} onClick={() => { setGrouped((value) => !value); setExpanded(new Set()); }}>
+                      <span><strong>유사컷 묶기</strong><small>비슷한 사진을 한 장으로 접어 보여요</small></span><i aria-hidden />
+                    </button>
+                  )}
+                  {hasQuality && (
+                    <button type="button" role="switch" aria-checked={setAside} className={s.switchRow} onClick={() => toggleSetAside(!setAside)}>
+                      <span><strong>흔들림·눈 감음 빼기</strong><small>AI가 의심한 사진을 갤러리에서 빼요(고른 사진은 남겨요)</small></span><i aria-hidden />
+                    </button>
+                  )}
+                  <div className={s.columnsRow}>
+                    <strong>한 줄에</strong>
+                    {([2, 3, 4] as MobileColumns[]).map((count) => <button key={count} type="button" aria-label={`한 줄에 ${count}장`} aria-pressed={mobileColumns === count} onClick={() => setMobileColumns(count)}>{count}</button>)}
+                  </div>
+                  {!hasGroups && !hasQuality && <p className={s.toolsMenuEmpty}>AI로 정리하면 유사컷 묶기·흔들림 빼기를 쓸 수 있어요</p>}
+                </div>
+              )}
+              </div>
+              {setAside && setAsideCount > 0 && (
+                <p className={s.toolsNote}>
+                  <span>흔들림·눈 감음 <strong>{setAsideCount}장</strong> 빼고 보는 중</span>
+                  <button type="button" onClick={() => setScope("quality")}>따로 보기</button>
+                  <button type="button" onClick={() => toggleSetAside(false)}>끄기</button>
+                </p>
+              )}
             </div>
             <SceneGrid
               key={sceneMode ? `scene-${sceneIndex}` : "all"}

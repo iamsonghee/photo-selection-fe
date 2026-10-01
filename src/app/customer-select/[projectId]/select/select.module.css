@@ -14,12 +14,49 @@
 .sceneHeader { flex: none; display: flex; align-items: center; gap: 12px; padding: 12px 32px 8px; background: var(--surface); }
 .tools { flex: none; display: flex; align-items: center; gap: 6px; padding: 0 32px 10px; background: var(--surface); border-bottom: 1px solid var(--border-subtle); overflow-x: auto; scrollbar-width: none; }
 .tools::-webkit-scrollbar { display: none; }
-.chip { flex: none; height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
-.chip:hover { border-color: var(--border-strong); color: var(--foreground); }
-.chip[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); color: var(--accent); }
-.search { flex: 0 1 220px; min-width: 120px; height: 32px; margin-left: auto; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--foreground); font: inherit; font-size: 12px; outline: none; }
+.search { flex: 0 1 220px; min-width: 120px; height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--foreground); font: inherit; font-size: 12px; outline: none; }
 .search:focus { border-color: var(--accent); }
-.columnsButton { display: none; }
+/* 툴바: 보기 범위(붙어 있는 탭) · 오른쪽 아이콘(검색·보기 옵션). 메뉴는 가로 스크롤에 잘리지 않게 바깥 틀 기준으로 띄운다. */
+.toolsWrap { flex: none; position: relative; z-index: 5; }
+.toolsAnchor { position: relative; }
+.toolsSpacer { flex: 1 1 auto; }
+.segments { flex: none; display: inline-flex; align-items: stretch; height: 34px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); overflow: hidden; }
+.segments button { height: 100%; padding: 0 13px; border: 0; border-left: 1px solid var(--border-subtle); background: none; color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.segments > button:first-child { border-left: 0; }
+.segments button b { color: var(--subtle-foreground); font-weight: 700; font-variant-numeric: tabular-nums; }
+.segments button:hover { color: var(--foreground); }
+.segments button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 9%, var(--surface)); color: var(--accent); }
+.segments button[aria-pressed="true"] b { color: var(--accent); }
+.segmentSplit { display: inline-flex; }
+.segmentSplit .segmentCaret { padding: 0 9px 0 4px; border-left: 0; }
+.segmentSplit:has(button[aria-pressed="true"]) .segmentCaret { background: color-mix(in srgb, var(--accent) 9%, var(--surface)); color: var(--accent); }
+.iconTool { position: relative; flex: none; width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted-foreground); display: grid; place-items: center; cursor: pointer; }
+.iconTool:hover, .iconTool[aria-expanded="true"] { border-color: var(--border-strong); color: var(--foreground); }
+.iconTool i { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 800; font-style: normal; line-height: 16px; }
+.toolsMenu { position: absolute; top: calc(100% - 4px); right: 32px; width: 280px; padding: 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgba(2, 56, 82, 0.16); display: flex; flex-direction: column; gap: 2px; }
+.toolsMenuLeft { right: auto; left: 32px; width: 200px; }
+.toolsMenu > button { width: 100%; min-height: 40px; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--foreground); display: flex; align-items: center; justify-content: space-between; gap: 10px; font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
+.toolsMenu > button:hover { background: var(--surface-raised); }
+.toolsMenu > button[aria-checked="true"][role="menuitemradio"] { color: var(--accent); }
+.toolsMenu > button b { color: var(--subtle-foreground); font-weight: 700; }
+.switchRow span { display: flex; flex-direction: column; gap: 2px; }
+.switchRow small { color: var(--muted-foreground); font-size: 11px; font-weight: 500; }
+.switchRow i { flex: none; position: relative; width: 34px; height: 20px; border-radius: 999px; background: var(--border-strong); transition: background-color 140ms ease; }
+.switchRow i::after { content: ""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); transition: transform 140ms ease; }
+.switchRow[aria-checked="true"] i { background: var(--accent); }
+.switchRow[aria-checked="true"] i::after { transform: translateX(14px); }
+.columnsRow { display: none; align-items: center; gap: 6px; padding: 8px 10px; font-size: 13px; }
+.columnsRow strong { flex: 1; font-weight: 600; }
+.columnsRow button { width: 34px; height: 30px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted-foreground); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.columnsRow button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.toolsMenuEmpty { margin: 0; padding: 8px 10px; color: var(--muted-foreground); font-size: 12px; }
+.toolsNote { margin: 0; padding: 7px 32px; background: color-mix(in srgb, var(--warning, #ffb800) 10%, var(--surface)); border-bottom: 1px solid var(--border-subtle); color: var(--foreground); display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.toolsNote button { padding: 0; border: 0; background: none; color: var(--muted-foreground); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+/* 장면 목록의 진행: ♥ 찜 수 · ✓ 고른 수/목표 */
+.sceneProgress { display: inline-flex; gap: 6px; }
+.sceneProgress i { font-style: normal; color: var(--subtle-foreground); }
+.sceneProgress b { font-weight: 600; }
+.sceneProgress b.done { color: var(--success); }
 
 /* ── AI 장면 정리 상태 ── */
 .analysis { flex: none; display: flex; align-items: flex-start; gap: 10px; margin: 12px 32px 0; padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--primary) 9%, var(--surface)); color: var(--foreground); }
@@ -217,7 +254,11 @@
   .sceneHeader { padding: 10px 20px 6px; }
   .tools { padding: 0 20px 8px; }
   .search { flex-basis: 140px; }
-  .columnsButton { display: inline-flex; }
+  .columnsRow { display: flex; }
+  .segments button { padding: 0 11px; }
+  .toolsMenu { left: 12px; right: 12px; width: auto; }
+  .toolsMenuLeft { right: auto; width: 200px; }
+  .toolsNote { padding: 7px 20px; }
   .analysis { margin: 10px 20px 0; flex-wrap: wrap; }
   .analysisActions { width: 100%; padding-left: 26px; }
   .rail, .floatNav { display: none; }
