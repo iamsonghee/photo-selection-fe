@@ -550,3 +550,36 @@ test("filter bar: scope segments with counts, like scope menu, and scene progres
   await expect(rail.getByRole("button", { name: /입장/ })).toContainText("♥1");
   await context.close();
 });
+
+test("real AI scenes: named scenes from the server, new photos collected, re-tidy sends the scene catalog", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  const data = project() as ReturnType<typeof project> & { aiScenes?: unknown };
+  // 서버 장면 2개(p0~p29 입장, p30~p59 예식) — p60~p89는 정리 뒤 새로 올린 사진이라 어느 장면에도 없다.
+  data.aiScenes = [
+    { name: "입장", start: data.photos[0].takenAt, end: data.photos[29].takenAt, photoIds: data.photos.slice(0, 30).map((photo) => photo.id) },
+    { name: "예식", start: data.photos[30].takenAt, end: data.photos[59].takenAt, photoIds: data.photos.slice(30, 60).map((photo) => photo.id) },
+  ];
+  await mock(page, data);
+  const started: unknown[] = [];
+  await page.route(`**/api/customer-select/projects/${PROJECT_ID}/ai/*`, async (route) => {
+    if (route.request().method() === "POST") { started.push(route.request().postDataJSON()); return route.fulfill({ json: { status: "processing" } }); }
+    return route.fulfill({ json: { status: "completed" } });
+  });
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=off`);
+  const rail = page.getByRole("navigation", { name: "장면" }).first();
+  await expect(rail.getByRole("button", { name: /^입장/ })).toBeVisible();
+  await expect(rail.getByRole("button", { name: /^예식/ })).toBeVisible();
+  await expect(rail.getByRole("button", { name: /^새로 올린 사진/ })).toBeVisible();
+
+  await page.getByRole("button", { name: "보기 옵션" }).click();
+  const retidy = page.getByRole("button", { name: /AI 다시 정리/ });
+  await expect(retidy).toContainText("새로 올린 30장");
+  await retidy.click();
+  await page.getByRole("button", { name: "정리 시작" }).click();
+  await expect.poll(() => started.length).toBeGreaterThan(0);
+  const similarity = started.find((body) => Array.isArray((body as { sceneNames?: unknown }).sceneNames)) as { sceneNames: string[] };
+  expect(similarity.sceneNames).toContain("식전·신부 대기실");
+  await context.close();
+});

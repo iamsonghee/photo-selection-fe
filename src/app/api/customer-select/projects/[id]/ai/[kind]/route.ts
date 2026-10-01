@@ -5,6 +5,14 @@ import { resolveCustomerProjectAccess, shareTokenFromRequest } from "@/lib/custo
 const CLIP_SERVICE_URL = process.env.CLIP_SERVICE_URL ?? "";
 const CLIP_INTERNAL_TOKEN = process.env.CLIP_INTERNAL_TOKEN ?? "";
 
+/** 촬영 종류의 장면 이름 목록(FE 카탈로그). 형식이 맞지 않으면 버리고 이름 없이 장면만 만든다. */
+async function sceneNamesFrom(req: NextRequest): Promise<string[] | undefined> {
+  const body = await req.json().catch(() => null) as { sceneNames?: unknown } | null;
+  const names = body?.sceneNames;
+  if (!Array.isArray(names) || names.length === 0 || names.length > 30) return undefined;
+  return names.every((name) => typeof name === "string" && name.length > 0 && name.length <= 40) ? names as string[] : undefined;
+}
+
 async function authorize(req: NextRequest, id: string) {
   return resolveCustomerProjectAccess(getAdminClient(), id, shareTokenFromRequest(req, id));
 }
@@ -19,7 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const res = await fetch(`${CLIP_SERVICE_URL}/analyze/customer/${kind}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Internal-Token": CLIP_INTERNAL_TOKEN },
-    body: JSON.stringify({ project_id: id }),
+    body: JSON.stringify({ project_id: id, scene_names: kind === "similarity" ? await sceneNamesFrom(req) : undefined }),
   });
   return new Response(await res.text(), { status: res.status, headers: { "Content-Type": "application/json" } });
 }

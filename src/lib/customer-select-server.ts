@@ -162,6 +162,23 @@ export function toPhoto(row: CustomerPhotoRow, projectId: string, quality?: Cust
   };
 }
 
+/** AI 장면(clip-service가 촬영 시각 공백으로 나누고 이름을 붙여 저장). photoIds는 촬영 시각순. */
+export type AiScene = { name: string | null; start: string | null; end: string | null; photoIds: string[] };
+type CustomerSceneRow = { id: string; scene_index: number; name: string | null; start_at: string | null; end_at: string | null };
+
+export function toAiScenes(scenes: CustomerSceneRow[], assignments: { id: string; scene_id: string | null }[], photos: CustomerPhotoRow[]): AiScene[] | null {
+  if (!scenes.length) return null;
+  const photoById = new Map(photos.map((photo) => [photo.id, photo]));
+  const order = (id: string) => photoById.get(id);
+  return scenes.slice().sort((a, b) => a.scene_index - b.scene_index).map((scene) => ({
+    name: scene.name,
+    start: scene.start_at,
+    end: scene.end_at,
+    photoIds: assignments.filter((row) => row.scene_id === scene.id && photoById.has(row.id)).map((row) => row.id)
+      .sort((a, b) => (order(a)!.taken_at ?? "￿").localeCompare(order(b)!.taken_at ?? "￿") || order(a)!.order_index - order(b)!.order_index),
+  }));
+}
+
 /** mock-store.tsx의 MockProject 형태와 최대한 맞춰서, 화면 컴포넌트를 그대로 재사용한다. */
 export function buildProjectView(
   project: CustomerProjectRow,
@@ -169,7 +186,8 @@ export function buildProjectView(
   selections: CustomerSelectionRow[],
   participants: CustomerParticipantRow[],
   quality: CustomerQualityRow[] = [],
-  opinions: CustomerParticipantOpinionRow[] = []
+  opinions: CustomerParticipantOpinionRow[] = [],
+  aiScenes: AiScene[] | null = null,
 ) {
   const collaboration = buildCustomerCollaborationState(selections, participants, opinions);
   const qualityByPhoto = new Map(quality.map((row) => [row.photo_id, row]));
@@ -199,5 +217,6 @@ export function buildProjectView(
     realtimeKey: createHash("sha256").update(project.share_token).digest("hex"),
     shareToken: project.share_token,
     shareEnabled: project.sharing_enabled,
+    aiScenes,
   };
 }

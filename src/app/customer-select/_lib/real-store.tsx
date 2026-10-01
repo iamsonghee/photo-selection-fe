@@ -45,6 +45,8 @@ export interface ProjectView {
   lastDeliveredAt?: string | null;
   shareToken: string;
   shareEnabled: boolean;
+  /** AI 장면(이름 포함). 아직 정리 전이거나 장면을 만들 근거가 없으면 null. */
+  aiScenes?: { name: string | null; start: string | null; end: string | null; photoIds: string[] }[] | null;
 }
 
 type CollaborationState = Pick<ProjectView, "selectedIds" | "photoStates" | "participantOpinions" | "participantDone" | "participantNicknames" | "onlineParticipants" | "participantViews" | "exported" | "deliveryCount" | "lastDeliveredAt">;

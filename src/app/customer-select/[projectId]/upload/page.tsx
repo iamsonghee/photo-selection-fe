@@ -29,7 +29,7 @@ import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAsset
 import type { Photo, PhotoGroupInfo } from "@/types";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import { ProjectStepHeader } from "../../_lib/ProjectStepHeader";
-import { AiTidySheet, type AiTidyKind } from "../select/AiTidySheet";
+import { AiTidySheet, startAiTidy, type AiTidyKind } from "../select/AiTidySheet";
 import { useCustomerSelectStore } from "../../_lib/real-store";
 import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
 
@@ -307,7 +307,7 @@ export default function CustomerUploadPage() {
     setAiStarting(true);
     setAiSheetError(null);
     try {
-      const responses = await Promise.all(kinds.map((kind) => fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`, { method: "POST" })));
+      const responses = await startAiTidy(projectId, kinds, project.shootType);
       if (!responses.some((response) => response.ok)) throw new Error("AI 정리를 시작하지 못했어요. 잠시 후 다시 시도하거나 원본 그대로 골라 주세요.");
       setAiSheet(null);
       setAiCompleted(false);

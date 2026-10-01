@@ -1,11 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { customerSceneCatalog } from "@/lib/customer-shoot-scenes";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { Sheet } from "./Sheets";
 import s from "./select.module.css";
 
 export type AiTidyKind = "similarity" | "quality";
+
+/** AI 정리 시작. 유사컷 분석은 이어서 장면도 만들므로 촬영 종류의 장면 이름 목록을 함께 보낸다. */
+export function startAiTidy(projectId: string, kinds: AiTidyKind[], shootType: string) {
+  return Promise.all(kinds.map((kind) => fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(kind === "similarity" ? { sceneNames: customerSceneCatalog(shootType) } : {}),
+  })));
+}
 
 /** "비슷한 사진 묶기"를 끈 사람은 고르기 화면을 묶지 않은 상태로 시작한다(기기별 보기 설정). */
 export const groupSimilarKey = (projectId: string) => `ps:self-select-group-similar:${projectId}`;

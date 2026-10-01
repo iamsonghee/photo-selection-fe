@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { buildProjectView, resolveCustomerProjectAccess, shareTokenFromRequest } from "@/lib/customer-select-server";
+import { buildProjectView, toAiScenes, resolveCustomerProjectAccess, shareTokenFromRequest } from "@/lib/customer-select-server";
 import { createClient } from "@/lib/supabase/server";
 import { isCustomerShootType as isProjectShootType } from "@/lib/customer-shoot-scenes";
 
@@ -24,7 +24,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (photosRes.error || selectionsRes.error || participantsRes.error || qualityRes.error || opinionsRes.error) {
     return NextResponse.json({ error: "조회 실패" }, { status: 500 });
   }
-  const projectView = buildProjectView(project, photosRes.data ?? [], selectionsRes.data ?? [], participantsRes.data ?? [], qualityRes.data ?? [], opinionsRes.data ?? []);
+  // AI 장면은 따로 읽고, 읽지 못하면(장면 테이블 마이그레이션 전 등) 장면 없이 내려준다 — 프로젝트 조회는 깨지지 않는다.
+  const [scenesRes, sceneAssignmentsRes] = await Promise.all([
+    admin.from("customer_scenes").select("id, scene_index, name, start_at, end_at").eq("project_id", id),
+    admin.from("customer_photos").select("id, scene_id").eq("project_id", id).not("scene_id", "is", null),
+  ]);
+  const aiScenes = scenesRes.error || sceneAssignmentsRes.error ? null : toAiScenes(scenesRes.data ?? [], sceneAssignmentsRes.data ?? [], photosRes.data ?? []);
+  const projectView = buildProjectView(project, photosRes.data ?? [], selectionsRes.data ?? [], participantsRes.data ?? [], qualityRes.data ?? [], opinionsRes.data ?? [], aiScenes);
   if (!access.isOwner) projectView.shareToken = "";
   return NextResponse.json(
     { project: projectView, isOwner: access.isOwner },

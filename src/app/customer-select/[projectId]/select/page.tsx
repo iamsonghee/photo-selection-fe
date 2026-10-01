@@ -103,7 +103,7 @@ function SelectScreen() {
     try { localStorage.setItem(railCollapsedKey, collapsed ? "1" : "0"); } catch {}
   };
 
-  const analysis = useSceneAnalysis(projectId, project.photos, project.shootType);
+  const analysis = useSceneAnalysis(projectId, project.photos, project.shootType, project.aiScenes, store.refresh);
   const photos = analysis.photos;
   const photoById = useMemo(() => new Map(photos.map((photo) => [photo.id, photo])), [photos]);
   const scenes = analysis.scenes;
@@ -478,6 +478,12 @@ function SelectScreen() {
                     {([2, 3, 4] as MobileColumns[]).map((count) => <button key={count} type="button" aria-label={`한 줄에 ${count}장`} aria-pressed={mobileColumns === count} onClick={() => setMobileColumns(count)}>{count}</button>)}
                   </div>
                   {!hasGroups && !hasQuality && <p className={s.toolsMenuEmpty}>AI로 정리하면 유사컷 묶기·흔들림 빼기를 쓸 수 있어요</p>}
+                  {isOwner && (analysis.status === "ready" || analysis.status === "fallback") && (
+                    <button type="button" className={s.retidyRow} onClick={() => { setMenu(null); setAiError(null); setSheet("ai"); }}>
+                      <span><strong>AI 다시 정리</strong><small>{analysis.newPhotoCount ? `새로 올린 ${analysis.newPhotoCount}장까지 장면·유사컷을 다시 나눠요` : "장면·유사컷을 다시 나눠요. 고른 사진·찜·메모는 그대로예요"}</small></span>
+                      <Sparkles size={15} aria-hidden />
+                    </button>
+                  )}
                 </div>
               )}
               </div>
