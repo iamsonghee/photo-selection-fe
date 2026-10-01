@@ -1,208 +1,217 @@
 "use client";
 
-/** S7 — 최종 검토. */
-import { useEffect, useState } from "react";
+/**
+ * 셀프 고객 ③ 작가에게 보내기.
+ * 주요 행동(결과 링크 보내기)을 위에 두고, 확인할 점은 막지 않고 링크로만 안내한다.
+ * 결과 링크는 항상 최신 선택을 보여주므로 보내기가 선택을 잠그거나 상태를 바꾸지 않는다.
+ */
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronDown, ChevronLeft, ChevronUp, FileSpreadsheet, FileText } from "lucide-react";
+import { AlertTriangle, Copy, FileSpreadsheet, FileText, MessageSquare, Send } from "lucide-react";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
-import { PhotoFocusOverlay } from "@/components/customer/PhotoFocusOverlay";
-import { PhotoThumbnailFrame } from "@/components/ui/PhotoThumbnailFrame";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import { csvEscape, downloadTextFile, sanitizeFilenamePart } from "@/lib/text-file-download";
-import {
-  activeParticipants,
-  bothDone,
-  requestedPhotoIds,
-  tasteMatchPct,
-  useCustomerSelectStore,
-} from "../../_lib/real-store";
+import { formatSceneRange, splitScenes } from "@/lib/customer-scenes";
+import type { Photo } from "@/types";
+import { activeParticipants, useCustomerSelectStore } from "../../_lib/real-store";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
-import ui from "../../_lib/ui.module.css";
+import { ProjectStepHeader } from "../../_lib/ProjectStepHeader";
+import { PhotoDetail } from "../select/PhotoDetail";
+import s from "./review.module.css";
 
-const INITIAL_VISIBLE_PHOTOS = 10;
+type Notice = { key: string; text: string; href?: string };
 
-function buildExportText(
-  selected: { id: string; name: string }[],
-  comments: Record<string, string | undefined>
-): string {
-  const lines = [`[선택 사진 ${selected.length}장]`];
-  selected.forEach(({ id, name }) => {
-    const comment = comments[id];
-    lines.push(comment ? `${name} — ${comment}` : name);
-  });
-  return lines.join("\n");
-}
-
-export default function CustomerReviewPage() {
-  const params = useParams();
-  const projectId = params.projectId as string;
+export default function CustomerSendPage() {
+  const projectId = useParams().projectId as string;
   const router = useRouter();
-  const { project, hydrated, isOwner, currentIdentity, syncStatus } = useCustomerSelectStore();
-  const [focusIndex, setFocusIndex] = useState<number | null>(null);
-  const [showAllSelected, setShowAllSelected] = useState(false);
-  const [linkCopyState, setLinkCopyState] = useState<"idle" | "loading" | "ok" | "fail">("idle");
+  const store = useCustomerSelectStore();
+  const { project, hydrated, isOwner, currentIdentity: me, syncStatus } = store;
+  const [linkState, setLinkState] = useState<"idle" | "loading" | "copied" | "shared" | "fail">("idle");
+  const [listCopied, setListCopied] = useState(false);
+  // 상세를 연 동안에는 목록을 고정한다 — 상세에서 선택을 빼도 앞뒤 이동이 흔들리지 않게.
+  const [detail, setDetail] = useState<{ photos: Photo[]; id: string } | null>(null);
 
   useEffect(() => {
     if (hydrated && !isOwner) router.replace(`/customer-select/${projectId}/select`);
   }, [hydrated, isOwner, projectId, router]);
 
-  const selected = project.photos.filter((p) => project.selectedIds.includes(p.id));
-  const collapseSelected = selected.length > INITIAL_VISIBLE_PHOTOS;
-  const visibleSelected = showAllSelected || !collapseSelected ? selected : selected.slice(0, INITIAL_VISIBLE_PHOTOS);
-  const requested = requestedPhotoIds(project);
-  const match = tasteMatchPct(project);
-  const reviewMeta = [requested.length > 0 ? `전달 메모 ${requested.length.toLocaleString()}장` : "", match !== null ? `취향 일치 ${match}%` : ""].filter(Boolean).join(" · ");
-  const done = bothDone(project);
-  const waiting = activeParticipants(project).filter((p) => p.id !== currentIdentity && !project.participantDone[p.id]);
-  const exportSelection = selected.map((photo) => ({ id: photo.id, name: getPhotoDisplayName(photo) }));
-  const comments = Object.fromEntries(project.photos.map(({ id }) => [id, project.photoStates[id]?.comment]));
-  const exportText = buildExportText(exportSelection, comments);
-  const exportBaseName = `${sanitizeFilenamePart(project.name || "사진셀렉")}_selections`;
+  const selectedIds = useMemo(() => new Set(project.selectedIds), [project.selectedIds]);
+  const selected = useMemo(() => project.photos.filter((photo) => selectedIds.has(photo.id)), [project.photos, selectedIds]);
+  const scenes = useMemo(() => splitScenes(project.photos), [project.photos]);
+  const people = useMemo(() => activeParticipants(project), [project]);
+  const memoOf = (id: string) => project.photoStates[id]?.comment?.trim() ?? "";
+  const memoCount = selected.filter((photo) => memoOf(photo.id)).length;
 
-  async function copyResultLink() {
-    setLinkCopyState("loading");
+  const sections = useMemo(() => {
+    if (!scenes || scenes.length < 2) return [{ title: "", sceneIndex: null as number | null, photos: selected }];
+    return scenes.map((scene, index) => ({
+      title: formatSceneRange(scene),
+      sceneIndex: index,
+      photos: scene.photoIds.filter((id) => selectedIds.has(id)).flatMap((id) => project.photos.find((photo) => photo.id === id) ?? []),
+    })).filter((section) => section.photos.length);
+  }, [project.photos, scenes, selected, selectedIds]);
+
+  const notices = useMemo<Notice[]>(() => {
+    const list: Notice[] = [];
+    const selectHref = (scene?: number) => `/customer-select/${projectId}/select${scene === undefined ? "" : `?scene=${scene}`}`;
+    if (scenes && scenes.length > 1) scenes.forEach((scene, index) => {
+      if (!scene.photoIds.some((id) => selectedIds.has(id))) list.push({ key: `scene-${index}`, text: `${formatSceneRange(scene)} 장면에서 아직 고르지 않았어요`, href: selectHref(index) });
+    });
+    const byGroup = new Map<string, Photo[]>();
+    selected.forEach((photo) => { if (photo.similarityGroupId) byGroup.set(photo.similarityGroupId, [...(byGroup.get(photo.similarityGroupId) ?? []), photo]); });
+    const multi = Array.from(byGroup.values()).filter((members) => members.length > 1);
+    const multiScene = scenes?.findIndex((scene) => multi.length > 0 && scene.photoIds.includes(multi[0][0].id)) ?? -1;
+    if (multi.length) list.push({ key: "multi", text: `비슷한 사진 묶음 ${multi.length}곳에서 2장 이상 골랐어요`, href: selectHref(multiScene >= 0 ? multiScene : undefined) });
+    const suspect = selected.filter((photo) => photo.isBlurry || (photo.faceDetected && photo.eyesClosed));
+    if (suspect.length) list.push({ key: "quality", text: `흔들림·눈 감음 의심 사진 ${suspect.length}장이 들어 있어요` });
+    const waiting = people.filter((person) => person.id !== me && !project.participantDone[person.id]);
+    if (waiting.length) list.push({ key: "waiting", text: `${waiting.map((person) => person.name).join(", ")}님이 아직 고르는 중이에요` });
+    return list;
+  }, [me, people, project.participantDone, projectId, scenes, selected, selectedIds]);
+
+  if (!hydrated || !isOwner) return <SystemLoadingScreen title="보낼 사진을 불러오고 있어요" homeHref="/customer-select" />;
+
+  const target = project.target;
+  const diff = selected.length - target;
+  const summary = !target || !selected.length ? "" : diff === 0 ? `약속한 ${target}장과 같아요` : `약속한 ${target}장보다 ${Math.abs(diff)}장 ${diff > 0 ? "많아요" : "적어요"}`;
+  const listText = [`[${project.name || "사진 셀렉"}] 선택 사진 ${selected.length}장`, ...selected.map((photo) => memoOf(photo.id) ? `${getPhotoDisplayName(photo)} — ${memoOf(photo.id)}` : getPhotoDisplayName(photo))].join("\n");
+  const baseName = `${sanitizeFilenamePart(project.name || "사진셀렉")}_selections`;
+  const canSend = selected.length > 0 && syncStatus === "connected" && linkState !== "loading";
+
+  async function resultUrl() {
+    const response = await fetch(`/api/customer-select/projects/${projectId}/result-link`);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.url) throw new Error(result.error || "결과 링크를 만들지 못했어요.");
+    return `${window.location.origin}${result.url}`;
+  }
+
+  async function sendLink(mode: "share" | "copy") {
+    setLinkState("loading");
     try {
-      const response = await fetch(`/api/customer-select/projects/${projectId}/result-link`);
-      const result = await response.json();
-      if (!response.ok || !result.url) throw new Error(result.error || "결과 링크를 만들지 못했습니다.");
-      await navigator.clipboard.writeText(`${window.location.origin}${result.url}`);
-      setLinkCopyState("ok");
+      const url = await resultUrl();
+      if (mode === "share" && navigator.share) {
+        try {
+          await navigator.share({ title: `${project.name} 선택 결과`, text: `선택한 사진 ${selected.length}장과 요청 사항이에요.`, url });
+          setLinkState("shared");
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") { setLinkState("idle"); return; }
+          await navigator.clipboard.writeText(url);
+          setLinkState("copied");
+        }
+      } else {
+        await navigator.clipboard.writeText(url);
+        setLinkState("copied");
+      }
     } catch {
-      setLinkCopyState("fail");
+      setLinkState("fail");
     }
-    setTimeout(() => setLinkCopyState("idle"), 2000);
+    setTimeout(() => setLinkState("idle"), 2500);
   }
 
-  function handleDownloadCsv() {
-    const rows = exportSelection.map(({ id, name }) => [csvEscape(name), csvEscape(comments[id] ?? "")].join(","));
-    downloadTextFile(`${exportBaseName}.csv`, ["파일명,작가 전달 메모", ...rows].join("\n"), "text/csv;charset=utf-8");
-  }
-
-  function handleDownloadTxt() {
-    downloadTextFile(`${exportBaseName}.txt`, exportSelection.map(({ name }) => name).join("\n"), "text/plain;charset=utf-8");
-  }
-
-  // 하이드레이션 전 첫 프레임 — real-store.tsx 참고(서버/클라이언트 렌더 불일치 방지).
-  if (!hydrated || !isOwner) {
-    return <SystemLoadingScreen title="셀렉 결과를 불러오고 있어요" homeHref="/customer-select" />;
+  async function copyList() {
+    try { await navigator.clipboard.writeText(listText); } catch { window.prompt("아래 내용을 복사해 주세요", listText); }
+    setListCopied(true);
+    setTimeout(() => setListCopied(false), 2000);
   }
 
   return (
-    <>
-    <CustomerSelectShell
-      navigation={false}
-      compactHeader
-      compactTitle={<h1><Link href="/customer-select" className="block max-w-[calc(100vw-156px)] truncate text-[14px] font-bold tracking-[-0.02em] text-foreground hover:text-accent md:max-w-[min(32vw,420px)] md:text-[16px]">{project.name || "이름 없는 프로젝트"}</Link></h1>}
-    >
-      <main className={ui.shellMain}>
-      <div className={ui.page}>
-        <div className={ui.header}>
-          <button type="button" className={ui.back} aria-label="이전 화면" onClick={() => router.back()}>
-            <ChevronLeft size={22} strokeWidth={1.8} aria-hidden />
-          </button>
-          <div className={ui.reviewTitleGroup}>
-            <h2 className={ui.title}>최종 검토</h2>
-            {reviewMeta ? <p>{reviewMeta}</p> : null}
-          </div>
-        </div>
-        <div className={ui.body}>
-          {syncStatus !== "connected" && <div className={`${ui.banner} ${ui.bannerWarn}`}><span className={ui.bannerHeadWarn}>{syncStatus === "offline" ? "최신 참여 상태를 확인하지 못하고 있어요" : "최신 참여 상태를 확인하고 있어요"}</span><span className={ui.bodyText}>연결되면 전달 단계를 계속할 수 있어요.</span></div>}
+    <CustomerSelectShell compactHeader compactTitle={<ProjectStepHeader projectId={projectId} name={project.name} step="send" backHref={`/customer-select/${projectId}/select`} backLabel="고르기로" />}>
+      <main className={s.main}>
+        {selected.length === 0 ? (
+          <section className={s.empty}>
+            <h2>아직 고른 사진이 없어요</h2>
+            <p>보정 받을 사진을 고르면 여기서 작가님께 보낼 수 있어요.</p>
+            <PhotographerLightButton size="work-panel" onClick={() => router.push(`/customer-select/${projectId}/select`)}>사진 고르러 가기</PhotographerLightButton>
+          </section>
+        ) : <>
+          <section className={s.hero}>
+            <h2>{selected.length}장을 보낼게요</h2>
+            <p>{[summary, memoCount ? `메모 ${memoCount}개` : ""].filter(Boolean).join(" · ") || "선택한 사진과 메모를 작가님께 보내요"}</p>
+          </section>
 
-          {!done && waiting.length > 0 && (
-            <div className={`${ui.banner} ${ui.bannerWarn}`}>
-              <span className={ui.bannerHeadWarn}>
-                {waiting.map((p) => p.name).join(", ")}님이 아직 고르는 중이에요
-              </span>
-              <span className={ui.bodyText}>그래도 지금 전달할 수 있어요.</span>
-            </div>
+          {notices.length > 0 && (
+            <section className={s.notices} aria-label="보내기 전에 확인할 점">
+              {notices.map((notice) => (
+                <div key={notice.key} className={s.notice}>
+                  <AlertTriangle size={15} aria-hidden />
+                  <span>{notice.text}</span>
+                  {notice.href && <Link href={notice.href}>보러 가기</Link>}
+                </div>
+              ))}
+              <p className={s.noticeHint}>확인만 해주세요. 그대로 보내도 괜찮아요.</p>
+            </section>
           )}
 
-          <section>
-            <div className={ui.reviewSectionHeading}>
-              <h3>선택한 사진 <span>{selected.length.toLocaleString()}장</span></h3>
-              <button type="button" className={ui.reviewEdit} onClick={() => router.push(`/customer-select/${projectId}/select`)}>사진 다시 고르기</button>
+          <section className={s.sendCard}>
+            <div className={s.sendText}>
+              <h3>작가님께 보내기</h3>
+              <p>링크를 받은 작가님은 로그인 없이 사진·파일명·메모를 보고 파일명 목록을 받을 수 있어요. 나중에 다시 골라도 같은 링크에 최신 선택이 보여요.</p>
             </div>
-            <div className={ui.reviewGrid}>
-              {visibleSelected.map((p, index) => (
-                <button key={p.id} type="button" className={ui.reviewThumbButton} aria-label={`${getPhotoDisplayName(p)} 크게 보기`} onClick={() => setFocusIndex(index)}>
-                  <PhotoThumbnailFrame className={ui.reviewThumb}>
-                    <img src={p.url} alt="" />
-                    {project.photoStates[p.id]?.comment && <span className={ui.reviewCommentBadge} aria-label="작가 전달 메모 있음">메모</span>}
-                  </PhotoThumbnailFrame>
-                  <span className={ui.reviewFilename}>{getPhotoDisplayName(p)}</span>
-                </button>
-              ))}
+            {syncStatus !== "connected" && <p className={s.syncWarn} role="status">최신 선택을 확인하는 중이에요. 연결되면 보낼 수 있어요.</p>}
+            <div className={s.sendActions}>
+              <PhotographerLightButton size="confirmation" disabled={!canSend} onClick={() => void sendLink("share")}>
+                <Send size={18} />{linkState === "loading" ? "링크 만드는 중…" : linkState === "shared" ? "보냈어요" : linkState === "copied" ? "링크를 복사했어요" : linkState === "fail" ? "다시 시도하기" : "결과 링크 보내기"}
+              </PhotographerLightButton>
+              <PhotographerLightButton variant="outline" size="confirmation" disabled={!canSend} onClick={() => void sendLink("copy")}><Copy size={18} />링크 복사</PhotographerLightButton>
             </div>
-            {collapseSelected && (
-              <button type="button" className={ui.reviewMore} aria-expanded={showAllSelected} onClick={() => setShowAllSelected((current) => !current)}>
-                {showAllSelected ? <ChevronUp size={16} aria-hidden /> : <ChevronDown size={16} aria-hidden />}
-                {showAllSelected ? "사진 접기" : `사진 ${(selected.length - INITIAL_VISIBLE_PHOTOS).toLocaleString()}장 더 보기`}
-              </button>
-            )}
+            <div className={s.fileLinks}>
+              <button type="button" onClick={() => void copyList()}><FileText size={14} />{listCopied ? "복사했어요" : "파일명·메모 복사"}</button>
+              <button type="button" onClick={() => downloadTextFile(`${baseName}.csv`, ["파일명,작가 전달 메모", ...selected.map((photo) => [csvEscape(getPhotoDisplayName(photo)), csvEscape(memoOf(photo.id))].join(","))].join("\n"), "text/csv;charset=utf-8")}><FileSpreadsheet size={14} />CSV</button>
+              <button type="button" onClick={() => downloadTextFile(`${baseName}.txt`, selected.map(getPhotoDisplayName).join("\n"), "text/plain;charset=utf-8")}><FileText size={14} />TXT</button>
+            </div>
           </section>
 
-          {requested.length > 0 ? <section className={ui.reviewSection}>
-            <p className={ui.label} style={{ marginBottom: 8 }}>
-              작가 전달 메모가 있는 사진
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {requested.map((id) => {
-                  const p = project.photos.find((x) => x.id === id)!;
-                  const comment = project.photoStates[id]?.comment;
-                  return (
-                    <div key={id} className={ui.reqItem}>
-                      <img src={p.previewUrl ?? p.url} alt="" />
-                      <span>
-                        <span className={ui.reqFilename}>{getPhotoDisplayName(p)}</span>
-                        <span className={ui.reqText}>{comment}</span>
-                      </span>
-                    </div>
-                  );
-                })}
+          <section className={s.photos}>
+            <div className={s.photosHead}>
+              <h3>보낼 사진</h3>
+              <Link href={`/customer-select/${projectId}/select`}>다시 고르기</Link>
             </div>
-          </section> : null}
-
-          <section className={ui.deliveryCard}>
-            <div className={ui.deliveryHeading}>
-              <h2>작가에게 전달하기</h2>
-            </div>
-            <div className={ui.deliveryMain}>
-              <div>
-                <p className={ui.bodyText}>링크를 복사해 작가님께 보내주세요. 같은 링크에 최신 결과가 반영돼요.</p>
+            {sections.map((section) => (
+              <div key={section.sceneIndex ?? "all"} className={s.section}>
+                {section.title && <p className={s.sectionTitle}>{section.title} <span>{section.photos.length}장</span></p>}
+                <div className={s.grid}>
+                  {section.photos.map((photo) => (
+                    <button key={photo.id} type="button" className={s.thumb} aria-label={`${getPhotoDisplayName(photo)} 크게 보기`} onClick={() => setDetail({ photos: selected, id: photo.id })}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={photo.url} alt="" />
+                      {memoOf(photo.id) && <i aria-label="메모 있음"><MessageSquare size={12} /></i>}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <button type="button" className={`${ui.btn} ${ui.btnPrimary} ${ui.deliveryPrimary}`} disabled={selected.length === 0 || linkCopyState === "loading" || syncStatus !== "connected"} onClick={() => void copyResultLink()}>
-                {linkCopyState === "loading" ? "링크 복사 중…" : linkCopyState === "ok" ? "복사했어요 ✓" : linkCopyState === "fail" ? "다시 복사하기" : "링크 복사"}
-              </button>
-            </div>
-            <details className={ui.exportDetails}>
-              <summary>파일로 내보내기</summary>
-              <pre className={ui.exportBlock}>{exportText}</pre>
-              <div className={ui.exportActions}>
-                <PhotographerLightButton variant="outline" size="toolbar" aria-label="CSV 다운로드" onClick={handleDownloadCsv}><FileSpreadsheet size={16} aria-hidden />CSV 다운로드</PhotographerLightButton>
-                <PhotographerLightButton variant="outline" size="toolbar" aria-label="TXT 다운로드" onClick={handleDownloadTxt}><FileText size={16} aria-hidden />TXT 다운로드</PhotographerLightButton>
-              </div>
-              <span className={ui.supportText}>CSV에는 작가 전달 메모가 함께 담기고, TXT에는 파일명만 담겨요.</span>
-            </details>
+            ))}
           </section>
 
-          <section className={ui.nextStepCard}>
-            <div><h2>보정본도 확인할까요?</h2><p>선택한 사진의 보정본을 올려 함께 비교할 수 있어요.</p></div>
-            <PhotographerLightButton variant="outline" onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>보정본 업로드</PhotographerLightButton>
+          <section className={s.retouch}>
+            <div><h3>보정본을 받으면</h3><p>원본과 나란히 비교하고 다시 보정할 사진을 정리할 수 있어요. 필요할 때만 쓰면 돼요.</p></div>
+            <PhotographerLightButton variant="outline" size="work-panel" onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>보정본 확인하기</PhotographerLightButton>
           </section>
-        </div>
-        <PhotoFocusOverlay
-          open={focusIndex !== null}
-          src={focusIndex !== null ? selected[focusIndex]?.previewUrl ?? selected[focusIndex]?.url ?? "" : ""}
-          alt={focusIndex !== null && selected[focusIndex] ? getPhotoDisplayName(selected[focusIndex]) : "선택 사진"}
-          onClose={() => setFocusIndex(null)}
-          onPrev={focusIndex !== null && focusIndex > 0 ? () => setFocusIndex(focusIndex - 1) : undefined}
-          onNext={focusIndex !== null && focusIndex < selected.length - 1 ? () => setFocusIndex(focusIndex + 1) : undefined}
-        />
-      </div>
+        </>}
       </main>
+
+      {detail && (
+        <PhotoDetail
+          photos={detail.photos}
+          photoId={detail.id}
+          onPhotoChange={(id) => setDetail((current) => current && { ...current, id })}
+          onClose={() => setDetail(null)}
+          isOwner
+          myColor={me}
+          people={people}
+          selectedIds={selectedIds}
+          likesOf={(id) => project.photoStates[id]?.color ?? []}
+          commentOf={(id) => project.photoStates[id]?.comment ?? ""}
+          similarOf={(photo) => photo.similarityGroupId ? project.photos.filter((member) => member.similarityGroupId === photo.similarityGroupId) : []}
+          commentSaveStates={store.commentSaveStates}
+          onToggleSelect={store.toggleSelect}
+          onToggleLike={(id) => store.toggleLike(id, me)}
+          onSaveComment={store.setComment}
+          selectedCount={selectedIds.size}
+          target={target}
+        />
+      )}
     </CustomerSelectShell>
-    </>
   );
 }

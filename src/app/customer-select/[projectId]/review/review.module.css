@@ -1,0 +1,50 @@
+/* 셀프 고객 ③ 보내기. 일반 화면 최대 폭 1120px, AcutLightTheme 토큰만 사용한다. */
+.main { width: 100%; max-width: 1120px; margin: 0 auto; padding: 28px 32px 48px; display: flex; flex-direction: column; gap: 16px; }
+
+.hero h2 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.03em; }
+.hero p { margin: 6px 0 0; color: var(--muted-foreground); font-size: 14px; }
+
+.notices { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--surface)); border-radius: 12px; background: color-mix(in srgb, var(--warning) 8%, var(--surface)); }
+.notice { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.notice svg { flex: none; color: color-mix(in srgb, var(--warning) 70%, var(--foreground)); }
+.notice span { min-width: 0; flex: 1; }
+.notice a { flex: none; color: var(--foreground); font-size: 12px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.noticeHint { margin: 4px 0 0; color: var(--muted-foreground); font-size: 12px; }
+
+.sendCard { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 24px; align-items: center; padding: 20px 24px; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--surface); }
+.sendText h3 { margin: 0; font-size: 17px; font-weight: 800; }
+.sendText p { margin: 6px 0 0; color: var(--muted-foreground); font-size: 13px; line-height: 1.55; }
+.syncWarn { grid-column: 1 / -1; margin: 0; color: var(--muted-foreground); font-size: 12px; }
+.sendActions { display: flex; gap: 8px; }
+.fileLinks { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 16px; padding-top: 12px; border-top: 1px solid var(--border-subtle); }
+.fileLinks button { padding: 4px 0; border: 0; background: none; color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.fileLinks button:hover { color: var(--foreground); }
+
+.photos { display: flex; flex-direction: column; gap: 14px; padding-top: 8px; }
+.photosHead { display: flex; align-items: baseline; justify-content: space-between; }
+.photosHead h3 { margin: 0; font-size: 17px; font-weight: 800; }
+.photosHead a { color: var(--muted-foreground); font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.section { display: flex; flex-direction: column; gap: 8px; }
+.sectionTitle { margin: 0; font-size: 13px; font-weight: 700; }
+.sectionTitle span { color: var(--subtle-foreground); font-weight: 600; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
+.thumb { position: relative; aspect-ratio: 1; padding: 0; border: 0; border-radius: 8px; overflow: hidden; background: var(--surface-raised); cursor: pointer; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb i { position: absolute; right: 6px; bottom: 6px; width: 22px; height: 22px; border-radius: 6px; background: var(--surface); color: var(--accent); display: grid; place-items: center; box-shadow: 0 1px 4px rgba(2, 56, 82, 0.2); }
+
+.retouch { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 8px; padding: 18px 24px; border: 1px dashed var(--border); border-radius: 14px; }
+.retouch h3 { margin: 0; font-size: 15px; font-weight: 700; }
+.retouch p { margin: 4px 0 0; color: var(--muted-foreground); font-size: 13px; }
+
+.empty { margin: 12vh auto 0; max-width: 360px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.empty h2 { margin: 0; font-size: 20px; font-weight: 800; }
+.empty p { margin: 0 0 8px; color: var(--muted-foreground); font-size: 14px; }
+
+@media (max-width: 767px) {
+  .main { padding: 20px 20px calc(32px + env(safe-area-inset-bottom)); }
+  .hero h2 { font-size: 22px; }
+  .sendCard { grid-template-columns: 1fr; padding: 18px; }
+  .sendActions { flex-direction: column; }
+  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .retouch { flex-direction: column; align-items: stretch; padding: 16px 18px; }
+}

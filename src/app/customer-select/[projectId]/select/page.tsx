@@ -9,7 +9,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ChevronDown, Grid2x2, Layers, Plus } from "lucide-react";
+import { ChevronDown, Grid2x2, Layers, Plus } from "lucide-react";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
@@ -19,6 +19,7 @@ import { formatSceneRange, sceneTargets, splitScenes, type Scene } from "@/lib/c
 import type { ColorTag, Photo } from "@/types";
 import { activeParticipants, useCustomerSelectStore } from "../../_lib/real-store";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
+import { ProjectStepHeader } from "../../_lib/ProjectStepHeader";
 import { NicknamePrompt } from "../../_lib/NicknamePrompt";
 import { ParticipantAccessEndedScreen, ParticipantJoinScreen } from "../../_lib/ParticipantJoinScreen";
 import { EphemeralChat } from "../../_lib/EphemeralChat";
@@ -254,19 +255,15 @@ function SelectScreen() {
     <CustomerSelectShell
       viewportLocked
       compactHeader
-      compactTitle={<div className={s.headerTitle}>
-          <div className={s.titleBlock}>
-          {isOwner && <Link href={scene ? `/customer-select/${projectId}/select` : "/customer-select"} className={s.backLink} aria-label={scene ? "장면 목록으로" : "내 프로젝트로"} onClick={(event) => { if (scene) { event.preventDefault(); goScene(null, "replace"); } }}><ArrowLeft size={18} /></Link>}
-          <h1 className={s.title}>{project.name || "이름 없는 프로젝트"}</h1>
-        </div>
-        {isOwner && (
-          <nav className={s.steps} aria-label="진행 단계">
-            <Link className={s.step} href={`/customer-select/${projectId}/upload`}>올리기</Link>
-            <span className={`${s.step} ${s.stepCurrent}`} aria-current="step">고르기</span>
-            <Link className={s.step} href={`/customer-select/${projectId}/review`}>보내기</Link>
-          </nav>
-        )}
-      </div>}
+      compactTitle={<ProjectStepHeader
+        projectId={projectId}
+        name={project.name}
+        step="select"
+        showSteps={isOwner}
+        backHref={isOwner ? (scene ? `/customer-select/${projectId}/select` : "/customer-select") : undefined}
+        backLabel={scene ? "장면 목록으로" : "내 프로젝트로"}
+        onBack={(event) => { if (scene) { event.preventDefault(); goScene(null, "replace"); } }}
+      />}
       headerMeta={peopleBar}
     >
       <div className={s.page}>
