@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { SupabaseClient, type User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { customerShareCookieName } from "@/lib/customer-select-share-auth";
-import type { ColorTag, Photo, StarRating } from "@/types";
+import type { ColorTag, PeopleKind, Photo, StarRating } from "@/types";
 
 export async function getCurrentCustomerAuthUser(): Promise<User | null> {
   const supabase = await createClient();
@@ -92,6 +92,8 @@ interface CustomerQualityRow {
   blur_or_shake: string;
   focus_issue: string;
   primary_subject_detected: boolean | null;
+  /** 셀프 고객 판정에만 있는 인물 구성 — 판정 원문(raw_response)에서 꺼낸다(별도 컬럼 없음). */
+  people?: string | null;
 }
 
 interface CustomerSelectionRow {
@@ -145,6 +147,9 @@ export function buildCustomerCollaborationState(
   return { selectedIds, photoStates, participantOpinions, participantDone, participantNicknames };
 }
 
+const PEOPLE_KINDS: readonly string[] = ["solo", "family", "group", "none"];
+const isPeopleKind = (value: unknown): value is PeopleKind => typeof value === "string" && PEOPLE_KINDS.includes(value);
+
 export function toPhoto(row: CustomerPhotoRow, projectId: string, quality?: CustomerQualityRow): Photo {
   return {
     id: row.id,
@@ -159,6 +164,7 @@ export function toPhoto(row: CustomerPhotoRow, projectId: string, quality?: Cust
     faceDetected: quality?.primary_subject_detected ?? null,
     // 눈 감음은 "likely"만 — 웃거나 윙크한 의도된 표정이 "possible"로 많이 잡힌다(실제 60장 중 10장).
     eyesClosed: quality ? quality.eyes_closed === "likely" : null,
+    people: isPeopleKind(quality?.people) ? quality.people : null,
   };
 }
 

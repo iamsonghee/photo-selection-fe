@@ -62,7 +62,8 @@ export default function ResultViewer({ project, photos, comments }: Props) {
           <button type="button" aria-pressed={commentOnly} disabled={commentedPhotos.length === 0} onClick={() => setCommentOnly(true)} className={`h-9 rounded-full border px-4 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${commentOnly ? "border-accent bg-accent text-white" : "border-border-subtle bg-white text-muted-foreground hover:border-border-strong"}`}><MessageSquare size={14} className="mr-1.5 inline" aria-hidden />전달 메모 있는 사진 {commentedPhotos.length.toLocaleString()}</button>
         </div>
 
-        <section className="mt-5 grid grid-cols-2 items-start gap-2 sm:grid-cols-3 md:grid-cols-4 md:gap-3 lg:grid-cols-5 xl:grid-cols-6" aria-label="선택된 사진">
+        {/* PC는 셀프 고객 갤러리 기준(photo-grid.ts: 최소 180px·간격 12px). 모바일은 메모를 읽을 수 있게 2열(기준 3열의 예외). */}
+        <section className="mt-5 grid grid-cols-2 items-start gap-2 md:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] md:gap-3" aria-label="선택된 사진">
           {visiblePhotos.map((photo, index) => {
             const comment = comments[photo.id]?.comment;
             return (

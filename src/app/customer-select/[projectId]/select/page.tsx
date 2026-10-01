@@ -16,7 +16,7 @@ import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import { formatSceneRange, sceneTargets } from "@/lib/customer-scenes";
-import type { Photo } from "@/types";
+import type { PeopleKind, Photo } from "@/types";
 import { activeParticipants, useCustomerSelectStore } from "../../_lib/real-store";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import { ProjectStepHeader } from "../../_lib/ProjectStepHeader";
@@ -33,6 +33,10 @@ import s from "./select.module.css";
 
 type Scope = "all" | "picked" | "liked" | "mine" | "popular";
 const LIKE_SCOPES: readonly Scope[] = ["liked", "mine", "popular"];
+// 인물 구성(AI 판정) 칩 순서·이름. 돌잔치는 단독 컷이 대부분 아기라 이름을 바꿔 보인다.
+const PEOPLE_KINDS: readonly PeopleKind[] = ["solo", "family", "group", "none"];
+const peopleLabel = (kind: PeopleKind, shootType: string | null) =>
+  ({ solo: shootType === "first_birthday" ? "아기 단독" : "단독", family: "가족·소수", group: "여러 명", none: "사람 없음" })[kind];
 
 /** AI가 흔들림(흐림) 또는 눈 감음을 의심한 사진 — 유사컷 묶음 안에서 맨 뒤로 보낸다(비슷한 컷 중 멀쩡한 것부터). */
 const isFlagged = (photo: Photo) => Boolean(photo.isBlurry || (photo.faceDetected && photo.eyesClosed));
@@ -64,6 +68,8 @@ function SelectScreen() {
     try { localStorage.setItem(setAsideKey(projectId), on ? "1" : "0"); } catch {}
   };
   const [query, setQuery] = useState("");
+  // 인물 구성 칩 선택은 고른 장면에서만 유지한다 — 다른 장면엔 그 구성이 없을 수 있다(빈 화면 방지).
+  const [peoplePick, setPeoplePick] = useState<{ scene: number | null; kind: PeopleKind } | null>(null);
   // 툴바 위에 뜨는 작은 메뉴(찜 범위 ▾, 보기 옵션)와 검색 입력창. 바깥을 누르면 메뉴가 닫힌다.
   const [menu, setMenu] = useState<"like" | "options" | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -128,6 +134,8 @@ function SelectScreen() {
   const resumeScene = scenes ? Math.max(0, scenes.findIndex((item, index) => pickedInScene(item) < (isOwner ? targets[index] : 1))) : 0;
   const sceneIndex = sceneMode ? Math.min(Math.max(chosenScene ?? resumeScene, 0), scenes!.length - 1) : null;
   const scene = sceneIndex === null ? null : scenes![sceneIndex];
+  const peopleFilter = peoplePick?.scene === sceneIndex ? peoplePick.kind : null;
+  const setPeopleFilter = (kind: PeopleKind | null) => setPeoplePick(kind ? { scene: sceneIndex, kind } : null);
   const nextScene = scenes && sceneIndex !== null && sceneIndex < scenes.length - 1 ? scenes[sceneIndex + 1] : null;
   const prevScene = scenes && sceneIndex !== null && sceneIndex > 0 ? scenes[sceneIndex - 1] : null;
 
@@ -144,9 +152,10 @@ function SelectScreen() {
       if (scope === "popular" && likesOf(photo.id).length < 2) return false;
       // 빼고 보기: 의심 사진은 갤러리에서 뺀다. 이미 고른(참여자는 찜한) 사진은 절대 빼지 않는다.
       if (setAside && isBlurFlagged(photo) && !picked.has(photo.id)) return false;
+      if (peopleFilter && photo.people !== peopleFilter) return false;
       return !text || getPhotoDisplayName(photo).toLowerCase().includes(text);
     });
-  }, [likesOf, myLikes, picked, query, scenePhotos, scope, selectedIds, setAside]);
+  }, [likesOf, myLikes, peopleFilter, picked, query, scenePhotos, scope, selectedIds, setAside]);
   const setAsideCount = useMemo(
     () => (setAside ? scenePhotos.filter((photo) => isBlurFlagged(photo) && !picked.has(photo.id)).length : 0),
     [picked, scenePhotos, setAside],
@@ -234,6 +243,8 @@ function SelectScreen() {
   const target = project.target;
   const pickedTotal = picked.size;
   const hasQuality = scenePhotos.some(isBlurFlagged);
+  // 인물 구성 칩: 지금 장면에 판정된 사진이 있을 때만, 장수가 있는 구성만 보인다.
+  const peopleCounts = PEOPLE_KINDS.map((kind) => ({ kind, count: scenePhotos.filter((photo) => photo.people === kind).length })).filter((item) => item.count > 0);
   const myDone = Boolean(project.participantDone[me]);
   const toReview = () => router.push(`/customer-select/${projectId}/review`);
   const withChat = people.length > 1;
@@ -250,13 +261,16 @@ function SelectScreen() {
   };
   const sceneDone = (index: number) => isOwner && targets[index] > 0 && pickedInScene(scenes![index]) >= targets[index];
 
+  const analysisPercent = analysis.status === "analyzing" && analysis.progress
+    ? Math.min(100, Math.round((analysis.progress.done / Math.max(1, analysis.progress.total)) * 100)) : null;
   const analysisBanner = analysis.status === "analyzing" ? (
     <div className={s.analysis} role="status">
       <Sparkles size={16} aria-hidden />
       <div>
-        <strong>AI가 장면을 나누고 있어요{analysis.progress ? ` · ${analysis.progress.done.toLocaleString()} / ${analysis.progress.total.toLocaleString()}장` : ""}</strong>
+        <strong>AI가 장면을 나누고 있어요{analysisPercent !== null ? ` · ${analysisPercent}%` : ""}</strong>
         <span>그동안 마음에 드는 사진에 ♡를 눌러 두세요. 정리가 끝나면 장면별로 모아서 보여드릴게요.</span>
-        {analysis.progress && <i style={{ width: `${Math.round((analysis.progress.done / Math.max(1, analysis.progress.total)) * 100)}%` }} />}
+        {/* 진행 수는 사진 수가 아니라 작업량(사진 처리 + 장면 정리)이라 %로만 보인다. 첫 진행 기록 전에도 빈 막대를 둔다. */}
+        <i aria-hidden><b style={{ width: `${analysisPercent ?? 0}%` }} /></i>
       </div>
     </div>
   ) : analysis.status === "ready" && holdAll && !promptDismissed && scenes ? (
@@ -398,7 +412,7 @@ function SelectScreen() {
     <CustomerSelectShell
       viewportLocked
       compactHeader
-      compactTitle={<ProjectStepHeader projectId={projectId} name={project.name} step="select" showSteps={isOwner} backHref={isOwner ? "/customer-select" : undefined} />}
+      compactTitle={<ProjectStepHeader projectId={projectId} name={project.name} step="select" isOwner={isOwner} />}
       headerMeta={peopleBar}
     >
       <div className={s.page} data-chat={withChat ? "" : undefined}>
@@ -487,6 +501,16 @@ function SelectScreen() {
                 </div>
               )}
               </div>
+              {peopleCounts.length > 1 && (
+                <div className={s.peopleChips} role="group" aria-label="인물 구성">
+                  <button type="button" aria-pressed={!peopleFilter} onClick={() => setPeopleFilter(null)}>모두</button>
+                  {peopleCounts.map(({ kind, count }) => (
+                    <button key={kind} type="button" aria-pressed={peopleFilter === kind} onClick={() => setPeopleFilter(peopleFilter === kind ? null : kind)}>
+                      {peopleLabel(kind, project.shootType)}<b>{count}</b>
+                    </button>
+                  ))}
+                </div>
+              )}
               {setAside && setAsideCount > 0 && (
                 <p className={s.toolsNote}>
                   <span>흔들림 <strong>{setAsideCount}장</strong> 빼고 보는 중</span>
@@ -498,7 +522,7 @@ function SelectScreen() {
               key={sceneMode ? `scene-${sceneIndex}` : "all"}
               photos={visible}
               mobileColumns={mobileColumns}
-              positionKey={`ps:self-select:${projectId}:${sceneMode ? `s${sceneIndex}` : "all"}:${scope}:${grouped ? 1 : 0}`}
+              positionKey={`ps:self-select:${projectId}:${sceneMode ? `s${sceneIndex}` : "all"}:${scope}:${peopleFilter ?? ""}:${grouped ? 1 : 0}`}
               startAt={enteredBy === "next" ? "top" : enteredBy === "prev" ? "bottom" : null}
               enterFrom={enteredBy === "next" ? "below" : null}
               renderCard={card}

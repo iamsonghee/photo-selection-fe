@@ -19,6 +19,8 @@ export interface Comment {
 }
 
 // ========== 사진 ==========
+export type PeopleKind = "solo" | "family" | "group" | "none";
+
 export interface Photo {
   id: string;
   projectId: string;
@@ -59,6 +61,8 @@ export interface Photo {
   faceDetected?: boolean | null;
   /** AI 눈 감음 의심 여부 (faceDetected가 true일 때만 유효) */
   eyesClosed?: boolean | null;
+  /** AI 인물 구성(셀프 고객 셀렉만) — 단독/가족·소수/여러 명/인물 없음. 미분석이면 null */
+  people?: PeopleKind | null;
   /** 원본 압축 처리 상태 (include_original=true 업로드 시에만 설정) */
   originalStatus?: 'awaiting_upload' | 'pending' | 'processing' | 'completed' | 'failed' | null;
 }

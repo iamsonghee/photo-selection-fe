@@ -6,14 +6,16 @@ import { ArrowDown } from "lucide-react";
 import type { Photo } from "@/types";
 import ui from "../../_lib/ui.module.css";
 import s from "./select.module.css";
+import { CUSTOMER_GALLERY_GRID } from "../../_lib/photo-grid";
 
 export type MobileColumns = 2 | 3 | 4;
 
-const DESKTOP_MIN_CELL = 180;
-const DESKTOP_GAP = 12;
+const DESKTOP_MIN_CELL = CUSTOMER_GALLERY_GRID.desktopMinCell;
+const DESKTOP_GAP = CUSTOMER_GALLERY_GRID.desktopGap;
+// 3열이 기준(photo-grid.ts). 2·4열은 고르기 화면에서만 고를 수 있는 보기 옵션.
 const MOBILE_GRID: Record<MobileColumns, { gap: number; aspect: number }> = {
   2: { gap: 10, aspect: 4 / 3 },
-  3: { gap: 8, aspect: 1 },
+  3: { gap: CUSTOMER_GALLERY_GRID.mobileGap, aspect: 1 },
   4: { gap: 6, aspect: 1 },
 };
 const FOOTER_HEIGHT = { desktop: 120, mobile: 104 };

@@ -42,6 +42,10 @@ export type OriginalPhotoGalleryProps = {
   mobileGridGap?: number;
   /** 모바일 grid의 사진 영역을 정사각형으로 표시한다. */
   mobileSquareMedia?: boolean;
+  /** PC에서도 정사각형 칸(셀프 고객 업로드 — 고르기·검토 화면의 정사각형 칸과 맞춘다). */
+  squareMedia?: boolean;
+  /** PC 칸 최소 너비(기본 PHOTO_GRID_MIN_CELL). 셀프 고객 화면은 photo-grid.ts 기준을 넘긴다. */
+  minCellWidth?: number;
   /** 모바일 grid에서도 PC와 같은 이미지 상단 파일명 행을 유지한다. */
   showMobileFilename?: boolean;
   /** PC grid의 파일명 행. 기본값은 기존 동작을 보존하는 true. */
@@ -239,7 +243,7 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
   };
 
   return (
-    <article data-original-photo-card className={`${styles.gridCell} ${selectionVariant ? styles.gridCellSelection : ""} ${props.showMobileFilename ? styles.gridCellMobileFilename : ""} ${props.mobileSquareMedia ? styles.gridCellMobileSquare : ""} ${props.mobileManageMode ? styles.gridCellMobileManage : ""} ${props.mobileSelectionVisible ? styles.gridCellMobileSelectable : ""} ${selected ? styles.gridCellSelected : ""} ${expanded ? styles.gridCellExpanded : ""}`}>
+    <article data-original-photo-card className={`${styles.gridCell} ${selectionVariant ? styles.gridCellSelection : ""} ${props.showMobileFilename ? styles.gridCellMobileFilename : ""} ${props.mobileSquareMedia ? styles.gridCellMobileSquare : ""} ${props.squareMedia ? styles.gridCellSquare : ""} ${props.mobileManageMode ? styles.gridCellMobileManage : ""} ${props.mobileSelectionVisible ? styles.gridCellMobileSelectable : ""} ${selected ? styles.gridCellSelected : ""} ${expanded ? styles.gridCellExpanded : ""}`}>
       <PhotoAssetPreview filename={name} active={selected}
         header={selectionVariant ? undefined : !props.compact && props.showFilename !== false ? (
         <div data-original-photo-filename-row className={styles.nameRow}>
@@ -352,9 +356,9 @@ function GridGallery(props: OriginalPhotoGalleryProps) {
       if (width <= 0) return;
       const gap = isMobile ? props.mobileGridGap ?? PHOTO_GRID_GAP : PHOTO_GRID_GAP;
       const minCols = isMobile ? props.mobileMinCols ?? props.minCols ?? 1 : props.minCols ?? 1;
-      const cols = Math.max(minCols, Math.floor((width + gap) / (PHOTO_GRID_MIN_CELL + gap)));
+      const cols = Math.max(minCols, Math.floor((width + gap) / ((isMobile ? PHOTO_GRID_MIN_CELL : props.minCellWidth ?? PHOTO_GRID_MIN_CELL) + gap)));
       const cellWidth = (width - gap * (cols - 1)) / cols;
-      const mediaAspectRatio = props.compact || (isMobile && props.mobileSquareMedia)
+      const mediaAspectRatio = props.compact || props.squareMedia || (isMobile && props.mobileSquareMedia)
         ? 1
         : PHOTO_GRID_MEDIA_ASPECT_RATIO;
       const mobileSquareChrome = isMobile && props.mobileSquareMedia
@@ -398,7 +402,7 @@ function GridGallery(props: OriginalPhotoGalleryProps) {
       if (secondFrame) window.cancelAnimationFrame(secondFrame);
       window.clearTimeout(transitionTimer);
     };
-  }, [props.active, props.compact, props.desktopPaddingX, props.minCols, props.mobileGridGap, props.mobileMinCols, props.mobilePaddingX, props.mobileSquareMedia, props.showFilename, props.showMobileFilename, props.variant]);
+  }, [props.active, props.compact, props.desktopPaddingX, props.minCols, props.mobileGridGap, props.mobileMinCols, props.mobilePaddingX, props.mobileSquareMedia, props.showFilename, props.squareMedia, props.minCellWidth, props.showMobileFilename, props.variant]);
 
   const hasLeadingCell = Boolean(props.leadingCell);
   const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
@@ -533,7 +537,7 @@ function GridGallery(props: OriginalPhotoGalleryProps) {
             if (cellIndex >= cellCount) break;
             if (hasLeadingCell && cellIndex === 0) {
               cells.push(
-                <div key="leading-cell" data-original-photo-leading-cell className={`${styles.gridCell} ${props.mobileSquareMedia ? styles.gridCellMobileSquare : ""}`}>
+                <div key="leading-cell" data-original-photo-leading-cell className={`${styles.gridCell} ${props.mobileSquareMedia ? styles.gridCellMobileSquare : ""} ${props.squareMedia ? styles.gridCellSquare : ""}`}>
                   <div className={styles.leadingCellMedia}>{cloneElement(props.leadingCell as React.ReactElement)}</div>
                 </div>,
               );

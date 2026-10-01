@@ -6,9 +6,10 @@
  * 그대로 재사용한다(단계 0 분석 결과). 압축된 결과만 BE로 전송, 썸네일·프리뷰 생성은 BE 담당.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { CUSTOMER_PHOTO_LIMIT as MAX_PHOTOS, uploadLimitError } from "../../_lib/upload-limit";
-import { CheckCircle2, Loader2, SlidersHorizontal, Sparkles, Trash2, UploadCloud } from "lucide-react";
+import { CheckCircle2, SlidersHorizontal, Sparkles, Trash2, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -16,18 +17,20 @@ import { PhotographerPhotoGallery } from "@/components/photographer/OriginalPhot
 import { OriginalPhotoViewer } from "@/components/photographer/OriginalPhotoViewer";
 import { PhotoUploadTile } from "@/components/photographer/PhotoUploadTile";
 import { PhotoSortSelect } from "@/components/photographer/PhotoSortSelect";
-import { ProjectAssetMobileContextAction, ProjectAssetMobileIconButton, ProjectAssetMobileSheet, ProjectAssetToolbarSummary } from "@/components/photographer/ProjectAssetWorkspaceToolbar";
+import { ProjectAssetMobileIconButton, ProjectAssetMobileSheet, ProjectAssetToolbarSummary } from "@/components/photographer/ProjectAssetWorkspaceToolbar";
 import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { compressImagesInParallel } from "@/lib/upload-client-compress";
 import { readTakenAt } from "@/lib/exif-taken-at";
+import { customerShootTypeLabel } from "@/lib/customer-shoot-scenes";
 import { UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
 import { getPhotoDisplayName, matchesFilenameQuery } from "@/lib/gallery-filter";
 import { estimateUploadRemainingSeconds, formatUploadRemainingTime, type UploadTimingSample } from "@/lib/upload-time-estimate";
 import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAssetHeader";
-import type { Photo, PhotoGroupInfo } from "@/types";
+import type { Photo } from "@/types";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
+import { CUSTOMER_GALLERY_GRID } from "../../_lib/photo-grid";
 import { ProjectStepHeader } from "../../_lib/ProjectStepHeader";
 import { AiTidySheet, startAiTidy, type AiTidyKind } from "../select/AiTidySheet";
 import { useCustomerSelectStore } from "../../_lib/real-store";
@@ -85,15 +88,16 @@ export default function CustomerUploadPage() {
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   // AI 정리 시트: 열린 이유가 "정리하고 고르기"면 시작 후 고르기로 이동한다.
-  const [aiSheet, setAiSheet] = useState<null | "here" | "thenSelect">(null);
+  // AI 정리는 업로드를 마친 뒤 "AI로 정리하고 고르기"로만 시작한다(다시 정리는 고르기 화면 보기 옵션).
+  const [aiSheet, setAiSheet] = useState(false);
   const [aiSheetError, setAiSheetError] = useState<string | null>(null);
-  const aiPromptOpen = aiSheet !== null;
+  const aiPromptOpen = aiSheet;
   // 방금 올린 장수. 업로드가 끝나면 모달 대신 하단 바에서 AI 정리와 다음 단계를 함께 제안한다.
   const [justUploaded, setJustUploaded] = useState(0);
   const [aiStarting, setAiStarting] = useState(false);
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
-  const [aiCompleted, setAiCompleted] = useState(false);
-  const [sort, setSort] = useState<"order-asc" | "order-desc" | "name-asc">("order-asc");
+  // 기본은 촬영 시간순 — 장면·유사컷이 모두 촬영 시각 기준이라 빠진 구간이나 섞인 사진이 바로 보인다.
+  const [sort, setSort] = useState<"taken-asc" | "order-asc" | "order-desc" | "name-asc">("taken-asc");
   const [nameFilter, setNameFilter] = useState("");
   const [retryFiles, setRetryFiles] = useState<File[]>([]);
   const [dragActive, setDragActive] = useState(false);
@@ -142,7 +146,6 @@ export default function CustomerUploadPage() {
       return response.ok ? (await response.json()).status as string | null : null;
     })).then((statuses) => {
       const processingKinds = ["similarity", "quality"].filter((_, index) => statuses[index] === "processing");
-      setAiCompleted(statuses.includes("completed"));
       if (processingKinds.length > 0) {
         setAiAnalyzing(true);
         void pollAiAnalysis(processingKinds);
@@ -323,17 +326,13 @@ export default function CustomerUploadPage() {
 
   /** 사용자가 시트에서 시작을 누를 때만 AI 정리를 시작한다. 시작하지 못하면 시트에 이유를 보여준다. */
   async function startTidy(kinds: AiTidyKind[]) {
-    const thenSelect = aiSheet === "thenSelect";
     setAiStarting(true);
     setAiSheetError(null);
     try {
       const responses = await startAiTidy(projectId, kinds, project.shootType);
       if (!responses.some((response) => response.ok)) throw new Error("AI 정리를 시작하지 못했어요. 잠시 후 다시 시도하거나 원본 그대로 골라 주세요.");
-      setAiSheet(null);
-      setAiCompleted(false);
-      setAiAnalyzing(true);
-      if (thenSelect) { router.push(`/customer-select/${projectId}/select`); return; }
-      void pollAiAnalysis(kinds);
+      setAiSheet(false);
+      router.push(`/customer-select/${projectId}/select`);
     } catch (e) {
       setAiSheetError(e instanceof Error && e.message ? e.message : "인터넷 연결을 확인하고 다시 시도해 주세요.");
     } finally {
@@ -356,7 +355,6 @@ export default function CustomerUploadPage() {
           setAiAnalyzing(false);
           await refresh();
           if (statuses.includes("failed")) setError("일부 AI 분석을 완료하지 못했습니다.");
-          else setAiCompleted(true);
           return;
         }
       }
@@ -449,6 +447,8 @@ export default function CustomerUploadPage() {
   const displayName = project.name || "이름 없는 프로젝트";
   const displayedPhotos = useMemo(() => [...project.photos, ...pendingPhotos], [project.photos, pendingPhotos]);
   const sortedPhotos = useMemo(() => [...displayedPhotos].sort((a, b) => {
+    // 촬영 시각 없는 사진(카톡·캡처 등)은 뒤로. 시각 문자열은 같은 형식(카메라 현지 시각)이라 문자열 비교로 충분하다.
+    if (sort === "taken-asc") return (a.takenAt ?? "\uffff").localeCompare(b.takenAt ?? "\uffff") || a.orderIndex - b.orderIndex;
     if (sort === "order-desc") return b.orderIndex - a.orderIndex;
     if (sort === "name-asc") return (a.originalFilename ?? "").localeCompare(b.originalFilename ?? "", "ko", { numeric: true });
     return a.orderIndex - b.orderIndex;
@@ -458,16 +458,6 @@ export default function CustomerUploadPage() {
     [nameFilter, sortedPhotos]
   );
   const viewerPhotos = visiblePhotos.filter((photo) => !photo.isPending);
-  const groupsById = useMemo(() => {
-    const groups = new Map<string, PhotoGroupInfo>();
-    for (const photo of visiblePhotos) {
-      if (!photo.similarityGroupId) continue;
-      const group = groups.get(photo.similarityGroupId);
-      if (group) group.photoCount += 1;
-      else groups.set(photo.similarityGroupId, { id: photo.similarityGroupId, representativePhotoId: photo.id, photoCount: 1 });
-    }
-    return groups;
-  }, [visiblePhotos]);
   const viewerIndex = viewerPhotoId ? viewerPhotos.findIndex((photo) => photo.id === viewerPhotoId) : -1;
   const deleteImpactItems = deleteImpact ? [
     deleteImpact.finalSelections && `최종 선택 ${deleteImpact.finalSelections.toLocaleString()}건`,
@@ -491,6 +481,10 @@ export default function CustomerUploadPage() {
     </div>
   ) : undefined;
 
+  // 장면은 촬영 시각으로 나눈다(src/lib/customer-scenes.ts: 20장 이상·시각 있는 사진 80% 이상일 때만).
+  // 카톡으로 받은 사진·캡처본은 시각이 빠져 있다. 고르는 데는 문제없으니 다시 올리라고 하지 않고, 어떻게 보이는지만 알린다.
+  const untimedCount = project.photos.filter((photo) => !photo.takenAt).length;
+  const scenesBlocked = project.photos.length >= 20 && untimedCount > project.photos.length * 0.2;
   const showUploadDone = justUploaded > 0 && !uploading && retryFiles.length === 0 && selectedPhotoIds.size === 0;
   const uploadDone = showUploadDone ? (
     <div className="flex min-w-0 flex-col gap-1.5 md:flex-row md:items-center md:gap-5" role="status">
@@ -498,6 +492,14 @@ export default function CustomerUploadPage() {
       {aiAnalyzing
         ? <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Sparkles size={13} className="shrink-0 text-primary" aria-hidden />AI가 사진을 정리하고 있어요. 기다리지 않고 바로 골라도 돼요.</p>
         : <p className="text-xs text-muted-foreground">사진을 다 올렸다면 AI가 장면별로 나누고 비슷한 사진·흔들린 사진을 정리해 드려요.</p>}
+      <p className="text-xs text-muted-foreground">촬영 종류 <strong className="font-semibold text-foreground">{customerShootTypeLabel(project.shootType || null)}</strong> · <Link href={`/customer-select/${projectId}/settings?from=upload`} className="font-semibold text-accent underline underline-offset-2">바꾸기</Link></p>
+      {untimedCount > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          {scenesBlocked
+            ? `촬영 시각이 없는 사진이 많아(${untimedCount.toLocaleString()}장) 장면 없이 전체 사진으로 보여드려요.`
+            : `${untimedCount.toLocaleString()}장은 촬영 시각이 없어 장면 정리 때 마지막에 따로 모여요.`}
+        </p>
+      ) : null}
     </div>
   ) : undefined;
 
@@ -513,7 +515,7 @@ export default function CustomerUploadPage() {
     <CustomerSelectShell
       viewportLocked
       compactHeader={compactUploadHeader}
-      compactTitle={<ProjectStepHeader projectId={projectId} name={displayName} step="upload" backHref="/customer-select" />}
+      compactTitle={<ProjectStepHeader projectId={projectId} name={displayName} step="upload" />}
       headerMeta={<div className="flex items-baseline gap-2 text-[12px] text-muted-foreground" aria-label="전체 사진 이용량"><span>전체 이용량</span><strong className="text-[13px] font-semibold tabular-nums text-foreground">{accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${MAX_PHOTOS.toLocaleString()}장` : "확인 중"}</strong></div>}
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -527,19 +529,17 @@ export default function CustomerUploadPage() {
           <div className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-0 md:min-h-[52px] md:px-8 md:py-1">
             <>
               <div className="flex min-w-0 flex-1 items-center justify-between gap-2 md:flex-none md:justify-start">
-                <ProjectAssetToolbarSummary label={nameFilter.trim() ? "검색 결과" : "사진"} count={`${visiblePhotos.length.toLocaleString()}장`} meta={displayedPhotos.length > 0 ? <span className="max-md:hidden">{uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 분석 완료" : "드래그하거나 체크해 여러 장 선택"}</span> : undefined} />
-                <div className="hidden md:block"><PhotographerLightButton variant="outline" size="toolbar" className="!h-9 !border-transparent !bg-accent/[0.09] !px-3 !text-[12px] !text-accent hover:!bg-accent/[0.16]" onClick={() => { setAiSheetError(null); setAiSheet("here"); }} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}>{aiAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}{aiAnalyzing ? "분석 중" : aiCompleted ? "다시 분석" : "AI 분석"}</PhotographerLightButton></div>
+                <ProjectAssetToolbarSummary label={nameFilter.trim() ? "검색 결과" : "사진"} count={`${visiblePhotos.length.toLocaleString()}장`} meta={displayedPhotos.length > 0 ? <span className="max-md:hidden">{uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : "드래그하거나 체크해 여러 장 선택"}</span> : undefined} />
                 <div className="flex shrink-0 items-center md:hidden">
-                  <ProjectAssetMobileContextAction active={aiCompleted} onClick={() => { setAiSheetError(null); setAiSheet("here"); }} disabled={uploading || project.photoCount === 0 || aiAnalyzing} aria-label={aiAnalyzing ? "AI 분석 중" : aiCompleted ? "AI 다시 분석" : "AI 분석 시작"}><Sparkles size={14} />{aiAnalyzing ? "분석 중" : "AI"}</ProjectAssetMobileContextAction>
                   <ProjectAssetMobileIconButton className="relative" onClick={() => setMobileToolsOpen(true)} aria-label="검색 및 정렬 설정" aria-haspopup="dialog" aria-expanded={mobileToolsOpen}>
                     <SlidersHorizontal size={18} aria-hidden />
-                    {nameFilter.trim() || sort !== "order-asc" ? <span className="absolute right-0.5 top-0.5 min-w-4 rounded-full bg-accent px-1 text-center text-[10px] font-bold leading-4 text-white">{Number(Boolean(nameFilter.trim())) + Number(sort !== "order-asc")}</span> : null}
+                    {nameFilter.trim() || sort !== "taken-asc" ? <span className="absolute right-0.5 top-0.5 min-w-4 rounded-full bg-accent px-1 text-center text-[10px] font-bold leading-4 text-white">{Number(Boolean(nameFilter.trim())) + Number(sort !== "taken-asc")}</span> : null}
                   </ProjectAssetMobileIconButton>
                 </div>
               </div>
               <div className="hidden min-w-0 items-center gap-1.5 md:flex">
                 <FilenameSearchInput value={nameFilter} onChange={setNameFilter} placeholder="파일명 검색" className="max-md:flex-1" style={{ "--fsi-width": "220px" } as React.CSSProperties} />
-                <PhotoSortSelect value={sort} onChange={setSort} options={[{ value: "order-asc", label: "업로드 순" }, { value: "order-desc", label: "최근 순" }, { value: "name-asc", label: "파일명 순" }]} />
+                <PhotoSortSelect value={sort} onChange={setSort} options={[{ value: "taken-asc", label: "촬영 시간순" }, { value: "order-asc", label: "업로드 순" }, { value: "order-desc", label: "최근 순" }, { value: "name-asc", label: "파일명 순" }]} />
               </div>
             </>
           </div>
@@ -585,9 +585,6 @@ export default function CustomerUploadPage() {
               selectedPhotoIds={selectedPhotoIds}
               selectionOnHover={!isMobile}
               mobileSelectionVisible={!uploading}
-              groupsById={groupsById}
-              showSimilarityGroups
-              showQualityBadges
               onToggleSelected={(photoId) => setSelectedPhotoIds((current) => {
                 const next = new Set(current);
                 if (next.has(photoId)) next.delete(photoId); else next.add(photoId);
@@ -603,11 +600,12 @@ export default function CustomerUploadPage() {
               }}
               onDragSelectionChange={isMobile ? undefined : setSelectedPhotoIds}
               onEmptyClick={() => setSelectedPhotoIds(new Set())}
-              minCols={6}
-              mobileMinCols={3}
-              mobileGridGap={6}
+              minCellWidth={CUSTOMER_GALLERY_GRID.desktopMinCell}
+              mobileMinCols={CUSTOMER_GALLERY_GRID.mobileCols}
+              mobileGridGap={CUSTOMER_GALLERY_GRID.mobileGap}
               desktopPaddingX={32}
               mobileSquareMedia
+              squareMedia
               compact={isMobile}
               showFilename={false}
               leadingCell={<PhotoUploadTile isUploading={uploading || checkingCapacity} progress={total ? Math.round((progress / total) * 100) : 0} serverWorking={checkingCapacity} hasPhotos={displayedPhotos.length > 0} onClick={() => inputRef.current?.click()} />}
@@ -627,7 +625,7 @@ export default function CustomerUploadPage() {
             {selectedPhotoIds.size > 0 ? <PhotographerLightButton variant="danger" pending={checkingDelete} pendingLabel="확인 중" onClick={requestDeleteSelectedPhotos}><Trash2 size={16} />선택 삭제 ({selectedPhotoIds.size.toLocaleString()})</PhotographerLightButton> : null}
             {selectedPhotoIds.size === 0 && showUploadDone && !aiAnalyzing ? <>
               <PhotographerLightButton variant="outline" onClick={goSelect}>원본 그대로 고르기</PhotographerLightButton>
-              <PhotographerLightButton onClick={() => { setAiSheetError(null); setAiSheet("thenSelect"); }}><Sparkles size={16} />AI로 정리하고 고르기 →</PhotographerLightButton>
+              <PhotographerLightButton onClick={() => { setAiSheetError(null); setAiSheet(true); }}><Sparkles size={16} />AI로 정리하고 고르기 →</PhotographerLightButton>
             </> : selectedPhotoIds.size === 0 ? <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={goSelect}>고르러 가기 →</PhotographerLightButton> : null}
           </>}
         />
@@ -638,7 +636,7 @@ export default function CustomerUploadPage() {
           title="사진 찾기"
           titleId="customer-upload-mobile-tools-title"
           closeLabel="검색 및 정렬 설정 닫기"
-          headerAction={<button type="button" disabled={!nameFilter.trim() && sort === "order-asc"} onClick={() => { setNameFilter(""); setSort("order-asc"); }} className="h-9 px-2 text-[12px] font-medium text-muted-foreground underline underline-offset-2 disabled:no-underline disabled:opacity-40">초기화</button>}
+          headerAction={<button type="button" disabled={!nameFilter.trim() && sort === "taken-asc"} onClick={() => { setNameFilter(""); setSort("taken-asc"); }} className="h-9 px-2 text-[12px] font-medium text-muted-foreground underline underline-offset-2 disabled:no-underline disabled:opacity-40">초기화</button>}
         >
           <div className="space-y-5 py-5">
             <section aria-labelledby="customer-upload-mobile-search-title">
@@ -648,7 +646,7 @@ export default function CustomerUploadPage() {
             <section className="border-t border-border-subtle pt-5" aria-labelledby="customer-upload-mobile-sort-title">
               <h3 id="customer-upload-mobile-sort-title" className="mb-2 text-[14px] font-semibold text-foreground">정렬</h3>
               <div className="grid grid-cols-2 gap-2" role="group" aria-label="사진 정렬 방식">
-                {([['order-asc', '업로드 순'], ['order-desc', '최근 순'], ['name-asc', '파일명 순']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={sort === value} onClick={() => setSort(value)} className={`h-11 rounded-lg border text-[14px] font-semibold transition-colors ${sort === value ? "border-accent bg-accent/10 text-accent" : "border-border bg-surface text-foreground"}`}>{label}</button>)}
+                {([['taken-asc', '촬영 시간순'], ['order-asc', '업로드 순'], ['order-desc', '최근 순'], ['name-asc', '파일명 순']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={sort === value} onClick={() => setSort(value)} className={`h-11 rounded-lg border text-[14px] font-semibold transition-colors ${sort === value ? "border-accent bg-accent/10 text-accent" : "border-border bg-surface text-foreground"}`}>{label}</button>)}
               </div>
             </section>
           </div>
@@ -658,7 +656,7 @@ export default function CustomerUploadPage() {
 
       {viewerIndex >= 0 ? <OriginalPhotoViewer photos={viewerPhotos} activeIndex={viewerIndex} onActiveIndexChange={(index) => setViewerPhotoId(viewerPhotos[index]?.id ?? null)} onClose={() => setViewerPhotoId(null)} /> : null}
 
-      {aiSheet ? <AiTidySheet projectId={projectId} photoCount={project.photoCount} pending={aiStarting} error={aiSheetError} onStart={(kinds) => void startTidy(kinds)} onClose={() => setAiSheet(null)} /> : null}
+      {aiSheet ? <AiTidySheet projectId={projectId} photoCount={project.photoCount} pending={aiStarting} error={aiSheetError} onStart={(kinds) => void startTidy(kinds)} onClose={() => setAiSheet(false)} /> : null}
 
       {deleteImpact ? <SelectionConfirmDialog
         title="이 사진들을 삭제할까요?"

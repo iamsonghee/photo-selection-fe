@@ -2,7 +2,7 @@
 
 import { CUSTOMER_SHOOT_TYPES } from "@/lib/customer-shoot-scenes";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { PhotographerLightPageFrame } from "@/components/layout/PhotographerLightPageHeader";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -38,6 +38,9 @@ type EditableProject = {
 
 export function EditCustomerProjectForm({ project }: { project: EditableProject }) {
   const router = useRouter();
+  // 프로젝트 화면(헤더의 프로젝트명, 업로드의 "촬영 종류 바꾸기")에서 왔으면 저장·취소 뒤 그 화면으로 돌아간다.
+  const from = useSearchParams().get("from");
+  const backHref = from && ["upload", "select", "review"].includes(from) ? `/customer-select/${project.id}/${from}` : "/customer-select";
   const [name, setName] = useState(project.name);
   const [shootType, setShootType] = useState<string | null>(project.shoot_type);
   const [target, setTarget] = useState(String(project.target_count));
@@ -69,7 +72,7 @@ export function EditCustomerProjectForm({ project }: { project: EditableProject 
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "수정 실패");
-      router.push("/customer-select");
+      router.push(backHref);
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "수정 실패");
@@ -96,7 +99,7 @@ export function EditCustomerProjectForm({ project }: { project: EditableProject 
   return <>
     <PhotographerLightPageFrame className="flex-1 pb-8">
       <div className="mx-auto max-w-[840px]">
-        <ProjectFormPageHeading title="프로젝트 설정" description="촬영 정보와 보정받을 사진 수를 수정할 수 있어요." onBack={() => router.push("/customer-select")} />
+        <ProjectFormPageHeading title="프로젝트 설정" description="촬영 정보와 보정받을 사진 수를 수정할 수 있어요." onBack={() => router.push(backHref)} />
         <div className="flex flex-col gap-5">
           <ProjectFormSection number="01" title="기본 정보" description="프로젝트명과 셀렉 기준을 관리합니다.">
             <div id="field-name"><ProjectFormField error={fieldErrors.name} label="프로젝트명" required><ProjectFormInput autoFocus maxLength={60} className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(name), error: Boolean(fieldErrors.name) })}`} value={name} onChange={(event) => { setName(event.target.value); setFieldErrors((current) => ({ ...current, name: "" })); }} /></ProjectFormField></div>
@@ -135,7 +138,7 @@ export function EditCustomerProjectForm({ project }: { project: EditableProject 
       </div>
     </PhotographerLightPageFrame>
 
-    <PhotographerFormActionBar maxWidth={840} error={error} leading={<p className="text-sm text-muted-foreground">변경한 정보는 프로젝트 목록과 셀렉 화면에 반영됩니다.</p>} actions={<><PhotographerLightButton variant="secondary" onClick={() => router.push("/customer-select")} disabled={saving}>취소</PhotographerLightButton><PhotographerLightButton onClick={save} pending={saving} pendingLabel="저장 중…">변경사항 저장</PhotographerLightButton></>} />
+    <PhotographerFormActionBar maxWidth={840} error={error} leading={<p className="text-sm text-muted-foreground">변경한 정보는 프로젝트 목록과 셀렉 화면에 반영됩니다.</p>} actions={<><PhotographerLightButton variant="secondary" onClick={() => router.push(backHref)} disabled={saving}>취소</PhotographerLightButton><PhotographerLightButton onClick={save} pending={saving} pendingLabel="저장 중…">변경사항 저장</PhotographerLightButton></>} />
     {confirmDelete && <SelectionConfirmDialog title="프로젝트를 삭제할까요?" description={<>업로드한 사진과 모든 작업 기록이 삭제됩니다.<br />이 작업은 되돌릴 수 없어요.</>} confirmLabel="삭제하기" busyLabel="삭제 중…" confirming={deleting} error={error} danger onCancel={() => setConfirmDelete(false)} onConfirm={remove} />}
   </>;
 }

@@ -56,6 +56,12 @@
 .toolsMenuEmpty { margin: 0; padding: 8px 10px; color: var(--muted-foreground); font-size: 12px; }
 .toolsNote { margin: 0; padding: 7px 32px; background: color-mix(in srgb, var(--warning, #ffb800) 10%, var(--surface)); border-bottom: 1px solid var(--border-subtle); color: var(--foreground); display: flex; align-items: center; gap: 10px; font-size: 12px; }
 .toolsNote button { padding: 0; border: 0; background: none; color: var(--muted-foreground); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+/* 인물 구성 칩(AI 판정): 아기 단독 · 가족·소수 · 여러 명 · 사람 없음 */
+.peopleChips { padding: 8px 32px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--border-subtle); }
+.peopleChips button { flex: none; height: 28px; padding: 0 11px; border: 1px solid var(--border-subtle); border-radius: 999px; background: var(--surface); color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.peopleChips button b { color: var(--subtle-foreground); font-weight: 600; }
+.peopleChips button[aria-pressed="true"] { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--surface)); color: var(--primary); }
+.peopleChips button[aria-pressed="true"] b { color: inherit; }
 /* 장면 목록의 진행: ♥ 찜 수 · ✓ 고른 수/목표 */
 .sceneProgress { display: inline-flex; gap: 6px; }
 .sceneProgress i { font-style: normal; color: var(--subtle-foreground); }
@@ -68,7 +74,8 @@
 .analysis > div:first-of-type { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
 .analysis strong { font-size: 14px; font-weight: 700; }
 .analysis span { color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
-.analysis i { display: block; height: 4px; margin-top: 6px; border-radius: 999px; background: var(--primary); transition: width 400ms ease; }
+.analysis i { display: block; height: 4px; margin-top: 6px; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--primary) 14%, transparent); }
+.analysis i b { display: block; height: 100%; background: var(--primary); transition: width 400ms ease; }
 .analysisActions { flex: none; display: flex; gap: 6px; align-self: center; }
 .aiButton { margin-left: auto; height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--primary) 12%, var(--surface)); color: var(--primary); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .aiButton:hover { background: color-mix(in srgb, var(--primary) 18%, var(--surface)); }
@@ -265,6 +272,7 @@
   .toolsMenu { left: 12px; right: 12px; width: auto; }
   .toolsMenuLeft { right: auto; width: 200px; }
   .toolsNote { padding: 7px 20px; }
+  .peopleChips { padding: 8px 20px; }
   .analysis { margin: 10px 20px 0; flex-wrap: wrap; }
   .analysisActions { width: 100%; padding-left: 26px; }
   .rail, .floatNav { display: none; }

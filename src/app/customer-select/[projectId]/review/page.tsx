@@ -124,7 +124,7 @@ function SendScreen() {
   }
 
   return (
-    <CustomerSelectShell compactHeader compactTitle={<ProjectStepHeader projectId={projectId} name={project.name} step="send" backHref={`/customer-select/${projectId}/select`} backLabel="고르기로" />}>
+    <CustomerSelectShell compactHeader compactTitle={<ProjectStepHeader projectId={projectId} name={project.name} step="send" />}>
       <main className={s.main}>
         {selected.length === 0 ? (
           <section className={s.empty}>

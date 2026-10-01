@@ -23,6 +23,11 @@ order = 0;
 const small = [...burst(10, 0, 25), ...burst(10, 40, 3), ...burst(11, 30, 25)];
 assert.deepEqual(splitScenes(small).map((scene) => scene.photoIds.length), [28, 25]);
 
+// 행사 스냅(돌잔치): 10분 공백 없이 순서가 바뀔 때 4분만 쉬어도 장면을 나눈다.
+order = 0;
+const studio = [...burst(10, 0, 30), ...burst(10, 5, 30), ...burst(10, 10, 30)];
+assert.deepEqual(splitScenes(studio).map((scene) => scene.photoIds.length), [30, 30, 30]);
+
 // 사진이 적거나 촬영 시각이 대부분 없으면 장면을 만들지 않는다.
 assert.equal(splitScenes(burst(9, 0, 10)), null);
 assert.equal(splitScenes(photos.map((photo, i) => (i % 2 ? photo : { ...photo, takenAt: null }))), null);

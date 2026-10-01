@@ -8,7 +8,7 @@ export type ScenePhoto = { id: string; orderIndex: number; takenAt?: string | nu
 export type Scene = { index: number; photoIds: string[]; start: string | null; end: string | null };
 
 // ponytail: 고정 임계값 휴리스틱. 실제 촬영 데이터로 장면 경계가 어긋나면 이 값들부터 조정한다.
-// 3분: 스튜디오 촬영(돌사진 등)은 의상·세트 교체 때만 3~10분 쉰다. 공백이 많으면 MAX_SCENES 안에서 큰 공백부터 자른다.
+// 3분: 행사 스냅(돌잔치 등)은 쉬지 않고 찍다가 순서가 바뀔 때만 3~10분 쉰다. 공백이 많으면 MAX_SCENES 안에서 큰 공백부터 자른다.
 const SCENE_GAP_MS = 3 * 60_000;
 const MIN_SCENE_PHOTOS = 10;
 const MAX_SCENES = 8;
