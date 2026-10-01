@@ -9,7 +9,7 @@
  */
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowDown, ChevronUp, Grid2x2, Layers, MessageCircle, Plus, Sparkles } from "lucide-react";
+import { ArrowDown, ChevronUp, Grid2x2, Layers, MessageCircle, PanelLeftClose, PanelLeftOpen, Plus, Sparkles } from "lucide-react";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
@@ -66,6 +66,15 @@ function SelectScreen() {
     try { const stored = sessionStorage.getItem(lastSceneKey); return stored === null ? null : Number(stored); } catch { return null; }
   });
   const [enteredByPull, setEnteredByPull] = useState(false);
+  // PC 장면 사이드바 접기(기기별 보기 설정). 접으면 작은 퀵메뉴로 바뀐다.
+  const railCollapsedKey = "ps:self-select-rail-collapsed";
+  const [railCollapsed, setRailCollapsed] = useState(() => {
+    try { return localStorage.getItem(railCollapsedKey) === "1"; } catch { return false; }
+  });
+  const toggleRail = (collapsed: boolean) => {
+    setRailCollapsed(collapsed);
+    try { localStorage.setItem(railCollapsedKey, collapsed ? "1" : "0"); } catch {}
+  };
 
   const photos = project.photos;
   const photoById = useMemo(() => new Map(photos.map((photo) => [photo.id, photo])), [photos]);
@@ -320,6 +329,21 @@ function SelectScreen() {
         {saveError && <div role="alert" className="flex items-center gap-2 border-b border-danger/20 bg-danger/8 px-5 py-2 text-xs font-semibold text-danger"><span className="flex-1">{saveError}</span><button type="button" onClick={clearSaveError}>닫기</button></div>}
 
         <div className={s.body}>
+          {/* PC 장면 사이드바: 장면 목차(지금 장면·장면별 고른 수)와 대화. 접으면 작은 퀵메뉴가 대신한다. */}
+          {sceneMode && scenes && !railCollapsed && (
+            <nav className={s.rail} aria-label="장면">
+              <div className={s.railHead}>
+                <strong>장면</strong>
+                <button type="button" className={s.railToggle} onClick={() => toggleRail(true)} aria-label="장면 목록 접기" title="장면 목록 접기"><PanelLeftClose size={16} /></button>
+              </div>
+              <div className={s.quickList}>{sceneItems}</div>
+              {failedNotice}
+              <div className={s.railFooter}>
+                <span>{isOwner ? <>전체 <strong>{pickedTotal}</strong>{target ? ` / ${target}` : ""}장</> : <>내 찜 <strong>{myLikes.size}</strong>장</>}</span>
+                {withChat && <button type="button" className={s.quickChat} aria-pressed={chatOpen} onClick={() => setChatOpen((value) => !value)}><MessageCircle size={15} />대화</button>}
+              </div>
+            </nav>
+          )}
           <div className={`${s.main} ${sceneMode ? s.mainWithQuick : ""}`}>
             {analysisBanner}
             {!sceneMode && !analysisBanner && (
@@ -352,12 +376,7 @@ function SelectScreen() {
             {/* 퀵메뉴: 장면 목차(지금 장면·장면별 고른 수)와 대화. PC는 오른쪽 세로 목록, 모바일은 떠 있는 버튼 → 장면 시트. */}
             {sceneMode && scenes && (
               <>
-                <aside className={s.quickMenu} aria-label="장면">
-                  <div className={s.quickList}>{sceneItems}</div>
-                  {failedNotice}
-                  {withChat && <button type="button" className={s.quickChat} aria-pressed={chatOpen} onClick={() => setChatOpen((value) => !value)}><MessageCircle size={15} />대화</button>}
-                </aside>
-                <div className={s.quickPill}>
+                <div className={`${s.quickPill} ${railCollapsed ? s.quickPillDesktop : ""}`}>
                   <button type="button" className={s.quickPillScene} onClick={() => setSheet("scenes")} aria-label="장면 목록 열기">
                     <i aria-hidden />
                     <strong>{sceneTitle(scene!)}</strong>
@@ -365,6 +384,7 @@ function SelectScreen() {
                     <ChevronUp size={15} aria-hidden />
                   </button>
                   {withChat && <button type="button" className={s.quickPillChat} aria-label={chatOpen ? "대화 닫기" : "대화 열기"} aria-pressed={chatOpen} onClick={() => setChatOpen((value) => !value)}><MessageCircle size={17} /></button>}
+                  <button type="button" className={`${s.quickPillChat} ${s.quickPillExpand}`} aria-label="장면 목록 펼치기" title="장면 목록 펼치기" onClick={() => toggleRail(false)}><PanelLeftOpen size={17} /></button>
                 </div>
               </>
             )}

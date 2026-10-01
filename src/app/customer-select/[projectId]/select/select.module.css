@@ -61,8 +61,14 @@
 
 /* ── 퀵메뉴: 장면 목차 ── */
 .main { position: relative; }
-.quickMenu { position: absolute; top: 72px; right: 24px; z-index: 5; width: 184px; max-height: calc(100% - 172px); display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--border-subtle); border-radius: 14px; background: color-mix(in srgb, var(--surface) 96%, transparent); box-shadow: 0 10px 30px rgba(2, 56, 82, 0.1); backdrop-filter: blur(8px); }
-.mainWithQuick .timelineScroll { padding-right: 224px; }
+.rail { flex: none; width: 232px; display: flex; flex-direction: column; gap: 6px; padding: 8px; border-right: 1px solid var(--border-subtle); background: var(--surface); overflow: hidden; }
+.railHead { display: flex; align-items: center; justify-content: space-between; padding: 6px 2px 4px 10px; }
+.railHead strong { color: var(--subtle-foreground); font-size: 12px; font-weight: 700; letter-spacing: 0.04em; }
+.railToggle { width: 30px; height: 30px; border: 0; border-radius: 8px; background: none; color: var(--muted-foreground); display: grid; place-items: center; cursor: pointer; }
+.railToggle:hover { background: var(--surface-raised); color: var(--foreground); }
+.railFooter { margin-top: auto; display: flex; flex-direction: column; gap: 4px; padding: 10px 10px 2px; border-top: 1px solid var(--border-subtle); color: var(--muted-foreground); font-size: 12px; }
+.railFooter strong { color: var(--foreground); font-size: 15px; }
+.railFooter .quickChat { border-top: 0; justify-content: flex-start; padding: 0; }
 .quickList { min-height: 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
 .quickItem { width: 100%; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--muted-foreground); display: flex; align-items: center; justify-content: space-between; gap: 8px; font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
 .quickItem span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -71,9 +77,18 @@
 .quickItem:hover { background: var(--surface-raised); color: var(--foreground); }
 .quickItem[aria-current="true"] { background: color-mix(in srgb, var(--accent) 9%, var(--surface)); color: var(--foreground); font-weight: 800; }
 .quickNotice { padding: 6px 10px; border: 0; background: none; color: var(--muted-foreground); font: inherit; font-size: 11px; font-weight: 600; text-align: left; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-.quickChat { height: 34px; border: 0; border-top: 1px solid var(--border-subtle); border-radius: 0 0 8px 8px; background: none; color: var(--foreground); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.quickChat { height: 34px; border: 0; border-radius: 8px; background: none; color: var(--foreground); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .quickChat[aria-pressed="true"] { color: var(--accent); }
 .quickPill { display: none; }
+.quickPillExpand { display: none; }
+.quickPillDesktop { position: absolute; left: 24px; bottom: 92px; z-index: 6; display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--border-subtle); border-radius: 999px; background: color-mix(in srgb, var(--surface) 96%, transparent); box-shadow: 0 8px 24px rgba(2, 56, 82, 0.16); backdrop-filter: blur(8px); }
+.quickPillDesktop .quickPillScene { height: 40px; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--foreground); display: flex; align-items: center; gap: 6px; font: inherit; cursor: pointer; }
+.quickPillDesktop .quickPillScene i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.quickPillDesktop .quickPillScene strong { font-size: 14px; font-weight: 800; }
+.quickPillDesktop .quickPillScene span { color: var(--subtle-foreground); font-size: 12px; font-weight: 700; }
+.quickPillDesktop .quickPillChat { width: 40px; height: 40px; border: 0; border-left: 1px solid var(--border-subtle); background: none; color: var(--foreground); display: grid; place-items: center; cursor: pointer; }
+.quickPillDesktop .quickPillChat:last-child { border-radius: 0 999px 999px 0; }
+.quickPillDesktop .quickPillExpand { display: grid; }
 
 /* ── 하단 바 ── */
 .bottomBar { flex: none; display: flex; align-items: center; gap: 12px; padding: 12px 32px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border-subtle); background: var(--surface); }
@@ -149,7 +164,8 @@
   .columnsButton { display: inline-flex; }
   .analysis { margin: 10px 20px 0; flex-wrap: wrap; }
   .analysisActions { width: 100%; padding-left: 26px; }
-  .quickMenu { display: none; }
+  .rail { display: none; }
+  .quickPillExpand, .quickPillDesktop .quickPillExpand { display: none; }
   .mainWithQuick .timelineScroll { padding-right: 20px; padding-bottom: 72px; }
   .quickPill { position: absolute; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 6; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--border-subtle); border-radius: 999px; background: color-mix(in srgb, var(--surface) 96%, transparent); box-shadow: 0 8px 24px rgba(2, 56, 82, 0.16); backdrop-filter: blur(8px); }
   .quickPillScene { max-width: 240px; height: 40px; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--foreground); display: flex; align-items: center; gap: 6px; font: inherit; cursor: pointer; }
