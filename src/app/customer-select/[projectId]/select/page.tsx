@@ -31,7 +31,7 @@ import { useSceneAnalysis, type NamedScene } from "./useSceneAnalysis";
 import { AiTidySheet, groupSimilarKey, setAsideKey, type AiTidyKind } from "./AiTidySheet";
 import s from "./select.module.css";
 
-type Scope = "all" | "picked" | "liked" | "mine" | "popular" | "quality";
+type Scope = "all" | "picked" | "liked" | "mine" | "popular";
 const LIKE_SCOPES: readonly Scope[] = ["liked", "mine", "popular"];
 
 /** AI가 흔들림(흐림) 또는 눈 감음을 의심한 사진. 의도적인 컷일 수 있어 지우지 않고 뒤로만 뺀다. */
@@ -140,15 +140,14 @@ function SelectScreen() {
       if (scope === "liked" && !likesOf(photo.id).length) return false;
       if (scope === "mine" && !myLikes.has(photo.id)) return false;
       if (scope === "popular" && likesOf(photo.id).length < 2) return false;
-      if (scope === "quality" && !isFlagged(photo)) return false;
       // 빼고 보기: 의심 사진은 갤러리에서 뺀다. 이미 고른(참여자는 찜한) 사진은 절대 빼지 않는다.
-      if (setAside && scope !== "quality" && isFlagged(photo) && !picked.has(photo.id)) return false;
+      if (setAside && isFlagged(photo) && !picked.has(photo.id)) return false;
       return !text || getPhotoDisplayName(photo).toLowerCase().includes(text);
     });
   }, [likesOf, myLikes, picked, query, scenePhotos, scope, selectedIds, setAside]);
   const setAsideCount = useMemo(
-    () => (setAside && scope !== "quality" ? scenePhotos.filter((photo) => isFlagged(photo) && !picked.has(photo.id)).length : 0),
-    [picked, scenePhotos, scope, setAside],
+    () => (setAside ? scenePhotos.filter((photo) => isFlagged(photo) && !picked.has(photo.id)).length : 0),
+    [picked, scenePhotos, setAside],
   );
 
   const groupsInView = useMemo(() => {
@@ -442,7 +441,6 @@ function SelectScreen() {
                     <button type="button" className={s.segmentCaret} aria-label="찜 범위 바꾸기" aria-haspopup="menu" aria-expanded={menu === "like"} onClick={() => setMenu(menu === "like" ? null : "like")}><ChevronDown size={14} /></button>
                   </span>
                   <button type="button" aria-pressed={scope === "picked"} aria-label={isOwner ? "✓ 고른 사진" : "✓ 최종 선택"} onClick={() => setScope("picked")}>{isOwner ? "✓ 고른 사진" : "✓ 최종 선택"}<b>{countIn((photo) => selectedIds.has(photo.id))}</b></button>
-                  {scope === "quality" && <button type="button" aria-pressed aria-label="흔들림·눈 감음 의심만" onClick={() => setScope("all")}>흔들림·눈 감음 의심만<b>{filtered.length}</b></button>}
                 </div>
                 <span className={s.toolsSpacer} />
                 {searchOpen || query
@@ -484,7 +482,6 @@ function SelectScreen() {
               {setAside && setAsideCount > 0 && (
                 <p className={s.toolsNote}>
                   <span>흔들림·눈 감음 <strong>{setAsideCount}장</strong> 빼고 보는 중</span>
-                  <button type="button" onClick={() => setScope("quality")}>따로 보기</button>
                   <button type="button" onClick={() => toggleSetAside(false)}>끄기</button>
                 </p>
               )}

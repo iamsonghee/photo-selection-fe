@@ -273,14 +273,16 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   await expect(page.getByRole("button", { name: "보기 옵션" })).toHaveText("1");
   await expect(page.locator("[data-photo-id]")).toHaveCount(25);
   await expect(page.locator(".gl-quality-badge")).toHaveCount(0);
-  // 따로 보기: 뺀 사진만 모아 보고, 칩 위에 이유가 붙어 있다.
-  await page.getByRole("button", { name: "따로 보기" }).click();
-  await expect(page.locator("[data-photo-id]")).toHaveCount(5);
-  await expect(page.locator(".gl-quality-badge")).toHaveCount(5);
-  await expect(page.getByLabel("눈 감음 의심", { exact: true })).toHaveCount(2);
+  // 다시 켠 채로 들어와도 기억한다(아래). 끄기 전에 새로고침해 확인한다.
   // 다시 켠 채로 들어와도 기억한다(기기별 보기 설정).
   await page.reload();
   await expect(page.locator('[class*="toolsNote"]')).toContainText("빼고 보는 중");
+  await expect(page.locator('[class*="toolsNote"]').getByRole("button", { name: "따로 보기" })).toHaveCount(0);
+  // 끄기: 뺀 5장이 이유 표시와 함께 돌아온다.
+  await page.getByRole("button", { name: "끄기" }).click();
+  await expect(page.locator('[class*="toolsNote"]')).toHaveCount(0);
+  await expect(page.locator(".gl-quality-badge")).toHaveCount(5);
+  await expect(page.getByLabel("눈 감음 의심", { exact: true })).toHaveCount(2);
 
   // 정리 전(none)에는 가짜 결과가 붙지 않는다.
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=none`);
