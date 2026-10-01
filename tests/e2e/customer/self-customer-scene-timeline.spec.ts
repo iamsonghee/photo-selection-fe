@@ -278,9 +278,13 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   await page.reload();
   await expect(page.locator('[class*="toolsNote"]')).toContainText("빼고 보는 중");
   await expect(page.locator('[class*="toolsNote"]').getByRole("button", { name: "따로 보기" })).toHaveCount(0);
-  // 끄기: 뺀 5장이 이유 표시와 함께 돌아온다.
+  // 끄기: 뺀 5장이 이유 표시와 함께 돌아온다(새로고침으로 다시 켜진 유사컷 묶기를 끄고 30장 전체에서 센다).
   await page.getByRole("button", { name: "끄기" }).click();
   await expect(page.locator('[class*="toolsNote"]')).toHaveCount(0);
+  await page.getByRole("button", { name: "보기 옵션" }).click();
+  await page.getByRole("switch", { name: /유사컷 묶기/ }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-photo-id]")).toHaveCount(30);
   await expect(page.locator(".gl-quality-badge")).toHaveCount(5);
   await expect(page.getByLabel("눈 감음 의심", { exact: true })).toHaveCount(2);
 
