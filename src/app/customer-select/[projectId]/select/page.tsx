@@ -28,10 +28,13 @@ import { SceneGrid, type MobileColumns } from "./SceneGrid";
 import { PhotoDetail } from "./PhotoDetail";
 import { InviteSheet, Sheet } from "./Sheets";
 import { useSceneAnalysis, type NamedScene } from "./useSceneAnalysis";
-import { AiTidySheet, groupSimilarKey, type AiTidyKind } from "./AiTidySheet";
+import { AiTidySheet, groupSimilarKey, setAsideKey, type AiTidyKind } from "./AiTidySheet";
 import s from "./select.module.css";
 
 type Scope = "all" | "picked" | "mine" | "popular" | "quality";
+
+/** AI가 흔들림(흐림) 또는 눈 감음을 의심한 사진. 의도적인 컷일 수 있어 지우지 않고 뒤로만 뺀다. */
+const isFlagged = (photo: Photo) => Boolean(photo.isBlurry || (photo.faceDetected && photo.eyesClosed));
 
 export default function CustomerSelectPage() {
   return <Suspense fallback={<SystemLoadingScreen title="사진을 불러오고 있어요" homeHref="/customer-select" />}><SelectScreen /></Suspense>;
@@ -50,6 +53,13 @@ function SelectScreen() {
   const [grouped, setGrouped] = useState(() => {
     try { return localStorage.getItem(groupSimilarKey(projectId)) !== "0"; } catch { return true; }
   });
+  const [setAside, setSetAside] = useState(() => {
+    try { return localStorage.getItem(setAsideKey(projectId)) === "1"; } catch { return false; }
+  });
+  const toggleSetAside = (on: boolean) => {
+    setSetAside(on);
+    try { localStorage.setItem(setAsideKey(projectId), on ? "1" : "0"); } catch {}
+  };
   const [query, setQuery] = useState("");
   const [mobileColumns, setMobileColumns] = useState<MobileColumns>(2);
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
@@ -114,20 +124,28 @@ function SelectScreen() {
       if (scope === "picked" && !selectedIds.has(photo.id)) return false;
       if (scope === "mine" && !myLikes.has(photo.id)) return false;
       if (scope === "popular" && likesOf(photo.id).length < 2) return false;
-      if (scope === "quality" && !(photo.isBlurry || (photo.faceDetected && photo.eyesClosed))) return false;
+      if (scope === "quality" && !isFlagged(photo)) return false;
+      // 빼고 보기: 의심 사진은 갤러리에서 뺀다. 이미 고른(참여자는 찜한) 사진은 절대 빼지 않는다.
+      if (setAside && scope !== "quality" && isFlagged(photo) && !picked.has(photo.id)) return false;
       return !text || getPhotoDisplayName(photo).toLowerCase().includes(text);
     });
-  }, [likesOf, myLikes, query, scenePhotos, scope, selectedIds]);
+  }, [likesOf, myLikes, picked, query, scenePhotos, scope, selectedIds, setAside]);
+  const setAsideCount = useMemo(
+    () => (setAside && scope !== "quality" ? scenePhotos.filter((photo) => isFlagged(photo) && !picked.has(photo.id)).length : 0),
+    [picked, scenePhotos, scope, setAside],
+  );
 
   const groupsInView = useMemo(() => {
     const groups = new Map<string, Photo[]>();
     filtered.forEach((photo) => {
       if (photo.similarityGroupId) groups.set(photo.similarityGroupId, [...(groups.get(photo.similarityGroupId) ?? []), photo]);
     });
+    // 묶음 안에서는 흔들림·눈 감음 의심 사진을 맨 뒤로(표지·상세 ↑↓·띠가 멀쩡한 컷부터).
+    groups.forEach((members, groupId) => groups.set(groupId, [...members.filter((photo) => !isFlagged(photo)), ...members.filter(isFlagged)]));
     return groups;
   }, [filtered]);
   const hasGroups = Array.from(groupsInView.values()).some((members) => members.length > 1);
-  // 접힌 묶음의 표지는 고른 사진이 있으면 그 사진, 없으면 첫 사진.
+  // 접힌 묶음의 표지는 고른 사진이 있으면 그 사진, 없으면 (의심 사진을 뒤로 보낸) 첫 사진.
   const visible = useMemo(() => {
     if (!grouped || !hasGroups) return filtered;
     const covers = new Map<string, string>();
@@ -152,6 +170,7 @@ function SelectScreen() {
     setAiError(null);
     const error = await analysis.start(kinds);
     setAiPending(false);
+    if (!error && kinds.includes("quality")) setSetAside(true);
     if (error) setAiError(error);
     else setSheet(null);
   }
@@ -290,7 +309,8 @@ function SelectScreen() {
     { value: "picked", label: isOwner ? "✓ 고른 사진" : "✓ 최종 선택", show: true },
     { value: "mine", label: "♡ 내 찜", show: true },
     { value: "popular", label: "찜 2명 이상", show: people.length > 1 },
-    { value: "quality", label: "흔들림·눈 감음 의심", show: hasQuality },
+    // 의심 사진만 모아 보기는 "빼기" 칩 옆 "따로 보기"로 들어오고, 켜져 있는 동안만 칩으로 보인다.
+    { value: "quality", label: "흔들림·눈 감음 의심만", show: scope === "quality" },
   ];
 
   // 장면 끝의 얇은 안내: 다음 장면 이름(당기면 넘어간다는 신호), 마지막 장면이면 보내기.
@@ -360,6 +380,8 @@ function SelectScreen() {
             )}
             <div className={s.tools} style={sceneMode || analysisBanner ? { paddingTop: 10 } : undefined}>
               {scopeChips.filter((chip) => chip.show).map((chip) => <button key={chip.value} type="button" className={s.chip} aria-pressed={scope === chip.value} onClick={() => setScope(chip.value)}>{chip.label}</button>)}
+              {hasQuality && <button type="button" className={s.chip} aria-pressed={setAside} onClick={() => toggleSetAside(!setAside)}>{setAside && setAsideCount ? `흔들림·눈 감음 ${setAsideCount}장 빼는 중` : "흔들림·눈 감음 빼기"}</button>}
+              {setAside && setAsideCount > 0 && <button type="button" className={s.textLink} style={{ alignSelf: "center" }} onClick={() => setScope("quality")}>따로 보기</button>}
               {hasGroups && <button type="button" className={s.chip} aria-pressed={grouped} onClick={() => setGrouped((value) => !value)}><Layers size={13} />유사컷 묶기</button>}
               <input className={s.search} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="파일명 검색" aria-label="파일명 검색" />
               <button type="button" className={`${s.chip} ${s.columnsButton}`} aria-label={`한 줄에 ${mobileColumns}장 — 바꾸기`} onClick={() => setMobileColumns((value) => (value === 4 ? 2 : value + 1) as MobileColumns)}><Grid2x2 size={13} />{mobileColumns}열</button>

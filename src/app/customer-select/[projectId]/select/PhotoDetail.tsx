@@ -179,6 +179,7 @@ export function PhotoDetail({
                     <img src={member.url} alt="" draggable={false} loading="lazy" />
                     {selectedIds.has(member.id) && <i><Check size={11} strokeWidth={3} /></i>}
                     {run.collapsed && <b>{run.size}</b>}
+                    {(member.isBlurry || (member.faceDetected && member.eyesClosed)) && <em title={member.isBlurry ? "흐림 의심" : "눈 감음 의심"} aria-label={member.isBlurry ? "흐림 의심" : "눈 감음 의심"}>!</em>}
                   </button>
                 ));
                 if (run.collapsed || run.photos.length < 2) return thumbs;

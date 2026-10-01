@@ -137,9 +137,12 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
     await page.getByRole("button", { name: /한 줄에 3장/ }).click();
   }
   // 흐림(137번째마다 15장) + 눈 감음(211번째마다 10장), 첫 사진이 겹쳐 24장
-  await page.getByRole("button", { name: "흔들림·눈 감음 의심" }).click();
+  // 빼기를 켜고 "따로 보기"로 뺀 사진만 모아 본 뒤, 전체로 돌아와 빼기를 끈다.
+  await page.getByRole("button", { name: "흔들림·눈 감음 빼기" }).click();
+  await page.getByRole("button", { name: "따로 보기" }).click();
   await expect(page.locator("[data-photo-id]")).toHaveCount(24);
   await page.getByRole("button", { name: "전체", exact: true }).click();
+  await page.getByRole("button", { name: /흔들림·눈 감음 \d+장 빼는 중/ }).click();
   await page.waitForTimeout(250);
   await sample();
 

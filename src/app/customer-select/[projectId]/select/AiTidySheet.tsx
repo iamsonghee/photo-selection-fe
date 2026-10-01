@@ -14,6 +14,9 @@ export function rememberGroupSimilar(projectId: string, on: boolean) {
   try { localStorage.setItem(groupSimilarKey(projectId), on ? "1" : "0"); } catch {}
 }
 
+/** "흔들림·눈 감음 사진 뒤로 빼기"를 켜고 정리한 사람은 고르기 화면을 의심 사진을 뺀 채로 시작한다(기기별 보기 설정). */
+export const setAsideKey = (projectId: string) => `ps:self-select-set-aside:${projectId}`;
+
 /**
  * AI 정리 시작 확인. "할지·언제 할지"는 사용자가 정하고, 시작하기로 한 뒤에만 세부 항목을 보여준다.
  * 대부분은 기본값 그대로 `정리 시작` 한 번이면 된다. 장면 나누기는 이 서비스의 핵심이라 항상 켠다.
@@ -46,11 +49,15 @@ export function AiTidySheet({ projectId, photoCount, pending, error, onStart, on
         </label>
         <label className={s.tidyOption}>
           <input type="checkbox" checked={quality} onChange={(event) => setQuality(event.target.checked)} />
-          <span><strong>흔들림·눈 감음 표시</strong><small>확인이 필요한 사진에 표시만 해요. 사진을 빼지는 않아요</small></span>
+          <span><strong>흔들림·눈 감음 사진 뒤로 빼기</strong><small>의심 사진은 갤러리에서 빼고 묶음에서는 맨 뒤로 보내요. 지우지 않고 언제든 다시 볼 수 있어요</small></span>
         </label>
       </div>
       {error && <p className={s.tidyError} role="alert">{error}</p>}
-      <PhotographerLightButton size="confirmation" pending={pending} pendingLabel="시작하는 중…" onClick={() => { rememberGroupSimilar(projectId, similar); onStart(kinds); }}>정리 시작</PhotographerLightButton>
+      <PhotographerLightButton size="confirmation" pending={pending} pendingLabel="시작하는 중…" onClick={() => {
+        rememberGroupSimilar(projectId, similar);
+        try { localStorage.setItem(setAsideKey(projectId), quality ? "1" : "0"); } catch {}
+        onStart(kinds);
+      }}>정리 시작</PhotographerLightButton>
     </Sheet>
   );
 }

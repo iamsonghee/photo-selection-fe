@@ -250,12 +250,21 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   await page.keyboard.press("Escape");
   await expect(page.locator('.gl-photo-card[data-photo-id="p9"]')).toHaveCount(0);
 
-  // 의심 사진만 모아 볼 수 있다(묶음을 끄고 전체에서).
+  // 흔들림·눈 감음 빼기: 첫 장면(30장)의 의심 5장(흔들림 3 + 눈 감음 2)을 갤러리에서 뺀다(묶음을 끄고 전체에서).
   await page.getByRole("button", { name: "유사컷 묶기" }).click();
-  await page.getByRole("button", { name: "흔들림·눈 감음 의심" }).click();
-  // 첫 장면(30장)에서 흔들림 3장 + 눈 감음 2장 — 모두 의심 표시가 붙은 사진만 남는다.
+  await expect(page.locator("[data-photo-id]")).toHaveCount(30);
+  await page.getByRole("button", { name: "흔들림·눈 감음 빼기" }).click();
+  await expect(page.getByRole("button", { name: "흔들림·눈 감음 5장 빼는 중" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("[data-photo-id]")).toHaveCount(25);
+  await expect(page.locator(".gl-quality-badge")).toHaveCount(0);
+  // 따로 보기: 뺀 사진만 모아 보고, 칩 위에 이유가 붙어 있다.
+  await page.getByRole("button", { name: "따로 보기" }).click();
   await expect(page.locator("[data-photo-id]")).toHaveCount(5);
   await expect(page.locator(".gl-quality-badge")).toHaveCount(5);
+  await expect(page.getByLabel("눈 감음 의심")).toHaveCount(2);
+  // 다시 켠 채로 들어와도 기억한다(기기별 보기 설정).
+  await page.reload();
+  await expect(page.getByRole("button", { name: /흔들림·눈 감음 \d+장 빼는 중/ })).toHaveAttribute("aria-pressed", "true");
 
   // 정리 전(none)에는 가짜 결과가 붙지 않는다.
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=none`);
@@ -278,12 +287,15 @@ test("detail moves by gallery stops and browses a folded group with up/down and 
   const count = page.locator('[class*="detailCount"]');
   await expect(count).toContainText("6 / 22");
 
-  // ‹ › 는 묶음을 한 칸으로 지나고, 묶음 안에서는 ↑↓ 로 넘긴다.
+  // ‹ › 는 묶음을 한 칸으로 지나고, 묶음 안에서는 ↑↓ 로 넘긴다. 눈 감음 의심(p9)은 묶음 맨 뒤.
   await page.keyboard.press("ArrowRight");
   await expect(count).toContainText("7 / 22 · 비슷한 사진 1/3");
   await page.keyboard.press("ArrowDown");
   await expect(count).toContainText("7 / 22 · 비슷한 사진 2/3");
+  await expect(page.getByRole("dialog", { name: "S_10.jpg 상세 보기" })).toBeVisible();
+  await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("dialog", { name: "S_9.jpg 상세 보기" })).toBeVisible();
+  await expect(page.locator('[class*="stripRow"]').getByRole("button", { name: "S_9.jpg 보기" }).getByLabel("눈 감음 의심")).toBeVisible();
   await page.keyboard.press("ArrowRight");
   await expect(count).toContainText("8 / 22");
   await expect(count).not.toContainText("비슷한 사진");
@@ -292,10 +304,11 @@ test("detail moves by gallery stops and browses a folded group with up/down and 
   const strip = page.locator('[class*="stripRow"]');
   await expect(strip.getByRole("button", { name: "S_11.jpg 보기" })).toHaveAttribute("aria-current", "true");
   await expect(strip.getByRole("button", { name: "S_8.jpg 외 비슷한 사진 2장 보기" })).toBeVisible();
-  await strip.getByRole("button", { name: "S_16.jpg 외 비슷한 사진 2장 보기" }).click();
+  // p16~p18 묶음은 흔들림 의심(p16)이 맨 뒤라 표지가 p17이다.
+  await strip.getByRole("button", { name: "S_17.jpg 외 비슷한 사진 2장 보기" }).click();
   await expect(count).toContainText("13 / 22 · 비슷한 사진 1/3");
   await expect(strip.locator('[class*="stripGroup"]').filter({ hasText: "비슷한 사진 3장" })).toHaveCount(1);
-  await strip.getByRole("button", { name: "S_18.jpg 보기" }).click();
+  await strip.getByRole("button", { name: "S_16.jpg 보기" }).click();
   await expect(count).toContainText("13 / 22 · 비슷한 사진 3/3");
   await context.close();
 });
@@ -344,5 +357,21 @@ test("quality flags sit at the right edge and step aside only when the like butt
   await card.getByRole("button", { name: "찜하기" }).click();
   await page.mouse.move(0, 0);
   await expect(flag).toHaveCSS("transform", "matrix(1, 0, 0, 1, -27, 0)");
+  await context.close();
+});
+
+test("set-aside never hides a photo that is already picked", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.getByRole("button", { name: "유사컷 묶기" }).click();
+  // p5(흔들림 의심)를 먼저 고른 뒤 빼기를 켜면 p5는 남는다.
+  await page.locator('.gl-photo-card[data-photo-id="p5"]').getByRole("button", { name: "선택", exact: true }).click();
+  await page.getByRole("button", { name: "흔들림·눈 감음 빼기" }).click();
+  await expect(page.locator('.gl-photo-card[data-photo-id="p5"]')).toBeVisible();
+  await expect(page.getByRole("button", { name: "흔들림·눈 감음 4장 빼는 중" })).toBeVisible();
+  await page.getByRole("button", { name: /빼는 중/ }).click();
   await context.close();
 });
