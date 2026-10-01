@@ -55,6 +55,8 @@ type GalleryPhotoCardProps = {
   liked?: boolean;
   /** true면 내가 체크로 선택하는 순간에만 체크가 톡 튀고 테두리가 번진다(해제·동기화·다시 그려질 때는 조용) */
   popOnSelect?: boolean;
+  /** 선택 스타일(✓·어둡게) 없이 주황 테두리만 — 셀프 고객 셀렉의 접힌 묶음 표지에 고른 사진이 있을 때 */
+  highlighted?: boolean;
   /** 없으면 묶음 배지는 표시만 한다 */
   onGroupBadgeClick?: (e: React.MouseEvent, groupId: string) => void;
   onRate: (photoId: string, star: StarRating | undefined) => void;
@@ -91,6 +93,7 @@ function GalleryPhotoCardImpl({
   onLikeClick,
   liked = false,
   popOnSelect = false,
+  highlighted = false,
   onGroupBadgeClick,
   onRate,
   onThumbError,
@@ -190,7 +193,7 @@ function GalleryPhotoCardImpl({
     >
       <PhotoThumbnailFrame
         className={`gl-card-media${inExpandedGroup ? " gl-group-media" : showGroupBadge ? " gl-group-stack" : ""}`}
-        active={selected}
+        active={selected || highlighted}
         ringLayer={19}
       >
         {shouldLoad && presignedThumb ? (

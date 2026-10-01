@@ -186,7 +186,8 @@ export function SceneGrid({ photos, mobileColumns, positionKey, startAt, enterFr
 
     const onWheel = (event: WheelEvent) => {
       if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
-      const now = performance.now();
+      // 처리 시각이 아니라 휠이 생긴 시각으로 잰다 — 장면을 새로 그리느라 바쁜 동안 쌓였다 늦게 처리된 휠을 '쉰 뒤 새 휠'로 오해하지 않게.
+      const now = event.timeStamp || performance.now();
       const gap = now - lastWheel;
       lastWheel = now;
       const dy = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * el.clientHeight : event.deltaY;

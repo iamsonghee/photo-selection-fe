@@ -150,8 +150,24 @@ test("desktop: one continuous scroll moves at most one scene", async ({ browser 
   await page.waitForTimeout(400);
 
   // 쉬지 않고 2초 넘게 계속 굴려도(트랙패드 연속 스와이프·관성) 다음 장면 하나까지만 간다.
+  // 테스트 기기가 바쁘면 Playwright가 보내는 휠 자체에 0.14초 넘는 틈이 생기는데, 그건 "쉬었다 다시 당김"이라 넘어가는 게 맞다.
+  // 그래서 결과 장면 대신 규칙을 확인한다: 첫 이동 뒤의 이동은 그 장면에서 0.14초 이상 쉰 휠이 있었을 때만 일어난다.
+  await page.evaluate(() => {
+    const w = window as unknown as { __wheels: { t: number; scene: string }[] };
+    w.__wheels = [];
+    addEventListener("wheel", (event) => w.__wheels.push({ t: event.timeStamp, scene: new URLSearchParams(location.search).get("scene") ?? "" }), { capture: true });
+  });
   for (let i = 0; i < 120; i++) { await page.mouse.wheel(0, 40); await page.waitForTimeout(16); }
   await page.waitForTimeout(500);
+  const wheels = await page.evaluate(() => (window as unknown as { __wheels: { t: number; scene: string }[] }).__wheels);
+  const finalScene = Number(new URL(page.url()).searchParams.get("scene"));
+  expect(finalScene).toBeGreaterThanOrEqual(1);
+  for (let scene = 1; scene < finalScene; scene++) {
+    const inScene = wheels.filter((wheel) => wheel.scene === String(scene));
+    const paused = inScene.some((wheel, index) => index > 0 && wheel.t - inScene[index - 1].t >= 140);
+    expect(paused, `장면 ${scene}에서 쉬지 않았는데 다음 장면으로 넘어감`).toBe(true);
+  }
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=1`);
   await expect(page).toHaveURL(/scene=1/);
 
   // 한 번 쉬었다가 다시 장면 끝에서 당기면 그다음 장면으로 간다.
@@ -294,5 +310,8 @@ test("a collapsed cover never looks selected; the badge shows the group's picks"
   const cover = page.locator('.gl-photo-card[data-photo-id="p1"]');
   await expect(cover).toContainText("2장 선택");
   await expect(cover).not.toHaveClass(/gl-selected/);
+  // 대신 주황 테두리로 이 묶음에 고른 사진이 있음을 보인다.
+  await expect(cover.locator('[data-active="true"]')).toHaveCount(1);
+  await expect(page.locator('.gl-photo-card[data-photo-id="p8"] [data-active="true"]')).toHaveCount(0);
   await context.close();
 });
