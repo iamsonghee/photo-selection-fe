@@ -278,6 +278,7 @@ function SelectScreen() {
         onCheckClick={(event) => { event.preventDefault(); event.stopPropagation(); if (isOwner) store.toggleSelect(photo.id); else store.toggleLike(photo.id, me); }}
         onLikeClick={isOwner && !isCover ? (event) => { event.preventDefault(); event.stopPropagation(); store.toggleLike(photo.id, me); } : undefined}
         liked={isOwner && myLikes.has(photo.id)}
+        popOnSelect
         onGroupBadgeClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleGroup(); }}
         onRate={() => {}}
         onThumbError={() => {}}

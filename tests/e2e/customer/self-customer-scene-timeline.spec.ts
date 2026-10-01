@@ -193,3 +193,25 @@ test("owner card: like is a secondary hover action on desktop and display-only o
   await expect(phone.locator('[data-photo-id="p40"]').getByRole("button", { name: "찜하기" })).toBeHidden();
   await mobile.close();
 });
+
+test("selecting a card pops only at the moment it turns on", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  // 이미 선택돼 있던 사진(p1)은 처음 그려질 때 튀지 않는다.
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await expect(page.locator('.gl-photo-card[data-photo-id="p1"]')).toHaveClass(/gl-selected/);
+  await expect(page.locator(".gl-photo-card[data-pop]")).toHaveCount(0);
+
+  const card = page.locator('.gl-photo-card[data-photo-id="p5"]');
+  await card.getByRole("button", { name: "선택", exact: true }).click();
+  await expect(card).toHaveAttribute("data-pop", "");
+  await expect(card).toHaveClass(/gl-selected/);
+  await expect(card).not.toHaveAttribute("data-pop");
+  // 해제할 때는 조용하다.
+  await card.getByRole("button", { name: "선택 해제" }).click();
+  await expect(card).not.toHaveClass(/gl-selected/);
+  await expect(page.locator(".gl-photo-card[data-pop]")).toHaveCount(0);
+  await context.close();
+});

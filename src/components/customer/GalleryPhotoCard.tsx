@@ -53,6 +53,8 @@ type GalleryPhotoCardProps = {
   /** 주면 오른쪽 위에 보조 찜(♡) 버튼을 둔다 — 마우스를 올렸을 때만 보이고, 찜한 사진은 항상 ♥ 표시. 터치 기기에서는 표시만 한다 */
   onLikeClick?: (e: React.MouseEvent, photoId: string) => void;
   liked?: boolean;
+  /** true면 내가 체크로 선택하는 순간에만 체크가 톡 튀고 테두리가 번진다(해제·동기화·다시 그려질 때는 조용) */
+  popOnSelect?: boolean;
   onGroupBadgeClick: (e: React.MouseEvent, groupId: string) => void;
   onRate: (photoId: string, star: StarRating | undefined) => void;
   onThumbError: (photoId: string) => void;
@@ -87,6 +89,7 @@ function GalleryPhotoCardImpl({
   onCheckClick,
   onLikeClick,
   liked = false,
+  popOnSelect = false,
   onGroupBadgeClick,
   onRate,
   onThumbError,
@@ -213,7 +216,17 @@ function GalleryPhotoCardImpl({
 
         {showCheck && <button
         type="button"
-        onClick={(e) => onCheckClick(e, photo.id)}
+        onClick={(e) => {
+          // className은 React가 다시 쓰므로, 애니메이션 표시는 React가 관리하지 않는 data 속성으로 단다.
+          const cardEl = popOnSelect && !selected ? e.currentTarget.closest<HTMLElement>(".gl-photo-card") : null;
+          if (cardEl) {
+            delete cardEl.dataset.pop;
+            void cardEl.offsetWidth; // 연달아 눌러도 처음부터 다시 재생
+            cardEl.dataset.pop = "";
+            window.setTimeout(() => { delete cardEl.dataset.pop; }, 400);
+          }
+          onCheckClick(e, photo.id);
+        }}
         disabled={checkDisabled}
         aria-label={checkVariant === "heart" ? (selected ? "찜 해제" : "찜하기") : selected ? "선택 해제" : "선택"}
         aria-pressed={checkVariant === "heart" ? selected : undefined}
