@@ -59,8 +59,14 @@
 .timelineScroll :global(.gl-photo-card:has(.gl-group-stack) .gl-overlay-interactive) { justify-content: flex-start !important; }
 /* 고른 사진도 원래 밝기로 본다(비교가 정확하고 배지·글자가 묻히지 않게). 선택은 ✓·주황 테두리로만 보인다. */
 .timelineScroll :global(.gl-photo-card.gl-selected .gl-card-media img) { filter: none; }
-/* 소유자 카드 오른쪽 위는 보조 찜(♡) 자리라, 흔들림·눈 감음 표시는 그 왼쪽으로 비킨다. */
-.timelineScroll :global(.gl-photo-card:has(.gl-like-box) .gl-quality-badge) { transform: translateX(-36px); }
+/* 흔들림·눈 감음 표시: ♡와 같은 크기·중심선의 둥근 칩(중심이 오른쪽 위 ♡ 원과 같은 높이). 둘 다면 나란히. */
+.timelineScroll :global(.gl-quality-badge) { top: 9px !important; right: 13px !important; width: 22px !important; height: 22px !important; border: 0; border-radius: 50%; background: rgba(24, 30, 34, 0.72); transition: transform 120ms ease; }
+.timelineScroll :global(.gl-quality-badge-blur ~ .gl-quality-badge-eyes) { right: 39px !important; }
+/* 오른쪽 위는 소유자 보조 찜(♡) 자리 — ♡가 보일 때(마우스를 올렸거나 찜한 사진)만 표시가 왼쪽으로 비킨다. 평소엔 오른쪽 끝에 맞춘다. */
+.timelineScroll :global(.gl-photo-card:has(.gl-like-box.gl-liked) .gl-quality-badge),
+.timelineScroll :global(.gl-photo-card:has(.gl-like-box:focus-visible) .gl-quality-badge) { transform: translateX(-27px); }
+@media (hover: hover) { .timelineScroll :global(.gl-photo-card:hover:has(.gl-like-box) .gl-quality-badge) { transform: translateX(-27px); } }
+@media (prefers-reduced-motion: reduce) { .timelineScroll :global(.gl-quality-badge) { transition: none; } }
 .timelineScroll :global(.gl-group-stack) { border-bottom: 0; }
 
 /* ── 장면 하나씩: 끝에서 당겨 넘기기 ── */
