@@ -357,7 +357,7 @@ function SelectScreen() {
       />}
       headerMeta={peopleBar}
     >
-      <div className={s.page}>
+      <div className={s.page} data-chat={people.length > 1 ? "" : undefined}>
         <div className={s.mobilePeople}>{peopleBar}</div>
 
         {syncStatus === "offline" && <div role="status" className="border-b border-danger/20 bg-danger/8 px-5 py-2 text-center text-xs font-semibold text-danger">연결이 불안정해요. 다시 연결하고 있어요.</div>}

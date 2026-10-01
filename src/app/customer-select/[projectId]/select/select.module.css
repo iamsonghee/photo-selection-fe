@@ -79,6 +79,8 @@
 .boundaryNext { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-subtle); color: var(--muted-foreground); font-size: 13px; }
 .boundaryNext strong { color: var(--foreground); font-size: 15px; font-weight: 700; }
 .boundaryNext svg { margin-left: auto; flex: none; }
+.boundaryNext span, .boundaryNext strong { white-space: nowrap; }
+.boundaryNext { flex-wrap: wrap; row-gap: 4px; }
 .boundaryEnd { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-subtle); color: var(--muted-foreground); font-size: 13px; }
 
 /* ── 장면 개요 ── */
@@ -176,6 +178,10 @@
   .sceneCover { width: 72px; height: 72px; }
   .sceneProgress { grid-column: 2; margin-top: -6px; }
   .stickyHeader { padding: 0 20px; height: 44px; }
+  /* 대화 버튼(오른쪽 아래, 참여자 2명 이상)이 경계 카드의 화살표를 가리지 않도록 오른쪽을 비워 둔다 */
+  .page[data-chat] .boundaryCard { padding-right: 60px; }
+  /* 좁은 화면에서는 시간대·장수를 둘째 줄로 내려 단어가 중간에서 끊기지 않게 한다 */
+  .boundaryNext span:nth-of-type(2) { order: 3; flex-basis: 100%; }
   .analysis { margin: 10px 20px 0; flex-wrap: wrap; }
   .analysisActions { width: 100%; padding-left: 26px; }
   .bottomBar { padding: 10px 20px calc(10px + env(safe-area-inset-bottom)); }
