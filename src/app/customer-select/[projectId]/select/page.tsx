@@ -8,7 +8,7 @@
  */
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, Grid2x2, Layers, Plus, Sparkles } from "lucide-react";
+import { ArrowDown, CheckCircle2, ChevronDown, Grid2x2, Layers, Plus, Sparkles } from "lucide-react";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
@@ -23,7 +23,7 @@ import { NicknamePrompt } from "../../_lib/NicknamePrompt";
 import { ParticipantAccessEndedScreen, ParticipantJoinScreen } from "../../_lib/ParticipantJoinScreen";
 import { EphemeralChat } from "../../_lib/EphemeralChat";
 import ui from "../../_lib/ui.module.css";
-import { PhotoGrid, type MobileColumns } from "./PhotoGrid";
+import { TimelineGrid, type MobileColumns, type TimelineSection } from "./TimelineGrid";
 import { PhotoDetail } from "./PhotoDetail";
 import { InviteSheet, Sheet } from "./Sheets";
 import { useSceneAnalysis, type NamedScene } from "./useSceneAnalysis";
@@ -75,15 +75,19 @@ function SelectScreen() {
   const online = useMemo(() => new Set<string>(project.onlineParticipants ?? []), [project.onlineParticipants]);
   const targets = useMemo(() => scenes ? sceneTargets(scenes.map((scene) => scene.photoIds.length), project.target) : [], [project.target, scenes]);
 
-  const sceneParam = searchParams.get("scene");
-  const viewAll = !scenes || searchParams.get("view") === "all" || (holdAll && sceneParam === null);
-  const sceneIndex = !viewAll && scenes && sceneParam !== null && Number(sceneParam) >= 0 && Number(sceneParam) < scenes.length ? Number(sceneParam) : null;
-  const scene = sceneIndex === null ? null : scenes![sceneIndex];
-  const showOverview = Boolean(scenes) && !scene && !viewAll;
+  const sceneParam = searchParams.get("scene") ?? (searchParams.get("view") === "all" ? "0" : null);
+  // 장면이 있으면 모든 장면을 하나로 이어 붙인 타임라인, 정리 전·정리 중이면 촬영 시간순 한 목록.
+  const sectioned = Boolean(scenes) && !holdAll;
+  const showOverview = sectioned && sceneParam === null;
+  const inTimeline = sectioned && sceneParam !== null;
+  const initialSection = inTimeline && Number(sceneParam) >= 0 && Number(sceneParam) < scenes!.length ? Number(sceneParam) : null;
+  const [currentSection, setCurrentSection] = useState(initialSection ?? 0);
+  const [jump, setJump] = useState<{ section: number; nonce: number } | null>(null);
+  const sectionOf = useMemo(() => new Map((scenes ?? []).flatMap((scene, index) => scene.photoIds.map((id) => [id, index] as const))), [scenes]);
 
   const scenePhotos = useMemo(
-    () => scene ? scene.photoIds.flatMap((id) => photoById.get(id) ?? []) : viewAll ? timeOrdered : [],
-    [photoById, scene, timeOrdered, viewAll],
+    () => sectioned ? scenes!.flatMap((scene) => scene.photoIds.flatMap((id) => photoById.get(id) ?? [])) : timeOrdered,
+    [photoById, scenes, sectioned, timeOrdered],
   );
   const filtered = useMemo(() => {
     const text = query.trim().toLowerCase();
@@ -129,15 +133,20 @@ function SelectScreen() {
     else setSheet(null);
   }
 
-  const goScene = useCallback((index: number | null | "all", mode: "push" | "replace" = "push") => {
+  /** 장면 번호면 타임라인의 그 위치로(이미 타임라인이면 스크롤만), null이면 장면 개요로. */
+  function goScene(index: number | null, mode: "push" | "replace" = "push") {
+    if (index !== null && inTimeline) {
+      setJump({ section: index, nonce: Date.now() });
+      return;
+    }
     setScope("all");
     setQuery("");
     setExpanded(new Set());
     setHoldAll(false);
     const base = `/customer-select/${projectId}/select`;
-    const url = index === null ? base : index === "all" ? `${base}?view=all` : `${base}?scene=${index}`;
+    const url = index === null ? base : `${base}?scene=${index}`;
     if (mode === "push") router.push(url, { scroll: false }); else router.replace(url, { scroll: false });
-  }, [projectId, router]);
+  }
 
   // 상세에서 보고 있는 사진을 함께 고르는 사람에게 알린다.
   const { setViewingPhoto } = store;
@@ -154,7 +163,6 @@ function SelectScreen() {
 
   const target = project.target;
   const pickedTotal = picked.size;
-  const nextScene = scenes && sceneIndex !== null && sceneIndex < scenes.length - 1 ? sceneIndex + 1 : null;
   const resumeScene = scenes ? Math.max(0, scenes.findIndex((item, index) => pickedInScene(item) < (isOwner ? targets[index] : 1))) : 0;
   const hasQuality = scenePhotos.some((photo) => photo.isBlurry || (photo.faceDetected && photo.eyesClosed));
   const myDone = Boolean(project.participantDone[me]);
@@ -196,7 +204,7 @@ function SelectScreen() {
   ) : null;
 
   const sceneList = scenes?.map((item, index) => (
-    <button key={index} type="button" className={s.railItem} aria-current={index === sceneIndex} onClick={() => { setSheet(null); goScene(index, sceneIndex === null ? "push" : "replace"); }}>
+    <button key={index} type="button" className={s.railItem} aria-current={inTimeline && index === currentSection} onClick={() => { setSheet(null); goScene(index); }}>
       <strong>{sceneTitle(item)}</strong>
       <span>{sceneSub(item)}</span>
       <em className={sceneDone(item, index) ? s.done : ""}>{isOwner ? `${pickedInScene(item)}${targets[index] ? `/${targets[index]}` : ""}` : `♡${pickedInScene(item)}`}</em>
@@ -273,7 +281,6 @@ function SelectScreen() {
       return <>
         <div className={s.barMeta}><strong>내가 찜한 사진 {myLikes.size}장</strong><span>보정 받을 사진은 {project.participantNicknames.red || "소유자"}님이 정해요</span></div>
         <div className={s.barActions}>
-          {nextScene !== null && <PhotographerLightButton variant="outline" size="work-panel" className={s.desktopOnly} onClick={() => goScene(nextScene, "replace")}>다음 장면</PhotographerLightButton>}
           <PhotographerLightButton variant={myDone ? "outline" : "primary"} size="work-panel" onClick={() => store.toggleDone(me)}>{myDone ? "다시 고르기" : "다 골랐어요"}</PhotographerLightButton>
         </div>
       </>;
@@ -288,19 +295,52 @@ function SelectScreen() {
         </div>
       </>;
     }
+    const current = inTimeline ? scenes![currentSection] : null;
     return <>
       <div className={s.barMeta}>
-        <strong>{scene ? `이 장면 ${pickedInScene(scene)}${targets[sceneIndex!] ? ` / ${targets[sceneIndex!]}장 정도` : "장"}` : totalText}</strong>
-        <span>{scene ? `전체 ${totalText}` : "목표와 달라도 보낼 수 있어요"}</span>
+        <strong>{current ? `${sceneTitle(current)} ${pickedInScene(current)}${targets[currentSection] ? ` / ${targets[currentSection]}장 정도` : "장"}` : totalText}</strong>
+        <span>{current ? `전체 ${totalText}` : "목표와 달라도 보낼 수 있어요"}</span>
       </div>
       <div className={s.barActions}>
-        {nextScene !== null && <PhotographerLightButton variant="outline" size="work-panel" className={s.desktopOnly} disabled={!pickedTotal} onClick={toReview}>작가에게 보내기</PhotographerLightButton>}
-        {nextScene !== null
-          ? <PhotographerLightButton size="work-panel" onClick={() => goScene(nextScene, "replace")}>다음 장면 →</PhotographerLightButton>
-          : <PhotographerLightButton size="work-panel" disabled={!pickedTotal} onClick={toReview}>작가에게 보내기 →</PhotographerLightButton>}
+        <PhotographerLightButton size="work-panel" disabled={!pickedTotal} onClick={toReview}>작가에게 보내기 →</PhotographerLightButton>
       </div>
     </>;
   })();
+
+  // 장면 사이 경계 카드: 방금 본 장면에서 고른 수와 다음 장면을 보여주며, 스크롤이 이 근처에서 살짝 멈춘다.
+  const boundary = (index: number) => {
+    const scene = scenes![index];
+    const next = scenes![index + 1];
+    const count = pickedInScene(scene);
+    const done = isOwner
+      ? count ? `${sceneTitle(scene)} ${count}${targets[index] ? ` / ${targets[index]}장 정도` : "장"} 골랐어요` : `${sceneTitle(scene)}에서 아직 안 골랐어요`
+      : count ? `${sceneTitle(scene)}에서 ♡ ${count}장 찜했어요` : `${sceneTitle(scene)}에서 아직 찜 안 했어요`;
+    return (
+      <div className={s.boundaryCard}>
+        <p className={`${s.boundaryDone} ${count ? "" : s.muted}`}>{count ? <CheckCircle2 size={16} aria-hidden /> : null}{done}</p>
+        {next ? (
+          <div className={s.boundaryNext}><span>다음 장면</span><strong>{sceneTitle(next)}</strong><span>{sceneSub(next)}</span><ArrowDown size={16} aria-hidden /></div>
+        ) : (
+          <div className={s.boundaryEnd}>
+            <span>마지막 장면이에요 · 전체 {pickedTotal}장 {isOwner ? "선택" : "찜"}</span>
+            {isOwner
+              ? <PhotographerLightButton size="toolbar" disabled={!pickedTotal} onClick={toReview}>작가에게 보내기 →</PhotographerLightButton>
+              : <PhotographerLightButton size="toolbar" variant={myDone ? "outline" : "primary"} onClick={() => store.toggleDone(me)}>{myDone ? "다시 고르기" : "다 골랐어요"}</PhotographerLightButton>}
+          </div>
+        )}
+      </div>
+    );
+  };
+  const sectionHeader = (index: number, sticky = false) => (
+    <button type="button" className={s.sectionTitle} onClick={() => setSheet("scenes")} aria-label={`${sceneTitle(scenes![index])} — 다른 장면으로 이동`}>
+      <strong>{sceneTitle(scenes![index])}</strong>
+      <span>{sticky ? `${index + 1} / ${scenes!.length}` : sceneSub(scenes![index])}</span>
+      {sticky ? <ChevronDown size={15} aria-hidden /> : null}
+    </button>
+  );
+  const sections: TimelineSection[] = sectioned
+    ? scenes!.map((_, index) => ({ key: `scene-${index}`, header: sectionHeader(index), photos: visible.filter((photo) => sectionOf.get(photo.id) === index), boundary: boundary(index) }))
+    : [{ key: "all", photos: visible }];
 
   return (
     <CustomerSelectShell
@@ -311,9 +351,9 @@ function SelectScreen() {
         name={project.name}
         step="select"
         showSteps={isOwner}
-        backHref={isOwner ? (scene ? `/customer-select/${projectId}/select` : "/customer-select") : undefined}
-        backLabel={scene ? "장면 목록으로" : "내 프로젝트로"}
-        onBack={(event) => { if (scene) { event.preventDefault(); goScene(null, "replace"); } }}
+        backHref={isOwner ? (inTimeline ? `/customer-select/${projectId}/select` : "/customer-select") : undefined}
+        backLabel={inTimeline ? "장면 목록으로" : "내 프로젝트로"}
+        onBack={(event) => { if (inTimeline) { event.preventDefault(); goScene(null, "replace"); } }}
       />}
       headerMeta={peopleBar}
     >
@@ -324,7 +364,7 @@ function SelectScreen() {
         {saveError && <div role="alert" className="flex items-center gap-2 border-b border-danger/20 bg-danger/8 px-5 py-2 text-xs font-semibold text-danger"><span className="flex-1">{saveError}</span><button type="button" onClick={clearSaveError}>닫기</button></div>}
 
         <div className={s.body}>
-          {scenes && scenes.length > 1 && !showOverview && (
+          {inTimeline && scenes!.length > 1 && (
             <nav className={s.rail} aria-label="장면">
               <p className={s.railTitle}>장면</p>
               {sceneList}
@@ -339,7 +379,7 @@ function SelectScreen() {
                     <h2>장면별로 골라볼까요?</h2>
                     <p>{analysis.status === "ready" ? `AI가 ${scenes!.length}개 장면으로 정리했어요.` : analysis.status === "fallback" && analysis.failed ? `AI 정리를 하지 못해서 촬영 시간으로 ${scenes!.length}개 장면으로 나눴어요.` : `촬영 시간으로 ${scenes!.length}개 장면으로 나눴어요.`} {isOwner ? (target ? `약속한 ${target}장을 장면 크기에 맞춰 나눠 안내해요.` : "") : "마음에 드는 사진에 ♡를 눌러주세요."}</p>
                     {analysis.status === "fallback" && analysis.failed && isOwner && <p className={s.analysisFailed}><button type="button" onClick={() => setSheet("ai")}>AI 정리 다시 시도</button></p>}
-                    <button type="button" className={s.textLink} onClick={() => goScene("all")}>전체 사진 시간순으로 보기</button>
+                    <button type="button" className={s.textLink} onClick={() => goScene(0)}>처음부터 이어서 보기</button>
                   </div>
                   {scenes!.map((item, index) => {
                     const cover = photoById.get(item.photoIds.find((id) => picked.has(id)) ?? item.photoIds[0]);
@@ -357,15 +397,7 @@ function SelectScreen() {
             ) : (
               <>
                 {analysisBanner}
-                {scene && (
-                  <div className={s.sceneHeader}>
-                    <button type="button" className={s.scenePicker} onClick={() => setSheet("scenes")} aria-label="다른 장면 고르기">
-                      <strong>{sceneTitle(scene)}</strong><ChevronDown size={16} /><small>{sceneIndex! + 1} / {scenes!.length}</small>
-                    </button>
-                    <span className={s.sceneMeta}>{sceneSub(scene)}</span>
-                  </div>
-                )}
-                {!scene && !analysisBanner && (
+                {!sectioned && !analysisBanner && (
                   <div className={s.sceneHeader}>
                     <strong className={s.allTitle}>전체 사진 <small>촬영 시간순 · {photos.length.toLocaleString()}장</small></strong>
                     {scenes
@@ -373,18 +405,26 @@ function SelectScreen() {
                       : analysis.status === "none" && isOwner && photos.length > 0 && <button type="button" className={s.aiButton} onClick={() => { setAiError(null); setSheet("ai"); }}><Sparkles size={14} />AI로 장면 정리</button>}
                   </div>
                 )}
-                <div className={s.tools} style={scene ? undefined : { paddingTop: 10 }}>
+                <div className={s.tools} style={sectioned || analysisBanner ? { paddingTop: 10 } : undefined}>
                   {scopeChips.filter((chip) => chip.show).map((chip) => <button key={chip.value} type="button" className={s.chip} aria-pressed={scope === chip.value} onClick={() => setScope(chip.value)}>{chip.label}</button>)}
                   {hasGroups && <button type="button" className={s.chip} aria-pressed={grouped} onClick={() => { setGrouped((value) => !value); setExpanded(new Set()); }}><Layers size={13} />유사컷 묶기</button>}
                   <input className={s.search} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="파일명 검색" aria-label="파일명 검색" />
                   <button type="button" className={`${s.chip} ${s.columnsButton}`} aria-label={`한 줄에 ${mobileColumns}장 — 바꾸기`} onClick={() => setMobileColumns((value) => (value === 4 ? 2 : value + 1) as MobileColumns)}><Grid2x2 size={13} />{mobileColumns}열</button>
                 </div>
-                <PhotoGrid
-                  photos={visible}
+                <TimelineGrid
+                  sections={sections}
                   mobileColumns={mobileColumns}
-                  positionKey={`ps:self-select:${projectId}:${sceneIndex ?? "all"}:${scope}:${grouped ? 1 : 0}`}
+                  positionKey={`ps:self-select:${projectId}:${sectioned ? "scenes" : "all"}:${scope}:${grouped ? 1 : 0}`}
                   renderCard={card}
                   empty={<><strong>조건에 맞는 사진이 없어요</strong><span>보기 조건을 바꿔보세요.</span><button type="button" onClick={() => { setScope("all"); setQuery(""); }}>전체 보기</button></>}
+                  initialSection={initialSection}
+                  jump={jump}
+                  onSectionChange={(index) => {
+                    setCurrentSection(index);
+                    // 지금 보는 장면을 주소에 조용히 남겨 새로고침·뒤로가기 때 같은 장면으로 돌아온다.
+                    if (sectioned) window.history.replaceState(window.history.state, "", `?scene=${index}`);
+                  }}
+                  stickyHeader={sectioned ? (index) => sectionHeader(index, true) : undefined}
                 />
               </>
             )}
