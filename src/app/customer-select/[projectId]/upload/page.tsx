@@ -6,10 +6,9 @@
  * 그대로 재사용한다(단계 0 분석 결과). 압축된 결과만 BE로 전송, 썸네일·프리뷰 생성은 BE 담당.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { CUSTOMER_PHOTO_LIMIT as MAX_PHOTOS, uploadLimitError } from "../../_lib/upload-limit";
-import { Loader2, SlidersHorizontal, Sparkles, Trash2, UploadCloud } from "lucide-react";
+import { CheckCircle2, Loader2, SlidersHorizontal, Sparkles, Trash2, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -30,6 +29,7 @@ import { estimateUploadRemainingSeconds, formatUploadRemainingTime, type UploadT
 import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAssetHeader";
 import type { Photo, PhotoGroupInfo } from "@/types";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
+import { ProjectStepHeader } from "../../_lib/ProjectStepHeader";
 import { useCustomerSelectStore } from "../../_lib/real-store";
 import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
 
@@ -83,7 +83,9 @@ export default function CustomerUploadPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [aiPromptOpen, setAiPromptOpen] = useState(false);
   const [aiWantSimilar, setAiWantSimilar] = useState(true);
-  const [aiWantQuality, setAiWantQuality] = useState(false);
+  const [aiWantQuality, setAiWantQuality] = useState(true);
+  // 방금 올린 장수. 업로드가 끝나면 모달 대신 하단 바에서 AI 정리와 다음 단계를 함께 제안한다.
+  const [justUploaded, setJustUploaded] = useState(0);
   const [aiStarting, setAiStarting] = useState(false);
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiCompleted, setAiCompleted] = useState(false);
@@ -101,8 +103,9 @@ export default function CustomerUploadPage() {
   const cancelRequestedRef = useRef(false);
   const uploadTimingSamplesRef = useRef<UploadTimingSample[]>([]);
   const aiPollingRef = useRef(false);
-  const { compact: compactHeader, handleScroll: handleGalleryScroll } = useCollapsibleAssetHeaderController({ compactOnly: true });
-  const compactUploadHeader = isMobile || compactHeader;
+  const { handleScroll: handleGalleryScroll } = useCollapsibleAssetHeaderController({ compactOnly: true });
+  // 올리기·고르기·보내기 단계를 오갈 때 헤더 높이가 바뀌지 않게 항상 얇은 헤더를 쓴다.
+  const compactUploadHeader = true;
 
   useEffect(() => () => {
     uploadAbortRef.current?.abort();
@@ -170,6 +173,7 @@ export default function CustomerUploadPage() {
       setCheckingCapacity(false);
     }
     setUploading(true);
+    setJustUploaded(0);
     setError(null);
     setRetryFiles([]);
     setTotal(selectedFiles.length);
@@ -278,8 +282,13 @@ export default function CustomerUploadPage() {
     if (failedFiles.length > 0) {
       setError(`${uploaded.toLocaleString()}장은 업로드했고 ${failedFiles.length.toLocaleString()}장은 처리하지 못했습니다.`);
     } else if (uploaded > 0) {
-      setAiPromptOpen(true);
+      setJustUploaded(uploaded);
     }
+  }
+
+  function goSelect() {
+    if (justUploaded > 0 && !aiAnalyzing && (aiWantSimilar || aiWantQuality)) void startAiAnalysis(true);
+    else router.push(`/customer-select/${projectId}/select`);
   }
 
   function cancelUpload() {
@@ -287,7 +296,7 @@ export default function CustomerUploadPage() {
     uploadAbortRef.current?.abort();
   }
 
-  async function startAiAnalysis() {
+  async function startAiAnalysis(thenSelect = false) {
     setAiStarting(true);
     try {
       const requests = [
@@ -303,6 +312,7 @@ export default function CustomerUploadPage() {
       setAiPromptOpen(false);
       setAiCompleted(false);
       setAiAnalyzing(true);
+      if (thenSelect) { router.push(`/customer-select/${projectId}/select`); return; }
       void pollAiAnalysis([aiWantSimilar && "similarity", aiWantQuality && "quality"].filter(Boolean) as string[]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "AI 분석을 시작하지 못했습니다.");
@@ -460,6 +470,17 @@ export default function CustomerUploadPage() {
     </div>
   ) : undefined;
 
+  const showUploadDone = justUploaded > 0 && !uploading && retryFiles.length === 0 && selectedPhotoIds.size === 0;
+  const uploadDone = showUploadDone ? (
+    <div className="flex min-w-0 flex-col gap-1.5 md:flex-row md:items-center md:gap-5" role="status">
+      <p className="flex items-center gap-1.5 text-sm font-bold text-foreground"><CheckCircle2 size={16} className="text-primary" aria-hidden />{justUploaded.toLocaleString()}장 올렸어요</p>
+      {aiAnalyzing ? <p className="text-xs text-muted-foreground">AI가 사진을 정리하고 있어요. 고르면서 기다려도 돼요.</p> : <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-foreground">
+        <label className="inline-flex items-center gap-1.5"><input type="checkbox" className="size-4 accent-[var(--accent)]" checked={aiWantSimilar} onChange={(event) => setAiWantSimilar(event.target.checked)} />비슷한 사진끼리 묶기</label>
+        <label className="inline-flex items-center gap-1.5"><input type="checkbox" className="size-4 accent-[var(--accent)]" checked={aiWantQuality} onChange={(event) => setAiWantQuality(event.target.checked)} />흔들림·눈 감음 표시</label>
+      </div>}
+    </div>
+  ) : undefined;
+
   if (!hydrated) {
     return (
       <CustomerSelectShell viewportLocked>
@@ -472,7 +493,7 @@ export default function CustomerUploadPage() {
     <CustomerSelectShell
       viewportLocked
       compactHeader={compactUploadHeader}
-      compactTitle={<h1><Link href={`/customer-select/${projectId}`} className="block max-w-[calc(100vw-72px)] truncate text-[14px] font-bold tracking-[-0.02em] text-foreground hover:text-accent md:max-w-[min(40vw,520px)] md:text-[16px]">{displayName}</Link></h1>}
+      compactTitle={<ProjectStepHeader projectId={projectId} name={displayName} step="upload" backHref="/customer-select" />}
       headerMeta={<div className="flex items-baseline gap-2 text-[12px] text-muted-foreground" aria-label="전체 사진 이용량"><span>전체 이용량</span><strong className="text-[13px] font-semibold tabular-nums text-foreground">{accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${MAX_PHOTOS.toLocaleString()}장` : "확인 중"}</strong></div>}
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -527,7 +548,7 @@ export default function CustomerUploadPage() {
             <div className="grid min-h-full place-items-center p-5">
               <button type="button" onClick={() => inputRef.current?.click()} className="flex min-h-[260px] w-full max-w-[720px] flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border-strong bg-surface text-center transition-colors hover:border-accent/45 hover:bg-surface-raised/45">
                 <span className="grid size-14 place-items-center rounded-2xl bg-customer-soft text-primary"><UploadCloud size={26} strokeWidth={1.8} /></span>
-                <span><strong className="block text-[16px] text-foreground"><span className="md:hidden">사진을 선택하세요</span><span className="hidden md:inline">사진을 끌어다 놓거나 선택하세요</span></strong><small className="mt-1.5 block text-[13px] text-muted-foreground">JPG · PNG · WebP · HEIC · 최대 {MAX_PHOTOS.toLocaleString()}장</small><small className="mt-2 block px-4 text-[13px] text-muted-foreground">선택용 이미지를 저장해요. 원본 파일은 직접 보관해 주세요.</small></span>
+                <span><strong className="block text-[16px] text-foreground"><span className="md:hidden">사진을 선택하세요</span><span className="hidden md:inline">사진을 끌어다 놓거나 선택하세요</span></strong><small className="mt-1.5 block text-[13px] text-muted-foreground">JPG · PNG · WebP · HEIC · 최대 {MAX_PHOTOS.toLocaleString()}장</small><small className="mt-2 block px-4 text-[13px] text-muted-foreground">고르기용 사진만 저장해요. 원본 파일은 직접 보관해 주세요.</small>{accountUsage ? <small className="mt-1 block text-[13px] font-semibold text-foreground">{accountUsage.remaining.toLocaleString()}장 더 올릴 수 있어요</small> : null}</span>
               </button>
             </div>
           ) : visiblePhotos.length === 0 ? (
@@ -579,12 +600,12 @@ export default function CustomerUploadPage() {
           className="shrink-0"
           viewportFixed
           compactMobile
-          leading={uploadStatus}
-          mobileLeading={uploadStatus}
+          leading={uploadStatus ?? uploadDone}
+          mobileLeading={uploadStatus ?? uploadDone}
           actions={uploading ? <PhotographerLightButton variant="secondary" onClick={cancelUpload}>업로드 중단</PhotographerLightButton> : <>
             {retryFiles.length > 0 ? <PhotographerLightButton variant="secondary" onClick={() => void handleFiles(retryFiles)}>실패 {retryFiles.length.toLocaleString()}장 다시 시도</PhotographerLightButton> : null}
             {selectedPhotoIds.size > 0 ? <PhotographerLightButton variant="danger" pending={checkingDelete} pendingLabel="확인 중" onClick={requestDeleteSelectedPhotos}><Trash2 size={16} />선택 삭제 ({selectedPhotoIds.size.toLocaleString()})</PhotographerLightButton> : null}
-            {selectedPhotoIds.size === 0 ? <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={() => router.push(`/customer-select/${projectId}/select`)}>사진 고르기</PhotographerLightButton> : null}
+            {selectedPhotoIds.size === 0 ? <PhotographerLightButton disabled={project.photoCount === 0 || deleting || checkingCapacity} pending={aiStarting} pendingLabel="정리 시작 중" onClick={goSelect}>고르러 가기 →</PhotographerLightButton> : null}
           </>}
         />
 
@@ -623,7 +644,7 @@ export default function CustomerUploadPage() {
         onSimilarChange={setAiWantSimilar}
         onQualityChange={setAiWantQuality}
         onSkip={() => setAiPromptOpen(false)}
-        onStart={startAiAnalysis}
+        onStart={() => void startAiAnalysis()}
         pending={aiStarting}
       />
 
