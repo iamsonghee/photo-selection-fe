@@ -28,7 +28,7 @@ import { SceneGrid, type MobileColumns } from "./SceneGrid";
 import { PhotoDetail } from "./PhotoDetail";
 import { InviteSheet, Sheet } from "./Sheets";
 import { useSceneAnalysis, type NamedScene } from "./useSceneAnalysis";
-import { AiTidySheet, groupSimilarKey, setAsideKey, type AiTidyKind } from "./AiTidySheet";
+import { AiTidySheet, groupSimilarKey, rememberGroupSimilar, setAsideKey, type AiTidyKind } from "./AiTidySheet";
 import s from "./select.module.css";
 
 type Scope = "all" | "picked" | "liked" | "mine" | "popular";
@@ -462,7 +462,7 @@ function SelectScreen() {
               {menu === "options" && (
                 <div className={s.toolsMenu} role="dialog" aria-label="보기 옵션">
                   {hasGroups && (
-                    <button type="button" role="switch" aria-checked={grouped} className={s.switchRow} onClick={() => { setGrouped((value) => !value); setExpanded(new Set()); }}>
+                    <button type="button" role="switch" aria-checked={grouped} className={s.switchRow} onClick={() => { rememberGroupSimilar(projectId, !grouped); setGrouped(!grouped); setExpanded(new Set()); }}>
                       <span><strong>유사컷 묶기</strong><small>비슷한 사진을 한 장으로 접어 보여요</small></span><i aria-hidden />
                     </button>
                   )}
