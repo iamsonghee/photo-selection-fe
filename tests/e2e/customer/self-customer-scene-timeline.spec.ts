@@ -341,22 +341,24 @@ test("selected photos keep their original brightness", async ({ browser }) => {
   await context.close();
 });
 
-test("quality flags sit at the right edge and step aside only when the like button shows", async ({ browser }) => {
+test("owner like sits bottom-left and quality flags stay at the top-right edge", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
-  // p5는 흔들림 의심. 찜하지 않았고 마우스도 없으면 오른쪽 끝(비키지 않음).
+  // p5는 흔들림 의심. ♡는 왼쪽 아래라 오른쪽 위 표시는 찜해도 움직이지 않는다.
   const card = page.locator('.gl-photo-card[data-photo-id="p5"]');
   const flag = card.locator(".gl-quality-badge");
-  await page.mouse.move(0, 0);
-  await expect(flag).toHaveCSS("transform", "none");
-  // 찜하면 ♥가 늘 보이므로 그 왼쪽으로 비킨 채 남는다.
   await card.hover();
-  await card.getByRole("button", { name: "찜하기" }).click();
+  const like = card.getByRole("button", { name: "찜하기" });
+  const [cardBox, likeBox] = [(await card.boundingBox())!, (await like.boundingBox())!];
+  expect(likeBox.x - cardBox.x).toBeLessThan(4);
+  expect(cardBox.y + cardBox.height - (likeBox.y + likeBox.height)).toBeLessThan(4);
+  await like.click();
   await page.mouse.move(0, 0);
-  await expect(flag).toHaveCSS("transform", "matrix(1, 0, 0, 1, -27, 0)");
+  await expect(card.getByRole("button", { name: "찜 해제" })).toHaveAttribute("aria-pressed", "true");
+  await expect(flag).toHaveCSS("transform", "none");
   await context.close();
 });
 

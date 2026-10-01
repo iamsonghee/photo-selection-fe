@@ -29,7 +29,8 @@
 .gl-check-heart::before { border-radius: 50%; }
 .gl-check-heart svg { left: calc(8px + (var(--gl-check-size) - 14px) / 2); top: calc(8px + (var(--gl-check-size) - 14px) / 2); }
 .gl-photo-card.gl-selected .gl-check-heart { color: #fff; }
-.gl-like-box { left: auto; right: 0; opacity: 0; transition: opacity 120ms ease; }
+/* 보조 찜은 왼쪽 아래(✓와 대각선, 다른 사람 찜 색 점과 같은 아래 줄). */
+.gl-like-box { top: auto; bottom: 0; opacity: 0; transition: opacity 120ms ease; }
 .gl-like-box.gl-liked, .gl-photo-card:hover .gl-like-box, .gl-like-box:focus-visible { opacity: 1; }
 .gl-photo-card.gl-selected .gl-like-box { color: #023852; }
 .gl-like-box.gl-liked { color: #fff !important; }
