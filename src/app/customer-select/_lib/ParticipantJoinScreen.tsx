@@ -1,104 +1,125 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Heart, MessageSquare, UserCheck } from "lucide-react";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
+import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { COLOR_LABELS } from "@/lib/gallery-filter";
+import theme from "@/styles/AcutLightTheme.module.css";
 import type { ColorTag } from "@/types";
 import { COLOR_PALETTE, useCustomerSelectStore } from "./real-store";
-import ui from "./ui.module.css";
+import s from "./ParticipantJoinScreen.module.css";
 
+const OWNER_COLOR: ColorTag = "red";
+
+/** 초대 링크로 처음 들어온 참여자: 이름만 적으면 남은 색을 자동으로 받아 바로 시작한다. */
 export function ParticipantJoinScreen() {
   const { project, joinParticipant, resumeParticipant } = useCustomerSelectStore();
   const available = useMemo(() => COLOR_PALETTE.filter(({ id }) => !(id in project.participantNicknames)), [project.participantNicknames]);
   const existing = useMemo(() => COLOR_PALETTE.flatMap((item) => {
     const name = project.participantNicknames[item.id]?.trim();
-    return item.id !== "red" && name ? [{ ...item, name }] : [];
+    return item.id !== OWNER_COLOR && name ? [{ ...item, name }] : [];
   }), [project.participantNicknames]);
   const [nickname, setNickname] = useState("");
-  const [color, setColor] = useState<ColorTag>(available[0]?.id ?? "red");
+  const [color, setColor] = useState<ColorTag | null>(null);
+  const [colorsOpen, setColorsOpen] = useState(false);
+  const [resumeOpen, setResumeOpen] = useState(false);
+  const [resumeColor, setResumeColor] = useState<ColorTag | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [resumeColor, setResumeColor] = useState<ColorTag | null>(null);
-  const selectedColor = available.some(({ id }) => id === color) ? color : available[0]?.id ?? color;
+  // 다른 사람이 먼저 색을 가져가도 남은 색 중 하나로 자연스럽게 넘어간다.
+  const myColor = available.find(({ id }) => id === color) ?? available[0];
+  const ownerName = project.participantNicknames[OWNER_COLOR]?.trim() || "프로젝트를 만든 분";
+  const cover = project.photos[0];
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!nickname.trim() || !available.length) return;
+    if (!nickname.trim() || !myColor) return;
     setSaving(true);
-    setError(await joinParticipant(nickname.trim(), selectedColor));
+    setError(await joinParticipant(nickname.trim(), myColor.id));
     setSaving(false);
   }
 
-  const resumeName = resumeColor ? project.participantNicknames[resumeColor] : "";
-
-  return <><div className={ui.joinShell}>
-    <header className={ui.joinBrand}><BrandLogoBar size="sm" href="/" variant="default" /></header>
-    <main className={ui.joinMain}>
-      <form className={ui.joinCard} onSubmit={submit}>
-        <span className={ui.joinEyebrow}>사진 셀렉 초대</span>
-        <h1>{project.name || "사진 셀렉"}에<br />함께 참여해 주세요</h1>
-        <p>찜과 별점은 서로 볼 수 있고, 작가에게 남길 메모는 함께 수정해요. 최종 사진은 프로젝트를 만든 사람이 결정합니다.</p>
-
-        {existing.length > 0 && <section className={ui.joinResume}>
-          <strong>이미 참여했다면</strong>
-          <span>PC·모바일에서 같은 닉네임으로 이어서 이용할 수 있어요.</span>
-          <div>
-            {existing.map((participant) => <button key={participant.id} type="button" onClick={() => setResumeColor(participant.id)} aria-label={`${participant.name} ${COLOR_LABELS[participant.id]}으로 이어서 참여`}>
-              <i style={{ background: participant.hex }} />
-              <span>{participant.name}</span>
-              <small>이어서 참여</small>
-            </button>)}
+  return <>
+    <div className={`${theme.lightTheme} ${s.shell}`}>
+      <header className={s.brand}><BrandLogoBar size="sm" href="/" variant="default" /></header>
+      <main className={s.main}>
+        <form className={s.card} onSubmit={submit}>
+          {cover && <div className={s.cover}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={cover.previewUrl || cover.url} alt="" /></div>}
+          <div className={s.intro}>
+            <span>{ownerName}님이 사진 고르기에 초대했어요</span>
+            <h1>{project.name || "사진 셀렉"}</h1>
+            <p>{project.photoCount.toLocaleString()}장</p>
           </div>
-        </section>}
 
-        {existing.length > 0 && <div className={ui.joinDivider}><span>처음 참여한다면</span></div>}
+          <ul className={s.can}>
+            <li><Heart size={16} />마음에 드는 사진에 찜해요</li>
+            <li><MessageSquare size={16} />작가님께 전할 메모를 함께 써요</li>
+            <li><UserCheck size={16} />보정 받을 사진은 {ownerName}님이 정해요</li>
+          </ul>
 
-        {available.length ? <>
-          <label className={ui.joinField}>
-            <span>닉네임</span>
-            <input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 20))} placeholder="예: 신랑, 엄마" maxLength={20} autoFocus />
-          </label>
-          <fieldset className={ui.joinColors}>
-            <legend>내 컬러</legend>
-            <div>
-              {COLOR_PALETTE.map((item) => {
-                const usedBy = project.participantNicknames[item.id];
-                const occupied = Object.prototype.hasOwnProperty.call(project.participantNicknames, item.id);
-                return <button key={item.id} type="button" disabled={occupied} aria-pressed={!occupied && selectedColor === item.id} onClick={() => setColor(item.id)} title={occupied ? `${usedBy || "다른 참여자"}님이 사용 중` : COLOR_LABELS[item.id]}>
-                  <i style={{ background: item.hex }} />
-                  <span>{occupied ? (usedBy || "사용 중") : COLOR_LABELS[item.id]}</span>
-                </button>;
-              })}
+          {myColor ? <>
+            <label className={s.field}>
+              <span>이름</span>
+              <input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 20))} placeholder="예: 엄마, 신랑, 지우" maxLength={20} autoFocus enterKeyHint="go" />
+            </label>
+            <div className={s.colorRow}>
+              <span>내 색</span>
+              <i style={{ background: myColor.hex }} aria-hidden />
+              <strong>{COLOR_LABELS[myColor.id]}</strong>
+              <button type="button" className={s.textButton} aria-expanded={colorsOpen} onClick={() => setColorsOpen((open) => !open)}>{colorsOpen ? "접기" : "바꾸기"}</button>
             </div>
-            <small>선택한 컬러는 찜과 의견을 구분하는 데 사용되며 나중에 변경할 수 없어요.</small>
-          </fieldset>
-          {error && <p className={ui.joinError} role="alert">{error}</p>}
-          <button className={`${ui.btn} ${ui.btnPrimary}`} type="submit" disabled={!nickname.trim() || saving}>{saving ? "참여 중…" : "사진 고르기 시작"}</button>
-        </> : <div className={ui.joinFull} role="alert"><strong>참여 인원이 모두 찼어요</strong><span>이 프로젝트는 최대 5명까지 함께 고를 수 있어요. 초대한 사람에게 확인해 주세요.</span></div>}
-      </form>
-    </main>
-  </div>
-  {resumeColor && <SelectionConfirmDialog
-    title={`${resumeName}님으로 이어서 참여할까요?`}
-    description={<>이 기기에서도 기존 찜·별점·의견을 그대로 이어서 이용합니다.<br />본인의 닉네임이 맞는지 확인해 주세요.</>}
-    confirmLabel="이어서 참여"
-    busyLabel="처리 중…"
-    confirming={false}
-    onCancel={() => setResumeColor(null)}
-    onConfirm={() => resumeParticipant(resumeColor)}
-  />}
+            {colorsOpen && (
+              <div className={s.colors} role="radiogroup" aria-label="내 색">
+                {available.map((item) => (
+                  <button key={item.id} type="button" role="radio" aria-checked={myColor.id === item.id} aria-label={COLOR_LABELS[item.id]} onClick={() => { setColor(item.id); setColorsOpen(false); }}>
+                    <i style={{ background: item.hex }} />
+                  </button>
+                ))}
+              </div>
+            )}
+            {error && <p className={s.error} role="alert">{error}</p>}
+            <PhotographerLightButton type="submit" size="confirmation" disabled={!nickname.trim() || saving} pending={saving} pendingLabel="들어가는 중…">시작하기</PhotographerLightButton>
+          </> : <div className={s.full} role="alert"><strong>참여 인원이 모두 찼어요</strong><span>최대 5명까지 함께 고를 수 있어요. {ownerName}님에게 확인해 주세요.</span></div>}
+
+          {existing.length > 0 && (
+            <div className={s.resume}>
+              <button type="button" className={s.textButton} aria-expanded={resumeOpen} onClick={() => setResumeOpen((open) => !open)}>전에 참여했나요? 이어서 하기</button>
+              {resumeOpen && <div className={s.resumeList}>
+                {existing.map((person) => (
+                  <button key={person.id} type="button" onClick={() => setResumeColor(person.id)}>
+                    <i style={{ background: person.hex }} />{person.name}
+                  </button>
+                ))}
+              </div>}
+            </div>
+          )}
+        </form>
+      </main>
+    </div>
+    {resumeColor && <SelectionConfirmDialog
+      title={`${project.participantNicknames[resumeColor]}님으로 이어서 할까요?`}
+      description="이 기기에서도 남겨둔 찜과 메모를 그대로 이어서 볼 수 있어요. 본인 이름이 맞는지 확인해 주세요."
+      confirmLabel="이어서 하기"
+      busyLabel="처리 중…"
+      confirming={false}
+      onCancel={() => setResumeColor(null)}
+      onConfirm={() => resumeParticipant(resumeColor)}
+    />}
   </>;
 }
 
 export function ParticipantAccessEndedScreen() {
-  return <div className={ui.joinShell}>
-    <header className={ui.joinBrand}><BrandLogoBar size="sm" href="/" variant="default" /></header>
-    <main className={ui.joinMain}>
-      <div className={ui.joinCard}>
-        <span className={ui.joinEyebrow}>사진 셀렉 초대</span>
-        <h1>이 초대 링크는<br />더 이상 사용할 수 없어요</h1>
-        <p>프로젝트를 만든 사람이 공유를 중지했거나 새 링크를 발급했어요. 새로운 초대 링크를 요청해 주세요.</p>
+  return <div className={`${theme.lightTheme} ${s.shell}`}>
+    <header className={s.brand}><BrandLogoBar size="sm" href="/" variant="default" /></header>
+    <main className={s.main}>
+      <div className={s.card}>
+        <div className={s.intro}>
+          <span>사진 고르기 초대</span>
+          <h1>이 초대 링크는 더 이상 쓸 수 없어요</h1>
+          <p>초대한 분이 공유를 멈췄거나 새 링크를 만들었어요. 새 초대 링크를 요청해 주세요.</p>
+        </div>
       </div>
     </main>
   </div>;
