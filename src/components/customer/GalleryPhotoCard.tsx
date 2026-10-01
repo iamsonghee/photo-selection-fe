@@ -55,7 +55,8 @@ type GalleryPhotoCardProps = {
   liked?: boolean;
   /** true면 내가 체크로 선택하는 순간에만 체크가 톡 튀고 테두리가 번진다(해제·동기화·다시 그려질 때는 조용) */
   popOnSelect?: boolean;
-  onGroupBadgeClick: (e: React.MouseEvent, groupId: string) => void;
+  /** 없으면 묶음 배지는 표시만 한다 */
+  onGroupBadgeClick?: (e: React.MouseEvent, groupId: string) => void;
   onRate: (photoId: string, star: StarRating | undefined) => void;
   onThumbError: (photoId: string) => void;
 };
@@ -275,7 +276,7 @@ function GalleryPhotoCardImpl({
         {(showGroupBadge || inExpandedGroup) && groupId && (
           <SimilarityGroupBadge count={totalCount} expanded={isGroupExpanded} label={groupLabel}
             selectedCount={showGroupBadge ? selectedCount : 0}
-            onClick={(event) => onGroupBadgeClick(event, groupId)} />
+            onClick={onGroupBadgeClick && ((event) => onGroupBadgeClick(event, groupId))} />
         )}
       </PhotoThumbnailFrame>
 

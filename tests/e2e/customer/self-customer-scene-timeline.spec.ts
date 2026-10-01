@@ -223,14 +223,19 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   await mock(page);
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   await expect(page.getByRole("button", { name: "유사컷 묶기" })).toHaveAttribute("aria-pressed", "true");
-  const expand = page.getByRole("button", { name: /유사컷 \d+장 펼치기/ });
-  await expect(expand.first()).toBeVisible();
+  // 묶음 표지에는 누를 수 없는 "유사컷 3장" 표시만 있고, 표지를 누르면(펼치지 않고) 바로 상세가 열린다.
+  const cover = page.locator('.gl-photo-card[data-photo-id="p8"]');
+  await expect(cover).toContainText("유사컷 3장");
+  await expect(page.getByRole("button", { name: /유사컷 \d+장 펼치기/ })).toHaveCount(0);
   await expect(page.locator(".gl-quality-badge").first()).toBeVisible();
+  await cover.click();
+  await expect(page.getByRole("dialog", { name: "S_8.jpg 상세 보기" })).toBeVisible();
+  await expect(page.locator('[class*="detailCount"]')).toContainText("비슷한 사진 1/3");
+  await page.keyboard.press("Escape");
+  await expect(page.locator('.gl-photo-card[data-photo-id="p9"]')).toHaveCount(0);
 
-  // 묶음 표지를 누르면 펼쳐지고, 의심 사진만 모아 볼 수 있다.
-  const before = await page.locator("[data-photo-id]").count();
-  await expand.first().click();
-  await expect.poll(() => page.locator("[data-photo-id]").count()).toBeGreaterThan(before);
+  // 의심 사진만 모아 볼 수 있다(묶음을 끄고 전체에서).
+  await page.getByRole("button", { name: "유사컷 묶기" }).click();
   await page.getByRole("button", { name: "흔들림·눈 감음 의심" }).click();
   // 첫 장면(30장)에서 흔들림 3장 + 눈 감음 2장 — 모두 의심 표시가 붙은 사진만 남는다.
   await expect(page.locator("[data-photo-id]")).toHaveCount(5);
@@ -240,31 +245,41 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=none`);
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "유사컷 묶기" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /유사컷 \d+장 펼치기/ })).toHaveCount(0);
+  await expect(page.getByText("유사컷 3장")).toHaveCount(0);
   await expect(page.locator(".gl-quality-badge")).toHaveCount(0);
   await context.close();
 });
 
-test("detail view walks through photos folded into a similar-cut group", async ({ browser }) => {
+test("detail moves by gallery stops and browses a folded group with up/down and the filmstrip", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
-  // p8~p10은 접혀서 표지(p8)만 보이지만, p7 상세에서 다음으로 가면 p8 → p9 → p10을 모두 지난다.
+  // 첫 장면 30장 중 유사컷 4묶음(각 3장)이 접혀 22칸. p8~p10은 표지(p8) 한 칸이다.
   await expect(page.locator('.gl-photo-card[data-photo-id="p9"]')).toHaveCount(0);
   await page.locator('.gl-photo-card[data-photo-id="p7"]').click();
   const count = page.locator('[class*="detailCount"]');
-  await expect(count).toContainText("8 / 30");
-  for (const n of [9, 10, 11]) { await page.keyboard.press("ArrowRight"); await expect(count).toContainText(`${n} / 30`); }
+  await expect(count).toContainText("6 / 22");
 
-  // 하단 필름 띠도 ‹ › 와 같은 순서(묶음 밖 사진 포함)이고, 유사컷은 띠 위에서 묶음으로 표시된다.
+  // ‹ › 는 묶음을 한 칸으로 지나고, 묶음 안에서는 ↑↓ 로 넘긴다.
+  await page.keyboard.press("ArrowRight");
+  await expect(count).toContainText("7 / 22 · 비슷한 사진 1/3");
+  await page.keyboard.press("ArrowDown");
+  await expect(count).toContainText("7 / 22 · 비슷한 사진 2/3");
+  await expect(page.getByRole("dialog", { name: "S_9.jpg 상세 보기" })).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(count).toContainText("8 / 22");
+  await expect(count).not.toContainText("비슷한 사진");
+
+  // 띠도 같은 칸 순서: 다른 묶음은 겹친 썸네일 한 칸, 누르면 그 묶음의 표지부터 본다.
   const strip = page.locator('[class*="stripRow"]');
-  await expect(strip.getByRole("button", { name: "S_10.jpg 보기" })).toHaveAttribute("aria-current", "true");
-  await expect(strip.getByRole("button", { name: "S_3.jpg 보기" })).toBeVisible();
-  await expect(strip.getByRole("button", { name: "S_17.jpg 보기" })).toBeVisible();
-  await expect(strip.locator('[class*="stripGroup"]').filter({ hasText: "비슷한 사진 3장" })).toHaveCount(2);
-  await strip.getByRole("button", { name: "S_16.jpg 보기" }).click();
-  await expect(count).toContainText("17 / 30");
+  await expect(strip.getByRole("button", { name: "S_11.jpg 보기" })).toHaveAttribute("aria-current", "true");
+  await expect(strip.getByRole("button", { name: "S_8.jpg 외 비슷한 사진 2장 보기" })).toBeVisible();
+  await strip.getByRole("button", { name: "S_16.jpg 외 비슷한 사진 2장 보기" }).click();
+  await expect(count).toContainText("13 / 22 · 비슷한 사진 1/3");
+  await expect(strip.locator('[class*="stripGroup"]').filter({ hasText: "비슷한 사진 3장" })).toHaveCount(1);
+  await strip.getByRole("button", { name: "S_18.jpg 보기" }).click();
+  await expect(count).toContainText("13 / 22 · 비슷한 사진 3/3");
   await context.close();
 });

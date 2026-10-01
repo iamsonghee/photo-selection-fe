@@ -50,7 +50,6 @@ function SelectScreen() {
   const [grouped, setGrouped] = useState(() => {
     try { return localStorage.getItem(groupSimilarKey(projectId)) !== "0"; } catch { return true; }
   });
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [query, setQuery] = useState("");
   const [mobileColumns, setMobileColumns] = useState<MobileColumns>(2);
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
@@ -135,10 +134,16 @@ function SelectScreen() {
     groupsInView.forEach((members, groupId) => covers.set(groupId, (members.find((member) => picked.has(member.id)) ?? members[0]).id));
     return filtered.filter((photo) => {
       const groupId = photo.similarityGroupId;
-      if (!groupId || expanded.has(groupId) || (groupsInView.get(groupId)?.length ?? 0) < 2) return true;
+      if (!groupId || (groupsInView.get(groupId)?.length ?? 0) < 2) return true;
       return covers.get(groupId) === photo.id;
     });
-  }, [expanded, filtered, grouped, groupsInView, hasGroups, picked]);
+  }, [filtered, grouped, groupsInView, hasGroups, picked]);
+  // 묶기가 켜져 있으면 표지 한 칸에 든 사진들(상세에서 ↑↓·띠로 본다). 아니면 빈 목록.
+  const membersOf = useCallback((photo: Photo) => {
+    if (!grouped || !hasGroups || !photo.similarityGroupId) return [];
+    const members = groupsInView.get(photo.similarityGroupId) ?? [];
+    return members.length > 1 ? members : [];
+  }, [grouped, groupsInView, hasGroups]);
 
   const similarOf = useCallback((photo: Photo) => photo.similarityGroupId ? photos.filter((member) => member.similarityGroupId === photo.similarityGroupId) : [], [photos]);
 
@@ -155,7 +160,6 @@ function SelectScreen() {
   function goScene(index: number, byPull: "next" | "prev" | null = null) {
     setScope("all");
     setQuery("");
-    setExpanded(new Set());
     setHoldAll(false);
     setSheet(null);
     setChosenScene(index);
@@ -243,12 +247,7 @@ function SelectScreen() {
   const card = (photo: Photo, columns: number) => {
     const groupId = photo.similarityGroupId ?? undefined;
     const members = groupId ? groupsInView.get(groupId) ?? [] : [];
-    const isCover = grouped && hasGroups && members.length > 1 && !expanded.has(groupId!);
-    const toggleGroup = () => groupId && setExpanded((current) => {
-      const next = new Set(current);
-      if (next.has(groupId)) next.delete(groupId); else next.add(groupId);
-      return next;
-    });
+    const isCover = grouped && hasGroups && members.length > 1;
     return (
       <GalleryPhotoCard
         key={photo.id}
@@ -267,19 +266,17 @@ function SelectScreen() {
         restCount={Math.max(0, members.length - 1)}
         totalCount={members.length}
         selectedCount={isOwner ? members.filter((member) => picked.has(member.id)).length : 0}
-        isGroupExpanded={Boolean(groupId && expanded.has(groupId))}
-        inExpandedGroup={Boolean(groupId && expanded.has(groupId) && members.length > 1)}
+        isGroupExpanded={false}
         presignedThumb={photo.url}
         thumbQueue={thumbQueue}
         viewerQueryString=""
         density={columns}
         showFilename={query.trim().length > 0}
-        onPhotoClick={(event) => { event.preventDefault(); if (isCover) toggleGroup(); else setOpenPhotoId(photo.id); }}
+        onPhotoClick={(event) => { event.preventDefault(); setOpenPhotoId(photo.id); }}
         onCheckClick={(event) => { event.preventDefault(); event.stopPropagation(); if (isOwner) store.toggleSelect(photo.id); else store.toggleLike(photo.id, me); }}
         onLikeClick={isOwner && !isCover ? (event) => { event.preventDefault(); event.stopPropagation(); store.toggleLike(photo.id, me); } : undefined}
         liked={isOwner && myLikes.has(photo.id)}
         popOnSelect
-        onGroupBadgeClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleGroup(); }}
         onRate={() => {}}
         onThumbError={() => {}}
       />
@@ -361,7 +358,7 @@ function SelectScreen() {
             )}
             <div className={s.tools} style={sceneMode || analysisBanner ? { paddingTop: 10 } : undefined}>
               {scopeChips.filter((chip) => chip.show).map((chip) => <button key={chip.value} type="button" className={s.chip} aria-pressed={scope === chip.value} onClick={() => setScope(chip.value)}>{chip.label}</button>)}
-              {hasGroups && <button type="button" className={s.chip} aria-pressed={grouped} onClick={() => { setGrouped((value) => !value); setExpanded(new Set()); }}><Layers size={13} />유사컷 묶기</button>}
+              {hasGroups && <button type="button" className={s.chip} aria-pressed={grouped} onClick={() => setGrouped((value) => !value)}><Layers size={13} />유사컷 묶기</button>}
               <input className={s.search} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="파일명 검색" aria-label="파일명 검색" />
               <button type="button" className={`${s.chip} ${s.columnsButton}`} aria-label={`한 줄에 ${mobileColumns}장 — 바꾸기`} onClick={() => setMobileColumns((value) => (value === 4 ? 2 : value + 1) as MobileColumns)}><Grid2x2 size={13} />{mobileColumns}열</button>
             </div>
@@ -431,7 +428,9 @@ function SelectScreen() {
 
       {openPhotoId && (
         <PhotoDetail
-          photos={filtered.some((photo) => photo.id === openPhotoId) ? filtered : photos}
+          // ‹ › 는 갤러리에 보이는 칸 순서(접힌 묶음은 한 칸). 보기 조건 밖 사진을 열었으면 전체를 한 장씩.
+          photos={filtered.some((photo) => photo.id === openPhotoId) ? visible : photos}
+          membersOf={filtered.some((photo) => photo.id === openPhotoId) ? membersOf : undefined}
           photoId={openPhotoId}
           onPhotoChange={setOpenPhotoId}
           onClose={() => {

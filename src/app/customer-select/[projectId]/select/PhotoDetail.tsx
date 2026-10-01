@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Heart } from "lucide-react";
 import { PrevNextButton } from "@/components/PrevNextButton";
 import { MobileViewerPinchPhoto } from "@/components/MobileViewerPinchPhoto";
@@ -14,13 +14,14 @@ import s from "./select.module.css";
 const MEMO_SAVE_DELAY_MS = 600;
 // 필름 띠는 ‹ › 순서 그대로, 지금 사진 앞뒤 이만큼만 그린다(장면·전체 목록이 수천 장일 수 있다).
 const STRIP_RADIUS = 7;
+const noMembers = () => [];
 
 export type Person = { id: ColorTag; name: string; hex: string };
 
 /** 상세 보기 = "고민하는 곳". 큰 사진, 같은 묶음 비교, 찜한 사람, 작가 전달 메모, 최종 선택. */
 export function PhotoDetail({
   photos, photoId, onPhotoChange, onClose, isOwner, myColor, people, selectedIds, likesOf, commentOf,
-  similarOf, commentSaveStates, onToggleSelect, onToggleLike, onSaveComment, selectedCount, target,
+  similarOf, membersOf = noMembers, commentSaveStates, onToggleSelect, onToggleLike, onSaveComment, selectedCount, target,
 }: {
   photos: Photo[];
   photoId: string;
@@ -33,6 +34,8 @@ export function PhotoDetail({
   likesOf: (photoId: string) => ColorTag[];
   commentOf: (photoId: string) => string;
   similarOf: (photo: Photo) => Photo[];
+  /** 접힌 묶음 표지 한 칸에 든 사진들(없으면 빈 목록). ‹ › 는 칸 단위, ↑↓·띠는 묶음 안에서 움직인다. */
+  membersOf?: (photo: Photo) => Photo[];
   commentSaveStates: Record<string, CommentSaveStatus>;
   onToggleSelect: (photoId: string) => void;
   onToggleLike: (photoId: string) => void;
@@ -41,8 +44,12 @@ export function PhotoDetail({
   target: number;
 }) {
   const desktop = useDesktopViewport();
-  const index = Math.max(0, photos.findIndex((photo) => photo.id === photoId));
-  const photo = photos[index];
+  // 칸(stop) = 갤러리에 보이는 순서의 한 자리. 접힌 묶음이면 지금 사진은 그 묶음 안의 한 장이다.
+  const index = Math.max(0, photos.findIndex((item) => item.id === photoId || membersOf(item).some((member) => member.id === photoId)));
+  const stop = photos[index];
+  const members = useMemo(() => (stop ? membersOf(stop) : []), [membersOf, stop]);
+  const memberIndex = members.findIndex((member) => member.id === photoId);
+  const photo = memberIndex >= 0 ? members[memberIndex] : stop;
   const similar = photo ? similarOf(photo) : [];
   const liked = likesOf(photoId).includes(myColor);
   const selected = selectedIds.has(photoId);
@@ -50,11 +57,15 @@ export function PhotoDetail({
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const stripStart = Math.max(0, Math.min(index - STRIP_RADIUS, photos.length - (STRIP_RADIUS * 2 + 1)));
   // 띠에서 연달아 붙은 같은 유사컷은 한 덩어리로 묶어 보여준다.
-  const stripRuns: Photo[][] = [];
+  // 띠: 지금 칸의 묶음은 펼쳐 보이고, 다른 접힌 묶음은 겹친 썸네일 한 칸. 묶기를 끈 상태에서는 연달아 붙은 같은 유사컷을 괄호로 묶는다.
+  type StripRun = { photos: Photo[]; size: number; collapsed: boolean };
+  const stripRuns: StripRun[] = [];
   for (const item of photos.slice(stripStart, stripStart + STRIP_RADIUS * 2 + 1)) {
+    const group = membersOf(item);
+    if (group.length) { stripRuns.push(item === stop ? { photos: group, size: group.length, collapsed: false } : { photos: [item], size: group.length, collapsed: true }); continue; }
     const last = stripRuns.at(-1);
-    if (last && item.similarityGroupId && last[0].similarityGroupId === item.similarityGroupId) last.push(item);
-    else stripRuns.push([item]);
+    if (last && !last.collapsed && item.similarityGroupId && last.photos[0].similarityGroupId === item.similarityGroupId && !membersOf(last.photos[0]).length) last.photos.push(item);
+    else stripRuns.push({ photos: [item], size: 0, collapsed: false });
   }
   const currentThumbRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => { currentThumbRef.current?.scrollIntoView({ block: "nearest", inline: "center" }); }, [photoId]);
@@ -63,6 +74,10 @@ export function PhotoDetail({
     const next = photos[index + step];
     if (next) onPhotoChange(next.id);
   }, [index, onPhotoChange, photos]);
+  const goMember = useCallback((step: number) => {
+    const next = members[memberIndex + step];
+    if (next) onPhotoChange(next.id);
+  }, [memberIndex, members, onPhotoChange]);
 
   // 작가 전달 메모: 입력이 멈추면 자동 저장, 사진을 넘기거나 닫을 때도 남은 입력을 저장한다.
   const [draft, setDraft] = useState(() => commentOf(photoId));
@@ -99,10 +114,10 @@ export function PhotoDetail({
 
   // 앞뒤 사진은 미리 받아 넘김을 빠르게 한다.
   useEffect(() => {
-    [photos[index - 1], photos[index + 1]].forEach((neighbor) => {
+    [photos[index - 1], photos[index + 1], members[memberIndex - 1], members[memberIndex + 1]].forEach((neighbor) => {
       if (neighbor) new Image().src = neighbor.previewUrl || neighbor.url;
     });
-  }, [index, photos]);
+  }, [index, memberIndex, members, photos]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -111,12 +126,13 @@ export function PhotoDetail({
       if (typing || event.metaKey || event.ctrlKey || event.altKey || event.repeat) return;
       if (event.key === "ArrowLeft") go(-1);
       else if (event.key === "ArrowRight") go(1);
+      else if ((event.key === "ArrowUp" || event.key === "ArrowDown") && members.length > 1) { event.preventDefault(); goMember(event.key === "ArrowUp" ? -1 : 1); }
       else if (event.key === " " && isOwner) { event.preventDefault(); onToggleSelect(photoId); }
       else if (event.key.toLowerCase() === "f") onToggleLike(photoId);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, isOwner, onClose, onToggleLike, onToggleSelect, photoId]);
+  }, [go, goMember, isOwner, members.length, onClose, onToggleLike, onToggleSelect, photoId]);
 
   if (!photo) return null;
   const src = photo.previewUrl || photo.url;
@@ -130,7 +146,7 @@ export function PhotoDetail({
         <div className={s.detailTop}>
           <button type="button" onClick={onClose} aria-label="목록으로"><ArrowLeft size={20} /></button>
           <span className={s.detailName}>{getPhotoDisplayName(photo)}</span>
-          <span className={s.detailCount}>{index + 1} / {photos.length}{isOwner ? ` · 선택 ${selectedCount}${target ? `/${target}` : ""}장` : ""}</span>
+          <span className={s.detailCount}>{index + 1} / {photos.length}{members.length > 1 ? ` · 비슷한 사진 ${memberIndex + 1}/${members.length}` : ""}{isOwner ? ` · 선택 ${selectedCount}${target ? `/${target}` : ""}장` : ""}</span>
         </div>
         <div
           className={s.detailImage}
@@ -152,21 +168,24 @@ export function PhotoDetail({
           {quality && <span className={s.quality}>⚠ {quality} · 직접 확인해 주세요</span>}
         </div>
         {/* 필름 띠 = ‹ › 로 넘기는 순서 그대로. PC는 항상, 모바일은 비슷한 사진을 볼 때만(세로 공간이 좁다). */}
-        {photos.length > 1 && (desktop || similar.length > 1) && (
+        {photos.length > 1 && (desktop || members.length > 1 || similar.length > 1) && (
           <div className={s.strip}>
             <div className={s.stripRow}>
               {stripRuns.map((run) => {
-                const thumbs = run.map((member) => (
-                  <button key={member.id} ref={member.id === photoId ? currentThumbRef : undefined} type="button" aria-current={member.id === photoId} aria-label={`${getPhotoDisplayName(member)} 보기`} onClick={() => onPhotoChange(member.id)}>
+                const thumbs = run.photos.map((member) => (
+                  <button key={member.id} ref={member.id === photoId ? currentThumbRef : undefined} type="button" aria-current={member.id === photoId}
+                    aria-label={run.collapsed ? `${getPhotoDisplayName(member)} 외 비슷한 사진 ${run.size - 1}장 보기` : `${getPhotoDisplayName(member)} 보기`}
+                    data-stack={run.collapsed || undefined} onClick={() => onPhotoChange(member.id)}>
                     <img src={member.url} alt="" draggable={false} loading="lazy" />
                     {selectedIds.has(member.id) && <i><Check size={11} strokeWidth={3} /></i>}
+                    {run.collapsed && <b>{run.size}</b>}
                   </button>
                 ));
-                if (run.length < 2) return thumbs;
+                if (run.collapsed || run.photos.length < 2) return thumbs;
                 return (
-                  <div key={run[0].id} className={s.stripGroup} data-current={run.some((member) => member.id === photoId)}>
+                  <div key={run.photos[0].id} className={s.stripGroup} data-current={run.photos.some((member) => member.id === photoId)}>
                     <div>{thumbs}</div>
-                    <span>비슷한 사진 {similarOf(run[0]).length}장</span>
+                    <span>비슷한 사진 {run.size || similarOf(run.photos[0]).length}장</span>
                   </div>
                 );
               })}
@@ -213,7 +232,7 @@ export function PhotoDetail({
             </PhotographerLightButton>
           )}
         </div>
-        <span className={s.shortcutHint}>← → 이동 · {isOwner ? "Space 보정 받기 · " : ""}F 찜 · Esc 닫기</span>
+        <span className={s.shortcutHint}>← → 이동 · {members.length > 1 ? "↑ ↓ 비슷한 사진 · " : ""}{isOwner ? "Space 보정 받기 · " : ""}F 찜 · Esc 닫기</span>
       </aside>
     </div>
   );
