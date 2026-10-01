@@ -51,6 +51,10 @@
 .timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::before { inset: 0 0 8px 8px; background: #dfe5e8; }
 .timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::after { inset: 4px 4px 4px 4px; background: #bfcbd1; }
 .timelineScroll :global(.gl-group-stack) { z-index: 1; }
+/* 배지로 펼친 묶음: 같은 묶음 사진들을 하나로 이어진 띠로 감싼다 — 틀(4px)에 더해 카드 사이 간격의 절반씩을 같은 색으로 채워
+   묶음끼리는 붙어 보이고, 묶음 밖 카드와는 간격이 남는다. */
+.timelineScroll :global(.gl-photo-card:has(.gl-group-media)) { padding: 4px; background: #d3dce1; border-radius: 6px; box-shadow: 0 0 0 calc(var(--cell-gap, 12px) / 2) #d3dce1; }
+.timelineScroll :global(.gl-group-media) { outline: 0; }
 /* 아래쪽 그라데이션은 공용 카드에서 사진 층 전체 위(덮개 층)에 있어 배지까지 어둡게 덮는다.
    셀프 고객 셀렉에서는 사진 층 안(사진 위·배지 아래)으로 옮긴다. */
 .timelineScroll :global(.gl-card-overlay) { background: none; }

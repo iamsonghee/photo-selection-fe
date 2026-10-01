@@ -264,7 +264,7 @@ export function SceneGrid({ photos, mobileColumns, positionKey, startAt, enterFr
             const row = rows[item.index];
             if (row.kind === "footer") return <div key={item.key} className={s.sceneFooter} style={{ top: item.start, height: item.size }}>{footer}</div>;
             return (
-              <div key={item.key} className={ui.selectGridRow} style={{ top: item.start, height: Math.max(0, item.size - layout.gap), gridTemplateColumns: `repeat(${layout.cols}, minmax(0, 1fr))`, gap: layout.gap }}>
+              <div key={item.key} className={ui.selectGridRow} style={{ top: item.start, height: Math.max(0, item.size - layout.gap), gridTemplateColumns: `repeat(${layout.cols}, minmax(0, 1fr))`, gap: layout.gap, "--cell-gap": `${layout.gap}px` } as CSSProperties}>
                 {row.photos.map((photo) => renderCard(photo, layout.cols))}
               </div>
             );

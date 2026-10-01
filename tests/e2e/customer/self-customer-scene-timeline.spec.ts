@@ -28,6 +28,16 @@ async function mock(page: Page, data = project()) {
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/sync")) return route.fulfill({ json: { selectedIds: data.selectedIds, photoStates: data.photoStates, participantOpinions: {}, participantDone: data.participantDone, participantNicknames: data.participantNicknames, onlineParticipants: [], participantViews: {}, exported: false } });
     if (path.endsWith(`/projects/${PROJECT_ID}`) && route.request().method() === "GET") return route.fulfill({ json: { isOwner: true, project: data } });
+    // 선택·찜 쓰기를 기억해 둔다 — 주기 동기화가 방금 바꾼 상태를 되돌려 테스트가 흔들리지 않게.
+    if (path.endsWith("/selections") && route.request().method() === "POST") {
+      const body = route.request().postDataJSON() as { photo_id: string; is_selected?: boolean; color_op?: { color: string; add: boolean } };
+      if (typeof body.is_selected === "boolean") data.selectedIds = body.is_selected ? [...new Set([...data.selectedIds, body.photo_id])] : data.selectedIds.filter((id) => id !== body.photo_id);
+      if (body.color_op) {
+        const states = data.photoStates as Record<string, { color?: string[] }>;
+        const current = states[body.photo_id]?.color ?? [];
+        states[body.photo_id] = { ...states[body.photo_id], color: body.color_op.add ? [...new Set([...current, body.color_op.color])] : current.filter((color) => color !== body.color_op!.color) };
+      }
+    }
     return route.fulfill({ json: { ok: true } });
   });
 }
@@ -239,10 +249,9 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   await mock(page);
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   await expect(page.getByRole("button", { name: "유사컷 묶기" })).toHaveAttribute("aria-pressed", "true");
-  // 묶음 표지에는 누를 수 없는 배지(⧉ 3)만 있고, 표지를 누르면(펼치지 않고) 바로 상세가 열린다.
+  // 묶음 표지의 사진을 누르면(펼치지 않고) 바로 상세가 열린다. 펼치기는 ⧉ 배지로만 한다.
   const cover = page.locator('.gl-photo-card[data-photo-id="p8"]');
-  await expect(cover.getByRole("img", { name: "유사컷 3장" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /유사컷 \d+장 펼치기/ })).toHaveCount(0);
+  await expect(cover.getByRole("button", { name: "유사컷 3장 펼치기" })).toBeVisible();
   await expect(page.locator(".gl-quality-badge").first()).toBeVisible();
   await cover.click();
   await expect(page.getByRole("dialog", { name: "S_8.jpg 상세 보기" })).toBeVisible();
@@ -270,7 +279,7 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=none`);
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "유사컷 묶기" })).toHaveCount(0);
-  await expect(page.getByRole("img", { name: /유사컷 \d+장/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /유사컷 \d+장 펼치기/ })).toHaveCount(0);
   await expect(page.locator(".gl-quality-badge")).toHaveCount(0);
   await context.close();
 });
@@ -327,7 +336,7 @@ test("a collapsed cover never looks selected; the badge shows the group's picks"
   const [coverBox, picksBox] = [(await cover.boundingBox())!, (await picks.boundingBox())!];
   expect(picksBox.x - coverBox.x).toBeLessThan(24);
   expect(picksBox.y - coverBox.y).toBeLessThan(24);
-  await expect(cover.getByRole("img", { name: "유사컷 3장" })).toHaveText("3");
+  await expect(cover.getByRole("button", { name: "유사컷 3장 펼치기" })).toHaveText("3");
   await expect(cover).not.toHaveClass(/gl-selected/);
   // 대신 주황 테두리로 이 묶음에 고른 사진이 있음을 보인다.
   await expect(cover.locator('[data-active="true"]')).toHaveCount(1);
@@ -416,5 +425,31 @@ test("like dots collapse to two plus a count when many people liked", async ({ b
   const card = page.locator('.gl-photo-card[data-photo-id="p5"]');
   await expect(card.locator(".gl-color-dot")).toHaveCount(2);
   await expect(card.getByRole("img", { name: /^외 1명/ })).toHaveText("+1");
+  await context.close();
+});
+
+test("a single similar-cut group can be expanded from its badge", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  // p8~p10 묶음만 배지로 펼친다. 다른 묶음(p16~p18)은 그대로 접혀 있다.
+  await page.locator('.gl-photo-card[data-photo-id="p8"]').getByRole("button", { name: "유사컷 3장 펼치기" }).click();
+  await expect(page.locator('.gl-photo-card[data-photo-id="p9"]')).toBeVisible();
+  await expect(page.locator('.gl-photo-card[data-photo-id="p10"]')).toBeVisible();
+  await expect(page.locator('.gl-photo-card[data-photo-id="p18"]')).toHaveCount(0);
+  await expect(page.locator('.gl-photo-card[data-photo-id="p8"]').getByRole("button", { name: "유사컷 3장 접기" })).toHaveText("접기");
+  await expect(page.locator('.gl-photo-card[data-photo-id="p9"]').getByRole("button", { name: /유사컷/ })).toHaveCount(0);
+  // 펼친 사진은 바로 고를 수 있고, 상세에서는 한 장씩 넘어간다(22칸 → 24칸).
+  await page.locator('.gl-photo-card[data-photo-id="p9"]').getByRole("button", { name: "선택", exact: true }).click();
+  await expect(page.locator('.gl-photo-card[data-photo-id="p9"]')).toHaveClass(/gl-selected/);
+  await page.locator('.gl-photo-card[data-photo-id="p9"]').click();
+  await expect(page.locator('[class*="detailCount"]')).toContainText("8 / 24");
+  await expect(page.locator('[class*="detailCount"]')).not.toContainText("비슷한 사진");
+  await page.keyboard.press("Escape");
+  // 접기
+  await page.locator('.gl-photo-card[data-photo-id="p8"]').getByRole("button", { name: "유사컷 3장 접기" }).click();
+  await expect(page.locator('.gl-photo-card[data-photo-id="p10"]')).toHaveCount(0);
   await context.close();
 });

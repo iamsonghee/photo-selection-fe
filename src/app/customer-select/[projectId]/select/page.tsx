@@ -61,6 +61,8 @@ function SelectScreen() {
     try { localStorage.setItem(setAsideKey(projectId), on ? "1" : "0"); } catch {}
   };
   const [query, setQuery] = useState("");
+  // 배지(⧉ N)로 펼친 유사컷 묶음. 장면을 바꾸거나 묶기를 다시 켜면 접는다.
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [mobileColumns, setMobileColumns] = useState<MobileColumns>(2);
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
   const [sheet, setSheet] = useState<"invite" | "scenes" | "ai" | null>(null);
@@ -152,16 +154,22 @@ function SelectScreen() {
     groupsInView.forEach((members, groupId) => covers.set(groupId, (members.find((member) => picked.has(member.id)) ?? members[0]).id));
     return filtered.filter((photo) => {
       const groupId = photo.similarityGroupId;
-      if (!groupId || (groupsInView.get(groupId)?.length ?? 0) < 2) return true;
+      if (!groupId || expanded.has(groupId) || (groupsInView.get(groupId)?.length ?? 0) < 2) return true;
       return covers.get(groupId) === photo.id;
     });
-  }, [filtered, grouped, groupsInView, hasGroups, picked]);
+  }, [expanded, filtered, grouped, groupsInView, hasGroups, picked]);
+  // 펼친 묶음에서 "⧉ 접기" 배지를 달 첫 장(갤러리 순서 기준).
+  const firstOfGroup = useMemo(() => {
+    const first = new Map<string, string>();
+    filtered.forEach((photo) => { if (photo.similarityGroupId && !first.has(photo.similarityGroupId)) first.set(photo.similarityGroupId, photo.id); });
+    return first;
+  }, [filtered]);
   // 묶기가 켜져 있으면 표지 한 칸에 든 사진들(상세에서 ↑↓·띠로 본다). 아니면 빈 목록.
   const membersOf = useCallback((photo: Photo) => {
-    if (!grouped || !hasGroups || !photo.similarityGroupId) return [];
+    if (!grouped || !hasGroups || !photo.similarityGroupId || expanded.has(photo.similarityGroupId)) return [];
     const members = groupsInView.get(photo.similarityGroupId) ?? [];
     return members.length > 1 ? members : [];
-  }, [grouped, groupsInView, hasGroups]);
+  }, [expanded, grouped, groupsInView, hasGroups]);
 
   const similarOf = useCallback((photo: Photo) => photo.similarityGroupId ? photos.filter((member) => member.similarityGroupId === photo.similarityGroupId) : [], [photos]);
 
@@ -179,6 +187,7 @@ function SelectScreen() {
   function goScene(index: number, byPull: "next" | "prev" | null = null) {
     setScope("all");
     setQuery("");
+    setExpanded(new Set());
     setHoldAll(false);
     setSheet(null);
     setChosenScene(index);
@@ -266,7 +275,9 @@ function SelectScreen() {
   const card = (photo: Photo, columns: number) => {
     const groupId = photo.similarityGroupId ?? undefined;
     const members = groupId ? groupsInView.get(groupId) ?? [] : [];
-    const isCover = grouped && hasGroups && members.length > 1;
+    const inGroup = grouped && hasGroups && members.length > 1;
+    const isOpen = inGroup && expanded.has(groupId!);
+    const isCover = inGroup && !isOpen;
     return (
       <GalleryPhotoCard
         key={photo.id}
@@ -289,7 +300,19 @@ function SelectScreen() {
         restCount={Math.max(0, members.length - 1)}
         totalCount={members.length}
         selectedCount={isOwner ? members.filter((member) => picked.has(member.id)).length : 0}
-        isGroupExpanded={false}
+        // 펼친 묶음은 첫 장에만 "⧉ 접기" 배지를 둔다.
+        isGroupExpanded={isOpen && firstOfGroup.get(groupId!) === photo.id}
+        inExpandedGroup={isOpen}
+        compactGroupBadge
+        onGroupBadgeClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setExpanded((current) => {
+            const next = new Set(current);
+            if (next.has(groupId!)) next.delete(groupId!); else next.add(groupId!);
+            return next;
+          });
+        }}
         presignedThumb={photo.url}
         thumbQueue={thumbQueue}
         viewerQueryString=""
@@ -384,7 +407,7 @@ function SelectScreen() {
               {scopeChips.filter((chip) => chip.show).map((chip) => <button key={chip.value} type="button" className={s.chip} aria-pressed={scope === chip.value} onClick={() => setScope(chip.value)}>{chip.label}</button>)}
               {hasQuality && <button type="button" className={s.chip} aria-pressed={setAside} onClick={() => toggleSetAside(!setAside)}>{setAside && setAsideCount ? `흔들림·눈 감음 ${setAsideCount}장 빼는 중` : "흔들림·눈 감음 빼기"}</button>}
               {setAside && setAsideCount > 0 && <button type="button" className={s.textLink} style={{ alignSelf: "center" }} onClick={() => setScope("quality")}>따로 보기</button>}
-              {hasGroups && <button type="button" className={s.chip} aria-pressed={grouped} onClick={() => setGrouped((value) => !value)}><Layers size={13} />유사컷 묶기</button>}
+              {hasGroups && <button type="button" className={s.chip} aria-pressed={grouped} onClick={() => { setGrouped((value) => !value); setExpanded(new Set()); }}><Layers size={13} />유사컷 묶기</button>}
               <input className={s.search} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="파일명 검색" aria-label="파일명 검색" />
               <button type="button" className={`${s.chip} ${s.columnsButton}`} aria-label={`한 줄에 ${mobileColumns}장 — 바꾸기`} onClick={() => setMobileColumns((value) => (value === 4 ? 2 : value + 1) as MobileColumns)}><Grid2x2 size={13} />{mobileColumns}열</button>
             </div>

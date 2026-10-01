@@ -59,8 +59,9 @@ type GalleryPhotoCardProps = {
   highlighted?: boolean;
   /** 주면 찜 색 점을 이 개수까지만 그리고 나머지는 +N으로 줄인다 */
   maxColorDots?: number;
-  /** 없으면 묶음 배지는 표시만 한다 */
-  onGroupBadgeClick?: (e: React.MouseEvent, groupId: string) => void;
+  onGroupBadgeClick: (e: React.MouseEvent, groupId: string) => void;
+  /** 셀프 고객 셀렉: 묶음 배지를 짧게(⧉ 3 / ⧉ 접기) 쓰고, 표지의 묶음 안 고른 장수는 ✓ 자리(왼쪽 위)에 보인다 */
+  compactGroupBadge?: boolean;
   onRate: (photoId: string, star: StarRating | undefined) => void;
   onThumbError: (photoId: string) => void;
 };
@@ -97,6 +98,7 @@ function GalleryPhotoCardImpl({
   popOnSelect = false,
   highlighted = false,
   maxColorDots,
+  compactGroupBadge = false,
   onGroupBadgeClick,
   onRate,
   onThumbError,
@@ -284,13 +286,13 @@ function GalleryPhotoCardImpl({
         )}
 
         {/* 표시 전용 묶음 표지: 묶음 안 고른 장수를 ✓ 자리(왼쪽 위)에 */}
-        {showGroupBadge && !onGroupBadgeClick && selectedCount > 0 && (
+        {showGroupBadge && compactGroupBadge && selectedCount > 0 && (
           <span className="gl-group-picks" role="img" aria-label={`${selectedCount}장 선택`}><Check size={12} strokeWidth={3} aria-hidden />{selectedCount}</span>
         )}
-        {(showGroupBadge || inExpandedGroup) && groupId && (
-          <SimilarityGroupBadge count={totalCount} expanded={isGroupExpanded} label={groupLabel}
-            selectedCount={showGroupBadge ? selectedCount : 0}
-            onClick={onGroupBadgeClick && ((event) => onGroupBadgeClick(event, groupId))} />
+        {(showGroupBadge || (inExpandedGroup && isGroupExpanded)) && groupId && (
+          <SimilarityGroupBadge count={totalCount} expanded={isGroupExpanded} label={groupLabel} compact={compactGroupBadge}
+            selectedCount={showGroupBadge && !compactGroupBadge ? selectedCount : 0}
+            onClick={(event) => onGroupBadgeClick(event, groupId)} />
         )}
       </PhotoThumbnailFrame>
 
