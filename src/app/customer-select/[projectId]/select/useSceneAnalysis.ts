@@ -23,6 +23,8 @@ export type SceneAnalysis =
   | { status: "fallback"; failed: boolean; scenes: NamedScene[] | null };
 
 export type SceneAnalysisControl = SceneAnalysis & {
+  /** 화면에 쓸 사진 목록. 시안 모드 완료 상태에서는 가짜 유사컷 묶음·흔들림/눈 감음 값이 붙는다. */
+  photos: Photo[];
   /** 정리를 시작한다. 시작 요청이 받아들여지지 않으면 오류 문구를 돌려준다. */
   start: (kinds: AiTidyKind[]) => Promise<string | null>;
 };
@@ -43,6 +45,17 @@ function mockScenes(photos: Photo[], timeScenes: Scene[] | null): Scene[] | null
     const chunk = photos.slice(index * size, (index + 1) * size);
     return { index, photoIds: chunk.map((photo) => photo.id), start: chunk[0]?.takenAt ?? null, end: chunk.at(-1)?.takenAt ?? null };
   }).filter((scene) => scene.photoIds.length);
+}
+
+/** 시안 확인용 AI 결과: 8장마다 앞 3장을 유사컷으로 묶고, 11장마다 흔들림, 13장마다 눈 감음으로 표시한다. */
+function withMockAi(photos: Photo[]): Photo[] {
+  return photos.map((photo, index) => ({
+    ...photo,
+    similarityGroupId: index % 8 < 3 ? `mock-group-${Math.floor(index / 8)}` : null,
+    isBlurry: index % 11 === 5,
+    faceDetected: true,
+    eyesClosed: index % 13 === 9,
+  }));
 }
 
 /** AI 장면 이름이 붙기 전까지는 목록 순서대로 이름을 대신 붙인 시안용 결과를 만든다(개발 확인용). */
@@ -67,6 +80,7 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
   });
   const initialMock = mockParam ?? storedMock;
   const [mock, setMock] = useState<MockMode | null>(initialMock && MOCK_MODES.includes(initialMock) ? initialMock as MockMode : null);
+  const mockAiPhotos = useMemo(() => withMockAi(photos), [photos]);
   const realTimeScenes = useMemo(() => splitScenes(photos), [photos]);
   const timeScenes = useMemo(() => (mock ? mockScenes(photos, realTimeScenes) : realTimeScenes), [mock, photos, realTimeScenes]);
   const unnamed = useMemo<NamedScene[] | null>(() => timeScenes?.map((scene) => ({ ...scene, name: null })) ?? null, [timeScenes]);
@@ -127,6 +141,6 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
       : remote === "processing" ? { status: "analyzing", progress: null, scenes: null }
       : remote === "completed" || remote === "failed" ? { status: "fallback", failed: remote === "failed", scenes: unnamed }
       : { status: "none", scenes: null };
-    return { ...result, start };
-  }, [mock, mockDone, photos.length, remote, shootType, start, timeScenes, unnamed]);
+    return { ...result, photos: mock && result.status === "ready" ? mockAiPhotos : photos, start };
+  }, [mock, mockAiPhotos, mockDone, photos, remote, shootType, start, timeScenes, unnamed]);
 }

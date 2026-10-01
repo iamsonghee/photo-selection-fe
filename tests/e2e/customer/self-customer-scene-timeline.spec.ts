@@ -168,7 +168,7 @@ test("owner card: like is a secondary hover action on desktop and display-only o
   await loginAsPhotographer(page);
   await mock(page);
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=1`);
-  const card = page.locator('[data-photo-id="p40"]');
+  const card = page.locator('[data-photo-id="p43"]');
   const like = card.getByRole("button", { name: "찜하기" });
   await expect(card).toBeVisible();
   await expect(like).toHaveCSS("opacity", "0");
@@ -189,8 +189,8 @@ test("owner card: like is a secondary hover action on desktop and display-only o
   await loginAsPhotographer(phone);
   await mock(phone);
   await phone.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=1`);
-  await expect(phone.locator('[data-photo-id="p40"]')).toBeVisible();
-  await expect(phone.locator('[data-photo-id="p40"]').getByRole("button", { name: "찜하기" })).toBeHidden();
+  await expect(phone.locator('[data-photo-id="p43"]')).toBeVisible();
+  await expect(phone.locator('[data-photo-id="p43"]').getByRole("button", { name: "찜하기" })).toBeHidden();
   await mobile.close();
 });
 
@@ -213,5 +213,34 @@ test("selecting a card pops only at the moment it turns on", async ({ browser })
   await card.getByRole("button", { name: "선택 해제" }).click();
   await expect(card).not.toHaveClass(/gl-selected/);
   await expect(page.locator(".gl-photo-card[data-pop]")).toHaveCount(0);
+  await context.close();
+});
+
+test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await expect(page.getByRole("button", { name: "유사컷 묶기" })).toHaveAttribute("aria-pressed", "true");
+  const expand = page.getByRole("button", { name: /유사컷 \d+장 펼치기/ });
+  await expect(expand.first()).toBeVisible();
+  await expect(page.locator(".gl-quality-badge").first()).toBeVisible();
+
+  // 묶음 표지를 누르면 펼쳐지고, 의심 사진만 모아 볼 수 있다.
+  const before = await page.locator("[data-photo-id]").count();
+  await expand.first().click();
+  await expect.poll(() => page.locator("[data-photo-id]").count()).toBeGreaterThan(before);
+  await page.getByRole("button", { name: "흔들림·눈 감음 의심" }).click();
+  // 첫 장면(30장)에서 흔들림 3장 + 눈 감음 2장 — 모두 의심 표시가 붙은 사진만 남는다.
+  await expect(page.locator("[data-photo-id]")).toHaveCount(5);
+  await expect(page.locator(".gl-quality-badge")).toHaveCount(5);
+
+  // 정리 전(none)에는 가짜 결과가 붙지 않는다.
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=none`);
+  await expect(page.locator("[data-photo-id]").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "유사컷 묶기" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /유사컷 \d+장 펼치기/ })).toHaveCount(0);
+  await expect(page.locator(".gl-quality-badge")).toHaveCount(0);
   await context.close();
 });

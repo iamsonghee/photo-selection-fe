@@ -77,9 +77,9 @@ function SelectScreen() {
     try { localStorage.setItem(railCollapsedKey, collapsed ? "1" : "0"); } catch {}
   };
 
-  const photos = project.photos;
+  const analysis = useSceneAnalysis(projectId, project.photos, project.shootType);
+  const photos = analysis.photos;
   const photoById = useMemo(() => new Map(photos.map((photo) => [photo.id, photo])), [photos]);
-  const analysis = useSceneAnalysis(projectId, photos, project.shootType);
   const scenes = analysis.scenes;
   // 촬영 시간순 전체 목록 — 장면이 없을 때와 AI 정리 중(1차 훑어보기)에 쓴다.
   const timeOrdered = useMemo(() => [...photos].sort((a, b) => (a.takenAt ?? "").localeCompare(b.takenAt ?? "") || a.orderIndex - b.orderIndex), [photos]);
