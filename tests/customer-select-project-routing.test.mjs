@@ -25,12 +25,12 @@ assert.equal(customerProjectDestination(project()), "/customer-select/project-1/
 assert.equal(customerProjectDestination(project({ photo_count: 10 })), "/customer-select/project-1/select");
 assert.equal(customerProjectDestination(project({ exported: true, photo_count: 10 })), "/customer-select/project-1/select");
 assert.equal(customerProjectDestination(project({ retouch_done: true })), "/customer-select/project-1/done");
-assert.equal(customerProjectStatus(project({ retouch_done: true })), "보정 완료");
-assert.equal(customerProjectStatus(project({ exported: true, photo_count: 10 })), "선택 중");
-assert.equal(customerProjectStatus(project({ photo_count: 10, delivery_count: 1 })), "선택 중");
-assert.equal(customerProjectStatus(project({ photo_count: 10 })), "선택 중");
-assert.equal(customerProjectStatus(project({ photo_count: 10 }), 0), "선택 시작 전");
-assert.equal(customerProjectStatus(project()), "사진 준비");
+assert.equal(customerProjectStatus(project({ retouch_done: true })), "완료");
+assert.equal(customerProjectStatus(project({ exported: true, photo_count: 10 })), "고르는 중");
+assert.equal(customerProjectStatus(project({ photo_count: 10, delivery_count: 1 })), "고르는 중");
+assert.equal(customerProjectStatus(project({ photo_count: 10 })), "고르는 중");
+assert.equal(customerProjectStatus(project({ photo_count: 10 }), 0), "고르기 전");
+assert.equal(customerProjectStatus(project()), "사진 올리기 전");
 assert.equal(customerProjectAction(project()), "사진 올리기");
 assert.equal(customerProjectAction(project({ photo_count: 10 }), 0), "사진 고르기");
 assert.equal(customerProjectAction(project({ photo_count: 10 }), 1), "이어서 고르기");

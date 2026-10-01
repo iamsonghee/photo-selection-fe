@@ -24,9 +24,9 @@ export function customerProjectDestination(project: CustomerProjectSummary) {
 }
 
 export function customerProjectStatus(project: CustomerProjectSummary, selectedCount?: number | null) {
-  if (project.retouch_done) return "보정 완료";
-  if (project.photo_count > 0) return selectedCount === 0 ? "선택 시작 전" : "선택 중";
-  return "사진 준비";
+  if (project.retouch_done) return "완료";
+  if (project.photo_count > 0) return selectedCount === 0 ? "고르기 전" : "고르는 중";
+  return "사진 올리기 전";
 }
 
 export function customerProjectAction(project: CustomerProjectSummary, selectedCount?: number | null) {

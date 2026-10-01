@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import { FolderPlus, Plus } from "lucide-react";
+import { FolderPlus, Plus, Settings } from "lucide-react";
 import { getCurrentCustomerAuthUser } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "./_lib/CustomerSelectShell";
@@ -119,7 +119,8 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
               ].filter(Boolean).join(" · ");
               return (
               <article key={project.id} className="group relative overflow-hidden rounded-2xl border border-border-subtle bg-surface transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(2,56,82,0.08)]">
-              <Link href={`/customer-select/${project.id}`} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/35" aria-label={`${project.name} 프로젝트 현황`}>
+              <Link href={`/customer-select/${project.id}/settings`} aria-label={`${project.name} 설정`} title="프로젝트 설정" className="absolute right-3 top-3 z-10 grid size-9 place-items-center rounded-full bg-surface/90 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35"><Settings size={16} /></Link>
+              <Link href={customerProjectDestination(project)} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/35" aria-label={`${project.name} ${customerProjectAction(project, selectedCount)}`}>
                 <div className="relative grid aspect-[4/3] place-items-center overflow-hidden bg-surface-raised">
                   {coverUrl
                     ? <Image src={coverUrl} alt="" fill unoptimized sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover object-center" />
@@ -134,9 +135,9 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
                   <p className="mt-3 text-[14px] text-muted-foreground">
                     <span className="font-semibold text-foreground">사진 {project.photo_count.toLocaleString()}장</span>
                     <span aria-hidden="true"> · </span>
-                    {typeof selectedCount === "number" ? `선택 ${selectedCount.toLocaleString()}장` : "선택 수 확인 불가"}
-                    <span aria-hidden="true"> · </span>
-                    보정 목표 {project.target_count.toLocaleString()}장
+                    {typeof selectedCount === "number" ? `고른 사진 ${selectedCount.toLocaleString()}장` : "고른 수 확인 불가"}
+                    <span aria-hidden="true"> / </span>
+                    약속한 {project.target_count.toLocaleString()}장
                   </p>
                 </div>
               </Link>
