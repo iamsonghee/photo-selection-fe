@@ -14,7 +14,7 @@ export function rememberGroupSimilar(projectId: string, on: boolean) {
   try { localStorage.setItem(groupSimilarKey(projectId), on ? "1" : "0"); } catch {}
 }
 
-/** "흔들림·눈 감음 사진 뒤로 빼기"를 켜고 정리한 사람은 고르기 화면을 의심 사진을 뺀 채로 시작한다(기기별 보기 설정). */
+/** "흔들림·눈 감음 확인"을 켜고 정리한 사람은 고르기 화면을 흔들림 사진을 뺀 채로 시작한다(기기별 보기 설정). */
 export const setAsideKey = (projectId: string) => `ps:self-select-set-aside:${projectId}`;
 
 /**
@@ -49,7 +49,7 @@ export function AiTidySheet({ projectId, photoCount, pending, error, onStart, on
         </label>
         <label className={s.tidyOption}>
           <input type="checkbox" checked={quality} onChange={(event) => setQuality(event.target.checked)} />
-          <span><strong>흔들림·눈 감음 사진 뒤로 빼기</strong><small>의심 사진은 갤러리에서 빼고 묶음에서는 맨 뒤로 보내요. 지우지 않고 언제든 다시 볼 수 있어요</small></span>
+          <span><strong>흔들림·눈 감음 확인</strong><small>흔들린 사진은 갤러리에서 빼고, 눈 감은 컷은 비슷한 사진 묶음에서 뒤로 보내요. 지우지 않아요</small></span>
         </label>
       </div>
       {error && <p className={s.tidyError} role="alert">{error}</p>}

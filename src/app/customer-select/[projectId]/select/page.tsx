@@ -34,8 +34,10 @@ import s from "./select.module.css";
 type Scope = "all" | "picked" | "liked" | "mine" | "popular";
 const LIKE_SCOPES: readonly Scope[] = ["liked", "mine", "popular"];
 
-/** AI가 흔들림(흐림) 또는 눈 감음을 의심한 사진. 의도적인 컷일 수 있어 지우지 않고 뒤로만 뺀다. */
+/** AI가 흔들림(흐림) 또는 눈 감음을 의심한 사진 — 유사컷 묶음 안에서 맨 뒤로 보낸다(비슷한 컷 중 멀쩡한 것부터). */
 const isFlagged = (photo: Photo) => Boolean(photo.isBlurry || (photo.faceDetected && photo.eyesClosed));
+/** 갤러리에서 빼는 건 흔들림(흐림)만 — 눈 감음은 웃음·윙크 같은 의도된 표정이 많아 숨기지 않는다. */
+const isBlurFlagged = (photo: Photo) => photo.isBlurry === true;
 
 export default function CustomerSelectPage() {
   return <Suspense fallback={<SystemLoadingScreen title="사진을 불러오고 있어요" homeHref="/customer-select" />}><SelectScreen /></Suspense>;
@@ -141,12 +143,12 @@ function SelectScreen() {
       if (scope === "mine" && !myLikes.has(photo.id)) return false;
       if (scope === "popular" && likesOf(photo.id).length < 2) return false;
       // 빼고 보기: 의심 사진은 갤러리에서 뺀다. 이미 고른(참여자는 찜한) 사진은 절대 빼지 않는다.
-      if (setAside && isFlagged(photo) && !picked.has(photo.id)) return false;
+      if (setAside && isBlurFlagged(photo) && !picked.has(photo.id)) return false;
       return !text || getPhotoDisplayName(photo).toLowerCase().includes(text);
     });
   }, [likesOf, myLikes, picked, query, scenePhotos, scope, selectedIds, setAside]);
   const setAsideCount = useMemo(
-    () => (setAside ? scenePhotos.filter((photo) => isFlagged(photo) && !picked.has(photo.id)).length : 0),
+    () => (setAside ? scenePhotos.filter((photo) => isBlurFlagged(photo) && !picked.has(photo.id)).length : 0),
     [picked, scenePhotos, setAside],
   );
 
@@ -231,7 +233,7 @@ function SelectScreen() {
 
   const target = project.target;
   const pickedTotal = picked.size;
-  const hasQuality = scenePhotos.some((photo) => photo.isBlurry || (photo.faceDetected && photo.eyesClosed));
+  const hasQuality = scenePhotos.some(isBlurFlagged);
   const myDone = Boolean(project.participantDone[me]);
   const toReview = () => router.push(`/customer-select/${projectId}/review`);
   const withChat = people.length > 1;
@@ -468,7 +470,7 @@ function SelectScreen() {
                   )}
                   {hasQuality && (
                     <button type="button" role="switch" aria-checked={setAside} className={s.switchRow} onClick={() => toggleSetAside(!setAside)}>
-                      <span><strong>흔들림·눈 감음 빼기</strong><small>AI가 의심한 사진을 갤러리에서 빼요(고른 사진은 남겨요)</small></span><i aria-hidden />
+                      <span><strong>흔들림 사진 빼기</strong><small>AI가 흔들림·초점 문제를 의심한 사진을 빼요(고른 사진은 남겨요)</small></span><i aria-hidden />
                     </button>
                   )}
                   <div className={s.columnsRow}>
@@ -481,7 +483,7 @@ function SelectScreen() {
               </div>
               {setAside && setAsideCount > 0 && (
                 <p className={s.toolsNote}>
-                  <span>흔들림·눈 감음 <strong>{setAsideCount}장</strong> 빼고 보는 중</span>
+                  <span>흔들림 <strong>{setAsideCount}장</strong> 빼고 보는 중</span>
                   <button type="button" onClick={() => toggleSetAside(false)}>끄기</button>
                 </p>
               )}

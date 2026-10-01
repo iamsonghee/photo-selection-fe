@@ -261,18 +261,18 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   await page.keyboard.press("Escape");
   await expect(page.locator('.gl-photo-card[data-photo-id="p9"]')).toHaveCount(0);
 
-  // 흔들림·눈 감음 빼기: 첫 장면(30장)의 의심 5장(흔들림 3 + 눈 감음 2)을 갤러리에서 뺀다(묶음을 끄고 전체에서).
+  // 흔들림 사진 빼기: 첫 장면(30장)의 흔들림 3장만 뺀다 — 눈 감음 2장은 남는다(묶음을 끄고 전체에서).
   await page.getByRole("button", { name: "보기 옵션" }).click();
   await page.getByRole("switch", { name: /유사컷 묶기/ }).click();
   await expect(page.locator("[data-photo-id]")).toHaveCount(30);
-  await page.getByRole("switch", { name: /흔들림·눈 감음 빼기/ }).click();
-  await expect(page.getByRole("switch", { name: /흔들림·눈 감음 빼기/ })).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("switch", { name: /흔들림 사진 빼기/ }).click();
+  await expect(page.getByRole("switch", { name: /흔들림 사진 빼기/ })).toHaveAttribute("aria-checked", "true");
   await page.keyboard.press("Escape");
-  await expect(page.locator('[class*="toolsNote"]')).toContainText("5장 빼고 보는 중");
+  await expect(page.locator('[class*="toolsNote"]')).toContainText("흔들림 3장 빼고 보는 중");
   // 켠 옵션 수가 보기 옵션 버튼에 보인다(유사컷 묶기 끔 · 빼기 켬 = 1).
   await expect(page.getByRole("button", { name: "보기 옵션" })).toHaveText("1");
-  await expect(page.locator("[data-photo-id]")).toHaveCount(25);
-  await expect(page.locator(".gl-quality-badge")).toHaveCount(0);
+  await expect(page.locator("[data-photo-id]")).toHaveCount(27);
+  await expect(page.locator(".gl-quality-badge-blur")).toHaveCount(0);
   // 다시 켠 채로 들어와도 기억한다(아래). 끄기 전에 새로고침해 확인한다.
   // 다시 켠 채로 들어와도 기억한다(기기별 보기 설정).
   await page.reload();
@@ -286,8 +286,9 @@ test("mock analysis also shows similar-cut groups and blur/eyes-closed flags", a
   await page.getByRole("button", { name: "끄기" }).click();
   await expect(page.locator('[class*="toolsNote"]')).toHaveCount(0);
   await expect(page.locator("[data-photo-id]")).toHaveCount(30);
-  await expect(page.locator(".gl-quality-badge")).toHaveCount(5);
-  await expect(page.getByLabel("눈 감음 의심", { exact: true })).toHaveCount(2);
+  // 카드에는 흔들림만 보이고, 눈 감음은 카드에 표시하지 않는다(상세 안내·묶음 안 순서로만).
+  await expect(page.locator(".gl-quality-badge-blur")).toHaveCount(3);
+  for (const eyes of await page.locator(".gl-quality-badge-eyes").all()) await expect(eyes).toBeHidden();
 
   // 정리 전(none)에는 가짜 결과가 붙지 않는다.
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=none`);
@@ -405,10 +406,10 @@ test("set-aside never hides a photo that is already picked", async ({ browser })
   // p5(흔들림 의심)를 먼저 고른 뒤 빼기를 켜면 p5는 남는다.
   await page.locator('.gl-photo-card[data-photo-id="p5"]').getByRole("button", { name: "선택", exact: true }).click();
   await page.getByRole("button", { name: "보기 옵션" }).click();
-  await page.getByRole("switch", { name: /흔들림·눈 감음 빼기/ }).click();
+  await page.getByRole("switch", { name: /흔들림 사진 빼기/ }).click();
   await page.keyboard.press("Escape");
   await expect(page.locator('.gl-photo-card[data-photo-id="p5"]')).toBeVisible();
-  await expect(page.locator('[class*="toolsNote"]')).toContainText("4장 빼고 보는 중");
+  await expect(page.locator('[class*="toolsNote"]')).toContainText("흔들림 2장 빼고 보는 중");
   await page.getByRole("button", { name: "끄기" }).click();
   await context.close();
 });

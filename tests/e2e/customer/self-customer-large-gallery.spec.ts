@@ -140,11 +140,11 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
     await page.keyboard.press("Escape");
   }
   // 흐림(137번째마다 15장) + 눈 감음(211번째마다 10장), 첫 사진이 겹쳐 24장
-  // 빼기를 켜면 24장을 뺐다고 알리고, 끄기로 되돌린다.
+  // 흔들림 사진 빼기를 켜면 흐림 15장만 뺐다고 알리고(눈 감음은 빼지 않음), 끄기로 되돌린다.
   await options.click();
-  await page.getByRole("switch", { name: /흔들림·눈 감음 빼기/ }).click();
+  await page.getByRole("switch", { name: /흔들림 사진 빼기/ }).click();
   await page.keyboard.press("Escape");
-  await expect(page.locator('[class*="toolsNote"]')).toContainText("24장 빼고 보는 중");
+  await expect(page.locator('[class*="toolsNote"]')).toContainText("흔들림 15장 빼고 보는 중");
   await page.getByRole("button", { name: "끄기" }).click();
   await page.waitForTimeout(250);
   await sample();

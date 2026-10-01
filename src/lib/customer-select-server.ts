@@ -157,7 +157,8 @@ export function toPhoto(row: CustomerPhotoRow, projectId: string, quality?: Cust
     takenAt: row.taken_at ?? null,
     isBlurry: quality ? [quality.blur_or_shake, quality.focus_issue].some((value) => value === "possible" || value === "likely") : null,
     faceDetected: quality?.primary_subject_detected ?? null,
-    eyesClosed: quality ? quality.eyes_closed === "possible" || quality.eyes_closed === "likely" : null,
+    // 눈 감음은 "likely"만 — 웃거나 윙크한 의도된 표정이 "possible"로 많이 잡힌다(실제 60장 중 10장).
+    eyesClosed: quality ? quality.eyes_closed === "likely" : null,
   };
 }
 
