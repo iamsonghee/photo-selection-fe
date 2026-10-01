@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { BrandLogoBar } from "@/components/BrandLogo";
 import styles from "./about.module.css";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
@@ -67,10 +68,7 @@ export default function AboutPageClient() {
           </Link>
         </div>
         <div className={styles.brandCluster}>
-          <div className={styles.logoBox}>A</div>
-          <div className={styles.brandName}>
-            A컷 <span>A-CUT</span>
-          </div>
+          <BrandLogoBar />
         </div>
         <div className={styles.headerSide} />
       </header>

@@ -21,7 +21,7 @@ import {
   UserRound,
 } from "lucide-react";
 import type { PhotographerProfile } from "@/app/api/photographer/profile/route";
-import { DEFAULT_PROFILE_IMAGE, getProfileImageUrl } from "@/lib/photographer";
+import { DEFAULT_PROFILE_IMAGE, getProfileImageUrl, normalizeExternalHttpUrl } from "@/lib/photographer";
 import { createClient } from "@/lib/supabase/client";
 import { formatKstYearMonth } from "@/lib/kst-date";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -131,7 +131,7 @@ export default function SettingsPage() {
   const [editPhone, setEditPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [defaultDeadlineDays, setDefaultDeadlineDays] = useState("30");
+  const [defaultDeadlineDays, setDefaultDeadlineDays] = useState("");
   const [defaultIncludeOriginal, setDefaultIncludeOriginal] = useState(false);
   const [defaultUploadStrategy, setDefaultUploadStrategy] = useState<"preview_first" | "parallel">("parallel");
   const [savingDefaults, setSavingDefaults] = useState(false);
@@ -158,7 +158,7 @@ export default function SettingsPage() {
     );
     setEditPortfolio(ctxProfile.portfolioUrl ?? "");
     setEditPhone(ctxProfile.contactPhone ?? "");
-    setDefaultDeadlineDays(String(ctxProfile.defaultSelectionDeadlineDays));
+    setDefaultDeadlineDays(ctxProfile.defaultSelectionDeadlineDays === null ? "" : String(ctxProfile.defaultSelectionDeadlineDays));
     setDefaultIncludeOriginal(ctxProfile.defaultIncludeOriginal);
     setDefaultUploadStrategy(ctxProfile.defaultUploadStrategy);
   }, [ctxProfile, profile]);
@@ -181,6 +181,11 @@ export default function SettingsPage() {
       const instagramUrl = editInstagram.trim()
         ? `https://instagram.com/${editInstagram.trim().replace(/^@/, "")}`
         : null;
+      const portfolioUrl = normalizeExternalHttpUrl(editPortfolio);
+      if (editPortfolio.trim() && !portfolioUrl) {
+        setFormError("포트폴리오 주소를 확인해주세요.");
+        return;
+      }
       const res = await fetch("/api/photographer/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -188,7 +193,7 @@ export default function SettingsPage() {
           name: editName.trim() || null,
           bio: editBio.trim() || null,
           instagram_url: instagramUrl,
-          portfolio_url: editPortfolio.trim() || null,
+          portfolio_url: portfolioUrl,
           contact_phone: editPhone.trim() || null,
         }),
       });
@@ -197,7 +202,7 @@ export default function SettingsPage() {
         name: editName.trim() || null,
         bio: editBio.trim() || null,
         instagramUrl,
-        portfolioUrl: editPortfolio.trim() || null,
+        portfolioUrl,
         contactPhone: editPhone.trim() || null,
       };
       setProfile({ ...profile, ...patch });
@@ -225,8 +230,8 @@ export default function SettingsPage() {
 
   const handleDefaultsSave = async () => {
     if (!profile) return;
-    const days = Number(defaultDeadlineDays);
-    if (!Number.isInteger(days) || days < 1 || days > 365) {
+    const days = defaultDeadlineDays === "" ? null : Number(defaultDeadlineDays);
+    if (days !== null && (!Number.isInteger(days) || days < 1 || days > 365)) {
       setDefaultsError("셀렉 마감 기본 기간은 1~365일로 입력해주세요.");
       return;
     }

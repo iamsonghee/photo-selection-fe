@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useOAuthLogin } from "@/hooks/useOAuthLogin";
+import { BrandLogoBar } from "@/components/BrandLogo";
 import {
   clearPostLoginRedirect,
   DEFAULT_POST_LOGIN_PATH,
@@ -137,7 +138,7 @@ export function AuthModal({ isOpen, onClose, redirectPath }: AuthModalProps) {
           {/* Body */}
           <div className="auth-modal-body">
             <div className="auth-modal-logo">
-              A<span className="auth-modal-accent">-</span>CUT
+              <BrandLogoBar />
             </div>
 
             <div className="auth-modal-meta-block">
@@ -379,15 +380,9 @@ export function AuthModal({ isOpen, onClose, redirectPath }: AuthModalProps) {
         }
 
         .auth-modal-logo {
-          font-family: 'Space Mono', 'Noto Sans KR', sans-serif;
-          font-size: 42px;
-          font-weight: 700;
-          letter-spacing: -0.02em;
-          color: var(--foreground);
+          --brand-logo-ink: var(--foreground);
           margin-bottom: 8px;
         }
-
-        .auth-modal-accent { color: var(--accent); }
 
         .auth-modal-headline {
           font-size: 20px;

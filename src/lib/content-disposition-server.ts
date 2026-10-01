@@ -6,7 +6,9 @@ const MAX_LEN = 80;
 /** Content-Disposition에 안전하게 넣을 수 있도록 파일명 구성요소를 정리한다.
  * 슬래시/백슬래시/제어문자/따옴표 제거, 연속 공백 축소, 길이 제한. */
 export function sanitizeFilenameComponent(raw: string): string {
-  let cleaned = (raw || "").replace(UNSAFE_RE, "");
+  // macOS Finder가 NFD(자모 분리형)로 남긴 한글 파일명이 이미 DB에 저장돼 있어도
+  // 다운로드 시점에 NFC로 교정해 깨진 표시를 막는다.
+  let cleaned = (raw || "").normalize("NFC").replace(UNSAFE_RE, "");
   cleaned = cleaned.replace(/\s+/g, " ").trim();
   if (!cleaned) cleaned = "download";
   return cleaned.slice(0, MAX_LEN);

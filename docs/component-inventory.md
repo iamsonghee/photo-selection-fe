@@ -69,9 +69,9 @@
 
 | 컴포넌트 | 역할 | 현재 구현과 변형 |
 |---|---|---|
-| `CustomerHeader` | 상태 화면 공통 헤더 래퍼 | 기본은 다크(`#0a0a0c`/`#1a1a1e`). `theme="customerLight"`로 고객 라이트 팔레트 opt-in(격자·목록 화면용) — `SelectionConfirmFooter`와 같은 방식이라 기존 호출부는 영향 없음. 라이트 배경에서는 `BrandLogoBar variant="customerEntry"`를 함께 써야 로고가 흰 글씨로 묻히지 않는다. 갤러리/뷰어는 사용하지 않음 |
+| `CustomerHeader` | 상태 화면 공통 헤더 래퍼 | 기본은 다크(`#0a0a0c`/`#1a1a1e`). `theme="customerLight"`로 고객 라이트 팔레트 opt-in(격자·목록 화면용) — `SelectionConfirmFooter`와 같은 방식이라 기존 호출부는 영향 없음. `BrandLogoBar` 워드마크는 기본 `#191918`이라 어두운 배경에서는 `--brand-logo-ink`를 지정한다. 갤러리/뷰어는 사용하지 않음 |
 | `CustomerFooter` | 상태 화면 공통 하단 액션 래퍼 | fixed, safe area; 갤러리/리뷰는 자체 하단바 |
-| `CustomerEntryShell`/`CustomerEntryHeader` | 고객 최초 진입 canvas/app bar | 기본 variant는 375px preview canvas, responsive variant는 모바일·PC viewport 전체 폭을 사용하며 테두리와 외부 거터를 제거. safe area와 `BrandLogoBar customerEntry` variant를 제공 |
+| `CustomerEntryShell`/`CustomerEntryHeader` | 고객 최초 진입 canvas/app bar | 기본 variant는 375px preview canvas, responsive variant는 모바일·PC viewport 전체 폭을 사용하며 테두리와 외부 거터를 제거. safe area와 공통 `BrandLogoBar`를 제공 |
 | `CustomerInviteIntro` | 셀렉·보정본 검토 초대 인트로 | 대표 사진·작가 정보·PC split/mobile stack·본문/CTA slot을 공통 관리. PC·모바일 모두 `100dvh` 안에서 영역을 배분하고 양방향 overflow를 차단한다. 대표 사진은 사전 로드 성공 후에만 `<img>`를 연결하고 로딩·오류 중에는 깨진 이미지 대신 light brand placeholder를 유지 |
 | `ParticipantSheet` | 고객 참가자(색) 선택 시트 | `src/components/customer/ParticipantSheet.tsx`; 첫 "찜" 시점에 뜨고, 이후 앱바(모바일)·헤더(PC) 우측 신원 칩으로 다시 열어 이름·색을 고칠 수 있다(`current`가 있으면 `내 표시 바꾸기` 모드 — 제목/버튼 문구가 바뀌고 색을 옮길 때 경고를 띄운다). white bottom sheet. 이미 쓰인 색은 `사용 중`(이름이 등록돼 있으면 `민 사용 중`) 표시 — 되찾기용으로 선택은 허용하고, 고르면 저장된 이름을 미리 채운다. `roster` prop은 서버 명단이며 생략 시 색 이름만 쓴다. 식별자 저장·명단 조회는 `lib/customer-participant.ts` |
 | `PhotoFocusOverlay` | 사진 전체화면 집중 보기 | `src/components/customer/PhotoFocusOverlay.tsx`; 고객 뷰어 3곳(셀렉 상세·보정본 검토·잠금 뷰어)이 공유한다. 검은 판(`z-index: 200`)을 덮는 방식이라 챙 구조가 다른 화면에 붙여도 동작이 같다(예전에는 셀렉 뷰어 모바일에만 챙 숨김 방식으로 존재). 내부는 `MobileViewerPinchPhoto`라 확대/팬이 유지되고, `onPrev`/`onNext`를 주면 집중 중에도 스와이프·`← →`로 이동한다. `ESC`·탭·클릭으로 닫힌다. 단축키는 capture 단계에서 받아 아래 화면 단축키와 충돌하지 않는다 |

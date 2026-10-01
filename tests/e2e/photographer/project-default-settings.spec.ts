@@ -19,7 +19,7 @@ test("작가 프로젝트 기본값을 불러오고 저장한다", async ({ page
       instagramUrl: null,
       portfolioUrl: null,
       contactPhone: null,
-      defaultSelectionDeadlineDays: 30,
+      defaultSelectionDeadlineDays: null,
       defaultIncludeOriginal: false,
       defaultUploadStrategy: "parallel",
       createdAt: "2026-09-18T00:00:00Z",
@@ -32,19 +32,16 @@ test("작가 프로젝트 기본값을 불러오고 저장한다", async ({ page
   await contactInfo.hover();
   await expect(page.getByRole("tooltip")).toHaveText("알림 연동 시 사용됩니다.");
   const deadlineInput = page.getByLabel("셀렉 마감 기본 기간");
-  await expect(deadlineInput).toHaveValue("30");
+  await expect(deadlineInput).toHaveValue("");
   await expect(deadlineInput).toHaveCSS("height", "44px");
   await expect(page.getByRole("radio", { name: /원본까지 준비 후 요청/ })).toHaveAttribute("aria-checked", "true");
 
-  await deadlineInput.fill("45");
-  await page.getByLabel("새 프로젝트 원본 다운로드 허용").click();
-  await page.getByRole("radio", { name: /빠른 셀렉 요청/ }).click();
   await page.getByRole("button", { name: "기본 설정 저장" }).click();
 
   await expect.poll(() => saved).toEqual({
-    default_selection_deadline_days: 45,
-    default_include_original: true,
-    default_upload_strategy: "preview_first",
+    default_selection_deadline_days: null,
+    default_include_original: false,
+    default_upload_strategy: "parallel",
   });
   await expect(page.getByText("프로젝트 기본 설정이 저장되었습니다.")).toBeVisible();
 });

@@ -51,6 +51,7 @@ export function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row
     originalDownloadStartedAt:
       (row as { original_download_started_at?: string | null }).original_download_started_at ?? null,
     coverPhotoId: (row as { cover_photo_id?: string | null }).cover_photo_id ?? null,
+    photographerNote: (row as { photographer_note?: string | null }).photographer_note ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -290,6 +291,7 @@ export async function createProject(params: {
   max_revision_count?: 0 | 1 | 2;
   location?: string | null;
   include_original?: boolean;
+  photographer_note?: string | null;
 }): Promise<string> {
   const accessToken = crypto.randomUUID();
   const { data, error } = await supabase
@@ -311,6 +313,7 @@ export async function createProject(params: {
       ...(params.access_pin           ? { access_pin: params.access_pin } : {}),
       ...(params.location             ? { location: params.location } : {}),
       ...(params.include_original != null ? { include_original: params.include_original } : {}),
+      ...(params.photographer_note    ? { photographer_note: params.photographer_note } : {}),
     })
     .select("id")
     .single();
@@ -332,6 +335,7 @@ export async function updateProject(
     status: ProjectStatus;
     confirmed_at: string | null;
     delivered_at: string | null;
+    photographerNote: string | null;
   }>
 ): Promise<void> {
   const now = new Date().toISOString();
@@ -342,6 +346,7 @@ export async function updateProject(
   if (patch.deadline != null) payload.deadline = patch.deadline;
   if (patch.required_count != null) payload.required_count = patch.required_count;
   if (patch.status != null) payload.status = patch.status;
+  if (patch.photographerNote !== undefined) payload.photographer_note = patch.photographerNote;
   if (patch.confirmed_at !== undefined) payload.confirmed_at = patch.confirmed_at;
   if (patch.delivered_at !== undefined) payload.delivered_at = patch.delivered_at;
   if (patch.status === "delivered" && patch.delivered_at === undefined) {

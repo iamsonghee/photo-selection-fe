@@ -41,7 +41,7 @@ export function LandingPageClient({ limits }: { limits: PlanLimits }) {
         <a className="ac-skip" href="#landing-main">본문 바로가기</a>
         <header className="ac-header">
           <div className="ac-container ac-header-inner">
-            <BrandLogoBar href="/" variant="customerEntry" />
+            <BrandLogoBar href="/" />
             <nav aria-label="주 메뉴"><Link prefetch={false} href="/beta/apply">베타 신청 <ArrowRight size={14} /></Link></nav>
             <button type="button" className="ac-button ac-button-small" onClick={handleStart}>무료 시작하기<ArrowRight size={15} /></button>
           </div>
@@ -64,18 +64,14 @@ export function LandingPageClient({ limits }: { limits: PlanLimits }) {
         <footer className="ac-footer">
           <div className="ac-container ac-footer-inner">
             <div className="ac-footer-main">
-              <BrandLogoBar size="sm" variant="customerEntry" />
-              <p>사진에 집중할 수 있도록.</p>
-              <Link prefetch={false} href="/beta/apply">클로즈드 베타 신청<ArrowRight size={14} /></Link>
+              <BrandLogoBar />
+              <a href="mailto:multihatter@gmail.com">문의</a>
               <Link prefetch={false} href="/terms">이용약관</Link>
               <Link prefetch={false} href="/privacy">개인정보처리방침</Link>
-              <small>© {new Date().getFullYear()} A-CUT</small>
             </div>
-            <small className="ac-footer-business">
-              <span>A-CUT은 순한설기가 운영하는 사진 셀렉·보정 관리 서비스입니다.</span>
-              <span>상호: 순한설기 | 대표자: 심효순 | 사업자등록번호: 890-18-01386</span>
-              <span>문의: <a href="mailto:multihatter@gmail.com">multihatter@gmail.com</a></span>
-            </small>
+            <p className="ac-footer-biz">
+              상호: 순한설기 · 대표: 심효순 · 사업자등록번호: 890-18-01386 · 주소: 경기도 여주시 영릉로35-12 · 전화: 031-885-4355 · 이메일: multihatter@gmail.com
+            </p>
           </div>
         </footer>
       </div>

@@ -38,6 +38,17 @@ async function doUpload(page: import("@playwright/test").Page, filename: string)
 }
 
 test.describe("작가 — 파일 업로드", () => {
+  test("U0: 로그인한 작가의 실제 업로드 한도를 표시한다", async ({ page }) => {
+    await page.route("**/api/photographer/quota", route => route.fulfill({ json: {
+      tier: "beta", current: 1, max: 50, maxPhotosPerProject: 3500,
+      maxRevisionCount: 2, betaStatus: "active", betaEndDate: "2026-12-31", betaApplicationStatus: "approved",
+    } }));
+    await page.route("**/api/limits", route => route.fulfill({ json: { betaMaxPhotosPerProject: 2000 } }));
+
+    await page.goto(project.uploadUrl);
+    await expect(page.getByText("JPEG · PNG · WebP · HEIC · 최대 3,500장", { exact: true })).toBeVisible();
+  });
+
   test("U1: JPG 업로드 → 완료 메시지", async ({ page }) => {
     await doUpload(page, "sample.jpg");
     await expect(

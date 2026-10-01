@@ -14,7 +14,7 @@ export function LegalDocument({
     <div className="min-h-screen bg-[#fafbf9] text-[#191918] [color-scheme:light]">
       <header className="border-b border-[#e5e7e3] bg-white">
         <div className="mx-auto flex min-h-20 w-[min(1120px,calc(100%-40px))] items-center justify-between">
-          <BrandLogoBar href="/" variant="customerEntry" />
+          <BrandLogoBar href="/" />
           <Link className="text-sm text-[#666864] hover:text-[#bd3900]" href="/">홈으로</Link>
         </div>
       </header>

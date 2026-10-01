@@ -61,6 +61,10 @@ import { matchesFilenameQuery } from "@/lib/gallery-filter";
 import { selectPhotoRange } from "@/lib/drag-selection";
 import { useQuota } from "@/contexts/QuotaContext";
 import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAssetHeader";
+import {
+  clearPhotographerMobileProjectContext,
+  publishPhotographerMobileProjectContext,
+} from "@/lib/photographer-mobile-project-context";
 import themeStyles from "./UploadTheme.module.css";
 
 // ---------- constants ----------
@@ -661,8 +665,8 @@ function isAuthLikeDetail(detail: string | null) {
 // 담은 큰 드래그앤드롭 패널. 실제 드롭/드래그오버 처리는 이 컴포넌트를 감싸는 스크롤 컨테이너가 이미
 // 담당하므로(그 컨테이너의 dragOver 오버레이가 이 패널 위에 그대로 겹쳐 뜬다), 여기서는 클릭 시
 // 파일 선택창을 여는 것만 책임진다. 지원 파일 형식/최대 장수는 Figma 예시값이 아니라 실제 앱 값
-// (ACCEPT_TYPES, betaMaxPhotosPerProject)을 그대로 보여준다.
-function EmptyUploadPanel({ onBrowse, maxPhotos }: { onBrowse: () => void; maxPhotos: number }) {
+// (ACCEPT_TYPES, 로그인한 작가에게 적용되는 업로드 한도)을 그대로 보여준다.
+function EmptyUploadPanel({ onBrowse, maxPhotos }: { onBrowse: () => void; maxPhotos: number | null }) {
   return (
     // Figma #56069의 content inset은 desktop 40px이다. 좁은 화면에서는 공용 page gutter에
     // 맞춰 16px로 줄이되, margin 대신 padding을 사용해 100% 높이에서 불필요한 스크롤을
@@ -686,7 +690,7 @@ function EmptyUploadPanel({ onBrowse, maxPhotos }: { onBrowse: () => void; maxPh
               </p>
               <p className="mb-3 hidden text-[14px] leading-6 text-muted-foreground md:block">사진이나 폴더를 이곳에 끌어다 놓을 수 있어요.</p>
               <p className="m-0 text-[12px] font-normal leading-[21px] text-muted-foreground">
-                JPEG · PNG · WebP · HEIC · 최대 {maxPhotos.toLocaleString()}장
+                JPEG · PNG · WebP · HEIC · {maxPhotos === null ? "업로드 한도 없음" : `최대 ${maxPhotos.toLocaleString()}장`}
               </p>
             </div>
           </div>
@@ -719,17 +723,6 @@ export default function ProjectDetailPage() {
   const [copied, setCopied] = useState(false);
   // 그리드/리스트 뷰는 동시에 하나만 마운트되므로 큐 하나를 공유해도 무방하다.
   const [thumbQueue] = useState(() => createThumbLoadQueue(12));
-  const [betaMaxPhotosPerProject, setBetaMaxPhotosPerProject] = useState(DEFAULT_BETA_MAX_PHOTOS_PER_PROJECT);
-
-  useEffect(() => {
-    fetch("/api/limits")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.betaMaxPhotosPerProject) setBetaMaxPhotosPerProject(data.betaMaxPhotosPerProject);
-      })
-      .catch(() => {});
-  }, []);
-
   const [inviteActivating, setInviteActivating] = useState(false);
   const [inviteShareModalOpen, setInviteShareModalOpen] = useState(false);
   const [selectionRequestModalOpen, setSelectionRequestModalOpen] = useState(false);
@@ -892,6 +885,7 @@ export default function ProjectDetailPage() {
 
   /** Gemini 분석 POC — 관리자 전용 노출 여부 판단용 (실제 접근 제어는 API route에서도 재검증됨) */
   const { quota } = useQuota();
+  const maxPhotosPerProject = quota ? quota.maxPhotosPerProject : DEFAULT_BETA_MAX_PHOTOS_PER_PROJECT;
   const [isAdminTier, setIsAdminTier] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1018,6 +1012,14 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     if (quota?.tier === "admin") setIsAdminTier(true);
   }, [quota]);
+
+  /** 모바일 상단바가 축소 시 A 로고+프로젝트명만 보여주도록 — assets/[tab]과 동일한 공통 규칙 */
+  useEffect(() => {
+    if (!project) return;
+    const context = { projectName: project.name, customerName: project.customerName };
+    publishPhotographerMobileProjectContext(context);
+    return () => clearPhotographerMobileProjectContext(context);
+  }, [project?.name, project?.customerName]);
 
   const overallProgress = uploadSnapshot?.percent ?? uploadProgress;
   const isPreviewUploading = uploadPhase === "sending" || uploadPhase === "processing";
@@ -2060,7 +2062,7 @@ export default function ProjectDetailPage() {
             // 원본 납품 여부와 무관하게 목록용 원본 메타데이터는 항상 보존한다.
             // width/height=0은 기존 압축 단계에서 치수를 얻지 못한 경우이며,
             // 서버가 썸네일 생성 시 이미 디코딩한 입력 치수로 채운다.
-            f.append("original_filenames", sourceFile.name);
+            f.append("original_filenames", sourceFile.name.normalize("NFC"));
             f.append("original_file_sizes", String(sourceFile.size));
             f.append("original_last_modifieds", String(sourceFile.lastModified));
             f.append("original_content_types", sourceFile.type === "image/jpg" ? "image/jpeg" : sourceFile.type || "");
@@ -2752,9 +2754,9 @@ export default function ProjectDetailPage() {
     list = list.filter((f) => !isRawFile(f));
     if (rawCount > 0) setUploadError(`RAW 파일은 지원하지 않습니다 (${rawCount}개 제외). JPEG/PNG/WebP/HEIC로 내보내기 후 업로드해주세요.`);
     if (!list.length) return;
-    const remaining = Math.max(0, betaMaxPhotosPerProject - photos.length);
-    if (list.length > remaining) {
-      setUploadError(`최대 ${betaMaxPhotosPerProject}장까지 업로드 가능합니다. ${list.length - remaining}장이 제외됩니다.`);
+    const remaining = maxPhotosPerProject === null ? null : Math.max(0, maxPhotosPerProject - photos.length);
+    if (remaining !== null && list.length > remaining) {
+      setUploadError(`최대 ${maxPhotosPerProject}장까지 업로드 가능합니다. ${list.length - remaining}장이 제외됩니다.`);
       list = list.slice(0, remaining);
       if (!list.length) return;
     } else if (isMobileUploadClient() && list.length >= 100) {
@@ -2773,9 +2775,9 @@ export default function ProjectDetailPage() {
     list = list.filter((f) => !isRawFile(f));
     if (rawCount > 0) setUploadError(`RAW 파일은 지원하지 않습니다 (${rawCount}개 제외). JPEG/PNG/WebP/HEIC로 내보내기 후 업로드해주세요.`);
     if (!list.length) return;
-    const remaining = Math.max(0, betaMaxPhotosPerProject - photos.length);
-    if (list.length > remaining) {
-      setUploadError(`최대 ${betaMaxPhotosPerProject}장까지 업로드 가능합니다. ${list.length - remaining}장이 제외됩니다.`);
+    const remaining = maxPhotosPerProject === null ? null : Math.max(0, maxPhotosPerProject - photos.length);
+    if (remaining !== null && list.length > remaining) {
+      setUploadError(`최대 ${maxPhotosPerProject}장까지 업로드 가능합니다. ${list.length - remaining}장이 제외됩니다.`);
       list = list.slice(0, remaining);
       if (!list.length) return;
     } else if (isMobileUploadClient() && list.length >= 100) {
@@ -2783,7 +2785,7 @@ export default function ProjectDetailPage() {
     }
     setPendingFiles(list);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project, photos.length]);
+  }, [maxPhotosPerProject, project, photos.length]);
 
   const onDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(true); }, []);
   const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false); }, []);
@@ -3408,12 +3410,7 @@ export default function ProjectDetailPage() {
         data-upload-header-mode={immersiveUploadHeader ? "immersive" : compactUploadHeader ? "compact" : "expanded"}
         className="relative z-20 shrink-0 bg-background"
       >
-        {/* 축소 상태에서도 프로젝트 이동과 현재 위치를 유지한다. */}
-        <div className={themeStyles.compactHeader} aria-hidden={!compactUploadHeader} inert={!compactUploadHeader}>
-          <button type="button" onClick={() => requestInternalNavigation(`/photographer/projects/${id}`)} aria-label="프로젝트 상세로 돌아가기">←</button>
-          <span title={project.name}>{project.name}</span>
-          <strong>원본 업로드</strong>
-        </div>
+        {/* 축소 시 뒤로가기·프로젝트명은 공용 MobileHeader가 이미 보여주므로 여기서는 중복 표시하지 않는다. */}
         <div className={themeStyles.expandedHeader} aria-hidden={compactUploadHeader} inert={compactUploadHeader}>
         <div className={themeStyles.expandedHeaderInner}>
         <PhotographerLightPageFrame
@@ -4018,7 +4015,7 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
             ) : displayPhotos.length === 0 && photoUploadAllowed ? (
-              <EmptyUploadPanel onBrowse={requestOpenFilePicker} maxPhotos={betaMaxPhotosPerProject} />
+              <EmptyUploadPanel onBrowse={requestOpenFilePicker} maxPhotos={maxPhotosPerProject} />
             ) : galleryPhotos.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 px-5 text-center">
                 {showRecommendedOnly && recommendedPhotoIds.size === 0 ? <RecommendationMark size={24} aria-hidden /> : <Search size={24} className="text-subtle-foreground" aria-hidden />}

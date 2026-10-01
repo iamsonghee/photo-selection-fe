@@ -12,7 +12,7 @@
 
 @media (min-width: 768px) {
   .desktopFab {
-    background-color: #ff5712;
+    background-color: var(--accent);
   }
 }
 

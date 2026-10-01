@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { normalizeExternalHttpUrl } from "@/lib/photographer";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 
@@ -22,7 +23,7 @@ export interface PhotographerProfile {
   instagramUrl: string | null;
   portfolioUrl: string | null;
   contactPhone: string | null;
-  defaultSelectionDeadlineDays: number;
+  defaultSelectionDeadlineDays: number | null;
   defaultIncludeOriginal: boolean;
   defaultUploadStrategy: "preview_first" | "parallel";
   createdAt: string;
@@ -107,7 +108,7 @@ export async function GET() {
       instagramUrl: (row.instagram_url as string | null) ?? null,
       portfolioUrl: (row.portfolio_url as string | null) ?? null,
       contactPhone: (row.contact_phone as string | null) ?? null,
-      defaultSelectionDeadlineDays: (row.default_selection_deadline_days as number | null) ?? 30,
+      defaultSelectionDeadlineDays: (row.default_selection_deadline_days as number | null) ?? null,
       defaultIncludeOriginal: (row.default_include_original as boolean | null) ?? false,
       defaultUploadStrategy: row.default_upload_strategy === "preview_first" ? "preview_first" : "parallel",
       createdAt: row.created_at as string,
@@ -141,14 +142,20 @@ export async function PATCH(req: NextRequest) {
     else if (body.bio === null) payload.bio = null;
     if (typeof body.instagram_url === "string") payload.instagram_url = body.instagram_url;
     else if (body.instagram_url === null) payload.instagram_url = null;
-    if (typeof body.portfolio_url === "string") payload.portfolio_url = body.portfolio_url;
+    if (typeof body.portfolio_url === "string") {
+      const portfolioUrl = normalizeExternalHttpUrl(body.portfolio_url);
+      if (body.portfolio_url.trim() && !portfolioUrl) {
+        return NextResponse.json({ error: "포트폴리오 주소를 확인해주세요." }, { status: 400 });
+      }
+      payload.portfolio_url = portfolioUrl;
+    }
     else if (body.portfolio_url === null) payload.portfolio_url = null;
     if (typeof body.profile_image_url === "string") payload.profile_image_url = body.profile_image_url;
     else if (body.profile_image_url === null) payload.profile_image_url = null;
     if (typeof body.contact_phone === "string") payload.contact_phone = body.contact_phone;
     else if (body.contact_phone === null) payload.contact_phone = null;
     if ("default_selection_deadline_days" in body) {
-      if (!Number.isInteger(body.default_selection_deadline_days) || body.default_selection_deadline_days < 1 || body.default_selection_deadline_days > 365) {
+      if (body.default_selection_deadline_days !== null && (!Number.isInteger(body.default_selection_deadline_days) || body.default_selection_deadline_days < 1 || body.default_selection_deadline_days > 365)) {
         return NextResponse.json({ error: "셀렉 마감 기본 기간은 1~365일로 입력해주세요." }, { status: 400 });
       }
       payload.default_selection_deadline_days = body.default_selection_deadline_days;

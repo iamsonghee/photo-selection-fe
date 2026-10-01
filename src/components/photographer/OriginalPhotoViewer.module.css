@@ -7,9 +7,10 @@
   --muted-foreground: #acb2b8;
   --border-subtle: #303438;
   --border-strong: #555b61;
-  --accent: #ff5712;
-  --accent-rgb: 255, 87, 18;
+  --accent: #ff4d00;
+  --accent-rgb: 255, 77, 0;
   --customer-foreground: #75cdcb;
+  --brand-logo-ink: var(--foreground);
   position: fixed;
   inset: 0;
   z-index: 100000;

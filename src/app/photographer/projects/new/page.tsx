@@ -7,6 +7,7 @@
  * ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS customer_phone text;
  * ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS photo_count_expected int4;
  * ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS location text;
+ * ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS photographer_note text;
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -71,6 +72,7 @@ export default function NewProjectPage() {
     format(addDays(new Date(), DEFAULT_DEADLINE_DAYS), "yyyy-MM-dd")
   );
   const [location,      setLocation]      = useState("");
+  const [photographerNote, setPhotographerNote] = useState("");
   const [accessPin,     setAccessPin]     = useState("");
   const [maxRevisionCount, setMaxRevisionCount] = useState<0 | 1 | 2>(2);
   const [includeOriginal, setIncludeOriginal] = useState(false);
@@ -93,7 +95,9 @@ export default function NewProjectPage() {
     if (!profile || defaultsAppliedRef.current) return;
     defaultsAppliedRef.current = true;
     setIncludeOriginal(profile.defaultIncludeOriginal);
-    setDeadline(format(addDays(new Date(), profile.defaultSelectionDeadlineDays), "yyyy-MM-dd"));
+    if (profile.defaultSelectionDeadlineDays !== null) {
+      setDeadline(format(addDays(new Date(), profile.defaultSelectionDeadlineDays), "yyyy-MM-dd"));
+    }
   }, [profile]);
 
   const handleSubmit = async (goToUpload: boolean) => {
@@ -142,6 +146,7 @@ export default function NewProjectPage() {
           max_revision_count: maxRevisionCount,
           location: location.trim() || null,
           include_original: finalIncludeOriginal,
+          photographer_note: photographerNote.trim() || null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -194,11 +199,14 @@ export default function NewProjectPage() {
   // 한도 초과 — 폼 대신 안내 화면 바로 표시(서버도 동일하게 검증하지만, 폼을 채우기 전에 미리 안내)
   if (atLimit) {
     const heading = quota.tier === "beta" ? "베타 프로젝트 한도 도달" : wasBetaBeforeGeneral ? "베타 이용 기간 종료" : "무료 체험 한도 도달";
+    const canApply = quota.tier === "general"
+      && !wasBetaBeforeGeneral
+      && quota.betaApplicationStatus === null;
     const desc = quota.tier === "beta"
       ? <>베타 기간 중 최대 {quota.max}개의 프로젝트를 생성할 수 있습니다.<br />현재 <strong className="text-foreground">{quota.current} / {quota.max}개</strong> 사용 중입니다.</>
       : wasBetaBeforeGeneral
         ? <>베타 이용 기간이 종료되었습니다.<br />기존 프로젝트는 계속 이용하실 수 있습니다.</>
-        : <>무료 체험에서는 프로젝트 {quota.max}개까지 생성할 수 있습니다.<br />더 이용하시려면 베타 참여를 문의해주세요.</>;
+        : <>무료 체험에서는 프로젝트 {quota.max}개까지 생성할 수 있습니다.<br />현재 <strong className="text-foreground">{quota.current} / {quota.max}개</strong> 사용 중입니다.</>;
     return (
       <div
         className={`${themeStyles.lightTheme} min-h-screen bg-background text-foreground`}
@@ -224,13 +232,34 @@ export default function NewProjectPage() {
             <h2 className="text-xl font-bold text-foreground mb-2">{heading}</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => router.push("/photographer/projects")}
-            className="px-6 py-2.5 bg-accent text-[var(--accent-foreground)] text-sm font-bold rounded-xl hover:bg-[#ff5e1a] transition-colors"
-          >
-            프로젝트 목록으로
-          </button>
+          {quota.betaApplicationStatus !== null && quota.betaApplicationStatus !== "rejected" ? (
+            <BetaApprovalBanner
+              tier={quota.tier}
+              betaApplicationStatus={quota.betaApplicationStatus}
+              maxProjects={quota.max ?? 0}
+              maxPhotosPerProject={quota.maxPhotosPerProject ?? 0}
+            />
+          ) : quota.betaApplicationStatus === "rejected" ? (
+            <p className="text-sm text-muted-foreground">베타 신청 결과는 안내받은 내용을 확인해 주세요.</p>
+          ) : null}
+          <div className="flex flex-wrap justify-center gap-2">
+            <PhotographerLightButton
+              type="button"
+              variant={canApply ? "secondary" : "primary"}
+              onClick={() => router.push("/photographer/projects")}
+            >
+              프로젝트 목록으로
+            </PhotographerLightButton>
+            {canApply ? (
+              <PhotographerLightButton
+                type="button"
+                variant="primary"
+                onClick={() => router.push("/beta/apply")}
+              >
+                베타 참여 신청하기
+              </PhotographerLightButton>
+            ) : null}
+          </div>
         </div>
       </div>
     );
@@ -359,6 +388,15 @@ export default function NewProjectPage() {
                   />
                 </ProjectFormField>
               </div>
+
+              <ProjectFormField label="메모" info="작가만 볼 수 있어요. 고객에게는 보이지 않습니다.">
+                <textarea
+                  className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(photographerNote) })} min-h-[72px] resize-none`}
+                  value={photographerNote}
+                  onChange={(e) => setPhotographerNote(e.target.value)}
+                  placeholder="예: 신부 대기실에서 촬영, 실내 조명 어두움"
+                />
+              </ProjectFormField>
             </ProjectFormSection>
 
             <ProjectFormSection
@@ -408,20 +446,6 @@ export default function NewProjectPage() {
                 onCheckedChange={setIncludeOriginal}
                 ariaLabel="원본 다운로드 허용"
               />
-
-              {profile ? (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-raised px-4 py-3 text-xs text-muted-foreground">
-                  <span>
-                    셀렉 마감 {profile.defaultSelectionDeadlineDays}일
-                    {includeOriginal
-                      ? ` · ${profile.defaultUploadStrategy === "preview_first" ? "빠른 셀렉 요청" : "원본까지 준비 후 요청"}`
-                      : ""}
-                  </span>
-                  <button type="button" className="font-bold text-accent" onClick={() => router.push("/photographer/settings")}>
-                    기본 설정 변경
-                  </button>
-                </div>
-              ) : null}
 
               <ProjectPinControl value={accessPin} onChange={setAccessPin} />
             </ProjectFormSection>

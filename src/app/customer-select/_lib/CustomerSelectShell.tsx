@@ -10,7 +10,7 @@ export function CustomerSelectShell({ children, navigation = false, viewportLock
     <div className={`${theme.lightTheme} flex min-h-dvh flex-col bg-background text-foreground ${viewportLocked ? "h-dvh overflow-hidden" : ""}`}>
       <header data-customer-shell-header-mode={compactHeader ? "compact" : "expanded"} className="shrink-0 border-b border-border-subtle bg-surface">
         <div className={`flex w-full items-center px-5 transition-[height] duration-200 md:px-8 ${compactHeader ? "h-12 gap-3" : "h-16 gap-4"}`}>
-          <BrandLogoBar href="/customer-select" size={compactHeader ? "sm" : "md"} variant="default" markOnly={compactHeader} />
+          <BrandLogoBar href="/customer-select" size={compactHeader ? "sm" : "md"} />
           {compactTitle ? <div data-compact-project-title className={`min-w-0 md:border-l md:border-border-subtle ${compactHeader ? "md:pl-3" : "md:pl-4"}`}>{compactTitle}</div> : null}
           {headerMeta || account || navigation ? <div className="ml-auto flex items-center gap-2">
             {headerMeta ? <div className="hidden md:block">{headerMeta}</div> : null}

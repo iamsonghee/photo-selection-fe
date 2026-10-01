@@ -10,7 +10,7 @@ async function getPhotographerFromSession(): Promise<{
   betaStatus: BetaStatus;
   betaEndDate: string | null;
   totalProjectsCreated: number;
-  defaultSelectionDeadlineDays: number;
+  defaultSelectionDeadlineDays: number | null;
   defaultIncludeOriginal: boolean;
   defaultUploadStrategy: "preview_first" | "parallel";
 } | null> {
@@ -35,7 +35,7 @@ async function getPhotographerFromSession(): Promise<{
     betaStatus: data.beta_status as BetaStatus,
     betaEndDate: data.beta_end_date,
     totalProjectsCreated: data.total_projects_created ?? 0,
-    defaultSelectionDeadlineDays: data.default_selection_deadline_days ?? 30,
+    defaultSelectionDeadlineDays: data.default_selection_deadline_days ?? null,
     defaultIncludeOriginal: data.default_include_original ?? false,
     defaultUploadStrategy: data.default_upload_strategy === "preview_first" ? "preview_first" : "parallel",
   };
@@ -115,6 +115,7 @@ export async function POST(req: NextRequest) {
       max_revision_count,
       location,
       include_original,
+      photographer_note,
     } = body ?? {};
 
     if (
@@ -146,8 +147,9 @@ export async function POST(req: NextRequest) {
         ...(customer_phone ? { customer_phone } : {}),
         ...(access_pin ? { access_pin } : {}),
         ...(location ? { location } : {}),
+        ...(typeof photographer_note === "string" && photographer_note.trim() ? { photographer_note: photographer_note.trim() } : {}),
         include_original: typeof include_original === "boolean" ? include_original : photographer.defaultIncludeOriginal,
-        selection_deadline_days: photographer.defaultSelectionDeadlineDays,
+        ...(photographer.defaultSelectionDeadlineDays === null ? {} : { selection_deadline_days: photographer.defaultSelectionDeadlineDays }),
         upload_strategy: photographer.defaultUploadStrategy,
       })
       .select("id")

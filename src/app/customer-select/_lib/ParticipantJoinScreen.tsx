@@ -43,7 +43,7 @@ export function ParticipantJoinScreen() {
 
   return <>
     <div className={`${theme.lightTheme} ${s.shell}`}>
-      <header className={s.brand}><BrandLogoBar size="sm" href="/" variant="default" /></header>
+      <header className={s.brand}><BrandLogoBar size="sm" href="/" /></header>
       <main className={s.main}>
         <form className={s.card} onSubmit={submit}>
           {cover && <div className={s.cover}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={cover.previewUrl || cover.url} alt="" /></div>}
@@ -112,7 +112,7 @@ export function ParticipantJoinScreen() {
 
 export function ParticipantAccessEndedScreen() {
   return <div className={`${theme.lightTheme} ${s.shell}`}>
-    <header className={s.brand}><BrandLogoBar size="sm" href="/" variant="default" /></header>
+    <header className={s.brand}><BrandLogoBar size="sm" href="/" /></header>
     <main className={s.main}>
       <div className={s.card}>
         <div className={s.intro}>

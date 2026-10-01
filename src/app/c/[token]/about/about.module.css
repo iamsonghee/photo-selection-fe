@@ -6,6 +6,7 @@
   --accent-orange: var(--accent);
   --accent-green: #00e676;
   --text-primary: var(--foreground);
+  --brand-logo-ink: var(--foreground);
   --text-secondary: var(--muted-foreground);
   --text-muted: var(--subtle-foreground);
   --border-color: var(--border);
@@ -98,30 +99,6 @@
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.logoBox {
-  background-color: var(--accent-orange);
-  color: #000;
-  font-family: var(--font-sans);
-  font-weight: 800;
-  font-size: 14px;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.brandName {
-  font-family: var(--font-sans);
-  font-weight: 800;
-  font-size: 20px;
-  letter-spacing: -0.5px;
-}
-
-.brandName span {
-  color: var(--accent-orange);
 }
 
 .btnSub {
@@ -514,9 +491,6 @@
   }
   .headerSide {
     width: auto;
-  }
-  .brandName {
-    display: none;
   }
   .aboutContainer {
     padding: 40px 20px 80px;

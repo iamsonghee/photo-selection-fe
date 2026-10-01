@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronLeft, ChevronUp, LogOut, Settings } from "lucide-react";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -29,13 +29,6 @@ const sidebarSans = Inter({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
   variable: "--acb-sidebar-sans",
-  display: "swap",
-});
-
-const sidebarMono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
-  variable: "--acb-sidebar-mono",
   display: "swap",
 });
 
@@ -67,6 +60,10 @@ export function Sidebar({
   const { profile } = useProfile();
   const { quota } = useQuota();
   const displayName = profile?.name?.trim() || profile?.email?.split("@")[0] || "사용자";
+  // 이름·소개·사진 중 하나라도 비어있으면 아바타에 점 뱃지를 표시한다 — 고객이 초대 링크에서
+  // "담당 작가"로만 보게 되는 원인(ProfileCompletionBanner와 같은 판단 기준, 2026-09-22 상단
+  // 배너에서 사이드바 방식으로 교체).
+  const profileIncomplete = !!profile && (!profile.name?.trim() || !profile.bio?.trim() || !profile.profileImageUrl);
   const tierLabel = quota ? TIER_LABEL[quota.tier] : null;
   const usagePct =
     quota && quota.max ? Math.min(100, Math.round((quota.current / quota.max) * 100)) : 0;
@@ -155,7 +152,6 @@ export function Sidebar({
         isLightRoute ? styles.rootLight : "",
         collapsed ? styles.rootCollapsed : styles.rootExpanded,
         sidebarSans.variable,
-        sidebarMono.variable,
       ].join(" ")}
       data-photographer-sidebar
       data-sidebar-theme={isLightRoute ? "light" : "dark"}
@@ -194,13 +190,13 @@ export function Sidebar({
         >
           <div
             className={styles.logoMark}
-            style={{ fontFamily: "var(--acb-sidebar-mono), ui-monospace, monospace" }}
+            style={{ fontFamily: "Pretendard, sans-serif" }}
           >
             A
           </div>
           <span
             className={[styles.logoText, collapsed ? styles.logoTextHidden : ""].filter(Boolean).join(" ")}
-            style={{ fontFamily: "var(--acb-sidebar-sans), system-ui, sans-serif" }}
+            style={{ fontFamily: "Pretendard, sans-serif" }}
           >
             A-CUT<span className={styles.logoDot}>.</span>
           </span>
@@ -284,12 +280,14 @@ export function Sidebar({
                 >
                   {displayName} 작가님
                 </p>
-                {tierLabel && (
+                {(tierLabel || profileIncomplete) && (
                   <p
-                    className="mt-0.5 text-[12px] leading-[18px] tracking-[-0.25px] text-muted-foreground"
+                    className="mt-0.5 flex items-center gap-1 text-[12px] leading-[18px] tracking-[-0.25px] text-muted-foreground"
                     style={{ fontFamily: "inherit" }}
                   >
-                    {tierLabel}
+                    {tierLabel && <span>{tierLabel}</span>}
+                    {tierLabel && profileIncomplete && <span aria-hidden>·</span>}
+                    {profileIncomplete && <span style={{ color: "var(--accent)", fontWeight: 600 }}>프로필 미완성</span>}
                   </p>
                 )}
               </div>

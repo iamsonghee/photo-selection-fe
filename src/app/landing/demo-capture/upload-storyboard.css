@@ -1,5 +1,5 @@
 /* 20초 영상 검토용 정지 시안에만 적용한다. 현재 18초 영상은 변경하지 않는다. */
-.upload-storyboard .film-writer {opacity:1;--accent:#ff5712;}
+.upload-storyboard .film-writer {opacity:1;--accent:#ff4d00;}
 .us-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;max-width:860px;padding:18px 40px;}
 .us-card {position:relative;min-width:0;}
 .us-reference {display:flex;align-items:center;gap:9px;height:46px;margin-bottom:9px;}

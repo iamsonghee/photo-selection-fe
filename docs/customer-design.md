@@ -102,11 +102,11 @@ Typography는 Pretendard 하나를 사용한다.
 - preparing도 공통 라이트 초대 레이아웃으로 표시한다. 선택 CTA 없이 준비 중임을 안내한다. selecting과 reviewing의 CTA 및 상태별 리다이렉트는 유지한다.
 - 대표 사진은 URL 사전 로드가 끝날 때까지 light brand placeholder를 표시한다. 사전 로드에 성공한 URL만 실제 `<img>`에 연결하고 오류가 나면 placeholder를 유지해 브라우저의 깨진 이미지 아이콘을 노출하지 않는다.
 
-### BrandLogoBar customerEntry variant
+### BrandLogoBar (서비스 공통 락업, 2026-10-02 통일)
 
-- mark `24.96 × 24.96px`, radius `6.72px`, Orange fill, white `A`.
-- wordmark `18.24px` ExtraBold, `#191918`, trailing dot 없음.
-- 기존 Photographer/default variant는 변경하지 않는다.
+- variant 없음 — 작가·고객·랜딩·로그인 모달·소개 화면이 같은 락업을 쓴다.
+- md: mark `24.96 × 24.96px`, radius `6.72px`, `#ff4d00` fill, white `A`, Pretendard 800. sm은 같은 비율로 축소(mark 20px).
+- wordmark ExtraBold `A-CUT` + `#ff4d00` trailing dot. 색은 `var(--brand-logo-ink, #191918)` — 어두운 배경에서는 `--brand-logo-ink`를 지정한다.
 
 ## 6. PIN contract
 
@@ -177,7 +177,7 @@ PC에서는 제목·설명·마감일·CTA를 하나의 그룹으로 보고 화�
 
 - 브레이크포인트는 `768px`(앱 전역 `MOBILE_MAX_W` 관례와 동일)이며, 768px 미만에서는 이 절이 적용되지 않고 위 모바일 계약을 그대로 따른다.
 - 상단 헤더는 모바일 bottom sheet로 여닫던 필터·정렬·검색을 하나의 상시 노출 툴바로 구성한다: 브랜드 마크·프로젝트명·마감일/D-day(좌), 담당 작가·선택 수(우) 상단 행 + 전체/선택됨 scope 탭·별점 `≥N`·유사컷 묶어보기·흔들림/눈감음 토글(좌), 색상 다중 선택·필터 초기화·정렬·처음/마지막 이동·파일명 검색(우) 하단 필터 행. 기능 계약은 모바일과 동일하고 배치만 상시 노출로 바뀐다.
-- 색상 토큰은 `design-system-light.md`(Photographer 전용)를 참조하지 않고, 이 문서 §4 Customer entry tokens를 `.customer-app-shell` 스코프 CSS 변수(`--customer-canvas`, `--customer-ink`, `--customer-ink-secondary`, `--customer-control`, `--customer-divider`)로 선언해 사용한다. Brand accent는 `src/app/globals.css`의 전역 `--accent: #ff4d00`을 그대로 재사용한다(2026-09-09 PC computed 확인). 작가 Light route의 `#ff5712`는 고객 shell에 적용되지 않는다.
+- 색상 토큰은 `design-system-light.md`(Photographer 전용)를 참조하지 않고, 이 문서 §4 Customer entry tokens를 `.customer-app-shell` 스코프 CSS 변수(`--customer-canvas`, `--customer-ink`, `--customer-ink-secondary`, `--customer-control`, `--customer-divider`)로 선언해 사용한다. Brand accent는 `src/app/globals.css`의 전역 `--accent: #ff4d00`을 그대로 재사용한다(2026-09-09 PC computed 확인). 브랜드 주황은 2026-10-02부터 작가 화면 포함 전 서비스 `#ff4d00` 하나다.
 - 그리드 컬럼 수는 밀도 선택 UI 없이 뷰포트 폭에 따라 자동 계산된다(최소 셀 `148px`, 간격 `12px`, `max-width: 1800px` 컨테이너). 핀치 밀도 시스템은 PC에서 개입하지 않는다.
 - 결과 0건 empty state는 모바일과 동일한 문구·분기(필터 조건 없음 vs 선택한 사진 없음)를 라이트 톤으로 확대 배치한다.
 - 하단 확정바는 모바일과 같은 라이트 톤(Control `#26282C` CTA, Brand accent 진행바)을 폭에 상관없이 유지하고, 폭만 헤더/그리드와 동일한 `max-width: 1800px` 컨테이너에 맞춘다.
