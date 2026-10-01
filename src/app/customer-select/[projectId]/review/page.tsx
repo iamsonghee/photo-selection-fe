@@ -158,8 +158,8 @@ export default function CustomerSendPage() {
             </div>
             <div className={s.fileLinks}>
               <button type="button" onClick={() => void copyList()}><FileText size={14} />{listCopied ? "복사했어요" : "파일명·메모 복사"}</button>
-              <button type="button" onClick={() => downloadTextFile(`${baseName}.csv`, ["파일명,작가 전달 메모", ...selected.map((photo) => [csvEscape(getPhotoDisplayName(photo)), csvEscape(memoOf(photo.id))].join(","))].join("\n"), "text/csv;charset=utf-8")}><FileSpreadsheet size={14} />CSV</button>
-              <button type="button" onClick={() => downloadTextFile(`${baseName}.txt`, selected.map(getPhotoDisplayName).join("\n"), "text/plain;charset=utf-8")}><FileText size={14} />TXT</button>
+              <button type="button" onClick={() => downloadTextFile(`${baseName}.csv`, ["파일명,작가 전달 메모", ...selected.map((photo) => [csvEscape(getPhotoDisplayName(photo)), csvEscape(memoOf(photo.id))].join(","))].join("\n"), "text/csv;charset=utf-8")}><FileSpreadsheet size={14} />CSV 다운로드</button>
+              <button type="button" onClick={() => downloadTextFile(`${baseName}.txt`, selected.map(getPhotoDisplayName).join("\n"), "text/plain;charset=utf-8")}><FileText size={14} />TXT 다운로드</button>
             </div>
           </section>
 

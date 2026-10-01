@@ -62,63 +62,46 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   await page.goto("/customer-select/core-flow/select");
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
   const galleryTexts = await page.locator("body").innerText();
-  if (viewport === "desktop") expect(galleryTexts).toContain(`${selectedCount}장 선택 · 목표 10장`);
-  else {
-    expect(galleryTexts).toContain("선택한 사진");
-    expect(galleryTexts).toContain(`${selectedCount} / 10`);
-  }
+  // 목표 장수는 참고값이다 — 장수만 알려주고 더 고르거나 줄이라고 압박하지 않는다.
+  expect(galleryTexts).toContain(`${selectedCount}장 선택 · 약속한 10장`);
   expect(galleryTexts).not.toContain("더 골라주세요");
   expect(galleryTexts).not.toContain("더 선택해 주세요");
-  expect(galleryTexts).not.toContain("내 선택 완료");
-  const confirm = page.getByRole("button", { name: "최종 검토하기" });
+  expect(galleryTexts).not.toContain("줄여주세요");
+  const confirm = page.getByRole("button", { name: /작가에게 보내기/ }).last();
   const confirmBox = await confirm.boundingBox();
   const overflow = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth }));
 
   await page.locator('[data-photo-id="p1"]').click();
-  await expect(page.locator(".fs-page-root")).toBeVisible();
-  const viewerTexts = await page.locator(".fs-page-root").innerText();
-  const viewerReview = page.locator(".fs-page-root").getByRole("button", { name: "최종 검토하기" });
-  const viewerReviewBox = await viewerReview.boundingBox();
-  const viewerReviewText = await viewerReview.innerText();
-  expect(viewerTexts).toContain(`${selectedCount}장 선택 · 목표 10장`);
-  expect(viewerTexts).not.toContain("줄여주세요");
+  const viewer = page.getByRole("dialog", { name: /상세 보기/ });
+  await expect(viewer).toBeVisible();
+  const viewerTexts = await viewer.innerText();
+  expect(viewerTexts).toContain(`선택 ${selectedCount}/10장`);
   expect(viewerTexts).not.toContain("장 남음");
-  expect(viewerTexts).not.toContain("전체 사진에서 더 고르기");
-  if (viewport === "desktop") {
-    await page.getByRole("button", { name: /작가 전달 메모 수정/ }).click();
-    await page.getByRole("textbox", { name: "작가 전달 메모" }).fill("자동 저장 확인");
-  } else {
-    await page.getByRole("button", { name: /작가 전달 메모 수정/ }).click();
-    await page.getByRole("textbox", { name: "작가 전달 메모" }).fill("자동 저장 확인");
-  }
-  await expect(page.locator('span:visible', { hasText: "✓ 저장됨" })).toBeVisible();
-  if (viewport === "mobile") await page.getByRole("textbox", { name: "작가 전달 메모" }).blur();
-  await viewerReview.click();
+  const memo = page.getByRole("textbox", { name: "작가 전달 메모" });
+  await memo.fill("자동 저장 확인");
+  await expect(page.locator('[role="status"]:visible', { hasText: "저장됨" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(viewer).toHaveCount(0);
+  const viewerReviewBox = await confirm.boundingBox();
+  const viewerReviewText = await confirm.innerText();
+  await confirm.click();
   await expect(page).toHaveURL(/\/customer-select\/core-flow\/review/);
-  await expect(page.getByRole("heading", { name: "핵심 흐름 QA", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: `${selectedCount}장을 보낼게요` })).toBeVisible();
   const reviewTexts = await page.locator("body").innerText();
-  const collapsed = selectedCount > 10;
-  await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(collapsed ? 10 : selectedCount);
+  expect(reviewTexts).toContain(`약속한 10장보다 ${Math.abs(selectedCount - 10)}장 ${selectedCount > 10 ? "많아요" : "적어요"}`);
+  await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(selectedCount);
   const firstSelectedPhoto = page.getByRole("button", { name: /크게 보기$/ }).first().locator("img");
   const firstSelectedPhotoBox = await firstSelectedPhoto.boundingBox();
-  if (collapsed) {
-    await page.getByRole("button", { name: `사진 ${selectedCount - 10}장 더 보기` }).click();
-    await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(selectedCount);
-    await page.getByRole("button", { name: "사진 접기" }).click();
-    await expect(page.getByRole("button", { name: /크게 보기$/ })).toHaveCount(10);
-    await page.getByRole("button", { name: `사진 ${selectedCount - 10}장 더 보기` }).click();
-  }
-  const reviewPageBox = await page.locator('[class*="page"]').first().boundingBox();
+  const reviewPageBox = await page.locator("main").first().boundingBox();
   const reviewCardBoxes = await page.locator("img").evaluateAll((images) => images.map((image) => {
     const r = image.getBoundingClientRect(); return { width: r.width, height: r.height };
   }));
   const reviewOverflow = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth }));
   await page.screenshot({ path: `test-results/core-flow-${viewport}-${selectedCount}-review.png`, fullPage: true });
   await page.getByRole("button", { name: "CORE_001.jpg 크게 보기" }).click();
-  await expect(page.getByRole("dialog", { name: "CORE_001.jpg 크게 보기" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "CORE_001.jpg 상세 보기" })).toBeVisible();
   await page.keyboard.press("Escape");
 
-  await page.getByText("파일로 내보내기").click();
   const exportTexts = await page.locator("body").innerText();
   await page.getByRole("button", { name: "링크 복사" }).click();
   expect(projectStatePatches).toEqual([]);

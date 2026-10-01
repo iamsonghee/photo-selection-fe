@@ -30,19 +30,21 @@ test("shared participant can leave opinions but cannot change the final selectio
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/customer-select/role-check/select");
-    await expect(page.getByRole("button", { name: "내 의견 완료" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "내 선택 완료" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "최종 검토하기" })).toHaveCount(0);
-    await expect(page.locator('[data-photo-id="p1"] .gl-check-box')).toHaveCount(0);
+    // 참여자의 메인 동작은 찜(♡)이다. 최종 선택 체크와 보내기 행동은 보이지 않는다.
+    await expect(page.getByRole("button", { name: "다 골랐어요" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /작가에게 보내기/ })).toHaveCount(0);
+    await expect(page.locator('[data-photo-id="p1"] .gl-check-box:not(.gl-check-heart)')).toHaveCount(0);
+    await expect(page.locator('[data-photo-id="p1"] .gl-check-heart')).toHaveCount(1);
 
     await page.locator('[data-photo-id="p1"]').click();
-    await expect(page.locator('button:visible[aria-label="작가 전달 메모 수정: 표정이 좋아요"]')).toBeVisible();
-    await page.locator('button:visible[aria-label="작가 전달 메모 수정: 표정이 좋아요"]').click();
-    await page.getByRole("textbox", { name: "작가 전달 메모" }).fill("참여자 자동저장 확인");
-    await page.getByRole("textbox", { name: "작가 전달 메모" }).blur();
+    const memo = page.getByRole("textbox", { name: "작가 전달 메모" });
+    await expect(memo).toHaveValue("표정이 좋아요");
+    await memo.fill("참여자 자동저장 확인");
+    await memo.blur();
     await expect(page.locator('[role="status"]:visible').filter({ hasText: "저장됨" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "사진 선택 해제" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /보정 받/ })).toHaveCount(0);
     await page.keyboard.press("Space");
+    await page.keyboard.press("Escape");
   }
   expect(writes.some((body) => "is_selected" in body)).toBe(false);
 });
@@ -74,10 +76,12 @@ test("first-time participant chooses an available color before entering", async 
   } }));
 
   await page.goto("/customer-select/join-check/select");
-  await expect(page.getByRole("heading", { name: /함께 참여해 주세요/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "신랑", exact: true })).toBeDisabled();
-  await page.getByPlaceholder("예: 신랑, 엄마").fill("신부");
-  await page.getByRole("button", { name: "사진 고르기 시작" }).click();
+  await expect(page.getByText(/사진 고르기에 초대했어요/)).toBeVisible();
+  // 이름만 입력하면 남은 색(사용 중인 파랑 제외)이 자동으로 배정된다.
+  await page.getByRole("button", { name: "바꾸기" }).click();
+  await expect(page.getByRole("radio", { name: "파랑" })).toHaveCount(0);
+  await page.getByPlaceholder("예: 엄마, 신랑, 지우").fill("신부");
+  await page.getByRole("button", { name: "시작하기" }).click();
 
   await expect(page.locator('[data-photo-id="p1"]')).toBeVisible();
   await expect(page.locator("[data-photo-id]")).toHaveCount(24);
@@ -113,10 +117,11 @@ test("participant can continue the same identity on another device", async ({ pa
   } }));
 
   await page.goto("/customer-select/resume-check/select");
-  await page.getByRole("button", { name: /신랑.*이어서 참여/ }).click();
+  await page.getByRole("button", { name: "전에 참여했나요? 이어서 하기" }).click();
+  await page.getByRole("button", { name: "신랑", exact: true }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByText("신랑님으로 이어서 참여할까요?")).toBeVisible();
-  await dialog.getByRole("button", { name: "이어서 참여", exact: true }).click();
+  await expect(dialog.getByText("신랑님으로 이어서 할까요?")).toBeVisible();
+  await dialog.getByRole("button", { name: "이어서 하기", exact: true }).click();
 
   await expect(page.getByText("가족 사진").last()).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem("acut:customer-select:identity:resume-check"))).toBe("blue");

@@ -7,7 +7,6 @@
  * 격자는 고르는 곳, 상세는 고민하는 곳. 유사컷 묶음 표지는 바로 고르지 않고 펼쳐서 비교한다.
  */
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Grid2x2, Layers, Plus } from "lucide-react";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
@@ -334,7 +333,7 @@ function SelectScreen() {
       {sheet === "scenes" && scenes && <Sheet title="장면" onClose={() => setSheet(null)}><div className={s.sheetList}>{sceneList}</div><button type="button" className={s.textLink} onClick={() => { setSheet(null); goScene(null, "replace"); }}>장면 한눈에 보기</button></Sheet>}
       {sheet === "invite" && <InviteSheet projectId={projectId} shareToken={project.shareToken} shareEnabled={project.shareEnabled} people={people} online={online} done={project.participantDone} onClose={() => setSheet(null)} />}
 
-      {people.length > 1 && !openPhotoId && <EphemeralChat channelKey={project.realtimeKey} currentIdentity={me} nicknames={project.participantNicknames} hasRecipient={project.onlineParticipants?.some((color) => color !== me) ?? false} elevated={Boolean(openPhotoId)} />}
+      {people.length > 1 && <EphemeralChat channelKey={project.realtimeKey} currentIdentity={me} nicknames={project.participantNicknames} hasRecipient={project.onlineParticipants?.some((color) => color !== me) ?? false} elevated={Boolean(openPhotoId)} />}
 
       {openPhotoId && (
         <PhotoDetail

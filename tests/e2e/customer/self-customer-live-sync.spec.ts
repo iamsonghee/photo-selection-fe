@@ -57,20 +57,25 @@ test("selection and participant completion sync between sessions without a reloa
 
   await owner.goto("/customer-select/live-sync/select");
   await participant.goto("/customer-select/live-sync/select");
-  await expect(owner.getByText("동행 고르는 중").first()).toBeVisible();
-  await participant.getByRole("button", { name: "내 의견 완료" }).click();
-  await expect(owner.getByText("동행 완료").first()).toBeVisible({ timeout: 5000 });
+  const ownerSeesParticipant = owner.locator('[class*="participantPill"]').filter({ hasText: "동행" }).first();
+  await expect(ownerSeesParticipant).toBeVisible();
+  await expect(ownerSeesParticipant).not.toContainText("다 골랐어요");
+  await participant.getByRole("button", { name: "다 골랐어요" }).click();
+  await expect(ownerSeesParticipant).toContainText("다 골랐어요", { timeout: 5000 });
   await expect(owner.locator('[class*="participantPill"]').filter({ hasText: "동행" }).first()).toContainText("온라인", { timeout: 5000 });
   await owner.locator('[data-photo-id="p1"] .gl-check-box').click();
-  await expect(participant.locator(".gld-selected-count").first()).toContainText("1", { timeout: 5000 });
+  // 참여자는 소유자의 최종 선택을 "✓ 최종 선택" 보기로 확인한다.
+  await participant.getByRole("button", { name: "✓ 최종 선택" }).click();
+  await expect(participant.locator('[data-photo-id="p1"]')).toBeVisible({ timeout: 5000 });
+  await participant.getByRole("button", { name: "전체", exact: true }).click();
   await participant.locator('[data-photo-id="p1"]').click();
-  const samePhoto = owner.getByRole("button", { name: "동행님이 보는 A001.jpg 열기" }).first();
+  const samePhoto = owner.getByRole("button", { name: "동행님이 보는 사진 열기" }).first();
   await expect(samePhoto).toBeVisible({ timeout: 5000 });
   await samePhoto.click();
-  await participant.getByRole("button", { name: "작가 전달 메모 남기기" }).click();
   await participant.getByRole("textbox", { name: "작가 전달 메모" }).fill("조금 밝게 부탁드려요");
   await participant.getByRole("textbox", { name: "작가 전달 메모" }).blur();
-  await expect(owner.locator('button:visible[aria-label="작가 전달 메모 수정: 조금 밝게 부탁드려요"]')).toBeVisible({ timeout: 5000 });
+  // 같은 사진을 보고 있는 소유자 화면에도 공용 메모가 반영된다.
+  await expect(owner.getByRole("textbox", { name: "작가 전달 메모" })).toHaveValue("조금 밝게 부탁드려요", { timeout: 5000 });
   await participant.getByRole("button", { name: "대화 열기" }).click();
   await participant.getByLabel("일회성 메시지").fill("이 사진 같이 볼까요?");
   await expect(owner.getByRole("complementary", { name: "일회성 대화" })).toHaveAttribute("data-chat-connected", "true", { timeout: 10000 });
@@ -116,7 +121,7 @@ test("result link copy does not complete or lock the project", async ({ page }) 
   });
 
   await page.goto("/customer-select/delivery-sync/export");
-  await page.getByText("파일로 내보내기").click();
+  await expect(page.getByRole("heading", { name: "1장을 보낼게요" })).toBeVisible();
   const [csvDownload] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "CSV 다운로드" }).click(),

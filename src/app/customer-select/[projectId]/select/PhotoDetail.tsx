@@ -74,6 +74,16 @@ export function PhotoDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photoId]);
   useEffect(() => () => flushMemo(), [flushMemo]);
+  // 함께 고르는 사람이 같은 사진의 메모를 고치면, 내가 입력 중이 아니고 저장 안 된 내용이 없을 때만 반영한다.
+  const remoteMemo = commentOf(photoId);
+  const memoRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const current = draftRef.current;
+    if (current.photoId !== photoId || current.text !== current.saved || remoteMemo === current.saved) return;
+    if (document.activeElement === memoRef.current) return;
+    draftRef.current = { photoId, text: remoteMemo, saved: remoteMemo };
+    setDraft(remoteMemo);
+  }, [photoId, remoteMemo]);
 
   // 앞뒤 사진은 미리 받아 넘김을 빠르게 한다.
   useEffect(() => {
@@ -154,7 +164,9 @@ export function PhotoDetail({
         <div>
           <p className={s.panelLabel}>작가님께 전달할 메모</p>
           <textarea
+            ref={memoRef}
             className={s.memo}
+            aria-label="작가 전달 메모"
             value={draft}
             maxLength={1000}
             placeholder="예: 피부톤 밝게, 배경 사람 지워주세요"

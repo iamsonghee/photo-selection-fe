@@ -117,8 +117,8 @@ export function ParticipantAccessEndedScreen() {
       <div className={s.card}>
         <div className={s.intro}>
           <span>사진 고르기 초대</span>
-          <h1>이 초대 링크는 더 이상 쓸 수 없어요</h1>
-          <p>초대한 분이 공유를 멈췄거나 새 링크를 만들었어요. 새 초대 링크를 요청해 주세요.</p>
+          <h1>이 초대 링크는 더 이상 사용할 수 없어요</h1>
+          <p>초대한 분이 공유를 멈췄거나 새 링크를 만들었어요. 새로운 초대 링크를 요청해 주세요.</p>
         </div>
       </div>
     </main>

@@ -42,32 +42,21 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await page.screenshot({ path: testInfo.outputPath(`projects-${width}.png`), fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
-  const overview = page.getByRole("link", { name: /프로젝트 현황$/ }).first();
-  if (await overview.count()) {
+  const settingsLink = page.getByRole("link", { name: / 설정$/ }).first();
+  if (await settingsLink.count()) {
     await expect(page.getByRole("link", { name: "새 프로젝트" })).toBeVisible();
     await expect(page.getByRole("article").first().getByText(/장 남음/)).toHaveCount(0);
-    await overview.click();
-    await expect(page.getByRole("region", { name: "프로젝트 진행 현황" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "← 내 프로젝트" })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "새 프로젝트" })).toHaveCount(0);
-    await expect(page.getByText("올린 사진", { exact: true })).toBeVisible();
-    await expect(page.getByText("최종 선택", { exact: true })).toBeVisible();
-    await expect(page.getByText("추가 가능", { exact: true })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "올린 사진 보기" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "함께 고르기" })).toBeVisible();
-    await expect(page.getByText(/share_token=/)).toBeVisible();
-    await expect(page.getByRole("link", { name: "사진 관리" })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "초대 링크 관리" })).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: "촬영 정보" })).toBeVisible();
-    await expect(page.getByText(/미입력/)).toHaveCount(0);
-    for (const width of [1440, 390]) {
-      await page.setViewportSize({ width, height: 900 });
-      await page.screenshot({ path: testInfo.outputPath(`overview-${width}.png`), fullPage: true });
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    }
-    await page.getByRole("link", { name: "올린 사진 보기" }).click();
+    const settingsHref = (await settingsLink.getAttribute("href"))!;
+    const projectPath = settingsHref.replace(/\/settings$/, "");
+    // 카드는 별도 현황 화면 없이 현재 단계로 바로 간다.
+    const cardHref = await page.getByRole("article").first().locator("> a").last().getAttribute("href");
+    expect(cardHref).toMatch(/\/(upload|select|done)$/);
+    // 예전 현황 주소는 현재 단계로 리다이렉트된다.
+    await page.goto(projectPath);
+    await expect(page).toHaveURL(/\/(upload|select|done)$/);
+    await page.goto(`${projectPath}/upload`);
     await expect(page.locator("[data-compact-project-title]")).toBeVisible();
-    await expect(page.getByRole("button", { name: "사진 고르기", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "고르러 가기 →", exact: true })).toBeVisible();
     for (const [width, galleryPadding] of [[1792, 32], [390, 12]] as const) {
       await page.setViewportSize({ width, height: 900 });
       const gallery = page.locator('[data-photo-gallery-variant="original"]');
@@ -94,7 +83,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await firstCheckbox.click();
     await expect(firstCheckbox).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("button", { name: "선택 삭제 (1)" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "사진 고르기", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "고르러 가기 →", exact: true })).toHaveCount(0);
     await page.setViewportSize({ width: 390, height: 400 });
     const uploadGallery = page.getByRole("main", { name: "업로드 사진 갤러리" });
     const shellHeader = page.locator('[data-customer-shell-header-mode="compact"]');
@@ -104,7 +93,8 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await expect(page.locator("[data-upload-project-context]")).toHaveCount(0);
     await expect.poll(() => shellHeader.locator(":scope > div").evaluate((element) => element.getBoundingClientRect().height)).toBe(48);
     await page.setViewportSize({ width: 800, height: 300 });
-    await expect(page.locator('[data-customer-shell-header-mode="expanded"]')).toBeVisible();
+    // 올리기·고르기·보내기 단계 간 헤더 높이를 맞추기 위해 PC도 항상 얇은 헤더다.
+    await expect(page.locator('[data-customer-shell-header-mode="compact"]')).toBeVisible();
     await uploadGallery.evaluate((element) => {
       const spacer = document.createElement("div");
       spacer.style.height = "1000px";
@@ -116,9 +106,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await expect(page.locator('[data-customer-shell-header-mode="compact"] [data-brand-wordmark]')).toHaveCount(0);
     await expect(page.locator("[data-upload-project-context]")).toHaveCount(0);
     await uploadGallery.evaluate((element) => { element.scrollTop = 0; element.dispatchEvent(new Event("scroll")); });
-    await page.locator("[data-compact-project-title] a").click();
-    await expect(page.getByRole("region", { name: "프로젝트 진행 현황" })).toBeVisible();
-    await page.getByRole("link", { name: "프로젝트 수정", exact: true }).click();
+    await page.goto(settingsHref);
     await expect(page.getByRole("heading", { name: "프로젝트 설정" })).toBeVisible();
     await expect(page.getByText("담당 작가명", { exact: true })).toBeVisible();
     await expect(page.getByText("촬영 지역", { exact: true })).toBeVisible();
@@ -130,7 +118,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await deleteSection.locator("summary").click();
     await expect(deleteSection.getByRole("button", { name: "프로젝트 삭제", exact: true })).toBeVisible();
   } else {
-    testInfo.annotations.push({ type: "coverage", description: "No existing test-owner project: overview requires separate verification." });
+    testInfo.annotations.push({ type: "coverage", description: "No existing test-owner project: card routing and upload layout require separate verification." });
   }
 
   // Isolate upload preflight: no photos or participant records are written.
@@ -146,6 +134,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     } } });
   });
   await page.route("**/api/customer-select/projects/*/participants", async (route) => { await route.fulfill({ json: { ok: true } }); });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/customer-select/limit-check/upload");
   await expect(page.getByRole("heading", { name: "업로드 한도 확인" })).toBeVisible();
   await page.getByRole("button", { name: "AI 분석 시작" }).click();

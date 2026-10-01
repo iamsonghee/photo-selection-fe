@@ -114,7 +114,6 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
   await page.goto(`/customer-select/${PROJECT_ID}/select`);
   await expect(page.locator("[data-photo-id]").first()).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("[data-customer-shell-header-mode]")).toBeVisible();
-  await expect(page.locator(".gld-brand-mark")).toBeHidden();
   expect((await page.locator('[class*="selectGrid"]').first().boundingBox())?.x).toBe(viewport === "desktop" ? 24 : 20);
   const firstCardMs = Date.now() - started;
   const initialCards = await page.locator("[data-photo-id]").count();
@@ -122,11 +121,7 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
   const sample = async () => { maxCards = Math.max(maxCards, await page.locator("[data-photo-id]").count()); };
   const gallery = page.locator('[class*="selectGallery"]').first();
 
-  if (viewport === "desktop") {
-    await page.getByRole("button", { name: "마지막으로 이동" }).click();
-  } else {
-    await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
-  }
+  await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
   await page.waitForTimeout(350);
   await sample();
   const endIds = await visiblePhotoIds(page);
@@ -136,31 +131,27 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
   await page.waitForTimeout(300);
   await sample();
 
-  if (viewport === "desktop") {
-    await page.getByTitle("작게 보기").click();
+  if (viewport === "mobile") {
+    await page.getByRole("button", { name: /한 줄에 2장/ }).click();
     await page.waitForTimeout(250);
-    await page.getByTitle("크게 보기").click();
-  } else {
-    await page.getByRole("button", { name: /현재 2열, 누르면 3열로 변경/ }).click();
-    await page.waitForTimeout(250);
-    await page.getByRole("button", { name: /현재 3열, 누르면 4열로 변경/ }).click();
-    await page.getByRole("button", { name: "사진 필터 설정" }).click();
-    await expect(page.getByRole("dialog", { name: "필터 설정" })).toBeVisible();
-    await page.getByRole("button", { name: "흐림만" }).click();
-    await page.getByRole("button", { name: "필터 닫기" }).first().click();
-    await expect(page.locator("[data-photo-id]")).toHaveCount(15);
-    await page.getByRole("button", { name: "흐림" }).click();
+    await page.getByRole("button", { name: /한 줄에 3장/ }).click();
   }
+  // 흐림(137번째마다 15장) + 눈 감음(211번째마다 10장), 첫 사진이 겹쳐 24장
+  await page.getByRole("button", { name: "흔들림·눈 감음 의심" }).click();
+  await expect(page.locator("[data-photo-id]")).toHaveCount(24);
+  await page.getByRole("button", { name: "전체", exact: true }).click();
   await page.waitForTimeout(250);
   await sample();
 
-  const search = viewport === "desktop"
-    ? page.getByLabel("파일명으로 필터링").filter({ visible: true })
-    : (await page.getByRole("button", { name: "파일명 검색" }).click(), page.getByLabel("파일명으로 필터링").filter({ visible: true }));
+  const search = page.getByRole("searchbox", { name: "파일명 검색" });
   await search.fill("PHOTO_1999.jpg");
   const targetCard = page.locator('[data-photo-id="p1999"]');
   await expect(targetCard).toBeVisible();
   await expect(page.locator("[data-photo-id]")).toHaveCount(1);
+  if (viewport === "mobile") {
+    // 3열 이상에서는 체크 버튼 대신 상태만 보여주므로 2열로 돌아와 고른다.
+    await page.getByRole("button", { name: /한 줄에 4장/ }).click();
+  }
   await targetCard.getByRole("button", { name: "선택" }).click();
   const selectedCheck = targetCard.getByRole("button", { name: "선택 해제" });
   await expect(selectedCheck).toBeVisible();
@@ -168,21 +159,25 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
     const face = getComputedStyle(element, "::before");
     return [face.left, face.top, face.borderRadius];
   })).toEqual(["8px", "8px", "4px"]);
-  await targetCard.click({ position: { x: 40, y: 60 } });
-  await expect(page.locator(".fs-page-root")).toBeVisible();
-  await expect(page.getByText(/파일명 · PHOTO_1999/).filter({ visible: true })).toBeVisible();
-  if (viewport === "desktop") {
-    await page.getByRole("button", { name: "다음 사진" }).click();
-    await page.getByRole("button", { name: "이전 사진" }).click();
-  }
+  await targetCard.click({ position: { x: 60, y: 60 } });
+  await expect(page.getByRole("dialog", { name: "PHOTO_1999.jpg 상세 보기" })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByText(/파일명 · PHOTO_/)).toHaveCount(0);
-  await page.getByRole("button", { name: "검색어 지우기" }).click();
+  await expect(page.getByRole("dialog", { name: /상세 보기/ })).toHaveCount(0);
+  await search.fill("");
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
+  if (viewport === "desktop") {
+    await page.locator('[data-photo-id="p0001"]').click();
+    await page.getByRole("button", { name: "다음 사진" }).click();
+    await expect(page.getByRole("dialog", { name: "PHOTO_0002.jpg 상세 보기" })).toBeVisible();
+    await page.getByRole("button", { name: "이전 사진" }).click();
+    await expect(page.getByRole("dialog", { name: "PHOTO_0001.jpg 상세 보기" })).toBeVisible();
+    await page.keyboard.press("Escape");
+  }
 
   await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight * 0.63 }));
   await page.waitForTimeout(400);
-  const restoreBefore = await page.evaluate((id) => sessionStorage.getItem(`ps:self-gallery-position:${id}`), PROJECT_ID);
+  const positionKey = `ps:self-select:${PROJECT_ID}:all:all:1`;
+  const restoreBefore = await page.evaluate((key) => sessionStorage.getItem(key), positionKey);
   await page.reload();
   await expect(page.locator("[data-photo-id]").first()).toBeVisible({ timeout: 20_000 });
   await page.waitForTimeout(500);

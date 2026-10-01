@@ -29,6 +29,8 @@ export function PhotoGrid({ photos, mobileColumns, positionKey, renderCard, empt
   const gridRef = useRef<HTMLDivElement>(null);
   const restoredKeyRef = useRef("");
   const [layout, setLayout] = useState({ cols: 4, gap: DESKTOP_GAP, rowHeight: DESKTOP_MIN_CELL + DESKTOP_GAP });
+  // 실제 격자 폭으로 열 수를 계산하기 전에는 위치를 복원하지 않는다(기본 4열 기준 행으로 잘못 이동함).
+  const [measured, setMeasured] = useState(false);
 
   useLayoutEffect(() => {
     const grid = gridRef.current;
@@ -42,6 +44,7 @@ export function PhotoGrid({ photos, mobileColumns, positionKey, renderCard, empt
       const cell = (width - gap * (cols - 1)) / cols;
       const rowHeight = Math.ceil(cell / (mobile ? MOBILE_GRID[mobileColumns].aspect : 1)) + gap;
       setLayout((current) => current.cols === cols && current.gap === gap && current.rowHeight === rowHeight ? current : { cols, gap, rowHeight });
+      setMeasured(true);
     };
     update();
     const observer = new ResizeObserver(update);
@@ -65,18 +68,22 @@ export function PhotoGrid({ photos, mobileColumns, positionKey, renderCard, empt
 
   // 장면(positionKey)이 바뀌면 그 장면에서 마지막으로 보던 행으로 한 번 복원한다.
   useEffect(() => {
-    if (restoredKeyRef.current === positionKey) return;
+    if (!measured || restoredKeyRef.current === positionKey) return;
     restoredKeyRef.current = positionKey;
     let anchorId: string | null = null;
     try { anchorId = sessionStorage.getItem(positionKey); } catch {}
     const index = anchorId ? photos.findIndex((photo) => photo.id === anchorId) : -1;
-    const frame = window.requestAnimationFrame(() => {
-      if (index >= 0) virtualizer.scrollToIndex(Math.floor(index / layout.cols), { align: "start" });
-      else scrollRef.current?.scrollTo({ top: 0 });
+    // 측정된 행 높이가 반영된 다음 프레임에 이동한다.
+    let second = 0;
+    const first = window.requestAnimationFrame(() => {
+      second = window.requestAnimationFrame(() => {
+        if (index >= 0) virtualizer.scrollToIndex(Math.floor(index / layout.cols), { align: "start" });
+        else scrollRef.current?.scrollTo({ top: 0 });
+      });
     });
-    return () => window.cancelAnimationFrame(frame);
+    return () => { window.cancelAnimationFrame(first); window.cancelAnimationFrame(second); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [positionKey, photos, layout.cols]);
+  }, [measured, positionKey, photos, layout.cols]);
 
   return (
     <div
