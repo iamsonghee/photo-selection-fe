@@ -315,6 +315,8 @@ export default function CustomerUploadPage() {
       if (thenSelect) { router.push(`/customer-select/${projectId}/select`); return; }
       void pollAiAnalysis([aiWantSimilar && "similarity", aiWantQuality && "quality"].filter(Boolean) as string[]);
     } catch (e) {
+      // AI 정리는 선택 기능이다 — 시작하지 못해도 고르기로 넘어가는 흐름은 막지 않는다.
+      if (thenSelect) { router.push(`/customer-select/${projectId}/select`); return; }
       setError(e instanceof Error ? e.message : "AI 분석을 시작하지 못했습니다.");
     } finally {
       setAiStarting(false);
