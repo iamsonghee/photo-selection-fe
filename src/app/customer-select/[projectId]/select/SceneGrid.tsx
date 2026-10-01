@@ -20,10 +20,14 @@ const FOOTER_HEIGHT = { desktop: 120, mobile: 104 };
 // ponytail: 바닥에서 더 당기는 고무줄의 최대 길이·저항·넘어가는 지점. 실기기에서 만져 보며 조정할 값.
 const PULL_MAX = 170;
 const PULL_RESISTANCE = 220;
-const PULL_TO_PASS = 0.68;
-const WHEEL_RELEASE_MS = 180;
-// 바닥에 닿은 뒤 이만큼 쉬었다가 새로 시작한 휠만 당기기로 본다(빠르게 내린 관성 스크롤로 넘어가지 않게).
+const PULL_TO_PASS = 0.55;
+const WHEEL_RELEASE_MS = 350; // 천천히 굴리는 마우스 휠 칸 사이(0.2~0.3초)에 풀리지 않게
+// 휠: 바닥에서 이만큼 멈춰 있은 뒤, 잠깐 쉬었거나(간격) 느려지지 않는(새 스와이프·마우스 휠) 휠만 당기기로 본다.
+// 관성 스크롤은 계속 느려지기만 하므로 당기기로 잡히지 않는다.
+const WHEEL_BOTTOM_DWELL_MS = 250;
 const WHEEL_NEW_GESTURE_MS = 140;
+// 맥 마우스처럼 한 칸이 몇 px뿐인 휠도 몇 칸이면 넘어가도록 한 번에 최소 이만큼 당긴다.
+const WHEEL_MIN_STEP = 20;
 
 type Row = { kind: "photos"; photos: Photo[] } | { kind: "footer" };
 
@@ -140,6 +144,8 @@ export function SceneGrid({ photos, mobileColumns, positionKey, startAt, enterFr
     let raw = 0;
     let armed = false;
     let lastWheel = 0;
+    let lastWheelAbs = 0;
+    let bottomSince = 0;
     let releaseTimer = 0;
     let touchY: number | null = null;
     const atBottom = () => el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
@@ -179,13 +185,22 @@ export function SceneGrid({ photos, mobileColumns, positionKey, startAt, enterFr
       const gap = now - lastWheel;
       lastWheel = now;
       const dy = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * el.clientHeight : event.deltaY;
+      const notSlowing = Math.abs(dy) >= Math.max(lastWheelAbs, 10); // 관성 꼬리는 같은 작은 값(7, 7…)이 반복되기도 한다
+      lastWheelAbs = Math.abs(dy);
       if (!armed && continueUp(dy)) { event.preventDefault(); return; }
-      // 가장자리에 닿은 뒤 잠깐 쉬었다 새로 시작한 휠만 당기기로 본다(빠르게 스크롤한 관성으로 넘어가지 않게).
-      if (!armed && (gap < WHEEL_NEW_GESTURE_MS || !arm(dy))) return;
+      if (!armed) {
+        if (!atBottom()) { bottomSince = 0; return; }
+        // 휠 없이 바닥에 머물러 있다가(간격이 충분히 길면) 다시 굴린 것도 멈춤을 거친 것으로 본다.
+        if (!bottomSince) bottomSince = gap >= WHEEL_BOTTOM_DWELL_MS ? now - WHEEL_BOTTOM_DWELL_MS : now;
+        const fresh = now - bottomSince >= WHEEL_BOTTOM_DWELL_MS && (gap >= WHEEL_NEW_GESTURE_MS || notSlowing);
+        if (!fresh || !arm(dy)) return;
+      }
       event.preventDefault();
-      move(dy);
+      move(dy > 0 ? Math.max(dy, WHEEL_MIN_STEP) : dy);
       window.clearTimeout(releaseTimer);
-      releaseTimer = window.setTimeout(release, WHEEL_RELEASE_MS);
+      // 휠은 다 당기면 손을 떼기 기다리지 않고 바로 넘어간다(놓기 판정은 덜 당겼을 때 제자리로 돌릴 때만).
+      if (armed && distanceOf(raw) / PULL_MAX >= PULL_TO_PASS) release();
+      else releaseTimer = window.setTimeout(release, WHEEL_RELEASE_MS);
     };
     const onTouchStart = (event: TouchEvent) => { touchY = event.touches.length === 1 ? event.touches[0].clientY : null; };
     const onTouchMove = (event: TouchEvent) => {

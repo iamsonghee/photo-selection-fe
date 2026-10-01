@@ -85,9 +85,16 @@ test("desktop: pulling past the end of a scene moves to the next scene", async (
   await expect(page.locator('[class*="pullReveal"]')).toHaveCount(0);
   await expect(page).toHaveURL(/scene=0/);
 
-  // 충분히 당겼다 놓으면 다음 장면으로 넘어간다.
+  // 바닥으로 흘러든 관성 스크롤(계속 느려지는 휠)만으로는 넘어가지 않는다.
+  await gallery.evaluate((element) => { element.scrollTop = element.scrollHeight - element.clientHeight - 400; });
+  await page.waitForTimeout(400);
+  for (let i = 0; i < 50; i++) { await page.mouse.wheel(0, 60 * Math.pow(0.93, i)); await page.waitForTimeout(16); }
+  await page.waitForTimeout(500);
+  await expect(page).toHaveURL(/scene=0/);
+
+  // 바닥에서 멈췄다가 휠을 이어서 굴리면(쉬지 않고 연달아 굴려도) 손을 떼기 전에 바로 넘어간다.
   await page.waitForTimeout(300);
-  for (let i = 0; i < 16; i++) { await page.mouse.wheel(0, 60); await page.waitForTimeout(30); }
+  for (let i = 0; i < 3; i++) await page.mouse.wheel(0, 100);
   await expect(page).toHaveURL(/scene=1/);
   await expect(page.locator('[class*="barMeta"]').first()).toContainText("입장");
   await context.close();
