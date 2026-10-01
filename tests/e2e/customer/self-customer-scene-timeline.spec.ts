@@ -135,3 +135,29 @@ test("desktop: sample photos shot in one burst are still split into scenes in mo
   await expect(page).toHaveURL(/scene=1/);
   await context.close();
 });
+
+test("desktop: one continuous scroll moves at most one scene", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  const gallery = page.locator('[class*="selectGallery"]').first();
+  await expect(page.locator("[data-photo-id]").first()).toBeVisible();
+  await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+  const box = (await gallery.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.waitForTimeout(400);
+
+  // 쉬지 않고 2초 넘게 계속 굴려도(트랙패드 연속 스와이프·관성) 다음 장면 하나까지만 간다.
+  for (let i = 0; i < 120; i++) { await page.mouse.wheel(0, 40); await page.waitForTimeout(16); }
+  await page.waitForTimeout(500);
+  await expect(page).toHaveURL(/scene=1/);
+
+  // 한 번 쉬었다가 다시 장면 끝에서 당기면 그다음 장면으로 간다.
+  await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+  await page.waitForTimeout(400);
+  for (let i = 0; i < 3; i++) await page.mouse.wheel(0, 100);
+  await expect(page).toHaveURL(/scene=2/);
+  await context.close();
+});

@@ -20,7 +20,7 @@ const FOOTER_HEIGHT = { desktop: 120, mobile: 104 };
 // ponytail: 바닥에서 더 당기는 고무줄의 최대 길이·저항·넘어가는 지점. 실기기에서 만져 보며 조정할 값.
 const PULL_MAX = 170;
 const PULL_RESISTANCE = 220;
-const PULL_TO_PASS = 0.55;
+const PULL_TO_PASS = 0.62;
 const WHEEL_RELEASE_MS = 350; // 천천히 굴리는 마우스 휠 칸 사이(0.2~0.3초)에 풀리지 않게
 // 휠: 바닥에서 이만큼 멈춰 있은 뒤, 잠깐 쉬었거나(간격) 느려지지 않는(새 스와이프·마우스 휠) 휠만 당기기로 본다.
 // 관성 스크롤은 계속 느려지기만 하므로 당기기로 잡히지 않는다.
@@ -143,11 +143,16 @@ export function SceneGrid({ photos, mobileColumns, positionKey, startAt, enterFr
     if (!el) return;
     let raw = 0;
     let armed = false;
-    let lastWheel = 0;
+    // 장면이 바뀌면 이 그리드가 새로 마운트된다. 넘어온 스크롤이 이어지는 동안(휠이 한 번 쉬기 전)에는 다음 장면 당김을
+    // 시작하지 않는다 — 한 번의 스크롤로 장면을 여러 개 건너뛰지 않게.
+    let lastWheel = performance.now();
+    let needPause = true;
     let lastWheelAbs = 0;
     let bottomSince = 0;
     let releaseTimer = 0;
     let touchY: number | null = null;
+    // 터치는 장면 끝에 멈춘 상태에서 새로 댄 손가락으로만 당긴다(스크롤하던 손가락이 그대로 다음 장면으로 넘어가지 않게).
+    let touchFromBottom = false;
     const atBottom = () => el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
     const atTop = () => el.scrollTop <= 0;
     let continuedUp = false;
@@ -187,12 +192,13 @@ export function SceneGrid({ photos, mobileColumns, positionKey, startAt, enterFr
       const dy = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * el.clientHeight : event.deltaY;
       const notSlowing = Math.abs(dy) >= Math.max(lastWheelAbs, 10); // 관성 꼬리는 같은 작은 값(7, 7…)이 반복되기도 한다
       lastWheelAbs = Math.abs(dy);
+      if (gap >= WHEEL_NEW_GESTURE_MS) needPause = false;
       if (!armed && continueUp(dy)) { event.preventDefault(); return; }
       if (!armed) {
         if (!atBottom()) { bottomSince = 0; return; }
         // 휠 없이 바닥에 머물러 있다가(간격이 충분히 길면) 다시 굴린 것도 멈춤을 거친 것으로 본다.
         if (!bottomSince) bottomSince = gap >= WHEEL_BOTTOM_DWELL_MS ? now - WHEEL_BOTTOM_DWELL_MS : now;
-        const fresh = now - bottomSince >= WHEEL_BOTTOM_DWELL_MS && (gap >= WHEEL_NEW_GESTURE_MS || notSlowing);
+        const fresh = !needPause && now - bottomSince >= WHEEL_BOTTOM_DWELL_MS && (gap >= WHEEL_NEW_GESTURE_MS || notSlowing);
         if (!fresh || !arm(dy)) return;
       }
       event.preventDefault();
@@ -202,14 +208,17 @@ export function SceneGrid({ photos, mobileColumns, positionKey, startAt, enterFr
       if (armed && distanceOf(raw) / PULL_MAX >= PULL_TO_PASS) release();
       else releaseTimer = window.setTimeout(release, WHEEL_RELEASE_MS);
     };
-    const onTouchStart = (event: TouchEvent) => { touchY = event.touches.length === 1 ? event.touches[0].clientY : null; };
+    const onTouchStart = (event: TouchEvent) => {
+      touchY = event.touches.length === 1 ? event.touches[0].clientY : null;
+      touchFromBottom = atBottom();
+    };
     const onTouchMove = (event: TouchEvent) => {
       if (touchY === null || event.touches.length !== 1) return;
       const y = event.touches[0].clientY;
       const dy = touchY - y;
       touchY = y;
       if (!armed && continueUp(dy)) { if (event.cancelable) event.preventDefault(); return; }
-      if (!armed && !arm(dy)) return;
+      if (!armed && (!touchFromBottom || !arm(dy))) return;
       if (event.cancelable) event.preventDefault();
       move(dy);
     };
