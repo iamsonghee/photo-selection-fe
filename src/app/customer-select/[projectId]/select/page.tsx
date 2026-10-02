@@ -27,7 +27,7 @@ import ui from "../../_lib/ui.module.css";
 import { SceneGrid, type MobileColumns } from "./SceneGrid";
 import { PhotoDetail } from "./PhotoDetail";
 import { InviteSheet, Sheet } from "./Sheets";
-import { useSceneAnalysis, type NamedScene } from "./useSceneAnalysis";
+import { taskProgressText, useSceneAnalysis, type NamedScene } from "./useSceneAnalysis";
 import { AiTidySheet, groupSimilarKey, rememberGroupSimilar, setAsideKey, type AiTidyKind } from "./AiTidySheet";
 import s from "./select.module.css";
 
@@ -275,16 +275,17 @@ function SelectScreen() {
   };
   const sceneDone = (index: number) => isOwner && targets[index] > 0 && pickedInScene(scenes![index]) >= targets[index];
 
-  const analysisPercent = analysis.status === "analyzing" && analysis.progress
-    ? Math.min(100, Math.round((analysis.progress.done / Math.max(1, analysis.progress.total)) * 100)) : null;
+  // 장면 정리 진행 막대는 이름 붙인 장면 수 기준(유사컷·흔들림은 따로 줄로 보이고 장면을 기다리게 하지 않는다).
+  const sceneTask = analysis.tasks.find((task) => task.kind === "scene" && task.status === "processing");
+  const analysisPercent = sceneTask?.total ? Math.min(100, Math.round((sceneTask.done / sceneTask.total) * 100)) : 0;
   const analysisBanner = analysis.status === "analyzing" ? (
     <div className={s.analysis} role="status">
       <Sparkles size={16} aria-hidden />
       <div>
-        <strong>AI가 장면을 나누고 있어요{analysisPercent !== null ? ` · ${analysisPercent}%` : ""}</strong>
+        <strong>AI가 장면을 나누고 있어요</strong>
+        {analysis.tasks.filter((task) => task.status === "processing").map((task) => <span key={task.kind}>{taskProgressText(task)}</span>)}
         <span>그동안 마음에 드는 사진에 ♡를 눌러 두세요. 정리가 끝나면 장면별로 모아서 보여드릴게요.</span>
-        {/* 진행 수는 사진 수가 아니라 작업량(사진 처리 + 장면 정리)이라 %로만 보인다. 첫 진행 기록 전에도 빈 막대를 둔다. */}
-        <i aria-hidden><b style={{ width: `${analysisPercent ?? 0}%` }} /></i>
+        <i aria-hidden><b style={{ width: `${analysisPercent}%` }} /></i>
       </div>
     </div>
   ) : analysis.status === "ready" && holdAll && !promptDismissed && scenes ? (
@@ -301,8 +302,11 @@ function SelectScreen() {
     </div>
   ) : null;
 
-  const failedNotice = analysis.status === "fallback" && analysis.failed && isOwner
-    ? <button type="button" className={s.quickNotice} onClick={() => setSheet("ai")}>AI 정리 실패 · 다시 시도</button>
+  // 장면 정리 실패, 유사컷·흔들림 실패·일부 실패(다시 시도), 뒤에서 진행 중인 작업을 한 줄로.
+  const failedNotice = analysis.notice && isOwner
+    ? analysis.notice.retry
+      ? <button type="button" className={s.quickNotice} onClick={() => setSheet("ai")}>{analysis.notice.text}</button>
+      : <span className={s.quickNotice} role="status">{analysis.notice.text}</span>
     : null;
   const sceneItems = scenes?.map((item, index) => (
     <button key={index} type="button" className={s.quickItem} aria-current={index === sceneIndex} onClick={() => goScene(index)}>

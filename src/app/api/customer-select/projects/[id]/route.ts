@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { buildProjectView, customerAccountName, getCurrentCustomerAuthUser, toAiScenes, resolveCustomerProjectAccess, shareTokenFromRequest } from "@/lib/customer-select-server";
 import { createClient } from "@/lib/supabase/server";
+import { allRows } from "@/lib/supabase-all-rows";
 import { isCustomerShootType as isProjectShootType } from "@/lib/customer-shoot-scenes";
 
 export const dynamic = "force-dynamic";
@@ -14,22 +15,24 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (access instanceof NextResponse) return access;
   const { project } = access;
 
-  const [photosRes, selectionsRes, participantsRes, qualityRes, opinionsRes] = await Promise.all([
-    admin.from("customer_photos").select("id, filename, order_index, thumb_url, preview_url, similarity_group_id, taken_at, taken_at_source").eq("project_id", id),
-    admin.from("customer_selections").select("photo_id, rating, color_tags, comment, is_selected").eq("project_id", id),
-    admin.from("customer_project_participants").select("color, nickname, done").eq("project_id", id),
-    admin.from("customer_quality_assessments").select("photo_id, eyes_closed, blur_or_shake, focus_issue, primary_subject_detected, people:raw_response->>people").eq("project_id", id),
-    admin.from("customer_participant_opinions").select("photo_id, participant_color, rating").eq("project_id", id),
-  ]);
-  if (photosRes.error || selectionsRes.error || participantsRes.error || qualityRes.error || opinionsRes.error) {
-    return NextResponse.json({ error: "조회 실패" }, { status: 500 });
-  }
+  const participantsQuery = admin.from("customer_project_participants").select("color, nickname, done").eq("project_id", id);
+  // 사진별 행(사진·셀렉·판정·의견)은 1,000행을 넘을 수 있어(한도 2,000장) 나눠 끝까지 읽는다.
+  const loaded = await Promise.all([
+    allRows((from, to) => admin.from("customer_photos").select("id, filename, order_index, thumb_url, preview_url, similarity_group_id, taken_at, taken_at_source").eq("project_id", id).order("id").range(from, to)),
+    allRows((from, to) => admin.from("customer_selections").select("photo_id, rating, color_tags, comment, is_selected").eq("project_id", id).order("id").range(from, to)),
+    allRows((from, to) => admin.from("customer_quality_assessments").select("photo_id, eyes_closed, blur_or_shake, focus_issue, primary_subject_detected, people:raw_response->>people").eq("project_id", id).order("id").range(from, to)),
+    allRows((from, to) => admin.from("customer_participant_opinions").select("photo_id, participant_color, rating").eq("project_id", id).order("photo_id").order("participant_color").range(from, to)),
+  ]).catch(() => null);
+  if (!loaded) return NextResponse.json({ error: "조회 실패" }, { status: 500 });
+  const [photos, selections, quality, opinions] = loaded;
+  const participantsRes = await participantsQuery;
+  if (participantsRes.error) return NextResponse.json({ error: "조회 실패" }, { status: 500 });
   // AI 장면은 따로 읽고, 읽지 못하면(장면 테이블 마이그레이션 전 등) 장면 없이 내려준다 — 프로젝트 조회는 깨지지 않는다.
-  const [scenesRes, sceneAssignmentsRes] = await Promise.all([
+  const [scenesRes, sceneAssignments] = await Promise.all([
     admin.from("customer_scenes").select("id, scene_index, name, start_at, end_at").eq("project_id", id),
-    admin.from("customer_photos").select("id, scene_id").eq("project_id", id).not("scene_id", "is", null),
+    allRows((from, to) => admin.from("customer_photos").select("id, scene_id").eq("project_id", id).not("scene_id", "is", null).order("id").range(from, to)).catch(() => null),
   ]);
-  const aiScenes = scenesRes.error || sceneAssignmentsRes.error ? null : toAiScenes(scenesRes.data ?? [], sceneAssignmentsRes.data ?? [], photosRes.data ?? []);
+  const aiScenes = scenesRes.error || !sceneAssignments ? null : toAiScenes(scenesRes.data ?? [], sceneAssignments, photos);
   // 소유자 이름이 비어 있으면 로그인 계정 이름으로 한 번 채운다 — 함께 고르는 사람에게 "나"·빈 이름 대신 보이게(이후 아바타에서 수정).
   let participants = participantsRes.data ?? [];
   const ownerRow = participants.find((row) => row.color === "red");
@@ -41,7 +44,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       if (!nameError) participants = [...participants.filter((row) => row.color !== "red"), { color: "red", nickname: accountName, done: ownerRow?.done ?? false }];
     }
   }
-  const projectView = buildProjectView(project, photosRes.data ?? [], selectionsRes.data ?? [], participants, qualityRes.data ?? [], opinionsRes.data ?? [], aiScenes);
+  const projectView = buildProjectView(project, photos, selections, participants, quality, opinions, aiScenes);
   if (!access.isOwner) projectView.shareToken = "";
   return NextResponse.json(
     { project: projectView, isOwner: access.isOwner },

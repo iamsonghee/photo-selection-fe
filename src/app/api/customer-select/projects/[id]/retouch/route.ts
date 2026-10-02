@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
+import { allRows } from "@/lib/supabase-all-rows";
 import { resolveCustomerProjectAccess, shareTokenFromRequest } from "@/lib/customer-select-server";
 
 export const dynamic = "force-dynamic";
@@ -31,15 +32,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (access instanceof NextResponse) return access;
   const { project } = access;
 
-  const [photosRes, selectionsRes] = await Promise.all([
-    admin.from("customer_photos").select("id, filename, thumb_url, preview_url").eq("project_id", id),
-    admin.from("customer_selections").select("photo_id").eq("project_id", id).eq("is_selected", true),
+  // 사진은 1,000장을 넘을 수 있어(한도 2,000장) 나눠 끝까지 읽는다 — 잘리면 뒤쪽에서 고른 사진이 빠진다.
+  const [projectPhotos, selections] = await Promise.all([
+    allRows((from, to) => admin.from("customer_photos").select("id, filename, thumb_url, preview_url").eq("project_id", id).order("id").range(from, to)).catch(() => null),
+    allRows((from, to) => admin.from("customer_selections").select("photo_id").eq("project_id", id).eq("is_selected", true).order("id").range(from, to)).catch(() => null),
   ]);
-  if (photosRes.error || selectionsRes.error) {
+  if (!projectPhotos || !selections) {
     return NextResponse.json({ error: "조회 실패" }, { status: 500 });
   }
-  const selectedIds = new Set((selectionsRes.data ?? []).map((s) => s.photo_id));
-  const selectedPhotos = (photosRes.data ?? []).filter((p) => selectedIds.has(p.id));
+  const selectedIds = new Set(selections.map((s) => s.photo_id));
+  const selectedPhotos = projectPhotos.filter((p) => selectedIds.has(p.id));
 
   const versionsRes = await admin
     .from("customer_photo_versions")

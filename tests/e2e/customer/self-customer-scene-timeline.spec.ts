@@ -584,9 +584,12 @@ test("real AI scenes: named scenes from the server, new photos collected, re-tid
     { name: "예식", start: data.photos[30].takenAt, end: data.photos[59].takenAt, photoIds: data.photos.slice(30, 60).map((photo) => photo.id) },
   ];
   await mock(page, data);
-  const started: unknown[] = [];
+  const started: { kind: string | undefined; body: unknown }[] = [];
   await page.route(`**/api/customer-select/projects/${PROJECT_ID}/ai/*`, async (route) => {
-    if (route.request().method() === "POST") { started.push(route.request().postDataJSON()); return route.fulfill({ json: { status: "processing" } }); }
+    if (route.request().method() === "POST") {
+      started.push({ kind: new URL(route.request().url()).pathname.split("/").pop(), body: route.request().postDataJSON() });
+      return route.fulfill({ json: { status: "processing" } });
+    }
     return route.fulfill({ json: { status: "completed" } });
   });
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=off`);
@@ -601,23 +604,55 @@ test("real AI scenes: named scenes from the server, new photos collected, re-tid
   await retidy.click();
   await page.getByRole("button", { name: "정리 시작" }).click();
   await expect.poll(() => started.length).toBeGreaterThan(0);
-  const similarity = started.find((body) => Array.isArray((body as { sceneNames?: unknown }).sceneNames)) as { sceneNames: string[] };
-  expect(similarity.sceneNames).toContain("식전·신부 대기실");
+  // 장면 정리는 별도 실행(scene)이고 장면 이름 목록은 그 요청에만 실린다.
+  const scene = started.find((item) => item.kind === "scene")?.body as { sceneNames: string[] };
+  expect(scene.sceneNames).toContain("식전·신부 대기실");
+  expect(started.map((item) => item.kind).sort()).toEqual(["quality", "scene", "similarity"]);
   await context.close();
 });
 
-test("analysis banner shows real progress summed across the running runs", async ({ browser }) => {
+// 진행 중 실행 응답: 장면은 이름 붙일 장면 6개 중 3개, 유사컷 90장 중 30장, 흔들림 90장 중 60장.
+const RUNNING: Record<string, { image_count: number; processed_count: number }> = {
+  scene: { image_count: 6, processed_count: 3 }, similarity: { image_count: 90, processed_count: 30 }, quality: { image_count: 90, processed_count: 60 },
+};
+
+test("analysis banner shows each running step separately", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
-  // 유사컷·장면 90장 중 30장, 흔들림·눈 감음 90장 중 60장 처리 → 90 / 180장.
   await page.route(`**/api/customer-select/projects/${PROJECT_ID}/ai/*`, (route) => {
-    const kind = new URL(route.request().url()).pathname.split("/").pop();
-    return route.fulfill({ json: { status: "processing", run: { image_count: 90, processed_count: kind === "similarity" ? 30 : 60 } } });
+    const kind = new URL(route.request().url()).pathname.split("/").pop()!;
+    return route.fulfill({ json: { status: "processing", run: RUNNING[kind] } });
   });
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=off`);
   const banner = page.getByRole("status").filter({ hasText: "AI가 장면을 나누고 있어요" });
-  await expect(banner).toContainText("90 / 180장");
+  await expect(banner).toContainText("장면 이름 붙이는 중 · 3 / 6");
+  await expect(banner).toContainText("비슷한 사진 묶는 중 · 30 / 90장");
+  await expect(banner).toContainText("흔들림·눈 감음 확인 중 · 60 / 90장");
+  await context.close();
+});
+
+test("scenes show before similar-photo grouping finishes", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  const data = project() as ReturnType<typeof project> & { aiScenes?: unknown };
+  data.aiScenes = [
+    { name: "입장", start: data.photos[0].takenAt, end: data.photos[44].takenAt, photoIds: data.photos.slice(0, 45).map((photo) => photo.id) },
+    { name: "예식", start: data.photos[45].takenAt, end: data.photos[89].takenAt, photoIds: data.photos.slice(45, 90).map((photo) => photo.id) },
+  ];
+  await mock(page, data);
+  // 장면 정리는 끝났고 유사컷 묶기만 진행 중 → 장면은 바로 보이고, 유사컷 진행은 장면 목록 아래 한 줄로.
+  await page.route(`**/api/customer-select/projects/${PROJECT_ID}/ai/*`, (route) => {
+    const kind = new URL(route.request().url()).pathname.split("/").pop()!;
+    if (kind === "similarity") return route.fulfill({ json: { status: "processing", run: RUNNING.similarity } });
+    return route.fulfill({ json: { status: "completed", run: { image_count: 2, processed_count: 2, failed_count: 0 } } });
+  });
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=off`);
+  const rail = page.getByRole("navigation", { name: "장면" }).first();
+  await expect(rail.getByRole("button", { name: /^입장/ })).toBeVisible();
+  await expect(rail.getByRole("status")).toHaveText("비슷한 사진 묶는 중 · 30 / 90장");
+  await expect(page.getByText("AI가 장면을 나누고 있어요")).toHaveCount(0);
   await context.close();
 });

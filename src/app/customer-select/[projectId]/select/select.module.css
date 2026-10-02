@@ -335,3 +335,4 @@
   .panelActions > :last-child { flex: 1; }
   .shortcutHint { display: none; }
 }
+span.quickNotice { text-decoration: none; cursor: default; }

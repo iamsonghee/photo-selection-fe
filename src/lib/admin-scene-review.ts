@@ -1,6 +1,7 @@
 import "server-only";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { customerSceneCatalog } from "@/lib/customer-shoot-scenes";
+import { allRows } from "@/lib/supabase-all-rows";
 import type { LabeledScene } from "@/lib/scene-label-score";
 
 /** 장면 검수(/admin/scenes)용 서버 조회. 서비스 화면 데이터는 읽기만 하고, 정답은 customer_scene_labels에만 쓴다. */
@@ -8,20 +9,9 @@ import type { LabeledScene } from "@/lib/scene-label-score";
 export type ReviewPhoto = { id: string; thumbUrl: string | null; takenAt: string | null; filename: string };
 export type SceneLabelRow = { project_id: string; shoot_type: string | null; scenes: LabeledScene[]; ai_scenes: LabeledScene[] | null; note: string | null; labeled_by: string; updated_at: string };
 
-// clip-service `ai_settings`에 함께 남기는 현재 AI 설정 — 기준값을 바꾸면 여기도 바꾼다(채점 비교용 기록).
-export const CURRENT_AI_SETTINGS = { gapMinutes: 3, qualityPromptVersion: "v1-people" } as const;
+// 장면 실행 settings가 없을 때(2026-10-03 장면 실행 분리 전에 만든 장면) 검수 라벨 `ai_settings`에 남기는 값 — 그때 규칙(gap-v1).
+export const LEGACY_AI_SETTINGS = { algorithm: "gap-v1", gapMinutes: 3, qualityPromptVersion: "v1-people" } as const;
 
-const PAGE = 1000; // PostgREST 기본 최대 행 수
-
-async function allRows<T>(query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
-  const rows: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await query(from, from + PAGE - 1);
-    if (error) throw error;
-    rows.push(...(data ?? []));
-    if (!data || data.length < PAGE) return rows;
-  }
-}
 
 /** clip-service capture_order와 같은 순서: 촬영 시각(없으면 뒤로), 같으면 업로드 순 */
 function byCaptureOrder<T extends { taken_at: string | null; order_index: number }>(a: T, b: T) {

@@ -17,6 +17,9 @@
 `YYYY-MM-DDTHH:mm:ss`이며 `files`와 같은 순서의 JSON 배열로 `taken_at` 폼 필드에 실어 보낸다. BE는
 형식이 맞는 값만 `customer_photos.taken_at`(timestamp, 시간대 없음)에 저장하고, 틀린 값은 버릴 뿐
 업로드를 실패시키지 않는다(`_parse_taken_at`). 2026-10-01 이전 사진은 NULL이다.
+2026-10-03부터 출처도 같은 순서의 `taken_at_source` 폼 필드(`"exif"` | `"file"`)로 보내 `customer_photos.taken_at_source`에
+저장한다. `"file"`(EXIF가 없어 `lastModified`로 대신한 값 — HEIC·카카오톡·스크린샷 등)은 정렬 참고용일 뿐 장면 경계·촬영 시각 비율에는
+쓰지 않는다(`scene_taken_at`/`sceneTime`). 그 전 사진은 출처가 NULL이고 기존처럼 그대로 쓴다.
 
 진단·대기 안내(2026-10-01): BE는 배치마다 `customer upload timing` 한 줄로 인증·한도 확인, 파일 읽기, 사진 처리
 전체와 디코딩·R2 업로드 최대 시간, DB 저장, 전체 시간을 남긴다. 평소에는 info 로그이고, 전체가

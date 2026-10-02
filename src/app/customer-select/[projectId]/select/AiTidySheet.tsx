@@ -6,14 +6,14 @@ import { PhotographerLightButton } from "@/components/photographer/PhotographerL
 import { Sheet } from "./Sheets";
 import s from "./select.module.css";
 
-export type AiTidyKind = "similarity" | "quality";
+export type AiTidyKind = "scene" | "similarity" | "quality";
 
-/** AI 정리 시작. 유사컷 분석은 이어서 장면도 만들므로 촬영 종류의 장면 이름 목록을 함께 보낸다. */
+/** AI 정리 시작. 장면 정리에는 촬영 종류의 장면 이름 목록을 함께 보낸다. 각 작업은 따로 돌고 따로 끝난다. */
 export function startAiTidy(projectId: string, kinds: AiTidyKind[], shootType: string) {
   return Promise.all(kinds.map((kind) => fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(kind === "similarity" ? { sceneNames: customerSceneCatalog(shootType) } : {}),
+    body: JSON.stringify(kind === "scene" ? { sceneNames: customerSceneCatalog(shootType) } : {}),
   })));
 }
 
@@ -41,8 +41,8 @@ export function AiTidySheet({ projectId, photoCount, pending, error, onStart, on
 }) {
   const [similar, setSimilar] = useState(true);
   const [quality, setQuality] = useState(true);
-  // ponytail: 장면 정리 전용 엔진이 아직 없어 장면은 유사컷 분석 요청으로 시작한다. 엔진이 생기면 별도 kind로 나눈다.
-  const kinds: AiTidyKind[] = ["similarity", ...(quality ? ["quality" as const] : [])];
+  // 끈 항목은 실행하지 않는다(유사컷을 끄면 전체 사진 임베딩도 하지 않음).
+  const kinds: AiTidyKind[] = ["scene", ...(similar ? ["similarity" as const] : []), ...(quality ? ["quality" as const] : [])];
 
   return (
     <Sheet title="AI로 사진 정리" onClose={onClose}>
@@ -50,7 +50,7 @@ export function AiTidySheet({ projectId, photoCount, pending, error, onStart, on
       <div className={s.tidyOptions}>
         <label className={s.tidyOption}>
           <input type="checkbox" checked disabled />
-          <span><strong>장면별로 나누기</strong><small>촬영 흐름에 맞춰 장면으로 나누고 이름을 붙여요</small></span>
+          <span><strong>장면별로 나누기</strong><small>촬영 시간 간격으로 나누고 장면 이름을 추천해요</small></span>
           <em>기본</em>
         </label>
         <label className={s.tidyOption}>

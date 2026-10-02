@@ -150,11 +150,11 @@ export default function CustomerUploadPage() {
 
   useEffect(() => {
     if (!hydrated) return;
-    void Promise.all(["similarity", "quality"].map(async (kind) => {
+    void Promise.all(["scene", "similarity", "quality"].map(async (kind) => {
       const response = await fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`);
       return response.ok ? (await response.json()).status as string | null : null;
     })).then((statuses) => {
-      const processingKinds = ["similarity", "quality"].filter((_, index) => statuses[index] === "processing");
+      const processingKinds = ["scene", "similarity", "quality"].filter((_, index) => statuses[index] === "processing");
       if (processingKinds.length > 0) {
         setAiAnalyzing(true);
         void pollAiAnalysis(processingKinds);
@@ -352,7 +352,7 @@ export default function CustomerUploadPage() {
       // 고르기 화면 보기 설정도 AI 정리 시트의 기본값과 같게: 유사컷 묶기·흔들림 빼기 켬.
       rememberGroupSimilar(projectId, true);
       try { localStorage.setItem(setAsideKey(projectId), "1"); } catch {}
-      const responses = await startAiTidy(projectId, ["similarity", "quality"], project.shootType);
+      const responses = await startAiTidy(projectId, ["scene", "similarity", "quality"], project.shootType);
       if (!responses.some((response) => response.ok)) throw new Error("AI 정리를 시작하지 못했어요. 잠시 후 다시 시도하거나 원본 그대로 골라 주세요.");
       router.push(`/customer-select/${projectId}/select`);
     } catch (e) {

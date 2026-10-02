@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminUser } from "@/lib/admin-auth";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { CURRENT_AI_SETTINGS, loadSceneReview } from "@/lib/admin-scene-review";
+import { LEGACY_AI_SETTINGS, loadSceneReview } from "@/lib/admin-scene-review";
 import type { LabeledScene } from "@/lib/scene-label-score";
 
 /**
  * POST /api/admin/scene-labels — 관리자 전용. 장면 검수 정답을 저장(프로젝트당 한 건, 덮어쓰기).
- * 그 시점의 AI 장면과 AI 설정을 함께 남겨 나중에 채점한다. 서비스 화면의 장면은 바꾸지 않는다.
+ * 그 시점의 AI 장면과, 그 장면을 만든 장면 실행의 설정(clip-service가 실행에 남긴 기준값·이름 목록·모델·프롬프트 버전)을
+ * 함께 남겨 나중에 설정끼리 채점한다. 서비스 화면의 장면은 바꾸지 않는다.
  */
 export async function POST(req: NextRequest) {
   const auth = await getAdminUser();
@@ -33,12 +34,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "사진 목록이 바뀌었어요. 새로고침한 뒤 다시 검수해 주세요." }, { status: 409 });
   }
 
-  const { error } = await getAdminClient().from("customer_scene_labels").upsert({
+  const admin = getAdminClient();
+  const { data: run } = await admin.from("customer_ai_runs").select("settings").eq("project_id", review.project.id)
+    .eq("kind", "scene").eq("status", "completed").order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const { error } = await admin.from("customer_scene_labels").upsert({
     project_id: review.project.id,
     shoot_type: review.project.shootType,
     scenes,
     ai_scenes: review.aiScenes,
-    ai_settings: { ...CURRENT_AI_SETTINGS, catalog: review.catalog },
+    ai_settings: run?.settings ?? { ...LEGACY_AI_SETTINGS, catalog: review.catalog },
     note: typeof body.note === "string" ? body.note.slice(0, 1000) : null,
     labeled_by: auth.email,
     updated_at: new Date().toISOString(),

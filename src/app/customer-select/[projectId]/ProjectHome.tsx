@@ -68,7 +68,7 @@ export function ProjectHome({ projectId, retouchDone }: { projectId: string; ret
     // 업로드 완료 안내의 "AI로 정리하고 고르기"와 같은 기본값 — 정리를 시작하고 고르기 화면에서 진행을 본다.
     rememberGroupSimilar(projectId, true);
     try { localStorage.setItem(setAsideKey(projectId), "1"); } catch {}
-    const failed = await analysis.start(["similarity", "quality"]);
+    const failed = await analysis.start(["scene", "similarity", "quality"]);
     if (failed) setTidyError(failed);
     else router.push(`/customer-select/${projectId}/select`);
   }

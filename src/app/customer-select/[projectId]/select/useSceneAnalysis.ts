@@ -19,11 +19,27 @@ export type NamedScene = Scene & { name: string | null };
  */
 export type SceneAnalysis =
   | { status: "none"; scenes: null }
-  | { status: "analyzing"; progress: { done: number; total: number } | null; scenes: null }
+  | { status: "analyzing"; scenes: null }
   | { status: "ready"; scenes: NamedScene[] | null }
   | { status: "fallback"; failed: boolean; scenes: NamedScene[] | null };
 
+/** 최근 실행 하나(장면·유사컷·흔들림 각각). done/total: 장면은 이름 붙인 장면 수, 나머지는 사진 수. */
+export type AiTask = { kind: AiTidyKind; status: "processing" | "completed" | "failed"; done: number; total: number; failed: number };
+
+const TASK_LABELS: Record<AiTidyKind, string> = { scene: "장면 이름 붙이기", similarity: "비슷한 사진 묶기", quality: "흔들림·눈 감음 확인" };
+
+/** 진행 중인 작업 한 줄: "장면 이름 붙이는 중 · 3 / 6", "비슷한 사진 묶는 중 · 840 / 2,000장". */
+export function taskProgressText(task: AiTask): string {
+  const count = `${task.done.toLocaleString()} / ${task.total.toLocaleString()}`;
+  if (task.kind === "scene") return task.total ? `장면 이름 붙이는 중 · ${count}` : "장면 나누는 중";
+  return `${task.kind === "similarity" ? "비슷한 사진 묶는 중" : "흔들림·눈 감음 확인 중"}${task.total ? ` · ${count}장` : ""}`;
+}
+
 export type SceneAnalysisControl = SceneAnalysis & {
+  /** 최근 실행들. 장면이 끝난 뒤에도 유사컷·흔들림이 진행 중이거나 일부 실패했는지 보여줄 때 쓴다. */
+  tasks: AiTask[];
+  /** 장면 화면에 작게 띄울 안내(뒤에서 진행 중인 작업, 실패·일부 실패). retry면 누르면 다시 정리를 연다. */
+  notice: { text: string; retry: boolean } | null;
   /** 화면에 쓸 사진 목록. 시안 모드 완료 상태에서는 가짜 유사컷 묶음·흔들림/눈 감음 값이 붙는다. */
   photos: Photo[];
   /** AI 장면이 있을 때, 정리 뒤 새로 올려 어느 장면에도 없는 사진 수(다시 정리 안내용) */
@@ -80,6 +96,19 @@ function namedFromAi(aiScenes: NonNullable<ProjectView["aiScenes"]>, photos: Pho
   return { scenes: scenes.filter((scene) => scene.photoIds.length), newCount: fresh.length };
 }
 
+/** 장면 화면의 작은 안내 한 줄: 장면 정리 실패 > 다른 작업 실패·일부 실패 > 뒤에서 진행 중. 장면 정리 중이면 배너가 대신 보인다. */
+function noticeOf(result: SceneAnalysis, tasks: AiTask[]): SceneAnalysisControl["notice"] {
+  if (result.status === "analyzing" || result.status === "none") return null;
+  if (result.status === "fallback" && result.failed) return { text: "AI 정리 실패 · 다시 시도", retry: true };
+  const failed = tasks.find((task) => task.status === "failed" || (task.status === "completed" && task.failed > 0));
+  if (failed) {
+    const unit = failed.kind === "scene" ? "개 장면" : "장";
+    return { text: `${TASK_LABELS[failed.kind]} ${failed.status === "failed" ? "실패" : `${failed.failed.toLocaleString()}${unit} 못 함`} · 다시 시도`, retry: true };
+  }
+  const running = tasks.find((task) => task.status === "processing");
+  return running ? { text: taskProgressText(running), retry: false } : null;
+}
+
 export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: string, aiScenes?: ProjectView["aiScenes"], onCompleted?: () => void): SceneAnalysisControl {
   const searchParams = useSearchParams();
   // 시안 확인용 `?mockAnalysis=`는 개발 환경에서만 받고, 같은 탭의 다른 화면(보내기)에서도 이어지도록 세션에 기억한다.
@@ -101,10 +130,11 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
   const ai = useMemo(() => (aiScenes?.length ? namedFromAi(aiScenes, photos) : null), [aiScenes, photos]);
   const unnamed = useMemo<NamedScene[] | null>(() => timeScenes?.map((scene) => ({ ...scene, name: null })) ?? null, [timeScenes]);
 
-  // 실제 상태(유사컷 분석 상태 API): 진행 중이면 analyzing, 완료면 시간 장면, 실패면 시간 장면+다시 시도, 기록이 없으면 none.
+  // 실제 상태(장면 정리 실행 상태 API): 진행 중이면 analyzing, 완료면 AI 장면(없으면 시간 장면), 실패면 시간 장면+다시 시도, 기록이 없으면 none.
+  // 장면 실행이 따로 생기기 전(2026-10-03 전)에 정리한 프로젝트는 장면 실행 기록이 없지만 저장된 AI 장면이 있으면 그대로 ready.
   const [remote, setRemote] = useState<"none" | "processing" | "completed" | "failed">("none");
-  // 진행 중인 분석(유사컷·장면 + 흔들림·눈 감음)의 처리 장수 합 — clip-service가 진행하면서 기록한다.
-  const [remoteProgress, setRemoteProgress] = useState<{ done: number; total: number } | null>(null);
+  // 장면·유사컷·흔들림 각 최근 실행 — clip-service가 진행하면서 처리 수를 기록한다.
+  const [tasks, setTasks] = useState<AiTask[]>([]);
   const [pollKey, setPollKey] = useState(0);
   const onCompletedRef = useRef(onCompleted);
   useEffect(() => { onCompletedRef.current = onCompleted; }, [onCompleted]);
@@ -112,29 +142,28 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
     if (mock) return;
     let cancelled = false;
     let timer = 0;
-    let wasProcessing = false;
-    type RunStatus = { status: string | null; run?: { image_count?: number; processed_count?: number } | null } | null;
+    let wasRunning = new Set<AiTidyKind>();
+    type RunStatus = { status: AiTask["status"] | null; run?: { image_count?: number; processed_count?: number; failed_count?: number } | null } | null;
+    const kinds: AiTidyKind[] = ["scene", "similarity", "quality"];
     const read = async (kind: AiTidyKind): Promise<RunStatus> => {
       const response = await fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`, { cache: "no-store" });
       return response.ok ? await response.json() as RunStatus : null;
     };
     const poll = async () => {
       try {
-        const [similarity, quality] = await Promise.all([read("similarity"), read("quality")]);
+        const runs = await Promise.all(kinds.map(read));
         if (cancelled) return;
-        const status = similarity?.status ?? null;
-        const next = status === "processing" ? "processing" : status === "failed" ? "failed" : status === "completed" ? "completed" : "none";
-        const running = [similarity, quality].filter((item) => item?.status === "processing" && (item.run?.image_count ?? 0) > 0);
-        const anyRunning = similarity?.status === "processing" || quality?.status === "processing";
-        // 이 화면에서 정리(품질 판정까지)가 끝나면 새 장면·유사컷·품질 결과를 다시 읽는다.
-        if (wasProcessing && !anyRunning) onCompletedRef.current?.();
-        wasProcessing = anyRunning;
-        setRemote(next);
-        setRemoteProgress(running.length ? {
-          done: running.reduce((sum, item) => sum + (item!.run?.processed_count ?? 0), 0),
-          total: running.reduce((sum, item) => sum + (item!.run?.image_count ?? 0), 0),
-        } : null);
-        if (anyRunning) timer = window.setTimeout(poll, POLL_MS);
+        const next = runs.flatMap((item, index): AiTask[] => item?.status ? [{
+          kind: kinds[index], status: item.status,
+          done: item.run?.processed_count ?? 0, total: item.run?.image_count ?? 0, failed: item.run?.failed_count ?? 0,
+        }] : []);
+        const running = new Set(next.filter((task) => task.status === "processing").map((task) => task.kind));
+        // 작업 하나가 끝날 때마다 결과(장면·유사컷·품질)를 다시 읽는다 — 장면은 유사컷·흔들림을 기다리지 않고 먼저 보인다.
+        if ([...wasRunning].some((kind) => !running.has(kind))) onCompletedRef.current?.();
+        wasRunning = running;
+        setRemote(runs[0]?.status ?? "none");
+        setTasks(next);
+        if (running.size) timer = window.setTimeout(poll, POLL_MS);
       } catch {
         if (!cancelled) setRemote("none");
       }
@@ -171,14 +200,16 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
   return useMemo(() => {
     const result: SceneAnalysis =
       mock === "ready" || (mock === "analyzing" && mockDone >= 1) ? { status: "ready", scenes: mockNamedScenes(timeScenes, shootType) }
-      : mock === "analyzing" ? { status: "analyzing", progress: { done: Math.round(photos.length * mockDone), total: photos.length }, scenes: null }
+      : mock === "analyzing" ? { status: "analyzing", scenes: null }
       : mock === "failed" ? { status: "fallback", failed: true, scenes: unnamed }
       : mock === "none" ? { status: "none", scenes: null }
-      : remote === "processing" ? { status: "analyzing", progress: remoteProgress, scenes: null }
+      : remote === "processing" ? { status: "analyzing", scenes: null }
       // 저장된 AI 장면(이름 포함)이 있으면 그걸, 없으면(장면 근거 부족·실패) 시각 공백 장면.
       : ai && remote !== "failed" ? { status: "ready", scenes: ai.scenes }
       : remote === "completed" || remote === "failed" ? { status: "fallback", failed: remote === "failed", scenes: ai?.scenes ?? unnamed }
       : { status: "none", scenes: null };
-    return { ...result, photos: mock && result.status === "ready" ? mockAiPhotos : photos, newPhotoCount: mock ? 0 : ai?.newCount ?? 0, start };
-  }, [ai, mock, mockAiPhotos, mockDone, photos, remote, remoteProgress, shootType, start, timeScenes, unnamed]);
+    const shownTasks: AiTask[] = mock === "analyzing" && mockDone < 1
+      ? [{ kind: "scene", status: "processing", done: Math.round(6 * mockDone), total: 6, failed: 0 }] : mock ? [] : tasks;
+    return { ...result, tasks: shownTasks, notice: noticeOf(result, shownTasks), photos: mock && result.status === "ready" ? mockAiPhotos : photos, newPhotoCount: mock ? 0 : ai?.newCount ?? 0, start };
+  }, [ai, mock, mockAiPhotos, mockDone, photos, remote, tasks, shootType, start, timeScenes, unnamed]);
 }
