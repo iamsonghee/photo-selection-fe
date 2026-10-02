@@ -40,8 +40,10 @@ export function scoreScenes(label: LabeledScene[], ai: LabeledScene[]): SceneSco
   const indexOf = new Map(order.map((id, index) => [id, index]));
   const gt = boundaries(label, indexOf);
   const pred = boundaries(ai, indexOf);
-  const aiName = new Map(ai.flatMap((scene) => scene.photoIds.map((id) => [id, scene.name] as const)));
-  const named = label.flatMap((scene) => (scene.name ? scene.photoIds.map((id) => [id, scene.name] as const) : []));
+  // 같은 이름이 두 번 나오면 AI가 "야외 1"·"야외 2"로 번호를 붙인다 — 이름 정확도는 번호를 떼고 비교한다.
+  const base = (name: string | null) => name?.replace(/ \d+$/, "") ?? null;
+  const aiName = new Map(ai.flatMap((scene) => scene.photoIds.map((id) => [id, base(scene.name)] as const)));
+  const named = label.flatMap((scene) => (scene.name ? scene.photoIds.map((id) => [id, base(scene.name)] as const) : []));
   return {
     boundaryPrecision: pred.length ? matched(pred, gt) / pred.length : gt.length ? 0 : 1,
     boundaryRecall: gt.length ? matched(gt, pred) / gt.length : 1,

@@ -13,7 +13,7 @@ assert.equal(customerShootTypeLabel("wedding"), "웨딩");
 assert.equal(customerShootTypeLabel(null), "촬영 종류 미입력");
 
 // 장면 목록은 촬영 종류별로 시간 순서대로 관리하고, 목록이 없는 종류는 빈 배열이다.
-assert.deepEqual(customerSceneCatalog("wedding_ceremony").slice(0, 3), ["식전·신부 대기실", "입장", "예식"]);
+assert.deepEqual(customerSceneCatalog("wedding_ceremony").slice(0, 3), ["식전·신부 대기실", "입장", "예식(주례·서약)"]);
 assert.deepEqual(customerSceneCatalog("wedding"), []);
 assert.deepEqual(customerSceneCatalog("etc"), []);
 assert.equal(new Set(CUSTOMER_SHOOT_TYPES.map(({ value }) => value)).size, CUSTOMER_SHOOT_TYPES.length);

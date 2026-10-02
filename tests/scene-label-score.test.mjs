@@ -21,3 +21,6 @@ assert.equal(scoreScenes([{ name: null, photoIds: ids(0, 10) }], [{ name: null, 
 assert.equal(scoreScenes([{ name: null, photoIds: ids(0, 10) }], [{ name: null, photoIds: ids(0, 5) }, { name: null, photoIds: ids(5, 10) }]).boundaryPrecision, 0);
 
 console.log("scene-label-score ok");
+
+// AI가 같은 이름에 붙인 번호("야외 1")는 떼고 이름을 비교한다.
+assert.equal(scoreScenes([{ name: "야외", photoIds: ids(0, 10) }], [{ name: "야외 1", photoIds: ids(0, 10) }]).nameAccuracy, 1);
