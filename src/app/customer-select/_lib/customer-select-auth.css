@@ -7,3 +7,8 @@
 .cs-auth .auth-modal-header { justify-content:flex-end; }
 .cs-auth :is(.auth-modal-logo,.auth-modal-headline) { font-family:inherit; letter-spacing:-.04em; }
 .cs-auth .auth-modal-btn-google { border:1px solid #dededb; }
+/* 모바일에서만: 원본 업로드는 PC 권장(사진 수백 장을 휴대폰으로 올리기 어렵다). */
+.cs-auth .cs-auth-mobile-tip { display: none; }
+@media (max-width: 767px) {
+  .cs-auth .cs-auth-mobile-tip { display: block; margin-top: 6px; font-size: 12px; font-weight: 600; color: #191918; }
+}
