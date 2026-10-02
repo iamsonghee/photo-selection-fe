@@ -457,6 +457,51 @@ CSV/TXT 다운로드까지 정상 동작했고 가로 오버플로와 콘솔 오
 6개 시나리오로 검증했다. 실제 DB/R2 왕복과 Safari/Firefox 검증은 공개 전 별도로 진행한다.
 
 
+## AI 정리 개요와 조정 지점 (2026-10-02 기준)
+
+셀프 고객의 "AI 정리"가 무엇을 어떻게 판단하는지, 값을 바꾸려면 어디를 고치는지 한곳에 모은다. 값은 실제 촬영(돌잔치 528장)으로 확인하며 정했고, 앞으로 장면 검수(아래)로 계속 조정한다.
+
+### 흐름
+
+1. **업로드(FE)**: 압축 전에 원본 EXIF 촬영 시각(`DateTimeOriginal` → `DateTime` → 파일 수정 시각)을 읽어 `customer_photos.taken_at`에 저장한다(`src/lib/exif-taken-at.ts`, `docs/upload-flow.md`). 작가 쪽 사진에는 촬영 시각이 없다(보류 과제).
+2. **AI 정리 시작**: `similarity` 실행이 유사컷 → 장면을, `quality` 실행이 흔들림·눈 감음·인물 구성을 판정한다(clip-service `customer_ai.py`). 시작할 때 FE가 촬영 종류의 장면 이름 목록을 함께 보낸다.
+3. **유사컷**: Gemini 임베딩(이미 계산한 사진은 재사용) → 촬영 순서로 늘어놓고 이웃끼리 유사도로 묶는다.
+4. **장면**: 촬영 시각 공백으로 나눔 → 장면마다 대표 3장을 Gemini Flash에 보여 이름 목록 중 하나를 고르게 함 → 바로 이어진 장면의 이름이 같으면 합침.
+5. **품질·인물**: 사진마다 Gemini Flash 1회. 흔들림·초점·눈 감음·얼굴 가림·주 피사체 + 셀프 고객 전용 인물 구성(`people`).
+6. **화면 해석(FE)**: 판정 값을 어떻게 보여줄지는 FE가 정한다(아래 표의 "화면 해석").
+
+### 조정 지점
+
+| 무엇 | 현재 값 | 위치 | 이유·주의 |
+|---|---|---|---|
+| 장면 경계: 촬영 시각 공백 | 3분 이상 | BE `clip-service/app/scenes.py` `SCENE_GAP_SECONDS` / FE `src/lib/customer-scenes.ts` `SCENE_GAP_MS` | 행사 스냅은 거의 쉬지 않아 10분이면 2개로만 나뉨. **BE·FE 두 곳이 같은 규칙** — 함께 바꾼다 |
+| 장면 수 상한 | 8개 (큰 공백부터) | 같은 두 파일 `MAX_SCENES` | 공백이 많은 촬영도 과하게 쪼개지지 않게 |
+| 작은 장면 합치기 | 10장 미만은 앞 장면에 | `MIN_SCENE_PHOTOS` | |
+| 장면을 만들 최소 조건 | 사진 20장 이상, 촬영 시각 있는 사진 80% 이상 | `MIN_PHOTOS_FOR_SCENES`, `MIN_TIMED_RATIO` | 못 미치면 장면 없이 전체 한 목록 |
+| 장면 이름 후보 | 촬영 종류별 목록 (돌잔치: 야외·식장 밖 / 돌상 촬영 / 가족사진 / 행사 진행 / 돌잡이 / 이벤트 / 하객 / 단체사진) | FE `src/lib/customer-shoot-scenes.ts` | **사진만 보고 구분되는 이름**만 둔다("행사 전"처럼 시점만 다른 이름은 AI가 못 고름). 인물 구성(아기 단독 등)은 장면이 아니라 사진별 칩. 목록만 바꾸면 되고 학습·재배포(BE)는 필요 없음 |
+| 장면 이름 고르기 | 대표 3장(장면 가운데 쪽 고르게), 목록 밖이면 `기타 장면` | BE `customer_ai.py` `SCENE_SAMPLE_PHOTOS`, `_name_scene` 프롬프트 | |
+| 같은 이름 장면 합치기 | 바로 이어진 같은 이름은 합침(떨어진 것은 그대로, 번호 안 붙임) | BE `customer_ai.py` `merge_same_named` | 웨딩 촬영처럼 의상을 연달아 바꾸는 촬영은 합치면 안 될 수 있음 — 촬영 종류별로 끄는 것 검토 중 |
+| 유사컷 기준 | 코사인 유사도 0.94 | BE `clip-service/app/config.py` `GEMINI_SIMILARITY_THRESHOLD` (환경변수) | 작가 분석과 공용 값 |
+| 품질·인물 판정 프롬프트 | 셀프 고객 전용 `CustomerPhotoAssessment`(작가 판정 + `people`) | BE `clip-service/app/gemini_quality_client.py` `_CUSTOMER_PROMPT` | **프롬프트를 바꾸면 `CUSTOMER_QUALITY_PROMPT_VERSION`(`customer_ai.py`, 지금 `v1-people`)도 올린다** — 버전이 같으면 이미 판정한 사진을 다시 판정하지 않음. 올리면 다음 정리 때 전체 재판정(사진 수만큼 Gemini 호출). 작가 판정 프롬프트(`_PROMPT`)는 따로 |
+| 화면 해석: 흔들림 | `blur_or_shake` 또는 `focus_issue`가 possible·likely면 "흐림 의심" | FE `src/lib/customer-select-server.ts` `toPhoto` | |
+| 화면 해석: 눈 감음 | **likely만** 의심으로 침(possible은 무시) | 같은 곳 | 웃음·윙크 같은 의도된 표정이 많음(60장 분석에서 possible까지 치면 38%). 528장 돌잔치에서 likely 20장(약 4%) |
+| 눈 감음 표시 방식 | 카드에는 배지 안 보임, 상세 안내와 유사컷 묶음 안 순서(맨 뒤)에만 반영, 빼는 필터 없음 | FE `select/select.module.css` `.gl-quality-badge-eyes { display: none }`, `select/page.tsx` `isFlagged` | 카드 배지를 다시 보이려면 이 CSS 한 줄 |
+| 흔들림 빼기 | "AI로 정리하고 고르기"로 시작하면 기본 켬, 이미 고른(참여자는 찜한) 사진은 절대 안 뺌 | FE `upload/page.tsx`·`ProjectHome.tsx` `setAsideKey`, `select/page.tsx` `setAside` | 기기별로 기억 |
+| 인물 구성 | solo / family / group / none (돌잔치 solo는 "아기 단독"으로 표시) | 판정: `gemini_quality_client.py`, 읽기: FE `customer_quality_assessments.raw_response->>people`, 칩: `select/page.tsx` `peopleLabel` | 별도 컬럼 없이 판정 원문에서 읽음 |
+| Gemini 모델 | `gemini-3.5-flash-lite` | `config.py` `GEMINI_FLASH_MODEL` (환경변수) | |
+
+### 지금까지 확인한 것
+
+- 돌잔치 행사 스냅 528장(10:18~12:42): 10분 기준 → 장면 2개, 3분 기준 → 7개(같은 이름 합친 뒤 5~6개). 첫 장면(야외·식장 밖)은 정확. 192장·172장짜리 큰 장면이 남음 — 그 안에서는 3분 넘게 쉰 적이 없어 시간 기준으로는 더 못 나눔.
+- 인물 구성 24장 샘플: 가족 20 / 여러 명 3 / 단독 1 — 돌잔치 스냅은 가족 컷이 대부분.
+- 작가 프로젝트 사진은 업로드 압축으로 EXIF가 지워지고 원본도 없어 촬영 시각을 알 수 없다(파일명 순서만 앎).
+
+### 다음 과제
+
+- **큰 장면을 사진 내용으로 나누기**: 시간 공백이 없는 순서 전환(돌잡이 → 이벤트 등). 장면 검수 정답이 쌓이면 그걸로 튜닝.
+- **웨딩 촬영(야외·스튜디오) 이름 목록**: 드레스·스튜디오 / 드레스·야외 / 한복 / 캐주얼 / 흑백·컨셉 / 야간 / 디테일 제안, 같은 이름 합치기 끄기 검토.
+- 조정은 **장면 검수 → 값·목록·프롬프트 변경 → 같은 프로젝트를 다시 정리 → 다시 검수해 점수 비교** 순서로 한다(아래 "장면 검수").
+
 ## 장면 검수 (관리자, 2026-10-02)
 
 지인 베타의 실제 촬영으로 장면 분석을 다듬기 위해, 운영자가 셀프 고객 프로젝트의 AI 장면을 보고 정답을 남긴다(`/admin/scenes`, 관리자 이메일만). 참여자 동의는 오프라인으로 받는다.
