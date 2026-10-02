@@ -14,10 +14,37 @@ const MIN_SCENE_PHOTOS = 10;
 const MAX_SCENES = 8;
 const MIN_PHOTOS_FOR_SCENES = 20;
 const MIN_TIMED_RATIO = 0.8;
+// 이보다 짧은 공백은 "이어진 촬영": 작은 장면은 공백이 더 짧은 이웃에 붙이되, 양쪽(첫·마지막 장면은 한쪽) 공백이
+// 모두 이 이상이면 작아도 따로 둔다(입장·케이크 커팅처럼 짧은 장면).
+const CLOSE_GAP_MS = 10 * 60_000;
+// 따로 떨어져 있어도 이보다 적으면(한두 장 튄 사진) 장면으로 두지 않고 가까운 쪽에 붙인다.
+const MIN_ISOLATED_PHOTOS = 3;
 
 const time = (value: string) => Date.parse(`${value}Z`);
 /** 장면 경계에 쓸 수 있는 촬영 시각. 파일 수정 시각("file")은 실제 촬영 시각이 아니라 뺀다(출처 기록 전 사진은 그대로 쓴다). */
 const sceneTime = (photo: ScenePhoto) => (photo.takenAtSource === "file" ? null : photo.takenAt ?? null);
+
+const gapBetween = (before: ScenePhoto[], after: ScenePhoto[]) => time(sceneTime(after[0])!) - time(sceneTime(before[before.length - 1])!);
+
+/** 작은 장면을 공백이 더 짧은 이웃에 붙인다(같으면 앞). 양쪽 공백이 모두 CLOSE_GAP 이상이면 그대로 둔다. Python `_merge_small`과 같은 규칙. */
+function mergeSmall(ranges: ScenePhoto[][]): ScenePhoto[][] {
+  for (let merged = true; merged && ranges.length > 1;) {
+    merged = false;
+    for (let i = 0; i < ranges.length; i++) {
+      const part = ranges[i];
+      if (part.length >= MIN_SCENE_PHOTOS) continue;
+      const before = i > 0 ? gapBetween(ranges[i - 1], part) : null;
+      const after = i < ranges.length - 1 ? gapBetween(part, ranges[i + 1]) : null;
+      if (part.length >= MIN_ISOLATED_PHOTOS && [before, after].every((gap) => gap === null || gap >= CLOSE_GAP_MS)) continue;
+      const j = after === null || (before !== null && before <= after) ? i - 1 : i + 1;
+      const lo = Math.min(i, j);
+      ranges.splice(lo, 2, [...ranges[lo], ...ranges[lo + 1]]);
+      merged = true;
+      break;
+    }
+  }
+  return ranges;
+}
 
 /** 장면으로 나눌 근거가 부족하면(사진이 적거나 촬영 시각 대부분이 없으면) null. */
 export function splitScenes(photos: readonly ScenePhoto[]): Scene[] | null {
@@ -33,16 +60,8 @@ export function splitScenes(photos: readonly ScenePhoto[]): Scene[] | null {
     .map((item) => item.index)
     .sort((a, b) => a - b);
 
-  const ranges: ScenePhoto[][] = [];
-  let start = 0;
-  for (const cut of [...cuts, sorted.length]) {
-    const range = sorted.slice(start, cut);
-    start = cut;
-    // 너무 작은 장면은 바로 앞 장면에 붙인다(첫 장면이면 아래에서 다음 장면과 합친다).
-    if (range.length < MIN_SCENE_PHOTOS && ranges.length) ranges[ranges.length - 1].push(...range);
-    else ranges.push(range);
-  }
-  if (ranges.length > 1 && ranges[0].length < MIN_SCENE_PHOTOS) ranges.splice(0, 2, [...ranges[0], ...ranges[1]]);
+  const bounds = [0, ...cuts, sorted.length];
+  const ranges = mergeSmall(bounds.slice(1).map((end, index) => sorted.slice(bounds[index], end)));
 
   const untimed = photos.filter((photo) => !timed.includes(photo)).sort((a, b) => a.orderIndex - b.orderIndex);
   const scenes: Scene[] = ranges.map((range, index) => ({

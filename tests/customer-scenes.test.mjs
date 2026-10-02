@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { formatSceneRange, sceneTargets, splitScenes } from "../src/lib/customer-scenes.ts";
 import { exifTakenAtFromBytes } from "../src/lib/exif-taken-at.ts";
 
@@ -18,10 +19,20 @@ assert.equal(formatSceneRange(scenes[2]), "오후 1:30");
 // 업로드 순서가 섞여도 촬영 시각 순서로 장면을 만든다.
 assert.deepEqual(splitScenes([...photos].reverse()).map((scene) => scene.photoIds.length), [30, 40, 20]);
 
-// 10장 미만의 작은 구간은 앞 장면에 합친다.
-order = 0;
-const small = [...burst(10, 0, 25), ...burst(10, 40, 3), ...burst(11, 30, 25)];
-assert.deepEqual(splitScenes(small).map((scene) => scene.photoIds.length), [28, 25]);
+// 공용 골든 케이스 — BE clip-service/tests/test_customer_scenes.py 도 같은 파일을 읽는다(경계 규칙 드리프트 방지).
+const fixture = JSON.parse(readFileSync(new URL("./fixtures/scene-cases.json", import.meta.url), "utf8"));
+for (const { name, blocks, untimed = 0, expected } of fixture.cases) {
+  const casePhotos = [];
+  for (const [start, count, source = "exif"] of blocks) {
+    const [h, m, sec] = start.split(":").map(Number);
+    for (let i = 0; i < count; i++) {
+      const t = h * 3600 + m * 60 + sec + i * 20;
+      casePhotos.push({ id: `c${casePhotos.length}`, orderIndex: casePhotos.length, takenAt: at(Math.floor(t / 3600), Math.floor(t / 60) % 60, t % 60), takenAtSource: source });
+    }
+  }
+  for (let i = 0; i < untimed; i++) casePhotos.push({ id: `c${casePhotos.length}`, orderIndex: casePhotos.length, takenAt: null });
+  assert.deepEqual(splitScenes(casePhotos)?.map((scene) => scene.photoIds.length) ?? null, expected, name);
+}
 
 // 행사 스냅(돌잔치): 10분 공백 없이 순서가 바뀔 때 4분만 쉬어도 장면을 나눈다.
 order = 0;
