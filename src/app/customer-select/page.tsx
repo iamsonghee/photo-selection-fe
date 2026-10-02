@@ -135,7 +135,7 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
                   <p className="mt-3 text-[14px] text-muted-foreground">
                     <span className="font-semibold text-foreground">사진 {project.photo_count.toLocaleString()}장</span>
                     <span aria-hidden="true"> · </span>
-                    {typeof selectedCount === "number" ? `고른 사진 ${selectedCount.toLocaleString()}장` : "고른 수 확인 불가"}
+                    {typeof selectedCount === "number" ? `최종 선택 ${selectedCount.toLocaleString()}장` : "최종 선택 확인 불가"}
                     <span aria-hidden="true"> / </span>
                     약속한 {project.target_count.toLocaleString()}장
                   </p>

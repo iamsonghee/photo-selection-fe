@@ -73,8 +73,8 @@ export function ProjectHome({ projectId, retouchDone }: { projectId: string; ret
     else router.push(`/customer-select/${projectId}/select`);
   }
   const settingsHref = `/customer-select/${projectId}/settings?from=home`;
-  // 만들 때 입력한 값: 촬영 종류·보정 받을 사진 수·날짜·장소·스튜디오·셀렉 마감.
-  const meta = [customerShootTypeLabel(project.shootType || null), `보정 ${project.target.toLocaleString()}장`, date(project.shootDate), project.shootLocation || project.shootRegion, project.studioName || project.photographerName, project.selectionDeadline ? `셀렉 마감 ${date(project.selectionDeadline)}` : null].filter(Boolean);
+  // 만들 때 입력한 값: 촬영 종류·최종 선택 장수·날짜·장소·스튜디오·셀렉 마감.
+  const meta = [customerShootTypeLabel(project.shootType || null), `최종 선택 ${project.target.toLocaleString()}장`, date(project.shootDate), project.shootLocation || project.shootRegion, project.studioName || project.photographerName, project.selectionDeadline ? `셀렉 마감 ${date(project.selectionDeadline)}` : null].filter(Boolean);
   const steps = [
     { label: "올리기", value: `${project.photoCount.toLocaleString()}장`, href: `/customer-select/${projectId}/upload`, done: project.photoCount > 0 },
     { label: "고르기", value: `${selected.size.toLocaleString()} / ${project.target.toLocaleString()}장`, href: `/customer-select/${projectId}/select`, done: selected.size > 0 },
@@ -183,7 +183,7 @@ export function ProjectHome({ projectId, retouchDone }: { projectId: string; ret
                 ))}
               </ul>
             ) : (
-              <p className="text-[14px] leading-relaxed text-muted-foreground">링크를 보내면 가족이나 친구가 찜과 메모로 함께 고를 수 있어요. 보정 받을 사진은 나만 정해요.</p>
+              <p className="text-[14px] leading-relaxed text-muted-foreground">링크를 보내면 가족이나 친구가 찜과 메모로 함께 고를 수 있어요. 최종 선택은 나만 해요.</p>
             )}
           </section>
         </div>

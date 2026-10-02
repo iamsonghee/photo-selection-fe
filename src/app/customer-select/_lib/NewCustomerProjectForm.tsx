@@ -38,7 +38,7 @@ export function NewCustomerProjectForm() {
     const errors: Record<string, string> = {};
     if (!name.trim()) errors.name = "프로젝트명을 입력해주세요.";
     if (!shootType) errors.shootType = "촬영 종류를 선택해주세요.";
-    if (Number(target) < 1) errors.target = "보정받을 사진 수를 1장 이상 입력해주세요.";
+    if (Number(target) < 1) errors.target = "최종 선택 장수를 1장 이상 입력해주세요.";
     if (Object.keys(errors).length) {
       setFieldErrors(errors);
       requestAnimationFrame(() => document.getElementById(`field-${Object.keys(errors)[0]}`)?.querySelector<HTMLElement>("input,button")?.focus());
@@ -78,7 +78,7 @@ export function NewCustomerProjectForm() {
         <div className="mx-auto max-w-[840px]">
           <ProjectFormPageHeading
             title="어떤 사진을 골라볼까요?"
-            description="촬영 정보와 보정받을 사진 수를 입력하고 사진을 올려보세요."
+            description="촬영 정보와 최종 선택 장수를 입력하고 사진을 올려보세요."
             onBack={() => router.push("/customer-select")}
           />
           <div className="flex flex-col gap-5">
@@ -103,7 +103,7 @@ export function NewCustomerProjectForm() {
             </div>
 
             <div id="field-target" className="max-w-[360px]">
-              <ProjectFormField error={fieldErrors.target} label="보정받을 사진 수" required hint="작가님과 약속한 장수를 입력해 주세요. 실제 선택 장수가 달라도 전달할 수 있어요.">
+              <ProjectFormField error={fieldErrors.target} label="최종 선택 장수" required hint="작가님과 약속한 장수를 입력해 주세요. 실제 선택 장수가 달라도 전달할 수 있어요.">
                 <div className="relative">
                   <ProjectFormInput
                     className={`${PROJECT_FORM_INPUT_CLASS} !pr-14 text-right ${projectFormInputStateClass({ hasValue: Boolean(target), error: Boolean(fieldErrors.target) })}`}

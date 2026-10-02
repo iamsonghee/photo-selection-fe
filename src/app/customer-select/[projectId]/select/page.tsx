@@ -4,7 +4,7 @@
  * 셀프 고객 셀렉 ② 고르기.
  * 촬영 시각(이후 AI)으로 나눈 "장면"이 화면의 뼈대다 — 2,000장을 장면 몇 개의 작은 일로 쪼갠다.
  * 한 번에 한 장면을 보고, 장면 끝에서 쭉 당기면 다음 장면으로 넘어간다. 장면 이동은 퀵메뉴가 맡는다.
- * 역할마다 메인 동작은 하나다: 소유자는 ✓ 보정 받기, 참여자는 ♡ 찜.
+ * 역할마다 메인 동작은 하나다: 소유자는 ✓ 최종 선택, 참여자는 ♡ 찜.
  * 격자는 고르는 곳, 상세는 고민하는 곳. 유사컷 묶음 표지는 바로 고르지 않고 펼쳐서 비교한다.
  */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -409,15 +409,15 @@ function SelectScreen() {
   const sceneFooter = scene ? (nextScene
     ? <p className={s.sceneNext}><ArrowDown size={14} aria-hidden /><span>다음</span><strong>{sceneTitle(nextScene)}</strong></p>
     : <div className={s.sceneEnd}>
-        <span>마지막 장면 · 전체 {pickedTotal}장 {isOwner ? "선택" : "찜"}</span>
+        <span>마지막 장면 · {isOwner ? `전체 최종 선택 ${pickedTotal}장` : `전체 찜 ${pickedTotal}장`}</span>
         {isOwner
           ? <PhotographerLightButton size="toolbar" disabled={!pickedTotal} onClick={toReview}>작가에게 보내기 →</PhotographerLightButton>
           : <PhotographerLightButton size="toolbar" variant={myDone ? "outline" : "primary"} onClick={() => store.toggleDone(me)}>{myDone ? "다시 고르기" : "다 골랐어요"}</PhotographerLightButton>}
       </div>) : undefined;
 
-  const totalText = `${pickedTotal}장 선택${target ? ` · 약속한 ${target}장` : ""}`;
+  const totalText = `최종 선택 ${pickedTotal}장${target ? ` · 약속한 ${target}장` : ""}`;
   const bottomBar = !isOwner ? <>
-    <div className={s.barMeta}><strong>내가 찜한 사진 {myLikes.size}장</strong><span>보정 받을 사진은 {project.participantNicknames.red || "소유자"}님이 정해요</span></div>
+    <div className={s.barMeta}><strong>내가 찜한 사진 {myLikes.size}장</strong><span>최종 선택은 {project.participantNicknames.red || "소유자"}님이 해요</span></div>
     <div className={s.barActions}>
       <PhotographerLightButton variant={myDone ? "outline" : "primary"} size="work-panel" onClick={() => store.toggleDone(me)}>{myDone ? "다시 고르기" : "다 골랐어요"}</PhotographerLightButton>
     </div>

@@ -37,12 +37,14 @@ test("shared participant can leave opinions but cannot change the final selectio
     await expect(page.locator('[data-photo-id="p1"]').getByRole("button", { name: /^찜/ })).toHaveCount(1);
 
     await page.locator('[data-photo-id="p1"]').click();
+    // 모바일 상세는 사진 위주 — 메모는 메모 버튼을 눌러야 펼친다.
+    if (width < 768) await page.getByRole("button", { name: /^메모 (보기|쓰기)$/ }).dispatchEvent("click"); // dev 서버 Next.js 이슈 배지가 왼쪽 아래를 덮는다
     const memo = page.getByRole("textbox", { name: "작가 전달 메모" });
     await expect(memo).toHaveValue("표정이 좋아요");
     await memo.fill("참여자 자동저장 확인");
     await memo.blur();
     await expect(page.locator('[role="status"]:visible').filter({ hasText: "저장됨" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /보정 받/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "최종 선택", exact: true })).toHaveCount(0);
     await page.keyboard.press("Space");
     await page.keyboard.press("Escape");
   }

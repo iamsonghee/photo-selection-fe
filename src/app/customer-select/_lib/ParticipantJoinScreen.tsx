@@ -88,7 +88,7 @@ export function ParticipantJoinScreen({ onEnter }: { onEnter?: () => void }) {
           {returning
             ? <>{returning}님, 지금까지 <strong className={entry.introAccent}>♥ {myLikes.toLocaleString()}장</strong>을 찜했어요. 이어서 골라 보세요.</>
             : myColor
-            ? <>사진 <strong className={entry.introAccent}>{project.photoCount.toLocaleString()}장</strong> 중 마음에 드는 사진에 찜과 메모를 남겨 주세요. 보정 받을 사진은 {ownerLabel}이 정해요.</>
+            ? <>사진 <strong className={entry.introAccent}>{project.photoCount.toLocaleString()}장</strong> 중 마음에 드는 사진에 찜과 메모를 남겨 주세요. 최종 선택은 {ownerLabel}이 해요.</>
             : <>최대 5명까지 함께 고를 수 있어요. {ownerLabel}에게 확인해 주세요.</>}
         </p>
       </div>

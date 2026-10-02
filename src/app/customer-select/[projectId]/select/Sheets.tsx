@@ -40,7 +40,7 @@ export function InviteSheet({ projectId, shareToken, shareEnabled, people, onlin
 }) {
   return (
     <Sheet title="함께 고르기" onClose={onClose}>
-      <p>링크를 받은 사람은 마음에 드는 사진에 찜과 메모를 남길 수 있어요. 보정 받을 사진은 나만 정해요. 나를 포함해 최대 {MAX_PEOPLE}명까지 함께할 수 있어요.</p>
+      <p>링크를 받은 사람은 마음에 드는 사진에 찜과 메모를 남길 수 있어요. 최종 선택은 나만 해요. 나를 포함해 최대 {MAX_PEOPLE}명까지 함께할 수 있어요.</p>
       {shareEnabled && shareToken
         ? <CustomerShareLinkField projectId={projectId} token={shareToken} allowShare />
         : <p>초대 링크가 중지되어 있어요. 설정에서 다시 켤 수 있어요.</p>}

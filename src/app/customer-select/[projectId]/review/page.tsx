@@ -101,7 +101,7 @@ function SendScreen() {
       const url = await resultUrl();
       if (mode === "share" && navigator.share) {
         try {
-          await navigator.share({ title: `${project.name} 선택 결과`, text: `선택한 사진 ${selected.length}장과 요청 사항이에요.`, url });
+          await navigator.share({ title: `${project.name} 선택 결과`, text: `최종 선택한 사진 ${selected.length}장과 요청 사항이에요.`, url });
           setLinkState("shared");
         } catch (error) {
           if (error instanceof DOMException && error.name === "AbortError") { setLinkState("idle"); return; }
@@ -129,14 +129,14 @@ function SendScreen() {
       <main className={s.main}>
         {selected.length === 0 ? (
           <section className={s.empty}>
-            <h2>아직 고른 사진이 없어요</h2>
-            <p>보정 받을 사진을 고르면 여기서 작가님께 보낼 수 있어요.</p>
+            <h2>아직 최종 선택한 사진이 없어요</h2>
+            <p>사진을 최종 선택하면 여기서 작가님께 보낼 수 있어요.</p>
             <PhotographerLightButton size="work-panel" onClick={() => router.push(`/customer-select/${projectId}/select`)}>사진 고르러 가기</PhotographerLightButton>
           </section>
         ) : <>
           <section className={s.hero}>
             <h2>{selected.length}장을 보낼게요</h2>
-            <p>{[summary, memoCount ? `메모 ${memoCount}개` : ""].filter(Boolean).join(" · ") || "선택한 사진과 메모를 작가님께 보내요"}</p>
+            <p>{[summary, memoCount ? `메모 ${memoCount}개` : ""].filter(Boolean).join(" · ") || "최종 선택한 사진과 메모를 작가님께 보내요"}</p>
           </section>
 
           {notices.length > 0 && (

@@ -150,7 +150,7 @@ export function PhotoDetail({
         <div className={s.detailTop}>
           <button type="button" onClick={onClose} aria-label="목록으로"><ArrowLeft size={20} /></button>
           <span className={s.detailName}>{getPhotoDisplayName(photo)}</span>
-          <span className={s.detailCount}>{index + 1} / {photos.length}{members.length > 1 ? ` · 비슷한 사진 ${memberIndex + 1}/${members.length}` : ""}{isOwner ? ` · 선택 ${selectedCount}${target ? `/${target}` : ""}장` : ""}</span>
+          <span className={s.detailCount}>{index + 1} / {photos.length}{members.length > 1 ? ` · 비슷한 사진 ${memberIndex + 1}/${members.length}` : ""}{isOwner ? ` · 최종 선택 ${selectedCount}${target ? `/${target}` : ""}장` : ""}</span>
         </div>
         <div
           className={s.detailImage}

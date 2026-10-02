@@ -63,7 +63,7 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
   const galleryTexts = await page.locator("body").innerText();
   // 목표 장수는 참고값이다 — 장수만 알려주고 더 고르거나 줄이라고 압박하지 않는다.
-  expect(galleryTexts).toContain(`${selectedCount}장 선택 · 약속한 10장`);
+  expect(galleryTexts).toContain(`최종 선택 ${selectedCount}장 · 약속한 10장`);
   expect(galleryTexts).not.toContain("더 골라주세요");
   expect(galleryTexts).not.toContain("더 선택해 주세요");
   expect(galleryTexts).not.toContain("줄여주세요");
@@ -75,8 +75,10 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   const viewer = page.getByRole("dialog", { name: /상세 보기/ });
   await expect(viewer).toBeVisible();
   const viewerTexts = await viewer.innerText();
-  expect(viewerTexts).toContain(`선택 ${selectedCount}/10장`);
+  expect(viewerTexts).toContain(`최종 선택 ${selectedCount}/10장`);
   expect(viewerTexts).not.toContain("장 남음");
+  // 모바일 상세는 사진 위주 — 메모는 메모 버튼으로 펼친다(dispatchEvent: dev 서버의 Next.js 이슈 배지가 왼쪽 아래를 덮는다).
+  if (viewport === "mobile") await viewer.getByRole("button", { name: /^메모 (보기|쓰기)$/ }).dispatchEvent("click");
   const memo = page.getByRole("textbox", { name: "작가 전달 메모" });
   await memo.fill("자동 저장 확인");
   await expect(page.locator('[role="status"]:visible', { hasText: "저장됨" })).toBeVisible();
