@@ -367,6 +367,8 @@ test("a collapsed cover can be picked directly; the badge shows the group's pick
   await expect(plain.locator('[data-active="true"]')).toHaveCount(0);
   await plain.hover();
   await plain.getByRole("button", { name: "선택", exact: true }).click();
+  // 선택 순간(data-pop)에도 표지 뒤 회색 카드(::after)는 사진 뒤에 머문다 — 사진을 덮지 않는다.
+  expect(await plain.evaluate((element) => { const after = getComputedStyle(element, "::after"); return [element.hasAttribute("data-pop"), after.zIndex, after.animationName]; })).toEqual([true, "0", "none"]);
   await expect(plain.getByRole("img", { name: "1장 선택" })).toBeVisible();
   await expect(plain.locator('[data-active="true"]')).toHaveCount(1);
   // ✓ 1 을 다시 누르면 표지 사진 선택이 풀린다(배지는 표시만, 아래 ✓가 눌린다).

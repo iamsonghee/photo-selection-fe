@@ -109,7 +109,8 @@
 .timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::before,
 .timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::after { content: ""; position: absolute; border-radius: 8px; }
 .timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::before { inset: 0 0 8px 8px; background: #dfe5e8; }
-.timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::after { inset: 4px 4px 4px 4px; background: #bfcbd1; }
+/* 표지의 ::after는 뒤 카드라, 선택 순간의 주황 테두리(공용 [data-pop]::after, z-index 16)가 이 회색 카드를 사진 위로 올리지 않게 한다 — 표지는 ✓ 튀기기만. */
+.timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::after { inset: 4px 4px 4px 4px; z-index: 0; background: #bfcbd1; box-shadow: none; animation: none; }
 .timelineScroll :global(.gl-group-stack) { z-index: 1; }
 /* 표지의 `✓ M`은 표시만 — 누르면 그 아래 표지 ✓ 버튼이 눌린다. */
 .timelineScroll :global(.gl-group-picks) { pointer-events: none; }
