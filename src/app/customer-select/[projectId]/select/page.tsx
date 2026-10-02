@@ -557,7 +557,7 @@ function SelectScreen() {
               mobileColumns={mobileColumns}
               positionKey={`ps:self-select:${projectId}:${sceneMode ? `s${sceneIndex}` : "all"}:${scope}:${peopleFilter ?? ""}:${grouped ? 1 : 0}`}
               startAt={enteredBy === "next" ? "top" : enteredBy === "prev" ? "bottom" : null}
-              enterFrom={enteredBy === "next" ? "below" : null}
+              enterFrom={enteredBy === "next" ? "below" : enteredBy === "prev" ? "above" : null}
               renderCard={card}
               bandOf={bandOf}
               empty={<><strong>조건에 맞는 사진이 없어요</strong><span>보기 조건을 바꿔보세요.</span><button type="button" onClick={() => { setScope("all"); setQuery(""); }}>전체 보기</button></>}

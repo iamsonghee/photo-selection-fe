@@ -110,7 +110,7 @@ test("desktop: pulling past the end of a scene moves to the next scene", async (
   await context.close();
 });
 
-test("desktop: scrolling up past the top flows straight into the end of the previous scene", async ({ browser }) => {
+test("desktop: pulling past the top of a scene moves to the end of the previous scene", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await loginAsPhotographer(page);
@@ -121,13 +121,20 @@ test("desktop: scrolling up past the top flows straight into the end of the prev
   await gallery.evaluate((element) => element.scrollTo({ top: 0 }));
   const box = (await gallery.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.waitForTimeout(300); // 맨 위에 닿은 뒤 새로 시작한 당김만 인정한다
 
-  // 위로는 당기는 저항 없이 맨 위에서 더 올리면 바로 이전 장면의 끝으로 이어진다.
-  await page.mouse.wheel(0, -60);
-  await expect(page).toHaveURL(/scene=1/);
+  // 위로도 아래와 같은 고무줄: 조금 당기면 이전 장면이 드러나지만, 놓으면 제자리로 돌아온다.
+  await page.mouse.wheel(0, -30);
+  await expect(page.locator('[class*="pullReveal"]')).toContainText("입장");
   await expect(page.locator('[class*="pullReveal"]')).toHaveCount(0);
+  await expect(page).toHaveURL(/scene=2/);
+
+  // 충분히 당기면 이전 장면의 끝으로 넘어간다.
+  await page.waitForTimeout(300);
+  for (let i = 0; i < 3; i++) await page.mouse.wheel(0, -100);
+  await expect(page).toHaveURL(/scene=1/);
   await expect(page.locator('[class*="sceneNext"]').filter({ visible: true })).toContainText("예식");
-  // 연달아 올려도 한 번에 두 장면을 건너뛰지 않는다(새 장면은 끝에서 시작해 위로 계속 스크롤된다).
+  // 연달아 올려도 한 번에 두 장면을 건너뛰지 않는다.
   for (let i = 0; i < 3; i++) { await page.mouse.wheel(0, -60); await page.waitForTimeout(40); }
   await expect(page).toHaveURL(/scene=1/);
   await context.close();

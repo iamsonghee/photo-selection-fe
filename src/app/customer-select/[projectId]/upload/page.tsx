@@ -224,7 +224,8 @@ export default function CustomerUploadPage() {
         previewUrl: url,
         originalFilename: file.name,
         sourceFileSize: file.size,
-        takenAt: takenAtAll[index],
+        takenAt: takenAtAll[index].takenAt,
+        takenAtSource: takenAtAll[index].source,
         isPending: true,
         isUploading: false,
       } satisfies Photo;
@@ -261,7 +262,8 @@ export default function CustomerUploadPage() {
       const formData = new FormData();
       formData.append("project_id", projectId);
       batch.forEach((f) => formData.append("files", f));
-      formData.append("taken_at", JSON.stringify(takenAt));
+      formData.append("taken_at", JSON.stringify(takenAt.map((item) => item.takenAt)));
+      formData.append("taken_at_source", JSON.stringify(takenAt.map((item) => item.source)));
       formData.append("client_upload_ids", JSON.stringify(rawBatch.map(clientUploadId)));
       formData.append("original_filenames", JSON.stringify(rawBatch.map((file) => file.name))); // 압축하면 `이름.jpg`로 바뀐다
       setUploadPhase("uploading");
