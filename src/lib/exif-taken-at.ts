@@ -64,16 +64,22 @@ function readAscii(bytes: Uint8Array, start: number, length: number) {
   return text;
 }
 
-/** EXIF가 없거나(HEIC·스크린샷 등) 읽지 못하면 원본 파일의 수정 시각으로 대신한다. */
-export async function readTakenAt(file: File): Promise<string | null> {
+export type TakenAtSource = "exif" | "file";
+export type TakenAt = { takenAt: string | null; source: TakenAtSource | null };
+
+/**
+ * EXIF가 없거나(HEIC·스크린샷 등) 읽지 못하면 원본 파일의 수정 시각으로 대신한다 — 정렬 참고용일 뿐이라
+ * source를 "file"로 구분해 장면 경계에는 쓰지 않는다(카카오톡 등은 받은 시각이라 실제 촬영 시각과 다르다).
+ */
+export async function readTakenAt(file: File): Promise<TakenAt> {
   try {
     const bytes = new Uint8Array(await file.slice(0, EXIF_READ_BYTES).arrayBuffer());
     const exif = exifTakenAtFromBytes(bytes);
-    if (exif) return exif;
+    if (exif) return { takenAt: exif, source: "exif" };
   } catch {
     /* 읽기 실패 — 아래 수정 시각으로 대체 */
   }
-  if (!file.lastModified) return null;
+  if (!file.lastModified) return { takenAt: null, source: null };
   const local = new Date(file.lastModified - new Date(file.lastModified).getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 19);
+  return { takenAt: local.toISOString().slice(0, 19), source: "file" };
 }

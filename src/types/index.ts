@@ -44,6 +44,8 @@ export interface Photo {
   sourceLastModified?: number | null;
   /** 셀프 고객 사진의 원본 촬영 시각(EXIF, 시간대 없는 현지 시각). 장면 구분에 사용 */
   takenAt?: string | null;
+  /** 촬영 시각 출처(셀프 고객). "file"은 EXIF가 없어 파일 수정 시각으로 대신한 값 — 장면 경계에 쓰지 않는다. */
+  takenAtSource?: "exif" | "file" | null;
   /** DB created_at — 업로드 일시 */
   createdAt?: string | null;
   selected?: boolean;

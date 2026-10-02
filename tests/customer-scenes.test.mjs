@@ -31,6 +31,11 @@ assert.deepEqual(splitScenes(studio).map((scene) => scene.photoIds.length), [30,
 // 사진이 적거나 촬영 시각이 대부분 없으면 장면을 만들지 않는다.
 assert.equal(splitScenes(burst(9, 0, 10)), null);
 assert.equal(splitScenes(photos.map((photo, i) => (i % 2 ? photo : { ...photo, takenAt: null }))), null);
+// 파일 수정 시각으로 대신한 촬영 시각("file")은 경계·비율에 쓰지 않는다 — Python split_scenes와 같은 규칙.
+assert.equal(splitScenes(photos.map((photo, i) => (i % 2 ? photo : { ...photo, takenAtSource: "file" }))), null);
+const withFileTimes = splitScenes([...photos, ...Array.from({ length: 5 }, (_, i) => ({ id: `f${i}`, orderIndex: 900 + i, takenAt: at(11, 30), takenAtSource: "file" }))]);
+assert.deepEqual(withFileTimes.map((scene) => scene.photoIds.length), [30, 40, 20, 5]);
+assert.equal(formatSceneRange(withFileTimes[3]), "촬영 시각 없음");
 
 // 시각 없는 소수 사진은 마지막 "촬영 시각 없음" 장면으로 모은다.
 const mostlyTimed = photos.map((photo, i) => (i < 5 ? { ...photo, takenAt: null } : photo));

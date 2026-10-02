@@ -4,7 +4,7 @@
  * 알 수 없어서, 틀린 이름보다 실제 시간이 더 정확하다.
  */
 
-export type ScenePhoto = { id: string; orderIndex: number; takenAt?: string | null };
+export type ScenePhoto = { id: string; orderIndex: number; takenAt?: string | null; takenAtSource?: "exif" | "file" | null };
 export type Scene = { index: number; photoIds: string[]; start: string | null; end: string | null };
 
 // ponytail: 고정 임계값 휴리스틱. 실제 촬영 데이터로 장면 경계가 어긋나면 이 값들부터 조정한다.
@@ -16,15 +16,17 @@ const MIN_PHOTOS_FOR_SCENES = 20;
 const MIN_TIMED_RATIO = 0.8;
 
 const time = (value: string) => Date.parse(`${value}Z`);
+/** 장면 경계에 쓸 수 있는 촬영 시각. 파일 수정 시각("file")은 실제 촬영 시각이 아니라 뺀다(출처 기록 전 사진은 그대로 쓴다). */
+const sceneTime = (photo: ScenePhoto) => (photo.takenAtSource === "file" ? null : photo.takenAt ?? null);
 
 /** 장면으로 나눌 근거가 부족하면(사진이 적거나 촬영 시각 대부분이 없으면) null. */
 export function splitScenes(photos: readonly ScenePhoto[]): Scene[] | null {
-  const timed = photos.filter((photo) => photo.takenAt && !Number.isNaN(time(photo.takenAt)));
+  const timed = photos.filter((photo) => sceneTime(photo) && !Number.isNaN(time(sceneTime(photo)!)));
   if (photos.length < MIN_PHOTOS_FOR_SCENES || timed.length < photos.length * MIN_TIMED_RATIO) return null;
 
-  const sorted = timed.slice().sort((a, b) => time(a.takenAt!) - time(b.takenAt!) || a.orderIndex - b.orderIndex);
+  const sorted = timed.slice().sort((a, b) => time(sceneTime(a)!) - time(sceneTime(b)!) || a.orderIndex - b.orderIndex);
   const cuts = sorted
-    .map((photo, index) => ({ index, gap: index === 0 ? 0 : time(photo.takenAt!) - time(sorted[index - 1].takenAt!) }))
+    .map((photo, index) => ({ index, gap: index === 0 ? 0 : time(sceneTime(photo)!) - time(sceneTime(sorted[index - 1])!) }))
     .filter((item) => item.gap >= SCENE_GAP_MS)
     .sort((a, b) => b.gap - a.gap)
     .slice(0, MAX_SCENES - 1)
@@ -46,8 +48,8 @@ export function splitScenes(photos: readonly ScenePhoto[]): Scene[] | null {
   const scenes: Scene[] = ranges.map((range, index) => ({
     index,
     photoIds: range.map((photo) => photo.id),
-    start: range[0].takenAt ?? null,
-    end: range[range.length - 1].takenAt ?? null,
+    start: sceneTime(range[0]),
+    end: sceneTime(range[range.length - 1]),
   }));
   if (untimed.length) scenes.push({ index: scenes.length, photoIds: untimed.map((photo) => photo.id), start: null, end: null });
   return scenes;

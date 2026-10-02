@@ -90,6 +90,7 @@ interface CustomerPhotoRow {
   preview_url: string | null;
   similarity_group_id: string | null;
   taken_at?: string | null;
+  taken_at_source?: "exif" | "file" | null;
 }
 
 interface CustomerQualityRow {
@@ -166,6 +167,7 @@ export function toPhoto(row: CustomerPhotoRow, projectId: string, quality?: Cust
     originalFilename: row.filename,
     similarityGroupId: row.similarity_group_id,
     takenAt: row.taken_at ?? null,
+    takenAtSource: row.taken_at_source ?? null,
     isBlurry: quality ? [quality.blur_or_shake, quality.focus_issue].some((value) => value === "possible" || value === "likely") : null,
     faceDetected: quality?.primary_subject_detected ?? null,
     // 눈 감음은 "likely"만 — 웃거나 윙크한 의도된 표정이 "possible"로 많이 잡힌다(실제 60장 중 10장).
