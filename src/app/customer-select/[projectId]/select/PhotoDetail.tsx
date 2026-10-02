@@ -243,11 +243,11 @@ export function PhotoDetail({
           </PhotographerLightButton>
           {isOwner && (
             <PhotographerLightButton variant={selected ? "outline" : "primary"} size="confirmation" aria-pressed={selected} onClick={() => onToggleSelect(photoId)}>
-              <Check size={18} strokeWidth={3} />{selected ? "보정 받을 사진에서 빼기" : "보정 받기"}
+              <Check size={18} strokeWidth={3} />{selected ? "최종 선택 취소" : "최종 선택"}
             </PhotographerLightButton>
           )}
         </div>
-        <span className={s.shortcutHint}>← → 이동 · {members.length > 1 ? "↑ ↓ 비슷한 사진 · " : ""}{isOwner ? "Space 보정 받기 · " : ""}F 찜 · Esc 닫기</span>
+        <span className={s.shortcutHint}>← → 이동 · {members.length > 1 ? "↑ ↓ 비슷한 사진 · " : ""}{isOwner ? "Space 최종 선택 · " : ""}F 찜 · Esc 닫기</span>
       </aside>
     </div>
   );

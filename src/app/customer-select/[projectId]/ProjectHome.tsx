@@ -18,6 +18,8 @@ import { rememberGroupSimilar, setAsideKey } from "./select/AiTidySheet";
 import { useSceneAnalysis } from "./select/useSceneAnalysis";
 
 const date = (value?: string | null) => value ? value.slice(0, 10).replaceAll("-", ".") : null;
+// 모바일 장면 목록은 처음 이만큼만 보이고 나머지는 "전체 장면 보기"로 펼친다.
+const MOBILE_SCENE_PREVIEW = 5;
 const textLink = "text-[13px] font-semibold text-accent hover:text-[var(--accent-hover)]";
 
 /** 장면 대표 사진: 장면 가운데 컷(첫 컷은 디테일·준비 컷인 경우가 많다). */
@@ -42,6 +44,7 @@ export function ProjectHome({ projectId, retouchDone }: { projectId: string; ret
   // 장면은 고르기 화면과 같은 판단(AI 장면, 정리 후 장면 근거가 없으면 시간 장면, 정리 전·중이면 없음)과 같은 번호(?scene=N)를 쓴다.
   const analysis = useSceneAnalysis(projectId, project.photos, project.shootType, project.aiScenes, store.refresh);
   const [tidyError, setTidyError] = useState<string | null>(null);
+  const [allScenes, setAllScenes] = useState(false);
 
   if (!hydrated) {
     return (
@@ -115,11 +118,12 @@ export function ProjectHome({ projectId, retouchDone }: { projectId: string; ret
             </div>
             {scenes.length ? (
               // 모바일은 작은 썸네일 + 이름 한 줄 목록(목차처럼), PC는 사진이 주인공인 카드 그리드.
+              <>
               <ul className="flex flex-col divide-y divide-border-subtle md:grid md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] md:gap-3 md:divide-y-0">
                 {scenes.map((scene, index) => {
                   const picked = scene.photoIds.filter((id) => selected.has(id)).length;
                   return (
-                    <li key={index}>
+                    <li key={index} className={index >= MOBILE_SCENE_PREVIEW && !allScenes ? "max-md:hidden" : undefined}>
                       <Link href={`/customer-select/${projectId}/select?scene=${index}`} className="group flex items-center gap-3 py-2.5 md:block md:py-0">
                         <Thumb photo={photoById.get(middleOf(scene.photoIds))} className="size-14 shrink-0 rounded-lg transition-opacity group-hover:opacity-90 md:aspect-square md:size-auto md:rounded-xl" />
                         <span className="block min-w-0 flex-1">
@@ -134,6 +138,8 @@ export function ProjectHome({ projectId, retouchDone }: { projectId: string; ret
                   );
                 })}
               </ul>
+              {scenes.length > MOBILE_SCENE_PREVIEW && !allScenes ? <button type="button" onClick={() => setAllScenes(true)} className={`mt-1 h-11 w-full border-t border-border-subtle md:hidden ${textLink}`}>전체 장면 {scenes.length}개 보기</button> : null}
+              </>
             ) : project.photoCount ? (
               <>
                 <Link href={`/customer-select/${projectId}/select`} className="grid grid-cols-4 gap-1.5 overflow-hidden rounded-xl md:grid-cols-8" aria-label="사진 고르러 가기">

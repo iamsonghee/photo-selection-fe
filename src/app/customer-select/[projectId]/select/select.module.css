@@ -322,7 +322,7 @@
   .detailStage { min-height: 0; flex: 1; }
   .detailImage { padding: 0 0 8px; }
   .detailNav { display: none !important; }
-  /* 모바일 상세: 사진이 화면을 채우고, 아래는 [메모][찜][보정 받기] 한 줄만. 메모는 눌렀을 때만 위에 펼친다. */
+  /* 모바일 상세: 사진이 화면을 채우고, 아래는 [메모][찜][최종 선택] 한 줄만. 메모는 눌렀을 때만 위에 펼친다. */
   .panel { width: 100%; flex: none; gap: 10px; border-radius: 16px 16px 0 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
   .memo { min-height: 72px; }
   .panelActions { display: flex; }
