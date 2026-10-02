@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -113,17 +114,21 @@ export function ProjectHome({ projectId, retouchDone }: { projectId: string; ret
               {project.photoCount ? <Link href={`/customer-select/${projectId}/select`} className={textLink}>전체 보기 →</Link> : null}
             </div>
             {scenes.length ? (
-              <ul className="-mx-5 flex snap-x gap-3 overflow-x-auto px-5 pb-2 md:mx-0 md:grid md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] md:overflow-visible md:px-0">
+              // 모바일은 작은 썸네일 + 이름 한 줄 목록(목차처럼), PC는 사진이 주인공인 카드 그리드.
+              <ul className="flex flex-col divide-y divide-border-subtle md:grid md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] md:gap-3 md:divide-y-0">
                 {scenes.map((scene, index) => {
                   const picked = scene.photoIds.filter((id) => selected.has(id)).length;
                   return (
-                    <li key={index} className="w-[150px] shrink-0 snap-start md:w-auto">
-                      <Link href={`/customer-select/${projectId}/select?scene=${index}`} className="group block">
-                        <Thumb photo={photoById.get(middleOf(scene.photoIds))} className="aspect-square rounded-xl transition-opacity group-hover:opacity-90" />
-                        <strong className="mt-2 block truncate text-[14px] font-semibold">{scene.name ?? formatSceneRange(scene)}</strong>
-                        <span className="block text-[12px] text-muted-foreground">
-                          {scene.photoIds.length.toLocaleString()}장{picked ? <> · <span className="font-semibold text-accent">✓ {picked}</span></> : null}
+                    <li key={index}>
+                      <Link href={`/customer-select/${projectId}/select?scene=${index}`} className="group flex items-center gap-3 py-2.5 md:block md:py-0">
+                        <Thumb photo={photoById.get(middleOf(scene.photoIds))} className="size-14 shrink-0 rounded-lg transition-opacity group-hover:opacity-90 md:aspect-square md:size-auto md:rounded-xl" />
+                        <span className="block min-w-0 flex-1">
+                          <strong className="block truncate text-[14px] font-semibold md:mt-2">{scene.name ?? formatSceneRange(scene)}</strong>
+                          <span className="block text-[12px] text-muted-foreground">
+                            {scene.photoIds.length.toLocaleString()}장{picked ? <> · <span className="font-semibold text-accent">✓ {picked}</span></> : null}
+                          </span>
                         </span>
+                        <ChevronRight size={16} className="shrink-0 text-subtle-foreground md:hidden" aria-hidden />
                       </Link>
                     </li>
                   );
