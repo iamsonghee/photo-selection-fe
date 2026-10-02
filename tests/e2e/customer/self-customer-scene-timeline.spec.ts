@@ -535,7 +535,7 @@ test("filter bar: scope segments with counts, like scope menu, and scene progres
   // 지금 장면(30장) 기준: 누구든 찜 2장(p3·p4), 고른 사진 2장(p1·p2).
   await expect(scopes.getByRole("button", { name: "전체", exact: true })).toContainText("30");
   await expect(scopes.getByRole("button", { name: "♥ 찜한 사진" })).toContainText("2");
-  await expect(scopes.getByRole("button", { name: "✓ 고른 사진" })).toContainText("2");
+  await expect(scopes.getByRole("button", { name: "✓ 최종 선택" })).toContainText("2");
   await scopes.getByRole("button", { name: "♥ 찜한 사진" }).click();
   await expect(page.locator(".gl-photo-card[data-photo-id]")).toHaveCount(2);
   // ▾ 메뉴에서 내 찜(p4)·2명 이상(p4)으로 좁힌다.

@@ -39,6 +39,8 @@ function SendScreen() {
   const [listCopied, setListCopied] = useState(false);
   // 상세를 연 동안에는 목록을 고정한다 — 상세에서 선택을 빼도 앞뒤 이동이 흔들리지 않게.
   const [detail, setDetail] = useState<{ photos: Photo[]; id: string } | null>(null);
+  // 보정본 확인(비교·재보정 정리)은 아직 열지 않았다 — 누르면 준비 중 안내만 보인다.
+  const [retouchSoon, setRetouchSoon] = useState(false);
 
   useEffect(() => {
     if (hydrated && !isOwner) router.replace(`/customer-select/${projectId}/select`);
@@ -46,7 +48,8 @@ function SendScreen() {
 
   const selectedIds = useMemo(() => new Set(project.selectedIds), [project.selectedIds]);
   const selected = useMemo(() => project.photos.filter((photo) => selectedIds.has(photo.id)), [project.photos, selectedIds]);
-  const { scenes } = useSceneAnalysis(projectId, project.photos, project.shootType);
+  // AI 장면(이름)을 넘겨야 고르기 화면과 같은 장면·이름으로 묶인다(빠뜨리면 촬영 시각으로 다시 나눈 시간대가 나온다).
+  const { scenes } = useSceneAnalysis(projectId, project.photos, project.shootType, project.aiScenes);
   const people = useMemo(() => activeParticipants(project), [project]);
   const memoOf = (id: string) => project.photoStates[id]?.comment?.trim() ?? "";
   const memoCount = selected.filter((photo) => memoOf(photo.id)).length;
@@ -63,9 +66,7 @@ function SendScreen() {
   const notices = useMemo<Notice[]>(() => {
     const list: Notice[] = [];
     const selectHref = (scene?: number) => `/customer-select/${projectId}/select${scene === undefined ? "" : `?scene=${scene}`}`;
-    if (scenes && scenes.length > 1) scenes.forEach((scene, index) => {
-      if (!scene.photoIds.some((id) => selectedIds.has(id))) list.push({ key: `scene-${index}`, text: `${sceneLabel(scene)} 장면에서 아직 고르지 않았어요`, href: selectHref(index) });
-    });
+    // 장면마다 골랐는지는 확인하지 않는다 — 장면 수만큼 줄이 쌓여 소음이 되고, 장면을 고르게 채울 필요도 없다.
     const byGroup = new Map<string, Photo[]>();
     selected.forEach((photo) => { if (photo.similarityGroupId) byGroup.set(photo.similarityGroupId, [...(byGroup.get(photo.similarityGroupId) ?? []), photo]); });
     const multi = Array.from(byGroup.values()).filter((members) => members.length > 1);
@@ -76,7 +77,7 @@ function SendScreen() {
     const waiting = people.filter((person) => person.id !== me && !project.participantDone[person.id]);
     if (waiting.length) list.push({ key: "waiting", text: `${waiting.map((person) => person.name).join(", ")}님이 아직 고르는 중이에요` });
     return list;
-  }, [me, people, project.participantDone, projectId, scenes, selected, selectedIds]);
+  }, [me, people, project.participantDone, projectId, scenes, selected]);
 
   if (!hydrated || !isOwner) return <SystemLoadingScreen title="보낼 사진을 불러오고 있어요" homeHref="/customer-select" />;
 
@@ -193,7 +194,8 @@ function SendScreen() {
 
           <section className={s.retouch}>
             <div><h3>보정본을 받으면</h3><p>원본과 나란히 비교하고 다시 보정할 사진을 정리할 수 있어요. 필요할 때만 쓰면 돼요.</p></div>
-            <PhotographerLightButton variant="outline" size="work-panel" onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>보정본 확인하기</PhotographerLightButton>
+            <PhotographerLightButton variant="outline" size="work-panel" onClick={() => setRetouchSoon(true)}>보정본 확인하기</PhotographerLightButton>
+            {retouchSoon && <p className={s.retouchSoon} role="status">보정본 확인은 아직 준비 중이에요. 곧 열어 드릴게요.</p>}
           </section>
         </>}
       </main>

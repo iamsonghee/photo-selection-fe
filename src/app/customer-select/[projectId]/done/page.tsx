@@ -63,7 +63,7 @@ export default function CustomerDonePage() {
             </p>
             {saveError && <p role="alert" className={ui.bannerHeadWarn}>{saveError}</p>}
           </div>
-          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton disabled={retouchDone} pending={saving} pendingLabel="저장 중…" onClick={handleDone}>{retouchDone ? "완료로 표시됨 ✓" : "완료로 표시"}</PhotographerLightButton>} />
+          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton size="work-panel" disabled={retouchDone} pending={saving} pendingLabel="저장 중…" onClick={handleDone}>{retouchDone ? "완료로 표시됨 ✓" : "완료로 표시"}</PhotographerLightButton>} />
         </div>
       </main>
     </CustomerSelectShell>

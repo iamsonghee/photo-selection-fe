@@ -11,30 +11,33 @@
 .mobilePeople { display: none; }
 
 /* ── 장면 머리글·도구 ── */
-.sceneHeader { flex: none; display: flex; align-items: center; gap: 12px; padding: 12px 32px 8px; background: var(--surface); }
-.tools { flex: none; display: flex; align-items: center; gap: 6px; padding: 0 32px 10px; background: var(--surface); border-bottom: 1px solid var(--border-subtle); overflow-x: auto; scrollbar-width: none; }
+.sceneHeader { flex: none; display: flex; align-items: center; gap: 12px; padding: 12px 24px 8px; background: var(--surface); }
+.tools { flex: none; display: flex; align-items: center; gap: 6px; padding: 0 24px 10px; background: var(--surface); border-bottom: 1px solid var(--border-subtle); overflow-x: auto; scrollbar-width: none; }
 .tools::-webkit-scrollbar { display: none; }
-.search { flex: 0 1 220px; min-width: 120px; height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--foreground); font: inherit; font-size: 12px; outline: none; }
-.search:focus { border-color: var(--accent); }
-/* 툴바: 보기 범위(붙어 있는 탭) · 오른쪽 아이콘(검색·보기 옵션). 메뉴는 가로 스크롤에 잘리지 않게 바깥 틀 기준으로 띄운다. */
+/* 툴바: 테두리 알약을 반복하지 않고 역할별 모양으로 구분한다(2026-10-02).
+ * 보기 범위 = 회색 트랙 안에서 선택 칸만 흰 알약, 인물 칩 = 글자형, 검색·보기 옵션 = 아이콘만. 높이는 모두 34px. */
+.search { flex: 0 1 220px; min-width: 120px; height: 34px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--surface-raised); color: var(--foreground); font: inherit; font-size: 12px; outline: none; }
+.search:focus { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+/* 메뉴는 가로 스크롤에 잘리지 않게 바깥 틀 기준으로 띄운다. */
 .toolsWrap { flex: none; position: relative; z-index: 5; }
 .toolsAnchor { position: relative; }
 .toolsSpacer { flex: 1 1 auto; }
-.segments { flex: none; display: inline-flex; align-items: stretch; height: 34px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); overflow: hidden; }
-.segments button { height: 100%; padding: 0 13px; border: 0; border-left: 1px solid var(--border-subtle); background: none; color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
-.segments > button:first-child { border-left: 0; }
-.segments button b { color: var(--subtle-foreground); font-weight: 700; font-variant-numeric: tabular-nums; }
+.segments { flex: none; display: inline-flex; align-items: stretch; gap: 2px; height: 34px; padding: 3px; border-radius: 999px; background: var(--surface-raised); }
+.segments button { height: 100%; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.segments button b { color: var(--subtle-foreground); font-weight: 600; font-variant-numeric: tabular-nums; }
 .segments button:hover { color: var(--foreground); }
-.segments button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 9%, var(--surface)); color: var(--accent); }
+.segments > button[aria-pressed="true"], .segmentSplit:has(button[aria-pressed="true"]) { background: var(--surface); box-shadow: 0 1px 3px rgba(2, 56, 82, 0.14); }
+.segments button[aria-pressed="true"], .segmentSplit:has(button[aria-pressed="true"]) button { color: var(--accent); }
 .segments button[aria-pressed="true"] b { color: var(--accent); }
-.segmentSplit { display: inline-flex; }
-.segmentSplit .segmentCaret { padding: 0 9px 0 4px; border-left: 0; }
-.segmentSplit:has(button[aria-pressed="true"]) .segmentCaret { background: color-mix(in srgb, var(--accent) 9%, var(--surface)); color: var(--accent); }
-.iconTool { position: relative; flex: none; width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted-foreground); display: grid; place-items: center; cursor: pointer; }
-.iconTool:hover, .iconTool[aria-expanded="true"] { border-color: var(--border-strong); color: var(--foreground); }
-.iconTool i { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 800; font-style: normal; line-height: 16px; }
-.toolsMenu { position: absolute; top: calc(100% - 4px); right: 32px; width: 280px; padding: 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgba(2, 56, 82, 0.16); display: flex; flex-direction: column; gap: 2px; }
-.toolsMenuLeft { right: auto; left: 32px; width: 200px; }
+/* 찜 칸: 이름·숫자와 ▾가 한 알약 — ▾는 이름에 붙여 둔다. */
+.segmentSplit { display: inline-flex; border-radius: 999px; }
+.segmentSplit > button:first-child { padding-right: 2px; }
+.segmentSplit .segmentCaret { padding: 0 10px 0 2px; }
+.iconTool { position: relative; flex: none; width: 34px; height: 34px; border: 0; border-radius: 999px; background: none; color: var(--muted-foreground); display: grid; place-items: center; cursor: pointer; }
+.iconTool:hover, .iconTool[aria-expanded="true"] { background: var(--surface-raised); color: var(--foreground); }
+.iconTool i { position: absolute; top: -2px; right: -2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 800; font-style: normal; line-height: 16px; }
+.toolsMenu { position: absolute; top: calc(100% - 4px); right: 24px; width: 280px; padding: 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgba(2, 56, 82, 0.16); display: flex; flex-direction: column; gap: 2px; }
+.toolsMenuLeft { right: auto; left: 24px; width: 200px; }
 .toolsMenu > button { width: 100%; min-height: 40px; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--foreground); display: flex; align-items: center; justify-content: space-between; gap: 10px; font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
 .toolsMenu > button:hover { background: var(--surface-raised); }
 .toolsMenu > button[aria-checked="true"][role="menuitemradio"] { color: var(--accent); }
@@ -54,14 +57,22 @@
 .retidyRow small { color: var(--muted-foreground); font-size: 11px; font-weight: 500; }
 .retidyRow svg { flex: none; color: var(--accent); }
 .toolsMenuEmpty { margin: 0; padding: 8px 10px; color: var(--muted-foreground); font-size: 12px; }
-.toolsNote { margin: 0; padding: 7px 32px; background: color-mix(in srgb, var(--warning, #ffb800) 10%, var(--surface)); border-bottom: 1px solid var(--border-subtle); color: var(--foreground); display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.toolsNote { margin: 0; padding: 7px 24px; background: color-mix(in srgb, var(--warning, #ffb800) 10%, var(--surface)); border-bottom: 1px solid var(--border-subtle); color: var(--foreground); display: flex; align-items: center; gap: 10px; font-size: 12px; }
 .toolsNote button { padding: 0; border: 0; background: none; color: var(--muted-foreground); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-/* 인물 구성 칩(AI 판정): 아기 단독 · 가족·소수 · 여러 명 · 사람 없음 */
-.peopleChips { padding: 8px 32px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--border-subtle); }
-.peopleChips button { flex: none; height: 28px; padding: 0 11px; border: 1px solid var(--border-subtle); border-radius: 999px; background: var(--surface); color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
-.peopleChips button b { color: var(--subtle-foreground); font-weight: 600; }
-.peopleChips button[aria-pressed="true"] { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--surface)); color: var(--primary); }
+/* 인물 구성 칩(AI 판정): 아기 단독 · 가족·소수 · 여러 명 · 사람 없음. 켜고 끄는 토글, 선택 색은 보기 범위 탭과 같은 주황. */
+.peopleChips { display: flex; gap: 6px; }
+.peopleChips button { flex: none; height: 34px; padding: 0 10px; border: 0; border-radius: 999px; background: none; color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.peopleChips button:hover { background: var(--surface-raised); color: var(--foreground); }
+.peopleChips button b { color: var(--subtle-foreground); font-weight: 600; font-variant-numeric: tabular-nums; }
+.peopleChips button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--accent); }
 .peopleChips button[aria-pressed="true"] b { color: inherit; }
+/* PC: 툴바 줄 안(보기 범위 탭 옆, 간격으로 구분). 모바일: 보기 옵션 안. */
+.peopleChipsInline { flex: none; margin-left: 12px; gap: 2px; }
+/* 모바일 보기 옵션 안 인물 칩 줄 / 고른 동안의 안내 줄 — PC는 툴바 줄에 칩이 보이므로 숨긴다. */
+.peopleMenuRow { display: none; flex-direction: column; gap: 8px; padding: 8px 10px; font-size: 13px; }
+.peopleMenuRow .peopleChips { flex-wrap: wrap; }
+.peopleNote { display: none; }
+.inviteLabel { display: inline; }
 /* 장면 목록의 진행: ♥ 찜 수 · ✓ 고른 수/목표 */
 .sceneProgress { display: inline-flex; gap: 6px; }
 .sceneProgress i { font-style: normal; color: var(--subtle-foreground); }
@@ -69,7 +80,7 @@
 .sceneProgress b.done { color: var(--success); }
 
 /* ── AI 장면 정리 상태 ── */
-.analysis { flex: none; display: flex; align-items: flex-start; gap: 10px; margin: 12px 32px 0; padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--primary) 9%, var(--surface)); color: var(--foreground); }
+.analysis { flex: none; display: flex; align-items: flex-start; gap: 10px; margin: 12px 24px 0; padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--primary) 9%, var(--surface)); color: var(--foreground); }
 .analysis > svg { flex: none; margin-top: 2px; color: var(--primary); }
 .analysis > div:first-of-type { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
 .analysis strong { font-size: 14px; font-weight: 700; }
@@ -91,11 +102,13 @@
 .timeline { position: relative; min-height: 0; flex: 1; display: flex; flex-direction: column; }
 /* 카드 안 z-index(체크 버튼 등)가 위에 붙는 장면 머리글 위로 올라오지 않도록 스크롤 영역을 별도 레이어로 묶는다 */
 .timelineScroll { isolation: isolate; }
+/* 사진 카드 모서리 8px — 업로드·상세 등 셀프 고객 화면 기준(photo-grid.ts). 공용 카드(작가 고객 갤러리)는 4px 그대로. */
+.timelineScroll :global(.gl-photo-card), .timelineScroll :global(.gl-card-media), .timelineScroll :global(.gl-photo-card[data-pop])::after { border-radius: 8px; }
 /* 접힌 유사컷 표지: 뒤에 카드가 겹친 모양(누르면 상세에서 묶음을 본다). */
 /* 줄(selectGridRow)이 overflow: hidden이라 카드 안에서 그린다: 사진을 왼쪽 아래로 8px 줄이고 뒤 카드 두 장을 오른쪽 위에 겹친다. */
 .timelineScroll :global(.gl-photo-card:has(.gl-group-stack)) { padding: 8px 8px 0 0; background: transparent; }
 .timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::before,
-.timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::after { content: ""; position: absolute; border-radius: 4px; }
+.timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::after { content: ""; position: absolute; border-radius: 8px; }
 .timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::before { inset: 0 0 8px 8px; background: #dfe5e8; }
 .timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::after { inset: 4px 4px 4px 4px; background: #bfcbd1; }
 .timelineScroll :global(.gl-group-stack) { z-index: 1; }
@@ -184,10 +197,17 @@
 .floatLabel { opacity: 0; transition: opacity 120ms ease; }
 .floatNav:hover .floatLabel, .floatNav:focus-within .floatLabel { opacity: 1; }
 .mainFloatNav .timelineScroll { padding-left: 76px; }
+/* 좌우 여백 기준: 사진 영역과 툴바·장면 제목·칩·안내의 왼쪽 시작선을 맞춘다(펼침 24px, 접힘 76px = 점 메뉴 자리).
+ * 접힘 정렬은 PC만 — 모바일은 점 메뉴가 없고 아래 모바일 규칙(20px)을 쓴다. */
+@media (min-width: 768px) {
+  .mainFloatNav .sceneHeader, .mainFloatNav .tools, .mainFloatNav .toolsNote { padding-left: 76px; }
+  .mainFloatNav .analysis { margin-left: 76px; }
+  .mainFloatNav .toolsMenuLeft { left: 76px; }
+}
 @media (prefers-reduced-motion: reduce) { .floatNav, .floatLabel { transition: none; } }
 
 /* ── 하단 바 ── */
-.bottomBar { flex: none; display: flex; align-items: center; gap: 12px; padding: 12px 32px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border-subtle); background: var(--surface); }
+.bottomBar { flex: none; display: flex; align-items: center; gap: 12px; padding: 12px 24px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border-subtle); background: var(--surface); }
 .barMeta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .barMeta strong { font-size: 15px; font-weight: 800; letter-spacing: -0.02em; }
 .barMeta span { color: var(--muted-foreground); font-size: 12px; }
@@ -199,6 +219,10 @@
 .sheetHead { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 8px; }
 .sheetHead h2 { margin: 0; font-size: 17px; font-weight: 800; }
 .sheetClose { width: 32px; height: 32px; border: 0; border-radius: 8px; background: none; color: var(--muted-foreground); display: grid; place-items: center; cursor: pointer; }
+@media (min-width: 768px) {
+  .sheetBackdrop { align-items: center; padding: 20px; }
+  .sheet { border-radius: 16px; padding-bottom: 0; }
+}
 .sheetBody { overflow-y: auto; padding: 4px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
 .sheetBody p { margin: 0; color: var(--muted-foreground); font-size: 13px; line-height: 1.55; }
 .sheetList { display: flex; flex-direction: column; gap: 2px; }
@@ -262,17 +286,19 @@
 @media (prefers-reduced-motion: reduce) { .sceneEnter { animation: none; } }
 
 @media (max-width: 767px) {
-  .mobilePeople { display: block; flex: none; padding: 8px 20px 4px; background: var(--surface); }
-  .mobilePeople .people { margin-left: 0; }
   .sceneHeader { padding: 10px 20px 6px; }
   .tools { padding: 0 20px 8px; }
   .search { flex-basis: 140px; }
   .columnsRow { display: flex; }
-  .segments button { padding: 0 11px; }
+  .segments button { padding: 0 10px; }
   .toolsMenu { left: 12px; right: 12px; width: auto; }
   .toolsMenuLeft { right: auto; width: 200px; }
   .toolsNote { padding: 7px 20px; }
-  .peopleChips { padding: 8px 20px; }
+  .peopleChipsInline { display: none; }
+  .peopleMenuRow { display: flex; }
+  .peopleNote { display: flex; }
+  /* 헤더 오른쪽 초대: 모바일도 글자를 둔다(+ 아이콘만이면 사진 추가로 오해) — 좁은 폭에 맞게 여백만 줄인다. */
+  .inviteButton { padding: 0 10px; }
   .analysis { margin: 10px 20px 0; flex-wrap: wrap; }
   .analysisActions { width: 100%; padding-left: 26px; }
   .rail, .floatNav { display: none; }

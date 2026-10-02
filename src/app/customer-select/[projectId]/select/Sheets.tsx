@@ -7,6 +7,7 @@ import { CustomerShareLinkField } from "../../_lib/CustomerShareLinkField";
 import type { Person } from "./PhotoDetail";
 import s from "./select.module.css";
 
+/** 모바일은 아래에서 올라오는 시트, PC는 화면 가운데 모달(바닥에 붙으면 넓은 화면에서 멀고 어색하다). */
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };

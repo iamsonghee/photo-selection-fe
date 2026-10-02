@@ -53,6 +53,12 @@ function SelectScreen() {
   const searchParams = useSearchParams();
   const store = useCustomerSelectStore();
   const { project, hydrated, isOwner, currentIdentity: me, participantReady, accessDenied, syncStatus, saveError, clearSaveError } = store;
+  // 초대 링크(`?invite=1`, 미들웨어가 붙임)로 들어오면 참여한 적이 있어도 초대 화면을 먼저 보여준다(작가 고객 초대와 같은 흐름).
+  const [inviteSeen, setInviteSeen] = useState(false);
+  const enterFromInvite = () => {
+    setInviteSeen(true);
+    if (searchParams.get("invite")) router.replace(`/customer-select/${projectId}/select`, { scroll: false });
+  };
   const lastSceneKey = `ps:self-select-scene:${projectId}`;
 
   const [thumbQueue] = useState(() => createThumbLoadQueue(12));
@@ -238,13 +244,19 @@ function SelectScreen() {
 
   if (!hydrated) return <SystemLoadingScreen title="사진을 불러오고 있어요" homeHref="/customer-select" />;
   if (accessDenied) return <ParticipantAccessEndedScreen />;
-  if (!isOwner && !participantReady) return <ParticipantJoinScreen />;
+  if (!isOwner && (!participantReady || (searchParams.get("invite") === "1" && !inviteSeen))) return <ParticipantJoinScreen onEnter={enterFromInvite} />;
 
   const target = project.target;
   const pickedTotal = picked.size;
   const hasQuality = scenePhotos.some(isBlurFlagged);
   // 인물 구성 칩: 지금 장면에 판정된 사진이 있을 때만, 장수가 있는 구성만 보인다.
   const peopleCounts = PEOPLE_KINDS.map((kind) => ({ kind, count: scenePhotos.filter((photo) => photo.people === kind).length })).filter((item) => item.count > 0);
+  // 켜고 끄는 토글(다시 누르면 풀림) — "모두" 칩은 두지 않는다(보기 범위의 "전체"와 겹쳐 헷갈림).
+  const peopleChips = peopleCounts.length > 1 ? peopleCounts.map(({ kind, count }) => (
+    <button key={kind} type="button" aria-pressed={peopleFilter === kind} onClick={() => setPeopleFilter(peopleFilter === kind ? null : kind)}>
+      {peopleLabel(kind, project.shootType)}<b>{count}</b>
+    </button>
+  )) : null;
   const myDone = Boolean(project.participantDone[me]);
   const toReview = () => router.push(`/customer-select/${projectId}/review`);
   const withChat = people.length > 1;
@@ -299,17 +311,28 @@ function SelectScreen() {
     </button>
   ));
 
+  // 참여자: 색 아바타(이름 첫 글자)만 겹쳐 놓는다. 온라인은 초록 점, 다 골랐으면 ✓, 이름·상태는 마우스를 올리면 보인다.
+  // 보는 사진이 있는 참여자는 눌러서 같은 사진을 연다. 혼자일 때는 아바타 없이 초대 버튼만.
   const peopleBar = (
     <div className={s.people}>
-      {people.map((person) => {
-        if (person.id === me) return <NicknamePrompt key={person.id} hex={person.hex} isDone={myDone} online={online.has(person.id)} />;
-        const viewingId = project.participantViews?.[person.id];
-        const viewing = viewingId && online.has(person.id) ? photoById.get(viewingId) : undefined;
-        return viewing
-          ? <button key={person.id} type="button" className={`${ui.participantPill} ${ui.participantViewTarget}`} onClick={() => setOpenPhotoId(viewing.id)} aria-label={`${person.name}님이 보는 사진 열기`}><i style={{ background: person.hex }} />{person.name}<span className={ui.participantOnline}>보는 중</span></button>
-          : <span key={person.id} className={`${ui.participantPill} ${project.participantDone[person.id] ? ui.participantDone : ""}`}><i style={{ background: person.hex }} />{person.name}{project.participantDone[person.id] ? " 다 골랐어요" : ""}{online.has(person.id) ? <span className={ui.participantOnline}>온라인</span> : null}</span>;
-      })}
-      {isOwner && <button type="button" className={s.inviteButton} onClick={() => setSheet("invite")}><Plus size={14} />초대</button>}
+      {people.length > 1 && (
+        <span className={ui.avatars} role="list" aria-label="함께 고르는 사람">
+          {people.map((person) => {
+            const isOnline = online.has(person.id);
+            if (person.id === me) return <NicknamePrompt key={person.id} hex={person.hex} isDone={myDone} online={isOnline} />;
+            const done = project.participantDone[person.id];
+            const viewingId = project.participantViews?.[person.id];
+            const viewing = viewingId && isOnline ? photoById.get(viewingId) : undefined;
+            const label = [person.name, done ? "다 골랐어요" : null, viewing ? "보는 사진 열기" : isOnline ? "온라인" : null].filter(Boolean).join(" · ");
+            const className = `${ui.avatar} ${isOnline ? ui.avatarOnline : ""} ${viewing ? ui.avatarViewing : ""}`;
+            const content = <>{person.name.slice(0, 1)}{done ? <span className={ui.avatarDone} aria-hidden>✓</span> : null}</>;
+            return viewing
+              ? <button key={person.id} type="button" role="listitem" className={className} style={{ background: person.hex }} title={label} aria-label={label} onClick={() => setOpenPhotoId(viewing.id)}>{content}</button>
+              : <span key={person.id} role="listitem" className={className} style={{ background: person.hex }} title={label} aria-label={label}>{content}</span>;
+          })}
+        </span>
+      )}
+      {isOwner && <button type="button" className={s.inviteButton} aria-label="초대" onClick={() => setSheet("invite")}><Plus size={14} /><span className={s.inviteLabel}>초대</span></button>}
     </div>
   );
 
@@ -371,12 +394,12 @@ function SelectScreen() {
     );
   };
 
-  // 보기 범위: 붙어 있는 탭 하나(전체 · 찜 ▾ · 고른 사진) — 지금 장면 기준 장수. 찜 세부 범위는 ▾ 메뉴에서.
+  // 보기 범위: 회색 트랙 하나(전체 · 찜 ▾ · 최종 선택) — 지금 장면 기준 장수. 찜 세부 범위는 ▾ 메뉴에서. 보이는 글자는 짧게, 읽어 주는 이름(aria)은 원래 이름.
   const countIn = (test: (photo: Photo) => boolean) => scenePhotos.filter(test).length;
-  const likeOptions: { value: Scope; label: string; menuLabel: string; count: number; show: boolean }[] = [
-    { value: "liked", label: "♥ 찜한 사진", menuLabel: "누구든 찜", count: countIn((photo) => likesOf(photo.id).length > 0), show: true },
-    { value: "mine", label: "♡ 내 찜", menuLabel: "내 찜", count: countIn((photo) => myLikes.has(photo.id)), show: true },
-    { value: "popular", label: "찜 2명 이상", menuLabel: "2명 이상 찜", count: countIn((photo) => likesOf(photo.id).length >= 2), show: people.length > 1 },
+  const likeOptions: { value: Scope; label: string; ariaLabel: string; menuLabel: string; count: number; show: boolean }[] = [
+    { value: "liked", label: "♥ 찜", ariaLabel: "♥ 찜한 사진", menuLabel: "누구든 찜", count: countIn((photo) => likesOf(photo.id).length > 0), show: true },
+    { value: "mine", label: "♡ 내 찜", ariaLabel: "♡ 내 찜", menuLabel: "내 찜", count: countIn((photo) => myLikes.has(photo.id)), show: true },
+    { value: "popular", label: "♥ 2명 이상", ariaLabel: "찜 2명 이상", menuLabel: "2명 이상 찜", count: countIn((photo) => likesOf(photo.id).length >= 2), show: people.length > 1 },
   ];
   const likeActive = LIKE_SCOPES.includes(scope);
   const likeOption = likeOptions.find((option) => option.value === (likeActive ? scope : "liked"))!;
@@ -413,10 +436,9 @@ function SelectScreen() {
       viewportLocked
       compactHeader
       compactTitle={<ProjectStepHeader projectId={projectId} name={project.name} step="select" isOwner={isOwner} />}
-      headerMeta={peopleBar}
+      headerActions={peopleBar}
     >
       <div className={s.page} data-chat={withChat ? "" : undefined}>
-        <div className={s.mobilePeople}>{peopleBar}</div>
 
         {syncStatus === "offline" && <div role="status" className="border-b border-danger/20 bg-danger/8 px-5 py-2 text-center text-xs font-semibold text-danger">연결이 불안정해요. 다시 연결하고 있어요.</div>}
         {saveError && <div role="alert" className="flex items-center gap-2 border-b border-danger/20 bg-danger/8 px-5 py-2 text-xs font-semibold text-danger"><span className="flex-1">{saveError}</span><button type="button" onClick={clearSaveError}>닫기</button></div>}
@@ -453,11 +475,13 @@ function SelectScreen() {
                 <div className={s.segments} role="group" aria-label="보기 범위">
                   <button type="button" aria-pressed={scope === "all"} aria-label="전체" onClick={() => setScope("all")}>전체<b>{scenePhotos.length}</b></button>
                   <span className={s.segmentSplit}>
-                    <button type="button" aria-pressed={likeActive} aria-label={likeOption.label} onClick={() => setScope(likeOption.value)}>{likeOption.label}<b>{likeOption.count}</b></button>
+                    <button type="button" aria-pressed={likeActive} aria-label={likeOption.ariaLabel} onClick={() => setScope(likeOption.value)}>{likeOption.label}<b>{likeOption.count}</b></button>
                     <button type="button" className={s.segmentCaret} aria-label="찜 범위 바꾸기" aria-haspopup="menu" aria-expanded={menu === "like"} onClick={() => setMenu(menu === "like" ? null : "like")}><ChevronDown size={14} /></button>
                   </span>
-                  <button type="button" aria-pressed={scope === "picked"} aria-label={isOwner ? "✓ 고른 사진" : "✓ 최종 선택"} onClick={() => setScope("picked")}>{isOwner ? "✓ 고른 사진" : "✓ 최종 선택"}<b>{countIn((photo) => selectedIds.has(photo.id))}</b></button>
+                  <button type="button" aria-pressed={scope === "picked"} aria-label="✓ 최종 선택" onClick={() => setScope("picked")}>✓ 최종 선택<b>{countIn((photo) => selectedIds.has(photo.id))}</b></button>
                 </div>
+                {/* 인물 칩: PC는 툴바 줄에(줄 수를 줄인다), 모바일은 아래 별도 줄(가로 스크롤). */}
+                {peopleChips && <div className={`${s.peopleChips} ${s.peopleChipsInline}`} role="group" aria-label="인물 구성">{peopleChips}</div>}
                 <span className={s.toolsSpacer} />
                 {searchOpen || query
                   ? <input className={s.search} type="search" value={query} autoFocus onChange={(event) => setQuery(event.target.value)} onBlur={() => { if (!query) setSearchOpen(false); }} placeholder="파일명 검색" aria-label="파일명 검색" />
@@ -487,6 +511,7 @@ function SelectScreen() {
                       <span><strong>흔들림 사진 빼기</strong><small>AI가 흔들림·초점 문제를 의심한 사진을 빼요(고른 사진은 남겨요)</small></span><i aria-hidden />
                     </button>
                   )}
+                  {peopleChips && <div className={s.peopleMenuRow}><strong>인물</strong><div className={s.peopleChips} role="group" aria-label="인물 구성">{peopleChips}</div></div>}
                   <div className={s.columnsRow}>
                     <strong>한 줄에</strong>
                     {([2, 3, 4] as MobileColumns[]).map((count) => <button key={count} type="button" aria-label={`한 줄에 ${count}장`} aria-pressed={mobileColumns === count} onClick={() => setMobileColumns(count)}>{count}</button>)}
@@ -501,15 +526,12 @@ function SelectScreen() {
                 </div>
               )}
               </div>
-              {peopleCounts.length > 1 && (
-                <div className={s.peopleChips} role="group" aria-label="인물 구성">
-                  <button type="button" aria-pressed={!peopleFilter} onClick={() => setPeopleFilter(null)}>모두</button>
-                  {peopleCounts.map(({ kind, count }) => (
-                    <button key={kind} type="button" aria-pressed={peopleFilter === kind} onClick={() => setPeopleFilter(peopleFilter === kind ? null : kind)}>
-                      {peopleLabel(kind, project.shootType)}<b>{count}</b>
-                    </button>
-                  ))}
-                </div>
+              {/* 모바일: 인물 칩은 보기 옵션 안에 있고, 고른 동안만 안내 줄로 알린다(PC는 툴바 줄에 칩이 보인다). */}
+              {peopleFilter && (
+                <p className={`${s.toolsNote} ${s.peopleNote}`}>
+                  <span><strong>{peopleLabel(peopleFilter, project.shootType)}</strong>만 보는 중</span>
+                  <button type="button" onClick={() => setPeopleFilter(null)}>해제</button>
+                </p>
               )}
               {setAside && setAsideCount > 0 && (
                 <p className={s.toolsNote}>

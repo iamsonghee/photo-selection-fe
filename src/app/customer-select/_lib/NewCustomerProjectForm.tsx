@@ -175,8 +175,8 @@ export function NewCustomerProjectForm() {
         leading={<div><p className="text-sm font-bold text-foreground">프로젝트를 만든 후 사진을 올립니다.</p><p className="mt-1 text-xs text-muted-foreground">업로드한 순서와 원본 파일명은 그대로 유지돼요.</p></div>}
         actions={(
           <>
-            <PhotographerLightButton variant="secondary" onClick={() => router.push("/customer-select")} disabled={submitting}>취소</PhotographerLightButton>
-            <PhotographerLightButton onClick={handleCreate} pending={submitting} pendingLabel="생성 중…">사진 올리기</PhotographerLightButton>
+            <PhotographerLightButton size="work-panel" variant="secondary" onClick={() => router.push("/customer-select")} disabled={submitting}>취소</PhotographerLightButton>
+            <PhotographerLightButton size="work-panel" onClick={handleCreate} pending={submitting} pendingLabel="생성 중…">사진 올리기</PhotographerLightButton>
           </>
         )}
       />

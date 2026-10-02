@@ -19,10 +19,13 @@ export const BrandLogoBar = memo(function BrandLogoBar({
   size = "md",
   className = "",
   href,
+  markOnly = false,
 }: {
   size?: BrandLogoSize;
   className?: string;
   href?: string;
+  /** "A" 마크만 — 옆에 프로젝트명 같은 제목이 붙는 좁은 헤더용(셀프 고객 프로젝트 화면). */
+  markOnly?: boolean;
 }) {
   const s = BAR[size];
   const inner = (
@@ -51,7 +54,7 @@ export const BrandLogoBar = memo(function BrandLogoBar({
       >
         A
       </div>
-      <span
+      {!markOnly && <span
         style={{
           fontFamily: FONT,
           fontWeight: 800,
@@ -63,7 +66,7 @@ export const BrandLogoBar = memo(function BrandLogoBar({
         }}
       >
         A-CUT<span style={{ color: BRAND_ORANGE }}>.</span>
-      </span>
+      </span>}
     </div>
   );
   if (href) {

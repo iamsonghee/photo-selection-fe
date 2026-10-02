@@ -188,7 +188,7 @@ export default function RetouchComparePage() {
               )}
             </div>
           </div>
-          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton
+          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton size="work-panel"
               disabled={!allReviewed || Boolean(savingVersionId)}
               onClick={() => router.push(`/customer-select/${projectId}/retouch/export`)}
             >
