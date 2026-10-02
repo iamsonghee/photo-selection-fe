@@ -387,8 +387,9 @@ function SelectScreen() {
   // 보는 사진이 있는 참여자는 눌러서 같은 사진을 연다. 혼자일 때는 아바타 없이 초대 버튼만.
   const peopleBar = (
     <div className={s.people}>
+      {/* 아바타 묶음은 group — 버튼에 listitem 역할을 덮으면 버튼으로 읽히지 않는다. 누를 수 없는 아바타는 img로 이름·상태를 읽힌다. */}
       {people.length > 1 && (
-        <span className={ui.avatars} role="list" aria-label="함께 고르는 사람">
+        <span className={ui.avatars} role="group" aria-label="함께 고르는 사람">
           {people.map((person) => {
             const isOnline = online.has(person.id);
             if (person.id === me) return <NicknamePrompt key={person.id} hex={person.hex} isDone={myDone} online={isOnline} />;
@@ -399,8 +400,8 @@ function SelectScreen() {
             const className = `${ui.avatar} ${isOnline ? ui.avatarOnline : ""} ${viewing ? ui.avatarViewing : ""}`;
             const content = <>{person.name.slice(0, 1)}{done ? <span className={ui.avatarDone} aria-hidden>✓</span> : null}</>;
             return viewing
-              ? <button key={person.id} type="button" role="listitem" className={className} style={{ background: person.hex }} title={label} aria-label={label} onClick={() => setOpenPhotoId(viewing.id)}>{content}</button>
-              : <span key={person.id} role="listitem" className={className} style={{ background: person.hex }} title={label} aria-label={label}>{content}</span>;
+              ? <button key={person.id} type="button" className={className} style={{ background: person.hex }} title={label} aria-label={label} onClick={() => setOpenPhotoId(viewing.id)}>{content}</button>
+              : <span key={person.id} role="img" className={className} style={{ background: person.hex }} title={label} aria-label={label}>{content}</span>;
           })}
         </span>
       )}

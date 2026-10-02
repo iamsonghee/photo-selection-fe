@@ -1,6 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 import { loginAsPhotographer } from "../../helpers/auth";
 
+const PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+
 test("selection and participant completion sync between sessions without a reload", async ({ browser }) => {
   const ownerContext = await browser.newContext();
   const participantContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -17,7 +19,8 @@ test("selection and participant completion sync between sessions without a reloa
   const views: Record<string, string | null> = {};
   const project = () => ({
     id: "live-sync", name: "실시간 확인", shootType: "wedding", target: 30, photoCount: 1, uploaded: true, realtimeKey: "live-sync-e2e",
-    photos: [{ id: "p1", projectId: "live-sync", orderIndex: 0, url: "", previewUrl: "", originalFilename: "A001.jpg" }],
+    // 빈 src는 개발 모드 오류 배지를 띄워 하단 버튼을 덮는다 — 1픽셀 이미지를 쓴다.
+    photos: [{ id: "p1", projectId: "live-sync", orderIndex: 0, url: PIXEL, previewUrl: PIXEL, originalFilename: "A001.jpg" }],
     selectedIds: selected ? ["p1"] : [], photoStates: sharedComment ? { p1: { comment: sharedComment } } : {}, participantOpinions: {},
     participantDone: { red: false, blue: participantDone }, participantNicknames: { red: "소유자", blue: "동행" },
     shareToken: "", shareEnabled: true, exported: false, deliveryCount: 0, lastDeliveredAt: null,
@@ -57,21 +60,24 @@ test("selection and participant completion sync between sessions without a reloa
 
   await owner.goto("/customer-select/live-sync/select");
   await participant.goto("/customer-select/live-sync/select");
-  const ownerSeesParticipant = owner.locator('[class*="participantPill"]').filter({ hasText: "동행" }).first();
+  // 헤더의 참여자 아바타: 이름·상태는 아바타 이름(aria-label)에 `동행 · 다 골랐어요 · 온라인`처럼 들어 있다.
+  const ownerSeesParticipant = owner.getByRole("group", { name: "함께 고르는 사람" }).locator('[aria-label^="동행"]');
   await expect(ownerSeesParticipant).toBeVisible();
-  await expect(ownerSeesParticipant).not.toContainText("다 골랐어요");
+  await expect(ownerSeesParticipant).not.toHaveAttribute("aria-label", /다 골랐어요/);
   await participant.getByRole("button", { name: "다 골랐어요" }).click();
-  await expect(ownerSeesParticipant).toContainText("다 골랐어요", { timeout: 5000 });
-  await expect(owner.locator('[class*="participantPill"]').filter({ hasText: "동행" }).first()).toContainText("온라인", { timeout: 5000 });
+  await expect(ownerSeesParticipant).toHaveAttribute("aria-label", /다 골랐어요/, { timeout: 5000 });
+  await expect(ownerSeesParticipant).toHaveAttribute("aria-label", /온라인|보는 사진 열기/, { timeout: 5000 });
   await owner.locator('[data-photo-id="p1"] .gl-check-box').click();
   // 참여자는 소유자의 최종 선택을 "✓ 최종 선택" 보기로 확인한다.
   await participant.getByRole("button", { name: "✓ 최종 선택" }).click();
   await expect(participant.locator('[data-photo-id="p1"]')).toBeVisible({ timeout: 5000 });
   await participant.getByRole("button", { name: "모두", exact: true }).click();
   await participant.locator('[data-photo-id="p1"]').click();
-  const samePhoto = owner.getByRole("button", { name: "동행님이 보는 사진 열기" }).first();
+  const samePhoto = owner.getByRole("button", { name: /^동행 · .*보는 사진 열기/ }).first();
   await expect(samePhoto).toBeVisible({ timeout: 5000 });
   await samePhoto.click();
+  // 모바일 상세의 메모는 `메모 쓰기`를 눌러야 펼쳐진다.
+  await participant.getByRole("button", { name: "메모 쓰기" }).click();
   await participant.getByRole("textbox", { name: "작가 전달 메모" }).fill("조금 밝게 부탁드려요");
   await participant.getByRole("textbox", { name: "작가 전달 메모" }).blur();
   // 같은 사진을 보고 있는 소유자 화면에도 공용 메모가 반영된다.

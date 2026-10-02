@@ -78,7 +78,10 @@ test("first-time participant chooses an available color before entering", async 
   } }));
 
   await page.goto("/customer-select/join-check/select");
-  await expect(page.getByText(/사진 고르기에 초대했어요/)).toBeVisible();
+  // 처음 온 참여자는 초대 화면(작가 고객 초대와 같은 구성)을 보고, `함께 고르기 시작`을 눌러 이름 시트를 연다.
+  // 소유자 이름이 없는 프로젝트라 제목은 "함께 사진을 골라 주세요".
+  await expect(page.getByRole("heading", { name: /함께 사진을\s*골라 주세요/ })).toBeVisible();
+  await page.getByRole("button", { name: "함께 고르기 시작" }).click();
   // 이름만 입력하면 남은 색(사용 중인 파랑 제외)이 자동으로 배정된다.
   await page.getByRole("button", { name: "바꾸기" }).click();
   await expect(page.getByRole("radio", { name: "파랑" })).toHaveCount(0);

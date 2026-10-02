@@ -198,7 +198,8 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
 
   await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight * 0.63 }));
   await page.waitForTimeout(400);
-  const positionKey = `ps:self-select:${PROJECT_ID}:all:all:1`;
+  // select/page.tsx positionKey: ps:self-select:{프로젝트}:{장면|all}:{보기 범위}:{인물 필터}:{유사컷 묶기}
+  const positionKey = `ps:self-select:${PROJECT_ID}:all:all::1`;
   const restoreBefore = await page.evaluate((key) => sessionStorage.getItem(key), positionKey);
   await page.reload();
   await expect(page.locator("[data-photo-id]").first()).toBeVisible({ timeout: 20_000 });
