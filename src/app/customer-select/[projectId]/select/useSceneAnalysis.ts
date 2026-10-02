@@ -150,7 +150,8 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
     }
     try {
       const responses = await startAiTidy(projectId, kinds, shootType);
-      if (!responses.some((response) => response.ok)) return "AI 정리를 시작하지 못했어요. 잠시 후 다시 시도해 주세요.";
+      // 409: 다른 탭·기기에서 이미 정리 중 — 오류가 아니라 그 진행 상태를 이어서 보여준다.
+      if (!responses.some((response) => response.ok || response.status === 409)) return "AI 정리를 시작하지 못했어요. 잠시 후 다시 시도해 주세요.";
       setRemote("processing");
       setPollKey((key) => key + 1);
       return null;

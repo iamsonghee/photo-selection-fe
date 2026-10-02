@@ -351,11 +351,12 @@ function SelectScreen() {
         href="#"
         photo={photo}
         // ✓(왼쪽 위)는 최종 선택 — 소유자는 누르고, 참여자는 소유자가 고른 사진에 표시만 본다.
-        // 표지는 "묶음 하나"라 표지 사진의 선택 스타일을 쓰지 않는다 — 묶음 안 선택 수는 ✓ 자리에 `✓ M`.
-        selected={!isCover && selectedIds.has(photo.id)}
+        // 접힌 묶음도 표지(앞에 보이는 대표 사진)를 바로 최종 선택할 수 있다 — 표지의 ✓는 표지 사진 한 장.
+        // 묶음 안에 고른 사진이 있으면 ✓ 자리에 묶음 선택 수 `✓ M`을 덮어 보이고(누르면 아래 ✓가 눌린다), 표지는 고른 사진이 앞에 온다.
+        selected={selectedIds.has(photo.id)}
         highlighted={isCover && members.some((member) => selectedIds.has(member.id))}
         showCheck={!(columns >= 3 && typeof window !== "undefined" && window.innerWidth <= 767)}
-        checkReadOnly={!isOwner || isCover}
+        checkReadOnly={!isOwner}
         showRating={false}
         // 찜(왼쪽 아래 `♥ N`): 누구에게나 같은 자리·모양. 표지는 묶음 전체 찜 수를 표시만 한다.
         liked={!isCover && myLikes.has(photo.id)}

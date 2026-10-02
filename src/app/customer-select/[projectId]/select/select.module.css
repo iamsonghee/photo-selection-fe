@@ -111,6 +111,8 @@
 .timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::before { inset: 0 0 8px 8px; background: #dfe5e8; }
 .timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::after { inset: 4px 4px 4px 4px; background: #bfcbd1; }
 .timelineScroll :global(.gl-group-stack) { z-index: 1; }
+/* 표지의 `✓ M`은 표시만 — 누르면 그 아래 표지 ✓ 버튼이 눌린다. */
+.timelineScroll :global(.gl-group-picks) { pointer-events: none; }
 /* 배지로 펼친 묶음의 띠(SceneGrid가 묶음 줄 뒤에 깐다). 사진 크기는 다른 카드와 같다. */
 .groupBand { position: absolute; left: -5px; right: -5px; background: #d3dce1; }
 .timelineScroll :global(.gl-group-media) { outline: 0; }

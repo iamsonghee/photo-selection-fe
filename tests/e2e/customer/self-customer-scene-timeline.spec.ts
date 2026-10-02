@@ -346,25 +346,33 @@ test("detail moves by gallery stops and browses a folded group with up/down and 
   await context.close();
 });
 
-test("a collapsed cover never looks selected; the badge shows the group's picks", async ({ browser }) => {
+test("a collapsed cover can be picked directly; the badge shows the group's picks", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await loginAsPhotographer(page);
   await mock(page);
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
-  // p1·p2를 고른 첫 묶음(p0~p2)의 표지는 고른 사진(p1)이지만 선택 스타일 없이 배지로만 알린다.
+  // p1·p2를 고른 첫 묶음(p0~p2)의 표지는 고른 사진(p1). 고른 장수는 ✓ 자리(왼쪽 위)에 `✓ 2`, 묶음 배지는 ⧉ 3 만.
   const cover = page.locator('.gl-photo-card[data-photo-id="p1"]');
-  // 고른 장수는 ✓ 자리(왼쪽 위)에, 묶음 배지는 ⧉ 3 만.
   const picks = cover.getByRole("img", { name: "2장 선택" });
   await expect(picks).toHaveText("2");
   const [coverBox, picksBox] = [(await cover.boundingBox())!, (await picks.boundingBox())!];
   expect(picksBox.x - coverBox.x).toBeLessThan(24);
   expect(picksBox.y - coverBox.y).toBeLessThan(24);
   await expect(cover.getByRole("button", { name: "유사컷 3장 펼치기" })).toHaveText("3");
-  await expect(cover).not.toHaveClass(/gl-selected/);
-  // 대신 주황 테두리로 이 묶음에 고른 사진이 있음을 보인다.
   await expect(cover.locator('[data-active="true"]')).toHaveCount(1);
-  await expect(page.locator('.gl-photo-card[data-photo-id="p8"] [data-active="true"]')).toHaveCount(0);
+
+  // 고른 사진이 없는 묶음도 펼치지 않고 표지(앞의 대표 사진)를 바로 최종 선택한다.
+  const plain = page.locator('.gl-photo-card[data-photo-id="p8"]');
+  await expect(plain.locator('[data-active="true"]')).toHaveCount(0);
+  await plain.hover();
+  await plain.getByRole("button", { name: "선택", exact: true }).click();
+  await expect(plain.getByRole("img", { name: "1장 선택" })).toBeVisible();
+  await expect(plain.locator('[data-active="true"]')).toHaveCount(1);
+  // ✓ 1 을 다시 누르면 표지 사진 선택이 풀린다(배지는 표시만, 아래 ✓가 눌린다).
+  await plain.getByRole("img", { name: "1장 선택" }).click();
+  await expect(plain.getByRole("img", { name: /장 선택/ })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: /상세 보기/ })).toHaveCount(0);
   await context.close();
 });
 
