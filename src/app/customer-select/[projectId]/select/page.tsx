@@ -358,10 +358,10 @@ function SelectScreen() {
         showCheck={!(columns >= 3 && typeof window !== "undefined" && window.innerWidth <= 767)}
         checkReadOnly={!isOwner}
         showRating={false}
-        // 찜(왼쪽 아래 `♥ N`): 누구에게나 같은 자리·모양. 표지는 묶음 전체 찜 수를 표시만 한다.
-        liked={!isCover && myLikes.has(photo.id)}
-        likeCount={isCover ? members.reduce((sum, member) => sum + likesOf(member.id).length, 0) : likesOf(photo.id).length}
-        likeNames={isCover ? undefined : likesOf(photo.id).map((color) => color === me ? "나" : project.participantNicknames[color] || "참가자").join(", ")}
+        // 찜(왼쪽 아래 `♥ N`): 누구에게나 같은 자리·모양. 접힌 묶음도 ✓처럼 표지(대표 사진) 한 장의 찜이다.
+        liked={myLikes.has(photo.id)}
+        likeCount={likesOf(photo.id).length}
+        likeNames={likesOf(photo.id).map((color) => color === me ? "나" : project.participantNicknames[color] || "참가자").join(", ")}
         likePrimary={!isOwner}
         hasComment={Boolean(project.photoStates[photo.id]?.comment)}
         showGroupBadge={isCover}
@@ -389,7 +389,7 @@ function SelectScreen() {
         showFilename={query.trim().length > 0}
         onPhotoClick={(event) => { event.preventDefault(); setOpenPhotoId(photo.id); }}
         onCheckClick={(event) => { event.preventDefault(); event.stopPropagation(); store.toggleSelect(photo.id); }}
-        onLikeClick={isCover ? undefined : (event) => { event.preventDefault(); event.stopPropagation(); store.toggleLike(photo.id, me); }}
+        onLikeClick={(event) => { event.preventDefault(); event.stopPropagation(); store.toggleLike(photo.id, me); }}
         popOnSelect={isOwner}
         onRate={() => {}}
         onThumbError={() => {}}

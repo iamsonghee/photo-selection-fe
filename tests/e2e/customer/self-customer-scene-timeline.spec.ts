@@ -375,6 +375,11 @@ test("a collapsed cover can be picked directly; the badge shows the group's pick
   await plain.getByRole("img", { name: "1장 선택" }).click();
   await expect(plain.getByRole("img", { name: /장 선택/ })).toHaveCount(0);
   await expect(page.getByRole("dialog", { name: /상세 보기/ })).toHaveCount(0);
+  // 찜(♡)도 ✓처럼 표지 사진 한 장 — 펼치지 않고 표지에서 바로 찜한다.
+  await plain.hover();
+  await plain.getByRole("button", { name: /^찜하기/ }).click();
+  await expect(plain.getByRole("button", { name: /^찜 해제 · 1명 찜/ })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: /상세 보기/ })).toHaveCount(0);
   await context.close();
 });
 
