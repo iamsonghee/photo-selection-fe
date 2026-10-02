@@ -234,7 +234,8 @@ AI 장면 정리는 이 서비스의 핵심 차별점이다. 분석에는 시간
 - `customer_photo_versions`: 사진별 보정본 회차와 확정·재보정 결정
 - `customer_ai_runs`, `customer_ai_embeddings`, `customer_photo_groups`,
   `customer_quality_assessments`: 셀프 고객 사진의 장면·유사컷·품질 분석(`customer_ai_runs.kind` = scene·similarity·quality,
-  `settings` = 그 실행의 AI 설정, `updated_at` = 마지막 진행 기록)
+  `settings` = 그 실행의 AI 설정, `updated_at` = 마지막 진행 기록, `usage` = 장면 이름·품질 판정의 Gemini 토큰 합계
+  `{calls, prompt_tokens, output_tokens, thinking_tokens, total_tokens}` — 마이그레이션 `20261003020000_customer_ai_run_usage.sql`)
 
 모든 테이블은 RLS를 켜고 브라우저에서 직접 쓰지 않는다. Next.js API 또는 BE가 service role로
 처리한다. 참가자별 찜 변경은 `toggle_customer_selection_color` RPC로 원자 처리한다.
@@ -488,6 +489,8 @@ CSV/TXT 다운로드까지 정상 동작했고 가로 오버플로와 콘솔 오
 | 장면 이름 고르기 | 대표 3장(흔들림·초점·눈 감음 likely 제외, 유사컷 묶음당 한 장, 앞·중간·뒤 고르게), 목록 밖이거나 `confident=false`면 `기타 장면` | BE `customer_ai.py` `SCENE_SAMPLE_PHOTOS`, `pick_samples`, `_name_scene` 프롬프트 | **프롬프트·응답 형식을 바꾸면 `SCENE_NAME_PROMPT_VERSION`(지금 `v2-confident`)을 올린다** — 실행 `settings`에 남아 검수 채점에서 구분. 품질·유사컷 결과는 이미 있을 때만 씀(장면이 그 분석을 기다리지 않음) |
 | 같은 이름 장면 합치기 | 바로 이어지고 사이 공백이 10분 미만인 같은 이름만 합침(`기타 장면`·이름 없음은 안 합침). 합친 뒤에도 같은 이름이 두 번 이상 남으면 순서대로 `야외 1`, `야외 2` 번호를 붙인다(순서는 모델이 아니라 후처리 — 검수 채점은 번호를 떼고 비교) | BE `customer_ai.py` `merge_same_named`, `number_repeated` / FE `scene-label-score.ts` | 이름 오판이 긴 시간 경계를 없애지 않게(2026-10-02). 웨딩 촬영처럼 의상을 연달아 바꾸는 촬영은 짧은 공백도 합치면 안 될 수 있음 — 라벨 결과 보고 판단 |
 | 유사컷 기준 | 코사인 유사도 0.94 | BE `clip-service/app/config.py` `GEMINI_SIMILARITY_THRESHOLD` (환경변수) | 작가 분석과 공용 값 |
+| Gemini 재시도 | 429·5xx·timeout·네트워크 오류만 최대 2회(`GEMINI_QUALITY_MAX_RETRIES`, `GEMINI_MAX_RETRIES`), 응답 JSON이 스키마에 안 맞으면 한 번만 다시 묻기. 400대는 재시도 안 함 | BE `clip-service/app/gemini_client.py` `is_retryable`, `gemini_quality_client.py` `_assess_one` | 장애 때 호출 수(=비용)가 3배로 튀지 않게(2026-10-03). 작가 분석 임베딩도 같은 규칙 |
+| 품질·인물 판정 비용 | 셀프 고객 판정은 Gemini **Flex** 티어(표준가의 절반), 1200px 미리보기 그대로, thinking 설정 없음 | BE `clip-service/app/config.py` `GEMINI_CUSTOMER_QUALITY_SERVICE_TIER`(env, 기본 `flex`, `standard`로 되돌림) | 2026-10-03 실측(돌잔치 150장, `clip-service/scripts/quality_cost_experiment.py`): 표준 사진 1,000장당 약 $0.71(입력 69%·출력 31%, thinking 0) → Flex $0.36, 판정·지연 차이 없음. 해상도 MEDIUM/LOW는 눈 감음 likely를 7장 중 4/1장만 잡아 쓰지 않음, 300px 썸네일은 토큰이 줄지 않음(해상도 설정 기준 과금). `notes`(출력의 약 40%, 화면 미사용)를 빼면 약 12% 더 줄지만 프롬프트 버전이 바뀌어 전체 재판정 — 다음 판정 변경 때 함께. 작가 판정은 표준(비용 추정이 표준가) |
 | 품질·인물 판정 프롬프트 | 셀프 고객 전용 `CustomerPhotoAssessment`(작가 판정 + `people`) | BE `clip-service/app/gemini_quality_client.py` `_CUSTOMER_PROMPT` | **프롬프트를 바꾸면 `CUSTOMER_QUALITY_PROMPT_VERSION`(`customer_ai.py`, 지금 `v1-people`)도 올린다** — 버전이 같으면 이미 판정한 사진을 다시 판정하지 않음. 올리면 다음 정리 때 전체 재판정(사진 수만큼 Gemini 호출). 작가 판정 프롬프트(`_PROMPT`)는 따로 |
 | 화면 해석: 흔들림 | `blur_or_shake` 또는 `focus_issue`가 possible·likely면 "흐림 의심" | FE `src/lib/customer-select-server.ts` `toPhoto` | |
 | 화면 해석: 눈 감음 | **likely만** 의심으로 침(possible은 무시) | 같은 곳 | 웃음·윙크 같은 의도된 표정이 많음(60장 분석에서 possible까지 치면 38%). 528장 돌잔치에서 likely 20장(약 4%) |
