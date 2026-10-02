@@ -38,9 +38,10 @@ type EditableProject = {
 
 export function EditCustomerProjectForm({ project }: { project: EditableProject }) {
   const router = useRouter();
-  // 프로젝트 화면(헤더의 프로젝트명, 업로드의 "촬영 종류 바꾸기")에서 왔으면 저장·취소 뒤 그 화면으로 돌아간다.
+  // 프로젝트 화면(상세의 "설정에서 수정", 업로드의 "촬영 종류 바꾸기")에서 왔으면 저장·취소 뒤 그 화면으로 돌아간다.
   const from = useSearchParams().get("from");
-  const backHref = from && ["upload", "select", "review"].includes(from) ? `/customer-select/${project.id}/${from}` : "/customer-select";
+  const backHref = from === "home" ? `/customer-select/${project.id}`
+    : from && ["upload", "select", "review"].includes(from) ? `/customer-select/${project.id}/${from}` : "/customer-select";
   const [name, setName] = useState(project.name);
   const [shootType, setShootType] = useState<string | null>(project.shoot_type);
   const [target, setTarget] = useState(String(project.target_count));
@@ -138,7 +139,7 @@ export function EditCustomerProjectForm({ project }: { project: EditableProject 
       </div>
     </PhotographerLightPageFrame>
 
-    <PhotographerFormActionBar maxWidth={840} error={error} leading={<p className="text-sm text-muted-foreground">변경한 정보는 프로젝트 목록과 셀렉 화면에 반영됩니다.</p>} actions={<><PhotographerLightButton variant="secondary" onClick={() => router.push(backHref)} disabled={saving}>취소</PhotographerLightButton><PhotographerLightButton onClick={save} pending={saving} pendingLabel="저장 중…">변경사항 저장</PhotographerLightButton></>} />
+    <PhotographerFormActionBar maxWidth={840} error={error} leading={<p className="text-sm text-muted-foreground">변경한 정보는 프로젝트 목록과 셀렉 화면에 반영됩니다.</p>} actions={<><PhotographerLightButton size="work-panel" variant="secondary" onClick={() => router.push(backHref)} disabled={saving}>취소</PhotographerLightButton><PhotographerLightButton size="work-panel" onClick={save} pending={saving} pendingLabel="저장 중…">변경사항 저장</PhotographerLightButton></>} />
     {confirmDelete && <SelectionConfirmDialog title="프로젝트를 삭제할까요?" description={<>업로드한 사진과 모든 작업 기록이 삭제됩니다.<br />이 작업은 되돌릴 수 없어요.</>} confirmLabel="삭제하기" busyLabel="삭제 중…" confirming={deleting} error={error} danger onCancel={() => setConfirmDelete(false)} onConfirm={remove} />}
   </>;
 }

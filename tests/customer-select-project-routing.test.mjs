@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { customerProjectAction, customerProjectDestination, customerProjectStatus, filterCustomerProjects } from "../src/app/customer-select/_lib/project-routing.ts";
+import { customerProjectAction, customerProjectDestination, customerProjectHome, customerProjectStatus, filterCustomerProjects } from "../src/app/customer-select/_lib/project-routing.ts";
 
 const project = (overrides = {}) => ({
   id: "project-1",
@@ -21,6 +21,7 @@ const project = (overrides = {}) => ({
   ...overrides,
 });
 
+assert.equal(customerProjectHome("project-1"), "/customer-select/project-1");
 assert.equal(customerProjectDestination(project()), "/customer-select/project-1/upload");
 assert.equal(customerProjectDestination(project({ photo_count: 10 })), "/customer-select/project-1/select");
 assert.equal(customerProjectDestination(project({ exported: true, photo_count: 10 })), "/customer-select/project-1/select");
