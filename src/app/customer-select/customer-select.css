@@ -1,0 +1,99 @@
+/* Customer foundations: customer-design.md §4. Scoped to the Select prototype. */
+.customer-select-app {
+  --select-surface: #f7f7f6;
+  --select-line: #eceeed;
+  --select-muted: #757575;
+  --select-accent-soft: #fff2ec;
+  --select-accent-line: #ffcfba;
+  --select-accent-ink: #c33d00;
+  --select-photo-radius: 4px;
+  color: var(--customer-ink);
+  background: var(--customer-canvas);
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.customer-select-app .cs-title {
+  color: var(--customer-ink);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 36px;
+  letter-spacing: -.045em;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.customer-select-app .cs-brand-header { border-bottom: 1px solid var(--select-line); }
+.customer-select-app .cs-brand-header > header { max-width: 1440px; margin: auto; }
+.customer-select-app .cs-brand-header > span { z-index: 21; }
+.customer-select-app .cs-primary,
+.customer-select-app .cs-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  text-align: center;
+  transition: background-color 150ms, border-color 150ms;
+}
+.customer-select-app .cs-primary {
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 20px;
+  border: 1px solid var(--customer-control);
+  background: var(--customer-control);
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 24px;
+}
+.customer-select-app .cs-secondary {
+  min-height: 44px;
+  border-color: var(--customer-divider);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+.customer-select-app .cs-primary.cs-compact { width: auto; min-height: 48px; padding: 10px 16px; font-size: 14px; }
+.customer-select-app .cs-filter-trigger { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 5px; padding: 8px; border: 1px solid var(--customer-divider); border-radius: 8px; background: white; color: var(--customer-control); font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; list-style: none; }
+.customer-select-app .cs-filter-trigger::-webkit-details-marker { display: none; }
+.customer-select-app details[open] > .cs-filter-trigger { border-color: var(--customer-control); background: var(--select-surface); }
+.customer-select-app .cs-filter-count { display: grid; min-width: 18px; height: 18px; place-items: center; padding-inline: 4px; border-radius: 9px; background: var(--customer-control); color: white; font-size: 11px; line-height: 1; }
+.customer-select-app .cs-card-action { gap: 4px; padding-inline: 8px; white-space: nowrap; }
+.customer-select-app .cs-secondary:not(.cs-primary):not([aria-pressed="true"]) { background: var(--select-surface); color: var(--customer-control); }
+.customer-select-app .cs-primary:disabled { opacity: .4; cursor: not-allowed; }
+.customer-select-app :is(button, a, summary, input, select, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.customer-select-app :is(input:not([type="checkbox"]):not([type="file"]), textarea, select) { background-color: var(--customer-canvas); color: var(--customer-ink); border-radius: 8px; }
+.customer-select-app input[type="checkbox"] { accent-color: var(--accent); }
+.customer-select-app .cs-panel { border: 1px solid var(--customer-divider); border-radius: 12px; background: var(--select-surface); padding: 24px; }
+.customer-select-app .cs-section { border-top: 1px solid var(--customer-divider); }
+.customer-select-app .cs-photo-card { border-radius: var(--select-photo-radius); }
+.customer-select-app .cs-upload-select:focus-visible { opacity: 1; }
+@media (min-width: 768px) and (hover: hover) {
+  .customer-select-app .cs-photo-card:hover .cs-upload-select { opacity: 1; }
+}
+.customer-select-app .cs-card-favorite { color: var(--customer-control); }
+.customer-select-app .cs-actionbar { box-shadow: none; border-top-color: var(--customer-divider); }
+.customer-select-app .cs-actionbar > div { min-width: 0; }
+
+/* Dark photo workspace: chrome stays neutral; orange means an actual selection. */
+.customer-select-app .cs-viewer { background: #15161a; color: #f2f2f4; }
+.customer-select-app .cs-viewer :is(header, footer) { border-color: #3a3a42; }
+.customer-select-app .cs-viewer :is(p, label, section > div > span) { color: #b8b8c0; }
+.customer-select-app .cs-viewer .cs-secondary:not([aria-pressed="true"]) { border-color: #52525b; background: #27282f; color: #f2f2f4; }
+.customer-select-app .cs-viewer .cs-select-photo:not([aria-pressed="true"]) { border-color: #f2f2f4; background: #f2f2f4; color: #15161a; }
+.customer-select-app .cs-viewer .cs-photo-stage { background: #000; }
+.customer-select-app .cs-viewer [role="img"] { background: #1d1e23; color: #b8b8c0; }
+.customer-select-app .cs-viewer .cs-select-photo[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: white; }
+.customer-select-app .cs-viewer .cs-thumbnail[aria-pressed="true"] { border-color: white; }
+
+@media (hover: hover) {
+  .customer-select-app .cs-primary:not(:disabled):hover { background: #191918; }
+  .customer-select-app .cs-secondary:not(.cs-primary):not(:disabled):not([aria-pressed="true"]):hover { background: #eceeed; }
+  .customer-select-app .cs-filter-trigger:hover { background: var(--select-surface); }
+  .customer-select-app .cs-viewer .cs-secondary:not(:disabled):not([aria-pressed="true"]):hover { background: #3a3a42; }
+  .customer-select-app .cs-viewer .cs-select-photo:not(:disabled):not([aria-pressed="true"]):hover { background: white; }
+}
+@media (min-width: 768px) { .customer-select-app .cs-title { font-size: 32px; line-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .customer-select-app :is(.cs-primary, .cs-secondary) { transition: none; } }

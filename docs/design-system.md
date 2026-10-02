@@ -11,6 +11,7 @@
 
 - **작가 Light 운영 UI:** [design-system-light.md](design-system-light.md)를 우선한다. 이 문서의 Dark palette·과거 Dashboard/Detail 수치를 Light 화면에 재적용하지 않는다.
 - **고객 PC:** [customer-design.md](customer-design.md)의 PC composition을 따른다. 고객 Light palette와 Dark 사진 viewer 경계는 작가 Light와 별도다.
+- **A-CUT Select 셀프 셀렉:** `/customer-select/**`의 신규 화면은 [customer-design.md](customer-design.md)의 2026-09-30 Select 적용 절을 따른다. 고객 foundation을 재사용하며 신규 조합은 이 경로에만 스코프한다.
 - **이 문서:** Shared 원칙과 Dark/legacy 기준을 보존한다. 아래 Stability/미구현 서술은 해당 갱신 시점의 기록이며, 현재 Light 전환 완료 여부를 나타내지 않는다.
 - **최신 PC 검수:** [2026-09-09 검수 결과](desktop-design-audit-2026-09-09.md). 모바일은 이번 검수에서 제외했다.
 
