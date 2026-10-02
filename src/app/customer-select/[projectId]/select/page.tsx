@@ -576,7 +576,7 @@ function SelectScreen() {
                     {withChat && <button type="button" className={s.floatTool} aria-pressed={chatOpen} onClick={() => setChatOpen((value) => !value)} aria-label={chatOpen ? "대화 닫기" : "대화 열기"}><MessageCircle size={16} /><span className={s.floatLabel}>대화</span></button>}
                   </nav>
                 )}
-                <div className={s.quickPill}>
+                <div className={s.quickPill} data-locked-bar>
                   <button type="button" className={s.quickPillScene} onClick={() => setSheet("scenes")} aria-label="장면 목록 열기">
                     <i aria-hidden />
                     <strong>{sceneTitle(scene!)}</strong>
@@ -587,7 +587,7 @@ function SelectScreen() {
                 </div>
               </>
             )}
-            <div className={s.bottomBar}>{bottomBar}</div>
+            <div className={s.bottomBar} data-locked-bar>{bottomBar}</div>
           </div>
         </div>
       </div>

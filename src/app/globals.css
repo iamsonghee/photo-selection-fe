@@ -42,6 +42,10 @@ html:has([data-viewport-locked]),
 body:has([data-viewport-locked]) {
   overscroll-behavior: none;
 }
+/* 그래도 iOS는 스크롤 없는 띠(헤더·하단 바)에서 시작한 세로 드래그로 화면을 살짝 끌어 올린다 —
+ * 그 띠에서는 세로 팬을 아예 받지 않는다(탭은 그대로, 헤더 참여자 줄의 가로 스크롤은 유지). */
+[data-viewport-locked] > header { touch-action: pan-x; }
+[data-viewport-locked] [data-locked-bar] { touch-action: none; }
 
 /* 셀프 고객 화면: iOS는 16px 미만 입력칸에 포커스가 가면 화면을 확대한다 — 모바일 입력칸은 16px로 맞춘다. */
 @media (max-width: 767px) {
