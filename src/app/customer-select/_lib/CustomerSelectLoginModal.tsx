@@ -12,7 +12,12 @@ export function CustomerSelectLoginModal() {
   const router = useRouter();
   return (
     <div className="cs-auth">
-      <AuthModal isOpen onClose={() => router.push("/")} redirectPath="/customer-select" />
+      <AuthModal
+        isOpen
+        onClose={() => router.push("/")}
+        redirectPath="/customer-select"
+        notice={<><strong>베타 테스트 중</strong><br />웨딩스냅·본식스냅·돌잔치 원본을 올리고<br />가족·친구와 함께 사진을 골라 보세요.</>}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { useOAuthLogin } from "@/hooks/useOAuthLogin";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import {
@@ -14,6 +14,8 @@ interface AuthModalProps {
   onClose: () => void;
   /** 로그인 완료 후 돌아올 경로. 생략 시 기존과 동일하게 /photographer/dashboard로 이동. */
   redirectPath?: string;
+  /** 제목 아래 짧은 안내(선택). 셀프 고객 로그인의 베타 안내처럼 화면별 설명이 필요할 때만 넘긴다. */
+  notice?: ReactNode;
 }
 
 function isKakaoInAppBrowser(): boolean {
@@ -21,7 +23,7 @@ function isKakaoInAppBrowser(): boolean {
   return /KAKAOTALK/i.test(navigator.userAgent);
 }
 
-export function AuthModal({ isOpen, onClose, redirectPath }: AuthModalProps) {
+export function AuthModal({ isOpen, onClose, redirectPath, notice }: AuthModalProps) {
   const { loading, error, login, reset: resetOAuth } = useOAuthLogin();
   const [closing, setClosing] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 600);
@@ -147,6 +149,7 @@ export function AuthModal({ isOpen, onClose, redirectPath }: AuthModalProps) {
             </div>
 
             <h1 className="auth-modal-headline">3초면 시작할 수 있어요</h1>
+            {notice ? <div className="auth-modal-notice">{notice}</div> : null}
 
             {error && (
               <div className="auth-modal-error" role="alert">
@@ -379,6 +382,24 @@ export function AuthModal({ isOpen, onClose, redirectPath }: AuthModalProps) {
           gap: 12px;
         }
 
+        .auth-modal-notice {
+          margin: -8px 0 20px;
+          text-align: center;
+          font-size: 13px;
+          line-height: 1.6;
+          color: var(--muted-foreground);
+          word-break: keep-all;
+        }
+        .auth-modal-notice strong {
+          display: inline-block;
+          margin-bottom: 4px;
+          padding: 2px 8px;
+          border-radius: 999px;
+          background: color-mix(in srgb, #ff4d00 10%, transparent);
+          color: #ff4d00;
+          font-size: 11px;
+          font-weight: 700;
+        }
         .auth-modal-logo {
           --brand-logo-ink: var(--foreground);
           margin-bottom: 8px;
