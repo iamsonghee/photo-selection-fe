@@ -281,6 +281,12 @@
 .panelActions { margin-top: auto; display: grid; grid-template-columns: auto 1fr; gap: 8px; }
 .panelActions.single { grid-template-columns: 1fr; }
 .likeButton[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.memoHead { display: flex; align-items: center; justify-content: space-between; }
+.memoDone { margin: 0 0 6px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.memoButton { position: relative; }
+.memoButton i { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.likerDots { display: inline-flex; margin-left: 2px; }
+.likerDots i { width: 8px; height: 8px; margin-left: -2px; border: 1.5px solid var(--surface); border-radius: 50%; box-sizing: content-box; }
 .shortcutHint { color: var(--subtle-foreground); font-size: 11px; text-align: center; }
 
 @media (prefers-reduced-motion: reduce) { .sceneEnter { animation: none; } }
@@ -312,10 +318,14 @@
   .quickPillChat { width: 40px; height: 40px; border: 0; border-left: 1px solid var(--border-subtle); border-radius: 0 999px 999px 0; background: none; color: var(--foreground); display: grid; place-items: center; cursor: pointer; }
   .quickPillChat[aria-pressed="true"] { color: var(--accent); }
   .bottomBar { padding: 10px 20px calc(10px + env(safe-area-inset-bottom)); }
-  .detail { flex-direction: column; overflow-y: auto; }
-  .detailStage { flex: none; height: 62dvh; }
+  .detail { flex-direction: column; }
+  .detailStage { min-height: 0; flex: 1; }
   .detailImage { padding: 0 0 8px; }
   .detailNav { display: none !important; }
-  .panel { width: 100%; flex: 1; border-radius: 16px 16px 0 0; padding: 18px 20px calc(18px + env(safe-area-inset-bottom)); }
+  /* 모바일 상세: 사진이 화면을 채우고, 아래는 [메모][찜][보정 받기] 한 줄만. 메모는 눌렀을 때만 위에 펼친다. */
+  .panel { width: 100%; flex: none; gap: 10px; border-radius: 16px 16px 0 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+  .memo { min-height: 72px; }
+  .panelActions { display: flex; }
+  .panelActions > :last-child { flex: 1; }
   .shortcutHint { display: none; }
 }

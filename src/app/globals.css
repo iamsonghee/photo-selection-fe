@@ -36,6 +36,20 @@ body:has([data-acut-light-canvas]) {
   background-color: var(--acut-canvas);
 }
 
+/* 화면 높이에 잠근 셀프 고객 화면(고르기·업로드): 스크롤 안 되는 하단 바·헤더를 끌면 iOS가 문서 전체를
+ * 러버밴드로 끌어올려 바가 떠 보인다 — 바깥 문서의 오버스크롤을 끈다(안쪽 사진 스크롤은 그대로). */
+html:has([data-viewport-locked]),
+body:has([data-viewport-locked]) {
+  overscroll-behavior: none;
+}
+
+/* 셀프 고객 화면: iOS는 16px 미만 입력칸에 포커스가 가면 화면을 확대한다 — 모바일 입력칸은 16px로 맞춘다. */
+@media (max-width: 767px) {
+  [data-customer-select] :is(input:not([type="checkbox"], [type="radio"], [type="file"], [type="range"]), textarea, select) {
+    font-size: 16px;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

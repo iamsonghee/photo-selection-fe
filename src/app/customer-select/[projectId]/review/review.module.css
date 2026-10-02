@@ -44,10 +44,13 @@
 .empty p { margin: 0 0 8px; color: var(--muted-foreground); font-size: 14px; }
 
 @media (max-width: 767px) {
-  .main { padding: 20px 20px calc(32px + env(safe-area-inset-bottom)); }
+  .main { padding: 20px 20px calc(96px + env(safe-area-inset-bottom)); }
   .hero h2 { font-size: 22px; }
   .sendCard { grid-template-columns: 1fr; padding: 18px; }
-  .sendActions { flex-direction: column; }
+  /* 보내기가 이 화면의 유일한 메인 동작 — 사진을 훑어 내려가도 보이게 화면 아래에 고정한다. */
+  .sendActions { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; padding: 10px 20px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border-subtle); background: var(--surface); }
+  .sendActions > :first-child { flex: 1; }
   .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-  .retouch { flex-direction: column; align-items: stretch; padding: 16px 18px; }
+  /* 보정본 확인은 아직 준비 중 — 좁은 화면에서 자리만 차지하므로 숨긴다. */
+  .retouch { display: none; }
 }

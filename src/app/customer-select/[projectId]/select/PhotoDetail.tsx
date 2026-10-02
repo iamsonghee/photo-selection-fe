@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, Heart } from "lucide-react";
+import { ArrowLeft, Check, Heart, MessageSquare } from "lucide-react";
 import { PrevNextButton } from "@/components/PrevNextButton";
 import { MobileViewerPinchPhoto } from "@/components/MobileViewerPinchPhoto";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -104,6 +104,10 @@ export function PhotoDetail({
   // 함께 고르는 사람이 같은 사진의 메모를 고치면, 내가 입력 중이 아니고 저장 안 된 내용이 없을 때만 반영한다.
   const remoteMemo = commentOf(photoId);
   const memoRef = useRef<HTMLTextAreaElement>(null);
+  // 모바일은 사진을 크게 — 메모는 버튼을 눌렀을 때만 펼치고, 다른 사진으로 넘기면 접는다.
+  const [memoOpen, setMemoOpen] = useState(false);
+  useEffect(() => { setMemoOpen(false); }, [photoId]);
+  const showMemo = desktop || memoOpen;
   useEffect(() => {
     const current = draftRef.current;
     if (current.photoId !== photoId || current.text !== current.saved || remoteMemo === current.saved) return;
@@ -196,14 +200,17 @@ export function PhotoDetail({
       </div>
 
       <aside className={s.panel}>
-        <div>
+        {desktop && <div>
           <p className={s.panelLabel}>찜한 사람</p>
           {likers.length
             ? <div className={s.likers}>{likers.map((person) => <span key={person.id} className={s.liker}><i style={{ background: person.hex }} />{person.name}{person.id === myColor ? " (나)" : ""}</span>)}</div>
             : <span className={s.noLikes}>아직 찜한 사람이 없어요</span>}
-        </div>
-        <div>
-          <p className={s.panelLabel}>작가님께 전달할 메모</p>
+        </div>}
+        {showMemo && <div>
+          <div className={s.memoHead}>
+            <p className={s.panelLabel}>작가님께 전달할 메모</p>
+            {!desktop && <button type="button" className={s.memoDone} onClick={() => { flushMemo(); setMemoOpen(false); }}>완료</button>}
+          </div>
           <textarea
             ref={memoRef}
             className={s.memo}
@@ -211,6 +218,7 @@ export function PhotoDetail({
             value={draft}
             maxLength={1000}
             placeholder="예: 피부톤 밝게, 배경 사람 지워주세요"
+            autoFocus={!desktop}
             onChange={(event) => {
               setDraft(event.target.value);
               draftRef.current.text = event.target.value;
@@ -222,10 +230,16 @@ export function PhotoDetail({
           <p className={`${s.memoStatus} ${memoStatus === "error" ? s.error : ""}`} role="status">
             {memoStatus === "saving" ? "저장 중…" : memoStatus === "saved" ? "저장됨" : memoStatus === "error" ? "저장하지 못했어요. 다시 입력해 주세요." : "함께 고르는 모두가 보고 고칠 수 있어요"}
           </p>
-        </div>
+        </div>}
         <div className={`${s.panelActions} ${isOwner ? "" : s.single}`}>
+          {!desktop && (
+            <PhotographerLightButton variant="outline" size="confirmation" className={s.memoButton} aria-label={draft.trim() ? "메모 보기" : "메모 쓰기"} aria-expanded={memoOpen} onClick={() => setMemoOpen((open) => !open)}>
+              <MessageSquare size={18} />{draft.trim() && <i aria-hidden />}
+            </PhotographerLightButton>
+          )}
           <PhotographerLightButton variant="outline" size="confirmation" className={s.likeButton} aria-pressed={liked} onClick={() => onToggleLike(photoId)}>
             <Heart size={18} fill={liked ? "currentColor" : "none"} />{isOwner ? "" : liked ? "찜했어요" : "찜하기"}
+            {!desktop && likers.length > 0 && <span className={s.likerDots} aria-label={`찜한 사람: ${likers.map((person) => person.name).join(", ")}`}>{likers.map((person) => <i key={person.id} style={{ background: person.hex }} />)}</span>}
           </PhotographerLightButton>
           {isOwner && (
             <PhotographerLightButton variant={selected ? "outline" : "primary"} size="confirmation" aria-pressed={selected} onClick={() => onToggleSelect(photoId)}>

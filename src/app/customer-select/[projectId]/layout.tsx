@@ -11,7 +11,7 @@ export default async function CustomerSelectProjectLayout({
 }) {
   const { projectId } = await params;
   return (
-    <div className={theme.lightTheme} data-acut-light-canvas>
+    <div className={theme.lightTheme} data-acut-light-canvas data-customer-select>
       <Suspense fallback={null}>
         <CustomerSelectStoreProvider projectId={projectId}>{children}</CustomerSelectStoreProvider>
       </Suspense>
