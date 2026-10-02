@@ -18,6 +18,12 @@ export async function getCurrentCustomerAuthUser(): Promise<User | null> {
   return user;
 }
 
+/** 소유자가 함께 고르는 사람에게 보일 기본 이름 — 로그인 계정 이름(Google 등). 없으면 null(이메일 앞부분은 이름으로 어색해 쓰지 않는다). */
+export function customerAccountName(user: User | null): string | null {
+  const name = String(user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? "").trim();
+  return name ? name.slice(0, 20) : null;
+}
+
 export async function getCurrentCustomerAuthId(): Promise<string | null> {
   return (await getCurrentCustomerAuthUser())?.id ?? null;
 }

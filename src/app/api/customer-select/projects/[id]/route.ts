@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { buildProjectView, toAiScenes, resolveCustomerProjectAccess, shareTokenFromRequest } from "@/lib/customer-select-server";
+import { buildProjectView, customerAccountName, getCurrentCustomerAuthUser, toAiScenes, resolveCustomerProjectAccess, shareTokenFromRequest } from "@/lib/customer-select-server";
 import { createClient } from "@/lib/supabase/server";
 import { isCustomerShootType as isProjectShootType } from "@/lib/customer-shoot-scenes";
 
@@ -30,7 +30,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     admin.from("customer_photos").select("id, scene_id").eq("project_id", id).not("scene_id", "is", null),
   ]);
   const aiScenes = scenesRes.error || sceneAssignmentsRes.error ? null : toAiScenes(scenesRes.data ?? [], sceneAssignmentsRes.data ?? [], photosRes.data ?? []);
-  const projectView = buildProjectView(project, photosRes.data ?? [], selectionsRes.data ?? [], participantsRes.data ?? [], qualityRes.data ?? [], opinionsRes.data ?? [], aiScenes);
+  // 소유자 이름이 비어 있으면 로그인 계정 이름으로 한 번 채운다 — 함께 고르는 사람에게 "나"·빈 이름 대신 보이게(이후 아바타에서 수정).
+  let participants = participantsRes.data ?? [];
+  const ownerRow = participants.find((row) => row.color === "red");
+  if (access.isOwner && !ownerRow?.nickname?.trim()) {
+    const accountName = customerAccountName(await getCurrentCustomerAuthUser());
+    if (accountName) {
+      const { error: nameError } = await admin.from("customer_project_participants")
+        .upsert([{ project_id: id, color: "red", nickname: accountName }], { onConflict: "project_id,color", defaultToNull: false });
+      if (!nameError) participants = [...participants.filter((row) => row.color !== "red"), { color: "red", nickname: accountName, done: ownerRow?.done ?? false }];
+    }
+  }
+  const projectView = buildProjectView(project, photosRes.data ?? [], selectionsRes.data ?? [], participants, qualityRes.data ?? [], opinionsRes.data ?? [], aiScenes);
   if (!access.isOwner) projectView.shareToken = "";
   return NextResponse.json(
     { project: projectView, isOwner: access.isOwner },

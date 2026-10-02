@@ -189,6 +189,8 @@ async function exchangeCustomerShareToken(req: NextRequest, projectId: string, s
     return NextResponse.redirect(cleanUrl);
   }
 
+  // 초대 링크로 들어왔다는 표시 — 이미 참여한 사람도 고르기 화면이 초대 화면(이어서 고르기)을 먼저 보여준다.
+  cleanUrl.searchParams.set("invite", "1");
   const response = NextResponse.redirect(cleanUrl);
   response.cookies.set(customerShareCookieName(projectId), shareToken, {
     httpOnly: true,
