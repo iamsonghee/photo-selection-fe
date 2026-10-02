@@ -2,28 +2,38 @@
 @import "tailwindcss";
 
 :root {
+  /* 라이트 화면 공통 캔버스(작가 운영 화면·셀프 고객) — html/body overscroll에서도 쓰여 :root에 둔다. 전역 기본 토큰은 Dark Photo Workspace 그대로. */
   --acut-canvas: #f5f8f8;
-  --background: var(--acut-canvas);
-  --foreground: #023852;
-  --muted-foreground: rgba(2, 56, 82, 0.68);
-  --subtle-foreground: rgba(2, 56, 82, 0.52);
-  --placeholder-foreground: rgba(2, 56, 82, 0.46);
-  --disabled-foreground: rgba(2, 56, 82, 0.38);
-  --border: color-mix(in srgb, #023852 16%, #ffffff);
-  --border-strong: color-mix(in srgb, #023852 28%, #ffffff);
-  --border-subtle: color-mix(in srgb, #023852 9%, #ffffff);
-  --surface: #ffffff;
-  --surface-raised: #eef3f4;
-  --primary: #079fa0;
+  --background: #0a0b0d;
+  --foreground: #f2f2f4;
+  --muted-foreground: #b8b8c0;
+  --subtle-foreground: #9494a0;
+  --placeholder-foreground: #888894;
+  --disabled-foreground: #6f6f7a;
+  --border: #3a3a42;
+  --border-strong: #52525b;
+  --border-subtle: #23232a;
+  --surface: #15161a;
+  --surface-raised: #1d1e23;
+  --primary: #4f7eff;
   --accent: #ff4d00;
   --accent-rgb: 255, 77, 0;
-  --success: #079fa0;
-  --danger: #dc2e2f;
-  --warning: #fac005;
-  --cyan: #079fa0;
+  --success: #2ed573;
+  --danger: #ff4757;
+  --warning: #f5a623;
+  /* Customer Actor semantic (Cyan/Porcelain) — docs/design-system.md §30. --primary(Blue)는
+     정보/focus 전용으로 그대로 두고, Customer Actor 의미는 이 토큰만 사용한다. */
+  --cyan: #9ecad0;
   --google: #4285f4;
   --kakao-bg: #fee500;
   --kakao-text: #3c1e1e;
+}
+
+/* 셀프 고객 화면(라이트)이 떠 있는 동안 html/body도 같은 캔버스로 — 전역 바탕은 다크라,
+ * 모바일 러버밴드·주소창 접힘으로 드러나는 바깥 영역이 검게 비치지 않게 한다(작가 쪽 photographer.css와 같은 방식). */
+html:has([data-acut-light-canvas]),
+body:has([data-acut-light-canvas]) {
+  background-color: var(--acut-canvas);
 }
 
 @theme inline {

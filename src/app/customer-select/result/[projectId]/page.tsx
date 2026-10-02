@@ -50,7 +50,7 @@ export default async function CustomerResultPage({ params }: { params: Promise<{
   const photos = (photosResult.data ?? []).sort((a, b) => a.order_index - b.order_index).map((row) => toPhoto(row, projectId));
 
   return (
-    <div className={theme.lightTheme}>
+    <div className={theme.lightTheme} data-acut-light-canvas>
       <ResultViewer
         project={{ name: project.name, target: project.target_count }}
         photos={photos}

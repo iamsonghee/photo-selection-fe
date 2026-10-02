@@ -4,7 +4,7 @@
 .customer-app-shell {
   font-family: "Pretendard", system-ui, sans-serif;
 
-  /* Customer light tokens — 전역 ACUT light token을 유지하고 고객 화면 전용 값만 스코프한다. */
+  /* Customer light tokens — 전역 :root 토큰은 Dark Photo Workspace와 공유되므로 바꾸지 않고, 고객 화면 전용 라이트 팔레트를 여기 스코프한다. */
   --customer-canvas: #ffffff;
   --customer-ink: #191918;
   --customer-ink-secondary: #5f5e5b;

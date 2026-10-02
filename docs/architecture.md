@@ -29,8 +29,8 @@ BE는 초과 배치를 통째로 거절한다. DB도 소유자별 advisory lock�
 소유자 UI의 로그인·프로젝트 목록·생성 화면은 작가 Light UI의 토큰을
 `src/styles/AcutLightTheme.module.css`를 통해 공유한다. 로그인 후 기본 착지점은
 `/customer-select`이며, 서버 세션으로 소유자를 확인한 뒤 `customer_projects.owner_id`로
-목록을 조회한다. 전역 캔버스도 `--acut-canvas: #f5f8f8`을 기본으로 사용하며,
-화면 바탕을 다크 팔레트에 의존하지 않는다. 작가 전용 사이드바·이용량·베타 컨텍스트는
+목록을 조회한다. 전역 `:root` 토큰은 운영과 같은 Dark Photo Workspace 그대로이고(2026-10-02 되돌림 — 셀프 고객을 위해 전역을 라이트로 바꾸면 테마로 감싸지 않은 화면까지 바뀜),
+셀프 고객 화면은 라이트 테마로 감싸며 루트에 `data-acut-light-canvas`를 달아 html/body도 `--acut-canvas`(#f5f8f8)로 맞춘다. 작가 전용 사이드바·이용량·베타 컨텍스트는
 재사용하지 않는다.
 
 셀렉 갤러리는 기존 고객 갤러리의 카드·상세 뷰어·검색·정렬·유사컷 토글·확정 풋터를

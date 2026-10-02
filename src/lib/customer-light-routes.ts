@@ -3,7 +3,7 @@
  *
  * 사진 상세(셀렉 뷰어 `/viewer/[photoId]`, 보정본 검토 상세 `/review/[photoId]`)와
  * 소개 화면(`/about`)은 자체 화면 배경을 사용하므로 순백 고객 셸 적용 대상에서 제외한다.
- * 전역 기본값은 ACUT light system이며, 사진 상세의 집중 표면은 화면 안에서 직접 지정한다.
+ * 전역 기본 토큰은 Dark Photo Workspace이고, 라이트 화면은 셸에서 고객 라이트 팔레트를 스코프한다.
  *
  * 작가 쪽 `isPhotographerLightRoute`(src/lib/photographer-sidebar-routes.ts)와
  * 같은 목적·같은 모양의 판별기다.

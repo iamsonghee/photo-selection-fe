@@ -333,7 +333,7 @@ PC에서는 제목·설명·마감일·CTA를 하나의 그룹으로 보고 화�
   - **원본 다운로드는 머리 아래 sub 헤더 띠**(`OriginalDownloadEntry variant="subheader"`)다 — 모바일 `.locked-mobile-status`와 같은 자리·같은 주황 틴트(`rgba(255,77,0,.06)`). 기한이 있는 안내라 버튼만 두면 "언제까지"를 알 수 없어, **만료일과 남은 일수를 같은 줄**에 둔다(`2026.10.01까지 · 21일 남음`). 3일 이내·당일·만료는 주황으로 표시한다 — 날짜만 보여주면 급한지를 고객이 스스로 계산해야 한다.
     - 밴드는 "설명 + 버튼" 한 줄이라 **줄 전체를 컴포넌트가 그린다**. 만료일은 이 컴포넌트만 아는 값이라(`info.expiresAt`) 바깥에서 조립하려면 상태를 새어 보내야 하고, 아카이브가 없는 프로젝트에서는 컴포넌트가 스스로 아무것도 렌더하지 않아 띠도 함께 사라진다.
     - 함정: `variant="inline"`은 **다크 전용**(글자색 `var(--foreground)` = 흰색)이라 라이트에서 글자가 사라진다.
-- **전역 `body`는 ACUT 라이트 캔버스를 기본으로 쓴다**(`--acut-canvas: #f5f8f8`). 흰색 고객 캔버스 라우트는 `customer-light-shell`이 overscroll 영역까지 `#fff`로 맞춘다.
+- **전역 `body`는 Dark Photo Workspace 바탕(`--background`)이다**(2026-10-02, 운영과 같게 되돌림). 흰색 고객 캔버스 라우트는 `customer-light-shell`이 overscroll 영역까지 `#fff`로, 셀프 고객 화면은 `data-acut-light-canvas`로 `--acut-canvas`(#f5f8f8)로 맞춘다.
   - 안쪽 스크롤러를 쓰는 화면(검토 목록 `.rgv-scroll`)은 `overscroll-behavior: contain`도 함께 건다 — 러버밴드가 문서로 번지는 것 자체를 막는다.
 
 - **보정본 검토 목록(`/c/[token]/review`)은 모바일·PC가 같은 컴포넌트(`ReviewGalleryView`)를 쓴다.** 예전에는 PC만 첫 사진(`photos[0]`)으로 자동 이동시켰는데, 상세의 닫기·`Esc`가 이 경로로 돌아오는 탓에 **PC에서는 뷰어를 닫을 수 없고 늘 1번 사진으로 튕겼다**(새로고침도 마찬가지). 셀렉이 `목록 → 상세`인 것과도 어긋났고, 제출 직전에 어느 장이 미검토인지 훑어볼 수단이 PC에만 없었다.
