@@ -61,6 +61,9 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   await mock(page, selectedCount);
   await page.goto("/customer-select/core-flow/select");
   await expect(page.locator("[data-photo-id]").first()).toBeVisible();
+  // 셀프 고르기 카드는 모바일 기본 2열에서도 1:1(공용 카드의 2열 4:3을 덮어쓴다).
+  const cardBox = await page.locator("[data-photo-id]").first().boundingBox();
+  expect(Math.abs(cardBox!.width - cardBox!.height)).toBeLessThan(2);
   const galleryTexts = await page.locator("body").innerText();
   // 목표 장수는 참고값이다 — 장수만 알려주고 더 고르거나 줄이라고 압박하지 않는다.
   expect(galleryTexts).toContain(`최종 선택 ${selectedCount}장 · 약속한 10장`);

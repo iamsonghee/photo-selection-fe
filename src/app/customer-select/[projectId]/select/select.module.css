@@ -99,6 +99,8 @@
 .timeline { position: relative; min-height: 0; flex: 1; display: flex; flex-direction: column; }
 /* 카드 안 z-index(체크 버튼 등)가 위에 붙는 장면 머리글 위로 올라오지 않도록 스크롤 영역을 별도 레이어로 묶는다 */
 .timelineScroll { isolation: isolate; }
+/* 공용 카드(GalleryPhotoCard.css)는 모바일 2열을 4:3으로 두지만, 셀프 고르기는 모든 크기 1:1(SceneGrid 줄 높이와 같게). */
+.timelineScroll:global(.gl-density-2) :global(.gl-photo-card) { aspect-ratio: 1; }
 /* 사진 카드 모서리 8px — 업로드·상세 등 셀프 고객 화면 기준(photo-grid.ts). 공용 카드(작가 고객 갤러리)는 4px 그대로. */
 .timelineScroll :global(.gl-photo-card), .timelineScroll :global(.gl-card-media), .timelineScroll :global(.gl-photo-card[data-pop])::after { border-radius: 8px; }
 /* 접힌 유사컷 표지: 뒤에 카드가 겹친 모양(누르면 상세에서 묶음을 본다). */
