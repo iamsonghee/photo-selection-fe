@@ -1,0 +1,9 @@
+/* 셀프 고객 로그인 모달을 운영 랜딩의 로그인 모달과 같은 흰 카드로 — src/app/landing/landing.css의 `.ac-landing .auth-modal-*` 덮어쓰기와 같은 값.
+ * AuthModal 기본 모양(줄무늬·장식 글자·모서리 표시)은 덮어쓰기가 있는 화면에서만 흰 카드가 된다. */
+.cs-auth { --foreground: #191918; --accent: #ff4d00; color: #191918; }
+.cs-auth .auth-modal-backdrop { background: rgba(25,25,24,.35) !important; }
+.cs-auth .auth-modal-container { --muted-foreground:#666864; --subtle-foreground:#737373; --disabled-foreground:#929292; --border-subtle:#eceeeb; background:#fff !important; border:1px solid #e1e1de !important; border-radius:16px !important; box-shadow:0 24px 80px #19191820 !important; }
+.cs-auth :is(.auth-modal-bracket,.auth-modal-scanlines,.auth-modal-sys-status,.auth-modal-meta-block) { display:none !important; }
+.cs-auth .auth-modal-header { justify-content:flex-end; }
+.cs-auth :is(.auth-modal-logo,.auth-modal-headline) { font-family:inherit; letter-spacing:-.04em; }
+.cs-auth .auth-modal-btn-google { border:1px solid #dededb; }
