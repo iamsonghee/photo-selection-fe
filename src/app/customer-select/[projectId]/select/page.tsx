@@ -278,6 +278,11 @@ function SelectScreen() {
   // 장면 정리 진행 막대는 이름 붙인 장면 수 기준(유사컷·흔들림은 따로 줄로 보이고 장면을 기다리게 하지 않는다).
   const sceneTask = analysis.tasks.find((task) => task.kind === "scene" && task.status === "processing");
   const analysisPercent = sceneTask?.total ? Math.min(100, Math.round((sceneTask.done / sceneTask.total) * 100)) : 0;
+  // 장면이 먼저 끝나도 유사컷·흔들림은 뒤에서 계속 돈다 — 끝난 것처럼 보이지 않게 배너로 진행을 보여준다.
+  const backgroundTasks = analysis.status === "analyzing" ? [] : analysis.tasks.filter((task) => task.status === "processing" && task.kind !== "scene");
+  const backgroundTotal = backgroundTasks.reduce((sum, task) => sum + task.total, 0);
+  const backgroundPercent = backgroundTotal ? Math.min(100, Math.round((backgroundTasks.reduce((sum, task) => sum + task.done, 0) / backgroundTotal) * 100)) : 0;
+  const backgroundLines = backgroundTasks.map((task) => <span key={task.kind}>{taskProgressText(task)}</span>);
   const analysisBanner = analysis.status === "analyzing" ? (
     <div className={s.analysis} role="status">
       <Sparkles size={16} aria-hidden />
@@ -294,10 +299,22 @@ function SelectScreen() {
       <div>
         <strong>장면 정리가 끝났어요 · {scenes.length}개 장면</strong>
         <span>{myLikes.size ? `찜한 ${myLikes.size}장도 장면별로 나눠뒀어요.` : "장면별로 나눠서 보면 고르기 쉬워요."}</span>
+        {backgroundLines}
       </div>
       <div className={s.analysisActions}>
         <PhotographerLightButton size="toolbar" onClick={() => goScene(resumeScene)}>장면별로 보기</PhotographerLightButton>
         <PhotographerLightButton variant="outline" size="toolbar" onClick={() => setPromptDismissed(true)}>계속 보기</PhotographerLightButton>
+      </div>
+    </div>
+  ) : null;
+  const backgroundBanner = !analysisBanner && backgroundTasks.length ? (
+    <div className={s.analysis} role="status">
+      <Sparkles size={16} aria-hidden />
+      <div>
+        <strong>AI가 사진을 더 정리하고 있어요</strong>
+        {backgroundLines}
+        <span>끝나면 이 화면에 바로 반영돼요.</span>
+        <i aria-hidden><b style={{ width: `${backgroundPercent}%` }} /></i>
       </div>
     </div>
   ) : null;
@@ -468,6 +485,7 @@ function SelectScreen() {
           )}
           <div className={`${s.main} ${sceneMode ? s.mainWithQuick : ""} ${sceneMode && railCollapsed ? s.mainFloatNav : ""}`}>
             {analysisBanner}
+            {backgroundBanner}
             {!sceneMode && !analysisBanner && (
               <div className={s.sceneHeader}>
                 <strong className={s.allTitle}>전체 사진 <small>촬영 시간순 · {photos.length.toLocaleString()}장</small></strong>
@@ -478,7 +496,7 @@ function SelectScreen() {
             )}
             <div className={s.toolsWrap} ref={toolsRef}>
               <div className={s.toolsAnchor}>
-              <div className={s.tools} style={sceneMode || analysisBanner ? { paddingTop: 10 } : undefined}>
+              <div className={s.tools} style={sceneMode || analysisBanner || backgroundBanner ? { paddingTop: 10 } : undefined}>
                 <div className={s.segments} role="group" aria-label="보기 범위">
                   <button type="button" aria-pressed={scope === "all"} aria-label="전체" onClick={() => setScope("all")}>전체<b>{scenePhotos.length}</b></button>
                   <span className={s.segmentSplit}>
