@@ -107,6 +107,7 @@ Typography는 Pretendard 하나를 사용한다.
 - variant 없음 — 작가·고객·랜딩·로그인 모달·소개 화면이 같은 락업을 쓴다.
 - md: mark `24.96 × 24.96px`, radius `6.72px`, `#ff4d00` fill, white `A`, Pretendard 800. sm은 같은 비율로 축소(mark 20px).
 - wordmark ExtraBold `A-CUT` + `#ff4d00` trailing dot. 색은 `var(--brand-logo-ink, #191918)` — 어두운 배경에서는 `--brand-logo-ink`를 지정한다.
+- `markOnly` — "A" 마크만. 옆에 제목이 붙는 좁은 헤더용으로, 셀프 고객 프로젝트 화면(업로드·고르기·보내기) 헤더가 프로젝트명과 함께 쓴다(`CustomerSelectShell`의 `compactTitle`이 있을 때). 그 외 화면은 전체 락업.
 
 ## 6. PIN contract
 
