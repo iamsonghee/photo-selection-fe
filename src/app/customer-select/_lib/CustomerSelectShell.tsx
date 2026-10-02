@@ -6,8 +6,9 @@ import theme from "@/styles/AcutLightTheme.module.css";
 import { CustomerAccountMenu, type CustomerAccountSummary } from "./CustomerAccountMenu";
 
 export function CustomerSelectShell({ children, navigation = false, viewportLocked = false, compactHeader = false, compactTitle, headerMeta, headerActions, account }: { children: ReactNode; navigation?: boolean; viewportLocked?: boolean; compactHeader?: boolean; compactTitle?: ReactNode; headerMeta?: ReactNode; /** 모바일에서도 보이는 헤더 오른쪽(참여자·초대). headerMeta는 PC만. */ headerActions?: ReactNode; account?: CustomerAccountSummary }) {
+  // 잠금 화면은 h-dvh 대신 fixed inset-0: iOS 26 Safari 등은 dvh를 하단 툴바 위까지로 잡아 맨 아래 바가 떠 보인다.
   return (
-    <div data-acut-light-canvas data-customer-select data-viewport-locked={viewportLocked || undefined} className={`${theme.lightTheme} flex min-h-dvh flex-col bg-background text-foreground ${viewportLocked ? "h-dvh overflow-hidden" : ""}`}>
+    <div data-acut-light-canvas data-customer-select data-viewport-locked={viewportLocked || undefined} className={`${theme.lightTheme} flex flex-col bg-background text-foreground ${viewportLocked ? "fixed inset-0 overflow-hidden" : "min-h-dvh"}`}>
       <header data-customer-shell-header-mode={compactHeader ? "compact" : "expanded"} className="shrink-0 border-b border-border-subtle bg-surface">
         <div className={`flex w-full items-center px-5 transition-[height] duration-200 md:px-8 ${compactHeader ? "h-12 gap-3" : "h-16 gap-4"}`}>
           {/* 프로젝트 화면(제목 있음)은 "A" 마크만 — 프로젝트명이 헤더의 주인공. 목록 등은 전체 로고. */}
