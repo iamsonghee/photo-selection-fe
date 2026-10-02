@@ -42,6 +42,11 @@ html:has([data-viewport-locked]),
 body:has([data-viewport-locked]) {
   overscroll-behavior: none;
 }
+/* 스크롤 화면(목록·상세 등)도 맨 위에서 더 당기면 문서 전체가 내려와 고정 헤더 위로 캔버스가 비친다 — 세로 바운스를 끈다. */
+html:has([data-customer-select]),
+body:has([data-customer-select]) {
+  overscroll-behavior-y: none;
+}
 /* 그래도 iOS는 스크롤 없는 띠(헤더·하단 바)에서 시작한 세로 드래그로 화면을 살짝 끌어 올린다 —
  * 그 띠에서는 세로 팬을 아예 받지 않는다(탭은 그대로, 헤더 참여자 줄의 가로 스크롤은 유지). */
 [data-viewport-locked] > header { touch-action: pan-x; }

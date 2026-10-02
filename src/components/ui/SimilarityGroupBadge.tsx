@@ -9,17 +9,17 @@ import styles from "./SimilarityGroupBadge.module.css";
 export function SimilarityGroupBadge({ count, expanded, selectedCount = 0, recommendedCount = 0, label, onClick, inline = false, compact = false }: {
   count: number; expanded: boolean; selectedCount?: number; recommendedCount?: number; label?: string;
   onClick: (event: MouseEvent<HTMLButtonElement>) => void; inline?: boolean;
-  /** 짧은 모양: 접힘 `⧉ 3 ▾`, 펼침 `⧉ 접기 ▴`(셀프 고객 셀렉 — 고른 장수는 카드가 따로 보인다) */
+  /** 짧은 모양: 접힘 `⧉ 3`, 펼침 `⧉ 접기 ▴`(셀프 고객 셀렉 — 고른 장수는 카드가 따로 보인다) */
   compact?: boolean;
 }) {
   return <div className={`${styles.wrap} ${inline ? styles.inline : ""}`}>
     {selectedCount > 0 && <span className={styles.selected}>{selectedCount}장 선택</span>}
     {recommendedCount > 0 && <span className={styles.recommended} aria-label={`작가 추천 ${recommendedCount}장`}><RecommendationMark size={10} />추천 {recommendedCount}장</span>}
-    <button type="button" className={styles.button} onClick={onClick} aria-expanded={expanded}
+    <button type="button" className={`${styles.button} ${compact ? styles.compact : ""}`} onClick={onClick} aria-expanded={expanded}
       aria-label={`${label ? `${label}, ` : ""}유사컷 ${count}장 ${expanded ? "접기" : "펼치기"}`}>
       <Layers size={13} aria-hidden />
       {compact ? <span>{expanded ? "접기" : count}</span> : <span>{expanded && label ? <><span className={styles.word}>묶음 </span>{label.replace("묶음 ", "")} · </> : <span className={styles.word}>유사컷 </span>}{count}장</span>}
-      {expanded ? <ChevronUp size={13} aria-hidden /> : <ChevronDown size={13} aria-hidden />}
+      {expanded ? <ChevronUp size={13} aria-hidden /> : compact ? null : <ChevronDown size={13} aria-hidden />}
     </button>
   </div>;
 }

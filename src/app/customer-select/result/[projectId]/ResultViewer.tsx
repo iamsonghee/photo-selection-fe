@@ -36,7 +36,7 @@ export default function ResultViewer({ project, photos, comments }: Props) {
   return (
     <div className="min-h-dvh bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border-subtle bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-16 w-full max-w-[1504px] items-center justify-between gap-4 px-5 md:px-8">
+        <div className="mx-auto flex h-14 w-full max-w-[1504px] items-center justify-between gap-4 px-5 md:px-8">
           <BrandLogoBar size="sm" href="/" />
           <span className="text-xs font-semibold text-muted-foreground">작가용 · 읽기 전용</span>
         </div>

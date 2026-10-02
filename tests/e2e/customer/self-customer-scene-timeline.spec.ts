@@ -62,7 +62,7 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
     await expect(page).toHaveURL(/scene=1/);
     await expect(page.locator('[class*="barMeta"]').first()).toContainText("입장");
 
-    // 장면 끝에는 다음 장면 이름만 얇게, 마지막 장면 끝에는 보내기가 있다.
+    // 장면 끝에는 다음 장면 이름만 얇게, 마지막 장면 끝에는 "마지막 장면이에요"만(버튼은 하단 바).
     const gallery = page.locator('[class*="selectGallery"]').first();
     await gallery.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
     await expect(page.locator('[class*="sceneNext"]').filter({ visible: true })).toContainText("예식");
@@ -422,8 +422,8 @@ test("a collapsed cover can be picked directly; the badge shows the group's pick
   await expect(plain.locator('[data-active="true"]')).toHaveCount(0);
   await plain.hover();
   await plain.getByRole("button", { name: "선택", exact: true }).click();
-  // 선택 순간(data-pop)에도 표지 뒤 회색 카드(::after)는 사진 뒤에 머문다 — 사진을 덮지 않는다.
-  expect(await plain.evaluate((element) => { const after = getComputedStyle(element, "::after"); return [element.hasAttribute("data-pop"), after.zIndex, after.animationName]; })).toEqual([true, "0", "none"]);
+  // 표지는 뒤에 카드를 겹쳐 그리지 않는다(유사컷은 배지로만 알린다) — 사진 칸이 일반 카드와 같은 크기다.
+  expect(await plain.evaluate((element) => getComputedStyle(element).paddingTop)).toBe("0px");
   await expect(plain.getByRole("img", { name: "1장 선택" })).toBeVisible();
   await expect(plain.locator('[data-active="true"]')).toHaveCount(1);
   // ✓ 1 을 다시 누르면 표지 사진 선택이 풀린다(배지는 표시만, 아래 ✓가 눌린다).
@@ -598,7 +598,7 @@ test("an expanded group stays together even when its photos are not consecutive 
   await context.close();
 });
 
-test("filter bar: scope segments with counts, like scope menu, and scene progress", async ({ browser }) => {
+test("filter bar: scope segments without counts, liked view by heart count, and scene progress", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await loginAsPhotographer(page);
@@ -609,22 +609,21 @@ test("filter bar: scope segments with counts, like scope menu, and scene progres
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=none&scene=0`);
   await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
   const scopes = page.getByRole("group", { name: "보기 범위" });
-  // 지금 장면(30장) 기준: 누구든 찜 2장(p3·p4), 고른 사진 2장(p1·p2).
-  await expect(scopes.getByRole("button", { name: "전체", exact: true })).toContainText("30");
-  await expect(scopes.getByRole("button", { name: "♥ 찜한 사진" })).toContainText("2");
-  await expect(scopes.getByRole("button", { name: "✓ 최종 선택" })).toContainText("2");
+  // 보기 범위 칸에는 장수를 붙이지 않는다 — 걸러진 결과로 확인한다. 지금 장면: 누구든 찜 2장(p3·p4), 고른 사진 2장(p1·p2).
+  await expect(scopes.getByRole("button", { name: "모두", exact: true })).toHaveText("모두");
+  await scopes.getByRole("button", { name: "✓ 최종 선택" }).click();
+  // 고른 사진만 보인다(p1·p2는 유사컷으로 한 칸에 접힐 수 있다).
+  await expect(page.locator(".gl-photo-card.gl-selected[data-photo-id]").first()).toBeVisible();
+  await expect(page.locator(".gl-photo-card[data-photo-id]:not(.gl-selected)")).toHaveCount(0);
   await scopes.getByRole("button", { name: "♥ 찜한 사진" }).click();
   await expect(page.locator(".gl-photo-card[data-photo-id]")).toHaveCount(2);
-  // ▾ 메뉴에서 내 찜(p4)·2명 이상(p4)으로 좁힌다.
-  await scopes.getByRole("button", { name: "찜 범위 바꾸기" }).click();
-  await page.getByRole("menuitemradio", { name: /내 찜/ }).click();
-  await expect(scopes.getByRole("button", { name: "♡ 내 찜" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".gl-photo-card[data-photo-id]")).toHaveCount(1);
-  // 장면 목록: 장면마다 ♥ 찜 수 · ✓ 고른 수/목표.
+  // 찜 보기는 세부 범위 메뉴 없이, 찜한 사람이 많은 사진(p4, 2명)부터 보인다 — 촬영 순서는 p3이 먼저.
+  await expect(scopes.getByRole("button", { name: "찜 범위 바꾸기" })).toHaveCount(0);
+  await expect(page.locator(".gl-photo-card[data-photo-id]").first()).toHaveAttribute("data-photo-id", "p4");
+  // 장면 목록: 분수·추천 장수 없이 `N장 골랐어요` (찜 수는 보이지 않는다).
   const rail = page.getByRole("navigation", { name: "장면" }).first();
-  await expect(rail.getByRole("button", { name: /식전·신부 대기실/ })).toContainText("♥2");
-  await expect(rail.getByRole("button", { name: /식전·신부 대기실/ })).toContainText("✓2/3");
-  await expect(rail.getByRole("button", { name: /입장/ })).toContainText("♥1");
+  await expect(rail.getByRole("button", { name: /식전·신부 대기실/ })).toContainText("2장 골랐어요");
+  await expect(rail.getByRole("button", { name: /식전·신부 대기실/ })).not.toContainText("♥");
   await context.close();
 });
 

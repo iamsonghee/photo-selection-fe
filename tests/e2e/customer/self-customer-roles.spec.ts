@@ -32,7 +32,7 @@ test("shared participant can leave opinions but cannot change the final selectio
     await page.goto("/customer-select/role-check/select");
     // 참여자의 메인 동작은 찜(왼쪽 아래 ♥)이다. 최종 선택 체크(누르기)와 보내기 행동은 보이지 않는다.
     await expect(page.getByRole("button", { name: "다 골랐어요" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /작가에게 보내기/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /선택 완료/ })).toHaveCount(0);
     await expect(page.locator('[data-photo-id="p1"]').getByRole("button", { name: /^선택/ })).toHaveCount(0);
     await expect(page.locator('[data-photo-id="p1"]').getByRole("button", { name: /^찜/ })).toHaveCount(1);
 

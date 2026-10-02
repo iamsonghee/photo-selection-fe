@@ -39,7 +39,9 @@ type EditableProject = {
 export function EditCustomerProjectForm({ project }: { project: EditableProject }) {
   const router = useRouter();
   // 프로젝트 화면(상세의 "설정에서 수정", 업로드의 "촬영 종류 바꾸기")에서 왔으면 저장·취소 뒤 그 화면으로 돌아간다.
-  const from = useSearchParams().get("from");
+  const searchParams = useSearchParams();
+  const from = searchParams.get("from");
+  const deleteFromMenu = searchParams.get("delete") === "1";
   const backHref = from === "home" ? `/customer-select/${project.id}`
     : from && ["upload", "select", "review"].includes(from) ? `/customer-select/${project.id}/${from}` : "/customer-select";
   const [name, setName] = useState(project.name);
@@ -53,7 +55,7 @@ export function EditCustomerProjectForm({ project }: { project: EditableProject 
   const [shootLocation, setShootLocation] = useState(project.shoot_location ?? "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(deleteFromMenu);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -103,7 +105,7 @@ export function EditCustomerProjectForm({ project }: { project: EditableProject 
         <ProjectFormPageHeading title="프로젝트 설정" description="촬영 정보와 최종 선택 장수를 수정할 수 있어요." onBack={() => router.push(backHref)} />
         <div className="flex flex-col gap-5">
           <ProjectFormSection number="01" title="기본 정보" description="프로젝트명과 셀렉 기준을 관리합니다.">
-            <div id="field-name"><ProjectFormField error={fieldErrors.name} label="프로젝트명" required><ProjectFormInput autoFocus maxLength={60} className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(name), error: Boolean(fieldErrors.name) })}`} value={name} onChange={(event) => { setName(event.target.value); setFieldErrors((current) => ({ ...current, name: "" })); }} /></ProjectFormField></div>
+            <div id="field-name"><ProjectFormField error={fieldErrors.name} label="프로젝트명" required><ProjectFormInput autoFocus={!confirmDelete} maxLength={60} className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(name), error: Boolean(fieldErrors.name) })}`} value={name} onChange={(event) => { setName(event.target.value); setFieldErrors((current) => ({ ...current, name: "" })); }} /></ProjectFormField></div>
             <div id="field-shootType"><ProjectFormField group error={fieldErrors.shootType} label="촬영 종류" required><ProjectShootTypeSelector options={CUSTOMER_SHOOT_TYPES} value={shootType} onChange={(value) => { setShootType(value); setFieldErrors((current) => ({ ...current, shootType: "" })); }} /></ProjectFormField></div>
             <div id="field-target" className="max-w-[360px]"><ProjectFormField error={fieldErrors.target} label="최종 선택 장수" required hint="작가님과 약속한 장수를 입력해 주세요. 실제 선택 장수가 달라도 전달할 수 있어요."><div className="relative"><ProjectFormInput className={`${PROJECT_FORM_INPUT_CLASS} !pr-14 text-right ${projectFormInputStateClass({ hasValue: Boolean(target), error: Boolean(fieldErrors.target) })}`} inputMode="numeric" pattern="[0-9]*" value={target} onChange={(event) => { setTarget(event.target.value.replace(/\D/g, "")); setFieldErrors((current) => ({ ...current, target: "" })); }} /><span className="pointer-events-none absolute inset-y-0 right-5 flex items-center text-sm text-subtle-foreground">장</span></div></ProjectFormField></div>
           </ProjectFormSection>
@@ -140,6 +142,6 @@ export function EditCustomerProjectForm({ project }: { project: EditableProject 
     </PhotographerLightPageFrame>
 
     <PhotographerFormActionBar maxWidth={840} error={error} leading={<p className="text-sm text-muted-foreground">변경한 정보는 프로젝트 목록과 셀렉 화면에 반영됩니다.</p>} actions={<><PhotographerLightButton size="work-panel" variant="secondary" onClick={() => router.push(backHref)} disabled={saving}>취소</PhotographerLightButton><PhotographerLightButton size="work-panel" onClick={save} pending={saving} pendingLabel="저장 중…">변경사항 저장</PhotographerLightButton></>} />
-    {confirmDelete && <SelectionConfirmDialog title="프로젝트를 삭제할까요?" description={<>업로드한 사진과 모든 작업 기록이 삭제됩니다.<br />이 작업은 되돌릴 수 없어요.</>} confirmLabel="삭제하기" busyLabel="삭제 중…" confirming={deleting} error={error} danger onCancel={() => setConfirmDelete(false)} onConfirm={remove} />}
+    {confirmDelete && <SelectionConfirmDialog title="프로젝트를 삭제할까요?" description={<>업로드한 사진과 모든 작업 기록이 삭제됩니다.<br />이 작업은 되돌릴 수 없어요.</>} confirmLabel="삭제하기" busyLabel="삭제 중…" confirming={deleting} error={error} danger onCancel={() => { setConfirmDelete(false); if (deleteFromMenu) router.push("/customer-select"); }} onConfirm={remove} />}
   </>;
 }

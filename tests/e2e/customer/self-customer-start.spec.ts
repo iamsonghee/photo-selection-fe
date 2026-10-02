@@ -93,7 +93,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
     await expect(shellHeader.locator("[data-brand-wordmark]")).toBeHidden();
     await expect(page.locator("[data-compact-project-title]")).toBeVisible();
     await expect(page.locator("[data-upload-project-context]")).toHaveCount(0);
-    await expect.poll(() => shellHeader.locator(":scope > div").evaluate((element) => element.getBoundingClientRect().height)).toBe(48);
+    await expect.poll(() => shellHeader.locator(":scope > div").evaluate((element) => element.getBoundingClientRect().height)).toBe(56);
     await page.setViewportSize({ width: 800, height: 300 });
     // 올리기·고르기·보내기 단계 간 헤더 높이를 맞추기 위해 PC도 항상 얇은 헤더다.
     await expect(page.locator('[data-customer-shell-header-mode="compact"]')).toBeVisible();

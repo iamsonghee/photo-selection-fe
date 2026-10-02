@@ -18,7 +18,7 @@
 .page {
   display: flex;
   flex-direction: column;
-  min-height: calc(100dvh - 64px);
+  min-height: calc(100dvh - 56px);
 }
 
 .header {
@@ -273,7 +273,7 @@
 
 .joinShell { min-height: 100dvh; background: #f3f6f7; color: #191918; font-family: Pretendard, "Pretendard Variable", -apple-system, sans-serif; }
 .joinBrand { height: 64px; display: flex; align-items: center; padding: 0 max(32px, calc((100vw - 1440px) / 2)); border-bottom: 1px solid #e7ecee; background: #fff; }
-.joinMain { min-height: calc(100dvh - 64px); padding: 48px 20px; display: grid; place-items: start center; box-sizing: border-box; }
+.joinMain { min-height: calc(100dvh - 56px); padding: 48px 20px; display: grid; place-items: start center; box-sizing: border-box; }
 .joinCard { width: min(100%, 460px); padding: 34px; border: 1px solid #e1e6e8; border-radius: 18px; background: #fff; box-shadow: 0 14px 42px rgba(2,56,82,.08); }
 .joinEyebrow { color: #ff4d00; font-size: 12px; font-weight: 800; }
 .joinCard h1 { margin: 10px 0 10px; color: #023852; font-size: 28px; line-height: 1.35; letter-spacing: -.04em; }
@@ -624,7 +624,7 @@ button.avatar:hover { transform: translateY(-1px); }
 /* PC uses the same roomy A-CUT work surface; mobile keeps the original single-column flow. */
 @media (min-width: 768px) {
   .page {
-    min-height: calc(100dvh - 64px);
+    min-height: calc(100dvh - 56px);
   }
   .header {
     width: 100%;

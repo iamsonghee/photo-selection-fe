@@ -26,19 +26,15 @@
 .segments button { height: 100%; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
 .segments button b { color: var(--subtle-foreground); font-weight: 600; font-variant-numeric: tabular-nums; }
 .segments button:hover { color: var(--foreground); }
-.segments > button[aria-pressed="true"], .segmentSplit:has(button[aria-pressed="true"]) { background: var(--surface); box-shadow: 0 1px 3px rgba(2, 56, 82, 0.14); }
-.segments button[aria-pressed="true"], .segmentSplit:has(button[aria-pressed="true"]) button { color: var(--accent); }
-.segments button[aria-pressed="true"] b { color: var(--accent); }
-/* 찜 칸: 이름·숫자와 ▾가 한 알약 — ▾는 이름에 붙여 둔다. */
-.segmentSplit { display: inline-flex; border-radius: 999px; }
-.segmentSplit > button:first-child { padding-right: 2px; }
-.segmentSplit .segmentCaret { padding: 0 10px 0 2px; }
+.segments > button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 1px 3px rgba(2, 56, 82, 0.14); }
+/* 주황은 "고른 것"과 주 버튼에만 — 보기 범위·인물 칩·옵션 배지의 켜짐은 남색으로. */
+.segments button[aria-pressed="true"] { color: var(--foreground); }
+.segments button[aria-pressed="true"] b { color: var(--foreground); }
 .iconTool { position: relative; flex: none; width: 34px; height: 34px; border: 0; border-radius: 999px; background: none; color: var(--muted-foreground); display: grid; place-items: center; cursor: pointer; }
 .mobileOnly { display: none; }
 .iconTool:hover, .iconTool[aria-expanded="true"] { background: var(--surface-raised); color: var(--foreground); }
-.iconTool i { position: absolute; top: -2px; right: -2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 800; font-style: normal; line-height: 16px; }
+.iconTool i { position: absolute; top: -2px; right: -2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--foreground); color: #fff; font-size: 10px; font-weight: 800; font-style: normal; line-height: 16px; }
 .toolsMenu { position: absolute; top: calc(100% - 4px); right: 24px; width: 280px; padding: 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgba(2, 56, 82, 0.16); display: flex; flex-direction: column; gap: 2px; }
-.toolsMenuLeft { right: auto; left: 24px; width: 200px; }
 .toolsMenu > button { width: 100%; min-height: 40px; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--foreground); display: flex; align-items: center; justify-content: space-between; gap: 10px; font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
 .toolsMenu > button:hover { background: var(--surface-raised); }
 .toolsMenu > button[aria-checked="true"][role="menuitemradio"] { color: var(--accent); }
@@ -57,22 +53,20 @@
 .toolsNote { margin: 0; padding: 7px 24px; background: color-mix(in srgb, var(--warning, #ffb800) 10%, var(--surface)); border-bottom: 1px solid var(--border-subtle); color: var(--foreground); display: flex; align-items: center; gap: 10px; font-size: 12px; }
 .toolsNote button { padding: 0; border: 0; background: none; color: var(--muted-foreground); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 /* 인물 구성 칩(AI 판정): 아기 단독 · 가족·소수 · 여러 명 · 사람 없음. 켜고 끄는 토글, 선택 색은 보기 범위 탭과 같은 주황. */
-.peopleChips { display: flex; gap: 6px; }
-.peopleChips button { flex: none; height: 34px; padding: 0 10px; border: 0; border-radius: 999px; background: none; color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
-.peopleChips button:hover { background: var(--surface-raised); color: var(--foreground); }
+/* 인물 칩: 보기 범위 탭(회색 판 위 흰 알약)과 다른 필터라는 걸 모양으로 — 앞에 `인물` 이름, 작은 테두리 칩. */
+.peopleChips { display: flex; align-items: center; gap: 6px; }
+.peopleLabel { flex: none; display: inline-flex; align-items: center; gap: 4px; margin-right: 2px; color: var(--subtle-foreground); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.peopleChips button { flex: none; height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; background: none; color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.peopleChips button:hover { border-color: var(--border-strong); color: var(--foreground); }
 .peopleChips button b { color: var(--subtle-foreground); font-weight: 600; font-variant-numeric: tabular-nums; }
-.peopleChips button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--accent); }
+.peopleChips button[aria-pressed="true"] { border-color: var(--foreground); background: var(--foreground); color: #fff; }
 .peopleChips button[aria-pressed="true"] b { color: inherit; }
 /* PC: 툴바 줄 안(보기 범위 탭 옆, 간격으로 구분). 모바일: 보기 옵션 안. */
-.peopleChipsInline { flex: none; margin-left: 12px; gap: 2px; }
+.peopleChipsInline { flex: none; margin-left: 8px; padding-left: 14px; border-left: 1px solid var(--border-subtle); }
 /* 모바일 보기 옵션 안 인물 칩 줄 / 고른 동안의 안내 줄 — PC는 툴바 줄에 칩이 보이므로 숨긴다. */
-.peopleMenuRow { display: none; flex-direction: column; gap: 8px; padding: 8px 10px; font-size: 13px; }
-.peopleMenuRow .peopleChips { flex-wrap: wrap; }
-.peopleNote { display: none; }
 .inviteLabel { display: inline; }
 /* 장면 목록의 진행: ♥ 찜 수 · ✓ 고른 수/목표 */
 .sceneProgress { display: inline-flex; gap: 6px; }
-.sceneProgress i { font-style: normal; color: var(--subtle-foreground); }
 .sceneProgress b { font-weight: 600; }
 .sceneProgress b.done { color: var(--success); }
 
@@ -103,17 +97,12 @@
 .timelineScroll:global(.gl-density-2) :global(.gl-photo-card) { aspect-ratio: 1; }
 /* 사진 카드 모서리 8px — 업로드·상세 등 셀프 고객 화면 기준(photo-grid.ts). 공용 카드(작가 고객 갤러리)는 4px 그대로. */
 .timelineScroll :global(.gl-photo-card), .timelineScroll :global(.gl-card-media), .timelineScroll :global(.gl-photo-card[data-pop])::after { border-radius: 8px; }
-/* 접힌 유사컷 표지: 뒤에 카드가 겹친 모양(누르면 상세에서 묶음을 본다). */
-/* 줄(selectGridRow)이 overflow: hidden이라 카드 안에서 그린다: 사진을 왼쪽 아래로 8px 줄이고 뒤 카드 두 장을 오른쪽 위에 겹친다. */
-.timelineScroll :global(.gl-photo-card:has(.gl-group-stack)) { padding: 8px 8px 0 0; background: transparent; }
-.timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::before,
-.timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::after { content: ""; position: absolute; border-radius: 8px; }
-.timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::before { inset: 0 0 8px 8px; background: #dfe5e8; }
-/* 표지의 ::after는 뒤 카드라, 선택 순간의 주황 테두리(공용 [data-pop]::after, z-index 16)가 이 회색 카드를 사진 위로 올리지 않게 한다 — 표지는 ✓ 튀기기만. */
-.timelineScroll :global(.gl-photo-card:has(.gl-group-stack))::after { inset: 4px 4px 4px 4px; z-index: 0; background: #bfcbd1; box-shadow: none; animation: none; }
-.timelineScroll :global(.gl-group-stack) { z-index: 1; }
+/* 접힌 유사컷 표지는 오른쪽 아래 `⧉ N` 배지 하나로만 알린다(뒤에 카드를 겹쳐 그리지 않는다 — 사진 위 표시를 줄인다). */
 /* 표지의 `✓ M`은 표시만 — 누르면 그 아래 표지 ✓ 버튼이 눌린다. */
 .timelineScroll :global(.gl-group-picks) { pointer-events: none; }
+/* 내가 찜한 ♥: 주황 채움 대신 흰 바탕에 빨간 하트 — 주황(고른 사진)과 헷갈리지 않게. */
+.timelineScroll :global(.gl-like-box.gl-liked) { background: rgba(255, 255, 255, 0.92); color: var(--foreground); }
+.timelineScroll :global(.gl-like-box.gl-liked svg) { color: var(--danger); }
 /* 배지로 펼친 묶음의 띠(SceneGrid가 묶음 줄 뒤에 깐다). 사진 크기는 다른 카드와 같다. */
 .groupBand { position: absolute; left: -5px; right: -5px; background: #d3dce1; }
 .timelineScroll :global(.gl-group-media) { outline: 0; }
@@ -130,8 +119,23 @@
   .timelineScroll :global(.gl-photo-card:not(.gl-selected) .gl-check-box:focus-visible) { opacity: 1; }
 }
 @media (hover: none) {
-  .timelineScroll :global(.gl-photo-card:not(.gl-selected) .gl-check-box)::before { background: rgba(0, 0, 0, 0.12); border-color: rgba(255, 255, 255, 0.9); box-shadow: none; }
+  .timelineScroll :global(.gl-photo-card:not(.gl-selected) .gl-check-box)::before { background: rgba(0, 0, 0, 0.08); border-color: rgba(255, 255, 255, 0.95); box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.18), 0 1px 3px rgba(0, 0, 0, 0.2); }
 }
+/* 고르는 순간: 번쩍이는 두꺼운 테두리(공용 [data-pop]::after)는 빼고, ✓만 작게 톡 튀며 주황 테두리는 서서히 나타난다.
+   연달아 빠르게 골라도 화면이 깜빡이지 않게 한다. */
+.timelineScroll :global(.gl-photo-card[data-pop])::after { display: none; }
+.timelineScroll :global(.gl-photo-card[data-pop] .gl-check-box)::before,
+.timelineScroll :global(.gl-photo-card[data-pop] .gl-check-box svg) { animation: checkTap 180ms ease-out; }
+.timelineScroll :global([data-photo-thumbnail-selection-ring]) { animation: ringIn 150ms ease-out; }
+@keyframes checkTap { 0% { transform: scale(0.9); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
+@keyframes ringIn { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .timelineScroll :global(.gl-photo-card[data-pop] .gl-check-box)::before,
+  .timelineScroll :global(.gl-photo-card[data-pop] .gl-check-box svg),
+  .timelineScroll :global([data-photo-thumbnail-selection-ring]) { animation: none; }
+}
+/* ✓는 A-CUT 로고 마크처럼 모서리 둥근 네모 — 고르지 않은 칸은 흰 테두리만, 고르면 주황으로 채운다. */
+.timelineScroll :global(.gl-check-box)::before { border-radius: 6px; border-width: 1.5px; }
 /* 고른 사진도 원래 밝기로 본다(비교가 정확하고 배지·글자가 묻히지 않게). 선택은 ✓·주황 테두리로만 보인다. */
 .timelineScroll :global(.gl-photo-card.gl-selected .gl-card-media img) { filter: none; }
 /* 갤러리 카드에는 흔들림만 표시한다 — 눈 감음은 의도된 표정이 많아 상세 안내와 묶음 안 순서로만 반영한다. */
@@ -156,7 +160,6 @@
 .sceneFooter { position: absolute; left: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
 .sceneNext { margin: 0; display: inline-flex; align-items: center; gap: 6px; color: var(--subtle-foreground); font-size: 13px; }
 .sceneNext strong { color: var(--muted-foreground); font-weight: 700; }
-.sceneEnd { width: min(520px, 100%); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--surface); color: var(--muted-foreground); font-size: 13px; }
 /* 당긴 만큼 아래에서 드러나는 다음 장면. 원이 다 차면(놓으면 넘어감) 강조색으로 바뀐다. */
 .pullReveal { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; overflow: hidden; color: var(--muted-foreground); font-size: 14px; pointer-events: none; }
 .pullRevealTop { top: 0; bottom: auto; flex-direction: column-reverse; }
@@ -185,7 +188,6 @@
 .quickNotice { padding: 6px 10px; border: 0; background: none; color: var(--muted-foreground); font: inherit; font-size: 11px; font-weight: 600; text-align: left; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .quickChat { height: 34px; border: 0; border-radius: 8px; background: none; color: var(--foreground); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .quickChat[aria-pressed="true"] { color: var(--accent); }
-.quickPill { display: none; }
 /* 접힌 PC 장면 메뉴: 왼쪽 가운데 점 목록. 마우스를 올리거나 키보드로 들어가면 장면 이름이 펼쳐진다. */
 .floatNav { position: absolute; left: 16px; top: 50%; z-index: 6; transform: translateY(-50%); width: 44px; max-height: calc(100% - 200px); display: flex; flex-direction: column; gap: 2px; padding: 6px; overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 16px; background: color-mix(in srgb, var(--surface) 96%, transparent); box-shadow: 0 10px 30px rgba(2, 56, 82, 0.12); backdrop-filter: blur(8px); transition: width 180ms ease; }
 .floatNav:hover, .floatNav:focus-within { width: 224px; }
@@ -207,7 +209,6 @@
 @media (min-width: 768px) {
   .mainFloatNav .sceneHeader, .mainFloatNav .tools, .mainFloatNav .toolsNote { padding-left: 76px; }
   .mainFloatNav .analysis { margin-left: 76px; }
-  .mainFloatNav .toolsMenuLeft { left: 76px; }
 }
 @media (prefers-reduced-motion: reduce) { .floatNav, .floatLabel { transition: none; } }
 
@@ -217,6 +218,30 @@
 .barMeta strong { font-size: 15px; font-weight: 800; letter-spacing: -0.02em; }
 .barMeta span { color: var(--muted-foreground); font-size: 12px; }
 .barActions { flex: none; display: flex; gap: 8px; }
+/* 연한 주황 끝내기 버튼: 아직 볼 장면이 남았을 때. 색이 있어 비활성처럼 보이지 않고, 마지막 장면·약속 장수에서 진한 주황으로 바뀐다. */
+.barActions .finishSoft { border-color: transparent; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--accent); transition: background-color 200ms ease, color 200ms ease; }
+.barActions .finishSoft.finishSoft:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 20%, var(--surface)); }
+/* 모바일 하단 바의 장면 버튼·대화 버튼(PC는 사이드바가 맡아 숨긴다). */
+.barScene, .barChat { display: none; }
+.desktopOnlyInline { display: inline; }
+@media (max-width: 767px) {
+  .barMetaWithDock { display: none; }
+  .desktopOnlyInline { display: none; }
+  /* 소유자 장면 보기: 위 줄은 지금 장면(누르면 장면 목록), 아래 줄은 전체 진행 문장 + 선택 완료. */
+  .bottomBar[data-stacked] { flex-wrap: wrap; row-gap: 8px; }
+  .bottomBar[data-stacked] .barScene { flex: 0 0 100%; flex-direction: row; align-items: center; gap: 8px; padding: 0 0 8px; border-bottom: 1px solid var(--border-subtle); }
+  .bottomBar[data-stacked] .barScene strong { flex: none; max-width: 60%; font-size: 13px; }
+  .bottomBar[data-stacked] .barScene span { flex: 1; text-align: right; }
+  .bottomBar[data-stacked] .barMetaWithDock { display: flex; }
+  .bottomBar { gap: 8px; }
+  .barScene { min-width: 0; flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 4px 0; border: 0; background: none; color: var(--foreground); font: inherit; text-align: left; cursor: pointer; }
+  .barScene strong { max-width: 100%; display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 800; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; }
+  .barScene strong i { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--accent); }
+  .barScene strong em { flex: none; color: var(--subtle-foreground); font-size: 12px; font-style: normal; font-weight: 700; }
+  .barScene span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-foreground); font-size: 12px; }
+  .barChat { width: 44px; height: 44px; flex: none; border: 1px solid var(--border-subtle); border-radius: 999px; background: var(--surface); color: var(--foreground); display: grid; place-items: center; cursor: pointer; }
+  .barChat[aria-pressed="true"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+}
 
 /* ── 시트(장면 목록·초대) ── */
 .sheetBackdrop { position: fixed; inset: 0; z-index: 150; display: flex; align-items: flex-end; justify-content: center; background: rgba(2, 56, 82, 0.32); }
@@ -255,6 +280,7 @@
 .detailCount { margin-left: auto; color: rgba(255, 255, 255, 0.64); font-size: 12px; white-space: nowrap; }
 .detailImage { position: relative; min-height: 0; flex: 1; display: flex; align-items: center; justify-content: center; padding: 0 64px 16px; }
 .detailImage img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+.detailSceneNotice { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 6; padding: 8px 14px; border-radius: 999px; background: rgba(0, 0, 0, .7); color: #fff; font-size: 13px; white-space: nowrap; pointer-events: none; }
 .quality { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 6px 12px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .strip { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 0 16px 14px; }
 .stripRow { display: flex; align-items: flex-start; gap: 6px; padding: 6px 8px 0 0; overflow-x: auto; scrollbar-width: none; }
@@ -294,36 +320,33 @@
 .likerDots i { width: 8px; height: 8px; margin-left: -2px; border: 1.5px solid var(--surface); border-radius: 50%; box-sizing: content-box; }
 .shortcutHint { color: var(--subtle-foreground); font-size: 11px; text-align: center; }
 
-@media (prefers-reduced-motion: reduce) { .sceneEnter, .sceneEnterAbove { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .sceneEnter, .sceneEnterAbove { animation: none; } .toolsWrap, :global([data-customer-select]) > header { transition: none !important; } }
 
 @media (max-width: 767px) {
   .sceneHeader { padding: 10px 20px 6px; }
-  .tools { padding: 0 20px 8px; }
+  .tools { padding: 0 20px 8px; flex-wrap: wrap; row-gap: 4px; overflow-x: visible; }
   .search { flex-basis: 140px; }
   .desktopOnly { display: none; }
   .mobileOnly { display: grid; }
   .segments button { padding: 0 10px; }
   .toolsMenu { left: 12px; right: 12px; width: auto; }
-  .toolsMenuLeft { right: auto; width: 200px; }
   .toolsNote { padding: 7px 20px; }
-  .peopleChipsInline { display: none; }
-  .peopleMenuRow { display: flex; }
-  .peopleNote { display: flex; }
+  /* 인물 칩: 툴바 아래 한 줄, 넘치면 가로 스크롤(화면 가장자리까지). */
+  .peopleChipsInline { order: 10; flex: 0 0 calc(100% + 40px); margin: 2px -20px 0; padding: 0 20px; border-left: 0; overflow-x: auto; scrollbar-width: none; }
   /* 헤더 오른쪽 초대: 모바일도 글자를 둔다(+ 아이콘만이면 사진 추가로 오해) — 좁은 폭에 맞게 여백만 줄인다. */
   .inviteButton { padding: 0 10px; }
   .analysis { margin: 10px 20px 0; flex-wrap: wrap; }
   .analysisActions { width: 100%; padding-left: 26px; }
   .rail, .floatNav { display: none; }
-  .mainFloatNav .timelineScroll { padding-left: 20px; }
-  .mainWithQuick .timelineScroll { padding-right: 20px; padding-bottom: 72px; }
-  .quickPill { position: absolute; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 6; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--border-subtle); border-radius: 999px; background: color-mix(in srgb, var(--surface) 96%, transparent); box-shadow: 0 8px 24px rgba(2, 56, 82, 0.16); backdrop-filter: blur(8px); }
-  .quickPillScene { max-width: 240px; height: 40px; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--foreground); display: flex; align-items: center; gap: 6px; font: inherit; cursor: pointer; }
-  .quickPillScene i { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--accent); }
-  .quickPillScene strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 800; }
-  .quickPillScene span { flex: none; color: var(--subtle-foreground); font-size: 12px; font-weight: 700; }
-  .quickPillChat { width: 40px; height: 40px; border: 0; border-left: 1px solid var(--border-subtle); border-radius: 0 999px 999px 0; background: none; color: var(--foreground); display: grid; place-items: center; cursor: pointer; }
-  .quickPillChat[aria-pressed="true"] { color: var(--accent); }
+  .mainFloatNav .timelineScroll { padding-left: 8px; }
+  .mainWithQuick .timelineScroll { padding-right: 8px; }
+  .main .timelineScroll { padding-left: 8px; padding-right: 8px; }
   .bottomBar { padding: 10px 20px calc(10px + env(safe-area-inset-bottom)); }
+  /* 사진을 내려 볼 때 헤더(56px + 테두리)와 보기 도구를 접는다 — 위로 올리면 다시 펼친다. */
+  :global([data-customer-select]):has(.page) > header { transition: margin-top 200ms ease; }
+  :global([data-customer-select]):has(.page[data-chrome-hidden]) > header { margin-top: -57px; }
+  .toolsWrap { max-height: 240px; transition: max-height 200ms ease, opacity 200ms ease; }
+  .page[data-chrome-hidden] .toolsWrap { max-height: 0; opacity: 0; overflow: hidden; pointer-events: none; }
   .detail { flex-direction: column; }
   .detailStage { min-height: 0; flex: 1; }
   .detailImage { padding: 0 0 8px; }

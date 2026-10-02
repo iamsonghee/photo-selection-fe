@@ -8,7 +8,7 @@ export default async function CustomerSelectLoginPage() {
 
   return (
     <CustomerSelectShell navigation={false}>
-      <main className="min-h-[calc(100dvh-64px)]" />
+      <main className="min-h-[calc(100dvh-56px)]" />
       <CustomerSelectLoginModal />
     </CustomerSelectShell>
   );

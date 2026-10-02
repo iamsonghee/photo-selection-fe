@@ -26,20 +26,23 @@ export function customerProjectHome(projectId: string) {
 }
 
 /** 지금 할 단계 화면 — 상세의 주 버튼과 목록 카드의 행동 링크가 쓴다. */
-export function customerProjectDestination(project: ProjectStage) {
+export function customerProjectDestination(project: ProjectStage, sent = false) {
   if (project.retouch_done) return `/customer-select/${project.id}/done`;
+  if (sent) return `/customer-select/${project.id}/review`;
   if (project.photo_count > 0) return `/customer-select/${project.id}/select`;
   return `/customer-select/${project.id}/upload`;
 }
 
-export function customerProjectStatus(project: Omit<ProjectStage, "id">, selectedCount?: number | null) {
+export function customerProjectStatus(project: Omit<ProjectStage, "id">, selectedCount?: number | null, sent = false) {
   if (project.retouch_done) return "완료";
+  if (sent) return "작가에게 전달함";
   if (project.photo_count > 0) return selectedCount === 0 ? "고르기 전" : "고르는 중";
   return "사진 올리기 전";
 }
 
-export function customerProjectAction(project: Omit<ProjectStage, "id">, selectedCount?: number | null) {
+export function customerProjectAction(project: Omit<ProjectStage, "id">, selectedCount?: number | null, sent = false) {
   if (project.retouch_done) return "완료 내용 보기";
+  if (sent) return "선택 결과 보기";
   if (project.photo_count === 0) return "사진 올리기";
   return selectedCount === 0 ? "사진 고르기" : "이어서 고르기";
 }
@@ -56,4 +59,16 @@ export function filterCustomerProjects(projects: CustomerProjectSummary[], query
       || (status === "done" && project.retouch_done);
     return matchesQuery && matchesStatus;
   });
+}
+
+/** 마감 D-day 계산용 KST 기준 오늘(YYYY-MM-DD). */
+export function kstToday() {
+  return new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+}
+
+/** 셀렉 마감 칩(목록 카드·상세 공용). 3일 이내·오늘·지남은 urgent로 강조한다. 보정 완료면 보이지 않는다. */
+export function selectionDeadlineBadge(deadline: string | null | undefined, today: string, done = false) {
+  if (!deadline || done) return null;
+  const days = Math.round((Date.parse(deadline.slice(0, 10)) - Date.parse(today)) / 86400_000);
+  return { label: days < 0 ? "마감 지남" : days === 0 ? "오늘 마감" : `마감 D-${days}`, urgent: days <= 3 };
 }

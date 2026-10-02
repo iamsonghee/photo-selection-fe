@@ -38,7 +38,13 @@ function SendScreen() {
   const [linkState, setLinkState] = useState<"idle" | "loading" | "copied" | "shared" | "fail">("idle");
   const [listCopied, setListCopied] = useState(false);
   // 상세를 연 동안에는 목록을 고정한다 — 상세에서 선택을 빼도 앞뒤 이동이 흔들리지 않게.
-  const [detail, setDetail] = useState<{ photos: Photo[]; id: string } | null>(null);
+  const [detail, setDetail] = useState<{ photos: Photo[]; id: string; sceneOf: Record<string, string> } | null>(null);
+  const [sceneNotice, setSceneNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sceneNotice) return;
+    const timer = window.setTimeout(() => setSceneNotice(null), 1800);
+    return () => window.clearTimeout(timer);
+  }, [sceneNotice]);
   // 보정본 확인(비교·재보정 정리)은 아직 열지 않았다 — 누르면 준비 중 안내만 보인다.
   const [retouchSoon, setRetouchSoon] = useState(false);
 
@@ -181,7 +187,10 @@ function SendScreen() {
                 {section.title && <p className={s.sectionTitle}>{section.title} <span>{section.photos.length}장</span></p>}
                 <div className={s.grid}>
                   {section.photos.map((photo) => (
-                    <button key={photo.id} type="button" className={s.thumb} aria-label={`${getPhotoDisplayName(photo)} 크게 보기`} onClick={() => setDetail({ photos: selected, id: photo.id })}>
+                    <button key={photo.id} type="button" className={s.thumb} aria-label={`${getPhotoDisplayName(photo)} 크게 보기`} onClick={() => setDetail({
+                      photos: sections.flatMap((item) => item.photos), id: photo.id,
+                      sceneOf: Object.fromEntries(sections.flatMap((item) => item.photos.map((member) => [member.id, item.title]))),
+                    })}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={photo.url} alt="" />
                       {memoOf(photo.id) && <i aria-label="메모 있음"><MessageSquare size={12} /></i>}
@@ -204,8 +213,14 @@ function SendScreen() {
         <PhotoDetail
           photos={detail.photos}
           photoId={detail.id}
-          onPhotoChange={(id) => setDetail((current) => current && { ...current, id })}
-          onClose={() => setDetail(null)}
+          onPhotoChange={(id) => {
+            const before = detail.sceneOf[detail.id];
+            const after = detail.sceneOf[id];
+            if (before !== after && after) setSceneNotice(`${detail.photos.findIndex((photo) => photo.id === id) > detail.photos.findIndex((photo) => photo.id === detail.id) ? "다음" : "이전"} 장면 · ${after}`);
+            setDetail({ ...detail, id });
+          }}
+          onClose={() => { setDetail(null); setSceneNotice(null); }}
+          sceneNotice={sceneNotice}
           isOwner
           myColor={me}
           people={people}
@@ -218,7 +233,6 @@ function SendScreen() {
           onToggleLike={(id) => store.toggleLike(id, me)}
           onSaveComment={store.setComment}
           selectedCount={selectedIds.size}
-          target={target}
         />
       )}
     </CustomerSelectShell>

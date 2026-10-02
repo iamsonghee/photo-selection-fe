@@ -9,11 +9,12 @@ export function CustomerSelectShell({ children, navigation = false, viewportLock
   // 잠금 화면은 h-dvh 대신 fixed inset-0: iOS 26 Safari 등은 dvh를 하단 툴바 위까지로 잡아 맨 아래 바가 떠 보인다.
   return (
     <div data-acut-light-canvas data-customer-select data-viewport-locked={viewportLocked || undefined} className={`${theme.lightTheme} flex flex-col bg-background text-foreground ${viewportLocked ? "fixed inset-0 overflow-hidden" : "min-h-dvh"}`}>
-      <header data-customer-shell-header-mode={compactHeader ? "compact" : "expanded"} className="shrink-0 border-b border-border-subtle bg-surface">
-        <div className={`flex w-full items-center px-5 transition-[height] duration-200 md:px-8 ${compactHeader ? "h-12 gap-3" : "h-16 gap-4"}`}>
+      {/* 모든 고객 셀렉 화면이 같은 높이(56px)의 헤더를 쓰고, 스크롤해도 위에 붙어 있다(불투명 배경이라 뒤 내용이 비치지 않는다). */}
+      <header data-customer-shell-header-mode={compactHeader ? "compact" : "expanded"} className={`shrink-0 border-b border-border-subtle bg-surface ${viewportLocked ? "" : "sticky top-0 z-40"}`}>
+        <div className="flex h-14 w-full items-center gap-3 px-5 md:px-8">
           {/* 프로젝트 화면(제목 있음)은 "A" 마크만 — 프로젝트명이 헤더의 주인공. 목록 등은 전체 로고. */}
-          <BrandLogoBar href="/customer-select" size={compactHeader ? "sm" : "md"} markOnly={Boolean(compactTitle)} />
-          {compactTitle ? <div data-compact-project-title className={`min-w-0 md:border-l md:border-border-subtle ${compactHeader ? "md:pl-3" : "md:pl-4"}`}>{compactTitle}</div> : null}
+          <BrandLogoBar href="/customer-select" size="md" markOnly={Boolean(compactTitle)} />
+          {compactTitle ? <div data-compact-project-title className="min-w-0 md:border-l md:border-border-subtle md:pl-3">{compactTitle}</div> : null}
           {headerMeta || headerActions || account || navigation ? <div className="ml-auto flex min-w-0 items-center gap-2">
             {headerMeta ? <div className="hidden md:block">{headerMeta}</div> : null}
             {headerActions}

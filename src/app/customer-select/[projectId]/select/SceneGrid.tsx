@@ -14,9 +14,10 @@ const DESKTOP_MIN_CELL = CUSTOMER_GALLERY_GRID.desktopMinCell;
 const DESKTOP_GAP = CUSTOMER_GALLERY_GRID.desktopGap;
 // 3열이 기준(photo-grid.ts). 2·4열은 고르기 화면에서만 고를 수 있는 보기 옵션.
 const MOBILE_GRID: Record<MobileColumns, { gap: number; aspect: number }> = {
-  2: { gap: 10, aspect: 1 },
-  3: { gap: CUSTOMER_GALLERY_GRID.mobileGap, aspect: 1 },
-  4: { gap: 6, aspect: 1 },
+  // 사진 사이를 좁게(사진 앱처럼) 해 칸을 키운다.
+  2: { gap: 4, aspect: 1 },
+  3: { gap: 3, aspect: 1 },
+  4: { gap: 2, aspect: 1 },
 };
 const FOOTER_HEIGHT = { desktop: 120, mobile: 104 };
 // ponytail: 바닥에서 더 당기는 고무줄의 최대 길이·저항·넘어가는 지점. 실기기에서 만져 보며 조정할 값.
@@ -38,7 +39,7 @@ type Row = { kind: "photos"; photos: Photo[]; band: string | null; bandStart: bo
  * 장면 하나의 가상화 사진 격자. 장면 끝(아래·위)에서는 브라우저 스크롤이 스스로 멈추고, 거기서 더 당기면 고무줄처럼
  * 늘어나며 다음(아래)·이전(위) 장면이 드러난다. 충분히 당긴 채 놓으면 넘어간다(덜 당기면 원래대로).
  */
-export function SceneGrid({ photos, mobileColumns, positionKey, startAt, enterFrom, renderCard, empty, footer, next, prev, focus, bandOf }: {
+export function SceneGrid({ photos, mobileColumns, positionKey, startAt, enterFrom, renderCard, empty, footer, next, prev, focus, bandOf, onScrollDirection }: {
   photos: Photo[];
   /** 펼친 유사컷 묶음이면 그 묶음 키. 묶음은 새 줄에서 시작해 묶음 사진만으로 줄을 채우고, 뒤에 하나로 이어진 띠를 깐다. */
   bandOf?: (photo: Photo) => string | null;
@@ -58,8 +59,11 @@ export function SceneGrid({ photos, mobileColumns, positionKey, startAt, enterFr
   prev?: { label: string; onPass: () => void } | null;
   /** 상세 보기를 닫은 뒤 마지막으로 본 사진이 화면 밖이면 가운데로 가져온다(작가 고객 갤러리와 같은 규칙). */
   focus?: { photoId: string; nonce: number } | null;
+  /** 스크롤 방향(true = 아래로 내려 사진을 더 보는 중). 맨 위 근처는 항상 false. 모바일 헤더 접기에 쓴다. */
+  onScrollDirection?: (down: boolean) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastTopRef = useRef(0);
   const gridRef = useRef<HTMLDivElement>(null);
   const restoredRef = useRef(false);
   // 처음 위치를 잡기 전에는 위 당기기를 하지 않는다(끝부터 보는 장면이 아직 맨 위일 때 잘못 잡히지 않게).
@@ -270,7 +274,15 @@ export function SceneGrid({ photos, mobileColumns, positionKey, startAt, enterFr
         ref={scrollRef}
         className={`${ui.selectGallery} ${s.timelineScroll} gl-density-${mobileColumns}`}
         onScroll={(event) => {
-          const item = virtualizer.getVirtualItemForOffset(event.currentTarget.scrollTop + 1);
+          const el = event.currentTarget;
+          const top = el.scrollTop;
+          // 작은 흔들림(관성 끝·바운스)은 무시하고 12px 넘게 움직였을 때만 방향을 알린다. 맨 아래에서는 헤더를 접으며 칸이
+          // 커져 scrollTop이 줄어드는 것을 "위로"로 읽지 않게 방향을 바꾸지 않는다(접힘·펼침이 반복되는 것 방지).
+          const atBottom = el.scrollHeight - el.clientHeight - top < 4;
+          if (top < 48) { onScrollDirection?.(false); lastTopRef.current = top; }
+          else if (atBottom) lastTopRef.current = top;
+          else if (Math.abs(top - lastTopRef.current) > 12) { onScrollDirection?.(top > lastTopRef.current); lastTopRef.current = top; }
+          const item = virtualizer.getVirtualItemForOffset(top + 1);
           const row = item ? rows[item.index] : null;
           if (row?.kind === "photos") {
             try { sessionStorage.setItem(positionKey, row.photos[0].id); } catch {}

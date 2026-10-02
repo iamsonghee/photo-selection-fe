@@ -38,13 +38,9 @@ export default function InvitePageClient() {
   const inviteHref = token ? `/c/${token}` : undefined;
   const ctx      = useSelectionOptional();
   const project  = ctx?.project ?? null;
-  const firstPhotoId = ctx?.photos[0]?.id ?? null;
-  const coverPhotoId = project?.coverPhotoId && ctx?.photos.some((photo) => photo.id === project.coverPhotoId)
-    ? project.coverPhotoId
-    : firstPhotoId;
   const loading  = ctx?.loading ?? true;
   const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
-  const [introImage, setIntroImage] = useState<{ photoId: string; url: string } | null>(null);
+  const [introImage, setIntroImage] = useState<{ token: string; url: string } | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -61,16 +57,21 @@ export default function InvitePageClient() {
   }, [token]);
 
   useEffect(() => {
-    if (!token || !coverPhotoId) return;
+    if (!token) return;
     let cancelled = false;
-    fetch(`/api/c/presign-preview?token=${encodeURIComponent(token)}&photoId=${encodeURIComponent(coverPhotoId)}`, { cache: "no-store" })
+    fetch(`/api/c/presign-preview?token=${encodeURIComponent(token)}&cover=1`, { cache: "no-store" })
       .then((response) => response.ok ? response.json() : null)
       .then((data) => {
-        if (!cancelled && data?.url) setIntroImage({ photoId: coverPhotoId, url: data.url });
+        if (!cancelled && data?.url) {
+          setIntroImage({ token, url: data.url });
+          const image = new Image();
+          image.fetchPriority = "high";
+          image.src = data.url;
+        }
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [coverPhotoId, token]);
+  }, [token]);
 
   useEffect(() => {
     if (!project) return;
@@ -118,7 +119,7 @@ export default function InvitePageClient() {
 
   if (["confirmed", "delivered"].includes(project.status)) return <LoadingScreen />;
 
-  const introImageUrl = introImage?.photoId === coverPhotoId ? introImage.url : null;
+  const introImageUrl = introImage?.token === token ? introImage.url : null;
   const entryPhotographerName = photographer?.name?.trim();
   const photographerLabel = entryPhotographerName ? `${entryPhotographerName} 작가` : "담당 작가";
   const avatarUrl = photographer?.profile_image_url

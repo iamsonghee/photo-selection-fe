@@ -66,11 +66,13 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   expect(Math.abs(cardBox!.width - cardBox!.height)).toBeLessThan(2);
   const galleryTexts = await page.locator("body").innerText();
   // 목표 장수는 참고값이다 — 장수만 알려주고 더 고르거나 줄이라고 압박하지 않는다.
-  expect(galleryTexts).toContain(`최종 선택 ${selectedCount}장 · 약속한 10장`);
+  // 진행은 분수 대신 문장: 한 일(지금까지 N장) + 할 일(약속 장수 정도).
+  expect(galleryTexts).toContain(`지금까지 ${selectedCount}장 골랐어요`);
+  expect(galleryTexts).toContain("10장 정도 골라주세요");
   expect(galleryTexts).not.toContain("더 골라주세요");
   expect(galleryTexts).not.toContain("더 선택해 주세요");
   expect(galleryTexts).not.toContain("줄여주세요");
-  const confirm = page.getByRole("button", { name: /작가에게 보내기/ }).last();
+  const confirm = page.getByRole("button", { name: /선택 완료/ }).last();
   const confirmBox = await confirm.boundingBox();
   const overflow = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth }));
 
@@ -78,7 +80,7 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   const viewer = page.getByRole("dialog", { name: /상세 보기/ });
   await expect(viewer).toBeVisible();
   const viewerTexts = await viewer.innerText();
-  expect(viewerTexts).toContain(`최종 선택 ${selectedCount}/10장`);
+  expect(viewerTexts).toContain(`지금까지 ${selectedCount}장 골랐어요`);
   expect(viewerTexts).not.toContain("장 남음");
   // 모바일 상세는 사진 위주 — 메모는 메모 버튼으로 펼친다(dispatchEvent: dev 서버의 Next.js 이슈 배지가 왼쪽 아래를 덮는다).
   if (viewport === "mobile") await viewer.getByRole("button", { name: /^메모 (보기|쓰기)$/ }).dispatchEvent("click");

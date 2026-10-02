@@ -9,7 +9,7 @@
  */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowDown, ChevronDown, ChevronUp, MessageCircle, Grid2x2, Grid3x3, Grip, PanelLeftClose, PanelLeftOpen, Plus, Search, SlidersHorizontal, Sparkles } from "lucide-react";
+import { ArrowDown, ChevronUp, MessageCircle, Grid2x2, Grid3x3, Grip, PanelLeftClose, PanelLeftOpen, Plus, Search, SlidersHorizontal, Sparkles, Users } from "lucide-react";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
@@ -31,8 +31,8 @@ import { taskProgressText, useSceneAnalysis, type NamedScene } from "./useSceneA
 import { AiTidySheet, groupSimilarKey, rememberGroupSimilar, setAsideKey, type AiTidyKind } from "./AiTidySheet";
 import s from "./select.module.css";
 
-type Scope = "all" | "picked" | "liked" | "mine" | "popular";
-const LIKE_SCOPES: readonly Scope[] = ["liked", "mine", "popular"];
+type Scope = "all" | "picked" | "liked";
+const CHAT_ENABLED = false;
 // 인물 구성(AI 판정) 칩 순서·이름. 돌잔치는 단독 컷이 대부분 아기라 이름을 바꿔 보인다.
 const PEOPLE_KINDS: readonly PeopleKind[] = ["solo", "family", "group", "none"];
 const peopleLabel = (kind: PeopleKind, shootType: string | null) =>
@@ -44,6 +44,8 @@ const isFlagged = (photo: Photo) => Boolean(photo.isBlurry || (photo.faceDetecte
 const isBlurFlagged = (photo: Photo) => photo.isBlurry === true;
 
 const sizeLabel: Record<MobileColumns, string> = { 2: "크게", 3: "중간", 4: "작게" };
+// 보기 크기 버튼은 누를 때마다 바로 다음 크기로(크게 → 중간 → 작게 → 크게). 아이콘이 지금 크기를 보여준다.
+const nextColumns: Record<MobileColumns, MobileColumns> = { 2: 3, 3: 4, 4: 2 };
 
 export default function CustomerSelectPage() {
   return <Suspense fallback={<SystemLoadingScreen title="사진을 불러오고 있어요" homeHref="/customer-select" />}><SelectScreen /></Suspense>;
@@ -57,6 +59,21 @@ function SelectScreen() {
   const { project, hydrated, isOwner, currentIdentity: me, participantReady, accessDenied, syncStatus, saveError, clearSaveError } = store;
   // 초대 링크(`?invite=1`, 미들웨어가 붙임)로 들어오면 참여한 적이 있어도 초대 화면을 먼저 보여준다(작가 고객 초대와 같은 흐름).
   const [inviteSeen, setInviteSeen] = useState(false);
+  useEffect(() => {
+    if (searchParams.get("invite") !== "1") return;
+    const controller = new AbortController();
+    fetch(`/api/customer-select/projects/${projectId}/invite-cover`, { signal: controller.signal, cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (data?.url && !controller.signal.aborted) {
+          const image = new Image();
+          image.fetchPriority = "high";
+          image.src = data.url;
+        }
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [projectId, searchParams]);
   const enterFromInvite = () => {
     setInviteSeen(true);
     if (searchParams.get("invite")) router.replace(`/customer-select/${projectId}/select`, { scroll: false });
@@ -79,7 +96,9 @@ function SelectScreen() {
   // 인물 구성 칩 선택은 고른 장면에서만 유지한다 — 다른 장면엔 그 구성이 없을 수 있다(빈 화면 방지).
   const [peoplePick, setPeoplePick] = useState<{ scene: number | null; kind: PeopleKind } | null>(null);
   // 툴바 위에 뜨는 작은 메뉴(찜 범위 ▾, 보기 옵션)와 검색 입력창. 바깥을 누르면 메뉴가 닫힌다.
-  const [menu, setMenu] = useState<"like" | "options" | "size" | null>(null);
+  const [menu, setMenu] = useState<"options" | null>(null);
+  // 모바일: 사진을 내려 볼 때 헤더·보기 도구를 접어 사진 칸을 넓힌다(위로 올리면 다시 보인다). PC는 CSS에서 무시.
+  const [chromeHidden, setChromeHidden] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const toolsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -94,6 +113,12 @@ function SelectScreen() {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [mobileColumns, setMobileColumns] = useState<MobileColumns>(2);
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
+  const [sceneNotice, setSceneNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sceneNotice) return;
+    const timer = window.setTimeout(() => setSceneNotice(null), 1800);
+    return () => window.clearTimeout(timer);
+  }, [sceneNotice]);
   const [sheet, setSheet] = useState<"invite" | "scenes" | "ai" | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [aiPending, setAiPending] = useState(false);
@@ -151,19 +176,22 @@ function SelectScreen() {
     () => scene ? scene.photoIds.flatMap((id) => photoById.get(id) ?? []) : timeOrdered,
     [photoById, scene, timeOrdered],
   );
-  const filtered = useMemo(() => {
+  const filterPhotos = useCallback((candidates: Photo[], person: PeopleKind | null) => {
     const text = query.trim().toLowerCase();
-    return scenePhotos.filter((photo) => {
+    return candidates.filter((photo) => {
       if (scope === "picked" && !selectedIds.has(photo.id)) return false;
       if (scope === "liked" && !likesOf(photo.id).length) return false;
-      if (scope === "mine" && !myLikes.has(photo.id)) return false;
-      if (scope === "popular" && likesOf(photo.id).length < 2) return false;
       // 빼고 보기: 의심 사진은 갤러리에서 뺀다. 이미 고른(참여자는 찜한) 사진은 절대 빼지 않는다.
       if (setAside && isBlurFlagged(photo) && !picked.has(photo.id)) return false;
-      if (peopleFilter && photo.people !== peopleFilter) return false;
+      if (person && photo.people !== person) return false;
       return !text || getPhotoDisplayName(photo).toLowerCase().includes(text);
     });
-  }, [likesOf, myLikes, peopleFilter, picked, query, scenePhotos, scope, selectedIds, setAside]);
+  }, [likesOf, picked, query, scope, selectedIds, setAside]);
+  // 찜 보기는 찜한 사람이 많은 사진부터(같으면 촬영 순서 그대로 — 안정 정렬). 따로 "2명 이상" 같은 범위를 두지 않는다.
+  const filtered = useMemo(() => {
+    const result = filterPhotos(scenePhotos, peopleFilter);
+    return scope === "liked" ? result.sort((a, b) => likesOf(b.id).length - likesOf(a.id).length) : result;
+  }, [filterPhotos, likesOf, peopleFilter, scenePhotos, scope]);
   const setAsideCount = useMemo(
     () => (setAside ? scenePhotos.filter((photo) => isBlurFlagged(photo) && !picked.has(photo.id)).length : 0),
     [picked, scenePhotos, setAside],
@@ -222,18 +250,42 @@ function SelectScreen() {
   }
 
   /** 다른 장면으로 이동. 당겨서 넘어온 장면은 처음부터, 퀵메뉴로 고른 장면은 마지막으로 보던 곳부터 본다. */
-  function goScene(index: number, byPull: "next" | "prev" | null = null) {
-    setScope("all");
-    setQuery("");
+  function goScene(index: number, byPull: "next" | "prev" | null = null, keepView = false) {
+    if (!keepView) { setScope("all"); setQuery(""); }
+    setPeoplePick(keepView && peopleFilter ? { scene: index, kind: peopleFilter } : null);
     setExpanded(new Set());
     setHoldAll(false);
     setSheet(null);
+    // 접힌 헤더·보기 도구는 새 장면에서 다시 펼친다 — 장면 맨 위에서는 스크롤 신호가 없어 접힌 채 남는다.
+    setChromeHidden(false);
     setChosenScene(index);
     setEnteredBy(byPull);
     // 지금 보는 장면을 주소와 이 탭에 남겨 새로고침·재진입 때 같은 장면으로 돌아온다.
     window.history.replaceState(window.history.state, "", `?scene=${index}`);
     try { sessionStorage.setItem(lastSceneKey, String(index)); } catch {}
   }
+
+  // AI 장면은 이름이 제목, 시간대는 보조 정보. 이름이 없으면(시간 장면) 시간대가 제목이다.
+  const sceneTitle = (item: NamedScene) => item.name ?? (scenes && scenes.length > 1 ? formatSceneRange(item) : "전체 사진");
+
+  // 상세의 끝에서는 같은 보기 조건에 맞는 사진이 있는 다음/이전 장면으로 이어간다.
+  const detailInScene = Boolean(openPhotoId && filtered.some((photo) => photo.id === openPhotoId));
+  const boundary = (step: 1 | -1) => {
+    if (!sceneMode || !scenes || sceneIndex === null || !detailInScene) return null;
+    for (let index = sceneIndex + step; index >= 0 && index < scenes.length; index += step) {
+      const matches = filterPhotos(scenes[index].photoIds.flatMap((id) => photoById.get(id) ?? []), peopleFilter);
+      const photo = step === 1 ? matches[0] : matches.at(-1);
+      if (photo) return { index, photoId: photo.id, label: sceneTitle(scenes[index]) };
+    }
+    return null;
+  };
+  const nextDetailScene = boundary(1);
+  const prevDetailScene = boundary(-1);
+  const passDetailScene = (target: NonNullable<typeof nextDetailScene>) => {
+    goScene(target.index, null, true);
+    setOpenPhotoId(target.photoId);
+    setSceneNotice(`${target.index > sceneIndex! ? "다음" : "이전"} 장면 · ${target.label}`);
+  };
 
   // 상세에서 보고 있는 사진을 함께 고르는 사람에게 알린다.
   const { setViewingPhoto } = store;
@@ -254,24 +306,21 @@ function SelectScreen() {
   // 인물 구성 칩: 지금 장면에 판정된 사진이 있을 때만, 장수가 있는 구성만 보인다.
   const peopleCounts = PEOPLE_KINDS.map((kind) => ({ kind, count: scenePhotos.filter((photo) => photo.people === kind).length })).filter((item) => item.count > 0);
   // 켜고 끄는 토글(다시 누르면 풀림) — "모두" 칩은 두지 않는다(보기 범위의 "전체"와 겹쳐 헷갈림).
-  const peopleChips = peopleCounts.length > 1 ? peopleCounts.map(({ kind, count }) => (
+  const peopleChips = peopleCounts.length > 1 ? peopleCounts.map(({ kind }) => (
     <button key={kind} type="button" aria-pressed={peopleFilter === kind} onClick={() => setPeopleFilter(peopleFilter === kind ? null : kind)}>
-      {peopleLabel(kind, project.shootType)}<b>{count}</b>
+      {peopleLabel(kind, project.shootType)}
     </button>
   )) : null;
   const myDone = Boolean(project.participantDone[me]);
   const toReview = () => router.push(`/customer-select/${projectId}/review`);
-  const withChat = people.length > 1;
+  // 일시 대화는 당분간 숨긴다(2026-10-02) — 다시 켜려면 CHAT_ENABLED만 true로.
+  const withChat = CHAT_ENABLED && people.length > 1;
 
-  // AI 장면은 이름이 제목, 시간대는 보조 정보. 이름이 없으면(시간 장면) 시간대가 제목이다.
-  const sceneTitle = (item: NamedScene) => item.name ?? (scenes && scenes.length > 1 ? formatSceneRange(item) : "전체 사진");
-  // 장면별 진행: 찜 수(누구든) → 최종 선택 수/목표. 참여자는 내 찜 수만.
-  const likedInScene = (item: NamedScene) => item.photoIds.filter((id) => likesOf(id).length > 0).length;
+  // 장면별 진행은 계산하게 하지 않고 한 일만 말로: `4장 골랐어요`(분수·추천 장수 없음). 참여자는 내 찜 수만.
   const sceneCount = (index: number) => {
     const count = pickedInScene(scenes![index]);
-    if (!isOwner) return count ? `♥${count}` : "";
-    const liked = likedInScene(scenes![index]);
-    return `${liked ? `♥${liked} · ` : ""}✓${count}${targets[index] ? `/${targets[index]}` : ""}`;
+    if (!count) return "";
+    return isOwner ? `${count}장 골랐어요` : `찜 ${count}장`;
   };
   const sceneDone = (index: number) => isOwner && targets[index] > 0 && pickedInScene(scenes![index]) >= targets[index];
 
@@ -329,7 +378,7 @@ function SelectScreen() {
     <button key={index} type="button" className={s.quickItem} aria-current={index === sceneIndex} onClick={() => goScene(index)}>
       <span>{sceneTitle(item)}</span>
       {isOwner
-        ? <em className={s.sceneProgress}>{likedInScene(item) > 0 && <i>♥{likedInScene(item)}</i>}<b className={sceneDone(index) ? s.done : ""}>✓{pickedInScene(item)}{targets[index] ? `/${targets[index]}` : ""}</b></em>
+        ? <em className={s.sceneProgress}><b className={sceneDone(index) ? s.done : ""}>{sceneCount(index)}</b></em>
         : <em>{sceneCount(index)}</em>}
     </button>
   ));
@@ -375,7 +424,6 @@ function SelectScreen() {
         // 접힌 묶음도 표지(앞에 보이는 대표 사진)를 바로 최종 선택할 수 있다 — 표지의 ✓는 표지 사진 한 장.
         // 묶음 안에 고른 사진이 있으면 ✓ 자리에 묶음 선택 수 `✓ M`을 덮어 보이고(누르면 아래 ✓가 눌린다), 표지는 고른 사진이 앞에 온다.
         selected={selectedIds.has(photo.id)}
-        highlighted={isCover && members.some((member) => selectedIds.has(member.id))}
         showCheck={!(columns >= 3 && typeof window !== "undefined" && window.innerWidth <= 767)}
         checkReadOnly={!isOwner}
         showRating={false}
@@ -409,7 +457,12 @@ function SelectScreen() {
         density={columns}
         showFilename={query.trim().length > 0}
         onPhotoClick={(event) => { event.preventDefault(); setOpenPhotoId(photo.id); }}
-        onCheckClick={(event) => { event.preventDefault(); event.stopPropagation(); store.toggleSelect(photo.id); }}
+        onCheckClick={(event) => {
+          event.preventDefault(); event.stopPropagation();
+          // 고를 때만 아주 짧은 진동(지원하는 기기만 — iOS Safari는 무시).
+          if (!selectedIds.has(photo.id)) navigator.vibrate?.(10);
+          store.toggleSelect(photo.id);
+        }}
         onLikeClick={(event) => { event.preventDefault(); event.stopPropagation(); store.toggleLike(photo.id, me); }}
         popOnSelect={isOwner}
         onRate={() => {}}
@@ -418,40 +471,40 @@ function SelectScreen() {
     );
   };
 
-  // 보기 범위: 회색 트랙 하나(전체 · 찜 ▾ · 최종 선택) — 지금 장면 기준 장수. 찜 세부 범위는 ▾ 메뉴에서. 보이는 글자는 짧게, 읽어 주는 이름(aria)은 원래 이름.
-  const countIn = (test: (photo: Photo) => boolean) => scenePhotos.filter(test).length;
-  const likeOptions: { value: Scope; label: string; ariaLabel: string; menuLabel: string; count: number; show: boolean }[] = [
-    { value: "liked", label: "♥ 찜", ariaLabel: "♥ 찜한 사진", menuLabel: "누구든 찜", count: countIn((photo) => likesOf(photo.id).length > 0), show: true },
-    { value: "mine", label: "♡ 내 찜", ariaLabel: "♡ 내 찜", menuLabel: "내 찜", count: countIn((photo) => myLikes.has(photo.id)), show: true },
-    { value: "popular", label: "♥ 2명 이상", ariaLabel: "찜 2명 이상", menuLabel: "2명 이상 찜", count: countIn((photo) => likesOf(photo.id).length >= 2), show: people.length > 1 },
-  ];
-  const likeActive = LIKE_SCOPES.includes(scope);
-  const likeOption = likeOptions.find((option) => option.value === (likeActive ? scope : "liked"))!;
   const optionCount = (hasGroups && grouped ? 1 : 0) + (hasQuality && setAside ? 1 : 0);
 
-  // 장면 끝의 얇은 안내: 다음 장면 이름(당기면 넘어간다는 신호), 마지막 장면이면 보내기.
+  // 장면 끝의 얇은 안내: 다음 장면 이름(당기면 넘어간다는 신호), 마지막 장면이면 끝이라는 것만 — 진행·버튼은 하단 바에 이미 있다.
   const sceneFooter = scene ? (nextScene
     ? <p className={s.sceneNext}><ArrowDown size={14} aria-hidden /><span>다음</span><strong>{sceneTitle(nextScene)}</strong></p>
-    : <div className={s.sceneEnd}>
-        <span>마지막 장면 · {isOwner ? `전체 최종 선택 ${pickedTotal}장` : `전체 찜 ${pickedTotal}장`}</span>
-        {isOwner
-          ? <PhotographerLightButton size="toolbar" disabled={!pickedTotal} onClick={toReview}>작가에게 보내기 →</PhotographerLightButton>
-          : <PhotographerLightButton size="toolbar" variant={myDone ? "outline" : "primary"} onClick={() => store.toggleDone(me)}>{myDone ? "다시 고르기" : "다 골랐어요"}</PhotographerLightButton>}
-      </div>) : undefined;
+    : <p className={s.sceneNext}><span>마지막 장면이에요</span></p>) : undefined;
 
-  const totalText = `최종 선택 ${pickedTotal}장${target ? ` · 약속한 ${target}장` : ""}`;
+  // 진행은 분수 대신 문장으로 — 이미 한 일(크게)과 앞으로 할 일(작게).
+  const doneText = pickedTotal ? `지금까지 ${pickedTotal}장 골랐어요` : "아직 고른 사진이 없어요";
+  const guideText = target ? `${target}장 정도 골라주세요` : "마음에 드는 사진을 골라주세요";
+  // 모바일 하단 바 왼쪽: 지금 장면(누르면 장면 목록 시트)과 대화 — 떠 있던 장면 버튼을 하단 바 한 줄로 합쳤다. PC는 사이드바가 맡는다.
+  const sceneDock = sceneMode && scenes ? <>
+    <button type="button" className={s.barScene} onClick={() => setSheet("scenes")} aria-label="장면 목록 열기">
+      <strong><i aria-hidden />{sceneTitle(scene!)}<ChevronUp size={14} aria-hidden /></strong>
+      <span>{isOwner ? (pickedInScene(scene!) ? `이 장면에서 ${pickedInScene(scene!)}장 골랐어요` : "") : <>이 장면 ♥{pickedInScene(scene!)} · 내 찜 {myLikes.size}장</>}</span>
+    </button>
+    {withChat && <button type="button" className={s.barChat} aria-label={chatOpen ? "대화 닫기" : "대화 열기"} aria-pressed={chatOpen} onClick={() => setChatOpen((value) => !value)}><MessageCircle size={18} /></button>}
+  </> : null;
+  // 끝내기 버튼은 하나 — 장면이 남았고 약속 장수도 못 채웠으면 연한 주황(눌리지만 재촉하지 않음), 마지막 장면이거나 장수를 채우면 진한 주황.
+  const finishSoft = Boolean(nextScene) && !(target && pickedTotal >= target);
   const bottomBar = !isOwner ? <>
-    <div className={s.barMeta}><strong>내가 찜한 사진 {myLikes.size}장</strong><span>최종 선택은 {project.participantNicknames.red || "소유자"}님이 해요</span></div>
+    {sceneDock}
+    <div className={`${s.barMeta} ${sceneDock ? s.barMetaWithDock : ""}`}><strong>내가 찜한 사진 {myLikes.size}장</strong><span>최종 선택은 {project.participantNicknames.red || "소유자"}님이 해요</span></div>
     <div className={s.barActions}>
-      <PhotographerLightButton variant={myDone ? "outline" : "primary"} size="work-panel" onClick={() => store.toggleDone(me)}>{myDone ? "다시 고르기" : "다 골랐어요"}</PhotographerLightButton>
+      <PhotographerLightButton variant={myDone ? "outline" : "primary"} size="work-panel" className={!myDone && nextScene ? s.finishSoft : ""} onClick={() => store.toggleDone(me)}>{myDone ? "다시 고르기" : "다 골랐어요"}</PhotographerLightButton>
     </div>
   </> : <>
-    <div className={s.barMeta}>
-      <strong>{scene ? `${sceneTitle(scene)} ${pickedInScene(scene)}${targets[sceneIndex!] ? ` / ${targets[sceneIndex!]}장 정도` : "장"}` : totalText}</strong>
-      <span>{scene ? `전체 ${totalText}` : "목표와 달라도 보낼 수 있어요"}</span>
+    {sceneDock}
+    <div className={`${s.barMeta} ${sceneDock ? s.barMetaWithDock : ""}`}>
+      <strong>{doneText}</strong>
+      <span>{guideText}{scene && <span className={s.desktopOnlyInline}> · {sceneTitle(scene)}{pickedInScene(scene) ? `에서 ${pickedInScene(scene)}장 골랐어요` : ""}</span>}</span>
     </div>
     <div className={s.barActions}>
-      <PhotographerLightButton size="work-panel" disabled={!pickedTotal} onClick={toReview}>작가에게 보내기 →</PhotographerLightButton>
+      <PhotographerLightButton size="work-panel" className={finishSoft ? s.finishSoft : ""} disabled={!pickedTotal} onClick={toReview}>선택 완료 →</PhotographerLightButton>
     </div>
   </>;
 
@@ -462,7 +515,7 @@ function SelectScreen() {
       compactTitle={<ProjectStepHeader projectId={projectId} name={project.name} step="select" isOwner={isOwner} />}
       headerActions={peopleBar}
     >
-      <div className={s.page} data-chat={withChat ? "" : undefined}>
+      <div className={s.page} data-chat={withChat ? "" : undefined} data-chrome-hidden={chromeHidden && !menu ? "" : undefined}>
 
         {syncStatus === "offline" && <div role="status" className="border-b border-danger/20 bg-danger/8 px-5 py-2 text-center text-xs font-semibold text-danger">연결이 불안정해요. 다시 연결하고 있어요.</div>}
         {saveError && <div role="alert" className="flex items-center gap-2 border-b border-danger/20 bg-danger/8 px-5 py-2 text-xs font-semibold text-danger"><span className="flex-1">{saveError}</span><button type="button" onClick={clearSaveError}>닫기</button></div>}
@@ -477,10 +530,12 @@ function SelectScreen() {
               </div>
               <div className={s.quickList}>{sceneItems}</div>
               {failedNotice}
-              <div className={s.railFooter}>
-                <span>{isOwner ? <>전체 <strong>{pickedTotal}</strong>{target ? ` / ${target}` : ""}장</> : <>내 찜 <strong>{myLikes.size}</strong>장</>}</span>
-                {withChat && <button type="button" className={s.quickChat} aria-pressed={chatOpen} onClick={() => setChatOpen((value) => !value)}><MessageCircle size={15} />대화</button>}
-              </div>
+              {/* 전체 진행은 하단 바 문장이 맡는다(여기 `2 / 9장` 분수는 뺐다). */}
+              {withChat && (
+                <div className={s.railFooter}>
+                  <button type="button" className={s.quickChat} aria-pressed={chatOpen} onClick={() => setChatOpen((value) => !value)}><MessageCircle size={15} />대화</button>
+                </div>
+              )}
             </nav>
           )}
           <div className={`${s.main} ${sceneMode ? s.mainWithQuick : ""} ${sceneMode && railCollapsed ? s.mainFloatNav : ""}`}>
@@ -497,46 +552,26 @@ function SelectScreen() {
             <div className={s.toolsWrap} ref={toolsRef}>
               <div className={s.toolsAnchor}>
               <div className={s.tools} style={sceneMode || analysisBanner || backgroundBanner ? { paddingTop: 10 } : undefined}>
+                {/* 보기 범위·인물 칩에는 장수를 붙이지 않는다 — 숫자를 해석하게 만들어서(2026-10-02). */}
                 <div className={s.segments} role="group" aria-label="보기 범위">
-                  <button type="button" aria-pressed={scope === "all"} aria-label="전체" onClick={() => setScope("all")}>전체<b>{scenePhotos.length}</b></button>
-                  <span className={s.segmentSplit}>
-                    <button type="button" aria-pressed={likeActive} aria-label={likeOption.ariaLabel} onClick={() => setScope(likeOption.value)}>{likeOption.label}<b>{likeOption.count}</b></button>
-                    <button type="button" className={s.segmentCaret} aria-label="찜 범위 바꾸기" aria-haspopup="menu" aria-expanded={menu === "like"} onClick={() => setMenu(menu === "like" ? null : "like")}><ChevronDown size={14} /></button>
-                  </span>
-                  <button type="button" aria-pressed={scope === "picked"} aria-label="✓ 최종 선택" onClick={() => setScope("picked")}>✓ 최종 선택<b>{countIn((photo) => selectedIds.has(photo.id))}</b></button>
+                  <button type="button" aria-pressed={scope === "all"} aria-label="모두" onClick={() => setScope("all")}>모두</button>
+                  <button type="button" aria-pressed={scope === "liked"} aria-label="♥ 찜한 사진" onClick={() => setScope("liked")}>♥ 찜</button>
+                  <button type="button" aria-pressed={scope === "picked"} aria-label="✓ 최종 선택" onClick={() => setScope("picked")}>✓ 최종 선택</button>
                 </div>
-                {/* 인물 칩: PC는 툴바 줄에(줄 수를 줄인다), 모바일은 아래 별도 줄(가로 스크롤). */}
-                {peopleChips && <div className={`${s.peopleChips} ${s.peopleChipsInline}`} role="group" aria-label="인물 구성">{peopleChips}</div>}
+                {/* 인물 칩: PC는 툴바 줄 안, 모바일은 툴바 아래 가로 스크롤 줄(스크롤하면 툴바와 함께 접힌다). */}
+                {peopleChips && <div className={`${s.peopleChips} ${s.peopleChipsInline}`} role="group" aria-label="인물 구성"><span className={s.peopleLabel} aria-hidden><Users size={13} />인물</span>{peopleChips}</div>}
                 <span className={s.toolsSpacer} />
                 {searchOpen || query
                   ? <input className={`${s.search} ${s.desktopOnly}`} type="search" value={query} autoFocus onChange={(event) => setQuery(event.target.value)} onBlur={() => { if (!query) setSearchOpen(false); }} placeholder="파일명 검색" aria-label="파일명 검색" />
                   : <button type="button" className={`${s.iconTool} ${s.desktopOnly}`} aria-label="파일명 검색 열기" title="파일명 검색" onClick={() => setSearchOpen(true)}><Search size={16} /></button>}
                 {/* 모바일은 파일명 검색 대신 보기 크기(크게 2열·중간 3열·작게 4열). */}
-                <button type="button" className={`${s.iconTool} ${s.mobileOnly}`} aria-label={`보기 크기: ${sizeLabel[mobileColumns]}`} title="보기 크기" aria-haspopup="menu" aria-expanded={menu === "size"} onClick={() => setMenu(menu === "size" ? null : "size")}>
+                <button type="button" className={`${s.iconTool} ${s.mobileOnly}`} aria-label={`보기 크기: ${sizeLabel[mobileColumns]} (누르면 ${sizeLabel[nextColumns[mobileColumns]]})`} title="보기 크기" onClick={() => setMobileColumns(nextColumns[mobileColumns])}>
                   {mobileColumns === 2 ? <Grid2x2 size={16} /> : mobileColumns === 3 ? <Grid3x3 size={16} /> : <Grip size={16} />}
                 </button>
                 <button type="button" className={s.iconTool} aria-label="보기 옵션" title="보기 옵션" aria-haspopup="dialog" aria-expanded={menu === "options"} onClick={() => setMenu(menu === "options" ? null : "options")}>
                   <SlidersHorizontal size={16} />{optionCount > 0 && <i>{optionCount}</i>}
                 </button>
               </div>
-              {menu === "like" && (
-                <div className={`${s.toolsMenu} ${s.toolsMenuLeft}`} role="menu" aria-label="찜 범위">
-                  {likeOptions.filter((option) => option.show).map((option) => (
-                    <button key={option.value} type="button" role="menuitemradio" aria-checked={likeOption.value === option.value && likeActive} onClick={() => { setScope(option.value); setMenu(null); }}>
-                      <span>{option.menuLabel}</span><b>{option.count}</b>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {menu === "size" && (
-                <div className={s.toolsMenu} role="menu" aria-label="보기 크기">
-                  {([2, 3, 4] as MobileColumns[]).map((count) => (
-                    <button key={count} type="button" role="menuitemradio" aria-checked={mobileColumns === count} onClick={() => { setMobileColumns(count); setMenu(null); }}>
-                      <span>{sizeLabel[count]}</span><b>한 줄에 {count}장</b>
-                    </button>
-                  ))}
-                </div>
-              )}
               {menu === "options" && (
                 <div className={s.toolsMenu} role="dialog" aria-label="보기 옵션">
                   {hasGroups && (
@@ -549,7 +584,6 @@ function SelectScreen() {
                       <span><strong>흔들림 사진 빼기</strong><small>AI가 흔들림·초점 문제를 의심한 사진을 빼요(고른 사진은 남겨요)</small></span><i aria-hidden />
                     </button>
                   )}
-                  {peopleChips && <div className={s.peopleMenuRow}><strong>인물</strong><div className={s.peopleChips} role="group" aria-label="인물 구성">{peopleChips}</div></div>}
                   {!hasGroups && !hasQuality && <p className={s.toolsMenuEmpty}>AI로 정리하면 유사컷 묶기·흔들림 빼기를 쓸 수 있어요</p>}
                   {isOwner && (analysis.status === "ready" || analysis.status === "fallback") && (
                     <button type="button" className={s.retidyRow} onClick={() => { setMenu(null); setAiError(null); setSheet("ai"); }}>
@@ -560,13 +594,6 @@ function SelectScreen() {
                 </div>
               )}
               </div>
-              {/* 모바일: 인물 칩은 보기 옵션 안에 있고, 고른 동안만 안내 줄로 알린다(PC는 툴바 줄에 칩이 보인다). */}
-              {peopleFilter && (
-                <p className={`${s.toolsNote} ${s.peopleNote}`}>
-                  <span><strong>{peopleLabel(peopleFilter, project.shootType)}</strong>만 보는 중</span>
-                  <button type="button" onClick={() => setPeopleFilter(null)}>해제</button>
-                </p>
-              )}
               {setAside && setAsideCount > 0 && (
                 <p className={s.toolsNote}>
                   <span>흔들림 <strong>{setAsideCount}장</strong> 빼고 보는 중</span>
@@ -583,14 +610,15 @@ function SelectScreen() {
               enterFrom={enteredBy === "next" ? "below" : enteredBy === "prev" ? "above" : null}
               renderCard={card}
               bandOf={bandOf}
-              empty={<><strong>조건에 맞는 사진이 없어요</strong><span>보기 조건을 바꿔보세요.</span><button type="button" onClick={() => { setScope("all"); setQuery(""); }}>전체 보기</button></>}
+              empty={<><strong>조건에 맞는 사진이 없어요</strong><span>보기 조건을 바꿔보세요.</span><button type="button" onClick={() => { setScope("all"); setQuery(""); }}>모두 보기</button></>}
               footer={sceneFooter}
               next={nextScene ? { label: sceneTitle(nextScene), onPass: () => goScene(sceneIndex! + 1, "next") } : null}
               prev={prevScene ? { label: sceneTitle(prevScene), onPass: () => goScene(sceneIndex! - 1, "prev") } : null}
               focus={focus}
+              onScrollDirection={setChromeHidden}
             />
 
-            {/* 퀵메뉴: 장면 목차(지금 장면·장면별 고른 수)와 대화. PC는 오른쪽 세로 목록, 모바일은 떠 있는 버튼 → 장면 시트. */}
+            {/* 퀵메뉴: 장면 목차(지금 장면·장면별 고른 수)와 대화. PC는 사이드바·접은 점 메뉴, 모바일은 하단 바의 장면 버튼 → 장면 시트. */}
             {sceneMode && scenes && (
               <>
                 {/* PC에서 사이드바를 접으면: 왼쪽 가운데 장면 점 메뉴. 올리면 장면 이름이 펼쳐진다. */}
@@ -610,18 +638,9 @@ function SelectScreen() {
                     {withChat && <button type="button" className={s.floatTool} aria-pressed={chatOpen} onClick={() => setChatOpen((value) => !value)} aria-label={chatOpen ? "대화 닫기" : "대화 열기"}><MessageCircle size={16} /><span className={s.floatLabel}>대화</span></button>}
                   </nav>
                 )}
-                <div className={s.quickPill} data-locked-bar>
-                  <button type="button" className={s.quickPillScene} onClick={() => setSheet("scenes")} aria-label="장면 목록 열기">
-                    <i aria-hidden />
-                    <strong>{sceneTitle(scene!)}</strong>
-                    <span>{sceneIndex! + 1}/{scenes.length}</span>
-                    <ChevronUp size={15} aria-hidden />
-                  </button>
-                  {withChat && <button type="button" className={s.quickPillChat} aria-label={chatOpen ? "대화 닫기" : "대화 열기"} aria-pressed={chatOpen} onClick={() => setChatOpen((value) => !value)}><MessageCircle size={17} /></button>}
-                </div>
               </>
             )}
-            <div className={s.bottomBar} data-locked-bar>{bottomBar}</div>
+            <div className={s.bottomBar} data-locked-bar data-stacked={isOwner && sceneMode && scenes ? "" : undefined}>{bottomBar}</div>
           </div>
         </div>
       </div>
@@ -642,10 +661,13 @@ function SelectScreen() {
       {openPhotoId && (
         <PhotoDetail
           // ‹ › 는 갤러리에 보이는 칸 순서(접힌 묶음은 한 칸). 보기 조건 밖 사진을 열었으면 전체를 한 장씩.
-          photos={filtered.some((photo) => photo.id === openPhotoId) ? visible : photos}
-          membersOf={filtered.some((photo) => photo.id === openPhotoId) ? membersOf : undefined}
+          photos={detailInScene ? visible : photos}
+          membersOf={detailInScene ? membersOf : undefined}
           photoId={openPhotoId}
           onPhotoChange={setOpenPhotoId}
+          nextScene={nextDetailScene && { label: nextDetailScene.label, onGo: () => passDetailScene(nextDetailScene) }}
+          prevScene={prevDetailScene && { label: prevDetailScene.label, onGo: () => passDetailScene(prevDetailScene) }}
+          sceneNotice={sceneNotice}
           onClose={() => {
             // 마지막으로 본 사진이 접힌 유사컷 안에 있으면 그 묶음의 표지 위치로 돌아간다.
             const last = photoById.get(openPhotoId);
@@ -653,6 +675,7 @@ function SelectScreen() {
               : visible.find((photo) => last?.similarityGroupId && photo.similarityGroupId === last.similarityGroupId)?.id;
             if (target) setFocus({ photoId: target, nonce: Date.now() });
             setOpenPhotoId(null);
+            setSceneNotice(null);
           }}
           isOwner={isOwner}
           myColor={me}
@@ -666,7 +689,6 @@ function SelectScreen() {
           onToggleLike={(photoId) => store.toggleLike(photoId, me)}
           onSaveComment={store.setComment}
           selectedCount={selectedIds.size}
-          target={target}
         />
       )}
     </CustomerSelectShell>

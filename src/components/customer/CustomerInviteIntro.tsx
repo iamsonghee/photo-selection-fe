@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { ChevronRight, Globe2, Instagram, X } from "lucide-react";
 import { CustomerEntryHeader, CustomerEntryShell } from "./CustomerEntryShell";
 import { DEFAULT_PROFILE_IMAGE, normalizeExternalHttpUrl } from "@/lib/photographer";
@@ -34,10 +34,10 @@ export function CustomerInviteIntro({
   variant?: "selection" | "review";
 }) {
   const profileDialogRef = useRef<HTMLDialogElement>(null);
-  const [preloadedHero, setPreloadedHero] = useState<{ requestedUrl: string; resolvedUrl: string } | null>(null);
   const [paintedHeroUrl, setPaintedHeroUrl] = useState<string | null>(null);
+  const [failedHeroUrl, setFailedHeroUrl] = useState<string | null>(null);
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
-  const resolvedHeroUrl = preloadedHero?.requestedUrl === heroUrl ? preloadedHero.resolvedUrl : null;
+  const resolvedHeroUrl = heroUrl && failedHeroUrl !== heroUrl ? heroUrl : null;
   const avatarSrc = photographerAvatarUrl && failedAvatarUrl !== photographerAvatarUrl
     ? photographerAvatarUrl
     : AVATAR_FALLBACK;
@@ -45,28 +45,6 @@ export function CustomerInviteIntro({
   const instagramUrl = normalizeExternalHttpUrl(photographerInstagramUrl);
   const portfolioUrl = normalizeExternalHttpUrl(photographerPortfolioUrl);
   const hasProfileDetails = Boolean(bio || instagramUrl || portfolioUrl);
-
-  useEffect(() => {
-    if (!heroUrl) return;
-
-    let cancelled = false;
-    const preload = new Image();
-    preload.onload = () => {
-      if (!cancelled) setPreloadedHero({ requestedUrl: heroUrl, resolvedUrl: heroUrl });
-    };
-    preload.onerror = () => {
-      if (!cancelled) {
-        setPreloadedHero((current) => current?.requestedUrl === heroUrl ? null : current);
-      }
-    };
-    preload.src = heroUrl;
-
-    return () => {
-      cancelled = true;
-      preload.onload = null;
-      preload.onerror = null;
-    };
-  }, [heroUrl]);
 
   return (
     <CustomerEntryShell
@@ -82,8 +60,9 @@ export function CustomerInviteIntro({
             className={`${styles.heroImage} ${paintedHeroUrl === resolvedHeroUrl ? styles.heroImageLoaded : ""}`}
             src={resolvedHeroUrl}
             alt={heroAlt}
+            fetchPriority="high"
             onLoad={() => setPaintedHeroUrl(resolvedHeroUrl)}
-            onError={() => setPreloadedHero(null)}
+            onError={() => setFailedHeroUrl(resolvedHeroUrl)}
           />
         ) : null}
         <CustomerEntryHeader href={href} overlay />

@@ -11,8 +11,8 @@ export const dynamic = "force-dynamic";
 function MessagePage({ title, description }: { title: string; description: string }) {
   return (
     <div className={`${theme.lightTheme} min-h-dvh bg-background text-foreground`}>
-      <header className="border-b border-border-subtle bg-white"><div className="mx-auto flex h-16 max-w-[1504px] items-center px-5 md:px-8"><BrandLogoBar size="sm" href="/" /></div></header>
-      <main className="mx-auto flex min-h-[calc(100dvh-64px)] max-w-lg flex-col items-center justify-center px-5 text-center md:px-8">
+      <header className="border-b border-border-subtle bg-white"><div className="mx-auto flex h-14 max-w-[1504px] items-center px-5 md:px-8"><BrandLogoBar size="sm" href="/" /></div></header>
+      <main className="mx-auto flex min-h-[calc(100dvh-56px)] max-w-lg flex-col items-center justify-center px-5 text-center md:px-8">
         <h1 className="text-2xl font-bold tracking-[-0.04em]">{title}</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">{description}</p>
       </main>

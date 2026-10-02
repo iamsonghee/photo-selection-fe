@@ -355,7 +355,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 
 | 라우트 | 설명 |
 |---|---|
-| `/c/[token]` | 진입점. 서버에서 `delivered` 여부·PIN 쿠키 존재 여부를 먼저 확인한 뒤 클라이언트에서 상태별 재분기한다. `selecting`과 `reviewing_v1/v2`는 `CustomerInviteIntro`가 `CustomerEntryShell` 위에서 대표 사진·작가 정보·PC split/mobile stack·CTA 영역을 공통 제공한다. 레이아웃은 `100dvh` 안에서 완결되고 페이지 overflow를 만들지 않는다. 대표 사진 URL은 사전 로드 성공 후에만 DOM 이미지에 연결한다. |
+| `/c/[token]` | 진입점. 서버에서 `delivered` 여부·PIN 쿠키 존재 여부를 먼저 확인한 뒤 클라이언트에서 상태별 재분기한다. `selecting`과 `reviewing_v1/v2`는 `CustomerInviteIntro`가 `CustomerEntryShell` 위에서 대표 사진·작가 정보·PC split/mobile stack·CTA 영역을 공통 제공한다. 레이아웃은 `100dvh` 안에서 완결되고 페이지 overflow를 만들지 않는다. 대표 사진 URL이 준비되면 DOM 이미지에 바로 연결하고, 로드가 끝날 때 플레이스홀더에서 사진으로 전환한다. |
 | `/c/[token]/pin` | PIN 입력 폼 (PIN 없는 프로젝트는 `/api/c/auto-verify`로 자동 통과) |
 | `/c/[token]/about` | 고객 온보딩/도움말 |
 | `/c/[token]/gallery` | 사진 선택 그리드. 흔들림/눈감음 의심 사진에 경고 배지 표시(정보성, 선택/확정 차단 없음) — 이 배지 UI 코드는 그대로 남아있지만, **베타 전환(2026-07-28) 이후 신규 분석에서는 관련 컬럼(`blur_variance` 등)이 더 이상 채워지지 않아** 과거 OpenCLIP으로 분석된 레거시 프로젝트에서만 실제로 보인다(§5, §6.5). 유사도분석이 완료된 프로젝트는 "유사컷 묶어보기" 토글도 노출(기본 OFF, 2026-07-30 이전 라벨은 "유사컷 대표이미지 적용"). **(2026-07-30 UX 개선)** 켜면 그룹별 표지 사진 1장만 보이고 나머지 멤버는 배지를 눌러야 펼쳐짐 — 표지는 그룹 내 선택이 없으면 내부 기본값(구 "대표컷", 화면에 문구 노출 안 함), 1장 이상 선택되면 개수와 무관하게 항상 선택된 사진 중 원래 순서가 가장 앞선 사진이다. 배지는 `+N`(표지 외 접힌 사진 수, 고정값)에 선택이 있으면 `· M/전체 선택`을 병기한다. 펼치면 항상 원래 orderIndex 순서로 표시되고, 선택/해제가 순서나 펼침 상태를 바꾸지 않는다(`src/lib/photo-groups.ts`의 `getGroupFrontPhotoId`/`buildGroupSelectionInfo`). 이 토글은 엔진 무관하게 `photo_groups`/`similarity_group_id`를 그대로 읽으므로, 베타 전환 이후에는 Gemini가 채운 결과로 동일하게 동작한다(§6.6). 가시성에 직접 영향을 주는 기능. 이 토글 상태는 사진 클릭 시 뷰어에 `?grouped=1`로 전달됨(`GalleryFilterState.groupedView`, `src/lib/gallery-filter.ts`). **필터 상태 전체(선택됨 탭/별점/색상/정렬/파일명 검색/품질/그룹핑)가 URL 쿼리와 동기화**되어 새로고침·뒤로가기 후에도 유지됨 — 마운트 시 1회 복원, 이후 `router.replace`로 반영(히스토리 미증가) |
@@ -365,6 +365,8 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `/c/[token]/review` | 보정본 검토 갤러리(모바일) / 영수증형(재보정 0회) / 데스크톱은 `/review/[photoId]`로 리다이렉트 |
 | `/c/[token]/review/[photoId]` | 개별 보정본 승인/재보정 요청 뷰어 |
 | `/c/[token]/delivered` | 납품 완료 화면 |
+
+초대 대표 사진 로딩: 작가 고객 링크 `/c/[token]`는 클라이언트 마운트 직후 `GET /api/c/presign-preview?cover=1`로 대표 프리뷰 URL을 발급받아 전체 사진 조회와 병렬로 이미지 전송을 시작한다. PIN 쿠키를 검증하고 프로젝트에 지정된 대표 사진(없으면 첫 사진)만 조회한다. 셀프 고객의 지인 초대 링크는 공유 토큰을 쿠키로 교환한 뒤 `GET /api/customer-select/projects/[id]/invite-cover`로 첫 AI 장면 가운데 사진(없으면 첫 사진)의 URL을 조회해 전체 프로젝트 조회와 병렬로 받는다. 두 화면은 같은 `CustomerInviteIntro`에서 이미지 URL을 즉시 렌더링하고 로드 전·실패 시 플레이스홀더를 표시한다.
 
 **납품용 원본 다운로드 진입점**: `OriginalDownloadEntry.tsx`는 고객 페이지의 inline 진입점으로 마운트된다. `include_original=false`면 숨기고, 초대 링크 활성화 후 ZIP이 아직 `ready`가 아니어도 진입점과 개별 원본 다운로드는 노출하며 ZIP 탭에는 준비 중 상태를 표시한다. 개별 파일 탭은 전체 ZIP과 역할이 겹치지 않도록 PC·모바일 모두 전체 선택을 노출하지 않는다. PC Chrome/Edge는 `showDirectoryPicker()`로 사용자가 고른 폴더에 presigned 원본을 한 파일씩 스트리밍해, 반복 `<a>.click()`이 Chrome의 자동 다중 다운로드 권한에 막히는 문제를 피한다. 이 API가 없는 데스크톱 브라우저만 기존 anchor 다운로드로 폴백한다. 모바일은 Web Share 전에 원본을 전부 Blob/File로 메모리에 적재하므로 최대 10장(`MOBILE_MAX_FILE_COUNT=10`)과 선택 원본 합계 100MiB(`MOBILE_MAX_TOTAL_BYTES=100 * 1024 * 1024`)를 선택 시점과 저장 직전에 모두 검사한다. §8.2 `user-flow.md` 참고.
 
@@ -385,7 +387,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `/admin/logs` | `src/app/admin/logs/page.tsx` | Activity Logs — 전체 작가 대상 `project_logs` 조회 |
 | `/admin/settings` | `src/app/admin/settings/page.tsx` + `AdminSettingsForm.tsx` | Settings — 등급별(일반/베타) 이용 한도를 편집 가능한 폼으로 제공(신규, 2026-07-26). `PATCH /api/admin/settings`로 `app_settings` 테이블을 갱신하며, 재배포 없이 즉시 반영된다(§6.3). 관리자 계정(`ADMIN_EMAILS`)은 여전히 읽기 전용 표시(하드코딩 유지). |
 
-- 레이아웃 `src/app/admin/layout.tsx`(서버 컴포넌트)에서 `src/lib/admin-auth.ts`의 `getAdminUser()`로 접근 제어를 수행한다. 비로그인은 `/`로, 로그인했지만 허용 이메일(`ADMIN_EMAILS`, 코드 상수 하드코딩)이 아니면 `/photographer/dashboard`로 리다이렉트한다. 별도의 관리자 회원/역할·권한 테이블은 없다.
+- `src/middleware.ts`가 `/admin/**` 렌더링 전에 세션 이메일을 `ADMIN_EMAILS`와 대조한다. 비로그인은 `/`로, 허용되지 않은 이메일은 `/photographer/dashboard`로 리다이렉트한다. `src/app/admin/layout.tsx`의 `getAdminUser()`도 확인하며, 별도의 관리자 회원/역할·권한 테이블은 없다.
 - 셸/사이드바는 `src/components/admin/AdminShell.tsx`, `AdminSidebar.tsx`, 메뉴 배열은 `src/lib/admin-nav.ts`. `/photographer/**`의 접기형 사이드바와 달리 데스크톱 전용 고정폭 사이드바로 단순화했다. `metadata.robots.index = false`로 검색엔진 노출 차단.
 - **조회 전용 화면**(Dashboard/Beta Users/Projects 목록·상세/Activity Logs/Feedback 목록)은 전부 `src/lib/admin-db.ts`의 서버 전용 함수가 `getAdminClient()`(service role, RLS 우회)로 직접 조회한다 — 별도 API 라우트 없음.
 - **개입(쓰기) 동작**만 `/api/admin/**` Route Handler로 분리되어 있고, 각 라우트가 자체적으로 `getAdminUser()`를 다시 호출해 인가를 검증한다(레이아웃의 서버 가드는 페이지 렌더링에만 적용되고 API 라우트에는 자동 적용되지 않으므로): `PATCH /api/admin/projects/[id]/pin`(PIN 재설정/제거), `PATCH /api/admin/feedback/[id]`(피드백 상태 변경), `PATCH /api/admin/users/[id]/beta`(베타 상태/기간/메모 변경 + `admin_audit_logs` 기록), `POST /api/admin/beta-invitations` / `DELETE /api/admin/beta-invitations/[id]`(사전 초대 등록/취소).
@@ -811,7 +813,7 @@ sequenceDiagram
 
 - **작가 데이터 격리**: 거의 모든 작가용 API 라우트가 "세션에서 `auth_id` 추출 → `photographers.id` 조회 → 대상 리소스의 `photographer_id`와 일치 확인" 패턴을 반복 구현합니다(공용 미들웨어/헬퍼로 통합되어 있지 않고 각 라우트 파일에 개별 구현).
 - **`/photographer/**` 페이지 자체는 미들웨어로 보호되지 않습니다.** `src/middleware.ts`의 matcher는 고객 경로(`/c/:token`, `/c/:token/:path+`)와 관리자 경로만 포함하므로, 인증되지 않은 사용자도 작가 페이지 셸은 렌더링될 수 있고, 실제 데이터는 각 API 호출이 401을 반환할 때 비로소 막힙니다(레이아웃 자체의 렌더 타임 인증 체크는 없음).
-- **`/admin/**`는 이와 반대로 레이아웃(서버 컴포넌트) 렌더 타임에 접근 제어됩니다.** `src/app/admin/layout.tsx`가 매 요청마다 `getAdminUser()`(`src/lib/admin-auth.ts`)로 세션 이메일을 확인해, 허용 목록(`ADMIN_EMAILS`)에 없으면 페이지 셸이 렌더링되기 전에 리다이렉트합니다. 미들웨어는 사용하지 않으며(matcher에 `/admin`을 추가하지 않음), 역할/권한 테이블 없이 이메일 하드코딩만으로 판별하는 단일 계정 전용 구조입니다. **레이아웃 가드는 페이지 렌더링에만 적용되고 API 라우트에는 자동 적용되지 않으므로**, `/api/admin/**`(PIN 재설정, 피드백 상태 변경)의 각 Route Handler는 자체적으로 `getAdminUser()`를 다시 호출해 인가를 재검증합니다(§6.3).
+- **`/admin/**`는 미들웨어에서 렌더링 전에 접근 제어됩니다.** `src/middleware.ts`가 세션 이메일을 허용 목록(`ADMIN_EMAILS`)과 대조해 HTTP 리다이렉트하고, `src/app/admin/layout.tsx`도 `getAdminUser()`로 확인합니다. 역할/권한 테이블 없이 이메일 허용 목록으로 판별합니다. **페이지 가드는 `/api/admin/**`에 자동 적용되지 않으므로**, 각 Route Handler가 `getAdminUser()`를 다시 호출해 인가를 재검증합니다(§6.3).
 - **레거시 미인증 라우트**: `src/app/api/projects/[id]/route.ts`(PATCH)는 세션/소유권 확인이 전혀 없이 `src/lib/db.ts`의 `updateProject()`를 직접 호출합니다. 같은 기능을 하는 `src/app/api/photographer/projects/[id]/route.ts`는 세션+소유권 검증을 하므로, 이 레거시 경로는 사용되지 않는 것으로 보이나 **엔드포인트 자체는 살아있어 확인 필요**합니다.
 - **FastAPI `/api/storage/delete`는 인증 의존성이 전혀 없습니다.** 요청 가능한 누구나 임의의 R2 키 목록을 삭제 요청할 수 있는 구조입니다(코드상 사실이며, 실제 배포 환경에서 네트워크 격리 등으로 외부 접근이 막혀 있는지는 `확인 필요`).
 - **이용량 등급(관리자/베타/일반) 판정은 요청마다 실시간 계산됩니다.** 배치/크론으로 상태를 미리 갱신해두지 않고, 매 프로젝트 생성·사진 업로드 요청 시점에 `photographers.beta_status`/`beta_end_date`를 조회해 그 순간 유효한지 판정합니다(§6.3). 그래서 베타 기간이 지나거나 관리자가 상태를 바꾸면 다음 요청부터 즉시 반영되고, 별도 만료 처리 로직이 없습니다. 기존 데이터(이미 생성된 프로젝트/사진)는 이 판정과 무관하게 항상 그대로 조회·진행 가능합니다 — 한도 검사는 오직 "새로 생성/업로드하는 시점"에만 개입합니다.

@@ -1,3 +1,6 @@
+/* 아래 font-family가 가리키는 Pretendard를 테마에서 직접 불러온다 — 다른 CSS가 먼저 불러오던 화면에서만 적용되던 문제. */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css");
+
 /* Photographer Light UI가 공유하는 단일 Light Theme token source.
    Dashboard / Project List / Project Create의 route-scoped *.module.css는
    이 클래스를 composes로 재사용한다 — 페이지 전용 token/class는 각 route module에 그대로 남긴다. */

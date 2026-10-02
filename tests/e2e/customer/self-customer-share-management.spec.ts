@@ -29,7 +29,9 @@ test("owner can stop and replace a self-customer invite link", async ({ page, br
     const oldContext = await browser.newContext();
     participantContexts.push(oldContext);
     const oldParticipant = await oldContext.newPage();
+    const coverResponse = oldParticipant.waitForResponse((response) => response.url().includes(`/api/customer-select/projects/${projectId}/invite-cover`));
     await oldParticipant.goto(`${origin}/customer-select/${projectId}/select?share_token=${oldToken}`);
+    expect((await coverResponse).status()).toBe(200);
     await expect(oldParticipant.getByRole("button", { name: "함께 고르기 시작" })).toBeVisible();
 
     await page.goto(`/customer-select/${projectId}/settings#sharing`);

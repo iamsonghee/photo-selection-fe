@@ -114,7 +114,7 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
   await page.goto(`/customer-select/${PROJECT_ID}/select`);
   await expect(page.locator("[data-photo-id]").first()).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("[data-customer-shell-header-mode]")).toBeVisible();
-  expect((await page.locator('[class*="selectGrid"]').first().boundingBox())?.x).toBe(viewport === "desktop" ? 24 : 20);
+  expect((await page.locator('[class*="selectGrid"]').first().boundingBox())?.x).toBe(viewport === "desktop" ? 24 : 8);
   const firstCardMs = Date.now() - started;
   const initialCards = await page.locator("[data-photo-id]").count();
   let maxCards = initialCards;
@@ -132,10 +132,12 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
   await sample();
 
   const options = page.getByRole("button", { name: "보기 옵션" });
-  // 모바일 보기 크기는 툴바의 보기 크기 메뉴(크게 2열·중간 3열·작게 4열)에서 바꾼다.
+  // 모바일 보기 크기 버튼은 누를 때마다 바로 다음 크기로 바뀐다(크게 2열 → 중간 3열 → 작게 4열 → 크게). 메뉴는 열지 않는다.
+  const label: Record<number, string> = { 2: "크게", 3: "중간", 4: "작게" };
   const setColumns = async (count: number) => {
     await page.getByRole("button", { name: /^보기 크기/ }).click();
-    await page.getByRole("menuitemradio", { name: new RegExp(`한 줄에 ${count}장`) }).click();
+    await expect(page.getByRole("button", { name: new RegExp(`^보기 크기: ${label[count]}`) })).toBeVisible();
+    await expect(page.getByRole("menu")).toHaveCount(0);
   };
   if (viewport === "mobile") {
     await setColumns(3);
@@ -174,7 +176,7 @@ async function exercise(page: Page, viewport: string): Promise<Metrics> {
   expect(await selectedCheck.evaluate((element) => {
     const face = getComputedStyle(element, "::before");
     return [face.left, face.top, face.borderRadius];
-  })).toEqual(["8px", "8px", "4px"]);
+  })).toEqual(["8px", "8px", "6px"]);
   await targetCard.click({ position: { x: 60, y: 60 } });
   await expect(page.getByRole("dialog", { name: `PHOTO_${targetId.slice(1)}.jpg 상세 보기` })).toBeVisible();
   await page.keyboard.press("Escape");

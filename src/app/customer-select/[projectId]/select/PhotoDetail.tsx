@@ -21,7 +21,8 @@ export type Person = { id: ColorTag; name: string; hex: string };
 /** 상세 보기 = "고민하는 곳". 큰 사진, 같은 묶음 비교, 찜한 사람, 작가 전달 메모, 최종 선택. */
 export function PhotoDetail({
   photos, photoId, onPhotoChange, onClose, isOwner, myColor, people, selectedIds, likesOf, commentOf,
-  similarOf, membersOf = noMembers, commentSaveStates, onToggleSelect, onToggleLike, onSaveComment, selectedCount, target,
+  similarOf, membersOf = noMembers, commentSaveStates, onToggleSelect, onToggleLike, onSaveComment, selectedCount,
+  nextScene, prevScene, sceneNotice,
 }: {
   photos: Photo[];
   photoId: string;
@@ -41,7 +42,9 @@ export function PhotoDetail({
   onToggleLike: (photoId: string) => void;
   onSaveComment: (photoId: string, text: string) => void;
   selectedCount: number;
-  target: number;
+  nextScene?: { label: string; onGo: () => void } | null;
+  prevScene?: { label: string; onGo: () => void } | null;
+  sceneNotice?: string | null;
 }) {
   const desktop = useDesktopViewport();
   // 칸(stop) = 갤러리에 보이는 순서의 한 자리. 접힌 묶음이면 지금 사진은 그 묶음 안의 한 장이다.
@@ -73,7 +76,8 @@ export function PhotoDetail({
   const go = useCallback((step: number) => {
     const next = photos[index + step];
     if (next) onPhotoChange(next.id);
-  }, [index, onPhotoChange, photos]);
+    else (step > 0 ? nextScene : prevScene)?.onGo();
+  }, [index, nextScene, onPhotoChange, photos, prevScene]);
   const goMember = useCallback((step: number) => {
     const next = members[memberIndex + step];
     if (next) onPhotoChange(next.id);
@@ -150,7 +154,7 @@ export function PhotoDetail({
         <div className={s.detailTop}>
           <button type="button" onClick={onClose} aria-label="목록으로"><ArrowLeft size={20} /></button>
           <span className={s.detailName}>{getPhotoDisplayName(photo)}</span>
-          <span className={s.detailCount}>{index + 1} / {photos.length}{members.length > 1 ? ` · 비슷한 사진 ${memberIndex + 1}/${members.length}` : ""}{isOwner ? ` · 최종 선택 ${selectedCount}${target ? `/${target}` : ""}장` : ""}</span>
+          <span className={s.detailCount}>{index + 1} / {photos.length}{members.length > 1 ? ` · 비슷한 사진 ${memberIndex + 1}/${members.length}` : ""}{isOwner && selectedCount ? ` · 지금까지 ${selectedCount}장 골랐어요` : ""}</span>
         </div>
         <div
           className={s.detailImage}
@@ -167,8 +171,9 @@ export function PhotoDetail({
           {desktop
             ? <img key={photo.id} src={src} alt={getPhotoDisplayName(photo)} draggable={false} />
             : <MobileViewerPinchPhoto key={photo.id} src={src} alt={getPhotoDisplayName(photo)} showBadge={false} onZoomStateChange={setZoomed} />}
-          {index > 0 && <PrevNextButton direction="prev" size="lg" align="edge" className={s.detailNav} onClick={() => go(-1)} />}
-          {index < photos.length - 1 && <PrevNextButton direction="next" size="lg" align="edge" className={s.detailNav} onClick={() => go(1)} />}
+          {sceneNotice && <span className={s.detailSceneNotice} role="status">{sceneNotice}</span>}
+          {(index > 0 || prevScene) && <PrevNextButton direction="prev" size="lg" align="edge" className={s.detailNav} ariaLabel={index > 0 ? "이전 사진" : `이전 장면 · ${prevScene?.label}`} onClick={() => go(-1)} />}
+          {(index < photos.length - 1 || nextScene) && <PrevNextButton direction="next" size="lg" align="edge" className={s.detailNav} ariaLabel={index < photos.length - 1 ? "다음 사진" : `다음 장면 · ${nextScene?.label}`} onClick={() => go(1)} />}
           {quality && <span className={s.quality}>⚠ {quality} · 직접 확인해 주세요</span>}
         </div>
         {/* 필름 띠 = ‹ › 로 넘기는 순서 그대로. PC는 항상, 모바일은 비슷한 사진을 볼 때만(세로 공간이 좁다). */}

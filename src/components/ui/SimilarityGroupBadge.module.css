@@ -3,6 +3,10 @@
 .button { position: relative; min-height: 36px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; color: white; border: 0; border-radius: 7px; background: transparent; font: 600 11px/1.2 Pretendard, sans-serif; cursor: pointer; pointer-events: auto; white-space: nowrap; isolation: isolate; }
 .button::before { content: ""; position: absolute; inset: 4px 0; border-radius: inherit; background: rgba(24,30,34,.82); z-index: -1; }
 .button:hover::before { background: rgba(24,30,34,.96); }
+/* 셀프 고객 셀렉(compact): 거의 모든 카드에 붙어 무늬처럼 보이지 않게 작고 옅게. */
+.compact { gap: 3px; font-size: 10px; }
+.compact svg { width: 11px; height: 11px; }
+.compact::before { inset: 9px 0; background: rgba(24,30,34,.5); }
 .button:focus-visible { outline: 2px solid white; outline-offset: -2px; }
 .selected { padding: 3px 6px; border-radius: 4px; background: rgba(24,30,34,.82); color: white; font: 500 10px/1.2 Pretendard, sans-serif; }
 .recommended { display:inline-flex; align-items:center; gap:3px; padding:3px 6px; border-radius:4px; background:rgba(24,30,34,.82); color:white; font:600 10px/1.2 Pretendard,sans-serif; }
@@ -11,6 +15,7 @@
   .inline { right: auto; }
   .button { min-height: 44px; padding-inline: 6px; gap: 3px; font-size: 10px; }
   .button::before { inset-block: 8px; }
+  .compact::before { inset-block: 12px; }
   .word { display: none; }
   .selected, .recommended { font-size: 9px; margin-bottom: -5px; }
 }

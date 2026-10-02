@@ -39,7 +39,9 @@ test.afterAll(async ({ browser }) => {
 test.describe("고객 — 초대 링크", () => {
   test("I1: 유효한 초대 링크 → 안내 화면에서 갤러리 진입", async ({ page }) => {
     await mockCustomerThumbPresigning(page);
+    const coverRequest = page.waitForRequest((request) => request.url().includes("/api/c/presign-preview?") && request.url().includes("cover=1"));
     await page.goto(`/c/${project.accessToken}`);
+    await coverRequest;
     await page.waitForLoadState("networkidle");
     const introCanvas = page.locator('[data-customer-entry-layout="responsive"]');
     await expect(introCanvas).toBeVisible();

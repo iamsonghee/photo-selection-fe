@@ -67,7 +67,7 @@ test("selection and participant completion sync between sessions without a reloa
   // 참여자는 소유자의 최종 선택을 "✓ 최종 선택" 보기로 확인한다.
   await participant.getByRole("button", { name: "✓ 최종 선택" }).click();
   await expect(participant.locator('[data-photo-id="p1"]')).toBeVisible({ timeout: 5000 });
-  await participant.getByRole("button", { name: "전체", exact: true }).click();
+  await participant.getByRole("button", { name: "모두", exact: true }).click();
   await participant.locator('[data-photo-id="p1"]').click();
   const samePhoto = owner.getByRole("button", { name: "동행님이 보는 사진 열기" }).first();
   await expect(samePhoto).toBeVisible({ timeout: 5000 });
@@ -76,14 +76,9 @@ test("selection and participant completion sync between sessions without a reloa
   await participant.getByRole("textbox", { name: "작가 전달 메모" }).blur();
   // 같은 사진을 보고 있는 소유자 화면에도 공용 메모가 반영된다.
   await expect(owner.getByRole("textbox", { name: "작가 전달 메모" })).toHaveValue("조금 밝게 부탁드려요", { timeout: 5000 });
-  await participant.getByRole("button", { name: "대화 열기" }).click();
-  await participant.getByLabel("일회성 메시지").fill("이 사진 같이 볼까요?");
-  await expect(owner.getByRole("complementary", { name: "일회성 대화" })).toHaveAttribute("data-chat-connected", "true", { timeout: 10000 });
-  const send = participant.getByRole("button", { name: "메시지 보내기" });
-  await expect(send).toBeEnabled({ timeout: 10000 });
-  await send.click();
-  await expect(owner.getByText("이 사진 같이 볼까요?", { exact: true })).toBeVisible({ timeout: 10000 });
-  await expect(owner.getByText("이 사진 같이 볼까요?", { exact: true })).toBeHidden({ timeout: 10000 });
+  // 일시 대화는 당분간 숨긴다(select/page.tsx CHAT_ENABLED) — 다시 켜면 메시지 주고받기 확인을 되살린다.
+  await expect(participant.getByRole("button", { name: /대화 열기/ })).toHaveCount(0);
+  await expect(owner.getByRole("complementary", { name: "일회성 대화" })).toHaveCount(0);
 
   await ownerContext.close();
   await participantContext.close();

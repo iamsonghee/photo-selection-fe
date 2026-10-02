@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { checkPinAuth } from "@/lib/customer-auth-server";
+import { getPinAuthorizedProject } from "@/lib/customer-auth-server";
 import { extractR2Key } from "@/lib/r2-key-server";
 import { callPresignApi } from "@/lib/presign-server";
 
@@ -19,8 +19,32 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "token required" }, { status: 400 });
   }
 
-  const pinErr = await checkPinAuth(req, token);
-  if (pinErr) return pinErr;
+  const auth = await getPinAuthorizedProject(req, token);
+  if (auth.error) return auth.error;
+  if (!auth.project) return NextResponse.json({ error: "Invalid token" }, { status: 404 });
+
+  // 초대 첫 화면은 전체 사진 목록보다 먼저 대표 사진을 요청한다.
+  if (req.nextUrl.searchParams.get("cover") === "1") {
+    try {
+      const admin = getAdminClient();
+      const coverId = auth.project.coverPhotoId;
+      const cover = coverId ? await admin.from("photos").select("r2_preview_url").eq("project_id", auth.project.id).eq("id", coverId).maybeSingle() : null;
+      if (cover?.error) throw cover.error;
+      let previewUrl = cover?.data?.r2_preview_url;
+      if (!previewUrl) {
+        const first = await admin.from("photos").select("r2_preview_url").eq("project_id", auth.project.id).order("number").limit(1).maybeSingle();
+        if (first.error) throw first.error;
+        previewUrl = first.data?.r2_preview_url;
+      }
+      if (!previewUrl) return NextResponse.json({ error: "No preview URL" }, { status: 404 });
+      const key = extractR2Key(previewUrl);
+      const { urls } = await callPresignApi([key]);
+      return NextResponse.json({ url: urls[key] ?? null });
+    } catch (e) {
+      console.error("[presign-preview cover]", e);
+      return NextResponse.json({ error: "Presign failed" }, { status: 500 });
+    }
+  }
 
   const singlePhotoId = req.nextUrl.searchParams.get("photoId")?.trim() ?? "";
   const photoIdsParam = req.nextUrl.searchParams.get("photoIds")?.trim() ?? "";
@@ -43,22 +67,11 @@ export async function GET(req: NextRequest) {
   try {
     const admin = getAdminClient();
 
-    // token → project 확인
-    const { data: project } = await admin
-      .from("projects")
-      .select("id")
-      .eq("access_token", token)
-      .single();
-
-    if (!project) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 404 });
-    }
-
     // photo 조회 (이 프로젝트 소속인지 검증 포함)
     const { data: photos, error } = await admin
       .from("photos")
       .select("id, r2_preview_url")
-      .eq("project_id", project.id)
+      .eq("project_id", auth.project.id)
       .in("id", photoIds);
 
     if (error) {
