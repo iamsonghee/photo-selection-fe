@@ -346,6 +346,61 @@ test("detail moves by gallery stops and browses a folded group with up/down and 
   await context.close();
 });
 
+test("detail continues across scene boundaries in both directions", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.locator('.gl-photo-card[data-photo-id="p29"]').click();
+  await page.keyboard.press("ArrowRight");
+  await expect(page).toHaveURL(/scene=1/);
+  await expect(page.getByRole("dialog", { name: "S_30.jpg 상세 보기" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "입장" })).toBeVisible();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page).toHaveURL(/scene=0/);
+  await expect(page.getByRole("dialog", { name: "S_29.jpg 상세 보기" })).toBeVisible();
+  await context.close();
+});
+
+test("detail skips scenes without photos in the current filter", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  const data = project();
+  data.selectedIds.push("p60");
+  await mock(page, data);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.getByRole("button", { name: "✓ 최종 선택" }).click();
+  await page.locator('.gl-photo-card[data-photo-id="p1"]').click();
+  await page.keyboard.press("ArrowRight");
+  await expect(page).toHaveURL(/scene=2/);
+  await expect(page.getByRole("dialog", { name: "S_60.jpg 상세 보기" })).toBeVisible();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page).toHaveURL(/scene=0/);
+  await context.close();
+});
+
+test("review detail follows the displayed scene order", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  const data = project();
+  data.selectedIds = ["p29", "p30", "p60"];
+  data.photos.unshift(data.photos.splice(60, 1)[0]); // 저장 배열 순서는 장면 순서와 다르다.
+  await mock(page, data);
+  await page.goto(`/customer-select/${PROJECT_ID}/review?mockAnalysis=ready`);
+  await page.getByRole("button", { name: "S_29.jpg 크게 보기" }).click();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("dialog", { name: "S_30.jpg 상세 보기" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "다음 장면 · 입장" })).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("dialog", { name: "S_60.jpg 상세 보기" })).toBeVisible();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByRole("dialog", { name: "S_30.jpg 상세 보기" })).toBeVisible();
+  await context.close();
+});
+
 test("a collapsed cover can be picked directly; the badge shows the group's picks", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
@@ -654,5 +709,33 @@ test("scenes show before similar-photo grouping finishes", async ({ browser }) =
   await expect(rail.getByRole("button", { name: /^입장/ })).toBeVisible();
   await expect(rail.getByRole("status")).toHaveText("비슷한 사진 묶는 중 · 30 / 90장");
   await expect(page.getByText("AI가 장면을 나누고 있어요")).toHaveCount(0);
+  await context.close();
+});
+
+test("a step that fails to start is named, and runs that finish before the first poll still refresh the project", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  let projectReads = 0;
+  page.on("request", (request) => {
+    if (request.method() === "GET" && new URL(request.url()).pathname.endsWith(`/projects/${PROJECT_ID}`)) projectReads += 1;
+  });
+  let started = false;
+  await page.route(`**/api/customer-select/projects/${PROJECT_ID}/ai/*`, (route) => {
+    const kind = new URL(route.request().url()).pathname.split("/").pop();
+    if (route.request().method() === "POST") {
+      started = true;
+      // 흔들림 확인만 시작 실패, 나머지는 시작 — 시작한 작업은 첫 조회 전에 이미 끝난다(캐시 재사용 등).
+      return kind === "quality" ? route.fulfill({ status: 503, json: { error: "down" } }) : route.fulfill({ status: 202, json: { status: "processing" } });
+    }
+    return route.fulfill({ json: started && kind !== "quality" ? { status: "completed", run: { image_count: 0, processed_count: 0, failed_count: 0 } } : { status: null } });
+  });
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=off`);
+  await page.getByRole("button", { name: "AI로 장면 정리" }).click();
+  await page.getByRole("button", { name: "정리 시작" }).click();
+  await expect(page.getByRole("dialog", { name: "AI로 사진 정리" }).getByRole("alert")).toContainText("흔들림·눈 감음 확인을(를) 시작하지 못했어요. 나머지는 진행 중이에요.");
+  const readsAfterStart = projectReads;
+  await expect.poll(() => projectReads).toBeGreaterThan(readsAfterStart);
   await context.close();
 });

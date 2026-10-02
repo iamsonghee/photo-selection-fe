@@ -352,8 +352,9 @@ export default function CustomerUploadPage() {
       // 고르기 화면 보기 설정도 AI 정리 시트의 기본값과 같게: 유사컷 묶기·흔들림 빼기 켬.
       rememberGroupSimilar(projectId, true);
       try { localStorage.setItem(setAsideKey(projectId), "1"); } catch {}
-      const responses = await startAiTidy(projectId, ["scene", "similarity", "quality"], project.shootType);
-      if (!responses.some((response) => response.ok)) throw new Error("AI 정리를 시작하지 못했어요. 잠시 후 다시 시도하거나 원본 그대로 골라 주세요.");
+      // 하나라도 시작하지 못하면 이 안내에 머문다 — 다시 누르면 진행 중인 작업은 넘어가고 실패한 작업만 다시 시작된다.
+      const { error } = await startAiTidy(projectId, ["scene", "similarity", "quality"], project.shootType);
+      if (error) throw new Error(error);
       router.push(`/customer-select/${projectId}/select`);
     } catch (e) {
       setAiSheetError(e instanceof Error && e.message ? e.message : "인터넷 연결을 확인하고 다시 시도해 주세요.");

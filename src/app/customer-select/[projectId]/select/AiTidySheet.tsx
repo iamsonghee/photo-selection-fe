@@ -8,13 +8,26 @@ import s from "./select.module.css";
 
 export type AiTidyKind = "scene" | "similarity" | "quality";
 
-/** AI 정리 시작. 장면 정리에는 촬영 종류의 장면 이름 목록을 함께 보낸다. 각 작업은 따로 돌고 따로 끝난다. */
-export function startAiTidy(projectId: string, kinds: AiTidyKind[], shootType: string) {
-  return Promise.all(kinds.map((kind) => fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`, {
+const TIDY_LABELS: Record<AiTidyKind, string> = { scene: "장면 나누기", similarity: "비슷한 사진 묶기", quality: "흔들림·눈 감음 확인" };
+
+/**
+ * AI 정리 시작. 장면 정리에는 촬영 종류의 장면 이름 목록을 함께 보낸다. 각 작업은 따로 돌고 따로 끝난다.
+ * 반환: 시작한(또는 이미 진행 중인 — 409) 작업, 시작하지 못한 작업에 대한 안내(모두 시작했으면 null).
+ * 일부만 실패해도 안내한다 — 다시 누르면 진행 중인 작업은 409로 넘어가고 실패한 작업만 다시 시작된다.
+ */
+export async function startAiTidy(projectId: string, kinds: AiTidyKind[], shootType: string): Promise<{ started: AiTidyKind[]; error: string | null }> {
+  const responses = await Promise.all(kinds.map((kind) => fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(kind === "scene" ? { sceneNames: customerSceneCatalog(shootType) } : {}),
-  })));
+  }).catch(() => null)));
+  const started = kinds.filter((_, index) => responses[index]?.ok || responses[index]?.status === 409);
+  const failed = kinds.filter((kind) => !started.includes(kind));
+  if (!failed.length) return { started, error: null };
+  return {
+    started,
+    error: `${failed.map((kind) => TIDY_LABELS[kind]).join(", ")}을(를) 시작하지 못했어요.${started.length ? " 나머지는 진행 중이에요." : ""} 잠시 후 다시 시도해 주세요.`,
+  };
 }
 
 /** "비슷한 사진 묶기"를 끈 사람은 고르기 화면을 묶지 않은 상태로 시작한다(기기별 보기 설정). */

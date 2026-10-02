@@ -136,13 +136,16 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
   // 장면·유사컷·흔들림 각 최근 실행 — clip-service가 진행하면서 처리 수를 기록한다.
   const [tasks, setTasks] = useState<AiTask[]>([]);
   const [pollKey, setPollKey] = useState(0);
+  // 이 화면에서 방금 시작한 작업 — 첫 조회 전에 끝나도(캐시를 다 재사용하는 등 몇 초 만에) 결과를 다시 읽게 진행 중으로 셈한다.
+  const startedRef = useRef<AiTidyKind[]>([]);
   const onCompletedRef = useRef(onCompleted);
   useEffect(() => { onCompletedRef.current = onCompleted; }, [onCompleted]);
   useEffect(() => {
     if (mock) return;
     let cancelled = false;
     let timer = 0;
-    let wasRunning = new Set<AiTidyKind>();
+    let wasRunning = new Set<AiTidyKind>(startedRef.current);
+    startedRef.current = [];
     type RunStatus = { status: AiTask["status"] | null; run?: { image_count?: number; processed_count?: number; failed_count?: number } | null } | null;
     const kinds: AiTidyKind[] = ["scene", "similarity", "quality"];
     const read = async (kind: AiTidyKind): Promise<RunStatus> => {
@@ -178,12 +181,14 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
       return null;
     }
     try {
-      const responses = await startAiTidy(projectId, kinds, shootType);
-      // 409: 다른 탭·기기에서 이미 정리 중 — 오류가 아니라 그 진행 상태를 이어서 보여준다.
-      if (!responses.some((response) => response.ok || response.status === 409)) return "AI 정리를 시작하지 못했어요. 잠시 후 다시 시도해 주세요.";
-      setRemote("processing");
-      setPollKey((key) => key + 1);
-      return null;
+      // 409(다른 탭·기기에서 이미 정리 중)는 시작한 것으로 보고 그 진행 상태를 이어서 보여준다.
+      const { started, error } = await startAiTidy(projectId, kinds, shootType);
+      if (started.length) {
+        startedRef.current = started;
+        if (started.includes("scene")) setRemote("processing");
+        setPollKey((key) => key + 1);
+      }
+      return error;
     } catch {
       return "인터넷 연결을 확인하고 다시 시도해 주세요.";
     }
