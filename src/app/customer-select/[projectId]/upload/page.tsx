@@ -28,6 +28,15 @@ import { estimateUploadRemainingSeconds, formatUploadRemainingTime, type UploadT
 import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAssetHeader";
 import type { Photo } from "@/types";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
+
+// 사진(File)마다 한 번 정한 업로드 ID를 재시도에도 그대로 보낸다 — 서버가 응답을 못 돌려줬어도
+// 이미 저장된 사진은 같은 ID라 다시 저장되지 않는다.
+const clientUploadIds = new WeakMap<File, string>();
+function clientUploadId(file: File) {
+  let id = clientUploadIds.get(file);
+  if (!id) clientUploadIds.set(file, id = crypto.randomUUID());
+  return id;
+}
 import { CUSTOMER_GALLERY_GRID } from "../../_lib/photo-grid";
 import { ProjectStepHeader } from "../../_lib/ProjectStepHeader";
 import { rememberGroupSimilar, setAsideKey, startAiTidy } from "../select/AiTidySheet";
@@ -253,6 +262,8 @@ export default function CustomerUploadPage() {
       formData.append("project_id", projectId);
       batch.forEach((f) => formData.append("files", f));
       formData.append("taken_at", JSON.stringify(takenAt));
+      formData.append("client_upload_ids", JSON.stringify(rawBatch.map(clientUploadId)));
+      formData.append("original_filenames", JSON.stringify(rawBatch.map((file) => file.name))); // 압축하면 `이름.jpg`로 바뀐다
       setUploadPhase("uploading");
       const slowTimer = window.setTimeout(() => setSlowBatch(true), SLOW_BATCH_NOTICE_MS);
       try {
@@ -264,10 +275,13 @@ export default function CustomerUploadPage() {
           const msg = typeof detail === "string" ? detail : detail?.message ?? detail?.error;
           throw new Error(msg ?? "업로드 실패");
         }
-        const data = await res.json() as { uploaded?: number; rejected?: string[] };
-        const rejectedNames = new Set(data.rejected ?? []);
-        failedFiles.push(...rawBatch.filter((file) => rejectedNames.has(file.name)));
-        uploaded += data.uploaded ?? Math.max(0, batch.length - rejectedNames.size);
+        const data = await res.json() as { uploaded?: number; rejected?: string[]; rejected_indices?: number[] };
+        // 실패는 배치 내 위치로 받는다 — 같은 이름의 파일이 여럿일 수 있다. 이름은 구 BE 응답 호환용.
+        const rejectedIndices = new Set(data.rejected_indices ?? []);
+        const rejectedNames = new Set(data.rejected_indices ? [] : data.rejected ?? []);
+        const rejectedFiles = rawBatch.filter((file, index) => rejectedIndices.has(index) || rejectedNames.has(file.name));
+        failedFiles.push(...rejectedFiles);
+        uploaded += data.uploaded ?? Math.max(0, batch.length - rejectedFiles.length);
       } catch (e) {
         // 중단·오류 때는 대기 중이던 사진도 다시 시도 목록에 넣는다(아무것도 잃지 않게).
         const remainingFiles = [...carriedFailed, ...failedFiles, ...selectedFiles.slice(i), ...queueRef.current.splice(0)];

@@ -424,7 +424,6 @@ button.avatar:hover { transform: translateY(-1px); }
   .selectHeaderCompact .selectHeaderTop { display: none; }
   .selectGallery { padding: 8px 20px; }
   .selectGrid { max-width: none; }
-  .selectDensity2 :global(.gl-photo-card) { aspect-ratio: 4 / 3; }
   .ephemeralChat { right: 14px; bottom: calc(112px + env(safe-area-inset-bottom)); }
   .ephemeralChatTrigger { min-width: 42px; width: 42px; padding: 0; }
   .ephemeralChatTrigger span { display: none; }

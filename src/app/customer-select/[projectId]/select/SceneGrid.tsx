@@ -14,7 +14,7 @@ const DESKTOP_MIN_CELL = CUSTOMER_GALLERY_GRID.desktopMinCell;
 const DESKTOP_GAP = CUSTOMER_GALLERY_GRID.desktopGap;
 // 3열이 기준(photo-grid.ts). 2·4열은 고르기 화면에서만 고를 수 있는 보기 옵션.
 const MOBILE_GRID: Record<MobileColumns, { gap: number; aspect: number }> = {
-  2: { gap: 10, aspect: 4 / 3 },
+  2: { gap: 10, aspect: 1 },
   3: { gap: CUSTOMER_GALLERY_GRID.mobileGap, aspect: 1 },
   4: { gap: 6, aspect: 1 },
 };

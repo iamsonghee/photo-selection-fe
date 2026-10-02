@@ -9,7 +9,7 @@
  */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowDown, ChevronDown, ChevronUp, MessageCircle, PanelLeftClose, PanelLeftOpen, Plus, Search, SlidersHorizontal, Sparkles } from "lucide-react";
+import { ArrowDown, ChevronDown, ChevronUp, MessageCircle, Grid2x2, Grid3x3, Grip, PanelLeftClose, PanelLeftOpen, Plus, Search, SlidersHorizontal, Sparkles } from "lucide-react";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
@@ -42,6 +42,8 @@ const peopleLabel = (kind: PeopleKind, shootType: string | null) =>
 const isFlagged = (photo: Photo) => Boolean(photo.isBlurry || (photo.faceDetected && photo.eyesClosed));
 /** 갤러리에서 빼는 건 흔들림(흐림)만 — 눈 감음은 웃음·윙크 같은 의도된 표정이 많아 숨기지 않는다. */
 const isBlurFlagged = (photo: Photo) => photo.isBlurry === true;
+
+const sizeLabel: Record<MobileColumns, string> = { 2: "크게", 3: "중간", 4: "작게" };
 
 export default function CustomerSelectPage() {
   return <Suspense fallback={<SystemLoadingScreen title="사진을 불러오고 있어요" homeHref="/customer-select" />}><SelectScreen /></Suspense>;
@@ -77,7 +79,7 @@ function SelectScreen() {
   // 인물 구성 칩 선택은 고른 장면에서만 유지한다 — 다른 장면엔 그 구성이 없을 수 있다(빈 화면 방지).
   const [peoplePick, setPeoplePick] = useState<{ scene: number | null; kind: PeopleKind } | null>(null);
   // 툴바 위에 뜨는 작은 메뉴(찜 범위 ▾, 보기 옵션)와 검색 입력창. 바깥을 누르면 메뉴가 닫힌다.
-  const [menu, setMenu] = useState<"like" | "options" | null>(null);
+  const [menu, setMenu] = useState<"like" | "options" | "size" | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const toolsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -484,8 +486,12 @@ function SelectScreen() {
                 {peopleChips && <div className={`${s.peopleChips} ${s.peopleChipsInline}`} role="group" aria-label="인물 구성">{peopleChips}</div>}
                 <span className={s.toolsSpacer} />
                 {searchOpen || query
-                  ? <input className={s.search} type="search" value={query} autoFocus onChange={(event) => setQuery(event.target.value)} onBlur={() => { if (!query) setSearchOpen(false); }} placeholder="파일명 검색" aria-label="파일명 검색" />
-                  : <button type="button" className={s.iconTool} aria-label="파일명 검색 열기" title="파일명 검색" onClick={() => setSearchOpen(true)}><Search size={16} /></button>}
+                  ? <input className={`${s.search} ${s.desktopOnly}`} type="search" value={query} autoFocus onChange={(event) => setQuery(event.target.value)} onBlur={() => { if (!query) setSearchOpen(false); }} placeholder="파일명 검색" aria-label="파일명 검색" />
+                  : <button type="button" className={`${s.iconTool} ${s.desktopOnly}`} aria-label="파일명 검색 열기" title="파일명 검색" onClick={() => setSearchOpen(true)}><Search size={16} /></button>}
+                {/* 모바일은 파일명 검색 대신 보기 크기(크게 2열·중간 3열·작게 4열). */}
+                <button type="button" className={`${s.iconTool} ${s.mobileOnly}`} aria-label={`보기 크기: ${sizeLabel[mobileColumns]}`} title="보기 크기" aria-haspopup="menu" aria-expanded={menu === "size"} onClick={() => setMenu(menu === "size" ? null : "size")}>
+                  {mobileColumns === 2 ? <Grid2x2 size={16} /> : mobileColumns === 3 ? <Grid3x3 size={16} /> : <Grip size={16} />}
+                </button>
                 <button type="button" className={s.iconTool} aria-label="보기 옵션" title="보기 옵션" aria-haspopup="dialog" aria-expanded={menu === "options"} onClick={() => setMenu(menu === "options" ? null : "options")}>
                   <SlidersHorizontal size={16} />{optionCount > 0 && <i>{optionCount}</i>}
                 </button>
@@ -495,6 +501,15 @@ function SelectScreen() {
                   {likeOptions.filter((option) => option.show).map((option) => (
                     <button key={option.value} type="button" role="menuitemradio" aria-checked={likeOption.value === option.value && likeActive} onClick={() => { setScope(option.value); setMenu(null); }}>
                       <span>{option.menuLabel}</span><b>{option.count}</b>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {menu === "size" && (
+                <div className={s.toolsMenu} role="menu" aria-label="보기 크기">
+                  {([2, 3, 4] as MobileColumns[]).map((count) => (
+                    <button key={count} type="button" role="menuitemradio" aria-checked={mobileColumns === count} onClick={() => { setMobileColumns(count); setMenu(null); }}>
+                      <span>{sizeLabel[count]}</span><b>한 줄에 {count}장</b>
                     </button>
                   ))}
                 </div>
@@ -512,10 +527,6 @@ function SelectScreen() {
                     </button>
                   )}
                   {peopleChips && <div className={s.peopleMenuRow}><strong>인물</strong><div className={s.peopleChips} role="group" aria-label="인물 구성">{peopleChips}</div></div>}
-                  <div className={s.columnsRow}>
-                    <strong>한 줄에</strong>
-                    {([2, 3, 4] as MobileColumns[]).map((count) => <button key={count} type="button" aria-label={`한 줄에 ${count}장`} aria-pressed={mobileColumns === count} onClick={() => setMobileColumns(count)}>{count}</button>)}
-                  </div>
                   {!hasGroups && !hasQuality && <p className={s.toolsMenuEmpty}>AI로 정리하면 유사컷 묶기·흔들림 빼기를 쓸 수 있어요</p>}
                   {isOwner && (analysis.status === "ready" || analysis.status === "fallback") && (
                     <button type="button" className={s.retidyRow} onClick={() => { setMenu(null); setAiError(null); setSheet("ai"); }}>
