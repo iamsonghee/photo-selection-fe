@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { resolveCustomerProjectAccess, shareTokenFromRequest } from "@/lib/customer-select-server";
 
+// PostgREST는 `in.(...)` 목록을 URL에 싣는다 — ID 약 600개를 넘으면 400으로 거절해 전체 선택 삭제가 실패했다.
+// 목록 조회는 이 크기로 나눠 보내고 결과를 합친다.
+const ID_CHUNK = 200;
+
+async function inChunks<T>(ids: string[], query: (chunk: string[]) => PromiseLike<{ data: T[] | null; error: unknown }>) {
+  const results = await Promise.all(Array.from({ length: Math.ceil(ids.length / ID_CHUNK) }, (_, index) => query(ids.slice(index * ID_CHUNK, (index + 1) * ID_CHUNK))));
+  return { data: results.flatMap((result) => result.data ?? []), error: results.find((result) => result.error)?.error ?? null };
+}
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const admin = getAdminClient();
@@ -10,17 +19,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!access.isOwner) return NextResponse.json({ error: "프로젝트 소유자만 사진을 삭제할 수 있습니다." }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
-  const photoIds = Array.isArray(body.photo_ids)
-    ? [...new Set(body.photo_ids.filter((value: unknown): value is string => typeof value === "string" && value.length > 0))]
+  const photoIds: string[] = Array.isArray(body.photo_ids)
+    ? [...new Set<string>(body.photo_ids.filter((value: unknown): value is string => typeof value === "string" && value.length > 0))]
     : [];
   if (!photoIds.length || photoIds.length > 2000) return NextResponse.json({ error: "삭제할 사진을 확인해주세요." }, { status: 400 });
 
   const [photos, selections, opinions, quality, versions] = await Promise.all([
-    admin.from("customer_photos").select("id, similarity_group_id").eq("project_id", id).in("id", photoIds),
-    admin.from("customer_selections").select("photo_id, rating, color_tags, comment, is_selected").eq("project_id", id).in("photo_id", photoIds),
-    admin.from("customer_participant_opinions").select("photo_id, rating").eq("project_id", id).in("photo_id", photoIds),
-    admin.from("customer_quality_assessments").select("photo_id").eq("project_id", id).in("photo_id", photoIds),
-    admin.from("customer_photo_versions").select("id, photo_id").in("photo_id", photoIds),
+    inChunks(photoIds, (chunk) => admin.from("customer_photos").select("id, similarity_group_id").eq("project_id", id).in("id", chunk)),
+    inChunks(photoIds, (chunk) => admin.from("customer_selections").select("photo_id, rating, color_tags, comment, is_selected").eq("project_id", id).in("photo_id", chunk)),
+    inChunks(photoIds, (chunk) => admin.from("customer_participant_opinions").select("photo_id, rating").eq("project_id", id).in("photo_id", chunk)),
+    inChunks(photoIds, (chunk) => admin.from("customer_quality_assessments").select("photo_id").eq("project_id", id).in("photo_id", chunk)),
+    inChunks(photoIds, (chunk) => admin.from("customer_photo_versions").select("id, photo_id").in("photo_id", chunk)),
   ]);
   const failed = [photos, selections, opinions, quality, versions].find((result) => result.error);
   if (failed?.error) return NextResponse.json({ error: "삭제 영향을 확인하지 못했습니다." }, { status: 500 });

@@ -11,8 +11,8 @@
 먼저 안내한다. 예상 남은 시간은 첫 배치 완료 후 최근 3개 배치의 `압축+전송` 실측 시간과 장수를
 가중 평균해 분 단위로 표시한다. 새로고침을 넘는 업로드 큐 영속화는 하지 않는다.
 
-장면 구분용 촬영 시각: 브라우저 압축(canvas 재인코딩)이 EXIF를 지우므로, 각 배치를 압축하기 **전에**
-원본 파일 앞 256KB에서 JPEG EXIF `DateTimeOriginal`(없으면 IFD0 `DateTime`, 그것도 없거나 HEIC 등이면
+장면 구분용 촬영 시각: 브라우저 압축(canvas 재인코딩)이 EXIF를 지우므로, 업로드를 시작할 때(미리보기를 만들기 **전에**,
+2026-10-02부터 — 미리보기도 촬영 시간순 정렬에서 처음부터 제자리에 보이도록) 선택한 모든 원본 파일 앞 256KB에서 JPEG EXIF `DateTimeOriginal`(없으면 IFD0 `DateTime`, 그것도 없거나 HEIC 등이면
 원본 `File.lastModified`)을 읽는다(`src/lib/exif-taken-at.ts`). 값은 시간대 없는 카메라 현지 시각
 `YYYY-MM-DDTHH:mm:ss`이며 `files`와 같은 순서의 JSON 배열로 `taken_at` 폼 필드에 실어 보낸다. BE는
 형식이 맞는 값만 `customer_photos.taken_at`(timestamp, 시간대 없음)에 저장하고, 틀린 값은 버릴 뿐
