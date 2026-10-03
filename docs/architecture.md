@@ -1,5 +1,19 @@
 # 시스템 아키텍처
 
+## 작가 고객 데이터
+
+고객관리 화면은 현재 페이지에서 조회한 목록·상세를 각각 최대 50건(`CUSTOMER_CACHE_MAX_ENTRIES`), 60초(`CUSTOMER_CACHE_STALE_MS`) 동안 메모리에서 재사용한다. 브라우저 포커스 복귀 시 오래된 데이터만 화면을 유지하며 갱신하고, 고객/필터 재선택은 캐시를 즉시 표시한다. 검색 입력만 250ms 대기하며 필터·페이지 이동에는 이 지연이 없다. 저장 성공 시 현재 고객 정보를 캐시에 반영하고 목록을 갱신한다. 페이지를 벗어나면 캐시는 폐기한다.
+
+`20261003150000_add_photographer_customers.sql`은 `photographer_customers`와 `projects.customer_id`를 추가한다. 고객은 작가 소유이며, 고객 ID·작가 ID 복합 FK가 타 작가의 고객과 프로젝트를 연결하지 못하게 한다. 고객은 프로젝트 삭제 후에도 남고 작가 삭제 시 CASCADE로 제거된다. 이름·연락처의 프로젝트 필드는 촬영 당시 스냅샷으로 유지한다.
+
+`projects_connect_customer` BEFORE 트리거는 프로젝트 INSERT와 고객 식별정보 변경을 같은 트랜잭션에서 처리한다. `(photographer_id, name, phone)`의 부분 UNIQUE 인덱스와 UPSERT로 동시 생성의 중복을 막는다. 이름은 앞뒤 공백, 번호는 숫자만 남겨 비교한다. NULL 전화번호는 자동 연결 대상이 아니며, 명시적으로 선택한 고객 ID가 있으면 소유권과 현재 이름·연락처 일치를 검증한다. 프로젝트 고객정보 수정은 해당 프로젝트만 재연결한다. 기존 프로젝트 백필도 이 트리거를 사용한다. 고객 마스터 변경 후 스냅샷을 그대로 다시 저장한 경우에는 연결을 유지한다.
+
+`photographer_customer_summaries` view는 고객별 프로젝트 수·진행 중 수·첫/최근 촬영일을 집계한다. `GET /api/photographer/customers`는 작가 소유 필터, 이름 또는 전화번호 검색, 신규/재방문 필터, 페이지당 50명(`CUSTOMER_PAGE_SIZE`)을 반환한다. `GET /api/photographer/customers/[id]`는 고객 정보와 촬영 이력·대표 썸네일을 반환한다. 프로젝트 조회는 `batchSize=100` 단위로 PostgREST 행 제한을 피하고 해당 프로젝트의 사진만 읽는다. 고객 GET 응답은 `private, no-store`다.
+
+`PATCH /api/photographer/customers/[id]`는 이름(최대 100자, `CUSTOMER_NAME_MAX_LENGTH`), 전화번호, 메모(최대 2,000자, `CUSTOMER_NOTE_MAX_LENGTH`)만 수정한다. `updatedAt`을 비교하여 동시 수정은 409로 거절한다. 이름·전화번호 중복도 409이며 프로젝트 스냅샷을 갱신하지 않는다. 모든 API는 세션에서 작가를 확인하고 service role 조회·쓰기에도 소유권 필터를 적용한다. 고객 테이블 RLS는 본인 작가의 조회만 허용하고 직접 클라이언트 쓰기를 차단한다. summary view는 service role에서만 읽는다. 고객 메모는 고객용 링크 API에 포함하지 않는다.
+
+프로젝트 생성 API는 명시적 고객 ID가 있으면 소유권·최신 기본정보를 검증한다. 기존 프로젝트 수정 API는 트리거가 연결한 `customerId`를 반환하여 상세의 고객관리 링크를 갱신한다. FastAPI 업로드·R2 삭제 및 기존 다운로드 만료 처리는 그대로 사용한다.
+
 ## 셀프 고객 셀렉 서비스 (2026-09-19)
 
 2026-09-22: 소유자 전용 프로젝트 현황(`/customer-select/[projectId]`)을 추가했다.

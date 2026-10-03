@@ -100,6 +100,7 @@ export interface Project {
   name: string;
   photographerId: string;
   customerName: string;
+  customerId?: string | null;
   shootDate: string; // ISO date
   deadline: string; // ISO date
   requiredCount: number; // N

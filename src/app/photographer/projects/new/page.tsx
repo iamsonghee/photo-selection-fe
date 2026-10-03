@@ -18,7 +18,8 @@ import { useProfile } from "@/contexts/ProfileContext";
 import { useQuota } from "@/contexts/QuotaContext";
 import { parseBetaLimitError } from "@/lib/beta-limits";
 import { BetaApprovalBanner } from "@/components/photographer/BetaApprovalBanner";
-import { isValidKoreanPhone } from "@/lib/phone";
+import { isCustomerId, type PhotographerCustomer } from "@/lib/photographer-customers";
+import { isValidKoreanPhone, formatPhone } from "@/lib/phone";
 import { PhotographerLightPageFrame } from "@/components/layout/PhotographerLightPageHeader";
 import themeStyles from "./NewProjectTheme.module.css";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -80,6 +81,28 @@ export default function NewProjectPage() {
   const [submitAction,  setSubmitAction]  = useState<"later" | "upload" | null>(null);
   const [error,         setError]         = useState<string | null>(null);
   const [fieldErrors,   setFieldErrors]   = useState<Record<string, string>>({});
+  const [linkedCustomer, setLinkedCustomer] = useState<PhotographerCustomer | null>(null);
+  const [customerLoading, setCustomerLoading] = useState(true);
+  const [customerLoadError, setCustomerLoadError] = useState("");
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("customerId");
+    if (!id) { setCustomerLoading(false); return; }
+    const controller = new AbortController();
+    (async () => {
+      try {
+        if (!isCustomerId(id)) throw new Error("고객 정보가 올바르지 않습니다.");
+        const response = await fetch(`/api/photographer/customers/${id}`, { signal: controller.signal, cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? "고객 정보를 불러오지 못했습니다.");
+        if (controller.signal.aborted) return;
+        setLinkedCustomer(data.customer); setCustomerName(data.customer.name);
+        setCustomerPhone(data.customer.phone ? formatPhone(data.customer.phone) : "");
+      } catch (reason) {
+        if (!controller.signal.aborted) setCustomerLoadError(reason instanceof Error ? reason.message : "고객 정보를 불러오지 못했습니다.");
+      } finally { if (!controller.signal.aborted) setCustomerLoading(false); }
+    })();
+    return () => controller.abort();
+  }, []);
   const defaultsAppliedRef = useRef(false);
   const { quota, loading: quotaLoading, error: quotaError, refetch: refetchQuota } = useQuota();
 
@@ -101,7 +124,7 @@ export default function NewProjectPage() {
   }, [profile]);
 
   const handleSubmit = async (goToUpload: boolean) => {
-    if (submitting || profileLoading) return;
+    if (submitting || profileLoading || customerLoading || customerLoadError) return;
 
     // 필드별 검증
     const errors: Record<string, string> = {};
@@ -137,6 +160,7 @@ export default function NewProjectPage() {
         body: JSON.stringify({
           name: name.trim(),
           customer_name: customerName.trim(),
+          ...(linkedCustomer ? { customer_id: linkedCustomer.id } : {}),
           shoot_date: shootDate,
           deadline,
           required_count: Number(requiredCount),
@@ -340,11 +364,15 @@ export default function NewProjectPage() {
               {/* 2열: 고객이름 + 촬영일자 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div id="field-customerName">
+                  {customerLoading && <p role="status" className="mb-3 text-sm text-muted-foreground">고객 정보를 불러오는 중이에요.</p>}
+                  {customerLoadError && <div role="alert" className="mb-3 text-sm text-danger">{customerLoadError} <button type="button" className="underline" onClick={() => window.location.reload()}>다시 시도</button></div>}
+                  {linkedCustomer && <p className="mb-3 text-xs text-muted-foreground">고객관리에서 선택한 고객이에요. 이름·연락처를 바꾸면 입력한 정보로 고객을 다시 연결합니다.</p>}
                   <ProjectFormField error={fieldErrors.customerName} label="고객 이름" required>
                     <ProjectFormInput
                       className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(customerName), error: Boolean(fieldErrors.customerName) })}`}
+                      disabled={customerLoading || !!customerLoadError}
                       value={customerName}
-                      onChange={(e) => { setCustomerName(e.target.value); setFieldErrors((p) => ({ ...p, customerName: "" })); }}
+                      onChange={(e) => { setLinkedCustomer(null); setCustomerName(e.target.value); setFieldErrors((p) => ({ ...p, customerName: "" })); }}
                       placeholder="예: 김민수"
                     />
                   </ProjectFormField>
@@ -374,8 +402,9 @@ export default function NewProjectPage() {
                   <ProjectFormField error={fieldErrors.customerPhone} label="연락처" info="알림 기능 연동 시 사용됩니다">
                     <ProjectFormPhoneInput
                       className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(customerPhone), error: Boolean(fieldErrors.customerPhone) })}`}
+                      disabled={customerLoading || !!customerLoadError}
                       value={customerPhone}
-                      onChange={(v) => { setCustomerPhone(v); setFieldErrors((p) => ({ ...p, customerPhone: "" })); }}
+                      onChange={(v) => { setLinkedCustomer(null); setCustomerPhone(v); setFieldErrors((p) => ({ ...p, customerPhone: "" })); }}
                     />
                   </ProjectFormField>
                 </div>
@@ -476,7 +505,7 @@ export default function NewProjectPage() {
                 onClick={() => handleSubmit(false)}
                 pending={submitting && submitAction === "later"}
                 pendingLabel="생성 중…"
-                disabled={submitting || profileLoading}
+                disabled={submitting || profileLoading || customerLoading || !!customerLoadError}
               >
                 나중에 올리기
               </PhotographerLightButton>
@@ -486,7 +515,7 @@ export default function NewProjectPage() {
                 onClick={() => handleSubmit(true)}
                 pending={submitting && submitAction === "upload"}
                 pendingLabel="생성 중…"
-                disabled={submitting || profileLoading}
+                disabled={submitting || profileLoading || customerLoading || !!customerLoadError}
               >
                 원본 올리기
               </PhotographerLightButton>

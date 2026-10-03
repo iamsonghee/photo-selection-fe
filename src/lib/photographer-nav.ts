@@ -12,6 +12,6 @@ export type PhotographerNavItem = {
 export const PHOTOGRAPHER_NAV_ITEMS: PhotographerNavItem[] = [
   { href: "/photographer/dashboard", label: "대시보드", icon: LayoutDashboard, comingSoon: false },
   { href: "/photographer/projects",  label: "프로젝트",  icon: FolderOpen,    comingSoon: false },
-  { href: "#",                        label: "고객관리",  icon: Users,         comingSoon: true  },
+  { href: "/photographer/customers", label: "고객관리",  icon: Users,         comingSoon: false },
   { href: "#",                        label: "통계",      icon: BarChart3,     comingSoon: true  },
 ];

@@ -216,6 +216,7 @@ export function ProjectNexusPageClient() {
         ...project,
         name: editName,
         customerName: editCustomerName,
+        customerId: data.customerId ?? null,
         shootDate: editShootDate,
         deadline: project.status === "selecting" ? editDeadline : project.deadline,
         reviewDeadline: ["reviewing_v1", "reviewing_v2"].includes(project.status) ? editReviewDeadline || null : project.reviewDeadline,

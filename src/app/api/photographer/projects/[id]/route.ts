@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getPhotographerIdFromSession } from "@/lib/photographer-session-auth";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { canTransition, getTransitionErrorMessage } from "@/lib/project-status";
+import { isValidKoreanPhone } from "@/lib/phone";
 import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 import type { ProjectStatus } from "@/types";
 
@@ -121,7 +122,12 @@ export async function PATCH(
     const now = new Date().toISOString();
     const payload: Record<string, unknown> = { updated_at: now };
     if (typeof body.name === "string") payload.name = body.name;
-    if (typeof body.customer_name === "string") payload.customer_name = body.customer_name;
+    if ("customer_name" in body) {
+      if (typeof body.customer_name !== "string" || !body.customer_name.trim()) {
+        return NextResponse.json({ error: "고객 이름을 입력해주세요." }, { status: 400 });
+      }
+      payload.customer_name = body.customer_name.trim();
+    }
     if (typeof body.shoot_date === "string") payload.shoot_date = body.shoot_date;
     if ("deadline" in body) {
       if (!isDateYmd(body.deadline)) {
@@ -208,7 +214,10 @@ export async function PATCH(
       }
     }
     if ('customer_phone' in body) {
-      payload.customer_phone = body.customer_phone ?? null;
+      if (body.customer_phone != null && (typeof body.customer_phone !== "string" || (body.customer_phone.trim() && !isValidKoreanPhone(body.customer_phone)))) {
+        return NextResponse.json({ error: "연락처를 확인해주세요." }, { status: 400 });
+      }
+      payload.customer_phone = body.customer_phone?.trim() || null;
     }
     if ("location" in body) {
       payload.location = typeof body.location === "string" && body.location.trim()
@@ -241,10 +250,11 @@ export async function PATCH(
       if (body.status === "delivered") payload.delivered_at = now;
     }
 
-    const { error: updateError } = await admin
+    const { data: updated, error: updateError } = await admin
       .from("projects")
       .update(payload)
-      .eq("id", id);
+      .eq("id", id).eq("photographer_id", photographerId)
+      .select("customer_id").single();
     if (updateError) {
       console.error("[PATCH projects]", updateError);
       return NextResponse.json(
@@ -252,7 +262,7 @@ export async function PATCH(
         { status: 500 }
       );
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, customerId: updated.customer_id });
   } catch (e) {
     console.error(e);
     return NextResponse.json(

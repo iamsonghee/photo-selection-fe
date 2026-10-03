@@ -25,7 +25,7 @@ export function useNewProjectGate() {
   const { refetch } = useQuota();
   const [limitInfo, setLimitInfo] = useState<ProjectLimitInfo | null>(null);
 
-  const handleNewProject = useCallback(async () => {
+  const openProjectForm = useCallback(async (customerId?: string) => {
     const data = await refetch();
     if (data?.max !== null && data?.max !== undefined && data.current >= data.max) {
       setLimitInfo({
@@ -37,8 +37,8 @@ export function useNewProjectGate() {
       });
       return;
     }
-    router.push("/photographer/projects/new");
+    router.push(customerId ? `/photographer/projects/new?customerId=${encodeURIComponent(customerId)}` : "/photographer/projects/new");
   }, [refetch, router]);
 
-  return { handleNewProject, limitInfo, closeLimitModal: () => setLimitInfo(null) };
+  return { handleNewProject: () => openProjectForm(), handleNewProjectForCustomer: (id: string) => openProjectForm(id), limitInfo, closeLimitModal: () => setLimitInfo(null) };
 }

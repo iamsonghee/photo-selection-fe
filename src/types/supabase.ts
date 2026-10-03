@@ -26,6 +26,7 @@ export interface Database {
           id: string;
           name: string;
           customer_name: string;
+          customer_id: string | null;
           shoot_date: string;
           deadline: string;
           required_count: number;
@@ -45,6 +46,7 @@ export interface Database {
           id?: string;
           name: string;
           customer_name: string;
+          customer_id?: string | null;
           shoot_date: string;
           deadline: string;
           required_count: number;
@@ -64,6 +66,7 @@ export interface Database {
           id?: string;
           name?: string;
           customer_name?: string;
+          customer_id?: string | null;
           shoot_date?: string;
           deadline?: string;
           required_count?: number;

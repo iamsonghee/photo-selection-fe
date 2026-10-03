@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { getPolicyForPhotographer, type BetaStatus } from "@/lib/beta-policy";
+import { isCustomerId } from "@/lib/photographer-customers";
+import { normalizePhone, isValidKoreanPhone } from "@/lib/phone";
 import { getAppSettings } from "@/lib/app-settings";
 
 async function getPhotographerFromSession(): Promise<{
@@ -106,6 +108,7 @@ export async function POST(req: NextRequest) {
     const {
       name,
       customer_name,
+      customer_id,
       shoot_date,
       deadline,
       required_count,
@@ -128,12 +131,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "필수 항목이 누락되었습니다." }, { status: 400 });
     }
 
+    if (customer_phone != null && (typeof customer_phone !== "string" || (customer_phone.trim() && !isValidKoreanPhone(customer_phone)))) {
+      return NextResponse.json({ error: "연락처를 확인해주세요." }, { status: 400 });
+    }
+    if (customer_id != null) {
+      if (!isCustomerId(customer_id)) return NextResponse.json({ error: "고객 정보가 올바르지 않습니다." }, { status: 400 });
+      const { data: customer, error: customerError } = await admin.from("photographer_customers")
+        .select("id,name,phone").eq("id", customer_id).eq("photographer_id", photographer.id).maybeSingle();
+      if (customerError) throw customerError;
+      if (!customer) return NextResponse.json({ error: "고객을 찾을 수 없습니다." }, { status: 404 });
+      if (customer.name !== customer_name.trim() || customer.phone !== (normalizePhone(customer_phone ?? "") || null)) {
+        return NextResponse.json({ error: "고객 정보가 변경되었습니다. 고객관리에서 다시 프로젝트를 만들어주세요." }, { status: 409 });
+      }
+    }
+
     const accessToken = crypto.randomUUID();
     const { data: inserted, error: insertError } = await admin
       .from("projects")
       .insert({
         name: name.trim(),
         customer_name: customer_name.trim(),
+        ...(customer_id ? { customer_id } : {}),
         shoot_date,
         deadline,
         required_count,
@@ -156,6 +174,9 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insertError || !inserted?.id) {
+      if (customer_id && insertError?.code === "23514") {
+        return NextResponse.json({ error: "고객 정보가 변경되었습니다. 고객관리에서 다시 프로젝트를 만들어주세요." }, { status: 409 });
+      }
       return NextResponse.json({ error: insertError?.message ?? "프로젝트 생성 실패" }, { status: 500 });
     }
 

@@ -30,7 +30,8 @@ export function isProjectAssetsPath(pathname: string | null): boolean {
 
 /** Light Golden Reference가 적용된 작가 운영 화면. Portal UI도 이 판별을 공유한다. */
 export function isPhotographerLightRoute(pathname: string | null): boolean {
-  return pathname === "/photographer/dashboard" ||
+  return pathname === "/photographer/customers" ||
+    pathname === "/photographer/dashboard" ||
     pathname === "/photographer/projects" ||
     pathname === "/photographer/projects/new" ||
     pathname === "/photographer/settings" ||

@@ -23,6 +23,7 @@ export function mapProjectRow(row: Database["public"]["Tables"]["projects"]["Row
     name: row.name,
     photographerId: row.photographer_id,
     customerName: row.customer_name,
+    customerId: row.customer_id ?? null,
     shootDate: row.shoot_date,
     deadline: row.deadline,
     requiredCount: row.required_count,
