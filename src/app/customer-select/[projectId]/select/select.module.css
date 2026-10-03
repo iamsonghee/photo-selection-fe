@@ -278,9 +278,6 @@
 .detailStage { position: relative; min-width: 0; flex: 1; display: flex; flex-direction: column; }
 .detailTop { position: relative; flex: none; display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px; }
 .detail:focus { outline: none; }
-/* 크게 보기 버튼은 위쪽 줄 오른쪽 끝(비슷한 사진 칩이 있으면 그 옆). */
-.detailExpand { margin-left: auto; }
-.detailCount ~ .detailExpand { margin-left: 0; }
 .detailTop button { width: 40px; height: 40px; border: 0; border-radius: 10px; background: none; color: #fff; display: grid; place-items: center; cursor: pointer; }
 .detailTop button:hover { background: rgba(255, 255, 255, 0.08); }
 .detailName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(255, 255, 255, 0.64); font-size: 13px; font-weight: 500; }
@@ -294,10 +291,11 @@
 .detailImage img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; transition: opacity 150ms ease 120ms; }
 /* 다음 사진을 받는 동안: 이전 사진을 흐리게 남겨 둔다(잠깐이면 티 나지 않게 0.12초 뒤부터). PC·모바일 공통. */
 .detailImage[data-loading] img { opacity: 0.55; }
-.detailSpinner { position: absolute; top: 50%; left: 50%; z-index: 6; width: 28px; height: 28px; margin: -14px 0 0 -14px; border: 3px solid rgba(255, 255, 255, 0.25); border-top-color: #fff; border-radius: 50%; animation: detailSpin 800ms linear infinite; opacity: 0; animation-delay: 0s; transition: opacity 150ms ease 300ms; }
-.detailImage[data-loading] .detailSpinner { opacity: 1; }
+.detailSpinner { position: absolute; top: 50%; left: 50%; z-index: 6; width: 28px; height: 28px; margin: -14px 0 0 -14px; border: 3px solid rgba(255, 255, 255, 0.25); border-top-color: #fff; border-radius: 50%; opacity: 0; animation: detailSpinnerIn 0s linear 600ms forwards, detailSpin 800ms linear infinite; }
+/* 0.6초 안에 뜨면 원형이 아예 안 보인다(금방 나타났다 사라지는 깜빡임 방지). */
+@keyframes detailSpinnerIn { to { opacity: 1; } }
 @keyframes detailSpin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .detailSpinner { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .detailSpinner { animation: detailSpinnerIn 0s linear 600ms forwards; } }
 .detailError { position: absolute; left: 50%; bottom: 24px; z-index: 6; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 999px; background: rgba(0, 0, 0, 0.78); color: #fff; font-size: 13px; white-space: nowrap; }
 .detailError button { padding: 5px 12px; border: 0; border-radius: 999px; background: #fff; color: #0e1517; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .memoRetry { margin-left: 4px; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
@@ -307,8 +305,6 @@
 .detail[data-immersive] .detailImage img { cursor: zoom-out; }
 .detail[data-immersive] .detailTop, .detail[data-immersive] .strip, .detail[data-immersive] .panel { display: none; }
 .detail[data-immersive] .detailImage { padding: 0 64px; }
-.immersiveExit { position: absolute; top: 12px; right: 12px; z-index: 7; width: 40px; height: 40px; border: 0; border-radius: 999px; background: rgba(0, 0, 0, 0.45); color: #fff; display: grid; place-items: center; cursor: pointer; }
-.immersiveExit:hover { background: rgba(0, 0, 0, 0.7); }
 .immersivePicked { position: absolute; top: 16px; left: 16px; z-index: 6; width: 26px; height: 26px; border-radius: 7px; background: var(--accent); color: #fff; display: grid; place-items: center; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); pointer-events: none; }
 /* 고른 사진 표시: 위쪽 줄의 주황 칩(갤러리 ✓와 같은 색). */
 .detailPicked { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px 4px 8px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; }
@@ -402,7 +398,6 @@
   .stripGroup > span { display: none; }
   .detail[data-immersive] .detailImage { padding: 0; }
   .immersivePicked { top: calc(12px + env(safe-area-inset-top)); left: 12px; }
-  .immersiveExit { top: calc(8px + env(safe-area-inset-top)); right: 8px; }
   /* 좁은 폭: 칩(선택됨·흐림·비슷한 사진)이 있으면 파일명은 숨긴다. */
   .detailTop:has(.detailPicked, .detailQuality, .detailCount) .detailName { display: none; }
   /* 44px 칸이라 접힌 묶음은 겹친 그림자 없이 묶음 수만, ✓·숫자도 작게. */

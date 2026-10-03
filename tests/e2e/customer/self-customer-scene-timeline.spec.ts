@@ -807,7 +807,7 @@ test("mobile: swiping goes through the similar photos first, then to the next st
   await context.close();
 });
 
-test("detail keeps keyboard focus inside, and the photo-only view always has a way back", async ({ browser }) => {
+test("detail keeps keyboard focus inside, and the photo-only view comes back by clicking outside the photo", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await loginAsPhotographer(page);
@@ -821,10 +821,11 @@ test("detail keeps keyboard focus inside, and the photo-only view always has a w
     await page.keyboard.press("Tab");
     expect(await page.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]')))).toBe(true);
   }
-  // 크게 보기는 버튼으로도 켜고, 켠 뒤에도 돌아가는 버튼이 남는다.
-  await dialog.getByRole("button", { name: "크게 보기", exact: true }).click();
+  // 확대/축소 아이콘은 두지 않는다 — 크게 보기는 사진 누르기로 켜고, 사진 밖(검은 여백)을 누르거나 Esc로 돌아온다.
+  await expect(dialog.getByRole("button", { name: /크게 보기/ })).toHaveCount(0);
+  await dialog.locator('[class*="detailImage"] img').click();
   await expect(dialog).toHaveAttribute("data-immersive", "true");
-  await dialog.getByRole("button", { name: "크게 보기 끄기" }).click();
+  await dialog.locator('[class*="detailImage"]').click({ position: { x: 5, y: 5 } });
   await expect(dialog).not.toHaveAttribute("data-immersive", "true");
   await context.close();
 });

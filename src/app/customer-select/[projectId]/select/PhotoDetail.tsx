@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, Heart, Maximize2, MessageSquare, Minimize2 } from "lucide-react";
+import { ArrowLeft, Check, Heart, MessageSquare } from "lucide-react";
 import { PrevNextButton } from "@/components/PrevNextButton";
 import { MobileViewerPinchPhoto } from "@/components/MobileViewerPinchPhoto";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -59,22 +59,35 @@ export function PhotoDetail({
   // 큰 사진은 새 파일을 다 받은 뒤에만 바뀐다(그동안 이전 사진을 흐리게 유지, 실패하면 이전 사진 + 다시 시도).
   // 파일명·선택 상태·찜·메모·버튼은 "지금 화면에 보이는 사진"(view)을 따른다 — 사진과 정보가 늘 함께 바뀌어
   // 보이는 사진과 다른 사진을 고르거나 오해하지 않는다. 띠·넘기기는 가려는 사진(photoId)을 따른다.
+  // 빨리 보이게: 작은 썸네일(대개 갤러리·띠에서 이미 받아 둠)이 먼저 오면 바로 띄우고, 큰 사진이 오면 선명하게 바꾼다.
+  // 둘 다 오기 전에만 이전 사진을 흐리게 남긴다. 사진 저장소는 요청마다 0.4~0.9초 걸려 큰 사진만 기다리면 느리다.
   const src = photo ? photo.previewUrl || photo.url : "";
-  const [shown, setShown] = useState<{ id: string; src: string; photo: Photo } | null>(null);
+  const thumbSrc = photo?.url && photo.url !== src ? photo.url : "";
+  const [shown, setShown] = useState<{ id: string; src: string; photo: Photo; full: boolean } | null>(null);
+  const shownRef = useRef(shown);
+  shownRef.current = shown;
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
   const photoRef = useRef(photo);
   photoRef.current = photo;
   useEffect(() => {
-    if (!src || (shown?.src === src && shown.id === photoId)) return;
+    const current = shownRef.current;
+    if (!src || (current?.id === photoId && current.full)) return;
     let alive = true;
+    const show = (url: string, full: boolean) => {
+      if (!alive || !photoRef.current) return;
+      const now = shownRef.current;
+      if (!full && now?.id === photoId) return; // 이미 이 사진(큰 사진)이 떠 있으면 썸네일로 되돌리지 않는다
+      setShown({ id: photoId, src: url, photo: photoRef.current, full });
+    };
+    if (thumbSrc) { const thumb = new Image(); thumb.onload = () => show(thumbSrc, false); thumb.src = thumbSrc; }
     const image = new Image();
-    image.onload = () => { if (alive && photoRef.current) { setShown({ id: photoId, src, photo: photoRef.current }); setFailedSrc(null); } };
+    image.onload = () => { show(src, true); if (alive) setFailedSrc(null); };
     image.onerror = () => { if (alive) setFailedSrc(src); };
     image.src = src;
     return () => { alive = false; };
-  }, [photoId, retryKey, shown, src]);
-  const loaded = !src || (shown?.src === src && shown.id === photoId); // 주소가 없으면 기다릴 이미지도 없다
+  }, [photoId, retryKey, src, thumbSrc]);
+  const loaded = !src || shown?.id === photoId; // 이 사진(썸네일 이상)이 보이면 정보·버튼이 함께 바뀐다
   const imageFailed = failedSrc === src;
   const view = shown && shown.id !== photoId ? shown.photo : photo;
   const viewId = view?.id ?? photoId;
@@ -192,12 +205,14 @@ export function PhotoDetail({
     setDraft(remoteMemo);
   }, [viewId, remoteMemo]);
 
-  // 앞뒤 사진은 미리 받아 넘김을 빠르게 한다.
+  // 앞뒤 두 칸, 묶음 안 앞뒤, 뒤로 들어갈 묶음의 마지막 사진을 미리 받아 넘김을 빠르게 한다.
   useEffect(() => {
-    [photos[index - 1], photos[index + 1], members[memberIndex - 1], members[memberIndex + 1]].forEach((neighbor) => {
+    const before = photos[index - 1];
+    const beforeGroup = before ? membersOf(before) : [];
+    [photos[index - 2], before, photos[index + 1], photos[index + 2], members[memberIndex - 1], members[memberIndex + 1], beforeGroup[beforeGroup.length - 1]].forEach((neighbor) => {
       if (neighbor) new Image().src = neighbor.previewUrl || neighbor.url;
     });
-  }, [index, memberIndex, members, photos]);
+  }, [index, memberIndex, members, membersOf, photos]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -243,13 +258,12 @@ export function PhotoDetail({
           {/* AI 의심 표시는 사진을 가리지 않게 위쪽 작은 칩으로(갤러리 카드 칩과 같은 톤). */}
           {quality && <button type="button" className={s.detailQuality} aria-expanded={qualityOpen} onClick={() => setQualityOpen((open) => !open)}>{quality}</button>}
           {members.length > 1 && <span className={s.detailCount}>비슷한 사진 {memberIndex + 1}/{members.length}</span>}
-          {/* 크게 보기: 키보드로도 켤 수 있게 버튼을 둔다(사진 클릭만으로는 키보드 사용자가 못 쓴다). */}
-          <button type="button" className={s.detailExpand} aria-label="크게 보기" title="크게 보기" onClick={() => setImmersive(true)}><Maximize2 size={18} /></button>
           {qualityOpen && <p className={s.qualityTip} role="note">AI가 {[view.isBlurry ? "흐림(흔들림·초점)" : null, view.faceDetected && view.eyesClosed ? "눈 감음" : null].filter(Boolean).join("·")} 가능성을 표시했어요. 틀릴 수 있으니 사진을 직접 확인해 주세요.</p>}
         </div>
         <div
           ref={stageRef}
           className={s.detailImage}
+          onClick={(event) => { if (immersive && event.target === event.currentTarget) setImmersive(false); }}
           data-loading={!loaded && !imageFailed ? "" : undefined}
           onTouchStart={(event) => { touchStartRef.current = event.touches.length === 1 ? { x: event.touches[0].clientX, y: event.touches[0].clientY, at: Date.now(), axis: null } : null; }}
           onTouchMove={(event) => {
@@ -282,7 +296,7 @@ export function PhotoDetail({
         >
           {shown && (desktop
             ? <img src={shown.src} alt={viewName} draggable={false} title={immersive ? "누르면 돌아가기" : "누르면 크게 보기"} onClick={toggleImmersive} />
-            : <MobileViewerPinchPhoto key={shown.src} src={shown.src} alt={viewName} showBadge={false} onZoomStateChange={setZoomed} onSingleTap={toggleImmersive} />)}
+            : <MobileViewerPinchPhoto key={shown.id} src={shown.src} alt={viewName} showBadge={false} onZoomStateChange={setZoomed} onSingleTap={toggleImmersive} />)}
           {!loaded && !imageFailed && <span className={s.detailSpinner} role="status" aria-label="다음 사진을 불러오는 중" />}
           {imageFailed && (
             <div className={s.detailError} role="alert">
@@ -290,8 +304,6 @@ export function PhotoDetail({
               <button type="button" onClick={() => { setFailedSrc(null); setRetryKey((key) => key + 1); }}>다시 시도</button>
             </div>
           )}
-          {/* 크게 보기에서도 돌아가는 버튼은 늘 남긴다(사진을 못 불러왔을 때나 키보드로도 돌아올 수 있게). */}
-          {immersive && <button type="button" className={s.immersiveExit} aria-label="크게 보기 끄기" title="돌아가기" onClick={() => setImmersive(false)}><Minimize2 size={18} /></button>}
           {immersive && selected && <span className={s.immersivePicked} aria-label="최종 선택됨"><Check size={14} strokeWidth={3} aria-hidden /></span>}
           {sceneNotice && <span className={s.detailSceneNotice} role="status">{sceneNotice}</span>}
           {swipeHint && !sceneNotice && <span className={s.detailSceneNotice} role="status">밀어서 넘기고 · 누르면 크게 · 내려서 닫기</span>}

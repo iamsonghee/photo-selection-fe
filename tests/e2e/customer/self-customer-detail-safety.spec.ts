@@ -5,7 +5,7 @@ import { loginAsPhotographer } from "../../helpers/auth";
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
 const img = (name: string) => `http://localhost:3001/__e2e-img/${name}.png`;
 
-async function setup(page: Page) {
+async function setup(page: Page, { holdThumbs = false } = {}) {
   await loginAsPhotographer(page);
   const photos = ["d1", "d2", "d3"].map((id, index) => ({
     id, projectId: "detail-safety", orderIndex: index, url: img(`${id}-thumb`), previewUrl: img(id), originalFilename: `${id.toUpperCase()}.jpg`,
@@ -30,7 +30,8 @@ async function setup(page: Page) {
   let failing = new Set<string>();
   await page.route("**/__e2e-img/**", async (route) => {
     const name = route.request().url().split("/").pop()!.replace(".png", "");
-    if (name.endsWith("-thumb") || name === "d1") return route.fulfill({ body: PNG, contentType: "image/png" });
+    // d1(처음 여는 사진)은 바로 준다. 썸네일은 holdThumbs면 d1 것만 바로 주고 나머지는 붙잡는다.
+    if (name === "d1" || name === "d1-thumb" || (name.endsWith("-thumb") && !holdThumbs)) return route.fulfill({ body: PNG, contentType: "image/png" });
     if (failing.has(name)) return route.abort();
     held.set(name, route);
   });
@@ -40,9 +41,9 @@ async function setup(page: Page) {
   };
 }
 
-test("next photo: name, state and buttons follow the photo on screen until the new image shows", async ({ page }) => {
+test("next photo: until its thumbnail or full image arrives, name, state and buttons stay with the photo on screen", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  const images = await setup(page);
+  const images = await setup(page, { holdThumbs: true });
   await page.goto("/customer-select/detail-safety/select");
   await page.locator('.gl-photo-card[data-photo-id="d1"]').click();
   const pick = page.getByRole("button", { name: "최종 선택", exact: true });
@@ -54,14 +55,16 @@ test("next photo: name, state and buttons follow the photo on screen until the n
   await page.keyboard.press(" ");
   await expect(page.locator('.gl-photo-card[data-photo-id="d1"]')).toHaveClass(/gl-selected/);
   await expect(page.locator('.gl-photo-card[data-photo-id="d2"]')).not.toHaveClass(/gl-selected/);
-  await images.release("d2");
-  // 새 사진이 뜨면 이름·상태·버튼도 함께 d2로 바뀐다.
+  // 작은 썸네일이 먼저 오면 바로 d2로 바뀐다(이름·상태·버튼도 함께) — 큰 사진은 뒤이어 선명하게.
+  await images.release("d2-thumb");
   await expect(page.getByRole("dialog", { name: "D2.jpg 상세 보기" })).toBeVisible();
+  await expect(page.locator('[role="dialog"] [class*="detailImage"] img')).toHaveAttribute("src", /d2-thumb\.png$/);
   await expect(pick).toBeEnabled();
+  await images.release("d2");
   await expect(page.locator('[role="dialog"] [class*="detailImage"] img')).toHaveAttribute("src", /d2\.png$/);
 });
 
-test("image that fails to load keeps the previous photo and offers a retry", async ({ page }) => {
+test("full image that fails to load stays on the thumbnail and offers a retry", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const images = await setup(page);
   images.fail(["d2"]);
@@ -70,9 +73,9 @@ test("image that fails to load keeps the previous photo and offers a retry", asy
   await page.keyboard.press("ArrowRight");
   const error = page.getByRole("alert").filter({ hasText: "불러오지 못했어요" });
   await expect(error).toBeVisible();
-  // 깨진 사진으로 바꾸지 않고 이전 사진(d1)을 그대로 둔다. 이름·버튼도 화면의 d1 기준이다.
-  await expect(page.locator('[role="dialog"] [class*="detailImage"] img')).toHaveAttribute("src", /d1\.png$/);
-  await expect(page.getByRole("dialog", { name: "D1.jpg 상세 보기" })).toBeVisible();
+  // 깨진 사진으로 바꾸지 않고 받아 둔 썸네일을 그대로 둔다.
+  await expect(page.locator('[role="dialog"] [class*="detailImage"] img')).toHaveAttribute("src", /d2-thumb\.png$/);
+  await expect(page.getByRole("dialog", { name: "D2.jpg 상세 보기" })).toBeVisible();
   images.fail([]);
   await error.getByRole("button", { name: "다시 시도" }).click();
   await images.release("d2");
