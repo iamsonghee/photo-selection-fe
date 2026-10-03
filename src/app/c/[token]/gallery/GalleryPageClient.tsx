@@ -90,7 +90,6 @@ const SIMILARITY_HINT_STORAGE_KEY = "ps:c-gallery-similarity-hint:v1";
 const SIMILARITY_HINT_DURATION_MS = 4500;
 const MOBILE_HEADER_COLLAPSE_Y = 72;
 const MOBILE_HEADER_DIRECTION_THRESHOLD = 12;
-const PRESIGN_DEBOUNCE_MS = 80;
 
 type GridLayout = { cols: number; gap: number; rowHeight: number; overscan: number };
 const DEFAULT_LAYOUT: GridLayout = { cols: 4, gap: GRID_GAP, rowHeight: Math.ceil(GRID_MIN_CELL / DESKTOP_CARD_ASPECT) + GRID_GAP, overscan: 6 };
@@ -104,7 +103,7 @@ export default function GalleryPageClient() {
   const token        = (params?.token as string) ?? "";
 
   const { project, photos, photoGroups, Y, N, toggle, selectedIds, photoStates, loading, updatePhotoState, includeRecommendations, selectionSaving, saveError } = useSelection();
-  const { thumbUrls: presignedUrls, thumbQueue, ensureThumbUrls, refreshThumbUrl } = useCustomerImageCache();
+  const { thumbQueue } = useCustomerImageCache();
   const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
 
   /* 새로고침/뒤로가기 시 필터가 초기화되지 않도록, 마운트 시 1회 URL에서 필터 상태를 복원한다.
@@ -204,8 +203,6 @@ export default function GalleryPageClient() {
   const gridRef        = useRef<HTMLDivElement>(null);
   const mobileHeaderScrollRef = useRef({ lastY: 0, directionDelta: 0 });
   const densityAnchorIdRef = useRef<string | null>(null);
-  const retryingIdsRef = useRef(new Set<string>()); // onError 재시도 중
-  const firstThumbRangeRequestedRef = useRef(false);
 
   // ── 가상화 그리드 레이아웃 (열 수·행 높이는 컨테이너 폭 기준으로 JS에서 계산) ──
   const [layout, setLayout] = useState<GridLayout>(DEFAULT_LAYOUT);
@@ -467,16 +464,10 @@ export default function GalleryPageClient() {
     window.history.replaceState(window.history.state, "", `/c/${token}/gallery${nextQs ? `?${nextQs}` : ""}`);
   }, [filterState, token]);
 
-  // img onError → 해당 사진 1회만 재발급 (HEAD 요청 없음)
-  const handleThumbError = useCallback(
-    (photoId: string) => {
-      if (retryingIdsRef.current.has(photoId)) return;
-      retryingIdsRef.current.add(photoId);
-      console.warn("[gallery] thumb error, re-presigning:", photoId);
-      refreshThumbUrl(photoId).finally(() => retryingIdsRef.current.delete(photoId));
-    },
-    [refreshThumbUrl]
-  );
+  // 썸네일은 공개 주소라 다시 발급할 것이 없다 — 실패만 기록한다(카드는 빈 칸으로 남는다).
+  const handleThumbError = useCallback((photoId: string) => {
+    console.warn("[gallery] thumb load failed:", photoId);
+  }, []);
 
   // 컨테이너 폭 → 열 수·행 높이·overscan(화면 2.5개 분량) 계산.
   // 모바일은 2/3/4열 밀도별 gap과 카드 비율을 사용한다.
@@ -642,42 +633,6 @@ export default function GalleryPageClient() {
   }, [loading, layoutMeasured, displayPhotos, layout.cols, galleryScrollKey, galleryFocusKey, searchParams, token, router]);
 
   const virtualRows = rowVirtualizer.getVirtualItems();
-  const rangeKey = virtualRows.length > 0
-    ? `${virtualRows[0].index}-${virtualRows[virtualRows.length - 1].index}-${layout.cols}`
-    : "";
-
-  // 현재 렌더 범위(visible + overscan)의 photoId만 모아 공통 캐시에서 presign한다.
-  // 최초 화면은 지연 없이 요청한다. 이후 빠른 스크롤만 80ms 안정될 때까지 기다려
-  // 스쳐 지나간 범위의 불필요한 presign 요청을 줄인다.
-  useEffect(() => {
-    if (loading || !token || virtualRows.length === 0) return;
-    const startPhoto = virtualRows[0].index * layout.cols;
-    const endPhoto = Math.min(
-      (virtualRows[virtualRows.length - 1].index + 1) * layout.cols,
-      displayPhotos.length
-    );
-
-    const requestRange = () => {
-      const ids: string[] = [];
-      for (let i = startPhoto; i < endPhoto; i++) {
-        const photo = displayPhotos[i];
-        if (!photo) continue;
-        ids.push(photo.id);
-      }
-      void ensureThumbUrls(ids);
-    };
-
-    if (!firstThumbRangeRequestedRef.current) {
-      firstThumbRangeRequestedRef.current = true;
-      requestRange();
-      return;
-    }
-
-    const timer = setTimeout(requestRange, PRESIGN_DEBOUNCE_MS);
-
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rangeKey, loading, token, displayPhotos, ensureThumbUrls]);
 
   /* ── 처음/마지막/인덱스로 이동 ── */
   const scrollToPhotoIndex = useCallback(
@@ -1112,7 +1067,7 @@ export default function GalleryPageClient() {
                 const groupingActive  = similarityToggleOn && !narrowingFilterActive;
                 const showGroupBadge  = groupingActive && isRepresentative && restCount > 0;
                 const groupExpanded   = groupingActive && !!group && expandedGroups.has(group.id);
-                const presignedThumb  = presignedUrls.get(photo.id)?.url;
+                const presignedThumb  = photo.url || undefined; // 공개 썸네일 주소(img.acut.kr)
 
                 cells.push(
                   <GalleryPhotoCard

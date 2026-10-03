@@ -12,7 +12,6 @@ import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
 import type { Photo } from "@/types";
 
 type Props = {
-  token: string;
   photos: Photo[];
   initialIndex: number;
   sectionLabel: string;
@@ -22,17 +21,14 @@ type Props = {
   onClose: () => void;
 };
 
-type PresignedPreview = { url: string; expiresAt: number };
 
 function displayName(photo: Photo): string {
   return photo.originalFilename?.split("/").pop() ?? `#${photo.orderIndex}`;
 }
 
-export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, selectedPhotoIds, comments, showCommentOnDesktop = false, onClose }: Props) {
+export function LockedPhotoViewer({ photos, initialIndex, sectionLabel, selectedPhotoIds, comments, showCommentOnDesktop = false, onClose }: Props) {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [zoomed, setZoomed] = useState(false);
-  const [presignedPreviews, setPresignedPreviews] = useState<Map<string, PresignedPreview>>(new Map());
-  const presignedPreviewCacheRef = useRef<Map<string, PresignedPreview>>(new Map());
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const current = photos[activeIndex] ?? null;
 
@@ -45,46 +41,10 @@ export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, s
     setActiveIndex((index) => (index + 1) % photos.length);
   }, [photos.length]);
 
-  useEffect(() => {
-    if (!token || photos.length === 0) return;
-    const controller = new AbortController();
-    const isMobile = window.matchMedia("(max-width: 900px)").matches;
-    const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true;
-    const offsets = saveData ? [0] : isMobile ? [-1, 0, 1] : [-1, 0, 1, 2];
-    const now = Math.floor(Date.now() / 1000);
-    const ids = [...new Set(offsets.map((offset) => photos[(activeIndex + offset + photos.length) % photos.length]?.id).filter(Boolean))];
-    const missingIds = ids.filter((id) => {
-      const cached = presignedPreviewCacheRef.current.get(id);
-      return !cached || cached.expiresAt <= now + 60;
-    });
-    if (missingIds.length === 0) return;
-
-    void fetch(`/api/c/presign-preview?token=${encodeURIComponent(token)}&photoIds=${encodeURIComponent(missingIds.join(","))}`, {
-      signal: controller.signal,
-    })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: { presignedUrls?: Record<string, PresignedPreview> } | null) => {
-        if (!data?.presignedUrls) return;
-        setPresignedPreviews((currentMap) => {
-          const next = new Map(currentMap);
-          Object.entries(data.presignedUrls ?? {}).forEach(([photoId, info]) => {
-            if (info?.url && info.expiresAt > now) {
-              next.set(photoId, info);
-              presignedPreviewCacheRef.current.set(photoId, info);
-            }
-          });
-          return next;
-        });
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-      });
-    return () => controller.abort();
-  }, [activeIndex, photos, token]);
 
   const preloadUrlGroups = useMemo(
-    () => photos.map((photo) => [presignedPreviews.get(photo.id)?.url ?? viewerImageUrl(photo)]),
-    [photos, presignedPreviews],
+    () => photos.map((photo) => [viewerImageUrl(photo)]), // 공개 preview 주소(2026-10-03 서명 URL 발급 제거)
+    [photos],
   );
   useAdjacentImagePreload(preloadUrlGroups, current ? activeIndex : null, { wrap: true });
 
@@ -118,7 +78,7 @@ export function LockedPhotoViewer({ token, photos, initialIndex, sectionLabel, s
 
   const filename = displayName(current);
   const hasMultiple = photos.length > 1;
-  const currentSrc = presignedPreviews.get(current.id)?.url ?? viewerImageUrl(current);
+  const currentSrc = viewerImageUrl(current);
   const selected = selectedPhotoIds.has(current.id);
   const comment = comments[current.id]?.comment?.trim() ?? "";
 

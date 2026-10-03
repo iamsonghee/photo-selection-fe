@@ -59,6 +59,7 @@ export default function InvitePageClient() {
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
+    // 대표 사진 공개 주소를 사진 목록보다 먼저 받아 이미지 전송을 일찍 시작한다.
     fetch(`/api/c/presign-preview?token=${encodeURIComponent(token)}&cover=1`, { cache: "no-store" })
       .then((response) => response.ok ? response.json() : null)
       .then((data) => {

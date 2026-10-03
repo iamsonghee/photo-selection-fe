@@ -943,7 +943,6 @@ export default function LockedPage() {
 
       {viewer && (
         <LockedPhotoViewer
-          token={token}
           photos={viewer.photos}
           initialIndex={viewer.initialIndex}
           sectionLabel={viewer.sectionLabel}

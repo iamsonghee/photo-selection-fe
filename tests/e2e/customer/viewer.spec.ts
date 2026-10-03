@@ -195,77 +195,37 @@ test.describe("고객 — 뷰어 (사진 크게 보기)", () => {
     await expect(page.getByRole("link", { name: "갤러리로 돌아가기" })).toHaveAttribute("href", /\/gallery/);
   });
 
-  test("V6: 현재·인접 프리뷰를 배치 발급하고 캐시된 사진은 다시 요청하지 않음", async ({ page }) => {
-    const requestedBatches: string[][] = [];
-    const transparentGif = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
-    await page.route("**/api/c/presign-preview?*", async (route) => {
-      const requestUrl = new URL(route.request().url());
-      const photoIds = (requestUrl.searchParams.get("photoIds") ?? "")
-        .split(",")
-        .map((id) => id.trim())
-        .filter(Boolean);
-      requestedBatches.push(photoIds);
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          presignedUrls: Object.fromEntries(photoIds.map((id) => [
-            id,
-            { url: `${transparentGif}#${id}`, expiresAt: Math.floor(Date.now() / 1000) + 3600 },
-          ])),
-        }),
-      });
+  test("V6: 현재·인접 프리뷰를 공개 주소로 바로 미리 받고 서명 발급은 하지 않음", async ({ page }) => {
+    const presignRequests: string[] = [];
+    const previewRequests: string[] = [];
+    page.on("request", (request) => {
+      const url = request.url();
+      if (url.includes("/api/c/presign")) presignRequests.push(url);
+      if (/picsum\.photos\/seed\/e2e-prev/.test(url)) previewRequests.push(url);
     });
-
     await openGallery(page);
     const href = await page.locator("a[href*='/viewer/']").first().getAttribute("href");
     if (!href) { test.skip(true, "뷰어 URL 없음"); return; }
     await page.goto(href);
-
-    await expect.poll(() => requestedBatches.length).toBe(1);
-    expect(requestedBatches[0]).toHaveLength(3); // 첫 사진 + 다음 2장
-
-    await page.keyboard.press("ArrowRight");
-    await expect.poll(() => requestedBatches.length).toBe(2);
-    expect(requestedBatches[1]).toHaveLength(1); // 앞서 받은 3장은 캐시, 새 다음 사진만 추가
-
-    const allRequestedIds = requestedBatches.flat();
-    expect(new Set(allRequestedIds).size).toBe(allRequestedIds.length);
-    expect(requestedBatches.every((batch) => batch.length <= 4)).toBeTruthy();
+    // PC: 첫 사진 + 다음 2장(이전 사진 없음)을 공개 주소로 미리 받는다.
+    await expect.poll(() => new Set(previewRequests).size).toBeGreaterThanOrEqual(3);
+    expect(presignRequests).toEqual([]);
   });
 
-  test("V7: 모바일은 현재 사진과 양옆 1장 범위만 선발급", async ({ page }) => {
+  test("V7: 모바일은 현재 사진과 양옆 1장 범위만 미리 받음", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    const requestedBatches: string[][] = [];
-    await page.route("**/api/c/presign-preview?*", async (route) => {
-      const requestUrl = new URL(route.request().url());
-      const photoIds = (requestUrl.searchParams.get("photoIds") ?? "")
-        .split(",")
-        .map((id) => id.trim())
-        .filter(Boolean);
-      requestedBatches.push(photoIds);
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          presignedUrls: Object.fromEntries(photoIds.map((id) => [
-            id,
-            {
-              url: `data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=#${id}`,
-              expiresAt: Math.floor(Date.now() / 1000) + 3600,
-            },
-          ])),
-        }),
-      });
+    const previewRequests = new Set<string>();
+    page.on("request", (request) => {
+      if (/picsum\.photos\/seed\/e2e-prev/.test(request.url())) previewRequests.add(request.url());
     });
-
     await openGallery(page);
     const href = await page.locator("a[href*='/viewer/']").first().getAttribute("href");
     if (!href) { test.skip(true, "뷰어 URL 없음"); return; }
     await page.goto(href);
-
-    await expect.poll(() => requestedBatches.length).toBe(1);
-    expect(requestedBatches[0]).toHaveLength(2); // 첫 사진 + 다음 1장 (이전 사진 없음)
+    // 첫 사진 + 다음 1장(이전 사진 없음) — PC의 3장보다 적다.
+    await expect.poll(() => previewRequests.size).toBe(2);
+    await page.waitForTimeout(500);
+    expect(previewRequests.size).toBe(2);
   });
 
   test("V8: 보정본 상세는 다크 셸·사진 집중 보기·모바일 길게 누르기를 유지", async ({ page }) => {

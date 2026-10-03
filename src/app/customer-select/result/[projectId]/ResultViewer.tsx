@@ -87,7 +87,6 @@ export default function ResultViewer({ project, photos, comments }: Props) {
 
       {viewerIndex !== null ? (
         <LockedPhotoViewer
-          token=""
           photos={visiblePhotos}
           initialIndex={viewerIndex}
           sectionLabel="셀렉 결과"

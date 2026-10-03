@@ -50,14 +50,7 @@ import { triggerSelectionHaptic } from "@/lib/selection-feedback";
 import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
 
 const COMMENT_MAX_LENGTH = 100;
-const PREVIEW_URL_CACHE_MAX = 100;
 const PREVIEW_DECODE_CACHE_MAX = 6;
-const PREVIEW_EXPIRY_SAFETY_SECONDS = 60;
-
-type PresignedPreviewInfo = {
-  url: string;
-  expiresAt: number;
-};
 
 export type CustomerSelectionViewerAdapter = {
   token: string;
@@ -214,18 +207,13 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
   const star  = current ? photoStates[current.id]?.rating : undefined;
   const color = current ? photoStates[current.id]?.color  : undefined;
 
-  const previewUrlCacheRef = useRef<Map<string, PresignedPreviewInfo>>(new Map());
-  const previewRequestPendingRef = useRef<Set<string>>(new Set());
   const decodedPreviewImagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
-  const [presignedPreviewUrls, setPresignedPreviewUrls] = useState<Map<string, PresignedPreviewInfo>>(
-    () => new Map()
-  );
 
-  /** 인접 사진은 URL 발급만 해두지 않고 실제 이미지 decode까지 시작한다. Image 객체는
+  /** 인접 사진은 실제 이미지 decode까지 미리 시작한다(공개 주소, Cloudflare 캐시). Image 객체는
    *  최근 6장만 유지해 모바일 디코딩 메모리가 사진 수에 비례해 늘어나지 않게 한다. */
-  const preloadPreview = useCallback((photoId: string, info: PresignedPreviewInfo, highPriority: boolean) => {
+  const preloadPreview = useCallback((photoId: string, url: string, highPriority: boolean) => {
     const existing = decodedPreviewImagesRef.current.get(photoId);
-    if (existing?.src === info.url) {
+    if (existing?.src === url) {
       if (highPriority) existing.fetchPriority = "high";
       return;
     }
@@ -233,7 +221,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
     const image = new Image();
     image.decoding = "async";
     image.fetchPriority = highPriority ? "high" : "low";
-    image.src = info.url;
+    image.src = url;
     decodedPreviewImagesRef.current.delete(photoId);
     decodedPreviewImagesRef.current.set(photoId, image);
     while (decodedPreviewImagesRef.current.size > PREVIEW_DECODE_CACHE_MAX) {
@@ -246,54 +234,8 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
     });
   }, []);
 
-  const ensurePreviewUrls = useCallback(async (photoIds: string[], priorityPhotoId: string) => {
-    if (!token || photoIds.length === 0) return;
-    const now = Math.floor(Date.now() / 1000);
-    const uniqueIds = [...new Set(photoIds)];
-    const idsToFetch: string[] = [];
 
-    for (const photoId of uniqueIds) {
-      const cached = previewUrlCacheRef.current.get(photoId);
-      if (cached && cached.expiresAt > now + PREVIEW_EXPIRY_SAFETY_SECONDS) {
-        preloadPreview(photoId, cached, photoId === priorityPhotoId);
-        continue;
-      }
-      if (cached) previewUrlCacheRef.current.delete(photoId);
-      if (!previewRequestPendingRef.current.has(photoId)) {
-        previewRequestPendingRef.current.add(photoId);
-        idsToFetch.push(photoId);
-      }
-    }
-    if (idsToFetch.length === 0) return;
-
-    try {
-      const res = await fetch(
-        `/api/c/presign-preview?token=${encodeURIComponent(token)}&photoIds=${encodeURIComponent(idsToFetch.join(","))}`
-      );
-      if (!res.ok) return;
-      const data = await res.json().catch(() => ({ presignedUrls: {} })) as {
-        presignedUrls?: Record<string, PresignedPreviewInfo>;
-      };
-      for (const [photoId, info] of Object.entries(data.presignedUrls ?? {})) {
-        if (!info?.url || info.expiresAt <= now) continue;
-        previewUrlCacheRef.current.delete(photoId);
-        previewUrlCacheRef.current.set(photoId, info);
-        preloadPreview(photoId, info, photoId === priorityPhotoId);
-      }
-      while (previewUrlCacheRef.current.size > PREVIEW_URL_CACHE_MAX) {
-        const oldestId = previewUrlCacheRef.current.keys().next().value as string | undefined;
-        if (!oldestId) break;
-        previewUrlCacheRef.current.delete(oldestId);
-      }
-      setPresignedPreviewUrls(new Map(previewUrlCacheRef.current));
-    } catch {
-      // 현재 사진에는 공개 preview URL 폴백이 있으므로 인접 preload 실패는 조용히 복구한다.
-    } finally {
-      idsToFetch.forEach((photoId) => previewRequestPendingRef.current.delete(photoId));
-    }
-  }, [preloadPreview, token]);
-
-  // PC는 이전 1장·다음 2장, 모바일은 양옆 1장씩 선발급·선로딩한다.
+  // PC는 이전 1장·다음 2장, 모바일은 양옆 1장씩 미리 받는다.
   // 데이터 절약 모드에서는 현재 사진만 요청한다.
   useEffect(() => {
     // SelectionContext hydration 전에 현재 사진만 따로 요청하면 곧바로 인접 사진 요청이
@@ -303,15 +245,12 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
     const saveData = connection?.saveData === true;
     const isMobileViewport = window.matchMedia("(max-width: 767px)").matches;
     const offsets = saveData ? [0] : isMobileViewport ? [-1, 0, 1] : [-1, 0, 1, 2];
-    const ids = [activePhotoId];
-    if (navAnchorIndex >= 0) {
-      for (const offset of offsets) {
-        const photo = filteredPhotos[navAnchorIndex + offset];
-        if (photo) ids.push(photo.id);
-      }
+    if (navAnchorIndex < 0) return;
+    for (const offset of offsets) {
+      const photo = filteredPhotos[navAnchorIndex + offset];
+      if (photo) preloadPreview(photo.id, viewerImageUrl(photo), offset === 0);
     }
-    void ensurePreviewUrls(ids, activePhotoId);
-  }, [adapter, activePhotoId, navAnchorIndex, filteredPhotos, ensurePreviewUrls]);
+  }, [adapter, activePhotoId, navAnchorIndex, filteredPhotos, preloadPreview]);
 
   const [hoverStar,      setHoverStar]      = useState(0);
   const [starPressRing,  setStarPressRing]  = useState<number | null>(null);
@@ -806,14 +745,8 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
   const displayRating      = hoverStar || star || 0;
   const isCurrentSelected  = selectedIds.has(current.id);
   const filename           = getPhotoDisplayName(current);
-  // 사진별 캐시를 사용하므로 빠르게 넘겨도 이전 사진의 presigned URL이 새 사진에 섞이지 않는다.
-  // 발급 전이나 일시 실패 시에는 공개 preview URL로 즉시 표시한다(Phase B: R2 public 유지).
-  const cachedPreview = presignedPreviewUrls.get(current.id);
-  const viewerSrc = adapter
-    ? (current.previewUrl || current.url)
-    : cachedPreview && cachedPreview.expiresAt > Math.floor(Date.now() / 1000)
-    ? cachedPreview.url
-    : viewerImageUrl(current);
+  // 공개 preview 주소(img.acut.kr)를 바로 쓴다 — 2026-10-03 서명 URL 발급 제거.
+  const viewerSrc = adapter ? (current.previewUrl || current.url) : viewerImageUrl(current);
   // photoId(라우트 파라미터)는 최초 진입 사진 id에 고정돼 있음(navigateTo가 history.replaceState만
   // 사용) — 필름스트립/화살표로 다른 사진을 보다가 닫으면 activePhotoId를 써야 실제로 보던 사진으로 돌아간다.
   const galleryHref        = adapter?.galleryHref ?? buildGalleryHrefWithFocus(token, searchParams, activePhotoId);

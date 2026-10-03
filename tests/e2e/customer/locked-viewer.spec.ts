@@ -14,20 +14,6 @@ Reflect.deleteProperty(mobileDevice, "defaultBrowserType");
 
 async function prepareLockedPage(page: Page) {
   await mockCustomerThumbPresigning(page);
-  await page.route("**/api/c/presign-preview?*", async (route) => {
-    const requestUrl = new URL(route.request().url());
-    const photoIds = (requestUrl.searchParams.get("photoIds") ?? "").split(",").filter(Boolean);
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        presignedUrls: Object.fromEntries(photoIds.map((id) => [id, {
-          url: `https://picsum.photos/seed/locked-${id}/1200/900`,
-          expiresAt: Math.floor(Date.now() / 1000) + 3600,
-        }])),
-      }),
-    });
-  });
   await page.route("https://picsum.photos/**", (route) => route.fulfill({
     status: 200,
     contentType: "image/svg+xml",
