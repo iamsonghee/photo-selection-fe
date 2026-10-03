@@ -2036,15 +2036,16 @@ export default function WorkflowPageClient({
     // 재시도 가능성이 있는 요청이라 이전 실패 문구를 지우고 시작한다.
     setReviewDeadlineModal((m) => (m ? { ...m, error: undefined } : null));
     try {
-      if (reviewDeadline) {
-        const ymd = normalizeReviewDeadlineYmd(reviewDeadline);
-        if (ymd) {
-          await fetch(`/api/photographer/projects/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ review_deadline: ymd }),
-          });
-        }
+      const ymd = normalizeReviewDeadlineYmd(reviewDeadline);
+      if (reviewDeadline && !ymd) throw new Error("검토 기한이 올바르지 않습니다.");
+      const deadlineRes = await fetch(`/api/photographer/projects/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ review_deadline: ymd }),
+      });
+      if (!deadlineRes.ok) {
+        const data = await deadlineRes.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "검토 기한 저장 실패");
       }
       const res = await fetch(`/api/photographer/projects/${id}/status`, {
         method: "PATCH",
@@ -2062,7 +2063,7 @@ export default function WorkflowPageClient({
         body: JSON.stringify({ project_id: id, action: nextStatus }),
       }).catch(() => {});
       // status만 변경 — rows(사진/보정본)는 그대로이므로 loadData() 불필요
-      setProject((prev) => prev ? { ...prev, status: nextStatus } : null);
+      setProject((prev) => prev ? { ...prev, status: nextStatus, reviewDeadline: ymd } : null);
       // 성공 시 같은 모달을 공유 단계로 전환 (작가가 직접 링크 공유)
       setReviewDeadlineModal((m) => (m ? { ...m, stage: "share" } : null));
     } catch (e) {
@@ -2977,7 +2978,7 @@ export default function WorkflowPageClient({
           version={reviewDeadlineModal.v}
           customerName={project?.customerName ?? "고객"}
           photoCount={reviewDeadlineModal.v === 2 ? v2Total : counts.total}
-          initialDeadline={reviewDeadlineModal.dateInput || project?.reviewDeadline}
+          initialDeadline={reviewDeadlineModal.dateInput || (reviewDeadlineModal.v === 1 ? project?.reviewDeadline : null)}
           pending={startingReview === reviewDeadlineModal.v}
           error={reviewDeadlineModal.error}
           onRequest={(deadline) => {

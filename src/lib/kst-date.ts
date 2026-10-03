@@ -68,3 +68,14 @@ export function formatKstLongDateTime(iso: string): string {
 export function toKstShifted(iso: string): Date {
   return new Date(new Date(iso).getTime() + 9 * 60 * 60 * 1000);
 }
+
+/** UTC 시각부터 N일 뒤의 KST 달력 날짜. */
+export function formatKstDeadlineAfterDays(iso: string, days: number): string {
+  const shifted = toKstShifted(iso);
+  if (Number.isNaN(shifted.getTime())) return "—";
+  shifted.setUTCDate(shifted.getUTCDate() + days);
+  const y = shifted.getUTCFullYear();
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(shifted.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}

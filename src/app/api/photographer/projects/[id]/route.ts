@@ -8,6 +8,12 @@ import type { ProjectStatus } from "@/types";
 
 const VALID_SHOOT_TYPES = new Set(SHOOT_TYPES.map((t) => t.value));
 
+function isDateYmd(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -100,7 +106,7 @@ export async function PATCH(
     const admin = getAdminClient();
     const { data: project, error: projectError } = await admin
       .from("projects")
-      .select("id, photographer_id, photo_count, status, include_original, access_pin")
+      .select("id, photographer_id, photo_count, status, include_original, access_pin, deadline, review_deadline")
       .eq("id", id)
       .single();
 
@@ -117,7 +123,15 @@ export async function PATCH(
     if (typeof body.name === "string") payload.name = body.name;
     if (typeof body.customer_name === "string") payload.customer_name = body.customer_name;
     if (typeof body.shoot_date === "string") payload.shoot_date = body.shoot_date;
-    if (typeof body.deadline === "string") payload.deadline = body.deadline;
+    if ("deadline" in body) {
+      if (!isDateYmd(body.deadline)) {
+        return NextResponse.json({ error: "셀렉 기한은 올바른 날짜여야 합니다." }, { status: 400 });
+      }
+      if (!["preparing", "selecting"].includes(project.status) && body.deadline !== project.deadline) {
+        return NextResponse.json({ error: "셀렉이 끝난 뒤에는 셀렉 기한을 변경할 수 없습니다." }, { status: 400 });
+      }
+      if (body.deadline !== project.deadline) payload.deadline = body.deadline;
+    }
     if (typeof body.required_count === "number") {
       const photoCount = (project as { photo_count: number | null }).photo_count ?? 0;
       const projectStatus = (project as { status: string }).status;
@@ -164,7 +178,15 @@ export async function PATCH(
       if (body.include_original !== currentIncludeOriginal) payload.include_original = body.include_original;
     }
     if ('review_deadline' in body) {
-      payload.review_deadline = body.review_deadline ?? null;
+      if (body.review_deadline !== null && !isDateYmd(body.review_deadline)) {
+        return NextResponse.json({ error: "검토 기한은 올바른 날짜이거나 비어 있어야 합니다." }, { status: 400 });
+      }
+      const currentReviewDeadline = project.review_deadline ?? null;
+      if (!["editing", "editing_v2", "reviewing_v1", "reviewing_v2"].includes(project.status)
+        && body.review_deadline !== currentReviewDeadline) {
+        return NextResponse.json({ error: "검토 단계가 끝난 뒤에는 검토 기한을 변경할 수 없습니다." }, { status: 400 });
+      }
+      if (body.review_deadline !== currentReviewDeadline) payload.review_deadline = body.review_deadline;
     }
     if ("cover_photo_id" in body) {
       if (body.cover_photo_id !== null && typeof body.cover_photo_id !== "string") {

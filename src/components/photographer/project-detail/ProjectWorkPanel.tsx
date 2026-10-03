@@ -4,7 +4,7 @@ import { ChevronRight, Clock, Flag, ListChecks, PenLine, Upload } from "lucide-r
 import type { Project, ProjectStatus } from "@/types";
 import { dday, getProjectActor } from "@/lib/project-actor";
 import { getActiveDeadline } from "@/lib/project-deadline";
-import { formatKstDateTimeDash, toKstShifted } from "@/lib/kst-date";
+import { formatKstDateTimeDash, formatKstDeadlineAfterDays } from "@/lib/kst-date";
 import { OriginalUploadWarningBadge } from "@/components/photographer/OriginalUploadWarningBadge";
 
 // 고객 화면(src/lib/customer-api-server.ts)의 ORIGINAL_DOWNLOAD_WINDOW_DAYS /
@@ -12,19 +12,6 @@ import { OriginalUploadWarningBadge } from "@/components/photographer/OriginalUp
 // 서버 전용 모듈이라 여기서 import할 수 없어 값만 맞춰 둔다.
 const ORIGINAL_RETENTION_DAYS = 30;
 const FINAL_DELIVERY_RETENTION_DAYS = 30;
-
-function formatRetentionDeadline(iso: string, days: number): string {
-  try {
-    const shifted = toKstShifted(iso);
-    shifted.setUTCDate(shifted.getUTCDate() + days);
-    const y = shifted.getUTCFullYear();
-    const m = String(shifted.getUTCMonth() + 1).padStart(2, "0");
-    const d = String(shifted.getUTCDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  } catch {
-    return "—";
-  }
-}
 
 type WorkMode =
   | "upload-start"
@@ -231,10 +218,10 @@ export function ProjectWorkPanel({
             })()
           : "—";
         const finalRetentionDisplay = project.deliveredAt
-          ? formatRetentionDeadline(project.deliveredAt, FINAL_DELIVERY_RETENTION_DAYS)
+          ? formatKstDeadlineAfterDays(project.deliveredAt, FINAL_DELIVERY_RETENTION_DAYS)
           : "—";
         const originalRetentionDisplay = project.includeOriginal && project.originalDownloadStartedAt
-          ? formatRetentionDeadline(project.originalDownloadStartedAt, ORIGINAL_RETENTION_DAYS)
+          ? formatKstDeadlineAfterDays(project.originalDownloadStartedAt, ORIGINAL_RETENTION_DAYS)
           : null;
 
         return {

@@ -102,6 +102,7 @@ export function ProjectNexusPageClient() {
   const [editCustomerName, setEditCustomerName] = useState("");
   const [editShootDate, setEditShootDate] = useState("");
   const [editDeadline, setEditDeadline] = useState("");
+  const [editReviewDeadline, setEditReviewDeadline] = useState("");
   const [editRequiredCount, setEditRequiredCount] = useState(0);
   const [editMaxRevisionCount, setEditMaxRevisionCount] = useState<0 | 1 | 2>(2);
   const [editIncludeOriginal, setEditIncludeOriginal] = useState(false);
@@ -166,6 +167,7 @@ export function ProjectNexusPageClient() {
     if (!editName.trim()) fieldErrors.name = "프로젝트명을 입력해주세요.";
     if (!editCustomerName.trim()) fieldErrors.customerName = "고객 이름을 입력해주세요.";
     if (!editShootDate) fieldErrors.shootDate = "촬영 일자를 선택해주세요.";
+    if (project.status === "selecting" && !editDeadline) fieldErrors.deadline = "셀렉 기한을 선택해주세요.";
     if (canEditN && newN < 1) fieldErrors.requiredCount = "셀렉 갯수를 1 이상으로 입력해주세요.";
     if (editCustomerPhone.trim() && !isValidKoreanPhone(editCustomerPhone)) {
       fieldErrors.customerPhone = "연락처는 010-0000-0000 형식으로 입력해주세요.";
@@ -197,7 +199,8 @@ export function ProjectNexusPageClient() {
           name: editName,
           customer_name: editCustomerName,
           shoot_date: editShootDate,
-          deadline: editDeadline,
+          ...(project.status === "selecting" ? { deadline: editDeadline } : {}),
+          ...(["reviewing_v1", "reviewing_v2"].includes(project.status) ? { review_deadline: editReviewDeadline || null } : {}),
           required_count: newN,
           max_revision_count: editMaxRevisionCount,
           ...(canEditDeliverySetting ? { include_original: editIncludeOriginal } : {}),
@@ -214,7 +217,8 @@ export function ProjectNexusPageClient() {
         name: editName,
         customerName: editCustomerName,
         shootDate: editShootDate,
-        deadline: editDeadline,
+        deadline: project.status === "selecting" ? editDeadline : project.deadline,
+        reviewDeadline: ["reviewing_v1", "reviewing_v2"].includes(project.status) ? editReviewDeadline || null : project.reviewDeadline,
         requiredCount: newN,
         maxRevisionCount: editMaxRevisionCount,
         includeOriginal: canEditDeliverySetting ? editIncludeOriginal : project.includeOriginal,
@@ -318,7 +322,8 @@ export function ProjectNexusPageClient() {
     setEditName(project.name);
     setEditCustomerName(project.customerName);
     setEditShootDate(project.shootDate);
-    setEditDeadline(project.deadline);
+    setEditDeadline(project.deadline.slice(0, 10));
+    setEditReviewDeadline(project.reviewDeadline?.slice(0, 10) ?? "");
     setEditRequiredCount(project.requiredCount);
     setEditMaxRevisionCount(project.maxRevisionCount);
     setEditIncludeOriginal(project.includeOriginal ?? false);
@@ -585,6 +590,42 @@ export function ProjectNexusPageClient() {
                     </ProjectFormField>
                   </div>
 
+                  {project.status === "selecting" || project.status === "reviewing_v1" || project.status === "reviewing_v2" ? (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      {project.status === "selecting" ? (
+                        <div id="edit-field-deadline">
+                          <ProjectFormField error={editFieldErrors.deadline} label="셀렉 기한" required>
+                            <ProjectFormDateInput
+                              value={editDeadline}
+                              onChange={(event) => {
+                                setEditDeadline(event.target.value);
+                                setEditFieldErrors((current) => ({ ...current, deadline: "" }));
+                              }}
+                              onClick={(event) => event.currentTarget.showPicker?.()}
+                              className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(editDeadline), error: Boolean(editFieldErrors.deadline) })}`}
+                            />
+                          </ProjectFormField>
+                        </div>
+                      ) : null}
+
+                      {project.status === "reviewing_v1" || project.status === "reviewing_v2" ? (
+                        <div id="edit-field-reviewDeadline">
+                          <ProjectFormField error={editFieldErrors.reviewDeadline} label="검토 기한">
+                            <ProjectFormDateInput
+                              value={editReviewDeadline}
+                              onChange={(event) => {
+                                setEditReviewDeadline(event.target.value);
+                                setEditFieldErrors((current) => ({ ...current, reviewDeadline: "" }));
+                              }}
+                              onClick={(event) => event.currentTarget.showPicker?.()}
+                              className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(editReviewDeadline), error: Boolean(editFieldErrors.reviewDeadline) })}`}
+                            />
+                          </ProjectFormField>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
                   <ProjectFormToggleRow
                     label="원본 다운로드 허용"
                     description="고객이 셀렉 갤러리에서 원본 사진을 내려받을 수 있도록 허용해요"
@@ -709,6 +750,7 @@ export function ProjectNexusPageClient() {
           <ProjectInformationCard
             project={project}
             shootDisplay={shootDisplay}
+            deadlineDisplay={deadlineDisplay}
             reviewDeadlineDisplay={reviewDeadlineDisplay}
             onEdit={openEdit}
             onDelete={() => {

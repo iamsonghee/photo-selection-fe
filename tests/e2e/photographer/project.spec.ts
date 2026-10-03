@@ -1,7 +1,12 @@
 import { test, expect } from "@playwright/test";
 import { loginAsPhotographer } from "../../helpers/auth";
-import { createFullProject, setupTestProject, deleteTestProject, type TestProject } from "../../helpers/setup";
+import { createEditingProject, createFullProject, setupTestProject, deleteTestProject, setProjectStatus, type TestProject } from "../../helpers/setup";
 import { formatPhotoDisplayFilename } from "../../../src/lib/photo-display-filename";
+import { formatKstDeadlineAfterDays } from "../../../src/lib/kst-date";
+
+test("보관 종료일은 UTC 시각에서 30일 후의 한국 날짜로 표시", () => {
+  expect(formatKstDeadlineAfterDays("2026-09-30T16:00:00Z", 30)).toBe("2026-10-31");
+});
 
 let project: TestProject;
 
@@ -22,6 +27,21 @@ test.afterAll(async ({ browser }) => {
 test.describe("작가 — 프로젝트 관리", () => {
   test.beforeEach(async ({ page }) => {
     await loginAsPhotographer(page);
+  });
+
+  test("프로젝트 정보에서 요청된 셀렉 기한을 PC와 모바일 모두 확인", async ({ page }) => {
+    await page.goto(`/photographer/projects/${project.projectId}`);
+    await expect(page.locator("[data-project-selection-deadline]")).toHaveCount(0);
+
+    const selecting = await createFullProject(page, 2);
+    try {
+      await page.goto(`/photographer/projects/${selecting.projectId}`);
+      await expect(page.locator("[data-project-selection-deadline]:visible")).toHaveText(/\d{4}-\d{2}-\d{2}/);
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(page.locator("[data-project-selection-deadline]:visible")).toHaveText(/\d{4}-\d{2}-\d{2}/);
+    } finally {
+      await deleteTestProject(page, selecting.projectId);
+    }
   });
 
   test("P0: 원본 갤러리 표시 파일명은 원본 stem을 보존하고 확장자만 소문자로 통일", () => {
@@ -499,6 +519,88 @@ test.describe("작가 — 프로젝트 관리", () => {
       await page.getByRole("menuitem", { name: "수정하기" }).click();
       await expect(page.getByLabel("고객 비밀번호", { exact: true })).toBeEnabled();
       await expect(page.getByLabel("고객 비밀번호", { exact: true })).toHaveValue("1357");
+    } finally {
+      await deleteTestProject(page, activeProject.projectId);
+    }
+  });
+
+  test("P7-1: 셀렉 중 기한 변경은 재접속 후에도 유지되고 종료 후에는 거부", async ({ page }) => {
+    const activeProject = await createFullProject(page, 3);
+    try {
+      await page.goto(`/photographer/projects/${activeProject.projectId}`);
+      await page.locator("[data-project-information-card] summary[aria-label='프로젝트 더보기']:visible").click();
+      await page.getByRole("menuitem", { name: "수정하기" }).click();
+
+      await page.locator("#edit-field-deadline input[type='date']").fill("2099-12-01");
+      await expect(page.locator("#edit-field-reviewDeadline")).toHaveCount(0);
+      await page.getByRole("button", { name: "변경사항 저장" }).click();
+      await expect(page.locator("[data-project-selection-deadline]:visible")).toHaveText("2099-12-01");
+      await page.reload();
+      await expect(page.locator("[data-project-selection-deadline]:visible")).toHaveText("2099-12-01");
+      await page.request.get(`/api/c/auto-verify?token=${activeProject.accessToken}&to=/c/${activeProject.accessToken}`);
+      const customerResponse = await page.request.get(`/api/c/photos?token=${activeProject.accessToken}`);
+      expect(customerResponse.ok(), await customerResponse.text()).toBeTruthy();
+      expect((await customerResponse.json()).project.deadline).toBe("2099-12-01");
+      const invalidDate = await page.request.patch(`/api/photographer/projects/${activeProject.projectId}`, {
+        data: { deadline: "2099-02-30" },
+      });
+      expect(invalidDate.status()).toBe(400);
+
+      await setProjectStatus(page, activeProject.projectId, "confirmed");
+      const lateChange = await page.request.patch(`/api/photographer/projects/${activeProject.projectId}`, {
+        data: { deadline: "2099-12-03" },
+      });
+      expect(lateChange.status()).toBe(400);
+      await page.reload();
+      await page.locator("[data-project-information-card] summary[aria-label='프로젝트 더보기']:visible").click();
+      await page.getByRole("menuitem", { name: "수정하기" }).click();
+      await expect(page.locator("#edit-field-deadline")).toHaveCount(0);
+    } finally {
+      await deleteTestProject(page, activeProject.projectId);
+    }
+  });
+
+  test("P7-2: 검토 중 기한이 없어도 추가할 수 있고 종료 후에는 변경 불가", async ({ page }) => {
+    const activeProject = await createEditingProject(page, 1);
+    try {
+      await setProjectStatus(page, activeProject.projectId, "reviewing_v1");
+      await page.goto(`/photographer/projects/${activeProject.projectId}`);
+      await page.locator("[data-project-information-card] summary[aria-label='프로젝트 더보기']:visible").click();
+      await page.getByRole("menuitem", { name: "수정하기" }).click();
+      await expect(page.locator("#edit-field-deadline")).toHaveCount(0);
+      await page.locator("#edit-field-reviewDeadline input[type='date']").fill("2099-12-02");
+      await page.getByRole("button", { name: "변경사항 저장" }).click();
+      await expect(page.locator("[data-project-review-deadline]:visible")).toHaveText("2099-12-02");
+      await page.reload();
+      await expect(page.locator("[data-project-review-deadline]:visible")).toHaveText("2099-12-02");
+      await page.request.get(`/api/c/auto-verify?token=${activeProject.accessToken}&to=/c/${activeProject.accessToken}`);
+      const customerResponse = await page.request.get(`/api/c/photos?token=${activeProject.accessToken}`);
+      expect(customerResponse.ok(), await customerResponse.text()).toBeTruthy();
+      expect((await customerResponse.json()).project.reviewDeadline).toBe("2099-12-02");
+
+      await page.locator("[data-project-information-card] summary[aria-label='프로젝트 더보기']:visible").click();
+      await page.getByRole("menuitem", { name: "수정하기" }).click();
+      await page.locator("#edit-field-reviewDeadline input[type='date']").fill("");
+      await page.getByRole("button", { name: "변경사항 저장" }).click();
+      await expect(page.locator("#edit-field-reviewDeadline")).toHaveCount(0);
+      await expect(page.locator("[data-project-review-deadline]:visible")).toHaveCount(0);
+      await page.reload();
+      const clearedResponse = await page.request.get(`/api/c/photos?token=${activeProject.accessToken}`);
+      expect((await clearedResponse.json()).project.reviewDeadline).toBeNull();
+      const invalidDate = await page.request.patch(`/api/photographer/projects/${activeProject.projectId}`, {
+        data: { review_deadline: "2099-02-30" },
+      });
+      expect(invalidDate.status()).toBe(400);
+
+      await setProjectStatus(page, activeProject.projectId, "delivered");
+      const lateChange = await page.request.patch(`/api/photographer/projects/${activeProject.projectId}`, {
+        data: { review_deadline: "2099-12-03" },
+      });
+      expect(lateChange.status()).toBe(400);
+      await page.reload();
+      await page.locator("[data-project-information-card] summary[aria-label='프로젝트 더보기']:visible").click();
+      await page.getByRole("menuitem", { name: "수정하기" }).click();
+      await expect(page.locator("#edit-field-reviewDeadline")).toHaveCount(0);
     } finally {
       await deleteTestProject(page, activeProject.projectId);
     }
