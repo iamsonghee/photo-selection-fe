@@ -271,19 +271,51 @@
 .tidyError { color: var(--danger) !important; font-weight: 600; }
 
 /* ── 상세 보기 ── */
-.detail { position: fixed; inset: 0; z-index: 200; display: flex; background: #0e1517; color: #fff; }
+.detail { position: fixed; inset: 0; z-index: 200; display: flex; background: rgb(14 21 23 / var(--dismiss, 1)); color: #fff; transition: background-color 220ms ease; }
+/* 아래로 끄는 동안: 배경과 주변(위쪽 줄·띠·패널)이 끈 만큼 옅어진다. */
+.detail[data-dragging] { transition: none; }
+.detail[data-dragging] .detailTop, .detail[data-dragging] .strip, .detail[data-dragging] .panel { opacity: var(--dismiss, 1); }
 .detailStage { position: relative; min-width: 0; flex: 1; display: flex; flex-direction: column; }
-.detailTop { flex: none; display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px; }
+.detailTop { position: relative; flex: none; display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px; }
+.detail:focus { outline: none; }
+/* 크게 보기 버튼은 위쪽 줄 오른쪽 끝(비슷한 사진 칩이 있으면 그 옆). */
+.detailExpand { margin-left: auto; }
+.detailCount ~ .detailExpand { margin-left: 0; }
 .detailTop button { width: 40px; height: 40px; border: 0; border-radius: 10px; background: none; color: #fff; display: grid; place-items: center; cursor: pointer; }
 .detailTop button:hover { background: rgba(255, 255, 255, 0.08); }
-.detailName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; }
-.detailCount { margin-left: auto; color: rgba(255, 255, 255, 0.64); font-size: 12px; white-space: nowrap; }
+.detailName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(255, 255, 255, 0.64); font-size: 13px; font-weight: 500; }
+/* .detailTop button(40px 아이콘 버튼) 모양을 덮는다. */
+.detailTop .detailQuality { width: auto; height: auto; padding: 4px 10px; border-radius: 999px; background: rgba(250, 192, 5, 0.16); color: #ffd25a; display: inline-block; }
+.detailTop .detailQuality:hover { background: rgba(250, 192, 5, 0.26); }
+.detailQuality { flex: none; padding: 4px 10px; border: 0; border-radius: 999px; background: rgba(250, 192, 5, 0.16); color: #ffd25a; font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.qualityTip { position: absolute; top: 52px; left: 16px; right: 16px; z-index: 8; max-width: 420px; margin: 0; padding: 10px 12px; border-radius: 10px; background: rgba(24, 30, 34, 0.96); color: #fff; font-size: 13px; line-height: 1.5; }
+.detailCount { margin-left: auto; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.1); color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .detailImage { position: relative; min-height: 0; flex: 1; display: flex; align-items: center; justify-content: center; padding: 0 64px 16px; }
-.detailImage img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+.detailImage img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; transition: opacity 150ms ease 120ms; }
+/* 다음 사진을 받는 동안: 이전 사진을 흐리게 남겨 둔다(잠깐이면 티 나지 않게 0.12초 뒤부터). PC·모바일 공통. */
+.detailImage[data-loading] img { opacity: 0.55; }
+.detailSpinner { position: absolute; top: 50%; left: 50%; z-index: 6; width: 28px; height: 28px; margin: -14px 0 0 -14px; border: 3px solid rgba(255, 255, 255, 0.25); border-top-color: #fff; border-radius: 50%; animation: detailSpin 800ms linear infinite; opacity: 0; animation-delay: 0s; transition: opacity 150ms ease 300ms; }
+.detailImage[data-loading] .detailSpinner { opacity: 1; }
+@keyframes detailSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .detailSpinner { animation: none; } }
+.detailError { position: absolute; left: 50%; bottom: 24px; z-index: 6; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 999px; background: rgba(0, 0, 0, 0.78); color: #fff; font-size: 13px; white-space: nowrap; }
+.detailError button { padding: 5px 12px; border: 0; border-radius: 999px; background: #fff; color: #0e1517; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.memoRetry { margin-left: 4px; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+/* 크게 보기: 사진만 남긴다(위쪽 줄·띠·패널 숨김, 배경 완전 검정). */
+.detailImage img { cursor: zoom-in; }
+.detail[data-immersive] { background: rgb(0 0 0 / var(--dismiss, 1)); }
+.detail[data-immersive] .detailImage img { cursor: zoom-out; }
+.detail[data-immersive] .detailTop, .detail[data-immersive] .strip, .detail[data-immersive] .panel { display: none; }
+.detail[data-immersive] .detailImage { padding: 0 64px; }
+.immersiveExit { position: absolute; top: 12px; right: 12px; z-index: 7; width: 40px; height: 40px; border: 0; border-radius: 999px; background: rgba(0, 0, 0, 0.45); color: #fff; display: grid; place-items: center; cursor: pointer; }
+.immersiveExit:hover { background: rgba(0, 0, 0, 0.7); }
+.immersivePicked { position: absolute; top: 16px; left: 16px; z-index: 6; width: 26px; height: 26px; border-radius: 7px; background: var(--accent); color: #fff; display: grid; place-items: center; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); pointer-events: none; }
+/* 고른 사진 표시: 위쪽 줄의 주황 칩(갤러리 ✓와 같은 색). */
+.detailPicked { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px 4px 8px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; }
 .detailSceneNotice { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 6; padding: 8px 14px; border-radius: 999px; background: rgba(0, 0, 0, .7); color: #fff; font-size: 13px; white-space: nowrap; pointer-events: none; }
-.quality { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 6px 12px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .strip { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 0 16px 14px; }
-.stripRow { display: flex; align-items: flex-start; gap: 6px; padding: 6px 8px 0 0; overflow-x: auto; scrollbar-width: none; }
+/* 높이 고정: 묶음(테두리·여백·아래 "비슷한 사진 N장")이 있든 없든 같은 높이 — 넘길 때 사진 크기가 들썩이지 않게. 모바일은 아래에서 59px. */
+.stripRow { min-height: 91px; display: flex; align-items: flex-start; justify-content: safe center; gap: 6px; padding: 6px 8px 0 0; overflow-x: auto; scrollbar-width: none; }
 /* 띠 위의 유사컷 묶음: 테두리로 감싸고 아래에 "비슷한 사진 N장". 지금 보는 사진이 든 묶음은 강조색. */
 .stripGroup { flex: none; display: flex; flex-direction: column; gap: 4px; padding: 3px; border: 1.5px solid rgba(255, 255, 255, 0.28); border-radius: 9px; }
 .stripRow > button { margin-top: 4.5px; }
@@ -293,7 +325,7 @@
 .stripRow b { position: absolute; left: 3px; bottom: 3px; padding: 1px 4px; border-radius: 4px; background: rgba(0, 0, 0, 0.66); color: #fff; font-size: 10px; font-weight: 700; line-height: 1.3; } /* 묶음 테두리(1.5px)+안쪽 여백(3px)만큼 내려 썸네일 높이를 맞춘다 */
 .stripGroup > div { display: flex; gap: 4px; }
 .stripGroup > span { color: rgba(255, 255, 255, 0.64); font-size: 11px; font-weight: 600; text-align: center; white-space: nowrap; }
-.stripGroup[data-current="true"] { border-color: var(--accent); }
+.stripGroup[data-current="true"] { border-color: rgba(255, 255, 255, 0.72); }
 .stripGroup[data-current="true"] > span { color: #fff; }
 .stripRow button { position: relative; flex: none; width: 56px; height: 56px; padding: 0; border: 2px solid transparent; border-radius: 6px; overflow: hidden; background: rgba(255, 255, 255, 0.08); cursor: pointer; }
 .stripRow button[aria-current="true"] { border-color: #fff; }
@@ -305,18 +337,31 @@
 .liker { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px; background: var(--surface-raised); font-size: 12px; font-weight: 600; }
 .liker i { width: 8px; height: 8px; border-radius: 50%; }
 .noLikes { color: var(--subtle-foreground); font-size: 12px; }
-.memo { width: 100%; min-height: 96px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--foreground); font: inherit; font-size: 14px; line-height: 1.5; resize: vertical; outline: none; }
+.memo { width: 100%; min-height: 72px; field-sizing: content; max-height: 240px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--foreground); font: inherit; font-size: 14px; line-height: 1.5; resize: none; outline: none; }
 .memo:focus { border-color: var(--accent); }
+.memo:focus-visible { outline: none; }
 .memoStatus { margin-top: 4px; color: var(--subtle-foreground); font-size: 11px; }
 .memoStatus.error { color: var(--danger); }
-.panelActions { margin-top: auto; display: grid; grid-template-columns: auto 1fr; gap: 8px; }
+/* 좁은 PC(768~1099px): 패널·사진 여백을 줄여 사진 폭을 지킨다(768px에서 사진 가로 약 280px → 약 410px). */
+@media (min-width: 768px) and (max-width: 1099px) {
+  .panel { width: 280px; padding: 16px; }
+  .detailImage { padding: 0 40px 16px; }
+}
+/* PC: 버튼을 패널 맨 위에(사진 가까이), 메모·찜한 사람은 그 아래. 모바일은 아래 바에 둔다. */
+.panelActions { order: -1; display: grid; grid-template-columns: auto 1fr; gap: 8px; }
+.pickButton { border-color: var(--accent) !important; color: var(--accent) !important; }
+.shortcutHint { margin-top: auto; }
 .panelActions.single { grid-template-columns: 1fr; }
 .likeButton[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .memoHead { display: flex; align-items: center; justify-content: space-between; }
 .memoDone { margin: 0 0 6px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .memoButton { position: relative; }
-.memoButton i { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
-.likerDots { display: inline-flex; margin-left: 2px; }
+/* 메모가 있으면 버튼을 옅은 남색으로 채워 둔다(작은 점 대신). */
+.memoButton[data-has-memo] { border-color: var(--foreground) !important; background: color-mix(in srgb, var(--foreground) 8%, var(--surface)) !important; }
+.likerDots { display: inline-flex; margin-right: 6px; }
+.likerLine { margin: 0; display: flex; align-items: center; color: var(--muted-foreground); font-size: 12px; font-weight: 600; }
+.pickOff { display: none; }
+@media (hover: hover) { button:hover > .pickOn { display: none; } button:hover > .pickOff { display: inline; } }
 .likerDots i { width: 8px; height: 8px; margin-left: -2px; border: 1.5px solid var(--surface); border-radius: 50%; box-sizing: content-box; }
 .shortcutHint { color: var(--subtle-foreground); font-size: 11px; text-align: center; }
 
@@ -350,11 +395,27 @@
   .detail { flex-direction: column; }
   .detailStage { min-height: 0; flex: 1; }
   .detailImage { padding: 0 0 8px; }
+  /* 모바일 띠: 작게(44px), 높이가 늘 같도록 묶음 아래 "비슷한 사진 N장" 글자는 숨긴다(테두리로 충분, 위쪽 칩에 N/3). */
+  .strip { padding: 0 8px 8px; }
+  .stripRow { min-height: 59px; } /* 묶음 테두리(1.5px)+여백(3px)까지 담는 높이로 고정 — 묶음이 있든 없든 같은 높이 */
+  .stripRow button { width: 44px; height: 44px; }
+  .stripGroup > span { display: none; }
+  .detail[data-immersive] .detailImage { padding: 0; }
+  .immersivePicked { top: calc(12px + env(safe-area-inset-top)); left: 12px; }
+  .immersiveExit { top: calc(8px + env(safe-area-inset-top)); right: 8px; }
+  /* 좁은 폭: 칩(선택됨·흐림·비슷한 사진)이 있으면 파일명은 숨긴다. */
+  .detailTop:has(.detailPicked, .detailQuality, .detailCount) .detailName { display: none; }
+  /* 44px 칸이라 접힌 묶음은 겹친 그림자 없이 묶음 수만, ✓·숫자도 작게. */
+  .stripRow button[data-stack] { margin-right: 0; box-shadow: none; }
+  .stripRow i { right: 2px; top: 2px; width: 13px; height: 13px; border-radius: 3px; }
+  .stripRow i svg { width: 9px; height: 9px; }
+  .stripRow b { left: 2px; bottom: 2px; padding: 0 3px; font-size: 9px; }
+  .stripRow em { left: 2px; top: 2px; width: 13px; height: 13px; font-size: 9px; }
   .detailNav { display: none !important; }
   /* 모바일 상세: 사진이 화면을 채우고, 아래는 [메모][찜][최종 선택] 한 줄만. 메모는 눌렀을 때만 위에 펼친다. */
   .panel { width: 100%; flex: none; gap: 10px; border-radius: 16px 16px 0 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
   .memo { min-height: 72px; }
-  .panelActions { display: flex; }
+  .panelActions { order: 0; display: flex; }
   .panelActions > :last-child { flex: 1; }
   .shortcutHint { display: none; }
 }

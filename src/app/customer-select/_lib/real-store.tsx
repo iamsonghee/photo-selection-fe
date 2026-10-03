@@ -126,6 +126,9 @@ interface StoreValue {
   resumeParticipant: (color: ColorTag) => void;
   refresh: () => Promise<ProjectView | undefined>;
   commentSaveStates: Record<string, CommentSaveStatus>;
+  /** 저장하지 못한 메모(사진 id → 입력한 글). 화면을 닫아도 남아 `retryFailedComments`로 다시 저장한다. */
+  failedComments: Record<string, string>;
+  retryFailedComments: () => void;
   saveError: string | null;
   clearSaveError: () => void;
 }
@@ -161,6 +164,7 @@ export function CustomerSelectStoreProvider({
 
   const [saveError, setSaveError] = useState<string | null>(null);
   const [commentSaveStates, setCommentSaveStates] = useState<Record<string, CommentSaveStatus>>({});
+  const [failedComments, setFailedComments] = useState<Record<string, string>>({});
   const commentWriteVersionsRef = useRef<Record<string, number>>({});
   const commentSavedTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -427,11 +431,20 @@ export function CustomerSelectStoreProvider({
           photoStates: { ...prev.photoStates, [photoId]: { ...prev.photoStates[photoId], comment: prevComment } },
         }));
       }).then((saved) => {
-        if (commentWriteVersionsRef.current[photoId] === version) setCommentSaveStatus(photoId, saved ? "saved" : "error");
+        if (commentWriteVersionsRef.current[photoId] !== version) return;
+        setCommentSaveStatus(photoId, saved ? "saved" : "error");
+        // 실패한 글은 버리지 않고 보관한다(화면의 메모는 서버 값으로 되돌아가도 다시 저장할 수 있게).
+        setFailedComments((current) => {
+          if (saved) { if (!(photoId in current)) return current; const next = { ...current }; delete next[photoId]; return next; }
+          return { ...current, [photoId]: text };
+        });
       });
     },
     [apiPost, project.photoStates, setCommentSaveStatus]
   );
+  const retryFailedComments = useCallback(() => {
+    Object.entries(failedComments).forEach(([photoId, text]) => setComment(photoId, text));
+  }, [failedComments, setComment]);
 
   const toggleDone = useCallback(
     (identity: ColorTag) => {
@@ -500,9 +513,9 @@ export function CustomerSelectStoreProvider({
   const value = useMemo<StoreValue>(
     () => ({
       project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, setViewingPhoto, toggleSelect, toggleLike,
-      setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, commentSaveStates, saveError, clearSaveError,
+      setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, commentSaveStates, failedComments, retryFailedComments, saveError, clearSaveError,
     }),
-    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, setViewingPhoto, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, commentSaveStates, saveError, clearSaveError]
+    [project, hydrated, isOwner, currentIdentity, participantReady, accessDenied, shareUrl, syncStatus, syncNow, setViewingPhoto, toggleSelect, toggleLike, setStar, setComment, toggleDone, setNickname, joinParticipant, resumeParticipant, refresh, commentSaveStates, failedComments, retryFailedComments, saveError, clearSaveError]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

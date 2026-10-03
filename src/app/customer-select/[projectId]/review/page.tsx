@@ -34,7 +34,8 @@ function SendScreen() {
   const projectId = useParams().projectId as string;
   const router = useRouter();
   const store = useCustomerSelectStore();
-  const { project, hydrated, isOwner, currentIdentity: me, syncStatus } = store;
+  const { project, hydrated, isOwner, currentIdentity: me, syncStatus, failedComments, retryFailedComments } = store;
+  const failedMemoCount = Object.keys(failedComments).length;
   const [linkState, setLinkState] = useState<"idle" | "loading" | "copied" | "shared" | "fail">("idle");
   const [listCopied, setListCopied] = useState(false);
   // 상세를 연 동안에는 목록을 고정한다 — 상세에서 선택을 빼도 앞뒤 이동이 흔들리지 않게.
@@ -164,6 +165,8 @@ function SendScreen() {
               <p>링크를 받은 작가님은 로그인 없이 사진·파일명·메모를 보고 파일명 목록을 받을 수 있어요. 나중에 다시 골라도 같은 링크에 최신 선택이 보여요.</p>
             </div>
             {syncStatus !== "connected" && <p className={s.syncWarn} role="status">최신 선택을 확인하는 중이에요. 연결되면 보낼 수 있어요.</p>}
+            {/* 저장 못 한 메모가 있으면 보내기 전에 알린다 — 작가에게 메모가 빠진 채 가지 않게. */}
+            {failedMemoCount > 0 && <p className={s.syncWarn} role="alert">메모 {failedMemoCount}개를 저장하지 못했어요. <button type="button" className="font-bold underline" onClick={retryFailedComments}>다시 저장</button></p>}
             <div className={s.sendActions}>
               <PhotographerLightButton size="confirmation" disabled={!canSend} onClick={() => void sendLink("share")}>
                 <Send size={18} />{linkState === "loading" ? "링크 만드는 중…" : linkState === "shared" ? "보냈어요" : linkState === "copied" ? "링크를 복사했어요" : linkState === "fail" ? "다시 시도하기" : "결과 링크 보내기"}
@@ -226,13 +229,12 @@ function SendScreen() {
           people={people}
           selectedIds={selectedIds}
           likesOf={(id) => project.photoStates[id]?.color ?? []}
-          commentOf={(id) => project.photoStates[id]?.comment ?? ""}
+          commentOf={(id) => failedComments[id] ?? project.photoStates[id]?.comment ?? ""}
           similarOf={(photo) => photo.similarityGroupId ? project.photos.filter((member) => member.similarityGroupId === photo.similarityGroupId) : []}
           commentSaveStates={store.commentSaveStates}
           onToggleSelect={store.toggleSelect}
           onToggleLike={(id) => store.toggleLike(id, me)}
           onSaveComment={store.setComment}
-          selectedCount={selectedIds.size}
         />
       )}
     </CustomerSelectShell>

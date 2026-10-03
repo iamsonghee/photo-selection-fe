@@ -317,21 +317,28 @@ test("detail moves by gallery stops and browses a folded group with up/down and 
   // 첫 장면 30장 중 유사컷 4묶음(각 3장)이 접혀 22칸. p8~p10은 표지(p8) 한 칸이다.
   await expect(page.locator('.gl-photo-card[data-photo-id="p9"]')).toHaveCount(0);
   await page.locator('.gl-photo-card[data-photo-id="p7"]').click();
+  // 위치 숫자(6 / 22)는 두지 않는다 — 넘김 순서는 사진 이름으로, 묶음 안 위치는 `비슷한 사진 N/3`으로 확인한다.
   const count = page.locator('[class*="detailCount"]');
-  await expect(count).toContainText("6 / 22");
+  await expect(page.getByRole("dialog", { name: "S_7.jpg 상세 보기" })).toBeVisible();
+  await expect(count).toHaveCount(0);
 
   // ‹ › 는 묶음을 한 칸으로 지나고, 묶음 안에서는 ↑↓ 로 넘긴다. 눈 감음 의심(p9)은 묶음 맨 뒤.
+  const stageHeight = () => page.locator('[class*="detailImage"]').evaluate((element) => Math.round(element.getBoundingClientRect().height));
+  const singleHeight = await stageHeight();
   await page.keyboard.press("ArrowRight");
-  await expect(count).toContainText("7 / 22 · 비슷한 사진 1/3");
+  await expect(page.getByRole("dialog", { name: "S_8.jpg 상세 보기" })).toBeVisible();
+  await expect(count).toHaveText("비슷한 사진 1/3");
+  // 띠에 묶음(테두리·"비슷한 사진 N장")이 나와도 띠 높이가 같아 사진 크기가 들썩이지 않는다.
+  expect(await stageHeight()).toBe(singleHeight);
   await page.keyboard.press("ArrowDown");
-  await expect(count).toContainText("7 / 22 · 비슷한 사진 2/3");
+  await expect(count).toHaveText("비슷한 사진 2/3");
   await expect(page.getByRole("dialog", { name: "S_10.jpg 상세 보기" })).toBeVisible();
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("dialog", { name: "S_9.jpg 상세 보기" })).toBeVisible();
   await expect(page.locator('[class*="stripRow"]').getByRole("button", { name: "S_9.jpg 보기" }).getByLabel("눈 감음 의심")).toBeVisible();
   await page.keyboard.press("ArrowRight");
-  await expect(count).toContainText("8 / 22");
-  await expect(count).not.toContainText("비슷한 사진");
+  await expect(page.getByRole("dialog", { name: "S_11.jpg 상세 보기" })).toBeVisible();
+  await expect(count).toHaveCount(0);
 
   // 띠도 같은 칸 순서: 다른 묶음은 겹친 썸네일 한 칸, 누르면 그 묶음의 표지부터 본다.
   const strip = page.locator('[class*="stripRow"]');
@@ -339,10 +346,11 @@ test("detail moves by gallery stops and browses a folded group with up/down and 
   await expect(strip.getByRole("button", { name: "S_8.jpg 외 비슷한 사진 2장 보기" })).toBeVisible();
   // p16~p18 묶음은 흔들림 의심(p16)이 맨 뒤라 표지가 p17이다.
   await strip.getByRole("button", { name: "S_17.jpg 외 비슷한 사진 2장 보기" }).click();
-  await expect(count).toContainText("13 / 22 · 비슷한 사진 1/3");
+  await expect(page.getByRole("dialog", { name: "S_17.jpg 상세 보기" })).toBeVisible();
+  await expect(count).toHaveText("비슷한 사진 1/3");
   await expect(strip.locator('[class*="stripGroup"]').filter({ hasText: "비슷한 사진 3장" })).toHaveCount(1);
   await strip.getByRole("button", { name: "S_16.jpg 보기" }).click();
-  await expect(count).toContainText("13 / 22 · 비슷한 사진 3/3");
+  await expect(count).toHaveText("비슷한 사진 3/3");
   await context.close();
 });
 
@@ -552,8 +560,11 @@ test("a single similar-cut group can be expanded from its badge", async ({ brows
   await expect(page.locator('.gl-photo-card[data-photo-id="p9"]')).toHaveClass(/gl-selected/);
   await page.locator('.gl-photo-card[data-photo-id="p9"]').click();
   // 펼친 묶음도 의심 사진(p9, 눈 감음)을 맨 뒤에 둔다: p8, p10, p9 → p9는 9번째.
-  await expect(page.locator('[class*="detailCount"]')).toContainText("9 / 24");
-  await expect(page.locator('[class*="detailCount"]')).not.toContainText("비슷한 사진");
+  await expect(page.getByRole("dialog", { name: "S_9.jpg 상세 보기" })).toBeVisible();
+  await expect(page.locator('[class*="detailCount"]')).toHaveCount(0);
+  // 순서 p8, p10, p9 — p9에서 ‹ 이면 p10.
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByRole("dialog", { name: "S_10.jpg 상세 보기" })).toBeVisible();
   await page.keyboard.press("Escape");
   // 접기
   await page.locator('.gl-photo-card[data-photo-id="p8"]').getByRole("button", { name: "유사컷 3장 접기" }).click();
@@ -736,5 +747,84 @@ test("a step that fails to start is named, and runs that finish before the first
   await expect(page.getByRole("dialog", { name: "AI로 사진 정리" }).getByRole("alert")).toContainText("흔들림·눈 감음 확인을(를) 시작하지 못했어요. 나머지는 진행 중이에요.");
   const readsAfterStart = projectReads;
   await expect.poll(() => projectReads).toBeGreaterThan(readsAfterStart);
+  await context.close();
+});
+
+test("detail: clicking the photo shows it alone, and it stays while moving; Esc comes back first", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.locator('.gl-photo-card[data-photo-id="p7"]').click();
+  const dialog = page.getByRole("dialog", { name: /상세 보기/ });
+  await expect(dialog.getByRole("button", { name: "최종 선택" })).toBeVisible();
+  // 사진을 누르면 위쪽 줄·띠·패널이 숨고 사진만 남는다.
+  await dialog.locator('[class*="detailImage"] img').click();
+  await expect(dialog).toHaveAttribute("data-immersive", "true");
+  await expect(dialog.getByRole("button", { name: "최종 선택" })).toBeHidden();
+  await expect(page.locator('[class*="stripRow"]')).toBeHidden();
+  // 넘겨도 크게 보기는 유지된다.
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("dialog", { name: "S_8.jpg 상세 보기" })).toHaveAttribute("data-immersive", "true");
+  // Esc는 먼저 크게 보기만 끄고, 한 번 더 누르면 닫힌다.
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toHaveAttribute("data-immersive", "true");
+  await expect(dialog.getByRole("button", { name: /최종 선택|선택됨/ })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await context.close();
+});
+
+test("mobile: swiping goes through the similar photos first, then to the next stop (and back into a group from its last photo)", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  await context.addInitScript(() => { try { localStorage.setItem("ps:self-select-swipe-hint", "1"); } catch {} });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.locator('.gl-photo-card[data-photo-id="p8"] .gl-card-media').click();
+  await expect(page.getByRole("dialog", { name: "S_8.jpg 상세 보기" })).toBeVisible();
+  const cdp = await context.newCDPSession(page);
+  const swipe = async (fromX: number, toX: number) => {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: fromX, y: 400 }] });
+    for (let i = 1; i <= 6; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: fromX + ((toX - fromX) * i) / 6, y: 400 }] });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  };
+  const count = page.locator('[class*="detailCount"]');
+  // 묶음(p8, p10, p9) 안에서 먼저 넘어간다.
+  await swipe(320, 80);
+  await expect(page.getByRole("dialog", { name: "S_10.jpg 상세 보기" })).toBeVisible();
+  await expect(count).toHaveText("비슷한 사진 2/3");
+  await swipe(320, 80);
+  await expect(page.getByRole("dialog", { name: "S_9.jpg 상세 보기" })).toBeVisible();
+  // 묶음 마지막에서 밀면 다음 칸(p11)으로.
+  await swipe(320, 80);
+  await expect(page.getByRole("dialog", { name: "S_11.jpg 상세 보기" })).toBeVisible();
+  // 거꾸로 밀면 묶음의 마지막 사진(p9)부터 들어간다.
+  await swipe(80, 320);
+  await expect(page.getByRole("dialog", { name: "S_9.jpg 상세 보기" })).toBeVisible();
+  await context.close();
+});
+
+test("detail keeps keyboard focus inside, and the photo-only view always has a way back", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await loginAsPhotographer(page);
+  await mock(page);
+  await page.goto(`/customer-select/${PROJECT_ID}/select?mockAnalysis=ready&scene=0`);
+  await page.locator('.gl-photo-card[data-photo-id="p7"]').click();
+  const dialog = page.getByRole("dialog", { name: /상세 보기/ });
+  await expect(dialog).toBeFocused();
+  // Tab을 여러 번 눌러도 상세 밖(뒤 갤러리)으로 빠지지 않는다.
+  for (let i = 0; i < 25; i++) {
+    await page.keyboard.press("Tab");
+    expect(await page.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]')))).toBe(true);
+  }
+  // 크게 보기는 버튼으로도 켜고, 켠 뒤에도 돌아가는 버튼이 남는다.
+  await dialog.getByRole("button", { name: "크게 보기", exact: true }).click();
+  await expect(dialog).toHaveAttribute("data-immersive", "true");
+  await dialog.getByRole("button", { name: "크게 보기 끄기" }).click();
+  await expect(dialog).not.toHaveAttribute("data-immersive", "true");
   await context.close();
 });

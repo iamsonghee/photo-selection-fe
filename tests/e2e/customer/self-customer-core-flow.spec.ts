@@ -80,13 +80,18 @@ async function inspect(page: Page, selectedCount: number, viewport: string) {
   const viewer = page.getByRole("dialog", { name: /상세 보기/ });
   await expect(viewer).toBeVisible();
   const viewerTexts = await viewer.innerText();
-  expect(viewerTexts).toContain(`지금까지 ${selectedCount}장 골랐어요`);
+  // 고른 사진(p1)은 상세 위쪽에 `선택됨` 칩, 버튼도 `선택됨`(위치·장수 숫자는 두지 않는다).
+  expect(viewerTexts).toContain("선택됨");
   expect(viewerTexts).not.toContain("장 남음");
   // 모바일 상세는 사진 위주 — 메모는 메모 버튼으로 펼친다(dispatchEvent: dev 서버의 Next.js 이슈 배지가 왼쪽 아래를 덮는다).
   if (viewport === "mobile") await viewer.getByRole("button", { name: /^메모 (보기|쓰기)$/ }).dispatchEvent("click");
   const memo = page.getByRole("textbox", { name: "작가 전달 메모" });
   await memo.fill("자동 저장 확인");
   await expect(page.locator('[role="status"]:visible', { hasText: "저장됨" })).toBeVisible();
+  // 메모 입력 중 Esc는 입력창에서만 빠지고(상세는 그대로), 한 번 더 누르면 닫힌다.
+  await page.keyboard.press("Escape");
+  await expect(viewer).toHaveCount(1);
+  await expect(memo).not.toBeFocused();
   await page.keyboard.press("Escape");
   await expect(viewer).toHaveCount(0);
   const viewerReviewBox = await confirm.boundingBox();

@@ -56,7 +56,8 @@ function SelectScreen() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const store = useCustomerSelectStore();
-  const { project, hydrated, isOwner, currentIdentity: me, participantReady, accessDenied, syncStatus, saveError, clearSaveError } = store;
+  const { project, hydrated, isOwner, currentIdentity: me, participantReady, accessDenied, syncStatus, saveError, clearSaveError, failedComments, retryFailedComments } = store;
+  const failedMemoCount = Object.keys(failedComments).length;
   // 초대 링크(`?invite=1`, 미들웨어가 붙임)로 들어오면 참여한 적이 있어도 초대 화면을 먼저 보여준다(작가 고객 초대와 같은 흐름).
   const [inviteSeen, setInviteSeen] = useState(false);
   useEffect(() => {
@@ -519,7 +520,9 @@ function SelectScreen() {
       <div className={s.page} data-chat={withChat ? "" : undefined} data-chrome-hidden={chromeHidden && !menu ? "" : undefined}>
 
         {syncStatus === "offline" && <div role="status" className="border-b border-danger/20 bg-danger/8 px-5 py-2 text-center text-xs font-semibold text-danger">연결이 불안정해요. 다시 연결하고 있어요.</div>}
-        {saveError && <div role="alert" className="flex items-center gap-2 border-b border-danger/20 bg-danger/8 px-5 py-2 text-xs font-semibold text-danger"><span className="flex-1">{saveError}</span><button type="button" onClick={clearSaveError}>닫기</button></div>}
+        {/* 저장하지 못한 메모는 상세를 닫아도 여기 남고, 다시 저장할 수 있다(글은 버리지 않는다). */}
+        {failedMemoCount > 0 && <div role="alert" className="flex items-center gap-2 border-b border-danger/20 bg-danger/8 px-5 py-2 text-xs font-semibold text-danger"><span className="flex-1">메모 {failedMemoCount}개를 저장하지 못했어요. 쓴 내용은 남아 있어요.</span><button type="button" className="underline" onClick={retryFailedComments}>다시 저장</button></div>}
+        {saveError && failedMemoCount === 0 && <div role="alert" className="flex items-center gap-2 border-b border-danger/20 bg-danger/8 px-5 py-2 text-xs font-semibold text-danger"><span className="flex-1">{saveError}</span><button type="button" onClick={clearSaveError}>닫기</button></div>}
 
         <div className={s.body}>
           {/* PC 장면 사이드바: 장면 목차(지금 장면·장면별 고른 수)와 대화. 접으면 작은 퀵메뉴가 대신한다. */}
@@ -683,13 +686,12 @@ function SelectScreen() {
           people={people}
           selectedIds={selectedIds}
           likesOf={likesOf}
-          commentOf={(photoId) => project.photoStates[photoId]?.comment ?? ""}
+          commentOf={(photoId) => failedComments[photoId] ?? project.photoStates[photoId]?.comment ?? ""}
           similarOf={similarOf}
           commentSaveStates={store.commentSaveStates}
           onToggleSelect={store.toggleSelect}
           onToggleLike={(photoId) => store.toggleLike(photoId, me)}
           onSaveComment={store.setComment}
-          selectedCount={selectedIds.size}
         />
       )}
     </CustomerSelectShell>
