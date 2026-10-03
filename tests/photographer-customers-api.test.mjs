@@ -63,6 +63,7 @@ function load(file) {
   const module = { exports: {} };
   const code = ts.transpileModule(fs.readFileSync(file,"utf8"), { compilerOptions:{ module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022 } }).outputText;
   const mocks = {
+    "server-only": {},
     "next/server": { NextResponse: { json: (body, init = {}) => ({ status:init.status ?? 200, body }) } },
     "@/lib/photographer-session-auth": { getPhotographerIdFromSession: async () => sessionOwner },
     "@/lib/supabase-admin": { getAdminClient: () => admin },

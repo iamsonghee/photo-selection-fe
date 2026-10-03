@@ -18,9 +18,10 @@ test("고객 탭과 브라우저 복귀는 캐시 재사용, 만료 갱신은 �
     const id = route.request().url().split("/").at(-1)!;
     detailCalls.set(id,(detailCalls.get(id)??0)+1);
     if (hold) { pending.push(route); return; }
-    await route.fulfill({json:{customer:{...customers.find(customer=>customer.id===id),note:"저장된 메모",updatedAt:"2026-10-01T00:00:00Z",projects:[]}}});
+    await route.fulfill({json:{customer:{...(customers.find(customer=>customer.id===id) ?? {id,name:"기존 고객"}),note:"저장된 메모",updatedAt:"2026-10-01T00:00:00Z",projects:[]}}});
   });
   await page.goto("/photographer/customers");
+  await page.getByRole("searchbox").fill("캐시검증");
   const detail = page.getByRole("article", { name:"고객 상세" });
   await expect(detail.getByRole("heading",{name:"김지민",exact:true})).toBeVisible();
   await page.evaluate(() => { for(let i=0;i<4;i++) window.dispatchEvent(new Event("focus")); });
@@ -42,6 +43,15 @@ test("고객 탭과 브라우저 복귀는 캐시 재사용, 만료 갱신은 �
   await page.waitForTimeout(350);
   expect(listCalls).toBe(2);
 
+  // Layout cache survives a real route change and return via browser history.
+  await page.getByRole("link", { name: "프로젝트", exact: true }).first().click();
+  await expect(page).toHaveURL(/photographer\/projects$/);
+  await page.goBack();
+  await page.getByRole("searchbox").fill("캐시검증");
+  await expect(detail.getByRole("heading",{name:"김지민",exact:true})).toBeVisible();
+  expect(detailCalls.get(customers[0].id)).toBe(1);
+  expect(listCalls).toBe(2);
+
   hold = true;
   await page.clock.setFixedTime(new Date(Date.now()+61_000));
   await page.evaluate(()=>window.dispatchEvent(new Event("focus")));
@@ -51,4 +61,12 @@ test("고객 탭과 브라우저 복귀는 캐시 재사용, 만료 갱신은 �
   await expect(page.getByText("고객 정보를 불러오는 중이에요.",{exact:true})).toHaveCount(0);
   for (const route of pending) await route.fulfill(route.request().url().includes("?") ? {json:list} : {json:{customer:{...customers[0],note:"갱신된 메모",updatedAt:"2026-10-03T00:00:00Z",projects:[]}}});
   await expect(detail.getByText("갱신된 메모",{exact:true})).toBeVisible();
+  await page.locator("aside summary").click();
+  await page.getByRole("menuitem", { name: "로그아웃" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("article", { name: "고객 상세" })).toHaveCount(0);
+  const unauthorized = await page.request.get("/photographer/customers");
+  expect(await unauthorized.text()).not.toContain('aria-label="고객 목록"');
+  await page.goto("/photographer/customers");
+  await expect(page).toHaveURL(/\/$/);
 });

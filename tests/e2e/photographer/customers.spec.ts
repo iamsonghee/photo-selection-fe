@@ -23,10 +23,17 @@ test("고객관리 — 실제 저장·프로젝트 연결·PC·모바일", async
     expect(seed.error).toBeNull();
     projectIds.push(seed.data!.id); customerIds.add(seed.data!.customer_id);
     const customerId = seed.data!.customer_id;
+    // Initial customer rows are present before JavaScript runs.
+    const html = await page.request.get("/photographer/customers");
+    expect(html.status()).toBe(200);
+    expect(await html.text()).toContain(unique);
+    let initialListRequests = 0;
+    page.on("request", request => { if (request.url().includes("/api/photographer/customers?")) initialListRequests++; });
     for (const width of [1280, 390]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/photographer/customers");
       const list = page.getByRole("region", { name: "고객 목록", exact: true });
+      if (width === 1280) expect(initialListRequests).toBe(0);
       await page.getByRole("searchbox").fill(unique);
       await list.getByRole("button", { name: new RegExp(unique) }).click();
       const detail = page.getByRole("article", { name: "고객 상세" });
@@ -114,10 +121,11 @@ test("고객관리 — 저장 실패 시 입력 보존, 빈 목록과 재시도"
   let listFails = true;
   await page.route("**/api/photographer/customers?**", route => route.fulfill(listFails ? {status:500,json:{error:"목록 조회 실패"}} : {json:{customers:[],total:0,counts:{all:0,new:0,returning:0}}}));
   await page.goto("/photographer/customers");
+  await page.getByRole("searchbox").fill("빈결과검증");
   await expect(page.getByText("목록 조회 실패", { exact: true })).toBeVisible();
   listFails = false;
   await page.getByRole("button", { name: "다시 시도", exact: true }).click();
-  await expect(page.getByText("아직 등록된 고객이 없어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("조건에 맞는 고객이 없어요", { exact: true })).toBeVisible();
   await page.route(`**/api/photographer/customers/${id}`, route => route.fulfill(route.request().method() === "PATCH" ? {status:500,json:{error:"저장 실패"}} : {json:{customer:{id,name:"오류 검증",phone:null,note:"",updatedAt:"2026-10-03T00:00:00Z",projects:[]}}}));
   await page.goto(`/photographer/customers?customerId=${id}`);
   await page.getByRole("button", { name: "메모 추가", exact: true }).click();

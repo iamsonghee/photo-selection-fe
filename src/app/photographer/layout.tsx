@@ -1,6 +1,7 @@
 import type { Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { PhotographerDesktopShell } from "@/components/layout/PhotographerDesktopShell";
+import { CustomerCacheProvider } from "@/contexts/CustomerCacheContext";
 import { ProfileProvider } from "@/contexts/ProfileContext";
 import { QuotaProvider } from "@/contexts/QuotaContext";
 import { PhotographerModalProvider } from "@/contexts/PhotographerModalContext";
@@ -34,7 +35,7 @@ export default function PhotographerLayout({
   return (
     <ProfileProvider>
       <QuotaProvider>
-        <PhotographerModalProvider>
+        <CustomerCacheProvider><PhotographerModalProvider>
           <div
             className={`photographer-app relative flex min-h-screen bg-background text-foreground ${inter.variable} ${mono.variable}`}
           >
@@ -45,7 +46,7 @@ export default function PhotographerLayout({
             <PhotographerDesktopShell>{children}</PhotographerDesktopShell>
             <BetaSurveyGate />
           </div>
-        </PhotographerModalProvider>
+        </PhotographerModalProvider></CustomerCacheProvider>
       </QuotaProvider>
     </ProfileProvider>
   );
