@@ -3,6 +3,7 @@
 import { CUSTOMER_SHOOT_TYPES } from "@/lib/customer-shoot-scenes";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useCustomerSelectStore } from "./real-store";
 import { ChevronDown } from "lucide-react";
 import { PhotographerLightPageFrame } from "@/components/layout/PhotographerLightPageHeader";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
@@ -38,6 +39,7 @@ type EditableProject = {
 
 export function EditCustomerProjectForm({ project }: { project: EditableProject }) {
   const router = useRouter();
+  const store = useCustomerSelectStore();
   // 프로젝트 화면(상세의 "설정에서 수정", 업로드의 "촬영 종류 바꾸기")에서 왔으면 저장·취소 뒤 그 화면으로 돌아간다.
   const searchParams = useSearchParams();
   const from = searchParams.get("from");
@@ -75,6 +77,8 @@ export function EditCustomerProjectForm({ project }: { project: EditableProject 
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "수정 실패");
+      // 프로젝트 화면들이 쓰는 store는 진입 때 한 번만 읽는다 — 바뀐 촬영 종류(장면 이름 목록)·장수가 돌아간 화면에 보이게 다시 읽는다.
+      await store.refresh();
       router.push(backHref);
       router.refresh();
     } catch (cause) {
