@@ -22,11 +22,7 @@ export function getDesktopNextAction(project: Project): DesktopNextAction {
       href: `${base}/assets/retouched`,
     };
     case "reviewing_v2": return { kind: "waiting" };
-    // Figma #56057 실측: 납품 완료 Row는 다음 작업 칸이 빈 값("–")이 아니라 결과 확인용 버튼을
-    // 보여준다 — 이미 존재하는 results 페이지로 연결. 단, "결과보기"는 "지금 당장 해야 할 작업"이
-    // 아니라 "이미 끝난 프로젝트의 결과를 다시 보는" 열람 액션이라 Primary(Orange Filled)가 아닌
-    // Secondary(Neutral Raised Surface)로 구분한다(CTA Hierarchy 정정).
-    case "delivered":    return { kind: "secondary", label: "결과보기", href: `${base}/results` };
+    // 완료 작업은 최종 납품 사진을 바로 열며 보조 버튼으로 표시한다.
+    case "delivered":    return { kind: "secondary", label: "최종본 보기", href: `${base}/assets/final` };
   }
 }
-
