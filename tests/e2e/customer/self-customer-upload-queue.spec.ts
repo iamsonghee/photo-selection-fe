@@ -8,7 +8,7 @@ test("photos added while uploading are queued and uploaded right after", async (
   const uploads: number[] = [];
   let releaseFirst!: () => void;
   const firstHeld = new Promise<void>((resolve) => { releaseFirst = resolve; });
-  await page.route("**/api/customer-select/upload/photos", async (route) => {
+  await page.route("**/api/customer-upload/photos", async (route) => {
     const files = (route.request().postDataBuffer()?.toString("latin1").match(/name="files"/g) ?? []).length;
     uploads.push(files);
     if (uploads.length === 1) await firstHeld;

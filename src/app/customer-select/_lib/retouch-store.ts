@@ -4,6 +4,7 @@
  * 회차 보정본을 가짐) 별도로 둔다 — Provider 없이 훅 하나로 충분한 범위라 Context는 안 만든다. */
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { CUSTOMER_UPLOAD_API } from "./upload-limit";
 
 export interface RetouchVersion {
   id: string;
@@ -82,13 +83,15 @@ async function authHeaders(): Promise<Record<string, string>> {
 export async function uploadRetouched(
   projectId: string,
   files: File[],
-  photoIds: string[]
+  photoIds: string[],
+  // 압축하면 `이름.jpg`로 바뀐다 — 원래 이름으로 보내야 BE가 돌려주는 실패 목록·저장 파일명이 선택한 파일과 맞는다.
+  filenames: string[]
 ): Promise<{ uploaded: number; rejected: string[] }> {
   const formData = new FormData();
   formData.append("project_id", projectId);
-  files.forEach((f) => formData.append("files", f));
+  files.forEach((f, i) => formData.append("files", f, filenames[i]));
   photoIds.forEach((id) => formData.append("photo_ids", id));
-  const res = await fetch("/api/customer-select/upload/retouched", { method: "POST", headers: await authHeaders(), body: formData });
+  const res = await fetch(`${CUSTOMER_UPLOAD_API}/retouched`, { method: "POST", headers: await authHeaders(), body: formData });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     const detail = data.detail;

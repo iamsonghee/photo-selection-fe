@@ -125,7 +125,7 @@ test("self customer start screens and over-limit selection", async ({ page }, te
 
   // Isolate upload preflight: no photos or participant records are written.
   let uploadRequests = 0;
-  await page.route("**/api/customer-select/upload/photos", async (route) => { uploadRequests++; await route.abort(); });
+  await page.route("**/api/customer-upload/photos", async (route) => { uploadRequests++; await route.abort(); });
   await page.route("**/api/customer-select/usage", async (route) => {
     await route.fulfill({ json: { photoCount: 1999, limit: 2000, remaining: 1 } });
   });

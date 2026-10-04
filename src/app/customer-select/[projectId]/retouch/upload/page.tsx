@@ -11,7 +11,8 @@ import { PhotographerLightButton } from "@/components/photographer/PhotographerL
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { buildVersionMapping, type MappingResult } from "@/lib/version-mapping";
 import { compressImagesInParallel } from "@/lib/upload-client-compress";
-import { UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
+import { UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
+import { CUSTOMER_UPLOAD_MAX_EDGE } from "../../../_lib/upload-limit";
 import { useRetouchData, uploadRetouched, type RetouchPhoto } from "../../../_lib/retouch-store";
 import { RetouchErrorScreen } from "../../../_lib/RetouchErrorScreen";
 import { CustomerSelectShell } from "../../../_lib/CustomerSelectShell";
@@ -66,12 +67,12 @@ export default function RetouchUploadPage() {
           pairs.map((p) => p.file),
           new AbortController().signal,
           3,
-          { maxEdge: UPLOAD_INTERMEDIATE_MAX_EDGE, jpegQuality: UPLOAD_INTERMEDIATE_JPEG_QUALITY }
+          { maxEdge: CUSTOMER_UPLOAD_MAX_EDGE, jpegQuality: UPLOAD_INTERMEDIATE_JPEG_QUALITY }
         );
       } catch {
         compressed = pairs.map((p) => p.file);
       }
-      const result = await uploadRetouched(projectId, compressed, pairs.map((p) => p.photoId));
+      const result = await uploadRetouched(projectId, compressed, pairs.map((p) => p.photoId), pairs.map((p) => p.file.name));
       await refresh();
       if (result.rejected.length || result.uploaded !== pairs.length) {
         const rejected = new Set(result.rejected);

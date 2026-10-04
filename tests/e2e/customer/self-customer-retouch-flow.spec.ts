@@ -32,7 +32,7 @@ for (const viewport of [
     await page.setViewportSize(viewport);
     await mockGet(page, photos([]));
     let uploadCount = 0;
-    await page.route("**/api/customer-select/upload/retouched", async (route) => {
+    await page.route("**/api/customer-upload/retouched", async (route) => {
       uploadCount++;
       await route.fulfill({ json: uploadCount === 1 ? { uploaded: 0, rejected: ["A001-final.jpg"] } : { uploaded: 1, rejected: [] } });
     });

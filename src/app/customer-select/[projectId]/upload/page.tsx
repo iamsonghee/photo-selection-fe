@@ -7,7 +7,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { CUSTOMER_PHOTO_LIMIT as MAX_PHOTOS, uploadLimitError } from "../../_lib/upload-limit";
+import { CUSTOMER_PHOTO_LIMIT as MAX_PHOTOS, CUSTOMER_UPLOAD_API, CUSTOMER_UPLOAD_MAX_EDGE, uploadLimitError } from "../../_lib/upload-limit";
 import { CheckCircle2, SlidersHorizontal, Trash2, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
@@ -20,7 +20,7 @@ import { ProjectAssetMobileIconButton, ProjectAssetMobileSheet, ProjectAssetTool
 import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { compressImagesInParallel } from "@/lib/upload-client-compress";
 import { readTakenAt } from "@/lib/exif-taken-at";
-import { UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
+import { UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
 import { getPhotoDisplayName, matchesFilenameQuery } from "@/lib/gallery-filter";
@@ -253,7 +253,7 @@ export default function CustomerUploadPage() {
           rawBatch,
           controller.signal,
           COMPRESS_POOL_SIZE,
-          { maxEdge: UPLOAD_INTERMEDIATE_MAX_EDGE, jpegQuality: UPLOAD_INTERMEDIATE_JPEG_QUALITY }
+          { maxEdge: CUSTOMER_UPLOAD_MAX_EDGE, jpegQuality: UPLOAD_INTERMEDIATE_JPEG_QUALITY }
         );
       } catch {
         batch = rawBatch; // 압축 실패 시 원본 그대로 업로드(작가 화면과 동일한 폴백 원칙)
@@ -269,7 +269,7 @@ export default function CustomerUploadPage() {
       setUploadPhase("uploading");
       const slowTimer = window.setTimeout(() => setSlowBatch(true), SLOW_BATCH_NOTICE_MS);
       try {
-        const res = await fetch("/api/customer-select/upload/photos", { method: "POST", headers: authHeader, body: formData, signal: controller.signal })
+        const res = await fetch(`${CUSTOMER_UPLOAD_API}/photos`, { method: "POST", headers: authHeader, body: formData, signal: controller.signal })
           .finally(() => { window.clearTimeout(slowTimer); setSlowBatch(false); });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
