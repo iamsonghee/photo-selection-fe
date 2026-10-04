@@ -245,7 +245,7 @@ export function ProjectShootTypeSelector({
             className={`flex min-h-11 min-w-[30%] flex-1 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-lg border px-1 py-2.5 text-[12px] font-medium transition-colors sm:min-h-0 sm:min-w-0 sm:py-3.5 ${
               active
                 ? "border-accent/50 bg-accent/8 text-accent"
-                : "border-border-subtle bg-transparent text-subtle-foreground hover:border-border-strong hover:text-foreground"
+                : "border-border-subtle bg-transparent text-muted-foreground hover:border-border-strong hover:text-foreground"
             }`}
           >
             <Icon size={12} className="shrink-0" />
@@ -307,7 +307,7 @@ export function PhotographerLightSwitch({
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
-      className="relative grid h-11 w-11 md:h-5 md:w-9 shrink-0 place-items-center disabled:cursor-not-allowed"
+      className="relative grid h-11 w-11 md:h-5 md:w-9 shrink-0 place-items-center disabled:cursor-not-allowed disabled:opacity-55"
     >
       <span className={`relative block h-5 w-9 rounded-full border transition-colors ${
         checked ? "border-accent bg-accent" : "border-border-strong bg-surface-raised"
@@ -344,12 +344,13 @@ export function ProjectFormToggleRow({
 }) {
   return (
     <div>
-      <div className={`flex items-center justify-between gap-4 ${disabled ? "opacity-50" : ""}`}>
+      <div className="flex items-center justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-0.5">
           <div className="flex items-center gap-0.5">
             <span className="text-[14px] font-semibold text-muted-foreground">
               {label}<span className="text-accent"> *</span>
             </span>
+            {disabled ? <span className="ml-1 rounded bg-surface-raised px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">변경 불가</span> : null}
             <span className="md:hidden">
               <FieldInfoTip
                 text={description}
@@ -358,7 +359,7 @@ export function ProjectFormToggleRow({
               />
             </span>
           </div>
-          <span className="hidden text-[12px] text-disabled-foreground md:inline">{description}</span>
+          <span className="hidden text-[12px] text-muted-foreground md:inline">{description}</span>
         </div>
         <PhotographerLightSwitch
           checked={checked}
@@ -390,7 +391,7 @@ export function ProjectPinControl({
 
   return (
     <div>
-      <div className={`flex flex-wrap items-center gap-2 md:flex-nowrap md:gap-6 ${disabled ? "opacity-50" : ""}`}>
+      <div className="flex flex-wrap items-center gap-2 md:flex-nowrap md:gap-6">
         <div className="flex min-w-0 basis-full flex-col gap-0.5 md:flex-1 md:basis-auto">
         <span
           data-project-pin-label
@@ -400,13 +401,14 @@ export function ProjectPinControl({
           <span className="hidden md:inline">고객 비밀번호 (PIN)</span>
           <span className="text-accent"> *</span>
         </span>
-        <span className="hidden text-[12px] text-disabled-foreground md:inline">
+        {disabled ? <span className="text-[11px] font-medium text-muted-foreground">변경 불가</span> : null}
+        <span className="hidden text-[12px] text-muted-foreground md:inline">
           고객이 갤러리 링크를 열 때 입력할 4자리 숫자를 설정해 주세요
         </span>
         </div>
         <div
-        className={`flex shrink-0 items-center gap-1.5 rounded-lg border border-border-subtle bg-surface px-2.5 py-2.5 transition-opacity md:gap-2 md:px-4 ${
-          enabled ? "opacity-100" : "opacity-50"
+        className={`flex shrink-0 items-center gap-1.5 rounded-lg border border-border-subtle px-2.5 py-2.5 md:gap-2 md:px-4 ${
+          enabled ? "bg-surface" : "bg-surface-raised"
         }`}
       >
         <input

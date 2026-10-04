@@ -454,7 +454,7 @@ export function ProjectNexusPageClient() {
             void handleSaveEdit();
           }}
         >
-          <PhotographerLightPageFrame className="pb-8">
+          <PhotographerLightPageFrame className={`${styles.editFrame} pb-8`}>
             <div className={styles.editContainer}>
               <ProjectFormPageHeading
                 title="프로젝트 정보 수정"

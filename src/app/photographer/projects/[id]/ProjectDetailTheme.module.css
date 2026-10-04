@@ -9,6 +9,9 @@
 .editPage { width:100%; }
 .editContainer { width:100%; max-width:1100px; margin-inline:auto; }
 .editSections { display:grid; grid-template-columns:minmax(0,1fr); align-items:start; gap:20px; }
+@media(min-width:1280px) and (min-height:850px) {
+  .editPage .editFrame { padding-top:clamp(24px,7vh,88px); }
+}
 @media(min-width:1280px) {
   .editSections { grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:24px; }
 }
