@@ -152,6 +152,7 @@ function SelectScreen() {
   // 정리 중에 들어온 사람은 끝나도 보던 전체 보기를 유지하고, 장면별 보기는 제안만 한다.
   const [holdAll, setHoldAll] = useState(false);
   const [promptDismissed, setPromptDismissed] = useState(false);
+  const [newPhotosDismissed, setNewPhotosDismissed] = useState(false);
   if (analysis.status === "analyzing" && !holdAll) setHoldAll(true);
   const selectedIds = useMemo(() => new Set(project.selectedIds), [project.selectedIds]);
   const likesOf = useCallback((photoId: string) => project.photoStates[photoId]?.color ?? [], [project.photoStates]);
@@ -368,6 +369,21 @@ function SelectScreen() {
       </div>
     </div>
   ) : null;
+  const tidied = analysis.status === "ready" || analysis.status === "fallback";
+  // 정리 뒤에 사진이 더 올라오면 다시 정리를 권한다(보기 옵션 안에만 두면 찾기 어려워서).
+  const newPhotosBanner = !analysisBanner && !backgroundBanner && isOwner && tidied && analysis.newPhotoCount && !newPhotosDismissed ? (
+    <div className={s.analysis} role="status">
+      <Sparkles size={16} aria-hidden />
+      <div>
+        <strong>새 사진 {analysis.newPhotoCount}장이 추가됐어요</strong>
+        <span>AI로 다시 정리하면 새 사진도 장면·유사컷에 들어가요. 고른 사진·찜·메모는 그대로예요.</span>
+      </div>
+      <div className={s.analysisActions}>
+        <PhotographerLightButton size="toolbar" onClick={() => { setAiError(null); setSheet("ai"); }}>AI로 다시 정리</PhotographerLightButton>
+        <PhotographerLightButton variant="outline" size="toolbar" onClick={() => setNewPhotosDismissed(true)}>나중에</PhotographerLightButton>
+      </div>
+    </div>
+  ) : null;
 
   // 장면 정리 실패, 유사컷·흔들림 실패·일부 실패(다시 시도), 뒤에서 진행 중인 작업을 한 줄로.
   const failedNotice = analysis.notice && isOwner
@@ -545,6 +561,7 @@ function SelectScreen() {
           <div className={`${s.main} ${sceneMode ? s.mainWithQuick : ""} ${sceneMode && railCollapsed ? s.mainFloatNav : ""}`}>
             {analysisBanner}
             {backgroundBanner}
+            {newPhotosBanner}
             {!sceneMode && !analysisBanner && (
               <div className={s.sceneHeader}>
                 <strong className={s.allTitle}>전체 사진 <small>촬영 시간순 · {photos.length.toLocaleString()}장</small></strong>
@@ -555,7 +572,7 @@ function SelectScreen() {
             )}
             <div className={s.toolsWrap} ref={toolsRef}>
               <div className={s.toolsAnchor}>
-              <div className={s.tools} style={sceneMode || analysisBanner || backgroundBanner ? { paddingTop: 10 } : undefined}>
+              <div className={s.tools} style={sceneMode || analysisBanner || backgroundBanner || newPhotosBanner ? { paddingTop: 10 } : undefined}>
                 {/* 보기 범위·인물 칩에는 장수를 붙이지 않는다 — 숫자를 해석하게 만들어서(2026-10-02). */}
                 <div className={s.segments} role="group" aria-label="보기 범위">
                   <button type="button" aria-pressed={scope === "all"} aria-label="모두" onClick={() => setScope("all")}>모두</button>
@@ -589,7 +606,7 @@ function SelectScreen() {
                     </button>
                   )}
                   {!hasGroups && !hasQuality && <p className={s.toolsMenuEmpty}>AI로 정리하면 유사컷 묶기·흔들림 빼기를 쓸 수 있어요</p>}
-                  {isOwner && (analysis.status === "ready" || analysis.status === "fallback") && (
+                  {isOwner && tidied && (
                     <button type="button" className={s.retidyRow} onClick={() => { setMenu(null); setAiError(null); setSheet("ai"); }}>
                       <span><strong>AI 다시 정리</strong><small>{analysis.newPhotoCount ? `새로 올린 ${analysis.newPhotoCount}장까지 장면·유사컷을 다시 나눠요` : "장면·유사컷을 다시 나눠요. 고른 사진·찜·메모는 그대로예요"}</small></span>
                       <Sparkles size={15} aria-hidden />
@@ -650,7 +667,7 @@ function SelectScreen() {
       </div>
 
       {sheet === "scenes" && scenes && <Sheet title="장면" onClose={() => setSheet(null)}><div className={s.sheetList}>{sceneItems}</div>{failedNotice}</Sheet>}
-      {sheet === "ai" && <AiTidySheet projectId={projectId} photoCount={photos.length} pending={aiPending} error={aiError} onStart={(kinds) => void startTidy(kinds)} onClose={() => setSheet(null)} />}
+      {sheet === "ai" && <AiTidySheet projectId={projectId} photoCount={photos.length} rerun={tidied} pending={aiPending} error={aiError} onStart={(kinds) => void startTidy(kinds)} onClose={() => setSheet(null)} />}
       {sheet === "invite" && <InviteSheet projectId={projectId} shareToken={project.shareToken} shareEnabled={project.shareEnabled} people={people} online={online} done={project.participantDone} onClose={() => setSheet(null)} />}
 
       {withChat && <EphemeralChat

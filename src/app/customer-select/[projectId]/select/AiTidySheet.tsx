@@ -44,9 +44,11 @@ export const setAsideKey = (projectId: string) => `ps:self-select-set-aside:${pr
  * AI 정리 시작 확인. "할지·언제 할지"는 사용자가 정하고, 시작하기로 한 뒤에만 세부 항목을 보여준다.
  * 대부분은 기본값 그대로 `정리 시작` 한 번이면 된다. 장면 나누기는 이 서비스의 핵심이라 항상 켠다.
  */
-export function AiTidySheet({ projectId, photoCount, pending, error, onStart, onClose }: {
+export function AiTidySheet({ projectId, photoCount, rerun, pending, error, onStart, onClose }: {
   projectId: string;
   photoCount: number;
+  /** 이미 정리한 프로젝트를 다시 정리 — 고른 결과가 초기화될까 걱정하지 않게 유지된다고 밝힌다. */
+  rerun?: boolean;
   pending: boolean;
   error: string | null;
   onStart: (kinds: AiTidyKind[]) => void;
@@ -58,8 +60,9 @@ export function AiTidySheet({ projectId, photoCount, pending, error, onStart, on
   const kinds: AiTidyKind[] = ["scene", ...(similar ? ["similarity" as const] : []), ...(quality ? ["quality" as const] : [])];
 
   return (
-    <Sheet title="AI로 사진 정리" onClose={onClose}>
-      <p>{photoCount.toLocaleString()}장을 정리해요. 사진 수에 따라 몇 분 걸릴 수 있고, 그동안에도 사진을 고를 수 있어요.</p>
+    <Sheet title={rerun ? "AI로 다시 정리" : "AI로 사진 정리"} onClose={onClose}>
+      <p>{photoCount.toLocaleString()}장을 {rerun ? "다시 " : ""}정리해요. 사진 수에 따라 몇 분 걸릴 수 있고, 그동안에도 사진을 고를 수 있어요.</p>
+      {rerun && <p><strong>고른 사진·찜·메모는 그대로예요.</strong> 장면과 유사컷 묶음만 새로 나눠요.</p>}
       <div className={s.tidyOptions}>
         <label className={s.tidyOption}>
           <input type="checkbox" checked disabled />
