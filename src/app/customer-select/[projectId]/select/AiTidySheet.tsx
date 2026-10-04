@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { customerSceneCatalog, customerSceneGapSeconds } from "@/lib/customer-shoot-scenes";
+import { MIN_PHOTOS_FOR_SCENES } from "@/lib/customer-scenes";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { Sheet } from "./Sheets";
 import s from "./select.module.css";
@@ -57,6 +58,9 @@ export function AiTidySheet({ projectId, photoCount, rerun, pending, error, onSt
   const [similar, setSimilar] = useState(true);
   const [quality, setQuality] = useState(true);
   // 끈 항목은 실행하지 않는다(유사컷을 끄면 전체 사진 임베딩도 하지 않음).
+  // 사진이 적으면 장면을 나누지 않는다(골라낸 사진만 올리면 시간 간격으로 장소 경계를 못 찾음). 장면 실행은 그대로 보내
+  // 정리 상태 흐름을 바꾸지 않는다 — clip-service가 장면 없이 바로 끝내고 Gemini도 부르지 않는다.
+  const fewPhotos = photoCount < MIN_PHOTOS_FOR_SCENES;
   const kinds: AiTidyKind[] = ["scene", ...(similar ? ["similarity" as const] : []), ...(quality ? ["quality" as const] : [])];
 
   return (
@@ -65,9 +69,9 @@ export function AiTidySheet({ projectId, photoCount, rerun, pending, error, onSt
       {rerun && <p><strong>고른 사진·찜·메모는 그대로예요.</strong> 장면과 유사컷 묶음만 새로 나눠요.</p>}
       <div className={s.tidyOptions}>
         <label className={s.tidyOption}>
-          <input type="checkbox" checked disabled />
-          <span><strong>장면별로 나누기</strong><small>촬영 시간 간격으로 나누고 장면 이름을 추천해요</small></span>
-          <em>기본</em>
+          <input type="checkbox" checked={!fewPhotos} disabled />
+          <span><strong>장면별로 나누기</strong><small>{fewPhotos ? `사진이 ${MIN_PHOTOS_FOR_SCENES}장 이상일 때 장면으로 나눠요` : "촬영 시간 간격으로 나누고 장면 이름을 추천해요"}</small></span>
+          {!fewPhotos && <em>기본</em>}
         </label>
         <label className={s.tidyOption}>
           <input type="checkbox" checked={similar} onChange={(event) => setSimilar(event.target.checked)} />

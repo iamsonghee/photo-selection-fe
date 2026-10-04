@@ -9,15 +9,16 @@ let order = 0;
 const burst = (h, m, count) => Array.from({ length: count }, (_, i) => ({ id: `p${order}`, orderIndex: order++, takenAt: at(h, m, i % 60) }));
 
 // 세 구간(11:00, 12:00, 13:30)이 30분 이상 떨어져 있으면 장면 3개.
-const photos = [...burst(11, 0, 30), ...burst(12, 0, 40), ...burst(13, 30, 20)];
+// 장면은 사진 100장 이상일 때만 나눈다(MIN_PHOTOS_FOR_SCENES).
+const photos = [...burst(11, 0, 35), ...burst(12, 0, 45), ...burst(13, 30, 25)];
 const scenes = splitScenes(photos);
 assert.equal(scenes.length, 3);
-assert.deepEqual(scenes.map((scene) => scene.photoIds.length), [30, 40, 20]);
+assert.deepEqual(scenes.map((scene) => scene.photoIds.length), [35, 45, 25]);
 assert.equal(formatSceneRange(scenes[0]), "오전 11:00");
 assert.equal(formatSceneRange(scenes[2]), "오후 1:30");
 
 // 업로드 순서가 섞여도 촬영 시각 순서로 장면을 만든다.
-assert.deepEqual(splitScenes([...photos].reverse()).map((scene) => scene.photoIds.length), [30, 40, 20]);
+assert.deepEqual(splitScenes([...photos].reverse()).map((scene) => scene.photoIds.length), [35, 45, 25]);
 
 // 공용 골든 케이스 — BE clip-service/tests/test_customer_scenes.py 도 같은 파일을 읽는다(경계 규칙 드리프트 방지).
 const fixture = JSON.parse(readFileSync(new URL("./fixtures/scene-cases.json", import.meta.url), "utf8"));
@@ -36,16 +37,17 @@ for (const { name, blocks, untimed = 0, gapSeconds = 180, expected } of fixture.
 
 // 행사 스냅(돌잔치): 10분 공백 없이 순서가 바뀔 때 4분만 쉬어도 장면을 나눈다.
 order = 0;
-const studio = [...burst(10, 0, 30), ...burst(10, 5, 30), ...burst(10, 10, 30)];
-assert.deepEqual(splitScenes(studio).map((scene) => scene.photoIds.length), [30, 30, 30]);
+const studio = [...burst(10, 0, 35), ...burst(10, 5, 35), ...burst(10, 10, 35)];
+assert.deepEqual(splitScenes(studio).map((scene) => scene.photoIds.length), [35, 35, 35]);
 
 // 사진이 적거나 촬영 시각이 대부분 없으면 장면을 만들지 않는다.
 assert.equal(splitScenes(burst(9, 0, 10)), null);
+assert.equal(splitScenes(photos.slice(0, 99)), null);
 assert.equal(splitScenes(photos.map((photo, i) => (i % 2 ? photo : { ...photo, takenAt: null }))), null);
 // 파일 수정 시각으로 대신한 촬영 시각("file")은 경계·비율에 쓰지 않는다 — Python split_scenes와 같은 규칙.
 assert.equal(splitScenes(photos.map((photo, i) => (i % 2 ? photo : { ...photo, takenAtSource: "file" }))), null);
 const withFileTimes = splitScenes([...photos, ...Array.from({ length: 5 }, (_, i) => ({ id: `f${i}`, orderIndex: 900 + i, takenAt: at(11, 30), takenAtSource: "file" }))]);
-assert.deepEqual(withFileTimes.map((scene) => scene.photoIds.length), [30, 40, 20, 5]);
+assert.deepEqual(withFileTimes.map((scene) => scene.photoIds.length), [35, 45, 25, 5]);
 assert.equal(formatSceneRange(withFileTimes[3]), "촬영 시각 없음");
 
 // 시각 없는 소수 사진은 마지막 "촬영 시각 없음" 장면으로 모은다.

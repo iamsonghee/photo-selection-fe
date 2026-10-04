@@ -43,6 +43,7 @@ import { rememberGroupSimilar, setAsideKey, startAiTidy } from "../select/AiTidy
 import { UploadDoneSheet } from "./UploadDoneSheet";
 import { useCustomerSelectStore } from "../../_lib/real-store";
 import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
+import { MIN_PHOTOS_FOR_SCENES } from "@/lib/customer-scenes";
 
 const BATCH_SIZE = 20;
 // ponytail: 작가 화면의 PC/모바일 적응형 동시성 대신 보수적인 고정값 하나만 쓴다.
@@ -61,7 +62,7 @@ type DeleteImpact = {
   retouchedVersions: number;
 };
 
-type AccountUsage = { photoCount: number; limit: number; remaining: number };
+type AccountUsage = { photoCount: number; limit: number | null; remaining: number | null }; // null = 관리자 무제한
 
 async function getAccountUsage(): Promise<AccountUsage> {
   const response = await fetch("/api/customer-select/usage", { cache: "no-store" });
@@ -184,7 +185,7 @@ export default function CustomerUploadPage() {
     try {
       const [, usage] = await Promise.all([refresh(), getAccountUsage()]);
       setAccountUsage(usage);
-      const limitError = uploadLimitError(usage.photoCount, selectedFiles.length);
+      const limitError = usage.limit === null ? null : uploadLimitError(usage.photoCount, selectedFiles.length);
       if (limitError) {
         setError(limitError);
         setNeedsReselection(true);
@@ -506,10 +507,10 @@ export default function CustomerUploadPage() {
     </div>
   ) : undefined;
 
-  // 장면은 촬영 시각으로 나눈다(src/lib/customer-scenes.ts: 20장 이상·시각 있는 사진 80% 이상일 때만).
+  // 장면은 촬영 시각으로 나눈다(src/lib/customer-scenes.ts: MIN_PHOTOS_FOR_SCENES장 이상·시각 있는 사진 80% 이상일 때만).
   // 카톡으로 받은 사진·캡처본은 시각이 빠져 있다. 고르는 데는 문제없으니 다시 올리라고 하지 않고, 어떻게 보이는지만 알린다.
   const untimedCount = project.photos.filter((photo) => !photo.takenAt).length;
-  const scenesBlocked = project.photos.length >= 20 && untimedCount > project.photos.length * 0.2;
+  const scenesBlocked = project.photos.length >= MIN_PHOTOS_FOR_SCENES && untimedCount > project.photos.length * 0.2;
   const showUploadDone = justUploaded > 0 && !uploading && retryFiles.length === 0 && selectedPhotoIds.size === 0;
   const uploadDone = showUploadDone ? (
     <div className="flex min-w-0 flex-col gap-1.5 md:flex-row md:items-center md:gap-5" role="status">
@@ -530,7 +531,7 @@ export default function CustomerUploadPage() {
       viewportLocked
       compactHeader={compactUploadHeader}
       compactTitle={<ProjectStepHeader projectId={projectId} name={displayName} step="upload" />}
-      headerMeta={<div className="flex items-baseline gap-2 text-[12px] text-muted-foreground" aria-label="전체 사진 이용량"><span>전체 이용량</span><strong className="text-[13px] font-semibold tabular-nums text-foreground">{accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${MAX_PHOTOS.toLocaleString()}장` : "확인 중"}</strong></div>}
+      headerMeta={<div className="flex items-baseline gap-2 text-[12px] text-muted-foreground" aria-label="전체 사진 이용량"><span>전체 이용량</span><strong className="text-[13px] font-semibold tabular-nums text-foreground">{accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${accountUsage.limit === null ? "무제한" : `${accountUsage.limit.toLocaleString()}장`}` : "확인 중"}</strong></div>}
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden onChange={(event) => {
@@ -583,7 +584,7 @@ export default function CustomerUploadPage() {
             <div className="grid min-h-full place-items-center p-5">
               <button type="button" onClick={() => inputRef.current?.click()} className="flex min-h-[260px] w-full max-w-[720px] flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border-strong bg-surface text-center transition-colors hover:border-accent/45 hover:bg-surface-raised/45">
                 <span className="grid size-14 place-items-center rounded-2xl bg-customer-soft text-primary"><UploadCloud size={26} strokeWidth={1.8} /></span>
-                <span><strong className="block text-[16px] text-foreground"><span className="md:hidden">사진을 선택하세요</span><span className="hidden md:inline">사진을 끌어다 놓거나 선택하세요</span></strong><small className="mt-1.5 block text-[13px] text-muted-foreground">JPG · PNG · WebP · HEIC · 최대 {MAX_PHOTOS.toLocaleString()}장</small><small className="mt-2 block px-4 text-[13px] text-muted-foreground">고르기용 사진만 저장해요. 원본 파일은 직접 보관해 주세요.</small>{accountUsage ? <small className="mt-1 block text-[13px] font-semibold text-foreground">{accountUsage.remaining.toLocaleString()}장 더 올릴 수 있어요</small> : null}</span>
+                <span><strong className="block text-[16px] text-foreground"><span className="md:hidden">사진을 선택하세요</span><span className="hidden md:inline">사진을 끌어다 놓거나 선택하세요</span></strong><small className="mt-1.5 block text-[13px] text-muted-foreground">JPG · PNG · WebP · HEIC{accountUsage?.limit === null ? "" : ` · 최대 ${MAX_PHOTOS.toLocaleString()}장`}</small><small className="mt-2 block px-4 text-[13px] text-muted-foreground">고르기용 사진만 저장해요. 원본 파일은 직접 보관해 주세요.</small>{accountUsage?.remaining != null ? <small className="mt-1 block text-[13px] font-semibold text-foreground">{accountUsage.remaining.toLocaleString()}장 더 올릴 수 있어요</small> : null}</span>
               </button>
             </div>
           ) : visiblePhotos.length === 0 ? (
