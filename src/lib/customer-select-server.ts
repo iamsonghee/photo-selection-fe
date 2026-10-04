@@ -8,6 +8,8 @@ import { createHash } from "node:crypto";
 import { SupabaseClient, type User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { customerShareCookieName } from "@/lib/customer-select-share-auth";
+import { isAdminEmail } from "@/lib/admin-emails";
+import { CUSTOMER_PHOTO_LIMIT } from "@/app/customer-select/_lib/upload-limit";
 import type { ColorTag, PeopleKind, Photo, StarRating } from "@/types";
 
 export async function getCurrentCustomerAuthUser(): Promise<User | null> {
@@ -22,6 +24,11 @@ export async function getCurrentCustomerAuthUser(): Promise<User | null> {
 export function customerAccountName(user: User | null): string | null {
   const name = String(user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? "").trim();
   return name ? name.slice(0, 20) : null;
+}
+
+/** 셀프 고객 계정 전체 사진 한도. 관리자는 무제한(null) — BE·DB 트리거도 같은 기준. */
+export function customerPhotoLimit(email: string | null | undefined): number | null {
+  return isAdminEmail(email) ? null : CUSTOMER_PHOTO_LIMIT;
 }
 
 export async function getCurrentCustomerAuthId(): Promise<string | null> {

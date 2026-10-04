@@ -2,12 +2,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { ArrowRight, FolderPlus, ImagePlus, MoreVertical, PenLine, Plus, Send, Trash2, Upload, Users } from "lucide-react";
-import { getCurrentCustomerAuthUser } from "@/lib/customer-select-server";
+import { customerPhotoLimit, getCurrentCustomerAuthUser } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "./_lib/CustomerSelectShell";
 import { customerProjectAction, customerProjectDestination, customerProjectHome, customerProjectStatus, filterCustomerProjects, kstToday, selectionDeadlineBadge, type CustomerProjectFilter, type CustomerProjectSummary } from "./_lib/project-routing";
 import { isCustomerShootType as isProjectShootType, customerShootTypeLabel as projectShootTypeLabel } from "@/lib/customer-shoot-scenes";
-import { CUSTOMER_PHOTO_LIMIT } from "./_lib/upload-limit";
 import { ProjectFilters } from "./_lib/ProjectFilters";
 
 export default async function CustomerSelectHomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -24,7 +23,8 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
     .order("created_at", { ascending: false });
   const projects = (data ?? []) as CustomerProjectSummary[];
   const accountPhotoCount = projects.reduce((sum, project) => sum + Math.max(0, project.photo_count), 0);
-  const remainingPhotoCount = Math.max(0, CUSTOMER_PHOTO_LIMIT - accountPhotoCount);
+  const photoLimit = customerPhotoLimit(user.email);
+  const remainingPhotoCount = photoLimit === null ? null : Math.max(0, photoLimit - accountPhotoCount);
   const projectIdsWithPhotos = projects.filter((project) => project.photo_count > 0).map((project) => project.id);
   const selectedCounts = await Promise.all(projects.map((project) => admin.from("customer_selections")
     .select("photo_id", { count: "exact", head: true }).eq("project_id", project.id).eq("is_selected", true)));
@@ -48,7 +48,6 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
   const displayName = String(user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email?.split("@")[0] ?? "사용자");
   const avatarUrl = user.user_metadata?.avatar_url ?? user.user_metadata?.picture;
   const today = kstToday();
-  const usagePercent = Math.min(100, accountPhotoCount / CUSTOMER_PHOTO_LIMIT * 100);
 
   return (
     <CustomerSelectShell
@@ -59,7 +58,7 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
         avatarUrl: typeof avatarUrl === "string" ? avatarUrl : null,
         provider: typeof user.app_metadata?.provider === "string" ? user.app_metadata.provider : null,
         photoCount: accountPhotoCount,
-        photoLimit: CUSTOMER_PHOTO_LIMIT,
+        photoLimit,
       }}
     >
       <main className="mx-auto w-full max-w-[1504px] px-5 pb-28 pt-8 md:px-8 md:pb-16 md:pt-12">
@@ -75,11 +74,15 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
           {!error ? (
             <div className="flex items-center gap-3">
             <section className="flex flex-1 items-center gap-3 rounded-full border border-border-subtle bg-surface py-2 pl-4 pr-3 md:min-w-[320px]" aria-label="전체 사진 이용량">
-              <p className="shrink-0 text-[13px] font-semibold text-muted-foreground">사진 <strong className="font-bold text-foreground">{accountPhotoCount.toLocaleString()}</strong> / {CUSTOMER_PHOTO_LIMIT.toLocaleString()}장</p>
-              <div className="h-1.5 min-w-12 flex-1 overflow-hidden rounded-full bg-surface-raised" role="progressbar" aria-label="전체 사진 이용량" aria-valuemin={0} aria-valuemax={CUSTOMER_PHOTO_LIMIT} aria-valuenow={Math.min(accountPhotoCount, CUSTOMER_PHOTO_LIMIT)}>
-                <div className="h-full min-w-1.5 rounded-full bg-accent" style={{ width: `${usagePercent}%` }} />
-              </div>
-              <p className="shrink-0 text-[12px] font-bold text-accent">{remainingPhotoCount.toLocaleString()}장 남음</p>
+              <p className="shrink-0 text-[13px] font-semibold text-muted-foreground">사진 <strong className="font-bold text-foreground">{accountPhotoCount.toLocaleString()}</strong> / {photoLimit === null ? "무제한" : `${photoLimit.toLocaleString()}장`}</p>
+              {photoLimit !== null && remainingPhotoCount !== null ? (
+                <>
+                  <div className="h-1.5 min-w-12 flex-1 overflow-hidden rounded-full bg-surface-raised" role="progressbar" aria-label="전체 사진 이용량" aria-valuemin={0} aria-valuemax={photoLimit} aria-valuenow={Math.min(accountPhotoCount, photoLimit)}>
+                    <div className="h-full min-w-1.5 rounded-full bg-accent" style={{ width: `${Math.min(100, accountPhotoCount / photoLimit * 100)}%` }} />
+                  </div>
+                  <p className="shrink-0 text-[12px] font-bold text-accent">{remainingPhotoCount.toLocaleString()}장 남음</p>
+                </>
+              ) : null}
             </section>
             {projects.length > 0 ? <Link href="/customer-select/new" className="hidden h-11 shrink-0 items-center gap-1.5 rounded-full bg-accent pl-4 pr-5 text-[14px] font-bold text-white transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 md:inline-flex"><Plus size={18} strokeWidth={2.4} />새 프로젝트</Link> : null}
             </div>

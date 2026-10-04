@@ -9,7 +9,7 @@ export type CustomerAccountSummary = {
   avatarUrl: string | null;
   provider: string | null;
   photoCount: number;
-  photoLimit: number;
+  photoLimit: number | null; // null = 관리자 무제한
 };
 
 export function CustomerAccountMenu({ account }: { account: CustomerAccountSummary }) {
@@ -40,7 +40,7 @@ export function CustomerAccountMenu({ account }: { account: CustomerAccountSumma
       <div className="border-t border-border-subtle px-4 py-3">
         <div className="flex items-center justify-between gap-3 text-xs">
           <span className="text-muted-foreground">전체 사진 이용량</span>
-          <strong className="text-foreground">{account.photoCount.toLocaleString()} / {account.photoLimit.toLocaleString()}장</strong>
+          <strong className="text-foreground">{account.photoCount.toLocaleString()} / {account.photoLimit === null ? "무제한" : `${account.photoLimit.toLocaleString()}장`}</strong>
         </div>
       </div>
       <button type="button" onClick={signOut} className="flex min-h-11 w-full items-center gap-2 border-t border-border-subtle px-4 text-sm font-semibold text-muted-foreground hover:bg-surface-raised hover:text-foreground"><LogOut size={16} />로그아웃</button>
