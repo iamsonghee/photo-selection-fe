@@ -21,7 +21,7 @@ assert.deepEqual(splitScenes([...photos].reverse()).map((scene) => scene.photoId
 
 // 공용 골든 케이스 — BE clip-service/tests/test_customer_scenes.py 도 같은 파일을 읽는다(경계 규칙 드리프트 방지).
 const fixture = JSON.parse(readFileSync(new URL("./fixtures/scene-cases.json", import.meta.url), "utf8"));
-for (const { name, blocks, untimed = 0, expected } of fixture.cases) {
+for (const { name, blocks, untimed = 0, gapSeconds = 180, expected } of fixture.cases) {
   const casePhotos = [];
   for (const [start, count, source = "exif"] of blocks) {
     const [h, m, sec] = start.split(":").map(Number);
@@ -31,7 +31,7 @@ for (const { name, blocks, untimed = 0, expected } of fixture.cases) {
     }
   }
   for (let i = 0; i < untimed; i++) casePhotos.push({ id: `c${casePhotos.length}`, orderIndex: casePhotos.length, takenAt: null });
-  assert.deepEqual(splitScenes(casePhotos)?.map((scene) => scene.photoIds.length) ?? null, expected, name);
+  assert.deepEqual(splitScenes(casePhotos, gapSeconds * 1000)?.map((scene) => scene.photoIds.length) ?? null, expected, name);
 }
 
 // 행사 스냅(돌잔치): 10분 공백 없이 순서가 바뀔 때 4분만 쉬어도 장면을 나눈다.

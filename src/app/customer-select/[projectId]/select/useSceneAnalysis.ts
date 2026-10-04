@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { splitScenes, type Scene } from "@/lib/customer-scenes";
-import { customerSceneCatalog, OTHER_SCENE } from "@/lib/customer-shoot-scenes";
+import { customerSceneCatalog, customerSceneGapSeconds, OTHER_SCENE } from "@/lib/customer-shoot-scenes";
 import type { Photo } from "@/types";
 import { startAiTidy, type AiTidyKind } from "./AiTidySheet";
 import type { ProjectView } from "../../_lib/real-store";
@@ -125,7 +125,8 @@ export function useSceneAnalysis(projectId: string, photos: Photo[], shootType: 
   const initialMock = mockParam ?? storedMock;
   const [mock, setMock] = useState<MockMode | null>(initialMock && MOCK_MODES.includes(initialMock) ? initialMock as MockMode : null);
   const mockAiPhotos = useMemo(() => withMockAi(photos), [photos]);
-  const realTimeScenes = useMemo(() => splitScenes(photos), [photos]);
+  const gapSeconds = customerSceneGapSeconds(shootType);
+  const realTimeScenes = useMemo(() => splitScenes(photos, gapSeconds && gapSeconds * 1000), [photos, gapSeconds]);
   const timeScenes = useMemo(() => (mock ? mockScenes(photos, realTimeScenes) : realTimeScenes), [mock, photos, realTimeScenes]);
   const ai = useMemo(() => (aiScenes?.length ? namedFromAi(aiScenes, photos) : null), [aiScenes, photos]);
   const unnamed = useMemo<NamedScene[] | null>(() => timeScenes?.map((scene) => ({ ...scene, name: null })) ?? null, [timeScenes]);

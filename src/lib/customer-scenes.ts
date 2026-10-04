@@ -46,15 +46,15 @@ function mergeSmall(ranges: ScenePhoto[][]): ScenePhoto[][] {
   return ranges;
 }
 
-/** 장면으로 나눌 근거가 부족하면(사진이 적거나 촬영 시각 대부분이 없으면) null. */
-export function splitScenes(photos: readonly ScenePhoto[]): Scene[] | null {
+/** 장면으로 나눌 근거가 부족하면(사진이 적거나 촬영 시각 대부분이 없으면) null. gapMs: 촬영 종류별 경계 공백(`customerSceneGapSeconds`). */
+export function splitScenes(photos: readonly ScenePhoto[], gapMs = SCENE_GAP_MS): Scene[] | null {
   const timed = photos.filter((photo) => sceneTime(photo) && !Number.isNaN(time(sceneTime(photo)!)));
   if (photos.length < MIN_PHOTOS_FOR_SCENES || timed.length < photos.length * MIN_TIMED_RATIO) return null;
 
   const sorted = timed.slice().sort((a, b) => time(sceneTime(a)!) - time(sceneTime(b)!) || a.orderIndex - b.orderIndex);
   const cuts = sorted
     .map((photo, index) => ({ index, gap: index === 0 ? 0 : time(sceneTime(photo)!) - time(sceneTime(sorted[index - 1])!) }))
-    .filter((item) => item.gap >= SCENE_GAP_MS)
+    .filter((item) => item.gap >= gapMs)
     .sort((a, b) => b.gap - a.gap)
     .slice(0, MAX_SCENES - 1)
     .map((item) => item.index)

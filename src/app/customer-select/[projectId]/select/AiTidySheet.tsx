@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { customerSceneCatalog } from "@/lib/customer-shoot-scenes";
+import { customerSceneCatalog, customerSceneGapSeconds } from "@/lib/customer-shoot-scenes";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { Sheet } from "./Sheets";
 import s from "./select.module.css";
@@ -19,7 +19,7 @@ export async function startAiTidy(projectId: string, kinds: AiTidyKind[], shootT
   const responses = await Promise.all(kinds.map((kind) => fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(kind === "scene" ? { sceneNames: customerSceneCatalog(shootType) } : {}),
+    body: JSON.stringify(kind === "scene" ? { sceneNames: customerSceneCatalog(shootType), sceneGapSeconds: customerSceneGapSeconds(shootType) } : {}),
   }).catch(() => null)));
   const started = kinds.filter((_, index) => responses[index]?.ok || responses[index]?.status === 409);
   const failed = kinds.filter((kind) => !started.includes(kind));
