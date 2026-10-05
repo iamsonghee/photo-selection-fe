@@ -8,10 +8,11 @@ export type ScenePhoto = { id: string; orderIndex: number; takenAt?: string | nu
 export type Scene = { index: number; photoIds: string[]; start: string | null; end: string | null };
 
 // ponytail: 고정 임계값 휴리스틱. 실제 촬영 데이터로 장면 경계가 어긋나면 이 값들부터 조정한다.
-// 3분: 행사 스냅(돌잔치 등)은 쉬지 않고 찍다가 순서가 바뀔 때만 3~10분 쉰다. 공백이 많으면 MAX_SCENES 안에서 큰 공백부터 자른다.
+// 3분: 행사 스냅(돌잔치 등)은 쉬지 않고 찍다가 순서가 바뀔 때만 3~10분 쉰다. 공백이 많으면 장면 상한(maxScenes) 안에서 큰 공백부터 자른다.
 const SCENE_GAP_MS = 3 * 60_000;
 const MIN_SCENE_PHOTOS = 10;
-const MAX_SCENES = 8;
+// 장면 상한: 사진 40장당 1개(최소 8, 최대 30) — Python `max_scenes`와 같은 규칙. 고정 8개는 1,572장 홈스냅(장소 12곳)에서 막혔다.
+const maxScenes = (photoCount: number) => Math.min(30, Math.max(8, Math.floor(photoCount / 40)));
 export const MIN_PHOTOS_FOR_SCENES = 100;
 const MIN_TIMED_RATIO = 0.8;
 // 이보다 짧은 공백은 "이어진 촬영": 작은 장면은 공백이 더 짧은 이웃에 붙이되, 양쪽(첫·마지막 장면은 한쪽) 공백이
@@ -56,7 +57,7 @@ export function splitScenes(photos: readonly ScenePhoto[], gapMs = SCENE_GAP_MS)
     .map((photo, index) => ({ index, gap: index === 0 ? 0 : time(sceneTime(photo)!) - time(sceneTime(sorted[index - 1])!) }))
     .filter((item) => item.gap >= gapMs)
     .sort((a, b) => b.gap - a.gap)
-    .slice(0, MAX_SCENES - 1)
+    .slice(0, maxScenes(photos.length) - 1)
     .map((item) => item.index)
     .sort((a, b) => a - b);
 
