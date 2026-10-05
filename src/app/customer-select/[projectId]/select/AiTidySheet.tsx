@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { customerSceneCatalog, customerSceneGapSeconds } from "@/lib/customer-shoot-scenes";
+import { customerPlaceNames, customerSceneCatalog, customerSceneGapSeconds } from "@/lib/customer-shoot-scenes";
 import { MIN_PHOTOS_FOR_SCENES } from "@/lib/customer-scenes";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { Sheet } from "./Sheets";
@@ -20,7 +19,8 @@ export async function startAiTidy(projectId: string, kinds: AiTidyKind[], shootT
   const responses = await Promise.all(kinds.map((kind) => fetch(`/api/customer-select/projects/${projectId}/ai/${kind}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(kind === "scene" ? { sceneNames: customerSceneCatalog(shootType), sceneGapSeconds: customerSceneGapSeconds(shootType) } : {}),
+    body: JSON.stringify(kind === "scene" ? { sceneNames: customerSceneCatalog(shootType), sceneGapSeconds: customerSceneGapSeconds(shootType) }
+      : kind === "quality" ? { placeNames: customerPlaceNames(shootType) } : {}),
   }).catch(() => null)));
   const started = kinds.filter((_, index) => responses[index]?.ok || responses[index]?.status === 409);
   const failed = kinds.filter((kind) => !started.includes(kind));
@@ -41,9 +41,13 @@ export function rememberGroupSimilar(projectId: string, on: boolean) {
 /** "흔들림·눈 감음 확인"을 켜고 정리한 사람은 고르기 화면을 흔들림 사진을 뺀 채로 시작한다(기기별 보기 설정). */
 export const setAsideKey = (projectId: string) => `ps:self-select-set-aside:${projectId}`;
 
+/** AI 정리가 항상 하는 일 — 사용자가 항목을 고르지 않는다(보기 옵션에서 묶어 보기·흔들림 빼기만 켜고 끈다). */
+export const AI_TIDY_KINDS: AiTidyKind[] = ["scene", "similarity", "quality"];
+
 /**
- * AI 정리 시작 확인. "할지·언제 할지"는 사용자가 정하고, 시작하기로 한 뒤에만 세부 항목을 보여준다.
- * 대부분은 기본값 그대로 `정리 시작` 한 번이면 된다. 장면 나누기는 이 서비스의 핵심이라 항상 켠다.
+ * AI 정리 시작 확인. 몇 분 걸리고 비용이 드는 작업이라 한 번 확인만 받는다. 장면·유사컷·흔들림(홈스냅은 장소도)을 모두 돌리고,
+ * 다시 정리할 때 clip-service가 이미 판정·계산한 사진은 건너뛴다(새 사진만).
+ * 처음 정리할 때만 보기 설정(묶어 보기·흔들림 빼기)을 켠다 — 다시 정리할 때는 사용자가 보기 옵션에서 바꾼 값을 둔다.
  */
 export function AiTidySheet({ projectId, photoCount, rerun, pending, error, onStart, onClose }: {
   projectId: string;
@@ -55,38 +59,22 @@ export function AiTidySheet({ projectId, photoCount, rerun, pending, error, onSt
   onStart: (kinds: AiTidyKind[]) => void;
   onClose: () => void;
 }) {
-  const [similar, setSimilar] = useState(true);
-  const [quality, setQuality] = useState(true);
-  // 끈 항목은 실행하지 않는다(유사컷을 끄면 전체 사진 임베딩도 하지 않음).
   // 사진이 적으면 장면을 나누지 않는다(골라낸 사진만 올리면 시간 간격으로 장소 경계를 못 찾음). 장면 실행은 그대로 보내
   // 정리 상태 흐름을 바꾸지 않는다 — clip-service가 장면 없이 바로 끝내고 Gemini도 부르지 않는다.
   const fewPhotos = photoCount < MIN_PHOTOS_FOR_SCENES;
-  const kinds: AiTidyKind[] = ["scene", ...(similar ? ["similarity" as const] : []), ...(quality ? ["quality" as const] : [])];
 
   return (
     <Sheet title={rerun ? "AI로 다시 정리" : "AI로 사진 정리"} onClose={onClose}>
-      <p>{photoCount.toLocaleString()}장을 {rerun ? "다시 " : ""}정리해요. 사진 수에 따라 몇 분 걸릴 수 있고, 그동안에도 사진을 고를 수 있어요.</p>
+      <p>{photoCount.toLocaleString()}장을 {rerun ? "다시 " : ""}정리해요. {fewPhotos ? "" : "장면별로 나누고, "}비슷한 사진은 묶고, 흔들린 사진은 따로 모아요. 지우는 사진은 없어요.</p>
+      <p>사진 수에 따라 몇 분 걸릴 수 있고, 그동안에도 사진을 고를 수 있어요.{fewPhotos ? ` 장면은 사진이 ${MIN_PHOTOS_FOR_SCENES}장 이상일 때 나눠요.` : ""}</p>
       {rerun && <p><strong>고른 사진·찜·메모는 그대로예요.</strong> 장면과 유사컷 묶음만 새로 나눠요.</p>}
-      <div className={s.tidyOptions}>
-        <label className={s.tidyOption}>
-          <input type="checkbox" checked={!fewPhotos} disabled />
-          <span><strong>장면별로 나누기</strong><small>{fewPhotos ? `사진이 ${MIN_PHOTOS_FOR_SCENES}장 이상일 때 장면으로 나눠요` : "촬영 시간 간격으로 나누고 장면 이름을 추천해요"}</small></span>
-          {!fewPhotos && <em>기본</em>}
-        </label>
-        <label className={s.tidyOption}>
-          <input type="checkbox" checked={similar} onChange={(event) => setSimilar(event.target.checked)} />
-          <span><strong>비슷한 사진 묶기</strong><small>연달아 찍은 비슷한 사진을 한 묶음으로 보여줘요</small></span>
-        </label>
-        <label className={s.tidyOption}>
-          <input type="checkbox" checked={quality} onChange={(event) => setQuality(event.target.checked)} />
-          <span><strong>흔들림·눈 감음 확인</strong><small>흔들린 사진은 갤러리에서 빼고, 눈 감은 컷은 비슷한 사진 묶음에서 뒤로 보내요. 지우지 않아요</small></span>
-        </label>
-      </div>
       {error && <p className={s.tidyError} role="alert">{error}</p>}
       <PhotographerLightButton size="confirmation" pending={pending} pendingLabel="시작하는 중…" onClick={() => {
-        rememberGroupSimilar(projectId, similar);
-        try { localStorage.setItem(setAsideKey(projectId), quality ? "1" : "0"); } catch {}
-        onStart(kinds);
+        if (!rerun) {
+          rememberGroupSimilar(projectId, true);
+          try { localStorage.setItem(setAsideKey(projectId), "1"); } catch {}
+        }
+        onStart(AI_TIDY_KINDS);
       }}>정리 시작</PhotographerLightButton>
     </Sheet>
   );

@@ -6,15 +6,18 @@ const CLIP_SERVICE_URL = process.env.CLIP_SERVICE_URL ?? "";
 const CLIP_INTERNAL_TOKEN = process.env.CLIP_INTERNAL_TOKEN ?? "";
 const AI_KINDS = new Set(["scene", "similarity", "quality"]);
 
-/** 촬영 종류의 장면 이름 목록·경계 공백(FE 카탈로그). 형식이 맞지 않으면 버린다(이름 없이 장면만, 기본 공백). */
-async function sceneOptionsFrom(req: NextRequest): Promise<{ scene_names?: string[]; scene_gap_seconds?: number }> {
-  const body = await req.json().catch(() => null) as { sceneNames?: unknown; sceneGapSeconds?: unknown } | null;
-  const names = body?.sceneNames;
+const nameList = (names: unknown): string[] | undefined =>
+  Array.isArray(names) && names.length > 0 && names.length <= 30 && names.every((name) => typeof name === "string" && name.length > 0 && name.length <= 40)
+    ? names as string[] : undefined;
+
+/** FE 카탈로그 옵션 — 장면: 이름 목록·경계 공백, 흔들림 확인: 장소 목록(홈스냅). 형식이 맞지 않으면 버린다(이름·장소 없이, 기본 공백). */
+async function optionsFrom(req: NextRequest, kind: string): Promise<Record<string, unknown>> {
+  const body = await req.json().catch(() => null) as { sceneNames?: unknown; sceneGapSeconds?: unknown; placeNames?: unknown } | null;
+  if (kind === "quality") return { place_names: nameList(body?.placeNames) };
+  if (kind !== "scene") return {};
   const gap = body?.sceneGapSeconds;
-  const validNames = Array.isArray(names) && names.length > 0 && names.length <= 30
-    && names.every((name) => typeof name === "string" && name.length > 0 && name.length <= 40);
   const validGap = Number.isInteger(gap) && (gap as number) >= 30 && (gap as number) <= 1800;
-  return { scene_names: validNames ? names as string[] : undefined, scene_gap_seconds: validGap ? gap as number : undefined };
+  return { scene_names: nameList(body?.sceneNames), scene_gap_seconds: validGap ? gap as number : undefined };
 }
 
 async function authorize(req: NextRequest, id: string) {
@@ -31,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const res = await fetch(`${CLIP_SERVICE_URL}/analyze/customer/${kind}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Internal-Token": CLIP_INTERNAL_TOKEN },
-    body: JSON.stringify({ project_id: id, ...(kind === "scene" ? await sceneOptionsFrom(req) : {}) }),
+    body: JSON.stringify({ project_id: id, ...await optionsFrom(req, kind) }),
   });
   return new Response(await res.text(), { status: res.status, headers: { "Content-Type": "application/json" } });
 }

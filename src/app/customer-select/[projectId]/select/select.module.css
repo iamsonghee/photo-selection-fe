@@ -261,13 +261,6 @@
 .personRow span { margin-left: auto; color: var(--subtle-foreground); font-size: 12px; }
 .textLink { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--muted-foreground); font: inherit; font-size: 12px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 
-.tidyOptions { display: flex; flex-direction: column; gap: 2px; }
-.tidyOption { display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border-subtle); cursor: pointer; }
-.tidyOption input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--accent); }
-.tidyOption span { display: flex; flex-direction: column; gap: 2px; }
-.tidyOption strong { font-size: 14px; font-weight: 700; }
-.tidyOption small { color: var(--muted-foreground); font-size: 12px; line-height: 1.45; }
-.tidyOption em { padding: 2px 8px; border-radius: 999px; background: var(--surface-raised); color: var(--muted-foreground); font-size: 11px; font-style: normal; font-weight: 700; }
 .tidyError { color: var(--danger) !important; font-weight: 600; }
 
 /* ── 상세 보기 ── */

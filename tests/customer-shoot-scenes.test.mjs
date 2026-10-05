@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { CUSTOMER_SHOOT_TYPES, customerSceneCatalog, customerSceneGapSeconds, customerShootTypeLabel, isCustomerShootType } from "../src/lib/customer-shoot-scenes.ts";
+import { CUSTOMER_SHOOT_TYPES, customerPlaceNames, customerSceneCatalog, customerSceneGapSeconds, customerShootTypeLabel, isCustomerShootType } from "../src/lib/customer-shoot-scenes.ts";
 
 // 새 촬영 종류와 예전 셀프 고객 프로젝트 값(wedding 등)을 모두 허용한다.
 for (const { value } of CUSTOMER_SHOOT_TYPES) assert.equal(isCustomerShootType(value), true);
@@ -18,6 +18,9 @@ assert.deepEqual(customerSceneCatalog("wedding"), []);
 // 홈스냅만 장면 경계 공백을 짧게(75초) 둔다. 나머지는 기본값(undefined → 3분).
 assert.equal(customerSceneGapSeconds("home_snap"), 75);
 assert.equal(customerSceneGapSeconds("first_birthday"), undefined);
+// 홈스냅만 흔들림 확인에서 장소를 판정해 장면을 장소별로 다시 나눈다(장면 이름 목록 그대로 보낸다).
+assert.deepEqual(customerPlaceNames("home_snap"), customerSceneCatalog("home_snap"));
+assert.equal(customerPlaceNames("first_birthday"), undefined);
 assert.deepEqual(customerSceneCatalog("etc"), []);
 assert.equal(new Set(CUSTOMER_SHOOT_TYPES.map(({ value }) => value)).size, CUSTOMER_SHOOT_TYPES.length);
 console.log("customer-shoot-scenes ok");
