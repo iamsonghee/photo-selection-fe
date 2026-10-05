@@ -12,7 +12,8 @@ import type { ColorTag, Photo } from "@/types";
 import s from "./select.module.css";
 
 const MEMO_SAVE_DELAY_MS = 600;
-// 필름 띠는 ‹ › 순서 그대로, 지금 사진 앞뒤 이만큼만 그린다(장면·전체 목록이 수천 장일 수 있다).
+// 필름 띠는 ‹ › 순서 그대로, 지금 사진 앞뒤 일부만 그린다(장면·전체 목록이 수천 장일 수 있다).
+// 최소 이만큼, 넓은 화면에서는 띠 폭에 들어가는 만큼 늘린다 — 고정 15칸이면 넓은 PC에서 양옆이 크게 빈다.
 const STRIP_RADIUS = 7;
 const noMembers = () => [];
 const SWIPE_HINT_KEY = "ps:self-select-swipe-hint";
@@ -126,12 +127,21 @@ export function PhotoDetail({
     root.style.setProperty("--dismiss", String(1 - Math.min(dy / 400, 0.7)));
     if (dy && !animate) root.setAttribute("data-dragging", ""); else root.removeAttribute("data-dragging");
   }, []);
-  const stripStart = Math.max(0, Math.min(index - STRIP_RADIUS, photos.length - (STRIP_RADIUS * 2 + 1)));
+  const [stripRadius, setStripRadius] = useState(STRIP_RADIUS);
+  const stripObserverRef = useRef<ResizeObserver | null>(null);
+  const stripRef = useCallback((node: HTMLDivElement | null) => {
+    stripObserverRef.current?.disconnect();
+    if (!node) return;
+    const cell = desktop ? 62 : 50; // 썸네일(56·모바일 44) + 간격 6
+    stripObserverRef.current = new ResizeObserver(([entry]) => setStripRadius(Math.max(STRIP_RADIUS, Math.floor((entry.contentRect.width / cell - 1) / 2))));
+    stripObserverRef.current.observe(node);
+  }, [desktop]);
+  const stripStart = Math.max(0, Math.min(index - stripRadius, photos.length - (stripRadius * 2 + 1)));
   // 띠에서 연달아 붙은 같은 유사컷은 한 덩어리로 묶어 보여준다.
   // 띠: 지금 칸의 묶음은 펼쳐 보이고, 다른 접힌 묶음은 겹친 썸네일 한 칸. 묶기를 끈 상태에서는 연달아 붙은 같은 유사컷을 괄호로 묶는다.
   type StripRun = { photos: Photo[]; size: number; collapsed: boolean };
   const stripRuns: StripRun[] = [];
-  for (const item of photos.slice(stripStart, stripStart + STRIP_RADIUS * 2 + 1)) {
+  for (const item of photos.slice(stripStart, stripStart + stripRadius * 2 + 1)) {
     const group = membersOf(item);
     if (group.length) { stripRuns.push(item === stop ? { photos: group, size: group.length, collapsed: false } : { photos: [item], size: group.length, collapsed: true }); continue; }
     const last = stripRuns.at(-1);
@@ -312,7 +322,7 @@ export function PhotoDetail({
         </div>
         {/* 필름 띠 = ‹ › 로 넘기는 순서 그대로. PC·모바일 모두 늘 같은 자리에 둔다 — 유사컷일 때만 띄우면 사진 크기가 들썩인다. */}
         {photos.length > 1 && (
-          <div className={s.strip}>
+          <div ref={stripRef} className={s.strip}>
             <div className={s.stripRow}>
               {stripRuns.map((run) => {
                 const thumbs = run.photos.map((member) => (

@@ -55,6 +55,8 @@ export interface Photo {
   isPending?: boolean;
   /** XHR 전송 중 (true=스피너, false=테두리만) */
   isUploading?: boolean;
+  /** 업로드 프리뷰의 단계(대기·전송·완료·실패) — 그리드에서 어디까지 올라갔는지 보여준다. 없으면 isUploading만 본다 */
+  uploadState?: "waiting" | "uploading" | "done" | "failed";
   /** AI 유사컷 그룹 id (photo_groups.id). 그룹에 속하지 않으면 null/undefined */
   similarityGroupId?: string | null;
   /** AI 블러(흔들림) 의심 여부. 미분석/디코딩 실패 시 null/undefined */

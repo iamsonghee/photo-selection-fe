@@ -78,6 +78,8 @@ export default function CustomerUploadPage() {
   const { project, hydrated, refresh } = useCustomerSelectStore();
   const [progress, setProgress] = useState(0);
   const [total, setTotal] = useState(0);
+  // 지금 묶음에서 압축을 마친 장수 — 압축하는 동안에도 진행 막대가 움직이게 한다.
+  const [compressedInBatch, setCompressedInBatch] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [checkingCapacity, setCheckingCapacity] = useState(false);
   const [accountUsage, setAccountUsage] = useState<AccountUsage | null>(null);
@@ -171,7 +173,8 @@ export default function CustomerUploadPage() {
     setPendingPhotos([]);
   }
 
-  /** carriedUploaded/carriedFailed: 대기열을 이어 올릴 때 앞 묶음의 결과(완료 안내·다시 시도 목록을 합쳐 보여준다). */
+  /** carriedUploaded/carriedFailed: 대기열을 이어 올릴 때 앞 묶음의 결과(완료 안내·다시 시도 목록을 합쳐 보여준다).
+   *  이어 올릴 때는 앞 묶음의 실패 칸을 남겨 둔다 — 다시 시도 목록에 그대로 들어 있다. */
   async function handleFiles(selectedFiles: File[], carriedUploaded = 0, carriedFailed: File[] = []) {
     if (selectedFiles.length === 0) return;
     if (uploading || uploadStartingRef.current) {
@@ -204,10 +207,12 @@ export default function CustomerUploadPage() {
     setRetryFiles([]);
     setTotal(selectedFiles.length);
     setProgress(0);
+    setCompressedInBatch(0);
     setUploadPhase("compressing");
     setEstimatedRemainingSeconds(null);
     uploadTimingSamplesRef.current = [];
-    clearPendingPreviews();
+    if (carriedFailed.length === 0) clearPendingPreviews();
+    galleryScrollRef.current?.scrollTo({ top: 0 }); // 올라가는 사진은 맨 앞에 모인다
     const controller = new AbortController();
     uploadAbortRef.current = controller;
     cancelRequestedRef.current = false;
@@ -228,10 +233,18 @@ export default function CustomerUploadPage() {
         takenAt: takenAtAll[index].takenAt,
         takenAtSource: takenAtAll[index].source,
         isPending: true,
-        isUploading: false,
+        uploadState: "waiting",
       } satisfies Photo;
     });
-    setPendingPhotos(pending);
+    setPendingPhotos((current) => [...current, ...pending]);
+    // 끝나면 올라간 프리뷰는 실제 사진으로 바뀌니 치우고, 실패한 칸만 다시 시도할 수 있게 남긴다.
+    const failedIds = new Set<string>();
+    const finishPending = () => {
+      const doneUrls = new Set(pending.filter((photo) => !failedIds.has(photo.id)).map((photo) => photo.url));
+      doneUrls.forEach(URL.revokeObjectURL);
+      previewUrlsRef.current = previewUrlsRef.current.filter((url) => !doneUrls.has(url));
+      setPendingPhotos((current) => current.filter((photo) => !doneUrls.has(photo.url)));
+    };
 
     const {
       data: { session },
@@ -243,8 +256,10 @@ export default function CustomerUploadPage() {
     for (let i = 0; i < selectedFiles.length; i += BATCH_SIZE) {
       const batchStartedAt = performance.now();
       const rawBatch = selectedFiles.slice(i, i + BATCH_SIZE);
-      const batchIds = new Set(pending.slice(i, i + BATCH_SIZE).map((photo) => photo.id));
-      setPendingPhotos((current) => current.map((photo) => batchIds.has(photo.id) ? { ...photo, isUploading: true } : photo));
+      const batchPending = pending.slice(i, i + BATCH_SIZE);
+      const batchIds = new Set(batchPending.map((photo) => photo.id));
+      setPendingPhotos((current) => current.map((photo) => batchIds.has(photo.id) ? { ...photo, uploadState: "uploading" } : photo));
+      setCompressedInBatch(0);
 
       let batch: File[];
       setUploadPhase("compressing");
@@ -254,7 +269,8 @@ export default function CustomerUploadPage() {
           rawBatch,
           controller.signal,
           COMPRESS_POOL_SIZE,
-          { maxEdge: CUSTOMER_UPLOAD_MAX_EDGE, jpegQuality: UPLOAD_INTERMEDIATE_JPEG_QUALITY }
+          { maxEdge: CUSTOMER_UPLOAD_MAX_EDGE, jpegQuality: UPLOAD_INTERMEDIATE_JPEG_QUALITY },
+          () => setCompressedInBatch((count) => count + 1)
         );
       } catch {
         batch = rawBatch; // 압축 실패 시 원본 그대로 업로드(작가 화면과 동일한 폴백 원칙)
@@ -282,7 +298,9 @@ export default function CustomerUploadPage() {
         // 실패는 배치 내 위치로 받는다 — 같은 이름의 파일이 여럿일 수 있다. 이름은 구 BE 응답 호환용.
         const rejectedIndices = new Set(data.rejected_indices ?? []);
         const rejectedNames = new Set(data.rejected_indices ? [] : data.rejected ?? []);
-        const rejectedFiles = rawBatch.filter((file, index) => rejectedIndices.has(index) || rejectedNames.has(file.name));
+        const isRejected = (file: File, index: number) => rejectedIndices.has(index) || rejectedNames.has(file.name);
+        const rejectedFiles = rawBatch.filter(isRejected);
+        rawBatch.forEach((file, index) => { if (isRejected(file, index)) failedIds.add(batchPending[index].id); });
         failedFiles.push(...rejectedFiles);
         uploaded += data.uploaded ?? Math.max(0, batch.length - rejectedFiles.length);
       } catch (e) {
@@ -290,6 +308,8 @@ export default function CustomerUploadPage() {
         const remainingFiles = [...carriedFailed, ...failedFiles, ...selectedFiles.slice(i), ...queueRef.current.splice(0)];
         setQueuedCount(0);
         setRetryFiles(remainingFiles);
+        pending.slice(i).forEach((photo) => failedIds.add(photo.id));
+        setPendingPhotos((current) => current.map((photo) => failedIds.has(photo.id) ? { ...photo, uploadState: "failed" } : photo));
         setError(cancelRequestedRef.current
           ? `업로드를 중단했습니다. 남은 ${remainingFiles.length.toLocaleString()}장을 다시 시도할 수 있어요.`
           : e instanceof Error ? e.message : "업로드 중 오류가 발생했습니다.");
@@ -298,7 +318,7 @@ export default function CustomerUploadPage() {
         setEstimatedRemainingSeconds(null);
         uploadAbortRef.current = null;
         await Promise.all([refresh(), getAccountUsage().then(setAccountUsage)]);
-        clearPendingPreviews();
+        finishPending();
         return;
       }
       uploadTimingSamplesRef.current = [
@@ -309,11 +329,12 @@ export default function CustomerUploadPage() {
         uploadTimingSamplesRef.current,
         selectedFiles.length - i - rawBatch.length
       ));
-      setProgress(uploaded);
-      setPendingPhotos((current) => current.map((photo) => batchIds.has(photo.id) ? { ...photo, isUploading: false } : photo));
+      setProgress(i + rawBatch.length); // 처리한 장수(실패 포함) — 진행 막대용, 결과 안내는 uploaded로 따로 센다
+      setCompressedInBatch(0);
+      setPendingPhotos((current) => current.map((photo) => batchIds.has(photo.id) ? { ...photo, uploadState: failedIds.has(photo.id) ? "failed" : "done" } : photo));
     }
     await Promise.all([refresh(), getAccountUsage().then(setAccountUsage)]);
-    clearPendingPreviews();
+    finishPending();
     setUploading(false);
     setUploadPhase(null);
     setEstimatedRemainingSeconds(null);
@@ -473,6 +494,8 @@ export default function CustomerUploadPage() {
   const displayName = project.name || "이름 없는 프로젝트";
   const displayedPhotos = useMemo(() => [...project.photos, ...pendingPhotos], [project.photos, pendingPhotos]);
   const sortedPhotos = useMemo(() => [...displayedPhotos].sort((a, b) => {
+    // 올리는 중·실패한 사진은 정렬과 상관없이 맨 앞에 올린 순서대로 — 스크롤하지 않아도 어디까지 올라갔는지 보인다.
+    if (a.isPending || b.isPending) return Number(Boolean(b.isPending)) - Number(Boolean(a.isPending)) || a.orderIndex - b.orderIndex;
     // 촬영 시각 없는 사진(카톡·캡처 등)은 뒤로. 시각 문자열은 같은 형식(카메라 현지 시각)이라 문자열 비교로 충분하다.
     if (sort === "taken-asc") return (a.takenAt ?? "\uffff").localeCompare(b.takenAt ?? "\uffff") || a.orderIndex - b.orderIndex;
     if (sort === "order-desc") return b.orderIndex - a.orderIndex;
@@ -493,19 +516,23 @@ export default function CustomerUploadPage() {
     deleteImpact.aiPhotos && `AI 분석 ${deleteImpact.aiPhotos.toLocaleString()}장`,
     deleteImpact.retouchedVersions && `보정본 ${deleteImpact.retouchedVersions.toLocaleString()}개`,
   ].filter(Boolean) as string[] : [];
+  // 압축을 마친 사진은 한 장의 30%로 친다 — 압축하는 동안 0%에 멈춰 보이지 않게.
+  const uploadPercent = total ? Math.min(100, Math.round(((progress + compressedInBatch * 0.3) / total) * 100)) : 0;
   const uploadStatus = uploading ? (
-    <div className="flex items-center gap-3" role="status" aria-live="polite">
-      <svg className="size-[22px] shrink-0 -rotate-90" viewBox="0 0 20 20" aria-hidden>
-        <circle cx="10" cy="10" r="8" fill="none" stroke="var(--border)" strokeWidth="2.5" />
-        <circle cx="10" cy="10" r="8" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="50.27" strokeDashoffset={50.27 * (1 - (total ? progress / total : 0))} />
-      </svg>
-      <div>
-        <p className="text-sm font-bold text-foreground">{uploadPhase === "compressing" ? "사진 압축 중" : "사진 업로드 중"}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{progress.toLocaleString()} / {total.toLocaleString()}장 · {total ? Math.round((progress / total) * 100) : 0}% · {estimatedRemainingSeconds === null ? "예상 시간 계산 중" : formatUploadRemainingTime(estimatedRemainingSeconds)}{queuedCount ? ` · 대기 ${queuedCount.toLocaleString()}장` : ""}</p>
-        {slowBatch ? <p className="mt-1 text-xs font-semibold text-foreground">서버에서 사진을 정리하고 있어요. 인터넷이 느리면 조금 더 걸릴 수 있어요.</p> : null}
+    <div className="shrink-0 border-b border-border-subtle bg-surface px-3 py-2 md:px-8">
+      <div className="flex items-center justify-between gap-3">
+        <p className="min-w-0 truncate text-[13px]" role="status" aria-live="polite">
+          <strong className="font-bold text-foreground">{uploadPhase === "compressing" ? "사진 압축 중" : "사진 업로드 중"}</strong>
+          <span className="ml-2 tabular-nums text-muted-foreground">{progress.toLocaleString()} / {total.toLocaleString()}장 · {estimatedRemainingSeconds === null ? "예상 시간 계산 중" : formatUploadRemainingTime(estimatedRemainingSeconds)}{queuedCount ? ` · 대기 ${queuedCount.toLocaleString()}장` : ""}</span>
+        </p>
+        <button type="button" onClick={cancelUpload} className="h-9 shrink-0 rounded-lg px-3 text-[13px] font-semibold text-muted-foreground hover:bg-danger/8 hover:text-danger">업로드 중단</button>
       </div>
+      <div className="mt-1 h-1 overflow-hidden rounded-full bg-border" role="progressbar" aria-label="업로드 진행률" aria-valuemin={0} aria-valuemax={100} aria-valuenow={uploadPercent}>
+        <div className="h-full rounded-full bg-accent transition-[width] duration-300" style={{ width: `${uploadPercent}%` }} />
+      </div>
+      {slowBatch ? <p className="mt-1.5 text-xs font-semibold text-foreground">서버에서 사진을 정리하고 있어요. 인터넷이 느리면 조금 더 걸릴 수 있어요.</p> : null}
     </div>
-  ) : undefined;
+  ) : null;
 
   // 장면은 촬영 시각으로 나눈다(src/lib/customer-scenes.ts: MIN_PHOTOS_FOR_SCENES장 이상·시각 있는 사진 80% 이상일 때만).
   // 카톡으로 받은 사진·캡처본은 시각이 빠져 있다. 고르는 데는 문제없으니 다시 올리라고 하지 않고, 어떻게 보이는지만 알린다.
@@ -544,7 +571,7 @@ export default function CustomerUploadPage() {
           <div className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-0 md:min-h-[52px] md:px-8 md:py-1">
             <>
               <div className="flex min-w-0 flex-1 items-center justify-between gap-2 md:flex-none md:justify-start">
-                <ProjectAssetToolbarSummary label={nameFilter.trim() ? "검색 결과" : "사진"} count={`${visiblePhotos.length.toLocaleString()}장`} meta={displayedPhotos.length > 0 ? <span className="max-md:hidden">{uploading ? `${progress.toLocaleString()} / ${total.toLocaleString()}장 처리 중` : "드래그하거나 체크해 여러 장 선택"}</span> : undefined} />
+                <ProjectAssetToolbarSummary label={nameFilter.trim() ? "검색 결과" : "사진"} count={`${visiblePhotos.length.toLocaleString()}장`} meta={displayedPhotos.length > 0 && !uploading ? <span className="max-md:hidden">드래그하거나 체크해 여러 장 선택</span> : undefined} />
                 <div className="flex shrink-0 items-center md:hidden">
                   <ProjectAssetMobileIconButton className="relative" onClick={() => setMobileToolsOpen(true)} aria-label="검색 및 정렬 설정" aria-haspopup="dialog" aria-expanded={mobileToolsOpen}>
                     <SlidersHorizontal size={18} aria-hidden />
@@ -561,6 +588,7 @@ export default function CustomerUploadPage() {
           </div>
         </header>
 
+        {uploadStatus}
         {checkingCapacity ? <p role="status" className="px-5 py-2 text-sm text-muted-foreground">업로드 가능한 장수를 확인하고 있어요…</p> : null}
         {error ? <div role="alert" className="hidden shrink-0 border-b border-danger/20 bg-danger/8 px-8 py-2.5 text-[13px] font-semibold text-danger md:block">{error}{needsReselection ? <button type="button" onClick={() => inputRef.current?.click()} className="ml-3 min-h-11 underline">파일 다시 선택</button> : null}</div> : null}
 
@@ -624,7 +652,7 @@ export default function CustomerUploadPage() {
               squareMedia
               compact={isMobile}
               showFilename={false}
-              leadingCell={<PhotoUploadTile isUploading={uploading || checkingCapacity} progress={total ? Math.round((progress / total) * 100) : 0} serverWorking={checkingCapacity} hasPhotos={displayedPhotos.length > 0} onClick={() => inputRef.current?.click()} />}
+              leadingCell={<PhotoUploadTile isUploading={uploading || checkingCapacity} progress={uploadPercent} serverWorking={checkingCapacity} hasPhotos={displayedPhotos.length > 0} onClick={() => inputRef.current?.click()} />}
               onPhotoClick={(index) => { const photo = visiblePhotos[index]; if (photo && !photo.isPending) setViewerPhotoId(photo.id); }}
             />
           )}
@@ -634,9 +662,9 @@ export default function CustomerUploadPage() {
           className="shrink-0"
           viewportFixed
           compactMobile
-          leading={uploadStatus ?? uploadDone}
-          mobileLeading={uploadStatus ?? uploadDone}
-          actions={uploading ? <PhotographerLightButton size="work-panel" variant="secondary" onClick={cancelUpload}>업로드 중단</PhotographerLightButton> : <>
+          leading={uploadDone}
+          mobileLeading={uploadDone}
+          actions={uploading ? <PhotographerLightButton size="work-panel" disabled>사진 고르기 →</PhotographerLightButton> : <>
             {retryFiles.length > 0 ? <PhotographerLightButton size="work-panel" variant="secondary" onClick={() => void handleFiles(retryFiles)}>실패 {retryFiles.length.toLocaleString()}장 다시 시도</PhotographerLightButton> : null}
             {selectedPhotoIds.size > 0 ? <PhotographerLightButton size="work-panel" variant="danger" pending={checkingDelete} pendingLabel="확인 중" onClick={() => void requestDeleteSelectedPhotos()}><Trash2 size={16} />선택 삭제 ({selectedPhotoIds.size.toLocaleString()})</PhotographerLightButton> : null}
             {selectedPhotoIds.size === 0 ? <PhotographerLightButton size="work-panel" disabled={project.photoCount === 0 || deleting || checkingCapacity} onClick={goSelect}>사진 고르기 →</PhotographerLightButton> : null}

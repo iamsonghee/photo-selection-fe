@@ -296,6 +296,10 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
           </button>
         ) : null}
         {photo.isUploading || props.compressingPhotoId === photo.id ? <span className="absolute right-2 top-2 z-[6] text-accent"><Loader2 size={16} className="animate-spin" /></span> : null}
+        {/* 대기는 흐리게, 전송은 흐리게+스피너, 실패는 빨간 테두리 — 완료는 표시 없이 원래 밝기(체크는 최종 선택으로 읽힘). 선명한 칸과 흐린 칸의 경계로 진행이 보인다 */}
+        {photo.uploadState === "waiting" ? <span className="pointer-events-none absolute inset-0 z-[5] bg-background/60" aria-label="업로드 대기" /> : null}
+        {photo.uploadState === "uploading" ? <span className="pointer-events-none absolute inset-0 z-[5] grid place-items-center bg-background/40 text-accent" aria-label="업로드 중"><Loader2 size={20} className="animate-spin" /></span> : null}
+        {photo.uploadState === "failed" ? <span className="pointer-events-none absolute inset-0 z-[5] grid place-items-center rounded-[inherit] bg-background/50 text-danger ring-2 ring-inset ring-danger" aria-label="업로드 실패"><AlertTriangle size={20} /></span> : null}
         {(props.recommendedPhotoIds?.has(photo.id) ?? photo.photographerRecommended) ? (
           <span className={styles.recommendBadge} aria-label="작가 추천"><RecommendationMark size={12} aria-hidden /><span>작가 추천</span></span>
         ) : null}
