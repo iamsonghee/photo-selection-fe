@@ -1,5 +1,5 @@
 // Keep aligned with BE MAX_PHOTOS_PER_CUSTOMER_ACCOUNT until plan-specific limits exist.
-export const CUSTOMER_PHOTO_LIMIT = 2000;
+export const CUSTOMER_PHOTO_LIMIT = 5000;
 
 export function uploadLimitError(currentCount: number, selectedCount: number): string | null {
   const remaining = Math.max(0, CUSTOMER_PHOTO_LIMIT - currentCount);

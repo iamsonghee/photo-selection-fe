@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { project } = access;
 
   const participantsQuery = admin.from("customer_project_participants").select("color, nickname, done").eq("project_id", id);
-  // 사진별 행(사진·셀렉·판정·의견)은 1,000행을 넘을 수 있어(한도 2,000장) 나눠 끝까지 읽는다.
+  // 사진별 행(사진·셀렉·판정·의견)은 1,000행을 넘을 수 있어(한도 5,000장) 나눠 끝까지 읽는다.
   const loaded = await Promise.all([
     allRows((from, to) => admin.from("customer_photos").select("id, filename, order_index, thumb_url, preview_url, similarity_group_id, taken_at, taken_at_source").eq("project_id", id).order("id").range(from, to)),
     allRows((from, to) => admin.from("customer_selections").select("photo_id, rating, color_tags, comment, is_selected").eq("project_id", id).order("id").range(from, to)),

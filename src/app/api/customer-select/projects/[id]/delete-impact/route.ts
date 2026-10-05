@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { resolveCustomerProjectAccess, shareTokenFromRequest } from "@/lib/customer-select-server";
+import { CUSTOMER_PHOTO_LIMIT } from "@/app/customer-select/_lib/upload-limit";
 
 // PostgREST는 `in.(...)` 목록을 URL에 싣는다 — ID 약 600개를 넘으면 400으로 거절해 전체 선택 삭제가 실패했다.
 // 목록 조회는 이 크기로 나눠 보내고 결과를 합친다.
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const photoIds: string[] = Array.isArray(body.photo_ids)
     ? [...new Set<string>(body.photo_ids.filter((value: unknown): value is string => typeof value === "string" && value.length > 0))]
     : [];
-  if (!photoIds.length || photoIds.length > 2000) return NextResponse.json({ error: "삭제할 사진을 확인해주세요." }, { status: 400 });
+  if (!photoIds.length || photoIds.length > CUSTOMER_PHOTO_LIMIT) return NextResponse.json({ error: "삭제할 사진을 확인해주세요." }, { status: 400 });
 
   const [photos, selections, opinions, quality, versions] = await Promise.all([
     inChunks(photoIds, (chunk) => admin.from("customer_photos").select("id, similarity_group_id").eq("project_id", id).in("id", chunk)),

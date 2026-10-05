@@ -32,7 +32,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (access instanceof NextResponse) return access;
   const { project } = access;
 
-  // 사진은 1,000장을 넘을 수 있어(한도 2,000장) 나눠 끝까지 읽는다 — 잘리면 뒤쪽에서 고른 사진이 빠진다.
+  // 사진은 1,000장을 넘을 수 있어(한도 5,000장) 나눠 끝까지 읽는다 — 잘리면 뒤쪽에서 고른 사진이 빠진다.
   const [projectPhotos, selections] = await Promise.all([
     allRows((from, to) => admin.from("customer_photos").select("id, filename, thumb_url, preview_url").eq("project_id", id).order("id").range(from, to)).catch(() => null),
     allRows((from, to) => admin.from("customer_selections").select("photo_id").eq("project_id", id).eq("is_selected", true).order("id").range(from, to)).catch(() => null),
