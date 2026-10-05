@@ -21,6 +21,13 @@
 저장한다. `"file"`(EXIF가 없어 `lastModified`로 대신한 값 — HEIC·카카오톡·스크린샷 등)은 정렬 참고용일 뿐 장면 경계·촬영 시각 비율에는
 쓰지 않는다(`scene_taken_at`/`sceneTime`). 그 전 사진은 출처가 NULL이고 기존처럼 그대로 쓴다.
 
+작가 업로드 촬영 시각(2026-10-05, 저장만): 나중에 이미지 분석(장면 나누기 등)에 쓰려고 작가 업로드에서도 같은 값을 모은다.
+작가 업로드 화면(`/photographer/projects/[id]/upload`)이 묶음을 보내기 직전에 원본에서 같은 `readTakenAt`으로 읽어, 파일마다
+`taken_ats`·`taken_at_sources` 폼 필드(다른 `original_*` 필드처럼 파일 수만큼 반복, 값이 없으면 빈 문자열)로 보낸다.
+BE `POST /api/upload/photos`는 형식이 맞는 값만 `photos.taken_at`·`photos.taken_at_source`에 저장한다(`_parse_taken_at`, 틀리면 버릴 뿐 업로드는 계속).
+DB 마이그레이션 `20261005100000_add_photos_taken_at.sql`이 두 칸을 만들고 `insert_photos_with_numbers`가 채우도록 바꾼다 — 이전 함수는
+row JSON의 `taken_at` 키를 무시하므로 FE·BE·마이그레이션 배포 순서는 상관없다(마이그레이션 전 업로드는 NULL로 남음). 작가 화면 정렬·분석에는 아직 쓰지 않는다.
+
 진단·대기 안내(2026-10-01): BE는 배치마다 `customer upload timing` 한 줄로 인증·한도 확인, 파일 읽기, 사진 처리
 전체와 디코딩·R2 업로드 최대 시간, DB 저장, 전체 시간을 남긴다. 평소에는 info 로그이고, 전체가
 `SLOW_UPLOAD_SECONDS`(15초)를 넘으면 warning으로 남겨 로컬 기본 설정에서도 출력된다. FE는 한 배치의 서버
@@ -322,7 +329,7 @@ FastAPI 서버 측 동시성(요청 1건 안에서 파일별 처리) — 파이�
 | 배치 응답 성공 직후 | `pendingPhotos` | 위와 같은 압축본 blob URL 유지(서버가 반환한 thumb_url을 쓰지 않음 — iOS에서 업로드 XHR과 동시에 DB 조회하면 연결 한도를 초과하는 문제 회피) |
 | **전체 업로드 세션 종료 후, 딱 1회** | `photos`(DB) | `getPhotosByProjectId()` 재조회 → 이때 처음으로 실제 `r2_thumb_url` 사용 |
 
-각 파일은 큐에 들어올 때 만든 `tempId`와 `sourceIndex`를 `queuedPreviews → uploadingPhotos → pendingPhotos` 사이에서 그대로 인계받고, `sourceIndex` 순서로 렌더한다. 임시 사진이 DB 사진으로 교체될 때도 파일명 기반 key를 유지한다. 카드 컴포넌트는 새 blob URL이나 서버 썸네일을 투명 상태로 먼저 해독한 뒤에만 180ms 페이드로 교체하므로 상태 전환 때 카드가 재마운트되거나 번쩍이지 않는다. 각 blob URL은 세션 종료/실패/중단 때 즉시 revoke한다.
+각 파일은 큐에 들어올 때 만든 `tempId`와 `sourceIndex`를 `queuedPreviews → uploadingPhotos → pendingPhotos` 사이에서 그대로 인계받고, `sourceIndex` 순서로 렌더한다. 임시 사진이 DB 사진으로 교체될 때도 업로드 키(`client_upload_id`) 기반 key `upload:<키>`를 유지한다 — 2026-10-05 전에는 파일명 기반이라, 같은 파일명을 다시 올리면 key가 겹치고(React 경고) 이미 같은 이름 사진이 있으면 새 미리보기가 숨었다. 키가 없는 예전 사진은 사진 id를 key로 쓴다. 카드 컴포넌트는 새 blob URL이나 서버 썸네일을 투명 상태로 먼저 해독한 뒤에만 180ms 페이드로 교체하므로 상태 전환 때 카드가 재마운트되거나 번쩍이지 않는다. 각 blob URL은 세션 종료/실패/중단 때 즉시 revoke한다.
 
 즉 모든 기기에서 pipeline batch가 여러 번 반복되어도 세션 도중에는 서버 썸네일 URL을 한 번도 참조하지 않는다. 이 구조 때문에, 만약 향후 썸네일/프리뷰 생성을 비동기로 지연시키더라도 **업로드 세션 진행 중 화면 표시 자체는 깨지지 않는다** — 다만 다음 두 지점은 현재 코드가 "생성이 항상 동기로 끝나 있다"를 전제로 하고 있어 영향을 받는다:
 - `insert_photos_with_numbers` 시점에 `r2_thumb_url`이 이미 있어야 한다(현재 photos row는 thumb_url 없이 존재할 수 없음).

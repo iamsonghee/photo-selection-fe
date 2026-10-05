@@ -90,6 +90,7 @@ function mapPhotoRow(
     faceDetected: (row as { face_detected?: boolean | null }).face_detected ?? null,
     eyesClosed: (row as { eyes_closed?: boolean | null }).eyes_closed ?? null,
     originalStatus: row.original_status ?? null,
+    clientUploadId: row.client_upload_id ?? null,
   };
 }
 
@@ -364,7 +365,7 @@ export async function getPhotosByProjectId(projectId: string): Promise<Photo[]> 
   // BETA_MAX=3000이므로 3페이지를 처음부터 병렬 요청 — count 왕복 없음.
   const PAGE = 1000;
   const SOURCE_COLS =
-    "id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, is_photographer_recommended, file_size, source_file_size, source_width, source_height, source_content_type, source_last_modified, similarity_group_id, is_blurry, face_detected, eyes_closed, original_status";
+    "id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, is_photographer_recommended, file_size, source_file_size, source_width, source_height, source_content_type, source_last_modified, similarity_group_id, is_blurry, face_detected, eyes_closed, original_status, client_upload_id";
   const LEGACY_COLS =
     "id, project_id, number, r2_thumb_url, r2_preview_url, original_filename, file_size, similarity_group_id, is_blurry, face_detected, eyes_closed, original_status";
 

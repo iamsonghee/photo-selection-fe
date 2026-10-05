@@ -30,6 +30,7 @@ import { createClient } from "@/lib/supabase/client";
 import { parseBetaLimitError, DEFAULT_BETA_MAX_PHOTOS_PER_PROJECT } from "@/lib/beta-limits";
 import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 import { compressImagesInParallel, type UploadSourceMetadata } from "@/lib/upload-client-compress";
+import { readTakenAt } from "@/lib/exif-taken-at";
 import { UploadTelemetry, UPLOAD_SAMPLE_MS, describeUpload, formatUploadBytes, type UploadSnapshot, type UploadStage } from "@/lib/upload-telemetry";
 import { AdaptiveUploadConcurrency, UploadWorkQueue, uploadDeferred, UPLOAD_INTERMEDIATE_MAX_EDGE, UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
@@ -355,6 +356,8 @@ type UploadPreview = {
   blobUrl: string;
   filename: string;
   sourceIndex: number;
+  /** 저장된 사진과 같은 칸으로 잇는 키. 파일명은 겹칠 수 있어 쓰지 않는다 */
+  clientUploadId: string;
 };
 
 type UploadFailure = {
@@ -1103,7 +1106,8 @@ export default function ProjectDetailPage() {
 
   /** 기존 photos + 배치 완료(pending) + 전송 중(uploading) + 큐(queued) 합산 — early return 이전에 선언해야 Rules of Hooks 준수 */
   const displayPhotos = useMemo(() => {
-    const confirmedNames = new Set(photos.map((p) => p.originalFilename));
+    // 저장된 사진과는 업로드 키로 짝짓는다 — 파일명으로 맞추면 같은 이름 사진이 이미 있을 때 새 미리보기가 숨고 칸 key도 겹친다.
+    const confirmedUploadIds = new Set(photos.map((p) => p.clientUploadId).filter(Boolean));
     const uploadingIds = new Set(uploadingPhotos.map((p) => p.tempId));
     // 카드가 완료 순서에 따라 pending/uploading/queued 묶음 사이를 오가면 위치가 바뀐다.
     // tempId별로 하나만 남기고 원래 파일 순서(sourceIndex)로 정렬해, 상태만 바뀌게 한다.
@@ -1112,7 +1116,7 @@ export default function ProjectDetailPage() {
       previewsById.set(preview.tempId, preview);
     }
     const optimisticPhotos: Photo[] = [...previewsById.values()]
-      .filter((p) => !confirmedNames.has(p.filename))
+      .filter((p) => !confirmedUploadIds.has(p.clientUploadId))
       .sort((a, b) => a.sourceIndex - b.sourceIndex)
       .map((p) => ({
         id: p.tempId,
@@ -1120,6 +1124,7 @@ export default function ProjectDetailPage() {
         orderIndex: 99999,
         url: p.blobUrl,
         originalFilename: p.filename,
+        clientUploadId: p.clientUploadId,
         isPending: true,
         isUploading: uploadingIds.has(p.tempId),
       }));
@@ -2023,7 +2028,7 @@ export default function ProjectDetailPage() {
         }
         // 중단/복구 등으로 큐 미리보기가 없을 때도 압축본 미리보기를 만든다.
         const blobUrl = URL.createObjectURL(file);
-        return { tempId: `uploading-${inFlightNow}-${batchIndex}-${fi}`, blobUrl, filename: file.name, sourceIndex };
+        return { tempId: `uploading-${inFlightNow}-${batchIndex}-${fi}`, blobUrl, filename: file.name, sourceIndex, clientUploadId: clientUploadIds[sourceIndex] };
       });
       const inFlightIds = new Set(inFlight.map((p) => p.tempId));
       let previewRetained = false;
@@ -2049,6 +2054,8 @@ export default function ProjectDetailPage() {
         const globalIdx = batchIndex;
         // B Plan: rawFile은 브라우저 원본 파일 (effectiveBatch=1이므로 globalIdx가 uploadFiles와 1:1 대응). HEIC는 원본 PUT 불가 → undefined.
         const rawFile = (inclOrig && !isHeicFile(uploadFiles[globalIdx])) ? uploadFiles[globalIdx] : undefined;
+        // 원본 촬영 시각 — 압축본은 EXIF가 지워져 원본에서 읽는다(파일 앞부분만 읽어 빠름). 지금은 저장만 하고 나중에 이미지 분석에 쓴다.
+        const takenAts = await Promise.all(batch.map((file, fileIndex) => readTakenAt(uploadFiles[batchIndex * effectiveBatch + fileIndex] ?? file)));
         const buildForm = () => {
           const f = new FormData();
           f.append("project_id", id);
@@ -2068,6 +2075,8 @@ export default function ProjectDetailPage() {
             f.append("original_content_types", sourceFile.type === "image/jpg" ? "image/jpeg" : sourceFile.type || "");
             f.append("source_widths", String(sourceInfo?.width ?? 0));
             f.append("source_heights", String(sourceInfo?.height ?? 0));
+            f.append("taken_ats", takenAts[fileIndex].takenAt ?? "");
+            f.append("taken_at_sources", takenAts[fileIndex].source ?? "");
           });
           return f;
         };
@@ -2271,7 +2280,7 @@ export default function ProjectDetailPage() {
           const chunkQueued = batchIndexes.flatMap(batchIndex => rawBatches[batchIndex].map((file, i) => {
             const blobUrl = URL.createObjectURL(file);
             const sourceIndex = batchIndex * effectiveBatch + i;
-            const preview = { tempId: `upload-${chunkTs}-${sourceIndex}`, blobUrl, filename: file.name, sourceIndex };
+            const preview = { tempId: `upload-${chunkTs}-${sourceIndex}`, blobUrl, filename: file.name, sourceIndex, clientUploadId: clientUploadIds[sourceIndex] };
             queuedBlobsRef.current.push(blobUrl);
             queuedPreviewBySourceIndexRef.current.set(sourceIndex, preview);
             return preview;
@@ -2363,7 +2372,7 @@ export default function ProjectDetailPage() {
         const chunkQueued = allRawInChunk.map((file, i) => {
           const blobUrl = URL.createObjectURL(file);
           const sourceIndex = chunkStart * effectiveBatch + i;
-          const preview = { tempId: `upload-${chunkTs}-${sourceIndex}`, blobUrl, filename: file.name, sourceIndex };
+          const preview = { tempId: `upload-${chunkTs}-${sourceIndex}`, blobUrl, filename: file.name, sourceIndex, clientUploadId: clientUploadIds[sourceIndex] };
           queuedBlobsRef.current.push(blobUrl);
           queuedPreviewBySourceIndexRef.current.set(sourceIndex, preview);
           return preview;
@@ -4033,7 +4042,7 @@ export default function ProjectDetailPage() {
                 mobileGridGap={6}
                 mobileSquareMedia
                 thumbQueue={thumbQueue}
-                getPhotoKey={(photo) => photo.originalFilename ? `upload:${photo.originalFilename}` : photo.id}
+                getPhotoKey={(photo) => photo.clientUploadId ? `upload:${photo.clientUploadId}` : photo.id}
                 onPhotoClick={recommendationEditActive ? (index) => toggleTrayPhoto(galleryPhotos[index].id) : handleOpenPhotoViewer}
                 showQualityBadges
                 showOriginalUploadBadges={project.includeOriginal
