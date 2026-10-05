@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { CUSTOMER_PHOTO_LIMIT as LIMIT, uploadLimitError } from "../src/app/customer-select/_lib/upload-limit.ts";
 
-assert.equal(LIMIT, 5000);
+assert.equal(LIMIT, 3000);
 assert.equal(uploadLimitError(LIMIT - 1, 1), null);
 assert.match(uploadLimitError(LIMIT - 1, 2), /다시 선택/);
 assert.match(uploadLimitError(LIMIT - 1, 2), /셀프 고객 전체/);

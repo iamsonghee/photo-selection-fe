@@ -11,7 +11,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const access = await resolveCustomerProjectAccess(admin, id, shareTokenFromRequest(req, id));
   if (access instanceof NextResponse) return access;
 
-  // 셀렉·의견은 사진별 행이라 1,000행을 넘을 수 있어(한도 5,000장) 나눠 끝까지 읽는다.
+  // 셀렉·의견은 사진별 행이라 1,000행을 넘을 수 있어(한도 3,000장) 나눠 끝까지 읽는다.
   const [selections, participants, opinions, presence] = await Promise.all([
     allRows((from, to) => admin.from("customer_selections").select("photo_id, rating, color_tags, comment, is_selected").eq("project_id", id).order("id").range(from, to)).catch(() => null),
     admin.from("customer_project_participants").select("color, nickname, done").eq("project_id", id),
