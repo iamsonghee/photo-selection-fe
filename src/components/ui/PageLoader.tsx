@@ -47,7 +47,7 @@ export function PageLoader({ text }: { text?: string }) {
               animation: "pl-pulse 2s ease-in-out infinite",
             }}
           >
-            <span style={{ color: "#000", fontWeight: 900, fontSize: 10, fontFamily: "'JetBrains Mono', 'Space Mono', monospace", lineHeight: 1 }}>A</span>
+            <span style={{ color: "#000", fontWeight: 900, fontSize: 10, fontFamily: "var(--font-mono)", lineHeight: 1 }}>A</span>
           </div>
         </div>
 
@@ -67,7 +67,7 @@ export function PageLoader({ text }: { text?: string }) {
 
         {/* 선택적 텍스트 */}
         {text && (
-          <p style={{ fontFamily: "'JetBrains Mono', 'Space Mono', monospace", fontSize: 11, color: "var(--subtle-foreground)", letterSpacing: "0.05em", margin: 0 }}>
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--subtle-foreground)", letterSpacing: "0.05em", margin: 0 }}>
             {text}
           </p>
         )}

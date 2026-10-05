@@ -34,7 +34,7 @@ export default async function AdminUserDetailPage({
   return (
     <div>
       <Link href="/admin/users" className="text-xs text-muted-foreground hover:text-foreground">
-        ← Beta Users 목록으로
+        ← 작가 계정 목록으로
       </Link>
 
       <div className="mt-3 flex items-center gap-3">

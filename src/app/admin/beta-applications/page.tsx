@@ -34,7 +34,7 @@ export default async function AdminBetaApplicationsPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-foreground">Beta Applications</h1>
+      <h1 className="text-2xl font-semibold text-foreground">베타 신청</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         베타 신청 {all.length}건 {status !== "all" ? `· ${BETA_APPLICATION_STATUS_LABELS[status as BetaApplicationStatus]} ${filtered.length}건` : ""}
       </p>
@@ -77,9 +77,9 @@ export default async function AdminBetaApplicationsPage({
           <thead>
             <tr className="border-b border-border bg-surface-raised text-left text-xs uppercase tracking-wide text-muted-foreground">
               <th className="px-4 py-3 font-medium">이름</th>
-              <th className="px-4 py-3 font-medium">휴대폰번호</th>
+              <th className="px-4 py-3 font-medium">휴대폰 번호</th>
               <th className="px-4 py-3 font-medium">장르</th>
-              <th className="px-4 py-3 font-medium">월평균건수</th>
+              <th className="px-4 py-3 font-medium">월평균 촬영 건수</th>
               <th className="px-4 py-3 font-medium">상태</th>
               <th className="px-4 py-3 font-medium">신청일</th>
             </tr>

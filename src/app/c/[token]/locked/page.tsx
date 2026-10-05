@@ -71,7 +71,7 @@ function PhotoCard({ photo }: { photo: ReviewResultPhoto }) {
           <div className="lk-comment-label text-[9px] font-bold tracking-wide mb-1">재보정 요청</div>
           {photo.customerComment
             ? <>&ldquo;{photo.customerComment}&rdquo;</>
-            : <span className="lk-comment-empty italic">코멘트 없음</span>
+            : <span className="lk-comment-empty italic">요청 내용 없음</span>
           }
         </div>
       )}
@@ -100,7 +100,7 @@ function SimplePhotoCard({ photo, comment, onOpen }: { photo: Photo; comment?: s
       {!onOpen && <p className="lk-filename text-[11px] font-mono truncate" title={filename}>{filename}</p>}
       {note && (
         <span className="lk-comment lk-comment-plain rounded-lg p-2 text-[11px] leading-relaxed">
-          <span className="lk-comment-label text-[9px] font-bold tracking-wide">코멘트</span>
+          <span className="lk-comment-label text-[9px] font-bold tracking-wide">작가 전달 메모</span>
           &ldquo;{note}&rdquo;
         </span>
       )}
@@ -413,7 +413,7 @@ function LockedMobileGallery({ token, selectedPhotos, allPhotos, selectedIds, co
     <div className={`locked-mobile locked-density-${columns}`}>
       <header className="locked-mobile-appbar">
         <button type="button" onClick={() => router.push(`/c/${token}/confirmed`)} aria-label="완료 화면으로 돌아가기"><ChevronLeft size={24} /></button>
-        <h1>셀렉 상세보기</h1>
+        <h1>셀렉 결과</h1>
       </header>
 
       <aside className="locked-mobile-status">
@@ -424,13 +424,13 @@ function LockedMobileGallery({ token, selectedPhotos, allPhotos, selectedIds, co
       <div className="locked-mobile-toolbar">
         <div className="locked-mobile-scope">
           <button type="button" onClick={() => setScopeOpen((open) => !open)} aria-expanded={scopeOpen}>
-            <strong>{scope === "selected" ? "셀렉" : "원본"}</strong>
+            <strong>{scope === "selected" ? "선택한 사진" : "원본"}</strong>
             <span>{sourcePhotos.length.toLocaleString()}장</span>
             <ChevronDown size={8} aria-hidden />
           </button>
           {scopeOpen && (
             <div role="menu">
-              <button type="button" role="menuitem" onClick={() => changeScope("selected")}>셀렉 <span>{selectedPhotos.length.toLocaleString()}장</span></button>
+              <button type="button" role="menuitem" onClick={() => changeScope("selected")}>선택한 사진 <span>{selectedPhotos.length.toLocaleString()}장</span></button>
               <button type="button" role="menuitem" onClick={() => changeScope("original")}>원본 <span>{allPhotos.length.toLocaleString()}장</span></button>
             </div>
           )}
@@ -481,7 +481,7 @@ function LockedMobileGallery({ token, selectedPhotos, allPhotos, selectedIds, co
                       *  1) 검색 중 — 파일명이 곧 작업의 대상이라 안 보이면 무엇이 왜 걸렸는지 알 수 없다.
                       *  2) 상세보기를 열 수 없는 상태 — 그러면 격자가 이름이 나올 유일한 자리다. */}
                     {(normalizedQuery || !canOpenDetail) && <strong>{filename}</strong>}
-                    {scope === "selected" && <small className={comment ? "has-comment" : ""}>{comment || "코멘트 없음"}</small>}
+                    {scope === "selected" && <small className={comment ? "has-comment" : ""}>{comment || "메모 없음"}</small>}
                   </span>
                 </button>
               );

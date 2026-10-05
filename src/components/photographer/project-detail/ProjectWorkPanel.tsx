@@ -23,10 +23,10 @@ type WorkMode =
 
 const MOBILE_META_LABELS: Record<string, string> = {
   "업로드된 사진": "업로드",
-  "고객 셀렉 목표": "목표",
+  "셀렉 목표 장수": "목표",
   "셀렉 마감": "마감",
   "재보정 허용": "재보정",
-  "검토 기한": "기한",
+  "검토 마감일": "기한",
   "최종 납품": "납품",
   "최종 보정본 보관 종료": "보관 종료",
   "원본 보관 종료": "원본 보관",
@@ -130,7 +130,7 @@ export function ProjectWorkPanel({
           onClick: onUpload,
           meta: [
             { label: "업로드된 사진", value: "0장" },
-            { label: "고객 셀렉 목표", value: `${project.requiredCount}장` },
+            { label: "셀렉 목표 장수", value: `${project.requiredCount}장` },
           ],
         };
       case "upload-manage":
@@ -149,19 +149,19 @@ export function ProjectWorkPanel({
           onClick: onUpload,
           meta: [
             { label: "업로드된 사진", value: `${project.photoCount}장` },
-            { label: "고객 셀렉 목표", value: `${project.requiredCount}장` },
+            { label: "셀렉 목표 장수", value: `${project.requiredCount}장` },
           ],
         };
       case "selection":
         return {
           eyebrow: "현재 진행",
           title: "고객이 사진을 선택하고 있습니다",
-          description: "고객이 최종 선택을 완료하면 셀렉 결과와 코멘트를 확인할 수 있습니다.",
+          description: "고객이 셀렉을 확정하면 선택한 사진과 작가 전달 메모를 확인할 수 있습니다.",
           cta: "원본 사진 보기",
           icon: <ListChecks size={20} />,
           onClick: onUpload,
           meta: [
-            { label: "고객 셀렉 목표", value: `${project.requiredCount}장` },
+            { label: "셀렉 목표 장수", value: `${project.requiredCount}장` },
             { label: "셀렉 마감", value: deadlineDisplay, overdue: overdueText },
           ],
         };
@@ -172,19 +172,19 @@ export function ProjectWorkPanel({
             project.status === "confirmed"
               ? "고객 셀렉이 확정되었습니다"
               : project.status === "editing_v2"
-              ? "재보정 v2를 진행하세요"
+              ? "재보정을 진행하세요"
               : "보정본을 준비하고 있습니다",
           description:
             project.status === "confirmed"
-              ? "선택된 사진과 고객 코멘트를 확인하고 보정 작업을 시작하세요."
+              ? "선택한 사진과 작가 전달 메모를 확인하고 보정 작업을 시작하세요."
               : project.status === "editing_v2"
-              ? "고객 요청 사항을 반영한 재보정본을 준비하세요."
+              ? "재보정 요청 내용을 반영한 보정본을 준비하세요."
               : "보정이 끝난 사진을 업로드해 고객 검토를 요청하세요.",
           cta: project.status === "confirmed" ? "보정 작업 시작" : "보정 작업 계속하기",
           icon: <PenLine size={20} />,
           onClick: onWorkflow,
           meta: [
-            { label: "고객 셀렉 목표", value: `${project.requiredCount}장` },
+            { label: "셀렉 목표 장수", value: `${project.requiredCount}장` },
             { label: "재보정 허용", value: project.maxRevisionCount === 0 ? "없음" : `최대 ${project.maxRevisionCount}회` },
           ],
         };
@@ -197,7 +197,7 @@ export function ProjectWorkPanel({
           icon: <ListChecks size={20} />,
           onClick: onWorkflow,
           meta: [
-            { label: "검토 기한", value: reviewDeadlineDisplay ?? "미설정", overdue: overdueText },
+            { label: "검토 마감일", value: reviewDeadlineDisplay ?? "미설정", overdue: overdueText },
             { label: "재보정 허용", value: project.maxRevisionCount === 0 ? "없음" : `최대 ${project.maxRevisionCount}회` },
           ],
         };
@@ -227,7 +227,7 @@ export function ProjectWorkPanel({
         return {
           eyebrow: "프로젝트 완료",
           title: "사진 납품이 완료되었습니다",
-          description: "선택 결과와 고객 코멘트 등 프로젝트 이력을 확인할 수 있습니다.",
+          description: "선택 결과와 작가 전달 메모 등 프로젝트 이력을 확인할 수 있습니다.",
           cta: "프로젝트 결과 보기",
           icon: <Flag size={20} />,
           onClick: onResults,

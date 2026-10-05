@@ -42,7 +42,7 @@ export function isCustomerShootType(value: unknown): value is string {
 export function customerShootTypeLabel(value: string | null): string {
   return CUSTOMER_SHOOT_TYPES.find((type) => type.value === value)?.label
     ?? (value && Object.hasOwn(LEGACY_SHOOT_TYPE_LABELS, value) ? LEGACY_SHOOT_TYPE_LABELS[value] : undefined)
-    ?? "촬영 종류 미입력";
+    ?? "촬영 유형 미입력";
 }
 
 export function customerSceneGapSeconds(shootType: string | null | undefined): number | undefined {

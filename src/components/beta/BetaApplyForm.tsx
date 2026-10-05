@@ -29,7 +29,7 @@ function BetaApplySignInPrompt() {
       <p className="text-sm text-muted-foreground">
         베타 신청은 로그인 후 진행할 수 있습니다.
         <br />
-        구글 또는 카카오 계정으로 로그인해주세요.
+        구글 또는 카카오 계정으로 로그인해 주세요.
       </p>
       <Button onClick={() => setAuthOpen(true)} fullWidth>
         로그인하고 신청하기
@@ -110,7 +110,7 @@ function MultiSelectField({
           className="mt-2"
           value={otherValue ?? ""}
           onChange={(e) => onOtherChange(e.target.value)}
-          placeholder="기타 내용을 입력해주세요"
+          placeholder="기타 내용을 입력해 주세요"
         />
       )}
     </fieldset>
@@ -122,7 +122,7 @@ function SelectField({
   options,
   value,
   onChange,
-  placeholder = "선택해주세요",
+  placeholder = "선택해 주세요",
   allowClear = false,
 }: {
   label: string;
@@ -187,19 +187,19 @@ function BetaApplyFormFields({ email }: { email: string }) {
   const [error, setError] = useState("");
 
   function validate(): string | null {
-    if (!name.trim()) return "이름을 입력해주세요.";
+    if (!name.trim()) return "이름을 입력해 주세요.";
     if (!isValidKoreanPhone(phone)) return "휴대폰번호 형식이 올바르지 않습니다. (예: 010-1234-5678)";
-    if (genres.length === 0) return "주 촬영 분야를 선택해주세요.";
-    if (genres.includes("other") && !genreOther.trim()) return "기타 촬영 분야를 입력해주세요.";
-    if (!monthlyProjectRange) return "월평균 촬영 수를 선택해주세요.";
-    if (!avgPhotosRange) return "촬영당 평균 사진 수를 선택해주세요.";
-    if (workflowMethods.length === 0) return "현재 고객 셀렉 방식을 선택해주세요.";
-    if (workflowMethods.includes("other") && !workflowOther.trim()) return "기타 셀렉 방식을 입력해주세요.";
-    if (desiredFeatures.length === 0) return "베타에서 사용해보고 싶은 기능을 선택해주세요.";
+    if (genres.length === 0) return "주 촬영 분야를 선택해 주세요.";
+    if (genres.includes("other") && !genreOther.trim()) return "기타 촬영 분야를 입력해 주세요.";
+    if (!monthlyProjectRange) return "월평균 촬영 수를 선택해 주세요.";
+    if (!avgPhotosRange) return "촬영당 평균 사진 수를 선택해 주세요.";
+    if (workflowMethods.length === 0) return "현재 고객 셀렉 방식을 선택해 주세요.";
+    if (workflowMethods.includes("other") && !workflowOther.trim()) return "기타 셀렉 방식을 입력해 주세요.";
+    if (desiredFeatures.length === 0) return "베타에서 사용해보고 싶은 기능을 선택해 주세요.";
     if (desiredFeatures.includes("other") && !desiredFeaturesOther.trim())
-      return "기타 희망 기능을 입력해주세요.";
-    if (!privacyConsent) return "개인정보 수집·이용에 동의해주세요.";
-    if (!contactConsent) return "베타 운영 관련 연락에 동의해주세요.";
+      return "기타 희망 기능을 입력해 주세요.";
+    if (!privacyConsent) return "개인정보 수집·이용에 동의해 주세요.";
+    if (!contactConsent) return "베타 운영 관련 연락에 동의해 주세요.";
     return null;
   }
 
@@ -241,12 +241,12 @@ function BetaApplyFormFields({ email }: { email: string }) {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error((data as { error?: string }).error ?? "신청에 실패했습니다. 다시 시도해주세요.");
+        throw new Error((data as { error?: string }).error ?? "신청에 실패했습니다. 다시 시도해 주세요.");
       }
 
       router.push("/beta/apply/complete");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "신청에 실패했습니다. 다시 시도해주세요.");
+      setError(e instanceof Error ? e.message : "신청에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
@@ -273,7 +273,7 @@ function BetaApplyFormFields({ email }: { email: string }) {
         label="휴대폰번호 *"
         value={phone}
         onChange={setPhone}
-        onBlur={() => setPhoneError(phone && !isValidKoreanPhone(phone) ? "010-0000-0000 형식으로 입력해주세요." : "")}
+        onBlur={() => setPhoneError(phone && !isValidKoreanPhone(phone) ? "010-0000-0000 형식으로 입력해 주세요." : "")}
         error={phoneError}
       />
 

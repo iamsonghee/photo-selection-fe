@@ -10,9 +10,9 @@ const CLIP_INTERNAL_TOKEN = process.env.CLIP_INTERNAL_TOKEN ?? "";
 const GEMINI_ERROR_MESSAGES: Record<number, string> = {
   404: "프로젝트를 찾을 수 없습니다.",
   409: "이미 분석이 진행 중입니다.",
-  503: "분석 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.",
+  503: "분석 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.",
 };
-const GEMINI_ERROR_FALLBACK = "분석 시작에 실패했습니다. 잠시 후 다시 시도해주세요.";
+const GEMINI_ERROR_FALLBACK = "분석 시작에 실패했습니다. 잠시 후 다시 시도해 주세요.";
 
 /**
  * 베타 전환(2026-07-28) 이후 이 라우트는 모든 작가의 "AI 유사도 분석" 버튼(upload/page.tsx)이

@@ -522,7 +522,7 @@ function SelectScreen() {
       <span>{guideText}{scene && <span className={s.desktopOnlyInline}> · {sceneTitle(scene)}{pickedInScene(scene) ? `에서 ${pickedInScene(scene)}장 골랐어요` : ""}</span>}</span>
     </div>
     <div className={s.barActions}>
-      <PhotographerLightButton size="work-panel" className={finishSoft ? s.finishSoft : ""} disabled={!pickedTotal} onClick={toReview}>선택 완료 →</PhotographerLightButton>
+      <PhotographerLightButton size="work-panel" className={finishSoft ? s.finishSoft : ""} disabled={!pickedTotal} onClick={toReview}>선택 결과 확인하기 →</PhotographerLightButton>
     </div>
   </>;
 

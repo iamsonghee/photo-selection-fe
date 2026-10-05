@@ -13,8 +13,8 @@ type Props = {
   onResults: () => void;
 };
 
-const STEPS = ["원본", "셀렉", "보정", "1차 수정", "2차 수정", "납품"] as const;
-const MOBILE_STEPS = ["원본", "셀렉", "보정", "1차", "2차", "납품"] as const;
+const STEPS = ["원본", "셀렉", "보정", "1차 재보정", "2차 재보정", "납품"] as const;
+const MOBILE_STEPS = ["원본", "셀렉", "보정", "1차 재보정", "2차 재보정", "납품"] as const;
 
 function activeDescription(project: Project, step: number): string {
   if (step === 1) {

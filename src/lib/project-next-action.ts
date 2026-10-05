@@ -23,6 +23,6 @@ export function getDesktopNextAction(project: Project): DesktopNextAction {
     };
     case "reviewing_v2": return { kind: "waiting" };
     // 완료 작업은 최종 납품 사진을 바로 열며 보조 버튼으로 표시한다.
-    case "delivered":    return { kind: "secondary", label: "최종본 보기", href: `${base}/assets/final` };
+    case "delivered":    return { kind: "secondary", label: "최종 보정본 보기", href: `${base}/assets/final` };
   }
 }

@@ -9,9 +9,9 @@ export default function BetaApplyCompletePage() {
         <div className="beta-complete-icon"><Check size={26} aria-hidden="true"/></div>
         <h1 className="mt-3 text-xl font-semibold text-foreground">신청 완료</h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          신청이 정상적으로 접수되었습니다.
+          신청을 접수했어요.
           <br />
-          검토 후 입력하신 번호로 연락드리겠습니다.
+          검토 후 입력하신 번호로 연락드릴게요.
         </p>
         <Link
           href="/"

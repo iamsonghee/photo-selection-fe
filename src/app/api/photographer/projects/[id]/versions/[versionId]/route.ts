@@ -93,7 +93,7 @@ export async function DELETE(
         .or("review_status.not.is.null,reviewed_at.not.is.null")
         .limit(1);
       if (historyError) {
-        return NextResponse.json({ error: "검토 이력을 확인하지 못했습니다. 다시 시도해주세요." }, { status: 500 });
+        return NextResponse.json({ error: "검토 이력을 확인하지 못했습니다. 다시 시도해 주세요." }, { status: 500 });
       }
       if (review?.status || review?.reviewed_at || reviewedHistory?.length) {
         return NextResponse.json(

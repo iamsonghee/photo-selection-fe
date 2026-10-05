@@ -235,7 +235,7 @@ Dashboard(§26)와 Project Detail(§31)은 같은 규칙(Actor 색, Badge, CTA �
 - mono는 프로젝트 ID, 파일명, 숫자 비교, 기술 로그처럼 고정폭이 실제로 도움이 되는 곳에만 사용한다.
 - 한 화면에서 sans + mono 두 family를 넘기지 않는다.
 
-현재 Pretendard와 JetBrains Mono를 이미 사용하고 있으므로 새 폰트 패키지는 필요하지 않다. 구현 단계에서는 CDN import, Google import, `next/font` 중 한 경로로 정리한다.
+Pretendard와 JetBrains Mono는 `globals.css`에서 한 번만 불러오며, 제품 화면은 `--font-sans`와 `--font-mono` 토큰을 사용한다. route CSS와 `next/font`에서 폰트를 다시 불러오지 않는다.
 
 ### 5.2 Type scale
 

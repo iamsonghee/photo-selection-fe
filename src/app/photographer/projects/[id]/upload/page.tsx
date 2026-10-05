@@ -688,7 +688,7 @@ function EmptyUploadPanel({ onBrowse, maxPhotos }: { onBrowse: () => void; maxPh
             </div>
             <div className="w-full text-center">
               <p className="m-0 text-[20px] font-semibold leading-8 tracking-[-0.8px] text-foreground md:text-[24px] md:leading-[48px] md:tracking-[-1.47px]">
-                <span className="hidden md:inline">셀렉할 원본 사진을 준비하세요</span>
+                <span className="hidden md:inline">고객이 선택할 사진을 준비하세요</span>
                 <span className="md:hidden">원본 사진을 선택하세요</span>
               </p>
               <p className="mb-3 hidden text-[14px] leading-6 text-muted-foreground md:block">사진이나 폴더를 이곳에 끌어다 놓을 수 있어요.</p>
@@ -1169,7 +1169,7 @@ export default function ProjectDetailPage() {
       return { subtitle: "모든 사진 분석이 완료됐습니다", buttonLabel: "분석 결과 보기" };
     }
     if (pending !== null && pending > 0 && clipLastRunFailedCount > 0) {
-      return { subtitle: "일부 사진 분석에 실패했습니다. 다시 시도해주세요", buttonLabel: "분석 재개" };
+      return { subtitle: "일부 사진 분석에 실패했습니다. 다시 시도해 주세요", buttonLabel: "분석 재개" };
     }
     if (pending !== null && pending > 0 && alreadyAnalyzed > 0) {
       return {
@@ -2737,7 +2737,7 @@ export default function ProjectDetailPage() {
           }
         }
       }
-      if (failed) setUploadError(`원본 ${failed}장을 아직 저장하지 못했습니다. 실패한 원본만 다시 시도해주세요.`);
+      if (failed) setUploadError(`원본 ${failed}장을 아직 저장하지 못했습니다. 실패한 원본만 다시 시도해 주세요.`);
     } finally {
       setRecoveryCachedCount(recoveryFilesRef.current.size);
       recoveryBusyRef.current = false;
@@ -2761,7 +2761,7 @@ export default function ProjectDetailPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
     const rawCount = list.filter(isRawFile).length;
     list = list.filter((f) => !isRawFile(f));
-    if (rawCount > 0) setUploadError(`RAW 파일은 지원하지 않습니다 (${rawCount}개 제외). JPEG/PNG/WebP/HEIC로 내보내기 후 업로드해주세요.`);
+    if (rawCount > 0) setUploadError(`RAW 파일은 지원하지 않습니다 (${rawCount}개 제외). JPEG/PNG/WebP/HEIC로 내보내기 후 업로드해 주세요.`);
     if (!list.length) return;
     const remaining = maxPhotosPerProject === null ? null : Math.max(0, maxPhotosPerProject - photos.length);
     if (remaining !== null && list.length > remaining) {
@@ -2782,7 +2782,7 @@ export default function ProjectDetailPage() {
     let list = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/") || f.type === "");
     const rawCount = list.filter(isRawFile).length;
     list = list.filter((f) => !isRawFile(f));
-    if (rawCount > 0) setUploadError(`RAW 파일은 지원하지 않습니다 (${rawCount}개 제외). JPEG/PNG/WebP/HEIC로 내보내기 후 업로드해주세요.`);
+    if (rawCount > 0) setUploadError(`RAW 파일은 지원하지 않습니다 (${rawCount}개 제외). JPEG/PNG/WebP/HEIC로 내보내기 후 업로드해 주세요.`);
     if (!list.length) return;
     const remaining = maxPhotosPerProject === null ? null : Math.max(0, maxPhotosPerProject - photos.length);
     if (remaining !== null && list.length > remaining) {
@@ -3020,7 +3020,7 @@ export default function ProjectDetailPage() {
           : current);
         setSelectionRequestModalOpen(false);
         setInviteShareModalOpen(true);
-        setToast("셀렉 요청을 시작했습니다.");
+        setToast("고객 셀렉을 시작했어요.");
         router.refresh();
         return true;
       }
@@ -3093,7 +3093,7 @@ export default function ProjectDetailPage() {
     const results = await Promise.allSettled(jobs);
     const failed = results.filter((r) => r.status === "rejected" || (r.status === "fulfilled" && !(r.value as Response).ok));
     if (failed.length === results.length && results.length > 0) {
-      setToast("분석 시작에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      setToast("분석 시작에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } else if (failed.length > 0) {
       setToast("일부 분석을 시작하지 못했습니다.");
     } else if (results.length > 0) {
@@ -4254,7 +4254,7 @@ export default function ProjectDetailPage() {
             <p className="text-sm font-bold text-foreground">
               원본 {M.toLocaleString()}장
               <span className="mx-2 font-medium text-disabled-foreground">·</span>
-              셀렉 목표 {N.toLocaleString()}장
+              셀렉 목표 장수 {N.toLocaleString()}장
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               {isInviteActive
@@ -4352,7 +4352,7 @@ export default function ProjectDetailPage() {
               disabled={!isInviteActive && (inviteActivating || uploadBlockingInvite || recommendationHasUnsavedChanges || M < N)}
               className="min-w-[129px]"
             >
-              {isInviteActive ? (isMobile ? "링크 공유" : "초대 링크 공유") : "셀렉 요청하기"}
+              {isInviteActive ? (isMobile ? "링크 공유" : "초대 링크 공유") : "고객 셀렉 시작하기"}
             </PhotographerLightButton>
           </>
         ) : (
@@ -4386,7 +4386,7 @@ export default function ProjectDetailPage() {
                     ? (isMobile ? "업로드 중" : "사진 업로드 중…")
                     : M < N
                       ? "사진 업로드 필요"
-                      : "셀렉 요청하기"}
+                      : "고객 셀렉 시작하기"}
             </PhotographerLightButton>
           </>
         )}

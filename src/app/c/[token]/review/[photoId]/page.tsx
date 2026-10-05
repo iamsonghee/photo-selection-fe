@@ -26,7 +26,7 @@ const BG_BASE    = "var(--background)";
 const BORDER_HI  = "var(--border-strong)";
 const MUTED      = "var(--muted-foreground)";
 const DIM        = "var(--subtle-foreground)";
-const MONO       = "'JetBrains Mono', 'Space Mono', monospace";
+const MONO       = "var(--font-mono)";
 
 export default function ReviewViewerPage() {
   const params  = useParams();
@@ -288,7 +288,7 @@ export default function ReviewViewerPage() {
     if (!current || !isRevision) return;
     const normalized = normalizeReviewComment(revisionDraft);
     if (revisionDraft.trim() && !normalized) {
-      setRevisionError("내용을 확인해 주세요. 한글 자음 한 글자는 코멘트로 저장되지 않습니다.");
+      setRevisionError("내용을 확인해 주세요. 한글 자음 한 글자는 재보정 요청 내용으로 저장되지 않습니다.");
       return;
     }
     setReview(current.id, "revision_requested", normalized);
@@ -472,7 +472,7 @@ export default function ReviewViewerPage() {
           --viewer-stage: #0f1113;
           --review-panel-width: 320px;
           background: var(--viewer-stage); color: #fff;
-          font-family: Pretendard, 'Noto Sans KR', sans-serif;
+          font-family: var(--font-sans);
         }
         .rvx-appbar {
           flex-shrink: 0; height: 68px; padding: 0 24px;
@@ -488,8 +488,8 @@ export default function ReviewViewerPage() {
         .rvx-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
         .rvx-count { font: 600 15px/20px Pretendard, sans-serif; letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         /* 파일명은 제목이되 "제목처럼 읽히는 이름"이 아니라 식별자다 — 무게를 한 단계 낮춘다.
-         * 다른 화면의 파일명은 Space Mono를 쓰지만 여기서는 Pretendard다: 이 자리는 14px로 크고,
-         * 한글 파일명(예: 다혜태희1781.jpg)이 흔한데 Space Mono에는 한글 글립이 없어
+         * 다른 화면의 파일명은 JetBrains Mono를 쓰지만 여기서는 Pretendard다: 이 자리는 14px로 크고,
+         * 한글 파일명(예: 다혜태희1781.jpg)이 흔한데 고정폭 글꼴에는 한글 글립이 없어
          * 한 문자열 안에서 두 서체의 자폭이 섞여 깨져 보인다. */
         .rvx-fileline { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
         .rvx-filename { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 500; font-size: 14px; }
@@ -1130,7 +1130,7 @@ export default function ReviewViewerPage() {
                     <span>검토 완료</span>
                     <strong>{total}장 모두 확인했어요</strong>
                   </span>
-                  <button type="button" className="rvx-completion-action" onClick={() => setShowSubmitModal(true)}>작가에게 전달</button>
+                  <button type="button" className="rvx-completion-action" onClick={() => setShowSubmitModal(true)}>검토 결과 전달하기</button>
                 </>
               ) : revisionsMissingComment.length > 0 && pendingCount === 0 ? (
                 <>
@@ -1167,8 +1167,8 @@ export default function ReviewViewerPage() {
               전달 후에는 검토 결과를 바꿀 수 없어요.
             </>
           )}
-          confirmLabel={receiptMode ? "수령 완료" : "전달하기"}
-          busyLabel={receiptMode ? "처리 중..." : "전달 중..."}
+          confirmLabel={receiptMode ? "수령 완료" : "검토 결과 전달하기"}
+          busyLabel={receiptMode ? "처리 중…" : "전달 중…"}
           confirming={submitting}
           error={submitError}
           onCancel={() => { if (!submitting) { setShowSubmitModal(false); setSubmitError(null); } }}

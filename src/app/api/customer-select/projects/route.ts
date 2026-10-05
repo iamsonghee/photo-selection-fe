@@ -20,13 +20,13 @@ export async function POST(req: NextRequest) {
   const shootRegion = optionalText(body.shootRegion, 100);
   const shootLocation = optionalText(body.shootLocation, 150);
   if (!name || name.length > 60 || !shootType) {
-    return NextResponse.json({ error: "프로젝트 이름과 촬영 종류를 확인해주세요." }, { status: 400 });
+    return NextResponse.json({ error: "프로젝트 이름과 촬영 유형을 확인해 주세요." }, { status: 400 });
   }
   if (shootDate === undefined || selectionDeadline === undefined || (studioName?.length ?? 0) > 100 || photographerName === undefined || shootRegion === undefined || shootLocation === undefined) {
-    return NextResponse.json({ error: "촬영 정보를 확인해주세요." }, { status: 400 });
+    return NextResponse.json({ error: "촬영 정보를 확인해 주세요." }, { status: 400 });
   }
   if (shootDate && selectionDeadline && selectionDeadline < shootDate) {
-    return NextResponse.json({ error: "셀렉 마감일은 촬영일 이후로 설정해주세요." }, { status: 400 });
+    return NextResponse.json({ error: "셀렉 마감일은 촬영일 이후로 설정해 주세요." }, { status: 400 });
   }
   const admin = getAdminClient();
   const { data, error } = await admin

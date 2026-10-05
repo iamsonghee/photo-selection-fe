@@ -417,12 +417,12 @@ export default function ProjectAssetsPageClient({
       csvEscape(getDisplayFilename(photo)),
       csvEscape(photoStates[photo.id]?.comment?.trim() ?? ""),
     ].join(","));
-    downloadTextFile(`${exportBaseName}.csv`, ["파일명,코멘트", ...rows].join("\n"), "text/csv;charset=utf-8");
+    downloadTextFile(`${exportBaseName}.csv`, ["파일명,작가 전달 메모", ...rows].join("\n"), "text/csv;charset=utf-8");
   };
   const handleDownloadTxt = () => downloadTextFile(
     `${exportBaseName}.txt`, selectedPhotos.map(getDisplayFilename).join("\n"), "text/plain;charset=utf-8",
   );
-  const selectedDownloadLabel = project?.includeOriginal ? "셀렉 원본" : "셀렉 프리뷰";
+  const selectedDownloadLabel = project?.includeOriginal ? "선택한 사진의 원본" : "선택한 사진의 미리보기";
   const selectionIsFinal = project ? !["preparing", "selecting"].includes(project.status) : false;
   const handleDownloadSelectedOriginals = async () => {
     if (!project || !selectionIsFinal || originalDownloadProgress) return;
@@ -435,7 +435,7 @@ export default function ProjectAssetsPageClient({
         onProgress: (completed, total) => setOriginalDownloadProgress({ completed, total }),
       });
       if (!result) return;
-      setToast(`${result.downloadKind === "preview" ? "셀렉 프리뷰" : "셀렉 원본"} ${result.fileCount.toLocaleString()}개를 저장했습니다.`);
+      setToast(`${result.downloadKind === "preview" ? "선택한 사진의 미리보기" : "선택한 사진의 원본"} ${result.fileCount.toLocaleString()}개를 저장했습니다.`);
     } catch (reason) {
       setToast(reason instanceof Error ? reason.message : `${selectedDownloadLabel} 다운로드에 실패했습니다.`);
     } finally {
@@ -655,7 +655,7 @@ export default function ProjectAssetsPageClient({
                   { value: "filename-asc", label: "파일명순" },
                   { value: "uploaded-desc", label: "최근 업로드순" },
                   { value: "uploaded-asc", label: "오래된 업로드순" },
-                  ...(activeTab === "selected" ? [{ value: "comment-first" as const, label: "코멘트 우선" }] : []),
+                  ...(activeTab === "selected" ? [{ value: "comment-first" as const, label: "메모 우선" }] : []),
                 ]}
               />
               <ProjectAssetToolbarViewToggle value={viewMode} onChange={setViewMode} />
@@ -726,7 +726,7 @@ export default function ProjectAssetsPageClient({
                     ["filename-asc", "파일명순"],
                     ["uploaded-desc", "최근 업로드순"],
                     ["uploaded-asc", "오래된 업로드순"],
-                    ...(activeTab === "selected" ? [["comment-first", "코멘트 우선"] as const] : []),
+                    ...(activeTab === "selected" ? [["comment-first", "메모 우선"] as const] : []),
                   ] as ReadonlyArray<readonly [SortMode, string]>).map(([value, label]) => (
                     <button
                       key={value}
@@ -854,11 +854,11 @@ export default function ProjectAssetsPageClient({
             <div>
               <p className="text-[14px] font-bold text-foreground">
                 고객 셀렉 {selectedPhotos.length.toLocaleString()}장 확인
-                {commentCount > 0 ? <span className="ml-2 text-[12px] font-medium text-[var(--customer-foreground)]">코멘트 {commentCount.toLocaleString()}개</span> : null}
+                {commentCount > 0 ? <span className="ml-2 text-[12px] font-medium text-[var(--customer-foreground)]">메모 {commentCount.toLocaleString()}개</span> : null}
               </p>
               <p className="mt-1 text-[12px] text-muted-foreground">
                 {project.status === "confirmed"
-                  ? "선택 결과와 고객 코멘트를 확인한 뒤 보정 작업을 시작하세요."
+                  ? "선택 결과와 작가 전달 메모를 확인한 뒤 보정 작업을 시작하세요."
                   : "현재 보정 단계의 작업 화면으로 이동할 수 있습니다."}
               </p>
             </div>
@@ -972,15 +972,15 @@ export default function ProjectAssetsPageClient({
             onClose={() => { setGalleryThumbFocusIndex(lightboxIndex); setLightboxIndex(null); }}
             mobileDetailLayout
             mobileComments={[{
-              label: "셀렉 코멘트",
+              label: "작가 전달 메모",
               text: activeSelectionComment,
             }]}
-            mobileCommentsHeading="셀렉 코멘트"
+            mobileCommentsHeading="작가 전달 메모"
             inspector={(
               <ViewerCommentPanel
-                heading="셀렉 코멘트"
+                heading="작가 전달 메모"
                 comments={[{
-                  label: "셀렉 코멘트",
+                  label: "작가 전달 메모",
                   text: activeSelectionComment,
                 }]}
               />

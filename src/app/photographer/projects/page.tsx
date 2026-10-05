@@ -217,7 +217,7 @@ export default function ProjectsPage() {
     if (sortBy === "latest")     result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     if (sortBy === "updated")    result.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
     if (sortBy === "deadline") {
-      // 완료·기한 미설정은 뒤로 보내고 현재 단계의 셀렉/검토 기한으로 비교한다.
+      // 완료·기한 미설정은 뒤로 보내고 현재 단계의 셀렉/검토 마감일으로 비교한다.
       const dueTime = (project: Project) => { const due = getActiveDeadline(project); const time = due ? new Date(due.date).getTime() : NaN; return Number.isFinite(time) ? time : Infinity; };
       result.sort((a, b) => dueTime(a) - dueTime(b));
     }
@@ -310,7 +310,7 @@ export default function ProjectsPage() {
             </button>
           )}
         >
-          <label className="block pt-4 text-xs font-semibold text-muted-foreground">진행 단계<select aria-label="진행 단계 필터" value={stepFilter} onChange={e => setStepFilter(e.target.value === "all" ? "all" : Number(e.target.value) as 1 | 2 | 3 | 4 | 5 | 6)} className="mt-2 h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm text-foreground"><option value="all">전체 단계</option><option value="1">1 · 원본</option><option value="2">2 · 셀렉</option><option value="3">3 · 보정</option><option value="4">4 · 1차 수정</option><option value="5">5 · 2차 수정</option><option value="6">6 · 납품</option></select></label>
+          <label className="block pt-4 text-xs font-semibold text-muted-foreground">진행 단계<select aria-label="진행 단계 필터" value={stepFilter} onChange={e => setStepFilter(e.target.value === "all" ? "all" : Number(e.target.value) as 1 | 2 | 3 | 4 | 5 | 6)} className="mt-2 h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm text-foreground"><option value="all">전체 단계</option><option value="1">1 · 원본</option><option value="2">2 · 셀렉</option><option value="3">3 · 보정</option><option value="4">4 · 1차 재보정</option><option value="5">5 · 2차 재보정</option><option value="6">6 · 납품</option></select></label>
           <div data-mobile-project-date-filter className="py-5">
             <div className="grid grid-cols-[minmax(0,1fr)_12px_minmax(0,1fr)] items-end gap-2">
               <label className="min-w-0 text-[11px] font-medium text-muted-foreground">

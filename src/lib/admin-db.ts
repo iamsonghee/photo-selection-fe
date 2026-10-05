@@ -193,9 +193,9 @@ export const ADMIN_ACTION_LABELS: Record<ProjectLogAction, string> = {
   selecting: "셀렉 단계 전환",
   confirmed: "셀렉 확정",
   editing: "보정 시작",
-  reviewing_v1: "v1 검토 요청",
-  editing_v2: "v2 재보정 시작",
-  reviewing_v2: "v2 검토 요청",
+  reviewing_v1: "보정본 검토 요청",
+  editing_v2: "재보정 시작",
+  reviewing_v2: "재보정본 검토 요청",
   delivered: "납품 완료",
 };
 

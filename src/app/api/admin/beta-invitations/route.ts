@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const rawEmail = body?.email;
   if (typeof rawEmail !== "string" || !rawEmail.trim()) {
-    return NextResponse.json({ error: "이메일을 입력해주세요." }, { status: 400 });
+    return NextResponse.json({ error: "이메일을 입력해 주세요." }, { status: 400 });
   }
   const email = rawEmail.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   if (existingPhotographer) {
     return NextResponse.json(
-      { error: "이미 가입된 사용자입니다. 사용자 상세에서 직접 베타를 부여해주세요." },
+      { error: "이미 가입된 사용자입니다. 사용자 상세에서 직접 베타를 부여해 주세요." },
       { status: 400 }
     );
   }

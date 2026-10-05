@@ -63,7 +63,7 @@ function buildFocusContent(project: Project): {
         headline: "고객의 셀렉이 지연되고 있어요",
         headlineAccent: "danger",
         headlineIcon: Bell,
-        description: `원본 ${project.photoCount.toLocaleString()}장 중 ${project.requiredCount.toLocaleString()}장만 셀렉 완료된 상태로 마감일이 ${days}일 지났습니다.`,
+        description: `원본 ${project.photoCount.toLocaleString()}장 중 ${project.requiredCount.toLocaleString()}장 셀렉 요청이 마감일보다 ${days}일 지났습니다.`,
         stats: [
           { label: "셀렉 마감일", value: ddayResult.text, sub: deadlineDate, critical: true },
           { label: "셀렉 요청", value: `${project.requiredCount.toLocaleString()}장`, sub: `원본 ${project.photoCount.toLocaleString()}장` },
@@ -124,7 +124,7 @@ function buildFocusContent(project: Project): {
         { label: "재보정 대상", value: `${project.requiredCount.toLocaleString()}장` },
       ],
       followUp: "고객의 재보정 요청을 확인할까요?",
-      primaryLabel: "수정 요청 확인하기",
+      primaryLabel: "재보정 요청 확인하기",
     };
   }
 

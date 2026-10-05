@@ -30,7 +30,7 @@ export default async function AdminSurveysPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-foreground">Beta Surveys</h1>
+      <h1 className="text-2xl font-semibold text-foreground">베타 설문</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         설문 응답 {all.length}건 {status !== "all" ? `· ${STATUS_LABELS[status as AdminSurveyResponseStatus]} ${filtered.length}건` : ""}
       </p>

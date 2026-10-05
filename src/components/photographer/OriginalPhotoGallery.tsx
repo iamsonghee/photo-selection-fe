@@ -324,7 +324,7 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
             onClick={(event) => { event.stopPropagation(); props.onGroupBadgeClick?.(event, group.id); }} />
         ) : null}
       </PhotoAssetPreview>
-      {selectionVariant && secondaryText ? <PhotoCardComment comment={secondaryText} compact={!props.readableComments} showLabel={props.readableComments} label="보정 요청" readable={props.readableComments} /> : null}
+      {selectionVariant && secondaryText ? <PhotoCardComment comment={secondaryText} compact={!props.readableComments} showLabel={props.readableComments} label="작가 전달 메모" readable={props.readableComments} /> : null}
     </article>
   );
 }
@@ -624,7 +624,7 @@ function ListGallery(props: OriginalPhotoGalleryProps) {
     <div data-original-photo-list onClick={(event) => {
       if (event.target instanceof Element && !event.target.closest("[data-original-photo-list-row], button, input, select, a")) props.onEmptyClick?.();
     }} data-selection-active={props.selectionOnHover && (props.selectedPhotoIds?.size ?? 0) > 0 ? "true" : undefined} className={`${styles.listShell} ${selectionVariant ? styles.listShellSelection : ""} ${retouchedVariant ? styles.listShellRetouched : ""} ${props.mobileSelectionVisible ? styles.listShellMobileSelectable : ""}`}>
-      <div className={styles.listTable} role="table" aria-label={selectionVariant ? "고객 셀렉 사진 목록" : finalVariant ? "최종본 사진 목록" : retouchedVariant ? "보정본 사진 목록" : "원본 사진 목록"}>
+      <div className={styles.listTable} role="table" aria-label={selectionVariant ? "고객 셀렉 사진 목록" : finalVariant ? "최종 보정본 사진 목록" : retouchedVariant ? "보정본 사진 목록" : "원본 사진 목록"}>
         <div className={`${styles.listHeader} ${readonlyClass} ${listVariantClass}`} role="row">
           {mobileRetouchedList ? <>
             <span role="columnheader">원본</span>
@@ -646,7 +646,7 @@ function ListGallery(props: OriginalPhotoGalleryProps) {
               ) : null}
               <span data-mobile-retouched-column-label>보정본</span>
             </span>
-          </> : finalVariant ? <><span role="columnheader">사진</span><span role="columnheader">파일명</span></> : selectionVariant ? <><span role="columnheader">사진</span><span role="columnheader">파일명</span><span role="columnheader">고객 코멘트</span></> : <>
+          </> : finalVariant ? <><span role="columnheader">사진</span><span role="columnheader">파일명</span></> : selectionVariant ? <><span role="columnheader">사진</span><span role="columnheader">파일명</span><span role="columnheader">작가 전달 메모</span></> : <>
             {!props.readonly ? <button type="button" className={styles.selectButton} onClick={props.onToggleAllVisible} aria-label={props.allVisibleSelected ? "전체 선택 해제" : "전체 선택"} aria-pressed={props.allVisibleSelected} disabled={props.selectionDisabled}>{props.allVisibleSelected ? <Check size={13} strokeWidth={3} /> : null}</button> : props.selectionOnHover || props.mobileSelectionVisible ? <span aria-hidden /> : null}
             {retouchedVariant ? <><span role="columnheader">원본</span><span role="columnheader">보정본</span><span role="columnheader">상태</span><span role="columnheader">재보정 요청</span></> : <><span role="columnheader">파일명</span><span className={styles.listNumericHeader} role="columnheader">원본 용량</span><span className={styles.listNumericHeader} role="columnheader">해상도</span></>}
           </>}
@@ -676,7 +676,7 @@ function ListGallery(props: OriginalPhotoGalleryProps) {
                   </PhotoAssetPreview>
                 </div>
                 <div role="cell" className={styles.mobileMappingCell}>
-                  <PhotoAssetPreview filename={retouchedFilename || "보정본을 추가해주세요"} active={selected} mediaProps={{ className: styles.mobileMappingMedia }}>
+                  <PhotoAssetPreview filename={retouchedFilename || "보정본을 추가해 주세요"} active={selected} mediaProps={{ className: styles.mobileMappingMedia }}>
                     {retouchedPhoto ? <button type="button" data-original-photo-list-thumbnail onClick={() => props.onPhotoClick(row.index)} aria-label={`${retouchedFilename || "보정본"} 원본·보정본 비교`} className={styles.mobileMappingImageButton}>
                       <QueuedImage photo={retouchedPhoto} scrollRef={props.scrollRef} thumbQueue={props.thumbQueue} />
                     </button> : props.renderMissingRetouched?.(photo)}

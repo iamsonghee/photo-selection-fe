@@ -91,7 +91,7 @@ export function PhotoPositionBar({
         }
         .cpb-plain .cpb-thumb { background: #fff; }
         .cpb-count {
-          flex: 0 0 auto; font: 600 11px/1 Pretendard, 'Noto Sans KR', sans-serif;
+          flex: 0 0 auto; font: 600 11px/1 var(--font-sans);
           color: rgba(255,255,255,.55); font-variant-numeric: tabular-nums; white-space: nowrap;
         }
       `}</style>

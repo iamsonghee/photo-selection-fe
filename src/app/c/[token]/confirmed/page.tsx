@@ -22,7 +22,7 @@ function completionCopy(status: string) {
   if (status === "editing") {
     return {
       title: "사진 보정이 진행 중이에요",
-      description: <>작가님이 셀렉한 사진을 보정하고 있습니다.<br />보정본이 완성되면 알림을 보내드릴게요.</>,
+      description: <>고객님이 선택한 사진을 작가님이 보정하고 있어요.<br />보정본이 완성되면 알림을 보내드릴게요.</>,
     };
   }
   return {
@@ -114,7 +114,7 @@ export default function ConfirmedPage() {
             <Images size={21} strokeWidth={1.8} />
           </span>
           <span className="confirmed-selection-copy">
-            <strong>선택 완료 · {project.requiredCount.toLocaleString()}장</strong>
+            <strong>셀렉 확정 완료 · {project.requiredCount.toLocaleString()}장</strong>
             <span>{confirmedDateLabel ? `${confirmedDateLabel} 확정` : "작가님에게 전달 완료"}</span>
           </span>
         </section>

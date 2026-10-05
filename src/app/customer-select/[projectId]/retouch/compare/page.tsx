@@ -95,7 +95,7 @@ function CompareCard({
                 setReasonOpen(false);
               }}
             >
-              재보정 요청 확정
+              요청 내용 저장
             </button>
           </div>
         )}

@@ -41,7 +41,7 @@ export function PhotoVersionHistory({
   onCompareChange,
   canCompare,
   comment,
-  commentHeading = "고객 코멘트",
+  commentHeading = "재보정 요청 내용",
   hideMobileSecondaryControls = false,
 }: PhotoVersionHistoryProps) {
   const activeIndex = items.findIndex((item) => item.key === activeKey);

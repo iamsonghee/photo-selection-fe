@@ -205,7 +205,7 @@ export function SelectionConfirmFooter({
               style={{
                 display: "flex",
                 justifyContent: "space-between",
-                fontFamily: "'JetBrains Mono', 'Space Mono', monospace",
+                fontFamily: "var(--font-mono)",
                 fontSize: 10,
                 textTransform: "uppercase",
                 letterSpacing: "0.08em",
@@ -244,7 +244,7 @@ export function SelectionConfirmFooter({
               <div className="ac-confirm-footer-meta" style={{ textAlign: "right" }}>
                 <p
                   style={{
-                    fontFamily: "'JetBrains Mono', 'Space Mono', monospace",
+                    fontFamily: "var(--font-mono)",
                     fontSize: 11,
                     fontWeight: 700,
                     color: remaining === 0 ? "var(--accent)" : remaining < 0 ? "#ef4444" : isLight ? "var(--customer-ink-secondary)" : "var(--subtle-foreground)",

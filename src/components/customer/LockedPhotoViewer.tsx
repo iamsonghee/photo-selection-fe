@@ -113,7 +113,7 @@ export function LockedPhotoViewer({ photos, initialIndex, sectionLabel, selected
           onClick={onClose}
           autoFocus
           className="-ml-2 inline-flex h-11 w-8 shrink-0 items-center justify-center bg-transparent text-white md:hidden"
-          aria-label="셀렉 상세보기로 돌아가기"
+          aria-label="셀렉 결과로 돌아가기"
         >
           <ChevronLeft size={24} strokeWidth={1.8} />
         </button>
@@ -164,7 +164,7 @@ export function LockedPhotoViewer({ photos, initialIndex, sectionLabel, selected
 
       <footer className="locked-viewer-footer relative z-10 flex items-center bg-black px-5 pb-[calc(24px+env(safe-area-inset-bottom))] pt-2 md:min-h-12 md:justify-center md:border-t md:border-white/10 md:bg-black/70 md:px-4 md:py-0 md:text-xs md:text-white/55">
         <div className={`locked-viewer-comment ${comment ? "has-comment" : ""} ${showCommentOnDesktop ? "show-desktop" : ""}`}>
-          {comment || "코멘트 없음"}
+          {comment || "메모 없음"}
         </div>
         <span className="hidden md:inline">{activeIndex + 1} / {photos.length}</span>
         {hasMultiple && <span className="ml-3 hidden text-white/35 md:inline">← → 이전·다음</span>}

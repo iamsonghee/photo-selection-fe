@@ -9,7 +9,7 @@ export default async function AdminProjectsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-foreground">Projects</h1>
+      <h1 className="text-2xl font-semibold text-foreground">프로젝트</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         전체 작가의 프로젝트 {projects.length}건 (최근 업데이트순)
       </p>
@@ -21,7 +21,7 @@ export default async function AdminProjectsPage() {
               <th className="px-4 py-3 font-medium">프로젝트</th>
               <th className="px-4 py-3 font-medium">작가</th>
               <th className="px-4 py-3 font-medium">상태</th>
-              <th className="px-4 py-3 font-medium">사진 / 셀렉</th>
+              <th className="px-4 py-3 font-medium">업로드 사진 / 셀렉 목표 장수</th>
               <th className="px-4 py-3 font-medium">기한</th>
               <th className="px-4 py-3 font-medium">생성일</th>
             </tr>

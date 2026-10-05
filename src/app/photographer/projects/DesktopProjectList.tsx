@@ -29,7 +29,7 @@ type Props = {
   getAction: (project: Project) => Action;
 };
 const dateLabel = (date: string) => date ? date.slice(0, 10).replaceAll("-", ".") : "미등록";
-const steps = ["원본", "셀렉", "보정", "1차 수정", "2차 수정", "납품"];
+const steps = ["원본", "셀렉", "보정", "1차 재보정", "2차 재보정", "납품"];
 
 /** 기존 6단계 매핑을 재사용한다. 고객 검토는 해당 보정 단계에 머무르고 허용되지 않은 수정은 건너뛴다. */
 function CompactProjectProgress({ project }: { project: Project }) {

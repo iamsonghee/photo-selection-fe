@@ -100,8 +100,8 @@ export async function PATCH(
         const incomplete = /delivery_versions_incomplete/.test(archiveErr.message);
         return NextResponse.json({
           error: incomplete
-            ? "모든 셀렉 사진의 원본 크기 보정본을 업로드한 뒤 고객 검토를 시작해주세요."
-            : "최종 보정본 다운로드 준비를 시작하지 못했습니다. 잠시 후 다시 시도해주세요.",
+            ? "모든 셀렉 사진의 원본 크기 보정본을 업로드한 뒤 고객 검토를 시작해 주세요."
+            : "최종 보정본 다운로드 준비를 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.",
           code: incomplete ? "delivery_versions_incomplete" : "final_archive_start_failed",
         }, { status: incomplete ? 409 : 500 });
       }
@@ -116,13 +116,13 @@ export async function PATCH(
       });
       if (activateErr) {
         console.error("[PATCH project status] atomic activation failed", activateErr);
-        return NextResponse.json({ error: "사진 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요." }, { status: 500 });
+        return NextResponse.json({ error: "사진 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요." }, { status: 500 });
       }
       if (activationResult === "activated" || activationResult === "already_active") {
         return NextResponse.json({ status, alreadyActive: activationResult === "already_active" });
       }
       if (activationResult === "insufficient_photos") {
-        return NextResponse.json({ error: "셀렉 목표 장수만큼 사진을 업로드해주세요.", code: "insufficient_photos" }, { status: 409 });
+        return NextResponse.json({ error: "셀렉 목표 장수만큼 사진을 업로드해 주세요.", code: "insufficient_photos" }, { status: 409 });
       }
       if (activationResult === "originals_incomplete") {
         return NextResponse.json({ error: "납품용 원본 업로드가 끝난 뒤 셀렉을 요청할 수 있습니다.", code: "originals_incomplete" }, { status: 409 });

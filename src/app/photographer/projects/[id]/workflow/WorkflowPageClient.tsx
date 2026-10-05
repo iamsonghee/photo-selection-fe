@@ -441,12 +441,12 @@ function OriginalCard({
         <div className="bg-background border border-border-subtle rounded-lg p-2 text-[11px] text-muted-foreground leading-relaxed">
           <div className="text-[9px] text-accent font-semibold uppercase tracking-wide mb-1 flex items-center gap-1">
             <MessageSquare size={9} />
-            고객 코멘트
+            작가 전달 메모
           </div>
           &ldquo;{row.photo.comment}&rdquo;
         </div>
       ) : (
-        <div className="text-[10px] text-disabled-foreground italic">코멘트 없음</div>
+        <div className="text-[10px] text-disabled-foreground italic">메모 없음</div>
       )}
     </CardShell>
   );
@@ -478,7 +478,7 @@ function SingleVersionUploadSlot({
       return;
     }
     if (!nextFile.type.startsWith("image/") && !hasImageExtension) {
-      alert("지원하는 이미지 파일을 선택해주세요.");
+      alert("지원하는 이미지 파일을 선택해 주세요.");
       return;
     }
     void onUpload(photoId, version, nextFile);
@@ -763,7 +763,7 @@ function V2Card({
             V1 검토 결과 없음
           </span>
           <span className="text-[9px] text-subtle-foreground text-center">
-            페이지를 새로고침 해주세요
+            페이지를 새로고침 해 주세요
           </span>
         </div>
       ) : v2 && v2ThumbSrc && v2FullSrc ? (
@@ -903,7 +903,7 @@ export default function WorkflowPageClient({
   const [filter, setFilter]         = useState<FilterTab>("all");
   const [viewMode, setViewMode]     = useState<"gallery" | "list">("gallery");
   // 최초 진입 시에만 프로젝트 단계에 맞는 라운드를 제안한다. 이후 선택은 사용자가 유지한다.
-  // 최종본 경로는 첫 paint부터 final 상태로 시작한다. 기본 V1로 렌더한 뒤
+  // 최종 보정본 경로는 첫 paint부터 final 상태로 시작한다. 기본 V1로 렌더한 뒤
   // effect에서 전환하면 납품 완료 화면에 과거 `재보정 요청`이 잠깐 노출된다.
   const [stageTab, setStageTab]     = useState<StageTab>(() => assetView === "final" ? "final" : "v1");
   const initializedRoundProjectRef = useRef<string | null>(null);
@@ -1503,8 +1503,8 @@ export default function WorkflowPageClient({
     const isOriginal = stageTab === "original";
     const version = stageTab === "v2" ? 2 : 1;
     const header = isOriginal
-      ? withComment ? ["번호", "파일명", "고객 코멘트"] : ["번호", "파일명"]
-      : withComment ? ["번호", "파일명", "보정본 파일명", "상태", "고객 코멘트"] : ["번호", "파일명", "보정본 파일명", "상태"];
+      ? withComment ? ["번호", "파일명", "작가 전달 메모"] : ["번호", "파일명"]
+      : withComment ? ["번호", "파일명", "보정본 파일명", "상태", "재보정 요청 내용"] : ["번호", "파일명", "보정본 파일명", "상태"];
     const rowData = rows.map((row, i) => {
       const filename = row.photo.originalFilename ?? `FRAME_${String(row.photo.orderIndex).padStart(4, "0")}`;
       if (isOriginal) {
@@ -1536,7 +1536,7 @@ export default function WorkflowPageClient({
     a.download = isOriginal
       ? `${project?.name ?? "project"}_원본목록.csv`
       : stageTab === "final"
-        ? `${project?.name ?? "project"}_최종본목록.csv`
+        ? `${project?.name ?? "project"}_최종_보정본_목록.csv`
       : `${project?.name ?? "review"}_v${version}_검토결과.csv`;
     a.click();
     URL.revokeObjectURL(url);
@@ -1556,12 +1556,12 @@ export default function WorkflowPageClient({
       if (!result) return;
       setExportMessage({
         tone: "success",
-        text: `${result.downloadKind === "preview" ? "셀렉 프리뷰" : "셀렉 원본"} ${result.fileCount.toLocaleString()}개를 선택한 폴더에 저장했습니다.`,
+        text: `${result.downloadKind === "preview" ? "선택한 사진의 미리보기" : "선택한 사진의 원본"} ${result.fileCount.toLocaleString()}개를 선택한 폴더에 저장했습니다.`,
       });
     } catch (error) {
       setExportMessage({
         tone: "error",
-        text: error instanceof Error ? error.message : "셀렉 원본 다운로드에 실패했습니다.",
+        text: error instanceof Error ? error.message : "선택한 사진의 원본 다운로드에 실패했습니다.",
       });
     } finally {
       setOriginalDownloadProgress(null);
@@ -1666,7 +1666,7 @@ export default function WorkflowPageClient({
 
     const failedCount = results.length - deleted.length;
     if (failedCount > 0) {
-      alert(`${deleted.length}장은 삭제했고, ${failedCount}장은 삭제하지 못했습니다. 다시 시도해주세요.`);
+      alert(`${deleted.length}장은 삭제했고, ${failedCount}장은 삭제하지 못했습니다. 다시 시도해 주세요.`);
     }
   }
 
@@ -1898,7 +1898,7 @@ export default function WorkflowPageClient({
   const selectedOriginalDisabledReason = !selectionIsFinal
     ? "고객 셀렉 확정 후 이용 가능"
     : null;
-  const selectedDownloadLabel = project.includeOriginal ? "셀렉 원본" : "셀렉 프리뷰";
+  const selectedDownloadLabel = project.includeOriginal ? "선택한 사진의 원본" : "선택한 사진의 미리보기";
 
   const FILTER_TABS: { key: FilterTab; label: string; count: number }[] = [
     { key: "all", label: "전체", count: stageTab === "final" ? finalRows.length : stageTab === "v2" ? v2Total : counts.total },
@@ -2037,7 +2037,7 @@ export default function WorkflowPageClient({
     setReviewDeadlineModal((m) => (m ? { ...m, error: undefined } : null));
     try {
       const ymd = normalizeReviewDeadlineYmd(reviewDeadline);
-      if (reviewDeadline && !ymd) throw new Error("검토 기한이 올바르지 않습니다.");
+      if (reviewDeadline && !ymd) throw new Error("검토 마감일이 올바르지 않습니다.");
       const deadlineRes = await fetch(`/api/photographer/projects/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -2045,7 +2045,7 @@ export default function WorkflowPageClient({
       });
       if (!deadlineRes.ok) {
         const data = await deadlineRes.json().catch(() => ({}));
-        throw new Error((data as { error?: string }).error ?? "검토 기한 저장 실패");
+        throw new Error((data as { error?: string }).error ?? "검토 마감일 저장 실패");
       }
       const res = await fetch(`/api/photographer/projects/${id}/status`, {
         method: "PATCH",
@@ -2145,7 +2145,7 @@ export default function WorkflowPageClient({
       {/* ── Retouch work toolbar ── */}
       {!isSelecting && (
         <ProjectAssetWorkspaceToolbar
-          ariaLabel={assetView === "final" ? "최종본 작업 도구" : "보정본 작업 도구"}
+          ariaLabel={assetView === "final" ? "최종 보정본 작업 도구" : "보정본 작업 도구"}
           compactMobile
           leading={(
             <>
@@ -2281,11 +2281,11 @@ export default function WorkflowPageClient({
                 onOpenTools={() => setMobileToolsOpen(true)}
                 toolsOpen={mobileToolsOpen}
                 toolCount={filter === "all" ? 0 : 1}
-                toolsLabel={`${stageTab === "final" ? "최종본" : "보정본"} 필터 설정`}
+                toolsLabel={`${stageTab === "final" ? "최종 보정본" : "보정본"} 필터 설정`}
                 onOpenExport={stageTab === "final" && filteredRows.length > 0 ? () => setMobileExportOpen(true) : undefined}
                 onCloseExport={() => setMobileExportOpen(false)}
                 exportOpen={mobileExportOpen}
-                exportLabel={`${stageTab === "final" ? "최종본" : "보정본"} 내보내기`}
+                exportLabel={`${stageTab === "final" ? "최종 보정본" : "보정본"} 내보내기`}
                 exportContent={stageTab === "final" ? (
                   <div className="grid gap-1">
                     <div className="flex items-center justify-between px-2 pb-1 pt-0.5">
@@ -2293,7 +2293,7 @@ export default function WorkflowPageClient({
                       <span className="text-[11px] tabular-nums text-muted-foreground">{filteredRows.length.toLocaleString()}장</span>
                     </div>
                     <button type="button" onClick={() => { handleDownloadReview(false); setMobileExportOpen(false); }} className="flex h-11 items-center gap-3 rounded-lg px-3 text-left text-[13px] font-medium text-foreground hover:bg-surface-raised"><Download size={17} className="text-muted-foreground" />파일명 목록 (.csv)</button>
-                    <button type="button" onClick={() => { handleDownloadReview(true); setMobileExportOpen(false); }} className="flex h-11 items-center gap-3 rounded-lg px-3 text-left text-[13px] font-medium text-foreground hover:bg-surface-raised"><MessageSquare size={17} className="text-muted-foreground" />코멘트 포함 (.csv)</button>
+                    <button type="button" onClick={() => { handleDownloadReview(true); setMobileExportOpen(false); }} className="flex h-11 items-center gap-3 rounded-lg px-3 text-left text-[13px] font-medium text-foreground hover:bg-surface-raised"><MessageSquare size={17} className="text-muted-foreground" />재보정 요청 내용 포함 (.csv)</button>
                     <button
                       type="button"
                       onClick={() => { setMobileExportOpen(false); void handleDownloadSelectedOriginals(); }}
@@ -2318,7 +2318,7 @@ export default function WorkflowPageClient({
             {selectedVersionIds.size === 0 && rows.length > 0 && (
               <div ref={exportMenuRef} className="relative hidden md:block">
                 <ProjectAssetExportTrigger
-                  ariaLabel={`${stageTab === "final" ? "최종본" : "보정본"} 내보내기`}
+                  ariaLabel={`${stageTab === "final" ? "최종 보정본" : "보정본"} 내보내기`}
                   open={showExportMenu}
                   onClick={() => setShowExportMenu((v) => !v)}
                 />
@@ -2343,7 +2343,7 @@ export default function WorkflowPageClient({
                         className="flex min-h-10 w-full items-center gap-2 rounded-[7px] px-3 text-left text-[13px] text-foreground transition-colors hover:bg-surface-raised"
                       >
                         <Download size={15} className="shrink-0 text-accent" />
-                        코멘트 포함 (.csv)
+                        {stageTab === "original" ? "작가 전달 메모" : "재보정 요청 내용"} 포함 (.csv)
                       </button>
                       <div className="h-px bg-border-subtle mx-3" />
                       <button
@@ -2432,9 +2432,9 @@ export default function WorkflowPageClient({
       <ProjectAssetMobileSheet
         open={!isSelecting && mobileToolsOpen}
         onClose={() => setMobileToolsOpen(false)}
-        title={`${stageTab === "final" ? "최종본" : "보정본"} 필터`}
+        title={`${stageTab === "final" ? "최종 보정본" : "보정본"} 필터`}
         titleId="mobile-workflow-filter-title"
-        closeLabel={`${stageTab === "final" ? "최종본" : "보정본"} 필터 닫기`}
+        closeLabel={`${stageTab === "final" ? "최종 보정본" : "보정본"} 필터 닫기`}
         headerAction={(
           <button
             type="button"
@@ -2568,7 +2568,7 @@ export default function WorkflowPageClient({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-amber-200 font-semibold">고객 V1 검토 결과를 불러오지 못했습니다.</p>
                   <p className="text-xs text-amber-200/70 mt-0.5">
-                    페이지를 새로고침 해주세요. 새로고침 후에도 동일하면 관리자에게 알려주세요.
+                    페이지를 새로고침 해 주세요. 새로고침 후에도 동일하면 관리자에게 알려주세요.
                   </p>
             </div>
               </div>
@@ -2771,7 +2771,7 @@ export default function WorkflowPageClient({
           holdPreviewPhotos={assetView !== "final" && !activeArchivedVersion && resolvedViewerTab !== "original" && !viewerCompare ? originalViewerPhotos : undefined}
           comparisonImageLabel={activeViewerComparisonItem?.label}
           activeImageLabel={assetView === "final"
-            ? "최종본"
+            ? "최종 보정본"
             : activeArchivedVersion
             ? activeArchivedVersion.version === 2 ? `재보정본 ${activeArchivedVersion.revisionNo}차` : "이전 보정본"
             : resolvedViewerTab === "original" ? "원본" : resolvedViewerTab === "v2" ? `재보정본 ${activeViewerV2Round}차` : "보정본"}
@@ -2798,7 +2798,7 @@ export default function WorkflowPageClient({
               canCompare={activeViewerComparisonItem !== null}
               hideMobileSecondaryControls
               comment={(activeArchivedVersion ? activeArchivedVersion.comment : resolvedViewerTab === "original" ? activeViewerRow.photo.comment : resolvedViewerTab === "v2" ? activeViewerRow.v2?.comment : activeViewerRow.v1?.comment) ?? null}
-              commentHeading={resolvedViewerTab === "original" ? "셀렉 요청" : "검토 코멘트"}
+              commentHeading={resolvedViewerTab === "original" ? "작가 전달 메모" : "재보정 요청 내용"}
             />
           )}
           renderThumbnailOverlay={assetView === "final" ? undefined : () => (

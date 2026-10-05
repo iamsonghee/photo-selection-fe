@@ -26,7 +26,7 @@ function getVariant(
   if (status === "preparing") {
     if (photoCount === 0) {
       return {
-        label: "업로드전",
+        label: "업로드 전",
         pillStyle: { border: "1px solid var(--border-subtle)", background: "var(--surface)" },
         dotType: "filled",
         dotStyle: { background: "var(--border-strong)" },
@@ -35,7 +35,7 @@ function getVariant(
     }
     if (photoCount < requiredCount) {
       return {
-        label: "업로드중",
+        label: "업로드 중",
         pillStyle: { border: "1px solid var(--border-subtle)", background: "var(--surface)" },
         dotType: "outline",
         dotStyle: { border: "1px solid var(--subtle-foreground)" },
@@ -43,7 +43,7 @@ function getVariant(
       };
     }
     return {
-      label: "초대대기",
+      label: "초대 대기",
       pillStyle: { border: "1px solid var(--border)", background: "var(--surface)" },
       dotType: "filled",
       dotStyle: { background: "var(--subtle-foreground)" },
@@ -54,7 +54,7 @@ function getVariant(
   switch (status) {
     case "selecting":
       return {
-        label: "셀렉중",
+        label: "셀렉 중",
         pillStyle: { border: "1px solid var(--border)", background: "var(--surface)" },
         dotType: "outline",
         dotStyle: { border: "1px solid rgba(var(--accent-rgb), 0.6)" },
@@ -62,7 +62,7 @@ function getVariant(
       };
     case "confirmed":
       return {
-        label: "보정대기",
+        label: "보정 대기",
         pillStyle: { border: "1px solid var(--border-strong)", background: "var(--surface)" },
         dotType: "outline",
         dotStyle: { border: "1px solid var(--accent)" },
@@ -70,7 +70,7 @@ function getVariant(
       };
     case "editing":
       return {
-        label: "보정중",
+        label: "보정 중",
         pillStyle: { border: "1px solid var(--border)", background: "var(--surface)" },
         dotType: "filled",
         dotStyle: { background: "var(--accent)", boxShadow: "0 0 5px rgba(var(--accent-rgb), 0.4)" },
@@ -78,7 +78,7 @@ function getVariant(
       };
     case "reviewing_v1":
       return {
-        label: "검토중",
+        label: "검토 중",
         pillStyle: { border: "1px solid rgba(var(--accent-rgb), 0.3)", background: "rgba(var(--accent-rgb), 0.05)" },
         dotType: "filled",
         dotStyle: { background: "var(--accent)", boxShadow: "0 0 8px rgba(var(--accent-rgb), 0.6)" },
@@ -86,7 +86,7 @@ function getVariant(
       };
     case "editing_v2":
       return {
-        label: "재보정",
+        label: "재보정 중",
         pillStyle: {
           border: "1px solid rgba(var(--accent-rgb), 0.5)",
           background: "rgba(var(--accent-rgb), 0.1)",
@@ -97,7 +97,7 @@ function getVariant(
       };
     case "reviewing_v2":
       return {
-        label: "재검토",
+        label: "재보정본 검토 중",
         pillStyle: {
           border: "1px solid rgba(var(--accent-rgb), 0.8)",
           background: "rgba(var(--accent-rgb), 0.2)",
@@ -108,7 +108,7 @@ function getVariant(
       };
     case "delivered":
       return {
-        label: "납품완료",
+        label: "납품 완료",
         pillStyle: {
           border: "1px solid var(--accent)",
           background: "rgba(var(--accent-rgb), 0.05)",

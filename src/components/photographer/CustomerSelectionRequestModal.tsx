@@ -156,8 +156,8 @@ export function CustomerSelectionRequestModal({
       maxWidth={650}
       title={(
         <>
-          <span className="sm:hidden">셀렉 요청</span>
-          <span className="hidden sm:inline">고객에게 셀렉 요청하기</span>
+          <span className="sm:hidden">셀렉 시작</span>
+          <span className="hidden sm:inline">고객 셀렉 시작하기</span>
         </>
       )}
       description={<span className="hidden sm:inline">마감일을 정한 뒤 고객에게 접속 정보를 전달하세요</span>}
@@ -181,7 +181,7 @@ export function CustomerSelectionRequestModal({
             disabled={!deadline || !photoLockAcknowledged || pending || pinSaving}
             className="h-12 min-w-0 flex-1 px-4 text-[15px] leading-6 tracking-[-0.32px] sm:h-14 sm:px-6 sm:text-[16px] sm:flex-[1.28]"
           >
-            {pending ? "요청 시작 중…" : `${requiredCount.toLocaleString()}장 셀렉 요청하기`}
+            {pending ? "셀렉 시작 중…" : "고객 셀렉 시작하기"}
           </PhotographerLightButton>
         </div>
       )}
@@ -241,7 +241,7 @@ export function CustomerSelectionRequestModal({
                   {recommendedCount === 0
                     ? `고객이 전체 사진에서 직접 ${requiredCount.toLocaleString()}장을 선택합니다.`
                     : recommendationOverflow > 0
-                      ? `셀렉 요청 수보다 ${recommendationOverflow.toLocaleString()}장 많아요.`
+                      ? `셀렉 목표 장수보다 ${recommendationOverflow.toLocaleString()}장 많아요.`
                     : recommendedCount === requiredCount
                       ? "고객은 추천 그대로 확정하거나 다른 사진을 고를 수 있어요."
                       : `고객이 최종 ${requiredCount.toLocaleString()}장을 고를 때 참고합니다.`}

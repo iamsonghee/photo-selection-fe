@@ -37,7 +37,7 @@ Source of Truth 우선순위는 다음과 같다.
 - Project List 구현 후 Playwright Chromium에서 toolbar gap, filter→table gap, Project ID typography, deadline hierarchy, step state, row hover/focus를 실제 DOM/computed style로 재검증했다.
 - Project Detail 구현 후 Playwright Chromium에서 1440px Desktop, 1024px Narrow, 390px Mobile의 content grid, Expanded Stepper, Information/Work Panel, Customer Link, destructive dialog, typography와 Light mobile shell을 실제 DOM/computed style로 재검증했다.
 - Project ID는 Dashboard와 Project List 양쪽에서 `JetBrains Mono / 11px / 600 / 16.5px / normal`이 일치함을 확인했다. 전체 LNB typography처럼 아직 재검증하지 않은 값은 계속 **code-resolved / browser recheck required**로 표시한다.
-- Light route LNB와 콘텐츠는 Pretendard를 사용하고 ID·D+는 JetBrains Mono를 사용한다. Sidebar 내부의 `Inter` loader는 Dark/legacy 구현에 남아 있지만 Light scope에서는 computed Pretendard로 재검증했다.
+- Light/Dark 제품 화면의 LNB와 콘텐츠는 Pretendard를 사용하고 ID·D+는 JetBrains Mono를 사용한다. 폰트는 전역 토큰으로만 공급한다.
 
 ### 0.3 Draft 0.3 검증 결과 요약 — 2026-08-27 이력
 
@@ -46,7 +46,7 @@ Source of Truth 우선순위는 다음과 같다.
 | A. Stable 강화 | Light color/surface, shared page frame/header, Project ID, Actor semantic, Light route Pretendard scope, customer-stage overdue `D+N` |
 | B. 신규 검증 | Expanded Stepper, Information Card, Work Panel, Customer Link Tool, Destructive Confirmation, Project Detail responsive grid/mobile shell |
 | C. Page-specific | Dashboard Focus/Recent/Aside, Project List filter/grid/Usage Ring, Project Detail 6-step+information+work composition |
-| D. Conflict | Dashboard `focus` vs Project List `focus-visible`, 기존 `design-system.md` palette/type 차이, Dark/legacy Sidebar Inter loader |
+| D. Conflict | Dashboard `focus` vs Project List `focus-visible`, 기존 `design-system.md` palette/type 차이 |
 | E. Pending | completed-row fixture, Settings, generic Info/Warning semantic, 다른 Light route의 mobile page composition 전체 audit |
 
 ### 0.4 현재 PC 적용 범위와 검증 상태 (2026-09-09)
@@ -186,8 +186,8 @@ Light UI의 depth는 `background → white surface → raised surface` 순서로
 - Light App UI 기본 sans는 `"Pretendard Variable", "Pretendard", -apple-system, sans-serif`다.
 - `JetBrains Mono`는 project ID, D+ 값, 비교 가능한 숫자/카운터에만 허용한다.
 - 한 컴포넌트의 전체 본문을 mono로 바꾸지 않는다.
-- Sidebar는 legacy/Dark 경로를 위해 `Inter` loader를 보유하지만 `.rootLight`에서 Pretendard를 강제한다. Project Detail Light LNB의 computed family가 Pretendard임을 검증했으며 loader 자체 제거는 별도 migration item이다.
-- 전역 `globals.css`의 `Noto Sans KR`와 Light route의 Pretendard 관계도 Photographer shell 범위에서 정리해야 한다.
+- Sidebar를 포함한 Light/Dark 제품 화면은 전역 `--font-sans`의 Pretendard를 사용한다. 기존 `Inter` loader와 route별 Pretendard loader는 제거했다.
+- `globals.css`가 Pretendard와 JetBrains Mono를 한 번만 불러오며, Light route는 같은 전역 토큰을 재사용한다.
 
 ### 4.2 Golden Reference type specimens
 
@@ -852,7 +852,7 @@ Shared Page Header (+ Breadcrumb + Overflow)
 ### 9.2 Audit follow-up
 
 1. Project ID와 Project List 핵심 interaction은 computed 재검증을 마쳤다. 나머지 typography role도 route별 five-value set을 계속 채집한다. 특히 LNB inherited line-height와 fallback font를 확인한다.
-2. Light LNB는 Pretendard computed 검증을 마쳤다. Dark/legacy Sidebar를 위해 남은 `Inter` loader를 제거할지는 전체 Photographer shell migration에서 결정한다.
+2. Light LNB는 Pretendard computed 검증을 마쳤고, Dark/legacy Sidebar도 같은 전역 Pretendard 토큰을 사용하도록 통일했다.
 3. `JetBrains Mono`가 ID/숫자 외 Sidebar `MENU`에 필요한지 검토한다. (logo mark는 2026-10-02 Pretendard로 통일)
 4. 11px Project ID는 Stable role로 확정했다. Project Detail은 12/14/15/16/18/24/28px 명시 scale을 사용하며 Dashboard의 12.5px/21px과 weight 800은 page-specific으로 유지한다.
 5. Customer `#079FA0`와 generic Info semantic을 분리할지 결정한다. 현재 `--primary`, `--success`, `--cyan` alias가 같은 값이다.
@@ -886,7 +886,7 @@ Shared Page Header (+ Breadcrumb + Overflow)
 | Type minimum | 의미 텍스트 12px 이상 | Project ID와 Sidebar `준비중` helper가 11px 예외 | machine-readable/helper role의 제한적 예외로 관리 |
 | Heading weight | 제품 제목 800/900 금지 | Focus headline 800 | component-specific exception, 승격 금지 |
 | Type scale | 24/32 page title, 20/28 section, 16/24 card | 28/42, 15 inherited, 14/20 등 | PNG/이전 audit 값 복사 금지. 다화면 검증 후 Light scale 확정 |
-| Font family | Pretendard + JetBrains Mono | Light page/LNB Pretendard + ID·D+ JetBrains Mono; Dark/legacy loader에 Inter 잔존 | Light contract 검증 완료, loader 제거는 migration item |
+| Font family | Pretendard + JetBrains Mono | 전체 제품 page/LNB Pretendard + ID·D+ JetBrains Mono | 전역 토큰과 단일 로딩 진입점 적용 완료 |
 | Activity structure | 기존 문서에 과거 구현과의 follow-up 서술 | 현재 flat max-6 timeline 구현 | Light 문서는 현재 구현을 Source of Truth로 기록 |
 | Dashboard composition | Greeting / Focus / Work + 7:3 aside의 이전 정의 | unified header, recent projects, 320px aside | 기존 Dashboard 절은 최신 구현과 다름 |
 | Badge | status/attention pill 규칙 | Dashboard·Project List overdue는 text-only `D+N` | 일반 D-N 반복 badge 금지. Light Status Badge full set은 미검증 |

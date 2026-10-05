@@ -124,17 +124,17 @@ export async function PATCH(
     if (typeof body.name === "string") payload.name = body.name;
     if ("customer_name" in body) {
       if (typeof body.customer_name !== "string" || !body.customer_name.trim()) {
-        return NextResponse.json({ error: "고객 이름을 입력해주세요." }, { status: 400 });
+        return NextResponse.json({ error: "고객 이름을 입력해 주세요." }, { status: 400 });
       }
       payload.customer_name = body.customer_name.trim();
     }
     if (typeof body.shoot_date === "string") payload.shoot_date = body.shoot_date;
     if ("deadline" in body) {
       if (!isDateYmd(body.deadline)) {
-        return NextResponse.json({ error: "셀렉 기한은 올바른 날짜여야 합니다." }, { status: 400 });
+        return NextResponse.json({ error: "셀렉 마감일은 올바른 날짜여야 합니다." }, { status: 400 });
       }
       if (!["preparing", "selecting"].includes(project.status) && body.deadline !== project.deadline) {
-        return NextResponse.json({ error: "셀렉이 끝난 뒤에는 셀렉 기한을 변경할 수 없습니다." }, { status: 400 });
+        return NextResponse.json({ error: "셀렉이 끝난 뒤에는 셀렉 마감일을 변경할 수 없습니다." }, { status: 400 });
       }
       if (body.deadline !== project.deadline) payload.deadline = body.deadline;
     }
@@ -185,12 +185,12 @@ export async function PATCH(
     }
     if ('review_deadline' in body) {
       if (body.review_deadline !== null && !isDateYmd(body.review_deadline)) {
-        return NextResponse.json({ error: "검토 기한은 올바른 날짜이거나 비어 있어야 합니다." }, { status: 400 });
+        return NextResponse.json({ error: "검토 마감일은 올바른 날짜이거나 비어 있어야 합니다." }, { status: 400 });
       }
       const currentReviewDeadline = project.review_deadline ?? null;
       if (!["editing", "editing_v2", "reviewing_v1", "reviewing_v2"].includes(project.status)
         && body.review_deadline !== currentReviewDeadline) {
-        return NextResponse.json({ error: "검토 단계가 끝난 뒤에는 검토 기한을 변경할 수 없습니다." }, { status: 400 });
+        return NextResponse.json({ error: "검토 단계가 끝난 뒤에는 검토 마감일을 변경할 수 없습니다." }, { status: 400 });
       }
       if (body.review_deadline !== currentReviewDeadline) payload.review_deadline = body.review_deadline;
     }
@@ -215,7 +215,7 @@ export async function PATCH(
     }
     if ('customer_phone' in body) {
       if (body.customer_phone != null && (typeof body.customer_phone !== "string" || (body.customer_phone.trim() && !isValidKoreanPhone(body.customer_phone)))) {
-        return NextResponse.json({ error: "연락처를 확인해주세요." }, { status: 400 });
+        return NextResponse.json({ error: "연락처를 확인해 주세요." }, { status: 400 });
       }
       payload.customer_phone = body.customer_phone?.trim() || null;
     }

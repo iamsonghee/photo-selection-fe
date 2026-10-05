@@ -90,7 +90,7 @@ export default function InvitePageClient() {
           <h1 className={styles.entryTitle}>이 링크는 사용할 수 없어요</h1>
           <p className={styles.entryDescription}>
             주소가 잘못되었거나 링크가 삭제되었을 수 있어요.<br />
-            받은 메세지의 링크를 다시 확인해 주세요.
+            받은 메시지의 링크를 다시 확인해 주세요.
           </p>
         </div>
         <div className={styles.invalidIllustrationWrap} aria-hidden="true">
@@ -185,9 +185,9 @@ export default function InvitePageClient() {
               : <>총 {project.photoCount.toLocaleString()}장 중 마음에 드는 <strong className={styles.introAccent}>{project.requiredCount.toLocaleString()}장</strong>을 골라주세요.</>}
           </p>
         </div>
-        <div className={styles.deadlineRow} aria-label={`선택 마감일 ${format(deadlineDate, "yyyy년 M월 d일 EEEE", { locale: ko })}${dday ? `, ${dday.label}` : ""}`}>
+        <div className={styles.deadlineRow} aria-label={`셀렉 마감일 ${format(deadlineDate, "yyyy년 M월 d일 EEEE", { locale: ko })}${dday ? `, ${dday.label}` : ""}`}>
           <CalendarDays className={styles.deadlineIcon} aria-hidden="true" strokeWidth={1.6} />
-          <span className={styles.deadlineLabel}>선택 기한</span>
+          <span className={styles.deadlineLabel}>셀렉 마감일</span>
           <span className={styles.deadlineDate}>{format(deadlineDate, "yyyy.MM.dd (EEE)", { locale: ko })}</span>
           {dday && <Badge tone={dday.tone} theme="customerLight" className="font-mono">{dday.label}</Badge>}
         </div>
@@ -229,7 +229,7 @@ export default function InvitePageClient() {
 
         <dl className={styles.reviewSummary} aria-label="보정본 검토 정보">
           <div className={styles.reviewSummaryRow}>
-            <dt>검토 기한</dt>
+            <dt>검토 마감일</dt>
             <dd className={styles.reviewDeadline}>
               <span>{deadlineStr}</span>
               {dday && <Badge tone={dday.tone} theme="customerLight" className="font-mono">{dday.label}</Badge>}

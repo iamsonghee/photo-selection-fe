@@ -1,5 +1,4 @@
 import type { Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
 import { PhotographerDesktopShell } from "@/components/layout/PhotographerDesktopShell";
 import { CustomerCacheProvider } from "@/contexts/CustomerCacheContext";
 import { ProfileProvider } from "@/contexts/ProfileContext";
@@ -7,18 +6,6 @@ import { QuotaProvider } from "@/contexts/QuotaContext";
 import { PhotographerModalProvider } from "@/contexts/PhotographerModalContext";
 import { BetaSurveyGate } from "@/components/photographer/BetaSurveyGate";
 import "./photographer.css";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-const mono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
-  variable: "--font-mono",
-  display: "swap",
-});
 
 /** Next.js App Router: generates the same as meta viewport width=device-width, initial-scale=1, maximum-scale=1 */
 export const viewport: Viewport = {
@@ -37,7 +24,7 @@ export default function PhotographerLayout({
       <QuotaProvider>
         <CustomerCacheProvider><PhotographerModalProvider>
           <div
-            className={`photographer-app relative flex min-h-screen bg-background text-foreground ${inter.variable} ${mono.variable}`}
+            className="photographer-app relative flex min-h-screen bg-background text-foreground"
           >
             <div className="pointer-events-none fixed inset-0 z-0" aria-hidden>
               <div className="absolute -left-24 top-[8%] h-72 w-72 rounded-full bg-[#4f7eff]/15 blur-[100px]" />

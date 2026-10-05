@@ -19,7 +19,7 @@ const TAB_TITLES: Record<ProjectAssetTab, string> = {
   original: "원본 갤러리",
   selected: "셀렉 결과",
   retouched: "보정본 업로드",
-  final: "최종본 갤러리",
+  final: "최종 보정본 갤러리",
 };
 
 type ProjectAssetWorkspaceHeaderProps = {

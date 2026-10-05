@@ -164,16 +164,16 @@ export function ProjectNexusPageClient() {
     const canEditAccessPin = project.status !== "delivered";
     const newN = canEditN ? editRequiredCount : project.requiredCount;
     const fieldErrors: Record<string, string> = {};
-    if (!editName.trim()) fieldErrors.name = "프로젝트명을 입력해주세요.";
-    if (!editCustomerName.trim()) fieldErrors.customerName = "고객 이름을 입력해주세요.";
-    if (!editShootDate) fieldErrors.shootDate = "촬영 일자를 선택해주세요.";
-    if (project.status === "selecting" && !editDeadline) fieldErrors.deadline = "셀렉 기한을 선택해주세요.";
-    if (canEditN && newN < 1) fieldErrors.requiredCount = "셀렉 갯수를 1 이상으로 입력해주세요.";
+    if (!editName.trim()) fieldErrors.name = "프로젝트명을 입력해 주세요.";
+    if (!editCustomerName.trim()) fieldErrors.customerName = "고객 이름을 입력해 주세요.";
+    if (!editShootDate) fieldErrors.shootDate = "촬영일을 선택해 주세요.";
+    if (project.status === "selecting" && !editDeadline) fieldErrors.deadline = "셀렉 마감일을 선택해 주세요.";
+    if (canEditN && newN < 1) fieldErrors.requiredCount = "셀렉 목표 장수를 1장 이상 입력해 주세요.";
     if (editCustomerPhone.trim() && !isValidKoreanPhone(editCustomerPhone)) {
-      fieldErrors.customerPhone = "연락처는 010-0000-0000 형식으로 입력해주세요.";
+      fieldErrors.customerPhone = "연락처는 010-0000-0000 형식으로 입력해 주세요.";
     }
     if (editAccessPin && !/^\d{4}$/.test(editAccessPin)) {
-      fieldErrors.accessPin = "고객 비밀번호는 숫자 4자리로 입력해주세요.";
+      fieldErrors.accessPin = "고객 비밀번호는 숫자 4자리로 입력해 주세요.";
     }
     if (Object.keys(fieldErrors).length > 0) {
       setEditFieldErrors(fieldErrors);
@@ -187,7 +187,7 @@ export function ProjectNexusPageClient() {
     }
     setEditFieldErrors({});
     if (project.status !== "preparing" && canEditN && project.photoCount < newN) {
-      setSaveError(`업로드된 사진 수(${project.photoCount}장) 이하로 설정해주세요.`);
+      setSaveError(`업로드된 사진 수(${project.photoCount}장) 이하로 설정해 주세요.`);
       return;
     }
     setSaving(true);
@@ -510,7 +510,7 @@ export function ProjectNexusPageClient() {
                     </div>
 
                     <div id="edit-field-shootDate" className="min-w-0">
-                      <ProjectFormField error={editFieldErrors.shootDate} label="촬영 일자" required>
+                      <ProjectFormField error={editFieldErrors.shootDate} label="촬영일" required>
                         <ProjectFormDateInput
                           value={editShootDate}
                           onChange={(event) => {
@@ -562,7 +562,7 @@ export function ProjectNexusPageClient() {
                 >
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div id="edit-field-requiredCount">
-                      <ProjectFormField error={editFieldErrors.requiredCount} label="셀렉 장수" required>
+                      <ProjectFormField error={editFieldErrors.requiredCount} label="셀렉 목표 장수" required>
                         <div className="relative">
                           <ProjectFormInput
                             type="text"
@@ -595,7 +595,7 @@ export function ProjectNexusPageClient() {
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       {project.status === "selecting" ? (
                         <div id="edit-field-deadline">
-                          <ProjectFormField error={editFieldErrors.deadline} label="셀렉 기한" required>
+                          <ProjectFormField error={editFieldErrors.deadline} label="셀렉 마감일" required>
                             <ProjectFormDateInput
                               value={editDeadline}
                               onChange={(event) => {
@@ -611,7 +611,7 @@ export function ProjectNexusPageClient() {
 
                       {project.status === "reviewing_v1" || project.status === "reviewing_v2" ? (
                         <div id="edit-field-reviewDeadline">
-                          <ProjectFormField error={editFieldErrors.reviewDeadline} label="검토 기한">
+                          <ProjectFormField error={editFieldErrors.reviewDeadline} label="검토 마감일">
                             <ProjectFormDateInput
                               value={editReviewDeadline}
                               onChange={(event) => {
@@ -910,7 +910,7 @@ export function ProjectNexusPageClient() {
         onConfirm={() => void handleStartEditing()}
         title="보정을 시작할까요?"
         description="보정 작업을 시작하면 고객은 셀렉 사진을 직접 변경할 수 없습니다."
-        detail="선택된 사진과 고객 코멘트를 확인한 뒤 보정본을 업로드할 수 있어요."
+        detail="선택한 사진과 작가 전달 메모를 확인한 뒤 보정본을 업로드할 수 있어요."
         error={startEditingError || undefined}
         confirmLabel="보정 시작"
         pendingLabel="시작하는 중..."

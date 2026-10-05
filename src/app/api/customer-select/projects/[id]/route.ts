@@ -71,10 +71,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const shootRegion = optionalText(body.shootRegion, 100);
   const shootLocation = optionalText(body.shootLocation, 150);
   if (!name || name.length > 60 || !shootType || target < 1 || shootDate === undefined || selectionDeadline === undefined || (studioName?.length ?? 0) > 100 || photographerName === undefined || shootRegion === undefined || shootLocation === undefined) {
-    return NextResponse.json({ error: "프로젝트 정보를 확인해주세요." }, { status: 400 });
+    return NextResponse.json({ error: "프로젝트 정보를 확인해 주세요." }, { status: 400 });
   }
   if (shootDate && selectionDeadline && selectionDeadline < shootDate) {
-    return NextResponse.json({ error: "셀렉 마감일은 촬영일 이후로 설정해주세요." }, { status: 400 });
+    return NextResponse.json({ error: "셀렉 마감일은 촬영일 이후로 설정해 주세요." }, { status: 400 });
   }
   const { error } = await admin.from("customer_projects").update({ name, shoot_type: shootType, target_count: target, shoot_date: shootDate, selection_deadline: selectionDeadline, studio_name: studioName, photographer_name: photographerName, shoot_region: shootRegion, shoot_location: shootLocation }).eq("id", id).eq("owner_id", access.project.owner_id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

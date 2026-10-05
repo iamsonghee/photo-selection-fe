@@ -105,7 +105,7 @@ export function ParticipantSheet({ usedColors, roster = {}, current, onConfirm, 
           disabled={!color}
           onClick={() => color && onConfirm({ color, initial: initial.trim() })}
         >
-          {editing ? "저장" : color ? "이 색으로 시작하기" : "색을 선택해주세요"}
+          {editing ? "저장" : color ? "이 색으로 시작하기" : "색을 선택해 주세요"}
         </button>
 
         <style>{`
@@ -122,7 +122,7 @@ export function ParticipantSheet({ usedColors, roster = {}, current, onConfirm, 
             border-radius: 16px 16px 0 0;
             box-shadow: 0 -4px 16px rgba(0,0,0,.18);
             padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
-            font-family: Pretendard, 'Noto Sans KR', sans-serif;
+            font-family: var(--font-sans);
           }
           /* PC는 화면 아래에서 올라오는 시트가 아니라 가운데 뜨는 카드로 — 아래에서 슬라이드되는
            * 모바일 제스처 패턴을 마우스로 쓰는 큰 화면에 그대로 옮기면 어색하다. */

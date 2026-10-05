@@ -134,26 +134,9 @@ A-CUT이 화면마다 중구난방으로 느껴지는 가장 큰 원인은 **토
 
 ### 4.3 폰트
 
-현재 확인된 family:
+2026-10-05 정리 후 제품 UI는 Pretendard와 JetBrains Mono만 사용한다. `Space Grotesk`는 로고·랜딩의 제한된 브랜드 표현에만 사용한다.
 
-- Noto Sans KR
-- Pretendard / Pretendard Variable
-- Inter
-- DM Sans
-- Space Grotesk
-- Space Mono
-- JetBrains Mono
-- Playfair Display
-- system-ui / Apple system fallback
-
-불러오는 방식도 세 종류다.
-
-- `globals.css` Google Fonts `@import`
-- 역할별 CSS의 Google/CDN `@import`
-- `next/font/google`
-- root `<head>`의 Google Fonts `<link>`
-
-`Playfair Display`, `DM Sans`는 전역 import되지만 주요 `@theme`에는 연결되지 않는다. 작가 레이아웃은 Pretendard를 선언한 뒤 inline으로 Inter 변수를 우선한다.
+폰트는 `globals.css`에서 한 번만 불러온다. route CSS의 Google/CDN `@import`, `next/font/google`, root `<head>`의 중복 `<link>`는 제거했다.
 
 ### 4.4 font size/weight
 
@@ -219,14 +202,11 @@ elevation 단계와 focus shadow가 분리되지 않았다.
 - **수정 우선순위:** P1
 - **권장 개선 방향:** feedback 색의 base/subtle/border/text 조합을 토큰 세트로 만들고 직접 hex 사용을 금지한다.
 
-### TOKEN-03 — typography 체계와 폰트 로딩 중복
+### TOKEN-03 — typography 체계와 폰트 로딩 중복 (해결)
 
-- **문제 설명:** 최소 8개 font family와 4가지 로딩 방식이 혼재하며 본문/제목/모노의 역할이 화면마다 바뀐다.
-- **관련 파일:** `src/app/globals.css`, `src/app/layout.tsx`, `src/app/landing/landing.css`, `src/app/photographer/photographer.css`, `src/app/photographer/layout.tsx`, `src/app/c/[token]/gallery/GalleryPageClient.tsx`
-- **현재 구현 사례:** root는 Noto Sans KR, 작가는 Inter/Pretendard, 고객 작업공간은 Pretendard·Inter·Space 계열을 한 화면에서 섞는다.
-- **사용자에게 보이는 영향:** 제목의 성격과 텍스트 밀도가 페이지마다 달라지고 font swap/추가 요청 가능성도 커진다.
-- **수정 우선순위:** P1
-- **권장 개선 방향:** 본문/표시/모노 최대 3개 family와 type scale, weight, line-height, letter-spacing을 토큰화하고 `next/font` 또는 단일 로딩 경로로 통합한다.
+- **적용 기준:** 제품 본문은 Pretendard, 식별값·파일명·비교 숫자는 JetBrains Mono, 브랜드 표현은 Space 계열로 제한한다.
+- **로딩 방식:** `src/app/globals.css`의 단일 진입점에서 불러오고 `--font-sans`·`--font-mono` 토큰으로 배포한다.
+- **정리 범위:** route별 Google/CDN import, `next/font/google`, Noto Sans KR·Inter·DM Sans·Playfair Display 혼용을 제거했다.
 
 ### TOKEN-04 — 작은 텍스트가 시각 스타일을 넘어 가독성 문제로 확장됨
 

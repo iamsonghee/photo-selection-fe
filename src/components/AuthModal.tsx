@@ -330,7 +330,7 @@ export function AuthModal({ isOpen, onClose, redirectPath, notice }: AuthModalPr
         }
 
         .auth-modal-sys-status {
-          font-family: 'Space Mono', 'Noto Sans KR', sans-serif;
+          font-family: var(--font-mono);
           font-size: 11px;
           color: var(--subtle-foreground);
           letter-spacing: 0.05em;
@@ -358,7 +358,7 @@ export function AuthModal({ isOpen, onClose, redirectPath, notice }: AuthModalPr
           background: none;
           border: none;
           color: var(--subtle-foreground);
-          font-family: 'Space Mono', 'Noto Sans KR', sans-serif;
+          font-family: var(--font-mono);
           font-size: 24px;
           line-height: 1;
           cursor: pointer;
@@ -420,7 +420,7 @@ export function AuthModal({ isOpen, onClose, redirectPath, notice }: AuthModalPr
         }
 
         .auth-modal-sys-label {
-          font-family: 'Space Mono', 'Noto Sans KR', sans-serif;
+          font-family: var(--font-mono);
           font-size: 10px;
           color: var(--disabled-foreground);
           border: 1px solid var(--border-subtle);

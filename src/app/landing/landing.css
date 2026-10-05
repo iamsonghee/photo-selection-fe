@@ -1,5 +1,3 @@
-@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
-
 /* 모바일 상·하단 오버스크롤에서도 전역 다크 배경이 드러나지 않게 한다. */
 html:has(.ac-landing),
 body:has(.ac-landing) {
@@ -18,7 +16,7 @@ body:has(.ac-landing) {
   --accent: var(--ac-orange);
   background: var(--ac-canvas);
   color: var(--ac-ink);
-  font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+  font-family: var(--font-sans);
   min-height: 100vh;
   line-height: 1.5;
   overflow: clip;

@@ -33,7 +33,7 @@ export async function downloadSelectedPhotosToDirectory({
   onDirectoryReady,
   onProgress,
 }: DownloadSelectedPhotosOptions): Promise<SelectedPhotoDownloadResult | null> {
-  const downloadLabel = includeOriginal ? "셀렉 원본" : "셀렉 프리뷰";
+  const downloadLabel = includeOriginal ? "선택한 사진의 원본" : "선택한 사진의 미리보기";
   const showDirectoryPicker = getDirectoryPicker();
   if (!showDirectoryPicker) {
     throw new Error(`${downloadLabel} 폴더 저장은 PC용 Chrome 또는 Edge에서 이용해 주세요.`);

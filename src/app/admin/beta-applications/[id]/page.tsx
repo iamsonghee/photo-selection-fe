@@ -25,7 +25,7 @@ export default async function AdminBetaApplicationDetailPage({
   return (
     <div>
       <Link href="/admin/beta-applications" className="text-xs text-muted-foreground hover:text-foreground">
-        ← Beta Applications 목록으로
+        ← 베타 신청 목록으로
       </Link>
 
       <h1 className="mt-3 text-2xl font-semibold text-foreground">신청자 상세 — {application.name}</h1>

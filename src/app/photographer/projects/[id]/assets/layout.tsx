@@ -11,18 +11,10 @@ export default async function ProjectAssetsLayout({
   const { id } = await params;
 
   return (
-    <>
-      <link
-        rel="stylesheet"
-        as="style"
-        crossOrigin=""
-        href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
-      />
-      <ProjectAssetsDataProvider key={id} projectId={id}>
-        <CollapsibleAssetHeaderProvider compactOnly>
-          <ProjectAssetsRoutePanels />
-        </CollapsibleAssetHeaderProvider>
-      </ProjectAssetsDataProvider>
-    </>
+    <ProjectAssetsDataProvider key={id} projectId={id}>
+      <CollapsibleAssetHeaderProvider compactOnly>
+        <ProjectAssetsRoutePanels />
+      </CollapsibleAssetHeaderProvider>
+    </ProjectAssetsDataProvider>
   );
 }

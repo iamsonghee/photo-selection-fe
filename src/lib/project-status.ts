@@ -18,9 +18,9 @@ export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   selecting: "셀렉 중",
   confirmed: "셀렉 완료",
   editing: "보정 중",
-  reviewing_v1: "v1 검토 중",
-  editing_v2: "v2 재보정 중",
-  reviewing_v2: "v2 검토 중",
+  reviewing_v1: "보정본 검토 중",
+  editing_v2: "재보정 중",
+  reviewing_v2: "재보정본 검토 중",
   delivered: "납품 완료",
 };
 

@@ -34,7 +34,7 @@ export default async function AdminProjectDetailPage({
   return (
     <div>
       <Link href="/admin/projects" className="text-xs text-muted-foreground hover:text-foreground">
-        ← Projects 목록으로
+        ← 프로젝트 목록으로
       </Link>
 
       <div className="mt-3 flex items-center gap-3">
@@ -48,7 +48,7 @@ export default async function AdminProjectDetailPage({
 
       <div className="mt-8 grid grid-cols-2 gap-x-8 gap-y-6 rounded-xl border border-border bg-surface p-6 sm:grid-cols-3">
         <Field label="상태" value={getStatusLabel(project.status)} />
-        <Field label="사진 / 필요 선택" value={`${project.photoCount} / ${project.requiredCount}`} />
+        <Field label="업로드 사진 / 셀렉 목표 장수" value={`${project.photoCount} / ${project.requiredCount}`} />
         <Field
           label={deadline ? deadline.label : "기한"}
           value={

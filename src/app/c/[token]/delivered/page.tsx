@@ -75,7 +75,7 @@ export default function DeliveredPage() {
 
       <main className={styles.container}>
         <header className={styles.intro}>
-          <div className={styles.portalCmd}>최종 납품 완료</div>
+          <div className={styles.portalCmd}>납품 완료</div>
           <h1 className={styles.title}>{project.name}</h1>
         </header>
 

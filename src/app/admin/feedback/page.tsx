@@ -7,7 +7,7 @@ export default async function AdminFeedbackPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-foreground">Feedback</h1>
+      <h1 className="text-2xl font-semibold text-foreground">피드백</h1>
       <p className="mt-1 text-sm text-muted-foreground">작가가 남긴 버그 제보 · 기능 제안 {items.length}건</p>
 
       <div className="mt-6 flex flex-col gap-3">

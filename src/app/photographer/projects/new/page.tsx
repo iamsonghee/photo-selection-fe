@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Supabase SQL Editor에서 아래 SQL을 실행해주세요:
+ * Supabase SQL Editor에서 아래 SQL을 실행해 주세요:
  *
  * ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS shoot_type text;
  * ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS customer_phone text;
@@ -39,7 +39,7 @@ import {
   projectFormInputStateClass,
 } from "@/components/photographer/ProjectFormFields";
 
-// 셀렉 기한은 이 페이지에서 더 이상 입력받지 않는다 — 원본 업로드 후 고객 초대 시점에 별도로 정하며,
+// 셀렉 마감일은 이 페이지에서 더 이상 입력받지 않는다 — 원본 업로드 후 고객 초대 시점에 별도로 정하며,
 // 그 전까지는 촬영일 기준 기본값(+7일)을 자동으로 채워 기존 기능(마감일 임박순 정렬, D-day 배지 등)이
 // 계속 동작하도록 한다.
 const DEFAULT_DEADLINE_DAYS = 7;
@@ -128,12 +128,12 @@ export default function NewProjectPage() {
 
     // 필드별 검증
     const errors: Record<string, string> = {};
-    if (!name.trim())              errors.name          = "프로젝트명을 입력해주세요.";
-    if (!shootDate)                errors.shootDate     = "촬영 일자를 선택해주세요.";
-    if (!customerName.trim())      errors.customerName  = "고객 이름을 입력해주세요.";
-    if (Number(requiredCount) < 1) errors.requiredCount = "셀렉 갯수를 1 이상으로 입력해주세요.";
+    if (!name.trim())              errors.name          = "프로젝트명을 입력해 주세요.";
+    if (!shootDate)                errors.shootDate     = "촬영일을 선택해 주세요.";
+    if (!customerName.trim())      errors.customerName  = "고객 이름을 입력해 주세요.";
+    if (Number(requiredCount) < 1) errors.requiredCount = "셀렉 목표 장수를 1장 이상 입력해 주세요.";
     if (customerPhone.trim() && !isValidKoreanPhone(customerPhone))
-      errors.customerPhone = "연락처는 010-0000-0000 형식으로 입력해주세요.";
+      errors.customerPhone = "연락처는 010-0000-0000 형식으로 입력해 주세요.";
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -194,7 +194,7 @@ export default function NewProjectPage() {
     return (
       <div className={`${themeStyles.lightTheme} min-h-screen bg-background flex items-center justify-center px-4`}>
         <div className="flex flex-col items-center gap-4 text-center">
-          <p className="text-sm text-muted-foreground">이용 한도를 확인하지 못했습니다. 네트워크 상태를 확인해주세요.</p>
+          <p className="text-sm text-muted-foreground">이용 한도를 확인하지 못했습니다. 네트워크 상태를 확인해 주세요.</p>
           <button
             type="button"
             onClick={() => refetchQuota()}
@@ -378,14 +378,14 @@ export default function NewProjectPage() {
                   </ProjectFormField>
                 </div>
                 <div id="field-shootDate">
-                  <ProjectFormField error={fieldErrors.shootDate} label="촬영 일자" required>
+                  <ProjectFormField error={fieldErrors.shootDate} label="촬영일" required>
                     <ProjectFormDateInput
                       className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(shootDate), error: Boolean(fieldErrors.shootDate) })}`}
                       value={shootDate}
                       onChange={(e) => {
                         setShootDate(e.target.value);
                         setFieldErrors((p) => ({ ...p, shootDate: "" }));
-                        // 셀렉 기한 입력 UI는 제거됐지만, 촬영일 기준 기본값(+7일)은 계속 자동으로 맞춰둔다.
+                        // 셀렉 마감일 입력 UI는 제거됐지만, 촬영일 기준 기본값(+7일)은 계속 자동으로 맞춰둔다.
                         if (e.target.value) {
                           setDeadline(format(addDays(new Date(e.target.value), DEFAULT_DEADLINE_DAYS), "yyyy-MM-dd"));
                         }
@@ -437,7 +437,7 @@ export default function NewProjectPage() {
               {/* 2열: 셀렉 갯수 + 재보정 요청 횟수 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div id="field-requiredCount">
-                  <ProjectFormField error={fieldErrors.requiredCount} label="셀렉 갯수" required>
+                  <ProjectFormField error={fieldErrors.requiredCount} label="셀렉 목표 장수" required>
                     <div className="relative">
                       {/* pr-12만 있으면 md:px-5(공용 클래스)가 데스크톱에서 이 padding-right를
                         * 20px로 덮어써 "장" 자리에 숫자가 겹친다 — md:pr-12로 같은 브레이크포인트에서

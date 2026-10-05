@@ -1,8 +1,5 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap");
-@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css");
-
 .customer-app-shell {
-  font-family: "Pretendard", system-ui, sans-serif;
+  font-family: var(--font-sans);
 
   /* Customer light tokens — 전역 :root 토큰은 Dark Photo Workspace와 공유되므로 바꾸지 않고, 고객 화면 전용 라이트 팔레트를 여기 스코프한다. */
   --customer-canvas: #ffffff;

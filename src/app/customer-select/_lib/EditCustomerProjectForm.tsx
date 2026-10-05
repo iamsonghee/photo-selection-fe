@@ -40,7 +40,7 @@ type EditableProject = {
 export function EditCustomerProjectForm({ project }: { project: EditableProject }) {
   const router = useRouter();
   const store = useCustomerSelectStore();
-  // 프로젝트 화면(상세의 "설정에서 수정", 업로드의 "촬영 종류 바꾸기")에서 왔으면 저장·취소 뒤 그 화면으로 돌아간다.
+  // 프로젝트 화면(상세의 "설정에서 수정", 업로드의 "촬영 유형 바꾸기")에서 왔으면 저장·취소 뒤 그 화면으로 돌아간다.
   const searchParams = useSearchParams();
   const from = searchParams.get("from");
   const deleteFromMenu = searchParams.get("delete") === "1";
@@ -63,9 +63,9 @@ export function EditCustomerProjectForm({ project }: { project: EditableProject 
 
   async function save() {
     const errors: Record<string, string> = {};
-    if (!name.trim()) errors.name = "프로젝트명을 입력해주세요.";
-    if (!shootType) errors.shootType = "촬영 종류를 선택해주세요.";
-    if (Number(target) < 1) errors.target = "최종 선택 장수를 1장 이상 입력해주세요.";
+    if (!name.trim()) errors.name = "프로젝트명을 입력해 주세요.";
+    if (!shootType) errors.shootType = "촬영 유형을 선택해 주세요.";
+    if (Number(target) < 1) errors.target = "셀렉 목표 장수를 1장 이상 입력해 주세요.";
     if (Object.keys(errors).length) { setFieldErrors(errors); return; }
     setSaving(true);
     setError(null);
@@ -77,7 +77,7 @@ export function EditCustomerProjectForm({ project }: { project: EditableProject 
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "수정 실패");
-      // 프로젝트 화면들이 쓰는 store는 진입 때 한 번만 읽는다 — 바뀐 촬영 종류(장면 이름 목록)·장수가 돌아간 화면에 보이게 다시 읽는다.
+      // 프로젝트 화면들이 쓰는 store는 진입 때 한 번만 읽는다 — 바뀐 촬영 유형(장면 이름 목록)·장수가 돌아간 화면에 보이게 다시 읽는다.
       await store.refresh();
       router.push(backHref);
       router.refresh();
@@ -106,12 +106,12 @@ export function EditCustomerProjectForm({ project }: { project: EditableProject 
   return <>
     <PhotographerLightPageFrame className="flex-1 pb-8">
       <div className="mx-auto max-w-[840px]">
-        <ProjectFormPageHeading title="프로젝트 설정" description="촬영 정보와 최종 선택 장수를 수정할 수 있어요." onBack={() => router.push(backHref)} />
+        <ProjectFormPageHeading title="프로젝트 설정" description="촬영 정보와 셀렉 목표 장수를 수정할 수 있어요." onBack={() => router.push(backHref)} />
         <div className="flex flex-col gap-5">
-          <ProjectFormSection number="01" title="기본 정보" description="프로젝트명과 셀렉 기준을 관리합니다.">
+          <ProjectFormSection number="01" title="기본 정보" description="프로젝트명과 셀렉 목표 장수를 관리합니다.">
             <div id="field-name"><ProjectFormField error={fieldErrors.name} label="프로젝트명" required><ProjectFormInput autoFocus={!confirmDelete} maxLength={60} className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(name), error: Boolean(fieldErrors.name) })}`} value={name} onChange={(event) => { setName(event.target.value); setFieldErrors((current) => ({ ...current, name: "" })); }} /></ProjectFormField></div>
-            <div id="field-shootType"><ProjectFormField group error={fieldErrors.shootType} label="촬영 종류" required><ProjectShootTypeSelector options={CUSTOMER_SHOOT_TYPES} value={shootType} onChange={(value) => { setShootType(value); setFieldErrors((current) => ({ ...current, shootType: "" })); }} /></ProjectFormField></div>
-            <div id="field-target" className="max-w-[360px]"><ProjectFormField error={fieldErrors.target} label="최종 선택 장수" required hint="작가님과 약속한 장수를 입력해 주세요. 실제 선택 장수가 달라도 전달할 수 있어요."><div className="relative"><ProjectFormInput className={`${PROJECT_FORM_INPUT_CLASS} !pr-14 text-right ${projectFormInputStateClass({ hasValue: Boolean(target), error: Boolean(fieldErrors.target) })}`} inputMode="numeric" pattern="[0-9]*" value={target} onChange={(event) => { setTarget(event.target.value.replace(/\D/g, "")); setFieldErrors((current) => ({ ...current, target: "" })); }} /><span className="pointer-events-none absolute inset-y-0 right-5 flex items-center text-sm text-subtle-foreground">장</span></div></ProjectFormField></div>
+            <div id="field-shootType"><ProjectFormField group error={fieldErrors.shootType} label="촬영 유형" required><ProjectShootTypeSelector options={CUSTOMER_SHOOT_TYPES} value={shootType} onChange={(value) => { setShootType(value); setFieldErrors((current) => ({ ...current, shootType: "" })); }} /></ProjectFormField></div>
+            <div id="field-target" className="max-w-[360px]"><ProjectFormField error={fieldErrors.target} label="셀렉 목표 장수" required hint="작가님과 약속한 장수를 입력해 주세요. 실제 선택 장수가 달라도 전달할 수 있어요."><div className="relative"><ProjectFormInput className={`${PROJECT_FORM_INPUT_CLASS} !pr-14 text-right ${projectFormInputStateClass({ hasValue: Boolean(target), error: Boolean(fieldErrors.target) })}`} inputMode="numeric" pattern="[0-9]*" value={target} onChange={(event) => { setTarget(event.target.value.replace(/\D/g, "")); setFieldErrors((current) => ({ ...current, target: "" })); }} /><span className="pointer-events-none absolute inset-y-0 right-5 flex items-center text-sm text-subtle-foreground">장</span></div></ProjectFormField></div>
           </ProjectFormSection>
 
           <ProjectFormSection number="02" title="일정 및 작가 정보" description="프로젝트를 찾고 전달할 때 사용하는 정보입니다." required={false}>

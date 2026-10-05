@@ -95,7 +95,7 @@ export function ParticipantJoinScreen({ onEnter }: { onEnter?: () => void }) {
       {deadline ? (
         <div className={entry.deadlineRow} aria-label={`셀렉 마감일 ${format(deadline, "yyyy년 M월 d일 EEEE", { locale: ko })}${dday ? `, ${dday.label}` : ""}`}>
           <CalendarDays className={entry.deadlineIcon} aria-hidden="true" strokeWidth={1.6} />
-          <span className={entry.deadlineLabel}>셀렉 마감</span>
+          <span className={entry.deadlineLabel}>셀렉 마감일</span>
           <span className={entry.deadlineDate}>{format(deadline, "yyyy.MM.dd (EEE)", { locale: ko })}</span>
           {dday && <Badge tone={dday.tone} theme="customerLight" className="font-mono">{dday.label}</Badge>}
         </div>

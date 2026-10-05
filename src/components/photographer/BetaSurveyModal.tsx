@@ -165,14 +165,14 @@ export function BetaSurveyModal({
       await postAction("later");
       onDone();
     } catch {
-      setError("처리에 실패했습니다. 다시 시도해주세요.");
+      setError("처리에 실패했습니다. 다시 시도해 주세요.");
       setPending(null);
     }
   }
 
   async function handleSubmitProjectCreated() {
     if (!easeScale) {
-      setError("문항에 응답해주세요.");
+      setError("문항에 응답해 주세요.");
       return;
     }
     setPending("submit");
@@ -181,7 +181,7 @@ export function BetaSurveyModal({
       await postAction("submit", { easeScale });
       setDone(true);
     } catch {
-      setError("제출에 실패했습니다. 다시 시도해주세요.");
+      setError("제출에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setPending(null);
     }
@@ -189,7 +189,7 @@ export function BetaSurveyModal({
 
   async function handleSubmitOriginalUploaded() {
     if (!uploadEaseScale) {
-      setError("문항에 응답해주세요.");
+      setError("문항에 응답해 주세요.");
       return;
     }
     setPending("submit");
@@ -201,7 +201,7 @@ export function BetaSurveyModal({
       });
       setDone(true);
     } catch {
-      setError("제출에 실패했습니다. 다시 시도해주세요.");
+      setError("제출에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setPending(null);
     }
@@ -209,7 +209,7 @@ export function BetaSurveyModal({
 
   async function handleSubmitSelectionReceived() {
     if (!reviewEaseScale) {
-      setError("문항에 응답해주세요.");
+      setError("문항에 응답해 주세요.");
       return;
     }
     setPending("submit");
@@ -221,7 +221,7 @@ export function BetaSurveyModal({
       });
       setDone(true);
     } catch {
-      setError("제출에 실패했습니다. 다시 시도해주세요.");
+      setError("제출에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setPending(null);
     }
@@ -229,11 +229,11 @@ export function BetaSurveyModal({
 
   async function handleSubmitFirstDelivery() {
     if (usedWithRealCustomer === null || !timeSavedScale || helpfulFeatures.length === 0 || !willUseNextProject) {
-      setError("문항에 응답해주세요.");
+      setError("문항에 응답해 주세요.");
       return;
     }
     if (helpfulFeatures.includes("other") && !helpfulFeaturesOther.trim()) {
-      setError("기타 내용을 입력해주세요.");
+      setError("기타 내용을 입력해 주세요.");
       return;
     }
     setPending("submit");
@@ -249,7 +249,7 @@ export function BetaSurveyModal({
       });
       setDone(true);
     } catch {
-      setError("제출에 실패했습니다. 다시 시도해주세요.");
+      setError("제출에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setPending(null);
     }
@@ -257,7 +257,7 @@ export function BetaSurveyModal({
 
   async function handleSubmitSecondDelivery() {
     if (!continueUsingIntent || npsScore === null || !painIfGone || !priceRange || !subscribeIntentIfPaid) {
-      setError("문항에 응답해주세요.");
+      setError("문항에 응답해 주세요.");
       return;
     }
     setPending("submit");
@@ -275,7 +275,7 @@ export function BetaSurveyModal({
       });
       setDone(true);
     } catch {
-      setError("제출에 실패했습니다. 다시 시도해주세요.");
+      setError("제출에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setPending(null);
     }

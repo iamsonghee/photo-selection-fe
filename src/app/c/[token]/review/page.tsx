@@ -27,7 +27,7 @@ import type { Project } from "@/types";
 /** 검토 목록 격자를 좁히는 상태 필터 — `all`은 필터 해제 */
 type ReviewStatusFilter = "all" | "approved" | "revision_requested" | "pending";
 
-const MONO   = "'JetBrains Mono', 'Space Mono', monospace";
+const MONO   = "var(--font-mono)";
 const ACCENT = "var(--accent)";
 const BORDER = "var(--border)";
 
@@ -287,7 +287,7 @@ function ReviewGalleryView({
         color: "var(--customer-ink)",
         display: "flex",
         flexDirection: "column",
-        fontFamily: "Pretendard, 'Noto Sans KR', sans-serif",
+        fontFamily: "var(--font-sans)",
       }}
     >
       {/* 셀렉 갤러리와 같은 머리 구조: `A` 홈 마크 + 이름 + 마감일, 오른쪽에 진행 카운트.
@@ -581,8 +581,8 @@ function ReviewGalleryView({
               </>
             )
           }
-          confirmLabel={receiptMode ? "수령 완료" : "전달하기"}
-          busyLabel={receiptMode ? "처리 중..." : "전달 중..."}
+          confirmLabel={receiptMode ? "수령 완료" : "검토 결과 전달하기"}
+          busyLabel={receiptMode ? "처리 중…" : "전달 중…"}
           confirming={submitting}
           error={submitError}
           onCancel={() => { if (!submitting) { setShowSubmitModal(false); setSubmitError(null); } }}
@@ -849,7 +849,7 @@ function DeliveryReceiptView({
                   background: holdOriginal ? "rgba(255,255,255,.18)" : "rgba(0,0,0,.6)",
                   color: holdOriginal ? "#fff" : "rgba(255,255,255,.82)",
                   cursor: "pointer",
-                  font: "600 12px/1 Pretendard, 'Noto Sans KR', sans-serif",
+                  font: "600 12px/1 var(--font-sans)",
                   userSelect: "none", WebkitUserSelect: "none", touchAction: "none",
                   transition: "background .15s ease, border-color .15s ease, color .15s ease",
                 }}
@@ -964,7 +964,7 @@ function DeliveryReceiptView({
               border: "none",
               borderRadius: 12,
               color: "#000",
-              fontFamily: "'Inter','Pretendard',sans-serif",
+              fontFamily: "var(--font-sans)",
               fontSize: 14,
               fontWeight: 700,
               cursor: submitting || photos.length === 0 ? "not-allowed" : "pointer",

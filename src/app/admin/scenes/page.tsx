@@ -22,7 +22,7 @@ export default async function AdminScenesPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-foreground">Scene Review</h1>
+      <h1 className="text-2xl font-semibold text-foreground">장면 검수</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         셀프 고객 프로젝트의 AI 장면을 보고 정답(경계·이름)을 남깁니다. 서비스 화면의 장면은 바뀌지 않아요.
       </p>
@@ -48,7 +48,7 @@ export default async function AdminScenesPage() {
           <thead>
             <tr className="border-b border-border bg-surface-raised text-left text-xs uppercase tracking-wide text-muted-foreground">
               <th className="px-4 py-3 font-medium">프로젝트</th>
-              <th className="px-4 py-3 font-medium">촬영 종류</th>
+              <th className="px-4 py-3 font-medium">촬영 유형</th>
               <th className="px-4 py-3 font-medium">사진 / AI 장면</th>
               <th className="px-4 py-3 font-medium">검수</th>
               <th className="px-4 py-3 font-medium">경계 정밀도 / 재현율</th>

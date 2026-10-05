@@ -46,8 +46,6 @@ function SendScreen() {
     const timer = window.setTimeout(() => setSceneNotice(null), 1800);
     return () => window.clearTimeout(timer);
   }, [sceneNotice]);
-  // 보정본 확인(비교·재보정 정리)은 아직 열지 않았다 — 누르면 준비 중 안내만 보인다.
-  const [retouchSoon, setRetouchSoon] = useState(false);
 
   useEffect(() => {
     if (hydrated && !isOwner) router.replace(`/customer-select/${projectId}/select`);
@@ -155,7 +153,7 @@ function SendScreen() {
                   {notice.href && <Link href={notice.href}>보러 가기</Link>}
                 </div>
               ))}
-              <p className={s.noticeHint}>확인만 해주세요. 그대로 보내도 괜찮아요.</p>
+              <p className={s.noticeHint}>확인만 해 주세요. 그대로 보내도 괜찮아요.</p>
             </section>
           )}
 
@@ -169,7 +167,7 @@ function SendScreen() {
             {failedMemoCount > 0 && <p className={s.syncWarn} role="alert">메모 {failedMemoCount}개를 저장하지 못했어요. <button type="button" className="font-bold underline" onClick={retryFailedComments}>다시 저장</button></p>}
             <div className={s.sendActions}>
               <PhotographerLightButton size="confirmation" disabled={!canSend} onClick={() => void sendLink("share")}>
-                <Send size={18} />{linkState === "loading" ? "링크 만드는 중…" : linkState === "shared" ? "보냈어요" : linkState === "copied" ? "링크를 복사했어요" : linkState === "fail" ? "다시 시도하기" : "결과 링크 보내기"}
+                <Send size={18} />{linkState === "loading" ? "링크 만드는 중…" : linkState === "shared" ? "공유했어요" : linkState === "copied" ? "링크를 복사했어요" : linkState === "fail" ? "다시 시도하기" : "셀렉 결과 공유하기"}
               </PhotographerLightButton>
               <PhotographerLightButton variant="outline" size="confirmation" disabled={!canSend} onClick={() => void sendLink("copy")}><Copy size={18} />링크 복사</PhotographerLightButton>
             </div>
@@ -206,8 +204,7 @@ function SendScreen() {
 
           <section className={s.retouch}>
             <div><h3>보정본을 받으면</h3><p>원본과 나란히 비교하고 다시 보정할 사진을 정리할 수 있어요. 필요할 때만 쓰면 돼요.</p></div>
-            <PhotographerLightButton variant="outline" size="work-panel" onClick={() => setRetouchSoon(true)}>보정본 확인하기</PhotographerLightButton>
-            {retouchSoon && <p className={s.retouchSoon} role="status">보정본 확인은 아직 준비 중이에요. 곧 열어 드릴게요.</p>}
+            <PhotographerLightButton variant="outline" size="work-panel" disabled>보정본 확인 준비 중</PhotographerLightButton>
           </section>
         </>}
       </main>

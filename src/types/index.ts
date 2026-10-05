@@ -126,7 +126,7 @@ export interface Project {
   revisionRound: number;
   /** 촬영 장소 (옵셔널) */
   location?: string | null;
-  /** 고객 보정본 검토 기한 (reviewing_v1/v2 전환 시 설정) */
+  /** 고객 보정본 검토 마감일 (reviewing_v1/v2 전환 시 설정) */
   reviewDeadline?: string | null;
   /** AI 유사컷(burst shot) 분석 상태 (clip-service가 기록) */
   clipAnalysisStatus?: "processing" | "completed" | "failed" | null;

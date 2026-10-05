@@ -86,7 +86,7 @@ export default function RetouchExportPage() {
               </button>
             </div>
           </div>
-          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton size="work-panel" onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>다음 보정본 기다리기</PhotographerLightButton>} />
+          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton size="work-panel" onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>보정본 업로드 화면으로</PhotographerLightButton>} />
         </div>
       </main>
     </CustomerSelectShell>

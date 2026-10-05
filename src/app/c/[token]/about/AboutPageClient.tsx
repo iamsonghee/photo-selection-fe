@@ -145,7 +145,7 @@ export default function AboutPageClient() {
             <div className={styles.compRow}>
               <div className={`${styles.compCell} ${styles.compCellFeature}`}>재보정 요청</div>
               <div className={`${styles.compCell} ${styles.compCellOld}`}>텍스트 설명</div>
-              <div className={`${styles.compCell} ${styles.compCellNew}`}>사진 보며 직접 코멘트</div>
+              <div className={`${styles.compCell} ${styles.compCellNew}`}>사진별 메모·재보정 요청</div>
             </div>
           </div>
         </section>
@@ -191,13 +191,13 @@ export default function AboutPageClient() {
               <div className={styles.faqQ}>
                 <span className={styles.qMark}>Q.</span> 선택한 사진을 바꿀 수 있나요?
               </div>
-              <div className={styles.faqA}>확정 버튼을 누르기 전까지는 언제든 바꿀 수 있어요. 확정 후에도 작가님께 연락하시면 돼요.</div>
+              <div className={styles.faqA}>확정 버튼을 누르기 전까지는 언제든 바꿀 수 있어요. 확정 후에도 취소 가능 횟수가 남아 있고 보정이 시작되기 전이라면 완료 화면에서 취소할 수 있어요.</div>
             </div>
             <div className={styles.faqItem}>
               <div className={styles.faqQ}>
                 <span className={styles.qMark}>Q.</span> 사진은 얼마나 보관되나요?
               </div>
-              <div className={styles.faqA}>작가님이 프로젝트를 관리하는 동안 보관됩니다. 자세한 내용은 담당 작가님께 문의해주세요.</div>
+              <div className={styles.faqA}>작가님이 프로젝트를 관리하는 동안 보관됩니다. 자세한 내용은 담당 작가님께 문의해 주세요.</div>
             </div>
             <div className={styles.faqItem}>
               <div className={styles.faqQ}>

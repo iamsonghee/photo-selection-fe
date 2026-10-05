@@ -20,7 +20,7 @@ export function PhotoCardComment({
   className = "",
   showLabel = true,
   compact = false,
-  label = "고객 코멘트",
+  label = "작가 전달 메모",
   truncate = true,
   minimal = false,
   readable = false,

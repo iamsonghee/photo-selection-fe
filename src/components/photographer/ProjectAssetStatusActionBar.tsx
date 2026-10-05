@@ -98,7 +98,7 @@ export function ProjectAssetStatusActionBar({
               <p className="text-[13px] font-semibold text-foreground">{customerStage.title}</p>
               {customerStage.deadline ? (
                 <span className="text-[11px] font-medium tabular-nums text-[var(--customer-foreground)]">
-                  검토 기한 {customerStage.deadline}
+                  검토 마감일 {customerStage.deadline}
                 </span>
               ) : null}
             </div>

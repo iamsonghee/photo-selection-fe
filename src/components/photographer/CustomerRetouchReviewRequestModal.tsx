@@ -136,7 +136,7 @@ export function CustomerRetouchReviewRequestModal({
 
         <section>
           <div className="flex items-center justify-between gap-4">
-            <span id="retouch-review-deadline-label" className="text-[14px] font-bold leading-5 tracking-[-0.28px] text-foreground">고객 검토 기한</span>
+            <span id="retouch-review-deadline-label" className="text-[14px] font-bold leading-5 tracking-[-0.28px] text-foreground">고객 검토 마감일</span>
             <span aria-live="polite" className="shrink-0 whitespace-nowrap text-[11px] font-medium leading-[18px] tracking-[-0.24px] text-muted-foreground sm:text-[12px]">
               {relativeDeadlineLabel(deadline)}
             </span>

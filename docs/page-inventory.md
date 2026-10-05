@@ -100,7 +100,7 @@
 | `/` | `src/app/page.tsx` | `/landing` 구현을 재사용하는 메인 랜딩 | 밝은 반응형 셸과 로컬 제품 데모 | 가상 데이터만 사용, 시작 CTA는 셀렉 체험으로 이동, 운영 설정·인증 조회 없음 |
 | `/landing` | `src/app/landing/page.tsx` | 제품 소개·히어로 시연·독립 샘플 체험 | 무음 영상과 반응형 로컬 데모 | 가상 상태만 사용, 영상 실패/움직임 축소 시 poster |
 | `/landing/demo-capture` | `src/app/landing/demo-capture/page.tsx` | 영상 재생성용 고정 타임라인 | 1200×641 CSS px, 개발 전용 | production에서는 notFound, 운영 API 미사용 |
-| `/guide` | `src/app/guide/page.tsx`, `GuidePageClient.tsx` | 작가/고객 탭형 사용 가이드 | 독립적인 장문 가이드 UI, Noto Sans KR 기반 | 탭 전환, CTA disabled 처리 |
+| `/guide` | `src/app/guide/page.tsx`, `GuidePageClient.tsx` | 작가/고객 탭형 사용 가이드 | 독립적인 장문 가이드 UI, 전역 Pretendard 기반 | 탭 전환, CTA disabled 처리 |
 | `/beta/apply` | `src/app/beta/apply/page.tsx`, `BetaApplyForm.tsx` | 로그인 전 인증 유도 또는 베타 신청 폼 | 공통 `Card`, `Input`, `Textarea`, `Button`을 가장 일관되게 사용 | 로그인/제출/검증/오류/완료 |
 | `/beta/apply/complete` | `src/app/beta/apply/complete/page.tsx` | 신청 완료 확인 | 중앙 카드 | 단일 완료 상태 |
 
@@ -162,8 +162,8 @@
 
 > 2026-09-11 개편 1차: 현재 `/`와 `/landing`은 밝은 공통 헤더·푸터와 첫 화면만 렌더링한다. 아래의 기존 장식·섹션 설명은 개편 전 관찰 기록이다. 첫 화면은 Pretendard와 `ac-` 범위 토큰, 빈 사진 프레임의 고객·작가 정적 예시를 사용한다. 모바일은 고객→작가 순서로 배치한다. 공동 찜·AI 유사컷(베타)·보정 피드백을 소개하며 일반 체험 한도는 서버 설정을 유지한다. 보조 CTA는 제품 예시 앵커, 주 CTA는 기존 인증 모달 또는 대시보드다. 인증 모달은 라이트 테마 밖에서 기존 스타일을 유지한다. 단계형 데모·독립 체험·나머지 본문은 후속 범위이며 이번 변경에서 브라우저 시각 검증은 수행하지 않았다.
 
-- 루트 `body`는 `Noto Sans KR`, 어두운 배경과 전역 토큰을 사용한다.
-- 랜딩은 `Space Mono`, `Space Grotesk`, `JetBrains Mono`, Pretendard를 추가로 불러온다.
+- 루트 `body`와 제품 화면은 전역 `--font-sans`의 Pretendard를 사용한다.
+- 랜딩의 제한된 브랜드 표현만 `Space Grotesk`를 사용하며, 비교 숫자와 식별값은 전역 `--font-mono`의 JetBrains Mono를 사용한다.
 - 화면 전체 장식, 스캔라인, 각진 패널과 시스템 라벨이 강한 마케팅 전용 문법을 만든다.
 - 브라우저 렌더링에서 랜딩의 헤더, 서비스 섹션, 후기, CTA가 하나의 긴 문서로 확인됐다.
 

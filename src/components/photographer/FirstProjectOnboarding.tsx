@@ -28,7 +28,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
   },
   {
     title: "셀렉 확인하고 납품하기",
-    description: "확정된 셀렉 사진을 보정해 업로드하고, 고객의 수정 요청과 승인을 거쳐 최종본을 전달해요.",
+    description: "확정된 셀렉 사진을 보정해 업로드하고, 고객의 재보정 요청과 승인을 거쳐 최종 보정본을 전달해요.",
     icon: BadgeCheck,
   },
 ];

@@ -24,7 +24,7 @@ export default async function CustomerResultPage({ params }: { params: Promise<{
   const { projectId } = await params;
   const token = (await cookies()).get(customerResultCookieName(projectId))?.value ?? "";
   if (!verifyCustomerResultToken(projectId, token)) {
-    return <MessagePage title="결과 링크를 확인해주세요" description="작업을 의뢰한 고객에게 받은 결과 링크로 다시 접속해주세요." />;
+    return <MessagePage title="결과 링크를 확인해 주세요" description="작업을 의뢰한 고객에게 받은 결과 링크로 다시 접속해 주세요." />;
   }
 
   const admin = getAdminClient();
@@ -39,11 +39,11 @@ export default async function CustomerResultPage({ params }: { params: Promise<{
     .eq("project_id", projectId)
     .eq("is_selected", true);
   const photoIds = (selections ?? []).map((row) => row.photo_id);
-  if (selectionError || photoIds.length === 0) return <MessagePage title="선택된 사진이 없어요" description="고객에게 선택 결과를 다시 확인해달라고 요청해주세요." />;
+  if (selectionError || photoIds.length === 0) return <MessagePage title="선택된 사진이 없어요" description="고객에게 선택 결과를 다시 확인해달라고 요청해 주세요." />;
 
   const photosResult = await admin.from("customer_photos").select("id, filename, order_index, thumb_url, preview_url, similarity_group_id").eq("project_id", projectId).in("id", photoIds);
   if (photosResult.error) {
-    return <MessagePage title="결과를 불러오지 못했어요" description="잠시 후 다시 시도해주세요." />;
+    return <MessagePage title="결과를 불러오지 못했어요" description="잠시 후 다시 시도해 주세요." />;
   }
 
   const comments = Object.fromEntries((selections ?? []).filter((row) => row.comment?.trim()).map((row) => [row.photo_id, { comment: row.comment!.trim() }]));

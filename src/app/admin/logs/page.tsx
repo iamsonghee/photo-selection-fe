@@ -7,11 +7,11 @@ export default async function AdminActivityLogsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-foreground">Activity Logs</h1>
+      <h1 className="text-2xl font-semibold text-foreground">활동 로그</h1>
       <p className="mt-1 text-sm text-muted-foreground">전체 작가 대상 최근 활동 {logs.length}건</p>
 
       <div className="mt-4 rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted-foreground">
-        ⚠ v1 검토 / 재보정 / 납품 단계 전이는 현재 로그에 기록되지 않습니다. (
+        ⚠ 보정본 검토 / 재보정 / 납품 단계 전이는 현재 로그에 기록되지 않습니다. (
         <code className="text-xs">created / uploaded / selecting / confirmed / editing</code> 5개 액션만 기록됨)
       </div>
 

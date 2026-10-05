@@ -19,9 +19,9 @@ export default async function AdminSettingsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
+      <h1 className="text-2xl font-semibold text-foreground">설정</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        등급별 이용 한도 — 값을 바꾸고 저장하면 재배포 없이 즉시 반영됩니다. 관리자 계정은 읽기 전용(사용자별 개별 조정은 Beta Users에서)
+        등급별 이용 한도 — 값을 바꾸고 저장하면 재배포 없이 즉시 반영됩니다. 관리자 계정은 읽기 전용(사용자별 개별 조정은 작가 계정에서)
       </p>
 
       <h3 className="mt-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

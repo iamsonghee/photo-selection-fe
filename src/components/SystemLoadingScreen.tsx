@@ -48,7 +48,7 @@ export function SystemLoadingScreen({
           min-height: 100dvh; padding: env(safe-area-inset-top) 24px env(safe-area-inset-bottom);
           display: grid; place-items: center; overflow: hidden;
           background: #fff; color: #191918;
-          font-family: Pretendard, 'Noto Sans KR', sans-serif;
+          font-family: var(--font-sans);
         }
         .sls-content { width: 100%; max-width: 280px; display: flex; flex-direction: column; align-items: center; text-align: center; }
         .sls-mark {

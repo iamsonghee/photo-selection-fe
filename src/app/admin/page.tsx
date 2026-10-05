@@ -39,7 +39,7 @@ export default async function AdminDashboardPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
+      <h1 className="text-2xl font-semibold text-foreground">대시보드</h1>
       <p className="mt-1 text-sm text-muted-foreground">서비스 전체 현황 요약</p>
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -69,7 +69,7 @@ export default async function AdminDashboardPage() {
           마감 임박 / 지연 프로젝트
         </h3>
         <Link href="/admin/projects" className="text-xs text-primary hover:underline">
-          Projects 전체 보기 →
+          전체 프로젝트 보기 →
         </Link>
       </div>
 

@@ -36,9 +36,9 @@ export function NewCustomerProjectForm() {
   async function handleCreate() {
     if (submitting) return;
     const errors: Record<string, string> = {};
-    if (!name.trim()) errors.name = "프로젝트명을 입력해주세요.";
-    if (!shootType) errors.shootType = "촬영 종류를 선택해주세요.";
-    if (Number(target) < 1) errors.target = "최종 선택 장수를 1장 이상 입력해주세요.";
+    if (!name.trim()) errors.name = "프로젝트명을 입력해 주세요.";
+    if (!shootType) errors.shootType = "촬영 유형을 선택해 주세요.";
+    if (Number(target) < 1) errors.target = "셀렉 목표 장수를 1장 이상 입력해 주세요.";
     if (Object.keys(errors).length) {
       setFieldErrors(errors);
       requestAnimationFrame(() => document.getElementById(`field-${Object.keys(errors)[0]}`)?.querySelector<HTMLElement>("input,button")?.focus());
@@ -78,11 +78,11 @@ export function NewCustomerProjectForm() {
         <div className="mx-auto max-w-[840px]">
           <ProjectFormPageHeading
             title="어떤 사진을 골라볼까요?"
-            description="촬영 정보와 최종 선택 장수를 입력하고 사진을 올려보세요."
+            description="촬영 정보와 셀렉 목표 장수를 입력하고 사진을 올려보세요."
             onBack={() => router.push("/customer-select")}
           />
           <div className="flex flex-col gap-5">
-            <ProjectFormSection number="01" title="기본 정보" description="프로젝트를 구분하고 셀렉 기준으로 사용할 정보를 입력해 주세요.">
+            <ProjectFormSection number="01" title="기본 정보" description="프로젝트명과 셀렉 목표 장수를 입력해 주세요.">
             <div id="field-name">
               <ProjectFormField error={fieldErrors.name} label="프로젝트명" required>
                 <ProjectFormInput
@@ -97,13 +97,13 @@ export function NewCustomerProjectForm() {
             </div>
 
             <div id="field-shootType">
-              <ProjectFormField group error={fieldErrors.shootType} label="촬영 종류" required>
+              <ProjectFormField group error={fieldErrors.shootType} label="촬영 유형" required>
                 <ProjectShootTypeSelector options={CUSTOMER_SHOOT_TYPES} value={shootType} onChange={(value) => { setShootType(value); setFieldErrors((current) => ({ ...current, shootType: "" })); }} />
               </ProjectFormField>
             </div>
 
             <div id="field-target" className="max-w-[360px]">
-              <ProjectFormField error={fieldErrors.target} label="최종 선택 장수" required hint="작가님과 약속한 장수를 입력해 주세요. 실제 선택 장수가 달라도 전달할 수 있어요.">
+              <ProjectFormField error={fieldErrors.target} label="셀렉 목표 장수" required hint="작가님과 약속한 장수를 입력해 주세요. 실제 선택 장수가 달라도 전달할 수 있어요.">
                 <div className="relative">
                   <ProjectFormInput
                     className={`${PROJECT_FORM_INPUT_CLASS} !pr-14 text-right ${projectFormInputStateClass({ hasValue: Boolean(target), error: Boolean(fieldErrors.target) })}`}

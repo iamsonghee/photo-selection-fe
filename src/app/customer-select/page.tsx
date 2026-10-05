@@ -106,7 +106,7 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
                   </li>;
                 })}
               </ol>
-              <Link href="/customer-select/new" className="mt-8 inline-flex items-center gap-1.5 rounded-full bg-accent px-6 py-3.5 text-[15px] font-bold text-white transition-colors hover:bg-[var(--accent-hover)]"><Plus size={18} strokeWidth={2.4} />사진 선택 시작하기</Link>
+              <Link href="/customer-select/new" className="mt-8 inline-flex items-center gap-1.5 rounded-full bg-accent px-6 py-3.5 text-[15px] font-bold text-white transition-colors hover:bg-[var(--accent-hover)]"><Plus size={18} strokeWidth={2.4} />새 프로젝트 만들기</Link>
             </div>
           </section>
         ) : (

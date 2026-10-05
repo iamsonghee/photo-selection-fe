@@ -332,10 +332,10 @@ export default function UploadVersionsPanel({
         return `남은 대상 ${remainingTargetCount}장 중 ${selectedCount}장만 선택했습니다. 선택한 사진만 먼저 업로드됩니다.`;
       }
       if (selectedCount > targets.length) {
-        return `전체 대상보다 ${selectedCount - targets.length}장 많습니다. 초과 파일은 매칭되지 않으므로 파일을 확인해주세요.`;
+        return `전체 대상보다 ${selectedCount - targets.length}장 많습니다. 초과 파일은 매칭되지 않으므로 파일을 확인해 주세요.`;
       }
       if (selectedCount > remainingTargetCount) {
-        return `남은 대상보다 ${selectedCount - remainingTargetCount}장 많습니다. 기존 보정본이 교체될 수 있으니 매칭 결과를 확인해주세요.`;
+        return `남은 대상보다 ${selectedCount - remainingTargetCount}장 많습니다. 기존 보정본이 교체될 수 있으니 매칭 결과를 확인해 주세요.`;
       }
       return null;
     }
@@ -344,7 +344,7 @@ export default function UploadVersionsPanel({
       return `전체 대상 ${targets.length}장 중 ${selectedCount}장만 선택했습니다. 선택한 사진만 교체됩니다.`;
     }
     if (selectedCount > targets.length) {
-      return `전체 대상보다 ${selectedCount - targets.length}장 많습니다. 초과 파일은 매칭되지 않으므로 파일을 확인해주세요.`;
+      return `전체 대상보다 ${selectedCount - targets.length}장 많습니다. 초과 파일은 매칭되지 않으므로 파일을 확인해 주세요.`;
     }
     return null;
   }, [remainingTargetCount, targets.length, uploadedFiles.length]);
@@ -569,7 +569,7 @@ export default function UploadVersionsPanel({
         const failedCount = changed.length - uploadData.uploaded;
         throw new Error(
           uploadData.message ??
-            `${changed.length}장 중 ${failedCount}장이 업로드되지 않았습니다. 파일 형식과 용량을 확인한 뒤 다시 시도해주세요.`
+            `${changed.length}장 중 ${failedCount}장이 업로드되지 않았습니다. 파일 형식과 용량을 확인한 뒤 다시 시도해 주세요.`
         );
       }
 
@@ -586,7 +586,7 @@ export default function UploadVersionsPanel({
 
   if (!isOpen) return null;
 
-  const versionLabel = version === 1 ? "보정본" : "V2 재보정본";
+  const versionLabel = version === 1 ? "보정본" : "재보정본";
   const emptyCount =
     mapping.length > 0
       ? mapping.filter((m) => m.file == null && m.type !== "server").length
@@ -601,7 +601,7 @@ export default function UploadVersionsPanel({
           ? "사진 목록을 불러오는 중입니다."
           : totalUploadFileCount === 0
             ? hasExistingRetouches
-              ? "추가로 업로드할 파일을 선택해주세요."
+              ? "추가로 업로드할 파일을 선택해 주세요."
               : null
             : null;
   const mobileFileCountNotice = fileCountNotice
@@ -748,7 +748,7 @@ export default function UploadVersionsPanel({
             </span>
             <div className="min-w-0">
               <h2 id={dialogTitleId} className="m-0 text-[24px] font-semibold leading-8 tracking-[-0.72px] text-foreground">
-                <span className="md:hidden">{version === 1 ? "보정본 업로드" : "V2 보정본 업로드"}</span>
+                <span className="md:hidden">{version === 1 ? "보정본 업로드" : "재보정본 업로드"}</span>
                 <span className="hidden md:inline">{hasExistingRetouches ? "보정본 추가 업로드" : `${versionLabel} 업로드`}</span>
               </h2>
             </div>

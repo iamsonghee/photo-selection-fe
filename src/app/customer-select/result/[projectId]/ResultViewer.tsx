@@ -48,7 +48,7 @@ export default function ResultViewer({ project, photos, comments }: Props) {
             <p className="text-xs font-bold text-accent">셀렉 결과</p>
             <h1 className="mt-2 text-[26px] font-bold tracking-[-0.04em] md:text-[32px]">{project.name}</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              선택 {photos.length.toLocaleString()}장 · 전달 메모 {commentedPhotos.length.toLocaleString()}장 · 요청 기준 {project.target.toLocaleString()}장
+              선택 {photos.length.toLocaleString()}장 · 작가 전달 메모 {commentedPhotos.length.toLocaleString()}장 · 셀렉 목표 장수 {project.target.toLocaleString()}장
             </p>
           </div>
           <div className="flex gap-2">
@@ -59,7 +59,7 @@ export default function ResultViewer({ project, photos, comments }: Props) {
 
         <div className="mt-5 flex items-center gap-2" role="group" aria-label="사진 필터">
           <button type="button" aria-pressed={!commentOnly} onClick={() => setCommentOnly(false)} className={`h-9 rounded-full border px-4 text-[13px] font-semibold transition-colors ${!commentOnly ? "border-foreground bg-foreground text-white" : "border-border-subtle bg-white text-muted-foreground hover:border-border-strong"}`}>전체 {photos.length.toLocaleString()}</button>
-          <button type="button" aria-pressed={commentOnly} disabled={commentedPhotos.length === 0} onClick={() => setCommentOnly(true)} className={`h-9 rounded-full border px-4 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${commentOnly ? "border-accent bg-accent text-white" : "border-border-subtle bg-white text-muted-foreground hover:border-border-strong"}`}><MessageSquare size={14} className="mr-1.5 inline" aria-hidden />전달 메모 있는 사진 {commentedPhotos.length.toLocaleString()}</button>
+          <button type="button" aria-pressed={commentOnly} disabled={commentedPhotos.length === 0} onClick={() => setCommentOnly(true)} className={`h-9 rounded-full border px-4 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${commentOnly ? "border-accent bg-accent text-white" : "border-border-subtle bg-white text-muted-foreground hover:border-border-strong"}`}><MessageSquare size={14} className="mr-1.5 inline" aria-hidden />작가 전달 메모 있는 사진 {commentedPhotos.length.toLocaleString()}</button>
         </div>
 
         {/* PC는 셀프 고객 갤러리 기준(photo-grid.ts: 최소 180px·간격 12px). 모바일은 메모를 읽을 수 있게 2열(기준 3열의 예외). */}

@@ -52,7 +52,7 @@ export default function CustomerDonePage() {
               ✓
             </div>
             <p className={ui.entryTitle} style={{ textAlign: "center" }}>
-              {retouchDone ? "모든 보정이 완료됐어요" : "확정된 보정본을 확인해주세요"}
+              {retouchDone ? "모든 보정이 완료됐어요" : "확정된 보정본을 확인해 주세요"}
             </p>
             <div className={ui.statPill} style={{ flex: "none" }}>
               <span className={ui.n}>{confirmedCount}장</span>

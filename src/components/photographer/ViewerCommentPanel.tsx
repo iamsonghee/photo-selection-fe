@@ -13,7 +13,7 @@ type ViewerCommentPanelProps = {
 
 export function ViewerCommentPanel({
   comments,
-  heading = "고객 코멘트",
+  heading = "작가 전달 메모",
 }: ViewerCommentPanelProps) {
   const visibleComments = comments
     .map((comment) => ({ ...comment, text: comment.text.trim() }))
@@ -44,7 +44,7 @@ export function ViewerCommentPanel({
           ))}
         </div>
       ) : (
-        <p className={styles.empty}>남긴 코멘트가 없습니다.</p>
+        <p className={styles.empty}>내용이 없습니다.</p>
       )}
     </section>
   );

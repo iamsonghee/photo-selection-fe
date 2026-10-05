@@ -88,7 +88,7 @@ function CustomersContent({ cache, initialData, fetchedAt }: { cache: ReturnType
       } catch (reason) {
         if (!controller.signal.aborted) {
           const message = reason instanceof Error ? reason.message : "고객 목록을 불러오지 못했습니다.";
-          if (cached) setNotice("최신 고객 목록을 확인하지 못했어요. 잠시 후 다시 확인해주세요.");
+          if (cached) setNotice("최신 고객 목록을 확인하지 못했어요. 잠시 후 다시 확인해 주세요.");
           else { setCustomers([]); setListError(message); }
         }
       } finally { if (!controller.signal.aborted) setLoading(false); }
@@ -118,7 +118,7 @@ function CustomersContent({ cache, initialData, fetchedAt }: { cache: ReturnType
         }
       } catch (reason) {
         if (!controller.signal.aborted) {
-          if (cached && !missing) setNotice("최신 고객 정보를 확인하지 못했어요. 잠시 후 다시 확인해주세요.");
+          if (cached && !missing) setNotice("최신 고객 정보를 확인하지 못했어요. 잠시 후 다시 확인해 주세요.");
           else { detailCache.current.delete(selectedId); setDetail(null); setDetailError(reason instanceof Error ? reason.message : "고객 정보를 불러오지 못했습니다."); }
         }
       } finally { if (!controller.signal.aborted) setDetailLoading(false); }
@@ -152,7 +152,7 @@ function CustomersContent({ cache, initialData, fetchedAt }: { cache: ReturnType
   async function save() {
     if (!editCustomer || saving) return;
     if (editing === "info" && (!draftName.trim() || (draftPhone.trim() && !isValidKoreanPhone(draftPhone)))) {
-      setError(!draftName.trim() ? "고객 이름을 입력해주세요." : "연락처는 010-0000-0000 형식으로 입력해주세요."); return;
+      setError(!draftName.trim() ? "고객 이름을 입력해 주세요." : "연락처는 010-0000-0000 형식으로 입력해 주세요."); return;
     }
     setSaving(true); setError("");
     try {
@@ -172,7 +172,7 @@ function CustomersContent({ cache, initialData, fetchedAt }: { cache: ReturnType
       setDetail(current => current?.id === editCustomer.id ? { ...current, ...data.customer } : current);
       setCustomers(current => current.map(customer => customer.id === editCustomer.id ? { ...customer, name: data.customer.name, phone: data.customer.phone } : customer));
       setEditing(null); setNotice("고객 정보를 저장했어요."); setReload(value => value + 1);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "저장에 실패했습니다. 다시 시도해주세요."); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "저장에 실패했습니다. 다시 시도해 주세요."); }
     finally { setSaving(false); }
   }
   async function createProject(customerId?: string) {

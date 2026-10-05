@@ -63,33 +63,33 @@ export async function PATCH(req: NextRequest, { params }: Context) {
     const body = await req.json().catch(() => null);
     if (!body || typeof body !== "object" || Array.isArray(body) ||
       typeof body.updatedAt !== "string" || !Number.isFinite(Date.parse(body.updatedAt))) {
-      return NextResponse.json({ error: "저장할 고객 정보를 확인해주세요." }, { status: 400 });
+      return NextResponse.json({ error: "저장할 고객 정보를 확인해 주세요." }, { status: 400 });
     }
     const payload: { name?: string; phone?: string | null; note?: string; updated_at: string } = { updated_at: new Date().toISOString() };
     if ("name" in body || "phone" in body) {
       if (typeof body.name !== "string" || !body.name.trim() || body.name.trim().length > CUSTOMER_NAME_MAX_LENGTH ||
         !(body.phone === null || typeof body.phone === "string") ||
         (body.phone?.trim() && !isValidKoreanPhone(body.phone))) {
-        return NextResponse.json({ error: "이름과 연락처를 확인해주세요. 연락처는 010-0000-0000 형식입니다." }, { status: 400 });
+        return NextResponse.json({ error: "이름과 연락처를 확인해 주세요. 연락처는 010-0000-0000 형식입니다." }, { status: 400 });
       }
       payload.name = body.name.trim(); payload.phone = body.phone ? normalizePhone(body.phone) || null : null;
     }
     if ("note" in body) {
       if (typeof body.note !== "string" || body.note.length > CUSTOMER_NOTE_MAX_LENGTH) {
-        return NextResponse.json({ error: "고객 메모는 2,000자 이내로 입력해주세요." }, { status: 400 });
+        return NextResponse.json({ error: "고객 메모는 2,000자 이내로 입력해 주세요." }, { status: 400 });
       }
       payload.note = body.note.trim();
     }
-    if (Object.keys(payload).length === 1) return NextResponse.json({ error: "변경할 내용을 입력해주세요." }, { status: 400 });
+    if (Object.keys(payload).length === 1) return NextResponse.json({ error: "변경할 내용을 입력해 주세요." }, { status: 400 });
     const admin = getAdminClient();
     const result = await admin.from("photographer_customers").update(payload)
       .eq("id", id).eq("photographer_id", owner).eq("updated_at", body.updatedAt).select(customerFields).maybeSingle();
-    if (result.error?.code === "23505") return NextResponse.json({ error: "같은 이름과 연락처로 등록된 고객이 있습니다. 입력 정보를 확인해주세요." }, { status: 409 });
+    if (result.error?.code === "23505") return NextResponse.json({ error: "같은 이름과 연락처로 등록된 고객이 있습니다. 입력 정보를 확인해 주세요." }, { status: 409 });
     if (result.error) throw result.error;
     if (!result.data) {
       const existing = await admin.from("photographer_customers").select("id").eq("id", id).eq("photographer_id", owner).maybeSingle();
       if (existing.error) throw existing.error;
-      return NextResponse.json({ error: existing.data ? "다른 화면에서 고객 정보가 변경되었습니다. 닫고 새로고침한 뒤 다시 수정해주세요." : "고객을 찾을 수 없습니다." }, { status: existing.data ? 409 : 404 });
+      return NextResponse.json({ error: existing.data ? "다른 화면에서 고객 정보가 변경되었습니다. 닫고 새로고침한 뒤 다시 수정해 주세요." : "고객을 찾을 수 없습니다." }, { status: existing.data ? 409 : 404 });
     }
     return NextResponse.json({ customer: mapCustomer(result.data) });
   } catch (error) {

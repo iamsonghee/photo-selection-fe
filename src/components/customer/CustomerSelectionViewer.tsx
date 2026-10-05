@@ -781,8 +781,6 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
       onTouchEnd={handleTouchEnd}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;900&family=Space+Mono:wght@400;700&display=swap');
-
         .fs-grid-bg {
           position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.15;
           background-image: linear-gradient(var(--border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
@@ -858,8 +856,8 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
           display: grid; place-items: center;
         }
         .fs-select-big-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-        .fs-select-big-text strong { font: 700 15px/1.2 Pretendard, 'Noto Sans KR', sans-serif; letter-spacing: -.2px; }
-        .fs-select-big-text small { font: 500 11px/1.2 Pretendard, 'Noto Sans KR', sans-serif; color: rgba(255,255,255,.45); }
+        .fs-select-big-text strong { font: 700 15px/1.2 var(--font-sans); letter-spacing: -.2px; }
+        .fs-select-big-text small { font: 500 11px/1.2 var(--font-sans); color: rgba(255,255,255,.45); }
         /* 주황은 "선택됨" 전용 */
         .fs-select-big.is-selected { border-color: var(--accent); background: rgba(255,77,0,.12); }
         .fs-select-big.is-selected .fs-select-big-box { background: var(--accent); border-color: var(--accent); }
@@ -867,7 +865,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
           margin-top: auto; padding: 12px 20px 14px;
           border: 0; border-top: 1px solid rgba(255,255,255,.08);
           background: transparent; color: rgba(255,255,255,.42);
-          font: 500 11px/17px Pretendard, 'Noto Sans KR', sans-serif;
+          font: 500 11px/17px var(--font-sans);
           letter-spacing: -.15px; text-align: left; cursor: pointer;
           transition: color 140ms ease, background-color 140ms ease;
         }
@@ -920,7 +918,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
           background: #181818;
           border: 1px solid #a8abae;
           outline: none; font-size: 13px; line-height: 1.55; color: #fff;
-          font-family: Pretendard, 'Noto Sans KR', sans-serif;
+          font-family: var(--font-sans);
           resize: none;
         }
         .fs-comment-input::placeholder { color: #d6d6d6; }
@@ -932,7 +930,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
           display: flex; align-items: center; gap: 8px;
           width: 100%; min-height: 40px; padding: 0 14px;
           background: #181818; border: 1px solid #a8abae; border-radius: 8px;
-          color: rgba(255,255,255,.56); font: 400 13px/1.4 Pretendard, 'Noto Sans KR', sans-serif;
+          color: rgba(255,255,255,.56); font: 400 13px/1.4 var(--font-sans);
           text-align: left; cursor: pointer;
         }
         .fs-comment-toggle:hover { border-color: rgba(var(--accent-rgb), 0.4); }
@@ -944,7 +942,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
         .fs-panel-label {
           display: block; margin: 2px 0 0;
           color: rgba(255,255,255,.56);
-          font: 600 12px/1 Pretendard, 'Noto Sans KR', sans-serif;
+          font: 600 12px/1 var(--font-sans);
           letter-spacing: -.2px;
         }
         @keyframes fv-check-pop {
@@ -967,7 +965,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
           display: flex; align-items: center; gap: 6px;
           height: 32px; padding: 0 12px; flex-shrink: 0; border-radius: 999px;
           background: rgba(0,0,0,0.4); border: 1px solid var(--border); color: #fff;
-          font-family: Pretendard, 'Noto Sans KR', sans-serif; font-size: 12px; font-weight: 600;
+          font-family: var(--font-sans); font-size: 12px; font-weight: 600;
           cursor: pointer; transition: all 0.15s ease;
         }
         .fs-group-hint:hover { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.5); }
@@ -976,7 +974,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
           padding: 14px 20px;
         }
         .fs-mini-strip-label {
-          font-family: Pretendard, 'Noto Sans KR', sans-serif; font-size: 11px; font-weight: 600;
+          font-family: var(--font-sans); font-size: 11px; font-weight: 600;
           color: var(--muted-foreground); margin-bottom: 8px;
         }
         .fs-mini-strip { display: flex; gap: 10px; overflow-x: auto; }
@@ -1000,7 +998,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
            * 여기서 직접 fixed/inset을 선언해야 한다. relative로 두면 높이가 0이 된다. */
           position: fixed; inset: 0;
           background: #000; color: #fff;
-          font-family: Pretendard, 'Noto Sans KR', sans-serif;
+          font-family: var(--font-sans);
           overflow: hidden;
           /* 챙 높이는 여기서만 정의하고 아래 각 행과 사진 stage offset이 모두 이 값을 참조한다
            * (행 높이를 바꿔도 사진 정렬이 따로 놀지 않도록 단일 출처로 유지). */
@@ -1043,7 +1041,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
         .fv-title { min-width: 0; flex: 1; display: flex; flex-direction: column; justify-content: center; }
         .fv-selection-count { min-width: 0; font: 600 17px/22px Pretendard, sans-serif; letter-spacing: -.2px; white-space: nowrap; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
         /* 보조 줄 — 사진 위에 얹히므로 그림자로 대비를 준다. 길면 잘라낸다(전체는 title 속성으로 남는다). */
-        .fv-filename { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12px/15px 'Space Mono', Pretendard, sans-serif; color: rgba(255,255,255,.86); text-shadow: 0 1px 3px rgba(0,0,0,.9); }
+        .fv-filename { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12px/15px var(--font-mono); color: rgba(255,255,255,.86); text-shadow: 0 1px 3px rgba(0,0,0,.9); }
         .fv-selection-count strong { color: #ff4d00; font-weight: 700; }
         /* 신원 칩 — 이름·색은 사진마다 바뀌는 값이 아니라 "이 세션에서 나는 누구"라 앱바에 둔다.
          * 파일명·진행 바를 걷어낸 자리라 새 공간을 쓰지 않는다. */
@@ -1216,7 +1214,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
               * 모바일 앱바가 `Y / N장 선택`을 상시 노출하는 것과 같은 계약이다. */}
             <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, flex: 1, justifyContent: "center" }}>
               <h2 style={{
-                fontFamily: "Pretendard, 'Noto Sans KR', sans-serif",
+                fontFamily: "var(--font-sans)",
                 fontWeight: 600,
                 fontSize: 17,
                 letterSpacing: "-0.02em",
@@ -1228,7 +1226,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                 <strong style={{ color: "var(--accent)", fontWeight: 700 }}>{Y}</strong> / {N}장 선택
               </h2>
               <p style={{
-                fontFamily: "Pretendard, 'Noto Sans KR', sans-serif",
+                fontFamily: "var(--font-sans)",
                 fontSize: 12,
                 color: "rgba(255,255,255,.72)",
                 margin: 0,
@@ -1260,7 +1258,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                   border: `1px ${participant?.initial ? "solid" : "dashed"} var(--border)`,
                   borderRadius: 999, background: "transparent",
                   color: participant?.initial ? "#fff" : "var(--muted-foreground)",
-                  font: "600 13px/1 Pretendard, 'Noto Sans KR', sans-serif",
+                  font: "600 13px/1 var(--font-sans)",
                   cursor: "pointer",
                 }}
               >
@@ -1460,7 +1458,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                     border: `1px solid ${isMarkedByMe && myColorHex ? myColorHex : "var(--border)"}`,
                     background: isMarkedByMe ? "var(--fv-my-tint, transparent)" : "transparent",
                     color: "#fff",
-                    font: "600 13px/18px Pretendard, 'Noto Sans KR', sans-serif",
+                    font: "600 13px/18px var(--font-sans)",
                     cursor: "pointer",
                   }}
                 >

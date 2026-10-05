@@ -172,7 +172,7 @@ export default function SettingsPage() {
   const handleSave = async () => {
     if (!profile) return;
     if (editPhone.trim() && !isValidKoreanPhone(editPhone)) {
-      setFormError("연락처는 010-0000-0000 형식으로 입력해주세요.");
+      setFormError("연락처는 010-0000-0000 형식으로 입력해 주세요.");
       return;
     }
     setSaving(true);
@@ -183,7 +183,7 @@ export default function SettingsPage() {
         : null;
       const portfolioUrl = normalizeExternalHttpUrl(editPortfolio);
       if (editPortfolio.trim() && !portfolioUrl) {
-        setFormError("포트폴리오 주소를 확인해주세요.");
+        setFormError("포트폴리오 주소를 확인해 주세요.");
         return;
       }
       const res = await fetch("/api/photographer/profile", {
@@ -232,7 +232,7 @@ export default function SettingsPage() {
     if (!profile) return;
     const days = defaultDeadlineDays === "" ? null : Number(defaultDeadlineDays);
     if (days !== null && (!Number.isInteger(days) || days < 1 || days > 365)) {
-      setDefaultsError("셀렉 마감 기본 기간은 1~365일로 입력해주세요.");
+      setDefaultsError("셀렉 기본 마감 기간은 1~365일로 입력해 주세요.");
       return;
     }
     setSavingDefaults(true);
@@ -528,12 +528,12 @@ export default function SettingsPage() {
                 <div className="divide-y divide-border-subtle">
                   <SettingsRow
                     icon={CalendarDays}
-                    label="셀렉 마감 기본 기간"
+                    label="셀렉 기본 마감 기간"
                     description="고객에게 셀렉을 요청하는 날부터 계산합니다."
                   >
                     <label className="flex items-center gap-2">
                       <ProjectFormInput
-                        aria-label="셀렉 마감 기본 기간"
+                        aria-label="셀렉 기본 마감 기간"
                         className={`${SETTINGS_INPUT_CLASS} w-20 text-right md:w-24`}
                         type="text"
                         inputMode="numeric"
@@ -558,8 +558,8 @@ export default function SettingsPage() {
                     <p className="mt-1 text-[12px] leading-[18px] text-muted-foreground md:text-[13px] md:leading-5">원본을 포함하는 새 프로젝트의 업로드 순서와 초대 가능 시점을 정합니다.</p>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="고객 셀렉 시작 방식">
                       {([
-                        ["preview_first", "빠른 셀렉 요청", "셀렉용 사진을 먼저 준비하고 원본은 이어서 업로드해요."],
-                        ["parallel", "원본까지 준비 후 요청", "셀렉용 사진과 원본을 함께 올리고 모두 준비되면 요청해요."],
+                        ["preview_first", "미리보기 준비 후 셀렉 시작", "셀렉용 사진을 먼저 준비하고 원본은 이어서 업로드해요."],
+                        ["parallel", "원본 준비 후 셀렉 시작", "셀렉용 사진과 원본을 함께 올리고 모두 준비되면 요청해요."],
                       ] as const).map(([value, label, description]) => {
                         const selected = defaultUploadStrategy === value;
                         return (
@@ -603,7 +603,7 @@ export default function SettingsPage() {
                 <div className="divide-y divide-border-subtle">
                   {[
                     { label: "고객 단계 완료", desc: "고객이 셀렉을 확정하거나 최종 승인하면 알려드려요." },
-                    { label: "보정 요청 도착", desc: "새로운 수정 또는 재보정 요청이 등록되면 알려드려요." },
+                    { label: "재보정 요청 도착", desc: "새로운 재보정 요청이 등록되면 알려드려요." },
                     { label: "마감 임박", desc: "마감일 3일 전, 완료되지 않은 프로젝트를 알려드려요." },
                   ].map((item) => (
                     <SettingsRow key={item.label} label={item.label} description={item.desc}>

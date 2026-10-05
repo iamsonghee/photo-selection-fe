@@ -1,5 +1,5 @@
 /* 랜딩과 같은 밝은 캔버스. 공용 폼 컴포넌트는 베타 범위의 토큰을 상속한다. */
-.beta-light{--background:#fafbf9;--foreground:#191918;--muted-foreground:#666864;--subtle-foreground:#737373;--placeholder-foreground:#858585;--disabled-foreground:#929292;--border:#dededb;--border-strong:#cbcdca;--border-subtle:#eceeeb;--surface:#fff;--surface-raised:#f7f8f6;--primary:#d94100;--accent:#ff4d00;--danger:#c92b32;min-height:100dvh;background:var(--background);color:var(--foreground);color-scheme:light;font-family:Pretendard,"Noto Sans KR",sans-serif;line-height:1.7;}
+.beta-light{--background:#fafbf9;--foreground:#191918;--muted-foreground:#666864;--subtle-foreground:#737373;--placeholder-foreground:#858585;--disabled-foreground:#929292;--border:#dededb;--border-strong:#cbcdca;--border-subtle:#eceeeb;--surface:#fff;--surface-raised:#f7f8f6;--primary:#d94100;--accent:#ff4d00;--danger:#c92b32;min-height:100dvh;background:var(--background);color:var(--foreground);color-scheme:light;font-family:var(--font-sans);line-height:1.7;}
 body:has(.beta-light){background:#fafbf9;}
 .beta-light :is(h1,h2,p,legend,label){word-break:keep-all;overflow-wrap:break-word;}
 .beta-header{height:80px;max-width:1120px;padding-inline:32px;margin:auto;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-subtle);}

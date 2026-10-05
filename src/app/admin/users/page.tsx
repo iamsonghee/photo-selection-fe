@@ -11,7 +11,7 @@ export default async function AdminUsersPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-foreground">Beta Users</h1>
+      <h1 className="text-2xl font-semibold text-foreground">작가 계정</h1>
       <p className="mt-1 text-sm text-muted-foreground">가입 작가 {photographers.length}명</p>
 
       <div className="mt-6">

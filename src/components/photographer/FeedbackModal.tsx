@@ -52,7 +52,7 @@ export function FeedbackButton({
   async function submit() {
     if (submitting) return;
     if (!message.trim()) {
-      setError("내용을 입력해주세요.");
+      setError("내용을 입력해 주세요.");
       return;
     }
     setSubmitting(true);
@@ -66,7 +66,7 @@ export function FeedbackButton({
       if (!res.ok) throw new Error();
       setDone(true);
     } catch {
-      setError("전송에 실패했습니다. 다시 시도해주세요.");
+      setError("전송에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setSubmitting(false);
     }

@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (customer_phone != null && (typeof customer_phone !== "string" || (customer_phone.trim() && !isValidKoreanPhone(customer_phone)))) {
-      return NextResponse.json({ error: "연락처를 확인해주세요." }, { status: 400 });
+      return NextResponse.json({ error: "연락처를 확인해 주세요." }, { status: 400 });
     }
     if (customer_id != null) {
       if (!isCustomerId(customer_id)) return NextResponse.json({ error: "고객 정보가 올바르지 않습니다." }, { status: 400 });

@@ -73,7 +73,7 @@ export function OriginalPhotoViewer({
   mobileView,
   mobileDetailLayout = false,
   mobileComments = [],
-  mobileCommentsHeading = "고객 코멘트",
+  mobileCommentsHeading = "작가 전달 메모",
   mobileMissingRetouched = [],
   showGroupShortcut = false,
   canToggleGroup = false,

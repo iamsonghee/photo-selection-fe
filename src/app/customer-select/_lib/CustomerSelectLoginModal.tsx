@@ -16,7 +16,7 @@ export function CustomerSelectLoginModal() {
         isOpen
         onClose={() => router.push("/")}
         redirectPath="/customer-select"
-        notice={<><strong>베타 테스트 중</strong><br />웨딩스냅·본식스냅·돌잔치 원본을 올리고<br />가족·친구와 함께 사진을 골라 보세요.<span className="cs-auth-mobile-tip">원본이 많으면 PC에서 올리는 걸 권장해요.</span></>}
+        notice={<><strong>베타 테스트 중</strong><br />웨딩스냅·본식스냅·돌잔치 사진 선택용 이미지를 올리고<br />가족·친구와 함께 사진을 골라 보세요.<span className="cs-auth-mobile-tip">원본이 많으면 PC에서 올리는 걸 권장해요.</span></>}
       />
     </div>
   );

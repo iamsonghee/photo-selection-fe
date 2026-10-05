@@ -54,7 +54,7 @@ export const BETA_WORKFLOW_OPTIONS: readonly BetaOption[] = [
 export const BETA_DESIRED_FEATURE_OPTIONS: readonly BetaOption[] = [
   { key: "customer_gallery", label: "고객 셀렉 갤러리" },
   { key: "rating_color_tag", label: "별점·컬러 태그" },
-  { key: "photo_comment", label: "사진별 코멘트" },
+  { key: "photo_comment", label: "사진별 작가 전달 메모" },
   { key: "similar_grouping", label: "유사컷 그룹핑" },
   { key: "retouch_management", label: "보정 요청 관리" },
   { key: "confirm_revision_management", label: "고객 확정·재요청 관리" },

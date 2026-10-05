@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     }
     if (!sessionPhotographer.email) {
       return NextResponse.json(
-        { error: "계정에 이메일 정보가 없습니다. 관리자에게 문의해주세요." },
+        { error: "계정에 이메일 정보가 없습니다. 관리자에게 문의해 주세요." },
         { status: 400 }
       );
     }
@@ -88,37 +88,37 @@ export async function POST(req: NextRequest) {
     } = body ?? {};
 
     if (typeof name !== "string" || !name.trim()) {
-      return NextResponse.json({ error: "이름을 입력해주세요." }, { status: 400 });
+      return NextResponse.json({ error: "이름을 입력해 주세요." }, { status: 400 });
     }
     if (typeof phone !== "string" || !isValidKoreanPhone(phone)) {
       return NextResponse.json({ error: "휴대폰번호 형식이 올바르지 않습니다." }, { status: 400 });
     }
     if (!isValidKeySet(genres, BETA_GENRE_OPTIONS)) {
-      return NextResponse.json({ error: "주 촬영 분야를 선택해주세요." }, { status: 400 });
+      return NextResponse.json({ error: "주 촬영 분야를 선택해 주세요." }, { status: 400 });
     }
     if (genres.includes("other") && (typeof genreOther !== "string" || !genreOther.trim())) {
-      return NextResponse.json({ error: "기타 촬영 분야를 입력해주세요." }, { status: 400 });
+      return NextResponse.json({ error: "기타 촬영 분야를 입력해 주세요." }, { status: 400 });
     }
     if (!isValidKey(monthlyProjectRange, BETA_MONTHLY_PROJECT_OPTIONS)) {
-      return NextResponse.json({ error: "월평균 촬영 수를 선택해주세요." }, { status: 400 });
+      return NextResponse.json({ error: "월평균 촬영 수를 선택해 주세요." }, { status: 400 });
     }
     if (!isValidKey(avgPhotosRange, BETA_AVG_PHOTOS_OPTIONS)) {
-      return NextResponse.json({ error: "촬영당 평균 사진 수를 선택해주세요." }, { status: 400 });
+      return NextResponse.json({ error: "촬영당 평균 사진 수를 선택해 주세요." }, { status: 400 });
     }
     if (!isValidKeySet(workflowMethods, BETA_WORKFLOW_OPTIONS)) {
-      return NextResponse.json({ error: "현재 고객 셀렉 방식을 선택해주세요." }, { status: 400 });
+      return NextResponse.json({ error: "현재 고객 셀렉 방식을 선택해 주세요." }, { status: 400 });
     }
     if (workflowMethods.includes("other") && (typeof workflowOther !== "string" || !workflowOther.trim())) {
-      return NextResponse.json({ error: "기타 셀렉 방식을 입력해주세요." }, { status: 400 });
+      return NextResponse.json({ error: "기타 셀렉 방식을 입력해 주세요." }, { status: 400 });
     }
     if (!isValidKeySet(desiredFeatures, BETA_DESIRED_FEATURE_OPTIONS)) {
-      return NextResponse.json({ error: "베타에서 사용해보고 싶은 기능을 선택해주세요." }, { status: 400 });
+      return NextResponse.json({ error: "베타에서 사용해보고 싶은 기능을 선택해 주세요." }, { status: 400 });
     }
     if (
       desiredFeatures.includes("other") &&
       (typeof desiredFeaturesOther !== "string" || !desiredFeaturesOther.trim())
     ) {
-      return NextResponse.json({ error: "기타 희망 기능을 입력해주세요." }, { status: 400 });
+      return NextResponse.json({ error: "기타 희망 기능을 입력해 주세요." }, { status: 400 });
     }
     if (painPoint !== undefined && !isValidKey(painPoint, BETA_PAIN_POINT_OPTIONS)) {
       return NextResponse.json({ error: "가장 불편한 단계 값이 올바르지 않습니다." }, { status: 400 });
@@ -127,10 +127,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "A-CUT에 기대하는 점 값이 올바르지 않습니다." }, { status: 400 });
     }
     if (privacyConsent !== true) {
-      return NextResponse.json({ error: "개인정보 수집·이용에 동의해주세요." }, { status: 400 });
+      return NextResponse.json({ error: "개인정보 수집·이용에 동의해 주세요." }, { status: 400 });
     }
     if (contactConsent !== true) {
-      return NextResponse.json({ error: "베타 운영 연락 수신에 동의해주세요." }, { status: 400 });
+      return NextResponse.json({ error: "베타 운영 연락 수신에 동의해 주세요." }, { status: 400 });
     }
 
     const normalizedPhone = normalizePhone(phone);

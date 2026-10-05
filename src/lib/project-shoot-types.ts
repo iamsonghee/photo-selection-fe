@@ -15,5 +15,5 @@ export function isProjectShootType(value: unknown): value is string {
 }
 
 export function projectShootTypeLabel(value: string | null): string {
-  return SHOOT_TYPES.find((type) => type.value === value)?.label ?? "촬영 종류 미입력";
+  return SHOOT_TYPES.find((type) => type.value === value)?.label ?? "촬영 유형 미입력";
 }

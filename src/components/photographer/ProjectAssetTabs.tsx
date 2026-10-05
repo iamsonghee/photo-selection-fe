@@ -67,7 +67,7 @@ export function ProjectAssetTabs({
     ...(hasFinalAssetTab(status)
       ? [{
           key: "final" as const,
-          label: "최종본",
+          label: "최종 보정본",
           href: `/photographer/projects/${projectId}/assets/final`,
         }]
       : []),

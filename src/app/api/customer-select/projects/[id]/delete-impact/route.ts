@@ -23,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const photoIds: string[] = Array.isArray(body.photo_ids)
     ? [...new Set<string>(body.photo_ids.filter((value: unknown): value is string => typeof value === "string" && value.length > 0))]
     : [];
-  if (!photoIds.length || photoIds.length > CUSTOMER_PHOTO_LIMIT) return NextResponse.json({ error: "삭제할 사진을 확인해주세요." }, { status: 400 });
+  if (!photoIds.length || photoIds.length > CUSTOMER_PHOTO_LIMIT) return NextResponse.json({ error: "삭제할 사진을 확인해 주세요." }, { status: 400 });
 
   const [photos, selections, opinions, quality, versions] = await Promise.all([
     inChunks(photoIds, (chunk) => admin.from("customer_photos").select("id, similarity_group_id").eq("project_id", id).in("id", chunk)),

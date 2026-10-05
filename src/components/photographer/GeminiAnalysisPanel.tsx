@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, X } from "lucide-react";
 import type { Photo } from "@/types";
 
-const MONO = "'Space Mono', 'JetBrains Mono', 'Noto Sans KR', sans-serif";
+const MONO = "var(--font-mono)";
 const TEXT_MUTED = "var(--subtle-foreground)";
 const TEXT_NORMAL = "var(--muted-foreground)";
 const TEXT_BRIGHT = "var(--foreground)";
@@ -161,7 +161,7 @@ function qualityTooltip(q: QualityEntry): string {
     `흔들림: ${legacyBlur}`,
     `눈 감음: ${legacyEyes}`,
     "",
-    "해상도가 달라 직접 비교 시 참고용으로만 확인해주세요.",
+    "해상도가 달라 직접 비교 시 참고용으로만 확인해 주세요.",
   ].join("\n");
 }
 
@@ -451,7 +451,7 @@ export default function GeminiAnalysisPanel({ projectId, photos }: Props) {
                   run.estimated_cost_usd ?? 0
                 ).toFixed(4)}`
               : status === "failed"
-              ? `분석 실패: ${run?.error ?? "다시 시도해주세요"}`
+              ? `분석 실패: ${run?.error ?? "다시 시도해 주세요"}`
               : "Gemini 임베딩으로 유사컷 그룹핑을 실험합니다 (OpenCLIP 결과와 별개)"}
           </div>
           <div style={{ fontSize: 11, color: TEXT_MUTED }}>
@@ -462,7 +462,7 @@ export default function GeminiAnalysisPanel({ projectId, photos }: Props) {
                   qualityRun.estimated_cost_usd ?? 0
                 ).toFixed(4)}`
               : qualityStatus === "failed"
-              ? `품질 확인 실패: ${qualityRun?.error ?? "다시 시도해주세요"}`
+              ? `품질 확인 실패: ${qualityRun?.error ?? "다시 시도해 주세요"}`
               : "Gemini Flash로 눈감음·흔들림·초점을 1차 확인합니다 (자동 삭제·숨김 아님)"}
           </div>
         </div>

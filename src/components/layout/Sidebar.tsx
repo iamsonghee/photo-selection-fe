@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { ChevronLeft, ChevronUp, LogOut, Settings } from "lucide-react";
-import { Inter } from "next/font/google";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -24,13 +23,6 @@ export const TIER_LABEL: Record<string, string> = {
   beta: "베타",
   general: "무료체험",
 };
-
-const sidebarSans = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--acb-sidebar-sans",
-  display: "swap",
-});
 
 /** Figma #56039 NavigationMenu의 펼침/접힘 폭. Desktop shell의 content offset과 함께 관리한다. */
 export const PHOTOGRAPHER_SIDEBAR_WIDTH_FULL = 266;
@@ -151,13 +143,9 @@ export function Sidebar({
         styles.root,
         isLightRoute ? styles.rootLight : "",
         collapsed ? styles.rootCollapsed : styles.rootExpanded,
-        sidebarSans.variable,
       ].join(" ")}
       data-photographer-sidebar
       data-sidebar-theme={isLightRoute ? "light" : "dark"}
-      style={{
-        fontFamily: "var(--acb-sidebar-sans), system-ui, sans-serif",
-      }}
     >
       <div className={styles.toggleWrap}>
         <button
@@ -274,10 +262,7 @@ export function Sidebar({
             </div>
             {!collapsed && (
               <div className="overflow-hidden min-w-0">
-                <p
-                  className="truncate text-[15px] font-semibold leading-5 tracking-[-0.35px] text-foreground"
-                  style={{ fontFamily: "var(--acb-sidebar-sans)" }}
-                >
+                <p className="truncate text-[15px] font-semibold leading-5 tracking-[-0.35px] text-foreground">
                   {displayName} 작가님
                 </p>
                 {(tierLabel || profileIncomplete) && (

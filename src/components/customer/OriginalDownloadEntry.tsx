@@ -356,7 +356,7 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
         setDownloadError("사진 앱으로 저장할 수 없어 파일 다운로드로 전환했습니다.");
       }
     } catch {
-      setDownloadError("선택한 파일을 다운로드할 수 없습니다. 잠시 후 다시 시도해주세요.");
+      setDownloadError("선택한 파일을 다운로드할 수 없습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setIsDownloading(false);
     }
@@ -379,7 +379,7 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
       link.click();
       link.remove();
     } catch {
-      setDownloadError("ZIP을 다운로드할 수 없습니다. 잠시 후 다시 시도해주세요.");
+      setDownloadError("ZIP을 다운로드할 수 없습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setDownloadingPart(null);
     }

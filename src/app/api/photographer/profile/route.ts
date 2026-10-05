@@ -145,7 +145,7 @@ export async function PATCH(req: NextRequest) {
     if (typeof body.portfolio_url === "string") {
       const portfolioUrl = normalizeExternalHttpUrl(body.portfolio_url);
       if (body.portfolio_url.trim() && !portfolioUrl) {
-        return NextResponse.json({ error: "포트폴리오 주소를 확인해주세요." }, { status: 400 });
+        return NextResponse.json({ error: "포트폴리오 주소를 확인해 주세요." }, { status: 400 });
       }
       payload.portfolio_url = portfolioUrl;
     }
@@ -156,7 +156,7 @@ export async function PATCH(req: NextRequest) {
     else if (body.contact_phone === null) payload.contact_phone = null;
     if ("default_selection_deadline_days" in body) {
       if (body.default_selection_deadline_days !== null && (!Number.isInteger(body.default_selection_deadline_days) || body.default_selection_deadline_days < 1 || body.default_selection_deadline_days > 365)) {
-        return NextResponse.json({ error: "셀렉 마감 기본 기간은 1~365일로 입력해주세요." }, { status: 400 });
+        return NextResponse.json({ error: "셀렉 마감 기본 기간은 1~365일로 입력해 주세요." }, { status: 400 });
       }
       payload.default_selection_deadline_days = body.default_selection_deadline_days;
     }

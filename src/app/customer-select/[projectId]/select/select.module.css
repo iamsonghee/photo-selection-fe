@@ -354,7 +354,7 @@
 .likerDots i { width: 8px; height: 8px; margin-left: -2px; border: 1.5px solid var(--surface); border-radius: 50%; box-sizing: content-box; }
 .shortcutHint { color: var(--subtle-foreground); font-size: 11px; text-align: center; }
 
-@media (prefers-reduced-motion: reduce) { .sceneEnter, .sceneEnterAbove { animation: none; } .toolsWrap, :global([data-customer-select]) > header { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .sceneEnter, .sceneEnterAbove { animation: none; } .toolsWrap, :global([data-customer-select]):has(.page) > header { transition: none !important; } }
 
 @media (max-width: 767px) {
   .sceneHeader { padding: 10px 20px 6px; }

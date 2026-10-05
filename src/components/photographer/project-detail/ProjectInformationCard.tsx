@@ -38,10 +38,10 @@ export function ProjectInformationCard({
   const requiredCount = project.requiredCount;
   const shootType = SHOOT_TYPES.find((type) => type.value === project.shootType);
   const mobileGallerySummary = `셀렉 ${requiredCount}장 · ${project.includeOriginal ? "원본 포함" : "원본 미포함"}`;
-  const mobileRevisionSummary = project.maxRevisionCount === 0 ? "재수정 없음" : `재수정 ${project.maxRevisionCount}회`;
+  const mobileRevisionSummary = project.maxRevisionCount === 0 ? "재보정 없음" : `재보정 ${project.maxRevisionCount}회`;
   const selectionRequested = project.status !== "preparing";
   const reviewDeadlineLabel = project.status === "reviewing_v1" || project.status === "reviewing_v2"
-    ? "검토 기한" : "마지막 검토 기한";
+    ? "검토 마감일" : "마지막 검토 마감일";
   const finalRetentionDisplay = project.deliveredAt
     ? formatKstDeadlineAfterDays(project.deliveredAt, 30)
     : null;
@@ -139,7 +139,7 @@ export function ProjectInformationCard({
           ) : null}
           {selectionRequested ? (
             <div>
-              <dt className="text-[11px] font-medium text-muted-foreground">셀렉 기한</dt>
+              <dt className="text-[11px] font-medium text-muted-foreground">셀렉 마감일</dt>
               <dd data-project-selection-deadline className="mt-0.5 truncate text-[13px] font-semibold text-foreground">{deadlineDisplay}</dd>
             </div>
           ) : null}
@@ -177,7 +177,7 @@ export function ProjectInformationCard({
           <div className="flex justify-between gap-4"><dt className="shrink-0 text-muted-foreground">촬영일</dt><dd data-project-shoot-date>{shootDisplay}</dd></div>
           {project.location && <div className="flex justify-between gap-4"><dt className="shrink-0 text-muted-foreground">촬영 장소</dt><dd data-project-location className="flex min-w-0 items-start gap-1 text-right [overflow-wrap:anywhere]"><MapPin size={14} className="mt-0.5 shrink-0 text-muted-foreground"/>{project.location}</dd></div>}
           {shootType && <div className="flex justify-between gap-4"><dt className="text-muted-foreground">촬영 유형</dt><dd>{shootType.label}</dd></div>}
-          {selectionRequested && <div className="flex justify-between gap-4"><dt className="text-muted-foreground">셀렉 기한</dt><dd data-project-selection-deadline>{deadlineDisplay}</dd></div>}
+          {selectionRequested && <div className="flex justify-between gap-4"><dt className="text-muted-foreground">셀렉 마감일</dt><dd data-project-selection-deadline>{deadlineDisplay}</dd></div>}
           {reviewDeadlineDisplay && <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{reviewDeadlineLabel}</dt><dd data-project-review-deadline>{reviewDeadlineDisplay}</dd></div>}
           {finalRetentionDisplay && <div className="flex justify-between gap-4"><dt className="text-muted-foreground">최종 보정본 보관 종료</dt><dd data-project-final-retention-deadline>{finalRetentionDisplay}</dd></div>}
           {originalRetentionDisplay && <div className="flex justify-between gap-4"><dt className="text-muted-foreground">원본 보관 종료</dt><dd data-project-original-retention-deadline>{originalRetentionDisplay}</dd></div>}
@@ -185,9 +185,9 @@ export function ProjectInformationCard({
         <h3 className="mb-4 mt-6 border-t border-border-subtle pt-5 text-xs font-semibold text-muted-foreground">고객 갤러리 설정</h3>
         <dl data-project-gallery-summary className="space-y-4 text-[13px]">
           {[
-            { label: "셀렉 목표", value: `${requiredCount}장` },
+            { label: "셀렉 목표 장수", value: `${requiredCount}장` },
             { label: "업로드 사진", value: `${photoCount}장` },
-            { label: "재수정 요청", value: project.maxRevisionCount === 0 ? "허용 안함" : `${project.maxRevisionCount}회` },
+            { label: "재보정 요청", value: project.maxRevisionCount === 0 ? "허용 안 함" : `${project.maxRevisionCount}회` },
             { label: "납품 파일", value: project.includeOriginal ? "원본 포함" : "원본 미포함" },
           ].map(item => <div key={item.label} className="flex justify-between gap-4"><dt className="text-muted-foreground">{item.label}</dt><dd className="font-medium">{item.value}</dd></div>)}
         </dl>

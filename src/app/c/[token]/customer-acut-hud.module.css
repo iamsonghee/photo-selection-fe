@@ -1,5 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Pretendard:wght@400;600;700;800&display=swap");
-
 .root {
   --bg-color: var(--background);
   --grid-color: var(--border-subtle);

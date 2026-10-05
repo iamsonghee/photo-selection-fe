@@ -774,7 +774,7 @@ export default function GalleryPageClient() {
   if (!project) {
     return (
       <div style={{ display: "flex", minHeight: "100vh", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "var(--background)" }}>
-        <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "var(--subtle-foreground)" }}>INVALID_TOKEN</p>
+        <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--subtle-foreground)" }}>INVALID_TOKEN</p>
       </div>
     );
   }
@@ -782,8 +782,8 @@ export default function GalleryPageClient() {
   if (!loading && photos.length === 0) {
     return (
       <div style={{ display: "flex", minHeight: "100vh", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, background: "var(--background)" }}>
-        <p style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "var(--subtle-foreground)" }}>NO_PHOTOS_FOUND</p>
-        <Link href={`/c/${token}`} style={{ fontFamily: "'Space Mono', 'Noto Sans KR', sans-serif", fontSize: 11, color: "var(--accent)", textDecoration: "none", border: "1px solid var(--border-subtle)", padding: "8px 16px" }}>
+        <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--subtle-foreground)" }}>NO_PHOTOS_FOUND</p>
+        <Link href={`/c/${token}`} style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--accent)", textDecoration: "none", border: "1px solid var(--border-subtle)", padding: "8px 16px" }}>
           ← BACK_TO_INVITE
         </Link>
       </div>
@@ -804,7 +804,7 @@ export default function GalleryPageClient() {
   const dDayLabel = dday?.label ?? "";
   const dDayTone: BadgeTone = dday?.tone ?? "time";
   const footerButtonLabel = remaining > 0
-    ? `${remaining}장을 더 셀렉해주세요`
+    ? `${remaining}장을 더 선택해 주세요`
     : remaining < 0
       ? `${Math.abs(remaining)}장 초과됐어요`
       : finalReview ? "보정 요청하기" : `선택한 ${Y}장 확인하기`;
@@ -812,8 +812,6 @@ export default function GalleryPageClient() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;900&family=Space+Mono:wght@400;700&display=swap');
-
         .gl-grid-bg {
           position: fixed; inset: 0;
           background-image: linear-gradient(var(--border-subtle) 1px, transparent 1px),

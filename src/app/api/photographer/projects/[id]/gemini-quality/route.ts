@@ -10,9 +10,9 @@ const CLIP_INTERNAL_TOKEN = process.env.CLIP_INTERNAL_TOKEN ?? "";
 const GEMINI_ERROR_MESSAGES: Record<number, string> = {
   404: "프로젝트를 찾을 수 없습니다.",
   409: "이미 분석이 진행 중입니다.",
-  503: "분석 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.",
+  503: "분석 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.",
 };
-const GEMINI_ERROR_FALLBACK = "분석 시작에 실패했습니다. 잠시 후 다시 시도해주세요.";
+const GEMINI_ERROR_FALLBACK = "분석 시작에 실패했습니다. 잠시 후 다시 시도해 주세요.";
 
 /**
  * 품질 판정(눈감음·흔들림)은 이제 모든 작가가 쓰는 기능이라 세션 + 소유권만 검증한다.

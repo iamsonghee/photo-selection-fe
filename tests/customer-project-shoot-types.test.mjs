@@ -7,4 +7,4 @@ for (const value of ["wedding", "family", "graduation", "profile", "etc"]) {
 assert.equal(isProjectShootType(null), false);
 assert.equal(isProjectShootType("unknown"), false);
 assert.equal(projectShootTypeLabel("wedding"), "웨딩");
-assert.equal(projectShootTypeLabel(null), "촬영 종류 미입력");
+assert.equal(projectShootTypeLabel(null), "촬영 유형 미입력");

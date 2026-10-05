@@ -56,7 +56,7 @@ export default function RetouchUploadPage() {
       if (photoId) pairs.push({ file: f, photoId });
     });
     if (pairs.length === 0) {
-      setError("업로드할 사진과 원본 연결을 먼저 확인해주세요.");
+      setError("업로드할 사진과 원본 연결을 먼저 확인해 주세요.");
       setUploading(false);
       return;
     }
@@ -160,7 +160,7 @@ export default function RetouchUploadPage() {
             )}
             {error && <span className={ui.bannerHeadWarn}>{error}</span>}
           </div>
-          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton size="work-panel" pending={uploading} pendingLabel="업로드 중…" disabled={files.length === 0} onClick={handleConfirm}>매칭 확인하고 검토 시작</PhotographerLightButton>} />
+          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton size="work-panel" pending={uploading} pendingLabel="업로드 중…" disabled={files.length === 0} onClick={handleConfirm}>사진 연결 확인하고 검토하기</PhotographerLightButton>} />
         </div>
       </main>
     </CustomerSelectShell>

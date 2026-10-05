@@ -35,7 +35,7 @@ export function UploadDoneSheet({ projectId, uploaded, shootType, untimedCount, 
           : "사진을 다 올렸다면 AI가 장면별로 나누고 비슷한 사진·흔들린 사진을 정리해 드려요."}
       </p>
       <p>
-        촬영 종류 <strong className="font-semibold text-foreground">{customerShootTypeLabel(shootType || null)}</strong> · <Link href={`/customer-select/${projectId}/settings?from=upload`} className="font-semibold text-accent underline underline-offset-2">바꾸기</Link>
+        촬영 유형 <strong className="font-semibold text-foreground">{customerShootTypeLabel(shootType || null)}</strong> · <Link href={`/customer-select/${projectId}/settings?from=upload`} className="font-semibold text-accent underline underline-offset-2">바꾸기</Link>
         {untimedCount > 0 ? <><br />{scenesBlocked
           ? `촬영 시각이 없는 사진이 많아(${untimedCount.toLocaleString()}장) 장면 없이 전체 사진으로 보여드려요.`
           : `${untimedCount.toLocaleString()}장은 촬영 시각이 없어 장면 정리 때 마지막에 따로 모여요.`}</> : null}
