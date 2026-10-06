@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AlertTriangle, Copy, FileSpreadsheet, FileText, MessageSquare, Send } from "lucide-react";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
-import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { ProjectBodySkeleton } from "../../_lib/ProjectBodySkeleton";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import { csvEscape, downloadTextFile, sanitizeFilenamePart } from "@/lib/text-file-download";
 import { formatSceneRange } from "@/lib/customer-scenes";
@@ -24,7 +24,7 @@ import s from "./review.module.css";
 type Notice = { key: string; text: string; href?: string };
 
 export default function CustomerSendPage() {
-  return <Suspense fallback={<SystemLoadingScreen title="보낼 사진을 불러오고 있어요" homeHref="/customer-select" />}><SendScreen /></Suspense>;
+  return <Suspense fallback={<ProjectBodySkeleton variant="review" label="보낼 사진을 불러오고 있어요" />}><SendScreen /></Suspense>;
 }
 
 const sceneLabel = (scene: NamedScene) => scene.name ? `${scene.name}${scene.start ? ` (${formatSceneRange(scene)})` : ""}` : formatSceneRange(scene);
@@ -85,7 +85,7 @@ function SendScreen() {
     return list;
   }, [me, people, project.participantDone, projectId, scenes, selected]);
 
-  if (!hydrated || !isOwner) return <SystemLoadingScreen title="보낼 사진을 불러오고 있어요" homeHref="/customer-select" />;
+  if (!hydrated || !isOwner) return <ProjectBodySkeleton variant="review" label="보낼 사진을 불러오고 있어요" />;
 
   const target = project.target;
   const diff = selected.length - target;

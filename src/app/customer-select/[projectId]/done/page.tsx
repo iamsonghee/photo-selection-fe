@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
-import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { ProjectBodySkeleton } from "../../_lib/ProjectBodySkeleton";
 import { useRetouchData, markRetouchDone, latestVersion } from "../../_lib/retouch-store";
 import { RetouchErrorScreen } from "../../_lib/RetouchErrorScreen";
 import ui from "../../_lib/ui.module.css";
@@ -33,7 +33,7 @@ export default function CustomerDonePage() {
   }
 
   if (loading) {
-    return <SystemLoadingScreen title="완료 상태를 확인하고 있어요" homeHref="/customer-select" />;
+    return <ProjectBodySkeleton variant="cards" label="완료 상태를 확인하고 있어요" />;
   }
   if (loadError) return <RetouchErrorScreen message={loadError} />;
 

@@ -7,7 +7,7 @@ import { AlertTriangle, Check, Images, Monitor } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { BrandLogoBar } from "@/components/BrandLogo";
 import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
-import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { CustomerPageSkeleton } from "../CustomerPageSkeleton";
 import { formatKstLongDate } from "@/lib/kst-date";
 
 const CUSTOMER_CANCEL_MAX = 3;
@@ -55,12 +55,12 @@ export default function ConfirmedPage() {
     if (project.status === "delivered") router.replace(`/c/${token}/delivered`);
   }, [project, router, token]);
 
-  if (loading) return <SystemLoadingScreen />;
+  if (loading) return <CustomerPageSkeleton variant="page" />;
   if (!project) {
     return <main className="flex min-h-dvh items-center justify-center bg-white text-sm text-[#7d7a75]">존재하지 않는 초대 링크입니다.</main>;
   }
   if (["selecting", "reviewing_v1", "reviewing_v2", "delivered"].includes(project.status)) {
-    return <SystemLoadingScreen />;
+    return <CustomerPageSkeleton variant="page" />;
   }
 
   const cancelCount = project.customerCancelCount ?? 0;
@@ -84,7 +84,9 @@ export default function ConfirmedPage() {
         setCancelError((data as { error?: string }).error ?? "확정을 취소하지 못했습니다.");
         return;
       }
-      window.location.replace(`/c/${token}/gallery`);
+      // 컨텍스트 상태를 먼저 새로 받아야 갤러리가 옛 status(confirmed)를 보고 여기로 되돌리지 않는다.
+      await context?.reloadProject();
+      router.replace(`/c/${token}/gallery`);
     } catch {
       setCancelError("네트워크 연결을 확인하고 다시 시도해 주세요.");
     } finally {

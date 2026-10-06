@@ -1,6 +1,6 @@
 "use client";
 
-import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { PhotographerPageSkeleton } from "@/components/photographer/PhotographerPageSkeleton";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -65,17 +65,22 @@ function BetaWelcomeModal({ open, onClose, userName }: { open: boolean; onClose:
   );
 }
 
+// 작가별 마지막 대시보드 데이터. 다시 들어올 때 골격 없이 바로 그리고 뒤에서 새로 받는다(매 방문 흰 화면 방지).
+// 소프트 내비게이션 동안만 살아 있고 새로고침이면 비운다. 계정이 바뀌면 키(작가 ID)가 달라 섞이지 않는다.
+const dashboardCache = new Map<string, { projects: Project[]; logs: ProjectLogItem[] }>();
+
 // ── Main Page ──────────────────────────────────────────────
 export default function DashboardPage() {
   const router = useRouter();
   const { handleNewProject, limitInfo, closeLimitModal } = useNewProjectGate();
   const { profile, loading: profileLoading } = useProfile();
-  const [loading, setLoading]   = useState(true);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const cached = profile?.id ? dashboardCache.get(profile.id) : undefined;
+  const [loading, setLoading]   = useState(!cached);
+  const [projects, setProjects] = useState<Project[]>(cached?.projects ?? []);
   const [loadError, setLoadError] = useState(false);
   const [logsError, setLogsError] = useState(false);
   const [reload, setReload] = useState(0);
-  const [logs, setLogs]         = useState<ProjectLogItem[]>([]);
+  const [logs, setLogs]         = useState<ProjectLogItem[]>(cached?.logs ?? []);
   const { quota } = useQuota();
   const tier = quota?.tier ?? null;
   const maxProjects = quota?.max || DEFAULT_GENERAL_MAX_PROJECTS;
@@ -113,7 +118,8 @@ export default function DashboardPage() {
 
     let cancelled = false;
     async function load() {
-      setLoading(true);
+      // 기억해 둔 데이터가 있으면 그대로 보여주며 뒤에서 새로 받는다.
+      if (!dashboardCache.has(pid as string)) setLoading(true);
       // 프로젝트 조회와 활동 조회 실패를 분리해 빈 대시보드로 오인하지 않도록 한다.
       const [list, activity] = await Promise.allSettled([
         getProjectsByPhotographerId(pid as string),
@@ -129,6 +135,9 @@ export default function DashboardPage() {
       if (list.status === "fulfilled") setProjects(list.value);
       setLogsError(activity.status === "rejected");
       if (activity.status === "fulfilled") setLogs(activity.value);
+      if (list.status === "fulfilled") {
+        dashboardCache.set(pid as string, { projects: list.value, logs: activity.status === "fulfilled" ? activity.value : dashboardCache.get(pid as string)?.logs ?? [] });
+      }
       setLoading(false);
     }
     load();
@@ -146,7 +155,8 @@ export default function DashboardPage() {
   }, [tier, profile?.id]);
 
   if (pendingRedirect || profileLoading || (profile?.id && loading)) {
-    return <SystemLoadingScreen />;
+    // 로그인 직후 다른 곳으로 보내는 중이거나 첫 조회 중 — 사이드바는 그대로 두고 본문만 골격으로.
+    return <PhotographerPageSkeleton label="대시보드를 불러오고 있어요" />;
   }
 
   if (!profile?.id) {

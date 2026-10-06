@@ -723,7 +723,7 @@ sequenceDiagram
         else PIN 일치
             API->>DB: pin_attempts insert
             API-->>C: 200 {success:true} + Set-Cookie pin_verified_token(서명, 24h)
-            C->>C: window.location.href = from (전체 페이지 이동)
+            C->>C: SelectionContext.reloadProject() 후 router.replace(from) (전체 새로고침 없이 컨텍스트 재조회, 2026-10-06)
             Note over C: 클라이언트 라우팅(router.replace)이 아니라<br/>전체 이동을 써야 SelectionProvider가<br/>새 쿠키로 재요청함(과거 버그 수정 이력)
         end
     end

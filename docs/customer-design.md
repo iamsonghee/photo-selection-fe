@@ -81,14 +81,14 @@ Typography는 Pretendard 하나를 사용한다.
 
 ## 5. Shared components
 
-### SystemLoadingScreen light variant
+### 로딩 표시 — CustomerPageSkeleton (2026-10-06, SystemLoadingScreen 대체)
 
-- `/c/[token]` 아래 고객 플로우는 `variant="light"`를 사용한다.
-- 고객용 light variant는 시스템 로그·시계·격자·코너 장식을 사용하지 않는다.
-- 흰 캔버스 중앙에 `48px` 주황색 brand mark, 짧은 한국어 안내와 `112×3px` indeterminate progress만 배치한다.
-- `prefers-reduced-motion`에서는 mark/progress animation을 멈춘 정적 상태로 표시한다.
-- 강제 새로고침에서도 root dark fallback이 먼저 보이지 않도록 `app/c/loading.tsx`가 token layout의 서버 준비 구간을, `app/c/[token]/loading.tsx`가 내부 page streaming 구간을 light variant로 감싼다.
-- 루트·작가용 기본 dark variant는 유지한다.
+- `/c/[token]` 아래 고객 화면은 더 이상 화면 전체를 흰색으로 덮는 `SystemLoadingScreen`을 쓰지 않는다. `src/app/c/[token]/CustomerPageSkeleton.tsx`가 실제 배치를 닮은 골격을 본문 자리에 둔다(design-system.md §13.1).
+- variant: `invite`(초대 — 작가 아바타·제목·안내·대표 사진·버튼), `gallery`(갤러리·잠금·검토 목록 — 상단 줄·도구 줄·사진 격자, 모바일 2열 4:3·PC 180px 정사각), `page`(완료·수령·소개 — 제목·문단·카드).
+- 블록은 공용 `skeleton-block` 쉬머(design-system.md §13.1)다. 라이트 화면(`isCustomerLightRoute`)은 순백 캔버스 위 `rgba(25,25,24,.08)` 바탕 + 흰 띠 70%를 루트 `style`의 `--skeleton-base`/`--skeleton-highlight`로 주고(라이트 캔버스 속성이 없는 화면이라 인라인), 다크 화면(소개·뷰어)은 전역 기본(흰색 7%/9%)을 그대로 쓴다. `prefers-reduced-motion`에서는 띠 없이 바탕색만 남는다.
+- 라우트 로딩 파일 `app/loading.tsx`·`app/c/loading.tsx`·`app/c/[token]/loading.tsx`는 없앴다. token layout이 서버에서 준비되는 동안은 중간 화면 없이 기다렸다가 바로 그린다.
+- 상태를 바꾸는 행동(셀렉 확정·확정 취소·보정본 검토 제출·수령 완료·PIN 통과) 뒤에는 전체 새로고침 대신 `SelectionContext.reloadProject()`로 프로젝트·사진을 다시 받은 뒤 `router.replace`로 이동한다. 도착 화면의 status 가드가 옛 상태를 보고 되돌리는 루프를 막기 위해 **재조회를 먼저** 한다.
+- `SystemLoadingScreen` 자체는 남아 있지만 고객 화면에서는 쓰지 않는다(컴포넌트 주석 참고).
 
 ### CustomerEntryShell
 

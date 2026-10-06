@@ -11,7 +11,7 @@ import { useCustomerLightCanvas } from "@/lib/use-customer-light-canvas";
 import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
 import FinalDeliveryDownloadEntry from "@/components/customer/FinalDeliveryDownloadEntry";
 import { formatKstLongDate } from "@/lib/kst-date";
-import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { CustomerPageSkeleton } from "../CustomerPageSkeleton";
 
 type PhotographerInfo = { name: string | null; profile_image_url: string | null } | null;
 
@@ -41,7 +41,7 @@ export default function DeliveredPage() {
   }, [project, token, router]);
 
   if (!mounted || loading) {
-    return <SystemLoadingScreen />;
+    return <CustomerPageSkeleton variant="page" />;
   }
   if (!project) {
     return (
@@ -56,7 +56,7 @@ export default function DeliveredPage() {
     );
   }
   if (project.status !== "delivered") {
-    return <SystemLoadingScreen />;
+    return <CustomerPageSkeleton variant="page" />;
   }
 
   const photographerName = photographer?.name?.trim() || "작가";

@@ -24,7 +24,7 @@ import {
   type Participant,
   type ParticipantRoster,
 } from "@/lib/customer-participant";
-import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { CustomerPageSkeleton } from "../CustomerPageSkeleton";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { SimilarityToggleButton } from "@/components/ui/SimilarityToggleButton";
 import {
@@ -102,7 +102,7 @@ export default function GalleryPageClient() {
   const searchParams = useSearchParams();
   const token        = (params?.token as string) ?? "";
 
-  const { project, photos, photoGroups, Y, N, toggle, selectedIds, photoStates, loading, updatePhotoState, includeRecommendations, selectionSaving, saveError } = useSelection();
+  const { project, photos, photoGroups, Y, N, toggle, selectedIds, photoStates, loading, updatePhotoState, includeRecommendations, selectionSaving, saveError, reloadProject } = useSelection();
   const { thumbQueue } = useCustomerImageCache();
   const [photographer, setPhotographer] = useState<PhotographerInfo>(null);
 
@@ -758,18 +758,19 @@ export default function GalleryPageClient() {
         return;
       }
       setShowConfirmModal(false);
-      router.push(`/c/${token}/confirmed`);
-      window.location.href = `/c/${token}/confirmed`;
+      // 컨텍스트 상태를 먼저 새로 받아야 완료 화면이 옛 status(selecting)를 보고 갤러리로 되돌리지 않는다.
+      await reloadProject();
+      router.replace(`/c/${token}/confirmed`);
     } catch (e) {
       console.error(e);
       setConfirming(false);
       setConfirmError("네트워크 오류가 발생했습니다. 다시 시도해 주세요.");
     }
-  }, [project?.id, token, router, selectedIds, selectionSaving, applyingRecommendations, confirming, N]);
+  }, [project?.id, token, router, selectedIds, selectionSaving, applyingRecommendations, confirming, N, reloadProject]);
 
   /* ── Loading / error states ── */
   if (loading) {
-    return <SystemLoadingScreen />;
+    return <CustomerPageSkeleton variant="gallery" />;
   }
   if (!project) {
     return (

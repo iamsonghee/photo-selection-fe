@@ -12,7 +12,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowDown, ChevronUp, MessageCircle, Grid2x2, Grid3x3, Grip, PanelLeftClose, PanelLeftOpen, Search, SlidersHorizontal, Sparkles, Users } from "lucide-react";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
-import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { ProjectBodySkeleton } from "../../_lib/ProjectBodySkeleton";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
 import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import { formatSceneRange, sceneTargets } from "@/lib/customer-scenes";
@@ -45,7 +45,7 @@ const sizeLabel: Record<MobileColumns, string> = { 2: "크게", 3: "중간", 4: 
 const nextColumns: Record<MobileColumns, MobileColumns> = { 2: 3, 3: 4, 4: 2 };
 
 export default function CustomerSelectPage() {
-  return <Suspense fallback={<SystemLoadingScreen title="사진을 불러오고 있어요" homeHref="/customer-select" />}><SelectScreen /></Suspense>;
+  return <Suspense fallback={<ProjectBodySkeleton variant="gallery" label="사진을 불러오고 있어요" />}><SelectScreen /></Suspense>;
 }
 
 function SelectScreen() {
@@ -302,7 +302,7 @@ function SelectScreen() {
   }, [openPhotoId, participantReady, setViewingPhoto]);
   useEffect(() => () => setViewingPhoto(null), [setViewingPhoto]);
 
-  if (!hydrated) return <SystemLoadingScreen title="사진을 불러오고 있어요" homeHref="/customer-select" />;
+  if (!hydrated) return <ProjectBodySkeleton variant="gallery" label="사진을 불러오고 있어요" />;
   if (accessDenied) return <ParticipantAccessEndedScreen />;
   if (!isOwner && (!participantReady || (searchParams.get("invite") === "1" && !inviteSeen))) return <ParticipantJoinScreen onEnter={enterFromInvite} />;
 

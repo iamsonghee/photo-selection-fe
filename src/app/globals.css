@@ -28,6 +28,16 @@
   --google: #4285f4;
   --kakao-bg: #fee500;
   --kakao-text: #3c1e1e;
+  /* 로딩 골격 블록(`skeleton-block` 유틸리티, 아래)의 바탕과 쉬머 띠. 전역 기본은 Dark Photo Workspace,
+     라이트 캔버스([data-acut-light-canvas])는 바로 아래에서 덮어쓴다. 작가 고객 라이트 화면은 CustomerPageSkeleton이 인라인으로 준다. */
+  --skeleton-base: rgba(255, 255, 255, 0.07);
+  --skeleton-highlight: rgba(255, 255, 255, 0.09);
+}
+
+[data-acut-light-canvas] {
+  /* 라이트 전경(#023852) 9% — surface-raised(#eef3f4)는 흰 바탕과 거의 구분되지 않아 골격이 안 보였다(2026-10-06). */
+  --skeleton-base: rgba(2, 56, 82, 0.09);
+  --skeleton-highlight: rgba(255, 255, 255, 0.7);
 }
 
 /* 셀프 고객 화면(라이트)이 떠 있는 동안 html/body도 같은 캔버스로 — 전역 바탕은 다크라,
@@ -90,6 +100,25 @@ body {
 
 .font-mono {
   font-family: var(--font-mono);
+}
+
+/* 로딩 골격 블록(design-system.md §13.1): 바탕색 위로 밝은 띠가 1.6초마다 왼쪽→오른쪽으로 한 번 쓸고 지나간다(쉬머).
+ * 띠는 배경 이미지 폭(200%)의 38~62% 구간이라 주기의 절반쯤은 띠 없이 쉰다. 모션 줄이기 설정에서는 바탕색만 남는다(§12.6).
+ * 전체 opacity 펄스(animate-pulse) 대신 쓴다 — 펄스는 블록을 더 흐리게 만들어 라이트 캔버스에서 거의 보이지 않았다. */
+@utility skeleton-block {
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient(100deg, transparent 38%, var(--skeleton-highlight) 50%, transparent 62%);
+  background-size: 200% 100%;
+  background-position: 200% 0;
+  background-repeat: no-repeat;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: skeleton-shimmer 1.6s linear infinite;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -100% 0; }
 }
 
 @keyframes scale-in {

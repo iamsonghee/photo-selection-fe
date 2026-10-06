@@ -8,7 +8,7 @@ import { useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
-import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { ProjectBodySkeleton } from "../../../_lib/ProjectBodySkeleton";
 import { buildVersionMapping, type MappingResult } from "@/lib/version-mapping";
 import { compressImagesInParallel } from "@/lib/upload-client-compress";
 import { UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
@@ -91,7 +91,7 @@ export default function RetouchUploadPage() {
   }
 
   if (loading) {
-    return <SystemLoadingScreen title="보정본 정보를 불러오고 있어요" homeHref="/customer-select" />;
+    return <ProjectBodySkeleton variant="cards" label="보정본 정보를 불러오고 있어요" />;
   }
   if (loadError) return <RetouchErrorScreen message={loadError} />;
 

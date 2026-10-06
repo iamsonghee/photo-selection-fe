@@ -2,9 +2,12 @@
 
 /**
  * 작가 화면 **안**에서 이미 그려진 크롬(헤더·탭·필터) 아래, 특정 영역이 데이터를 불러오는
- * 동안 보여주는 인라인 로딩 표시. 전체 화면 로딩(첫 진입, "이 페이지 자체가 아직 없다")은
- * 이 컴포넌트가 아니라 `SystemLoadingScreen`을 쓴다 — 그쪽은 뷰포트 전체를 덮는 고정 오버레이고
- * 화면 정중앙에 고정되는 반면, 이건 자신을 담은 컨테이너 안에서만 중앙정렬된다.
+ * 동안 보여주는 인라인 로딩 표시. 자신을 담은 컨테이너 안에서만 중앙정렬된다.
+ * 페이지 단위 로딩은 이 스피너가 아니라 실제 배치를 닮은 골격(`PhotographerPageSkeleton`,
+ * `ProjectBodySkeleton`)을 쓴다(design-system.md §13.1, 2026-10-06).
+ *
+ * 300ms 안에 끝나는 조회에서는 아무것도 깜빡이지 않도록 300ms 뒤에야 나타난다(§13.1 "300ms 이내
+ * 작업에는 loader를 띄우지 않는다").
  *
  * (2026-09-12) 한때 `variant="full"`로 전체 화면도 덮을 수 있었는데, 실제로는 그 용도가 전부
  * `SystemLoadingScreen`으로 옮겨가 죽은 코드였다 — 지금은 인라인 형태 하나만 남겼다.
@@ -12,9 +15,12 @@
 export function PageLoader({ text }: { text?: string }) {
   return (
     <div
+      role="status"
+      aria-busy="true"
       style={{
         display: "flex", alignItems: "center", justifyContent: "center",
         width: "100%", height: "100%", minHeight: 120,
+        opacity: 0, animation: "pl-appear 0s linear 0.3s forwards",
       }}
     >
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
@@ -73,6 +79,7 @@ export function PageLoader({ text }: { text?: string }) {
         )}
 
         <style>{`
+          @keyframes pl-appear   { to { opacity: 1; } }
           @keyframes pl-spin-cw  { to { transform: rotate(360deg);  } }
           @keyframes pl-spin-ccw { to { transform: rotate(-360deg); } }
           @keyframes pl-pulse    { 0%,100% { transform: scale(1); } 50% { transform: scale(0.92); } }

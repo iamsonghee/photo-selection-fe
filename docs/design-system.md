@@ -517,6 +517,7 @@ Tailwind 기본 `2xl`은 1536px이므로 1440px wide 전환과 같은 의미로 
 - 사진은 중립 surface placeholder를 유지해 grid가 흔들리지 않게 한다.
 - 업로드는 파일 수, 성공/실패, 현재 단계, 재시도 가능 여부를 표시한다.
 - `SystemLoadingScreen` 같은 장식적 부팅 화면은 일반 route loading에서 사용하지 않는다.
+- **골격 블록(2026-10-06)**: 골격의 자리 표시 블록은 `globals.css`의 `skeleton-block` 유틸리티를 쓴다 — 바탕 `--skeleton-base` 위로 밝은 띠(`--skeleton-highlight`)가 1.6초 주기로 왼쪽→오른쪽으로 한 번 쓸고 지나가는 쉬머이며, 주기의 절반쯤은 띠 없이 쉰다. 라이트 캔버스(`[data-acut-light-canvas]`)는 전경 navy 9%(`rgba(2,56,82,.09)`) + 흰 띠 70%, Dark는 흰색 7% + 9%. `prefers-reduced-motion: reduce`에서는 애니메이션 없이 바탕색만 남는다(§12.6). 골격 루트 전체를 흐리게 하는 opacity 펄스(`animate-pulse`)는 쓰지 않는다 — `surface-raised`(#eef3f4) 블록이 흰 바탕과 거의 구분되지 않는데 펄스가 그마저 흐리게 해 라이트 화면에서 골격이 보이지 않았다.
 
 ### 13.2 Empty
 
@@ -580,6 +581,7 @@ opacity만으로 네 상태를 구분하지 않는다.
 허용:
 
 - 색/opacity 변화
+- 로딩 골격 블록의 쉬머(§13.1 — 로딩 중에만, 콘텐츠·badge에는 쓰지 않음)
 - dialog/sheet 8~16px 이내 이동
 - 선택 check의 짧은 scale
 - progress width
@@ -1268,6 +1270,7 @@ Information 그룹과 Action 그룹(Utility+Communication)은 레이아웃상 �
 ### 전체 화면 로딩 및 고객 별점 통일
 
 - `SystemLoadingScreen`의 기본값과 앱/작가 로딩 경계는 라이트 버전을 사용한다. 전체 화면 `PageLoader`도 흰 배경과 회색 안내 문구를 사용하며 인라인 로더는 기존 스타일을 유지한다.
+- (2026-10-06 갱신) 라우트 로딩 경계와 화면 안 데이터 로딩은 더 이상 `SystemLoadingScreen`으로 화면 전체를 덮지 않는다. 루트·`/c` `loading.tsx`는 없앴고, `customer-select/(list)/loading.tsx`·`photographer/loading.tsx`와 각 화면은 실제 배치를 닮은 골격(`PhotographerPageSkeleton`, `ProjectBodySkeleton`)을 이미 그려진 헤더·셸 아래 본문 자리에만 둔다(§13.1). 인라인 `PageLoader`는 300ms 뒤에 나타난다. `SystemLoadingScreen`은 작가 고객 페이지(`/c/[token]/**`) 화면 안 로딩에만 남아 있다.
 - 고객 갤러리 카드, 데스크톱 별점 필터, PC/모바일 상세보기의 문자 별(★/☆)을 랜딩 체험과 같은 Lucide `Star` SVG로 통일한다. 채운 별은 `currentColor`, 빈 별은 `none`, 둥근 외곽선은 `strokeWidth={2}`를 사용한다. 별점 저장·해제·필터 동작은 유지한다.
 - 로컬 샘플에서 390px/1440px 로딩 배경과 가로 넘침 없음, 실제 갤러리 카드의 SVG 별 5개 및 채움 상태를 확인했다. 운영 API는 호출하지 않았다.
 
