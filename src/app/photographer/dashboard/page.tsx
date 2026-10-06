@@ -3,7 +3,6 @@
 import { PhotographerPageSkeleton } from "@/components/photographer/PhotographerPageSkeleton";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import {
@@ -23,11 +22,6 @@ import { DashboardOverview } from "./DashboardOverview";
 
 
 import { BetaApprovalBanner, type BetaApplicationStatus } from "@/components/photographer/BetaApprovalBanner";
-import {
-  consumePostLoginRedirect,
-  DEFAULT_POST_LOGIN_PATH,
-  peekPostLoginRedirect,
-} from "@/lib/post-login-redirect";
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { ProjectLimitModal } from "@/components/photographer/ProjectLimitModal";
@@ -71,7 +65,6 @@ const dashboardCache = new Map<string, { projects: Project[]; logs: ProjectLogIt
 
 // ── Main Page ──────────────────────────────────────────────
 export default function DashboardPage() {
-  const router = useRouter();
   const { handleNewProject, limitInfo, closeLimitModal } = useNewProjectGate();
   const { profile, loading: profileLoading } = useProfile();
   const cached = profile?.id ? dashboardCache.get(profile.id) : undefined;
@@ -87,29 +80,11 @@ export default function DashboardPage() {
   const maxPhotosPerProject = quota?.maxPhotosPerProject || DEFAULT_GENERAL_MAX_PHOTOS_PER_PROJECT;
   const betaApplicationStatus: BetaApplicationStatus = quota?.betaApplicationStatus ?? null;
   const [showBetaWelcome, setShowBetaWelcome] = useState(false);
-  // 첫 렌더에서(이펙트를 기다리지 않고) 곧바로 읽는다 — 그래야 대시보드 실제 콘텐츠가 한 프레임도
-  // 그려지지 않고 바로 로딩 화면으로 대체된다. 실제 소비(제거)는 아래 이펙트가 담당.
-  const [pendingRedirect] = useState(() => {
-    if (typeof window === "undefined") return null;
-    const path = peekPostLoginRedirect();
-    // 기본 목적지는 현재 화면이므로 리다이렉트 대기로 취급하면 로딩 화면이 영구 유지된다.
-    return path === DEFAULT_POST_LOGIN_PATH ? null : path;
-  });
 
   const userName =
     profile?.name?.trim() ||
     profile?.email?.split("@")[0] ||
     "사용자";
-
-  // 로그인은 항상 여기로 도착한다(auth/callback 기본 목적지) — /beta/apply처럼 로그인 후 다른
-  // 페이지로 되돌아가야 하는 흐름은 AuthModal이 로그인 전에 남겨둔 목적지를 여기서 소비한다
-  // (src/lib/post-login-redirect.ts). 콜백 URL 자체에 쿼리스트링을 붙이지 않기 위한 우회.
-  useEffect(() => {
-    const redirectPath = consumePostLoginRedirect();
-    if (redirectPath && redirectPath !== DEFAULT_POST_LOGIN_PATH) {
-      router.replace(redirectPath);
-    }
-  }, [router]);
 
   useEffect(() => {
     if (profileLoading) return;
@@ -154,8 +129,8 @@ export default function DashboardPage() {
     setShowBetaWelcome(true);
   }, [tier, profile?.id]);
 
-  if (pendingRedirect || profileLoading || (profile?.id && loading)) {
-    // 로그인 직후 다른 곳으로 보내는 중이거나 첫 조회 중 — 사이드바는 그대로 두고 본문만 골격으로.
+  if (profileLoading || (profile?.id && loading)) {
+    // 첫 조회 중 — 사이드바는 그대로 두고 본문만 골격으로.
     return <PhotographerPageSkeleton label="대시보드를 불러오고 있어요" />;
   }
 

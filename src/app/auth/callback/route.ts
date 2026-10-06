@@ -1,18 +1,26 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getAppSettings } from "@/lib/app-settings";
 import { recordBetaUsageEvent } from "@/lib/beta-usage-events";
+import { isCustomerSelectLogin, POST_LOGIN_REDIRECT_COOKIE, resolvePostLoginPath } from "@/lib/post-login-redirect";
 
 /**
  * OAuth 콜백 Route Handler
  * Supabase가 구글 로그인 후 리다이렉트할 때 호출됩니다.
  * photographers 테이블에 auth_id = user.id 인 레코드 없으면 INSERT (auth_id, email).
+ * 로그인을 시작한 화면이 쿠키로 남긴 복귀 경로로 바로 보낸다(src/lib/post-login-redirect.ts).
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const next = requestUrl.searchParams.get("next") ?? "/photographer/dashboard";
+  // 같은 출처의 절대 경로만 믿는다 — 아니면 작가 대시보드. 쿼리 `next`는 쿠키가 없을 때의 보조 경로.
+  const next = resolvePostLoginPath(
+    request.cookies.get(POST_LOGIN_REDIRECT_COOKIE)?.value ?? requestUrl.searchParams.get("next"),
+  );
+  // 셀프 고객 서비스에서 시작한 로그인. 계정은 작가와 같아(한 계정으로 작가·셀프 고객 화면 모두 가능)
+  // photographers 행은 그대로 만들되, 작가 가입·첫 로그인 지표에는 섞지 않는다.
+  const customerSelectLogin = isCustomerSelectLogin(next);
 
   // request.url의 origin은 next dev가 리버스 프록시(ngrok/cloudflared 등) 뒤에서 실제 요청
   // Host를 무시하고 항상 localhost:PORT로 되돌려주는 문제가 있어(dev 서버 특유의 동작),
@@ -105,18 +113,26 @@ export async function GET(request: Request) {
             .is("matched_photographer_id", null);
         }
 
-        await recordBetaUsageEvent(admin, { eventType: "signup_completed", photographerId: newId });
+        if (!customerSelectLogin) {
+          await recordBetaUsageEvent(admin, { eventType: "signup_completed", photographerId: newId });
+        }
       }
 
       // 첫 로그인 — 신규/기존 계정 모두 여기서 시도한다. 유니크 인덱스가 작가당 1건만 허용해
       // 이미 기록됐으면 조용히 무시되므로(recordBetaUsageEvent 참고) 매 로그인마다 별도 조회 없이
-      // 그냥 insert를 시도해도 안전하다.
-      await recordBetaUsageEvent(admin, { eventType: "first_login", photographerId });
+      // 그냥 insert를 시도해도 안전하다. 셀프 고객 로그인은 건너뛰어, 그 계정이 나중에 작가 화면에서
+      // 로그인하면 그때 "첫 로그인"이 된다.
+      if (!customerSelectLogin) {
+        await recordBetaUsageEvent(admin, { eventType: "first_login", photographerId });
+      }
     } catch (e) {
       // photographer 행 생성 실패 시에도 로그인 리다이렉트는 계속 진행
       console.error("[Auth Callback] photographer upsert failed:", e);
     }
   }
 
-  return NextResponse.redirect(new URL(next, origin));
+  const response = NextResponse.redirect(new URL(next, origin));
+  // 복귀 경로는 이번 로그인에만 쓰고 지운다 — 다음 로그인이 옛 목적지로 가지 않게.
+  response.cookies.set(POST_LOGIN_REDIRECT_COOKIE, "", { path: "/", maxAge: 0 });
+  return response;
 }

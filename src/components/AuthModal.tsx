@@ -82,8 +82,8 @@ export function AuthModal({ isOpen, onClose, redirectPath, notice }: AuthModalPr
 
   // signInWithOAuth 호출 자체는 useOAuthLogin(고객 셀렉 로그인 화면과 공유)이 담당한다.
   // redirectTo URL은 항상 `/auth/callback` 그대로다 — Supabase의 Redirect URLs 허용
-  // 목록과 정확히 일치해야 하므로, "로그인 후 어디로 갈지"는 sessionStorage에 남겨두고
-  // 항상 도착하는 기본 목적지(/photographer/dashboard)에서 소비한다(post-login-redirect.ts).
+  // 목록과 정확히 일치해야 하므로, "로그인 후 어디로 갈지"는 쿠키에 남겨두고 콜백이 서버에서
+  // 읽어 바로 그곳으로 보낸다(post-login-redirect.ts).
   function preparePostLoginRedirect(): void {
     if (redirectPath && redirectPath !== DEFAULT_POST_LOGIN_PATH) {
       setPostLoginRedirect(redirectPath);
