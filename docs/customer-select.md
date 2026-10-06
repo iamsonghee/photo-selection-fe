@@ -539,19 +539,22 @@ CSV/TXT 다운로드까지 정상 동작했고 가로 오버플로와 콘솔 오
 | 앨범 관리 | `/customer-select/guest/[albumId]` | 레이아웃(서버)이 로그인·소유자를 확인하고 앨범·ready 파일을 읽는다(남의 앨범이면 목록으로). QR(`qrcode` 패키지, 브라우저에서 생성·PNG 저장)·하객 링크 복사/공유(`CustomerShareLinkField`의 `path`)·사진/영상/참여 하객 수(서로 다른 브라우저 수)·보관 종료일·`새로 보기`(router.refresh)·파일 그리드·크게 보기(올린 사람·축하 메시지, 영상 재생)·`셀렉 시작` 확인 → `POST …/[id]/close`(closed_at, 다시 여는 기능 없음) → 셀렉 화면 |
 | 셀렉 | `…/[albumId]/select` | 마감 후에만. 전체/사진/영상/고른 것, 칸·뷰어에서 선택, 영상 재생. **고른 결과는 메모리에만**(새로고침하면 초기화, 화면에 안내). AI 정리는 비활성 자리 |
 | 선택본 다운로드 | `…/[albumId]/download` | 고른 파일 목록·보관 종료일. 다운로드 버튼은 `다운로드 준비 중`(비활성) |
-| 하객 업로드 | `/g/[token]` | 서버가 토큰으로 앨범을 읽는다(없으면 안내, 마감이면 마감 화면). 이름/별명 필수(30자), 축하 메시지 선택(300자), 사진·영상 여러 개 선택·미리보기·빼기, 용량 초과·사진/영상 아닌 파일은 고를 때 빼고 안내, 파일별 진행률(동시 2개)·실패·`실패한 N개 다시 보내기`·완료. 보내는 중 페이지 이탈 경고. 올리는 사이 마감되면 마감 화면 |
+| 하객 업로드 | `/g/[token]` | 서버가 토큰으로 앨범을 읽는다(없으면 안내, 마감이면 마감 화면). 이름/별명 필수(30자), 축하 메시지 선택(300자), 사진·영상 여러 개 선택·미리보기·빼기, 용량 초과·사진/영상 아닌 파일은 고를 때 빼고 안내, `사진 원본으로 보내기` 체크(기본 꺼짐 — 사진을 줄여 보냄, 영상은 항상 원본), 파일별 진행률(동시 4개)·실패·`실패한 N개 다시 보내기`·완료. 보내는 중 페이지 이탈 경고. 올리는 사이 마감되면 마감 화면 |
 | 내가 보낸 사진 | `/g/[token]/mine` | 서버가 이 브라우저 쿠키로 그 하객의 파일만 조회한다(클라이언트에서 거르지 않음). 다른 기기·브라우저에서는 안 보임 |
 | 내 프로젝트 목록 | `/customer-select` | 하객 앨범 카드(`하객 사진 모으기` 칩, 업로드 받는 중/셀렉 중, 결혼식 날짜, 올라온 수, 첫 썸네일)를 프로젝트와 만든 순서로 섞어 보인다. 이름 검색은 적용, `보정 완료` 필터에서는 빠진다. `guest_albums` 조회가 실패하면(마이그레이션 전) 빈 목록 |
 
 ### 업로드 경로
 
 1. `POST /api/guest/[token]/submissions` {name, message} — 이번 보내기 묶음(`guest_submissions`). 식별 쿠키가 없으면 여기서 심는다.
-2. 파일마다 브라우저가 썸네일(480px)·미리보기(1600px) JPEG를 만든다 — 사진은 `compressImageForUpload`, 영상은 0.5초 지점 프레임(`guest-upload-client.ts`). 만들지 못하면 없이 올린다. 사진은 EXIF 촬영 시각(`readTakenAt`, exif일 때만)을 함께 보낸다.
-3. `POST /api/guest/[token]/media/presign` — 묶음 주인(쿠키) 확인, 용량 한도 확인, `guest_media` 행(pending, id는 브라우저 UUID라 재시도해도 같은 행) → FastAPI `POST /api/guest-upload/presign-put`(내부 비밀값 `INTERNAL_PRESIGN_SECRET`)이 R2 PUT 주소를 서명한다. **Content-Type과 크기를 서명에 포함**해 선언과 다른 PUT은 R2가 거절한다.
-4. 브라우저가 R2에 직접 PUT(원본은 XHR 진행률). 썸네일·미리보기 PUT 실패는 원본을 막지 않는다.
-5. `POST /api/guest/[token]/media/complete` — FastAPI `POST /api/guest-upload/head`로 원본 크기가 선언과 같은지 확인한 뒤 ready. 없는 썸네일·미리보기 키는 비운다. 앨범이 마감됐으면 올라간 파일을 지우고(`/api/guest-upload/delete`) 마감을 알린다.
+2. `사진 원본으로 보내기`를 체크하지 않았으면 사진을 긴 변 3200px JPEG(`compressImageForUpload` 기본값, 600KB 미만·디코딩 실패면 원본)로 줄여 그것을 원본 자리에 올린다(`guest_media.is_original=false`, 파일명 확장자 `.jpg`). 줄인 사진에는 EXIF가 없어 촬영 시각은 줄이기 전 원본에서 읽는다. 신랑신부의 크게 보기·다운로드 목록에 `원본`/`줄인 사진`을 표시한다. 영상은 브라우저에서 줄이지 않는다.
+3. 파일마다 브라우저가 썸네일(480px)·미리보기(1600px) JPEG를 만든다 — 사진은 `compressImageForUpload`, 영상은 0.5초 지점 프레임(`guest-upload-client.ts`). 만들지 못하면 없이 올린다. 사진은 EXIF 촬영 시각(`readTakenAt`, exif일 때만)을 함께 보낸다.
+4. `POST /api/guest/[token]/media/presign` — 묶음 주인(쿠키) 확인, 용량 한도 확인, `guest_media` 행(pending, id는 브라우저 UUID라 재시도해도 같은 행) → FastAPI `POST /api/guest-upload/presign-put`(내부 비밀값 `INTERNAL_PRESIGN_SECRET`)이 R2 PUT 주소를 서명한다. **Content-Type과 크기를 서명에 포함**해 선언과 다른 PUT은 R2가 거절한다.
+5. 브라우저가 R2에 직접 PUT(원본은 XHR 진행률). 썸네일·미리보기 PUT 실패는 원본을 막지 않는다.
+6. `POST /api/guest/[token]/media/complete` — FastAPI `POST /api/guest-upload/head`로 원본 크기가 선언과 같은지 확인한 뒤 ready. 없는 썸네일·미리보기 키는 비운다. 앨범이 마감됐으면 올라간 파일을 지우고(`/api/guest-upload/delete`) 마감을 알린다.
 
 R2 키: `guest-albums/{album_id}/{media_id}/(original|thumb|preview)`(FastAPI `GUEST_KEY_PATTERN`만 허용). 버킷이 공개라 화면은 공개 주소(`R2_PUBLIC_URL`, 기본 `https://img.acut.kr`)를 바로 쓴다 — 추측할 수 없는 UUID 키가 보호 수단(기존 셀프 고객 사진과 같음). 영상은 압축하지 않고 원본을 재생한다(아이폰 HEVC는 일부 PC 브라우저에서 재생되지 않을 수 있음 — 문제가 되면 재생용 변환 추가).
+
+측정(2026-10-06, 로컬 PC·업로드 약 15Mbps, 4MB 사진 10장 원본): 동시 2개 34.6초 → 동시 4개+presign 조회 병렬화 18.1초. 이때 회선이 거의 차서 동시 수를 더 늘려도 효과가 작다. 원본 전송량이 대부분이라 기본값을 줄여 보내기로 했다(카톡과 같은 방식).
 
 ### 하객 식별
 

@@ -29,8 +29,23 @@ export function mediaKindOf(file: File): GuestMediaKind | null {
   return null;
 }
 
+/**
+ * 원본 대신 보낼 줄인 사진(긴 변 3200px JPEG, 기존 업로드 압축 기본값). 이미 작거나 줄이지 못하면(디코딩 실패 등)
+ * null — 그때는 원본을 보낸다.
+ */
+async function reducePhoto(file: File): Promise<File | null> {
+  try {
+    const out = await compressImageForUpload(file);
+    if (out === file || out.type !== "image/jpeg") return null;
+    const base = file.name.replace(/\.[^.]+$/, "") || "photo";
+    return new File([out], `${base}.jpg`, { type: "image/jpeg", lastModified: file.lastModified });
+  } catch {
+    return null;
+  }
+}
+
 /** 썸네일 만들기에 실패해도 업로드는 계속한다(신랑신부 화면에 기본 아이콘으로 보임). */
-async function preparePhoto(file: File): Promise<Prepared> {
+async function preparePhoto(file: File, takenFrom: File = file): Promise<Prepared> {
   const jpeg = async (maxEdge: number) => {
     try {
       const out = await compressImageForUpload(file, { maxEdge, jpegQuality: 0.82, skipBelowBytes: 0 });
@@ -39,7 +54,8 @@ async function preparePhoto(file: File): Promise<Prepared> {
       return null;
     }
   };
-  const [taken, thumb, preview] = await Promise.all([readTakenAt(file), jpeg(THUMB_EDGE), jpeg(PREVIEW_EDGE)]);
+  // 줄인 사진에는 EXIF가 없어 촬영 시각은 원본에서 읽는다.
+  const [taken, thumb, preview] = await Promise.all([readTakenAt(takenFrom), jpeg(THUMB_EDGE), jpeg(PREVIEW_EDGE)]);
   return { takenAt: taken.source === "exif" ? taken.takenAt : null, durationSeconds: null, thumb, preview };
 }
 
@@ -114,14 +130,19 @@ export async function createGuestSubmission(token: string, name: string, message
   return submissionId;
 }
 
-/** 파일 하나 올리기. id는 파일마다 고정(재시도해도 같은 행). onProgress는 0~1. */
-export async function uploadGuestFile(token: string, submissionId: string, id: string, file: File, onProgress: (ratio: number) => void) {
-  const kind = mediaKindOf(file);
+/**
+ * 파일 하나 올리기. id는 파일마다 고정(재시도해도 같은 행). onProgress는 0~1.
+ * sendOriginal이 false면 사진은 줄여서 보낸다(카톡 기본과 같음). 영상은 항상 원본.
+ */
+export async function uploadGuestFile(token: string, submissionId: string, id: string, source: File, sendOriginal: boolean, onProgress: (ratio: number) => void) {
+  const kind = mediaKindOf(source);
   if (!kind) throw new GuestUploadError("사진과 영상만 보낼 수 있어요.", "invalid");
-  const prepared = kind === "photo" ? await preparePhoto(file) : await prepareVideo(file);
+  const reduced = kind === "photo" && !sendOriginal ? await reducePhoto(source) : null;
+  const file = reduced ?? source;
+  const prepared = kind === "photo" ? await preparePhoto(file, source) : await prepareVideo(file);
   onProgress(0.03);
   const target = await postJson<{ done: boolean; original?: string; thumb?: string | null; preview?: string | null }>(`/api/guest/${token}/media/presign`, {
-    submissionId, id, kind, contentType: file.type, size: file.size, filename: file.name,
+    submissionId, id, kind, contentType: file.type, size: file.size, filename: file.name, isOriginal: !reduced,
     durationSeconds: prepared.durationSeconds, takenAt: prepared.takenAt,
     thumb: prepared.thumb ? { contentType: "image/jpeg", size: prepared.thumb.size } : null,
     preview: prepared.preview ? { contentType: "image/jpeg", size: prepared.preview.size } : null,

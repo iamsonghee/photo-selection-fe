@@ -124,12 +124,13 @@ type MediaRow = {
   thumb_key: string | null;
   preview_key: string | null;
   duration_seconds: number | null;
+  is_original: boolean;
   created_at: string;
   submission_id: string;
 };
 type SubmissionRow = { id: string; name: string; message: string | null; device_hash: string };
 
-const MEDIA_COLUMNS = "id, kind, filename, original_key, thumb_key, preview_key, duration_seconds, created_at, submission_id";
+const MEDIA_COLUMNS = "id, kind, filename, original_key, thumb_key, preview_key, duration_seconds, is_original, created_at, submission_id";
 
 /**
  * 앨범의 올라온 파일(ready)과 참여 하객 수. deviceHash를 주면 그 브라우저가 보낸 것만.
@@ -166,6 +167,7 @@ export async function listGuestMedia(albumId: string, onlyDeviceHash?: string): 
       thumbUrl: row.thumb_key ? r2PublicUrl(row.thumb_key) : null,
       previewUrl: row.preview_key ? r2PublicUrl(row.preview_key) : null,
       durationSeconds: row.duration_seconds,
+      isOriginal: row.is_original,
       uploadedAt: row.created_at,
       guestName: submission.name,
       guestMessage: submission.message,

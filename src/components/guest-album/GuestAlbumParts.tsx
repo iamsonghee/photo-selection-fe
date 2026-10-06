@@ -44,6 +44,7 @@ export function GuestMediaViewer({ media, onClose, onPrev, onNext, actions, show
       <div className="flex h-14 shrink-0 items-center gap-3 px-3">
         <button type="button" onClick={onClose} aria-label="닫기" className="grid size-11 place-items-center rounded-full hover:bg-white/10"><X size={22} /></button>
         <p className="min-w-0 flex-1 truncate font-mono text-[13px] text-white/70">{media.fileName}</p>
+        {media.kind === "photo" ? <span className="shrink-0 rounded-full bg-white/15 px-2.5 py-1 text-[12px] font-semibold">{media.isOriginal ? "원본" : "줄인 사진"}</span> : null}
       </div>
       <div className="relative flex min-h-0 flex-1 items-center justify-center px-2">
         {media.kind === "video"

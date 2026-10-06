@@ -31,6 +31,8 @@ export function GuestUploadClient({ album, limits }: { album: GuestAlbumInfo; li
   const [message, setMessage] = useState("");
   const [nameError, setNameError] = useState("");
   const [notice, setNotice] = useState("");
+  // 카톡처럼 기본은 사진을 줄여서 빨리 보낸다. 체크하면 사진도 원본(영상은 항상 원본).
+  const [sendOriginal, setSendOriginal] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [phase, setPhase] = useState<Phase>("edit");
   const nameRef = useRef<HTMLInputElement>(null);
@@ -105,7 +107,7 @@ export function GuestUploadClient({ album, limits }: { album: GuestAlbumInfo; li
         const { id, file } = item;
         update(id, { status: "uploading", progress: 0 });
         try {
-          await uploadGuestFile(token, submissionId, id, file, (ratio) => update(id, { progress: ratio * 100 }));
+          await uploadGuestFile(token, submissionId, id, file, sendOriginal, (ratio) => update(id, { progress: ratio * 100 }));
           update(id, { status: "done", progress: 100 });
         } catch (error) {
           if (error instanceof GuestUploadError && error.code === "closed") closed = true;
@@ -218,7 +220,14 @@ export function GuestUploadClient({ album, limits }: { album: GuestAlbumInfo; li
             </ul>
           )}
           {notice ? <p role="status" className="text-[13px] font-semibold text-danger">{notice}</p> : null}
-          <p className="text-[12px] leading-5 text-subtle-foreground">사진은 {limits.photoMaxMb.toLocaleString()}MB, 영상은 {limits.videoMaxMb.toLocaleString()}MB까지 원본 그대로 보낼 수 있어요. 영상은 크기에 따라 시간이 걸려요.</p>
+          <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border border-border-subtle bg-surface px-4 py-3 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
+            <input type="checkbox" checked={sendOriginal} disabled={locked} onChange={(event) => setSendOriginal(event.target.checked)} className="mt-0.5 size-5 shrink-0 accent-[var(--accent)]" />
+            <span>
+              <span className="block text-[14px] font-semibold">사진 원본으로 보내기</span>
+              <span className="mt-0.5 block text-[12px] leading-5 text-muted-foreground">체크하지 않으면 사진을 줄여서 더 빨리 보내요. 영상은 항상 원본으로 보내요.</span>
+            </span>
+          </label>
+          <p className="text-[12px] leading-5 text-subtle-foreground">사진은 {limits.photoMaxMb.toLocaleString()}MB, 영상은 {limits.videoMaxMb.toLocaleString()}MB까지 보낼 수 있어요. 영상은 크기에 따라 시간이 걸려요.</p>
         </section>
       </main>
 

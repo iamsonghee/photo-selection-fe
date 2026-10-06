@@ -65,7 +65,7 @@ HttpOnly 쿠키로 교환한 다음 토큰 없는 URL로 이동한다. 결과 �
 
 ## 하객 사진 모으기 (2026-10-06, 1단계)
 
-셀프 고객의 두 번째 프로젝트 유형. 테이블 `guest_albums`(소유자·결혼식 날짜·업로드 토큰·`closed_at`)·`guest_submissions`(하객 이름·메시지·브라우저 해시)·`guest_media`(사진/영상, pending→ready), `app_settings`의 `guest_*` 한도 3개(마이그레이션 `20261006000000_add_guest_albums.sql`). 하객은 로그인 없이 `/g/[token]`에서 올리고, 파일은 브라우저가 R2에 직접 PUT한다 — Next API 라우트가 앨범·한도·하객 쿠키를 판단하고 FastAPI `/api/guest-upload/*`는 R2 서명·HEAD·삭제만 한다(내부 비밀값). 상세·남은 일은 `customer-select.md`의 "하객 사진 모으기".
+셀프 고객의 두 번째 프로젝트 유형. 테이블 `guest_albums`(소유자·결혼식 날짜·업로드 토큰·`closed_at`)·`guest_submissions`(하객 이름·메시지·브라우저 해시)·`guest_media`(사진/영상, pending→ready), `app_settings`의 `guest_*` 한도 3개(마이그레이션 `20261006000000_add_guest_albums.sql`, `20261006010000_guest_media_is_original.sql`). 하객은 로그인 없이 `/g/[token]`에서 올리고, 파일은 브라우저가 R2에 직접 PUT한다 — Next API 라우트가 앨범·한도·하객 쿠키를 판단하고 FastAPI `/api/guest-upload/*`는 R2 서명·HEAD·삭제만 한다(내부 비밀값). 상세·남은 일은 `customer-select.md`의 "하객 사진 모으기".
 
 ## 작가 추천 편집 (2026-09-18)
 
@@ -609,7 +609,7 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/customer-select/guest-albums` | POST | 셀프 고객 세션 | 하객 앨범 생성(이름·결혼식 날짜 필수, 업로드 토큰 발급) |
 | `api/customer-select/guest-albums/[id]/close` | POST | 셀프 고객 세션+소유자 | 셀렉 시작 = 하객 업로드 마감(`closed_at`, 멱등) |
 | `api/guest/[token]/submissions` | POST | 없음(업로드 토큰, 식별 쿠키 발급) | 하객 보내기 묶음(이름·메시지) 생성 |
-| `api/guest/[token]/media/presign` | POST | 업로드 토큰+식별 쿠키 | 파일 하나의 R2 PUT 주소(원본·썸네일·미리보기), 용량 한도 확인, `guest_media` pending |
+| `api/guest/[token]/media/presign` | POST | 업로드 토큰+식별 쿠키 | 파일 하나의 R2 PUT 주소(원본·썸네일·미리보기), 용량 한도 확인, `guest_media` pending(`is_original` — 줄여 보낸 사진이면 false) |
 | `api/guest/[token]/media/complete` | POST | 업로드 토큰+식별 쿠키 | R2 원본 크기 확인 후 ready. 마감됐으면 파일 삭제 후 409 |
 | `api/admin/settings` | PATCH | `getAdminUser()` | 이용 한도 9개 값(일반/베타 프로젝트·사진·재보정 한도, 베타 기본 기간, 하객 사진·영상 용량·보관 기간) 갱신 — 모두 1 이상 정수 검증, `updated_at`/`updated_by` 기록. 재배포 없이 즉시 반영(§6.3) |
 | `api/photographer/beta-survey/status` | GET | 세션 | 지금 노출해야 할 설문 타입 조회(`{surveyType}`, 없으면 `null`) — §6.1b |

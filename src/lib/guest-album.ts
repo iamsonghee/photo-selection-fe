@@ -24,6 +24,8 @@ export type GuestMedia = {
   thumbUrl: string | null;
   previewUrl: string | null;
   durationSeconds: number | null;
+  /** 사진을 줄이지 않고 원본으로 보냈는지(영상은 항상 true) */
+  isOriginal: boolean;
   uploadedAt: string;
   guestName: string;
   guestMessage: string | null;

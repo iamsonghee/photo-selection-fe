@@ -52,7 +52,7 @@ DB의 `customer_photos_lock_owner_quota`가 같은 소유자의 동시 INSERT를
 
 ## 하객 사진 모으기 업로드 (2026-10-06)
 
-작가·셀프 고객 업로드와 별개 경로다. 하객 브라우저가 원본(사진·영상, 재압축 없음)과 직접 만든 썸네일 480px·미리보기 1600px JPEG를 R2에 presigned PUT으로 올리고(동시 2개, `UPLOAD_CONCURRENCY` in `g/[token]/GuestUploadClient.tsx`), Next API가 FastAPI `/api/guest-upload/head`로 원본 크기를 확인한 뒤 ready로 바꾼다. 용량 한도는 `app_settings.guest_photo_max_mb`/`guest_video_max_mb`(임시 20MB/500MB)이고, PUT 서명에 크기가 들어가 우회할 수 없다. 자세한 단계는 `customer-select.md`의 "하객 사진 모으기 → 업로드 경로".
+작가·셀프 고객 업로드와 별개 경로다. 하객 브라우저가 사진(기본: 긴 변 3200px JPEG로 줄임, `사진 원본으로 보내기` 체크 시 원본)·영상(항상 원본, 재압축 없음)과 직접 만든 썸네일 480px·미리보기 1600px JPEG를 R2에 presigned PUT으로 올리고(동시 4개, `UPLOAD_CONCURRENCY` in `g/[token]/GuestUploadClient.tsx`), Next API가 FastAPI `/api/guest-upload/head`로 원본 크기를 확인한 뒤 ready로 바꾼다. 용량 한도는 `app_settings.guest_photo_max_mb`/`guest_video_max_mb`(임시 20MB/500MB)이고, PUT 서명에 크기가 들어가 우회할 수 없다. 자세한 단계는 `customer-select.md`의 "하객 사진 모으기 → 업로드 경로".
 
 ## 개요
 

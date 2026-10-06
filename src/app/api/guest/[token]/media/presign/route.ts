@@ -24,6 +24,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const filename = typeof body.filename === "string" && body.filename.trim() ? body.filename.trim().slice(0, 255) : "file";
   const duration = typeof body.durationSeconds === "number" && Number.isFinite(body.durationSeconds) && body.durationSeconds >= 0 ? body.durationSeconds : null;
   const takenAt = typeof body.takenAt === "string" && TAKEN_AT.test(body.takenAt) ? body.takenAt : null;
+  // 줄여 보내기는 사진만 — 영상은 항상 원본으로 기록한다.
+  const isOriginal = kind !== "photo" || body.isOriginal !== false;
   const thumb = derived(body.thumb);
   const preview = derived(body.preview);
   if (!UUID.test(id) || !kind || !CONTENT_TYPE.test(contentType) || !contentType.startsWith(kind === "photo" ? "image/" : "video/")
@@ -56,7 +58,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     };
     const { error } = await admin.from("guest_media").upsert({
       id, album_id: album.id, submission_id: submission!.id, kind, filename, content_type: contentType, size_bytes: size,
-      duration_seconds: kind === "video" ? duration : null, taken_at: takenAt,
+      duration_seconds: kind === "video" ? duration : null, taken_at: takenAt, is_original: isOriginal,
       original_key: keys.original, thumb_key: keys.thumb, preview_key: keys.preview, status: "pending",
     }, { onConflict: "id" });
     if (error) throw error;

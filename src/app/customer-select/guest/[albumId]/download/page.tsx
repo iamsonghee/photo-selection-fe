@@ -18,7 +18,7 @@ export default function GuestAlbumDownloadPage() {
       <Link href={selectHref} className="-ml-1 inline-flex items-center gap-1 self-start text-[14px] font-semibold text-muted-foreground hover:text-foreground"><ChevronLeft size={18} />고르기로 돌아가기</Link>
       <header>
         <h1 className="text-[24px] font-bold tracking-[-0.04em] md:text-[28px]">선택본 다운로드</h1>
-        <p className="mt-1 text-[14px] text-muted-foreground">고른 사진과 영상만 원본으로 내려받을 수 있어요.</p>
+        <p className="mt-1 text-[14px] text-muted-foreground">고른 사진과 영상만 하객이 보낸 그대로 내려받을 수 있어요.</p>
       </header>
 
       {picked.length === 0 ? (
@@ -36,7 +36,7 @@ export default function GuestAlbumDownloadPage() {
                   <MediaThumb media={item} className="size-14 shrink-0 rounded-lg" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-mono text-[13px]">{item.fileName}</p>
-                    <p className="truncate text-[12px] text-muted-foreground">{item.guestName} · {item.kind === "video" ? "영상" : "사진"}</p>
+                    <p className="truncate text-[12px] text-muted-foreground">{item.guestName} · {item.kind === "video" ? "영상" : item.isOriginal ? "사진 원본" : "줄인 사진"}</p>
                   </div>
                 </li>
               ))}
