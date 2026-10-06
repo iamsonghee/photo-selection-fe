@@ -721,7 +721,7 @@ Project List Row의 Primary/Secondary도 서로 같은 140×38px, 12/19px geomet
 - 탭 전환 중 `position: fixed; inset: 0` 형태의 full-screen loader를 사용하지 않는다. 공통 Page Header와 Asset Tab은 그대로 보이고, 해당 탭에만 필요한 추가 데이터는 content 영역의 inline loading state로 표시한다.
 - 보정본 탭은 공통 사진 데이터와 별도로 version 데이터만 요청한다. 프로젝트 status 변경은 provider의 project state에도 반영해 다른 Asset Tab으로 돌아갔을 때 이전 상태가 잠시 노출되지 않게 한다.
 - 비활성 탭 route는 hover와 keyboard focus에서 prefetch한다. 이미 활성화된 탭을 다시 눌러 동일 route navigation을 발생시키지 않는다.
-- 최초 직접 진입에서는 structured skeleton 또는 light inline loader를 허용한다. 이후 같은 Asset Workspace 내부 전환에서는 이미 확보한 데이터와 layout을 유지하는 것이 기본 contract다.
+- 최초 직접 진입에서는 structured skeleton(`PhotographerPageSkeleton`, 블록은 공용 `skeleton-block` 쉬머 — design-system.md §13.1) 또는 light inline loader를 허용한다. 이후 같은 Asset Workspace 내부 전환에서는 이미 확보한 데이터와 layout을 유지하는 것이 기본 contract다.
 
 ### 7.22 Button 역할별 크기와 상태 소유권
 

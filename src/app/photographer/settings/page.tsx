@@ -1,6 +1,6 @@
 "use client";
 
-import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { PhotographerPageSkeleton } from "@/components/photographer/PhotographerPageSkeleton";
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -329,7 +329,7 @@ export default function SettingsPage() {
   };
 
   if (profileLoading) {
-    return <SystemLoadingScreen />;
+    return <PhotographerPageSkeleton width="narrow" label="설정을 불러오고 있어요" />;
   }
 
   if (!profile) return null;

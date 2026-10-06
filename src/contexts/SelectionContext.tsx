@@ -178,6 +178,8 @@ export type SelectionContextValue = {
   projectId: string | null;
   projectStatus: string | null;
   loading: boolean;
+  /** 확정·취소·검토 제출·PIN 통과처럼 서버 상태가 바뀐 직후 프로젝트·사진을 새로 받는다(전체 새로고침 대신). 받은 프로젝트를 돌려준다. */
+  reloadProject: () => Promise<import("@/types").Project | null>;
   commentSaveStates: Record<string, CommentSaveStatus>;
   saveError: string | null;
   clearSaveError: () => void;
@@ -518,6 +520,31 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     [project?.id, token, flushColor, bumpVersion]
   );
 
+  // 프로젝트·사진 조회. 토큰이 바뀔 때와, 확정·취소·검토 제출처럼 서버 상태가 바뀐 직후 다시 부른다.
+  // seq로 늦게 도착한 옛 응답을 버린다. silent면 loading을 건드리지 않아 화면이 골격으로 돌아가지 않는다.
+  const loadSeqRef = useRef(0);
+  const loadProject = useCallback(async (nextToken: string, silent: boolean) => {
+    const seq = ++loadSeqRef.current;
+    if (!silent) setLoading(true);
+    try {
+      const data = await fetchCustomerPhotos(nextToken);
+      if (seq !== loadSeqRef.current) return null;
+      setProject(data.project ?? null);
+      setPhotos(data.photos ?? []);
+      setPhotoGroups(data.photoGroups ?? []);
+      setSelectedIds(new Set(data.selectedIds ?? []));
+      setPhotoStates(data.photoStates ?? {});
+      photoStatesRef.current = data.photoStates ?? {};
+      return (data.project ?? null) as import("@/types").Project | null;
+    } catch (e) {
+      if (seq === loadSeqRef.current) console.error(e);
+      return null;
+    } finally {
+      if (!silent && seq === loadSeqRef.current) setLoading(false);
+    }
+  }, []);
+  const reloadProject = useCallback(() => (token ? loadProject(token, true) : Promise.resolve(null)), [token, loadProject]);
+
   useEffect(() => {
     if (!token) {
       setProject(null);
@@ -546,28 +573,12 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     commentSavedTimersRef.current.forEach((timer) => clearTimeout(timer));
     commentSavedTimersRef.current.clear();
     setCommentSaveStates({});
-    let cancelled = false;
-    setLoading(true);
-    fetchCustomerPhotos(token)
-      .then((data) => {
-        if (cancelled) return;
-        setProject(data.project ?? null);
-        setPhotos(data.photos ?? []);
-        setPhotoGroups(data.photoGroups ?? []);
-        setSelectedIds(new Set(data.selectedIds ?? []));
-        setPhotoStates(data.photoStates ?? {});
-        photoStatesRef.current = data.photoStates ?? {};
-      })
-      .catch((e) => {
-        if (!cancelled) console.error(e);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    void loadProject(token, false);
+    // 토큰이 바뀌면 진행 중이던 조회 응답은 버린다.
     return () => {
-      cancelled = true;
+      loadSeqRef.current++;
     };
-  }, [token]);
+  }, [token, loadProject]);
 
   const updatePhotoState = useCallback(
     (photoId: string, patch: Partial<Omit<PhotoState, "color">>) => {
@@ -820,6 +831,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       projectId,
       projectStatus,
       loading,
+      reloadProject,
       commentSaveStates,
       saveError,
       clearSaveError: () => setSaveError(null),
@@ -841,6 +853,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       projectId,
       projectStatus,
       loading,
+      reloadProject,
       commentSaveStates,
       saveError,
     ]
@@ -876,8 +889,9 @@ export function SelectionConfirmBar() {
       await confirmProjectApi(token, projectId);
       setShowConfirmModal(false);
       console.log("[확정] 성공 분기 진입, 이동 시작");
-      router.push(`/c/${token}/confirmed`);
-      window.location.href = `/c/${token}/confirmed`;
+      // 컨텍스트 상태를 먼저 새로 받아야 완료 화면이 옛 status(selecting)를 보고 갤러리로 되돌리지 않는다.
+      await ctx.reloadProject();
+      router.replace(`/c/${token}/confirmed`);
     } catch (e) {
       console.log("[확정] 실패 분기 진입", e);
       console.error(e);
@@ -885,11 +899,11 @@ export function SelectionConfirmBar() {
       if (msg.includes("Project is not in selecting status")) {
         // 서버 상태와 로컬 상태가 어긋난 경우 최신 상태를 재조회 후 올바른 화면으로 이동
         try {
-          const latest = await fetchCustomerPhotos(token);
-          const latestStatus = latest?.project?.status as string | undefined;
+          const latest = await ctx.reloadProject();
+          const latestStatus = latest?.status as string | undefined;
           setShowConfirmModal(false);
           if (latestStatus === "confirmed") {
-            window.location.href = `/c/${token}/confirmed`;
+            router.replace(`/c/${token}/confirmed`);
             return;
           }
           if (
@@ -897,11 +911,11 @@ export function SelectionConfirmBar() {
             latestStatus === "reviewing_v1" ||
             latestStatus === "reviewing_v2"
           ) {
-            window.location.href = `/c/${token}/locked`;
+            router.replace(`/c/${token}/locked`);
             return;
           }
           if (latestStatus === "delivered") {
-            window.location.href = `/c/${token}/delivered`;
+            router.replace(`/c/${token}/delivered`);
             return;
           }
         } catch (refreshError) {

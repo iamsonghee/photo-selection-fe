@@ -3,11 +3,11 @@ import { redirect } from "next/navigation";
 import { FolderPlus, Plus, Send, Upload, Users } from "lucide-react";
 import { customerPhotoLimit, getCurrentCustomerAuthUser } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { CustomerSelectShell } from "./_lib/CustomerSelectShell";
-import { filterCustomerProjects, kstToday, type CustomerProjectFilter } from "./_lib/project-routing";
-import { ProjectCard, type ProjectCardProject } from "./_lib/ProjectCard";
-import type { ProjectCardParticipant } from "./_lib/ProjectCardPeople";
-import { ProjectFilters } from "./_lib/ProjectFilters";
+import { CustomerSelectShell } from "../_lib/CustomerSelectShell";
+import { filterCustomerProjects, kstToday, type CustomerProjectFilter } from "../_lib/project-routing";
+import { ProjectCard, type ProjectCardProject } from "../_lib/ProjectCard";
+import type { ProjectCardParticipant } from "../_lib/ProjectCardPeople";
+import { ProjectFilters } from "../_lib/ProjectFilters";
 
 export default async function CustomerSelectHomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const user = await getCurrentCustomerAuthUser();

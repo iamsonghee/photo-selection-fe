@@ -8,7 +8,7 @@ import { ko } from "date-fns/locale";
 import { CalendarDays } from "lucide-react";
 import { useSelectionOptional } from "@/contexts/SelectionContext";
 import { DEFAULT_PROFILE_IMAGE, getProfileImageUrl } from "@/lib/photographer";
-import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { CustomerPageSkeleton } from "./CustomerPageSkeleton";
 import { Badge } from "@/components/ui/Badge";
 import OriginalDownloadEntry from "@/components/customer/OriginalDownloadEntry";
 import { CustomerInviteIntro } from "@/components/customer/CustomerInviteIntro";
@@ -26,7 +26,7 @@ type PhotographerInfo = {
 
 /* ── Loading ── */
 function LoadingScreen() {
-  return <SystemLoadingScreen />;
+  return <CustomerPageSkeleton variant="invite" />;
 }
 
 /* ══════════════════════════════════════════════════════════ */
@@ -108,7 +108,7 @@ export default function InvitePageClient() {
             type="button"
             onClick={() => {
               if (window.history.length > 1) window.history.back();
-              else window.location.assign("/");
+              else router.push("/");
             }}
           >
             작가에게 문의하기

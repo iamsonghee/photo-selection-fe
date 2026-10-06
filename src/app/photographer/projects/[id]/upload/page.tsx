@@ -2,7 +2,7 @@
 
 import { RecommendationMark } from "@/components/RecommendationMark";
 
-import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { PhotographerPageSkeleton } from "@/components/photographer/PhotographerPageSkeleton";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { flushSync } from "react-dom";
@@ -3151,7 +3151,7 @@ export default function ProjectDetailPage() {
     }
   };
 
-  if (loading) return <SystemLoadingScreen />;
+  if (loading) return <PhotographerPageSkeleton variant="workspace" label="사진을 불러오고 있어요" />;
   if (!project) return (
     <div className={themeStyles.lightTheme} style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", background: SURFACE_0, fontFamily: "'Pretendard Variable', 'Pretendard', -apple-system, sans-serif" }}>
       <span style={{ fontSize: 13, color: TEXT_MUTED }}>프로젝트를 찾을 수 없습니다</span>

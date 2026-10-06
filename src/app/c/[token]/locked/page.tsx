@@ -1,6 +1,6 @@
 "use client";
 
-import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { CustomerPageSkeleton } from "../CustomerPageSkeleton";
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -600,11 +600,13 @@ export default function LockedPage() {
       });
       if (!res.ok) { setCancelling(false); return; }
       setCancelModalOpen(false);
-      if (typeof window !== "undefined") window.location.replace(`/c/${token}/gallery`);
+      // 컨텍스트 상태를 먼저 새로 받아야 갤러리가 옛 status를 보고 여기로 되돌리지 않는다.
+      await ctx?.reloadProject();
+      router.replace(`/c/${token}/gallery`);
     } catch { setCancelling(false); }
   };
 
-  if (loading) return <SystemLoadingScreen />;
+  if (loading) return <CustomerPageSkeleton variant="gallery" />;
   if (!project) return (
     <div className="flex min-h-dvh items-center justify-center bg-background text-subtle-foreground font-mono text-sm">
       존재하지 않는 초대 링크입니다.

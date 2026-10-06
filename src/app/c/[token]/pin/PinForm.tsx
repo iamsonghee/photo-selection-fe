@@ -1,12 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CustomerEntryHeader, CustomerEntryShell } from "@/components/customer/CustomerEntryShell";
+import { useSelectionOptional } from "@/contexts/SelectionContext";
 import styles from "../customer-entry.module.css";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
 
 export default function PinForm({ token, from }: { token: string; from: string }) {
+  const router = useRouter();
+  const selection = useSelectionOptional();
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
@@ -27,8 +31,14 @@ export default function PinForm({ token, from }: { token: string; from: string }
       const data = await res.json();
 
       if (data.success) {
-        // 같은 [token] 레이아웃의 SelectionProvider를 새 쿠키로 다시 마운트해야 한다.
-        window.location.href = from;
+        // 같은 [token] 레이아웃의 SelectionProvider가 PIN 전에 401로 비어 있으므로 새 쿠키로 다시 받은 뒤
+        // 이동한다(전체 새로고침 대신). 컨텍스트가 없으면(예외 경로) 예전처럼 전체 이동.
+        if (selection) {
+          await selection.reloadProject();
+          router.replace(from);
+        } else {
+          window.location.href = from;
+        }
       } else if (data.locked) {
         setLocked(true);
         setRetryAfter(data.retryAfterSeconds ?? 60);
@@ -43,7 +53,7 @@ export default function PinForm({ token, from }: { token: string; from: string }
     } finally {
       setSubmitting(false);
     }
-  }, [from, locked, submitting, token]);
+  }, [from, locked, submitting, token, selection, router]);
 
   const appendDigit = useCallback((digit: string) => {
     if (locked || submitting) return;

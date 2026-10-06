@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
-import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { ProjectBodySkeleton } from "../../../_lib/ProjectBodySkeleton";
 import { csvEscape, downloadTextFile } from "@/lib/text-file-download";
 import { useRetouchData, latestVersion } from "../../../_lib/retouch-store";
 import { RetouchErrorScreen } from "../../../_lib/RetouchErrorScreen";
@@ -57,7 +57,7 @@ export default function RetouchExportPage() {
 
   if (loadError) return <RetouchErrorScreen message={loadError} />;
   if (loading || redoList.length === 0) {
-    return <SystemLoadingScreen title={loading ? "재보정 요청을 불러오고 있어요" : "완료 화면으로 이동하고 있어요"} homeHref="/customer-select" />;
+    return <ProjectBodySkeleton variant="cards" label={loading ? "재보정 요청을 불러오고 있어요" : "완료 화면으로 이동하고 있어요"} />;
   }
 
   return (

@@ -31,6 +31,7 @@ import { estimateUploadRemainingSeconds, formatUploadRemainingTime, type UploadT
 import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAssetHeader";
 import type { Photo } from "@/types";
 import { useProjectShell } from "../../_lib/ProjectShell";
+import { ProjectBodySkeleton } from "../../_lib/ProjectBodySkeleton";
 
 // 업로드 ID를 프로젝트·파일 이름·크기·앞부분 내용으로 정한다(수정 시각은 iOS가 고른 시점으로 줄 수 있어 뺀다) — 서버가 응답을 못 돌려줬거나, 모바일에서
 // 페이지가 새로 열려 같은 사진을 다시 고른 경우에도 이미 저장된 사진은 같은 ID라 다시 저장되지 않는다.
@@ -597,9 +598,7 @@ export default function CustomerUploadPage() {
     headerMeta: <div className="flex items-baseline gap-2 text-[12px] text-muted-foreground" aria-label="전체 사진 이용량"><span>전체 이용량</span><strong className="text-[13px] font-semibold tabular-nums text-foreground">{accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${accountUsage.limit === null ? "무제한" : `${accountUsage.limit.toLocaleString()}장`}` : "확인 중"}</strong></div>,
   });
 
-  if (!hydrated) {
-    return <main className="grid flex-1 place-items-center"><span className="size-6 animate-spin rounded-full border-2 border-accent/20 border-t-accent" /></main>;
-  }
+  if (!hydrated) return <ProjectBodySkeleton variant="gallery" label="업로드 화면을 준비하고 있어요" />;
 
   return (
     <>

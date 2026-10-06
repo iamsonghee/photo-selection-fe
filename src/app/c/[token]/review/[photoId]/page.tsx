@@ -34,7 +34,7 @@ export default function ReviewViewerPage() {
   const token   = (params?.token as string) ?? "";
   const photoId = params?.photoId as string;
 
-  const { project, loading: selectionLoading } = useSelection();
+  const { project, loading: selectionLoading, reloadProject } = useSelection();
   const { reviewPhotos, loadReviewPhotos, reviewPhotosLoading, reviewState, setReview, getReview, resetAll, commentSaveStates } = useReview();
 
   const [activePhotoId,    setActivePhotoId]    = useState(photoId);
@@ -354,21 +354,23 @@ export default function ReviewViewerPage() {
       finalStatus = typeof data?.status === "string" ? data.status : null;
     }
     resetAll();
+    // 제출로 바뀐 status를 컨텍스트에 먼저 반영해야 도착 화면이 옛 상태를 보고 되돌리지 않는다.
+    await reloadProject();
     if (finalStatus === "delivered") {
-      window.location.replace(`/c/${token}/delivered`);
+      router.replace(`/c/${token}/delivered`);
       return;
     }
     // 재보정이 포함되면 editing_v2 — '셀렉 확정' 문구의 confirmed 대신 잠금 갤러리로
     if (finalStatus === "editing_v2" || finalStatus === "editing") {
-      window.location.replace(`/c/${token}/locked`);
+      router.replace(`/c/${token}/locked`);
       return;
     }
-    window.location.replace(`/c/${token}/confirmed`);
+    router.replace(`/c/${token}/confirmed`);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "제출에 실패했습니다. 다시 시도해 주세요.");
       setSubmitting(false);
     }
-  }, [canSubmit, receiptMode, token, revisionCount, photos, getReview, resetAll, submitting]);
+  }, [canSubmit, receiptMode, token, revisionCount, photos, getReview, resetAll, submitting, reloadProject, router]);
 
   /* 어느 사진에서든 꾹 눌러 원본을 볼 수 있으므로 인접 사진은 원본·보정본을 함께 준비한다 */
   const preloadUrlGroups = useMemo(

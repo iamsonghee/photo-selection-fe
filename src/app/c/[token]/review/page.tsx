@@ -1,6 +1,6 @@
 "use client";
 
-import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { CustomerPageSkeleton } from "../CustomerPageSkeleton";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
@@ -36,7 +36,7 @@ export default function ReviewRedirectPage() {
   const router  = useRouter();
   const token   = (params?.token as string) ?? "";
 
-  const { project, loading: selectionLoading } = useSelection();
+  const { project, loading: selectionLoading, reloadProject } = useSelection();
   const { reviewPhotos, loadReviewPhotos, reviewPhotosLoading, resetAll } = useReview();
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export default function ReviewRedirectPage() {
   }, [selectionLoading, reviewPhotosLoading, project, token, router, isReceiptOnly]);
 
   if (selectionLoading || reviewPhotosLoading || !project) {
-    return <SystemLoadingScreen />;
+    return <CustomerPageSkeleton variant="gallery" />;
   }
 
   if (isReceiptOnly) {
@@ -71,12 +71,12 @@ export default function ReviewRedirectPage() {
         token={token}
         project={project}
         photos={reviewPhotos}
-        onDone={() => {
-          // SelectionContext는 token 변경 시에만 /api/c/photos를 다시 불러옵니다.
-          // 수령 완료 직후 status가 delivered로 바뀌어도 client state가 stale이면
-          // /delivered ↔ /c/[token] 리다이렉트 루프가 생길 수 있어 하드 리로드로 전환합니다.
+        onDone={async () => {
+          // 수령 완료로 status가 delivered로 바뀐 뒤 컨텍스트가 옛 상태면 /delivered ↔ /c/[token]
+          // 리다이렉트 루프가 생긴다 — 전체 새로고침 대신 컨텍스트를 새로 받고 이동한다.
           resetAll();
-          window.location.replace(`/c/${token}/delivered`);
+          await reloadProject();
+          router.replace(`/c/${token}/delivered`);
         }}
       />
     );
@@ -120,6 +120,7 @@ function ReviewGalleryView({
 }) {
   const router = useRouter();
   const { reviewState, getReview } = useReview();
+  const { reloadProject } = useSelection();
   useCustomerLightCanvas();
 
   const [showSubmitModal, setShowSubmitModal] = useState(false);
@@ -262,20 +263,22 @@ function ReviewGalleryView({
         finalStatus = typeof data?.status === "string" ? data.status : null;
       }
       onSubmitted();
+      // 제출로 바뀐 status를 컨텍스트에 먼저 반영해야 도착 화면이 옛 상태를 보고 되돌리지 않는다.
+      await reloadProject();
       if (finalStatus === "delivered") {
-        window.location.replace(`/c/${token}/delivered`);
+        router.replace(`/c/${token}/delivered`);
         return;
       }
       if (finalStatus === "editing_v2" || finalStatus === "editing") {
-        window.location.replace(`/c/${token}/locked`);
+        router.replace(`/c/${token}/locked`);
         return;
       }
-      window.location.replace(`/c/${token}/confirmed`);
+      router.replace(`/c/${token}/confirmed`);
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : "제출에 실패했습니다.");
       setSubmitting(false);
     }
-  }, [allReviewed, submitting, photos, token, getReview, revisionCount, onSubmitted, receiptMode]);
+  }, [allReviewed, submitting, photos, token, getReview, revisionCount, onSubmitted, receiptMode, reloadProject, router]);
 
   return (
     /* 격자/목록 화면은 라이트, 몰입형 단일 사진은 다크 — 갤러리(선택)와 같은 규칙을 따른다.

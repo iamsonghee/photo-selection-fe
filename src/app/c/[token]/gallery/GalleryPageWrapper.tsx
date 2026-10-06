@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
+import { CustomerPageSkeleton } from "../CustomerPageSkeleton";
 import GalleryPageClient from "./GalleryPageClient";
 
 export default function GalleryPageWrapper() {
   return (
-    <Suspense fallback={<SystemLoadingScreen />}>
+    <Suspense fallback={<CustomerPageSkeleton variant="gallery" />}>
       <GalleryPageClient />
     </Suspense>
   );
