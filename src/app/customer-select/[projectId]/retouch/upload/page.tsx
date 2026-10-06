@@ -15,7 +15,6 @@ import { UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
 import { CUSTOMER_UPLOAD_MAX_EDGE } from "../../../_lib/upload-limit";
 import { useRetouchData, uploadRetouched, type RetouchPhoto } from "../../../_lib/retouch-store";
 import { RetouchErrorScreen } from "../../../_lib/RetouchErrorScreen";
-import { CustomerSelectShell } from "../../../_lib/CustomerSelectShell";
 import ui from "../../../_lib/ui.module.css";
 
 export default function RetouchUploadPage() {
@@ -97,7 +96,7 @@ export default function RetouchUploadPage() {
   if (loadError) return <RetouchErrorScreen message={loadError} />;
 
   return (
-    <CustomerSelectShell navigation={false}>
+    <>
       <main className={ui.shellMain}>
         <div className={ui.page}>
           <div className={ui.header}>
@@ -163,6 +162,6 @@ export default function RetouchUploadPage() {
           <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton size="work-panel" pending={uploading} pendingLabel="업로드 중…" disabled={files.length === 0} onClick={handleConfirm}>사진 연결 확인하고 검토하기</PhotographerLightButton>} />
         </div>
       </main>
-    </CustomerSelectShell>
+    </>
   );
 }

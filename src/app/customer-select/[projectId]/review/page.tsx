@@ -16,8 +16,7 @@ import { csvEscape, downloadTextFile, sanitizeFilenamePart } from "@/lib/text-fi
 import { formatSceneRange } from "@/lib/customer-scenes";
 import type { Photo } from "@/types";
 import { activeParticipants, useCustomerSelectStore } from "../../_lib/real-store";
-import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
-import { ProjectStepHeader } from "../../_lib/ProjectStepHeader";
+import { useProjectShell } from "../../_lib/ProjectShell";
 import { PhotoDetail } from "../select/PhotoDetail";
 import { useSceneAnalysis, type NamedScene } from "../select/useSceneAnalysis";
 import s from "./review.module.css";
@@ -34,6 +33,8 @@ function SendScreen() {
   const projectId = useParams().projectId as string;
   const router = useRouter();
   const store = useCustomerSelectStore();
+  // 공통 헤더(레이아웃): 보내기 단계 강조.
+  useProjectShell({ step: "send" });
   const { project, hydrated, isOwner, currentIdentity: me, syncStatus, failedComments, retryFailedComments } = store;
   const failedMemoCount = Object.keys(failedComments).length;
   const [linkState, setLinkState] = useState<"idle" | "loading" | "copied" | "shared" | "fail">("idle");
@@ -130,7 +131,7 @@ function SendScreen() {
   }
 
   return (
-    <CustomerSelectShell compactHeader compactTitle={<ProjectStepHeader projectId={projectId} name={project.name} step="send" />}>
+    <>
       <main className={s.main}>
         {selected.length === 0 ? (
           <section className={s.empty}>
@@ -234,6 +235,6 @@ function SendScreen() {
           onSaveComment={store.setComment}
         />
       )}
-    </CustomerSelectShell>
+    </>
   );
 }

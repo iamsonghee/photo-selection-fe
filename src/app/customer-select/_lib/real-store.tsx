@@ -232,7 +232,10 @@ export function CustomerSelectStoreProvider({
     let cancelled = false;
     (async () => {
       const data = await apiGet();
-      if (cancelled || !data) {
+      // 정리된(언마운트·재실행된) 실행은 아무것도 반영하지 않는다 — 여기서 hydrated를 켜면 빈 프로젝트가
+      // 한 번 그려진다(개발 모드 Strict Mode의 effect 이중 실행에서 "이름 없는 프로젝트"로 보이던 원인).
+      if (cancelled) return;
+      if (!data) {
         setHydrated(true);
         return;
       }
@@ -254,8 +257,9 @@ export function CustomerSelectStoreProvider({
       setProject(withCurrentOpinions(data.project, identity));
       // 저장된 색도 서버 참가자 행이 삭제됐을 수 있으므로 멱등적으로 복구한다.
       await apiPost("/participants", { color: identity });
+      if (cancelled) return;
       setParticipantReady(true);
-      if (!cancelled) setHydrated(true);
+      setHydrated(true);
     })();
     return () => {
       cancelled = true;

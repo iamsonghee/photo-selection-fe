@@ -10,7 +10,6 @@ import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { useHoldPreview } from "@/hooks/useHoldPreview";
 import { useRetouchData, setRetouchDecision, latestVersion, type RetouchPhoto, type RetouchVersion } from "../../../_lib/retouch-store";
 import { RetouchErrorScreen } from "../../../_lib/RetouchErrorScreen";
-import { CustomerSelectShell } from "../../../_lib/CustomerSelectShell";
 import ui from "../../../_lib/ui.module.css";
 
 function CompareCard({
@@ -142,7 +141,7 @@ export default function RetouchComparePage() {
   if (loadError) return <RetouchErrorScreen message={loadError} />;
 
   return (
-    <CustomerSelectShell navigation={false}>
+    <>
       <main className={ui.shellMain}>
         <div className={ui.page}>
           <div className={ui.header}>
@@ -205,6 +204,6 @@ export default function RetouchComparePage() {
           />
         </div>
       </main>
-    </CustomerSelectShell>
+    </>
   );
 }

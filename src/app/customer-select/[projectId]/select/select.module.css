@@ -2,11 +2,7 @@
 
 .page { min-height: 0; flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); }
 
-/* ── 상단: 프로젝트·단계·참여자 ── */
-.people { margin-left: auto; min-width: 0; display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; }
-.people::-webkit-scrollbar { display: none; }
-.inviteButton { flex: none; height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--foreground); display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
-.inviteButton:hover { border-color: var(--border-strong); }
+/* ── 상단: 참여자·초대는 공통 헤더(_lib/ProjectShell)가 그린다 ── */
 
 .mobilePeople { display: none; }
 
@@ -64,7 +60,6 @@
 /* PC: 툴바 줄 안(보기 범위 탭 옆, 간격으로 구분). 모바일: 보기 옵션 안. */
 .peopleChipsInline { flex: none; margin-left: 8px; padding-left: 14px; border-left: 1px solid var(--border-subtle); }
 /* 모바일 보기 옵션 안 인물 칩 줄 / 고른 동안의 안내 줄 — PC는 툴바 줄에 칩이 보이므로 숨긴다. */
-.inviteLabel { display: inline; }
 /* 장면 목록의 진행: ♥ 찜 수 · ✓ 고른 수/목표 */
 .sceneProgress { display: inline-flex; gap: 6px; }
 .sceneProgress b { font-weight: 600; }
@@ -367,8 +362,6 @@
   .toolsNote { padding: 7px 20px; }
   /* 인물 칩: 툴바 아래 한 줄, 넘치면 가로 스크롤(화면 가장자리까지). */
   .peopleChipsInline { order: 10; flex: 0 0 calc(100% + 40px); margin: 2px -20px 0; padding: 0 20px; border-left: 0; overflow-x: auto; scrollbar-width: none; }
-  /* 헤더 오른쪽 초대: 모바일도 글자를 둔다(+ 아이콘만이면 사진 추가로 오해) — 좁은 폭에 맞게 여백만 줄인다. */
-  .inviteButton { padding: 0 10px; }
   .analysis { margin: 10px 20px 0; flex-wrap: wrap; }
   .analysisActions { width: 100%; padding-left: 26px; }
   .rail, .floatNav { display: none; }

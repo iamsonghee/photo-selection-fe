@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { customerProjectAction, customerProjectDestination, customerProjectHome, customerProjectStatus, filterCustomerProjects, selectionDeadlineBadge } from "../src/app/customer-select/_lib/project-routing.ts";
+import { customerProjectAction, customerProjectDestination, customerProjectSent, customerProjectStatus, filterCustomerProjects, selectionDeadlineBadge } from "../src/app/customer-select/_lib/project-routing.ts";
 
 const project = (overrides = {}) => ({
   id: "project-1",
@@ -21,7 +21,11 @@ const project = (overrides = {}) => ({
   ...overrides,
 });
 
-assert.equal(customerProjectHome("project-1"), "/customer-select/project-1");
+// 목록 카드는 이 판단으로 sent를 넘긴다 — 보낸 프로젝트가 '고르는 중'으로 보이지 않게.
+assert.equal(customerProjectSent(project()), false);
+assert.equal(customerProjectSent(project({ exported: true })), true);
+assert.equal(customerProjectSent(project({ delivery_count: 1 })), true);
+assert.equal(customerProjectDestination(project({ exported: true, photo_count: 10 }), customerProjectSent(project({ exported: true }))), "/customer-select/project-1/review");
 assert.equal(customerProjectDestination(project()), "/customer-select/project-1/upload");
 assert.equal(customerProjectDestination(project({ photo_count: 10 })), "/customer-select/project-1/select");
 assert.equal(customerProjectDestination(project({ exported: true, photo_count: 10 })), "/customer-select/project-1/select");
