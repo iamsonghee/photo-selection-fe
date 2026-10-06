@@ -4698,7 +4698,7 @@ export default function ProjectDetailPage() {
           <PhotographerModal
             open
             onClose={closeModal}
-            title={filesToUpload.length === 0 ? "새로 올릴 사진이 없어요" : `원본 ${filesToUpload.length.toLocaleString()}장을 업로드할까요?`}
+            title={filesToUpload.length === 0 ? "새로 업로드할 사진이 없습니다" : `원본 ${filesToUpload.length.toLocaleString()}장을 업로드할까요?`}
             description={!isMob
               ? `총 ${formatUploadBytes(selectedBytes)} · 전송을 시작하면 남은 시간을 안내합니다.`
               : "선택한 원본의 업로드 설정을 확인해 주세요."}
@@ -4739,22 +4739,22 @@ export default function ProjectDetailPage() {
                     <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning" />
                     <div className="min-w-0">
                       <p className="text-[12px] font-semibold leading-[18px] text-foreground">
-                        이미 올린 사진 {duplicateFiles.length.toLocaleString()}장이 있어요
+                        이미 업로드한 사진이 {duplicateFiles.length.toLocaleString()}장 있습니다
                       </p>
-                      <p className="truncate text-[11px] leading-4 text-muted-foreground">
+                      <p className="truncate text-[12px] leading-[18px] text-muted-foreground">
                         {duplicateFiles.slice(0, 2).map((file) => file.name).join(", ")}
                         {duplicateFiles.length > 2 ? ` 외 ${(duplicateFiles.length - 2).toLocaleString()}장` : ""}
                       </p>
                     </div>
                   </div>
-                  <div role="radiogroup" aria-label="이미 올린 사진 처리" className="flex flex-col gap-1 pl-[22px]">
+                  <div role="radiogroup" aria-label="이미 업로드한 사진 처리" className="flex flex-col gap-1 pl-[22px]">
                     <label className="flex min-h-9 cursor-pointer items-center gap-2 text-[12px] text-foreground">
                       <input type="radio" name="duplicate-upload" checked={skipping} onChange={() => setSkipDuplicates(true)} className="accent-[var(--accent)]" />
                       건너뛰기 (새 사진 {newFileCount.toLocaleString()}장만 업로드)
                     </label>
                     <label className={`flex min-h-9 items-center gap-2 text-[12px] ${canUploadAll ? "cursor-pointer text-foreground" : "cursor-not-allowed text-muted-foreground"}`}>
                       <input type="radio" name="duplicate-upload" checked={!skipping} disabled={!canUploadAll} onChange={() => setSkipDuplicates(false)} className="accent-[var(--accent)]" />
-                      {canUploadAll ? "모두 올리기 (같은 사진이 하나 더 생겨요)" : "모두 올리기 (업로드 한도를 넘어 선택할 수 없어요)"}
+                      {canUploadAll ? "모두 업로드 (같은 사진이 하나 더 추가됩니다)" : "모두 업로드 (업로드 한도를 넘어 선택할 수 없습니다)"}
                     </label>
                   </div>
                 </div>
