@@ -45,17 +45,19 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 export async function getAppSettings(): Promise<AppSettings> {
   try {
     const admin = getAdminClient();
-    const { data, error } = await admin
-      .from("app_settings")
-      .select(
-        "general_max_projects, general_max_photos_per_project, beta_max_projects_total, beta_max_photos_per_project, beta_max_revision_count, beta_default_duration_days, updated_at, updated_by"
-      )
-      .eq("id", 1)
-      .maybeSingle();
+    // 하객 한도는 따로 읽는다 — 컬럼이 없어도(마이그레이션 전) 기존 한도는 그대로 쓰게. 두 조회는 함께 보낸다.
+    const [{ data, error }, guest] = await Promise.all([
+      admin
+        .from("app_settings")
+        .select(
+          "general_max_projects, general_max_photos_per_project, beta_max_projects_total, beta_max_photos_per_project, beta_max_revision_count, beta_default_duration_days, updated_at, updated_by"
+        )
+        .eq("id", 1)
+        .maybeSingle(),
+      admin.from("app_settings").select("guest_photo_max_mb, guest_video_max_mb, guest_retention_days").eq("id", 1).maybeSingle(),
+    ]);
 
     if (error || !data) return DEFAULT_APP_SETTINGS;
-    // 하객 한도는 따로 읽는다 — 컬럼이 없어도(마이그레이션 전) 기존 한도는 그대로 쓰게.
-    const guest = await admin.from("app_settings").select("guest_photo_max_mb, guest_video_max_mb, guest_retention_days").eq("id", 1).maybeSingle();
 
     return {
       generalMaxProjects: data.general_max_projects,

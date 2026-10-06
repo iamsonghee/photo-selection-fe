@@ -6,7 +6,7 @@ import { PhotographerLightPageFrame } from "@/components/layout/PhotographerLigh
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { PhotographerFormActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PROJECT_FORM_INPUT_CLASS, ProjectFormDateInput, ProjectFormField, ProjectFormInput, ProjectFormPageHeading, ProjectFormSection, ProjectFormTextarea, projectFormInputStateClass } from "@/components/photographer/ProjectFormFields";
-import { DEFAULT_GUEST_GREETING, GUEST_GREETING_MAX as GREETING_MAX, formatWeddingDateTime, retentionEndDate } from "@/lib/guest-album";
+import { CEREMONY_TIMES, DEFAULT_GUEST_GREETING, GUEST_GREETING_MAX as GREETING_MAX, formatCeremonyTime, formatWeddingDateTime, retentionEndDate } from "@/lib/guest-album";
 
 export function NewGuestAlbumForm({ retentionDays }: { retentionDays: number }) {
   const router = useRouter();
@@ -93,12 +93,16 @@ export function NewGuestAlbumForm({ retentionDays }: { retentionDays: number }) 
             <ProjectFormSection number="02" title="하객에게 보여줄 정보" description="하객이 맞는 앨범에 들어왔는지 알 수 있게 업로드 화면에 보여요." required={false}>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <ProjectFormField label="예식 시작 시간">
-                  <ProjectFormInput
-                    type="time"
+                  {/* 30분 단위 — iOS 시간 휠은 step을 무시해 select로 고른다. */}
+                  <select
+                    aria-label="예식 시작 시간"
                     className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(ceremonyTime) })}`}
                     value={ceremonyTime}
                     onChange={(event) => setCeremonyTime(event.target.value)}
-                  />
+                  >
+                    <option value="">선택 안 함</option>
+                    {CEREMONY_TIMES.map((time) => <option key={time} value={time}>{formatCeremonyTime(time)}</option>)}
+                  </select>
                 </ProjectFormField>
                 <ProjectFormField label="예식장">
                   <ProjectFormInput maxLength={100} className={`${PROJECT_FORM_INPUT_CLASS} ${projectFormInputStateClass({ hasValue: Boolean(venue) })}`} value={venue} onChange={(event) => setVenue(event.target.value)} placeholder="예: 더채플앳청담" />

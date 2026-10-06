@@ -11,7 +11,7 @@ type Item = { id: string; file: File; url: string; kind: GuestMediaKind; status:
 type Phase = "edit" | "sending" | "failed" | "done" | "closed";
 
 const INPUT_CLASS = "block w-full rounded-xl border border-border-subtle bg-surface px-4 py-3 text-[16px] outline-none transition-colors placeholder:text-placeholder-foreground focus:border-accent/50 disabled:bg-surface-raised";
-const UPLOAD_CONCURRENCY = 2;
+const UPLOAD_CONCURRENCY = 4;
 
 export function GuestClosedScreen({ album }: { album: Pick<GuestAlbumInfo, "name" | "uploadToken"> }) {
   return (

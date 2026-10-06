@@ -44,12 +44,17 @@ export const GUEST_GREETING_MAX = 100;
 export function formatWeddingDateTime(date: string, time?: string | null) {
   const [y, m, d] = date.split("-").map(Number);
   const weekday = "일월화수목금토"[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
-  let text = `${date.replaceAll("-", ".")} (${weekday})`;
-  if (time) {
-    const [h, min] = time.split(":").map(Number);
-    text += ` ${h < 12 ? "오전" : "오후"} ${h % 12 || 12}:${String(min).padStart(2, "0")}`;
-  }
-  return text;
+  const text = `${date.replaceAll("-", ".")} (${weekday})`;
+  return time ? `${text} ${formatCeremonyTime(time)}` : text;
+}
+
+/** 예식 시작 시간 선택지 — 30분 단위(00:00 ~ 23:30) */
+export const CEREMONY_TIMES = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`);
+
+/** 13:30 → 오후 1:30 */
+export function formatCeremonyTime(time: string) {
+  const [h, min] = time.split(":").map(Number);
+  return `${h < 12 ? "오전" : "오후"} ${h % 12 || 12}:${String(min).padStart(2, "0")}`;
 }
 
 /** 날짜·시간 · 예식장 */

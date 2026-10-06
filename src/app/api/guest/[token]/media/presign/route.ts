@@ -32,8 +32,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   }
 
   try {
-    const { album, submission } = await authorizeGuest(token, typeof body.submissionId === "string" ? body.submissionId : "");
-    const limits = await getGuestUploadLimits();
+    // 서로 기다릴 필요 없는 조회는 함께 보낸다 — 파일마다 부르는 경로라 왕복 수가 곧 업로드 대기 시간이다.
+    const [{ album, submission }, limits] = await Promise.all([
+      authorizeGuest(token, typeof body.submissionId === "string" ? body.submissionId : ""),
+      getGuestUploadLimits(),
+    ]);
     const maxMb = kind === "photo" ? limits.photoMaxMb : limits.videoMaxMb;
     if (size > maxMb * 1024 * 1024) {
       throw new GuestRequestError(413, "too_large", `${kind === "photo" ? "사진" : "영상"}은 ${maxMb.toLocaleString()}MB까지 보낼 수 있어요.`);

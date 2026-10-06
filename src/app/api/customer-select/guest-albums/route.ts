@@ -47,5 +47,6 @@ function validDate(value: unknown): string | null {
 }
 
 function validTime(value: unknown): string | undefined {
-  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : undefined;
+  // 30분 단위만(생성 화면 선택지와 같음)
+  return typeof value === "string" && /^([01]\d|2[0-3]):(00|30)$/.test(value) ? value : undefined;
 }
