@@ -11,3 +11,13 @@
 
 - 이 저장소(`photo-selection-fe`, Next.js)는 백엔드 저장소 `../photo-selection-be`(FastAPI)와 **별도 git 저장소**다. 두 저장소를 하나의 서비스로 함께 조사하되, 커밋은 각 저장소 기준으로 분리한다(이 저장소 커밋에 백엔드 변경을 함께 넣지 않는다).
 - 백엔드 저장소에는 별도의 `AGENTS.md`가 있다. Claude Code는 이 저장소의 `CLAUDE.md`를 따른다. 세 파일 모두 공통 규칙은 `docs/agent-guidelines.md` 하나만 참조한다.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

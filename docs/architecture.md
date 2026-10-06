@@ -242,13 +242,15 @@ clip-service/          완전히 독립된 FastAPI 앱 (별도 배포 단위)
 
 ## 3. 프론트엔드 기술 스택과 실행 구조
 
-- **프레임워크**: Next.js `16.1.6` (App Router), React `19.2.3`, TypeScript, Tailwind CSS 4 (`package.json`).
+- **프레임워크**: Next.js `16.3.8` (App Router, Turbopack), React `19.3.0`, TypeScript, Tailwind CSS 4 (`package.json`). 2026-10-06에 Next.js `16.1.6`·React `19.2.3`에서 올렸다 — 16.1.6이 해당되던 보안 권고(세그먼트 프리페치·동적 파라미터를 통한 미들웨어 우회, Server Components 서비스 거부, 이미지 최적화 원격 코드 실행·SSRF 등)를 반영하기 위해서다. `eslint-config-next`는 `next`와 같은 버전으로 고정한다.
+- **Next.js 16.3 기본 동작(2026-10-06 업그레이드로 적용)**: 링크 프리페치 묶음(`prefetchInlining`), 페이지 이동 후 새 스크롤·포커스 처리, 서버 렌더링의 Node.js 스트림, `next build` 타입 검사의 프로젝트 `tsc` 실행(`useTypeScriptCli`, tsconfig 전체 — e2e 테스트 파일 포함), Turbopack 개발 메모리 축출·빌드 디스크 캐시가 기본으로 켜진다. 설정으로 바꾼 것은 없다. Turbopack 루트는 Git 저장소 밖 lockfile(예: 홈 폴더 `pnpm-lock.yaml`)을 무시하고 FE 저장소를 쓰며, 기동 때 그 사실을 알리는 경고가 나오지만 동작에는 영향이 없다.
+- **에이전트 지침 블록(16.3~)**: AI 코딩 에이전트가 `next dev`를 띄우면 FE 루트 `AGENTS.md` 끝의 `<!-- BEGIN:nextjs-agent-rules -->` 블록(설치된 버전의 `node_modules/next/dist/docs/`를 먼저 읽으라는 안내)을 확인해, 없거나 문구가 다르면 다시 쓴다. `agentRules` 설정은 기본값(켜짐)을 유지하고 블록을 커밋해 두었다 — 블록 밖 내용은 보존된다. FE `CLAUDE.md`는 `AGENTS.md`를 불러오지 않으므로 이 블록은 Codex에만 보인다. Next.js를 올려 문구가 바뀌면 블록도 함께 갱신해 커밋한다.
 - **React Compiler**: `next.config.ts`에서 `reactCompiler: true` 활성화 — 별도 커스텀 헤더/리다이렉트/이미지 도메인 설정은 없음.
 - **폼**: `react-hook-form` + `zod`.
 - **가상 스크롤**: `@tanstack/react-virtual` (대량 사진 갤러리 렌더링용, 정확한 사용처는 갤러리 페이지로 추정 — 상세 코드 라인은 `확인 필요`).
 - **로컬 실행**: `npm run dev` → `next dev -p 3001` (포트 3001 고정). `dev:no-turbopack` 대안 스크립트 존재.
 - **인증 클라이언트**: `@supabase/ssr` — 서버(`src/lib/supabase/server.ts`, 쿠키 기반 `createServerClient`)와 브라우저(`src/lib/supabase/client.ts`, `createBrowserClient`) 두 종류의 클라이언트를 분리해 사용. 별도로 서비스 롤 키를 쓰는 관리자 클라이언트(`src/lib/supabase-admin.ts`)가 API 라우트 내부에서 사용됨.
-- **미들웨어**: `src/middleware.ts` — matcher가 `/c/:token/:path+` 하나뿐이라 **`/photographer/**` 경로는 미들웨어 보호 대상이 아님** (§11에서 상세). PIN 미인증 시 `/pin?from=<pathname+search>`로 리다이렉트하며 원래 URL의 쿼리스트링까지 보존한다(`pathname + req.nextUrl.search`) — PIN 인증 완료 후 `PinForm`이 `from`으로 복귀하므로, 쿼리 파라미터가 붙은 딥링크(예: 뷰어의 `?grouped=1`)로 최초 접근해도 인증 왕복 후 그대로 유지된다. PIN 인증 쿠키의 HMAC 범위에는 프로젝트 토큰과 현재 `access_pin` 상태가 함께 포함되며, 미들웨어와 고객 API의 `checkPinAuth`가 DB의 현재 PIN을 기준으로 검증하므로 PIN 설정·변경·삭제 시 기존 쿠키는 즉시 무효화된다.
+- **미들웨어**: `src/middleware.ts` — matcher는 정적 파일(`_next/static`, `_next/image`, `favicon.ico`)을 뺀 모든 경로지만, 실제로 처리하는 것은 레거시 도메인 리다이렉트, 셀프 고객 공유 토큰 교환(`/customer-select/[projectId]/**?share_token=`), 관리자 차단(`/admin/**`), 작가 고객 PIN 확인(`/c/[token]/**`)뿐이다. **`/photographer/**` 경로는 미들웨어 보호 대상이 아님** (§11에서 상세). Next.js 16부터 `middleware` 파일 이름은 폐기 예고(`proxy` 권장) 경고가 나오지만 16.3.8에서도 그대로 동작한다 — `proxy.ts` 전환은 별도 작업. (2026-10-06 matcher 서술을 코드 기준으로 정정, 16.3.8에서 비로그인·쿠키 없는 요청과 세그먼트 프리페치 요청 모두 PIN 화면·홈으로 보내는 것을 확인) PIN 미인증 시 `/pin?from=<pathname+search>`로 리다이렉트하며 원래 URL의 쿼리스트링까지 보존한다(`pathname + req.nextUrl.search`) — PIN 인증 완료 후 `PinForm`이 `from`으로 복귀하므로, 쿼리 파라미터가 붙은 딥링크(예: 뷰어의 `?grouped=1`)로 최초 접근해도 인증 왕복 후 그대로 유지된다. PIN 인증 쿠키의 HMAC 범위에는 프로젝트 토큰과 현재 `access_pin` 상태가 함께 포함되며, 미들웨어와 고객 API의 `checkPinAuth`가 DB의 현재 PIN을 기준으로 검증하므로 PIN 설정·변경·삭제 시 기존 쿠키는 즉시 무효화된다.
 
 ---
 
