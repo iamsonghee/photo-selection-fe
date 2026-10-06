@@ -9,7 +9,6 @@ import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { csvEscape, downloadTextFile } from "@/lib/text-file-download";
 import { useRetouchData, latestVersion } from "../../../_lib/retouch-store";
 import { RetouchErrorScreen } from "../../../_lib/RetouchErrorScreen";
-import { CustomerSelectShell } from "../../../_lib/CustomerSelectShell";
 import ui from "../../../_lib/ui.module.css";
 
 export default function RetouchExportPage() {
@@ -62,7 +61,7 @@ export default function RetouchExportPage() {
   }
 
   return (
-    <CustomerSelectShell navigation={false}>
+    <>
       <main className={ui.shellMain}>
         <div className={ui.page}>
           <div className={ui.header}>
@@ -89,6 +88,6 @@ export default function RetouchExportPage() {
           <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton size="work-panel" onClick={() => router.push(`/customer-select/${projectId}/retouch/upload`)}>보정본 업로드 화면으로</PhotographerLightButton>} />
         </div>
       </main>
-    </CustomerSelectShell>
+    </>
   );
 }

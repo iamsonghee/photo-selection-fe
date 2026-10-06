@@ -21,7 +21,7 @@
 바로가기와 별개로 제공하며 새로운 DB 상태/스키마는 추가하지 않는다.
 업로드 사전 한도 검사는 소유자의 모든 `customer_projects.photo_count` 합계를 조회해 사용하고,
 BE는 초과 배치를 통째로 거절한다. DB도 소유자별 advisory lock과 statement trigger로 여러
-프로젝트의 동시 업로드가 계정 합산 5,000장(2026-10-05 전에는 2,000장)을 넘지 않게 한다.
+프로젝트의 동시 업로드가 계정 합산 3,000장(2026-10-05에 2,000장 → 5,000장으로 올렸다가 같은 날 3,000장으로 조정)을 넘지 않게 한다.
 
 2026-09-22 촬영 분석 필드 계획: `customer_projects`의 기존 `studio_name`을 스튜디오·업체명으로
 정의하고 `photographer_name`, `shoot_region`, `shoot_location`을 추가한다. 생성·설정 API는 공통
@@ -29,8 +29,8 @@ BE는 초과 배치를 통째로 거절한다. DB도 소유자별 advisory lock�
 검증한다. 기존 행에는 현재 코드 외 촬영 종류가 있어 DB CHECK 제약은 추가하지 않는다. 기존 값을
 정규화하기 전까지 API를 쓰는 신규 생성·설정 요청에만 허용 코드 검증을 적용한다.
 
-작가가 A-CUT을 쓰지 않는 경우를 위한 별도 이용 흐름을 `feature/customer-select` 브랜치에
-추가했다(`main` 미병합). 소유자가 고객 계정(Google/Kakao 로그인)이고, 공유 링크로 들어오는
+작가가 A-CUT을 쓰지 않는 경우를 위한 별도 이용 흐름을 `feature/customer-select` 브랜치에서
+개발해 2026-09-19부터 `main`에 병합했다. 소유자가 고객 계정(Google/Kakao 로그인)이고, 공유 링크로 들어오는
 참가자는 로그인하지 않는다는 점이 기존 작가/고객 관계와 다르다. `customer_projects`/
 `customer_photos`/`customer_selections`/`customer_photo_versions`/
 `customer_project_participants`를 기존 `projects`/`photos`/`selections`와 완전히 분리된

@@ -30,7 +30,7 @@ import { getPhotoDisplayName, matchesFilenameQuery } from "@/lib/gallery-filter"
 import { estimateUploadRemainingSeconds, formatUploadRemainingTime, type UploadTimingSample } from "@/lib/upload-time-estimate";
 import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAssetHeader";
 import type { Photo } from "@/types";
-import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
+import { useProjectShell } from "../../_lib/ProjectShell";
 
 // 업로드 ID를 프로젝트·파일 이름·크기·앞부분 내용으로 정한다(수정 시각은 iOS가 고른 시점으로 줄 수 있어 뺀다) — 서버가 응답을 못 돌려줬거나, 모바일에서
 // 페이지가 새로 열려 같은 사진을 다시 고른 경우에도 이미 저장된 사진은 같은 ID라 다시 저장되지 않는다.
@@ -53,7 +53,6 @@ async function clientUploadId(projectId: string, file: File) {
   return id;
 }
 import { CUSTOMER_GALLERY_GRID } from "../../_lib/photo-grid";
-import { ProjectStepHeader } from "../../_lib/ProjectStepHeader";
 import { rememberGroupSimilar, setAsideKey, startAiTidy } from "../select/AiTidySheet";
 import { UploadDoneSheet } from "./UploadDoneSheet";
 import { useCustomerSelectStore } from "../../_lib/real-store";
@@ -537,7 +536,6 @@ export default function CustomerUploadPage() {
     return () => window.removeEventListener("beforeunload", warnBeforeLeave);
   }, [uploading]);
 
-  const displayName = project.name || "이름 없는 프로젝트";
   const displayedPhotos = useMemo(() => [...project.photos, ...pendingPhotos], [project.photos, pendingPhotos]);
   const sortedPhotos = useMemo(() => [...displayedPhotos].sort((a, b) => {
     // 올리는 중·실패한 사진은 정렬과 상관없이 맨 앞에 올린 순서대로 — 스크롤하지 않아도 어디까지 올라갔는지 보인다.
@@ -592,21 +590,19 @@ export default function CustomerUploadPage() {
     </div>
   ) : undefined;
 
+  // 공통 헤더(레이아웃): 올리기 단계 강조, 화면 높이 잠금, PC 헤더 오른쪽에 전체 이용량.
+  useProjectShell({
+    step: "upload",
+    viewportLocked: true,
+    headerMeta: <div className="flex items-baseline gap-2 text-[12px] text-muted-foreground" aria-label="전체 사진 이용량"><span>전체 이용량</span><strong className="text-[13px] font-semibold tabular-nums text-foreground">{accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${accountUsage.limit === null ? "무제한" : `${accountUsage.limit.toLocaleString()}장`}` : "확인 중"}</strong></div>,
+  });
+
   if (!hydrated) {
-    return (
-      <CustomerSelectShell viewportLocked>
-        <main className="grid flex-1 place-items-center"><span className="size-6 animate-spin rounded-full border-2 border-accent/20 border-t-accent" /></main>
-      </CustomerSelectShell>
-    );
+    return <main className="grid flex-1 place-items-center"><span className="size-6 animate-spin rounded-full border-2 border-accent/20 border-t-accent" /></main>;
   }
 
   return (
-    <CustomerSelectShell
-      viewportLocked
-      compactHeader={compactUploadHeader}
-      compactTitle={<ProjectStepHeader projectId={projectId} name={displayName} step="upload" />}
-      headerMeta={<div className="flex items-baseline gap-2 text-[12px] text-muted-foreground" aria-label="전체 사진 이용량"><span>전체 이용량</span><strong className="text-[13px] font-semibold tabular-nums text-foreground">{accountUsage ? `${accountUsage.photoCount.toLocaleString()} / ${accountUsage.limit === null ? "무제한" : `${accountUsage.limit.toLocaleString()}장`}` : "확인 중"}</strong></div>}
-    >
+    <>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden onChange={(event) => {
           const files = Array.from(event.currentTarget.files ?? []);
@@ -772,6 +768,6 @@ export default function CustomerUploadPage() {
         onCancel={() => { if (!deleting) { setDeleteImpact(null); setPendingDeleteIds([]); setDeleteError(null); } }}
         onConfirm={deleteSelectedPhotos}
       /> : null}
-    </CustomerSelectShell>
+    </>
   );
 }

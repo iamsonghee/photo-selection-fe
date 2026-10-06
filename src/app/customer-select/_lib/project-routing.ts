@@ -20,12 +20,12 @@ export type CustomerProjectSummary = {
 /** 단계 판단에 필요한 값만 — 프로젝트 상세는 목록 요약 대신 불러온 프로젝트로 같은 판단을 한다. */
 type ProjectStage = Pick<CustomerProjectSummary, "id" | "photo_count" | "retouch_done">;
 
-/** 프로젝트 상세(목록 카드·헤더 프로젝트명이 여는 곳). 지금 할 단계로 가는 버튼은 상세 안에 있다. */
-export function customerProjectHome(projectId: string) {
-  return `/customer-select/${projectId}`;
+/** 작가에게 보낸 적이 있는 프로젝트 — 목록 카드가 상세와 같은 기준으로 '전달함' 단계를 판단한다. */
+export function customerProjectSent(project: Pick<CustomerProjectSummary, "exported" | "delivery_count">) {
+  return project.exported || project.delivery_count > 0;
 }
 
-/** 지금 할 단계 화면 — 상세의 주 버튼과 목록 카드의 행동 링크가 쓴다. */
+/** 지금 할 단계 화면 — 목록 카드(본문·행동 링크)와 `/customer-select/[projectId]` 리다이렉트가 쓴다. */
 export function customerProjectDestination(project: ProjectStage, sent = false) {
   if (project.retouch_done) return `/customer-select/${project.id}/done`;
   if (sent) return `/customer-select/${project.id}/review`;
@@ -49,7 +49,7 @@ export function customerProjectAction(project: Omit<ProjectStage, "id">, selecte
 
 export type CustomerProjectFilter = "all" | "active" | "done";
 
-export function filterCustomerProjects(projects: CustomerProjectSummary[], query: string, status: CustomerProjectFilter) {
+export function filterCustomerProjects<T extends CustomerProjectSummary>(projects: T[], query: string, status: CustomerProjectFilter): T[] {
   const normalizedQuery = query.trim().toLocaleLowerCase("ko");
   return projects.filter((project) => {
     const matchesQuery = !normalizedQuery || [project.name, project.studio_name, project.photographer_name]

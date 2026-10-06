@@ -9,7 +9,7 @@
  */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowDown, ChevronUp, MessageCircle, Grid2x2, Grid3x3, Grip, PanelLeftClose, PanelLeftOpen, Plus, Search, SlidersHorizontal, Sparkles, Users } from "lucide-react";
+import { ArrowDown, ChevronUp, MessageCircle, Grid2x2, Grid3x3, Grip, PanelLeftClose, PanelLeftOpen, Search, SlidersHorizontal, Sparkles, Users } from "lucide-react";
 import { GalleryPhotoCard } from "@/components/customer/GalleryPhotoCard";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
@@ -18,15 +18,12 @@ import { getPhotoDisplayName } from "@/lib/gallery-filter";
 import { formatSceneRange, sceneTargets } from "@/lib/customer-scenes";
 import type { PeopleKind, Photo } from "@/types";
 import { activeParticipants, useCustomerSelectStore } from "../../_lib/real-store";
-import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
-import { ProjectStepHeader } from "../../_lib/ProjectStepHeader";
-import { NicknamePrompt } from "../../_lib/NicknamePrompt";
+import { useProjectShell } from "../../_lib/ProjectShell";
 import { ParticipantAccessEndedScreen, ParticipantJoinScreen } from "../../_lib/ParticipantJoinScreen";
 import { EphemeralChat } from "../../_lib/EphemeralChat";
-import ui from "../../_lib/ui.module.css";
 import { SceneGrid, type MobileColumns } from "./SceneGrid";
 import { PhotoDetail } from "./PhotoDetail";
-import { InviteSheet, Sheet } from "./Sheets";
+import { Sheet } from "./Sheets";
 import { taskProgressText, useSceneAnalysis, type NamedScene } from "./useSceneAnalysis";
 import { AiTidySheet, groupSimilarKey, rememberGroupSimilar, setAsideKey, type AiTidyKind } from "./AiTidySheet";
 import s from "./select.module.css";
@@ -114,13 +111,21 @@ function SelectScreen() {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [mobileColumns, setMobileColumns] = useState<MobileColumns>(2);
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
+  // 공통 헤더(레이아웃): 고르기 단계 강조, 화면 높이 잠금, 초대 인트로·접근 종료 화면에서는 감춘다. 참여자가 보는 사진은 헤더 아바타로 연다.
+  useProjectShell({
+    step: "select",
+    viewportLocked: true,
+    // 채워지기 전에는 숨기지 않는다 — 소유자도 isOwner가 아직 false라 헤더가 사라졌다 다시 생긴다.
+    hidden: hydrated && (accessDenied || (!isOwner && (!participantReady || (searchParams.get("invite") === "1" && !inviteSeen)))),
+    onOpenParticipantPhoto: setOpenPhotoId,
+  });
   const [sceneNotice, setSceneNotice] = useState<string | null>(null);
   useEffect(() => {
     if (!sceneNotice) return;
     const timer = window.setTimeout(() => setSceneNotice(null), 1800);
     return () => window.clearTimeout(timer);
   }, [sceneNotice]);
-  const [sheet, setSheet] = useState<"invite" | "scenes" | "ai" | null>(null);
+  const [sheet, setSheet] = useState<"scenes" | "ai" | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [aiPending, setAiPending] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -160,7 +165,6 @@ function SelectScreen() {
   // 역할별 "고른 사진": 소유자는 최종 선택, 참여자는 내 찜.
   const picked = isOwner ? selectedIds : myLikes;
   const people = useMemo(() => activeParticipants(project), [project]);
-  const online = useMemo(() => new Set<string>(project.onlineParticipants ?? []), [project.onlineParticipants]);
   const targets = useMemo(() => scenes ? sceneTargets(scenes.map((scene) => scene.photoIds.length), project.target) : [], [project.target, scenes]);
   const pickedInScene = useCallback((target: NamedScene) => target.photoIds.filter((id) => picked.has(id)).length, [picked]);
 
@@ -400,32 +404,6 @@ function SelectScreen() {
     </button>
   ));
 
-  // 참여자: 색 아바타(이름 첫 글자)만 겹쳐 놓는다. 온라인은 초록 점, 다 골랐으면 ✓, 이름·상태는 마우스를 올리면 보인다.
-  // 보는 사진이 있는 참여자는 눌러서 같은 사진을 연다. 혼자일 때는 아바타 없이 초대 버튼만.
-  const peopleBar = (
-    <div className={s.people}>
-      {/* 아바타 묶음은 group — 버튼에 listitem 역할을 덮으면 버튼으로 읽히지 않는다. 누를 수 없는 아바타는 img로 이름·상태를 읽힌다. */}
-      {people.length > 1 && (
-        <span className={ui.avatars} role="group" aria-label="함께 고르는 사람">
-          {people.map((person) => {
-            const isOnline = online.has(person.id);
-            if (person.id === me) return <NicknamePrompt key={person.id} hex={person.hex} isDone={myDone} online={isOnline} />;
-            const done = project.participantDone[person.id];
-            const viewingId = project.participantViews?.[person.id];
-            const viewing = viewingId && isOnline ? photoById.get(viewingId) : undefined;
-            const label = [person.name, done ? "다 골랐어요" : null, viewing ? "보는 사진 열기" : isOnline ? "온라인" : null].filter(Boolean).join(" · ");
-            const className = `${ui.avatar} ${isOnline ? ui.avatarOnline : ""} ${viewing ? ui.avatarViewing : ""}`;
-            const content = <>{person.name.slice(0, 1)}{done ? <span className={ui.avatarDone} aria-hidden>✓</span> : null}</>;
-            return viewing
-              ? <button key={person.id} type="button" className={className} style={{ background: person.hex }} title={label} aria-label={label} onClick={() => setOpenPhotoId(viewing.id)}>{content}</button>
-              : <span key={person.id} role="img" className={className} style={{ background: person.hex }} title={label} aria-label={label}>{content}</span>;
-          })}
-        </span>
-      )}
-      {isOwner && <button type="button" className={s.inviteButton} aria-label="초대" onClick={() => setSheet("invite")}><Plus size={14} /><span className={s.inviteLabel}>초대</span></button>}
-    </div>
-  );
-
   const card = (photo: Photo, columns: number) => {
     const groupId = photo.similarityGroupId ?? undefined;
     const members = groupId ? groupsInView.get(groupId) ?? [] : [];
@@ -527,12 +505,7 @@ function SelectScreen() {
   </>;
 
   return (
-    <CustomerSelectShell
-      viewportLocked
-      compactHeader
-      compactTitle={<ProjectStepHeader projectId={projectId} name={project.name} step="select" isOwner={isOwner} />}
-      headerActions={peopleBar}
-    >
+    <>
       <div className={s.page} data-chat={withChat ? "" : undefined} data-chrome-hidden={chromeHidden && !menu ? "" : undefined}>
 
         {syncStatus === "offline" && <div role="status" className="border-b border-danger/20 bg-danger/8 px-5 py-2 text-center text-xs font-semibold text-danger">연결이 불안정해요. 다시 연결하고 있어요.</div>}
@@ -668,7 +641,6 @@ function SelectScreen() {
 
       {sheet === "scenes" && scenes && <Sheet title="장면" onClose={() => setSheet(null)}><div className={s.sheetList}>{sceneItems}</div>{failedNotice}</Sheet>}
       {sheet === "ai" && <AiTidySheet projectId={projectId} photoCount={photos.length} rerun={tidied} pending={aiPending} error={aiError} onStart={(kinds) => void startTidy(kinds)} onClose={() => setSheet(null)} />}
-      {sheet === "invite" && <InviteSheet projectId={projectId} shareToken={project.shareToken} shareEnabled={project.shareEnabled} people={people} online={online} done={project.participantDone} onClose={() => setSheet(null)} />}
 
       {withChat && <EphemeralChat
         channelKey={project.realtimeKey}
@@ -711,6 +683,6 @@ function SelectScreen() {
           onSaveComment={store.setComment}
         />
       )}
-    </CustomerSelectShell>
+    </>
   );
 }

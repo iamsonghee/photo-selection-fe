@@ -44,8 +44,8 @@ export function EditCustomerProjectForm({ project }: { project: EditableProject 
   const searchParams = useSearchParams();
   const from = searchParams.get("from");
   const deleteFromMenu = searchParams.get("delete") === "1";
-  const backHref = from === "home" ? `/customer-select/${project.id}`
-    : from && ["upload", "select", "review"].includes(from) ? `/customer-select/${project.id}/${from}` : "/customer-select";
+  // 온 화면으로 돌아간다. 별도 상세 화면은 없으므로 그 외에는 목록으로.
+  const backHref = from && ["upload", "select", "review"].includes(from) ? `/customer-select/${project.id}/${from}` : "/customer-select";
   const [name, setName] = useState(project.name);
   const [shootType, setShootType] = useState<string | null>(project.shoot_type);
   const [target, setTarget] = useState(String(project.target_count));

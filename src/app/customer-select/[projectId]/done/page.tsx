@@ -8,7 +8,6 @@ import { PhotographerLightButton } from "@/components/photographer/PhotographerL
 import { SystemLoadingScreen } from "@/components/SystemLoadingScreen";
 import { useRetouchData, markRetouchDone, latestVersion } from "../../_lib/retouch-store";
 import { RetouchErrorScreen } from "../../_lib/RetouchErrorScreen";
-import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 import ui from "../../_lib/ui.module.css";
 
 export default function CustomerDonePage() {
@@ -39,7 +38,7 @@ export default function CustomerDonePage() {
   if (loadError) return <RetouchErrorScreen message={loadError} />;
 
   return (
-    <CustomerSelectShell navigation={false}>
+    <>
       <main className={ui.shellMain}>
         <div className={ui.page}>
           <div className={ui.header}>
@@ -66,6 +65,6 @@ export default function CustomerDonePage() {
           <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton size="work-panel" disabled={retouchDone} pending={saving} pendingLabel="저장 중…" onClick={handleDone}>{retouchDone ? "완료로 표시됨 ✓" : "완료로 표시"}</PhotographerLightButton>} />
         </div>
       </main>
-    </CustomerSelectShell>
+    </>
   );
 }
