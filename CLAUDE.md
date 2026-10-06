@@ -2,7 +2,7 @@
 
 이 문서는 **Claude Code 전용** 지침이다. Claude/Codex 공통 프로젝트 규칙(Source of Truth 원칙, 문서 동기화 조건, 안전한 구현 절차 등)은 `docs/agent-guidelines.md`에 있다.
 
-**작업을 시작하기 전에 `docs/agent-guidelines.md`를 읽고, 그 안의 공통 프로젝트 규칙(Project Scope, Source of Truth, Documentation sync, Documentation impact check, Safe implementation, Documentation quality)을 반드시 따른다.** 아래는 그 공통 규칙 위에 Claude Code에서만 쓰는 QA 절차·서브에이전트 운용 규칙을 추가한 것이다 — 공통 규칙 내용을 여기서 다시 복사하지 않는다.
+**작업을 시작하기 전에 `docs/agent-guidelines.md`를 읽고, 그 안의 공통 프로젝트 규칙(Project Scope, Source of Truth, Documentation sync, Documentation impact check, Safe implementation, Documentation quality, UI text & typography)을 반드시 따른다.** 아래는 그 공통 규칙 위에 Claude Code에서만 쓰는 QA 절차·서브에이전트 운용 규칙을 추가한 것이다 — 공통 규칙 내용을 여기서 다시 복사하지 않는다.
 
 ---
 
