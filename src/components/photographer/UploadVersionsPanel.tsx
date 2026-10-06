@@ -16,6 +16,8 @@ import {
 import { PhotographerPortal } from "./PhotographerPortal";
 import styles from "./UploadVersionsPanel.module.css";
 import { useDialogAccessibility } from "@/hooks/useDialogAccessibility";
+import { useWakeLock } from "@/hooks/useWakeLock";
+import { UploadConnectionHint } from "@/components/UploadConnectionHint";
 import { PhotographerConfirmDialog } from "@/components/ui/PhotographerConfirmDialog";
 import { PhotoCardComment } from "@/components/photographer/PhotoCardComment";
 import { createClient } from "@/lib/supabase/client";
@@ -159,6 +161,7 @@ export default function UploadVersionsPanel({
   const [deletingExisting, setDeletingExisting] = useState(false);
   const [deleteExistingError, setDeleteExistingError] = useState<string | null>(null);
   const [betaMaxRevisionCount, setBetaMaxRevisionCount] = useState(DEFAULT_BETA_MAX_REVISION_COUNT);
+  useWakeLock(submitting);
 
   useEffect(() => {
     fetch("/api/limits")
@@ -1102,6 +1105,7 @@ export default function UploadVersionsPanel({
                     {totalBytes > 0 ? ` · 합계 ${formatStoredFileSizeBytes(totalBytes)}` : ""}
                   </p>
                 )}
+                <UploadConnectionHint className="mt-1" />
               </div>
             )}
 

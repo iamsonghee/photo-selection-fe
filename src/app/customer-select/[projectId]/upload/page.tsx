@@ -19,6 +19,9 @@ import { PhotoSortSelect } from "@/components/photographer/PhotoSortSelect";
 import { ProjectAssetMobileIconButton, ProjectAssetMobileSheet, ProjectAssetToolbarSummary } from "@/components/photographer/ProjectAssetWorkspaceToolbar";
 import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { compressImagesInParallel } from "@/lib/upload-client-compress";
+import { useWakeLock } from "@/hooks/useWakeLock";
+import { UploadConnectionHint } from "@/components/UploadConnectionHint";
+import { isRetryableStatus, retryUpload, RetryableUploadError } from "@/lib/upload-resume";
 import { readTakenAt } from "@/lib/exif-taken-at";
 import { UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
 import { createThumbLoadQueue } from "@/lib/thumb-load-queue";
@@ -29,12 +32,24 @@ import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAsset
 import type { Photo } from "@/types";
 import { CustomerSelectShell } from "../../_lib/CustomerSelectShell";
 
-// 사진(File)마다 한 번 정한 업로드 ID를 재시도에도 그대로 보낸다 — 서버가 응답을 못 돌려줬어도
-// 이미 저장된 사진은 같은 ID라 다시 저장되지 않는다.
+// 업로드 ID를 프로젝트·파일 이름·크기·앞부분 내용으로 정한다(수정 시각은 iOS가 고른 시점으로 줄 수 있어 뺀다) — 서버가 응답을 못 돌려줬거나, 모바일에서
+// 페이지가 새로 열려 같은 사진을 다시 고른 경우에도 이미 저장된 사진은 같은 ID라 다시 저장되지 않는다.
 const clientUploadIds = new WeakMap<File, string>();
-function clientUploadId(file: File) {
+async function clientUploadId(projectId: string, file: File) {
   let id = clientUploadIds.get(file);
-  if (!id) clientUploadIds.set(file, id = crypto.randomUUID());
+  if (id) return id;
+  if (crypto.subtle) {
+    // 앞부분 64KB도 넣는다 — 이름·크기가 우연히 같은 다른 사진이 같은 ID로 묶여 빠지지 않게.
+    const key = await new Blob([`${projectId}\n${file.name}\n${file.size}\n`, file.slice(0, 65536)]).arrayBuffer();
+    const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", key)).slice(0, 16);
+    bytes[6] = (bytes[6] & 0x0f) | 0x50; // UUID v5 형식(이름 기반)
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
+    id = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  } else {
+    id = crypto.randomUUID();
+  }
+  clientUploadIds.set(file, id);
   return id;
 }
 import { CUSTOMER_GALLERY_GRID } from "../../_lib/photo-grid";
@@ -104,6 +119,7 @@ export default function CustomerUploadPage() {
   const [aiSheetError, setAiSheetError] = useState<string | null>(null);
   // 방금 올린 장수. 업로드가 끝나면 모달 대신 하단 바에서 AI 정리와 다음 단계를 함께 제안한다.
   const [justUploaded, setJustUploaded] = useState(0);
+  const [skippedCount, setSkippedCount] = useState(0);
   // 전체 삭제로 연 확인 창인지 — 제목을 "사진을 모두 삭제할까요?"로 바꾼다.
   const [deleteAll, setDeleteAll] = useState(false);
   const [aiStarting, setAiStarting] = useState(false);
@@ -186,8 +202,30 @@ export default function CustomerUploadPage() {
     setCheckingCapacity(true);
     setNeedsReselection(false);
     try {
-      const [, usage] = await Promise.all([refresh(), getAccountUsage()]);
+      const [freshProject, usage] = await Promise.all([refresh(), getAccountUsage()]);
       setAccountUsage(usage);
+      // 이미 올라간 사진(같은 업로드 ID = 사진 ID)과 한 번에 두 번 고른 사진은 빼고 새 사진만 센다 —
+      // 업로드가 끊긴 뒤 같은 사진을 다시 골라도 한도에 잘못 걸리거나 다시 보내지 않게.
+      const existingIds = new Set((freshProject ?? project).photos.map((photo) => photo.id));
+      const ids = await Promise.all(selectedFiles.map((file) => clientUploadId(projectId, file)));
+      const seenIds = new Set<string>();
+      const newFiles = selectedFiles.filter((_, index) => {
+        if (existingIds.has(ids[index]) || seenIds.has(ids[index])) return false;
+        seenIds.add(ids[index]);
+        return true;
+      });
+      const skipped = selectedFiles.length - newFiles.length;
+      setSkippedCount((count) => (carriedUploaded > 0 || carriedFailed.length > 0 ? count : 0) + skipped);
+      selectedFiles = newFiles;
+      if (selectedFiles.length === 0) {
+        if (carriedUploaded > 0 && carriedFailed.length === 0) {
+          setJustUploaded(carriedUploaded);
+          setDoneOpen(true);
+        } else {
+          setError(`고른 사진 ${skipped.toLocaleString()}장은 이미 올라가 있어요.`);
+        }
+        return;
+      }
       const limitError = usage.limit === null ? null : uploadLimitError(usage.photoCount, selectedFiles.length);
       if (limitError) {
         setError(limitError);
@@ -281,12 +319,17 @@ export default function CustomerUploadPage() {
       batch.forEach((f) => formData.append("files", f));
       formData.append("taken_at", JSON.stringify(takenAt.map((item) => item.takenAt)));
       formData.append("taken_at_source", JSON.stringify(takenAt.map((item) => item.source)));
-      formData.append("client_upload_ids", JSON.stringify(rawBatch.map(clientUploadId)));
+      formData.append("client_upload_ids", JSON.stringify(await Promise.all(rawBatch.map((file) => clientUploadId(projectId, file)))));
       formData.append("original_filenames", JSON.stringify(rawBatch.map((file) => file.name))); // 압축하면 `이름.jpg`로 바뀐다
       setUploadPhase("uploading");
       const slowTimer = window.setTimeout(() => setSlowBatch(true), SLOW_BATCH_NOTICE_MS);
       try {
-        const res = await fetch(`${CUSTOMER_UPLOAD_API}/photos`, { method: "POST", headers: authHeader, body: formData, signal: controller.signal })
+        // 같은 업로드 ID라 다시 보내도 중복 저장되지 않는다. 앱 전환·화면 잠금·오프라인으로 끊기면 돌아와서 이어 보낸다.
+        const res = await retryUpload(async () => {
+          const response = await fetch(`${CUSTOMER_UPLOAD_API}/photos`, { method: "POST", headers: authHeader, body: formData, signal: controller.signal });
+          if (isRetryableStatus(response.status)) throw new RetryableUploadError("서버가 잠시 응답하지 않아요. 남은 사진을 다시 시도해 주세요.");
+          return response;
+        }, { signal: controller.signal })
           .finally(() => { window.clearTimeout(slowTimer); setSlowBatch(false); });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -312,6 +355,7 @@ export default function CustomerUploadPage() {
         setPendingPhotos((current) => current.map((photo) => failedIds.has(photo.id) ? { ...photo, uploadState: "failed" } : photo));
         setError(cancelRequestedRef.current
           ? `업로드를 중단했습니다. 남은 ${remainingFiles.length.toLocaleString()}장을 다시 시도할 수 있어요.`
+          : e instanceof TypeError ? "인터넷 연결이 끊겨 업로드가 멈췄어요. 남은 사진을 다시 시도해 주세요."
           : e instanceof Error ? e.message : "업로드 중 오류가 발생했습니다.");
         setUploading(false);
         setUploadPhase(null);
@@ -484,6 +528,8 @@ export default function CustomerUploadPage() {
     return () => window.removeEventListener("keydown", handleShortcut);
   }, [doneOpen, deleting, project.photos, selectedPhotoIds, uploading, viewerPhotoId]);
 
+  useWakeLock(uploading);
+
   useEffect(() => {
     if (!uploading) return;
     const warnBeforeLeave = (event: BeforeUnloadEvent) => event.preventDefault();
@@ -530,6 +576,7 @@ export default function CustomerUploadPage() {
       <div className="mt-1 h-1 overflow-hidden rounded-full bg-border" role="progressbar" aria-label="업로드 진행률" aria-valuemin={0} aria-valuemax={100} aria-valuenow={uploadPercent}>
         <div className="h-full rounded-full bg-accent transition-[width] duration-300" style={{ width: `${uploadPercent}%` }} />
       </div>
+      <UploadConnectionHint className="mt-1" />
       {slowBatch ? <p className="mt-1.5 text-xs font-semibold text-foreground">서버에서 사진을 정리하고 있어요. 인터넷이 느리면 조금 더 걸릴 수 있어요.</p> : null}
     </div>
   ) : null;
@@ -701,6 +748,7 @@ export default function CustomerUploadPage() {
       {doneOpen && justUploaded > 0 ? <UploadDoneSheet
         projectId={projectId}
         uploaded={justUploaded}
+        skipped={skippedCount}
         shootType={project.shootType}
         untimedCount={untimedCount}
         scenesBlocked={scenesBlocked}

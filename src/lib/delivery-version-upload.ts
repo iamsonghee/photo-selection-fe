@@ -1,3 +1,5 @@
+import { isRetryableStatus, retryUpload, RetryableUploadError } from "@/lib/upload-resume";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const MAX_FILE_BYTES = 100 * 1024 * 1024;
 const DIRECT_UPLOAD_CONCURRENCY = 3;
@@ -60,10 +62,18 @@ export async function uploadDeliveryVersions(params: {
       const item = payload.items![cursor++];
       const file = fileByPhoto.get(item.photo_id);
       if (!file) throw new Error("업로드 파일 매핑이 변경되었습니다.");
-      const put = await fetch(item.url, {
-        method: "PUT",
-        headers: { "Content-Type": item.content_type },
-        body: file,
+      // 같은 키로 다시 PUT해도 덮어쓸 뿐이라 안전하다. 앱 전환·화면 잠금·오프라인으로 끊기면 돌아와서 이어 보낸다.
+      const put = await retryUpload(async () => {
+        const response = await fetch(item.url, {
+          method: "PUT",
+          headers: { "Content-Type": item.content_type },
+          body: file,
+        });
+        if (isRetryableStatus(response.status)) throw new RetryableUploadError(`${file.name}: 원본 크기 보정본 업로드에 실패했습니다.`);
+        return response;
+      }).catch((error) => {
+        if (error instanceof TypeError) throw new Error(`${file.name}: 인터넷 연결이 끊겨 보정본 업로드가 멈췄습니다. 다시 시도해 주세요.`);
+        throw error;
       });
       if (!put.ok) throw new Error(`${file.name}: 원본 크기 보정본 업로드에 실패했습니다.`);
       uploadedBytes += file.size;

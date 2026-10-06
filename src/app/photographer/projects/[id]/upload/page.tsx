@@ -62,6 +62,9 @@ import { matchesFilenameQuery } from "@/lib/gallery-filter";
 import { selectPhotoRange } from "@/lib/drag-selection";
 import { useQuota } from "@/contexts/QuotaContext";
 import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAssetHeader";
+import { useWakeLock } from "@/hooks/useWakeLock";
+import { UploadConnectionHint } from "@/components/UploadConnectionHint";
+import { MAX_INTERRUPTION_RETRIES, uploadInterruptions, waitIfInterrupted } from "@/lib/upload-resume";
 import {
   clearPhotographerMobileProjectContext,
   publishPhotographerMobileProjectContext,
@@ -212,7 +215,9 @@ async function xhrPostWithRetry(
 ): Promise<XhrResult> {
   const crossOrigin = /^https?:\/\//i.test(url);
   let lastErr: unknown;
+  let resumes = 0;
   for (let attempt = 1; attempt <= UPLOAD_MAX_ATTEMPTS; attempt++) {
+    const since = uploadInterruptions();
     try {
       const result = await new Promise<XhrResult>((resolve, reject) => {
         transferOpts?.onAttempt?.();
@@ -250,6 +255,9 @@ async function xhrPostWithRetry(
       }
       return result;
     } catch (e) {
+      // 앱 전환·화면 잠금·오프라인으로 끊긴 요청은 횟수를 쓰지 않고 돌아오면 같은 주소로 다시 보낸다
+      // (프록시 전환은 진짜 CORS·네트워크 실패에만).
+      if (resumes < MAX_INTERRUPTION_RETRIES && await waitIfInterrupted(since)) { resumes++; attempt--; continue; }
       if (e instanceof TypeError && crossOrigin) throw e;
       lastErr = e;
       if (attempt < UPLOAD_MAX_ATTEMPTS) { transferOpts?.onRetry?.(); await new Promise<void>((r) => setTimeout(r, 800 * attempt)); continue; }
@@ -298,13 +306,16 @@ type OriginalPresignedItem = {
 
 type OriginalRetryBudget = {
   retriesUsed: number;
+  /** 화면 이탈·오프라인으로 끊겨 횟수 없이 다시 보낸 횟수와, 마지막 확인 시점의 끊김 카운터 */
+  resumes: number;
+  interruptionsSeen: number;
   readonly maxRetries: number;
   onRetry?: () => void;
   onConfirmAttempt?: () => void;
 };
 
 function createOriginalRetryBudget(): OriginalRetryBudget {
-  return { retriesUsed: 0, maxRetries: ORIGINAL_TRANSFER_MAX_RETRIES };
+  return { retriesUsed: 0, maxRetries: ORIGINAL_TRANSFER_MAX_RETRIES, resumes: 0, interruptionsSeen: uploadInterruptions() };
 }
 
 /**
@@ -312,6 +323,13 @@ function createOriginalRetryBudget(): OriginalRetryBudget {
  * 정상 첫 요청은 지연하지 않고, 실패 뒤 재호출할 때만 예산을 소비한다.
  */
 async function waitForOriginalRetry(budget: OriginalRetryBudget): Promise<boolean> {
+  if (budget.resumes < MAX_INTERRUPTION_RETRIES && await waitIfInterrupted(budget.interruptionsSeen)) {
+    budget.resumes++;
+    budget.interruptionsSeen = uploadInterruptions();
+    budget.onRetry?.();
+    return true;
+  }
+  budget.interruptionsSeen = uploadInterruptions();
   if (budget.retriesUsed >= budget.maxRetries) return false;
   const exponentialDelay = Math.min(
     ORIGINAL_RETRY_BASE_DELAY_MS * (2 ** budget.retriesUsed),
@@ -802,6 +820,17 @@ export default function ProjectDetailPage() {
   const [compressingIndex, setCompressingIndex] = useState(-1);
 
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  /** 업로드 확인 모달: 이미 올린 사진(같은 이름·같은 원본 크기)을 건너뛸지 */
+  const [skipDuplicates, setSkipDuplicates] = useState(true);
+  // 이름만 같으면 다른 카메라의 IMG_0001일 수 있어 원본 크기까지 같아야 같은 사진으로 본다(BE는 이름을 NFC로 저장).
+  const uploadedPhotoKeys = useMemo(() => new Set(
+    photos.filter((photo) => photo.originalFilename && photo.sourceFileSize != null)
+      .map((photo) => `${photo.originalFilename!.normalize("NFC")}\n${photo.sourceFileSize}`),
+  ), [photos]);
+  const isAlreadyUploaded = useCallback(
+    (file: File) => uploadedPhotoKeys.has(`${file.name.normalize("NFC")}\n${file.size}`),
+    [uploadedPhotoKeys],
+  );
   const [dragOver, setDragOver] = useState(false);
   const [uploadPhase, setUploadPhase] = useState<"idle" | "sending" | "processing" | "originals" | "done">("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -1701,23 +1730,7 @@ export default function ProjectDetailPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [navigationGuardActive]);
 
-  // iOS에서 업로드 중 앱 전환/화면 잠금 감지 → 복귀 시 경고
-  useEffect(() => {
-    if (!isUploading || !isMobileUploadClient()) return;
-    let hiddenAt: number | null = null;
-    const handler = () => {
-      if (document.visibilityState === "hidden") {
-        hiddenAt = Date.now();
-      } else if (document.visibilityState === "visible" && hiddenAt !== null) {
-        if (Date.now() - hiddenAt > 3000) {
-          setUploadError("업로드 중 화면이 전환되어 일부 사진이 누락됐을 수 있습니다. 업로드 현황을 확인 후 필요 시 재업로드해 주세요.");
-        }
-        hiddenAt = null;
-      }
-    };
-    document.addEventListener("visibilitychange", handler);
-    return () => document.removeEventListener("visibilitychange", handler);
-  }, [isUploading]);
+  useWakeLock(isUploading || sendingSourcePhase);
 
   // 원본 R2 PUT 중 페이지 이탈 시 beforeunload 경고 (PUT 완료 전에 닫으면 job이 awaiting_upload에 멈춤)
   useEffect(() => {
@@ -2764,13 +2777,17 @@ export default function ProjectDetailPage() {
     if (rawCount > 0) setUploadError(`RAW 파일은 지원하지 않습니다 (${rawCount}개 제외). JPEG/PNG/WebP/HEIC로 내보내기 후 업로드해 주세요.`);
     if (!list.length) return;
     const remaining = maxPhotosPerProject === null ? null : Math.max(0, maxPhotosPerProject - photos.length);
-    if (remaining !== null && list.length > remaining) {
-      setUploadError(`최대 ${maxPhotosPerProject}장까지 업로드 가능합니다. ${list.length - remaining}장이 제외됩니다.`);
-      list = list.slice(0, remaining);
+    // 한도는 새 사진으로만 센다 — 이미 올린 사진은 확인 모달에서 기본으로 건너뛴다.
+    const newFiles = list.filter((f) => !isAlreadyUploaded(f));
+    if (remaining !== null && newFiles.length > remaining) {
+      setUploadError(`최대 ${maxPhotosPerProject}장까지 업로드 가능합니다. ${newFiles.length - remaining}장이 제외됩니다.`);
+      const keptNew = new Set(newFiles.slice(0, remaining));
+      list = list.filter((f) => keptNew.has(f) || isAlreadyUploaded(f));
       if (!list.length) return;
     } else if (isMobileUploadClient() && list.length >= 100) {
       setUploadError("모바일에서 100장 이상 업로드 시 시간이 오래 걸릴 수 있습니다. PC 사용을 권장합니다.");
     }
+    setSkipDuplicates(true);
     setPendingFiles(list);
   };
 
@@ -2785,16 +2802,20 @@ export default function ProjectDetailPage() {
     if (rawCount > 0) setUploadError(`RAW 파일은 지원하지 않습니다 (${rawCount}개 제외). JPEG/PNG/WebP/HEIC로 내보내기 후 업로드해 주세요.`);
     if (!list.length) return;
     const remaining = maxPhotosPerProject === null ? null : Math.max(0, maxPhotosPerProject - photos.length);
-    if (remaining !== null && list.length > remaining) {
-      setUploadError(`최대 ${maxPhotosPerProject}장까지 업로드 가능합니다. ${list.length - remaining}장이 제외됩니다.`);
-      list = list.slice(0, remaining);
+    // 한도는 새 사진으로만 센다 — 이미 올린 사진은 확인 모달에서 기본으로 건너뛴다.
+    const newFiles = list.filter((f) => !isAlreadyUploaded(f));
+    if (remaining !== null && newFiles.length > remaining) {
+      setUploadError(`최대 ${maxPhotosPerProject}장까지 업로드 가능합니다. ${newFiles.length - remaining}장이 제외됩니다.`);
+      const keptNew = new Set(newFiles.slice(0, remaining));
+      list = list.filter((f) => keptNew.has(f) || isAlreadyUploaded(f));
       if (!list.length) return;
     } else if (isMobileUploadClient() && list.length >= 100) {
       setUploadError("모바일에서 100장 이상 업로드 시 시간이 오래 걸릴 수 있습니다. PC 사용을 권장합니다.");
     }
+    setSkipDuplicates(true);
     setPendingFiles(list);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maxPhotosPerProject, project, photos.length]);
+  }, [maxPhotosPerProject, project, photos.length, isAlreadyUploaded]);
 
   const onDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragOver(true); }, []);
   const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false); }, []);
@@ -3479,6 +3500,7 @@ export default function ProjectDetailPage() {
                 <strong style={{ fontSize: 13, lineHeight: "18px", color: TEXT_BRIGHT }}>{uploadStatusLabel}</strong>
                 {uploadSavedLabel ? <span style={{ fontSize: 11, lineHeight: "16px", color: TEXT_MUTED }}>{uploadSavedLabel}</span> : null}
                 {uploadEtaLabel && !uploadStopRequested ? <span style={{ fontSize: 11, lineHeight: "16px", color: TEXT_MUTED }}>{uploadEtaLabel}</span> : null}
+                <UploadConnectionHint />
               </div>
               <button
                 type="button"
@@ -4661,16 +4683,22 @@ export default function ProjectDetailPage() {
 
       {/* ── 업로드 확인 모달 — 공용 PhotographerModal 재사용 ── */}
       {pendingFiles.length > 0 && (() => {
-        const heicCount = pendingFiles.filter(isHeicFile).length;
+        const duplicateFiles = pendingFiles.filter(isAlreadyUploaded);
+        const newFileCount = pendingFiles.length - duplicateFiles.length;
+        const uploadRemaining = maxPhotosPerProject === null ? null : Math.max(0, maxPhotosPerProject - photos.length);
+        const canUploadAll = uploadRemaining === null || pendingFiles.length <= uploadRemaining;
+        const skipping = duplicateFiles.length > 0 && (skipDuplicates || !canUploadAll);
+        const filesToUpload = skipping ? pendingFiles.filter((file) => !isAlreadyUploaded(file)) : pendingFiles;
+        const heicCount = filesToUpload.filter(isHeicFile).length;
         const isMob = isMobileUploadClient();
         const inclOrig = project.includeOriginal;
-        const selectedBytes = pendingFiles.reduce((sum, file) => sum + file.size, 0);
+        const selectedBytes = filesToUpload.reduce((sum, file) => sum + file.size, 0);
         const closeModal = () => setPendingFiles([]);
         return (
           <PhotographerModal
             open
             onClose={closeModal}
-            title={`원본 ${pendingFiles.length.toLocaleString()}장을 업로드할까요?`}
+            title={filesToUpload.length === 0 ? "새로 올릴 사진이 없어요" : `원본 ${filesToUpload.length.toLocaleString()}장을 업로드할까요?`}
             description={!isMob
               ? `총 ${formatUploadBytes(selectedBytes)} · 전송을 시작하면 남은 시간을 안내합니다.`
               : "선택한 원본의 업로드 설정을 확인해 주세요."}
@@ -4684,11 +4712,10 @@ export default function ProjectDetailPage() {
                   type="button"
                   variant="primary"
                   onClick={() => {
-                    const f = pendingFiles;
                     setPendingFiles([]);
-                    startUpload(f);
+                    startUpload(filesToUpload);
                   }}
-                  disabled={uploadPhase !== "idle"}
+                  disabled={uploadPhase !== "idle" || filesToUpload.length === 0}
                   className="flex-1"
                 >
                   <Upload size={12} />
@@ -4705,6 +4732,33 @@ export default function ProjectDetailPage() {
                   {inclOrig ? "납품용 원본 포함" : "썸네일만 업로드"}
                 </span>
               </div>
+
+              {duplicateFiles.length > 0 ? (
+                <div className="flex flex-col gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning" />
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-semibold leading-[18px] text-foreground">
+                        이미 올린 사진 {duplicateFiles.length.toLocaleString()}장이 있어요
+                      </p>
+                      <p className="truncate text-[11px] leading-4 text-muted-foreground">
+                        {duplicateFiles.slice(0, 2).map((file) => file.name).join(", ")}
+                        {duplicateFiles.length > 2 ? ` 외 ${(duplicateFiles.length - 2).toLocaleString()}장` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <div role="radiogroup" aria-label="이미 올린 사진 처리" className="flex flex-col gap-1 pl-[22px]">
+                    <label className="flex min-h-9 cursor-pointer items-center gap-2 text-[12px] text-foreground">
+                      <input type="radio" name="duplicate-upload" checked={skipping} onChange={() => setSkipDuplicates(true)} className="accent-[var(--accent)]" />
+                      건너뛰기 (새 사진 {newFileCount.toLocaleString()}장만 업로드)
+                    </label>
+                    <label className={`flex min-h-9 items-center gap-2 text-[12px] ${canUploadAll ? "cursor-pointer text-foreground" : "cursor-not-allowed text-muted-foreground"}`}>
+                      <input type="radio" name="duplicate-upload" checked={!skipping} disabled={!canUploadAll} onChange={() => setSkipDuplicates(false)} className="accent-[var(--accent)]" />
+                      {canUploadAll ? "모두 올리기 (같은 사진이 하나 더 생겨요)" : "모두 올리기 (업로드 한도를 넘어 선택할 수 없어요)"}
+                    </label>
+                  </div>
+                </div>
+              ) : null}
 
               {/* Warning만 semantic color를 사용한다. */}
               {heicCount > 0 && inclOrig ? (

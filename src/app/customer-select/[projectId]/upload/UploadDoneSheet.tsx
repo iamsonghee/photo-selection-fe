@@ -10,9 +10,11 @@ import { Sheet } from "../select/Sheets";
  * 업로드를 마치면 띄우는 안내. 업로드 화면을 고르는 화면으로 착각하지 않도록 다음 단계를 분명히 보여준다.
  * 주 동작은 AI 정리(장면이 고르기의 뼈대) — 옵션 시트 없이 기본값으로 바로 시작한다(옵션은 고르기 화면 보기 옵션에 있다).
  */
-export function UploadDoneSheet({ projectId, uploaded, shootType, untimedCount, scenesBlocked, aiAnalyzing, starting, error, onTidy, onSelect, onMore, onClose }: {
+export function UploadDoneSheet({ projectId, uploaded, skipped = 0, shootType, untimedCount, scenesBlocked, aiAnalyzing, starting, error, onTidy, onSelect, onMore, onClose }: {
   projectId: string;
   uploaded: number;
+  /** 이미 올라가 있어 건너뛴 장수 */
+  skipped?: number;
   shootType: string;
   untimedCount: number;
   /** 촬영 시각 없는 사진이 많아 장면으로 나눌 수 없음 */
@@ -29,6 +31,7 @@ export function UploadDoneSheet({ projectId, uploaded, shootType, untimedCount, 
   return (
     <Sheet title="업로드 완료" onClose={onClose}>
       <p className="flex items-center gap-2 !text-[15px] !font-bold !text-foreground"><CheckCircle2 size={18} className="shrink-0 text-primary" aria-hidden />{uploaded.toLocaleString()}장 올렸어요</p>
+      {skipped > 0 ? <p>이미 올라가 있던 {skipped.toLocaleString()}장은 건너뛰었어요.</p> : null}
       <p>
         {aiAnalyzing
           ? "AI가 사진을 정리하고 있어요. 기다리지 않고 바로 골라도 돼요."
