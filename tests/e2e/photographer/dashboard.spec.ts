@@ -17,10 +17,11 @@ test.describe("작가 — 대시보드", () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("D1-1: 로그인 기본 목적지가 남아 있어도 로딩 화면에 머물지 않음", async ({ page }) => {
-    await page.evaluate(() => {
-      sessionStorage.setItem("acut_post_login_redirect", "/photographer/dashboard");
-    });
+  test("D1-1: 로그인 복귀 쿠키가 남아 있어도 대시보드는 그대로 보임(복귀는 /auth/callback이 처리)", async ({ page }) => {
+    // 2026-10-06부터 복귀 경로는 쿠키에 담겨 콜백이 소비한다. 대시보드는 더 이상 읽지도, 이동시키지도 않는다.
+    await page.context().addCookies([
+      { name: "acut_post_login_redirect", value: encodeURIComponent("/beta/apply"), url: new URL(page.url()).origin },
+    ]);
 
     await page.goto("/photographer/dashboard");
 
@@ -29,20 +30,8 @@ test.describe("작가 — 대시보드", () => {
         .or(page.getByText("첫 프로젝트를"))
         .or(page.getByText("만들어보세요"))
     ).toBeVisible({ timeout: 10_000 });
+    await expect(page).toHaveURL(/\/photographer\/dashboard/);
     await expect(page.getByText("불러오는 중")).toHaveCount(0);
-    await expect.poll(() => page.evaluate(() => sessionStorage.getItem("acut_post_login_redirect"))).toBeNull();
-  });
-
-  test("D1-2: 다른 로그인 복귀 목적지는 기존처럼 이동함", async ({ page }) => {
-    await page.evaluate(() => {
-      sessionStorage.setItem("acut_post_login_redirect", "/beta/apply");
-    });
-
-    await page.goto("/photographer/dashboard");
-
-    await expect(page).toHaveURL(/\/beta\/apply$/, { timeout: 10_000 });
-    await expect(page.getByRole("heading", { name: "클로즈드 베타 신청" })).toBeVisible();
-    await expect.poll(() => page.evaluate(() => sessionStorage.getItem("acut_post_login_redirect"))).toBeNull();
   });
 
   test("D2: '진행중' 카드 클릭 → 필터 활성화", async ({ page }) => {
