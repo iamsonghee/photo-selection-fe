@@ -9,6 +9,9 @@ const FIELDS = [
   "beta_max_photos_per_project",
   "beta_max_revision_count",
   "beta_default_duration_days",
+  "guest_photo_max_mb",
+  "guest_video_max_mb",
+  "guest_retention_days",
 ] as const;
 
 /** PATCH /api/admin/settings — 관리자 전용, 이용 한도 값을 즉시 반영되도록 갱신 */

@@ -3,9 +3,10 @@
 import { Copy, Link2, Share2 } from "lucide-react";
 import { useState } from "react";
 
-export function CustomerShareLinkField({ projectId, token, allowShare = false }: { projectId: string; token: string; allowShare?: boolean }) {
+/** `path`를 주면 고르기 초대 링크 대신 그 주소를 공유한다(하객 업로드 링크). */
+export function CustomerShareLinkField({ projectId, token, allowShare = false, path, shareTitle = "함께 사진 골라요" }: { projectId?: string; token?: string; allowShare?: boolean; path?: string; shareTitle?: string }) {
   const [message, setMessage] = useState<string | null>(null);
-  const relativeUrl = `/customer-select/${projectId}/select?share_token=${token}`;
+  const relativeUrl = path ?? `/customer-select/${projectId}/select?share_token=${token}`;
   const url = () => `${window.location.origin}${relativeUrl}`;
 
   async function copyLink() {
@@ -20,7 +21,7 @@ export function CustomerShareLinkField({ projectId, token, allowShare = false }:
   async function shareLink() {
     if (!navigator.share) return copyLink();
     try {
-      await navigator.share({ title: "함께 사진 골라요", url: url() });
+      await navigator.share({ title: shareTitle, url: url() });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       await copyLink();

@@ -79,7 +79,7 @@ export function NewCustomerProjectForm() {
           <ProjectFormPageHeading
             title="어떤 사진을 골라볼까요?"
             description="촬영 정보와 셀렉 목표 장수를 입력하고 사진을 올려보세요."
-            onBack={() => router.push("/customer-select")}
+            onBack={() => router.push("/customer-select/new")}
           />
           <div className="flex flex-col gap-5">
             <ProjectFormSection number="01" title="기본 정보" description="프로젝트명과 셀렉 목표 장수를 입력해 주세요.">

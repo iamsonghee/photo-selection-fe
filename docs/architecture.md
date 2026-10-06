@@ -63,6 +63,10 @@ HttpOnly 쿠키로 교환한 다음 토큰 없는 URL로 이동한다. 결과 �
 선택과 의견만 service role로 조회한다. 다시 선택 중에는 내용을 숨기며 재전달하면 같은 링크에 최신
 결과가 나타난다. 과거 전달본 스냅샷과 별도 DB 토큰 컬럼은 만들지 않는다.
 
+## 하객 사진 모으기 (2026-10-06, 1단계)
+
+셀프 고객의 두 번째 프로젝트 유형. 테이블 `guest_albums`(소유자·결혼식 날짜·업로드 토큰·`closed_at`)·`guest_submissions`(하객 이름·메시지·브라우저 해시)·`guest_media`(사진/영상, pending→ready), `app_settings`의 `guest_*` 한도 3개(마이그레이션 `20261006000000_add_guest_albums.sql`). 하객은 로그인 없이 `/g/[token]`에서 올리고, 파일은 브라우저가 R2에 직접 PUT한다 — Next API 라우트가 앨범·한도·하객 쿠키를 판단하고 FastAPI `/api/guest-upload/*`는 R2 서명·HEAD·삭제만 한다(내부 비밀값). 상세·남은 일은 `customer-select.md`의 "하객 사진 모으기".
+
 ## 작가 추천 편집 (2026-09-18)
 
 원본 업로드 화면은 기존 선택 후 즉시 추천·삭제 동작을 유지하면서 작가 추천 편집을 추가한다. 평상시에는 갤러리 우측 하단에 `작가 추천 N장` 플로팅 버튼으로 표시하며 주변 레이아웃 공간을 점유하지 않는다. `작가 추천 편집`으로 저장된 추천 구성을 임시 Set에 복사하고, 같은 갤러리에서 클릭으로 담기·해제한다. 공통 갤러리는 선택 표시 종류와 빈 영역 클릭 콜백을 prop으로 받는다. 편집 영역이 펼쳐진 동안만 임시 추천 Set을 갤러리 선택 상태로 사용하고 A 추천 표시를 노출한다. 최소화하면 임시 Set은 보존하되 일반 `selectedPhotoIds`로 전환하고 선택 작업에서는 더보기 없이 직접 삭제 버튼만 제공한다. PC 편집 영역은 제목·저장 상태·조작의 상단 행과 56px 추천 썸네일의 하단 행으로 나누며 최대 10개를 표시한다. `작가 추천만 보기 / 전체 보기`로 갤러리 범위를 전환하고 모바일은 `추천만 / 전체`로 축약한다. PC는 펼친 상태, 모바일은 접힌 상태로 편집을 시작한다. 추천 변경은 450ms 동안 묶어 자동 저장하며 `저장 중 / 자동 저장됨 / 저장 실패` 상태를 표시한다. 업로드 중에는 추천 편집을 시작할 수 없다.
@@ -602,7 +606,12 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | `api/admin/users/[id]/beta` | PATCH | `getAdminUser()` | 관리자용 베타 상태/기간/메모 변경. 변경 diff에 따라 `admin_audit_logs`에 `beta_granted`/`beta_ended`/`beta_suspended`/`beta_period_changed` 기록(메모만 변경 시 로그 없음) |
 | `api/admin/beta-invitations` | POST | `getAdminUser()` | 가입 전 이메일 사전 등록(이미 가입된 이메일이면 400) |
 | `api/admin/beta-invitations/[id]` | DELETE | `getAdminUser()` | 대기 중인 사전 초대 취소 |
-| `api/admin/settings` | PATCH | `getAdminUser()` | 이용 한도 6개 값(일반/베타 프로젝트·사진·재보정 한도, 베타 기본 기간) 갱신 — 모두 1 이상 정수 검증, `updated_at`/`updated_by` 기록. 재배포 없이 즉시 반영(§6.3) |
+| `api/customer-select/guest-albums` | POST | 셀프 고객 세션 | 하객 앨범 생성(이름·결혼식 날짜 필수, 업로드 토큰 발급) |
+| `api/customer-select/guest-albums/[id]/close` | POST | 셀프 고객 세션+소유자 | 셀렉 시작 = 하객 업로드 마감(`closed_at`, 멱등) |
+| `api/guest/[token]/submissions` | POST | 없음(업로드 토큰, 식별 쿠키 발급) | 하객 보내기 묶음(이름·메시지) 생성 |
+| `api/guest/[token]/media/presign` | POST | 업로드 토큰+식별 쿠키 | 파일 하나의 R2 PUT 주소(원본·썸네일·미리보기), 용량 한도 확인, `guest_media` pending |
+| `api/guest/[token]/media/complete` | POST | 업로드 토큰+식별 쿠키 | R2 원본 크기 확인 후 ready. 마감됐으면 파일 삭제 후 409 |
+| `api/admin/settings` | PATCH | `getAdminUser()` | 이용 한도 9개 값(일반/베타 프로젝트·사진·재보정 한도, 베타 기본 기간, 하객 사진·영상 용량·보관 기간) 갱신 — 모두 1 이상 정수 검증, `updated_at`/`updated_by` 기록. 재배포 없이 즉시 반영(§6.3) |
 | `api/photographer/beta-survey/status` | GET | 세션 | 지금 노출해야 할 설문 타입 조회(`{surveyType}`, 없으면 `null`) — §6.1b |
 | `api/photographer/beta-survey` | POST | 세션 | 설문 제출(`action:"submit"`) 또는 "나중에" 기록(`action:"later"`, 24h 재노출 억제). 이미 제출된 설문은 재기록 없이 `alreadySubmitted:true` 반환(멱등) |
 | `api/photographer/beta-survey/skip` | POST | 세션 | 설문 "다시 묻지 않기"(영구 건너뛰기) 기록 |
@@ -625,6 +634,9 @@ DB는 Supabase Postgres이며, **전체 스키마를 한 번에 덤프한 마이
 | POST | `/api/upload/originals/recover` | Supabase JWT | `job_id` 전달 시 R2 HEAD 확인: 파일 존재하면 confirm 처리, 없으면 새 presigned PUT URL 발급. |
 | POST | `/api/upload/originals/abandon` | Supabase JWT | 원본 업로드 포기 — job을 `failed` 처리. |
 | POST | `/api/upload/originals/report-failure` | Supabase JWT | 브라우저의 즉시+지연 PUT/confirm 재시도가 모두 실패한 단계만 `original_jobs.last_error`에 기록. 복구 가능성을 유지하기 위해 상태는 바꾸지 않음. |
+| POST | `/api/guest-upload/presign-put` | 정적 시크릿(`INTERNAL_PRESIGN_SECRET`) | 하객 앨범 키(`guest-albums/…/(original\|thumb\|preview)`)만, Content-Type·크기를 서명에 포함한 PUT URL(최대 30개) |
+| POST | `/api/guest-upload/head` | 정적 시크릿 | 하객 앨범 키의 R2 크기(없으면 null) |
+| POST | `/api/guest-upload/delete` | 정적 시크릿 | 하객 앨범 키 삭제 |
 | POST | `/api/storage/delete` | **없음** | R2 키 목록 삭제 — §12 위험 항목 |
 | POST | `/api/storage/presign` | 정적 시크릿(`INTERNAL_PRESIGN_SECRET`) | R2 키 목록 presigned GET URL 발급. `dispositions`(2026-07-31 추가, optional)로 key별 `Content-Disposition`(다운로드 파일명) 지정 가능 — 납품용 원본 아카이브 ZIP 다운로드에 사용, 기존 호출부는 생략 시 그대로 동작. |
 

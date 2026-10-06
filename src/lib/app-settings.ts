@@ -19,6 +19,10 @@ export interface AppSettings {
   betaMaxPhotosPerProject: number;
   betaMaxRevisionCount: number;
   betaDefaultDurationDays: number;
+  /** 하객 사진 모으기 — 임시값(2026-10-06), guest-album-server의 getGuestUploadLimits와 같은 컬럼 */
+  guestPhotoMaxMb: number;
+  guestVideoMaxMb: number;
+  guestRetentionDays: number;
   updatedAt: string | null;
   updatedBy: string | null;
 }
@@ -30,6 +34,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   betaMaxPhotosPerProject: DEFAULT_BETA_MAX_PHOTOS_PER_PROJECT,
   betaMaxRevisionCount: DEFAULT_BETA_MAX_REVISION_COUNT,
   betaDefaultDurationDays: DEFAULT_BETA_DEFAULT_DURATION_DAYS,
+  guestPhotoMaxMb: 20,
+  guestVideoMaxMb: 500,
+  guestRetentionDays: 90,
   updatedAt: null,
   updatedBy: null,
 };
@@ -47,6 +54,8 @@ export async function getAppSettings(): Promise<AppSettings> {
       .maybeSingle();
 
     if (error || !data) return DEFAULT_APP_SETTINGS;
+    // 하객 한도는 따로 읽는다 — 컬럼이 없어도(마이그레이션 전) 기존 한도는 그대로 쓰게.
+    const guest = await admin.from("app_settings").select("guest_photo_max_mb, guest_video_max_mb, guest_retention_days").eq("id", 1).maybeSingle();
 
     return {
       generalMaxProjects: data.general_max_projects,
@@ -55,6 +64,9 @@ export async function getAppSettings(): Promise<AppSettings> {
       betaMaxPhotosPerProject: data.beta_max_photos_per_project,
       betaMaxRevisionCount: data.beta_max_revision_count,
       betaDefaultDurationDays: data.beta_default_duration_days,
+      guestPhotoMaxMb: guest.data?.guest_photo_max_mb ?? DEFAULT_APP_SETTINGS.guestPhotoMaxMb,
+      guestVideoMaxMb: guest.data?.guest_video_max_mb ?? DEFAULT_APP_SETTINGS.guestVideoMaxMb,
+      guestRetentionDays: guest.data?.guest_retention_days ?? DEFAULT_APP_SETTINGS.guestRetentionDays,
       updatedAt: data.updated_at,
       updatedBy: data.updated_by,
     };
