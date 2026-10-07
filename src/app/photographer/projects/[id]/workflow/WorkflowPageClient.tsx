@@ -2556,7 +2556,7 @@ export default function WorkflowPageClient({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-amber-200 font-semibold">고객 V1 검토 결과를 불러오지 못했습니다.</p>
                   <p className="text-xs text-amber-200/70 mt-0.5">
-                    페이지를 새로고침 해 주세요. 새로고침 후에도 동일하면 관리자에게 알려주세요.
+                    페이지를 새로고침 해 주세요. 새로고침 후에도 동일하면 관리자에게 알려 주세요.
                   </p>
             </div>
               </div>

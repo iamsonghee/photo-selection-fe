@@ -4677,7 +4677,7 @@ export default function ProjectDetailPage() {
         inviteUrl={inviteUrl}
         accessPin={project.accessPin}
         title="고객 초대 링크가 활성화되었습니다"
-        description="카카오톡, 이메일 등으로 아래 링크를 보내주세요. 고객이 사진 셀렉을 시작할 수 있습니다."
+        description="카카오톡, 이메일 등으로 아래 링크를 보내 주세요. 고객이 사진 셀렉을 시작할 수 있습니다."
         onSavePin={handleSavePin}
       />
 
@@ -4761,7 +4761,7 @@ export default function ProjectDetailPage() {
           </span>
           <div>
             <p className="text-[14px] font-semibold text-foreground">셀렉 결과 확인이 필요합니다</p>
-            <p className="mt-1 break-keep text-[13px] leading-5 text-muted-foreground">선택 사진과 고객 요청을 확인한 뒤 ‘보정 시작하기’를 눌러주세요.</p>
+            <p className="mt-1 break-keep text-[13px] leading-5 text-muted-foreground">선택 사진과 고객 요청을 확인한 뒤 ‘보정 시작하기’를 눌러 주세요.</p>
           </div>
         </div>
       </PhotographerModal>

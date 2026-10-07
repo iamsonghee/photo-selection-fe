@@ -598,7 +598,7 @@ export default function UploadVersionsPanel({
   const deliverDisabledReason = overBetaLimit
     ? `베타 기간 최대 보정 횟수(${betaMaxRevisionCount}회)에 도달했습니다.`
     : geminiMatching
-      ? "자동 매칭이 끝날 때까지 잠시 기다려주세요."
+      ? "자동 매칭이 끝날 때까지 잠시 기다려 주세요."
       : targets.length === 0
         ? "업로드할 대상 사진이 없습니다."
         : mapping.length !== targets.length
@@ -732,44 +732,36 @@ export default function UploadVersionsPanel({
           maxWidth: "100%",
           background: "var(--surface)",
           border: `1px solid ${BORDER}`,
-          borderRadius: "20px",
+          borderRadius: "16px",
           color: TEXT_NORMAL,
           display: "flex",
           flexDirection: "column",
 
-          boxShadow: "0 20px 60px rgba(2,56,82,0.18)",
+          boxShadow: "0 12px 32px rgba(2,56,82,0.18)",
           overflow: "hidden",
           pointerEvents: "auto",
-          fontFamily: "var(--font-pretendard, 'Pretendard Variable', 'Pretendard', sans-serif)",
         }}
       >
         <>
         {/* Header */}
-        <header data-upload-panel-header className="flex min-h-14 shrink-0 items-center justify-between px-4 py-1.5 md:min-h-0 md:px-8 md:pb-0 md:pt-7">
-          <div className="flex min-w-0 items-center gap-3">
-            <span data-upload-title-icon className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-raised text-foreground max-md:hidden" aria-hidden="true">
-              <Upload size={20} strokeWidth={1.8} />
-            </span>
-            <div className="min-w-0">
-              <h2 id={dialogTitleId} className="m-0 text-[24px] font-semibold leading-8 tracking-[-0.72px] text-foreground">
-                <span className="md:hidden">{version === 1 ? "보정본 업로드" : "재보정본 업로드"}</span>
-                <span className="hidden md:inline">{hasExistingRetouches ? "보정본 추가 업로드" : `${versionLabel} 업로드`}</span>
-              </h2>
-            </div>
-          </div>
+        {/* 공용 팝업(PhotographerModal)과 같은 머리 — 왼쪽 20px 제목·닫기 버튼 */}
+        <header data-upload-panel-header className="flex shrink-0 items-start justify-between gap-4 px-5 pb-1 pt-5 md:px-6 md:pt-6">
+          <h2 id={dialogTitleId} className="m-0 min-w-0 break-keep text-[20px] font-bold leading-7 tracking-[-0.5px] text-foreground">
+            {hasExistingRetouches ? "보정본 추가 업로드" : `${versionLabel} 업로드`}
+          </h2>
           <button
             type="button"
             onClick={onClose}
             disabled={submitting || deletingExisting}
             aria-label="닫기"
-            className="inline-flex h-11 w-11 md:h-10 md:w-10 items-center justify-center rounded-lg text-subtle-foreground transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            className="-mr-2 -mt-2 grid h-11 w-11 shrink-0 place-items-center rounded-lg text-subtle-foreground transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
           >
             <X size={18} />
           </button>
         </header>
 
         {/* Body */}
-        <div className="uvp-scroll flex-1 min-h-0 overflow-y-auto px-4 md:px-8 pb-4 md:pb-6 pt-4 md:pt-6">
+        <div className="uvp-scroll flex-1 min-h-0 overflow-y-auto px-5 py-4 md:px-6 md:py-5">
           {/* targets summary */}
           <div className="mb-4 hidden items-center justify-between gap-3 text-sm md:flex md:flex-wrap">
             <div className="text-muted-foreground">
@@ -1068,7 +1060,7 @@ export default function UploadVersionsPanel({
 
         {/* Footer / action bar */}
         {!overBetaLimit && targets.length > 0 ? (
-          <footer className="uvp-footer shrink-0 border-t border-border-subtle bg-surface px-8 py-5 flex flex-col gap-3">
+          <footer className="uvp-footer shrink-0 border-t border-border-subtle bg-surface px-5 py-4 md:px-6 flex flex-col gap-3">
             {/* 긴 매칭 목록을 보고 있어도 업로드 오류를 놓치지 않도록 고정 영역에 둔다. */}
             {error && (
               <div className="rounded-lg bg-rose-500/[0.07] px-3.5 py-2.5 text-[12px] text-danger" role="alert">

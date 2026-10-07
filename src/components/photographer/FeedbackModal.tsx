@@ -93,7 +93,7 @@ export function FeedbackButton({
         onClose={close}
         closeDisabled={submitting}
         title="A-CUT에 의견 보내기"
-        description="사용 중 불편했던 점이나 필요한 기능을 알려주세요."
+        description="사용 중 불편했던 점이나 필요한 기능을 알려 주세요."
         maxWidth={420}
         footer={done ? (
           <FeedbackAction primary fullWidth type="button" onClick={close}>닫기</FeedbackAction>
@@ -149,7 +149,7 @@ export function FeedbackButton({
                 aria-describedby={error ? errorId : undefined}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder={category === "bug" ? "어떤 문제가 있었는지 알려주세요." : "어떤 기능이 필요하신가요?"}
+                placeholder={category === "bug" ? "어떤 문제가 있었는지 알려 주세요." : "어떤 기능이 필요하신가요?"}
                 rows={5}
                 className="w-full resize-none rounded-xl border border-border-subtle bg-surface p-3.5 text-[14px] leading-6 text-foreground outline-none placeholder:text-placeholder-foreground focus:border-accent/50 focus:ring-2 focus:ring-accent/10"
               />

@@ -154,12 +154,7 @@ export function CustomerSelectionRequestModal({
       closeDisabled={pending || pinSaving}
       variant="workflow"
       maxWidth={650}
-      title={(
-        <>
-          <span className="sm:hidden">셀렉 시작</span>
-          <span className="hidden sm:inline">고객 셀렉 시작하기</span>
-        </>
-      )}
+      title="고객 셀렉 시작하기"
       description={<span className="hidden sm:inline">마감일을 정한 뒤 고객에게 접속 정보를 전달하세요</span>}
       footer={(
         <div className="flex min-w-0 gap-2">
@@ -195,7 +190,7 @@ export function CustomerSelectionRequestModal({
             <div className="min-w-0 flex-1">
               <p className="truncate text-[14px] font-semibold leading-5 text-foreground">{customerName}</p>
               <p className="mt-0.5 truncate text-[12px] leading-[18px] tracking-[-0.24px] text-muted-foreground">
-                원본 {photoCount.toLocaleString()}장 · 셀렉 {requiredCount.toLocaleString()}장 · 원본 다운로드 {includeOriginal ? "포함" : "미포함"}
+                원본 {photoCount.toLocaleString()}장 · 셀렉 {requiredCount.toLocaleString()}장 · 원본 파일 {includeOriginal ? "전달" : "전달 안 함"}
               </p>
             </div>
           </div>
@@ -221,9 +216,9 @@ export function CustomerSelectionRequestModal({
                 <p className="text-[14px] font-semibold leading-5 tracking-[-0.28px] text-foreground">{requiredCount.toLocaleString()}장</p>
               </div>
               <div className="border-l border-border-subtle pl-4 text-left sm:text-center">
-                <p className="text-[12px] font-medium leading-[18px] tracking-[-0.24px] text-muted-foreground">원본 다운로드</p>
+                <p className="text-[12px] font-medium leading-[18px] tracking-[-0.24px] text-muted-foreground">원본 파일</p>
                 <p className="text-[14px] font-semibold leading-5 tracking-[-0.28px] text-foreground">
-                  {includeOriginal ? "허용" : "미포함"}
+                  {includeOriginal ? "전달" : "전달 안 함"}
                 </p>
               </div>
             </div>
@@ -281,7 +276,7 @@ export function CustomerSelectionRequestModal({
             <span id="selection-deadline-label" className="text-[14px] font-bold leading-5 tracking-[-0.28px] text-foreground">
               셀렉 마감일
             </span>
-            <span className="shrink-0 whitespace-nowrap text-right text-[11px] font-medium leading-[18px] tracking-[-0.24px] text-muted-foreground sm:text-[12px]">
+            <span className="shrink-0 whitespace-nowrap text-right text-xs font-medium leading-[18px] tracking-[-0.24px] text-muted-foreground">
               {deadlineLabel}
             </span>
           </div>
@@ -328,7 +323,7 @@ export function CustomerSelectionRequestModal({
                   disabled={pending}
                   className={`hidden min-h-8 items-center rounded-md px-3 py-1.5 text-[13px] leading-[18px] tracking-[-0.24px] transition-colors disabled:opacity-40 sm:inline-flex ${
                     active
-                      ? "bg-accent/10 font-semibold text-accent"
+                      ? "bg-surface font-semibold text-foreground ring-1 ring-inset ring-border-strong"
                       : "bg-surface-raised font-normal text-muted-foreground hover:bg-border-subtle hover:text-foreground"
                   }`}
                 >
@@ -384,16 +379,16 @@ export function CustomerSelectionRequestModal({
                       <RefreshCw size={12} />
                     </button>
                   </div>
-                  {pinSaveError ? <p role="alert" className="text-[11px] text-danger">{pinSaveError}</p> : null}
+                  {pinSaveError ? <p role="alert" className="text-xs text-danger">{pinSaveError}</p> : null}
                   <div className="flex items-center gap-1.5">
-                    <button type="button" onClick={cancelEditPin} disabled={pinSaving} className="h-7 flex-1 rounded-md text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-surface-raised disabled:opacity-50">
+                    <button type="button" onClick={cancelEditPin} disabled={pinSaving} className="h-8 flex-1 rounded-md text-xs font-semibold text-muted-foreground transition-colors hover:bg-surface-raised disabled:opacity-50">
                       취소
                     </button>
                     <button
                       type="button"
                       onClick={() => void saveEditPin()}
                       disabled={pinSaving || (!!pinDraft && pinDraft.length !== 4)}
-                      className="h-7 flex-1 rounded-md bg-accent text-[11px] font-semibold text-[var(--accent-foreground)] transition-colors hover:bg-accent/90 disabled:opacity-40"
+                      className="h-8 flex-1 rounded-md bg-accent text-xs font-semibold text-[var(--accent-foreground)] transition-colors hover:bg-accent/90 disabled:opacity-40"
                     >
                       {pinSaving ? "저장 중…" : "저장"}
                     </button>

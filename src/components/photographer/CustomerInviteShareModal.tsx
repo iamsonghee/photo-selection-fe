@@ -147,7 +147,7 @@ export function CustomerInviteShareModal({
 
   const desc =
     description ??
-    `카카오톡, 이메일 등으로 아래 링크${accessPin ? "와 비밀번호" : ""}를 직접 보내주세요.`;
+    `카카오톡, 이메일 등으로 아래 링크${accessPin ? "와 비밀번호" : ""}를 직접 보내 주세요.`;
 
   return (
     <PhotographerModal

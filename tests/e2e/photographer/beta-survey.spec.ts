@@ -345,7 +345,7 @@ test.describe("작가 — 베타 설문(원본 업로드 후 마이크로 설문
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(TITLE)).toBeVisible({ timeout: 10_000 });
     await expect(dialog.getByText("원본 사진 업로드 과정이 수월하셨나요?")).toBeVisible();
-    await expect(dialog.getByText("혹시 불편했던 점이 있다면 알려주세요")).toBeVisible();
+    await expect(dialog.getByText("혹시 불편했던 점이 있다면 알려 주세요")).toBeVisible();
 
     await pickScale(dialog, "uploadEaseScale", 4); // 수월했다
     await dialog.getByPlaceholder("선택 입력").fill("배치 업로드가 조금 느렸어요");
@@ -399,7 +399,7 @@ test.describe("작가 — 베타 설문(셀렉 회신받았을 때 마이크로 
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(TITLE)).toBeVisible({ timeout: 10_000 });
     await expect(dialog.getByText("고객의 셀렉 결과를 확인하는 과정이 편리했나요?")).toBeVisible();
-    await expect(dialog.getByText("고객에게 들은 의견이나 불편사항이 있다면 알려주세요")).toBeVisible();
+    await expect(dialog.getByText("고객에게 들은 의견이나 불편사항이 있다면 알려 주세요")).toBeVisible();
 
     await pickScale(dialog, "", 5); // 아주 수월했다(문항 하나짜리 설문)
     await dialog.getByPlaceholder("선택 입력").fill("고객이 만족스러워했어요");

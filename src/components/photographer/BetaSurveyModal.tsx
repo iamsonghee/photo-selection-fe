@@ -335,7 +335,7 @@ export function BetaSurveyModal({
                 />
               </div>
               <div>
-                <QuestionHeader title="혹시 불편했던 점이 있다면 알려주세요" />
+                <QuestionHeader title="혹시 불편했던 점이 있다면 알려 주세요" />
                 <Textarea
                   value={uploadInconvenience}
                   onChange={(e) => setUploadInconvenience(e.target.value)}
@@ -359,7 +359,7 @@ export function BetaSurveyModal({
                 />
               </div>
               <div>
-                <QuestionHeader title="고객에게 들은 의견이나 불편사항이 있다면 알려주세요" />
+                <QuestionHeader title="고객에게 들은 의견이나 불편사항이 있다면 알려 주세요" />
                 <Textarea
                   value={customerFeedback}
                   onChange={(e) => setCustomerFeedback(e.target.value)}

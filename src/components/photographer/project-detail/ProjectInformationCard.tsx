@@ -66,7 +66,7 @@ export function ProjectInformationCard({
             <button
               type="button"
               role="menuitem"
-              onClick={onDelete}
+              onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); onDelete(); }}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-semibold text-danger"
             >
               <Trash2 size={13} /> 삭제하기
@@ -90,7 +90,7 @@ export function ProjectInformationCard({
             <button
               type="button"
               role="menuitem"
-              onClick={onEdit}
+              onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); onEdit(); }}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-semibold text-foreground transition-colors hover:bg-surface-raised"
             >
               <PenLine size={13} /> 수정하기
@@ -98,7 +98,7 @@ export function ProjectInformationCard({
             <button
               type="button"
               role="menuitem"
-              onClick={onDelete}
+              onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); onDelete(); }}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-semibold text-danger transition-colors hover:bg-danger/8"
             >
               <Trash2 size={13} /> 삭제하기
