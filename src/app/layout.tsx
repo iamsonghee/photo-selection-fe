@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { BRAND_MARK_SVG } from "@/lib/brand-assets";
+import { BRAND_APPLE_TOUCH_ICON_PNG, BRAND_MARK_SVG } from "@/lib/brand-assets";
+import { SITE_URL } from "@/lib/site-metadata";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.acut.kr"),
+  metadataBase: new URL(SITE_URL),
   title: "A-CUT — 사진작가를 위한 셀렉 워크플로우",
   description: "사진작가와 고객이 함께하는 사진 셀렉·보정 워크플로우",
   icons: {
     icon: [{ url: BRAND_MARK_SVG, type: "image/svg+xml" }],
-    apple: [{ url: BRAND_MARK_SVG, type: "image/svg+xml" }],
+    apple: [{ url: BRAND_APPLE_TOUCH_ICON_PNG, sizes: "180x180", type: "image/png" }],
   },
 };
 

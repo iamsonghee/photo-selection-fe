@@ -96,7 +96,18 @@ PC 업로드 갤러리의 드래그 선택은 `preparing` 프로젝트의 일반
 
 히어로(`HeroVideo`)와 03 검토 영상(`ReviewVideo`)은 정적 MP4와 poster를 공통 `LandingVideo`에서 재생한다. 무음 자동재생·화면 진입 재시도·실패 시 수동 재생·진단 기능을 공유한다. 녹화 전용 `/landing/demo-capture`는 개발 환경에서만 제공하며 실제 고객 카드·선택 확인·작가 코멘트·사진 탭을 로컬 샘플 상태로 렌더링한다. 재생성 스크립트는 API 및 서비스 경로를 차단한다. 자세한 타임라인과 검증은 `landing-hero-video.md` 참조.
 
-`/`와 `/landing`은 `sample-project.ts`의 로컬 사진·가상 상태·`SAMPLE_PLAN_LIMITS`만 사용한다. 랜딩의 `getAppSettings()` 및 Supabase 인증 조회·구독을 제거했다. “무료 시작하기” CTA는 클릭 시에만 Supabase 세션을 확인하여 기존 세션이 있으면 작가 대시보드로 이동하고, 없으면 기존 AuthModal을 연다. “고객 셀렉 체험하기” 보조 링크만 로컬 데모로 스크롤한다. 다른 서비스 페이지 링크는 prefetch를 비활성화했다. 서비스 페이지로 명시적으로 이동한 이후의 인증·운영 설정 흐름은 기존대로다. 랜딩 체험 자체는 FE 메모리에서만 동작하며 BE·DB·스토리지를 호출하지 않는다.
+`/`(`src/app/landing/page.tsx` 재사용. `/landing` 주소는 2026-10-07부터 `/`로 308 리다이렉트)는 `sample-project.ts`의 로컬 사진·가상 상태·`SAMPLE_PLAN_LIMITS`만 사용한다. 랜딩의 `getAppSettings()` 및 Supabase 인증 조회·구독을 제거했다. “무료 시작하기” CTA는 클릭 시에만 Supabase 세션을 확인하여 기존 세션이 있으면 작가 대시보드로 이동하고, 없으면 기존 AuthModal을 연다. “고객 셀렉 체험하기” 보조 링크만 로컬 데모로 스크롤한다. 다른 서비스 페이지 링크는 prefetch를 비활성화했다. 서비스 페이지로 명시적으로 이동한 이후의 인증·운영 설정 흐름은 기존대로다. 랜딩 체험 자체는 FE 메모리에서만 동작하며 BE·DB·스토리지를 호출하지 않는다.
+
+## 검색 노출·색인 정책 (2026-10-07)
+
+- 대표 주소는 `https://www.acut.kr`(`SITE_URL`, `src/lib/site-metadata.ts`)이다. apex `acut.kr`은 Vercel이 www로 308 리다이렉트하고, `acut.vercel.app`은 `src/middleware.ts`가 www로 바로 308 리다이렉트한다.
+- 색인 대상은 `src/app/sitemap.ts`의 `/`, `/beta/apply`, `/terms`, `/privacy`다. 네 페이지 모두 `alternates.canonical`을 갖고, `/`와 `/beta/apply`는 공유 미리보기 이미지 `OG_MAIN_IMAGE`(`/og/main.jpg?v=2`)를 쓴다. 정확한 수정일을 알 수 없어 `lastModified`는 넣지 않는다.
+- 고객·작가·관리자 화면과 API(`/c`, `/g`, `/photographer`, `/customer-select`, `/admin`, `/auth`, `/api` 하위, `/beta/apply/complete`)는 `next.config.ts`의 `NOINDEX_SOURCES`로 `X-Robots-Tag: noindex, nofollow` 헤더를 받는다. `src/app/robots.ts`는 크롤러가 이 헤더를 읽을 수 있도록 해당 경로를 막지 않고 `/api/`, `/auth/`만 `Disallow`하며 sitemap 주소를 알린다.
+- `/landing`은 `/`와 같은 화면을 그리던 중복 주소라 `next.config.ts` `redirects()`에서 `/`로 308 리다이렉트한다. 개발 전용 `/landing/demo-capture`·`/landing/support-capture`는 영향이 없다.
+- `/`는 JSON-LD(Organization·WebSite·FAQPage)를 렌더링한다. FAQ 문장은 `src/app/landing/faq.ts`의 `LANDING_FAQ`를 화면(`LandingStory`)과 함께 쓴다. 실제 후기·평점이 없으므로 리뷰·평점 스키마는 넣지 않는다(`PRODUCT.md` Evidence on Hand).
+- 아이콘: 파비콘은 SVG 마크(`BRAND_MARK_SVG`), apple-touch-icon은 180px PNG(`BRAND_APPLE_TOUCH_ICON_PNG`), 구조화 데이터 로고는 512px PNG(`BRAND_LOGO_PNG`)다(`src/lib/brand-assets.ts`, `public/brand/`).
+- IndexNow: `public/6b450f64221525ea4daabc787f24e635.txt` 키 파일로 사이트 소유를 증명한다. `npm run seo:indexnow`(`scripts/indexnow-submit.mjs`)는 운영 sitemap의 URL을 출력만 하고, `-- --submit`을 붙이면 네이버(`searchadvisor.naver.com/indexnow`)와 공용 엔드포인트(`api.indexnow.org`)에 보낸다. Google은 IndexNow를 지원하지 않는다.
+- 현재 Google Search Console·네이버 서치어드바이저 등록과 분석 도구는 없다.
 
 > 이 문서는 2026-07-13 기준 `photo-selection-fe`(Next.js)와 `photo-selection-be`(FastAPI, `clip-service` 포함) 실제 코드를 근거로 작성되었습니다.
 > 추측이 필요한 부분은 모두 **`확인 필요`**로 표시했습니다. 값이 확인되었더라도 실제 운영 환경(Railway/Vercel/Supabase 대시보드) 설정까지 코드로 검증할 수 없는 항목은 별도로 표시합니다.

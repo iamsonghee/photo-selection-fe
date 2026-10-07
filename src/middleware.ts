@@ -206,10 +206,12 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
 
   // 레거시 Vercel 기본 도메인 접속을 정식 도메인으로 영구 리다이렉트한다.
+  // apex(acut.kr)는 다시 www로 넘어가므로 대표 주소(www)로 한 번에 보낸다.
   if (req.headers.get("host") === "acut.vercel.app") {
     const url = req.nextUrl.clone();
     url.protocol = "https";
-    url.host = "acut.kr";
+    url.host = "www.acut.kr";
+    url.port = "";
     return NextResponse.redirect(url, 308);
   }
 

@@ -4,6 +4,7 @@ import { LegalDocument } from "@/components/legal/LegalDocument";
 export const metadata: Metadata = {
   title: "이용약관 | A-CUT",
   description: "A-CUT 서비스 이용약관",
+  alternates: { canonical: "/terms" },
 };
 
 export default function TermsPage() {
