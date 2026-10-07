@@ -184,20 +184,22 @@ export function toPhoto(row: CustomerPhotoRow, projectId: string, quality?: Cust
   };
 }
 
-/** AI 장면(clip-service가 촬영 시각 공백으로 나누고 이름을 붙여 저장). photoIds는 촬영 시각순. */
+/** AI 장면(clip-service가 촬영 시각 공백 — 시각이 없으면 사진 내용 변화 — 로 나누고 이름을 붙여 저장). photoIds는 촬영 시각순(없으면 업로드 순). */
 export type AiScene = { name: string | null; start: string | null; end: string | null; photoIds: string[] };
 type CustomerSceneRow = { id: string; scene_index: number; name: string | null; start_at: string | null; end_at: string | null };
 
 export function toAiScenes(scenes: CustomerSceneRow[], assignments: { id: string; scene_id: string | null }[], photos: CustomerPhotoRow[]): AiScene[] | null {
   if (!scenes.length) return null;
   const photoById = new Map(photos.map((photo) => [photo.id, photo]));
+  // 파일 수정 시각은 촬영 시각이 아니라 뺀다(장면 나누기 sceneTime과 같은 기준) — 시각 없는 보정본은 업로드(파일명) 순서로.
+  const time = (id: string) => { const photo = photoById.get(id)!; return (photo.taken_at_source === "file" ? null : photo.taken_at) ?? "\uffff"; };
   const order = (id: string) => photoById.get(id);
   return scenes.slice().sort((a, b) => a.scene_index - b.scene_index).map((scene) => ({
     name: scene.name,
     start: scene.start_at,
     end: scene.end_at,
     photoIds: assignments.filter((row) => row.scene_id === scene.id && photoById.has(row.id)).map((row) => row.id)
-      .sort((a, b) => (order(a)!.taken_at ?? "￿").localeCompare(order(b)!.taken_at ?? "￿") || order(a)!.order_index - order(b)!.order_index),
+      .sort((a, b) => time(a).localeCompare(time(b)) || order(a)!.order_index - order(b)!.order_index),
   }));
 }
 

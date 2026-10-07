@@ -40,7 +40,7 @@ export function UploadDoneSheet({ projectId, uploaded, skipped = 0, shootType, u
       <p>
         촬영 유형 <strong className="font-semibold text-foreground">{customerShootTypeLabel(shootType || null)}</strong> · <Link href={`/customer-select/${projectId}/settings?from=upload`} className="font-semibold text-accent underline underline-offset-2">바꾸기</Link>
         {untimedCount > 0 ? <><br />{scenesBlocked
-          ? `촬영 시각이 없는 사진이 많아(${untimedCount.toLocaleString()}장) 장면 없이 전체 사진으로 보여드려요.`
+          ? `촬영 시각이 없는 사진이 많아(${untimedCount.toLocaleString()}장) AI 정리 때 사진 내용을 보고 장면을 나눠요.`
           : `${untimedCount.toLocaleString()}장은 촬영 시각이 없어 장면 정리 때 마지막에 따로 모여요.`}</> : null}
       </p>
       {error ? <p className="!font-semibold !text-danger" role="alert">{error}</p> : null}
