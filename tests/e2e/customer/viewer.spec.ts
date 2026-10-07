@@ -395,7 +395,9 @@ test("V10: 최종 보정본 상세에서 전체 수령 확인 및 실패 후 재
     await route.fulfill({ status: attempts === 1 ? 500 : 200, json: attempts === 1 ? { error: "잠시 후 다시 시도해 주세요" } : { status: "delivered" } });
   });
   const base = project.galleryUrl.replace(/\/gallery$/, "");
-  await page.route("**/delivered", route => route.fulfill({ contentType: "text/html", body: "수령 완료" }));
+  // 클라이언트 이동의 RSC 요청(`/delivered?_rsc=…`)까지 막아야 한다 — 놓치면 실제 서버가 (DB상 미수령이라) /c/[token]으로
+  // 되돌려 URL이 /delivered를 잠깐만 지나가는 경합이 생겨 테스트가 들쭉날쭉했다.
+  await page.route(/\/c\/[^/]+\/delivered(\?.*)?$/, route => route.fulfill({ contentType: "text/html", body: "수령 완료" }));
   await page.goto(`${base}/review/receipt-photo`);
   await expect(page.locator(".rvx-panel")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "수령 완료", exact: true })).toBeVisible();
