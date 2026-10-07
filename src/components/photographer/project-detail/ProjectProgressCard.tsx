@@ -14,7 +14,8 @@ type Props = {
 };
 
 const STEPS = ["원본", "셀렉", "보정", "1차 재보정", "2차 재보정", "납품"] as const;
-const MOBILE_STEPS = ["원본", "셀렉", "보정", "1차 재보정", "2차 재보정", "납품"] as const;
+// 모바일 6칸에는 긴 이름이 들어가지 않아 옆 칸과 붙는다 — design-system-light.md 모바일 Stepper 규칙대로 줄인다.
+const MOBILE_STEPS = ["원본", "셀렉", "보정", "1차", "2차", "납품"] as const;
 
 function activeDescription(project: Project, step: number): string {
   if (step === 1) {

@@ -494,9 +494,9 @@ Project List Row의 Primary/Secondary도 서로 같은 140×38px, 12/19px geomet
 
 - 우측 Work Panel은 다음 행동을 안내하는 보조 영역이며, 페이지 본문이나 Expanded Stepper보다 큰 상태 배너처럼 보이지 않아야 한다.
 - outer padding 24px, eyebrow 14/20px, title 24/32px, description 14/22px을 사용한다. Desktop panel 높이는 430px 이하를 기준으로 한다.
-- meta는 별도의 bordered card를 중첩하지 않고 `surface-raised` 위에 subtle divider만 사용한다. label 13/20px, value 14/20px이다.
-- Photographer Primary CTA만 Orange filled를 사용한다. Customer/Completed action은 Neutral Secondary를 유지하며 actor semantic은 icon·eyebrow·작은 badge에만 사용한다.
-- CTA는 48px 높이와 14/20px Bold를 사용한다. 카드 테두리는 항상 Neutral이며 semantic border로 CTA와 경쟁하지 않는다.
+- meta는 배경 상자 없이 흰 면 위 subtle divider 줄로만 나눈다(2026-10-07, 카드 안 회색 상자 제거). label 13/20px, value 14/20px이다.
+- Photographer Primary CTA만 Orange filled를 사용한다. Customer/Completed action은 Neutral Secondary를 유지한다. 행위자는 eyebrow 한 줄 `● 현재 진행 · 고객 차례`(8px 점 + 13px 글자)로만 말하고, 아이콘 타일·`고객 진행 중` badge·카드 윗줄 색은 쓰지 않는다(2026-10-07 — 같은 상태를 세 번 말했다).
+- CTA는 48px 높이와 14/20px Bold를 사용한다. 카드 테두리는 항상 Neutral이며 semantic border(윗줄 포함)로 CTA와 경쟁하지 않는다. 우측 정보 카드 제목은 PC·모바일 모두 `프로젝트 정보`다.
 
 ### 7.15.2 Project Detail Information Card
 

@@ -77,7 +77,7 @@ export function ProjectInformationCard({
 
       <div className="hidden flex-wrap items-center justify-between gap-3 border-b border-border-subtle px-5 py-4 md:flex md:px-6">
         <h2 className="text-[18px] font-bold leading-6 tracking-[-0.4px] text-foreground">
-          프로젝트 설정
+          프로젝트 정보
         </h2>
         <details className="group relative">
           <summary
@@ -110,8 +110,7 @@ export function ProjectInformationCard({
       <div>
       <div data-project-mobile-information-summary className="px-4 pb-4 pt-1 md:hidden">
         <dl
-          className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg px-4 py-3"
-          style={{ background: "color-mix(in srgb, var(--surface-raised) 52%, var(--surface))" }}
+          className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border-subtle pt-3"
         >
           <div>
             <dt className="text-[11px] font-medium text-muted-foreground">고객</dt>

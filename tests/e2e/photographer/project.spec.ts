@@ -402,7 +402,7 @@ test.describe("작가 — 프로젝트 관리", () => {
     await expect(workPanelTitle).toHaveCSS("line-height", "32px");
     const informationCard = page.locator("[data-project-information-card]");
     await expect(informationCard).toBeVisible();
-    await expect(informationCard.getByRole("heading", { name: "프로젝트 설정" })).toHaveCSS("font-size", "18px");
+    await expect(informationCard.getByRole("heading", { name: "프로젝트 정보" })).toHaveCSS("font-size", "18px");
     const gallerySummary = page.locator("[data-project-gallery-summary]");
     await expect(gallerySummary).toHaveCSS("background-color", "rgb(238, 243, 244)");
     await expect(gallerySummary.locator("dt")).toHaveCount(4);

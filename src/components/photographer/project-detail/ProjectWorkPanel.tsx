@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { PhotographerLightButton } from "../PhotographerLightButton";
-import { ChevronRight, Clock, Flag, ListChecks, PenLine, Upload } from "lucide-react";
+import { ChevronRight, Clock } from "lucide-react";
 import type { Project, ProjectStatus } from "@/types";
 import { dday, getProjectActor } from "@/lib/project-actor";
 import { getActiveDeadline } from "@/lib/project-deadline";
@@ -54,7 +54,6 @@ type WorkPanelContent = {
   title: string;
   description: string;
   cta: string;
-  icon: React.ReactNode;
   onClick: () => void;
   meta: Array<{ label: string; value: string; overdue?: string }>;
   /** Figma #56060 "완료 후 30일동안 파일을 보관해요" — complete 모드에서만 노출되는 보관 안내 캡션 */
@@ -126,7 +125,6 @@ export function ProjectWorkPanel({
           title: "원본 사진을 업로드하세요",
           description: "고객에게 링크를 보내기 전에 셀렉용 사진을 먼저 준비해야 합니다.",
           cta: "사진 업로드 시작",
-          icon: <Upload size={20} />,
           onClick: onUpload,
           meta: [
             { label: "업로드된 사진", value: "0장" },
@@ -145,7 +143,6 @@ export function ProjectWorkPanel({
               ? "업로드 화면에서 사진을 더 추가하거나 고객 링크를 활성화할 수 있습니다."
               : `고객 셀렉을 시작하려면 사진을 ${project.requiredCount - project.photoCount}장 이상 더 준비하세요.`,
           cta: "업로드 현황 보기",
-          icon: <Upload size={20} />,
           onClick: onUpload,
           meta: [
             { label: "업로드된 사진", value: `${project.photoCount}장` },
@@ -158,7 +155,6 @@ export function ProjectWorkPanel({
           title: "고객이 사진을 선택하고 있습니다",
           description: "고객이 셀렉을 확정하면 선택한 사진과 작가 전달 메모를 확인할 수 있습니다.",
           cta: "원본 사진 보기",
-          icon: <ListChecks size={20} />,
           onClick: onUpload,
           meta: [
             { label: "셀렉 목표 장수", value: `${project.requiredCount}장` },
@@ -181,7 +177,6 @@ export function ProjectWorkPanel({
               ? "재보정 요청 내용을 반영한 보정본을 준비하세요."
               : "보정이 끝난 사진을 업로드해 고객 검토를 요청하세요.",
           cta: project.status === "confirmed" ? "보정 작업 시작" : "보정 작업 계속하기",
-          icon: <PenLine size={20} />,
           onClick: onWorkflow,
           meta: [
             { label: "셀렉 목표 장수", value: `${project.requiredCount}장` },
@@ -194,7 +189,6 @@ export function ProjectWorkPanel({
           title: project.status === "reviewing_v2" ? "고객이 재보정본을 검토하고 있습니다" : "고객이 보정본을 검토하고 있습니다",
           description: "고객의 검토 결과와 요청 사항은 보정 작업 화면에서 확인할 수 있습니다.",
           cta: "보정본 현황 보기",
-          icon: <ListChecks size={20} />,
           onClick: onWorkflow,
           meta: [
             { label: "검토 마감일", value: reviewDeadlineDisplay ?? "미설정", overdue: overdueText },
@@ -229,7 +223,6 @@ export function ProjectWorkPanel({
           title: "사진 납품이 완료되었습니다",
           description: "선택 결과와 작가 전달 메모 등 프로젝트 이력을 확인할 수 있습니다.",
           cta: "프로젝트 결과 보기",
-          icon: <Flag size={20} />,
           onClick: onResults,
           meta: [
             { label: "완료일", value: deliveredAtDisplay },
@@ -265,17 +258,8 @@ export function ProjectWorkPanel({
     : isCustomer
       ? "text-cyan"
       : "text-muted-foreground";
-  const iconTone = isPhotographer
-    ? "bg-accent text-white"
-    : isCustomer
-      ? "bg-cyan text-white"
-      : "bg-surface-raised text-muted-foreground";
-  const actorLabel = isPhotographer ? "작가 진행 중" : isCustomer ? "고객 진행 중" : "완료";
-  const actorBadgeTone = isPhotographer
-    ? "bg-accent/8 text-accent"
-    : isCustomer
-      ? "bg-[var(--customer-soft)] text-cyan"
-      : "bg-surface-raised text-muted-foreground";
+  const actorDot = isPhotographer ? "bg-accent" : isCustomer ? "bg-cyan" : "bg-subtle-foreground";
+  const actorLabel = isPhotographer ? "작가 차례" : isCustomer ? "고객 차례" : null;
 
 
   return (
@@ -286,19 +270,14 @@ export function ProjectWorkPanel({
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg [&>svg]:h-4 [&>svg]:w-4 ${iconTone}`}>
-            {content.icon}
-          </span>
-          <p className={`truncate text-[14px] font-bold leading-5 tracking-[-0.35px] ${semanticTone}`}>
-            {content.eyebrow}
+          {/* 행위자는 점 + 글자 한 줄로만 말한다(DESIGN Actor Signal). 아이콘 타일·상태 배지·윗줄 색을 겹쳐 같은 말을 세 번 하지 않는다. */}
+          <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${actorDot}`} />
+          <p className="truncate text-[13px] leading-5 tracking-[-0.3px]">
+            <span className={`font-bold ${semanticTone}`}>{content.eyebrow}</span>
+            {actorLabel ? <span className="text-muted-foreground"> · {actorLabel}</span> : null}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <OriginalUploadWarningBadge count={originalProgress?.needsRecovery} />
-          <span className={`hidden shrink-0 rounded-md px-2 py-1 text-[11px] font-medium leading-4 tracking-[-0.25px] md:inline-flex ${actorBadgeTone}`}>
-            {actorLabel}
-          </span>
-        </div>
+        <OriginalUploadWarningBadge count={originalProgress?.needsRecovery} />
       </div>
 
       <div className="mt-3 md:mt-5">
@@ -314,13 +293,11 @@ export function ProjectWorkPanel({
         {content.meta.map((item) => `${MOBILE_META_LABELS[item.label] ?? item.label} ${item.value}${item.overdue ? ` ${item.overdue}` : ""}`).join(" · ")}
       </p>
 
-      <dl className="mt-5 hidden overflow-hidden rounded-lg bg-surface-raised md:block">
-        {content.meta.map((item, index) => (
+      <dl className="mt-5 hidden border-t border-border-subtle md:block">
+        {content.meta.map((item) => (
           <div
             key={item.label}
-            className={`flex min-h-11 items-center justify-between gap-4 px-4 py-2.5 ${
-              index > 0 ? "border-t border-border-subtle" : ""
-            }`}
+            className="flex min-h-11 items-center justify-between gap-4 border-b border-border-subtle py-2.5"
           >
             <dt className="text-[13px] font-normal leading-5 tracking-[-0.3px] text-muted-foreground">
               {item.label}
