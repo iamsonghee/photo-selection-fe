@@ -133,11 +133,10 @@ function GalleryPhotoCardImpl({
     <div className="gl-overlay-interactive" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 14 }}>
       {showRating ? <>
       <span className="gl-rating-summary" aria-label={rating ? `별점 ${rating}점` : "별점 없음"}>
-        {rating ? <><Star size={12} fill="#FF4D00" color="#FF4D00" aria-hidden />{rating}</> : null}
+        {rating ? <><Star size={12} fill="currentColor" aria-hidden />{rating}</> : null}
       </span>
       <div
         className="gl-rating-row"
-        style={{ display: "flex", gap: 1 }}
         onClick={(e) => e.stopPropagation()}
         onMouseLeave={() => setHoverStar(0)}
       >
@@ -145,7 +144,7 @@ function GalleryPhotoCardImpl({
           const currentRating = Number(rating) || 0;
           const displayRating = hoverStar || currentRating;
           const isHovering    = hoverStar > 0;
-          // 기기와 별점 유무에 관계없이 다섯 별을 유지해 평가 상태를 한눈에 비교한다.
+          // 평소에는 매긴 별점만 `★N`으로 보이고(빈 별 다섯 개가 모든 사진을 덮지 않게), PC는 마우스·키보드 초점이 오면 이 줄이 나타난다(GalleryPhotoCard.css).
           const filled = s <= displayRating;
           return (
             <button
@@ -167,9 +166,8 @@ function GalleryPhotoCardImpl({
                 border: "none",
                 background: "none",
                 cursor: "pointer",
-                /* 별은 사진 위 그라데이션에 얹힌다 — 빈 별을 어두운 회색으로 두면 사진에 묻혀
-                 * "별점을 줄 수 있다"는 것 자체가 보이지 않는다(2열에서는 빈 별도 늘 그린다). */
-                color: filled ? (isHovering ? "rgba(255,77,0,.7)" : "#FF4D00") : "rgba(255,255,255,.72)",
+                /* 별은 사진 위 그라데이션에 얹힌다 — 흰색만 쓴다. 주황은 선택(체크)의 색이라 별까지 주황이면 무엇을 골랐는지 흐려진다. */
+                color: filled ? (isHovering ? "rgba(255,255,255,.75)" : "#fff") : "rgba(255,255,255,.72)",
                 filter: "drop-shadow(0 1px 2px rgba(0,0,0,.45))",
               }}
             >

@@ -383,9 +383,6 @@ export function MobileViewerPinchPhoto({ src, alt, showBadge, selected = false, 
         )}
         {/* 선택 여부는 이 화면의 결과물 그 자체라 배지 하나가 아니라 사진 테두리 전체로 알린다.
           * 단 집중 모드(showBadge=false)에서는 이 테두리도 함께 숨겨 사진만 남긴다. */}
-        {showBadge && selected && imageBounds.width > 0 && imageBounds.height > 0 && (
-          <span className="fv-selected-frame" style={imageBounds} aria-hidden />
-        )}
       </div>
       {showBadgeVisible && onToggleSelect && (
         <button

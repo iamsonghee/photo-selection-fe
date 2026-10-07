@@ -6,7 +6,13 @@
 .gl-card-overlay { position: absolute; inset: 0; z-index: 15; display: flex; flex-direction: column; justify-content: flex-end; padding: 10px; background: linear-gradient(to top, rgba(0,0,0,.75), rgba(0,0,0,.3) 40%, transparent 70%); pointer-events: none; }
 .gl-card-overlay .gl-overlay-interactive { pointer-events: auto; }
 .gl-overlay-filename { margin: 0 0 4px; overflow: hidden; color: rgba(255,255,255,.82); font: 9px/1.2 var(--font-mono); text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0,0,0,.8); white-space: nowrap; }
-.gl-rating-summary { display: none; }
+/* 별점: 평소에는 매긴 사진에만 `★N`. PC는 마우스를 올리거나 키보드 초점이 오면 다섯 별이 나와 바로 매긴다. 모바일은 상세 뷰어에서 매긴다. */
+.gl-rating-summary { display: inline-flex; align-items: center; gap: 3px; color: #fff; font: 700 11px/16px Pretendard, sans-serif; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+.gl-rating-row { display: none; gap: 1px; }
+@media (hover: hover) and (min-width: 768px) {
+  .gl-photo-card:hover .gl-rating-row, .gl-photo-card:focus-within .gl-rating-row { display: flex; }
+  .gl-photo-card:hover .gl-rating-summary, .gl-photo-card:focus-within .gl-rating-summary { display: none; }
+}
 .gl-comment-indicator { display: inline-grid; width: 13px; height: 13px; place-items: center; flex: 0 0 13px; color: #fff; filter: drop-shadow(0 1px 2px #0008); }
 .gl-comment-indicator svg { display: block; }
 .gl-recommended-badge { position: absolute; top: 10px; left: 42px; z-index: 20; display: flex; align-items: center; gap: 3px; padding: 3px 6px; border-radius: 999px; background: #0009; color: #fff; font-size: 10px; font-weight: 700; pointer-events: none; }
@@ -72,13 +78,10 @@ span.gl-check-box { pointer-events: none; }
   .gl-density-4 .gl-overlay-filename { display: none; }
   .gl-density-2 .gl-card-overlay, .gl-density-3 .gl-card-overlay { background: linear-gradient(to top, rgba(0,0,0,.62), rgba(0,0,0,.18) 42%, transparent 68%); }
   .gl-density-2 .gl-overlay-interactive { min-height: 16px !important; align-items: center !important; }
-  .gl-density-2 .gl-rating-row { display: flex !important; }
   .gl-density-2 .gl-rating-row, .gl-density-2 .gl-marker-row { height: 16px; align-items: center; }
   .gl-density-2 .gl-overlay-interactive button { width: 16px; height: 16px; display: grid; place-items: center; font-size: 12px !important; line-height: 16px !important; }
   .gl-density-3 .gl-overlay-interactive { min-height: 14px !important; align-items: center !important; }
   .gl-density-3 .gl-rating-row, .gl-density-3 .gl-marker-row { height: 14px; align-items: center; }
-  .gl-density-3 .gl-rating-row, .gl-density-4 .gl-rating-row { display: none !important; }
-  .gl-density-3 .gl-rating-summary, .gl-density-4 .gl-rating-summary { display: inline-flex; align-items: center; gap: 3px; color: #fff; font-size: 11px; line-height: 16px; }
   .gl-density-4 .gl-card-overlay { display: flex; padding: 4px; background: linear-gradient(to top, #0009, transparent 60%); }
   .gl-density-4 .gl-marker-row { display: none !important; }
   .gl-density-4 .gl-quality-badge { display: none; }

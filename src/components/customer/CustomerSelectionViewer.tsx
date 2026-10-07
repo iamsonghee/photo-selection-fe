@@ -837,7 +837,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
         .fs-side .fs-mini-strip { flex-wrap: wrap; }
         .fs-side .fs-mini-thumb { width: 80px; height: 54px; }
         /* 실제 단축키는 있었지만 여는 버튼이 없어 발견할 수 없었다. 작업 패널의 마지막 정보로
-         * 짧은 요약을 상시 두고, 상세 목록은 눌렀을 때만 보여 사진 작업보다 앞서지 않게 한다. */
+         * "? 단축키 보기" 버튼 하나만 두고, 목록은 눌렀을 때만 보여 사진 작업보다 앞서지 않게 한다. */
         .fs-select-big {
           margin: 16px 20px 0; box-sizing: border-box;
           display: flex; align-items: center; gap: 14px;
@@ -859,7 +859,8 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
         .fs-select-big-text strong { font: 700 15px/1.2 var(--font-sans); letter-spacing: -.2px; }
         .fs-select-big-text small { font: 500 11px/1.2 var(--font-sans); color: rgba(255,255,255,.45); }
         /* 주황은 "선택됨" 전용 */
-        .fs-select-big.is-selected { border-color: var(--accent); background: rgba(255,77,0,.12); }
+        /* 선택됨은 체크 상자(주황)만으로 말한다 — 카드까지 주황으로 칠하면 하단 주 버튼과 주황이 두 겹이 된다. */
+        .fs-select-big.is-selected { border-color: rgba(255,255,255,.34); background: rgba(255,255,255,.07); }
         .fs-select-big.is-selected .fs-select-big-box { background: var(--accent); border-color: var(--accent); }
         .fs-shortcuts {
           margin-top: auto; padding: 12px 20px 14px;
@@ -1041,8 +1042,8 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
         .fv-title { min-width: 0; flex: 1; display: flex; flex-direction: column; justify-content: center; }
         .fv-selection-count { min-width: 0; font: 600 17px/22px Pretendard, sans-serif; letter-spacing: -.2px; white-space: nowrap; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
         /* 보조 줄 — 사진 위에 얹히므로 그림자로 대비를 준다. 길면 잘라낸다(전체는 title 속성으로 남는다). */
-        .fv-filename { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12px/15px var(--font-mono); color: rgba(255,255,255,.86); text-shadow: 0 1px 3px rgba(0,0,0,.9); }
-        .fv-selection-count strong { color: #ff4d00; font-weight: 700; }
+        .fv-filename { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12px/15px var(--font-sans); color: rgba(255,255,255,.86); text-shadow: 0 1px 3px rgba(0,0,0,.9); }
+        .fv-selection-count strong { color: #fff; font-weight: 700; }
         /* 신원 칩 — 이름·색은 사진마다 바뀌는 값이 아니라 "이 세션에서 나는 누구"라 앱바에 둔다.
          * 파일명·진행 바를 걷어낸 자리라 새 공간을 쓰지 않는다. */
         .fv-identity {
@@ -1150,10 +1151,6 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
         }
         /* 이름 없는 원은 "찜은 있는데 누군지 모른다"로 읽혔다 — 점선 테두리 + 물음표로 미등록임을 드러낸다 */
         .fv-photo-mark-unnamed { border-style: dashed; }
-        .fv-selected-frame {
-          position: absolute; z-index: 2; pointer-events: none;
-          box-shadow: inset 0 0 0 3px #ff4d00, inset 0 0 0 4px rgba(255,255,255,.5);
-        }
         /* 코멘트: 별점·찜과 같은 .fv-pill 껍데기를 쓰고 내용만 다르다 —
          * 비어 있으면 아이콘만, 내용이 있으면 흰 점, 저장 실패면 재시도 라벨로 바뀐다. */
         .fv-comment-fab {
@@ -1223,7 +1220,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                 color: "#fff",
                 lineHeight: 1.3,
               }}>
-                <strong style={{ color: "var(--accent)", fontWeight: 700 }}>{Y}</strong> / {N}장 선택
+                <strong style={{ fontWeight: 700 }}>{Y}</strong> / {N}장 선택
               </h2>
               <p style={{
                 fontFamily: "var(--font-sans)",
@@ -1404,7 +1401,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                         fontSize: 20,
                         lineHeight: 1,
                         userSelect: "none",
-                        color: filled ? (previewing ? "rgba(255,77,0,.7)" : "#FF4D00") : "#777B7F",
+                        color: filled ? (previewing ? "rgba(255,255,255,.7)" : "#fff") : "#777B7F",
                         transform: starPressRing === s ? "scale(1.2)" : undefined,
                       }}
                     >
@@ -1606,8 +1603,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
           </div>
         )}
         <button type="button" className="fs-shortcuts" onClick={() => setShowShortcuts(true)}>
-          <span className="fs-shortcuts-line"><b>Space</b> 선택 · <b>1–5</b> 별점 · <b>F</b> 찜</span>
-          <span className="fs-shortcuts-line"><b>← →</b> 이동 · <b>?</b> 전체 단축키</span>
+          <span className="fs-shortcuts-line"><b>?</b> 단축키 보기</span>
         </button>
         </aside>
         </div>
@@ -1684,7 +1680,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
               <MobileViewerPinchPhoto
                 src={viewerSrc}
                 alt={filename}
-                /* 사진을 한 번 탭하면 챙뿐 아니라 사진 위 오버레이(체크박스·참가자 마크·선택 테두리)까지
+                /* 사진을 한 번 탭하면 챙뿐 아니라 사진 위 오버레이(체크박스·참가자 마크)까지
                  * 함께 사라져 "사진만" 남는다 — 집중 모드의 목적이 그것이다. */
                 showBadge
                 selected={isCurrentSelected}
@@ -1833,7 +1829,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
                     onPointerUp={() => setHoverStar(0)}
                     aria-label={`${value}점`}
                     aria-pressed={star === value}
-                    style={{ color: filled ? (previewing ? "rgba(255, 77, 0, 0.7)" : "#FF4D00") : "#777B7F" }}
+                    style={{ color: filled ? (previewing ? "rgba(255, 255, 255, 0.7)" : "#fff") : "#777B7F" }}
                   >
                     <Star size={22} fill={filled ? "currentColor" : "none"} strokeWidth={2} aria-hidden="true" style={{ display: "block", flexShrink: 0 }} />
                   </button>
