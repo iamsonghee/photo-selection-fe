@@ -28,7 +28,6 @@ import {
 import { getProjectById, getPhotosByProjectId } from "@/lib/db";
 import { createClient } from "@/lib/supabase/client";
 import { parseBetaLimitError, DEFAULT_BETA_MAX_PHOTOS_PER_PROJECT } from "@/lib/beta-limits";
-import { SHOOT_TYPES } from "@/lib/project-shoot-types";
 import { compressImagesInParallel, type UploadSourceMetadata } from "@/lib/upload-client-compress";
 import { readTakenAt } from "@/lib/exif-taken-at";
 import { UploadTelemetry, UPLOAD_SAMPLE_MS, describeUpload, formatUploadBytes, type UploadSnapshot, type UploadStage } from "@/lib/upload-telemetry";
@@ -53,15 +52,13 @@ import {
   ProjectAssetToolbarViewToggle,
   ProjectAssetWorkspaceToolbar,
 } from "@/components/photographer/ProjectAssetWorkspaceToolbar";
-import {
-  PhotographerLightPageFrame,
-  PhotographerLightPageHeader,
-} from "@/components/layout/PhotographerLightPageHeader";
 import { hasShortcutModifier } from "@/lib/keyboard-shortcut-guard";
 import { matchesFilenameQuery } from "@/lib/gallery-filter";
 import { selectPhotoRange } from "@/lib/drag-selection";
 import { useQuota } from "@/contexts/QuotaContext";
 import { useCollapsibleAssetHeaderController } from "@/hooks/useCollapsibleAssetHeader";
+import { ProjectAssetWorkspaceHeader } from "@/components/photographer/ProjectAssetWorkspaceHeader";
+import { AiAnalysisPromptModal } from "@/components/photographer/AiAnalysisPromptModal";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { UploadConnectionHint } from "@/components/UploadConnectionHint";
 import { MAX_INTERRUPTION_RETRIES, uploadInterruptions, waitIfInterrupted } from "@/lib/upload-resume";
@@ -3222,12 +3219,6 @@ export default function ProjectDetailPage() {
   const postUploadHintsHidden = aiPromptOpen || postUploadHintsHeld;
   const M = project.photoCount;
   const isInviteActive = project.status !== "preparing";
-  // 프로젝트 코드는 바로 위 breadcrumb에 이미 노출되므로 부제에서는 반복하지 않는다.
-  const shootTypeLabel = SHOOT_TYPES.find((t) => t.value === project.shootType)?.label;
-  const headerSubtitle = [
-    shootTypeLabel,
-    project.customerName ? `${project.customerName} 고객` : null,
-  ].filter(Boolean).join(" | ");
   // 고객 갤러리용 preview 구성만 활성화를 막는다. 전달용 원본 PUT과 복구는 링크를
   // 연 뒤에도 계속되므로 초대 가능 여부와 분리한다.
   const uploadBlockingInvite =
@@ -3494,43 +3485,19 @@ export default function ProjectDetailPage() {
 
       <input ref={fileInputRef} type="file" multiple accept={ACCEPT_TYPES} style={{ display: "none" }} onChange={handleFileChange} />
 
-      {/* 공통 Light page frame/header로 breadcrumb·title·description·actions의 시작점을 다른 작가 화면과 공유한다. */}
-      <div
-        data-upload-header-mode={immersiveUploadHeader ? "immersive" : compactUploadHeader ? "compact" : "expanded"}
-        className="relative z-20 shrink-0 bg-background"
-      >
-        {/* 축소 시 뒤로가기·프로젝트명은 공용 MobileHeader가 이미 보여주므로 여기서는 중복 표시하지 않는다. */}
-        <div className={themeStyles.expandedHeader} aria-hidden={compactUploadHeader} inert={compactUploadHeader}>
-        <div className={themeStyles.expandedHeaderInner}>
-        <PhotographerLightPageFrame
-          className="pb-4 md:!pt-6"
-        >
-          <PhotographerLightPageHeader
-            compact={false}
-            mobileDense
-            breadcrumb={
-            <nav aria-label="현재 위치" className="flex items-center gap-2 text-[14px] font-medium leading-[17px] tracking-[-0.15px] text-subtle-foreground">
-              <button type="button" onClick={() => requestInternalNavigation("/photographer/projects")} className="transition-colors hover:text-foreground">프로젝트</button>
-              <ChevronRight size={14} aria-hidden />
-              <button type="button" onClick={() => requestInternalNavigation(`/photographer/projects/${id}`)} className="transition-colors hover:text-foreground">
-                {project.name}
-              </button>
-              <ChevronRight size={14} aria-hidden />
-              <span className="text-muted-foreground">원본 업로드</span>
-            </nav>
-            }
-            title="원본 업로드"
-            description={
-              <span>
-                {headerSubtitle}
-                <span className="mx-2 text-disabled-foreground">·</span>
-                {project.includeOriginal ? "원본 파일 전달" : "미리보기만 전달"}
-              </span>
-            }
-          />
-        </PhotographerLightPageFrame>
-        </div>
-        </div>
+      {/* 보관함 탭(원본·셀렉·보정본)과 같은 공용 머리 — 프로젝트 작업 화면끼리 경로·탭 위치를 맞춘다.
+        * 이동은 requestInternalNavigation을 거쳐 업로드 중 이탈 확인을 유지한다. */}
+      <div data-upload-header-mode={immersiveUploadHeader ? "immersive" : compactUploadHeader ? "compact" : "expanded"} className="relative z-20 shrink-0">
+        <ProjectAssetWorkspaceHeader
+          project={project}
+          activeTab="original"
+          originalCount={M}
+          title="원본 업로드"
+          compact={compactUploadHeader}
+          immersive={immersiveUploadHeader}
+          metaExtra={project.includeOriginal ? "원본 파일 전달" : "미리보기만 전달"}
+          onNavigate={requestInternalNavigation}
+        />
       </div>
 
       {/* 모바일도 전체 폭 진행 바 대신 compact 상태를 유지한다. */}
@@ -4524,93 +4491,26 @@ export default function ProjectDetailPage() {
         * 유사컷 버튼은 툴바에서 정렬 드롭다운·뷰 전환기와 폭·높이·테두리·배경이 전부 같아
         * 중립 크롬으로 읽혔고, 품질 확인은 관리자 패널 밖으로 나온 적이 없어 존재 자체가 숨어 있었다.
         * 모달을 닫아도 툴바 버튼은 상시 진입점으로 남는다. */}
-      <PhotographerModal
+      <AiAnalysisPromptModal
         open={aiPromptOpen}
-        onClose={handleDismissAiPrompt}
-        maxWidth={412}
-        variant="confirmation"
-        title="AI가 정리를 도와드릴까요?"
         description={aiPromptSource === "upload"
           ? `원본 ${displayPhotos.length.toLocaleString()}장 업로드가 완료되었습니다.`
           : `이 프로젝트의 원본 ${displayPhotos.length.toLocaleString()}장을 분석합니다.`}
-        footer={(
-          <div className="flex gap-2">
-            <PhotographerLightButton
-              type="button"
-              variant="secondary"
-              onClick={handleSkipAiPrompt}
-              size="confirmation"
-              className="flex-1"
-            >
-              건너뛰기
-            </PhotographerLightButton>
-            <PhotographerLightButton
-              type="button"
-              variant="primary"
-              /* 둘 다 끄면 시작할 게 없다 — 빈 요청을 보내는 대신 버튼을 잠근다 */
-              disabled={!aiWantSimilar && !aiWantQuality}
-              onClick={() => { void handleStartAiFromPrompt(); }}
-              size="confirmation"
-              className="flex-1"
-            >
-              분석 시작
-            </PhotographerLightButton>
-          </div>
-        )}
-      >
-        <div className="flex flex-col gap-2">
-          {([
-            {
-              checked: aiWantSimilar,
-              set: setAiWantSimilar,
-              label: "유사컷 묶기",
-              desc: "연속 촬영된 비슷한 사진을 자동으로 묶습니다",
-              /* 툴바 버튼으로도 열 수 있게 되면서 "이미 한 걸 또 하는 건가?"를 답해줘야 한다.
-               * 분석은 캐시가 있어 이미 끝난 사진은 다시 부르지 않으므로, 남은 장수를 그대로 알린다. */
-              state: clipAnalysisStatus === "completed" && (clipPending?.pending ?? 0) === 0
-                ? "이미 분석 완료"
-                : (clipPending?.pending ?? 0) > 0 && (clipPending?.alreadyAnalyzed ?? 0) > 0
-                  ? `새 사진 ${clipPending?.pending.toLocaleString()}장 분석`
-                  : null,
-            },
-            {
-              checked: aiWantQuality,
-              set: setAiWantQuality,
-              label: "눈감음·흐림 확인",
-              desc: "골라내기 전에 확인할 사진을 미리 표시합니다",
-              state: qualityAnalysisStatus === "completed" ? "이미 확인 완료" : null,
-            },
-          ] as const).map((item) => (
-            <label
-              key={item.label}
-              className="flex cursor-pointer items-start gap-3 rounded-xl bg-surface-raised p-4"
-            >
-              <input
-                type="checkbox"
-                checked={item.checked}
-                onChange={(e) => item.set(e.target.checked)}
-                className="mt-[2px] h-4 w-4 flex-none accent-[var(--accent)]"
-              />
-              <span className="min-w-0">
-                <span className="flex items-center gap-2 text-[14px] font-semibold leading-[22px] tracking-[-0.35px] text-foreground">
-                  {item.label}
-                  {item.state && (
-                    <span className="rounded px-1.5 py-px text-[11px] font-medium leading-[16px] tracking-[-0.2px] text-subtle-foreground ring-1 ring-inset ring-border">
-                      {item.state}
-                    </span>
-                  )}
-                </span>
-                <span className="block text-[13px] font-normal leading-[20px] tracking-[-0.3px] text-muted-foreground">
-                  {item.desc}
-                </span>
-              </span>
-            </label>
-          ))}
-          <p className="m-0 px-1 text-[12px] leading-[18px] tracking-[-0.25px] text-subtle-foreground">
-            분석은 백그라운드에서 진행되며 언제든 중단할 수 있어요.
-          </p>
-        </div>
-      </PhotographerModal>
+        similar={aiWantSimilar}
+        quality={aiWantQuality}
+        onSimilarChange={setAiWantSimilar}
+        onQualityChange={setAiWantQuality}
+        onClose={handleDismissAiPrompt}
+        onSkip={handleSkipAiPrompt}
+        onStart={() => { void handleStartAiFromPrompt(); }}
+        /* 툴바 버튼으로도 열 수 있어 "이미 한 걸 또 하는 건가?"를 답해 준다 — 캐시가 있어 끝난 사진은 다시 부르지 않는다. */
+        similarState={clipAnalysisStatus === "completed" && (clipPending?.pending ?? 0) === 0
+          ? "이미 분석 완료"
+          : (clipPending?.pending ?? 0) > 0 && (clipPending?.alreadyAnalyzed ?? 0) > 0
+            ? `새 사진 ${clipPending?.pending.toLocaleString()}장 분석`
+            : null}
+        qualityState={qualityAnalysisStatus === "completed" ? "이미 확인 완료" : null}
+      />
 
       {/* ── 사진 삭제 확인 — Figma #55798 공용 confirmation pattern ── */}
       <PhotographerConfirmDialog

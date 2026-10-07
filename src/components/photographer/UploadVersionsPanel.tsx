@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { PhotographerLightButton } from "./PhotographerLightButton";
 import {
   AlertCircle,
   ArrowRight,
@@ -677,8 +678,8 @@ export default function UploadVersionsPanel({
             border-color: var(--border) !important;
           }
           .uvp-mapping-row[data-needs-review="true"] {
-            border-color: color-mix(in srgb, #d97706 48%, var(--border)) !important;
-            background: color-mix(in srgb, #f59e0b 5%, var(--surface)) !important;
+            border-color: color-mix(in srgb, var(--warning) 48%, var(--border)) !important;
+            background: color-mix(in srgb, var(--warning) 6%, var(--surface)) !important;
           }
           .uvp-mapping-grid {
             grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr) !important;
@@ -746,7 +747,7 @@ export default function UploadVersionsPanel({
         {/* Header */}
         <header data-upload-panel-header className="flex min-h-14 shrink-0 items-center justify-between px-4 py-1.5 md:min-h-0 md:px-8 md:pb-0 md:pt-7">
           <div className="flex min-w-0 items-center gap-3">
-            <span data-upload-title-icon className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent max-md:hidden" aria-hidden="true">
+            <span data-upload-title-icon className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-raised text-foreground max-md:hidden" aria-hidden="true">
               <Upload size={20} strokeWidth={1.8} />
             </span>
             <div className="min-w-0">
@@ -810,7 +811,7 @@ export default function UploadVersionsPanel({
               <div className="text-sm text-rose-300 font-semibold">
                 베타 기간 최대 보정 횟수({betaMaxRevisionCount}회)에 도달했습니다.
               </div>
-              <div className="text-[11px] text-subtle-foreground">
+              <div className="text-xs text-subtle-foreground">
                 현재 {existingVersionCount} / {betaMaxRevisionCount}회 사용 중
               </div>
             </div>
@@ -854,21 +855,20 @@ export default function UploadVersionsPanel({
                       <ImageIcon size={24} className="text-accent" strokeWidth={1.5} />
                     </div>
                     <p className="mb-0 mt-4 text-[18px] font-semibold leading-7 tracking-[-0.36px] text-foreground">
-                      {hasExistingRetouches ? "추가할 보정본을 올려주세요" : "보정본 파일을 올려주세요"}
+                      {hasExistingRetouches ? "추가할 보정본을 올려 주세요" : "보정본 파일을 올려 주세요"}
                     </p>
                     <p className="m-0 mt-1 text-[13px] leading-5 text-subtle-foreground">
                       끌어다 놓거나 버튼으로 선택하세요
                     </p>
-                    <button
-                      type="button"
+                    <PhotographerLightButton
                       onClick={(e) => {
                         e.stopPropagation();
                         multiInputRef.current?.click();
                       }}
-                      className="mt-4 rounded-lg bg-accent px-5 py-2.5 text-[13px] font-bold text-white transition-colors hover:bg-[#e94b0d]"
+                      className="mt-4"
                     >
                       파일 선택
-                    </button>
+                    </PhotographerLightButton>
                   </div>
                 ) : (
                   <div
@@ -937,12 +937,12 @@ export default function UploadVersionsPanel({
                     </div>
                   </div>
                 )}
-                <div className="mt-2.5 hidden items-center gap-1.5 pl-1 text-[11px] text-subtle-foreground md:flex">
+                <div className="mt-2.5 hidden items-center gap-1.5 pl-1 text-xs text-subtle-foreground md:flex">
                   <Info size={12} strokeWidth={2} />
                   <span>파일명이 같으면 자동 매핑 · 다르면 AI 유사도로 매칭 · 안 되면 직접 선택</span>
                 </div>
                 {geminiMatching && (
-                  <div className="flex items-center gap-1.5 mt-2 pl-1 text-[11px] text-accent">
+                  <div className="flex items-center gap-1.5 mt-2 pl-1 text-xs text-accent">
                     <span
                       aria-hidden
                       className="inline-block w-3 h-3 rounded-full border-2 border-accent/30 border-t-accent"
@@ -953,7 +953,7 @@ export default function UploadVersionsPanel({
                 )}
                 {fileSelectionMessages.length > 0 && (
                   <div
-                    className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3.5 py-3 text-[11px] leading-5 text-amber-700"
+                    className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3.5 py-3 text-xs leading-5 text-amber-700"
                     role="status"
                     aria-live="polite"
                   >
@@ -967,12 +967,12 @@ export default function UploadVersionsPanel({
                 )}
                 {fileCountNotice ? (
                   <>
-                    <div className="mt-2 hidden items-start gap-1.5 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3.5 py-3 text-[11px] leading-5 text-amber-700 md:flex" role="status">
+                    <div className="mt-2 hidden items-start gap-1.5 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3.5 py-3 text-xs leading-5 text-amber-700 md:flex" role="status">
                       <Info size={12} className="mt-1 shrink-0" />
                       <span>{fileCountNotice}</span>
                     </div>
                     {mobileFileCountNotice ? (
-                      <p data-mobile-selection-note className="m-0 mt-2 text-[11px] leading-4 text-subtle-foreground md:hidden" role="status">
+                      <p data-mobile-selection-note className="m-0 mt-2 text-xs leading-4 text-subtle-foreground md:hidden" role="status">
                         {mobileFileCountNotice}
                       </p>
                     ) : null}
@@ -1010,7 +1010,7 @@ export default function UploadVersionsPanel({
                       stats.gemini > 0 ||
                       stats.geminiLow > 0 ||
                       stats.order > 0) && (
-                      <div className="flex items-center gap-3 text-[11px]">
+                      <div className="flex items-center gap-3 text-xs">
                         {stats.exact > 0 && (
                           <StatChip dotColor="bg-border-strong" textColor="text-muted-foreground" label={`파일명 ${stats.exact}`} />
                         )}
@@ -1032,7 +1032,7 @@ export default function UploadVersionsPanel({
                   ) : null}
 
                   <div
-                    className="uvp-mapping-columns mb-1.5 hidden items-center px-3.5 text-[11px] font-medium text-subtle-foreground md:grid"
+                    className="uvp-mapping-columns mb-1.5 hidden items-center px-3.5 text-xs font-medium text-subtle-foreground md:grid"
                     style={{ gridTemplateColumns: "minmax(0, 1fr) 20px minmax(0, 1fr) 204px" }}
                     aria-hidden="true"
                   >
@@ -1079,8 +1079,8 @@ export default function UploadVersionsPanel({
             {submitting && (
               <div>
                 <div className="flex items-center justify-between mb-1.5 gap-3">
-                  <span className="text-[11px] font-semibold text-muted-foreground">업로드 진행도</span>
-                  <span className="text-[11px] text-accent font-medium">
+                  <span className="text-xs font-semibold text-muted-foreground">업로드 진행도</span>
+                  <span className="text-xs text-accent font-medium">
                     {serverProcessing
                       ? "서버 처리 중…"
                       : totalBytes > 0
@@ -1100,7 +1100,7 @@ export default function UploadVersionsPanel({
                   </div>
                 </div>
                 {totalUploadFileCount > 0 && (
-                  <p className="mt-1.5 text-[10px] text-subtle-foreground">
+                  <p className="mt-1.5 text-xs text-subtle-foreground">
                     총 {totalUploadFileCount}장
                     {totalBytes > 0 ? ` · 합계 ${formatStoredFileSizeBytes(totalBytes)}` : ""}
                   </p>
@@ -1111,7 +1111,7 @@ export default function UploadVersionsPanel({
 
             {/* deliver */}
             <div className="flex flex-col items-stretch md:flex-row md:items-center justify-between gap-3 md:gap-4">
-              <p className={`m-0 hidden text-[11px] md:block ${canDeliver ? "text-muted-foreground" : "text-subtle-foreground"}`} role="status">
+              <p className={`m-0 hidden text-xs md:block ${canDeliver ? "text-muted-foreground" : "text-subtle-foreground"}`} role="status">
                 {submitting
                   ? `${totalUploadFileCount}장을 안전하게 업로드하고 있습니다.`
                   : canDeliver
@@ -1119,26 +1119,27 @@ export default function UploadVersionsPanel({
                     : deliverDisabledReason}
               </p>
               <div className="flex shrink-0 items-center gap-2 max-md:w-full max-md:[&>button]:min-h-11 max-md:[&>button]:min-w-0 max-md:[&>button]:flex-1 max-md:[&>button]:px-3">
-                <button
-                  type="button"
+                <PhotographerLightButton
+                  variant="secondary"
+                  size="work-panel"
                   onClick={onClose}
                   disabled={submitting || deletingExisting}
-                  className="min-w-[104px] rounded-lg border border-border bg-surface px-5 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
+                  className="min-w-[104px]"
                 >
                   취소
-                </button>
-                <button
-                  type="button"
+                </PhotographerLightButton>
+                <PhotographerLightButton
+                  size="work-panel"
                   onClick={handleDeliver}
                   disabled={!canDeliver || submitting}
                   title={!canDeliver ? deliverDisabledReason ?? undefined : undefined}
-                  className="inline-flex min-w-[132px] items-center justify-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-[#e94b0d] disabled:cursor-not-allowed disabled:bg-border disabled:text-subtle-foreground"
+                  className="min-w-[132px]"
                 >
                   {submitting ? (
                     <>
                       <span
                         aria-hidden
-                        className="inline-block w-3 h-3 rounded-full border-2 border-black/40 border-t-black"
+                        className="inline-block h-3 w-3 rounded-full border-2 border-white/40 border-t-white"
                         style={{ animation: "uvp-spin 0.9s linear infinite" }}
                       />
                       {serverProcessing ? "서버 처리 중…" : `업로드 중 ${uploadPct}%`}
@@ -1149,7 +1150,7 @@ export default function UploadVersionsPanel({
                       {totalUploadFileCount > 0 ? `${totalUploadFileCount}장 업로드` : "업로드"}
                     </>
                   )}
-                </button>
+                </PhotographerLightButton>
               </div>
             </div>
           </footer>
@@ -1330,7 +1331,7 @@ function PanelMappingRow({
             ) : null}
           </div>
           <div className="uvp-source-filename min-w-0 flex-1">
-            <span className="uvp-mobile-column-label mb-0.5 hidden text-[10px] font-semibold text-subtle-foreground max-md:block">원본 사진</span>
+            <span className="uvp-mobile-column-label mb-0.5 hidden text-xs font-semibold text-subtle-foreground max-md:block">원본 사진</span>
             <div
               className="truncate text-[12px] font-medium text-muted-foreground"
               title={target.filename}
@@ -1355,7 +1356,7 @@ function PanelMappingRow({
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-surface text-subtle-foreground transition-colors group-hover/empty:text-accent">
               <Plus size={15} strokeWidth={1.8} aria-hidden="true" />
             </span>
-            <span className="min-w-0"><span className="mb-0.5 hidden text-[10px] font-semibold text-subtle-foreground max-md:block">업로드 파일</span><span className="block truncate text-[12px] font-semibold">파일 선택</span></span>
+            <span className="min-w-0"><span className="mb-0.5 hidden text-xs font-semibold text-subtle-foreground max-md:block">업로드 파일</span><span className="block truncate text-[12px] font-semibold">파일 선택</span></span>
           </button>
         ) : state === "server" ? (
           <div className="uvp-retouched-cell flex min-w-0 items-center gap-2.5">
@@ -1385,11 +1386,11 @@ function PanelMappingRow({
               ) : null}
             </div>
             <div className="uvp-retouch-meta min-w-0 flex-1">
-              <span className="uvp-mobile-column-label mb-0.5 hidden text-[10px] font-semibold text-subtle-foreground max-md:block">업로드 파일</span>
+              <span className="uvp-mobile-column-label mb-0.5 hidden text-xs font-semibold text-subtle-foreground max-md:block">업로드 파일</span>
               <div className="uvp-retouch-filename truncate text-[12px] font-medium text-muted-foreground" title={target.filename}>{target.filename}</div>
-              <span className="uvp-mobile-status mt-1 hidden text-[10px] text-subtle-foreground max-md:block">{mappingStatusLabel}</span>
+              <span className="uvp-mobile-status mt-1 hidden text-xs text-subtle-foreground max-md:block">{mappingStatusLabel}</span>
             </div>
-            <button type="button" onClick={() => onChangeOne(target.id)} aria-label={`${target.filename} 업로드 파일 변경`} className="uvp-mobile-change hidden min-h-9 items-center justify-center rounded-md border border-border bg-surface px-3 text-[11px] font-semibold text-muted-foreground max-md:inline-flex">파일 변경</button>
+            <button type="button" onClick={() => onChangeOne(target.id)} aria-label={`${target.filename} 업로드 파일 변경`} className="uvp-mobile-change hidden min-h-9 items-center justify-center rounded-md border border-border bg-surface px-3 text-xs font-semibold text-muted-foreground max-md:inline-flex">파일 변경</button>
           </div>
         ) : (
           <div className="uvp-retouched-cell flex min-w-0 items-center gap-2.5">
@@ -1423,29 +1424,29 @@ function PanelMappingRow({
               ) : null}
             </div>
             <div className="uvp-retouch-meta flex-1 min-w-0">
-              <span className="uvp-mobile-column-label mb-0.5 hidden text-[10px] font-semibold text-subtle-foreground max-md:block">업로드 파일</span>
+              <span className="uvp-mobile-column-label mb-0.5 hidden text-xs font-semibold text-subtle-foreground max-md:block">업로드 파일</span>
               <div className="uvp-retouch-filename text-[12px] font-medium text-muted-foreground truncate" title={file?.name}>
                 {file?.name ?? ""}
               </div>
               {fileSizeStr ? (
                 <div className="uvp-file-size text-[10.5px] text-subtle-foreground mt-0.5">{fileSizeStr}</div>
               ) : null}
-              <span className={`uvp-mobile-status mt-1 hidden text-[10px] font-medium max-md:block ${needsReview ? "text-amber-700" : "text-subtle-foreground"}`}>{mappingStatusLabel}</span>
+              <span className={`uvp-mobile-status mt-1 hidden text-xs font-medium max-md:block ${needsReview ? "text-amber-700" : "text-subtle-foreground"}`}>{mappingStatusLabel}</span>
             </div>
-            <button type="button" onClick={() => onChangeOne(target.id)} aria-label={`${target.filename} 업로드 파일 변경`} className="uvp-mobile-change hidden min-h-9 items-center justify-center rounded-md border border-border bg-surface px-3 text-[11px] font-semibold text-muted-foreground max-md:inline-flex">파일 변경</button>
+            <button type="button" onClick={() => onChangeOne(target.id)} aria-label={`${target.filename} 업로드 파일 변경`} className="uvp-mobile-change hidden min-h-9 items-center justify-center rounded-md border border-border bg-surface px-3 text-xs font-semibold text-muted-foreground max-md:inline-flex">파일 변경</button>
           </div>
         )}
 
         {/* Actions */}
         {state !== "empty" ? (
           <div className="uvp-mapping-actions flex shrink-0 items-center justify-end gap-1.5 pl-2 max-md:hidden">
-            <span className={`whitespace-nowrap px-1.5 py-0.5 text-[10px] font-semibold ${needsReview ? "rounded-md bg-amber-500/10 text-amber-700" : "text-subtle-foreground"}`}>{mappingStatusLabel}</span>
+            <span className={`whitespace-nowrap px-1.5 py-0.5 text-xs font-semibold ${needsReview ? "rounded-md bg-amber-500/10 text-amber-700" : "text-subtle-foreground"}`}>{mappingStatusLabel}</span>
             <button
               type="button"
               onClick={() => onChangeOne(target.id)}
               aria-label={primaryActionLabel}
               data-change-file
-              className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors md:min-h-9 ${primaryActionClass}`}
+              className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-md border px-2.5 py-1 text-xs font-medium transition-colors md:min-h-9 ${primaryActionClass}`}
             >
               <span className="md:hidden">변경</span>
               <span className="hidden md:inline">{primaryActionLabel}</span>
@@ -1455,7 +1456,7 @@ function PanelMappingRow({
                 type="button"
                 onClick={() => onDeleteLocalFile(target.id)}
                 aria-label={`${file.name} 선택한 보정본 삭제`}
-                className="inline-flex h-11 w-11 items-center justify-center gap-1 rounded-md border border-border bg-surface p-0 text-[11px] font-medium text-muted-foreground transition-colors hover:border-border-strong hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20 md:h-9 md:w-auto md:whitespace-nowrap md:border-danger/35 md:bg-danger/[0.04] md:px-2.5 md:py-1 md:text-danger md:hover:border-danger/50 md:hover:bg-danger/[0.08] md:hover:text-danger md:focus-visible:ring-danger/20"
+                className="inline-flex h-11 w-11 items-center justify-center gap-1 rounded-md border border-border bg-surface p-0 text-xs font-medium text-muted-foreground transition-colors hover:border-border-strong hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20 md:h-9 md:w-auto md:whitespace-nowrap md:border-danger/35 md:bg-danger/[0.04] md:px-2.5 md:py-1 md:text-danger md:hover:border-danger/50 md:hover:bg-danger/[0.08] md:hover:text-danger md:focus-visible:ring-danger/20"
               >
                 <Trash2 size={14} strokeWidth={1.8} aria-hidden="true" />
                 <span className="max-md:sr-only">삭제</span>
@@ -1466,7 +1467,7 @@ function PanelMappingRow({
                 type="button"
                 onClick={() => onDeleteExisting(target)}
                 aria-label={`${target.filename} 업로드된 보정본 삭제`}
-                className="inline-flex h-11 w-11 items-center justify-center gap-1 rounded-md border border-border bg-surface p-0 text-[11px] font-medium text-muted-foreground transition-colors hover:border-border-strong hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20 md:h-9 md:w-auto md:whitespace-nowrap md:border-danger/35 md:bg-danger/[0.04] md:px-2.5 md:py-1 md:text-danger md:hover:border-danger/50 md:hover:bg-danger/[0.08] md:hover:text-danger md:focus-visible:ring-danger/20"
+                className="inline-flex h-11 w-11 items-center justify-center gap-1 rounded-md border border-border bg-surface p-0 text-xs font-medium text-muted-foreground transition-colors hover:border-border-strong hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20 md:h-9 md:w-auto md:whitespace-nowrap md:border-danger/35 md:bg-danger/[0.04] md:px-2.5 md:py-1 md:text-danger md:hover:border-danger/50 md:hover:bg-danger/[0.08] md:hover:text-danger md:focus-visible:ring-danger/20"
               >
                 <Trash2 size={14} strokeWidth={1.8} aria-hidden="true" />
                 <span className="max-md:sr-only">삭제</span>

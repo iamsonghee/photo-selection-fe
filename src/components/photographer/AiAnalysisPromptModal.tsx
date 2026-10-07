@@ -33,11 +33,11 @@ export function AiAnalysisPromptModal({ open, description, similar, quality, onS
         {items.map((item) => <label key={item.label} className="flex cursor-pointer items-start gap-3 rounded-xl bg-surface-raised p-4">
           <input type="checkbox" checked={item.checked} onChange={(event) => item.set(event.target.checked)} className="mt-[2px] h-4 w-4 flex-none accent-[var(--accent)]" />
           <span className="min-w-0">
-            <span className="flex items-center gap-2 text-[14px] font-semibold leading-[22px] tracking-[-0.35px] text-foreground">{item.label}{item.state ? <span className="rounded px-1.5 py-px text-[11px] font-medium leading-[16px] tracking-[-0.2px] text-subtle-foreground ring-1 ring-inset ring-border">{item.state}</span> : null}</span>
+            <span className="flex items-center gap-2 text-[14px] font-semibold leading-[22px] tracking-[-0.35px] text-foreground">{item.label}{item.state ? <span className="rounded px-1.5 py-px text-[12px] font-medium leading-[16px] tracking-[-0.2px] text-subtle-foreground ring-1 ring-inset ring-border">{item.state}</span> : null}</span>
             <span className="block text-[13px] font-normal leading-[20px] tracking-[-0.3px] text-muted-foreground">{item.desc}</span>
           </span>
         </label>)}
-        <p className="m-0 px-1 text-[12px] leading-[18px] tracking-[-0.25px] text-subtle-foreground">분석은 백그라운드에서 진행되며 다른 작업을 계속할 수 있어요.</p>
+        <p className="m-0 px-1 text-[12px] leading-[18px] tracking-[-0.25px] text-subtle-foreground">분석은 백그라운드에서 진행되며 언제든 중단할 수 있어요.</p>
       </div>
     </PhotographerModal>
   );

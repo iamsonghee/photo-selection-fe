@@ -92,8 +92,8 @@ test("확정된 셀렉 원본을 고른 폴더에 원본 파일명으로 스트�
   expect(bulkBox).not.toBeNull();
   expect(viewBox!.x).toBeLessThan(exportBox!.x);
   expect(exportBox!.x).toBeLessThan(bulkBox!.x);
-  await expect(bulkButton).toHaveCSS("border-top-width", "0px");
-  await expect(bulkButton).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  // 남은 보정본이 있을 때 이 화면의 다음 행동은 일괄 업로드 하나라 주황 채움(primary)이다.
+  await expect(bulkButton).toHaveAttribute("data-variant", "primary");
   await page.locator("[data-project-asset-export-trigger]:visible").click();
 
   const downloadButton = page.getByRole("button", { name: /선택한 사진의 원본 다운로드/ });

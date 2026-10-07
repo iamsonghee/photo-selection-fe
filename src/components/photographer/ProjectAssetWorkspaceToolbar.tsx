@@ -34,7 +34,7 @@ export function ProjectAssetToolbarButton({
 
 type ProjectAssetMobileContextActionProps = Omit<ProjectAssetToolbarButtonProps, "variant"> & {
   active?: boolean;
-  faceKind?: "similarity" | "upload";
+  faceKind?: "upload";
 };
 
 /** Mobile asset toolbar의 대표 작업이 공유하는 44px hit area와 compact tonal face. */
@@ -59,8 +59,8 @@ export function ProjectAssetMobileContextAction({
           disabled
             ? "border-border-subtle bg-surface-raised text-subtle-foreground"
             : active
-              ? "border-accent/30 bg-accent/[0.14] text-foreground group-hover:bg-accent/20"
-              : "border-accent/20 bg-accent/[0.08] text-foreground group-hover:bg-accent/[0.14]"
+              ? "border-border-strong bg-surface text-foreground"
+              : "border-border-subtle bg-surface-raised text-foreground group-hover:border-border-strong"
         }`}
       >
         {children}

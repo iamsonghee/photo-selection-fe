@@ -211,7 +211,7 @@ function MobileRetouchedCardHeader({
           <p data-retouched-card-filename className={`${ASSET_CARD_FILENAME_CLASS} text-foreground`} title={versionFilename}>
             <RetouchedFilename filename={versionFilename} />
           </p>
-          <p className="truncate text-[10px] leading-[15px] text-subtle-foreground" title={originalFilename}>
+          <p className="truncate text-xs leading-[15px] text-subtle-foreground" title={originalFilename}>
             원본 · {originalFilename}
           </p>
         </div>
@@ -382,7 +382,7 @@ function OriginalReferenceThumbnail({
           <Layers size={13} />
         </span>
       )}
-      <span className="pointer-events-none absolute bottom-0.5 left-0.5 rounded bg-black/65 px-1 py-px text-[8px] font-semibold leading-3 text-white">
+      <span className="pointer-events-none absolute bottom-0.5 left-0.5 rounded bg-black/65 px-1 py-px text-xs font-semibold leading-3 text-white">
         원본
       </span>
     </button>
@@ -414,7 +414,7 @@ function OriginalCard({
             <Layers size={24} />
           </div>
         )}
-        <div className="absolute left-2 top-2 rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+        <div className="absolute left-2 top-2 rounded bg-black/65 px-1.5 py-0.5 text-xs font-semibold text-white">
           원본
         </div>
         <span className="pointer-events-none absolute inset-0 rounded-lg bg-[rgba(2,56,82,0.075)] opacity-0 transition-opacity duration-300 group-hover/media:opacity-100 group-focus-visible/media:opacity-100" />
@@ -423,7 +423,7 @@ function OriginalCard({
         {filename}
       </div>
       {row.photo.originalStatus && (
-        <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide mb-1.5 ${
+        <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide mb-1.5 ${
           row.photo.originalStatus === "completed"
             ? "bg-emerald-500/15 text-emerald-500"
             : row.photo.originalStatus === "failed"
@@ -438,15 +438,15 @@ function OriginalCard({
         </div>
       )}
       {row.photo.comment ? (
-        <div className="bg-background border border-border-subtle rounded-lg p-2 text-[11px] text-muted-foreground leading-relaxed">
-          <div className="text-[9px] text-accent font-semibold uppercase tracking-wide mb-1 flex items-center gap-1">
+        <div className="bg-background border border-border-subtle rounded-lg p-2 text-xs text-muted-foreground leading-relaxed">
+          <div className="text-xs text-accent font-semibold uppercase tracking-wide mb-1 flex items-center gap-1">
             <MessageSquare size={9} />
             작가 전달 메모
           </div>
           &ldquo;{row.photo.comment}&rdquo;
         </div>
       ) : (
-        <div className="text-[10px] text-disabled-foreground italic">메모 없음</div>
+        <div className="text-xs text-disabled-foreground italic">메모 없음</div>
       )}
     </CardShell>
   );
@@ -506,11 +506,11 @@ function SingleVersionUploadSlot({
       ) : (
         <Upload size={compact ? 16 : 20} className={canUpload ? "text-subtle-foreground" : "text-disabled-foreground"} />
       )}
-      <p className={`${compact ? "text-[14px] leading-5" : "text-[11px]"} font-semibold text-foreground`}>
+      <p className={`${compact ? "text-[14px] leading-5" : "text-xs"} font-semibold text-foreground`}>
         {isUploading ? "업로드 중" : canUpload ? compact ? "파일 선택" : uploadLabel : "업로드 대기"}
       </p>
       {canUpload && !isUploading ? (
-        <p className={`${compact ? "text-[10px]" : "text-[9px]"} text-subtle-foreground`}>선택 즉시 업로드{!compact ? <span className="hidden md:inline"> · 파일을 놓아도 됩니다</span> : null}</p>
+        <p className={`${compact ? "text-xs" : "text-xs"} text-subtle-foreground`}>선택 즉시 업로드{!compact ? <span className="hidden md:inline"> · 파일을 놓아도 됩니다</span> : null}</p>
       ) : null}
       <button
         type="button"
@@ -595,7 +595,7 @@ function V1Card({
           </p> : <p className={ASSET_CARD_FILENAME_CLASS} title={filename}><RetouchedFilename filename={filename} /></p>}
           {v1 ? (
             <p
-              className="hidden truncate text-[10px] leading-[15px] text-subtle-foreground md:block"
+              className="hidden truncate text-xs leading-[15px] text-subtle-foreground md:block"
               title={filename}
             >
               원본 · {filename}
@@ -731,7 +731,7 @@ function V2Card({
           </p> : <p className={ASSET_CARD_FILENAME_CLASS} title={filename}><RetouchedFilename filename={filename} /></p>}
           {v2 ? (
             <p
-              className="hidden truncate text-[10px] leading-[15px] text-subtle-foreground md:block"
+              className="hidden truncate text-xs leading-[15px] text-subtle-foreground md:block"
               title={filename}
             >
               원본 · {filename}
@@ -745,24 +745,24 @@ function V2Card({
       {v2Dimmed ? (
         <div className="w-full rounded-lg border border-border-subtle bg-background flex flex-col items-center justify-center gap-1 mb-2 opacity-50" style={ASSET_CARD_MEDIA_STYLE}>
           <Lock size={18} className="text-disabled-foreground" />
-          <span className="text-[10px] text-disabled-foreground text-center px-3">
+          <span className="text-xs text-disabled-foreground text-center px-3">
             V1 검토 완료 후 업로드 가능
           </span>
         </div>
       ) : effectiveV1Status === "approved" ? (
         <div className="w-full rounded-lg border border-dashed border-border-subtle bg-background flex flex-col items-center justify-center gap-1 mb-2 opacity-40" style={ASSET_CARD_MEDIA_STYLE}>
           <CheckCircle2 size={18} className="text-emerald-500" />
-          <span className="text-[10px] text-subtle-foreground text-center px-3">
+          <span className="text-xs text-subtle-foreground text-center px-3">
             V1 확정 — 재보정 불필요
           </span>
         </div>
       ) : effectiveV1Status === "pending" ? (
         <div className="w-full rounded-lg border border-dashed border-amber-500/30 bg-background flex flex-col items-center justify-center gap-1 mb-2 opacity-80 px-3" style={ASSET_CARD_MEDIA_STYLE}>
           <AlertTriangle size={18} className="text-amber-400" />
-          <span className="text-[10px] text-amber-300 text-center font-medium">
+          <span className="text-xs text-warning text-center font-medium">
             V1 검토 결과 없음
           </span>
-          <span className="text-[9px] text-subtle-foreground text-center">
+          <span className="text-xs text-subtle-foreground text-center">
             페이지를 새로고침 해 주세요
           </span>
         </div>
@@ -2118,7 +2118,7 @@ export default function WorkflowPageClient({
                 {isV2ProjectPhase && (
                   <>
                     <span className="h-1.5 w-1.5 rounded-full bg-cyan" aria-hidden />
-                    <span className="text-[10px] font-medium text-cyan">진행 중</span>
+                    <span className="text-xs font-medium text-cyan">진행 중</span>
                   </>
                 )}
               </button>
@@ -2151,7 +2151,7 @@ export default function WorkflowPageClient({
                     <span className={`flex h-5 w-5 items-center justify-center rounded border ${someSelectableSelected ? "border-accent bg-accent text-white" : "border-border-strong bg-surface text-transparent"}`}>
                       {allSelectableSelected ? <Check size={12} strokeWidth={3} /> : someSelectableSelected ? <span className="h-0.5 w-2 rounded-full bg-white" /> : null}
                     </span>
-                    <span className="text-[11px] font-semibold text-muted-foreground">전체</span>
+                    <span className="text-xs font-semibold text-muted-foreground">전체</span>
                   </button>
                 ) : null}
                 {selectedVersionIds.size > 0 ? (
@@ -2159,7 +2159,7 @@ export default function WorkflowPageClient({
                     type="button"
                     onClick={() => { setSelectedVersionIds(new Set()); setMobileSelectionMode(false); }}
                     aria-label="선택 해제"
-                    className="hidden h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-[11px] font-medium text-muted-foreground md:inline-flex transition-colors hover:bg-surface-raised hover:text-foreground"
+                    className="hidden h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground md:inline-flex transition-colors hover:bg-surface-raised hover:text-foreground"
                   >
                     <X size={14} />
                     선택 해제
@@ -2171,7 +2171,7 @@ export default function WorkflowPageClient({
                     aria-label={allSelectableSelected ? "현재 목록 전체 선택 해제" : "현재 목록 전체 선택"}
                     aria-pressed={allSelectableSelected}
                     disabled={deletingSelection}
-                    className="hidden h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground disabled:opacity-45 md:flex"
+                    className="hidden h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground disabled:opacity-45 md:flex"
                   >
                     <span className={`flex h-4 w-4 items-center justify-center rounded border ${
                       allSelectableSelected ? "border-accent bg-accent text-white" : "border-border-strong bg-surface text-transparent"
@@ -2203,7 +2203,7 @@ export default function WorkflowPageClient({
                 <ProjectAssetToolbarSummary label="최종 확정본" count={`${finalRows.length.toLocaleString()}장`} meta="사진별 마지막 확정 버전" metaClassName="max-md:hidden" />
               ) : (
                 <>
-                  <span className="truncate whitespace-nowrap text-[11px] font-medium tabular-nums text-muted-foreground md:hidden">
+                  <span className="truncate whitespace-nowrap text-xs font-medium tabular-nums text-muted-foreground md:hidden">
                     {activeUploadCount}/{activeUploadTotal}장 업로드
                   </span>
                   <div className="hidden items-center gap-2.5 whitespace-nowrap md:flex">
@@ -2220,11 +2220,11 @@ export default function WorkflowPageClient({
                       className="h-1.5 w-16 overflow-hidden rounded-full bg-border"
                     >
                       <span
-                        className="block h-full rounded-full bg-accent transition-[width] duration-300"
+                        className="block h-full rounded-full bg-foreground transition-[width] duration-300 motion-reduce:transition-none"
                         style={{ width: `${activeUploadTotal > 0 ? Math.min(100, (activeUploadCount / activeUploadTotal) * 100) : 0}%` }}
                       />
                     </div>
-                    <span className={`text-[12px] font-semibold tabular-nums ${activeUploadRemaining > 0 ? "text-accent" : "text-muted-foreground"}`}>
+                    <span className={`text-[12px] font-semibold tabular-nums ${activeUploadRemaining > 0 ? "text-foreground" : "text-muted-foreground"}`}>
                       {activeUploadRemaining > 0 ? `${activeUploadRemaining}장 남음` : "업로드 완료"}
                     </span>
                   </div>
@@ -2243,16 +2243,14 @@ export default function WorkflowPageClient({
                 data-review-filter={key}
                 aria-pressed={filter === key}
                 onClick={() => setFilter(key)}
-                    className={`inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 ${
+                    className={`inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 ${
                   filter === key
                       ? "bg-surface-raised text-foreground"
-                        : key === "revision" || key === "v1_pending" || key === "v2_pending"
-                          ? "bg-transparent text-accent hover:bg-accent/[0.06]"
-                          : "bg-transparent text-subtle-foreground hover:bg-surface-raised hover:text-muted-foreground"
+                      : "bg-transparent text-muted-foreground hover:bg-surface-raised hover:text-foreground"
                 }`}
               >
                 <span>{label}</span>
-                <span className="tabular-nums text-[10px] opacity-75">{count.toLocaleString()}</span>
+                <span className="tabular-nums text-xs text-subtle-foreground">{count.toLocaleString()}</span>
               </button>
             ))}
             </div>
@@ -2278,7 +2276,7 @@ export default function WorkflowPageClient({
                   <div className="grid gap-1">
                     <div className="flex items-center justify-between px-2 pb-1 pt-0.5">
                       <strong className="text-[13px] font-semibold text-foreground">내보내기</strong>
-                      <span className="text-[11px] tabular-nums text-muted-foreground">{filteredRows.length.toLocaleString()}장</span>
+                      <span className="text-xs tabular-nums text-muted-foreground">{filteredRows.length.toLocaleString()}장</span>
                     </div>
                     <button type="button" onClick={() => { handleDownloadReview(false); setMobileExportOpen(false); }} className="flex h-11 items-center gap-3 rounded-lg px-3 text-left text-[13px] font-medium text-foreground hover:bg-surface-raised"><Download size={17} className="text-muted-foreground" />파일명 목록 (.csv)</button>
                     <button type="button" onClick={() => { handleDownloadReview(true); setMobileExportOpen(false); }} className="flex h-11 items-center gap-3 rounded-lg px-3 text-left text-[13px] font-medium text-foreground hover:bg-surface-raised"><MessageSquare size={17} className="text-muted-foreground" />재보정 요청 내용 포함 (.csv)</button>
@@ -2291,7 +2289,7 @@ export default function WorkflowPageClient({
                       <Download size={17} className="shrink-0 text-accent" />
                       <span className="min-w-0">
                         <strong className="block truncate font-medium">{originalDownloadProgress ? `${selectedDownloadLabel} 저장 중` : `${selectedDownloadLabel} 다운로드`}</strong>
-                        <small className="block truncate text-[10px] font-normal text-muted-foreground">{selectedOriginalDisabledReason ?? (project.includeOriginal ? "업로드 원본 그대로" : "확인용 최대 1200px JPEG")}</small>
+                        <small className="block truncate text-xs font-normal text-muted-foreground">{selectedOriginalDisabledReason ?? (project.includeOriginal ? "업로드 원본 그대로" : "확인용 최대 1200px JPEG")}</small>
                       </span>
                     </button>
                   </div>
@@ -2330,7 +2328,7 @@ export default function WorkflowPageClient({
                         onClick={() => { setShowExportMenu(false); handleDownloadReview(true); }}
                         className="flex min-h-10 w-full items-center gap-2 rounded-[7px] px-3 text-left text-[13px] text-foreground transition-colors hover:bg-surface-raised"
                       >
-                        <Download size={15} className="shrink-0 text-accent" />
+                        <Download size={15} className="shrink-0 text-muted-foreground" />
                         {stageTab === "original" ? "작가 전달 메모" : "재보정 요청 내용"} 포함 (.csv)
                       </button>
                       <div className="h-px bg-border-subtle mx-3" />
@@ -2340,18 +2338,18 @@ export default function WorkflowPageClient({
                         disabled={!canDownloadSelectedOriginals || originalDownloadProgress !== null}
                         className="flex min-h-[58px] w-full items-start gap-2 rounded-[7px] px-3 py-2.5 text-left transition-colors enabled:hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <Download size={12} className="text-accent shrink-0 mt-0.5" />
+                        <Download size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
                         <span className="min-w-0">
-                          <span className="block text-[11px] font-medium text-foreground">
+                          <span className="block text-[13px] text-foreground">
                             {originalDownloadProgress ? `${selectedDownloadLabel} 저장 중` : `${selectedDownloadLabel} 다운로드`}
                           </span>
-                          <span className="block mt-0.5 text-[9px] leading-4 text-subtle-foreground">
+                          <span className="mt-0.5 block text-xs leading-[18px] text-subtle-foreground">
                             {selectedOriginalDisabledReason ?? (project.includeOriginal
                               ? `선택된 ${rows.length.toLocaleString()}장 · 업로드 원본 그대로`
                               : `선택된 ${rows.length.toLocaleString()}장 · 확인용 최대 1200px JPEG`)}
                           </span>
                           {!selectedOriginalDisabledReason && !project.includeOriginal && (
-                            <span className="block text-[9px] leading-4 text-disabled-foreground">
+                            <span className="block text-xs leading-[18px] text-subtle-foreground">
                               보정·납품용으로는 해상도가 부족할 수 있어요.
                             </span>
                           )}
@@ -2366,12 +2364,14 @@ export default function WorkflowPageClient({
               <div className="hidden items-center md:flex" title={activeUploadDisabledReason}>
                 <ProjectAssetToolbarButton
                   data-workflow-bulk-upload-action
+                  /* 남은 보정본이 있으면 이 화면의 다음 행동은 업로드 하나 — 주황 채움은 여기만 쓴다. */
+                  variant={activeUploadComplete ? "secondary" : "primary"}
                   onClick={() => openPanel(stageTab === "v2" ? 2 : 1)}
                   disabled={!activeCanUpload}
                   title={activeUploadDisabledReason ?? (activeUploadComplete
                     ? "업로드한 보정본을 일괄 교체합니다"
                     : "남은 보정본을 일괄 업로드합니다")}
-                  className="!h-[42px] !border-0 !bg-accent/[0.10] !px-3.5 !text-[13px] !font-semibold !text-accent hover:!bg-accent/[0.16]"
+                  className="!h-[42px] !px-3.5 !text-[13px] !font-semibold"
                 >
                   {activeUploadComplete ? <SquarePen size={16} /> : <Upload size={16} />}
                   {activeUploadComplete ? "일괄 교체" : "일괄 업로드"}
@@ -2408,7 +2408,7 @@ export default function WorkflowPageClient({
                 </span>
                 <span className="min-w-0 flex-1">
                   <strong className={`block text-[14px] ${selected ? "text-accent" : "text-foreground"}`}>{round === "v1" ? "1차 보정" : "재보정"}</strong>
-                  <small className={`mt-0.5 block text-[11px] ${current ? "text-cyan" : "text-muted-foreground"}`}>{current ? "현재 진행 단계" : "완료된 단계"}</small>
+                  <small className={`mt-0.5 block text-xs ${current ? "text-cyan" : "text-muted-foreground"}`}>{current ? "현재 진행 단계" : "완료된 단계"}</small>
                 </span>
                 {selected ? <Check size={17} className="text-accent" aria-label="현재 보고 있는 단계" /> : null}
               </button>
@@ -2478,7 +2478,7 @@ export default function WorkflowPageClient({
                   : exportMessage?.text}
               </p>
               {originalDownloadProgress && (
-                <p className="mt-1 text-[10px] text-subtle-foreground">
+                <p className="mt-1 text-xs text-subtle-foreground">
                   창을 닫지 마세요. 파일을 한 장씩 선택한 폴더에 저장하고 있어요.
                 </p>
               )}
@@ -2790,7 +2790,7 @@ export default function WorkflowPageClient({
             />
           )}
           renderThumbnailOverlay={assetView === "final" ? undefined : () => (
-            <span className="max-md:hidden absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold text-white/85">
+            <span className="max-md:hidden absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-xs font-semibold text-white/85">
               {activeArchivedVersion
                 ? activeArchivedVersion.version === 2 ? `재보정 ${activeArchivedVersion.revisionNo}차` : "이전 보정"
                 : resolvedViewerTab === "original" ? "원본" : resolvedViewerTab === "v2" ? `재보정 ${activeViewerV2Round}차` : "보정"}

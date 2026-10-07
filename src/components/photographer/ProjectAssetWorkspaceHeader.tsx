@@ -31,6 +31,12 @@ type ProjectAssetWorkspaceHeaderProps = {
   className?: string;
   compact?: boolean;
   immersive?: boolean;
+  /** 화면 제목(스크린리더용 h1). 없으면 탭 이름을 쓴다. */
+  title?: string;
+  /** 고객·프로젝트 ID 뒤에 붙는 보조 정보 */
+  metaExtra?: ReactNode;
+  /** 업로드 중 이탈 확인처럼 이동을 가로채야 하는 화면에서 넘긴다. */
+  onNavigate?: (href: string) => void;
 };
 
 /**
@@ -46,11 +52,15 @@ export function ProjectAssetWorkspaceHeader({
   className = "",
   compact = false,
   immersive = false,
+  title: titleOverride,
+  metaExtra,
+  onNavigate,
 }: ProjectAssetWorkspaceHeaderProps) {
   const router = useRouter();
+  const navigate = onNavigate ?? ((href: string) => router.push(href));
   const projectId = project.id;
   const displayId = project.displayId ?? projectId.slice(0, 8).toUpperCase();
-  const title = TAB_TITLES[activeTab];
+  const title = titleOverride ?? TAB_TITLES[activeTab];
 
   useEffect(() => {
     const context = { projectName: project.name, customerName: project.customerName };
@@ -82,7 +92,7 @@ export function ProjectAssetWorkspaceHeader({
         >
           <button
             type="button"
-            onClick={() => router.push("/photographer/projects")}
+            onClick={() => navigate("/photographer/projects")}
             className="shrink-0 transition-colors hover:text-foreground"
           >
             프로젝트
@@ -91,7 +101,7 @@ export function ProjectAssetWorkspaceHeader({
           <button
             type="button"
             data-project-asset-context-name
-            onClick={() => router.push(`/photographer/projects/${projectId}`)}
+            onClick={() => navigate(`/photographer/projects/${projectId}`)}
             className="truncate font-semibold text-foreground transition-colors hover:text-accent"
           >
             {project.name}
@@ -104,6 +114,7 @@ export function ProjectAssetWorkspaceHeader({
           <span className="max-w-[220px] truncate">{project.customerName} 고객</span>
           <span className="text-disabled-foreground">·</span>
           <span className="whitespace-nowrap font-mono">#{displayId}</span>
+          {metaExtra ? <><span className="text-disabled-foreground">·</span><span className="whitespace-nowrap">{metaExtra}</span></> : null}
         </div>
       </div>
 
@@ -117,6 +128,7 @@ export function ProjectAssetWorkspaceHeader({
           activeTab={activeTab}
           originalCount={originalCount}
           selectedCount={selectedCount}
+          onNavigate={onNavigate}
         />
         {tabTrailing ? <div className="flex h-11 shrink-0 items-center border-b border-border-subtle md:h-12 md:items-end md:pb-1">{tabTrailing}</div> : null}
       </div>

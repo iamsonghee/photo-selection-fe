@@ -17,23 +17,10 @@
 .workspace :global(.prj-gallery-display-tools) { border:0; padding:0; gap:12px; }
 .workspace :global(.prj-upload-compact) { min-height:48px; }
 
-.workspace [data-upload-header-mode] nav { min-width:0; }
-.workspace [data-upload-header-mode] nav button { max-width:45vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .emptyUpload p { word-break:keep-all; }
 @media(max-width:768px) {
   .emptyUpload { height:auto; min-height:100%; }
 }
-.expandedHeader {
-  display: grid;
-  grid-template-rows: 1fr;
-  opacity: 1;
-  transition: grid-template-rows 200ms ease-out, opacity 200ms ease-out;
-}
-
-.expandedHeaderInner { min-height: 0; overflow: hidden; }
-
-.workspace [data-upload-header-mode="compact"] .expandedHeader { grid-template-rows: 0fr; opacity: 0; }
-
 .recommendationTrayOpen {
   transform-origin: bottom right;
   animation: recommendation-tray-open 180ms ease-out both;
@@ -56,6 +43,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .expandedHeader { transition: none; }
   .recommendationTrayOpen, .recommendationTrayClosing { animation: none; }
 }

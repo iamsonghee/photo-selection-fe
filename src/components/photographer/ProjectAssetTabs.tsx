@@ -33,6 +33,7 @@ export function ProjectAssetTabs({
   originalCount,
   selectedCount,
   className = "",
+  onNavigate,
 }: {
   projectId: string;
   status: ProjectStatus;
@@ -40,6 +41,7 @@ export function ProjectAssetTabs({
   originalCount?: number;
   selectedCount?: number;
   className?: string;
+  onNavigate?: (href: string) => void;
 }) {
   const router = useRouter();
   const tabs: Array<{ key: ProjectAssetTab; label: string; count?: number; href: string }> = [
@@ -94,7 +96,9 @@ export function ProjectAssetTabs({
                 : "border-transparent bg-transparent font-medium text-muted-foreground hover:text-foreground"
             }`}
             onClick={() => {
-              if (!active) router.push(tab.href);
+              if (active) return;
+              if (onNavigate) onNavigate(tab.href);
+              else router.push(tab.href);
             }}
             onMouseEnter={() => router.prefetch(tab.href)}
             onFocus={() => router.prefetch(tab.href)}

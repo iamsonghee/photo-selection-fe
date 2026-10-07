@@ -44,7 +44,7 @@ test.describe("작가 — 워크플로우(보정 관리)", () => {
     // 첫 보정본이 없으면 일괄 업로드 패널이 자동으로 한 번 열린다.
     const uploadDialog = page.getByRole("dialog", { name: "보정본 업로드" });
     await expect(uploadDialog).toBeVisible({ timeout: 8000 });
-    await expect(uploadDialog.locator("[data-upload-title-icon]")).toHaveClass(/text-accent/);
+    await expect(uploadDialog.locator("[data-upload-title-icon]")).toHaveCount(1);
 
     await uploadDialog.locator('input[type="file"][multiple]').setInputFiles({
       name: "E2E_TEST_001.jpg",

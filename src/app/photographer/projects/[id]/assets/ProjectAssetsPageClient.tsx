@@ -25,6 +25,7 @@ import { PhotoAnalysisFilterGroup } from "@/components/photographer/PhotoAnalysi
 import { ViewerCommentPanel } from "@/components/photographer/ViewerCommentPanel";
 import { ProjectAssetStatusActionBar } from "@/components/photographer/ProjectAssetStatusActionBar";
 import { PhotographerModal } from "@/components/ui/PhotographerModal";
+import { AiAnalysisPromptModal } from "@/components/photographer/AiAnalysisPromptModal";
 import { FilenameSearchInput } from "@/components/ui/FilenameSearchInput";
 import { PhotoSortSelect } from "@/components/photographer/PhotoSortSelect";
 import { useProjectAssetsData } from "@/components/photographer/ProjectAssetsDataProvider";
@@ -87,6 +88,10 @@ export default function ProjectAssetsPageClient({
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [analysisStatus, setAnalysisStatus] = useState<"processing" | "completed" | "failed" | null>(null);
   const [analysisTriggering, setAnalysisTriggering] = useState(false);
+  const [qualityStatus, setQualityStatus] = useState<"processing" | "completed" | "failed" | null>(null);
+  const [aiPromptOpen, setAiPromptOpen] = useState(false);
+  const [aiWantSimilar, setAiWantSimilar] = useState(true);
+  const [aiWantQuality, setAiWantQuality] = useState(false);
   const [qualityByPhotoId, setQualityByPhotoId] = useState<Record<string, Pick<Photo, "isBlurry" | "faceDetected" | "eyesClosed">>>({});
   const [qualityFilter, setQualityFilter] = useState<Set<QualityFilter>>(new Set());
   const [showEditStartModal, setShowEditStartModal] = useState(false);
@@ -122,22 +127,42 @@ export default function ProjectAssetsPageClient({
     } catch {}
   }, [id]);
 
-  useEffect(() => {
-    if (activeTab !== "original") return;
-    void Promise.all([loadPhotoGroups(), loadAnalysisStatus()]);
-  }, [activeTab, loadAnalysisStatus, loadPhotoGroups]);
+  /** 눈감음·흐림 확인 — 업로드 화면과 같은 gemini-quality 상태를 원본 탭에서도 추적한다. */
+  const loadQualityStatus = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/photographer/projects/${id}/gemini-quality`);
+      if (!response.ok) return;
+      const data = await response.json() as { gemini_quality_status?: "processing" | "completed" | "failed" | null };
+      if (data.gemini_quality_status !== undefined) setQualityStatus(data.gemini_quality_status);
+    } catch {}
+  }, [id]);
+
+  const loadQualityResults = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/photographer/projects/${id}/photo-quality`);
+      if (!response.ok) return;
+      const data = await response.json() as { quality?: Record<string, Pick<Photo, "isBlurry" | "faceDetected" | "eyesClosed">> };
+      setQualityByPhotoId(data.quality ?? {});
+    } catch {}
+  }, [id]);
 
   useEffect(() => {
     if (activeTab !== "original") return;
-    let cancelled = false;
-    fetch(`/api/photographer/projects/${id}/photo-quality`)
-      .then((response) => response.ok ? response.json() : null)
-      .then((data: { quality?: Record<string, Pick<Photo, "isBlurry" | "faceDetected" | "eyesClosed">> } | null) => {
-        if (!cancelled) setQualityByPhotoId(data?.quality ?? {});
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [activeTab, id]);
+    void Promise.all([loadPhotoGroups(), loadAnalysisStatus(), loadQualityStatus(), loadQualityResults()]);
+  }, [activeTab, loadAnalysisStatus, loadPhotoGroups, loadQualityStatus, loadQualityResults]);
+
+  useEffect(() => {
+    if (qualityStatus !== "processing") return;
+    const timer = window.setInterval(() => { void loadQualityStatus(); }, 4000);
+    return () => window.clearInterval(timer);
+  }, [qualityStatus, loadQualityStatus]);
+
+  const previousQualityStatusRef = useRef(qualityStatus);
+  useEffect(() => {
+    const previous = previousQualityStatusRef.current;
+    previousQualityStatusRef.current = qualityStatus;
+    if (previous === "processing" && qualityStatus === "completed") void loadQualityResults();
+  }, [qualityStatus, loadQualityResults]);
 
   useEffect(() => {
     if (analysisStatus !== "processing") return;
@@ -443,32 +468,52 @@ export default function ProjectAssetsPageClient({
     }
   };
 
-  const handleSimilarityControl = async () => {
-    if (photoGroups.length > 0) {
-      const nextVisible = !similarityVisible;
-      setSimilarityVisible(nextVisible);
-      setToast(nextVisible
-        ? `유사컷 ${photoGroups.length.toLocaleString()}개 그룹을 묶어서 표시합니다.`
-        : "유사컷 묶음을 해제하고 모든 사진을 표시합니다.");
-      return;
-    }
-    if (analysisStatus === "processing" || analysisTriggering) return;
+  /** 유사컷 묶어보기는 보기 설정일 뿐이다 — 분석 시작은 AI 분석 버튼이 맡는다. */
+  const handleSimilarityControl = () => {
+    if (photoGroups.length === 0) return;
+    const nextVisible = !similarityVisible;
+    setSimilarityVisible(nextVisible);
+    setToast(nextVisible
+      ? `유사컷 ${photoGroups.length.toLocaleString()}개 그룹을 묶어서 표시합니다.`
+      : "유사컷 묶음을 해제하고 모든 사진을 표시합니다.");
+  };
+
+  const aiBusy = analysisTriggering || analysisStatus === "processing" || qualityStatus === "processing";
+
+  /** 업로드 화면 툴바와 같은 진입점 — 이미 끝난 분석은 꺼 둔 채 연다. */
+  const openAiPrompt = () => {
+    setAiWantSimilar(analysisStatus !== "completed");
+    setAiWantQuality(qualityStatus !== "completed");
+    setAiPromptOpen(true);
+  };
+
+  const cancelAiAnalysis = async () => {
+    const jobs: Promise<Response>[] = [];
+    if (analysisStatus === "processing") jobs.push(fetch(`/api/photographer/projects/${id}/gemini-analysis`, { method: "DELETE" }));
+    if (qualityStatus === "processing") jobs.push(fetch(`/api/photographer/projects/${id}/gemini-quality`, { method: "DELETE" }));
+    const results = await Promise.allSettled(jobs);
+    await Promise.all([loadAnalysisStatus(), loadQualityStatus()]);
+    setToast(results.every((r) => r.status === "fulfilled" && r.value.ok) ? "AI 분석을 중단했습니다." : "분석 중단에 실패했습니다.");
+  };
+
+  /** 체크한 것만 시작한다. 둘은 독립이라 한쪽이 실패해도 다른 쪽은 진행한다. */
+  const startAiAnalysis = async () => {
+    setAiPromptOpen(false);
+    const start = (path: "gemini-analysis" | "gemini-quality") => fetch(`/api/photographer/projects/${id}/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
     setAnalysisTriggering(true);
-    try {
-      const response = await fetch(`/api/photographer/projects/${id}/gemini-analysis`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const data = await response.json().catch(() => ({})) as { error?: string; detail?: string };
-      if (!response.ok) throw new Error(data.error ?? data.detail ?? "유사컷 분석을 시작하지 못했습니다.");
-      setAnalysisStatus("processing");
-      setToast("유사컷 분석을 시작했습니다.");
-    } catch (reason) {
-      setToast(reason instanceof Error ? reason.message : "유사컷 분석을 시작하지 못했습니다.");
-    } finally {
-      setAnalysisTriggering(false);
-    }
+    const results = await Promise.allSettled([
+      aiWantSimilar ? start("gemini-analysis").then((r) => { if (r.ok) setAnalysisStatus("processing"); return r; }) : null,
+      aiWantQuality ? start("gemini-quality").then((r) => { if (r.ok) setQualityStatus("processing"); return r; }) : null,
+    ].filter((job): job is Promise<Response> => job !== null));
+    setAnalysisTriggering(false);
+    const failed = results.filter((r) => r.status === "rejected" || !r.value.ok).length;
+    setToast(failed === 0 ? "AI 분석을 시작했습니다. 완료되면 화면에 반영됩니다."
+      : failed === results.length ? "분석 시작에 실패했습니다. 잠시 후 다시 시도해 주세요."
+      : "일부 분석을 시작하지 못했습니다.");
   };
 
   const handleGroupBadgeClick = (event: MouseEvent, groupId: string) => {
@@ -482,11 +527,11 @@ export default function ProjectAssetsPageClient({
     });
   };
 
-  const analysisControlLabel = analysisStatus === "processing"
-    ? "유사컷 분석 중"
-    : photoGroups.length > 0
-      ? similarityVisible ? "유사컷 묶음 해제" : "유사컷 묶어보기"
-      : analysisStatus === "completed" ? "유사컷 없음" : "유사컷 분석";
+  const aiControlLabel = aiBusy
+    ? (analysisStatus === "processing" && qualityStatus === "processing"
+        ? "AI 분석 중"
+        : analysisStatus === "processing" ? "유사컷 분석 중" : "품질 확인 중")
+    : "AI 분석";
   const activeMobileToolCount = Number(query.trim().length > 0)
     + Number(sortMode !== "filename-asc")
     + (activeTab === "original" ? qualityFilter.size : 0);
@@ -569,50 +614,46 @@ export default function ProjectAssetsPageClient({
                 onChange={setShowRecommendedOnly}
               />
             ) : null}
-            <div className="md:hidden">
+            {/* AI 분석 버튼과 유사컷 묶어보기 토글은 서로 대체하지 않는다(업로드 화면과 같은 규칙) —
+              * 분석이 끝나도 품질 확인을 시작할 진입점이 남아야 한다. */}
+            <div className="flex items-center gap-1 md:hidden">
+              <ProjectAssetMobileContextAction
+                data-ai-analysis-control
+                onClick={aiBusy ? () => void cancelAiAnalysis() : openAiPrompt}
+                disabled={analysisTriggering}
+                aria-label={aiBusy ? `${aiControlLabel} · 누르면 중단` : aiControlLabel}
+              >
+                {aiBusy ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} className="text-accent" />}
+                <span>{aiBusy ? "분석 중" : "AI 분석"}</span>
+              </ProjectAssetMobileContextAction>
               {photoGroups.length > 0 ? (
                 <PhotoAnalysisFilterGroup
                   similarity={{
                     count: photoGroups.length,
                     checked: similarityVisible,
-                    onChange: (checked) => { if (checked !== similarityVisible) void handleSimilarityControl(); },
+                    onChange: (checked) => { if (checked !== similarityVisible) handleSimilarityControl(); },
                   }}
                 />
-              ) : (
-                <ProjectAssetMobileContextAction
-                  data-similarity-control
-                  faceKind="similarity"
-                  onClick={handleSimilarityControl}
-                  disabled={analysisTriggering || analysisStatus === "completed"}
-                  aria-label={analysisControlLabel}
-                  title={analysisControlLabel}
-                >
-                  {analysisStatus === "processing" || analysisTriggering ? <Loader2 size={14} className="animate-spin text-accent" /> : <Sparkles size={14} className="text-accent" />}
-                  <span>{analysisStatus === "processing" || analysisTriggering ? "분석 중" : analysisStatus === "completed" ? "유사컷 없음" : "유사컷"}</span>
-                </ProjectAssetMobileContextAction>
-              )}
+              ) : null}
             </div>
             <div className="hidden md:block">
-              {photoGroups.length === 0 ? (
-                <ProjectAssetToolbarButton
-                  data-desktop-similarity-control
-                  onClick={handleSimilarityControl}
-                  disabled={analysisTriggering || analysisStatus === "completed"}
-                  aria-label={analysisControlLabel}
-                  title={analysisControlLabel}
-                  className="px-4"
-                >
-                  {analysisStatus === "processing" || analysisTriggering ? <Loader2 size={17} className="animate-spin text-accent" /> : <Sparkles size={17} className="text-accent" />}
-                  <span>{analysisControlLabel}</span>
-                </ProjectAssetToolbarButton>
-              ) : null}
+              <ProjectAssetToolbarButton
+                data-desktop-ai-analysis-control
+                onClick={aiBusy ? () => void cancelAiAnalysis() : openAiPrompt}
+                disabled={analysisTriggering}
+                aria-label={aiBusy ? `${aiControlLabel} · 누르면 중단` : aiControlLabel}
+                className="px-4"
+              >
+                {aiBusy ? <Loader2 size={17} className="animate-spin" /> : <Sparkles size={17} className="text-accent" />}
+                <span>{aiControlLabel}</span>
+              </ProjectAssetToolbarButton>
             </div>
             <div className="hidden md:block">
               <PhotoAnalysisFilterGroup
                 similarity={photoGroups.length > 0 ? {
                   count: photoGroups.length,
                   checked: similarityVisible,
-                  onChange: (checked) => { if (checked !== similarityVisible) void handleSimilarityControl(); },
+                  onChange: (checked) => { if (checked !== similarityVisible) handleSimilarityControl(); },
                 } : undefined}
                 eyesClosed={qualityCounts.eyesClosed > 0 ? {
                   count: qualityCounts.eyesClosed,
@@ -630,7 +671,7 @@ export default function ProjectAssetsPageClient({
         ) : (
           <div className="flex flex-wrap items-center gap-2 text-[13px]">
             <strong>선택 {selectedPhotos.length.toLocaleString()}장</strong>
-            <span className="hidden text-muted-foreground md:inline">· 요청 {commentCount.toLocaleString()}장</span>
+            <span className="hidden text-muted-foreground md:inline">· 고객 메모 {commentCount.toLocaleString()}장</span>
           </div>
         )}
         actions={(
@@ -761,19 +802,15 @@ export default function ProjectAssetsPageClient({
                       onChange: () => toggleQualityFilter("blurry"),
                     } : undefined}
                   />
-                  <p className="mt-2 text-[11px] leading-4 text-muted-foreground">두 항목을 함께 선택하면 둘 중 하나에 해당하는 사진을 표시합니다.</p>
+                  <p className="mt-2 text-xs leading-4 text-muted-foreground">두 항목을 함께 선택하면 둘 중 하나에 해당하는 사진을 표시합니다.</p>
                 </section>
               ) : null}
 
             </div>
 
-            <button
-              type="button"
-              onClick={() => setMobileToolsOpen(false)}
-              className="h-12 w-full rounded-lg bg-accent text-[15px] font-bold text-white transition-colors hover:bg-[#e94b0d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 focus-visible:ring-offset-2"
-            >
+            <PhotographerLightButton size="work-panel" onClick={() => setMobileToolsOpen(false)} className="w-full">
               완료
-            </button>
+            </PhotographerLightButton>
       </ProjectAssetMobileSheet>
 
       <ProjectAssetMobileSheet
@@ -959,8 +996,8 @@ export default function ProjectAssetsPageClient({
               const count = group ? (membersByGroup.get(group.id)?.length ?? group.photoCount) : 0;
               const representative = inGroupReview && groupReviewGroup?.representativePhotoId === photo.id;
               return <>
-                {group && count > 1 ? <span className="absolute bottom-[5px] right-[5px] z-[2] inline-flex h-5 min-w-[25px] items-center justify-center rounded-full border border-white/45 bg-[#111315]/80 px-1.5 text-[10px] font-bold text-white">+{(count - 1).toLocaleString()}</span> : null}
-                {representative ? <span className="absolute bottom-0.5 left-0.5 z-[2] rounded-[3px] bg-accent px-1 py-px text-[8px] font-bold text-accent-foreground">대표</span> : null}
+                {group && count > 1 ? <span className="absolute bottom-[5px] right-[5px] z-[2] inline-flex h-5 min-w-[25px] items-center justify-center rounded-full border border-white/45 bg-[#111315]/80 px-1.5 text-xs font-bold text-white">+{(count - 1).toLocaleString()}</span> : null}
+                {representative ? <span className="absolute bottom-0.5 left-0.5 z-[2] rounded-[3px] bg-accent px-1 py-px text-xs font-bold text-accent-foreground">대표</span> : null}
               </>;
             }}
           />
@@ -988,6 +1025,19 @@ export default function ProjectAssetsPageClient({
           />
         )
       ) : null}
+      <AiAnalysisPromptModal
+        open={aiPromptOpen}
+        description={`이 프로젝트의 원본 ${photos.length.toLocaleString()}장을 분석합니다.`}
+        similar={aiWantSimilar}
+        quality={aiWantQuality}
+        onSimilarChange={setAiWantSimilar}
+        onQualityChange={setAiWantQuality}
+        onClose={() => setAiPromptOpen(false)}
+        onSkip={() => setAiPromptOpen(false)}
+        onStart={() => void startAiAnalysis()}
+        similarState={analysisStatus === "completed" ? "이미 분석 완료" : null}
+        qualityState={qualityStatus === "completed" ? "이미 확인 완료" : null}
+      />
       {originalDownloadProgress ? (
         <div role="status" className="fixed bottom-6 left-1/2 z-[100010] min-w-[280px] -translate-x-1/2 rounded-lg border border-border bg-surface px-4 py-3 text-[13px] font-medium text-foreground shadow-lg">
           <p>{selectedDownloadLabel} 저장 중 · {originalDownloadProgress.completed.toLocaleString()} / {originalDownloadProgress.total.toLocaleString()}</p>
