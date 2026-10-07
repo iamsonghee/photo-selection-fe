@@ -291,7 +291,7 @@ test.describe("고객 — 뷰어 (사진 크게 보기)", () => {
     await page.getByRole("button", { name: "확정", exact: true }).click();
     await expect(page.locator(".rvx-panel-status")).toContainText("확정했어요");
     await expect(page.locator(".rvx-completion")).toContainText("1장 모두 확인했어요");
-    await expect(page.getByRole("button", { name: "작가에게 전달" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "검토 결과 전달하기" })).toBeVisible();
     expect((await page.locator(".rvx-strip").boundingBox())?.height).toBe(stripHeightBefore);
     const panelBox = await page.locator(".rvx-panel").boundingBox();
     const completionBox = await page.locator(".rvx-completion").boundingBox();
