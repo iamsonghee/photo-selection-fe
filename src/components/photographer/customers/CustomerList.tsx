@@ -38,7 +38,9 @@ export function CustomerList({ customers, selectedId, search, filter, counts, lo
           ))}
         </div>
       </div>
-      {loading ? <p role="status" className="p-8 text-center text-sm text-muted-foreground">고객을 불러오는 중이에요.</p>
+      {loading ? <div role="status" aria-label="고객을 불러오는 중" aria-busy="true" className="space-y-3 p-4">
+          {[0, 1, 2, 3].map(index => <div key={index} className="flex items-center gap-3"><span className="size-10 shrink-0 rounded-full skeleton-block" /><span className="h-5 flex-1 rounded-md skeleton-block" /></div>)}
+        </div>
         : error ? <div className="space-y-3 p-6 text-center"><p role="alert" className="text-sm text-danger">{error}</p><PhotographerLightButton variant="outline" onClick={onRetry}>다시 시도</PhotographerLightButton></div>
         : customers.length === 0 ? <div className="px-5 py-12 text-center">
           <UserRound size={28} className="mx-auto mb-3 text-subtle-foreground" aria-hidden />

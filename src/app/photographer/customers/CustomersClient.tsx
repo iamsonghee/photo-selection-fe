@@ -199,7 +199,7 @@ function CustomersContent({ cache, initialData, fetchedAt }: { cache: ReturnType
       </div>
       <div className={`${requestedId ? "block" : "hidden md:block"} min-w-0`}>
         {requestedId && <button type="button" className="mb-3 flex min-h-11 items-center gap-2 text-sm md:hidden" onClick={() => window.history.pushState(null, "", "/photographer/customers")}><ArrowLeft size={16} />고객 목록</button>}
-        {detailLoading ? <p role="status" className="rounded-xl border border-border-subtle bg-surface p-8 text-sm text-muted-foreground">고객 정보를 불러오는 중이에요.</p>
+        {detailLoading ? <div role="status" aria-label="고객 정보를 불러오는 중" aria-busy="true" className="space-y-4 rounded-xl border border-border-subtle bg-surface p-8"><span className="block h-7 w-44 rounded-md skeleton-block" /><span className="block h-4 w-64 max-w-full rounded-md skeleton-block" /><span className="block h-32 rounded-md skeleton-block" /></div>
           : detailError ? <div className="space-y-4 rounded-xl border border-border-subtle bg-surface p-6"><p role="alert" className="text-sm text-danger">{detailError}</p><PhotographerLightButton variant="outline" onClick={() => setReload(value => value + 1)}>다시 시도</PhotographerLightButton></div>
           : selected ? <article aria-label="고객 상세" className="rounded-xl border border-border-subtle bg-surface p-5 md:p-7">
           <div className="flex items-start justify-between gap-3">

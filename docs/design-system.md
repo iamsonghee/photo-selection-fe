@@ -1270,7 +1270,7 @@ Information 그룹과 Action 그룹(Utility+Communication)은 레이아웃상 �
 ### 전체 화면 로딩 및 고객 별점 통일
 
 - `SystemLoadingScreen`의 기본값과 앱/작가 로딩 경계는 라이트 버전을 사용한다. 전체 화면 `PageLoader`도 흰 배경과 회색 안내 문구를 사용하며 인라인 로더는 기존 스타일을 유지한다.
-- (2026-10-06 갱신) 라우트 로딩 경계와 화면 안 데이터 로딩은 더 이상 `SystemLoadingScreen`으로 화면 전체를 덮지 않는다. 루트·`/c` `loading.tsx`는 없앴고, `customer-select/(list)/loading.tsx`·`photographer/loading.tsx`와 각 화면은 실제 배치를 닮은 골격(`PhotographerPageSkeleton`, `ProjectBodySkeleton`)을 이미 그려진 헤더·셸 아래 본문 자리에만 둔다(§13.1). 인라인 `PageLoader`는 300ms 뒤에 나타난다. `SystemLoadingScreen`은 작가 고객 페이지(`/c/[token]/**`) 화면 안 로딩에만 남아 있다.
+- (2026-10-07 갱신) 작가·고객·하객·관리자 라우트 로딩과 화면 안 초기 데이터 로딩은 각 화면 배치를 닮은 `skeleton-block` 골격을 쓴다. 공통 헤더·셸은 유지하고 본문만 골격으로 채운다(§13.1). `PageLoader`와 `SystemLoadingScreen`은 현재 호출부가 없다.
 - 고객 갤러리 카드, 데스크톱 별점 필터, PC/모바일 상세보기의 문자 별(★/☆)을 랜딩 체험과 같은 Lucide `Star` SVG로 통일한다. 채운 별은 `currentColor`, 빈 별은 `none`, 둥근 외곽선은 `strokeWidth={2}`를 사용한다. 별점 저장·해제·필터 동작은 유지한다.
 - 로컬 샘플에서 390px/1440px 로딩 배경과 가로 넘침 없음, 실제 갤러리 카드의 SVG 별 5개 및 채움 상태를 확인했다. 운영 API는 호출하지 않았다.
 

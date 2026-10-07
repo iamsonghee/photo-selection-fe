@@ -779,8 +779,8 @@ export default function LockedPage() {
             )}
           </div>
         ) : (
-          <div className="lk-loading flex items-center justify-center h-48 font-mono text-sm">
-            불러오는 중...
+          <div role="status" aria-label="사진을 불러오는 중" aria-busy="true" className="grid grid-cols-2 gap-2 p-4 md:grid-cols-4">
+            {Array.from({ length: 8 }, (_, index) => <span key={index} className="aspect-square rounded-lg skeleton-block" />)}
           </div>
         )}
       </div>
@@ -881,7 +881,6 @@ export default function LockedPage() {
           display: grid; gap: 12px; align-items: start;
           grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
         }
-        .lk-loading { color: var(--customer-ink-secondary); }
         .lk-section-label { color: var(--customer-ink); }
         .lk-section-count { color: var(--customer-ink-secondary); }
 

@@ -4016,8 +4016,8 @@ export default function ProjectDetailPage() {
               </div>
             )}
             {photosLoading ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", gap: 8 }}>
-                <span style={{ fontSize: 13, color: TEXT_MUTED }}>불러오는 중...</span>
+              <div role="status" aria-label="사진을 불러오는 중" aria-busy="true" className="grid grid-cols-3 content-start gap-2 p-4 md:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]">
+                {Array.from({ length: 12 }, (_, index) => <span key={index} className="aspect-square rounded-lg skeleton-block" />)}
               </div>
             ) : displayPhotos.length === 0 && !photoUploadAllowed ? (
               <div

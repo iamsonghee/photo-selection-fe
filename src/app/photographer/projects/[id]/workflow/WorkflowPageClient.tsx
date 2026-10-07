@@ -1,6 +1,6 @@
 "use client";
 
-import { PageLoader } from "@/components/ui/PageLoader";
+import { PhotographerPageSkeleton } from "@/components/photographer/PhotographerPageSkeleton";
 import { Badge } from "@/components/ui/Badge";
 import { PhotographerConfirmDialog } from "@/components/ui/PhotographerConfirmDialog";
 
@@ -1799,13 +1799,7 @@ export default function WorkflowPageClient({
   // ── Loading / Error ────────────────────────────────────────────────────────
 
   if (assetDataLoading) {
-    return (
-      <div data-photographer-viewport-page className="flex h-screen flex-col bg-background text-foreground">
-        <div className="flex min-h-0 flex-1 items-center justify-center">
-          <PageLoader text="프로젝트 불러오는 중" />
-        </div>
-      </div>
-    );
+    return <PhotographerPageSkeleton variant="workspace" label="프로젝트를 불러오고 있어요" />;
   }
 
   if (assetDataError || !project) {
@@ -1823,13 +1817,7 @@ export default function WorkflowPageClient({
   }
 
   if (!assetRouteAllowed) {
-    return (
-      <div data-photographer-viewport-page className="flex h-screen flex-col bg-background text-foreground">
-        <div className="flex min-h-0 flex-1 items-center justify-center">
-          <PageLoader text="프로젝트 상세로 이동하는 중" />
-        </div>
-      </div>
-    );
+    return <PhotographerPageSkeleton variant="workspace" label="프로젝트 상세로 이동하는 중" />;
   }
 
   // ── Derived state ──────────────────────────────────────────────────────────
@@ -2574,8 +2562,8 @@ export default function WorkflowPageClient({
               </div>
             )}
             {initialVersionLoading ? (
-              <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-border-subtle bg-surface/40">
-                <PageLoader text="보정본 불러오는 중" />
+              <div role="status" aria-label="보정본을 불러오는 중" aria-busy="true" className="grid min-h-[420px] grid-cols-3 content-start gap-2 rounded-2xl border border-border-subtle bg-surface/40 p-4 md:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]">
+                {Array.from({ length: 12 }, (_, index) => <span key={index} className="aspect-square rounded-lg skeleton-block" />)}
               </div>
             ) : error ? (
               <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-2xl border border-border-subtle bg-surface/50 px-6 text-center">

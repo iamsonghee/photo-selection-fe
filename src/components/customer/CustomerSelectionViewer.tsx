@@ -12,6 +12,7 @@ import { SelectionLimitSnackbar } from "@/components/customer/SelectionLimitSnac
 import { ParticipantSheet } from "@/components/customer/ParticipantSheet";
 import { PhotoPositionBar } from "@/components/customer/PhotoPositionBar";
 import { PhotoFocusOverlay } from "@/components/customer/PhotoFocusOverlay";
+import { CustomerPageSkeleton } from "@/app/c/[token]/CustomerPageSkeleton";
 import {
   fetchRoster,
   getUsedColors,
@@ -84,7 +85,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
   const searchParams = useSearchParams();
   const token = adapter?.token ?? (params?.token as string) ?? "";
   const photoId = adapter?.photoId ?? (params?.photoId as string) ?? "";
-  const { project, photos: contextPhotos, photoGroups, selectedIds, Y, toggle, photoStates, updatePhotoState, toggleColor, commentSaveStates, selectionSaving, saveError } = useSelection();
+  const { project, photos: contextPhotos, photoGroups, selectedIds, Y, toggle, photoStates, updatePhotoState, toggleColor, commentSaveStates, selectionSaving, saveError, loading } = useSelection();
 
   // 로컬 state로 현재 사진 관리 — router.push 없이 전환해 컴포넌트 재마운트 방지
   const [activePhotoId, setActivePhotoId] = useState(photoId);
@@ -725,6 +726,7 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
     if (!adapter && (project.status === "confirmed" || project.status === "editing")) router.replace(`/c/${token}/locked`);
   }, [adapter, project?.status, project, token, router]);
 
+  if (loading) return <CustomerPageSkeleton variant="viewer" />;
   if (!project) return null;
   if (!current) {
     const galleryHref = adapter?.galleryHref ?? buildGalleryHrefWithFocus(token, searchParams, activePhotoId);

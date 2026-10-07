@@ -12,6 +12,7 @@ import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDi
 import { PhotoPositionBar } from "@/components/customer/PhotoPositionBar";
 import { PhotoFilmstrip } from "@/components/customer/PhotoFilmstrip";
 import { PhotoFocusOverlay } from "@/components/customer/PhotoFocusOverlay";
+import { CustomerPageSkeleton } from "../../CustomerPageSkeleton";
 import type { ReviewPhotoItem } from "@/lib/customer-api-server";
 import { normalizeReviewDeadlineYmd } from "@/lib/format-review-deadline";
 import { isReceiptMode } from "@/lib/review-mode";
@@ -386,11 +387,12 @@ export default function ReviewViewerPage() {
   });
 
   /* ── guard states ── */
-  if (selectionLoading || !project) {
+  if (selectionLoading) return <CustomerPageSkeleton variant="viewer" />;
+  if (!project) {
     return (
       <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: BG_BASE }}>
         <p style={{ fontFamily: MONO, fontSize: 11, color: DIM, letterSpacing: "0.1em" }}>
-          {selectionLoading ? "LOADING…" : "INVALID_TOKEN"}
+          INVALID_TOKEN
         </p>
       </div>
     );
@@ -409,11 +411,7 @@ export default function ReviewViewerPage() {
 
   if (!current) {
     if (reviewPhotosLoading || photos.length === 0) {
-      return (
-        <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: BG_BASE }}>
-          <p style={{ fontFamily: MONO, fontSize: 11, color: DIM, letterSpacing: "0.1em" }}>LOADING_ASSETS…</p>
-        </div>
-      );
+      return <CustomerPageSkeleton variant="viewer" />;
     }
     // photos loaded but ID mismatch — navigate to first photo
     if (photos[0]) {

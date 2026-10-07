@@ -5,11 +5,8 @@ import Link from "next/link";
 /**
  * 전체 화면 로딩 표시 — `position:fixed; inset:0` 흰 오버레이에 로고 마크와 진행 띠.
  *
- * (2026-10-06) 일반 로딩에는 더 이상 쓰지 않는다. 라우트 로딩(`loading.tsx`)과 화면 안 데이터 로딩은
- * 실제 배치를 닮은 골격(`PhotographerPageSkeleton`, `ProjectBodySkeleton`, `customer-select/(list)/loading.tsx`)이
- * 맡고, 이미 그려진 헤더·셸은 덮지 않는다(design-system.md §13.1 "장식적 부팅 화면은 route loading에서
- * 쓰지 않는다"). 남은 사용처는 작가 고객 페이지(`/c/[token]/**`)의 화면 안 로딩뿐이며, 그 흐름의
- * 전체 새로고침 이동을 없애는 작업과 함께 골격으로 바꿀 예정이다.
+ * 일반 로딩은 화면 배치를 닮은 스켈레톤이 맡는다. 현재 호출부는 없으며,
+ * 이 컴포넌트는 일반 route loading에 사용하지 않는다(design-system.md §13.1).
  *
  * 역사: 2026-09-12에 화면마다 달랐던 로딩 표시(`PageLoader` 전체 화면 변형, 스켈레톤 그리드, 평문
  * "SYS.LOADING…")를 이 컴포넌트 하나로 통일했고, 이후 "전체 화면을 덮는 것 자체"가 전환 깜빡임의

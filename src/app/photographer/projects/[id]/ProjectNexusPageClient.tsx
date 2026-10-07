@@ -31,6 +31,7 @@ import { ProjectProgressCard } from "@/components/photographer/project-detail/Pr
 import { formatProjectDisplayId } from "@/components/photographer/ProjectIdText";
 import { PhotographerFormActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { PhotographerPageSkeleton } from "@/components/photographer/PhotographerPageSkeleton";
 import {
   clearPhotographerMobileProjectContext,
   publishPhotographerMobileProjectContext,
@@ -340,26 +341,7 @@ export function ProjectNexusPageClient() {
   // ── empty / loading guards ────────────────────────────────────────────
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background text-foreground" style={{ fontFamily: PRETENDARD_FONT }}>
-        <PhotographerMobilePageHeader
-          backHref="/photographer/projects"
-          title="프로젝트 불러오는 중"
-          description="프로젝트 정보를 준비하고 있어요."
-        />
-        <PhotographerLightPageFrame className="hidden md:block">
-          <PhotographerLightPageHeader
-            title="프로젝트 불러오는 중"
-            description="프로젝트 정보를 준비하고 있어요."
-          />
-        </PhotographerLightPageFrame>
-        <div className="flex items-center justify-center py-32">
-          <span className="font-mono text-sm text-disabled-foreground">
-            SYS.LOADING…
-          </span>
-        </div>
-      </div>
-    );
+    return <PhotographerPageSkeleton label="프로젝트를 불러오고 있어요" />;
   }
 
   if (!project) {

@@ -13,12 +13,22 @@ import { isCustomerLightRoute } from "@/lib/customer-light-routes";
  * - gallery: 갤러리·검토 목록(상단 줄·도구 줄·사진 격자). 모바일 2열 4:3, PC 180px 이상 정사각.
  * - page: 완료·수령·소개 같은 문서형 화면(제목·문단·카드).
  */
-export function CustomerPageSkeleton({ variant = "page" }: { variant?: "invite" | "gallery" | "page" }) {
+export function CustomerPageSkeleton({ variant = "page" }: { variant?: "invite" | "gallery" | "page" | "viewer" }) {
   const light = isCustomerLightRoute(usePathname());
   const canvas: CSSProperties = light
     ? { background: "var(--customer-canvas, #ffffff)", "--skeleton-base": "rgba(25, 25, 24, 0.08)", "--skeleton-highlight": "rgba(255, 255, 255, 0.7)" } as CSSProperties
     : { background: "var(--background)" };
   const bar = (className: string) => <span className={`skeleton-block ${className}`} />;
+
+  if (variant === "viewer") {
+    return (
+      <div role="status" aria-label="사진을 불러오는 중" aria-busy="true" className="flex min-h-dvh flex-col px-4 py-4" style={canvas}>
+        <div className="flex h-10 items-center gap-3">{bar("size-9 rounded-full")}{bar("h-5 w-40 rounded-md")}</div>
+        <div className="flex flex-1 items-center justify-center py-8">{bar("aspect-[4/3] w-full max-w-[820px] rounded-lg")}</div>
+        <div className="flex h-14 items-center justify-center gap-2">{bar("h-12 w-12 rounded-md")}{bar("h-12 w-12 rounded-md")}{bar("h-12 w-12 rounded-md")}</div>
+      </div>
+    );
+  }
 
   if (variant === "invite") {
     return (

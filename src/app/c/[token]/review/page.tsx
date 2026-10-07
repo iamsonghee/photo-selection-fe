@@ -889,9 +889,7 @@ function DeliveryReceiptView({
               </div>
             </div>
           ) : (
-            <div style={{ flex: 1, border: `1px solid ${BORDER}`, borderRadius: 12, background: "var(--background)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--subtle-foreground)", fontFamily: MONO, fontSize: 11 }}>
-              보정본을 불러오는 중…
-            </div>
+            <div role="status" aria-label="보정본을 불러오는 중" aria-busy="true" className="skeleton-block" style={{ flex: 1, borderRadius: 12 }} />
           )}
         </div>
 

@@ -23,6 +23,7 @@ import { isValidKoreanPhone, formatPhone } from "@/lib/phone";
 import { PhotographerLightPageFrame } from "@/components/layout/PhotographerLightPageHeader";
 import themeStyles from "./NewProjectTheme.module.css";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
+import { PhotographerPageSkeleton } from "@/components/photographer/PhotographerPageSkeleton";
 import { PhotographerFormActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import {
   PROJECT_FORM_INPUT_CLASS,
@@ -209,12 +210,7 @@ export default function NewProjectPage() {
 
   // 로딩 중 — 한도 확인 전에는 폼을 렌더하지 않음
   if (quotaLoading || quota === null) {
-    return (
-      <div className={`${themeStyles.lightTheme} min-h-screen bg-background flex items-center justify-center`}>
-        <div className="w-6 h-6 rounded-full border-2 border-accent/20 border-t-accent" style={{ animation: "spin 0.9s linear infinite" }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
+    return <PhotographerPageSkeleton width="narrow" label="프로젝트 생성 화면을 준비하고 있어요" />;
   }
 
   const atLimit = quota.max !== null && quota.current >= quota.max;

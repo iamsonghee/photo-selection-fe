@@ -1,7 +1,7 @@
 "use client";
 import { getDesktopNextAction } from "@/lib/project-next-action";
 
-import { PageLoader } from "@/components/ui/PageLoader";
+import { PhotographerPageSkeleton } from "@/components/photographer/PhotographerPageSkeleton";
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -233,6 +233,7 @@ export default function ProjectsPage() {
       <PhotographerLightButton onClick={() => setReloadKey((key) => key + 1)}>다시 시도</PhotographerLightButton>
     </div>
   );
+  if (loading) return <PhotographerPageSkeleton label="프로젝트를 불러오고 있어요" />;
   return (
     <>
     {/* ── Mobile View ──────────────────────────────────────────── */}
@@ -242,7 +243,7 @@ export default function ProjectsPage() {
           title="프로젝트"
           trailing={<button type="button" onClick={handleNewProject} className="-mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-accent"><Plus size={17} />새 프로젝트</button>}
         />
-        {!loading && projects.length === 0 ? (
+        {projects.length === 0 ? (
           <div className="flex min-h-[calc(100dvh-9rem)] items-center justify-center px-5 py-12">
             <FirstProjectOnboarding
               onCreateProject={handleNewProject}
@@ -286,7 +287,7 @@ export default function ProjectsPage() {
           })}
         </div>
         <div className="flex items-center justify-between gap-2 px-5 py-2">
-          <span className="text-xs text-muted-foreground" role="status">{loading ? "불러오는 중" : `${filtered.length}개 프로젝트`}</span>
+          <span className="text-xs text-muted-foreground" role="status">{filtered.length}개 프로젝트</span>
           <select aria-label="모바일 프로젝트 정렬" value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)} className="min-h-11 max-w-[160px] bg-transparent text-xs text-muted-foreground">
             <option value="shoot_date">촬영일순</option><option value="updated">최근 변경순</option><option value="deadline">기한순</option><option value="latest">최근 생성순</option><option value="name">이름순</option>
           </select>
@@ -349,11 +350,7 @@ export default function ProjectsPage() {
 
         {/* cards list */}
         <div className="px-5 pb-6 flex flex-col gap-2.5">
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <PageLoader />
-            </div>
-          ) : filtered.length === 0 ? (
+          {filtered.length === 0 ? (
             <FilteredEmptyState onReset={resetFilters} />
           ) : (
             filtered.map((project) => (
@@ -372,7 +369,7 @@ export default function ProjectsPage() {
 
     <ProjectLimitModal info={limitInfo} onClose={closeLimitModal} />
     <div className={`${styles.lightTheme} hidden md:block min-h-screen bg-background text-foreground`}>
-      {loading ? <div className="py-24 flex justify-center"><PageLoader /></div> : projects.length === 0 ? (
+      {projects.length === 0 ? (
         // 대시보드의 빈 상태(EmptyDashboard)와 같은 위치(화면 중앙)에 오도록 맞춘다 —
         // PhotographerLightPageFrame은 좌측 상단 시작 좌표라 여기 그대로 쓰면 좌상단에 붙는다.
         <div className="flex min-h-[calc(100dvh-4rem)] w-full items-center justify-center px-6 py-16 md:min-h-screen md:px-10 md:py-20">
