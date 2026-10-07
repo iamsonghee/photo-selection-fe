@@ -108,6 +108,59 @@ const RAW_EXTENSIONS = new Set([
   ".dng", ".raf", ".rw2", ".orf", ".pef", ".ptx", ".srw",
   ".x3f", ".3fr", ".fff", ".rwl", ".kdc", ".dcr",
 ]);
+/** 원본 파일 저장이 끝나지 않은 사진의 복구 안내. 실제 경고라 노란 면을 쓰되, 글자는 남색으로 읽히게 둔다. */
+function OriginalRecoveryBanner({ count, cachedCount, busy, filenames, inputRef, onRetry, onFiles, onClose, className = "" }: {
+  count: number;
+  cachedCount: number;
+  busy: boolean;
+  filenames?: string[];
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  onRetry: () => void;
+  onFiles: (files: File[]) => void;
+  onClose: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={`flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-warning/30 bg-warning/10 px-4 py-2.5 ${className}`}>
+      <p className="flex min-w-[220px] flex-1 items-start gap-2 text-[13px] font-medium leading-5 text-foreground">
+        <AlertTriangle size={14} className="mt-[3px] shrink-0 text-warning" aria-hidden />
+        원본 {count}장 확인 필요 · 완료된 사진은 다시 보내지 않습니다
+      </p>
+      {filenames?.length ? (
+        <p className="min-w-0 max-w-[420px] truncate font-mono text-xs text-muted-foreground" title={filenames.join(", ")}>
+          {filenames.slice(0, 8).join(", ")}{filenames.length > 8 ? ` 외 ${filenames.length - 8}개` : ""}
+        </p>
+      ) : null}
+      <div className="flex shrink-0 items-center gap-2">
+        {cachedCount > 0 && (
+          <PhotographerLightButton variant="secondary" className="h-9 px-3 text-[13px]" disabled={busy} onClick={onRetry}>
+            {busy ? "다시 업로드 중…" : `실패 원본 ${cachedCount}장 재시도`}
+          </PhotographerLightButton>
+        )}
+        <PhotographerLightButton variant="outline" className="h-9 px-3 text-[13px]" disabled={busy} onClick={() => inputRef.current?.click()}>
+          파일 다시 선택
+        </PhotographerLightButton>
+        <input
+          ref={inputRef}
+          disabled={busy}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(e) => {
+            const files = Array.from(e.target.files || []);
+            e.target.value = "";
+            if (files.length > 0) onFiles(files);
+          }}
+        />
+        <button type="button" onClick={onClose} aria-label="원본 복구 안내 닫기" className="grid size-9 place-items-center rounded-lg text-muted-foreground hover:bg-surface-raised hover:text-foreground">
+          <X size={14} aria-hidden />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function isRawFile(file: File): boolean {
   const dot = file.name.lastIndexOf(".");
   return dot >= 0 && RAW_EXTENSIONS.has(file.name.slice(dot).toLowerCase());
@@ -897,6 +950,9 @@ export default function ProjectDetailPage() {
 
   /** 업로드 완료 직후 뜨는 AI 분석 제안 모달 */
   const [aiPromptOpen, setAiPromptOpen] = useState(false);
+  /** 업로드 완료 처리(600ms 뒤 목록 갱신·AI 제안 판단) 동안 추천 안내·떠 있는 추천 버튼을 숨긴다.
+   *  완료 직후 말풍선·AI 제안·추천 버튼·셀렉 시작 버튼이 한꺼번에 뜨지 않게 AI 제안을 먼저 보인다. */
+  const [postUploadHintsHeld, setPostUploadHintsHeld] = useState(false);
   /** 어디서 열렸는지 — 업로드 직후와 툴바 버튼은 안내 문구가 달라야 한다(후자는 방금 올린 게 없다) */
   const [aiPromptSource, setAiPromptSource] = useState<"upload" | "manual">("upload");
   /** 눈감음·흐림 필터 — 고객 갤러리와 같은 키(`blurry`/`eyesClosed`) */
@@ -2594,6 +2650,7 @@ export default function ProjectDetailPage() {
       setUploadPhase("done");
       fetch("/api/photographer/project-logs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: id, action: "uploaded" }) }).catch(() => {});
     }
+    setPostUploadHintsHeld(true);
     setTimeout(async () => {
       setAwaitingServerFinalize(false);
       setUploadPhase("idle"); setUploadProgress(0);
@@ -2647,6 +2704,7 @@ export default function ProjectDetailPage() {
         setUploadingPhotos([]);
         setQueuedPreviews([]);
         setPhotosLoading(false);
+        setPostUploadHintsHeld(false);
         router.refresh();
         return;
       }
@@ -2685,6 +2743,7 @@ export default function ProjectDetailPage() {
         setAiPromptSource("upload");
         setAiPromptOpen(true);
       }
+      setPostUploadHintsHeld(false);
     }, 600);
   }, [id, loadProject, loadPhotos, router, project?.includeOriginal, project?.uploadStrategy, loadClipAnalysisStatus, checkPendingOriginals, clipAnalysisStatus, qualityAnalysisStatus]);
 
@@ -3160,6 +3219,7 @@ export default function ProjectDetailPage() {
   );
 
   const N = project.requiredCount;
+  const postUploadHintsHidden = aiPromptOpen || postUploadHintsHeld;
   const M = project.photoCount;
   const isInviteActive = project.status !== "preparing";
   // 프로젝트 코드는 바로 위 breadcrumb에 이미 노출되므로 부제에서는 반복하지 않는다.
@@ -3223,7 +3283,7 @@ export default function ProjectDetailPage() {
       recommendedCount={recommendedPhotoIds.size}
       recommendedOnly={showRecommendedOnly}
       onChange={setPhotoScope}
-      showRecommendationGuide={showRecommendationGuide && recommendedPhotoIds.size === 0 && !showRecommendedOnly && !isUploading}
+      showRecommendationGuide={showRecommendationGuide && recommendedPhotoIds.size === 0 && !showRecommendedOnly && !isUploading && !postUploadHintsHidden}
       onDismissRecommendationGuide={dismissRecommendationGuide}
     />
   );
@@ -3391,8 +3451,9 @@ export default function ProjectDetailPage() {
          * "네모 칸" 문법에 다시 갇힌다. 무테 + accent 틴트 면이면 같은 줄에서도 성격이 갈린다
          * (주황 **채움**은 하단 제출 CTA의 몫이라 여기서는 옅은 틴트까지만 쓴다).
          * ⚠️ 위의 일반 hover 규칙과 명시도가 같으므로 **반드시 그 뒤에** 와야 덮어쓴다. */
-        .prj-ai-control-idle { border-color: transparent; background: rgba(var(--accent-rgb), 0.09); color: var(--accent); }
-        .prj-ai-control-idle:hover:not(:disabled) { border-color: transparent; background: rgba(var(--accent-rgb), 0.16); }
+        .prj-ai-control-idle { border-color: var(--border-subtle); background: var(--surface-raised); color: var(--foreground); }
+        .prj-ai-control-idle:hover:not(:disabled) { border-color: var(--border-strong); }
+        .prj-ai-control-idle svg { color: var(--accent); }
         .prj-ai-control-processing { border-color: transparent; background: var(--surface-raised); }
 
         .prj-ai-control:focus-visible { outline: 2px solid rgba(var(--accent-rgb), 0.24); outline-offset: 2px; }
@@ -3408,9 +3469,6 @@ export default function ProjectDetailPage() {
         .prj-upload-ring { width: 22px; height: 22px; flex: 0 0 22px; transform: rotate(-90deg); }
         .prj-upload-ring-track { fill: none; stroke: var(--border); stroke-width: 2.5; }
         .prj-upload-ring-value { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; transition: stroke-dashoffset 0.3s ease; }
-        .prj-upload-stop { min-width: 32px; height: 32px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--muted-foreground); font-size: 12px; font-weight: 600; white-space: nowrap; }
-        .prj-upload-stop:hover:not(:disabled) { border-color: var(--border-strong); color: var(--foreground); }
-        .prj-upload-stop:disabled { cursor: wait; opacity: 0.55; }
         @media (max-width: 1280px) and (min-width: 769px) {
           .prj-gallery-toolbar { padding-inline: 24px; gap: 12px; }
           .prj-gallery-context { gap: 12px; }
@@ -3499,18 +3557,10 @@ export default function ProjectDetailPage() {
               )}
               <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
                 <strong style={{ fontSize: 13, lineHeight: "18px", color: TEXT_BRIGHT }}>{uploadStatusLabel}</strong>
-                {uploadSavedLabel ? <span style={{ fontSize: 11, lineHeight: "16px", color: TEXT_MUTED }}>{uploadSavedLabel}</span> : null}
-                {uploadEtaLabel && !uploadStopRequested ? <span style={{ fontSize: 11, lineHeight: "16px", color: TEXT_MUTED }}>{uploadEtaLabel}</span> : null}
+                {uploadSavedLabel ? <span style={{ fontSize: 12, lineHeight: "17px", color: TEXT_MUTED }}>{uploadSavedLabel}</span> : null}
+                {uploadEtaLabel && !uploadStopRequested ? <span style={{ fontSize: 12, lineHeight: "17px", color: TEXT_MUTED }}>{uploadEtaLabel}</span> : null}
                 <UploadConnectionHint />
               </div>
-              <button
-                type="button"
-                onClick={handleStopUpload}
-                disabled={uploadStopRequested}
-                className="prj-upload-stop"
-              >
-                {uploadStopRequested ? "중단 중" : "중단"}
-              </button>
             </div>
           )}
           {uploadError && (
@@ -3533,39 +3583,15 @@ export default function ProjectDetailPage() {
           )}
           {/* ── 이어 업로드 복구 배너 ── */}
           {showRecoveryBanner && pendingRecovery.length > 0 && uploadPhase === "idle" && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "6px 14px", background: "rgba(250,192,5,0.1)", borderBottom: `1px solid rgba(250,192,5,0.3)`, flexShrink: 0 }}>
-              <AlertTriangle size={12} style={{ color: "var(--warning)", flexShrink: 0 }} />
-              <span style={{ fontSize: 12, color: "var(--warning)", flex: 1 }}>
-                원본 {pendingRecovery.length}장 확인 필요 · 완료된 사진은 다시 보내지 않습니다
-              </span>
-              {recoveryCachedCount > 0 && (
-                <button type="button" disabled={recoveryBusy} onClick={() => recoverOriginalFiles([])}
-                  style={{ fontSize: 12, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "4px 8px", borderRadius: 4, flexShrink: 0 }}>
-                  {recoveryBusy ? "다시 업로드 중…" : `실패 원본 ${recoveryCachedCount}장 재시도`}
-                </button>
-              )}
-              <label style={{ cursor: "pointer" }}>
-                <input
-                  ref={recoveryFileInputRef}
-                  disabled={recoveryBusy}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  style={{ display: "none" }}
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files || []);
-                    if (recoveryFileInputRef.current) recoveryFileInputRef.current.value = "";
-                    if (files.length > 0) recoverOriginalFiles(files);
-                  }}
-                />
-                <span style={{ fontSize: 12, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}>
-                  파일 다시 선택
-                </span>
-              </label>
-              <button type="button" onClick={() => setShowRecoveryBanner(false)} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 0, display: "flex" }}>
-                <X size={12} />
-              </button>
-            </div>
+            <OriginalRecoveryBanner
+              count={pendingRecovery.length}
+              cachedCount={recoveryCachedCount}
+              busy={recoveryBusy}
+              inputRef={recoveryFileInputRef}
+              onRetry={() => recoverOriginalFiles([])}
+              onFiles={recoverOriginalFiles}
+              onClose={() => setShowRecoveryBanner(false)}
+            />
           )}
           {/* ── 복구 매칭 실패 — 즉시 표시 ── */}
           {unmatchedJobs.length > 0 && (
@@ -3660,49 +3686,17 @@ export default function ProjectDetailPage() {
 
       {/* 데스크톱 원본 복구 배너 (모바일 배너는 mobileProgressBarMounted 블록 내에 표시됨) */}
       {showRecoveryBanner && pendingRecovery.length > 0 && uploadPhase === "idle" && (
-        <div className="prj-desktop-toolbar" style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 16px", background: "rgba(250,192,5,0.1)", borderBottom: `1px solid rgba(250,192,5,0.3)`, flexShrink: 0 }}>
-          <AlertTriangle size={12} style={{ color: "var(--warning)", flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: "var(--warning)", flex: 1 }}>
-            원본 {pendingRecovery.length}장 확인 필요 · 완료된 사진은 다시 보내지 않습니다
-          </span>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, maxWidth: 420 }}>
-            {pendingRecovery.slice(0, 8).map((j) => (
-              <span key={j.id} style={{ fontSize: 11, background: "rgba(250,192,5,0.12)", color: "var(--warning)", padding: "1px 6px", borderRadius: 3 }}>
-                {j.original_filename ?? "(파일명 없음)"}
-              </span>
-            ))}
-            {pendingRecovery.length > 8 && (
-              <span style={{ fontSize: 11, color: "var(--warning)" }}>외 {pendingRecovery.length - 8}개</span>
-            )}
-          </div>
-          {recoveryCachedCount > 0 && (
-                <button type="button" disabled={recoveryBusy} onClick={() => recoverOriginalFiles([])}
-                  style={{ fontSize: 12, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "4px 8px", borderRadius: 4, flexShrink: 0 }}>
-                  {recoveryBusy ? "다시 업로드 중…" : `실패 원본 ${recoveryCachedCount}장 재시도`}
-                </button>
-              )}
-              <label style={{ cursor: "pointer" }}>
-            <input
-              ref={recoveryFileInputRefDesktop}
-              disabled={recoveryBusy}
-              type="file"
-              accept="image/*"
-              multiple
-              style={{ display: "none" }}
-              onChange={(e) => {
-                const files = Array.from(e.target.files || []);
-                if (recoveryFileInputRefDesktop.current) recoveryFileInputRefDesktop.current.value = "";
-                if (files.length > 0) recoverOriginalFiles(files);
-              }}
-            />
-            <span style={{ fontSize: 12, color: ACCENT, border: `1px solid ${ACCENT}`, padding: "2px 8px", borderRadius: 4, cursor: "pointer" }}>
-              파일 다시 선택
-            </span>
-          </label>
-          <button type="button" onClick={() => setShowRecoveryBanner(false)} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, padding: 0, display: "flex" }}>
-            <X size={12} />
-          </button>
-        </div>
+        <OriginalRecoveryBanner
+          className="prj-desktop-toolbar"
+          count={pendingRecovery.length}
+          cachedCount={recoveryCachedCount}
+          busy={recoveryBusy}
+          filenames={pendingRecovery.map((j) => j.original_filename ?? "(파일명 없음)")}
+          inputRef={recoveryFileInputRefDesktop}
+          onRetry={() => recoverOriginalFiles([])}
+          onFiles={recoverOriginalFiles}
+          onClose={() => setShowRecoveryBanner(false)}
+        />
       )}
       {/* 데스크톱 복구 매칭 실패 배너 */}
       {unmatchedJobs.length > 0 && (
@@ -3961,40 +3955,41 @@ export default function ProjectDetailPage() {
                 className="prj-original-upload-intro pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-[rgba(2,56,82,0.14)] px-4 backdrop-blur-[1px]"
                 aria-hidden
               >
-                <div className="flex max-w-md items-start gap-3 rounded-xl border border-warning/35 bg-[color-mix(in_srgb,var(--surface)_94%,var(--warning))] px-4 py-3.5 shadow-[0_12px_36px_rgba(2,56,82,0.2)] md:items-center">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-warning/15 text-warning">
+                <div className="flex max-w-md items-start gap-3 rounded-xl border border-border-subtle bg-surface px-4 py-3.5 shadow-[0_12px_32px_rgba(2,56,82,0.18)] md:items-center">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-surface-raised text-foreground">
                     <Upload size={17} aria-hidden />
                   </span>
                   <div className="min-w-0">
                     <strong className="block text-sm font-bold leading-5 text-foreground">원본 파일 저장 중</strong>
-                    <span className="mt-0.5 block text-xs font-medium leading-5 text-muted-foreground">현재 보이는 사진은 셀렉용 미리보기입니다. 원본 업로드가 끝날 때까지 화면을 유지해 주세요.</span>
+                    <span className="mt-0.5 block text-xs font-medium leading-5 text-muted-foreground">현재 보이는 사진은 셀렉용 미리보기입니다. 원본 파일 저장이 끝날 때까지 화면을 닫거나 잠그지 마세요.</span>
                   </div>
                 </div>
               </div>
             )}
             {isOriginalUploading && (
-              <div data-original-upload-notice className="sticky top-3 z-30 mx-auto mb-3 w-[calc(100%_-_24px)] max-w-3xl px-3 md:top-4 md:mb-4" role="status" aria-live="polite">
-                <div className="flex items-start gap-3 rounded-xl border border-warning/35 bg-[color-mix(in_srgb,var(--surface)_92%,var(--warning))] px-3.5 py-3 shadow-[0_8px_24px_rgba(2,56,82,0.14)] md:items-center md:px-4">
-                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-warning/15 text-warning">
+              <div data-original-upload-notice className="sticky top-4 z-30 mx-auto mb-4 hidden w-[calc(100%_-_24px)] max-w-3xl px-3 md:block" role="status" aria-live="polite">
+                {/* 모바일은 상단 진행 줄(prj-mobile-progress)이 같은 안내를 맡는다 — 세 곳에 같은 상태를 두지 않는다. */}
+                <div className="flex items-center gap-3 rounded-xl border border-border-subtle bg-surface px-4 py-3 shadow-[0_2px_6px_rgba(2,56,82,0.03)]">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-raised text-foreground">
                     <Upload size={16} aria-hidden />
                   </span>
                   <div className="min-w-0">
-                    <strong className="block text-[13px] font-bold leading-5 text-foreground md:text-sm">원본 파일 저장 중</strong>
-                    <span className="block text-[11px] font-medium leading-4 text-muted-foreground md:text-xs md:leading-5">현재 보이는 사진은 셀렉용 미리보기입니다. 고객에게 전달할 원본 업로드가 끝날 때까지 화면을 닫거나 잠그지 마세요.</span>
-                    <div data-original-upload-progress className="mt-2 hidden md:block">
-                      <div className="mb-1 flex items-center justify-between text-[11px] font-semibold leading-4 text-muted-foreground">
+                    <strong className="block text-sm font-bold leading-5 text-foreground">원본 파일 저장 중</strong>
+                    <span className="block text-xs font-medium leading-5 text-muted-foreground">현재 보이는 사진은 셀렉용 미리보기입니다. 원본 파일 저장이 끝날 때까지 화면을 닫거나 잠그지 마세요.</span>
+                    <div data-original-upload-progress className="mt-2">
+                      <div className="mb-1 flex items-center justify-between text-xs font-semibold leading-4 text-muted-foreground">
                         <span>원본 파일 저장</span>
                         <span>{originalSavedCount.toLocaleString()} / {originalUploadTotal.toLocaleString()}장</span>
                       </div>
                       <div
-                        className="h-1.5 overflow-hidden rounded-full bg-warning/15"
+                        className="h-1.5 overflow-hidden rounded-full bg-surface-raised"
                         role="progressbar"
                         aria-label="원본 파일 저장 진행률"
                         aria-valuemin={0}
                         aria-valuemax={originalUploadTotal}
                         aria-valuenow={originalSavedCount}
                       >
-                        <div className="h-full rounded-full bg-warning transition-[width] duration-300 ease-out" style={{ width: `${originalSavedPercent}%` }} />
+                        <div className="h-full rounded-full bg-foreground transition-[width] duration-300 ease-out motion-reduce:transition-none" style={{ width: `${originalSavedPercent}%` }} />
                       </div>
                     </div>
                   </div>
@@ -4187,7 +4182,7 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
-      {photoUploadAllowed && !isUploading && !photoSelectionActive && photos.length > 0 && (
+      {photoUploadAllowed && !isUploading && !photoSelectionActive && photos.length > 0 && !postUploadHintsHidden && (
         <section aria-label="작가 추천" className={recommendationEditActive
           ? `sticky bottom-0 z-30 mx-3 mb-3 shrink-0 rounded-xl border border-border-subtle bg-surface px-4 py-3 shadow-lg md:mx-8 ${recommendationTrayClosing ? themeStyles.recommendationTrayClosing : themeStyles.recommendationTrayOpen}`
           : "fixed bottom-24 right-3 z-30 shrink-0 md:right-8"}>

@@ -189,13 +189,16 @@ for (const viewport of scenarios) {
       await expect(status).toContainText(/원본 전송 중 · 2[45]%/, { timeout: 20_000 });
       await expect(status).toContainText("0/1장 저장 완료");
       await expect(page.locator("[data-original-upload-intro]")).toBeVisible();
-      await expect(page.locator("[data-original-upload-notice]")).toBeVisible();
+      const originalNotice = page.locator("[data-original-upload-notice]");
       const originalProgress = page.locator("[data-original-upload-progress]");
       if (viewport.width >= 768) {
+        await expect(originalNotice).toBeVisible();
         await expect(originalProgress).toBeVisible();
         await expect(originalProgress).toContainText("원본 파일 저장");
         await expect(originalProgress).toContainText("0 / 1장");
       } else {
+        // 모바일은 상단 진행 줄 하나만 남긴다(같은 상태를 세 곳에 두지 않음).
+        await expect(originalNotice).toBeHidden();
         await expect(originalProgress).toBeHidden();
       }
       await expect(page.getByText("원본 누락", { exact: true })).toHaveCount(0);
