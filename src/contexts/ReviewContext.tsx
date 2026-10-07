@@ -242,6 +242,18 @@ export function ReviewProvider({ children }: { children: React.ReactNode }) {
   /* 판단 한 장을 서버에 올린다. 타자마다 보내지 않도록 사진별로 350ms 묶고, 보내는 동안에는
    * dirty로 표시해 폴링이 그 사진을 되돌리지 못하게 한다.
    * status "pending"(판단 취소)은 서버에서 행 삭제로 처리된다 — 행 없음이 곧 미검토다. */
+  const draftBody = useCallback((photoId: string, next: ReviewStateItem | null) => {
+    const photoVersionId = versionIdByPhotoRef.current.get(photoId);
+    if (!token || !photoVersionId) return null;
+    return JSON.stringify({
+      token,
+      photo_id: photoId,
+      photo_version_id: photoVersionId,
+      status: next?.status ?? "pending",
+      comment: next?.comment ?? null,
+    });
+  }, [token]);
+
   const queueDraftSave = useCallback((photoId: string, next: ReviewStateItem | null) => {
     if (!token) return;
     dirtyRef.current.set(photoId, next);
@@ -253,21 +265,11 @@ export function ReviewProvider({ children }: { children: React.ReactNode }) {
       photoId,
       window.setTimeout(() => {
         timers.delete(photoId);
-        const photoVersionId = versionIdByPhotoRef.current.get(photoId);
+        const body = draftBody(photoId, next);
         /* 사진 목록이 아직 안 왔으면 저장 키가 없다 — 로컬(localStorage)에만 남고 다음 판단 때 다시 올라간다 */
-        if (!photoVersionId) { dirtyRef.current.delete(photoId); return; }
+        if (!body) { dirtyRef.current.delete(photoId); return; }
         const versionAtSend = versionRef.current.get(photoId) ?? 0;
-        fetch("/api/c/review/draft", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            token,
-            photo_id: photoId,
-            photo_version_id: photoVersionId,
-            status: next?.status ?? "pending",
-            comment: next?.comment ?? null,
-          }),
-        })
+        fetch("/api/c/review/draft", { method: "POST", headers: { "Content-Type": "application/json" }, body })
           .then((res) => {
             if (!res.ok) { setCommentSaveStatus(photoId, "error"); return; }
             /* 보내는 사이에 또 바뀌었으면 dirty도, "저장됨" 표시도 아직 이르다 — 뒤따르는 저장이 정리한다 */
@@ -280,8 +282,24 @@ export function ReviewProvider({ children }: { children: React.ReactNode }) {
           .catch(() => setCommentSaveStatus(photoId, "error"));
       }, 350),
     );
-  }, [token, setCommentSaveStatus]);
+  }, [token, setCommentSaveStatus, draftBody]);
 
+  /* 350ms 묶음 대기 중에 새로고침·창 닫기가 일어나면 그 판단이 서버에 가지 못하고, 다시 열면 서버 값(빈 초안)이
+   * 로컬 값을 이겨 판단이 사라졌다 — 떠나는 순간 대기 중인 저장을 keepalive로 즉시 보낸다. */
+  useEffect(() => {
+    const flush = () => {
+      for (const [photoId, timer] of saveTimersRef.current) {
+        window.clearTimeout(timer);
+        const body = draftBody(photoId, dirtyRef.current.get(photoId) ?? null);
+        if (body) fetch("/api/c/review/draft", { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true }).catch(() => {});
+      }
+      saveTimersRef.current.clear();
+    };
+    window.addEventListener("pagehide", flush);
+    return () => window.removeEventListener("pagehide", flush);
+  }, [draftBody]);
+
+  /* 화면 안 이동(제출 직후 등)으로 검토 영역이 사라질 때는 보내지 않고 취소만 한다 — 제출된 판단의 초안을 되살리지 않도록. */
   useEffect(() => () => {
     for (const id of saveTimersRef.current.values()) window.clearTimeout(id);
     saveTimersRef.current.clear();
