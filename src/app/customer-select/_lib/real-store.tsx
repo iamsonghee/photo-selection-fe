@@ -41,6 +41,7 @@ export interface ProjectView {
   participantViews: Partial<Record<ColorTag, string | null>>;
   realtimeKey: string;
   exported: boolean;
+  selectionCompletedAt?: string | null;
   deliveryCount: number;
   lastDeliveredAt?: string | null;
   shareToken: string;
@@ -49,7 +50,7 @@ export interface ProjectView {
   aiScenes?: { name: string | null; start: string | null; end: string | null; photoIds: string[] }[] | null;
 }
 
-type CollaborationState = Pick<ProjectView, "selectedIds" | "photoStates" | "participantOpinions" | "participantDone" | "participantNicknames" | "onlineParticipants" | "participantViews" | "exported" | "deliveryCount" | "lastDeliveredAt">;
+type CollaborationState = Pick<ProjectView, "selectedIds" | "photoStates" | "participantOpinions" | "participantDone" | "participantNicknames" | "onlineParticipants" | "participantViews" | "exported" | "deliveryCount" | "lastDeliveredAt" | "selectionCompletedAt">;
 
 function emptyProject(id: string): ProjectView {
   return {

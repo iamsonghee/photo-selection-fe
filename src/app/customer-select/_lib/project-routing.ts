@@ -14,11 +14,13 @@ export type CustomerProjectSummary = {
   delivery_count: number;
   last_delivered_at: string | null;
   retouch_done: boolean;
+  selection_completed_at?: string | null;
+  retouched_count?: number | null;
   created_at: string;
 };
 
 /** 단계 판단에 필요한 값만 — 프로젝트 상세는 목록 요약 대신 불러온 프로젝트로 같은 판단을 한다. */
-type ProjectStage = Pick<CustomerProjectSummary, "id" | "photo_count" | "retouch_done">;
+type ProjectStage = Pick<CustomerProjectSummary, "id" | "photo_count" | "retouch_done" | "selection_completed_at" | "retouched_count">;
 
 /** 작가에게 보낸 적이 있는 프로젝트 — 목록 카드가 상세와 같은 기준으로 '전달함' 단계를 판단한다. */
 export function customerProjectSent(project: Pick<CustomerProjectSummary, "exported" | "delivery_count">) {
@@ -27,6 +29,8 @@ export function customerProjectSent(project: Pick<CustomerProjectSummary, "expor
 
 /** 지금 할 단계 화면 — 목록 카드(본문·행동 링크)와 `/customer-select/[projectId]` 리다이렉트가 쓴다. */
 export function customerProjectDestination(project: ProjectStage, sent = false) {
+  if (project.retouched_count) return `/customer-select/${project.id}/retouch/compare`;
+  if (project.selection_completed_at) return `/customer-select/${project.id}/review`;
   if (project.retouch_done) return `/customer-select/${project.id}/done`;
   if (sent) return `/customer-select/${project.id}/review`;
   if (project.photo_count > 0) return `/customer-select/${project.id}/select`;
@@ -34,6 +38,8 @@ export function customerProjectDestination(project: ProjectStage, sent = false) 
 }
 
 export function customerProjectStatus(project: Omit<ProjectStage, "id">, selectedCount?: number | null, sent = false) {
+  if (project.retouched_count) return `보정본 ${project.retouched_count}장`;
+  if (project.selection_completed_at) return "셀렉 완료";
   if (project.retouch_done) return "완료";
   if (sent) return "작가에게 전달함";
   if (project.photo_count > 0) return selectedCount === 0 ? "고르기 전" : "고르는 중";
@@ -41,6 +47,8 @@ export function customerProjectStatus(project: Omit<ProjectStage, "id">, selecte
 }
 
 export function customerProjectAction(project: Omit<ProjectStage, "id">, selectedCount?: number | null, sent = false) {
+  if (project.retouched_count) return "보정본 비교하기";
+  if (project.selection_completed_at) return "선택 결과 보기";
   if (project.retouch_done) return "완료 내용 보기";
   if (sent) return "선택 결과 보기";
   if (project.photo_count === 0) return "사진 올리기";

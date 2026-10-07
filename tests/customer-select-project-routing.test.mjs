@@ -58,3 +58,17 @@ assert.deepEqual(selectionDeadlineBadge("2026-10-09", "2026-10-02"), { label: "�
 assert.deepEqual(selectionDeadlineBadge("2026-10-05", "2026-10-02"), { label: "마감 D-3", urgent: true });
 assert.deepEqual(selectionDeadlineBadge("2026-10-02", "2026-10-02"), { label: "오늘 마감", urgent: true });
 assert.deepEqual(selectionDeadlineBadge("2026-09-27", "2026-10-02"), { label: "마감 지남", urgent: true });
+
+// Selection completion is independent of sharing; current retouches take priority on return.
+const completed = project({ photo_count: 12, selection_completed_at: "2026-10-07T00:00:00Z" });
+assert.equal(customerProjectSent(completed), false);
+assert.equal(customerProjectDestination(completed), "/customer-select/project-1/review");
+assert.equal(customerProjectStatus(completed, 12), "셀렉 완료");
+assert.equal(customerProjectAction(completed, 12), "선택 결과 보기");
+for (const completedAt of [null, completed.selection_completed_at]) {
+  const retouched = project({ photo_count: 12, selection_completed_at: completedAt, retouched_count: 2 });
+  assert.equal(customerProjectDestination(retouched), "/customer-select/project-1/retouch/compare");
+  assert.equal(customerProjectStatus(retouched, 12), "보정본 2장");
+  assert.equal(customerProjectAction(retouched, 12), "보정본 비교하기");
+}
+assert.equal(customerProjectDestination({ ...completed, retouched_count: null }), "/customer-select/project-1/review");

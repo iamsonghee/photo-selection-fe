@@ -29,7 +29,7 @@ export function ProjectCard({ project, coverUrl, selectedCount, today, participa
   const status = customerProjectStatus(project, selectedCount, sent);
   const href = customerProjectDestination(project, sent);
   const action = customerProjectAction(project, selectedCount, sent);
-  const deadline = selectionDeadlineBadge(project.selection_deadline, today, project.retouch_done);
+  const deadline = selectionDeadlineBadge(project.selection_deadline, today, project.retouch_done || Boolean(project.selection_completed_at));
   const selectedPercent = typeof selectedCount === "number" && project.target_count > 0 ? Math.min(100, selectedCount / project.target_count * 100) : 0;
   const statusDot = project.retouch_done ? "bg-foreground" : project.photo_count === 0 || selectedCount === 0 ? "bg-subtle-foreground" : "bg-primary";
   // 만들 때 입력한 값만(빈 값은 숨긴다).
@@ -87,8 +87,9 @@ export function ProjectCard({ project, coverUrl, selectedCount, today, participa
           </div>
         </div>
       </div>
-      <div className="relative px-5 pb-5">
+      <div className="relative flex flex-col gap-2 px-5 pb-5">
         <Link href={href} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-border-subtle bg-surface-raised text-[14px] font-semibold text-foreground transition-colors hover:bg-border-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong/50">{action}<ArrowRight size={16} strokeWidth={2.4} /></Link>
+        {(sent || project.selection_completed_at) && !project.retouched_count && typeof selectedCount === "number" && selectedCount > 0 && <Link href={`/customer-select/${project.id}/retouch/upload`} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-border-subtle bg-surface text-[14px] font-semibold text-foreground transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35"><ImagePlus size={17} />받은 보정본 올리기</Link>}
       </div>
     </article>
   );

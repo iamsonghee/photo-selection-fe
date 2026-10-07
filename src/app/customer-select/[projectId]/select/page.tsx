@@ -56,6 +56,8 @@ function SelectScreen() {
   const { project, hydrated, isOwner, currentIdentity: me, participantReady, accessDenied, syncStatus, saveError, clearSaveError, failedComments, retryFailedComments } = store;
   const failedMemoCount = Object.keys(failedComments).length;
   // 초대 링크(`?invite=1`, 미들웨어가 붙임)로 들어오면 참여한 적이 있어도 초대 화면을 먼저 보여준다(작가 고객 초대와 같은 흐름).
+  const [completing, setCompleting] = useState(false);
+  const [completionError, setCompletionError] = useState<string | null>(null);
   const [inviteSeen, setInviteSeen] = useState(false);
   useEffect(() => {
     if (searchParams.get("invite") !== "1") return;
@@ -318,7 +320,25 @@ function SelectScreen() {
     </button>
   )) : null;
   const myDone = Boolean(project.participantDone[me]);
-  const toReview = () => router.push(`/customer-select/${projectId}/review`);
+  const toReview = async () => {
+    if (completing) return;
+    setCompleting(true);
+    setCompletionError(null);
+    try {
+      const state = await store.syncNow();
+      if (!state) throw new Error("선택 내용을 저장하고 있어요. 잠시 후 다시 눌러 주세요.");
+      if (failedMemoCount || saveError) throw new Error("저장하지 못한 내용을 확인한 뒤 다시 시도해 주세요.");
+      const response = await fetch(`/api/customer-select/projects/${projectId}/complete-selection`, { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "셀렉 완료 상태를 저장하지 못했어요.");
+      await store.syncNow();
+      router.push(`/customer-select/${projectId}/review`);
+    } catch (error) {
+      setCompletionError(error instanceof Error ? error.message : "저장하지 못했어요. 다시 시도해 주세요.");
+    } finally {
+      setCompleting(false);
+    }
+  };
   // 일시 대화는 당분간 숨긴다(2026-10-02) — 다시 켜려면 CHAT_ENABLED만 true로.
   const withChat = CHAT_ENABLED && people.length > 1;
 
@@ -500,7 +520,7 @@ function SelectScreen() {
       <span>{guideText}{scene && <span className={s.desktopOnlyInline}> · {sceneTitle(scene)}{pickedInScene(scene) ? `에서 ${pickedInScene(scene)}장 골랐어요` : ""}</span>}</span>
     </div>
     <div className={s.barActions}>
-      <PhotographerLightButton size="work-panel" className={finishSoft ? s.finishSoft : ""} disabled={!pickedTotal} onClick={toReview}>선택 결과 확인하기 →</PhotographerLightButton>
+      <PhotographerLightButton size="work-panel" className={finishSoft ? s.finishSoft : ""} disabled={!pickedTotal || completing || failedMemoCount > 0} onClick={() => void toReview()}>{completing ? "셀렉 결과 저장 중…" : "선택 결과 확인하기 →"}</PhotographerLightButton>
     </div>
   </>;
 
@@ -508,6 +528,7 @@ function SelectScreen() {
     <>
       <div className={s.page} data-chat={withChat ? "" : undefined} data-chrome-hidden={chromeHidden && !menu ? "" : undefined}>
 
+        {completionError && <p role="alert" className="px-5 py-2 text-sm text-danger">{completionError}</p>}
         {syncStatus === "offline" && <div role="status" className="border-b border-danger/20 bg-danger/8 px-5 py-2 text-center text-xs font-semibold text-danger">연결이 불안정해요. 다시 연결하고 있어요.</div>}
         {/* 저장하지 못한 메모는 상세를 닫아도 여기 남고, 다시 저장할 수 있다(글은 버리지 않는다). */}
         {failedMemoCount > 0 && <div role="alert" className="flex items-center gap-2 border-b border-danger/20 bg-danger/8 px-5 py-2 text-xs font-semibold text-danger"><span className="flex-1">메모 {failedMemoCount}개를 저장하지 못했어요. 쓴 내용은 남아 있어요.</span><button type="button" className="underline" onClick={retryFailedComments}>다시 저장</button></div>}

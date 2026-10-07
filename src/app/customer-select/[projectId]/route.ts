@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentCustomerAuthId } from "@/lib/customer-select-server";
+import { customerRetouchCount } from "@/lib/customer-retouch-summary";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { customerProjectDestination, customerProjectSent } from "../_lib/project-routing";
 
@@ -13,9 +14,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
   const ownerId = await getCurrentCustomerAuthId();
   if (!ownerId) return NextResponse.redirect(new URL("/customer-select/login", req.url));
   const { projectId } = await params;
-  const { data } = await getAdminClient().from("customer_projects")
-    .select("id, photo_count, retouch_done, exported, delivery_count")
+  const admin = getAdminClient();
+  const { data } = await admin.from("customer_projects")
+    .select("id, photo_count, retouch_done, exported, delivery_count, selection_completed_at")
     .eq("id", projectId).eq("owner_id", ownerId).maybeSingle();
   // 내 프로젝트가 아니거나 없으면 목록으로 보낸다.
-  return NextResponse.redirect(new URL(data ? customerProjectDestination(data, customerProjectSent(data)) : "/customer-select", req.url));
+  return NextResponse.redirect(new URL(data ? customerProjectDestination({ ...data, retouched_count: await customerRetouchCount(admin, projectId) }, customerProjectSent(data)) : "/customer-select", req.url));
 }

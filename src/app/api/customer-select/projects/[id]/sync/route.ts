@@ -24,6 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   return NextResponse.json({
     ...buildCustomerCollaborationState(selections, participants.data ?? [], opinions),
     exported: access.project.exported,
+    selectionCompletedAt: access.project.selection_completed_at ?? null,
     deliveryCount: access.project.delivery_count,
     lastDeliveredAt: access.project.last_delivered_at,
     onlineParticipants: [...new Set((presence.data ?? []).map((row) => row.participant_color))],

@@ -34,14 +34,14 @@ export function stemFilename(normalized: string): string {
     // Capture One: _Angle1, _1, _2 ...
     .replace(/_angle\d+$/, "")
     // 공통: _retouched, _retouche, _retouch, _edited, _final, _comp, _web
-    .replace(/[_-](retouched?|edited?|final|comp|web|export|out|lr|co|ps)$/, "")
+    .replace(/[_-](retouch(?:ed)?|edit(?:ed)?|final|comp|web|export|out|lr|co|ps)$/, "")
     // 한글 접미사: 보정, 편집, 수정, 완성, 최종, 납품, 리터칭
     .replace(/[_-](보정|편집|수정|완성|최종|납품|리터칭)$/, "")
     // 공통: _v1, _v2, -v1, -v2, -1, -2, _1, _2 (버전 표기·1~2자리 변형 번호만 — "DSC_0001"처럼
     // 3자리 이상인 원본 파일명 고유 번호까지 지워버리면 서로 다른 사진이 같은 stem으로 충돌한다)
     .replace(/[_-](?:v\d+|\d{1,2})$/, "")
     // 연속 처리 (중첩 suffix 제거)
-    .replace(/[_-](retouched?|edited?|final|comp|web|export|out|lr|co|ps)$/, "")
+    .replace(/[_-](retouch(?:ed)?|edit(?:ed)?|final|comp|web|export|out|lr|co|ps)$/, "")
     .replace(/[_-](보정|편집|수정|완성|최종|납품|리터칭)$/, "")
     .replace(/[_-](?:v\d+|\d{1,2})$/, "")
     .trim();
@@ -77,6 +77,27 @@ export function buildVersionMapping<T extends MappingTarget>(
     // type "none"인 행과 미점유 파일을 모아 matchRetouchByGemini로 넘긴다.
     return { target, file: null, type: "none" };
   });
+}
+
+/** 고객 보정본: 정확한 이름을 먼저 찾고, 양쪽 모두 후보가 하나일 때만 자동 연결한다. */
+export function buildUnambiguousVersionMapping<T extends MappingTarget>(files: File[], targets: T[]): MappingResult<T>[] {
+  const rows: MappingResult<T>[] = targets.map((target) => ({ target, file: null, type: "none" }));
+  const used = new Set<File>();
+  for (const type of ["exact", "fuzzy"] as const) {
+    for (const row of rows) {
+      if (row.file) continue;
+      const key = type === "exact" ? normalizeFilename(row.target.filename) : stemFilename(normalizeFilename(row.target.filename));
+      if (!key) continue;
+      const match = (name: string) => (type === "exact" ? normalizeFilename(name) : stemFilename(normalizeFilename(name))) === key;
+      const candidates = files.filter((file) => !used.has(file) && match(file.name));
+      const targetCount = rows.filter((other) => !other.file && match(other.target.filename)).length;
+      if (candidates.length !== 1 || targetCount !== 1) continue;
+      row.file = candidates[0];
+      row.type = type;
+      used.add(candidates[0]);
+    }
+  }
+  return rows;
 }
 
 /** 서버에 이미 있는 보정본 URL이 있으면 그 행을 "server"로 채워 검토·부분 교체 UI에 사용 */

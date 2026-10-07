@@ -59,9 +59,15 @@ BE는 초과 배치를 통째로 거절한다. DB도 소유자별 advisory lock�
 
 작가용 결과 링크는 협업 `share_token`을 재사용하지 않는다. 서버가 `PIN_COOKIE_SECRET`으로
 프로젝트 ID를 HMAC 서명해 읽기 전용 토큰을 만들고, 최초 접속 라우트가 검증 후 프로젝트별
-HttpOnly 쿠키로 교환한 다음 토큰 없는 URL로 이동한다. 결과 화면은 `exported=true`인 현재 최종
-선택과 의견만 service role로 조회한다. 다시 선택 중에는 내용을 숨기며 재전달하면 같은 링크에 최신
-결과가 나타난다. 과거 전달본 스냅샷과 별도 DB 토큰 컬럼은 만들지 않는다.
+HttpOnly 쿠키로 교환한 다음 토큰 없는 URL로 이동한다. 결과 화면은 현재 선택과 공용 메모를 service role로 조회하며 exported 여부로 숨기지 않는다.
+선택 변경은 같은 링크에 반영된다. 과거 전달본 스냅샷과 별도 DB 토큰 컬럼은 만들지 않는다.
+
+2026-10-07 셀렉 이후 흐름: `customer_projects.selection_completed_at`(nullable timestamptz)을
+`20261007080000_customer_selection_completed.sql`로 추가한다. 소유자 전용 완료 API가 실제 선택 수를 확인한 뒤 저장하며,
+링크 공유·복사와 분리한다. 상세/동기화 응답은 `selectionCompletedAt`을 제공한다.
+목록 및 프로젝트 루트 진입은 `customerRetouchCount`로 현재 선택된 원본 중 보정본이 있는 사진 수를 조회한다(회차 수가 아님).
+보정본 있음 → 비교, 선택 완료 → 결과, 나머지 → 기존 단계. 조회 실패(null)는 보정본 개수를 단정하지 않고 기존 상태에 따른 경로를 사용한다.
+기존 exported/delivery_count/retouch_done 분기는 과거 프로젝트 호환용으로 유지한다. 앱 배포 전에 위 마이그레이션을 적용해야 한다.
 
 ## 하객 사진 모으기 (2026-10-06, 1단계)
 

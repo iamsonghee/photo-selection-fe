@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import { ArrowRight, FolderPlus, Plus, QrCode, Send, Upload, Users } from "lucide-react";
 import { customerPhotoLimit, getCurrentCustomerAuthUser } from "@/lib/customer-select-server";
+import { customerRetouchCount } from "@/lib/customer-retouch-summary";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "../_lib/CustomerSelectShell";
 import { filterCustomerProjects, kstToday, type CustomerProjectFilter } from "../_lib/project-routing";
@@ -21,10 +22,12 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
   const admin = getAdminClient();
   const { data, error } = await admin
     .from("customer_projects")
-    .select("id, name, shoot_type, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, target_count, photo_count, exported, delivery_count, last_delivered_at, retouch_done, created_at, share_token, sharing_enabled")
+    .select("id, name, shoot_type, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, target_count, photo_count, exported, delivery_count, last_delivered_at, retouch_done, selection_completed_at, created_at, share_token, sharing_enabled")
     .eq("owner_id", ownerId)
     .order("created_at", { ascending: false });
-  const projects = (data ?? []) as ProjectCardProject[];
+  const projects: ProjectCardProject[] = await Promise.all(((data ?? []) as ProjectCardProject[]).map(async (project) => ({
+    ...project, retouched_count: project.photo_count > 0 ? await customerRetouchCount(admin, project.id) : 0,
+  })));
   const guestAlbums = await listOwnerGuestAlbums(ownerId);
   const accountPhotoCount = projects.reduce((sum, project) => sum + Math.max(0, project.photo_count), 0);
   const photoLimit = customerPhotoLimit(user.email);

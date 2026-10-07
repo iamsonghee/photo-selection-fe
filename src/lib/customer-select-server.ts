@@ -54,6 +54,7 @@ export interface CustomerProjectRow {
   delivery_count: number;
   last_delivered_at: string | null;
   retouch_done: boolean;
+  selection_completed_at?: string | null;
 }
 
 /** 소유자(세션) 또는 참가자(share_token) 중 하나라도 맞으면 프로젝트를 반환한다. */
@@ -64,7 +65,7 @@ export async function resolveCustomerProjectAccess(
 ): Promise<{ project: CustomerProjectRow; isOwner: boolean } | NextResponse> {
   const { data: project, error } = await admin
     .from("customer_projects")
-    .select("id, owner_id, name, shoot_type, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, target_count, photo_count, share_token, sharing_enabled, exported, delivery_count, last_delivered_at, retouch_done")
+    .select("id, owner_id, name, shoot_type, shoot_date, selection_deadline, studio_name, photographer_name, shoot_region, shoot_location, target_count, photo_count, share_token, sharing_enabled, exported, delivery_count, last_delivered_at, retouch_done, selection_completed_at")
     .eq("id", projectId)
     .maybeSingle();
   if (error || !project) {
@@ -231,6 +232,7 @@ export function buildProjectView(
       .map((p) => toPhoto(p, project.id, qualityByPhoto.get(p.id))),
     ...collaboration,
     exported: project.exported,
+    selectionCompletedAt: project.selection_completed_at ?? null,
     deliveryCount: project.delivery_count,
     lastDeliveredAt: project.last_delivered_at,
     onlineParticipants: [],

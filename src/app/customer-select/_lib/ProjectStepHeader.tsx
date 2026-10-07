@@ -6,7 +6,7 @@ export type ProjectStep = "upload" | "select" | "send";
 const STEPS: { key: ProjectStep; label: string; path: string }[] = [
   { key: "upload", label: "올리기", path: "upload" },
   { key: "select", label: "고르기", path: "select" },
-  { key: "send", label: "보내기", path: "review" },
+  { key: "send", label: "셀렉 결과", path: "review" },
 ];
 
 /**

@@ -17,6 +17,7 @@ import { formatSceneRange } from "@/lib/customer-scenes";
 import type { Photo } from "@/types";
 import { activeParticipants, useCustomerSelectStore } from "../../_lib/real-store";
 import { useProjectShell } from "../../_lib/ProjectShell";
+import { useRetouchData } from "../../_lib/retouch-store";
 import { PhotoDetail } from "../select/PhotoDetail";
 import { useSceneAnalysis, type NamedScene } from "../select/useSceneAnalysis";
 import s from "./review.module.css";
@@ -33,6 +34,8 @@ function SendScreen() {
   const projectId = useParams().projectId as string;
   const router = useRouter();
   const store = useCustomerSelectStore();
+  const retouch = useRetouchData(projectId);
+  const retouchedCount = retouch.photos.filter((photo) => photo.versions.length > 0).length;
   // 공통 헤더(레이아웃): 보내기 단계 강조.
   useProjectShell({ step: "send" });
   const { project, hydrated, isOwner, currentIdentity: me, syncStatus, failedComments, retryFailedComments } = store;
@@ -92,7 +95,7 @@ function SendScreen() {
   const summary = !target || !selected.length ? "" : diff === 0 ? `약속한 ${target}장과 같아요` : `약속한 ${target}장보다 ${Math.abs(diff)}장 ${diff > 0 ? "많아요" : "적어요"}`;
   const listText = [`[${project.name || "사진 셀렉"}] 선택 사진 ${selected.length}장`, ...selected.map((photo) => memoOf(photo.id) ? `${getPhotoDisplayName(photo)} — ${memoOf(photo.id)}` : getPhotoDisplayName(photo))].join("\n");
   const baseName = `${sanitizeFilenamePart(project.name || "사진셀렉")}_selections`;
-  const canSend = selected.length > 0 && syncStatus === "connected" && linkState !== "loading";
+  const canSend = selected.length > 0 && syncStatus === "connected" && failedMemoCount === 0 && linkState !== "loading";
 
   async function resultUrl() {
     const response = await fetch(`/api/customer-select/projects/${projectId}/result-link`);
@@ -141,8 +144,8 @@ function SendScreen() {
           </section>
         ) : <>
           <section className={s.hero}>
-            <h2>{selected.length}장을 보낼게요</h2>
-            <p>{[summary, memoCount ? `메모 ${memoCount}개` : ""].filter(Boolean).join(" · ") || "최종 선택한 사진과 메모를 작가님께 보내요"}</p>
+            <h2>{selected.length}장을 골랐어요</h2>
+            <p>{[project.selectionCompletedAt ? "셀렉 결과가 저장됐어요" : "선택한 사진을 확인해 주세요", summary, memoCount ? `메모 ${memoCount}개` : ""].filter(Boolean).join(" · ") || "최종 선택한 사진과 메모를 작가님께 보내요"}</p>
           </section>
 
           {notices.length > 0 && (
@@ -168,22 +171,31 @@ function SendScreen() {
             {failedMemoCount > 0 && <p className={s.syncWarn} role="alert">메모 {failedMemoCount}개를 저장하지 못했어요. <button type="button" className="font-bold underline" onClick={retryFailedComments}>다시 저장</button></p>}
             <div className={s.sendActions}>
               <PhotographerLightButton size="confirmation" disabled={!canSend} onClick={() => void sendLink("share")}>
-                <Send size={18} />{linkState === "loading" ? "링크 만드는 중…" : linkState === "shared" ? "공유했어요" : linkState === "copied" ? "링크를 복사했어요" : linkState === "fail" ? "다시 시도하기" : "셀렉 결과 공유하기"}
+                <Send size={18} />{linkState === "loading" ? "링크 만드는 중…" : linkState === "shared" ? "공유했어요" : linkState === "copied" ? "링크를 복사했어요" : linkState === "fail" ? "다시 시도하기" : "작가에게 결과 공유하기"}
               </PhotographerLightButton>
               <PhotographerLightButton variant="outline" size="confirmation" disabled={!canSend} onClick={() => void sendLink("copy")}><Copy size={18} />링크 복사</PhotographerLightButton>
             </div>
-            <div className={s.fileLinks}>
+            <details className={s.otherMethods}>
+              <summary>다른 전달 방식</summary>
+              <div className={s.fileLinks}>
               <button type="button" onClick={() => void copyList()}><FileText size={14} />{listCopied ? "복사했어요" : "파일명·메모 복사"}</button>
-              <button type="button" onClick={() => downloadTextFile(`${baseName}.csv`, ["파일명,작가 전달 메모", ...selected.map((photo) => [csvEscape(getPhotoDisplayName(photo)), csvEscape(memoOf(photo.id))].join(","))].join("\n"), "text/csv;charset=utf-8")}><FileSpreadsheet size={14} />CSV 다운로드</button>
-              <button type="button" onClick={() => downloadTextFile(`${baseName}.txt`, selected.map(getPhotoDisplayName).join("\n"), "text/plain;charset=utf-8")}><FileText size={14} />TXT 다운로드</button>
-            </div>
+              <button type="button" onClick={() => downloadTextFile(`${baseName}.csv`, ["파일명,작가 전달 메모", ...selected.map((photo) => [csvEscape(getPhotoDisplayName(photo)), csvEscape(memoOf(photo.id))].join(","))].join("\n"), "text/csv;charset=utf-8")}><FileSpreadsheet size={14} />파일명과 메모 CSV</button>
+              <button type="button" onClick={() => downloadTextFile(`${baseName}.txt`, selected.map(getPhotoDisplayName).join("\n"), "text/plain;charset=utf-8")}><FileText size={14} />파일명만 TXT</button>
+              </div>
+            </details>
+          </section>
+
+          <section className={s.retouch}>
+            <div><h3>보정본 비교 <span className={s.optional}>선택 기능</span></h3><p>{retouchedCount ? `올린 보정본 ${retouchedCount}장을 원본과 비교해 보세요.` : "작가님께 받은 사진을 올리면 내가 고른 원본과 비교할 수 있어요."}</p></div>
+            <PhotographerLightButton variant="outline" size="work-panel" onClick={() => router.push(`/customer-select/${projectId}/retouch/${retouch.error || retouchedCount ? "compare" : "upload"}`)} disabled={retouch.loading}>{retouch.loading ? "보정본 확인 중…" : retouch.error ? "보정본 확인하기" : retouchedCount ? `보정본 ${retouchedCount}장 비교하기` : "받은 보정본 올리기"}</PhotographerLightButton>
           </section>
 
           <section className={s.photos}>
             <div className={s.photosHead}>
-              <h3>보낼 사진</h3>
+              <h3>선택한 사진</h3>
               <Link href={`/customer-select/${projectId}/select`}>다시 고르기</Link>
             </div>
+            <p className={s.noticeHint}>다시 고르면 작가님께 공유한 링크에도 바뀐 선택이 보여요.</p>
             {sections.map((section) => (
               <div key={section.sceneIndex ?? "all"} className={s.section}>
                 {section.title && <p className={s.sectionTitle}>{section.title} <span>{section.photos.length}장</span></p>}
@@ -203,10 +215,6 @@ function SendScreen() {
             ))}
           </section>
 
-          <section className={s.retouch}>
-            <div><h3>보정본을 받으면</h3><p>원본과 나란히 비교하고 다시 보정할 사진을 정리할 수 있어요. 필요할 때만 쓰면 돼요.</p></div>
-            <PhotographerLightButton variant="outline" size="work-panel" disabled>보정본 확인 준비 중</PhotographerLightButton>
-          </section>
         </>}
       </main>
 

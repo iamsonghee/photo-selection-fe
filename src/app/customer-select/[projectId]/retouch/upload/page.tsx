@@ -1,167 +1,141 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- R2 previews and local blob URLs already have their target size. */
 
-/**
- * S10 — 보정본 업로드 + 매칭 확인. 파일명 자동 매칭은 기존 순수 함수(lib/version-mapping.ts)를
- * 그대로 재사용한다(단계 1 결정) — 정확일치 → 접미사 제거 매칭, 실패분은 수동 지정.
- */
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, ArrowRight, Check, ImagePlus } from "lucide-react";
 import { PhotographerPageActionBar } from "@/components/photographer/PhotographerFormActionBar";
 import { PhotographerLightButton } from "@/components/photographer/PhotographerLightButton";
-import { ProjectBodySkeleton } from "../../../_lib/ProjectBodySkeleton";
-import { buildVersionMapping, type MappingResult } from "@/lib/version-mapping";
+import { buildUnambiguousVersionMapping } from "@/lib/version-mapping";
 import { compressImagesInParallel } from "@/lib/upload-client-compress";
 import { UPLOAD_INTERMEDIATE_JPEG_QUALITY } from "@/lib/upload-work-queue";
+import { ProjectBodySkeleton } from "../../../_lib/ProjectBodySkeleton";
+import { useRetouchData, uploadRetouched, latestVersion } from "../../../_lib/retouch-store";
 import { CUSTOMER_UPLOAD_MAX_EDGE } from "../../../_lib/upload-limit";
-import { useRetouchData, uploadRetouched, type RetouchPhoto } from "../../../_lib/retouch-store";
 import { RetouchErrorScreen } from "../../../_lib/RetouchErrorScreen";
-import ui from "../../../_lib/ui.module.css";
+import s from "./upload.module.css";
 
 export default function RetouchUploadPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const router = useRouter();
   const { photos, error: loadError, loading, refresh } = useRetouchData(projectId);
-
+  const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
-  const [mapping, setMapping] = useState<MappingResult<RetouchPhoto>[]>([]);
-  const [manualAssign, setManualAssign] = useState<Record<string, string>>({}); // fileName -> photoId
+  const [previews, setPreviews] = useState<string[]>([]);
+  const [assignments, setAssignments] = useState<(string | null)[]>([]);
+  const [choosing, setChoosing] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  const unmatchedFiles = useMemo(() => {
-    const matchedNames = new Set(mapping.filter((m) => m.file).map((m) => m.file!.name));
-    return files.filter((f) => !matchedNames.has(f.name));
-  }, [files, mapping]);
+  useEffect(() => () => previews.forEach(URL.revokeObjectURL), [previews]);
+  const assignedCount = assignments.filter(Boolean).length;
+  const uploadedCount = photos.filter((photo) => latestVersion(photo)).length;
+  const photoById = useMemo(() => new Map(photos.map((photo) => [photo.id, photo])), [photos]);
 
-  function handleSelect(list: FileList | null) {
-    if (!list || list.length === 0) return;
-    const arr = Array.from(list);
-    setFiles(arr);
-    setMapping(buildVersionMapping(arr, photos));
-    setManualAssign({});
+  function selectFiles(list: FileList | null) {
+    if (!list?.length) return;
+    const next = Array.from(list);
+    if (new Set(next.map((file) => file.name)).size !== next.length) {
+      setError("이름이 같은 파일이 있어요. 이름을 구분하거나 나누어 선택해 주세요.");
+      return;
+    }
+    const mapping = buildUnambiguousVersionMapping(next, photos);
+    setFiles(next);
+    setPreviews(next.map((file) => URL.createObjectURL(file)));
+    setAssignments(next.map((file) => mapping.find((row) => row.file === file)?.target.id ?? null));
+    setChoosing(null);
     setError(null);
   }
 
-  async function handleConfirm() {
+  function assign(index: number, photoId: string) {
+    setAssignments((current) => current.map((id, fileIndex) => fileIndex === index ? photoId : id === photoId ? null : id));
+    setChoosing(null);
+  }
+
+  async function upload() {
+    const pairs = files.flatMap((file, index) => assignments[index] ? [{ file, photoId: assignments[index]! }] : []);
+    if (!pairs.length || uploading) return;
     setUploading(true);
     setError(null);
-    const pairs: { file: File; photoId: string }[] = [];
-    mapping.forEach((m) => {
-      if (m.file) pairs.push({ file: m.file, photoId: m.target.id });
-    });
-    unmatchedFiles.forEach((f) => {
-      const photoId = manualAssign[f.name];
-      if (photoId) pairs.push({ file: f, photoId });
-    });
-    if (pairs.length === 0) {
-      setError("업로드할 사진과 원본 연결을 먼저 확인해 주세요.");
-      setUploading(false);
-      return;
-    }
     try {
-      let compressed: File[];
+      let uploadFiles: File[];
       try {
-        compressed = await compressImagesInParallel(
-          pairs.map((p) => p.file),
-          new AbortController().signal,
-          3,
+        uploadFiles = await compressImagesInParallel(
+          pairs.map(({ file }) => file), new AbortController().signal, 3,
           { maxEdge: CUSTOMER_UPLOAD_MAX_EDGE, jpegQuality: UPLOAD_INTERMEDIATE_JPEG_QUALITY }
         );
       } catch {
-        compressed = pairs.map((p) => p.file);
+        uploadFiles = pairs.map(({ file }) => file);
       }
-      const result = await uploadRetouched(projectId, compressed, pairs.map((p) => p.photoId), pairs.map((p) => p.file.name));
+      const result = await uploadRetouched(projectId, uploadFiles, pairs.map(({ photoId }) => photoId), pairs.map(({ file }) => file.name));
       await refresh();
-      if (result.rejected.length || result.uploaded !== pairs.length) {
-        const rejected = new Set(result.rejected);
-        const retryFiles = pairs.map((pair) => pair.file).filter((file) => rejected.has(file.name));
-        setFiles(retryFiles);
-        setMapping(buildVersionMapping(retryFiles, photos));
-        setManualAssign({});
-        setError(`${result.uploaded}장은 업로드했고 ${Math.max(result.rejected.length, pairs.length - result.uploaded)}장은 실패했어요. 실패한 파일을 다시 확인해 주세요.`);
+      if (result.uploaded !== pairs.length) {
+        setError(`${result.uploaded}장은 올렸어요. 실패한 사진은 다시 선택해 주세요.`);
+        setFiles([]);
+        setPreviews([]);
+        setAssignments([]);
         return;
       }
       router.push(`/customer-select/${projectId}/retouch/compare`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "업로드 실패");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "보정본을 올리지 못했어요. 다시 시도해 주세요.");
     } finally {
       setUploading(false);
     }
   }
 
-  if (loading) {
-    return <ProjectBodySkeleton variant="cards" label="보정본 정보를 불러오고 있어요" />;
-  }
+  if (loading) return <ProjectBodySkeleton variant="cards" label="선택한 사진을 불러오고 있어요" />;
   if (loadError) return <RetouchErrorScreen message={loadError} />;
 
-  return (
-    <>
-      <main className={ui.shellMain}>
-        <div className={ui.page}>
-          <div className={ui.header}>
-            <button type="button" className={ui.back} onClick={() => router.back()}>
-              ←
-            </button>
-            <h1 className={ui.title}>보정본 업로드</h1>
-          </div>
-          <div className={ui.body}>
-            <p className={ui.bodyText}>작가님께 받은 보정본을 올려주세요. 파일명이 비슷하면 자동으로 원본과 연결해요.</p>
-            <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => handleSelect(e.target.files)} />
-            <button type="button" className={`${ui.btn} ${ui.btnPrimary} ${ui.btnSm}`} style={{ width: 200 }} onClick={() => inputRef.current?.click()}>
-              보정본 선택
-            </button>
+  return <main className={s.page}>
+    <header className={s.header}>
+      <button type="button" className={s.back} aria-label="이전 화면" onClick={() => router.back()}><ArrowLeft size={20} /></button>
+      <h1>보정본 올리기</h1>
+    </header>
+    <div className={s.content}>
+      <section className={s.intro}>
+        <h2>{files.length ? `${files.length}장을 선택했어요` : "받은 보정본을 올려 주세요"}</h2>
+        <p>{files.length ? "원본과 보정본이 맞게 연결됐는지 사진으로 확인해 주세요." : "작가님께 받은 사진을 선택하면 내가 고른 원본 옆에 보여드릴게요."}</p>
+        <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(event) => { selectFiles(event.target.files); event.target.value = ""; }} />
+        <button type="button" className={s.pickButton} disabled={uploading} onClick={() => inputRef.current?.click()}>
+          <ImagePlus size={20} /> {files.length ? "파일 다시 선택하기" : "받은 사진 선택하기"}
+        </button>
+      </section>
 
-            {mapping.filter((m) => m.file).length > 0 && (
-              <div>
-                <p className={ui.label} style={{ marginBottom: 8 }}>
-                  자동 연결됨 ({mapping.filter((m) => m.file).length}장)
-                </p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {mapping.filter((m) => m.file).map((m) => (
-                    <div key={m.target.id} className={ui.reqItem}>
-                      <span className="fn">{m.target.filename}</span>
-                      <span className="tx">← {m.file!.name}</span>
-                    </div>
-                  ))}
-                </div>
+      {files.length > 0 ? <section className={s.section}>
+        <div className={s.sectionHead}><h2>사진 연결 확인</h2><span>{assignedCount}장 연결 · {files.length - assignedCount}장 확인 필요</span></div>
+        <div className={s.pairs}>
+          {files.map((file, index) => {
+            const photo = assignments[index] ? photoById.get(assignments[index]!) : null;
+            return <article className={s.pair} key={`${file.name}-${index}`}>
+              <div className={s.images}>
+                <div className={s.imageSlot}><span>내가 고른 원본</span>{photo ? <img src={photo.url} alt={photo.filename} /> : <div className={s.noPhoto}>사진을 골라 주세요</div>}</div>
+                <ArrowRight size={18} className={s.arrow} aria-hidden />
+                <div className={s.imageSlot}><span>받은 보정본</span><img src={previews[index]} alt={file.name} /></div>
               </div>
-            )}
-
-            {unmatchedFiles.length > 0 && (
-              <div>
-                <p className={ui.label} style={{ marginBottom: 8 }}>
-                  연결 안 된 파일 — 직접 골라주세요 ({unmatchedFiles.length}장)
-                </p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {unmatchedFiles.map((f) => (
-                    <div key={f.name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span className={ui.supportText} style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {f.name}
-                      </span>
-                      <select
-                        className={ui.input}
-                        style={{ height: 38, width: 160, fontSize: 12.5 }}
-                        value={manualAssign[f.name] ?? ""}
-                        onChange={(e) => setManualAssign((prev) => ({ ...prev, [f.name]: e.target.value }))}
-                      >
-                        <option value="">원본 선택</option>
-                        {photos.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.filename}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
+              <div className={s.pairFooter}>
+                <div><strong>{photo ? photo.filename : "어느 사진의 보정본인가요?"}</strong><small title={file.name}>{file.name}</small></div>
+                <button type="button" onClick={() => setChoosing(choosing === index ? null : index)}>{photo ? "변경" : "원본 고르기"}</button>
               </div>
-            )}
-            {error && <span className={ui.bannerHeadWarn}>{error}</span>}
-          </div>
-          <PhotographerPageActionBar maxWidth={1120} actions={<PhotographerLightButton size="work-panel" pending={uploading} pendingLabel="업로드 중…" disabled={files.length === 0} onClick={handleConfirm}>사진 연결 확인하고 검토하기</PhotographerLightButton>} />
+              {choosing === index && <div className={s.chooser}>
+                <p>이 보정본에 맞는 원본을 눌러 주세요.</p>
+                <div className={s.choices}>{photos.map((target) => <button type="button" key={target.id} aria-label={`${target.filename}에 연결`} onClick={() => assign(index, target.id)}>
+                  <img src={target.url} alt="" /><span>{target.filename}</span>
+                </button>)}</div>
+              </div>}
+            </article>;
+          })}
         </div>
-      </main>
-    </>
-  );
+        {files.length > assignedCount && <p className={s.help}>연결하지 않은 파일은 올리지 않고, 나중에 다시 선택할 수 있어요.</p>}
+      </section> : <section className={s.section}>
+        <div className={s.sectionHead}><h2>내가 고른 사진</h2><span>{photos.length}장</span></div>
+        {photos.length ? <div className={s.photoGrid}>{photos.map((photo) => <div className={s.photoTile} key={photo.id}>
+          <img src={photo.url} alt={photo.filename} /><span>{latestVersion(photo) ? <><Check size={14} /> 보정본 있음</> : "보정본 기다리는 중"}</span>
+        </div>)}</div> : <p className={s.help}>고른 사진이 없어요. 먼저 사진을 골라 작가님께 보내 주세요.</p>}
+        {uploadedCount > 0 && <button type="button" className={s.viewLink} onClick={() => router.push(`/customer-select/${projectId}/retouch/compare`)}>올린 보정본 비교하기 <ArrowRight size={17} /></button>}
+      </section>}
+      {error && <p role="alert" className={s.error}>{error}</p>}
+    </div>
+    {files.length > 0 && <PhotographerPageActionBar maxWidth={1040} actions={<PhotographerLightButton size="work-panel" pending={uploading} pendingLabel="보정본 올리는 중…" disabled={!assignedCount} onClick={upload}>확인한 {assignedCount}장 올리기</PhotographerLightButton>} />}
+  </main>;
 }
