@@ -38,9 +38,16 @@ test("PC 패널의 큰 선택 버튼: 선택 ↔ 해제가 개수와 무관하�
   // 사진 위 작은 체크박스와 같은 상태를 가리킨다
   await expect(page.locator(".fv-photo-checkbox:visible")).toHaveAttribute("aria-label", "사진 선택 해제");
 
+  // 같은 사진의 저장은 직렬화된다(선택 요청이 끝난 뒤 해제 요청이 나간다). 해제 저장이 끝나기 전에 테스트가 끝나면
+  // 같은 프로젝트를 쓰는 다음 테스트가 '선택된' 상태로 시작한다 — 해제 저장 응답까지 기다린다.
+  const deselectSaved = page.waitForResponse((response) =>
+    response.url().includes("/api/c/selections")
+    && response.request().method() === "POST"
+    && response.request().postDataJSON()?.is_selected === false);
   await big.click();
   await expect(big).not.toHaveClass(/is-selected/);
   await expect(big).toContainText("이 사진 선택하기");
+  expect((await deselectSaved).ok()).toBe(true);
 });
 
 test("필수 장수를 다 채워도 선택 해제는 이 버튼으로 가능하다", async ({ page }) => {
