@@ -61,7 +61,13 @@ test.describe("고객 — 갤러리 (사진 선택)", () => {
     }
     await page.reload();
     await expect(page.getByRole("textbox", { name: "파일명으로 필터링" })).toBeVisible();
+    // 별점·찜·정렬 등은 '필터' 패널 안에 있다(2026-10-07).
+    await page.getByRole("button", { name: /^필터/ }).click();
     await expect(page.getByRole("button", { name: "별점 5점 이상 필터" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#gld-filter-panel")).toHaveCount(0);
+    // 카드 별 다섯 개는 마우스를 올리면 나타난다(평소에는 매긴 별점만 ★N).
+    await page.locator(".gl-photo-card").first().hover();
     await expect(page.locator(".gl-photo-card").first().getByRole("button", { name: /^별점 \d점$/ })).toHaveCount(5);
     const fourthStar = page.locator(".gl-photo-card").first().getByRole("button", { name: "별점 4점", exact: true });
     await fourthStar.click();
@@ -93,6 +99,10 @@ test.describe("고객 — 갤러리 (사진 선택)", () => {
       await page.screenshot({ path: `test-results/gallery-mobile-${columns + 1}cols.png` });
     }
     await page.setViewportSize({ width: 1440, height: 900 });
+    await page.mouse.move(0, 0);
+    await expect(firstCard.locator(".gl-rating-summary")).toHaveText("4");
+    await expect(firstCard.locator(".gl-rating-row")).toBeHidden();
+    await firstCard.hover();
     await expect(firstCard.locator(".gl-rating-row")).toBeVisible();
     await expect(firstCard.locator(".gl-rating-summary")).toBeHidden();
   });

@@ -177,7 +177,7 @@ test.describe("고객 — 뷰어 (사진 크게 보기)", () => {
     await page.goto(href);
     await page.waitForLoadState("networkidle");
 
-    await page.getByRole("button", { name: /전체 단축키/ }).click();
+    await page.getByRole("button", { name: /단축키 보기/ }).click();
     const dialog = page.getByRole("dialog", { name: "단축키" });
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText("사진 선택 · 선택 해제");
