@@ -395,3 +395,56 @@ test(`mobile ${strategy} upload ordering`, async ({ browser }, testInfo) => {
   }
 });
 }
+
+test("upload completion shows the refreshed photo count, not the pre-upload count", async ({ browser }, testInfo) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, baseURL: testInfo.project.use.baseURL });
+  const page = await context.newPage();
+  try {
+    const expires = Math.floor(Date.now() / 1000) + 3600;
+    const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+    const jwt = `${encode({ alg: "HS256", typ: "JWT" })}.${encode({ sub: projectId, aud: "authenticated", exp: expires })}.test-signature`;
+    const storageKey = `sb-${new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).hostname.split(".")[0]}-auth-token`;
+    await context.addCookies([{ name: storageKey, value: `base64-${encode({ access_token: jwt, refresh_token: "mock-refresh", expires_at: expires,
+      token_type: "bearer", user: { id: projectId, aud: "authenticated", role: "authenticated" } })}`,
+      url: testInfo.project.use.baseURL!, sameSite: "Lax" }]);
+    let previewCount = 0;
+    await page.route("**/rest/v1/**", route => route.fulfill({ json: [] }));
+    await page.route("**/api/photographer/**", route => route.fulfill({ json: {} }));
+    await page.route("**/auth/v1/user", route => route.fulfill({ json: {
+      id: projectId, aud: "authenticated", role: "authenticated", email: "count-test@example.test",
+      app_metadata: {}, user_metadata: {}, created_at: "2026-10-07T00:00:00Z",
+    } }));
+    await page.route("**/rest/v1/photographers?**", route => route.fulfill({ json: {
+      id: projectId, auth_id: projectId, name: "테스트 작가", studio_name: "테스트 작가",
+    } }));
+    // 업로드 뒤 프로젝트 재조회가 늦게 도착해도 하단 장수가 0장으로 돌아가면 안 된다.
+    await page.route("**/rest/v1/projects?**", async route => {
+      if (previewCount > 0) await new Promise(resolve => setTimeout(resolve, 2000));
+      await route.fulfill({ json: {
+        id: projectId, photographer_id: projectId, name: "장수 갱신 검증", customer_name: "테스트",
+        required_count: 1, photo_count: previewCount, status: "preparing", include_original: false,
+        access_token: "test-upload-token", created_at: "2026-10-07T00:00:00Z", updated_at: "2026-10-07T00:00:00Z",
+      } });
+    });
+    await page.route("**/api/photographer/quota", route => route.fulfill({ json: {
+      tier: "beta", current: 1, max: 50, maxPhotosPerProject: 1000, betaStatus: "approved",
+    } }));
+    await page.route(/\/api\/(?:photographer\/)?upload\/photos$/, route => {
+      const files = route.request().postDataBuffer()?.toString().match(/filename="/g)?.length ?? 0;
+      previewCount += files;
+      return route.fulfill({ json: { uploaded: files, rejected: [], original_presigned: [] } });
+    });
+
+    await page.goto(`/photographer/projects/${projectId}/upload`);
+    const sample = fs.readFileSync(path.join(__dirname, "../../fixtures/sample.jpg"));
+    await page.locator('input[type="file"]').first().setInputFiles(Array.from({ length: 3 }, (_, index) => ({
+      name: `count-${index + 1}.jpg`, mimeType: "image/jpeg", buffer: sample,
+    })));
+    await page.getByRole("button", { name: "업로드 시작", exact: true }).click();
+    const summary = page.locator("p", { hasText: "셀렉 목표 장수" });
+    await expect(summary).toBeVisible({ timeout: 30_000 });
+    await expect(summary).toContainText("원본 3장", { timeout: 500 });
+  } finally {
+    await context.close();
+  }
+});

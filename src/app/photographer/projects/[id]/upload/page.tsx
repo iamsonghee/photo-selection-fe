@@ -2584,6 +2584,9 @@ export default function ProjectDetailPage() {
       sendingSourceFailedRef.current > 0 || !originalFinalize?.ok
     );
 
+    // 진행 표시가 사라지는 순간 하단 요약이 project.photoCount를 읽는다 — 전환 전에 서버 장수를 받아 둬야
+    // 방금 올린 사진이 "원본 0장 · N장이 더 필요"로 잠깐 보이지 않는다.
+    await loadProject();
     setAwaitingServerFinalize(false);
     telemetry.finish(originalIncomplete || failureBySourceIndex.size > 0 || backendRejected.length > 0 ? "incomplete" : "completed");
     setUploadSnapshot(telemetry.snapshot());
@@ -2619,7 +2622,6 @@ export default function ProjectDetailPage() {
       } else {
         setToast(totalFail === 0 ? "업로드 완료!" : `${totalFail}개 파일 처리 실패`);
       }
-      await loadProject();
       // 새로 업로드된 사진이 clipPending 캐시에 반영되지 않으면 이미 분석된 것으로
       // 오인해 재분석 버튼이 조용히 무시된다 — 업로드 완료 시마다 상태를 다시 읽는다.
       loadClipAnalysisStatus();
