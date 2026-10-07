@@ -486,6 +486,7 @@ Project List Row의 Primary/Secondary도 서로 같은 140×38px, 12/19px geomet
 - `maxRevisionCount`상 도달 불가능한 수정 단계는 점선 원을 쓰지 않고 quiet neutral fill + 짧은 `—`로 표시한다.
 - Current node 아래 Actor는 `작가/고객` text만 둔다. node color를 작은 dot으로 다시 반복하지 않는다.
 - Actor/state mapping은 `getProjectActor`, `getSixStepPosition`, `getDisabledSteps`에서 파생하며 화면에서 재해석하지 않는다.
+- PC Project List의 축약 진행 막대(`CompactProjectProgress`)는 단계명을 표시하지 않는다(2026-10-07). 6칸(약 44px)에 `1차 재보정` 등이 들어가지 않아 옆 칸과 붙었고, 현재 상태는 바로 위 상태 글자가 이미 말한다. 각 단계명은 `title`·`aria-label`로 전달한다.
 - Project Detail Expanded variant도 current item 전체에 Orange/Teal border·fill을 두지 않는다. semantic color는 current node와 단계 text에만 사용해 우측 작업 CTA와 경쟁하지 않게 한다.
 - Project Detail Expanded variant는 outer padding 16×12px, item min-height 68px, node 32px, title 15/20px, description 12/20px을 사용한다. Desktop 6열 전체 높이는 105px 이하로 유지해 본문보다 강한 상태 배너가 되지 않게 한다.
 

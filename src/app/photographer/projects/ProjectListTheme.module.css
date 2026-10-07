@@ -78,6 +78,8 @@
 .progressSegment { display:block; height:4px; border-radius:2px; background:var(--border-subtle); }
 .progressSteps li[data-done=true] .progressSegment { background:var(--border-strong); }
 .progressSteps li[data-current=true] { font-weight:700; color:var(--foreground); }
+/* 단계명은 칸(약 44px)보다 길어(1차 재보정 등) 옆 칸과 붙었다. 현재 상태는 바로 위 상태 글자가 이미 말하므로 목록에서는 막대만 두고, 각 단계명은 title·aria-label로 전달한다. */
+.progressSteps li .stepName { display:none; }
 .progressSteps li[data-current=true] .progressSegment { background:var(--step-color); }
 .progressSteps li[data-skipped=true] .progressSegment { background:transparent; border:1px dashed var(--border-strong); }
 .progressSteps li[data-skipped=true] .stepName { opacity:.55; }
