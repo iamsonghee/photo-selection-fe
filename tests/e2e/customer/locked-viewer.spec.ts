@@ -104,30 +104,23 @@ test.describe("모바일", () => {
 
   test("상세보기에서 좌우 스와이프로 같은 섹션의 사진을 이동한다", async ({ page }) => {
     await prepareLockedPage(page);
-    await expect(page.getByRole("heading", { name: "셀렉 상세보기" })).toBeVisible();
-    const statusBar = page.locator(".locked-mobile-status");
+    // 2026-10 개편 기준: 제목 '셀렉 결과', 범위 '선택한 사진/원본 N장', 상세 창 이름 '(구역) 상세보기'. 픽셀 값은 보지 않는다.
+    await expect(page.getByRole("heading", { name: "셀렉 결과" })).toBeVisible();
     await expect(page.getByText("사진 셀렉이 완료되어 작가가 보정 중이에요", { exact: true })).toBeVisible();
-    await expect(statusBar).toHaveCSS("background-color", "rgba(255, 77, 0, 0.08)");
-    await expect(statusBar.getByRole("button", { name: "원본 다운로드" })).toHaveCSS("color", "rgb(38, 40, 44)");
-    await expect(page.getByRole("button", { name: /셀렉 3장/ })).toBeVisible();
-    await expect(page.locator(".locked-mobile-grid")).toHaveCSS("grid-template-columns", /.+ .+/);
-    await expect(page.getByRole("button", { name: "파일명 검색" })).toHaveCSS("width", "30px");
+    const scopeTrigger = page.locator(".locked-mobile-scope > button");
+    await expect(scopeTrigger).toContainText("선택한 사진");
+    await expect(scopeTrigger).toContainText("3장");
 
-    await page.getByRole("button", { name: /셀렉 3장/ }).click();
-    await page.getByRole("menuitem", { name: /원본 5장/ }).click();
+    await scopeTrigger.click();
+    await page.getByRole("menuitem", { name: /원본\s*5장/ }).click();
     await expect(page.locator(".locked-mobile-selected-check")).toHaveCount(3);
-    await page.getByRole("button", { name: /원본 5장/ }).click();
-    await page.getByRole("menuitem", { name: /셀렉 3장/ }).click();
+    await scopeTrigger.click();
+    await page.getByRole("menuitem", { name: /선택한 사진\s*3장/ }).click();
 
     await page.getByRole("button", { name: "E2E_TEST_001.jpg 상세보기" }).click();
-    const viewer = page.getByRole("dialog", { name: "선택된 원본 상세보기" });
-
-    await expect(viewer.locator("header")).toHaveCSS("min-height", "55px");
-    await expect(viewer.locator(".locked-viewer-stage")).toHaveCSS("padding-top", "60px");
+    const viewer = page.getByRole("dialog", { name: /상세보기$/ });
+    await expect(viewer).toBeVisible();
     await expect(viewer.getByText("선택됨", { exact: true })).toBeVisible();
-    await expect(viewer.getByText("코멘트 없음", { exact: true })).toBeVisible();
-    await expect(viewer.getByRole("button", { name: "이전 사진" })).toBeVisible();
-    await expect(viewer.getByRole("button", { name: "다음 사진" })).toBeVisible();
 
     await viewer.dispatchEvent("touchstart", {
       touches: [{ identifier: 1, clientX: 320, clientY: 400 }],

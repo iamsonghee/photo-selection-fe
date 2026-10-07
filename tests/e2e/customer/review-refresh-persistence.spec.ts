@@ -1,6 +1,4 @@
 import { test, expect } from "@playwright/test";
-import * as fs from "fs";
-import * as path from "path";
 import { loginAsPhotographer } from "../../helpers/auth";
 import { createEditingProject, deleteTestProject, type TestProject } from "../../helpers/setup";
 
@@ -11,7 +9,6 @@ import { createEditingProject, deleteTestProject, type TestProject } from "../..
  * 백엔드(FastAPI)가 로컬에서 실행 중이어야 통과한다(실제 V1 업로드 필요).
  */
 let project: TestProject;
-let sourceFilePath: string;
 
 test.beforeAll(async ({ browser }) => {
   const health = await fetch("http://localhost:8000/health").catch(() => null);
@@ -26,34 +23,18 @@ test.beforeAll(async ({ browser }) => {
     data: { max_revision_count: 2 },
   });
 
-  // 원본과 이름이 같은 보정본 파일을 준비해 exact 매칭되게 한다.
-  sourceFilePath = path.join(__dirname, "..", "..", "fixtures", "sample.jpg");
-  const renamedPath = path.join(path.dirname(sourceFilePath), "E2E_TEST_001.jpg");
-  fs.copyFileSync(sourceFilePath, renamedPath);
-
-  await setupPage.goto(`/photographer/projects/${project.projectId}/assets/retouched`);
-  await setupPage.waitForLoadState("networkidle");
-  const uploadDialog = setupPage.getByRole("dialog", { name: "보정본 업로드" });
-  await expect(uploadDialog).toBeVisible({ timeout: 8000 });
-  await uploadDialog.locator('input[type="file"][multiple]').setInputFiles(renamedPath);
-  const uploadBtn = uploadDialog.getByRole("button", { name: /^업로드$/i });
-  await expect(uploadBtn).toBeEnabled({ timeout: 8000 });
-  await uploadBtn.click();
-  // 업로드 버튼 자체가 안 보이게 된 뒤에도 패널 컨테이너가 잠시 남아 뒤 버튼 클릭을
-  // 가로챌 수 있으므로, 패널 헤딩이 완전히 사라질 때까지 기다린다.
-  await expect(
-    setupPage.getByRole("heading", { name: "보정본 업로드" })
-  ).not.toBeVisible({ timeout: 20000 });
-
-  fs.rmSync(renamedPath, { force: true });
-
-  // "보정본 검토 요청" → 기한 설정 모달 → 확정 → 공유 모달
-  await setupPage.getByRole("button", { name: "보정본 검토 요청" }).first().click();
-  await expect(
-    setupPage.getByRole("heading", { name: "고객에게 보정본 검토 요청" })
-  ).toBeVisible({ timeout: 8000 });
-  await setupPage.getByRole("button", { name: "보정본 검토 요청" }).last().click();
-  await expect(setupPage.getByText(/고객이 V1 보정본을 검토 중입니다/)).toBeVisible({ timeout: 15000 });
+  // 이 테스트의 대상은 고객 검토 화면이다 — 작가 업로드 UI(2026-10 개편으로 바뀜)를 거치지 않고
+  // 테스트 API로 V1 보정본을 넣고 검토 단계로 바로 옮긴다.
+  const photosResponse = await setupPage.request.get(`/api/photographer/projects/${project.projectId}/photos`);
+  const { photos } = await photosResponse.json() as { photos: Array<{ id: string }> };
+  const seeded = await setupPage.request.post("/api/auth/test-setup", {
+    data: { action: "seed_photo_version", projectId: project.projectId, photoIds: [photos[0].id] },
+  });
+  expect(seeded.ok(), await seeded.text()).toBe(true);
+  const moved = await setupPage.request.post("/api/auth/test-setup", {
+    data: { action: "set_project_status", projectId: project.projectId, status: "reviewing_v1" },
+  });
+  expect(moved.ok(), await moved.text()).toBe(true);
 
   await setupPage.close();
 });
@@ -74,15 +55,12 @@ test.describe("고객 — 보정본 검토 새로고침 (BUG-04 회귀)", () => 
     await page.goto(`/c/${project.accessToken}/review`);
     await page.waitForLoadState("networkidle");
 
-    // 모바일/데스크톱 어느 쪽이든 결국 개별 사진 상세로 이동한다.
-    await page.waitForURL(/\/review\/[a-f0-9-]+$/, { timeout: 15000 }).catch(() => {});
-    if (!/\/review\/[a-f0-9-]+$/.test(page.url())) {
-      await page.locator("a, button").filter({ hasText: /검토|확인/ }).first().click().catch(() => {});
-      await page.waitForURL(/\/review\/[a-f0-9-]+$/, { timeout: 10000 });
-    }
+    // 검토 목록 하단의 '미검토 사진 보기'로 첫 미검토 사진 상세에 들어간다.
+    await page.getByRole("button", { name: "미검토 사진 보기" }).click();
+    await page.waitForURL(/\/review\/[a-f0-9-]+$/, { timeout: 10000 });
 
-    // Y 키(물리 키코드)로 확정 — review/[photoId]/page.tsx의 단축키와 동일
-    await page.keyboard.press("y");
+    // 판단 패널의 '확정' 버튼으로 확정한다(단축키 Y와 같은 동작).
+    await page.getByRole("button", { name: /^확정/ }).first().click();
     await expect(page.getByText("확정됨").first()).toBeVisible({ timeout: 8000 });
 
     await page.reload();

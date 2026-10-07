@@ -33,7 +33,7 @@ for (const width of [1440, 390]) {
     await expect(page.locator(".gl-gallery-notice-dismissible")).toHaveCount(0);
     await expect(page.locator(".gl-check-box[aria-label='선택 해제']")).toHaveCount(0);
     if (width === 390) {
-      const scopeTrigger = page.locator(".gl-mobile-filter-trigger");
+      const scopeTrigger = page.locator(".gmc-scope-trigger");
       await expect(scopeTrigger).toContainText("작가 추천2장");
       await scopeTrigger.click();
       const scopeSheet = page.getByRole("dialog", { name: "사진 보기" });
