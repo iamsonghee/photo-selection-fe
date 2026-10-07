@@ -44,7 +44,8 @@ async function setup(page: Page, { holdThumbs = false } = {}) {
 test("next photo: until its thumbnail or full image arrives, name, state and buttons stay with the photo on screen", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const images = await setup(page, { holdThumbs: true });
-  await page.goto("/customer-select/detail-safety/select");
+  // 썸네일 요청을 일부러 붙잡아 두므로 load 이벤트까지 기다리면 영영 끝나지 않는다.
+  await page.goto("/customer-select/detail-safety/select", { waitUntil: "domcontentloaded" });
   await page.locator('.gl-photo-card[data-photo-id="d1"]').click();
   const pick = page.getByRole("button", { name: "최종 선택", exact: true });
   await expect(pick).toBeEnabled();
