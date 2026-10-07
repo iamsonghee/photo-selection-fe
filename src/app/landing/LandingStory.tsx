@@ -10,6 +10,7 @@ import { ProjectOverview } from "./ProjectOverview";
 import { ReviewVideo } from "./ReviewVideo";
 import { SamplePhoto } from "./SamplePhoto";
 import { SAMPLE_PROJECT, SAMPLE_SELECTED_PHOTOS, getSamplePhoto, createSamplePhotoStates } from "./sample-project";
+import { LANDING_FAQ } from "./faq";
 
 // 01 체험은 대표 10장만 사용한다. 두 쌍만 묶어 처음에는 8개 카드를 보여준다.
 const PHOTO_IDS = ["01", "02", "03", "05", "06", "07", "14", "10", "11", "13"];
@@ -161,7 +162,7 @@ export function LandingStory({ limits, onStart }: { limits: { generalMaxProjects
     <section id="projects-demo" className="as-section ac-container as-split"><Heading step="04 / 다음 작업을 놓치지 않도록" title="지금 이어갈 작업을 한눈에.">고객을 기다리는 촬영과 작가가 처리할 촬영을 구분하세요. 우선 확인할 프로젝트부터 살펴보고, 다음 작업을 이어가세요.</Heading><ProjectOverview /></section>
 
     <section id="landing-plans" className="as-section ac-container"><Heading step="다음 촬영에서 시작해 보세요" title="다음 촬영도 A-CUT으로.">무료 체험으로 고객 셀렉을 경험해 보세요. 더 많은 사진을 관리하려면 클로즈드 베타에 신청하세요.</Heading><div className="as-plans"><article><span className="as-kicker">바로 시작</span><h3>무료 체험</h3><p>프로젝트 <strong>{limits.generalMaxProjects}개</strong><br />프로젝트당 최대 <strong>{limits.generalMaxPhotosPerProject.toLocaleString()}장</strong></p><button type="button" className="ac-button" onClick={onStart}>무료 시작하기<ArrowRight size={16} /></button></article><article><span className="as-kicker">승인 후 참여</span><h3>클로즈드 베타</h3><p>프로젝트 <strong>{limits.betaMaxProjectsTotal}개</strong><br />프로젝트당 최대 <strong>{limits.betaMaxPhotosPerProject.toLocaleString()}장</strong><br />AI 유사컷 분석</p><Link prefetch={false} href="/beta/apply" className="as-outline-button">베타 신청하기<ArrowRight size={16} /></Link></article></div><p className="as-footnote"><SentenceText>화면의 이용 조건은 랜딩 검토용 가상 수치입니다. 실제 서비스 정책과 다를 수 있습니다.</SentenceText></p>
-      <div className="as-faq"><h3>시작 전에 궁금한 점</h3>{[["고객도 가입하거나 앱을 설치해야 하나요?", "고객은 공유받은 링크를 브라우저에서 열면 됩니다. 비밀번호가 설정된 프로젝트는 비밀번호를 입력해 접속합니다."], ["여러 사람이 같이 사진을 고를 수 있나요?", "같은 링크에 접속해 이름과 색으로 각자의 찜을 구분할 수 있습니다. 찜과 최종 선택은 별개이며, 정해진 장수를 선택한 뒤 셀렉을 확정합니다."], ["AI가 사진을 보정해 주나요?", "AI 유사컷 분석은 비슷한 사진을 묶어 비교를 돕는 기능입니다. 보정은 작가가 기존 편집 도구에서 직접 작업하고, 완성한 보정본을 A-CUT에 올립니다."], ["기존 편집 도구에서는 어떻게 이어가나요?", "선택 결과에서 파일명을 복사하거나 파일명과 코멘트가 담긴 CSV를 내려받을 수 있습니다. 이를 참고해 기존 편집 도구에서 보정 대상을 찾으세요. 자동 동기화 기능은 아닙니다."], ["보정 요청은 몇 번까지 할 수 있나요?", "프로젝트에 설정한 재보정 횟수 안에서 요청할 수 있습니다. 고객은 사진별로 확정하거나 재보정 사유를 남길 수 있습니다."], ["사진 보관과 다운로드 기간은 어떻게 되나요?", "다운로드 가능 기간은 프로젝트의 다운로드 화면에서 확인하세요. 사진 보관 기간과 다운로드 만료는 서로 다르며, 상세 운영 정책은 별도 안내 예정입니다."]].map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown size={18} /></summary><p><SentenceText>{answer}</SentenceText></p></details>)}</div>
+      <div className="as-faq"><h3>시작 전에 궁금한 점</h3>{LANDING_FAQ.map(({ question, answer }) => <details key={question}><summary>{question}<ChevronDown size={18} /></summary><p><SentenceText>{answer}</SentenceText></p></details>)}</div>
       <div className="as-final"><h2>사진 셀렉, A-CUT으로 시작하세요.</h2><button type="button" className="ac-button" onClick={onStart}>무료 시작하기<ArrowRight size={17} /></button></div>
     </section>
   </div>;

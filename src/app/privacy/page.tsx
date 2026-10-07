@@ -4,6 +4,7 @@ import { LegalDocument } from "@/components/legal/LegalDocument";
 export const metadata: Metadata = {
   title: "개인정보처리방침 | A-CUT",
   description: "A-CUT 개인정보처리방침",
+  alternates: { canonical: "/privacy" },
 };
 
 export default function PrivacyPage() {

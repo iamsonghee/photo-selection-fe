@@ -1,18 +1,61 @@
 import type { Metadata } from "next";
+import LandingPage from "./landing/page";
+import { LANDING_FAQ } from "./landing/faq";
+import { BRAND_LOGO_PNG } from "@/lib/brand-assets";
+import { OG_MAIN_IMAGE, SITE_NAME, SITE_URL } from "@/lib/site-metadata";
 import "./landing/landing.css";
 
 const title = "A-CUT | 고객의 사진 셀렉부터 보정본 확정까지";
 const description = "사진작가를 위한 고객 셀렉·보정 피드백 관리. 함께 찜하고 AI 유사컷을 비교하며, 선택 결과부터 보정본 확정까지 한곳에서 관리하세요.";
-// 카톡/아이메시지 등은 og:image를 자체 캐시하고 우리 서버 캐시 헤더를 보지 않는다.
-// 이미지 파일을 바꿀 때는 이 REV도 함께 올려서 URL 자체를 바꿔야 플랫폼이 재스캔한다.
-const OG_MAIN_IMAGE_REV = "2";
-const ogImage = { url: `/og/main.jpg?v=${OG_MAIN_IMAGE_REV}`, width: 1200, height: 630, alt: "A-CUT — 사진 셀렉·보정을 한 곳에서" };
 
 export const metadata: Metadata = {
   title,
   description,
-  openGraph: { title, description, images: [ogImage], type: "website", locale: "ko_KR" },
-  twitter: { card: "summary_large_image", title, description, images: [ogImage] },
+  alternates: { canonical: "/" },
+  openGraph: { title, description, url: "/", siteName: SITE_NAME, images: [OG_MAIN_IMAGE], type: "website", locale: "ko_KR" },
+  twitter: { card: "summary_large_image", title, description, images: [OG_MAIN_IMAGE] },
 };
 
-export { default } from "./landing/page";
+// 검색 엔진용 구조화 데이터. 화면에 있는 사실(사업자 정보·FAQ)만 담고 후기·평점은 넣지 않는다.
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: SITE_NAME,
+      alternateName: ["A컷", "ACUT"],
+      legalName: "순한설기",
+      url: SITE_URL,
+      logo: `${SITE_URL}${BRAND_LOGO_PNG}`,
+      email: "multihatter@gmail.com",
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      name: SITE_NAME,
+      alternateName: ["A컷", "ACUT"],
+      url: SITE_URL,
+      inLanguage: "ko-KR",
+      publisher: { "@id": `${SITE_URL}/#organization` },
+    },
+    {
+      "@type": "FAQPage",
+      "@id": `${SITE_URL}/#faq`,
+      mainEntity: LANDING_FAQ.map(({ question, answer }) => ({
+        "@type": "Question",
+        name: question,
+        acceptedAnswer: { "@type": "Answer", text: answer },
+      })),
+    },
+  ],
+};
+
+export default function HomePage() {
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+      <LandingPage />
+    </>
+  );
+}

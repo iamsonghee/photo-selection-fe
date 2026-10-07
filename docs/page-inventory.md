@@ -19,7 +19,7 @@
 
 ### 2.1 공개 방문자/가입
 
-1. `/` 또는 `/landing`에서 서비스 소개 확인
+1. `/`에서 서비스 소개 확인(`/landing`은 2026-10-07부터 `/`로 308 리다이렉트)
 2. `무료로 시작하기`에서 `AuthModal` 실행
 3. OAuth 완료 후 `/photographer/dashboard`
 4. 별도 흐름으로 `/beta/apply` 신청 → `/beta/apply/complete`
@@ -97,8 +97,8 @@
 
 | 라우트 | 페이지 파일 | 화면 목적과 주요 UI | 레이아웃/반응형 | 상태 처리 |
 |---|---|---|---|---|
-| `/` | `src/app/page.tsx` | `/landing` 구현을 재사용하는 메인 랜딩 | 밝은 반응형 셸과 로컬 제품 데모 | 가상 데이터만 사용, 시작 CTA는 셀렉 체험으로 이동, 운영 설정·인증 조회 없음 |
-| `/landing` | `src/app/landing/page.tsx` | 제품 소개·히어로 시연·독립 샘플 체험 | 무음 영상과 반응형 로컬 데모 | 가상 상태만 사용, 영상 실패/움직임 축소 시 poster |
+| `/` | `src/app/page.tsx` | `src/app/landing/page.tsx` 구현을 재사용하는 메인 랜딩, 검색용 JSON-LD 포함 | 밝은 반응형 셸과 로컬 제품 데모 | 가상 데이터만 사용, 시작 CTA는 셀렉 체험으로 이동, 운영 설정·인증 조회 없음 |
+| `/landing` | `next.config.ts` `redirects()` | `/`로 308 리다이렉트(2026-10-07, 중복 주소 정리). 페이지 파일은 `/`가 재사용 | — | — |
 | `/landing/demo-capture` | `src/app/landing/demo-capture/page.tsx` | 영상 재생성용 고정 타임라인 | 1200×641 CSS px, 개발 전용 | production에서는 notFound, 운영 API 미사용 |
 | `/guide` | `src/app/guide/page.tsx`, `GuidePageClient.tsx` | 작가/고객 탭형 사용 가이드 | 독립적인 장문 가이드 UI, 전역 Pretendard 기반 | 탭 전환, CTA disabled 처리 |
 | `/beta/apply` | `src/app/beta/apply/page.tsx`, `BetaApplyForm.tsx` | 로그인 전 인증 유도 또는 베타 신청 폼 | 공통 `Card`, `Input`, `Textarea`, `Button`을 가장 일관되게 사용 | 로그인/제출/검증/오류/완료 |
