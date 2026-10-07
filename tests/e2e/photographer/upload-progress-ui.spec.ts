@@ -14,6 +14,7 @@ for (const viewport of scenarios) {
     let allowPreview = () => {};
     let allowThumbnail = () => {};
     let finalized = false, recovered = false, previewRegistered = false, selectionActivated = false;
+    let uploadedClientId: string | null = null;
     const verifyThumbnailTransition = viewport.width === 1440 && !viewport.fallback && !viewport.retry;
     const context = await browser.newContext({
       viewport,
@@ -51,7 +52,7 @@ for (const viewport of scenarios) {
         previewRegistered && new URL(route.request().url()).searchParams.get("offset") === "0" ? [{
           id: "uploading-original", project_id: projectId, number: 1,
           r2_thumb_url: verifyThumbnailTransition ? "http://localhost:3001/__upload-test/confirmed-thumb" : "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
-          r2_preview_url: null, original_filename: "sample.jpg",
+          r2_preview_url: null, original_filename: "sample.jpg", client_upload_id: uploadedClientId,
           original_status: finalized && !viewport.retry ? "completed" : "awaiting_upload",
         }] : [],
       }));
@@ -97,6 +98,8 @@ for (const viewport of scenarios) {
         if (!viewport.fallback) await previewGate;
         const body = route.request().postDataBuffer()?.toString();
         expect(body).not.toContain('name="early_original_upload"');
+        // 실제 서버처럼 업로드 키를 저장된 사진에 실어 줘야 미리보기 칸이 같은 칸으로 이어진다.
+        uploadedClientId = body?.match(/name="client_upload_ids"\r\n\r\n([^\r]+)/)?.[1] ?? null;
         previewRegistered = true;
         await route.fulfill({ json: {
         uploaded: 1, rejected: [], original_presigned: [{ job_id: "test-job", url: "http://localhost:3001/__upload-test/r2", content_type: "image/jpeg", source_key: "test", expires_at: "2099-01-01" }],
@@ -167,7 +170,7 @@ for (const viewport of scenarios) {
         expect(await page.evaluate(() => (window as unknown as { putCount: number }).putCount)).toBe(6);
         return;
       }
-      const status = viewport.width < 768 ? page.locator(".prj-mobile-progress [role=status]") : page.locator(".prj-upload-bottom-status");
+      const status = viewport.width < 768 ? page.locator(".prj-mobile-progress [role=status]").first() : page.locator(".prj-upload-bottom-status");
       if (viewport.width === 1440 && !viewport.fallback) {
         const leaveDialog = page.getByRole("dialog", { name: "사진 업로드가 진행 중입니다" });
         await expect.poll(() => page.evaluate(() => window.history.state?.acutUploadGuard)).toBe(true);
@@ -199,13 +202,13 @@ for (const viewport of scenarios) {
       await expect(page.locator("[data-original-upload-intro]")).toHaveCSS("visibility", "hidden", { timeout: 4000 });
       await advance(0.75);
       await expect(status).toContainText(/7[45]%/);
-      await expect(page.getByRole("button", { name: "셀렉 요청하기", exact: true })).toBeEnabled({ timeout: 15000 });
+      await expect(page.getByRole("button", { name: "고객 셀렉 시작하기", exact: true })).toBeEnabled({ timeout: 15000 });
       if (viewport.width === 1440 && !viewport.fallback) {
-        await page.getByRole("button", { name: "셀렉 요청하기", exact: true }).click();
-        const requestDialog = page.getByRole("dialog", { name: "고객에게 셀렉 요청하기" });
+        await page.getByRole("button", { name: "고객 셀렉 시작하기", exact: true }).click();
+        const requestDialog = page.getByRole("dialog", { name: "고객 셀렉 시작하기" });
         expect(await page.evaluate(() => typeof (window as unknown as { advanceUpload?: unknown }).advanceUpload)).toBe("function");
         await requestDialog.getByRole("checkbox").check();
-        await requestDialog.getByRole("button", { name: "1장 셀렉 요청하기" }).click();
+        await requestDialog.getByRole("button", { name: "고객 셀렉 시작하기", exact: true }).click();
         const shareDialog = page.getByRole("dialog", { name: "고객 초대 링크가 활성화되었습니다" });
         await expect(shareDialog).toBeVisible();
         expect(selectionActivated).toBe(true);

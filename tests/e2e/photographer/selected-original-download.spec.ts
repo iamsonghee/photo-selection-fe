@@ -96,12 +96,12 @@ test("확정된 셀렉 원본을 고른 폴더에 원본 파일명으로 스트�
   await expect(bulkButton).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   await page.locator("[data-project-asset-export-trigger]:visible").click();
 
-  const downloadButton = page.getByRole("button", { name: /셀렉 원본 다운로드/ });
+  const downloadButton = page.getByRole("button", { name: /선택한 사진의 원본 다운로드/ });
   await expect(downloadButton).toBeEnabled();
   await expect(downloadButton).toContainText("선택된 3장");
   await downloadButton.click();
 
-  await expect(page.getByText("셀렉 원본 3개를 선택한 폴더에 저장했습니다.")).toBeVisible();
+  await expect(page.getByText("선택한 사진의 원본 3개를 선택한 폴더에 저장했습니다.")).toBeVisible();
   const savedFilenames = await page.evaluate(() =>
     (window as typeof window & { __savedFilenames?: string[] }).__savedFilenames ?? [],
   );
@@ -145,13 +145,13 @@ test("원본 미포함 프로젝트는 1200px JPEG 프리뷰로 명확히 구분
   }
   await page.getByRole("button", { name: "내보내기" }).click();
 
-  const previewButton = page.getByRole("button", { name: /셀렉 프리뷰 다운로드/ });
+  const previewButton = page.getByRole("button", { name: /선택한 사진의 미리보기 다운로드/ });
   await expect(previewButton).toBeEnabled();
   await expect(previewButton).toContainText("확인용 최대 1200px JPEG");
   await expect(previewButton).toContainText("보정·납품용으로는 해상도가 부족할 수 있어요.");
   await previewButton.click();
 
-  await expect(page.getByText("셀렉 프리뷰 3개를 선택한 폴더에 저장했습니다.")).toBeVisible();
+  await expect(page.getByText("선택한 사진의 미리보기 3개를 선택한 폴더에 저장했습니다.")).toBeVisible();
   const savedFilenames = await page.evaluate(() =>
     (window as typeof window & { __savedFilenames?: string[] }).__savedFilenames ?? [],
   );
