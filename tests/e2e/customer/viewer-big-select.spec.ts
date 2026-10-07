@@ -24,6 +24,27 @@ async function openViewer(page: import("@playwright/test").Page, index = 0) {
   await page.waitForLoadState("networkidle");
 }
 
+// 필수 장수를 채우는 테스트보다 먼저 돈다(한도가 차면 새 선택이 막힌다).
+test("선택 직후 해제하고 바로 창을 닫아도 해제가 저장된다", async ({ browser }) => {
+  // 같은 사진의 저장은 직렬화된다 — 선택 요청이 도는 동안 누른 해제는 대기열에 있다가, 창을 닫는 순간 keepalive로 나가야 한다.
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await openViewer(page, 4);
+  const big = page.locator(".fs-select-big");
+  await expect(big).toBeVisible({ timeout: 10_000 });
+  await big.click();
+  await expect(big).toHaveClass(/is-selected/);
+  await big.click();
+  await expect(big).not.toHaveClass(/is-selected/);
+  await page.close({ runBeforeUnload: true });
+
+  const reopened = await context.newPage();
+  await openViewer(reopened, 4);
+  await expect(reopened.locator(".fs-select-big")).toBeVisible({ timeout: 10_000 });
+  await expect(reopened.locator(".fs-select-big")).not.toHaveClass(/is-selected/);
+  await context.close();
+});
+
 test("PC 패널의 큰 선택 버튼: 선택 ↔ 해제가 개수와 무관하게 늘 동작한다", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openViewer(page);

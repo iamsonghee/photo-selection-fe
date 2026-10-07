@@ -335,6 +335,26 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     [project?.id, token]
   );
 
+  /* 같은 사진의 저장은 직렬화돼서, 선택 요청이 도는 동안 누른 해제는 대기열에서 기다린다. 그 사이 새로고침·창 닫기를
+   * 하면 대기 중인 마지막 의도가 서버에 가지 못했다 — 떠나는 순간 사진별 최종 의도를 keepalive로 바로 보낸다
+   * (같은 값을 다시 보내도 서버 UPSERT라 안전). */
+  useEffect(() => {
+    if (!project?.id || !token) return;
+    const projectId = project.id;
+    const flush = () => {
+      for (const [photoId, isSelected] of desiredSelectedRef.current) {
+        fetch("/api/c/selections", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, project_id: projectId, photo_id: photoId, is_selected: isSelected }),
+          keepalive: true,
+        }).catch(() => {});
+      }
+    };
+    window.addEventListener("pagehide", flush);
+    return () => window.removeEventListener("pagehide", flush);
+  }, [project?.id, token]);
+
   /** 별점/색상/코멘트 저장 큐 — is_selected와 완전히 독립된 별도 직렬화(같은 사진이어도
    *  서로의 진행을 막거나 취소하지 않음, UPSERT가 필드별로 독립 컬럼이라 안전). 여러 필드가
    *  짧은 시간에 연달아 바뀌면 객체를 병합해 누적하고, 한 번의 요청으로 합쳐 보낸다. */
