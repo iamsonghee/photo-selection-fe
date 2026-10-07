@@ -169,8 +169,19 @@ function GuestAlbumCard({ album }: { album: GuestAlbumSummary }) {
         </div>
         <div className="px-5 pb-4 pt-3.5">
           <strong className="block truncate text-[17px] font-bold tracking-[-0.02em]">{album.name}</strong>
-          <p className="mt-1 truncate text-[13px] text-muted-foreground">{formatWeddingDateTime(album.weddingDate)}</p>
-          <p className="mt-4 text-[13px] text-muted-foreground">올라온 사진·영상 <strong className="text-[15px] font-bold text-foreground">{album.mediaCount.toLocaleString()}</strong>개</p>
+          <p className="mt-1 truncate text-[13px] text-muted-foreground">{[formatWeddingDateTime(album.weddingDate, album.ceremonyTime), album.venue].filter(Boolean).join(" · ")}</p>
+          {/* 촬영본 카드와 같은 자리(수치 → 구분선 아래 사람·상태)에 같은 무게로 채워, 한 줄의 카드 높이를 맞춰도 가운데가 비지 않게 한다. */}
+          <div className="mt-4 space-y-2 text-[13px]">
+            <div className="flex items-baseline justify-between"><span className="text-muted-foreground">올라온 사진·영상</span><span className="text-muted-foreground"><strong className="text-[15px] font-bold text-foreground">{album.mediaCount.toLocaleString()}</strong>개</span></div>
+            <div className="flex items-baseline justify-between"><span className="text-muted-foreground">보낸 하객</span><span className="text-muted-foreground"><strong className="text-[15px] font-bold text-foreground">{album.guestCount.toLocaleString()}</strong>명</span></div>
+          </div>
+          <div className="mt-4 flex items-center gap-3 border-t border-border-subtle pt-4">
+            <span className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-raised text-muted-foreground"><QrCode size={16} aria-hidden /></span>
+            <span className="min-w-0 flex-1 text-[13px]">
+              <strong className="block font-bold">{album.closed ? "업로드 마감" : "업로드 받는 중"}</strong>
+              <span className="block text-muted-foreground">{album.closed ? "모인 사진에서 마음에 드는 사진을 골라보세요" : "QR·링크로 하객에게 공유하세요"}</span>
+            </span>
+          </div>
         </div>
       </div>
       <div className="relative px-5 pb-5">

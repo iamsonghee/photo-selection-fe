@@ -89,12 +89,12 @@ export async function getOwnedGuestAlbum(albumId: string, ownerId: string): Prom
   return (data as GuestAlbumRow | null) ?? null;
 }
 
-export type GuestAlbumSummary = { id: string; name: string; weddingDate: string; closed: boolean; createdAt: string; mediaCount: number; coverUrl: string | null };
+export type GuestAlbumSummary = { id: string; name: string; weddingDate: string; ceremonyTime: string | null; venue: string | null; closed: boolean; createdAt: string; mediaCount: number; guestCount: number; coverUrl: string | null };
 
 /** 내 프로젝트 목록용. 테이블이 아직 없거나(마이그레이션 전) 실패하면 빈 목록 — 목록 화면을 깨지 않는다. */
 export async function listOwnerGuestAlbums(ownerId: string): Promise<GuestAlbumSummary[]> {
   const admin = getAdminClient();
-  const { data, error } = await admin.from("guest_albums").select("id, name, wedding_date, closed_at, created_at").eq("owner_id", ownerId).order("created_at", { ascending: false });
+  const { data, error } = await admin.from("guest_albums").select("id, name, wedding_date, ceremony_time, venue, closed_at, created_at").eq("owner_id", ownerId).order("created_at", { ascending: false });
   if (error) {
     console.warn("[guest albums list]", error.message);
     return [];
@@ -103,10 +103,11 @@ export async function listOwnerGuestAlbums(ownerId: string): Promise<GuestAlbumS
     const ready = admin.from("guest_media").select("id", { count: "exact", head: true }).eq("album_id", row.id).eq("status", "ready");
     const cover = admin.from("guest_media").select("thumb_key").eq("album_id", row.id).eq("status", "ready").not("thumb_key", "is", null)
       .order("created_at", { ascending: true }).limit(1).maybeSingle();
-    const [{ count }, { data: first }] = await Promise.all([ready, cover]);
+    const guests = admin.from("guest_submissions").select("id", { count: "exact", head: true }).eq("album_id", row.id);
+    const [{ count }, { data: first }, { count: guestCount }] = await Promise.all([ready, cover, guests]);
     return {
-      id: row.id, name: row.name, weddingDate: row.wedding_date, closed: Boolean(row.closed_at), createdAt: row.created_at,
-      mediaCount: count ?? 0, coverUrl: first?.thumb_key ? r2PublicUrl(first.thumb_key) : null,
+      id: row.id, name: row.name, weddingDate: row.wedding_date, ceremonyTime: row.ceremony_time, venue: row.venue, closed: Boolean(row.closed_at), createdAt: row.created_at,
+      mediaCount: count ?? 0, guestCount: guestCount ?? 0, coverUrl: first?.thumb_key ? r2PublicUrl(first.thumb_key) : null,
     };
   }));
 }
