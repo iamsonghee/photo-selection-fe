@@ -1,9 +1,9 @@
 .pinCanvas,
 .invalidCanvas {
-  --entry-text: #191918;
-  --entry-text-secondary: #5f5e5b;
-  --entry-control: #26282c;
-  --entry-divider: #dde1e4;
+  --entry-text: #023852;
+  --entry-text-secondary: rgba(2, 56, 82, 0.68);
+  --entry-control: #023852;
+  --entry-divider: #d7dfe3;
   --entry-danger: #ff3636;
   --entry-accent: #ff4d00;
 }
@@ -155,7 +155,7 @@
   justify-content: center;
   border: 0;
   border-radius: 8px;
-  background: var(--entry-control);
+  background: #ff4d00;
   color: #fff;
   font: inherit;
   font-size: 16px;
@@ -262,7 +262,7 @@
   width: 20px;
   height: 20px;
   flex: 0 0 20px;
-  color: #5f5e5b;
+  color: rgba(2, 56, 82, 0.68);
 }
 
 .deadlineDate {
@@ -377,7 +377,7 @@
 .entryDescription { word-break: keep-all; overflow-wrap: anywhere; }
 .projectLabel { margin: 0; color: #737373; font-size: 13px; line-height: 1.6; word-break: keep-all; overflow-wrap: anywhere; }
 .deadlineRow { flex-wrap: wrap; gap: 8px; }
-.deadlineLabel { color: #5f5e5b; font-size: 13px; }
+.deadlineLabel { color: rgba(2, 56, 82, 0.68); font-size: 13px; }
 .deadlineDate { font-size: 15px; }
 .pinCanvas { min-height: 0; }
 .pinContent { padding: 0 12px 12px; }
@@ -386,7 +386,7 @@
 .pinCanvas .entryDescription { font-size: 14px; }
 .pinStatusArea { padding: 12px 24px; }
 .pinSlots { padding: 0; gap: 12px; }
-.pinSlot { height: 58px; align-items: center; border: 1px solid #dde1e4; border-radius: 10px; background: #fafafa; }
+.pinSlot { height: 58px; align-items: center; border: 1px solid #d7dfe3; border-radius: 10px; background: #fafafa; }
 .pinSlotFilled { border-color: #ff4d00; background: #fff6f1; }
 .pinSlotError { border-color: #ff3636; background: #fff6f6; }
 .pinFeedback { min-height: 48px; font-weight: 400; }

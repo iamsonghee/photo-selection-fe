@@ -118,7 +118,7 @@ export function ParticipantSheet({ usedColors, roster = {}, current, onConfirm, 
             position: fixed; left: 50%; bottom: 0; z-index: 91;
             width: min(100%, 420px); transform: translateX(-50%);
             box-sizing: border-box;
-            background: #fff; color: #191918;
+            background: #fff; color: #023852;
             border-radius: 16px 16px 0 0;
             box-shadow: 0 -4px 16px rgba(0,0,0,.18);
             padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
@@ -138,13 +138,13 @@ export function ParticipantSheet({ usedColors, roster = {}, current, onConfirm, 
             }
           }
           .cps-title { margin: 0; font-size: 18px; line-height: 26px; font-weight: 700; letter-spacing: -.3px; }
-          .cps-desc { margin: 6px 0 0; font-size: 13px; line-height: 19px; color: #5f5e5b; }
+          .cps-desc { margin: 6px 0 0; font-size: 13px; line-height: 19px; color: rgba(2, 56, 82, 0.68); }
           .cps-colors { margin-top: 16px; display: flex; justify-content: space-between; gap: 4px; }
           .cps-color {
             display: flex; flex-direction: column; align-items: center; gap: 6px;
             flex: 1; min-width: 0; padding: 4px 0;
             border: 0; background: transparent;
-            font: 500 12px/16px Pretendard, sans-serif; color: #5f5e5b; text-align: center;
+            font: 500 12px/16px Pretendard, sans-serif; color: rgba(2, 56, 82, 0.68); text-align: center;
           }
           .cps-color-dot {
             width: 44px; height: 44px; flex: 0 0 44px; border-radius: 50%;
@@ -153,15 +153,15 @@ export function ParticipantSheet({ usedColors, roster = {}, current, onConfirm, 
             transition: box-shadow 0.15s;
           }
           .cps-color-active .cps-color-dot { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #ff4d00; }
-          .cps-color-active { color: #191918; font-weight: 700; }
+          .cps-color-active { color: #023852; font-weight: 700; }
           .cps-color-taken .cps-color-dot { opacity: .35; }
           .cps-color-caption { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
           .cps-field { margin-top: 20px; display: flex; flex-direction: column; gap: 6px; }
           .cps-field-label { font: 600 12px/16px Pretendard, sans-serif; color: #3a3a37; }
           .cps-field input {
             height: 48px; box-sizing: border-box; padding: 0 14px;
-            border: 1px solid #dde1e4; border-radius: 10px; outline: 0;
-            font: 400 15px/22px Pretendard, sans-serif; color: #191918; background: #fff;
+            border: 1px solid #d7dfe3; border-radius: 10px; outline: 0;
+            font: 400 15px/22px Pretendard, sans-serif; color: #023852; background: #fff;
           }
           .cps-field input:focus { border-color: #ff4d00; }
           .cps-warn {
@@ -172,10 +172,10 @@ export function ParticipantSheet({ usedColors, roster = {}, current, onConfirm, 
           .cps-confirm {
             margin-top: 18px; width: 100%; height: 52px;
             border: 0; border-radius: 10px;
-            background: #26282c; color: #fff;
+            background: #ff4d00; color: #fff;
             font: 700 15px/22px Pretendard, sans-serif;
           }
-          .cps-confirm:disabled { background: #dde1e4; color: #aab0b8; }
+          .cps-confirm:disabled { background: #d7dfe3; color: #aab0b8; }
         `}</style>
       </div>
     </>

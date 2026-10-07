@@ -106,14 +106,14 @@ export function SelectionConfirmDialog({
           overflow: hidden;
           border-radius: 12px;
           background: #fff;
-          color: #191918;
+          color: #023852;
           box-shadow: 0 3px 15px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.62);
           font-family: Pretendard, "Pretendard Variable", -apple-system, sans-serif;
         }
         .selection-confirm-copy { display: flex; flex-direction: column; gap: 6px; text-align: center; }
         .selection-confirm-dialog h2 { margin: 0; font-size: 20px; line-height: 35px; font-weight: 600; letter-spacing: -1.05px; }
         .selection-confirm-dialog p { margin: 0; }
-        .selection-confirm-copy p { color: #5f5e5b; font-size: 12px; line-height: 18px; font-weight: 400; }
+        .selection-confirm-copy p { color: rgba(2, 56, 82, 0.68); font-size: 12px; line-height: 18px; font-weight: 400; }
         .selection-confirm-error {
           margin-top: 12px;
           color: #d92d20;
@@ -133,9 +133,9 @@ export function SelectionConfirmDialog({
           transition: transform 100ms ease, opacity 120ms ease, background-color 120ms ease;
         }
         .selection-confirm-dialog button:active:not(:disabled) { transform: scale(0.98); }
-        .selection-confirm-dialog button:focus-visible { outline: 2px solid #191918; outline-offset: 2px; }
+        .selection-confirm-dialog button:focus-visible { outline: 2px solid #023852; outline-offset: 2px; }
         .selection-confirm-dialog button:disabled { cursor: wait; opacity: 0.58; }
-        .selection-confirm-cancel { border: 1px solid #d9d9d9; background: #fff; color: #191918; }
+        .selection-confirm-cancel { border: 1px solid #d9d9d9; background: #fff; color: #023852; }
         .selection-confirm-submit { border: 1px solid #ff4d00; background: #ff4d00; color: #fff; font-weight: 700; }
         .selection-confirm-danger { border-color: #d92d20; background: #d92d20; }
         @media (min-width: 768px) {

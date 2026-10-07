@@ -3,18 +3,15 @@
 
   /* Customer light tokens — 전역 :root 토큰은 Dark Photo Workspace와 공유되므로 바꾸지 않고, 고객 화면 전용 라이트 팔레트를 여기 스코프한다. */
   --customer-canvas: #ffffff;
-  --customer-ink: #191918;
-  --customer-ink-secondary: #5f5e5b;
-  --customer-control: #26282c;
-  --customer-divider: #dde1e4;
+  --customer-ink: #023852;
+  --customer-ink-secondary: rgba(2, 56, 82, 0.68);
+  --customer-control: #ff4d00;
+  --customer-divider: #d7dfe3;
   --customer-gallery-max-width: 1440px;
   --customer-danger: #ff3636;
   --customer-danger-text: #484b51;
 }
 
-.customer-app-shell .font-display-ps {
-  font-family: "Space Grotesk", "Pretendard", sans-serif;
-}
 
 /* 고객 화면의 순백 캔버스는 overscroll 영역까지 같은 색을 유지한다.
  * --customer-canvas는 자손에 스코프돼 조상인 html/body에서는 직접 쓸 수 없다. */

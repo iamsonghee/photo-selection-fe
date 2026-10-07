@@ -114,7 +114,7 @@ export function SelectionConfirmFooter({
           .ac-confirm-footer-btn { height: 40px !important; padding: 0 18px !important; font-size: 12px !important; }
           .ac-confirm-footer.ac-confirm-footer-gallery {
             background: #fff !important;
-            border-top: 1px solid #dde1e4 !important;
+            border-top: 1px solid #d7dfe3 !important;
             backdrop-filter: none !important;
           }
           .ac-confirm-footer-gallery .ac-confirm-footer-inner {
@@ -138,26 +138,26 @@ export function SelectionConfirmFooter({
             letter-spacing: 0 !important;
             text-transform: none !important;
           }
-          .ac-confirm-footer-gallery .ac-confirm-footer-progress-label span:first-child { color: #26282c !important; }
-          .ac-confirm-footer-gallery .ac-confirm-footer-progress-label span:last-child { color: #26282c !important; font-size: 14px; }
-          .ac-confirm-footer-gallery .ac-confirm-footer-current { color: #ff4d00; font-size: 15px; font-weight: 800; }
+          .ac-confirm-footer-gallery .ac-confirm-footer-progress-label span:first-child { color: #023852 !important; }
+          .ac-confirm-footer-gallery .ac-confirm-footer-progress-label span:last-child { color: #023852 !important; font-size: 14px; }
+          .ac-confirm-footer-gallery .ac-confirm-footer-current { color: #023852; font-size: 15px; font-weight: 800; }
           .ac-confirm-footer-gallery .ac-confirm-footer-track {
             height: 4px !important;
             border-radius: 999px;
-            background: #ffe1d4 !important;
+            background: #eef3f4 !important;
             overflow: hidden;
           }
-          .ac-confirm-footer-gallery .ac-confirm-footer-fill { background: #ff4d00 !important; border-radius: 999px; }
+          .ac-confirm-footer-gallery .ac-confirm-footer-fill { background: #023852 !important; border-radius: 999px; }
           .ac-confirm-footer-gallery .ac-confirm-footer-action { width: 100%; }
           .ac-confirm-footer-gallery .ac-confirm-footer-meta { display: none; }
           .ac-confirm-footer-gallery .ac-confirm-footer-btn {
             width: 100%; height: 48px !important; padding: 0 20px !important;
             justify-content: center; border-radius: 8px; clip-path: none;
-            background: #26282c; color: #fff; font-size: 15px !important;
+            background: #ff4d00; color: #fff; font-size: 15px !important;
             font-weight: 700; letter-spacing: -0.3px;
           }
           .ac-confirm-footer-gallery .ac-confirm-footer-btn:disabled {
-            opacity: 1; background: #dde1e4; color: #aab0b8;
+            opacity: 1; background: #d7dfe3; color: #aab0b8;
           }
           .ac-confirm-footer-gallery .ac-confirm-footer-btn svg { display: none; }
         }
@@ -212,7 +212,7 @@ export function SelectionConfirmFooter({
               }}
             >
               <span style={{ color: isLight ? "var(--customer-ink-secondary)" : "var(--muted-foreground)" }}>{progressLabel}</span>
-              <span style={{ color: remaining < 0 ? "#ef4444" : "var(--accent)" }}>
+              <span style={{ color: remaining < 0 ? "#ef4444" : isLight ? "var(--customer-ink)" : "var(--accent)" }}>
                 {mobileGallery ? <><span className="ac-confirm-footer-current">{Y}</span> / {N}</> : `${Y} / ${N}장`}
               </span>
             </div>
@@ -223,13 +223,13 @@ export function SelectionConfirmFooter({
               aria-valuemin={0}
               aria-valuemax={N}
               aria-valuenow={Math.min(Y, N)}
-              style={{ width: "100%", height: 3, background: isLight ? "#ffe1d4" : "var(--surface)" }}
+              style={{ width: "100%", height: 3, background: isLight ? "#eef3f4" : "var(--surface)" }}
             >
               <div
                 className="ac-confirm-footer-fill"
                 style={{
                   height: "100%",
-                  background: remaining < 0 ? "#ef4444" : "var(--accent)",
+                  background: remaining < 0 ? "#ef4444" : isLight ? "var(--customer-ink)" : "var(--accent)",
                   width: `${progressPct}%`,
                   transition: "width 0.3s",
                 }}
@@ -247,7 +247,7 @@ export function SelectionConfirmFooter({
                     fontFamily: "var(--font-mono)",
                     fontSize: 11,
                     fontWeight: 700,
-                    color: remaining === 0 ? "var(--accent)" : remaining < 0 ? "#ef4444" : isLight ? "var(--customer-ink-secondary)" : "var(--subtle-foreground)",
+                    color: remaining === 0 ? (isLight ? "var(--customer-ink)" : "var(--accent)") : remaining < 0 ? "#ef4444" : isLight ? "var(--customer-ink-secondary)" : "var(--subtle-foreground)",
                     margin: 0,
                     whiteSpace: "nowrap",
                   }}

@@ -863,7 +863,7 @@ export default function GalleryPageClient() {
             overflow: hidden; opacity: 1; transform: translateY(0);
             transition: height 200ms ease, opacity 140ms ease, transform 200ms ease;
           }
-          .gl-mobile-title { display: flex; align-items: center; gap: 5px; min-width: 0; color: #26282c; }
+          .gl-mobile-title { display: flex; align-items: center; gap: 5px; min-width: 0; color: #023852; }
           .gl-mobile-brand-home {
             width: 38px; height: 44px; margin-left: -6px; flex: 0 0 38px;
             display: grid; place-items: center; border-radius: 8px;
@@ -905,11 +905,11 @@ export default function GalleryPageClient() {
           }
           .gl-grid-main { padding: 0 20px !important; }
 
-          .gl-empty-mobile { min-height: 478px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 20px; color: #191918; }
+          .gl-empty-mobile { min-height: 478px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 20px; color: #023852; }
           .gl-empty-mobile-icon { width: 58px; height: 58px; border-radius: 12px; background: #f1f3f6; color: #aab0b8; display: grid; place-items: center; margin-bottom: 16px; }
           .gl-empty-mobile h2 { margin: 0; font-size: 19px; line-height: 38px; letter-spacing: -1.18px; }
-          .gl-empty-mobile p { margin: 0; color: #5f5e5b; font-size: 11px; line-height: 17px; }
-          .gl-empty-mobile button { height: 39px; margin-top: 28px; padding: 0 24px; border: 1px solid #bfbfbf; border-radius: 4px; background: #fff; color: #191918; font: 12px/19px Pretendard, sans-serif; }
+          .gl-empty-mobile p { margin: 0; color: rgba(2, 56, 82, 0.68); font-size: 11px; line-height: 17px; }
+          .gl-empty-mobile button { height: 39px; margin-top: 28px; padding: 0 24px; border: 1px solid #bfbfbf; border-radius: 4px; background: #fff; color: #023852; font: 12px/19px Pretendard, sans-serif; }
           .gl-empty-desktop { display: none !important; }
 
           /* 하단 바 */

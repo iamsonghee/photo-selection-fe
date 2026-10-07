@@ -25,7 +25,7 @@ const CUSTOMER_CANCEL_MAX = 3;
 const LOCKED_STATUS_TONE = {
   approved: { color: "#12833f", label: "확정" },
   revision_requested: { color: "#b26a00", label: "재보정 요청" },
-  pending: { color: "#7d7a75", label: "검토 대기" },
+  pending: { color: "rgba(2, 56, 82, 0.52)", label: "검토 대기" },
 } as const;
 
 /* 배지는 사진 위 오른쪽 위에 얹고, 값은 전 페이지(검토 목록 `.rgv-card-pill`)와 똑같이 쓴다 —
@@ -493,25 +493,25 @@ function LockedMobileGallery({ token, selectedPhotos, allPhotos, selectedIds, co
       </main>
 
       <style>{`
-        .locked-mobile { min-height: 100dvh; background: #fff; color: #191918; font-family: Pretendard, "Pretendard Variable", sans-serif; }
+        .locked-mobile { min-height: 100dvh; background: #fff; color: #023852; font-family: Pretendard, "Pretendard Variable", sans-serif; }
         .locked-mobile-appbar { height: calc(48px + env(safe-area-inset-top)); box-sizing: border-box; padding: env(safe-area-inset-top) 20px 0; display: flex; align-items: center; border-bottom: 1px solid #dfe1e4; background: #fff; }
-        .locked-mobile-appbar button { width: 24px; height: 44px; padding: 0; border: 0; background: transparent; color: #26282c; display: grid; place-items: center; }
+        .locked-mobile-appbar button { width: 24px; height: 44px; padding: 0; border: 0; background: transparent; color: #023852; display: grid; place-items: center; }
         .locked-mobile-appbar h1 { margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; letter-spacing: -.32px; }
         .locked-mobile-status { min-height: 52px; box-sizing: border-box; padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(255,77,0,.08); border-bottom: 1px solid rgba(255,77,0,.18); }
-        .locked-mobile-status > span { min-width: 0; display: flex; align-items: center; gap: 6px; color: #26282c; font-size: 12px; line-height: 19px; font-weight: 700; letter-spacing: -.24px; white-space: nowrap; }
+        .locked-mobile-status > span { min-width: 0; display: flex; align-items: center; gap: 6px; color: #023852; font-size: 12px; line-height: 19px; font-weight: 700; letter-spacing: -.24px; white-space: nowrap; }
         .locked-mobile-toolbar { height: 48px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; background: #fff; }
         .locked-mobile-scope { position: relative; }
-        .locked-mobile-scope > button { height: 36px; padding: 0 4px; border: 0; background: transparent; display: flex; align-items: center; gap: 6px; color: #26282c; font-size: 12px; }
+        .locked-mobile-scope > button { height: 36px; padding: 0 4px; border: 0; background: transparent; display: flex; align-items: center; gap: 6px; color: #023852; font-size: 12px; }
         .locked-mobile-scope > button strong { font-weight: 600; }
-        .locked-mobile-scope > button span { color: #7d7a75; }
+        .locked-mobile-scope > button span { color: rgba(2, 56, 82, 0.52); }
         .locked-mobile-scope > div { position: absolute; top: 40px; left: 0; z-index: 20; width: 132px; padding: 6px; border: 1px solid #dfe1e4; border-radius: 8px; background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
-        .locked-mobile-scope > div button { width: 100%; height: 38px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; display: flex; align-items: center; justify-content: space-between; color: #26282c; font-size: 12px; }
+        .locked-mobile-scope > div button { width: 100%; height: 38px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; display: flex; align-items: center; justify-content: space-between; color: #023852; font-size: 12px; }
         .locked-mobile-scope > div button:active { background: #f1f3f6; }
-        .locked-mobile-search-toggle { width: 30px; height: 30px; padding: 0; border: 1px solid #bfbfbf; border-radius: 4px; background: #fff; color: #7d7a75; display: grid; place-items: center; }
-        .locked-mobile-search { height: 42px; margin: 0 20px 8px; padding: 0 12px; border: 1px solid #c6cbd0; border-radius: 6px; display: flex; align-items: center; gap: 8px; color: #7d7a75; }
-        .locked-mobile-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #191918; font-size: 13px; }
+        .locked-mobile-search-toggle { width: 30px; height: 30px; padding: 0; border: 1px solid #bfbfbf; border-radius: 4px; background: #fff; color: rgba(2, 56, 82, 0.52); display: grid; place-items: center; }
+        .locked-mobile-search { height: 42px; margin: 0 20px 8px; padding: 0 12px; border: 1px solid #c6cbd0; border-radius: 6px; display: flex; align-items: center; gap: 8px; color: rgba(2, 56, 82, 0.52); }
+        .locked-mobile-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #023852; font-size: 13px; }
         .locked-mobile-grid-wrap { padding: 0 20px 20px; touch-action: pan-y; }
-        .locked-mobile-card { min-width: 0; padding: 4px 4px 8px; overflow: hidden; border: 1.5px solid #fff; border-radius: 4px; background: #f1f3f6; color: #191918; text-align: left; }
+        .locked-mobile-card { min-width: 0; padding: 4px 4px 8px; overflow: hidden; border: 1.5px solid #fff; border-radius: 4px; background: #f1f3f6; color: #023852; text-align: left; }
         .locked-mobile-image { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: 3px; background: #aab0b8; display: block; }
         .locked-density-2 .locked-mobile-image { aspect-ratio: 151.5 / 103.479; }
         .locked-mobile-image img { width: 100%; height: 100%; display: block; object-fit: cover; }
@@ -529,7 +529,7 @@ function LockedMobileGallery({ token, selectedPhotos, allPhotos, selectedIds, co
         .locked-density-3 .locked-mobile-image { aspect-ratio: 106.333 / 103.479; }
         .locked-density-4 .locked-mobile-image { aspect-ratio: 79.25 / 79; }
         .locked-density-3 .locked-mobile-card, .locked-density-4 .locked-mobile-card, .locked-density-5 .locked-mobile-card { padding: 0; }
-        .locked-mobile-empty { margin: 80px 0; color: #7d7a75; font-size: 13px; text-align: center; }
+        .locked-mobile-empty { margin: 80px 0; color: rgba(2, 56, 82, 0.52); font-size: 13px; text-align: center; }
       `}</style>
     </div>
   );

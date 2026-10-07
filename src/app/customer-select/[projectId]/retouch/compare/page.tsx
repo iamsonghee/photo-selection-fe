@@ -28,7 +28,7 @@ function CompareCard({
   const { previewActive, beginHold, moveHold } = useHoldPreview({ enabled: true, resetKey: version.id });
 
   return (
-    <div style={{ border: "1px solid #dde1e4", borderRadius: 14, overflow: "hidden" }}>
+    <div style={{ border: "1px solid #d7dfe3", borderRadius: 14, overflow: "hidden" }}>
       <div
         onPointerDown={beginHold}
         onPointerMove={moveHold}

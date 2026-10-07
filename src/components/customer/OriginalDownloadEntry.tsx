@@ -719,10 +719,10 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
           align-items: center;
           justify-content: center;
           gap: 8px;
-          border: 1px solid #dde1e4;
+          border: 1px solid #d7dfe3;
           border-radius: 8px;
           background: #f7f7f6;
-          color: #26282c;
+          color: #023852;
           font: inherit;
           font-size: 15px;
           font-weight: 600;
@@ -772,11 +772,11 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
           place-items: center;
           border: 1px solid #c6cbd0;
           background: #f1f3f6;
-          color: #7d7a75;
+          color: rgba(2, 56, 82, 0.52);
         }
         .original-download-summary-copy { min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 4px; }
         .original-download-summary-copy strong { overflow: hidden; color: #2c2c2b; font-size: 14px; line-height: 22px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-        .original-download-summary-copy span { color: #7d7a75; font-size: 14px; line-height: 22px; font-weight: 400; }
+        .original-download-summary-copy span { color: rgba(2, 56, 82, 0.52); font-size: 14px; line-height: 22px; font-weight: 400; }
         /* sub 헤더 밴드 — 모바일 .locked-mobile-status와 같은 주황 틴트 띠 */
         .original-download-subheader {
           display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -786,7 +786,7 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
         }
         .original-download-subheader-copy {
           display: flex; align-items: center; gap: 8px; min-width: 0;
-          color: #26282c;
+          color: #023852;
           font: 12px/1.4 Pretendard, "Pretendard Variable", sans-serif; letter-spacing: -0.2px;
         }
         .original-download-subheader-copy strong { font-weight: 700; }
@@ -800,7 +800,7 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
           border: 1px solid #d9d9d9;
           border-radius: 4px;
           background: #fff;
-          color: #26282c;
+          color: #023852;
           font-family: Pretendard, "Pretendard Variable", sans-serif;
           font-size: 10px;
           line-height: 16px;
@@ -1055,16 +1055,16 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
           background: #fff;
           border: 1px solid #e8e8e6;
           border-radius: 18px;
-          color: #191918;
+          color: #023852;
           box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18);
         }
         .original-download-modal.is-files { height: min(820px, calc(100dvh - 48px)); }
         .original-download-sheet-handle { display: none; }
         .original-download-header { align-items: flex-start; margin-bottom: 18px; }
-        .original-download-title { margin: 0; color: #191918; font-size: 22px; line-height: 1.3; letter-spacing: -0.035em; }
-        .original-download-subtitle { margin: 5px 0 0; color: #77746f; font-size: 13px; line-height: 1.5; }
-        .original-download-close { color: #77746f; }
-        .original-download-close:hover { background: #f3f3f1; color: #191918; }
+        .original-download-title { margin: 0; color: #023852; font-size: 22px; line-height: 1.3; letter-spacing: -0.035em; }
+        .original-download-subtitle { margin: 5px 0 0; color: rgba(2, 56, 82, 0.52); font-size: 13px; line-height: 1.5; }
+        .original-download-close { color: rgba(2, 56, 82, 0.52); }
+        .original-download-close:hover { background: #f3f3f1; color: #023852; }
         .original-download-meta {
           gap: 0;
           overflow: hidden;
@@ -1077,7 +1077,7 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
         .original-download-meta > div { min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 0 16px; border-left: 1px solid #e4e4e1; }
         .original-download-meta > div:first-child { border-left: 0; }
         .original-download-meta span { color: #8a8782; font-size: 11px; line-height: 1.4; }
-        .original-download-meta strong { overflow: hidden; color: #292927; font-size: 14px; line-height: 1.45; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+        .original-download-meta strong { overflow: hidden; color: #023852; font-size: 14px; line-height: 1.45; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
         .original-download-tabs { gap: 4px; margin-bottom: 16px; padding: 4px; border-radius: 10px; background: #f1f1ef; }
         .original-download-tabs button {
           min-height: 40px;
@@ -1090,7 +1090,7 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
           border: 1px solid transparent;
           border-radius: 7px;
           background: transparent;
-          color: #77746f;
+          color: rgba(2, 56, 82, 0.52);
           font: inherit;
           font-size: 13px;
           font-weight: 650;
@@ -1099,8 +1099,8 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
         .original-download-tabs button.is-active { border-color: rgba(255, 77, 0, 0.18); background: #fff; color: #e84600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06); }
         .original-download-archive-panel { margin-bottom: 12px; padding: 18px; border: 1px solid #ebebe8; border-radius: 12px; background: #fff; font-size: 13px; }
         .original-download-state { display: flex; flex-direction: column; gap: 5px; }
-        .original-download-state strong { color: #292927; font-size: 14px; }
-        .original-download-state span { color: #77746f; line-height: 1.55; }
+        .original-download-state strong { color: #023852; font-size: 14px; }
+        .original-download-state span { color: rgba(2, 56, 82, 0.52); line-height: 1.55; }
         .original-download-state.is-error strong { color: #c13f22; }
         .original-download-progress-state { gap: 10px; }
         .original-download-progress-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -1110,8 +1110,8 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
         .original-download-progress-eta { color: #e84600 !important; font-size: 13px !important; }
         .original-download-ready-copy { display: flex; align-items: center; gap: 12px; }
         .original-download-ready-copy > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-        .original-download-ready-copy strong { color: #292927; font-size: 14px; line-height: 1.5; }
-        .original-download-ready-copy span:not(.original-download-ready-icon) { color: #77746f; font-size: 12px; }
+        .original-download-ready-copy strong { color: #023852; font-size: 14px; line-height: 1.5; }
+        .original-download-ready-copy span:not(.original-download-ready-icon) { color: rgba(2, 56, 82, 0.52); font-size: 12px; }
         .original-download-ready-icon { width: 40px; height: 40px; flex: 0 0 40px; display: grid; place-items: center; border-radius: 10px; background: rgba(255, 77, 0, 0.09); color: #ff4d00; }
         .original-download-archive-primary {
           width: 100%;
@@ -1135,22 +1135,22 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
         .original-download-parts { display: flex; flex-direction: column; gap: 12px; }
         .original-download-parts-help { color: #8a8782; font-size: 12px; }
         .original-download-part-list { display: flex; flex-direction: column; gap: 7px; }
-        .original-download-part-button { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid #e3e3df; border-radius: 8px; background: #f8f8f7; color: #292927; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .original-download-part-button { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid #e3e3df; border-radius: 8px; background: #f8f8f7; color: #023852; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
         .original-download-part-button span:last-child { color: #e84600; }
-        .original-download-pc-note { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; color: #77746f; font-size: 12px; line-height: 1.5; }
+        .original-download-pc-note { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; color: rgba(2, 56, 82, 0.52); font-size: 12px; line-height: 1.5; }
         .original-download-inline-status { margin: 10px 0 0; color: #c13f22; font-size: 12px; }
-        .original-download-unavailable, .original-download-switch-hint { padding: 13px 14px; border-radius: 9px; background: #f8f8f7; color: #77746f; font-size: 12.5px; line-height: 1.5; text-align: center; }
+        .original-download-unavailable, .original-download-switch-hint { padding: 13px 14px; border-radius: 9px; background: #f8f8f7; color: rgba(2, 56, 82, 0.52); font-size: 12.5px; line-height: 1.5; text-align: center; }
         .original-download-switch-hint button { padding: 0; border: 0; background: none; color: #e84600; font: inherit; font-weight: 700; cursor: pointer; }
-        .original-download-files-help { margin: 0 0 8px; color: #77746f; font-size: 12px; line-height: 1.5; }
+        .original-download-files-help { margin: 0 0 8px; color: rgba(2, 56, 82, 0.52); font-size: 12px; line-height: 1.5; }
         .original-download-selected-filter { color: #4d4b47; }
         .original-download-selected-filter input, .original-download-file-row input { accent-color: #ff4d00; }
-        .original-download-selected-count { background: #f0efed; color: #77746f; }
-        .original-download-reset-selection { border-color: #dededa; background: #fff; color: #77746f; }
-        .original-download-reset-selection:hover:not(:disabled) { border-color: #bdbdb8; background: #f5f5f3; color: #292927; }
-        .original-download-search { border-color: #dededa; background: #fff; color: #292927; }
+        .original-download-selected-count { background: #f0efed; color: rgba(2, 56, 82, 0.52); }
+        .original-download-reset-selection { border-color: #dededa; background: #fff; color: rgba(2, 56, 82, 0.52); }
+        .original-download-reset-selection:hover:not(:disabled) { border-color: #bdbdb8; background: #f5f5f3; color: #023852; }
+        .original-download-search { border-color: #dededa; background: #fff; color: #023852; }
         .original-download-search::placeholder { color: #aaa7a2; }
         .original-download-search:focus { border-color: #ff4d00; box-shadow: 0 0 0 3px rgba(255, 77, 0, 0.1); }
-        .original-download-file-row { background: #f7f7f5; color: #292927; }
+        .original-download-file-row { background: #f7f7f5; color: #023852; }
         .original-download-file-row:hover { background: #f0f0ed; }
         .original-download-file-row:has(input:checked) { background: rgba(255, 77, 0, 0.08); }
         .original-download-file-size { flex-shrink: 0; color: #8a8782; }
@@ -1158,7 +1158,7 @@ export default function OriginalDownloadEntry({ token, variant = "floating" }: {
         .original-download-empty { color: #aaa7a2; }
         .original-download-footer { border-top-color: #ecece9; background: #fff; box-shadow: 0 -12px 24px rgba(255, 255, 255, 0.92); }
         .original-download-status { color: #c13f22; }
-        .original-download-selection-summary { color: #77746f; }
+        .original-download-selection-summary { color: rgba(2, 56, 82, 0.52); }
         .original-download-submit { background: #ff4d00; color: #fff; }
         .original-download-submit:hover:not(:disabled) { background: #e84600; }
         .original-download-submit:disabled { background: #e8e8e5; color: #aaa7a2; }

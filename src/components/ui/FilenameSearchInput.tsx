@@ -69,7 +69,7 @@ export function FilenameSearchInput({
           height: var(--fsi-height, 36px);
           width: var(--fsi-width, 100%);
           padding: 0 10px;
-          border: 1px solid var(--fsi-border-color, #dde1e4);
+          border: 1px solid var(--fsi-border-color, #d7dfe3);
           border-radius: var(--fsi-radius, 6px);
           background: #fff;
           cursor: text;
@@ -90,11 +90,11 @@ export function FilenameSearchInput({
           background: transparent;
           font-family: inherit;
           font-size: var(--fsi-font-size, 13px);
-          color: #191918;
+          color: #023852;
         }
         .fsi-root input::placeholder {
           /* 아이콘·테두리보다 한 단 더 옅게 — 빈 상태와 입력된 상태가 한눈에 구분되게 한다. */
-          color: color-mix(in srgb, #5f5e5b 55%, transparent);
+          color: color-mix(in srgb, rgba(2, 56, 82, 0.68) 55%, transparent);
         }
         .fsi-clear {
           flex-shrink: 0;
@@ -107,7 +107,7 @@ export function FilenameSearchInput({
           cursor: pointer;
         }
         .fsi-clear:hover {
-          color: #5f5e5b;
+          color: rgba(2, 56, 82, 0.68);
         }
       `}</style>
     </label>

@@ -1,8 +1,8 @@
 .canvas {
-  --entry-text: #191918;
-  --entry-text-secondary: #5f5e5b;
-  --entry-control: #26282c;
-  --entry-divider: #dde1e4;
+  --entry-text: #023852;
+  --entry-text-secondary: rgba(2, 56, 82, 0.68);
+  --entry-control: #023852;
+  --entry-divider: #d7dfe3;
   --entry-danger: #ff3636;
   --entry-accent: #ff4d00;
   display: grid;
@@ -137,7 +137,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: #191918;
+  color: #023852;
 }
 
 .profileDialog::backdrop { background: rgba(16, 18, 20, 0.42); }
@@ -319,7 +319,7 @@
     min-height: 44px;
     border-color: #e5e7e9;
     background: #fafafa;
-    color: #5f5e5b;
+    color: rgba(2, 56, 82, 0.68);
     font-size: 14px;
     font-weight: 500;
   }

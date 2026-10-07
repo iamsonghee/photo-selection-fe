@@ -1166,8 +1166,8 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
         .fv-comment-fab-error { color: #ff6262; }
         .fv-comment-fab-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 110px; }
         .fv-comment-fab:focus-visible, .fv-mark-toggle:focus-visible, .fv-group-pill:focus-visible { outline: 2px solid #fff; outline-offset: -2px; border-radius: 999px; }
-        .fv-comment-sheet { position: fixed; left: 50%; bottom: 0; z-index: 80; width: min(100%, 375px); transform: translateX(-50%); background: #fff; color: #191918; box-shadow: 0 -4px 8px rgba(0,0,0,.12); border-radius: 12px 12px 0 0; padding: 16px 20px calc(20px + env(safe-area-inset-bottom)); }
-        .fv-comment-sheet input { width: 100%; height: 40px; padding: 0; border: 0; outline: 0; background: transparent; color: #191918; font: 400 15px/24px Pretendard, sans-serif; letter-spacing: -.36px; }
+        .fv-comment-sheet { position: fixed; left: 50%; bottom: 0; z-index: 80; width: min(100%, 375px); transform: translateX(-50%); background: #fff; color: #023852; box-shadow: 0 -4px 8px rgba(0,0,0,.12); border-radius: 12px 12px 0 0; padding: 16px 20px calc(20px + env(safe-area-inset-bottom)); }
+        .fv-comment-sheet input { width: 100%; height: 40px; padding: 0; border: 0; outline: 0; background: transparent; color: #023852; font: 400 15px/24px Pretendard, sans-serif; letter-spacing: -.36px; }
         .fv-comment-sheet-actions { min-height: 36px; margin-top: 4px; display: flex; align-items: center; justify-content: space-between; }
         .fv-comment-save { width: 48px; height: 36px; padding: 0; border: 0; border-radius: 8px; background: #ff4d00; color: #fff; display: grid; place-items: center; }
         @media (prefers-reduced-motion: reduce) {
