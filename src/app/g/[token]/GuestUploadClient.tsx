@@ -10,7 +10,7 @@ type UploadStatus = "ready" | "queued" | "uploading" | "done" | "failed";
 type Item = { id: string; file: File; url: string; kind: GuestMediaKind; status: UploadStatus; progress: number; error?: string };
 type Phase = "edit" | "sending" | "failed" | "done" | "closed";
 
-const INPUT_CLASS = "block w-full rounded-xl border border-border-subtle bg-surface px-4 py-3 text-[16px] outline-none transition-colors placeholder:text-placeholder-foreground focus:border-accent/50 disabled:bg-surface-raised";
+const INPUT_CLASS = "block w-full rounded-lg border border-border-subtle bg-surface px-4 py-3 text-[16px] outline-none transition-colors placeholder:text-placeholder-foreground focus:border-accent/50 disabled:bg-surface-raised";
 const UPLOAD_CONCURRENCY = 4;
 
 export function GuestClosedScreen({ album }: { album: Pick<GuestAlbumInfo, "name" | "uploadToken"> }) {
@@ -20,7 +20,7 @@ export function GuestClosedScreen({ album }: { album: Pick<GuestAlbumInfo, "name
       <p className="mt-5 text-[13px] font-semibold text-muted-foreground">{album.name}</p>
       <h1 className="mt-1 text-[22px] font-bold tracking-[-0.03em]">사진 받기가 끝났어요</h1>
       <p className="mt-2 text-[15px] leading-6 text-muted-foreground">신랑신부가 사진 고르기를 시작해서 더 이상 보낼 수 없어요. 보내 주셔서 고마워요.</p>
-      <Link href={`/g/${album.uploadToken}/mine`} className="mt-8 inline-flex h-12 items-center rounded-xl border border-border-subtle bg-surface px-6 text-[15px] font-bold">내가 보낸 사진 보기</Link>
+      <Link href={`/g/${album.uploadToken}/mine`} className="mt-8 inline-flex h-12 items-center rounded-lg border border-border-subtle bg-surface px-6 text-[15px] font-bold">내가 보낸 사진 보기</Link>
     </main>
   );
 }
@@ -142,8 +142,8 @@ export function GuestUploadClient({ album, limits }: { album: GuestAlbumInfo; li
         <h1 className="mt-5 text-[22px] font-bold tracking-[-0.03em]">{name.trim()}님, 보내 주셔서 고마워요</h1>
         <p className="mt-2 text-[15px] text-muted-foreground">신랑신부에게 잘 전달했어요 · {mediaSummary(counts)}</p>
         <div className="mt-8 flex w-full flex-col gap-2">
-          <button type="button" onClick={sendMore} className="h-[52px] rounded-xl bg-accent text-[16px] font-bold text-white active:scale-[0.98]">사진 더 보내기</button>
-          <Link href={mineHref} className="grid h-[52px] place-items-center rounded-xl border border-border-subtle bg-surface text-[16px] font-bold">내가 보낸 사진 보기</Link>
+          <button type="button" onClick={sendMore} className="h-[52px] rounded-lg bg-accent text-[16px] font-bold text-white active:scale-[0.98]">사진 더 보내기</button>
+          <Link href={mineHref} className="grid h-[52px] place-items-center rounded-lg border border-border-subtle bg-surface text-[16px] font-bold">내가 보낸 사진 보기</Link>
         </div>
       </main>
     );
@@ -157,7 +157,7 @@ export function GuestUploadClient({ album, limits }: { album: GuestAlbumInfo; li
           <p className="mt-1 text-[13px] font-semibold text-muted-foreground">{weddingMeta(album)}</p>
           <p className="mt-2 text-[15px] leading-6 text-muted-foreground">{album.greeting ?? DEFAULT_GUEST_GREETING}</p>
         </div>
-        <Link href={mineHref} className="shrink-0 rounded-full border border-border-subtle bg-surface px-3 py-2 text-[13px] font-semibold">내가 보낸 사진</Link>
+        <Link href={mineHref} className="shrink-0 rounded-lg border border-border-subtle bg-surface px-3 py-2 text-[13px] font-semibold">내가 보낸 사진</Link>
       </header>
 
       <main className="flex flex-1 flex-col gap-5 px-5 pb-40 pt-3">
@@ -214,13 +214,13 @@ export function GuestUploadClient({ album, limits }: { album: GuestAlbumInfo; li
               ))}
               {!locked ? (
                 <li>
-                  <button type="button" onClick={() => fileRef.current?.click()} aria-label="사진·영상 더 고르기" className="grid aspect-square w-full place-items-center rounded-xl border-2 border-dashed border-border text-muted-foreground active:bg-surface-raised"><Plus size={26} /></button>
+                  <button type="button" onClick={() => fileRef.current?.click()} aria-label="사진·영상 더 고르기" className="grid aspect-square w-full place-items-center rounded-lg border-2 border-dashed border-border text-muted-foreground active:bg-surface-raised"><Plus size={26} /></button>
                 </li>
               ) : null}
             </ul>
           )}
           {notice ? <p role="status" className="text-[13px] font-semibold text-danger">{notice}</p> : null}
-          <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border border-border-subtle bg-surface px-4 py-3 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
+          <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-border-subtle bg-surface px-4 py-3 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
             <input type="checkbox" checked={sendOriginal} disabled={locked} onChange={(event) => setSendOriginal(event.target.checked)} className="mt-0.5 size-5 shrink-0 accent-[var(--accent)]" />
             <span>
               <span className="block text-[14px] font-semibold">사진 원본으로 보내기</span>
@@ -242,12 +242,12 @@ export function GuestUploadClient({ album, limits }: { album: GuestAlbumInfo; li
           ) : phase === "failed" ? (
             <div className="flex flex-col gap-2">
               <p role="alert" className="text-[14px] font-semibold text-danger">{failed.length}개를 보내지 못했어요. {failed[0]?.error ?? "인터넷 연결을 확인해 주세요."}</p>
-              <button type="button" onClick={send} className="h-[52px] rounded-xl bg-accent text-[16px] font-bold text-white active:scale-[0.98]">실패한 {failed.length}개 다시 보내기</button>
+              <button type="button" onClick={send} className="h-[52px] rounded-lg bg-accent text-[16px] font-bold text-white active:scale-[0.98]">실패한 {failed.length}개 다시 보내기</button>
             </div>
           ) : (
             <>
               {items.length === 0 ? <p className="mb-2 text-center text-[12px] text-muted-foreground">사진이나 영상을 골라 주세요.</p> : null}
-              <button type="button" onClick={send} disabled={items.length === 0} className="h-[52px] w-full rounded-xl bg-accent text-[16px] font-bold text-white transition-opacity active:scale-[0.98] disabled:opacity-40">
+              <button type="button" onClick={send} disabled={items.length === 0} className="h-[52px] w-full rounded-lg bg-accent text-[16px] font-bold text-white transition-opacity active:scale-[0.98] disabled:opacity-40">
                 {items.length ? `${items.length}개 보내기` : "보내기"}
               </button>
             </>

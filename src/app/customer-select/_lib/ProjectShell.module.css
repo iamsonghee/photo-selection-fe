@@ -1,7 +1,7 @@
 /* 프로젝트 화면 공통 헤더 오른쪽: 참여자 아바타 묶음 + 초대. 고르기 화면에서 쓰던 규칙을 그대로 옮겼다. */
 .people { margin-left: auto; min-width: 0; display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; }
 .people::-webkit-scrollbar { display: none; }
-.inviteButton { flex: none; height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--foreground); display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.inviteButton { flex: none; height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--foreground); display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .inviteButton:hover { border-color: var(--border-strong); }
 .inviteLabel { display: inline; }
 

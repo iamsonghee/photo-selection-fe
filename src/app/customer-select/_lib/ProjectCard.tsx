@@ -8,7 +8,7 @@ import { ProjectCardPeople, type ProjectCardParticipant } from "./ProjectCardPeo
 export type ProjectCardProject = CustomerProjectSummary & { share_token: string; sharing_enabled: boolean };
 
 // hover 대상인 카드 자체는 움직이지 않는다 — 위로 띄우면 하단 가장자리에서 hover가 붙었다 떨어지며 떨린다.
-const CARD_CLASS = "group relative flex flex-col rounded-[24px] border border-border-subtle bg-surface transition-[box-shadow,border-color] duration-200 ease-[cubic-bezier(0.2,0,0,1)] has-[details[open]]:z-20 hover:border-border hover:shadow-[0_12px_28px_-10px_rgba(2,56,82,0.16)] motion-reduce:transition-none";
+const CARD_CLASS = "group relative flex flex-col rounded-2xl border border-border-subtle bg-surface transition-[box-shadow,border-color] duration-200 ease-[cubic-bezier(0.2,0,0,1)] has-[details[open]]:z-20 hover:border-border hover:shadow-[0_12px_28px_-10px_rgba(2,56,82,0.16)] motion-reduce:transition-none";
 const MENU_ITEM = "flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-surface-raised";
 
 /**
@@ -42,9 +42,9 @@ export function ProjectCard({ project, coverUrl, selectedCount, today, participa
   return (
     <article className={CARD_CLASS}>
       {/* 카드 전체가 이 링크로 열리고, 더보기·초대·행동 버튼만 그 위에서 따로 눌린다. */}
-      <Link href={href} className="absolute inset-0 rounded-[24px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/35" aria-label={`${project.name} 열기`} />
+      <Link href={href} className="absolute inset-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/35" aria-label={`${project.name} 열기`} />
       <div className="pointer-events-none relative flex-1">
-        <div className="relative m-2 mb-0 grid aspect-[4/3] place-items-center overflow-hidden rounded-[18px] bg-surface-raised">
+        <div className="relative m-2 mb-0 grid aspect-[4/3] place-items-center overflow-hidden rounded-xl bg-surface-raised">
           {coverUrl
             ? <Image src={coverUrl} alt="" fill unoptimized sizes="(min-width: 1536px) 25vw, (min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover object-center transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] group-hover:scale-[1.025] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
             : <div className="flex flex-col items-center gap-2 text-subtle-foreground"><ImagePlus size={30} strokeWidth={1.6} /><span className="text-[13px] font-semibold">아직 사진이 없어요</span></div>}
@@ -52,7 +52,7 @@ export function ProjectCard({ project, coverUrl, selectedCount, today, participa
             {/* 프로젝트 유형 — customer_projects는 모두 촬영본 고르기다(하객 사진 모으기는 guest_albums, 목록의 GuestAlbumCard). */}
             <span className="inline-flex h-7 items-center rounded-full bg-foreground/75 px-2.5 text-[12px] font-bold text-white shadow-sm backdrop-blur-md">촬영본 고르기</span>
             <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-white/80 px-2.5 text-[12px] font-bold text-foreground shadow-sm backdrop-blur-md"><span className={`size-1.5 rounded-full ${statusDot}`} aria-hidden="true" />{status}</span>
-            {deadline ? <span className={`inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-bold shadow-sm backdrop-blur-md ${deadline.urgent ? "bg-accent text-white" : "bg-white/80 text-foreground"}`}>{deadline.label}</span> : null}
+            {deadline ? <span className={`inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-bold shadow-sm backdrop-blur-md ${deadline.label === "마감 지남" ? "bg-danger text-white" : deadline.urgent ? "bg-white/80 text-danger" : "bg-white/80 text-foreground"}`}>{deadline.label}</span> : null}
           </div>
         </div>
         <div className="px-5 pb-4 pt-3.5">
@@ -88,7 +88,7 @@ export function ProjectCard({ project, coverUrl, selectedCount, today, participa
         </div>
       </div>
       <div className="relative px-5 pb-5">
-        <Link href={href} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full bg-accent/10 text-[14px] font-bold text-accent transition-colors hover:bg-accent hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35">{action}<ArrowRight size={16} strokeWidth={2.4} /></Link>
+        <Link href={href} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-border-subtle bg-surface-raised text-[14px] font-semibold text-foreground transition-colors hover:bg-border-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong/50">{action}<ArrowRight size={16} strokeWidth={2.4} /></Link>
       </div>
     </article>
   );

@@ -40,7 +40,7 @@ export function ProjectCardPeople({ projectId, participants, shareToken, shareEn
         <strong className="font-bold">함께 고르기 {people.length}명</strong>
         <span className="line-clamp-2 break-keep text-muted-foreground">{people.length > 1 ? doneCount ? `${doneCount}명 다 골랐어요` : "고르는 중이에요" : "가족·친구를 초대해 함께 골라보세요"}</span>
       </span>
-      <button type="button" onClick={() => setOpen(true)} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-border px-3.5 text-[13px] font-bold transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35"><Plus size={14} />초대</button>
+      <button type="button" onClick={() => setOpen(true)} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border border-border px-3.5 text-[13px] font-bold transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35"><Plus size={14} />초대</button>
       {open && <InviteSheet projectId={projectId} shareToken={shareToken} shareEnabled={shareEnabled} people={people} online={new Set()} done={done} onClose={() => setOpen(false)} />}
     </div>
   );

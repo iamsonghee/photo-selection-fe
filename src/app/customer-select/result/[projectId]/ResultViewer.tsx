@@ -58,8 +58,8 @@ export default function ResultViewer({ project, photos, comments }: Props) {
         </div>
 
         <div className="mt-5 flex items-center gap-2" role="group" aria-label="사진 필터">
-          <button type="button" aria-pressed={!commentOnly} onClick={() => setCommentOnly(false)} className={`h-9 rounded-full border px-4 text-[13px] font-semibold transition-colors ${!commentOnly ? "border-foreground bg-foreground text-white" : "border-border-subtle bg-white text-muted-foreground hover:border-border-strong"}`}>전체 {photos.length.toLocaleString()}</button>
-          <button type="button" aria-pressed={commentOnly} disabled={commentedPhotos.length === 0} onClick={() => setCommentOnly(true)} className={`h-9 rounded-full border px-4 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${commentOnly ? "border-accent bg-accent text-white" : "border-border-subtle bg-white text-muted-foreground hover:border-border-strong"}`}><MessageSquare size={14} className="mr-1.5 inline" aria-hidden />작가 전달 메모 있는 사진 {commentedPhotos.length.toLocaleString()}</button>
+          <button type="button" aria-pressed={!commentOnly} onClick={() => setCommentOnly(false)} className={`h-9 rounded-lg border px-4 text-[13px] font-semibold transition-colors ${!commentOnly ? "border-foreground bg-foreground text-white" : "border-border-subtle bg-white text-muted-foreground hover:border-border-strong"}`}>전체 {photos.length.toLocaleString()}</button>
+          <button type="button" aria-pressed={commentOnly} disabled={commentedPhotos.length === 0} onClick={() => setCommentOnly(true)} className={`h-9 rounded-lg border px-4 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${commentOnly ? "border-accent bg-accent text-white" : "border-border-subtle bg-white text-muted-foreground hover:border-border-strong"}`}><MessageSquare size={14} className="mr-1.5 inline" aria-hidden />작가 전달 메모 있는 사진 {commentedPhotos.length.toLocaleString()}</button>
         </div>
 
         {/* PC는 셀프 고객 갤러리 기준(photo-grid.ts: 최소 180px·간격 12px). 모바일은 메모를 읽을 수 있게 2열(기준 3열의 예외). */}

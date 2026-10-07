@@ -66,7 +66,7 @@ export default function GuestAlbumManagePage() {
       </header>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <section aria-labelledby="share-title" className="rounded-[24px] border border-border-subtle bg-surface p-5 md:p-6">
+        <section aria-labelledby="share-title" className="rounded-2xl border border-border-subtle bg-surface p-5 md:p-6">
           <h2 id="share-title" className="text-[16px] font-bold">QR·링크 공유</h2>
           <div className="mt-4 flex flex-col gap-5 sm:flex-row">
             <div className="grid aspect-square w-40 shrink-0 place-items-center self-center overflow-hidden rounded-2xl border border-border-subtle bg-white sm:self-start">
@@ -84,7 +84,7 @@ export default function GuestAlbumManagePage() {
           </div>
         </section>
 
-        <section aria-labelledby="status-title" className="flex flex-col rounded-[24px] border border-border-subtle bg-surface p-5 md:p-6">
+        <section aria-labelledby="status-title" className="flex flex-col rounded-2xl border border-border-subtle bg-surface p-5 md:p-6">
           <div className="flex items-center justify-between gap-3">
             <h2 id="status-title" className="text-[16px] font-bold">업로드 현황</h2>
             <button type="button" onClick={() => router.refresh()} className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-semibold text-muted-foreground hover:bg-surface-raised hover:text-foreground"><RefreshCw size={14} />새로 보기</button>
@@ -116,7 +116,7 @@ export default function GuestAlbumManagePage() {
           ) : null}
         </div>
         {media.length === 0 ? (
-          <div className="mt-4 flex flex-col items-center rounded-[24px] border border-border-subtle bg-surface px-6 py-14 text-center">
+          <div className="mt-4 flex flex-col items-center rounded-2xl border border-border-subtle bg-surface px-6 py-14 text-center">
             <span className="grid size-14 place-items-center rounded-2xl bg-accent/10 text-accent"><Upload size={26} strokeWidth={1.8} /></span>
             <p className="mt-4 text-[16px] font-bold">아직 올라온 사진이 없어요</p>
             <p className="mt-1 text-[14px] text-muted-foreground">하객이 사진과 영상을 보내면 여기에 모여요.</p>

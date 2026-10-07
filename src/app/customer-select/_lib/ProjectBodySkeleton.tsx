@@ -30,7 +30,7 @@ export function ProjectBodySkeleton({ variant, label }: { variant: "gallery" | "
       {variant === "review"
         ? <div className="grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-2">{Array.from({ length: 10 }, (_, index) => <span key={index} className="aspect-square rounded-lg skeleton-block" />)}</div>
         : [0, 1].map((index) => (
-          <div key={index} className="rounded-[24px] border border-border-subtle bg-surface p-5">
+          <div key={index} className="rounded-2xl border border-border-subtle bg-surface p-5">
             <span className="block h-5 w-1/3 rounded-md skeleton-block" />
             <span className="mt-3 block h-4 w-2/3 rounded-md skeleton-block" />
             <span className="mt-6 block h-10 w-40 max-w-full rounded-full skeleton-block" />

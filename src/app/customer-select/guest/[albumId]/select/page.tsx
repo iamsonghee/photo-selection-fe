@@ -49,7 +49,7 @@ export default function GuestAlbumSelectPage() {
         <Link href={`/customer-select/guest/${albumId}`} className="text-[13px] font-semibold text-muted-foreground underline underline-offset-4 hover:text-foreground">앨범 관리</Link>
       </header>
 
-      <section className="flex flex-col gap-3 rounded-[20px] border border-border-subtle bg-surface p-4 sm:flex-row sm:items-center md:p-5" aria-label="AI 정리">
+      <section className="flex flex-col gap-3 rounded-2xl border border-border-subtle bg-surface p-4 sm:flex-row sm:items-center md:p-5" aria-label="AI 정리">
         <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent"><Sparkles size={20} /></span>
         <div className="min-w-0 flex-1">
           <p className="text-[14px] font-bold">사진 AI 정리</p>
@@ -69,7 +69,7 @@ export default function GuestAlbumSelectPage() {
       </div>
 
       {visible.length === 0 ? (
-        <p className="rounded-[20px] border border-border-subtle bg-surface px-6 py-14 text-center text-[14px] text-muted-foreground">{filter === "selected" ? "아직 고른 사진·영상이 없어요." : "해당하는 파일이 없어요."}</p>
+        <p className="rounded-2xl border border-border-subtle bg-surface px-6 py-14 text-center text-[14px] text-muted-foreground">{filter === "selected" ? "아직 고른 사진·영상이 없어요." : "해당하는 파일이 없어요."}</p>
       ) : (
         <ul className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 md:grid-cols-6">
           {visible.map((item, index) => {

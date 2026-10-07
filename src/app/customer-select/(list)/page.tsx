@@ -88,7 +88,7 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-[14px] font-semibold text-muted-foreground">{displayName}님, 안녕하세요</p>
-            <h1 className="mt-1 flex items-baseline gap-2.5 whitespace-nowrap text-[28px] font-bold tracking-[-0.04em] md:text-[34px]">
+            <h1 className="mt-1 flex items-baseline gap-2.5 whitespace-nowrap text-[24px] font-bold tracking-[-0.04em] md:text-[28px]">
               내 프로젝트
               <span className="text-[16px] font-semibold tracking-normal text-subtle-foreground md:text-[18px]">{totalCount.toLocaleString()}</span>
             </h1>
@@ -97,18 +97,18 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
           {!error ? (
             <div className="flex flex-wrap items-center gap-3 md:justify-end">
             {/* 태블릿 폭(768~1023px)에서는 이용량·새 프로젝트가 한 줄에 다 안 들어가 제목을 밀어 줄바꿈시키므로 오른쪽 묶음이 줄바꿈한다. */}
-            <section className="flex flex-1 items-center gap-3 rounded-full border border-border-subtle bg-surface py-2 pl-4 pr-3 md:min-w-[240px] lg:min-w-[320px]" aria-label="전체 사진 이용량">
+            <section className="flex flex-1 items-center gap-3 rounded-lg border border-border-subtle bg-surface py-2 pl-4 pr-3 md:min-w-[240px] lg:min-w-[320px]" aria-label="전체 사진 이용량">
               <p className="shrink-0 text-[13px] font-semibold text-muted-foreground">사진 <strong className="font-bold text-foreground">{accountPhotoCount.toLocaleString()}</strong> / {photoLimit === null ? "무제한" : `${photoLimit.toLocaleString()}장`}</p>
               {photoLimit !== null && remainingPhotoCount !== null ? (
                 <>
                   <div className="h-1.5 min-w-12 flex-1 overflow-hidden rounded-full bg-surface-raised" role="progressbar" aria-label="전체 사진 이용량" aria-valuemin={0} aria-valuemax={photoLimit} aria-valuenow={Math.min(accountPhotoCount, photoLimit)}>
-                    <div className="h-full min-w-1.5 rounded-full bg-accent" style={{ width: `${Math.min(100, accountPhotoCount / photoLimit * 100)}%` }} />
+                    <div className={`h-full min-w-1.5 rounded-full ${accountPhotoCount >= photoLimit ? "bg-danger" : accountPhotoCount / photoLimit >= 0.8 ? "bg-accent" : "bg-foreground/60"}`} style={{ width: `${Math.min(100, accountPhotoCount / photoLimit * 100)}%` }} />
                   </div>
-                  <p className="shrink-0 text-[12px] font-bold text-accent">{remainingPhotoCount.toLocaleString()}장 남음</p>
+                  <p className={`shrink-0 text-[12px] font-bold ${accountPhotoCount >= photoLimit ? "text-danger" : accountPhotoCount / photoLimit >= 0.8 ? "text-accent" : "text-muted-foreground"}`}>{remainingPhotoCount.toLocaleString()}장 남음</p>
                 </>
               ) : null}
             </section>
-            {totalCount > 0 ? <Link href="/customer-select/new" className="hidden h-11 shrink-0 items-center gap-1.5 rounded-full bg-accent pl-4 pr-5 text-[14px] font-bold text-white transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 md:inline-flex"><Plus size={18} strokeWidth={2.4} />새 프로젝트</Link> : null}
+            {totalCount > 0 ? <Link href="/customer-select/new" className="hidden h-11 shrink-0 items-center gap-1.5 rounded-lg bg-accent pl-4 pr-5 text-[14px] font-bold text-white transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 md:inline-flex"><Plus size={18} strokeWidth={2.4} />새 프로젝트</Link> : null}
             </div>
           ) : null}
         </div>
@@ -116,7 +116,7 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
         {error ? (
           <div className="mt-8 rounded-2xl border border-danger/20 bg-surface p-6 text-[14px] text-danger">프로젝트를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</div>
         ) : totalCount === 0 ? (
-          <section className="mt-8 flex min-h-[480px] items-center justify-center rounded-[28px] border border-border-subtle bg-surface px-6 py-14">
+          <section className="mt-8 flex min-h-[480px] items-center justify-center rounded-2xl border border-border-subtle bg-surface px-6 py-14">
             <div className="flex max-w-[640px] flex-col items-center text-center">
               <div className="grid size-16 place-items-center rounded-2xl bg-accent/10 text-accent"><FolderPlus size={29} strokeWidth={1.8} /></div>
               <h2 className="mt-6 text-[24px] font-bold tracking-[-0.04em] md:text-[28px]">첫 프로젝트를 만들어보세요</h2>
@@ -130,7 +130,7 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
                   </li>;
                 })}
               </ol>
-              <Link href="/customer-select/new" className="mt-8 inline-flex items-center gap-1.5 rounded-full bg-accent px-6 py-3.5 text-[15px] font-bold text-white transition-colors hover:bg-[var(--accent-hover)]"><Plus size={18} strokeWidth={2.4} />새 프로젝트 만들기</Link>
+              <Link href="/customer-select/new" className="mt-8 inline-flex items-center gap-1.5 rounded-lg bg-accent px-6 py-3.5 text-[15px] font-bold text-white transition-colors hover:bg-[var(--accent-hover)]"><Plus size={18} strokeWidth={2.4} />새 프로젝트 만들기</Link>
             </div>
           </section>
         ) : (
@@ -141,7 +141,7 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
               ? <GuestAlbumCard key={item.album.id} album={item.album} />
               : <ProjectCard key={item.project.id} project={item.project} coverUrl={coverByProject.get(item.project.id)} selectedCount={selectedByProject.get(item.project.id)} today={today} participants={participantsByProject.get(item.project.id) ?? []} />
             )}
-          </section> : <section className="mt-8 rounded-[24px] border border-border-subtle bg-surface px-6 py-16 text-center"><h2 className="font-bold">조건에 맞는 프로젝트가 없어요</h2><Link href="/customer-select" className="mt-3 inline-flex text-sm font-semibold text-accent">전체 프로젝트 보기</Link></section>}
+          </section> : <section className="mt-8 rounded-2xl border border-border-subtle bg-surface px-6 py-16 text-center"><h2 className="font-bold">조건에 맞는 프로젝트가 없어요</h2><Link href="/customer-select" className="mt-3 inline-flex text-sm font-semibold text-accent">전체 프로젝트 보기</Link></section>}
           </>
         )}
       </main>
@@ -155,15 +155,15 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
 function GuestAlbumCard({ album }: { album: GuestAlbumSummary }) {
   const href = `/customer-select/guest/${album.id}`;
   return (
-    <article className="group relative flex flex-col rounded-[24px] border border-border-subtle bg-surface transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-[0_20px_48px_-12px_rgba(2,56,82,0.18)] motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-      <Link href={href} className="absolute inset-0 rounded-[24px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/35" aria-label={`${album.name} 관리`} />
+    <article className="group relative flex flex-col rounded-2xl border border-border-subtle bg-surface transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-[0_20px_48px_-12px_rgba(2,56,82,0.18)] motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+      <Link href={href} className="absolute inset-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/35" aria-label={`${album.name} 관리`} />
       <div className="pointer-events-none relative flex-1">
-        <div className="relative m-2 mb-0 grid aspect-[4/3] place-items-center overflow-hidden rounded-[18px] bg-surface-raised">
+        <div className="relative m-2 mb-0 grid aspect-[4/3] place-items-center overflow-hidden rounded-xl bg-surface-raised">
           {album.coverUrl
             ? <Image src={album.coverUrl} alt="" fill unoptimized sizes="(min-width: 1536px) 25vw, (min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover object-center transition-transform duration-500 ease-out group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
             : <div className="flex flex-col items-center gap-2 text-subtle-foreground"><QrCode size={30} strokeWidth={1.6} /><span className="text-[13px] font-semibold">하객 사진을 기다리는 중</span></div>}
           <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
-            <span className="inline-flex h-7 items-center rounded-full bg-accent px-2.5 text-[12px] font-bold text-white shadow-sm">하객 사진 모으기</span>
+            <span className="inline-flex h-7 items-center rounded-full bg-foreground/75 px-2.5 text-[12px] font-bold text-white shadow-sm backdrop-blur-md">하객 사진 모으기</span>
             <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-white/80 px-2.5 text-[12px] font-bold text-foreground shadow-sm backdrop-blur-md"><span className={`size-1.5 rounded-full ${album.closed ? "bg-primary" : "bg-success"}`} aria-hidden="true" />{album.closed ? "셀렉 중" : "업로드 받는 중"}</span>
           </div>
         </div>
@@ -174,7 +174,7 @@ function GuestAlbumCard({ album }: { album: GuestAlbumSummary }) {
         </div>
       </div>
       <div className="relative px-5 pb-5">
-        <Link href={href} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full bg-accent/10 text-[14px] font-bold text-accent transition-colors hover:bg-accent hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35">{album.closed ? "셀렉 계속하기" : "QR·업로드 현황 보기"}<ArrowRight size={16} strokeWidth={2.4} /></Link>
+        <Link href={href} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-border-subtle bg-surface-raised text-[14px] font-semibold text-foreground transition-colors hover:bg-border-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong/50">{album.closed ? "셀렉 계속하기" : "QR·업로드 현황 보기"}<ArrowRight size={16} strokeWidth={2.4} /></Link>
       </div>
     </article>
   );

@@ -30,7 +30,7 @@ export default async function NewCustomerProjectTypePage() {
         <ul className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {TYPES.map(({ href, icon: Icon, title, description }) => (
             <li key={href}>
-              <Link href={href} className="group flex h-full flex-col rounded-[24px] border border-border-subtle bg-surface p-6 transition-[border-color,box-shadow] hover:border-accent/40 hover:shadow-[0_20px_48px_-12px_rgba(2,56,82,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35">
+              <Link href={href} className="group flex h-full flex-col rounded-2xl border border-border-subtle bg-surface p-6 transition-[border-color,box-shadow] hover:border-accent/40 hover:shadow-[0_20px_48px_-12px_rgba(2,56,82,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35">
                 <span className="grid size-12 place-items-center rounded-2xl bg-accent/10 text-accent"><Icon size={24} strokeWidth={1.8} /></span>
                 <strong className="mt-5 text-[18px] font-bold tracking-[-0.02em]">{title}</strong>
                 <span className="mt-2 flex-1 text-[14px] leading-6 text-muted-foreground">{description}</span>

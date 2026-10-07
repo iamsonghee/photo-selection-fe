@@ -22,13 +22,13 @@ export default function GuestAlbumDownloadPage() {
       </header>
 
       {picked.length === 0 ? (
-        <section className="rounded-[24px] border border-border-subtle bg-surface px-6 py-14 text-center">
+        <section className="rounded-2xl border border-border-subtle bg-surface px-6 py-14 text-center">
           <p className="text-[16px] font-bold">아직 고른 사진·영상이 없어요</p>
           <Link href={selectHref} className="mt-4 inline-flex h-11 items-center rounded-lg bg-foreground px-5 text-[14px] font-bold text-background">고르러 가기</Link>
         </section>
       ) : (
         <>
-          <section className="rounded-[24px] border border-border-subtle bg-surface p-5 md:p-6" aria-label="내려받을 파일">
+          <section className="rounded-2xl border border-border-subtle bg-surface p-5 md:p-6" aria-label="내려받을 파일">
             <p className="text-[16px] font-bold">{mediaSummary(counts)}</p>
             <ul className="mt-4 divide-y divide-border-subtle">
               {picked.map((item) => (

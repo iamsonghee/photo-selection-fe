@@ -12,21 +12,21 @@
 .tools::-webkit-scrollbar { display: none; }
 /* 툴바: 테두리 알약을 반복하지 않고 역할별 모양으로 구분한다(2026-10-02).
  * 보기 범위 = 회색 트랙 안에서 선택 칸만 흰 알약, 인물 칩 = 글자형, 검색·보기 옵션 = 아이콘만. 높이는 모두 34px. */
-.search { flex: 0 1 220px; min-width: 120px; height: 34px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--surface-raised); color: var(--foreground); font: inherit; font-size: 12px; outline: none; }
+.search { flex: 0 1 220px; min-width: 120px; height: 34px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--surface-raised); color: var(--foreground); font: inherit; font-size: 12px; outline: none; }
 .search:focus { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
 /* 메뉴는 가로 스크롤에 잘리지 않게 바깥 틀 기준으로 띄운다. */
 .toolsWrap { flex: none; position: relative; z-index: 5; }
 .toolsAnchor { position: relative; }
 .toolsSpacer { flex: 1 1 auto; }
-.segments { flex: none; display: inline-flex; align-items: stretch; gap: 2px; height: 34px; padding: 3px; border-radius: 999px; background: var(--surface-raised); }
-.segments button { height: 100%; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.segments { flex: none; display: inline-flex; align-items: stretch; gap: 2px; height: 34px; padding: 3px; border-radius: 8px; background: var(--surface-raised); }
+.segments button { height: 100%; padding: 0 12px; border: 0; border-radius: 6px; background: none; color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
 .segments button b { color: var(--subtle-foreground); font-weight: 600; font-variant-numeric: tabular-nums; }
 .segments button:hover { color: var(--foreground); }
 .segments > button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 1px 3px rgba(2, 56, 82, 0.14); }
 /* 주황은 "고른 것"과 주 버튼에만 — 보기 범위·인물 칩·옵션 배지의 켜짐은 남색으로. */
 .segments button[aria-pressed="true"] { color: var(--foreground); }
 .segments button[aria-pressed="true"] b { color: var(--foreground); }
-.iconTool { position: relative; flex: none; width: 34px; height: 34px; border: 0; border-radius: 999px; background: none; color: var(--muted-foreground); display: grid; place-items: center; cursor: pointer; }
+.iconTool { position: relative; flex: none; width: 34px; height: 34px; border: 0; border-radius: 8px; background: none; color: var(--muted-foreground); display: grid; place-items: center; cursor: pointer; }
 .mobileOnly { display: none; }
 .iconTool:hover, .iconTool[aria-expanded="true"] { background: var(--surface-raised); color: var(--foreground); }
 .iconTool i { position: absolute; top: -2px; right: -2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--foreground); color: #fff; font-size: 10px; font-weight: 800; font-style: normal; line-height: 16px; }
@@ -74,7 +74,7 @@
 .analysis i { display: block; height: 4px; margin-top: 6px; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--primary) 14%, transparent); }
 .analysis i b { display: block; height: 100%; background: var(--primary); transition: width 400ms ease; }
 .analysisActions { flex: none; display: flex; gap: 6px; align-self: center; }
-.aiButton { margin-left: auto; height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--primary) 12%, var(--surface)); color: var(--primary); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.aiButton { margin-left: auto; height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: color-mix(in srgb, var(--primary) 12%, var(--surface)); color: var(--primary); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .aiButton:hover { background: color-mix(in srgb, var(--primary) 18%, var(--surface)); }
 .allTitle { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; }
 .allTitle small { margin-left: 6px; color: var(--subtle-foreground); font-size: 12px; font-weight: 600; }

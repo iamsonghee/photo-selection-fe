@@ -57,5 +57,3 @@
   }
 }
 
-/* 셀프 고객 셀렉 화면만 알약 모양 — 작가 화면은 기존 8px 모서리 그대로. */
-:global([data-customer-select]) .button { border-radius: 9999px; }
