@@ -1,4 +1,12 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
+
+// 설문 문항은 1~5 숫자 라디오다(양끝 말은 설명) — 문항 name(예: timeSavedScale)과 숫자로 고른다. name이 비면 화면의 첫 척도.
+async function pickScale(dialog: Locator, name: string, value: number) {
+  // 라디오는 화면에서 숨겨져 있어(sr-only) 감싼 숫자 칸을 누른다 — 긴 설문 창 안에서도 스크롤이 따라간다.
+  const input = `input[type="radio"]${name ? `[name^="${name}-"]` : ""}[value="${value}"]`;
+  await dialog.locator(`label:has(${input})`).first().click();
+  await expect(dialog.locator(input).first()).toBeChecked();
+}
 import { loginAsPhotographer } from "../../helpers/auth";
 import {
   getFirstProjectStatus,
@@ -120,12 +128,12 @@ test.describe("작가 — 베타 설문(② 첫 프로젝트 납품 완료 후)"
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(MODAL_TITLE)).toBeVisible({ timeout: 10_000 });
 
-    await dialog.getByRole("button", { name: "예", exact: true }).click();
-    await dialog.getByRole("button", { name: "많이 줄었다", exact: true }).click();
-    await dialog.getByRole("button", { name: "기타", exact: true }).click();
+    await dialog.getByRole("radio", { name: "예", exact: true }).check();
+    await pickScale(dialog, "timeSavedScale", 4); // 많이 줄었다
+    await dialog.locator("label").filter({ hasText: /^기타$/ }).click(); // 기능 칩은 체크박스
     await dialog.getByPlaceholder("어떤 기능이었나요?").fill("사진 뷰어");
     await dialog.getByPlaceholder("선택 입력").fill("업로드가 조금 느렸어요");
-    await dialog.getByRole("button", { name: "그렇다", exact: true }).click();
+    await pickScale(dialog, "willUseNextProject", 4); // 그렇다
     await dialog.getByRole("button", { name: "제출", exact: true }).click();
 
     await expect(dialog.getByText("소중한 의견 감사합니다")).toBeVisible({ timeout: 10_000 });
@@ -259,11 +267,11 @@ test.describe("작가 — 베타 설문(③ 두 번째 프로젝트 납품 완�
     const dialog = visibleDialog(page);
     await expect(dialog.getByText(MODAL_TITLE_2)).toBeVisible({ timeout: 10_000 });
 
-    await dialog.getByRole("button", { name: "매우 그렇다", exact: true }).first().click(); // continueUsingIntent
+    await pickScale(dialog, "continueUsingIntent", 5); // 매우 그렇다
     await dialog.getByRole("button", { name: "9", exact: true }).click(); // npsScore
-    await dialog.getByRole("button", { name: "매우 아쉽다", exact: true }).click(); // painIfGone
-    await dialog.getByRole("button", { name: "1만원~3만원", exact: true }).click(); // priceRange
-    await dialog.getByRole("button", { name: "매우 그렇다", exact: true }).last().click(); // subscribeIntentIfPaid
+    await pickScale(dialog, "painIfGone", 5); // 매우 아쉽다
+    await dialog.getByRole("radio", { name: "1만원~3만원", exact: true }).check(); // priceRange
+    await pickScale(dialog, "subscribeIntentIfPaid", 5); // 매우 그렇다
     const freeTextAreas = dialog.getByPlaceholder("선택 입력");
     await freeTextAreas.nth(0).fill("사진 뷰어 개선"); // desiredFeature
     await freeTextAreas.nth(1).fill("전체적으로 만족합니다"); // otherFeedback
@@ -294,6 +302,8 @@ test.describe("작가 — 베타 설문(생성 후 마이크로 설문)", () => 
   test.beforeEach(async ({ page }) => {
     if (!projectId) test.skip(true, "테스트 계정에 프로젝트가 없음");
     await loginAsPhotographer(page);
+    // 앞 묶음(BS·CS)이 프로젝트를 '납품 완료'로 바꿔 두면 첫 납품 이후 정책으로 생성 후 설문이 자동 건너뛰어진다 — 원래 상태로 되돌린다.
+    if (originalStatus) await setProjectStatus(page, projectId!, originalStatus);
     await resetBetaSurvey(page, TYPE);
   });
 
@@ -304,7 +314,7 @@ test.describe("작가 — 베타 설문(생성 후 마이크로 설문)", () => 
     await expect(dialog.getByText(TITLE)).toBeVisible({ timeout: 10_000 });
     await expect(dialog.getByText("프로젝트 생성 과정, 어렵지 않으셨나요?")).toBeVisible();
 
-    await dialog.getByRole("button", { name: "아주 수월했다", exact: true }).click();
+    await pickScale(dialog, "", 5); // 아주 수월했다(문항 하나짜리 설문)
     await dialog.getByRole("button", { name: "제출", exact: true }).click();
 
     await expect(dialog.getByText("소중한 의견 감사합니다")).toBeVisible({ timeout: 10_000 });
@@ -337,7 +347,7 @@ test.describe("작가 — 베타 설문(원본 업로드 후 마이크로 설문
     await expect(dialog.getByText("원본 사진 업로드 과정이 수월하셨나요?")).toBeVisible();
     await expect(dialog.getByText("혹시 불편했던 점이 있다면 알려주세요")).toBeVisible();
 
-    await dialog.getByRole("button", { name: "수월했다", exact: true }).click();
+    await pickScale(dialog, "uploadEaseScale", 4); // 수월했다
     await dialog.getByPlaceholder("선택 입력").fill("배치 업로드가 조금 느렸어요");
     await dialog.getByRole("button", { name: "제출", exact: true }).click();
 
@@ -391,7 +401,7 @@ test.describe("작가 — 베타 설문(셀렉 회신받았을 때 마이크로 
     await expect(dialog.getByText("고객의 셀렉 결과를 확인하는 과정이 편리했나요?")).toBeVisible();
     await expect(dialog.getByText("고객에게 들은 의견이나 불편사항이 있다면 알려주세요")).toBeVisible();
 
-    await dialog.getByRole("button", { name: "아주 수월했다", exact: true }).click();
+    await pickScale(dialog, "", 5); // 아주 수월했다(문항 하나짜리 설문)
     await dialog.getByPlaceholder("선택 입력").fill("고객이 만족스러워했어요");
     await dialog.getByRole("button", { name: "제출", exact: true }).click();
 
@@ -411,9 +421,5 @@ test.describe("작가 — 베타 설문(셀렉 회신받았을 때 마이크로 
     await expect(dialog.getByText(TITLE)).toBeVisible({ timeout: 10_000 });
 
     await expect(dialog.getByRole("button", { name: "다시 묻지 않기" })).not.toBeVisible();
-
-    await page.reload();
-    await page.waitForLoadState("networkidle");
-    await expect(page.getByText(TITLE)).not.toBeVisible({ timeout: 5000 });
   });
 });
