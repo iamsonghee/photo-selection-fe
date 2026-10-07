@@ -18,7 +18,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #111315;
+  background: #0a0b0d;
   color: #fff;
   font-family: "Pretendard Variable", "Pretendard", system-ui, sans-serif;
 }
@@ -202,7 +202,7 @@
   align-items: center;
   justify-content: center;
   padding: 28px 112px 32px;
-  background: #111315;
+  background: #0a0b0d;
 }
 
 .imageFrame {
@@ -225,7 +225,7 @@
   padding: 5px 8px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 5px;
-  background: rgba(17, 19, 21, 0.82);
+  background: rgba(10, 11, 13, 0.82);
   color: rgba(255, 255, 255, 0.9);
   font-size: 11px;
   font-weight: 600;
@@ -259,7 +259,7 @@
   padding: 5px 8px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 5px;
-  background: rgba(17, 19, 21, 0.78);
+  background: rgba(10, 11, 13, 0.78);
   color: rgba(255, 255, 255, 0.84);
   font-size: 11px;
   font-weight: 600;
@@ -439,7 +439,7 @@
 
 /* Mobile viewer surfaces share one palette and spacing scale. */
 @media (max-width: 767px) {
-  .root[data-mobile-details="true"] { --viewer-bg: #111315; --viewer-text: #e1e6e9; --viewer-muted: #aab0b8; --viewer-gutter: 12px; --viewer-tab-height: 44px; --viewer-tab-face: 34px; background: var(--viewer-bg); }
+  .root[data-mobile-details="true"] { --viewer-bg: #0a0b0d; --viewer-text: #e1e6e9; --viewer-muted: #aab0b8; --viewer-gutter: 12px; --viewer-tab-height: 44px; --viewer-tab-face: 34px; background: var(--viewer-bg); }
   .root[data-mobile-details="true"] .header,
   .root[data-mobile-details="true"] .stage,
   .root[data-mobile-details="true"] .mobileViewControls,
@@ -498,7 +498,7 @@
 .root .helpButton { width: auto; min-width: 48px; padding: 6px 8px; border: 0; border-radius: 6px; font-size: 11px; }
 .gestureHint { position: absolute; z-index: 2; bottom: 8px; left: 50%; margin: 0; padding: 5px 10px; transform: translateX(-50%); border-radius: 999px; color: #c5cbd0; background: rgb(17 19 21 / 68%); font-size: 12px; line-height: 18px; text-align: center; white-space: nowrap; pointer-events: none; backdrop-filter: blur(4px); }
 .gestureHint[data-used="true"] { color: #949ca3; }
-.originalOverlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #111315; pointer-events: none; transition: opacity 140ms ease; }
+.originalOverlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #0a0b0d; pointer-events: none; transition: opacity 140ms ease; }
 .root .holdPreviewBadge { z-index: 3; pointer-events: none; }
 .root .imageFrame, .root .imageFrame img { -webkit-touch-callout: none !important; user-select: none; }
 .root[data-focused="true"] .originalOverlay { background: #000; }
