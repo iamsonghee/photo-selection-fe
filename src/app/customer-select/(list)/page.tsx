@@ -136,7 +136,7 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
         ) : (
           <>
           {filtersEnabled ? <ProjectFilters query={query} status={statusFilter} /> : null}
-          {listItems.length > 0 ? <section className="mt-8 grid grid-cols-1 items-start gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-label="프로젝트 목록">
+          {listItems.length > 0 ? <section className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-label="프로젝트 목록">
             {listItems.map((item) => item.type === "guest"
               ? <GuestAlbumCard key={item.album.id} album={item.album} />
               : <ProjectCard key={item.project.id} project={item.project} coverUrl={coverByProject.get(item.project.id)} selectedCount={selectedByProject.get(item.project.id)} today={today} participants={participantsByProject.get(item.project.id) ?? []} />
