@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { FolderPlus, Plus, Send, Upload, Users } from "lucide-react";
+import Image from "next/image";
+import { ArrowRight, FolderPlus, Plus, QrCode, Send, Upload, Users } from "lucide-react";
 import { customerPhotoLimit, getCurrentCustomerAuthUser } from "@/lib/customer-select-server";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { CustomerSelectShell } from "../_lib/CustomerSelectShell";
@@ -8,6 +9,8 @@ import { filterCustomerProjects, kstToday, type CustomerProjectFilter } from "..
 import { ProjectCard, type ProjectCardProject } from "../_lib/ProjectCard";
 import type { ProjectCardParticipant } from "../_lib/ProjectCardPeople";
 import { ProjectFilters } from "../_lib/ProjectFilters";
+import { listOwnerGuestAlbums, type GuestAlbumSummary } from "@/lib/guest-album-server";
+import { formatWeddingDateTime } from "@/lib/guest-album";
 
 export default async function CustomerSelectHomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const user = await getCurrentCustomerAuthUser();
@@ -22,6 +25,7 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
     .eq("owner_id", ownerId)
     .order("created_at", { ascending: false });
   const projects = (data ?? []) as ProjectCardProject[];
+  const guestAlbums = await listOwnerGuestAlbums(ownerId);
   const accountPhotoCount = projects.reduce((sum, project) => sum + Math.max(0, project.photo_count), 0);
   const photoLimit = customerPhotoLimit(user.email);
   const remainingPhotoCount = photoLimit === null ? null : Math.max(0, photoLimit - accountPhotoCount);
@@ -34,6 +38,13 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
   const statusFilter: CustomerProjectFilter = filtersEnabled && typeof params.status === "string" && ["active", "done"].includes(params.status)
     ? params.status as CustomerProjectFilter : "all";
   const filteredProjects = filterCustomerProjects(projects, query, statusFilter);
+  // 하객 앨범은 이름 검색만 적용하고, '보정 완료' 상태 필터에서는 뺀다.
+  const filteredGuestAlbums = statusFilter === "done" ? [] : guestAlbums.filter((album) => !query.trim() || album.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const listItems = [
+    ...filteredProjects.map((project) => ({ type: "project" as const, createdAt: project.created_at, project })),
+    ...filteredGuestAlbums.map((album) => ({ type: "guest" as const, createdAt: album.createdAt, album })),
+  ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const totalCount = projects.length + guestAlbums.length;
   const firstPhotoResults = await Promise.all(projectIdsWithPhotos.map((projectId) => admin
     .from("customer_photos")
     .select("project_id, thumb_url, preview_url")
@@ -79,7 +90,7 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
             <p className="text-[14px] font-semibold text-muted-foreground">{displayName}님, 안녕하세요</p>
             <h1 className="mt-1 flex items-baseline gap-2.5 whitespace-nowrap text-[28px] font-bold tracking-[-0.04em] md:text-[34px]">
               내 프로젝트
-              <span className="text-[16px] font-semibold tracking-normal text-subtle-foreground md:text-[18px]">{projects.length.toLocaleString()}</span>
+              <span className="text-[16px] font-semibold tracking-normal text-subtle-foreground md:text-[18px]">{totalCount.toLocaleString()}</span>
             </h1>
           </div>
 
@@ -97,14 +108,14 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
                 </>
               ) : null}
             </section>
-            {projects.length > 0 ? <Link href="/customer-select/new" className="hidden h-11 shrink-0 items-center gap-1.5 rounded-full bg-accent pl-4 pr-5 text-[14px] font-bold text-white transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 md:inline-flex"><Plus size={18} strokeWidth={2.4} />새 프로젝트</Link> : null}
+            {totalCount > 0 ? <Link href="/customer-select/new" className="hidden h-11 shrink-0 items-center gap-1.5 rounded-full bg-accent pl-4 pr-5 text-[14px] font-bold text-white transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 md:inline-flex"><Plus size={18} strokeWidth={2.4} />새 프로젝트</Link> : null}
             </div>
           ) : null}
         </div>
 
         {error ? (
           <div className="mt-8 rounded-2xl border border-danger/20 bg-surface p-6 text-[14px] text-danger">프로젝트를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</div>
-        ) : projects.length === 0 ? (
+        ) : totalCount === 0 ? (
           <section className="mt-8 flex min-h-[480px] items-center justify-center rounded-[28px] border border-border-subtle bg-surface px-6 py-14">
             <div className="flex max-w-[640px] flex-col items-center text-center">
               <div className="grid size-16 place-items-center rounded-2xl bg-accent/10 text-accent"><FolderPlus size={29} strokeWidth={1.8} /></div>
@@ -125,17 +136,46 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
         ) : (
           <>
           {filtersEnabled ? <ProjectFilters query={query} status={statusFilter} /> : null}
-          {filteredProjects.length > 0 ? <section className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-label="프로젝트 목록">
-            {filteredProjects.map((project) => (
-              <ProjectCard key={project.id} project={project} coverUrl={coverByProject.get(project.id)} selectedCount={selectedByProject.get(project.id)} today={today} participants={participantsByProject.get(project.id) ?? []} />
-            ))}
+          {listItems.length > 0 ? <section className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-label="프로젝트 목록">
+            {listItems.map((item) => item.type === "guest"
+              ? <GuestAlbumCard key={item.album.id} album={item.album} />
+              : <ProjectCard key={item.project.id} project={item.project} coverUrl={coverByProject.get(item.project.id)} selectedCount={selectedByProject.get(item.project.id)} today={today} participants={participantsByProject.get(item.project.id) ?? []} />
+            )}
           </section> : <section className="mt-8 rounded-[24px] border border-border-subtle bg-surface px-6 py-16 text-center"><h2 className="font-bold">조건에 맞는 프로젝트가 없어요</h2><Link href="/customer-select" className="mt-3 inline-flex text-sm font-semibold text-accent">전체 프로젝트 보기</Link></section>}
           </>
         )}
       </main>
-      {!error && projects.length > 0 ? <Link href="/customer-select/new" aria-label="새 프로젝트" className="fixed bottom-[calc(20px+env(safe-area-inset-bottom))] right-5 z-40 inline-flex h-14 items-center gap-1.5 rounded-full bg-accent pl-5 pr-6 text-[15px] font-bold text-white shadow-[0_12px_28px_rgba(255,77,0,0.32)] transition-[transform,background-color] active:scale-95 hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/25 md:hidden">
+      {!error && totalCount > 0 ? <Link href="/customer-select/new" aria-label="새 프로젝트" className="fixed bottom-[calc(20px+env(safe-area-inset-bottom))] right-5 z-40 inline-flex h-14 items-center gap-1.5 rounded-full bg-accent pl-5 pr-6 text-[15px] font-bold text-white shadow-[0_12px_28px_rgba(255,77,0,0.32)] transition-[transform,background-color] active:scale-95 hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/25 md:hidden">
         <Plus size={22} strokeWidth={2.4} />새 프로젝트
       </Link> : null}
     </CustomerSelectShell>
+  );
+}
+
+function GuestAlbumCard({ album }: { album: GuestAlbumSummary }) {
+  const href = `/customer-select/guest/${album.id}`;
+  return (
+    <article className="group relative flex flex-col rounded-[24px] border border-border-subtle bg-surface transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-[0_20px_48px_-12px_rgba(2,56,82,0.18)] motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+      <Link href={href} className="absolute inset-0 rounded-[24px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/35" aria-label={`${album.name} 관리`} />
+      <div className="pointer-events-none relative flex-1">
+        <div className="relative m-2 mb-0 grid aspect-[4/3] place-items-center overflow-hidden rounded-[18px] bg-surface-raised">
+          {album.coverUrl
+            ? <Image src={album.coverUrl} alt="" fill unoptimized sizes="(min-width: 1536px) 25vw, (min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover object-center transition-transform duration-500 ease-out group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
+            : <div className="flex flex-col items-center gap-2 text-subtle-foreground"><QrCode size={30} strokeWidth={1.6} /><span className="text-[13px] font-semibold">하객 사진을 기다리는 중</span></div>}
+          <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+            <span className="inline-flex h-7 items-center rounded-full bg-accent px-2.5 text-[12px] font-bold text-white shadow-sm">하객 사진 모으기</span>
+            <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-white/80 px-2.5 text-[12px] font-bold text-foreground shadow-sm backdrop-blur-md"><span className={`size-1.5 rounded-full ${album.closed ? "bg-primary" : "bg-success"}`} aria-hidden="true" />{album.closed ? "셀렉 중" : "업로드 받는 중"}</span>
+          </div>
+        </div>
+        <div className="px-5 pb-4 pt-3.5">
+          <strong className="block truncate text-[17px] font-bold tracking-[-0.02em]">{album.name}</strong>
+          <p className="mt-1 truncate text-[13px] text-muted-foreground">{formatWeddingDateTime(album.weddingDate)}</p>
+          <p className="mt-4 text-[13px] text-muted-foreground">올라온 사진·영상 <strong className="text-[15px] font-bold text-foreground">{album.mediaCount.toLocaleString()}</strong>개</p>
+        </div>
+      </div>
+      <div className="relative px-5 pb-5">
+        <Link href={href} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full bg-accent/10 text-[14px] font-bold text-accent transition-colors hover:bg-accent hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35">{album.closed ? "셀렉 계속하기" : "QR·업로드 현황 보기"}<ArrowRight size={16} strokeWidth={2.4} /></Link>
+      </div>
+    </article>
   );
 }

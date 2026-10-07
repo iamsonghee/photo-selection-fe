@@ -11,6 +11,9 @@ const FIELD_DEFS: { key: keyof AppSettings; label: string; note?: string; suffix
   { key: "betaMaxPhotosPerProject", label: "베타 프로젝트당 최대 사진 수", suffix: "장" },
   { key: "betaMaxRevisionCount", label: "최대 재보정 라운드", suffix: "회" },
   { key: "betaDefaultDurationDays", label: "베타 부여 시 기본 이용 기간", note: "종료일을 지정하지 않으면 자동 적용", suffix: "일" },
+  { key: "guestPhotoMaxMb", label: "하객 사진 1장 최대 용량", note: "임시값 — 하객 사진 모으기", suffix: "MB" },
+  { key: "guestVideoMaxMb", label: "하객 영상 1개 최대 용량", note: "임시값 — 원본 그대로 저장", suffix: "MB" },
+  { key: "guestRetentionDays", label: "하객 앨범 보관 기간", note: "결혼식 날짜부터 — 자동 삭제는 아직 없음", suffix: "일" },
 ];
 
 function toFormValues(settings: AppSettings): Record<string, string> {

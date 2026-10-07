@@ -49,6 +49,8 @@ export function ProjectCard({ project, coverUrl, selectedCount, today, participa
             ? <Image src={coverUrl} alt="" fill unoptimized sizes="(min-width: 1536px) 25vw, (min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover object-center transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] group-hover:scale-[1.025] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
             : <div className="flex flex-col items-center gap-2 text-subtle-foreground"><ImagePlus size={30} strokeWidth={1.6} /><span className="text-[13px] font-semibold">아직 사진이 없어요</span></div>}
           <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+            {/* 프로젝트 유형 — customer_projects는 모두 촬영본 고르기다(하객 사진 모으기는 guest_albums, 목록의 GuestAlbumCard). */}
+            <span className="inline-flex h-7 items-center rounded-full bg-foreground/75 px-2.5 text-[12px] font-bold text-white shadow-sm backdrop-blur-md">촬영본 고르기</span>
             <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-white/80 px-2.5 text-[12px] font-bold text-foreground shadow-sm backdrop-blur-md"><span className={`size-1.5 rounded-full ${statusDot}`} aria-hidden="true" />{status}</span>
             {deadline ? <span className={`inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-bold shadow-sm backdrop-blur-md ${deadline.urgent ? "bg-accent text-white" : "bg-white/80 text-foreground"}`}>{deadline.label}</span> : null}
           </div>
