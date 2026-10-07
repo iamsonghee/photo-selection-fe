@@ -4,7 +4,6 @@ import { PhotographerPageSkeleton } from "@/components/photographer/Photographer
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
 import {
   DEFAULT_GENERAL_MAX_PROJECTS,
   DEFAULT_GENERAL_MAX_PHOTOS_PER_PROJECT,
@@ -37,7 +36,7 @@ function BetaWelcomeModal({ open, onClose, userName }: { open: boolean; onClose:
     <PhotographerModal
       open={open}
       onClose={onClose}
-      title={<span className="flex items-center gap-2"><Sparkles size={17} className="text-accent" />베타 서비스 시작</span>}
+      title="베타 서비스 시작"
       description="A-CUT과 함께 첫 프로젝트를 시작해 보세요."
       maxWidth={440}
       footer={
@@ -47,9 +46,6 @@ function BetaWelcomeModal({ open, onClose, userName }: { open: boolean; onClose:
       }
     >
       <div className="py-3 text-center">
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-accent/30 bg-accent/10">
-          <Sparkles size={26} className="text-accent" />
-        </div>
         <p className="text-[17px] font-bold text-foreground">{userName}님, 환영합니다!</p>
         <p className="mt-2 break-keep text-[13px] leading-5 text-muted-foreground">
           사진 셀렉부터 보정본 검토와 납품까지 한 프로젝트에서 이어갈 수 있습니다.

@@ -74,8 +74,9 @@
 .analysis i { display: block; height: 4px; margin-top: 6px; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--primary) 14%, transparent); }
 .analysis i b { display: block; height: 100%; background: var(--primary); transition: width 400ms ease; }
 .analysisActions { flex: none; display: flex; gap: 6px; align-self: center; }
-.aiButton { margin-left: auto; height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: color-mix(in srgb, var(--primary) 12%, var(--surface)); color: var(--primary); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
-.aiButton:hover { background: color-mix(in srgb, var(--primary) 18%, var(--surface)); }
+.aiButton { margin-left: auto; height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--foreground); display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+/* 청록은 '고객' 행위자 색이라 AI 기능 버튼에 쓰면 의미가 섞인다 — 중립 테두리 버튼(2026-10-07). */
+.aiButton:hover { border-color: var(--border-strong); background: var(--surface-raised); }
 .allTitle { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; }
 .allTitle small { margin-left: 6px; color: var(--subtle-foreground); font-size: 12px; font-weight: 600; }
 .sceneHeader .textLink { margin-left: auto; }

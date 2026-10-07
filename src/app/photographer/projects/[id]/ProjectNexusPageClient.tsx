@@ -880,6 +880,8 @@ export function ProjectNexusPageClient() {
                 >
                   <MessageCircle size={15} />
                   알림톡 보내기
+                  {/* title 툴팁은 터치에서 안 보인다 — 왜 꺼져 있는지 버튼 안에 적는다(작업 화면 하단 바와 같은 표시). */}
+                  <span className="rounded-full bg-surface-raised px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">준비 중</span>
                 </PhotographerLightButton>
               </div>
             </div>

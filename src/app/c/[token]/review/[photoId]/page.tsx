@@ -503,9 +503,9 @@ export default function ReviewViewerPage() {
         .rvx-sum-pending { color: var(--muted-foreground); }
         .rvx-sum-n {
           display: inline-block; font-weight: 700; font-variant-numeric: tabular-nums;
-          animation: rvx-bump 220ms cubic-bezier(.34,1.56,.64,1) both;
+          animation: rvx-bump 220ms cubic-bezier(.2,0,0,1) both;
         }
-        @keyframes rvx-bump { 0% { transform: scale(1); } 45% { transform: scale(1.45); } 100% { transform: scale(1); } }
+        @keyframes rvx-bump { 0% { transform: scale(1); } 45% { transform: scale(1.15); } 100% { transform: scale(1); } }
         @media (prefers-reduced-motion: reduce) { .rvx-sum-n { animation: none; } }
         .rvx-deadline {
           flex: 0 0 auto; font: 600 12px/1 Pretendard, sans-serif; color: var(--muted-foreground); white-space: nowrap;
@@ -664,7 +664,7 @@ export default function ReviewViewerPage() {
         .rvx-chip-approved { background: rgba(0,200,90,.16); border-color: rgba(0,200,90,.5); color: #4ade80; }
         .rvx-chip-revision { background: rgba(255,170,0,.16); border-color: rgba(255,170,0,.5); color: #ffbb33; }
         /* 결정된 순간이 눈에 걸리도록 아이콘만 한 번 튄다 — 색만 바뀌면 바뀐 줄도 모른다 */
-        .rvx-chip-icon { animation: rvx-pop 180ms cubic-bezier(.34,1.56,.64,1) both; }
+        .rvx-chip-icon { animation: rvx-pop 180ms cubic-bezier(.2,0,0,1) both; }
         @keyframes rvx-pop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
         .rvx-quiet-swap { flex: 0 0 auto; max-width: none; height: 40px; font-size: 12px; }
         @media (prefers-reduced-motion: reduce) { .rvx-chip-icon { animation: none; } }
@@ -787,7 +787,7 @@ export default function ReviewViewerPage() {
         .rvx-badge-revision { background: rgba(64,42,5,.92); color: #fcd34d; }
         /* 방금 판단한 한 장만 튄다 — 첫 로드에서 이미 판단된 배지가 한꺼번에 튀면 그건 잡음이다.
          * 판단 직후 시선이 가는 곳(스크롤로 움직이는 필름스트립)에서 결과가 쌓이는 것을 보여준다. */
-        .rvx-badge-pop { animation: rvx-pop 240ms cubic-bezier(.34,1.56,.64,1) both; }
+        .rvx-badge-pop { animation: rvx-pop 240ms cubic-bezier(.2,0,0,1) both; }
         @media (prefers-reduced-motion: reduce) { .rvx-badge-pop { animation: none; } }
 
         @media (max-width: 767px) {

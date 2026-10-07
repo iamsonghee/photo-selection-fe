@@ -813,13 +813,6 @@ export default function GalleryPageClient() {
   return (
     <>
       <style>{`
-        .gl-grid-bg {
-          position: fixed; inset: 0;
-          background-image: linear-gradient(var(--border-subtle) 1px, transparent 1px),
-                            linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
-          background-size: 40px 40px;
-          pointer-events: none; z-index: 0; opacity: 0.5;
-        }
         .gl-mobile-similarity-hint { display: none; }
 
         .gl-btn-confirm {
@@ -854,7 +847,6 @@ export default function GalleryPageClient() {
 
         @media (max-width: 767px) {
           .gl-mobile-header { display: block !important; }
-          .gl-grid-bg { display: none; }
           .gl-page-wrapper { background: #fff !important; }
 
           .gl-mobile-appbar {
@@ -928,13 +920,11 @@ export default function GalleryPageClient() {
           /* PC 라이트 재스킨 — docs/customer-design.md §10 "PC composition".
            * 다크 워크스페이스 토큰(var(--surface)/var(--background))을 그대로 물려받던 배경/카드를
            * 고객 라이트 토큰으로 override한다. 그리드 컬럼 계산(JS)과 카드 구조는 그대로 둔다. */
-          .gl-grid-bg { display: none; }
           .gl-page-wrapper { background: var(--customer-canvas) !important; }
         }
       `}</style>
 
       <div className={`gl-page-wrapper gl-density-${mobileColumns}${mobileHeaderCompact ? " gl-mobile-header-compact" : ""}${mobileSearchOpen ? " gl-mobile-search-expanded" : ""}${mobileFilterChipsVisible ? " gl-mobile-filter-active" : ""}`} style={{ background: "var(--background)", minHeight: "100vh", paddingTop: 140, paddingBottom: 100 }}>
-        <div className="gl-grid-bg" />
 
         {/* ── Header ── */}
         <header

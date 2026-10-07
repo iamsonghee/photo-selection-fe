@@ -73,8 +73,8 @@ export default function ResultViewer({ project, photos, comments }: Props) {
                 </PhotoThumbnailFrame>
                 <div className="px-0.5 pt-2">
                   <p className="truncate font-mono text-[11px] text-muted-foreground">{getPhotoDisplayName(photo)}</p>
-                  {comment ? <div className="mt-1.5 rounded-lg border border-border-subtle border-l-2 border-l-accent/60 bg-surface-raised px-2.5 py-2">
-                    <span className="flex items-center gap-1 text-[10px] font-bold text-accent"><MessageSquare size={12} aria-hidden />작가 전달 메모</span>
+                  {comment ? <div className="mt-1.5 rounded-lg border border-border-subtle bg-surface-raised px-2.5 py-2">
+                    <span className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground"><MessageSquare size={12} aria-hidden />작가 전달 메모</span>
                     <p className="mt-1 line-clamp-2 break-words text-[12px] leading-[18px] text-foreground" title={comment}>{comment}</p>
                   </div>
                   : null}

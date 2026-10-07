@@ -781,11 +781,6 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
       onTouchEnd={handleTouchEnd}
     >
       <style>{`
-        .fs-grid-bg {
-          position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.15;
-          background-image: linear-gradient(var(--border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
-          background-size: 40px 40px;
-        }
         .fs-hud {
           background: transparent;
           border: 0;
@@ -1173,15 +1168,8 @@ export function CustomerSelectionViewer({ adapter }: { adapter?: CustomerSelecti
           .fv-selection-flash { display: none !important; }
         }
 
-        /* PC(≥768px)도 모바일 Figma #56109와 같은 다크 사진 워크스페이스 톤을 쓴다.
-         * .fs-grid-bg(사이버펑크 격자 장식)만 모바일처럼 숨긴다 — 나머지 .fs-* 색상은 모바일 .fv-* 팔레트를 참고해 조정했다. */
-        @media (min-width: 768px) {
-          .fs-grid-bg { display: none; }
-        }
       `}</style>
 
-      {/* Grid background */}
-      <div className="fs-grid-bg" />
 
       {/* ════ DESKTOP (md+) ════ */}
       <div className="hidden md:flex flex-col" style={{ height: "100vh", ...myColorVars }}>

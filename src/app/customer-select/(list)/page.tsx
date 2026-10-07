@@ -118,7 +118,7 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
         ) : totalCount === 0 ? (
           <section className="mt-8 flex min-h-[480px] items-center justify-center rounded-2xl border border-border-subtle bg-surface px-6 py-14">
             <div className="flex max-w-[640px] flex-col items-center text-center">
-              <div className="grid size-16 place-items-center rounded-2xl bg-accent/10 text-accent"><FolderPlus size={29} strokeWidth={1.8} /></div>
+              <div className="grid size-16 place-items-center rounded-2xl bg-surface-raised text-muted-foreground"><FolderPlus size={29} strokeWidth={1.8} /></div>
               <h2 className="mt-6 text-[24px] font-bold tracking-[-0.04em] md:text-[28px]">첫 프로젝트를 만들어보세요</h2>
               <p className="mt-3 text-[15px] leading-6 text-muted-foreground">촬영본을 올리고 함께 고른 뒤, 파일명과 보정 요청을 작가에게 전달할 수 있어요.</p>
               <ol className="mt-8 grid w-full grid-cols-1 gap-2 text-left sm:grid-cols-3">
@@ -136,7 +136,7 @@ export default async function CustomerSelectHomePage({ searchParams }: { searchP
         ) : (
           <>
           {filtersEnabled ? <ProjectFilters query={query} status={statusFilter} /> : null}
-          {listItems.length > 0 ? <section className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-label="프로젝트 목록">
+          {listItems.length > 0 ? <section className="mt-8 grid grid-cols-1 items-start gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-label="프로젝트 목록">
             {listItems.map((item) => item.type === "guest"
               ? <GuestAlbumCard key={item.album.id} album={item.album} />
               : <ProjectCard key={item.project.id} project={item.project} coverUrl={coverByProject.get(item.project.id)} selectedCount={selectedByProject.get(item.project.id)} today={today} participants={participantsByProject.get(item.project.id) ?? []} />

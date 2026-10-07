@@ -1,19 +1,6 @@
 /* ── Workflow page custom styles ── */
 
 /* Background grid */
-.gridBg {
-  position: fixed;
-  inset: 0;
-  background-image:
-    linear-gradient(var(--border-subtle) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
-  background-size: 60px 60px;
-  background-position: center top;
-  opacity: 0.15;
-  pointer-events: none;
-  z-index: 0;
-}
-
 /* Scanline sweep */
 .scanline {
   width: 100%;
