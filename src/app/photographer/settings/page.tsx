@@ -544,18 +544,18 @@ export default function SettingsPage() {
                     </label>
                   </SettingsRow>
                   <SettingsRow
-                    label="원본 다운로드"
+                    label="원본 파일 전달"
                     description="새 프로젝트에서 고객에게 납품용 원본을 전달할지 정합니다."
                   >
                     <PhotographerLightSwitch
                       checked={defaultIncludeOriginal}
                       onCheckedChange={setDefaultIncludeOriginal}
-                      ariaLabel="새 프로젝트 원본 다운로드 허용"
+                      ariaLabel="새 프로젝트 원본 파일 전달"
                     />
                   </SettingsRow>
                   <div className="px-4 py-4 md:px-6 md:py-5">
                     <p className="text-[14px] font-semibold leading-5 text-foreground">고객 셀렉 시작 방식</p>
-                    <p className="mt-1 text-[12px] leading-[18px] text-muted-foreground md:text-[13px] md:leading-5">원본을 포함하는 새 프로젝트의 업로드 순서와 초대 가능 시점을 정합니다.</p>
+                    <p className="mt-1 text-[12px] leading-[18px] text-muted-foreground md:text-[13px] md:leading-5">원본 파일을 전달하는 새 프로젝트의 업로드 순서와 초대 가능 시점을 정합니다.</p>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="고객 셀렉 시작 방식">
                       {([
                         ["preview_first", "미리보기 준비 후 셀렉 시작", "셀렉용 사진을 먼저 준비하고 원본은 이어서 업로드해요."],

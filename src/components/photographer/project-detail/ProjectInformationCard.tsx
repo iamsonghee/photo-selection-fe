@@ -37,7 +37,7 @@ export function ProjectInformationCard({
   const photoCount = project.photoCount;
   const requiredCount = project.requiredCount;
   const shootType = SHOOT_TYPES.find((type) => type.value === project.shootType);
-  const mobileGallerySummary = `셀렉 ${requiredCount}장 · ${project.includeOriginal ? "원본 포함" : "원본 미포함"}`;
+  const mobileGallerySummary = `셀렉 ${requiredCount}장 · ${project.includeOriginal ? "원본 파일 전달" : "원본 파일 전달 안 함"}`;
   const mobileRevisionSummary = project.maxRevisionCount === 0 ? "재보정 없음" : `재보정 ${project.maxRevisionCount}회`;
   const selectionRequested = project.status !== "preparing";
   const reviewDeadlineLabel = project.status === "reviewing_v1" || project.status === "reviewing_v2"
@@ -187,7 +187,7 @@ export function ProjectInformationCard({
             { label: "셀렉 목표 장수", value: `${requiredCount}장` },
             { label: "업로드 사진", value: `${photoCount}장` },
             { label: "재보정 요청", value: project.maxRevisionCount === 0 ? "허용 안 함" : `${project.maxRevisionCount}회` },
-            { label: "납품 파일", value: project.includeOriginal ? "원본 포함" : "원본 미포함" },
+            { label: "원본 파일", value: project.includeOriginal ? "전달" : "전달 안 함" },
           ].map(item => <div key={item.label} className="flex justify-between gap-4"><dt className="text-muted-foreground">{item.label}</dt><dd className="font-medium">{item.value}</dd></div>)}
         </dl>
       </div>

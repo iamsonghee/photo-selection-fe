@@ -465,11 +465,11 @@ export default function NewProjectPage() {
               </div>
 
               <ProjectFormToggleRow
-                label="원본 다운로드 허용"
-                description="고객이 셀렉 갤러리에서 원본 사진을 내려받을 수 있도록 허용해요"
+                label="원본 파일 전달"
+                description="고객이 원본 파일을 내려받을 수 있게 합니다."
                 checked={includeOriginal}
                 onCheckedChange={setIncludeOriginal}
-                ariaLabel="원본 다운로드 허용"
+                ariaLabel="원본 파일 전달"
               />
 
               <ProjectPinControl value={accessPin} onChange={setAccessPin} />

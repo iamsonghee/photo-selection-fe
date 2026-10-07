@@ -706,8 +706,7 @@ function EmptyUploadPanel({ onBrowse, maxPhotos }: { onBrowse: () => void; maxPh
             </div>
             <div className="w-full text-center">
               <p className="m-0 text-[20px] font-semibold leading-8 tracking-[-0.8px] text-foreground md:text-[24px] md:leading-[48px] md:tracking-[-1.47px]">
-                <span className="hidden md:inline">고객이 선택할 사진을 준비하세요</span>
-                <span className="md:hidden">원본 사진을 선택하세요</span>
+                원본 사진을 선택하세요
               </p>
               <p className="mb-3 hidden text-[14px] leading-6 text-muted-foreground md:block">사진이나 폴더를 이곳에 끌어다 놓을 수 있어요.</p>
               <p className="m-0 text-[12px] font-normal leading-[21px] text-muted-foreground">
@@ -2618,7 +2617,7 @@ export default function ProjectDetailPage() {
         setUploadError(originalFinalize
           ? `사진 업로드는 완료됐지만 원본 ${incompleteCount}장이 완료되지 않았습니다. 아래에서 원본을 복구해 주세요.`
           : "사진 업로드는 완료됐지만 원본 상태를 확인하지 못했습니다. 아래 복구 상태를 확인해 주세요.");
-        setToast("원본 업로드 확인 필요");
+        setToast("원본 파일 저장을 확인해 주세요");
       } else {
         setToast(totalFail === 0 ? "업로드 완료!" : `${totalFail}개 파일 처리 실패`);
       }
@@ -2746,7 +2745,7 @@ export default function ProjectDetailPage() {
         setShowRecoveryBanner(remaining.length > 0);
         if (remaining.length === 0) {
           setUploadError(null);
-          setToast("원본 업로드 복구 완료!");
+          setToast("원본 파일을 모두 저장했습니다.");
           if (new URLSearchParams(window.location.search).get("recover") === "1") {
             window.setTimeout(() => router.replace(`/photographer/projects/${id}/assets/original`), 600);
           }
@@ -3004,7 +3003,7 @@ export default function ProjectDetailPage() {
       queuedPreviews.length > 0;
     if (uploadStillActive) {
       setToast(originalsMustFinish
-        ? "납품용 원본 업로드가 끝난 뒤 고객 링크를 활성화할 수 있습니다."
+        ? "원본 파일 저장이 끝난 뒤 고객 링크를 활성화할 수 있습니다."
         : "셀렉용 사진 저장이 끝난 뒤 고객 링크를 활성화할 수 있습니다.");
       return false;
     }
@@ -3467,7 +3466,7 @@ export default function ProjectDetailPage() {
               <span>
                 {headerSubtitle}
                 <span className="mx-2 text-disabled-foreground">·</span>
-                {project.includeOriginal ? "납품용 원본 포함" : "셀렉용 사진만 전달"}
+                {project.includeOriginal ? "원본 파일 전달" : "미리보기만 전달"}
               </span>
             }
           />
@@ -3967,7 +3966,7 @@ export default function ProjectDetailPage() {
                     <Upload size={17} aria-hidden />
                   </span>
                   <div className="min-w-0">
-                    <strong className="block text-sm font-bold leading-5 text-foreground">납품용 원본 업로드 중</strong>
+                    <strong className="block text-sm font-bold leading-5 text-foreground">원본 파일 저장 중</strong>
                     <span className="mt-0.5 block text-xs font-medium leading-5 text-muted-foreground">현재 보이는 사진은 셀렉용 미리보기입니다. 원본 업로드가 끝날 때까지 화면을 유지해 주세요.</span>
                   </div>
                 </div>
@@ -3980,17 +3979,17 @@ export default function ProjectDetailPage() {
                     <Upload size={16} aria-hidden />
                   </span>
                   <div className="min-w-0">
-                    <strong className="block text-[13px] font-bold leading-5 text-foreground md:text-sm">납품용 원본 업로드 중</strong>
+                    <strong className="block text-[13px] font-bold leading-5 text-foreground md:text-sm">원본 파일 저장 중</strong>
                     <span className="block text-[11px] font-medium leading-4 text-muted-foreground md:text-xs md:leading-5">현재 보이는 사진은 셀렉용 미리보기입니다. 고객에게 전달할 원본 업로드가 끝날 때까지 화면을 닫거나 잠그지 마세요.</span>
                     <div data-original-upload-progress className="mt-2 hidden md:block">
                       <div className="mb-1 flex items-center justify-between text-[11px] font-semibold leading-4 text-muted-foreground">
-                        <span>원본 저장</span>
+                        <span>원본 파일 저장</span>
                         <span>{originalSavedCount.toLocaleString()} / {originalUploadTotal.toLocaleString()}장</span>
                       </div>
                       <div
                         className="h-1.5 overflow-hidden rounded-full bg-warning/15"
                         role="progressbar"
-                        aria-label="납품용 원본 저장 진행률"
+                        aria-label="원본 파일 저장 진행률"
                         aria-valuemin={0}
                         aria-valuemax={originalUploadTotal}
                         aria-valuenow={originalSavedCount}
@@ -4284,7 +4283,7 @@ export default function ProjectDetailPage() {
               {isInviteActive
                 ? "고객에게 초대 링크를 공유할 수 있어요."
                 : M < N
-                  ? `셀렉 요청까지 원본 ${(N - M).toLocaleString()}장이 더 필요해요.`
+                  ? `고객 셀렉 시작까지 원본 ${(N - M).toLocaleString()}장이 더 필요해요.`
                   : recommendationHint}
             </p>
           </div>
@@ -4729,9 +4728,9 @@ export default function ProjectDetailPage() {
             <div className="flex flex-col gap-4">
               {/* 프로젝트에서 정한 납품 설정은 변경 컨트롤이 아니라 확인용 정보 행으로 표시한다. */}
               <div className="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-border-subtle bg-surface px-4 py-3">
-                <span className="text-[12px] font-medium text-muted-foreground">업로드 설정</span>
+                <span className="text-[12px] font-medium text-muted-foreground">원본 파일</span>
                 <span className="text-[13px] font-semibold text-foreground">
-                  {inclOrig ? "납품용 원본 포함" : "썸네일만 업로드"}
+                  {inclOrig ? "함께 저장" : "미리보기만 저장"}
                 </span>
               </div>
 
@@ -4767,7 +4766,7 @@ export default function ProjectDetailPage() {
                 <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5">
                   <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning" />
                   <p className="text-[12px] leading-[18px] text-muted-foreground">
-                    HEIC 파일 {heicCount}개는 원본을 포함할 수 없어 썸네일만 업로드됩니다.
+                    HEIC 파일 {heicCount}개는 원본 파일로 저장할 수 없어 미리보기만 저장됩니다.
                   </p>
                 </div>
               ) : null}

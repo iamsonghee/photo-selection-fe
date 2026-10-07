@@ -306,7 +306,7 @@ function GridPhoto({ photo, index, props }: { photo: Photo; index: number; props
         {(originalMissing || (props.showQualityBadges && (photo.isBlurry === true || (photo.faceDetected === true && photo.eyesClosed === true)))) ? (
           <span className={styles.statusBadges}>
             {originalMissing ? (
-              <span className={styles.originalMissingBadge} title="납품용 원본 파일이 업로드되지 않았습니다.">
+              <span className={styles.originalMissingBadge} title="원본 파일이 저장되지 않았습니다.">
                 <AlertTriangle size={11} aria-hidden />원본 누락
               </span>
             ) : null}

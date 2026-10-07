@@ -166,7 +166,7 @@ for (const viewport of scenarios) {
         allowConfirm();
         await retryButton.evaluate(button => { (button as HTMLButtonElement).click(); (button as HTMLButtonElement).click(); });
         await advance(1, true);
-        await expect(page.getByText("원본 업로드 복구 완료!", { exact: true })).toBeVisible({ timeout: 15000 });
+        await expect(page.getByText("원본 파일을 모두 저장했습니다.", { exact: true })).toBeVisible({ timeout: 15000 });
         expect(await page.evaluate(() => (window as unknown as { putCount: number }).putCount)).toBe(6);
         return;
       }
@@ -193,7 +193,7 @@ for (const viewport of scenarios) {
       const originalProgress = page.locator("[data-original-upload-progress]");
       if (viewport.width >= 768) {
         await expect(originalProgress).toBeVisible();
-        await expect(originalProgress).toContainText("원본 저장");
+        await expect(originalProgress).toContainText("원본 파일 저장");
         await expect(originalProgress).toContainText("0 / 1장");
       } else {
         await expect(originalProgress).toBeHidden();

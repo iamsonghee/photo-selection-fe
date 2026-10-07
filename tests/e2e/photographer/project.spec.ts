@@ -257,7 +257,7 @@ test.describe("작가 — 프로젝트 관리", () => {
     await expect(page.getByText("프로젝트를 구분하고 고객에게 안내할 정보를 입력해 주세요.")).toBeHidden();
     await expect(page.getByText("고객이 사진을 선택하고 요청을 남길 수 있는 범위와 접속 방식을 설정해 주세요.")).toBeHidden();
     await expect(page.getByText("필수", { exact: true }).first()).toBeVisible();
-    const originalDownloadInfo = page.getByRole("button", { name: "원본 다운로드 허용 안내" });
+    const originalDownloadInfo = page.getByRole("button", { name: "원본 파일 전달 안내" });
     await expect(originalDownloadInfo).toBeVisible();
     await originalDownloadInfo.click();
     await expect(page.getByRole("tooltip")).toHaveText("고객이 셀렉 갤러리에서 원본 사진을 내려받을 수 있도록 허용해요");
