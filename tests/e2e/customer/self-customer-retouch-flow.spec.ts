@@ -42,17 +42,17 @@ for (const viewport of [
     await input.setInputFiles([{ name: "A001-final.jpg", mimeType: "image/jpeg", buffer: Buffer.from("x") }, { name: "mystery.jpg", mimeType: "image/jpeg", buffer: Buffer.from("x") }]);
     await expect(page.getByText("자동 연결됨 (1장)")).toBeVisible();
     await expect(page.getByText(/연결 안 된 파일.*1장/)).toBeVisible();
-    await page.getByRole("button", { name: "매칭 확인하고 검토 시작" }).click();
+    await page.getByRole("button", { name: "사진 연결 확인하고 검토하기" }).click();
     await expect(page).toHaveURL(new RegExp(`/retouch/upload$`));
     await expect(page.getByText(/0장은 업로드했고 1장은 실패했어요/)).toBeVisible();
     expect(uploadCount).toBe(1);
 
     await page.goto(`/customer-select/${projectId}/retouch/upload`);
     await input.setInputFiles({ name: "unknown.jpg", mimeType: "image/jpeg", buffer: Buffer.from("x") });
-    await page.getByRole("button", { name: "매칭 확인하고 검토 시작" }).click();
-    await expect(page.getByText("업로드할 사진과 원본 연결을 먼저 확인해주세요.")).toBeVisible();
+    await page.getByRole("button", { name: "사진 연결 확인하고 검토하기" }).click();
+    await expect(page.getByText("업로드할 사진과 원본 연결을 먼저 확인해 주세요.")).toBeVisible();
     await page.locator("select").selectOption("p2");
-    await page.getByRole("button", { name: "매칭 확인하고 검토 시작" }).click();
+    await page.getByRole("button", { name: "사진 연결 확인하고 검토하기" }).click();
     await expect(page).toHaveURL(new RegExp(`/retouch/compare$`));
   });
 
@@ -86,7 +86,7 @@ for (const viewport of [
     await page.getByRole("button", { name: "확정", exact: true }).first().click();
     await page.getByRole("button", { name: "재보정 요청", exact: true }).nth(1).click();
     await page.getByPlaceholder("예: 피부톤이 너무 밝아요").fill("피부톤을 낮춰주세요");
-    await page.getByRole("button", { name: "재보정 요청 확정" }).click();
+    await page.getByRole("button", { name: "요청 내용 저장" }).click();
     await expect(page.getByText("2 / 2")).toBeVisible();
     await expect(page.getByText("1장은 아직 보정본을 못 받았어요")).toBeVisible();
     await expect(page.getByRole("button", { name: /검토 마치기/ })).toBeDisabled();
@@ -106,7 +106,7 @@ for (const viewport of [
     const [txt] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "TXT 다운로드" }).click()]);
     expect(csv.suggestedFilename()).toBe("재보정_요청.csv");
     expect(txt.suggestedFilename()).toBe("재보정_요청.txt");
-    await page.getByRole("button", { name: "다음 보정본 기다리기" }).click();
+    await page.getByRole("button", { name: "보정본 업로드 화면으로" }).click();
     await expect(page).toHaveURL(new RegExp(`/retouch/upload$`));
 
     await page.goto(`/customer-select/${projectId}/done`);
