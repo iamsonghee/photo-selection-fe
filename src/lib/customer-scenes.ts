@@ -23,7 +23,7 @@ const MIN_ISOLATED_PHOTOS = 3;
 
 const time = (value: string) => Date.parse(`${value}Z`);
 /** 장면 경계에 쓸 수 있는 촬영 시각. 파일 수정 시각("file")은 실제 촬영 시각이 아니라 뺀다(출처 기록 전 사진은 그대로 쓴다). */
-const sceneTime = (photo: ScenePhoto) => (photo.takenAtSource === "file" ? null : photo.takenAt ?? null);
+export const sceneTime = (photo: ScenePhoto) => (photo.takenAtSource === "file" ? null : photo.takenAt ?? null);
 
 const gapBetween = (before: ScenePhoto[], after: ScenePhoto[]) => time(sceneTime(after[0])!) - time(sceneTime(before[before.length - 1])!);
 

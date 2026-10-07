@@ -58,7 +58,7 @@ import { rememberGroupSimilar, setAsideKey, startAiTidy } from "../select/AiTidy
 import { UploadDoneSheet } from "./UploadDoneSheet";
 import { useCustomerSelectStore } from "../../_lib/real-store";
 import { SelectionConfirmDialog } from "@/components/customer/SelectionConfirmDialog";
-import { MIN_PHOTOS_FOR_SCENES } from "@/lib/customer-scenes";
+import { MIN_PHOTOS_FOR_SCENES, sceneTime } from "@/lib/customer-scenes";
 
 const BATCH_SIZE = 20;
 // ponytail: 작가 화면의 PC/모바일 적응형 동시성 대신 보수적인 고정값 하나만 쓴다.
@@ -581,8 +581,8 @@ export default function CustomerUploadPage() {
   ) : null;
 
   // 장면은 촬영 시각으로 나눈다(src/lib/customer-scenes.ts: MIN_PHOTOS_FOR_SCENES장 이상·시각 있는 사진 80% 이상일 때만).
-  // 카톡으로 받은 사진·캡처본은 시각이 빠져 있다. 고르는 데는 문제없으니 다시 올리라고 하지 않고, 어떻게 보이는지만 알린다.
-  const untimedCount = project.photos.filter((photo) => !photo.takenAt).length;
+  // 카톡으로 받은 사진·캡처본·보정본은 시각이 빠져 있다(파일 시각만 있으면 장면에 못 쓴다 — sceneTime). 고르는 데는 문제없으니 다시 올리라고 하지 않고, 어떻게 보이는지만 알린다.
+  const untimedCount = project.photos.filter((photo) => !sceneTime(photo)).length;
   const scenesBlocked = project.photos.length >= MIN_PHOTOS_FOR_SCENES && untimedCount > project.photos.length * 0.2;
   const showUploadDone = justUploaded > 0 && !uploading && retryFiles.length === 0 && selectedPhotoIds.size === 0;
   const uploadDone = showUploadDone ? (
