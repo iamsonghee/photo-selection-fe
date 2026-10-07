@@ -226,7 +226,7 @@ export default function CustomerUploadPage() {
         }
         return;
       }
-      const limitError = usage.limit === null ? null : uploadLimitError(usage.photoCount, selectedFiles.length);
+      const limitError = usage.limit === null ? null : uploadLimitError(usage.photoCount, selectedFiles.length, usage.limit);
       if (limitError) {
         setError(limitError);
         setNeedsReselection(true);
