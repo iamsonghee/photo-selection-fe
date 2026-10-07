@@ -116,14 +116,17 @@ export default function DashboardPage() {
   }, [profile, profileLoading, reload]);
 
   useEffect(() => {
-    if (tier !== "beta" || !profile?.id || typeof window === "undefined") return;
+    if (tier !== "beta" || !profile?.id || loading || typeof window === "undefined") return;
     const key = `acut:beta-welcome:${profile.id}`;
     if (window.localStorage.getItem(key)) return;
     window.localStorage.setItem(key, "shown");
+    // '첫 프로젝트를 시작해 보세요' 환영은 아직 프로젝트가 없는 작가에게만 — 브라우저 저장소 기록이라 기존 작가도
+    // 새 기기에서 다시 떠서, 납품 후 설문과 한 화면에 겹쳤다.
+    if (projects.length > 0) return;
     // 브라우저 저장소의 최초 방문 여부를 모달 상태와 동기화한다.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowBetaWelcome(true);
-  }, [tier, profile?.id]);
+  }, [tier, profile?.id, loading, projects.length]);
 
   if (profileLoading || (profile?.id && loading)) {
     // 첫 조회 중 — 사이드바는 그대로 두고 본문만 골격으로.
